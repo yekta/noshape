@@ -29,6 +29,10 @@ pub enum Glue {
     Off,
     Shift,
     Full,
+    /// GlueShift where it is right: kept only when the fused volume is the
+    /// sum of the inputs' (they merely touch), else the boolean runs again
+    /// without glue. For patterns, whose instances usually stand on a face.
+    ShiftChecked,
 }
 
 /// Options for [`boolean`] and [`split`].
@@ -44,11 +48,14 @@ pub struct BooleanOptions {
     pub unify: bool,
     /// Run the boolean in parallel.
     pub parallel: bool,
+    /// Oriented bounding boxes for the interference pre-tests.
+    #[serde(default)]
+    pub obb: bool,
 }
 
 impl Default for BooleanOptions {
     fn default() -> Self {
-        BooleanOptions { fuzzy: 0.0, glue: Glue::Off, unify: false, parallel: true }
+        BooleanOptions { fuzzy: 0.0, glue: Glue::Off, unify: false, parallel: true, obb: false }
     }
 }
 
@@ -60,9 +67,11 @@ impl BooleanOptions {
                 Glue::Off => 0,
                 Glue::Shift => 1,
                 Glue::Full => 2,
+                Glue::ShiftChecked => 3,
             },
             unify: self.unify,
             parallel: self.parallel,
+            obb: self.obb,
         }
     }
 }
@@ -81,6 +90,25 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
     let a = vec_to_list(objects);
     let t = vec_to_list(tools);
     Ok(OpResult::from_ffi(ck(ffi::op_boolean(code, &a, &t, &opts.ffi()))?))
+}
+
+/// Run `f` with `flag` as this thread's boolean cancel flag: once it is set,
+/// a running [`boolean`] stops inside OCCT and fails with "cancelled" (a
+/// stale regeneration releases its thread quickly).
+pub fn with_cancel<R>(flag: &std::sync::atomic::AtomicBool, f: impl FnOnce() -> R) -> R {
+    thread_local!(static CURRENT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
+    // Restores the previous flag, also when `f` panics.
+    struct Restore(usize);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CURRENT.with(|c| c.set(self.0));
+            ffi::set_thread_cancel(self.0);
+        }
+    }
+    let addr = flag.as_ptr() as usize;
+    let _restore = Restore(CURRENT.with(|c| c.replace(addr)));
+    ffi::set_thread_cancel(addr);
+    f()
 }
 
 /// `a ∪ b`.

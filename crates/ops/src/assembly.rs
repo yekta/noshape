@@ -53,21 +53,44 @@ pub fn insert_part(a: &mut Assembly, studio: TabId, studio_name: &str, part: Opt
     id
 }
 
+/// Whether freshly inserted `ids` are all the assembly has (they went into an
+/// empty assembly). Onshape places that first insert with the Part Studio
+/// origin on the assembly origin, and it does not follow the cursor; later
+/// inserts start there too (the same part again at a slight offset,
+/// [`insert_part`]) and follow the cursor once it enters the graphics area,
+/// landing where it is clicked (help: Insert parts and assemblies; live
+/// behaviours "Insert dialog").
+pub fn inserted_into_empty(a: &Assembly, ids: &[InstanceId]) -> bool {
+    !ids.is_empty() && a.instances.iter().all(|i| ids.contains(&i.id))
+}
+
 /// "Insert : Fastened 1" / "Edit : Fastened 1".
 pub fn mate_description(m: &Mate, editing: bool) -> String {
     if editing { format!("Edit : {}", m.name) } else { format!("Insert : {}", m.name) }
 }
 
-/// Accept the mate dialog: a new mate is appended; an edited one replaces
-/// the old, with configured parameters going to the current configuration.
+/// Accept the mate dialog: a new mate is appended, hidden like Onshape's
+/// (live: a new mate's row is light grey, tooltip "… (Hidden)"; j shows
+/// mates); an edited one replaces the old, with configured parameters going
+/// to the current configuration.
 pub fn commit_mate(a: &mut Assembly, mut m: Mate, editing: Option<MateId>, values: &ConfigValues) {
     match editing.and_then(|id| a.mates.iter().position(|x| x.id == id)) {
         Some(i) => {
             a.store_mate_edit(&mut m, values);
             a.mates[i] = m;
         }
-        None => a.mates.push(m),
+        None => {
+            m.hidden = true;
+            a.mates.push(m);
+        }
     }
+}
+
+/// The instance a mate preview moves (live: drawn amber while the dialog is
+/// open): the first connector's, unless it is fixed (then the second's).
+pub fn mate_preview_moving(a: &Assembly, m: &Mate) -> InstanceId {
+    let fixed = |id: InstanceId| id == InstanceId::ORIGIN || a.instance(id).is_some_and(|i| i.fixed);
+    if fixed(m.a.instance) { m.b.instance } else { m.a.instance }
 }
 
 /// Solve options while the mate dialog previews `m` (before Solve): only
@@ -164,4 +187,69 @@ pub fn delete_mate(a: &mut Assembly, id: MateId) {
 pub fn default_flip_primary(result: &AssemblyResult, a: &noshape_model::assembly::MateConnectorRef, b: &noshape_model::assembly::MateConnectorRef, units: &noshape_units::UnitPrefs) -> Option<bool> {
     let (fa, fb) = (result.connector_world(a, units)?, result.connector_world(b, units)?);
     Some(fa.z().dot(fb.z()) > 0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::DVec3;
+
+    fn part(index: u32, width: f64) -> CatalogPart {
+        let body = BodyId { feature: noshape_model::reference::FeatureId(1), index };
+        (body, format!("Part {}", index + 1), Some((DVec3::ZERO, DVec3::new(width, 0.01, 0.01))))
+    }
+
+    #[test]
+    fn mate_preview_moves_the_first_picked_unless_fixed() {
+        use noshape_model::assembly::{MateConnectorRef, MateType};
+        use noshape_model::reference::Reference;
+        let mut a = Assembly::default();
+        let p0 = insert_part(&mut a, TabId(7), "Part Studio 1", Some(part(0, 0.04)), ConfigValues::default());
+        let p1 = insert_part(&mut a, TabId(7), "Part Studio 1", Some(part(1, 0.02)), ConfigValues::default());
+        let c = |i: InstanceId| MateConnectorRef::on(i, vec![], Reference::Origin);
+        let m = Mate::new(MateId(9), "Revolute 1".into(), MateType::Revolute, c(p1), c(p0));
+        assert_eq!(mate_preview_moving(&a, &m), p1, "the first picked moves");
+        a.instance_mut(p1).unwrap().fixed = true;
+        assert_eq!(mate_preview_moving(&a, &m), p0, "a fixed first pick stays; the other moves");
+    }
+
+    #[test]
+    fn new_mates_are_hidden_edited_ones_keep_their_visibility() {
+        use noshape_model::assembly::{MateConnectorRef, MateType};
+        use noshape_model::reference::Reference;
+        let mut a = Assembly::default();
+        let c = |i: u64| MateConnectorRef::on(InstanceId(i), vec![], Reference::Origin);
+        let m = Mate::new(MateId(5), "Fastened 1".into(), MateType::Fastened, c(1), c(2));
+        commit_mate(&mut a, m, None, &ConfigValues::default());
+        assert!(a.mates[0].hidden, "live: a new mate is hidden");
+        let mut shown = a.mates[0].clone();
+        shown.hidden = false;
+        commit_mate(&mut a, shown, Some(MateId(5)), &ConfigValues::default());
+        assert!(!a.mates[0].hidden, "editing keeps the mate's own visibility");
+    }
+
+    #[test]
+    fn first_insert_lands_at_the_origin_later_ones_follow_the_cursor() {
+        let mut a = Assembly::default();
+        let studio = TabId(7);
+        // The first instance into an empty assembly: origins aligned, placed
+        // there without following the cursor.
+        let first = insert_part(&mut a, studio, "Part Studio 1", Some(part(0, 0.04)), ConfigValues::default());
+        assert!(inserted_into_empty(&a, &[first]));
+        assert_eq!(a.instance(first).unwrap().placement, Placement::default());
+        // The same part again starts at a slight offset (it then follows the
+        // cursor in the graphics area).
+        let second = insert_part(&mut a, studio, "Part Studio 1", Some(part(0, 0.04)), ConfigValues::default());
+        assert!(!inserted_into_empty(&a, &[second]));
+        assert_eq!(a.instance(second).unwrap().placement.translation, [0.05, 0.0, 0.0]);
+        // Another part starts with its origin on the assembly origin.
+        let other = insert_part(&mut a, studio, "Part Studio 1", Some(part(1, 0.02)), ConfigValues::default());
+        assert!(!inserted_into_empty(&a, &[other]));
+        assert_eq!(a.instance(other).unwrap().placement, Placement::default());
+        // A whole Part Studio's parts into an empty assembly: all at the origin.
+        let mut b = Assembly::default();
+        let ids = vec![insert_part(&mut b, studio, "Part Studio 1", Some(part(0, 0.04)), ConfigValues::default()), insert_part(&mut b, studio, "Part Studio 1", Some(part(1, 0.02)), ConfigValues::default())];
+        assert!(inserted_into_empty(&b, &ids));
+        assert!(ids.iter().all(|id| b.instance(*id).unwrap().placement == Placement::default()));
+    }
 }

@@ -37,7 +37,7 @@ pub mod transform;
 
 pub use boolean::{
     BooleanOp, BooleanOptions, Glue, boolean, common, cut, fuse, fuse_all, imprint, project_curves, section,
-    section_caps, section_plane, section_wires, split, split_by_plane, unify_same_domain,
+    section_caps, section_plane, section_wires, split, split_by_plane, unify_same_domain, with_cancel,
 };
 pub use construct::*;
 pub use error::{KernelError, Result};

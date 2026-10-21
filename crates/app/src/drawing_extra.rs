@@ -335,7 +335,7 @@ impl DrawingEditor {
         crate::ui::tree_row(SharedString::from(format!("dr-table-{id}")), self.selection.contains(&Sel::Table(id)))
             .pl(px(indent))
             .text_color(rgb(0x666666))
-            .child(crate::ui::tree_icon(icon, false, cx))
+            .child(sheets_icon(icon, cx))
             .child(div().flex_1().truncate().child(label))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.selection = vec![Sel::Table(id)];
@@ -383,24 +383,22 @@ impl DrawingEditor {
         let (label, icon) = match &v.kind {
             // Onshape lists views by name: "Front", and projected views by the
             // orientation they show ("Right").
-            ViewKind::Base { .. } => (named(crate::drawing_props::default_view_name(&self.drawing, sheet, v)), "base-view"),
-            ViewKind::Projected { .. } => (named(crate::drawing_props::default_view_name(&self.drawing, sheet, v)), "projected-view"),
-            ViewKind::Auxiliary { .. } => ("Auxiliary view".to_string(), "auxiliary-view"),
-            ViewKind::Section { label, .. } => (format!("Section {label}"), "section-view"),
-            ViewKind::Detail { label, .. } => (format!("Detail {label}"), "detail-view"),
-            _ => ("Section view".to_string(), "section-view"),
+            // Onshape's tree shows base views with its "standard views" icon,
+            // not the Insert view tool icon; a linked view gets the grey
+            // "-Linked" variant with a dark ↗ (live drawing/760, 1040).
+            ViewKind::Base { .. } => (named(crate::drawing_props::default_view_name(&self.drawing, sheet, v)), "drawing-standard-views"),
+            ViewKind::Projected { .. } => (named(crate::drawing_props::default_view_name(&self.drawing, sheet, v)), if linked { "projected-view-linked" } else { "projected-view" }),
+            ViewKind::Auxiliary { .. } => ("Auxiliary view".to_string(), if linked { "auxiliary-view-linked" } else { "auxiliary-view" }),
+            ViewKind::Section { label, .. } => (format!("Section {label}"), if linked { "section-view-linked" } else { "section-view" }),
+            ViewKind::Detail { label, .. } => (format!("Detail {label}"), if linked { "detail-view-linked" } else { "detail-view" }),
+            _ => ("Section view".to_string(), if linked { "section-view-linked" } else { "section-view" }),
         };
         let label = v.label.clone().filter(|l| !l.is_empty()).unwrap_or(label);
         let id = v.id;
         crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), false)
             .pl(px(indent + 20. * depth as f32))
             .text_color(rgb(0x666666))
-            .child(
-                div()
-                    .relative()
-                    .child(crate::ui::tree_icon(icon, false, cx))
-                    .when(linked, |d| d.opacity(0.6).child(div().absolute().top(px(-4.)).right(px(-3.)).text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0x000000)).child("↗"))),
-            )
+            .child(sheets_icon(icon, cx))
             .child(div().flex_1().truncate().child(label))
             // Onshape's view row menu (live dom/context-menus-drawing-sheets.txt):
             // Properties... | Replace... (the view's reference) | Delete.
@@ -453,6 +451,7 @@ impl DrawingEditor {
             || self.break_dlg.is_some()
             || self.aux_dlg.is_some()
             || self.detail_dlg.is_some()
+            || self.crop_dlg.is_some()
             || self.gdt_dlg.is_some()
             || self.callout_dlg.is_some()
             || self.stack_dlg.is_some()
@@ -647,7 +646,7 @@ impl DrawingEditor {
                 .pl(px(indent))
                 .text_color(rgb(0x666666))
                 .child(crate::ui::caret(true))
-                .child(crate::ui::tree_icon("part", false, cx))
+                .child(sheets_icon("part", cx))
                 .child(div().min_w_0().truncate().child(name))
                 // Pinned: a pin and the version name; else Onshape's "In progress" badge.
                 .child(match version {
@@ -695,7 +694,7 @@ impl DrawingEditor {
                             crate::ui::tree_row(SharedString::from(format!("dr-ref-{k}-sheet-{sheet_i}")), false)
                                 .pl(px(24.))
                                 .text_color(rgb(0x666666))
-                                .child(crate::ui::tree_icon("sheet-page", false, cx))
+                                .child(div().w(px(20.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon("sheet-page", 18., cx)))
                                 .child(div().flex_1().truncate().child(s.name.clone())),
                         );
                     }
@@ -851,122 +850,8 @@ impl DrawingEditor {
         refused
     }
 
-    /// The letter of a new datum target set: after the last set's letter
-    /// (datum letters, skipping I, O, Q, S, X, Z).
-    pub fn next_target_set(&self) -> char {
-        const LETTERS: &str = "ABCDEFGHJKLMNPRTUVWY";
-        let last = self.current_sheet().annotations.iter().filter_map(|a| if let AnnotationKind::DatumTarget { label, .. } = &a.kind { label.chars().next() } else { None }).filter_map(|c| LETTERS.find(c)).max();
-        match last {
-            Some(i) => LETTERS.chars().nth(i + 1).unwrap_or('A'),
-            None => 'A',
-        }
-    }
-
     pub fn next_datum_label(&self) -> String {
-        let used: Vec<String> = self.current_sheet().annotations.iter().filter_map(|a| if let AnnotationKind::Datum { label, .. } = &a.kind { Some(label.clone()) } else { None }).collect();
-        "ABCDEFGHJKLMNPRTUVWY".chars().map(|c| c.to_string()).find(|l| !used.contains(l)).unwrap_or_else(|| "A".into())
-    }
-
-    /// Sheet direction perpendicular to the ordinate's measured axis.
-    fn ordinate_normal(&self, view: ViewId, horizontal: bool) -> [f64; 2] {
-        let rot = self.placement(view).map(|p| p.rotation).unwrap_or(0.0);
-        views::rotate2(if horizontal { [0.0, 1.0] } else { [1.0, 0.0] }, rot)
-    }
-
-    pub fn extra_pending_annotation(&self, id: u64) -> Option<Annotation> {
-        if let Some(a) = self.more_pending_annotation(id) {
-            return Some(a);
-        }
-        let c = self.cursor;
-        let refs = |v: Vec<(u8, Option<PointRef>)>| v.into_iter().filter_map(|(slot, r)| r.map(|point| AnnotationRef { slot, point })).collect::<Vec<_>>();
-        match &self.tool {
-            Tool::Dimension { kind: DimTool::Chamfer, picks } => {
-                let [Pick::Line { a: a1, b: b1 }, Pick::Line { a: a2, b: b2 }] = picks.as_slice() else { return None };
-                if a1.view != a2.view {
-                    return None;
-                }
-                Some(Annotation {
-                    id,
-                    kind: AnnotationKind::ChamferDimension { view: a1.view, a: a1.p, b: b1.p, c: a2.p, d: b2.p },
-                    position: c,
-                    refs: refs(vec![(0, a1.r.clone()), (1, b1.r.clone()), (2, a2.r.clone()), (3, b2.r.clone())]),
-                    ..Default::default()
-                })
-            }
-            Tool::Dimension { kind: DimTool::ArcLength, picks } => {
-                let [Pick::Arc { view, center, radius, a, b, mid, r }] = picks.as_slice() else { return None };
-                let pl = self.placement(*view)?;
-                let offset = (len(sub(c, pl.to_sheet(*center))) - pl.len_to_sheet(*radius)).max(2.0);
-                Some(Annotation {
-                    id,
-                    kind: AnnotationKind::ArcLengthDimension { view: *view, center: *center, radius: *radius, a: a.p, b: b.p, mid: *mid, offset },
-                    position: c,
-                    refs: refs(vec![(0, r.clone()), (1, a.r.clone()), (2, b.r.clone())]),
-                    ..Default::default()
-                })
-            }
-            Tool::Ordinate { origin: Some(o), horizontal: None, .. } => {
-                let os = self.pick_sheet(o)?;
-                let rot = self.placement(o.view).map(|p| p.rotation).unwrap_or(0.0);
-                let d = views::rotate2(sub(c, os), -rot);
-                if len(d) < 3.0 {
-                    return None;
-                }
-                let horizontal = d[1].abs() >= d[0].abs();
-                let n = self.ordinate_normal(o.view, horizontal);
-                let pos = add(os, mul(n, dot(sub(c, os), n)));
-                // A new ordinate group holding the datum's own "0".
-                Some(Annotation { id, kind: AnnotationKind::OrdinateGroup { view: o.view, origin: o.p, points: vec![o.p], horizontal }, position: pos, refs: refs(vec![(0, o.r.clone()), (1, o.r.clone())]), ..Default::default() })
-            }
-            Tool::Ordinate { origin: Some(o), horizontal: Some(_), group: Some(gid), .. } => {
-                // The group with the point under the cursor added.
-                let p = self.snap_at(c).filter(|p| p.view == o.view)?;
-                let mut a = self.current_sheet().annotations.iter().find(|a| a.id == *gid)?.clone();
-                let AnnotationKind::OrdinateGroup { points, .. } = &mut a.kind else { return None };
-                if points.iter().any(|q| len(sub(*q, p.p)) < 1e-9) {
-                    return None;
-                }
-                points.push(p.p);
-                let slot = points.len() as u8;
-                if let Some(r) = p.r.clone() {
-                    a.refs.push(AnnotationRef { slot, point: r });
-                }
-                Some(a)
-            }
-            Tool::Datum { anchor: Some(a) } => {
-                if len(sub(c, *a)) < 3.0 {
-                    return None;
-                }
-                Some(Annotation { id, kind: AnnotationKind::Datum { anchor: *a, label: self.datum_dialog_label(), on: self.datum_on }, position: c, ..Default::default() })
-            }
-            _ => None,
-        }
-    }
-
-    /// Placement of a section view perpendicular to the first leg.
-    fn section_position(&self, parent: &DrawingView, a: [f64; 2], b: [f64; 2]) -> Option<[f64; 2]> {
-        let pl = self.placement(parent.id)?;
-        let e = norm(sub(pl.to_sheet(b), pl.to_sheet(a)));
-        let n = [-e[1], e[0]];
-        let t = dot(sub(self.cursor, parent.position), n);
-        Some(add(parent.position, mul(n, t)))
-    }
-
-    pub fn extra_pending_view(&self, id: ViewId) -> Option<DrawingView> {
-        let sheet = self.drawing.sheets.get(self.sheet)?;
-        match &self.tool {
-            Tool::JoggedSection { parent: Some(pid), points, done: true } if points.len() >= 2 => {
-                let parent = sheet.view(*pid)?;
-                let pos = self.section_position(parent, points[0], points[1])?;
-                Some(DrawingView { id, kind: ViewKind::Section { parent: *pid, line: points.clone(), label: sheet.next_label(), cuts: vec![] }, position: pos, show_tangent_edges: parent.show_tangent_edges, ..Default::default() })
-            }
-            Tool::AlignedSection { parent: Some(pid), center: Some(c), a: Some(a), b: Some(b) } => {
-                let parent = sheet.view(*pid)?;
-                let pos = self.section_position(parent, *a, *c)?;
-                Some(DrawingView { id, kind: ViewKind::AlignedSection { parent: *pid, center: *c, a: *a, b: *b, label: sheet.next_label() }, position: pos, show_tangent_edges: parent.show_tangent_edges, ..Default::default() })
-            }
-            _ => None,
-        }
+        self.pk().next_datum_label()
     }
 
     pub fn extra_overlay(&self, overlay: &mut Overlay) {
@@ -1118,10 +1003,11 @@ impl DrawingEditor {
                     let corners = [f, [c[0], f[1]], c, [f[0], c[1]]];
                     (len(sub(c, f)) > 1.0).then(|| Crop::Polygon(corners.iter().map(|k| pl.to_view(*k)).collect()))
                 };
-                if let Some(crop) = crop {
-                    self.edit_view("Crop view", v, cx, |dv| dv.crop = Some(crop));
+                // The Crop view dialog's ✓ applies it.
+                match crop {
+                    Some(crop) => self.crop_done(v, crop, cx),
+                    None => self.tool = Tool::Crop { parent: None, first: None, circle },
                 }
-                self.tool = Tool::Select;
             }
             Tool::Break { parent, first: None, vertical } => {
                 let v = parent.or_else(|| self.view_at(c));
@@ -1251,12 +1137,81 @@ impl DrawingEditor {
             [mid[0] + d[0] * co - d[1] * s, mid[1] + d[0] * s + d[1] * co]
         };
         // Side squares at the text ends; free notes also rotate from a grip
-        // above the text (live drawing/234).
+        // about 20 px above the text (live drawing/234).
         let mut out = vec![(0, rot([b[0], mid[1]])), (1, rot([b[2], mid[1]]))];
         if style.leaders.is_empty() {
-            out.push((2, rot([mid[0], b[3] + 4.0])));
+            out.push((2, rot([mid[0], b[3] + 20.0 / self.zoom.max(1e-6)])));
         }
         Some((*id, out))
+    }
+
+    /// The selected note's grips as live drawing/229b and 234 draw them: 10 px
+    /// squares (#cc925c, #e6c9ae edge) at the text ends; free notes add a
+    /// round grip at the bottom centre and the rotate grip (a circle with two
+    /// arrowheads on a short stem) above the text.
+    pub fn note_grip_overlay(&self, o: &mut crate::drawing_scene::Overlay) {
+        // Rotating: the note inside a dotted outline (live 235 / 236).
+        if let Drag::NoteGrip { id, grip: 2, .. } = &self.drag
+            && let Some(a) = self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|a| a.id == *id))
+            && let Some((b, angle)) = note_box(a)
+        {
+            let mid = noshape_model::drawing::note::center(&b);
+            let (sn, co) = angle.sin_cos();
+            let rot = |p: [f64; 2]| {
+                let d = sub(p, mid);
+                [mid[0] + d[0] * co - d[1] * sn, mid[1] + d[0] * sn + d[1] * co]
+            };
+            // Black dots, 2 px on / 2 px off.
+            let k = 1.0 / self.zoom.max(1e-6);
+            let corners = [rot([b[0], b[1]]), rot([b[2], b[1]]), rot([b[2], b[3]]), rot([b[0], b[3]]), rot([b[0], b[1]])];
+            for w in corners.windows(2) {
+                let (d, n) = (sub(w[1], w[0]), len(sub(w[1], w[0])));
+                let steps = (n / (4.0 * k)).floor() as usize;
+                for i in 0..steps {
+                    let t0 = i as f64 * 4.0 * k / n;
+                    let t1 = (t0 + 2.0 * k / n).min(1.0);
+                    o.tinted.push((vec![[w[0][0] + d[0] * t0, w[0][1] + d[1] * t0], [w[0][0] + d[0] * t1, w[0][1] + d[1] * t1]], [0, 0, 0, 255], 1.0));
+                }
+            }
+            return;
+        }
+        let Some((id, grips)) = self.note_grips() else { return };
+        let k = 1.0 / self.zoom.max(1e-6);
+        const TAN: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
+        const EDGE: [u8; 4] = [0xe6, 0xc9, 0xae, 255];
+        let ring = |c: [f64; 2], r: f64| -> Vec<[f64; 2]> {
+            (0..=24).map(|i| {
+                let t = i as f64 / 24.0 * std::f64::consts::TAU;
+                [c[0] + r * t.cos(), c[1] + r * t.sin()]
+            }).collect()
+        };
+        for (g, p) in &grips {
+            match g {
+                0 | 1 => {
+                    let h = 5.0 * k;
+                    o.tinted.push((vec![[p[0] - h, p[1]], [p[0] + h, p[1]]], TAN, 10.0));
+                    o.tinted.push((vec![[p[0] - h, p[1] - h], [p[0] + h, p[1] - h], [p[0] + h, p[1] + h], [p[0] - h, p[1] + h], [p[0] - h, p[1] - h]], EDGE, 1.0));
+                }
+                _ => {
+                    // The rotate circle, its two arrowheads and the stem dot.
+                    o.tinted.push((ring(*p, 5.5 * k), TAN, 1.5));
+                    for s in [-1.0, 1.0] {
+                        let x = p[0] + s * 7.5 * k;
+                        o.tinted.push((vec![[x - s * 2.5 * k, p[1] + 2.5 * k], [x + s * 1.0 * k, p[1] - 0.5 * k], [x - s * 2.5 * k, p[1] - 2.5 * k]], TAN, 2.0));
+                    }
+                    o.tinted.push((vec![[p[0], p[1] - 10.0 * k], [p[0], p[1] - 13.0 * k]], TAN, 3.0));
+                }
+            }
+        }
+        // Free notes: the round grip at the bottom centre of the text.
+        if grips.iter().any(|(g, _)| *g == 2)
+            && let Some(a) = self.current_sheet().annotations.iter().find(|a| a.id == id)
+            && let Some((b, _)) = note_box(a)
+        {
+            let c = [(b[0] + b[2]) / 2.0, b[1]];
+            o.tinted.push((vec![[c[0] - 2.5 * k, c[1]], [c[0] + 2.5 * k, c[1]]], TAN, 9.0));
+            o.tinted.push((ring(c, 5.0 * k), [255, 255, 255, 255], 1.2));
+        }
     }
 
     /// A drag starting on a note grip.
@@ -1270,7 +1225,7 @@ impl DrawingEditor {
 
     pub fn extra_start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Option<Drag> {
         // A snap point of a selected auxiliary view's reference indicator.
-        let aux = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some((*v, self.aux_grip_at(*v, start)?)) } else { None });
+        let aux = self.aux_dot_views().into_iter().find_map(|v| Some((v, self.aux_grip_at(v, start)?)));
         if let Some((view, grip)) = aux {
             let orig = self.current_sheet().view(view)?.aux_ref.clone()?;
             return Some(Drag::AuxIndicator { view, grip, orig });
@@ -1316,7 +1271,6 @@ impl DrawingEditor {
                 Some(Drag::MoveSectionLine { view: v, start, orig: sheet.view(v)?.kind.clone() })
             }
             PickTarget::AuxIndicator(v) => {
-                self.selection = vec![Sel::View(v)];
                 let grip = self.aux_grip_at(v, start)?;
                 Some(Drag::AuxIndicator { view: v, grip, orig: sheet.view(v)?.aux_ref.clone()? })
             }
@@ -1482,9 +1436,15 @@ impl DrawingEditor {
                     v.kind = kind;
                 }
             }
+            Drag::MoveViewLabel { view, start, orig } => {
+                let o = orig.unwrap_or_default();
+                if let Some(v) = sheet.view_mut(*view) {
+                    v.label_at = Some([o[0] + c[0] - start[0], o[1] + c[1] - start[1]]);
+                }
+            }
             Drag::AuxIndicator { view, grip, orig } => {
                 let Some(ind) = aux else { return };
-                Self::drag_aux_grip(sheet, *view, *grip, orig, &ind, c);
+                Self::drag_aux_grip(sheet, *view, *grip, orig, &ind, c, self.drawing.props.view_tab.aux_arrow_format);
             }
             Drag::MoveSectionPoint { view, index, orig } => {
                 let Some(parent) = sheet.parent_of(*view) else { return };
@@ -1547,7 +1507,7 @@ impl DrawingEditor {
             vec![
                 MenuEntry::item("Jogged section view", move |t, _, cx| t.set_tool(Tool::JoggedSection { parent: Some(id), points: vec![], done: false }, cx)),
                 MenuEntry::item("Aligned section view", move |t, _, cx| t.set_tool(Tool::AlignedSection { parent: Some(id), center: None, a: None, b: None }, cx)),
-                MenuEntry::item("Partial section view", move |t, _, cx| t.set_tool(Tool::Section { parent: Some(id), p0: None, line: None, partial: true }, cx)),
+                MenuEntry::item("Partial section view", move |t, _, cx| t.set_tool(Tool::Section { parent: Some(id), p0: None, line: None, partial: true, jogs: vec![] }, cx)),
                 MenuEntry::item("Broken-out section", move |t, _, cx| t.set_tool(Tool::BrokenOut { parent: Some(id), points: vec![], done: false }, cx)),
             ],
         ));
@@ -1891,7 +1851,7 @@ impl DrawingEditor {
         let f = t.shown_cell_format(row, col);
         let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
         let style = NoteStyle {
-            font: (f.bold || f.italic).then(|| noshape_model::drawing::sheet::TextFont { family: noshape_model::drawing::font::DEFAULT_FAMILY.into(), bold: f.bold, italic: f.italic }),
+            font: (f.bold || f.italic || f.font.is_some()).then(|| noshape_model::drawing::sheet::TextFont { family: f.font.clone().unwrap_or_else(|| noshape_model::drawing::font::DEFAULT_FAMILY.into()), bold: f.bold, italic: f.italic }),
             underline: f.underline,
             strikethrough: f.strikethrough,
             align: match f.align {
@@ -1906,16 +1866,16 @@ impl DrawingEditor {
             },
             ..Default::default()
         };
-        let height = self.input(&format!("{} mm", format::format_number(h, None, 2)), window, cx);
+        let height = self.input(&crate::drawing_note::note_height_text(h, self.drawing.units_mm), window, cx);
         Some(Box::new(CellNote { style, height }))
     }
 
     /// The cell format the Note panel of a general table cell sets.
-    fn cell_note_format(t: &noshape_model::drawing::Table, row: usize, col: usize, note: &CellNote, cx: &App) -> noshape_model::drawing::CellFormat {
+    fn cell_note_format(t: &noshape_model::drawing::Table, row: usize, col: usize, note: &CellNote, units_mm: bool, cx: &App) -> noshape_model::drawing::CellFormat {
         use noshape_model::drawing::note::{NoteAlign, NoteVAlign};
         use noshape_model::drawing::{CellAlign, CellVAlign};
         let st = &note.style;
-        let h = note.height.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().ok().filter(|v| *v > 0.1);
+        let h = crate::drawing_note::parse_note_height(&note.height.read(cx).value(), units_mm);
         let (bold, italic) = st.font.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
         noshape_model::drawing::CellFormat {
             align: match st.align {
@@ -1937,6 +1897,7 @@ impl DrawingEditor {
             italic,
             underline: st.underline,
             strikethrough: st.strikethrough,
+            font: st.font.as_ref().map(|f| f.family.clone()).filter(|f| f != noshape_model::drawing::font::DEFAULT_FAMILY),
         }
     }
 
@@ -1961,6 +1922,15 @@ impl DrawingEditor {
         };
         let (row, col) = self.built.as_ref().and_then(|b| b.table_layout(table)).and_then(|l| l.cell_at(self.cursor)).map(|(r, c)| t.anchor_cell(r, c)).unwrap_or((0, 0));
         let text = cells.get(row).and_then(|r| r.get(col)).cloned().unwrap_or_default();
+        // Live 1143 / behaviours "Note panel popups" (6): an empty cell is
+        // selected (table selected, the cell grey) with the Cell panel; a cell
+        // with text is edited in place.
+        if text.trim().is_empty() {
+            self.selection = vec![Sel::Table(table)];
+            self.cell_sel = Some(crate::drawing_cells::CellSel { table, a: (row, col), b: (row, col) });
+            cx.notify();
+            return;
+        }
         let input = self.textarea(&text, 3, window, cx);
         let note = self.cell_note(table, row, col, window, cx);
         // Live 755 / 756: a general table cell is edited with the table
@@ -2099,7 +2069,7 @@ impl DrawingEditor {
             }
             Panel::Cell { table, row, col, input, note } => {
                 let text = input.read(cx).value().to_string();
-                let format = note.as_ref().and_then(|n| self.current_sheet().table(table).map(|t| Self::cell_note_format(t, row, col, n, cx)));
+                let format = note.as_ref().and_then(|n| self.current_sheet().table(table).map(|t| Self::cell_note_format(t, row, col, n, self.drawing.units_mm, cx)));
                 self.edit_table(table, "Edit cell", cx, |t| {
                     if let Some(f) = format.clone() {
                         t.set_cell_format(row, col, f);
@@ -2173,3 +2143,9 @@ pub fn note_box(a: &Annotation) -> Option<([f64; 4], f64)> {
 /// A note grip: 0 / 1 the left / right side, 2 the rotate grip above the
 /// text; its sheet point.
 pub type NoteGrip = (u8, [f64; 2]);
+
+/// A Sheets panel tree icon: Onshape draws them at 20 px in full #333
+/// (18x18 ink, live drawing/760), unlike the feature list's 17 px at 80 %.
+fn sheets_icon(name: &str, cx: &App) -> Div {
+    div().w(px(20.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(name, 20., cx))
+}

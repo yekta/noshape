@@ -47,11 +47,52 @@ pub struct RegenOptions {
     pub derived: Option<std::sync::Arc<dyn derived::DerivedProvider>>,
     /// Compiled Feature Studios of the document (custom features).
     pub custom_features: Option<std::sync::Arc<dyn crate::custom::CustomFeatureProvider>>,
+    /// Lets the caller stop this run when a newer edit makes it stale.
+    pub cancel: Option<RegenCancel>,
+}
+
+/// Stops a running regeneration that a newer edit made stale (live
+/// "Pending state": the newest edit wins; Onshape has no visible cancel).
+/// `supersede`: finish the features (their results are cached, so the next
+/// run reuses them) but skip the display. `abort`: stop at the next feature
+/// or pattern instance; nothing half-done is cached.
+#[derive(Clone, Debug, Default)]
+pub struct RegenCancel(Arc<CancelFlags>);
+
+#[derive(Debug, Default)]
+struct CancelFlags {
+    superseded: std::sync::atomic::AtomicBool,
+    aborted: std::sync::atomic::AtomicBool,
+}
+
+impl RegenCancel {
+    pub fn abort(&self) {
+        self.0.superseded.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.0.aborted.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn supersede(&self) {
+        self.0.superseded.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn aborted(&self) -> bool {
+        self.0.aborted.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn superseded(&self) -> bool {
+        self.0.superseded.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Run `f` (kernel work) so that an abort stops its booleans inside the
+    /// kernel ([`noshape_kernel::with_cancel`]).
+    pub fn scope<R>(&self, f: impl FnOnce() -> R) -> R {
+        noshape_kernel::with_cancel(&self.0.aborted, f)
+    }
 }
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None }
+        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None, cancel: None }
     }
 }
 
@@ -63,6 +104,8 @@ pub struct RegenResult {
     pub needs_refine: bool,
     /// Final context (bodies with kernel shapes), for export and assemblies.
     pub context: Arc<Context>,
+    /// Stopped by [`RegenCancel`]: `display` and `context` are empty.
+    pub cancelled: bool,
 }
 
 struct CacheEntry {
@@ -130,7 +173,12 @@ impl Regenerator {
                 eval::EffectiveFeature { id: f.id, type_id: f.type_id.clone(), name: f.name.clone(), params, suppressed }
             })
             .collect();
+        let aborted = || opts.cancel.as_ref().is_some_and(RegenCancel::aborted);
+        let cancelled = || RegenResult { cancelled: true, ..Default::default() };
         for (i, f) in studio.features.iter().enumerate() {
+            if aborted() {
+                return cancelled();
+            }
             let (params, mut suppressed) = (&effective[i].params, effective[i].suppressed);
             // Boolean expressions (dynamic suppression, checkboxes converted
             // to expressions) see the variables defined upstream.
@@ -198,6 +246,7 @@ impl Regenerator {
                             }
                         }
                         let mut ev = EvalCtx::new(f.id, &f.name, params, units, base, &outer_vars);
+                        ev.cancel = opts.cancel.clone();
                         ev.editing_sketch = opts.editing_sketch;
                         ev.features = &effective;
                         ev.derived = opts.derived.clone();
@@ -208,6 +257,10 @@ impl Regenerator {
                             ev.check_bounds(specs)?;
                             eval_fn(&mut ev)
                         }));
+                        // Stopped part-way: don't cache a half-done feature.
+                        if aborted() {
+                            return cancelled();
+                        }
                         match result {
                             Ok(Ok(())) => {
                                 if !ev.warnings.is_empty() {
@@ -246,7 +299,13 @@ impl Regenerator {
             states.push(state);
         }
         self.entries.retain(|id, _| live.contains(id));
+        if opts.cancel.as_ref().is_some_and(RegenCancel::superseded) {
+            return cancelled();
+        }
         let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes);
+        if aborted() {
+            return cancelled();
+        }
         crate::configured_properties::apply_names(&mut display, studio, config);
         // The shown Assembly context: its bodies, translucent and pickable.
         if let Some(active) = studio.active_context
@@ -258,7 +317,7 @@ impl Regenerator {
         display.features = states;
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
-        RegenResult { display, needs_refine, context: ctx }
+        RegenResult { display, needs_refine, context: ctx, cancelled: false }
     }
 }
 

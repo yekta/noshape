@@ -73,7 +73,7 @@ impl DrawingEditor {
     /// The open note editor's place on the canvas.
     pub fn note_inplace_box(&self, cx: &App) -> Option<InplaceBox> {
         let Some(Panel::Note { input, pos, height, style, .. }) = &self.panel else { return None };
-        let h = height.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().ok().filter(|v| *v > 0.1).unwrap_or(3.5);
+        let h = crate::drawing_note::parse_note_height(&height.read(cx).value(), self.drawing.units_mm).unwrap_or(3.5);
         let text = input.read(cx).value().to_string();
         let shown = if text.trim().is_empty() { "H".to_string() } else { note::fractions(&text) };
         let l = note::layout(&shown, h, style, *pos);
@@ -128,6 +128,12 @@ impl DrawingEditor {
         if b.italic {
             text = text.italic();
         }
+        if style.underline {
+            text = text.underline();
+        }
+        if style.strikethrough {
+            text = text.line_through();
+        }
         let top = b.text_top.min(b.top);
         Some(
             div()
@@ -176,7 +182,8 @@ impl DrawingEditor {
                 .bg(gpui_kit::white())
                 .border_2()
                 .border_color(gpui_kit::rgb(0xf5a623))
-                .text_size(px(12.))
+                // Live 235: 14 px, no space before "deg".
+                .text_size(px(14.))
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(gpui_kit::rgb(0x000000))
                 .child(format!("{deg}deg"))
@@ -242,7 +249,12 @@ impl DrawingEditor {
             Some(Panel::Cell { note: Some(n), .. }) => n.style.font.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false)),
             _ => (f.bold, f.italic),
         };
-        let family = noshape_model::drawing::font::DEFAULT_FAMILY.to_string();
+        let family = match &self.panel {
+            Some(Panel::Cell { note: Some(n), .. }) => n.style.font.as_ref().map(|f| f.family.clone()),
+            _ => None,
+        }
+        .or_else(|| f.font.clone())
+        .unwrap_or_else(|| noshape_model::drawing::font::DEFAULT_FAMILY.to_string());
         let (cap, asc, desc) = metrics(&family);
         let font_px = h * self.zoom / cap;
         let pitch_px = h * 1.6 * self.zoom;
@@ -261,6 +273,7 @@ impl DrawingEditor {
         let b = self.cell_inplace_box()?;
         let Some(Panel::Cell { input, note, .. }) = &self.panel else { return None };
         let align = note.as_ref().map(|n| n.style.align).unwrap_or_default();
+        let (underline, strike) = note.as_ref().map(|n| (n.style.underline, n.style.strikethrough)).unwrap_or_default();
         let pad = 2.0;
         // Centred / right-aligned cells: the editor is as wide as its text
         // and placed by the alignment (a multi-line Textarea aligns left).
@@ -290,6 +303,12 @@ impl DrawingEditor {
         }
         if b.italic {
             text = text.italic();
+        }
+        if underline {
+            text = text.underline();
+        }
+        if strike {
+            text = text.line_through();
         }
         Some(
             div()

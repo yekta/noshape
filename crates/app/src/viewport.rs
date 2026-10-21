@@ -30,7 +30,8 @@ pub enum ViewportEvent {
     /// Right click without drag.
     ContextMenu { pick: Option<u32>, position: Point<Pixels> },
     /// Box selection finished; ids are unique.
-    BoxSelect { ids: Vec<u32>, modifiers: Modifiers },
+    /// `crossing`: dragged right→left (touched ids), else window (inside).
+    BoxSelect { ids: Vec<u32>, modifiers: Modifiers, crossing: bool },
     /// Left-button press/drag/release while a tool captured the pointer.
     ToolDown { position: DVec2, modifiers: Modifiers, click_count: usize },
     ToolDrag { position: DVec2 },
@@ -113,6 +114,8 @@ pub struct Viewport {
     /// Where GPUI laid the view cube widget out (window coordinates).
     cube_origin: Option<Point<Pixels>>,
     plane_labels: Vec<noshape_render::overlay::WorldFill>,
+    /// Boxes with text at model points, drawn in the frame.
+    overlay_labels: Vec<noshape_render::overlay::Label>,
     axis_masks: Option<(f32, [noshape_render::overlay::AxisLabel; 3])>,
     overlay_sent: Option<Arc<noshape_render::overlay::Overlay>>,
     /// Camera-dependent geometry handed to the renderer (see
@@ -242,6 +245,8 @@ pub struct Viewport {
     _picks: Task<()>,
     /// Frames presented so far.
     frames_presented: u64,
+    /// Frames the renderer reported failed.
+    frames_failed: u64,
     /// `NOSHAPE_PERF`: when the last frame was presented (paint latency).
     presented_at: Option<Instant>,
     /// `NOSHAPE_PERF_ORBIT`: closed-loop orbit benchmark state.
@@ -340,6 +345,7 @@ impl Viewport {
             cube: None,
             cube_origin: None,
             plane_labels: Vec::new(),
+            overlay_labels: Vec::new(),
             axis_masks: None,
             overlay_sent: None,
             camera_geometry: Vec::new(),
@@ -406,6 +412,7 @@ impl Viewport {
             _frames: frames,
             _picks: picks,
             frames_presented: 0,
+            frames_failed: 0,
             presented_at: None,
             bench,
         }
@@ -709,7 +716,7 @@ impl Viewport {
                     Some(buf) => box_ids(buf, a, b, s, crossing),
                     None => Vec::new(),
                 };
-                cx.emit(ViewportEvent::BoxSelect { ids, modifiers });
+                cx.emit(ViewportEvent::BoxSelect { ids, modifiers, crossing });
             }
             PickPurpose::DepthPivot => {
                 let frame = buf.as_ref().map(|b| (b.frame_width, b.frame_height)).unwrap_or_default();
@@ -846,7 +853,10 @@ impl Viewport {
                 }
                 self.frames_presented += 1;
             }
-            Err(e) => log::error!("render failed: {e}"),
+            Err(e) => {
+                log::error!("render failed: {e}");
+                self.frames_failed += 1;
+            }
         }
         self.bench_presented();
         self.submit_if_ready(cx);
@@ -889,6 +899,15 @@ impl Viewport {
 
     /// The plane names in the frame: glyph contours in
     /// world space with their colors.
+    /// Boxes with text at model points (value boxes, readouts) in the
+    /// frame: they follow the camera without any UI layout or paint.
+    pub fn set_overlay_labels(&mut self, labels: Vec<noshape_render::overlay::Label>, cx: &mut Context<Self>) {
+        if self.overlay_labels != labels {
+            self.overlay_labels = labels;
+            self.sync_overlay(cx);
+        }
+    }
+
     pub fn set_plane_labels(&mut self, labels: Vec<noshape_render::overlay::WorldFill>, cx: &mut Context<Self>) {
         if self.plane_labels != labels {
             self.plane_labels = labels;
@@ -907,6 +926,11 @@ impl Viewport {
         self.camera_geometry = geometry.clone();
         self.gpu.set_camera_geometry(self.target_id, geometry);
         self.request_redraw(cx);
+    }
+
+    /// Frames presented and frames failed so far (smoke test).
+    pub fn frame_counts(&self) -> (u64, u64) {
+        (self.frames_presented, self.frames_failed)
     }
 
     /// Whether the owner draws content that follows the camera with GPUI
@@ -938,7 +962,7 @@ impl Viewport {
             axis_labels: self.axis_masks.as_ref().map(|m| m.1.clone()),
             colors,
         });
-        let overlay = Overlay { world_fills: self.plane_labels.clone(), view_cube };
+        let overlay = Overlay { world_fills: self.plane_labels.clone(), labels: self.overlay_labels.clone(), window_origin: [f32::from(o.x), f32::from(o.y)], view_cube };
         if self.overlay_sent.as_deref() == Some(&overlay) {
             return;
         }

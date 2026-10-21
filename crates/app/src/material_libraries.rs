@@ -81,9 +81,9 @@ const FILTERS: [&str; 6] = ["Onshape", "Owned by me", "Recently opened", "Create
 
 /// The Onshape filter's mark, Shared with me and Public (the others are the
 /// documents page's glyphs).
-const GLYPH_ONSHAPE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M10 1.8 17.1 5.9v8.2L10 18.2 2.9 14.1V5.9z"/><circle cx="10" cy="10" r="3.2"/></svg>"#;
-const GLYPH_SHARED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="7.5" cy="6.5" r="3"/><path d="M1.8 16.5c.6-3.2 2.9-5 5.7-5s5.1 1.8 5.7 5z"/><path d="M13.2 4.2h4.8v4.8h-1.5V6.8l-3.3 3.3-1.1-1.1 3.3-3.3h-2.2z"/></svg>"#;
-const GLYPH_PUBLIC: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="10" cy="10" r="8"/><path d="M2 10h16M10 2c2.4 2.3 3.6 5 3.6 8s-1.2 5.7-3.6 8c-2.4-2.3-3.6-5-3.6-8S7.6 4.3 10 2z"/></svg>"#;
+const GLYPH_ONSHAPE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 1.9 17.3 6v8L10 18.1 2.7 14V6zM10 10.1v8"/><path d="M10 1.9 17.3 6 10 10.1 2.7 6zm0 2.8c-1.4 0-2.5.6-2.5 1.3S8.6 7.3 10 7.3s2.5-.6 2.5-1.3-1.1-1.3-2.5-1.3z" fill="currentColor" fill-rule="evenodd"/></svg>"#;
+const GLYPH_SHARED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M1.7 1.7h12l4.6 4.5v12.1H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="11.5" cy="6.9" r="2.5"/><path d="M7.6 13.7c0-2.3 1.8-3.8 3.9-3.8s3.9 1.5 3.9 3.8v.9c0 .8-.6 1.4-1.4 1.4H9c-.8 0-1.4-.6-1.4-1.4z"/></svg>"#;
+const GLYPH_PUBLIC: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.4 4 7 2.4l3-.4.4 2.4-.8 1.8-1.8.9-1.4.2-.3 1.2 1.2.6 1.4 1.6 1.3 1.6-1.1.2-1.6-1-1.8-1.3-1.6-1.4-.7-1.8z"/><path d="m11 4.4 1.6-.4-.6 1.8-1 .4z"/><path d="m10.6 11.5 2.2-.6 1.6.4 1.1 1.4-.6 1.8-1.6 1.6-.6 1.9-1.1-.3-.4-2.6-.7-1.8z"/><path d="m16.3 5.5 1.2 1.7.4 2-1.2-.6-.6-1.5z"/></svg>"#;
 
 /// The Material Library tabs of the local documents (name, owner, recent).
 fn local_libraries() -> Vec<(AddedLibrary, bool)> {

@@ -12,6 +12,15 @@ Platform variants: the client picks the "WINDOWS" images when `isWindows()`, els
 us (never copied); CSS standard names use the platform's own cursor (X11/Wayland theme name,
 macOS `NSCursor`, Windows `IDC_*`; where the OS has none, Chrome draws its own and so do we).
 
+**No private OS APIs (rule since v0.4.4, 21 Oct).** v0.4.3 aborted on macOS 27 when GPUI showed
+`CursorStyle::Move` through the private `+[NSCursor _moveCursor]` (now raises). Chrome on macOS shows the
+system's private CoreCursor art for `move`, `nwse-resize`, `nesw-resize` and `wait` (busy-but-clickable: the
+arrow with the spinning pinwheel); we draw look-alikes ourselves (`vendor/gpui-pre-macos/src/cursors/`,
+sources and the generator in `cursors/src/`, 24 pt with 1×/2×/3× bitmaps; hot spots: centre, centre, centre,
+arrow tip 4,3) and load them with public AppKit only (`NSBitmapImageRep` reps on one `NSImage`). Not yet
+compared with a real Mac (no Mac capture exists; the user's Mac is the check); `wait` is one still frame
+(the system animates the pinwheel). The viewport's own `move` (cursor.rs) uses the same drawing.
+
 Live check (2026-10-20, `/root/onshape-research/live/dom/cursors.txt` and `cursors-*.json`:
 `getComputedStyle(...).cursor` in Chrome) confirms the stack below and settles the ❓ rows.
 Chrome truncates fractional hot spots: `crosshair-cursor.svg 7.5 7.5` is applied at 7,7.
@@ -27,14 +36,14 @@ Status: ✅ done, 🟡 partly, ❌ not yet. "Hot" = hot spot in CSS pixels.
 | 6 or more selected | image: arrow + "5+" (`…SelectionCursor-5plus`) | mac 3,3 · win 1,2 | ✅ |
 | Any sketch drawing tool active (line, rectangles, circles, arcs, polygons, splines, point, text, slot, fillet, chamfer, trim, extend, offset, use, mirror, dimension, constraints …: the sketch tool base class `getDefaultCursor()`) | image crosshair (`crosshair-cursor.svg`), fallback CSS `crosshair` | 7.5,7.5 (Chrome truncates to 7,7) | ✅ (read back: 15 px, hot 7,7) |
 | Sketch pattern tools (linear / circular pattern, transform: they select first) | `default` | — | ✅ |
-| Sketch linear / circular pattern, transform (`canCreatePattern`) and offset (preview shown): operation complete, nothing pre-highlighted and no dimension box open ("click to accept"; `showConfirmationCursor`) | image confirmation (`macConfirmation_Cursor` / `winConfirmation_Cursor`); while something is pre-highlighted the stack is empty, so the selection cursor shows | 1,1 | ✅ (read back: 32 px, hot 1,1) |
+| Sketch linear / circular pattern, transform (`canCreatePattern`) and offset (preview shown): operation complete, nothing pre-highlighted and no dimension box open ("click to accept"; `showConfirmationCursor`) | image confirmation (`macConfirmation_Cursor` / `winConfirmation_Cursor`); while something is pre-highlighted the stack is empty, so the selection cursor shows | 1,1 | ✅ (read back: 37 px as Onshape's 36×37 file, hot 1,1; art compared with live cursors/icons2-*) |
 | Hovering a dimension's value (draggable) | `move` | — | 🟡 (viewport `overlay_cursor`; read-back pending) |
 | Hovering a dimension's lines | `default` | — | ✅ |
 | Hovering / dragging the section view arrow (and other 3D manipulators) | `default`: live (behaviours.md "Remaining cursor rows" (1)) never sets `move` or a grab cursor on 3D manipulators; there is no draggable plane surface | — | ✅ (ours keeps the canvas cursor) |
 | Ctrl held during a box selection (box deselect) | image remove-selection (`macRemoveSelectionCursor` / `winRemoveSelectionCursor`) | mac 3,3 · win 1,2 | ✅ (Part Studio and sketch box; Ctrl in a sketch box now also deselects; read back: 32 px, hot 3,3) |
 | Zoom to window mode ("Drag to create zoom bounding box.") | `zoom-in` | — | ✅ (theme `zoom-in` on X11; our drawing where the theme has none) |
 | Assembly: dragging a fixed instance | `no-drop` | — | ✅ (was not-allowed) |
-| Assembly: snapping a mate connector during a drag | image snap-mate (`macSnapMate_Cursor` / `winSnapMate_Cursor`), fallback `nesw-resize` | 7.5,7.5 | 🟡 (shown for the whole snap drag) |
+| Assembly: snapping a mate connector during a drag | image snap-mate (`macSnapMate_Cursor` / `winSnapMate_Cursor`), fallback `nesw-resize` | 7.5,7.5 | 🟡 (shown for the whole snap drag; art redrawn against live cursors/icons2-macSnapMate_Cursor: arrow at the count-cursor spot, 35 px) |
 | Analysis color-map legend: over the legend / its color bar / dragging / tick hover / value text | `grab` / crosshair image (7,7) / `grabbing` / `ew-resize` (horizontal legend) / `pointer` | — | ✅ (legend `OpenHand`/`ClosedHand`, color map through the viewport's `overlay_cursor`) |
 | Drawing: no tool (sheet, views, dragging a view) | `auto` (arrow) | — | ✅ |
 | Drawing: Dimension, Ordinate, Datum, GD&T, Note, Balloon, Table, Centerline, Line, Hatch, Insert view placement | `DrawingCrosshair-01.cur` (the sketch crosshair's 15 px plus) | 7,7 | ✅ (`AppCursor::Crosshair` via `CursorSync`) |
@@ -45,6 +54,10 @@ Status: ✅ done, 🟡 partly, ❌ not yet. "Hot" = hot spot in CSS pixels.
 | Selection-count cursor outside the canvas | the same cursor on `.navbar`; while a context menu is open the layer and the canvas are `default` (live dom/cursors-count.json) | — | ✅ (navbar via `CursorSync`) |
 | Follow mode (another user's pointer) | cloud-only (excluded) | — | — |
 | Comment tag placement (`comment-tag.svg`) | cloud-only (excluded) | — | — |
+
+Image cursor art (icons2, 2026-10-21) was compared with Chrome renders of Onshape's own cursor files (live/cursors/icons2-*-{1x,2x}.png):
+the shared drop shadow is `dx 0, dy 1, σ 1, opacity 0.8`; the Windows white arrow has its own softer shadow (`1, 1, σ 1.5, 0.4`), and the Windows
+art beside the arrow sits +1,+1 (the count label +3,−5) on a 38 px canvas, as in Onshape's `win*` files.
 
 ## HTML controls (woolsthorpe.css)
 

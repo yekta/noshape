@@ -1287,6 +1287,10 @@ pub struct Window {
     long_press_timer: Option<Task<()>>,
     long_press_capture: Option<EntityId>,
     pub(crate) refreshing: bool,
+    /// NOSHAPE PATCH (agent qa4): counts `draw` calls; a cached view reuses
+    /// its ranges only if it recorded them in the frame just drawn (see
+    /// view.rs `nested_views_refresh`).
+    pub(crate) noshape_frame: u64,
     pub(crate) activation_observers: SubscriberSet<(), AnyObserver>,
     pub(crate) focus: Option<FocusId>,
     focus_enabled: bool,
@@ -2189,6 +2193,7 @@ impl Window {
             long_press_timer: None,
             long_press_capture: None,
             refreshing: false,
+            noshape_frame: 0,
             activation_observers: SubscriberSet::new(),
             focus: None,
             focus_enabled: true,
@@ -2417,6 +2422,17 @@ impl Window {
         self.clear_pending_keystrokes(cx);
 
         self.refresh();
+    }
+
+    /// NOSHAPE PATCH: focus the nearest focusable ancestor of `handle` in
+    /// the current focus path (blur when it has none or isn't in the path).
+    pub fn focus_parent_of(&mut self, handle: &FocusHandle, cx: &mut App) {
+        let path = self.rendered_frame.focus_path();
+        let parent = path.iter().position(|id| *id == handle.id).and_then(|i| i.checked_sub(1)).and_then(|i| path.get(i).copied());
+        match parent.and_then(|id| FocusHandle::for_id(id, &cx.focus_handles)) {
+            Some(handle) => self.focus(&handle, cx),
+            None => self.blur(cx),
+        }
     }
 
     /// Remove focus from all elements within this context's window.
@@ -3442,6 +3458,7 @@ impl Window {
         // Set up the per-App arena for element allocation during this draw.
         // This ensures that multiple test Apps have isolated arenas.
         let arena_scope = ElementArenaScope::enter(&cx.element_arena);
+        self.noshape_frame += 1;
 
         if self.platform_window.prepare_frame() {
             self.refresh();

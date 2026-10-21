@@ -10,11 +10,9 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{Table, TableCorner, TableKind};
+use noshape_model::drawing::{Table, TableCorner};
 
 const CORNERS: [TableCorner; 4] = [TableCorner::TopLeft, TableCorner::TopRight, TableCorner::BottomLeft, TableCorner::BottomRight];
-/// New general tables: column width and row height (mm).
-const COL_W: f64 = 28.0;
 
 /// The open Table dialog.
 pub struct TableToolDlg {
@@ -32,8 +30,8 @@ impl DrawingEditor {
     pub fn sync_table_tool(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let active = matches!(self.tool, Tool::Table { kind: TableTool::General, .. });
         if active && self.table_tool.is_none() {
-            let rows = cx.new(|cx| InputState::new(window, cx).default_value("2"));
-            let cols = cx.new(|cx| InputState::new(window, cx).default_value("2"));
+            let rows = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value("2"));
+            let cols = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value("2"));
             // Live 530: Rows has the focus with its value selected.
             rows.update(cx, |s, cx| {
                 s.focus(window, cx);
@@ -48,21 +46,14 @@ impl DrawingEditor {
     /// Rows and columns typed in the dialog.
     fn table_tool_size(&self, cx: &App) -> Option<(usize, usize)> {
         let d = self.table_tool.as_ref()?;
-        let r = d.rows.read(cx).value().trim().parse::<usize>().unwrap_or(2).clamp(1, 60);
-        let c = d.cols.read(cx).value().trim().parse::<usize>().unwrap_or(2).clamp(1, 20);
-        Some((r, c))
+        Some(noshape_scene::drawing_tools::table_size(&d.rows.read(cx).value(), &d.cols.read(cx).value()))
     }
 
     /// The table the dialog would create, its fixed corner at `at`.
     fn table_tool_table(&self, at: [f64; 2], cx: &App) -> Option<Table> {
         let d = self.table_tool.as_ref()?;
         let (r, c) = self.table_tool_size(cx)?;
-        let rows = r + d.header_row as usize;
-        let cells = vec![vec![String::new(); c]; rows];
-        let mut t = Table::new(0, TableKind::General { cells, title: d.title_row.then(String::new), header: d.header_row }, at);
-        t.col_widths = vec![COL_W; c];
-        t.corner = d.corner;
-        Some(t)
+        Some(noshape_scene::drawing_tools::general_table(r, c, d.title_row, d.header_row, d.corner, at))
     }
 
     /// The ghost outline at the placed point or the pointer.

@@ -86,7 +86,7 @@ impl EventEmitter<FsNoticesEvent> for FsNoticesPanel {}
 
 impl FsNoticesPanel {
     pub fn new(doc: Entity<DocModel>, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let filter = cx.new(|cx| InputState::new(window, cx).placeholder("Filter notices"));
+        let filter = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Filter notices"));
         let subs = vec![
             cx.subscribe_in(&filter, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
                 if matches!(ev, InputEvent::Change) {

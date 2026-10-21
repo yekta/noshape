@@ -682,6 +682,34 @@ impl PartStudioView {
 
     /// The tool's dialog (left, like feature dialogs) and the minimum
     /// radius label in the viewport.
+    /// The tool's readouts at model points ("Min: …", "Max: …", "R …"), drawn
+    /// in the 3D frame: the value boxes `render_analysis_tool` draws with
+    /// NOSHAPE_GPUI_LABELS.
+    pub(super) fn analysis_labels(&self, window: &Window, cx: &App) -> Vec<noshape_render::overlay::Label> {
+        let Some(t) = &self.ui.analysis_tool else { return Vec::new() };
+        let pal = p();
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let fmt_len = |v: f64| noshape_units::format_quantity(noshape_units::Quantity::new(v, noshape_units::Dim::LENGTH), &units);
+        let value = |text: &str, border: u32, offset: [f32; 2], at: DVec3| {
+            let b = crate::overlay_labels::ValueBox { text, text_size: 12., text_color: pal.text.into(), background: gpui_kit::rgb(0xffffff).into(), border: Some(gpui_kit::rgb(border).into()), pad_x: 3., offset };
+            crate::overlay_labels::value_box(window, cx, &b, at)
+        };
+        let mut out = Vec::new();
+        if let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation) {
+            for ((d, a, b), label, color) in [(min, "Min", 0x2858dcu32), (max, "Max", 0xdc3228)] {
+                let off = 10.0 + 120.0 * t.options.scale;
+                out.extend(value(&format!("{label}: {}", fmt_len(d)), color, [off, -10.], (a + b) * 0.5));
+            }
+        }
+        if t.options.min_radius
+            && t.kind == ToolKind::CurveSurface
+            && let Some((r, at)) = t.result.as_ref().and_then(|r| r.min_radius)
+        {
+            out.extend(value(&format!("R {}", fmt_len(r)), 0xd228c8, [8., -8.], at));
+        }
+        out
+    }
+
     pub(super) fn render_analysis_tool(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let Some(t) = &self.ui.analysis_tool else { return Vec::new() };
         let pal = p();
@@ -987,7 +1015,7 @@ impl PartStudioView {
                                     .cursor_pointer()
                                     .rounded(px(2.))
                                     .when(r.opposite, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
-                                    .child(crate::assets::icon("flip-circular", 18., cx))
+                                    .child(crate::assets::icon("flip-circular-opposite", 18., cx))
                                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                         if let Some(t) = &mut this.ui.analysis_tool {
                                             t.options.reflection.opposite = !t.options.reflection.opposite;
@@ -1012,12 +1040,12 @@ impl PartStudioView {
                             .child(check("at-max", "Max", o.show_max, |o, v| o.show_max = v, cx))
                             .child(check("at-min", "Min", !o.show_max, |o, v| o.show_max = !v, cx)),
                     )
-                    .child(div().text_size(px(12.)).text_color(pal.text).child(if t.selection.is_empty() { String::new() } else if o.show_max { format!("Max: {hi:.2} deg") } else { format!("Min: {lo:.2} deg") }))
+                    .child(div().text_size(px(12.)).text_color(pal.text).child(if t.selection.is_empty() { String::new() } else if o.show_max { format!("Max: {} deg", noshape_units::to_fixed(hi, 2)) } else { format!("Min: {} deg", noshape_units::to_fixed(lo, 2)) }))
                     .child(check("at-thr", "Enable threshold display", o.threshold, |o, v| o.threshold = v, cx));
                 if o.threshold {
                     body = body
-                        .child(stepper("at-hi", "High threshold", format!("{:.0} deg", o.high_deg), |o, d| o.high_deg = (o.high_deg + d as f64).clamp(0.0, 180.0), cx))
-                        .child(stepper("at-lo", "Low threshold", format!("{:.0} deg", o.low_deg), |o, d| o.low_deg = (o.low_deg + d as f64).clamp(0.0, 180.0), cx));
+                        .child(stepper("at-hi", "High threshold", format!("{} deg", noshape_units::to_fixed(o.high_deg, 0)), |o, d| o.high_deg = (o.high_deg + d as f64).clamp(0.0, 180.0), cx))
+                        .child(stepper("at-lo", "Low threshold", format!("{} deg", noshape_units::to_fixed(o.low_deg, 0)), |o, d| o.low_deg = (o.low_deg + d as f64).clamp(0.0, 180.0), cx));
                 }
             }
         }
@@ -1123,8 +1151,10 @@ impl PartStudioView {
             .into_any_element();
         let mut out = vec![dialog];
         // "Min: …" / "Max: …" beside the deviation lines; the scale slider
-        // moves them away from the curves (Onshape).
-        if let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation) {
+        // moves them away from the curves (Onshape). Drawn in the 3D frame
+        // (`analysis_labels`) unless NOSHAPE_GPUI_LABELS.
+        let gpui_labels = crate::overlay_labels::gpui_labels();
+        if gpui_labels && let Some((min, max)) = t.result.as_ref().and_then(|r| r.deviation) {
             let vp = self.viewport.read(cx);
             for ((d, a, b), label, color) in [(min, "Min", 0x2858dcu32), (max, "Max", 0xdc3228)] {
                 let mid = (a + b) * 0.5;
@@ -1135,7 +1165,8 @@ impl PartStudioView {
             }
         }
         // "R 12.5 mm" beside the minimum-radius point.
-        if o.min_radius
+        if gpui_labels
+            && o.min_radius
             && kind == ToolKind::CurveSurface
             && let Some((r, at)) = t.result.as_ref().and_then(|r| r.min_radius)
             && let Some(s) = self.viewport.read(cx).project(at)

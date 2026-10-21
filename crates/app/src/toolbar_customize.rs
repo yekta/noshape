@@ -61,7 +61,7 @@ pub(crate) fn full_order(order: &[usize], n: usize) -> Vec<usize> {
 
 impl Customize {
     pub fn new<V: 'static>(n_sets: usize, order: &[usize], removed: &[String], window: &mut Window, cx: &mut Context<V>) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools"));
+        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search tools"));
         let sub = cx.subscribe(&search, |_, _, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
                 cx.notify();

@@ -3,6 +3,7 @@
 //! labels, associative annotations, tables, border and title block, into
 //! one [`SheetGeometry`] plus a pick table for the editor.
 
+use super::cad_layers::CadLayer;
 use super::font;
 use super::format::{self, DimText};
 use super::sheet::{Anchor, AnnotationEnv, Fill2, LineStyle, Polyline2, SheetGeometry, Text2, format_scale};
@@ -41,6 +42,8 @@ pub enum PickTarget {
     Image(u64),
     /// The reference indicator of auxiliary view `0` in its parent.
     AuxIndicator(ViewId),
+    /// The label (and scale label) under view `0`.
+    ViewLabel(ViewId),
     /// An automatic centermark of a view, keyed by its circle's center
     /// ([`centermark_key`]).
     AutoCentermark { view: ViewId, center: [i64; 2] },
@@ -56,7 +59,7 @@ impl PickTarget {
     /// The view this target belongs to (for selecting/dragging views).
     pub fn view(&self) -> Option<ViewId> {
         match self {
-            PickTarget::View(v) | PickTarget::Edge { view: v, .. } => Some(*v),
+            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::ViewLabel(v) => Some(*v),
             _ => None,
         }
     }
@@ -316,9 +319,11 @@ impl Picks {
 
 /// Placement of view `id` showing geometry `g` (geometry is shared through
 /// the cache between views with identical projections, so `g.id` may differ).
-/// An auxiliary view's reference indicator on the sheet (Onshape: the
-/// viewing-plane line beside the edge, an "elbow" at each end and a short
-/// leg with an arrow pointing back at the edge).
+/// An auxiliary view's reference indicator on the sheet (live behaviours
+/// "Auxiliary view reference indicator", asb 10-20 u): a phantom viewing-plane
+/// line parallel to the edge, on the view's side, centred on the edge and
+/// 0.105 in longer at each end; at each end an arrow (shaft + head, 0.36 in)
+/// pointing at the edge, and the letter beyond its tip.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AuxIndicator {
     /// The anchor on the edge (sheet).
@@ -327,22 +332,44 @@ pub struct AuxIndicator {
     pub es: [f64; 2],
     pub ns: [f64; 2],
     pub offset: f64,
+    /// The line's half lengths either side of its middle.
     pub ext: [f64; 2],
+    /// The line's ends (where the arrows start).
     pub elbows: [[f64; 2]; 2],
     pub tips: [[f64; 2]; 2],
     /// The middle snap point (on the line).
     pub mid: [f64; 2],
-    /// The largest offset: the middle of the auxiliary view.
-    pub max_offset: f64,
+    /// The letters' places (each one's snap point).
+    pub letters: [[f64; 2]; 2],
 }
 
-pub const AUX_OFFSET: f64 = 12.0;
+/// Arrow style: where the letter sits, beside the arrow (live u-933: 0.13 in
+/// from the tail along it, 0.17 in to its upper / left side), plus its
+/// own move (`letter_at[0]`).
+pub fn aux_arrow_letter(ind: &AuxIndicator, a: &super::AuxRef) -> [f64; 2] {
+    let sight = [-ind.ns[0], -ind.ns[1]];
+    let mut side = [-sight[1], sight[0]];
+    if side[1] < -1e-9 || (side[1].abs() <= 1e-9 && side[0] > 0.0) {
+        side = [-side[0], -side[1]];
+    }
+    let moved = a.letter_at.map(|m| m[0]).unwrap_or_default();
+    [ind.mid[0] + sight[0] * 3.35 + side[0] * 4.4 + moved[0], ind.mid[1] + sight[1] * 3.35 + side[1] * 4.4 + moved[1]]
+}
+
+/// Live (sheet inches → mm): line 0.879 in from the edge, 0.105 in past
+/// each end of it; arrow shaft and head 0.18 in each, head 0.06 in wide;
+/// letters 0.12 in.
+pub const AUX_OFFSET: f64 = 22.33;
+pub const AUX_PAST_EDGE: f64 = 2.667;
+pub const AUX_SHAFT: f64 = 4.572;
+pub const AUX_HEAD: f64 = 4.572;
+pub const AUX_LETTER: f64 = 3.048;
+/// The line's half length when the edge can't be measured.
 pub const AUX_EXT: f64 = 10.0;
-pub const AUX_LEG: f64 = 8.0;
 
 /// The reference indicator of auxiliary view `id`, `ppl` being its parent's
-/// placement.
-pub fn aux_indicator(sheet: &Sheet, id: ViewId, ppl: &ViewPlacement) -> Option<AuxIndicator> {
+/// placement and `parent` its geometry (for the edge's extent).
+pub fn aux_indicator(sheet: &Sheet, id: ViewId, ppl: &ViewPlacement, parent: Option<&ViewGeometry>) -> Option<AuxIndicator> {
     let v = sheet.view(id)?;
     let (ViewKind::Auxiliary { edge_dir, .. }, Some(a)) = (&v.kind, v.aux_ref.as_ref()) else { return None };
     let l = (edge_dir[0].powi(2) + edge_dir[1].powi(2)).sqrt().max(1e-12);
@@ -350,14 +377,39 @@ pub fn aux_indicator(sheet: &Sheet, id: ViewId, ppl: &ViewPlacement) -> Option<A
     let n = views::auxiliary_toward(sheet, id).unwrap_or([-e[1], e[0]]);
     let (es, ns) = (ppl.dir_to_sheet(e), ppl.dir_to_sheet(n));
     let c = ppl.to_sheet(a.anchor);
-    let max_offset = ((v.position[0] - c[0]) * ns[0] + (v.position[1] - c[1]) * ns[1]).max(AUX_LEG);
-    let offset = a.offset.unwrap_or(AUX_OFFSET).clamp(AUX_LEG, max_offset);
-    let ext = a.ext.unwrap_or([AUX_EXT; 2]);
-    let base = [c[0] + ns[0] * offset, c[1] + ns[1] * offset];
+    // The edge's extent along itself (view coordinates → sheet mm), from the
+    // parent's edges through the anchor parallel to it.
+    let k = ppl.scale * 1000.0;
+    let mut span: Option<(f64, f64)> = None;
+    for edge in parent.map(|g| g.edges.as_slice()).unwrap_or(&[]) {
+        for w in edge.points.windows(2) {
+            let d = [w[1][0] - w[0][0], w[1][1] - w[0][1]];
+            let dl = (d[0] * d[0] + d[1] * d[1]).sqrt();
+            if dl < 1e-12 || (d[0] * e[1] - d[1] * e[0]).abs() / dl > 1e-3 || views::dist_to_segment(a.anchor, w[0], w[1]) > 1e-6 {
+                continue;
+            }
+            for p in [w[0], w[1]] {
+                let t = (p[0] - a.anchor[0]) * e[0] + (p[1] - a.anchor[1]) * e[1];
+                span = Some(match span {
+                    None => (t, t),
+                    Some((lo, hi)) => (lo.min(t), hi.max(t)),
+                });
+            }
+        }
+    }
+    let (centre, half) = match span {
+        Some((lo, hi)) => ((lo + hi) / 2.0 * k, (hi - lo) / 2.0 * k + AUX_PAST_EDGE),
+        None => (0.0, AUX_EXT),
+    };
+    let offset = a.offset.unwrap_or(AUX_OFFSET);
+    let ext = a.ext.unwrap_or([half; 2]);
+    let base = [c[0] + ns[0] * offset + es[0] * centre, c[1] + ns[1] * offset + es[1] * centre];
     let at = |t: f64| [base[0] + es[0] * t, base[1] + es[1] * t];
     let elbows = [at(-ext[0]), at(ext[1])];
-    let tips = elbows.map(|p| [p[0] - ns[0] * AUX_LEG, p[1] - ns[1] * AUX_LEG]);
-    Some(AuxIndicator { anchor: c, es, ns, offset, ext, elbows, tips, mid: at((ext[1] - ext[0]) / 2.0), max_offset })
+    let tips = elbows.map(|p| [p[0] - ns[0] * (AUX_SHAFT + AUX_HEAD), p[1] - ns[1] * (AUX_SHAFT + AUX_HEAD)]);
+    let moved = a.letter_at.unwrap_or([[0.0; 2]; 2]);
+    let letters = [0, 1].map(|i| [tips[i][0] - ns[0] * (AUX_LETTER * 0.8) + moved[i][0], tips[i][1] - ns[1] * (AUX_LETTER * 0.8) + moved[i][1]]);
+    Some(AuxIndicator { anchor: c, es, ns, offset, ext, elbows, tips, mid: at((ext[1] - ext[0]) / 2.0), letters })
 }
 
 pub fn placement_of(sheet: &Sheet, id: ViewId, g: &ViewGeometry) -> Option<ViewPlacement> {
@@ -581,6 +633,45 @@ fn map_polyline(pl: &ViewPlacement, pts: &[[f64; 2]]) -> Vec<Vec<[f64; 2]>> {
     pieces.into_iter().map(|p| p.into_iter().map(|q| pl.to_sheet(q)).collect()).collect()
 }
 
+/// Mass (kg) of the part the sheet's first base view shows: its override,
+/// else from its material's density.
+fn part_mass(drawing: &Drawing, sheet: &Sheet, sources: &Sources) -> Option<f64> {
+    let base = sheet.views.iter().chain(drawing.sheets.iter().flat_map(|s| s.views.iter())).find(|v| matches!(v.kind, ViewKind::Base { .. }))?;
+    let (k, body) = views::SourceKey::of_view(base)?;
+    let src = sources.get(&k)?;
+    // An assembly: its override, else the sum of its parts.
+    if src.assembly && body.is_none() {
+        if let Some(m) = src.own.as_ref().and_then(|o| o.mass_override) {
+            return Some(m);
+        }
+        let masses: Vec<f64> = src
+            .parts
+            .iter()
+            .filter_map(|p| p.mass_override.or_else(|| crate::regen::measure::mass_properties(&src.context, std::slice::from_ref(p.body.as_ref()?), &|_| p.density).and_then(|m| m.mass)))
+            .collect();
+        return (!masses.is_empty()).then(|| masses.iter().sum());
+    }
+    let info = src.part(body.as_ref())?;
+    if let Some(m) = info.mass_override {
+        return Some(m);
+    }
+    let id = info.body.clone()?;
+    let rho = info.density;
+    crate::regen::measure::mass_properties(&src.context, std::slice::from_ref(&id), &|_| rho).and_then(|m| m.mass)
+}
+
+/// Export layers (lines, texts) of an annotation's elements.
+fn annotation_cad_layers(k: &AnnotationKind) -> (CadLayer, CadLayer) {
+    use AnnotationKind as A;
+    match k {
+        A::Centermark { .. } => (CadLayer::Centermarks, CadLayer::Centermarks),
+        A::Centerline { .. } | A::CircleCenterline { .. } => (CadLayer::Centerlines, CadLayer::Centerlines),
+        A::VirtualSharp { .. } => (CadLayer::VirtualSharps, CadLayer::VirtualSharps),
+        A::Note { .. } | A::Balloon { .. } | A::HoleCallout { .. } | A::RevisionCallout { .. } => (CadLayer::AnnotationLines, CadLayer::AnnotationText),
+        _ => (CadLayer::AnnotationText, CadLayer::AnnotationText),
+    }
+}
+
 /// Lookup of property fields for a sheet.
 fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources, key: &str) -> Option<String> {
     let sheet = drawing.sheets.get(si)?;
@@ -589,7 +680,10 @@ fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources
         let base = sheet.views.iter().chain(drawing.sheets.iter().flat_map(|s| s.views.iter())).find(|v| matches!(v.kind, ViewKind::Base { .. }))?;
         let (k, part) = views::SourceKey::of_view(base)?;
         let src = sources.get(&k)?;
-        Some((src.name.clone(), src.part(part.as_ref()).cloned(), src.assembly))
+        // An assembly view shows the assembly's own Properties (its part
+        // number, not its first part's; qa5 D4).
+        let p = if src.assembly && part.is_none() { src.own.clone() } else { src.part(part.as_ref()).cloned() };
+        Some((src.name.clone(), p, src.assembly))
     };
     Some(match key {
         "part.name" => part().map(|(n, p, asm)| if asm { n } else { p.map(|p| p.name).unwrap_or_default() }).unwrap_or_default(),
@@ -598,16 +692,47 @@ fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources
         "part.description" => part().and_then(|(_, p, _)| p).map(|p| p.description).unwrap_or_default(),
         "model.name" => part().map(|(n, _, _)| n).unwrap_or_default(),
         "doc.name" => info.doc_name.clone(),
-        "user.name" => info.user_name.to_uppercase(),
+        "user.name" => drawing.drawn_by.as_deref().unwrap_or(&info.user_name).to_uppercase(),
         // Release approver / date and the drawing's three title lines: empty
         // until set (the title block shows its "----" placeholders, live
         // drawing/156, 164).
         "release.approver" | "release.date" | "drawing.title1" | "drawing.title2" | "drawing.title3" => String::new(),
         "drawing.name" => info.drawing_name.clone(),
+        // Who / when (the local user, today), as Onshape's drawn / changed by.
+        "drawing.drawn_by" => drawing.drawn_by.as_deref().unwrap_or(&info.user_name).to_uppercase(),
+        "drawing.changed_by" => info.user_name.to_uppercase(),
+        // Live: M/D/YYYY in ANSI drawings ("10/19/2026"), ISO dates otherwise.
+        "drawing.date_drawn" | "drawing.changed_date" => if sheet.title_style == super::TitleBlockStyle::Ansi { format::field_format(&format::today(), "m/d/yyyy") } else { format::today() },
+        // Release / metadata properties with no value yet: "----".
+        // An unreleased drawing is "In progress" (as parts, `ItemMeta::state`).
+        "drawing.state" => crate::partstudio::RELEASE_STATES[0].to_string(),
+        "drawing.category" => "Onshape Drawing".into(),
+        "drawing.not_revision_managed" => "False".into(),
+        "drawing.description" | "drawing.number" | "drawing.revision" | "drawing.revision_description" => String::new(),
+        "drawing.inspection_count" => drawing.sheets.iter().flat_map(|s| s.annotations.iter()).filter(|a| a.inspection.is_some()).count().to_string(),
+        // Sheet reference properties from the part's Properties.
+        // Live (drw2 10-21 h): an unset revision reads "-".
+        "part.revision" => part().and_then(|(_, p, _)| p).map(|p| if p.revision.is_empty() { "-".into() } else { p.revision }).unwrap_or_default(),
+        "part.state" => part().and_then(|(_, p, _)| p).map(|p| p.meta.state().to_string()).unwrap_or_default(),
+        "part.vendor" => part().and_then(|(_, p, _)| p).and_then(|p| p.meta.vendor).unwrap_or_default(),
+        "part.project" => part().and_then(|(_, p, _)| p).and_then(|p| p.meta.project).unwrap_or_default(),
+        "part.product_line" => part().and_then(|(_, p, _)| p).and_then(|p| p.meta.product_line).unwrap_or_default(),
+        "part.title1" => part().and_then(|(_, p, _)| p).and_then(|p| p.meta.title1).unwrap_or_default(),
+        "part.title2" => part().and_then(|(_, p, _)| p).and_then(|p| p.meta.title2).unwrap_or_default(),
+        "part.title3" => part().and_then(|(_, p, _)| p).and_then(|p| p.meta.title3).unwrap_or_default(),
+        "part.not_revision_managed" => part().and_then(|(_, p, _)| p).map(|p| if p.meta.not_revision_managed { "True" } else { "False" }.to_string()).unwrap_or_default(),
+        "part.exclude_from_bom" => part().and_then(|(_, p, _)| p).map(|p| if p.meta.exclude_from_bom { "True" } else { "False" }.to_string()).unwrap_or_default(),
+        "part.unit_of_measure" => part().and_then(|(_, p, _)| p).map(|p| p.meta.unit_of_measure.unwrap_or_else(|| "Each".into())).unwrap_or_default(),
+        "part.tessellation" => part().and_then(|(_, p, _)| p).map(|p| p.tessellation.unwrap_or(crate::partstudio::TessQuality::Auto).label().to_string()).unwrap_or_default(),
+        // Live: 3 decimals in the drawing's mass unit ("0.052 LB"); "----"
+        // without a material.
+        "part.mass" => part_mass(drawing, sheet, sources).map(|m| if drawing.units_mm { format!("{m:.3} kg") } else { format!("{:.3} lb", m / 0.453_592_37) }).unwrap_or_default(),
+        "part.category" => part().map(|(_, _, asm)| if asm { "Onshape Assembly" } else { "Onshape Part" }.to_string()).unwrap_or_default(),
+        "part.subassembly_bom" => String::new(),
         "sheet.name" => sheet.name.clone(),
         "sheet.number" => (si + 1).to_string(),
         "sheet.count" => drawing.sheets.len().to_string(),
-        "sheet.scale" => format_scale(sheet.scale),
+        "sheet.scale" => if sheet.views.is_empty() { String::new() } else { format_scale(sheet.scale) },
         "sheet.size" => sheet.size.label().to_string(),
         "date" => format::today(),
         "units" => if drawing.units_mm { "mm".into() } else { "in".into() },
@@ -794,7 +919,8 @@ impl AnnotationEnv for Env<'_> {
         hole_callout_marked(self.drawing, self.sheet, self.sources, a).unwrap_or_else(|| vec!["⌀?".into()])
     }
     fn balloon_text(&self, a: &Annotation, text: &str) -> String {
-        let body = a.refs.iter().find(|r| r.slot == 0).map(|r| r.point.body().clone());
+        let part = if let AnnotationKind::Balloon { callout, .. } = &a.kind { callout.part.clone() } else { None };
+        let body = a.refs.iter().find(|r| r.slot == 0).map(|r| r.point.body().clone()).or(part);
         self.callout_text(a, body.as_ref(), text)
     }
     fn stacked_text(&self, a: &Annotation, st: &super::StackedCallout) -> String {
@@ -974,9 +1100,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             // Section hatching: computed on the unbroken view, then cropped and
             // broken in view coordinates.
+            let cad_mark = g.mark();
             if !geo.section_segments.is_empty() {
                 let ub = pl.unbroken();
                 let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
+                let hatch_l0 = g.lines.len();
                 for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
                     let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
                     if let Some(poly) = &geo.clip_poly {
@@ -993,7 +1121,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         }
                     }
                 }
+                // An uncut, unbroken section: the boundary for the HATCH entity.
+                if geo.clip_poly.is_none() && geo.clip.is_none() && geo.crop.is_none() && pl.breaks().is_empty()
+                    && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6)
+                {
+                    g.hatches.push(super::cad_layers::HatchRegion { loops, spacing: vt.hatch_spacing.max(0.3), lines: hatch_l0..g.lines.len() });
+                }
             }
+            g.cad_since(cad_mark, CadLayer::ViewHatches);
             // Detail boundary ("Show detail view profile"; none with "Clip
             // border to geometry").
             // Detail profile lines: Phantom / Dashed / Solid.
@@ -1002,6 +1137,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 1 => LineStyle::Hidden,
                 _ => LineStyle::Thin,
             };
+            let cad_mark = g.mark();
             if !v.detail_hide_profile && !v.detail_clip_border {
                 if let Some(poly) = &geo.clip_poly {
                     g.lines.push(Polyline2 { points: poly.iter().map(|p| pl.to_sheet(*p)).collect(), style: detail_line, closed: true, pick: view_pick });
@@ -1009,6 +1145,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.lines.push(Polyline2 { points: circle_points(pl.to_sheet(c), pl.len_to_sheet(r), 96), style: detail_line, closed: true, pick: view_pick });
                 }
             }
+            g.cad_since(cad_mark, CadLayer::DetailViewBorder);
             // Automatic centermarks on face-on circles and centerlines on
             // cylinders seen from the side.
             let auto_lines = v.auto_centerlines.unwrap_or(v.show_centerlines);
@@ -1028,6 +1165,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.lines.push(Polyline2 { points: vec![[c[0] - ux[0] * r, c[1] - ux[1] * r], [c[0] + ux[0] * r, c[1] + ux[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });
                     g.lines.push(Polyline2 { points: vec![[c[0] - uy[0] * r, c[1] - uy[1] * r], [c[0] + uy[0] * r, c[1] + uy[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });
                 }
+                g.cad_since(mark, CadLayer::Centermarks);
                 if let Some(c) = vt.centermark_color {
                     g.color_since(mark, c);
                 }
@@ -1081,6 +1219,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                             g.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick: view_pick });
                         }
                     }
+                    g.cad_since(mark, CadLayer::BendTangentLines);
                     if let Some(c) = vt.bend_tangent_color {
                         g.color_since(mark, c);
                     }
@@ -1094,6 +1233,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     for piece in map_polyline(&pl, &[b.a, b.b]) {
                         g.lines.push(Polyline2 { points: piece, style, closed: false, pick: view_pick });
                     }
+                    g.cad_since(mark, if b.up { CadLayer::BendLinesUp } else { CadLayer::BendLinesDown });
                     if let Some(c) = color {
                         g.color_since(mark, c);
                     }
@@ -1142,6 +1282,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 g.lines.push(Polyline2 { points: vec![[c[0], c[1] - arm], [c[0], c[1] + arm]], style: LineStyle::Centerline, closed: false, pick: view_pick });
             }
             // Break lines.
+            let cad_mark = g.mark();
             for br in pl.breaks() {
                 let pick = picks.id(PickTarget::BreakLine { view: v.id, index: br.index as usize });
                 let style = v.breaks.get(br.index as usize).map(|b| b.style).unwrap_or_default();
@@ -1194,6 +1335,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     g.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
                 }
             }
+            g.cad_since(cad_mark, CadLayer::BreakLines);
             if let Some(err) = &geo.error
                 && geo.edges.is_empty()
             {
@@ -1206,14 +1348,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // Labels below the view.
             let mut label_lines: Vec<(String, f64)> = Vec::new();
             match &v.kind {
-                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.push((format!("{} {label}-{label}", vt.section_prefix).trim().to_string(), 5.0)),
+                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.push((format!("{} {label} - {label}", vt.section_prefix).trim().to_string(), 5.0)),
                 ViewKind::Detail { label, .. } => {
                     label_lines.push((format!("{} {label}", vt.detail_prefix).trim().to_string(), 5.0));
                     label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
                 }
                 ViewKind::Auxiliary { .. } => {
                     if let Some(a) = v.aux_ref.as_ref().filter(|a| !a.letter.is_empty()) {
-                        let l = if vt.aux_double_label { format!("{0}-{0}", a.letter) } else { a.letter.clone() };
+                        let l = if vt.aux_double_label { format!("{0} - {0}", a.letter) } else { a.letter.clone() };
                         label_lines.push((format!("{} {l} {}", vt.aux_prefix, vt.aux_suffix).trim().to_string(), 5.0));
                     }
                 }
@@ -1229,10 +1371,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             if !matches!(v.kind, ViewKind::Detail { .. }) && v.scale_label.unwrap_or(user_label.is_some() && v.scale.is_some()) {
                 label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
             }
+            // Live (behaviours "view labels", asb 10-20 u): the label is its
+            // own selectable item, moved freely by `label_at`.
+            let label_pick = picks.id(PickTarget::ViewLabel(v.id));
+            let at = v.label_at.unwrap_or_default();
             let mut y = pl.min[1] - 6.0;
             for (text, height) in label_lines {
                 y -= height;
-                g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0, y], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: view_pick });
+                g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0 + at[0], y + at[1]], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: label_pick });
                 y -= 2.0;
             }
         }
@@ -1241,6 +1387,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             continue;
         }
         // Cutting line / detail circle in the parent.
+        let cad_mark = g.mark();
         match &v.kind {
             ViewKind::Section { parent, label, .. } | ViewKind::AlignedSection { parent, label, .. } => {
                 if let (Some(ppl), Some(cut)) = (place(*parent), views::section_cut(sheet, v.id)) {
@@ -1282,15 +1429,26 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // the edge with arrows along the line of sight and the letter.
             ViewKind::Auxiliary { parent, .. } => {
                 if let (Some(ppl), Some(a)) = (place(*parent), v.aux_ref.as_ref().filter(|a| a.show && drawing.props.view_tab.aux_indicator))
-                    && let Some(ind) = aux_indicator(sheet, v.id, &ppl)
+                    && let Some(ind) = aux_indicator(sheet, v.id, &ppl, views.get(parent).map(|g| g.as_ref()))
                 {
                     let pick = picks.id(PickTarget::AuxIndicator(v.id));
-                    g.lines.push(Polyline2 { points: ind.elbows.to_vec(), style: LineStyle::Centerline, closed: false, pick });
                     let sight = [-ind.ns[0], -ind.ns[1]];
-                    for (elbow, tip) in ind.elbows.into_iter().zip(ind.tips) {
-                        g.lines.push(Polyline2 { points: vec![elbow, tip], style: LineStyle::Thin, closed: false, pick });
-                        g.arrow(tip, sight, 3.5);
-                        g.texts.push(Text2 { pos: [tip[0] + sight[0] * 4.0, tip[1] + sight[1] * 4.0], height: 5.0, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    // Arrow style (live u-933): one arrow from the line's middle
+                    // toward the edge and the letter beside it; no line.
+                    if drawing.props.view_tab.aux_arrow_format {
+                        let tail = ind.mid;
+                        let neck = [tail[0] + sight[0] * AUX_SHAFT, tail[1] + sight[1] * AUX_SHAFT];
+                        g.lines.push(Polyline2 { points: vec![tail, neck], style: LineStyle::Thin, closed: false, pick });
+                        g.arrow([neck[0] + sight[0] * AUX_HEAD, neck[1] + sight[1] * AUX_HEAD], sight, 3.0);
+                        g.texts.push(Text2 { pos: aux_arrow_letter(&ind, a), height: AUX_LETTER, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                    } else {
+                        g.lines.push(Polyline2 { points: ind.elbows.to_vec(), style: LineStyle::Phantom, closed: false, pick });
+                        for ((elbow, tip), letter) in ind.elbows.into_iter().zip(ind.tips).zip(ind.letters) {
+                            let neck = [elbow[0] + sight[0] * AUX_SHAFT, elbow[1] + sight[1] * AUX_SHAFT];
+                            g.lines.push(Polyline2 { points: vec![elbow, neck], style: LineStyle::Thin, closed: false, pick });
+                            g.arrow(tip, sight, 3.0);
+                            g.texts.push(Text2 { pos: letter, height: AUX_LETTER, text: a.letter.clone(), angle: 0.0, anchor: Anchor::Center, pick });
+                        }
                     }
                 }
             }
@@ -1336,6 +1494,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }
             _ => {}
         }
+        g.cad_since(cad_mark, if matches!(v.kind, ViewKind::Detail { .. }) { CadLayer::DetailViewParentBorder } else { CadLayer::SectionCuttingLine });
     }
 
     // Annotations with resolved references.
@@ -1355,6 +1514,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             remap.insert(super::sheet::inspection_pick(a.id), picks.id(PickTarget::Inspection(a.id)));
         }
     }
+    // Export layers by annotation kind (live: dimensions and symbols on
+    // ANNOTATION_TEXT, leaders on ANNOTATION_LINES, centermarks /
+    // centerlines on their own layers).
+    let kinds: HashMap<u32, (CadLayer, CadLayer)> = resolved.annotations.iter().map(|a| ((a.id & 0xFFFF_FFFF) as u32, annotation_cad_layers(&a.kind))).collect();
+    let line_kinds: Vec<Option<CadLayer>> = g.lines[ml..].iter().map(|l| kinds.get(&l.pick).map(|k| k.0)).collect();
+    let text_kinds: Vec<Option<CadLayer>> = g.texts[mt..].iter().map(|t| kinds.get(&t.pick).map(|k| k.1)).collect();
+    g.cad_runs(ml, &line_kinds, mt, &text_kinds);
     for l in &mut g.lines[ml..] {
         l.pick = remap.get(&l.pick).copied().unwrap_or(0);
     }
@@ -1383,7 +1549,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         if drawing.props.image_borders {
             let pick = picks.id(PickTarget::Image(im.id));
             let (p, s) = (im.pos, im.size);
+            let image_mark = g.mark();
             g.lines.push(Polyline2 { points: vec![p, [p[0] + s[0], p[1]], [p[0] + s[0], p[1] + s[1]], [p[0], p[1] + s[1]]], style: LineStyle::Thin, closed: true, pick });
+            g.cad_since(image_mark, CadLayer::Images);
         }
     }
 
@@ -1393,7 +1561,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let ent = |e: noshape_sketch::EntityId| cell.borrow_mut().id(PickTarget::SketchEntity(e.0));
         let hat = |h: u64| cell.borrow_mut().id(PickTarget::Hatch(h));
         let to_sheet = |v: ViewId, p: [f64; 2]| placements.iter().find(|pl| pl.id == v).map(|pl| pl.to_sheet(p));
+        let sketch_mark = g.mark();
         sheet.sketch.render(&mut g, &ent, &hat, &to_sheet);
+        g.cad_since(sketch_mark, CadLayer::SketchedGeometry);
     }
 
     // Tables (and hole tags in their views).
@@ -1416,6 +1586,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let layout = tables::layout(t, &data);
         let (l0, t0, f0) = (g.lines.len(), g.texts.len(), g.fills.len());
         tables::render(&mut g, t, &data, &layout, pick);
+        g.cad_since((l0, t0, f0), CadLayer::Tables);
         // Moved to a format layer: its color, locked with the format.
         if !t.layer.is_drawing() {
             let span = LayerSpan { lines: l0..g.lines.len(), texts: t0..g.texts.len(), fills: f0..g.fills.len(), layer: t.layer };
@@ -1430,6 +1601,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         }
         if let (TableKind::Hole { flip_x, flip_y, .. }, Some(geo), Some(pl), Some(o)) = (&t.kind, geo, view.and_then(place), origin) {
             let os = pl.to_sheet(o);
+            let origin_mark = g.mark();
             // The tag axis: X and Y arrows in the table's directions.
             let (sx, sy) = (if *flip_x { -1.0 } else { 1.0 }, if *flip_y { -1.0 } else { 1.0 });
             let (xt, yt) = ([os[0] + 8.0 * sx, os[1]], [os[0], os[1] + 8.0 * sy]);
@@ -1440,6 +1612,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             g.texts.push(Text2 { pos: [xt[0] + 1.5 * sx - if sx < 0.0 { 1.8 } else { 0.0 }, xt[1] - 0.9], height: 1.8, text: "X".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
             g.texts.push(Text2 { pos: [yt[0] - 0.6, yt[1] + if sy > 0.0 { 1.0 } else { -2.8 }], height: 1.8, text: "Y".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick });
             g.fills.push(Fill2 { points: circle_points(os, 0.8, 8) });
+            g.cad_since(origin_mark, CadLayer::OriginIndicators);
             for hrow in tables::hole_rows(geo, o) {
                 let c = pl.to_sheet(hrow.center);
                 let r = pl.len_to_sheet(hrow.diameter / 2.0);

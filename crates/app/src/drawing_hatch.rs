@@ -52,45 +52,31 @@ pub struct HatchDlg {
     _subs: [Subscription; 2],
 }
 
-/// "Auto" (None) or the number typed (a trailing unit or ° ignored).
-fn parse_auto(s: &str) -> Option<f64> {
-    let t = s.trim().trim_end_matches(['°', ' ']).trim_end_matches("deg").trim();
-    if t.is_empty() || t.eq_ignore_ascii_case("auto") { None } else { t.parse::<f64>().ok() }
-}
-
 impl HatchDlg {
-    fn scale_value(&self, cx: &App) -> f64 {
-        if self.standard == 2 {
-            return 1.0;
+    /// The dialog's options as typed (see `noshape_scene::drawing_tools::HatchOpts`).
+    fn opts(&self, cx: &App) -> noshape_scene::drawing_tools::HatchOpts {
+        noshape_scene::drawing_tools::HatchOpts {
+            standard: self.standard,
+            pattern: self.pattern,
+            scale: self.scale.read(cx).value().to_string(),
+            angle: self.angle.read(cx).value().to_string(),
+            drawing_color: self.drawing_color,
+            color: self.color,
+            profiles: self.profiles.clone(),
         }
-        parse_auto(&self.scale.read(cx).value()).filter(|s| *s > 0.0).unwrap_or(1.0)
+    }
+
+    fn scale_value(&self, cx: &App) -> f64 {
+        self.opts(cx).scale_value()
     }
 
     /// The angle added to the pattern's own.
     fn angle_value(&self, cx: &App) -> f64 {
-        if self.standard == 2 {
-            return 0.0;
-        }
-        parse_auto(&self.angle.read(cx).value()).map(|a| a - hatch_pat::base_angle(self.standard, self.pattern)).unwrap_or(0.0)
+        self.opts(cx).angle_value()
     }
 
     fn regions(&self, first_id: u64, cx: &App) -> Vec<HatchRegion> {
-        let (scale, angle) = (self.scale_value(cx), self.angle_value(cx));
-        self.profiles
-            .iter()
-            .enumerate()
-            .map(|(i, ((boundary, holes), view))| HatchRegion {
-                id: first_id + i as u64,
-                boundary: boundary.clone(),
-                holes: holes.clone(),
-                view: *view,
-                standard: self.standard,
-                pattern: self.pattern,
-                scale,
-                angle,
-                color: if self.drawing_color { None } else { self.color.or(Some([0, 0, 0])) },
-            })
-            .collect()
+        self.opts(cx).regions(first_id)
     }
 }
 
@@ -110,8 +96,8 @@ impl DrawingEditor {
             ),
             None => ("Auto".into(), "Auto".into()),
         };
-        let scale = cx.new(|cx| InputState::new(window, cx).default_value(scale_text));
-        let angle = cx.new(|cx| InputState::new(window, cx).default_value(angle_text));
+        let scale = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(scale_text));
+        let angle = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(angle_text));
         let sub = |st: &Entity<InputState>, cx: &mut Context<Self>| {
             cx.subscribe(st, |this: &mut Self, _, ev: &InputEvent, cx| {
                 if matches!(ev, InputEvent::Change) {

@@ -225,7 +225,7 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
         return None;
     }
     let mut first = None;
-    let label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.root))).collect::<Vec<_>>().join(", ");
+    let label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
     let mut errors: Vec<String> = Vec::new();
     let files: Vec<noshape_model::file_tab::FileTab> = if keep_files {
         paths.iter().filter_map(|p| Some(noshape_model::file_tab::FileTab::new(&crate::workspace::import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect()
@@ -255,12 +255,17 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
                     }
                     continue;
                 }
-                match noshape_model::native_assembly::add_native_assembly(d, &a.root, &a.components, &a.files, c.appearances, &units) {
-                    Ok((studio, assembly)) => {
+                match noshape_model::native_assembly::add_native_zip(d, a, c.appearances, &units) {
+                    Ok(noshape_model::native_assembly::NativeTabs::Assembly { studio, assembly }) => {
                         crate::workspace::place_after(d, assembly, at);
                         crate::workspace::place_after(d, studio, Some(assembly));
                         at = Some(studio);
                         first.get_or_insert(assembly);
+                    }
+                    Ok(noshape_model::native_assembly::NativeTabs::Studio(studio)) => {
+                        crate::workspace::place_after(d, studio, at);
+                        at = Some(studio);
+                        first.get_or_insert(studio);
                     }
                     Err(e) => errors.push(format!("Import failed: {}: {e}", a.root)),
                 }

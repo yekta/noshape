@@ -12,6 +12,7 @@ use crate::params::{NumKind, ParamValue, ParamValues, ReferenceKind, fill_defaul
 use crate::reference::FeatureId;
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, err};
 use noshape_featurescript::interp::{Interp, Notice};
+use noshape_featurescript::ir::GlobalCell;
 use noshape_featurescript::value::{Map, Value, type_info};
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -33,6 +34,20 @@ pub struct FeatureOutput {
     pub feature_name: String,
     pub notices: Vec<Notice>,
     pub output: String,
+    /// Time per (module, line) while profiling ([`set_profiling`]).
+    pub line_times: Vec<(Arc<str>, u32, std::time::Duration)>,
+}
+
+static PROFILING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Feature Studio "Profile <Part Studio>": time every FeatureScript line of
+/// the custom features run from now on.
+pub fn set_profiling(on: bool) {
+    PROFILING.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn profiling() -> bool {
+    PROFILING.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 static OUTPUTS: LazyLock<Mutex<HashMap<FeatureId, FeatureOutput>>> = LazyLock::new(Default::default);
@@ -152,18 +167,26 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
         return err(format!("The Feature Studio no longer defines \"{name}\""));
     };
 
+    run_feature(ev, &def.cell, &def.params, &def.feature_type.params, type_id, Some(&*provider))
+}
+
+/// Run a feature lambda (`cell`: `(context, id, definition)`) on the Part
+/// Studio context, its definition built from `params` (the precondition's
+/// parameters) and the feature's values (`specs` fill the defaults); used for
+/// custom features and for built-in features run by the standard library.
+pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[ParamDecl], specs: &[crate::params::ParamSpec], type_id: String, provider: Option<&dyn super::CustomFeatureProvider>) -> FResult<()> {
     let mut values: ParamValues = ev.params.clone();
-    fill_defaults(&def.feature_type.params, &mut values, ev.units);
+    fill_defaults(specs, &mut values, ev.units);
     // Live (FS probe at Size 0.5 mm): "A parameter value is not valid.",
     // the field marked.
-    if let Some(id) = out_of_bounds(ev, &def.feature_type.params, &values) {
+    if let Some(id) = out_of_bounds(ev, specs, &values) {
         return Err(FeatureError { faulty: vec![id], ..FeatureError::new("A parameter value is not valid.") });
     }
 
     // Printed object numbers restart per feature run (the Context is "BuiltIn: 0").
     noshape_featurescript::value::reset_shown_numbers();
     let cx = FsContext::new(std::mem::take(&mut ev.ctx), ev.feature, ev.name.to_string(), *ev.units, ev.outer_vars.clone(), ev.xform);
-    let definition = match definition(&cx, &def.params, &values, ev, Some(&*provider)) {
+    let definition = match definition(&cx, params, &values, ev, provider) {
         Ok(d) => d,
         Err(e) => {
             ev.ctx = cx.take_context();
@@ -172,7 +195,7 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
     };
     let feature_id = vec![Arc::<str>::from(ev.feature.to_string())];
     let ctx_value = cx.value();
-    let cell = def.cell.clone();
+    let cell = cell.clone();
     let counters = noshape_featurescript::value::shown_counters();
     let derived = ev.derived.clone();
 
@@ -185,18 +208,22 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
                 host::set_derived(derived);
                 let mut i = Interp::new();
                 i.set_deadline(Some(Instant::now() + TIME_LIMIT));
+                if profiling() {
+                    i.profile = Some(Default::default());
+                }
                 let f = i.global(&cell);
                 let r = f.and_then(|f| i.call_value(&f, vec![ctx_value, host::id_value(&feature_id), definition]));
-                (r.map(|_| ()).map_err(|e| e.message()), std::mem::take(&mut i.notices), std::mem::take(&mut i.output))
+                let lines = i.profile.take().map(|p| p.times.into_iter().map(|((m, l), t)| (m, l, t)).collect()).unwrap_or_default();
+                (r.map(|_| ()).map_err(|e| e.message()), std::mem::take(&mut i.notices), std::mem::take(&mut i.output), lines)
             })
             .map(|h| h.join())
     });
-    let (result, notices, output) = match run {
+    let (result, notices, output, line_times) = match run {
         Ok(Ok(r)) => r,
-        _ => (Err("Feature evaluation crashed".to_string()), Vec::new(), String::new()),
+        _ => (Err("Feature evaluation crashed".to_string()), Vec::new(), String::new(), Vec::new()),
     };
     OUTPUT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    OUTPUTS.lock().insert(ev.feature, FeatureOutput { type_id: type_id.clone(), feature_name: ev.name.to_string(), notices, output });
+    OUTPUTS.lock().insert(ev.feature, FeatureOutput { type_id: type_id.clone(), feature_name: ev.name.to_string(), notices, output, line_times });
 
     ev.ctx = cx.take_context();
     let st = cx.state.lock();
@@ -267,6 +294,23 @@ fn notice_entry(doc: &crate::document::Document, n: &noshape_featurescript::inte
         noshape_featurescript::NoticeKind::Info => super::Severity::Info,
     };
     MonitorEntry { message: n.message.clone(), severity, at, rows }
+}
+
+/// Profile of a Part Studio's last regeneration: time per Feature Studio
+/// line, summed over its custom features (live "Profile": bars beside the
+/// lines that ran).
+pub fn profile(doc: &crate::document::Document, part_studio: crate::document::TabId) -> HashMap<crate::document::TabId, std::collections::BTreeMap<u32, std::time::Duration>> {
+    use crate::document::{TabContent, TabId};
+    let mut out: HashMap<TabId, std::collections::BTreeMap<u32, std::time::Duration>> = HashMap::new();
+    let Some(TabContent::PartStudio(ps)) = doc.tab(part_studio).map(|t| &t.content) else { return out };
+    for f in ps.features.iter().filter(|f| !f.suppressed && super::is_custom(&f.type_id)) {
+        let Some(o) = output_of(f.id) else { continue };
+        for (module, line, t) in &o.line_times {
+            let Some(tab) = module.strip_prefix("tab:").and_then(|t| u64::from_str_radix(t, 16).ok()).map(TabId) else { continue };
+            *out.entry(tab).or_default().entry(*line).or_default() += *t;
+        }
+    }
+    out
 }
 
 /// The notices of a custom table run as Monitor entries, ending with

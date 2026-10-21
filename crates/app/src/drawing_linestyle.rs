@@ -31,7 +31,7 @@ pub struct LinestyleDlg {
 
 impl DrawingEditor {
     pub fn open_linestyle(&mut self, view: ViewId, window: &mut Window, cx: &mut Context<Self>) {
-        let dashes = cx.new(|cx| InputState::new(window, cx).default_value("1.00"));
+        let dashes = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value("1.00"));
         self.linestyle = Some(LinestyleDlg { view, edges: Vec::new(), pattern: LinePattern::Solid, dashes, thickness: 0.35, color: None, revert: false });
         cx.notify();
     }

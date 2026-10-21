@@ -9,7 +9,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use crate::ui::TipExt as _;
-use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam};
+use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, VariableKind};
 use noshape_model::params::ParamValue;
 use noshape_model::partstudio::PartStudio;
 
@@ -709,22 +709,27 @@ impl PartStudioView {
         let pal = p();
         let border = gpui_kit::rgb(0xaaaaaa);
         let view = cx.entity();
+        // The split button's bounds: its menu drops from its bottom-left.
+        let button: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let probe = button.clone();
+        // Live (part-studio/181): the split button is 34 px tall with its
+        // border, its top 2 px under the panel's tab strip.
         let main = div()
             .id("cfg-configure")
-            .h(px(28.))
+            .h(px(32.))
             .px(px(10.))
             .flex()
             .items_center()
             .gap(px(6.))
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::assets::icon("table", 16., cx))
+            .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Configure Part Studio"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_config_input("List", cx)));
         let caret = div()
             .id("cfg-configure-more")
-            .w(px(22.))
-            .h(px(28.))
+            .w(px(24.))
+            .h(px(32.))
             .flex()
             .items_center()
             .justify_center()
@@ -732,12 +737,17 @@ impl PartStudioView {
             .border_color(border)
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
-            // Live (part-studio/181): List, Checkbox, Configuration variable.
-            .on_click(move |e: &ClickEvent, window, cx| {
+            .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
+            // Live (part-studio/181): List, Checkbox, Configuration variable, in
+            // a dropdown under the split button, left-aligned and as wide as it,
+            // 4 px below; 28.5 px rows, 20 px icons, text 48 px in.
+            .on_click(move |_: &ClickEvent, window, cx| {
                 let v = view.clone();
-                let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                    for (label, icon, kind) in [("List", "table", "List"), ("Checkbox", "checkbox-input", "Checkbox"), ("Configuration variable", "variable", "Variable")] {
+                let b = button.get();
+                let width = f32::from(b.size.width);
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                    let mut m = m.dropdown().min_width(width).row_height(28.5).text_inset(48.);
+                    for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                         let v = v.clone();
                         m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
                     }
@@ -748,12 +758,21 @@ impl PartStudioView {
                     }
                     m
                 });
-                crate::os_menu::open(e.position(), menu, window, cx);
+                crate::os_menu::open_anchored(point(b.left(), b.bottom() + px(4.)), Anchor::TopLeft, menu, window, cx);
             });
         v_flex()
             .items_center()
-            .pt(px(4.))
-            .child(h_flex().rounded(px(3.)).border_1().border_color(border).bg(pal.panel).child(main).child(caret))
+            .child(
+                h_flex()
+                    .relative()
+                    .rounded(px(3.))
+                    .border_1()
+                    .border_color(border)
+                    .bg(pal.panel)
+                    .child(main)
+                    .child(caret)
+                    .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()),
+            )
             .child(div().mt(px(105.)).child(crate::assets::icon("config-illustration", 160., cx)))
             .child({
                 // Onshape's text in its own four lines (the panel is as wide as
@@ -1032,7 +1051,9 @@ impl PartStudioView {
                         .h(px(23.))
                         .px(px(4.))
                         .gap(px(2.))
-                        .bg(if picking { pal.panel_active } else { pal.panel })
+                        .bg(pal.panel)
+                        // Live (psb 10-21 g): the button greys out (0.4) in the mode.
+                        .when(picking, |d| d.opacity(0.4))
                         .border_1()
                         .border_color(grid)
                         .rounded(px(3.5))
@@ -1906,11 +1927,11 @@ impl PartStudioView {
                     .border_color(border)
                     .cursor_pointer()
                     .hover(|d| d.bg(pal.panel_hover))
-                    .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+                    .child(crate::ui::glyph("ui-dropdown-arrow", 10., gpui_kit::rgb(0x666666)))
                     .on_click(move |e: &ClickEvent, window, cx| {
                         let v = view.clone();
                         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                            for (label, icon, kind) in [("List", "table", "List"), ("Checkbox", "checkbox-input", "Checkbox"), ("Configuration variable", "variable", "Variable")] {
+                            for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                                 let v = v.clone();
                                 m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
                             }
@@ -2092,8 +2113,15 @@ impl PartStudioView {
         let letters = self.studio(cx).map(|s| noshape_model::annotations::datum_letters(&s.annotations)).unwrap_or_default();
         // Toleranced parameters, the open dialog's included (live 596, 598:
         // the panel fills while the feature dialog is still open).
-        let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.clone());
-        let chars = self.studio(cx).map(|s| noshape_model::annotations::characteristics(s, draft.as_ref())).unwrap_or_default();
+        // The studio as shown: the draft in place, later features rolled back
+        // (live 10-21 b: their Nominal reads 0.000 on pink).
+        let chars = self
+            .effective_studio(cx)
+            .map(|(s, upto)| {
+                let upto = upto.unwrap_or_else(|| s.rollback_index());
+                noshape_model::annotations::characteristics(&s, None, upto)
+            })
+            .unwrap_or_default();
         let standard = self.studio(cx).is_some_and(|s| s.default_tolerances.is_some());
         if !letters.is_empty() || !chars.is_empty() || standard {
             return self.render_inspection_filled(letters, chars, cx);
@@ -2199,8 +2227,10 @@ impl PartStudioView {
         let cell = |t: String, bold: bool| div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text).when(bold, |d| d.font_weight(FontWeight::BOLD).bg(gpui_kit::rgb(0xeaeaea))).child(t);
         let n = letters.len();
         let units = self.doc.read(cx).session.doc.settings.units;
-        // Types ▾ (live 599-click-types): nothing ticked shows every row.
+        // Types ▾ (live 599-click-types): nothing ticked shows every row;
+        // Hide default tolerances hides the type-Default rows (10-21 c).
         let shown: Vec<&noshape_model::annotations::Characteristic> = chars.iter().filter(|c| self.ui.insp.shows(c)).collect();
+        let standard = self.studio(cx).and_then(|s| s.default_tolerances.clone());
         let defaults = self.render_default_tolerances_section(cx);
         v_flex()
             .mx(px(-5.))
@@ -2221,21 +2251,44 @@ impl PartStudioView {
             .child(h_flex().border_l_1().border_color(grid).children(letters.into_iter().map(|l| cell(l, true))))
             .child(div().h(px(8.)))
             .child(section("Characteristics", shown.len(), chars.len()).child(self.render_characteristics_tools(cx)))
-            .child(h_flex().border_l_1().border_color(grid).children(["Type", "Nominal value", "Tolerance", "Upper limit", "Lower limit"].map(|h| cell(h.to_string(), true))))
-            // Live 598: "Distance | 20.000 | ±0.000 | 20.000 | 20.000", the
-            // type bold, numbers without their unit.
-            .children(shown.iter().map(|c| {
+            // Hovering a cell darkens its row's Type cell and its column's
+            // header (live psb/tl-99a).
+            .child(h_flex().border_l_1().border_color(grid).children(["Type", "Nominal value", "Tolerance", "Upper limit", "Lower limit"].into_iter().enumerate().map(|(col, h)| {
+                let hot = self.ui.insp.hover_cell.is_some_and(|(_, c)| c == col);
+                cell(h.to_string(), true).when(hot, |d| d.bg(gpui_kit::rgb(0xd5d5d5)))
+            })))
+            // Live 598 / 10-21 b: "Distance | 20.000 | ±0.000 | 20.000 |
+            // 20.000", the type bold, numbers without their unit.
+            .children(shown.iter().enumerate().map(|(row, c)| {
                 let factor = units.si_factor(c.dim);
                 let decimals = usize::from(if c.dim == noshape_units::Dim::ANGLE { units.angle_precision } else { units.length_precision });
-                let [tol, upper, lower] = c.cells(factor, decimals);
-                h_flex()
-                    .border_l_1()
-                    .border_color(grid)
-                    .child(cell(c.kind.to_string(), false).font_weight(FontWeight::BOLD))
-                    .child(cell(format!("{:.*}", c.tolerance.precision.map(usize::from).unwrap_or(decimals), c.nominal / factor), false))
-                    .child(cell(tol, false))
-                    .child(cell(upper, false))
-                    .child(cell(lower, false))
+                let [nominal, tol, upper, lower] = c.cells(factor, decimals, standard.as_deref());
+                let feature = c.feature;
+                let (hover, focus) = (self.ui.insp.hover_cell, self.ui.insp.focus_cell);
+                let rolled_back = c.rolled_back;
+                h_flex().border_l_1().border_color(grid).children([c.kind.to_string(), nominal, tol, upper, lower].into_iter().enumerate().map(|(col, text)| {
+                    cell(text, false)
+                        .id(SharedString::from(format!("insp-cell-{row}-{col}")))
+                        .when(col == 0, |d| d.font_weight(FontWeight::BOLD).when(hover.is_some_and(|(r, _)| r == row), |d| d.bg(gpui_kit::rgb(0xd5d5d5))))
+                        .when(col == 1 && rolled_back, |d| d.bg(gpui_kit::rgb(0xf9ebec)))
+                        // Click: a 2 px blue focus border, nothing selected.
+                        .when(focus == Some((row, col)), |d| d.border_2().border_color(pal.accent))
+                        .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                            let cellid = (*h).then_some((row, col));
+                            if *h || this.ui.insp.hover_cell == Some((row, col)) {
+                                this.ui.insp.hover_cell = cellid;
+                                // The feature's geometry pre-highlights and its
+                                // list row lights up.
+                                this.ui.insp.hover_feature = h.then_some(feature);
+                                this.refresh_scene(false, cx);
+                                cx.notify();
+                            }
+                        }))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.ui.insp.focus_cell = Some((row, col));
+                            cx.notify();
+                        }))
+                }))
             }))
             .when_some(defaults, |d, body| d.child(div().h(px(8.))).child(section_plain("Default tolerances")).child(body))
             .into_any_element()
@@ -2331,7 +2384,7 @@ impl PartStudioView {
             .gap(px(6.))
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::assets::icon("table", 16., cx))
+            .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Add configuration input"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_config_input("List", cx)));
         let caret = div()
@@ -2349,7 +2402,7 @@ impl PartStudioView {
             .on_click(move |e: &ClickEvent, window, cx| {
                 let v = view.clone();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                    for (label, icon, kind) in [("List", "table", "List"), ("Checkbox", "checkbox-input", "Checkbox"), ("Configuration variable", "variable", "Variable")] {
+                    for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                         let v = v.clone();
                         m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));
                     }
@@ -2363,6 +2416,47 @@ impl PartStudioView {
                 crate::os_menu::open_anchored(e.position(), Anchor::BottomLeft, menu, window, cx);
             });
         h_flex().rounded(px(3.)).border_1().border_color(border).bg(pal.panel).child(main).child(caret).into_any_element()
+    }
+
+    /// The parameters of `feature` that are configured, and whether the
+    /// studio has a list or checkbox input (parameters can be configured).
+    pub(super) fn configured_of(&self, feature: noshape_model::FeatureId, cx: &App) -> (std::collections::HashSet<String>, bool) {
+        let Some(ps) = self.studio(cx) else { return Default::default() };
+        let cfg = &ps.configuration;
+        let set = cfg.configured.iter().filter(|c| c.feature == feature).map(|c| c.param.clone()).collect();
+        (set, cfg.inputs.iter().any(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })))
+    }
+
+    /// Configure / unconfigure a parameter of the open dialog (configure
+    /// mode click, right-click Configure / Unconfigure; live psb 10-21 g):
+    /// the dialog stays open, the parameter gets its "Configured" outline
+    /// and Onshape's toast "Extrude 1 Depth added to Size" shows ~6.7 s.
+    pub(super) fn configure_dialog_param(&mut self, param: &str, on: bool, cx: &mut Context<Self>) {
+        let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) else { return };
+        let feature = dialog.read(cx).feature.clone();
+        let Some(ps) = self.studio(cx) else { return };
+        let inputs: Vec<(String, String)> = ps.configuration.inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).map(|i| (i.id.clone(), i.name.clone())).collect();
+        // The input being configured (Configure features), else the first.
+        let Some((input, input_name)) = self.ui.configure_pick.as_ref().and_then(|id| inputs.iter().find(|(i, _)| i == id).cloned()).or_else(|| inputs.first().cloned()) else { return };
+        let label = if param == noshape_model::configuration::SUPPRESSED_PARAM {
+            "Unsuppressed".to_string()
+        } else {
+            feature.feature_type().and_then(|t| t.params.iter().find(|s| s.id == param).map(|s| s.label.to_string())).unwrap_or_else(|| param.to_string())
+        };
+        if on {
+            self.add_configured(feature.id, param, &input, cx);
+            self.flash_for(noshape_model::display::FeatureStatus::Info, format!("{} {label} added to {input_name}", feature.name), std::time::Duration::from_millis(6700), cx);
+        } else {
+            let (fid, p) = (feature.id, param.to_string());
+            self.edit_config("Unconfigure parameter", cx, |ps| ps.configuration.configured.retain(|c| !(c.feature == fid && c.param == p)));
+        }
+        let (configured, _) = self.configured_of(feature.id, cx);
+        dialog.update(cx, |d, cx| {
+            d.configured = configured;
+            cx.notify();
+        });
+        self.right_panel = Some(RightPanel::Configurations);
+        cx.notify();
     }
 
     pub(super) fn add_configured(&mut self, feature: noshape_model::FeatureId, param: &str, input: &str, cx: &mut Context<Self>) {
@@ -2397,6 +2491,13 @@ impl PartStudioView {
             let current = typed.unwrap_or_else(|| effective.0.get(&input.id).cloned().unwrap_or_default());
             let i = input.clone();
             self.cell_input(key, current, window, cx, move |this, v, cx| {
+                // Live (qa5 C8): a bare number takes the workspace unit, "25" →
+                // "25 mm" (lengths) / "25 deg" (angles).
+                let v = match &i.kind {
+                    ConfigInputKind::Variable { kind: VariableKind::Length, .. } => noshape_model::variable_table::with_workspace_unit("LENGTH", &v, &units),
+                    ConfigInputKind::Variable { kind: VariableKind::Angle, .. } => noshape_model::variable_table::with_workspace_unit("ANGLE", &v, &units),
+                    _ => v,
+                };
                 // An invalid value stays in the field and isn't applied.
                 if config_value_error(&i, &v, &units).is_some() {
                     cx.notify();
@@ -2453,10 +2554,34 @@ impl PartStudioView {
             .when(!self.display.bodies.is_empty() || !self.display.sketches.is_empty(), |d| d.child(btn("panel-appearance", "appearance", "Appearance panel", RightPanel::Appearance, cx)))
             .child(btn("panel-config", "configuration", "Configuration panel", RightPanel::Configurations, cx))
             .child(btn("panel-custom", "featurescript-table", "Custom tables", RightPanel::CustomTables, cx))
-            .child(btn("panel-inspection", "inspection-table", "Inspection table", RightPanel::Inspection, cx))
+            .child(btn("panel-inspection", "mbd-status", "Inspection table", RightPanel::Inspection, cx))
             .child(btn("panel-vars", "variable-table", "Variable table", RightPanel::Variables, cx))
             .when(self.has_sheet_metal(), |d| d.child(btn("panel-sm", "sheet-metal-table", "Sheet metal: flat pattern and bend table", RightPanel::SheetMetal, cx)))
             .when(self.has_frames(), |d| d.child(btn("panel-cut", "cut-list", "Cut list", RightPanel::CutList, cx)))
+            // Live rp-906/914: with the Repair panel open, its wrench "Repair
+            // panel" (active, joined to the panel) closes it.
+            .when(crate::repair_mode::is_open(&self.doc, cx), |d| {
+                let doc = self.doc.clone();
+                d.child(
+                    div()
+                        .id("panel-repair")
+                        .w(px(33.))
+                        .h(px(34.))
+                        .mt(px(-1.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .bg(pal.panel)
+                        .hover(|d| d.bg(pal.panel_hover))
+                        .cursor_pointer()
+                        .border_1()
+                        .border_r_0()
+                        .border_color(pal.border_strong)
+                        .child(crate::assets::icon("repair", 20., cx))
+                        .tip("Repair panel", crate::ui::TipSide::Left)
+                        .on_click(move |_, _, cx| crate::repair_mode::close(&doc, cx)),
+                )
+            })
             .into_any_element()
     }
 }

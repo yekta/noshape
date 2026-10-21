@@ -45,6 +45,10 @@ pub mod surfacing_c;
 pub type EvalFn = fn(&mut EvalCtx) -> FResult<()>;
 
 pub fn evaluator(type_id: &str) -> Option<EvalFn> {
+    // Sheet metal by the standard library (custom/std_feature.rs), when on.
+    if let Some(f) = crate::custom::std_feature::evaluator(type_id) {
+        return Some(f);
+    }
     Some(match type_id {
         "sketch" => sketch::eval,
         "extrude" => extrude::eval,

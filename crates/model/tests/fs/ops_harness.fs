@@ -40,8 +40,8 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const v = evVolume(context, { "entities" : qCreatedBy(sub, EntityType.BODY) });
             check("box", near(v, 1000 * mm ^ 3), v);
             check("evArea", abs(evArea(context, { "entities" : qCreatedBy(sub, EntityType.FACE) }) - 600 * mm ^ 2) < 1e-12 * meter ^ 2, "");
-            const box = evBox3d(context, { "topology" : qCreatedBy(sub, EntityType.BODY) });
-            check("evBox3d", tolerantEquals(box.maxCorner, vector(10, 10, 10) * mm), box);
+            const bx = evBox3d(context, { "topology" : qCreatedBy(sub, EntityType.BODY) });
+            check("evBox3d", tolerantEquals(bx.maxCorner, vector(10, 10, 10) * mm), bx);
             const edge = qContainsPoint(qCreatedBy(sub, EntityType.EDGE), vector(5, 0, 0) * mm);
             check("evLength", abs(evLength(context, { "entities" : edge }) - 10 * mm) < 1e-12 * meter, evLength(context, { "entities" : edge }));
             const line = evEdgeTangentLine(context, { "edge" : edge, "parameter" : 0.5 });

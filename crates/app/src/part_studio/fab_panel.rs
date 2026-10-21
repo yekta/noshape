@@ -79,7 +79,7 @@ impl PartStudioView {
             let kv = |k: &str, v: String| h_flex().justify_between().text_xs().child(div().text_color(pal.text_muted).child(k.to_string())).child(div().text_color(pal.text).child(v)).into_any_element();
             out.push(kv("Flat size", format!("{} × {}", len(size.x), len(size.y))));
             out.push(kv("Thickness", len(flat.thickness)));
-            out.push(kv("Area", format!("{:.0} mm²", flat.area() * 1e6)));
+            out.push(kv("Area", format!("{} mm²", noshape_units::to_fixed(flat.area() * 1e6, 0))));
             out.push(kv("Bends", flat.bend_lines.len().to_string()));
             for w in &flat.warnings {
                 out.push(div().text_xs().text_color(pal.warning).child(w.clone()).into_any_element());
@@ -94,7 +94,7 @@ impl PartStudioView {
                             .text_color(pal.text)
                             .child(div().w(px(24.)).text_color(pal.text_muted).child(format!("{}", i + 1)))
                             .child(div().w(px(52.)).text_color(if b.up { pal.success } else { pal.info }).child(if b.up { "Up" } else { "Down" }))
-                            .child(div().w(px(56.)).child(format!("{:.1}°", b.angle.to_degrees())))
+                            .child(div().w(px(56.)).child(format!("{}°", noshape_units::to_fixed(b.angle.to_degrees(), 1))))
                             .child(div().w(px(64.)).child(len(b.radius)))
                             .child(div().flex_1().child(len(b.allowance)))
                             .into_any_element(),
@@ -124,7 +124,7 @@ impl PartStudioView {
         }
         let units = self.doc.read(cx).session.doc.settings.units;
         let len = |v: f64| noshape_units::format_quantity(noshape_units::Quantity::new(v, noshape_units::Dim::LENGTH), &units);
-        let ang = |a: Option<f64>| a.map(|a| format!("{:.1}°", a.to_degrees())).unwrap_or_else(|| "—".into());
+        let ang = |a: Option<f64>| a.map(|a| format!("{}°", noshape_units::to_fixed(a.to_degrees(), 1))).unwrap_or_else(|| "—".into());
         let header = h_flex()
             .text_xs()
             .text_color(pal.text_faint)

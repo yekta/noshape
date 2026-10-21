@@ -294,7 +294,7 @@ fn feature_lambda(e: &ast::Expr) -> Option<&ast::FnDef> {
 }
 
 /// The lambda passed to `define(...)` (`defineFeature`, `defineTable`).
-fn defined_lambda<'a>(e: &'a ast::Expr, define: &str) -> Option<&'a ast::FnDef> {
+pub(crate) fn defined_lambda<'a>(e: &'a ast::Expr, define: &str) -> Option<&'a ast::FnDef> {
     match &*e.kind {
         ExprKind::Call(f, args) if matches!(&*f.kind, ExprKind::Ident(q) if &*q.name == define) => match args.first().map(|a| &*a.kind) {
             Some(ExprKind::Lambda(def)) => Some(def),
@@ -389,7 +389,7 @@ fn compile_condition(module: &CompiledModule, cond: &ast::Expr, root: &str) -> O
     module.compile_lambda(&[root], cond).ok()
 }
 
-fn collect_params(module: &Arc<CompiledModule>, s: &ast::Stmt, out: &mut Vec<ParamDecl>) {
+pub(crate) fn collect_params(module: &Arc<CompiledModule>, s: &ast::Stmt, out: &mut Vec<ParamDecl>) {
     collect_in(module, s, &[], None, &[], out)
 }
 

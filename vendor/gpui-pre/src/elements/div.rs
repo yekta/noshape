@@ -3197,6 +3197,10 @@ impl Interactivity {
                     .long_press_tooltip_active
                     .get_or_insert_with(Default::default)
                     .clone();
+                let tooltip_pressed = element_state
+                    .tooltip_pressed
+                    .get_or_insert_with(Default::default)
+                    .clone();
 
                 let tooltip_is_hoverable = tooltip_builder.hoverable;
                 let build_tooltip = Rc::new(move |window: &mut Window, cx: &mut App| {
@@ -3212,6 +3216,11 @@ impl Interactivity {
                             && source_bounds.contains(&window.mouse_position())
                     }
                 });
+                // The pointer over the element, pressed or not.
+                let is_inside: Rc<dyn Fn(&Window) -> bool> = Rc::new({
+                    let hitbox = hitbox.clone();
+                    move |window: &Window| hitbox.is_hovered(window)
+                });
                 let check_is_hovered = Rc::new({
                     let hitbox = hitbox.clone();
                     move |window: &Window| {
@@ -3225,6 +3234,7 @@ impl Interactivity {
                     check_is_hovered,
                     check_is_hovered_during_prepaint,
                     long_press_tooltip_active,
+                    (tooltip_pressed, is_inside),
                     self.tooltip_show_delay,
                     window,
                 );
@@ -3624,6 +3634,8 @@ pub struct InteractiveElementState {
     ongoing_scroll: Option<Rc<RefCell<OngoingScroll>>>,
     pub(crate) active_tooltip: Option<Rc<RefCell<Option<ActiveTooltip>>>>,
     long_press_tooltip_active: Option<Rc<Cell<bool>>>,
+    /// NOSHAPE PATCH: see [`TooltipPressGate`].
+    tooltip_pressed: Option<TooltipPressGate>,
 }
 
 /// Whether or not the element or a group that contains it is clicked by the mouse.
@@ -3709,6 +3721,36 @@ pub(crate) fn set_tooltip_on_window(
     Some(window.set_tooltip(tooltip))
 }
 
+/// NOSHAPE PATCH: as in a browser, pressing an element hides its tooltip,
+/// and it doesn't come back until the pointer has left the element (a click
+/// that opens a dialog, list or panel under the pointer must not leave the
+/// tooltip over it). One per element with a tooltip.
+#[derive(Clone, Default)]
+pub struct TooltipPressGate(Rc<Cell<bool>>);
+
+impl TooltipPressGate {
+    /// A mouse button went down; `inside`: over the element. True when the
+    /// tooltip must hide (the press was on the element).
+    pub fn press(&self, inside: bool) -> bool {
+        if inside {
+            self.0.set(true);
+        }
+        inside
+    }
+
+    /// The pointer moved; false while the tooltip must stay hidden (pressed
+    /// and still over the element). Leaving the element lifts the block.
+    pub fn may_show(&self, inside: bool) -> bool {
+        if self.0.get() {
+            if inside {
+                return false;
+            }
+            self.0.set(false);
+        }
+        true
+    }
+}
+
 pub(crate) fn register_tooltip_mouse_handlers(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     tooltip_id: Option<TooltipId>,
@@ -3716,9 +3758,14 @@ pub(crate) fn register_tooltip_mouse_handlers(
     check_is_hovered: Rc<dyn Fn(&Window) -> bool>,
     check_is_hovered_during_prepaint: Rc<dyn Fn(&Window) -> bool>,
     long_press_tooltip_active: Rc<Cell<bool>>,
+    (pressed, is_inside): (TooltipPressGate, Rc<dyn Fn(&Window) -> bool>),
     show_delay: Option<Duration>,
     window: &mut Window,
 ) {
+    // NOSHAPE PATCH: as in a browser, pressing an element hides its tooltip
+    // and it doesn't come back until the pointer has left the element (a
+    // click that opens a dialog, list or panel under the pointer must not
+    // leave the tooltip over it).
     let current_view = window.current_view();
     let show_delay = show_delay.unwrap_or(DEFAULT_TOOLTIP_SHOW_DELAY);
 
@@ -3727,7 +3774,11 @@ pub(crate) fn register_tooltip_mouse_handlers(
         let build_tooltip = build_tooltip.clone();
         let check_is_hovered = check_is_hovered.clone();
         let check_is_hovered_during_prepaint = check_is_hovered_during_prepaint.clone();
+        let (pressed, is_inside) = (pressed.clone(), is_inside.clone());
         move |_: &MouseMoveEvent, phase, window, cx| {
+            if !pressed.may_show(is_inside(window)) {
+                return;
+            }
             handle_tooltip_mouse_move(
                 &active_tooltip,
                 &build_tooltip,
@@ -3747,7 +3798,11 @@ pub(crate) fn register_tooltip_mouse_handlers(
         let active_tooltip = active_tooltip.clone();
         move |_: &MouseDownEvent, _phase, window: &mut Window, _cx| {
             if !tooltip_id.is_some_and(|tooltip_id| tooltip_id.is_hovered(window)) {
-                clear_active_tooltip_if_not_hoverable(&active_tooltip, window);
+                if pressed.press(is_inside(window)) {
+                    clear_active_tooltip(&active_tooltip, window);
+                } else {
+                    clear_active_tooltip_if_not_hoverable(&active_tooltip, window);
+                }
             }
         }
     });

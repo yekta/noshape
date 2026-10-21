@@ -392,6 +392,10 @@ impl<'a> Parser<'a> {
                 self.bump();
                 Ok(QualName { ns: None, name: "undefined".into() })
             }
+            Tok::Kw(Kw::Box) => {
+                self.bump();
+                Ok(QualName { ns: None, name: "box".into() })
+            }
             Tok::Ident(_) => self.qual_name(),
             _ => self.unexpected("ID", None),
         }
@@ -927,7 +931,7 @@ impl<'a> Parser<'a> {
             }
             Tok::Kw(Kw::New) => {
                 self.bump();
-                if !self.is_ident("box") {
+                if !matches!(self.peek(), Tok::Kw(Kw::Box)) {
                     return self.unexpected("'box'", None);
                 }
                 self.bump();

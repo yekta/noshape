@@ -146,6 +146,17 @@ impl Args<'_> {
 static REGISTRY: std::sync::OnceLock<Vec<Op>> = std::sync::OnceLock::new();
 
 /// Every operation, in a stable order (grouped).
+/// The groups, in order of their first operation, each once.
+pub fn groups() -> Vec<&'static str> {
+    let mut g: Vec<&'static str> = Vec::new();
+    for op in all() {
+        if !g.contains(&op.group) {
+            g.push(op.group);
+        }
+    }
+    g
+}
+
 pub fn all() -> &'static [Op] {
     REGISTRY.get_or_init(crate::ops::all)
 }

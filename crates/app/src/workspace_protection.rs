@@ -116,25 +116,46 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
     });
 }
 
-/// The banner at the top of the document while the protected workspace is
-/// active: a white bar like the version view-only bar.
-pub fn render_banner(doc: &Entity<DocModel>, cx: &App) -> Option<AnyElement> {
-    if !doc.read(cx).session.is_protected() {
+/// The message on a protected workspace's drawings (live wp-928).
+const BANNER_MESSAGE: &str = "Workspace protection enabled.  Changes must be merged in from another workspace.";
+
+/// While the protected workspace is active, Onshape's view-only-mode bar in
+/// the toolbar row (live wp-928 / 930: white, 32 px, rounded below, 14 px
+/// `#333` / 600): a Part Studio shows the read-only document's "This
+/// document is view only. [Make a copy to edit] (?)", a drawing (and the
+/// other tabs) "Workspace protection enabled.  Changes must be merged in
+/// from another workspace." (501 px, truncated) and (?). workspace.rs puts
+/// it over the toolbar row.
+pub fn render_banner(doc: &Entity<DocModel>, part_studio: bool, cx: &App) -> Option<AnyElement> {
+    let s = &doc.read(cx).session;
+    if !s.is_protected() {
         return None;
     }
-    Some(
-        h_flex()
-            .id("protected-banner")
-            .h(px(32.))
-            .px(px(20.))
-            .gap(px(8.))
-            .bg(rgb(0xffffff))
-            .border_1()
-            .border_t_0()
-            .border_color(rgb(0xcccccc))
-            .rounded_b(px(6.))
-            .child(crate::assets::icon("lock", 16., cx))
-            .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(rgb(0x333333)).child(crate::session::PROTECTED_MESSAGE))
-            .into_any_element(),
-    )
+    let pal = p();
+    let help = div().size(px(18.)).flex_none().rounded_full().bg(rgb(0x999999)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?");
+    let bar = h_flex().id("protected-banner").h(px(32.)).px(px(20.)).gap(px(10.)).bg(rgb(0xffffff)).border_1().border_t_0().border_color(rgb(0xcccccc)).rounded_b(px(6.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(rgb(0x333333));
+    Some(if part_studio {
+        let d = doc.clone();
+        bar.child("This document is view only.")
+            .child(
+                div()
+                    .id("protected-copy")
+                    .h(px(24.))
+                    .px(px(8.))
+                    .flex()
+                    .items_center()
+                    .rounded(px(3.))
+                    .bg(pal.accent)
+                    .cursor_pointer()
+                    .text_size(px(12.))
+                    .font_weight(FontWeight::NORMAL)
+                    .text_color(rgb(0xffffff))
+                    .child("Make a copy to edit")
+                    .on_click(move |_, window, cx| crate::doc_dialogs::copy_workspace(d.clone(), window, cx)),
+            )
+            .child(help)
+            .into_any_element()
+    } else {
+        bar.max_w(px(501.)).child(div().min_w_0().truncate().child(BANNER_MESSAGE)).child(help).into_any_element()
+    })
 }

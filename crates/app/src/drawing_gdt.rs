@@ -19,22 +19,7 @@ use gpui_kit::*;
 use noshape_model::drawing::{Annotation, AnnotationKind, GdtExtra, GdtLeader};
 
 /// The Type list (glyph, name) in Onshape's order.
-pub const GDT_TYPES: [(&str, &str); 14] = [
-    ("⌖", "Position"),
-    ("◎", "Concentricity"),
-    ("⌯", "Symmetry"),
-    ("∥", "Parallelism"),
-    ("⟂", "Perpendicularity"),
-    ("∠", "Angularity"),
-    ("⌭", "Cylindricity"),
-    ("▱", "Flatness"),
-    ("○", "Roundness"),
-    ("⏤", "Straightness"),
-    ("⌓", "Profile (Surface)"),
-    ("⌒", "Profile (Line)"),
-    ("↗", "Circular runout"),
-    ("⌰", "Total runout"),
-];
+pub use noshape_scene::drawing_tools::GDT_TYPES;
 
 /// The symbol palette (glyph, tooltip) in Onshape's order.
 const PALETTE: [(&str, &str); 28] = [
@@ -119,7 +104,7 @@ impl DrawingEditor {
     fn gdt_row(&mut self, symbol: Option<usize>, cells: &[String], prefix: &str, suffix: &str, window: &mut Window, cx: &mut Context<Self>) -> GdtRow {
         let (before, value, after) = split_tolerance(cells.get(1).map(String::as_str).unwrap_or(""));
         let vals = [prefix.to_string(), before, value, after, cells.get(2).cloned().unwrap_or_default(), cells.get(3).cloned().unwrap_or_default(), cells.get(4).cloned().unwrap_or_default(), suffix.to_string()];
-        let inputs = vals.into_iter().map(|v| cx.new(|cx| InputState::new(window, cx).default_value(v))).collect();
+        let inputs = vals.into_iter().map(|v| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(v))).collect();
         GdtRow { symbol, inputs }
     }
 
@@ -131,8 +116,17 @@ impl DrawingEditor {
             let row = self.gdt_row(sym(r.first()), r, extra.prefix.get(i + 1).map(String::as_str).unwrap_or(""), extra.suffix.get(i + 1).map(String::as_str).unwrap_or(""), window, cx);
             rows.push(row);
         }
-        let upper = cx.new(|cx| InputState::new(window, cx).placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(gpui_kit::FontWeight::NORMAL), color: Some(gpui_kit::rgb(0x707070).into()) }).default_value(extra.upper.clone()));
-        let lower = cx.new(|cx| InputState::new(window, cx).placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(gpui_kit::FontWeight::NORMAL), color: Some(gpui_kit::rgb(0x707070).into()) }).default_value(extra.lower.clone()));
+        let upper = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(gpui_kit::FontWeight::NORMAL), color: Some(gpui_kit::rgb(0x707070).into()) }).default_value(extra.upper.clone()));
+        let lower = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(gpui_kit::FontWeight::NORMAL), color: Some(gpui_kit::rgb(0x707070).into()) }).default_value(extra.lower.clone()));
+        // The Tolerance field takes the keys at once (qa5 D7: it looked
+        // focused but typing went to the canvas). Deferred: the dialog is
+        // created while rendering.
+        let tol = rows[0].inputs[VALUE].downgrade();
+        window.defer(cx, move |window, cx| {
+            if let Some(st) = tol.upgrade() {
+                st.update(cx, |s, cx| s.focus(window, cx));
+            }
+        });
         GdtDlg { edit, rows, upper, lower, leader: extra.leader, symbols: false, focus: (0, VALUE) }
     }
 
@@ -182,38 +176,21 @@ impl DrawingEditor {
     /// The dialog's frame (first row) and extra, None when nothing is entered.
     fn gdt_values(&self, cx: &App) -> Option<(Vec<String>, GdtExtra)> {
         let d = self.gdt_dlg.as_ref()?;
-        let v = |e: &Entity<InputState>| e.read(cx).value().trim().to_string();
-        let cells = |r: &GdtRow, first: bool| -> Vec<String> {
-            let symbol = match r.symbol {
-                Some(i) => GDT_TYPES[i].0.to_string(),
-                None if first => GDT_TYPES[0].0.to_string(),
-                None => "Composite".to_string(),
-            };
-            let mut c = vec![symbol, format!("{}{}{}", v(&r.inputs[BEFORE]), v(&r.inputs[VALUE]), v(&r.inputs[AFTER]))];
-            c.extend((0..3).map(|k| v(&r.inputs[DATUM0 + k])));
-            while c.len() > 2 && c.last().is_some_and(|x| x.is_empty()) {
-                c.pop();
-            }
-            c
-        };
-        let frame = cells(&d.rows[0], true);
-        let extra = GdtExtra {
-            upper: v(&d.upper),
-            lower: v(&d.lower),
-            prefix: d.rows.iter().map(|r| v(&r.inputs[PREFIX])).collect(),
-            suffix: d.rows.iter().map(|r| v(&r.inputs[SUFFIX])).collect(),
-            rows: d.rows.iter().skip(1).map(|r| cells(r, false)).collect(),
-            leader: d.leader,
-        };
-        let mut extra = extra;
-        if extra.prefix.iter().all(String::is_empty) {
-            extra.prefix.clear();
-        }
-        if extra.suffix.iter().all(String::is_empty) {
-            extra.suffix.clear();
-        }
-        let entered = frame.iter().skip(1).any(|c| !c.is_empty()) || !extra.upper.is_empty() || !extra.lower.is_empty() || extra.rows.iter().any(|r| r.iter().skip(1).any(|c| !c.is_empty()));
-        entered.then_some((frame, extra))
+        let v = |e: &Entity<InputState>| e.read(cx).value().to_string();
+        let rows: Vec<noshape_scene::drawing_tools::GdtRowValues> = d
+            .rows
+            .iter()
+            .map(|r| noshape_scene::drawing_tools::GdtRowValues {
+                symbol: r.symbol,
+                prefix: v(&r.inputs[PREFIX]),
+                before: v(&r.inputs[BEFORE]),
+                value: v(&r.inputs[VALUE]),
+                after: v(&r.inputs[AFTER]),
+                datums: [0, 1, 2].map(|k| v(&r.inputs[DATUM0 + k])),
+                suffix: v(&r.inputs[SUFFIX]),
+            })
+            .collect();
+        noshape_scene::drawing_tools::gdt_values(&rows, &v(&d.upper), &v(&d.lower), d.leader)
     }
 
     /// A click with the tool: place a frame there (the dialog stays open).
@@ -273,7 +250,6 @@ impl DrawingEditor {
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
-        let editing = d.edit.is_some();
         let focus = d.focus;
         let leader = d.leader;
         let show_symbols = d.symbols;
@@ -468,7 +444,8 @@ impl DrawingEditor {
                 )
                 .child(crate::ui::input_with_placeholder(input, placeholder, cx).appearance(false).small().text_size(px(21.)).text_color(gpui_kit::rgb(0x555555)).pl(px(0.)))
         };
-        let can_accept = entered && editing;
+        // Live: ✓ is enabled once something is entered (placing: it ends the tool).
+        let can_accept = entered;
         Some(
             v_flex()
                 .id("dr-gdt-dlg")

@@ -362,6 +362,18 @@ Preferences, Release/Publish):**
   Studio (right of the viewport) + the strip's "Repair panel" wrench (psb / ui heads-up via lead), perf
   renders `repair_mode::document()` as the second view (following the camera while
   `synchronized()`). Until then `repair_mode.rs` carries narrow commented `#[allow(dead_code)]`s.
+- **After v0.4.3 (GO):** Repair panel mounted — part_studio/mod.rs: `repair_mode::render_panel` right of
+  the viewport area (567 px; graphics slot `None` until perf's second view), config_panel.rs strip:
+  the active wrench "Repair panel" at the bottom closes it. `repair_mode::document()` /
+  `synchronized()` / `RepairSession.mv` keep commented `#[allow(dead_code)]` for perf.
+- **qa4 R6 #6/#7 (Variable Studio value cell, live input/variable-value-*, behaviours "Input behaviour"
+  F):** a click focuses the cell (no text field: the value, an expression's result, a 2 px `#1651b0`
+  border, tooltip = the stored text); the first printable key opens the editor with that key
+  (type-to-edit), a double-click opens it with all selected; Enter commits and keeps the cell
+  focused, a click away commits, **Esc reverts** (and keeps the cell focused). Unchanged text no
+  longer commits (no empty undo step). R6 #9 (mine): version / workspace Properties — Enter no
+  longer closes the modal and drops the edit (`on_ok` refuses; Apply / Save save). "Create version
+  here…" added to change rows (live rp-904; same Create version dialog, the version at that entry).
 - **Workspace protection — plan:** store meta `workspace_protected:<branch>`; history panel: the
   workspace-row menu item "Workspace protection…" + dialog (look after the live capture) and a lock
   icon on protected workspaces; ops session (api): a `protected()` check refusing tab content edits
@@ -434,6 +446,158 @@ Preferences, Release/Publish):**
     notices filter 30, documents column search 32, location field 30. Left at 28 on purpose:
     start_window 1190 (28 = live) and 1781 (inside its framed box); the 26 px rename fields in
     variable_studio / tab_manager sit in fixed rows.
+
+**Round 10 (21 Oct ~07:00–, new ui2 after an account move; nothing was half done):**
+- Took over: Compare mount, Repair mount, protection banner, Variable Studio value cell (qa4 R6 #6/#7),
+  Overwritten ⓘ, workspace-row Delete and "Create version here…" were all already in the tree (complete edits).
+- **Compare, against live cp-920…924 / dom ui2-compare* / help Document__compare:**
+  `compare_mode.rs` now keys sides by `Side::{Workspace(branch), Entry(mv)}` (`compare(doc, base, target)`
+  replaces `start`; base = the workspace or the version viewed). Bar names are links ("Go to 'Main'": leave
+  compare and open that side). Unchanged tabs get the white dot, still enabled (help fs-compare-01; tooltip
+  "Compare has found no differences." is a guess, REQUESTS ui2 10-21 08:30). `content_override` (workspace.rs):
+  "NOT COMPARABLE" (live cp-923: `#333` bold 14 px) for tabs only in the base, drawings, assemblies and other
+  non Part / Feature Studio tabs; **Feature Studio compare** (help fs-compare-01): side-by-side line diff
+  (model `compare::compare_code`, LCS, paired change runs with the changed characters marked; test
+  `code_side_by_side`), gutter "12 -" / "8 +", pink / green rows with red / green bars, hatched fillers, a
+  12 px scrollbar with red / green change marks after each pane, per-pane sideways scroll (Shift+wheel),
+  editor colours via `feature_studio::line_styles`. Feature list: names black, sketches grey until shown with
+  the row's eye (hover; `CompareSession.shown_sketches` for perf's graphics), live column x's.
+  **"Compare history entries"** header button (tooltip as live): pick mode, first pick blue, second starts
+  the compare (`picking` / `pick` / `first_pick`); exclusive with the Repair wrench. Change rows get the
+  compare highlights too.
+- **Workspace protection bar** = help protections-3.1-ui-message-01: "Workspace protection enabled. Changes
+  must be merged in from another workspace." (bold 14 px `#333`, no icon) in a view-only bar over the
+  toolbar row (workspace.rs, like the compare bar). Live capture still open (blocked until 12:07 UTC).
+- **Merge dialog (new `merge_dialog.rs`, help Document__merging + merge-dialog-* images):** the workspace
+  row's "Merge into current workspace…" opens Onshape's dialog instead of merging at once: chips title,
+  Overall merge strategy cards (Keep / Merge changes / Replace, counts, "Compare with base ↗" = compare
+  mode base ↔ that side), Tabs table (Changes in each side with ✓ / ✗ / !, ⓘ on drawings, per-tab select
+  with icons, yellow when it differs), "N tabs have no changes" group, up-to-date and protected notices,
+  ? · Merge · Cancel. Store: `Document::merge_with(theirs_mv, name, from_branch, into, pick, resolver)` +
+  `MergePick::{Auto, Ours, Theirs}` (store test `merge_with_per_name_picks`); ops session `merge_picked`
+  (merge_from goes through it). New icons merge-card-*.svg / merge-{keep,both,replace}.svg (README).
+  Live capture requested (REQUESTS ui2 10-21 08:45). **Not yet:** assemblies don't really merge
+  (model `merge_tab_blobs` keeps ours for anything but Part / Feature Studios) — needs an assembly 3-way
+  merge; version rows of other branches don't offer "Merge into current workspace…" yet.
+
+- **Assemblies merge** item by item: model `merge::merge_json` (3-way JSON merge; id-keyed lists, key-wise
+  objects, both-sides conflicts keep ours; test `json_merges_items_by_id`), used by `merge_tab_blobs`.
+- **Version stamp (qa4 / lead):** `crate::VERSION` (main.rs) = `NOSHAPE_VERSION` (release.yml now exports it
+  from the tag) else CARGO_PKG_VERSION; documents-page footer shows it as live "(1.222…)" at the right end;
+  document details too. **Lead:** the workspace `version = "0.1.0"` should follow the releases (Cargo.lock).
+- **icons2's findings:** empty-state art 175 px glyph in `#eeeeee` (= live 166 x 150, 20 px over the text);
+  history-panel wrench: ours shows it only while a Part Studio is active, as live (document/22 was on a
+  Variable Studio, ui2/950 / cp-902 on Part Studios show it) — to confirm in the app.
+- **Variable Studio configurations (help VariableStudio__variable_studio_configurations, config-*):**
+  model `variables::VsConfiguration { inputs, configured: Vec<VsConfigured { input, variable, field:
+  Value|Description, values: row key → text }>, active }` on `VariableStudio.configuration`; `StudioRef.config`
+  (an insert's configuration); evaluation applies it (`VariableStudio::configured`, test
+  `configured_studio_evaluates_per_configuration`). App (`variable_config.rs`, a submodule of
+  variable_studio.rs): right-edge Configuration panel button (live document/10), 512 px panel ("automatically
+  referenced" notice while Insert into all is on, [Configure Variable Studio ▾] + illustration, Filter inputs +
+  type toggles, per-input tables with "#var / Value" columns, active row blue bar, italic Name row, "No
+  variables are configured" box, [Add configuration input ▲]); Value / Description right-click Configure /
+  Configure with ▸ / Set to ▸ / Unconfigure; configured cells dashed `#fab601`; typing in a configured cell
+  edits the shown configuration's row. Insert Variable Studio: configured studios get [▦ ▾] → inputs +
+  Generate (inserts with that configuration). Not yet: visibility conditions / input ⋯ beyond Delete, editing
+  a configuration variable's default and min/max, checking against a live capture.
+
+- **Checked in the app (09:46 build):** Variable Studio rail button + panel = help config-panel-02 / -insert-
+  checkbox-02 / config-rmb-configure-01 / config-configured-values-01 (Configure, rows, dotted cells, switching
+  rows re-evaluates `#width * 2`); Feature Studio compare (rows, markers, hatching, rulers); Part Studio compare
+  panel + feature dialogs; tab dots; Merge dialog = help merge-dialog-full-01 and merging B1 into Main (new tab
+  taken, Main's suppression kept, merge line drawn); documents page empty state + "(0.1.0)" footer; wrench hidden
+  on a Feature Studio (live document/22).
+- Fixed after that check: compare mode now ends when the window opens another workspace / history point
+  (`compare_mode::follow`, workspace.rs render); a workspace switch that drops the open tab updates
+  `session.active_tab` (undo scope, the wrench) in `sync_tabs`; Variable Studio config table header "Name" spans
+  both header rows, filter row ⋯ (Collapse all / Expand all); empty-state art 167 px / 12 px gap (166 x 150, 26 px
+  to the text, as live 90).
+- **Lead (icons2):** assembly toolbar tools now 2 px apart (34 px pitch, assembly_toolbar.rs `render_toolset`).
+  The assembly rail's 6th live button is **Simulation** (behaviours "Assembly right rail, 5th button"): out of
+  scope by TEAM-RULES (simulation excluded) — not added.
+- Surgical in another agent's file: part_studio/sketch.rs `render_sketch_labels` (broken ~25 min at 09:25, E0500):
+  the Create-variable popup is built before `data` borrows `cx` (`var_popup`), same behaviour.
+
+- **Later (10:00–12:00):** Compare panel "Configurations" section (help compare-configurations: a select per
+  list input on each side; `CompareSession.base_config` / `target_config`, swapped by Reverse; features compared
+  in those configurations — perf: the graphics should use them too). Version rows of another workspace offer
+  "Merge into current workspace…" (merge dialog with `Side::Entry`). Clippy in my files fixed
+  (compare_mode / variable_config let-chains, `cell_menu` cell tuple). **Surgical in ui's ui.rs:** its new
+  test module's `#[test]` expanded gpui's `test` attribute (glob `super::*` → gpui_kit) forever ("recursion
+  limit reached while expanding #[test]", blocked every `--all-targets`): now `#[::core::prelude::v1::test]`.
+  Others' clippy errors seen at 11:00: drawing_aux.rs:443, feature_dialog.rs:1213, part_studio/sketch.rs:2513,
+  smoke.rs:214, model regen/features/pattern.rs:967.
+- Live requests open: ui2 10-21 08:30 (Compare details), 08:45 (Merge dialog), 09:10 (Variable Studio
+  configurations), 10:40 (moved-feature marker); 10-20 23:30 (Workspace protection, retry after 12:07 UTC).
+
+- **Live answers applied (12:00–, behaviours "Compare, remaining details", "Merge dialog (ui2 10-21 08:45)",
+  "Variable Studio configurations", "Compare: the moved feature marker", "Workspace protection, completed"):**
+  - Compare: pick banner "Select two history entries to compare." (first pick = selected blue, no bar), toast
+    "Can't open tab. The tab does not exist in this document comparison.", FS compare 14 px code, 600 headers,
+    bars #ea7158 / #2bb534, inline marks rgba, no ruler marks; **moved features** (model `FeatureCompare.moved`,
+    LCS over common ids, test `moved_features_get_two_rows`): two rows, amber circle arrows (own glyphs).
+  - Merge dialog: 948 px, 14 px title + 18 px lane-coloured chips (`history_panel::lane_color`), 18 px headings,
+    16/600 table header 18 px in, 30 px rows, bordered selects with the yellow corner triangle, drawing ⓘ
+    "For this tab type, edits from separate branches cannot be merged." + "Open in <source>", no-changes group
+    open, Compare with base = side vs base (base label = version name or change description), protected text.
+  - Variable Studio configurations: rail 33 px, panel 572 px; flat Configure / Configure with <input> / Set to
+    #CV (type-matched) / Unconfigure from <input> + toast "#L1 = 10 mm Value added to Configuration"; checkbox
+    rows ☐ ☑ + "Default: true"; CV "(#CV)" header, no table, Usages badge; input ⋯ Copy table / Copy input /
+    Rename / Visibility conditions… (config_visibility::open) / Delete; table cell menu Switch to / Set as
+    default / Duplicate row / Move up / down / Delete row / Delete column; Paste inputs; Checkbox / Variable
+    input dialogs (220 px, red title until named); left "Configurations" box (205 px, selectors); Insert into
+    all greyed once configured; Insert dialog ▦ / ▾ (Set to last viewed / Reset to default), Generate disabled
+    until changed. **Not yet:** Edit internal IDs…, Input propagation… (Part Studio has the latter; none has the
+    former), the box's collapse handle.
+  - Workspace protection: Part Studio bar "This document is view only. [Make a copy to edit] (?)" (copy →
+    doc_dialogs::copy_workspace), other tabs "Workspace protection enabled.  Changes must be merged in from
+    another workspace." (501 px) + (?); lock inside the history chip and before the title's workspace name;
+    "+" greyed / inert; tab menu = Properties… / Show code / Copy to clipboard, no rename. **For psb / ui
+    (lead):** live also opens features read-only (no ✓, greyed fields; menu View… / Add comment / Zoom to
+    selection / Show dependencies…) and draws the model in view-only grey; the drawing keeps "Hide inspection
+    items" in its bar and a 3-button rail (asb).
+
+- **13:30–:** clippy `-D warnings` on noshape / model / store / ops (all targets) clean after the
+  variable_config.rs collapsible-if fixes (lead's 304 / 318 / 330 / 224). Lead / icons2 items: Merge dialog row
+  icons per row (`strategy_icon(s, row)`: Keep × only when the source changed the tab, else merge-keep-plain;
+  Replace × only when the target did, else merge-replace-plain; 24 px); assembly rail centred as live's six
+  buttons (`.pb(33)`, Simulation excluded) so BOM / Configuration / Explode / Named positions sit at live's y;
+  Variable table header of an automatically referenced studio (model `variables::is_auto_referenced`): icon
+  `auto-variable-reference` (20 px, **icons2 draws it**; renders empty until then) + tooltip "Automatically
+  referenced Variable Studio" instead of the studio icon. Live request open: ui2 10-21 13:10 (Edit internal
+  IDs… / Input propagation… dialogs).
+- Checked in the app (12:55 build): Variable Studio configurations as live vs-914 (left box, CV / CB inputs via
+  their dialogs, Value menu Configure with … / Set to #CV, toast, Usages badge, greyed Insert into all).
+
+- **qa5 items (docs/parity/workflow-*.md), 13:40–:** D9 "View export rules" = `os_ui::export_rules_link` in the
+  drawing and Part Studio Export dialogs → Preferences `Page::ExportRules` (scrolls to the end, where kern's User
+  export rules section goes — kern G39 owns that section). D1: Create Drawing always preselects ANSI_A_INCH.dwt
+  (live drawing/01). D5: DrawingEditor::render takes the focus back when nothing has it (a closed view dialog's
+  field had it), so `d` etc. work at once (drawing_view.rs, asb's, surgical). A6 (skb's assembly_panels.rs,
+  visual): Replicate / linear / circular pattern / mirror are 220 px feature dialogs (help replicate-dialog-01,
+  linear- / circular-pattern-dialog-01, assembly-mirror-01): red title until valid ✓ ✕, Instances query box
+  (active by default, follows the selection — no "Use selection"), Direction / Axis of pattern / Mirror plane
+  boxes with the mate connector button, value rows (`os::param_row`) with the opposite-direction toggle at
+  Instance count, Equal spacing / Second direction, "Mirror strategy…", "Mate to be matched", help ?; no OK.
+  Not in our model yet (for skb): "Centered", Replicate's "Match faces in parts ▾" + "Parts to find match in",
+  the Mirror strategy dialog itself, a live preview for linear / circular (qa5 A8). C7: "Change configuration"
+  is a 220 px feature dialog (instance name ✓ ✕, select per list, checkboxes, value rows) until live's capture
+  (REQUESTS ui2 10-21 13:45). A10 (tooltip after click): ui fixes tooltips centrally.
+
+- **F27 (version):** workspace `version = "0.4.4"` (= tag v0.4.4; Cargo.lock: only the 11 workspace crates'
+  versions, via `cargo update --workspace`); crates/app/build.rs stamps `NOSHAPE_COMMIT` (12-hex `git rev-parse`,
+  rebuilds when HEAD moves); the documents-page footer shows `crate::build_label()` = "(0.4.4.<commit>)" like
+  live's "(1.222.90730.c8d74e607a47)"; release.yml also exports `NOSHAPE_VERSION` from the tag. **Lead:** bump
+  the workspace version with each release tag (or keep relying on NOSHAPE_VERSION in release builds).
+- **qa5 DOC2 / DOC4:** the Merge dialog offers Merge changes (card + per-row "Merge changes from both") for every
+  edited Part Studio / Assembly (live mg-903), default Merge only when both sides edited, else Replace / Keep
+  (help full-01), so the overall default is Merge and Merge is enabled; workspace rows always list Delete,
+  greyed on Main (help: "The Main workspace … cannot be deleted").
+- Others' in-progress breakage seen 14:30–14:55 (not mine): skb's assembly_panels.rs `render_config_panel`
+  rework (borrow at ~2117) and assembly_view.rs:577 (`matched` private); model bom.rs / annotations.rs
+  (`noshape_units::to_fixed` missing), drawing/cad_export.rs (borrow); clippy in model std_feature.rs:23,
+  drawing/cad_fit.rs:33.
 
 ## (was) PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
 
@@ -1054,3 +1218,16 @@ with that tooltip. psb didn't edit your file because you have uncommitted work i
   "skb (10-20 assembly shortcut toolbar)"); ours default to Insert, Mate connector and 8 mates meanwhile.
 - Your Round 9 input-height note: the assembly call sites now go through `os_ui::input_h` (dialog
   fields 25–26 px; live `input.os-param-text` 26 px).
+
+## From ui (21 Oct): shared input Esc and your Variable Studio cells
+- The kit input (vendor/gpui-base `InputState`) now does Onshape's Esc in every single-line field:
+  - Esc after an edit reverts to the text the field had when focused, and the focus moves out of the field. The
+    revert point is taken when `focus()` is called, so type-to-edit's first key doesn't count as the old value.
+  - Esc with nothing edited passes on.
+  - Opt-outs: `revert_on_escape(false)` and `select_on_focus(false)`. Search boxes get both from
+    `set_search_box(true)`.
+- **One-line change in your `variable_studio.rs` `cell()`:** value cells now pass `revert_on_escape(!value_cell)`,
+  so your `capture_key_down` Escape → `revert_value_edit` runs again and keeps the cell selected.
+- Name and description cells use the kit's revert; qa4 R6 item 6 is checked in the app.
+- Views that bind Esc to their own action can call `InputState::revert_escape(window, cx)` first; it returns
+  false when nothing was edited.

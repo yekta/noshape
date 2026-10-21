@@ -214,6 +214,28 @@ pub struct Instance {
     pub zebra: Option<Zebra>,
     /// A mirror reflecting an environment map (Reflection analysis).
     pub reflection: Option<Reflection>,
+    /// Compare mode ([`Scene::compare`]): which version this instance draws
+    /// ([`compare::BASE`], [`compare::TARGET`]; 0: neither, always drawn).
+    pub compare: u8,
+}
+
+/// Versions and history › Compare, as Onshape draws it (webgl bundle): the
+/// scene holds both versions' instances. Each version's faces are lit in
+/// COMPARE_SAME_LIT_TINT where the other version has the same surface at
+/// that pixel (depth within 0.0004 of Onshape's near..far, normals within
+/// dot 0.98), else in its tint (base rgb(144,207,241), target
+/// rgb(221,82,40)). The frame is the "under" version alone (the base below
+/// blend 0.5, else the target) mixed with both versions drawn together, by
+/// 2·blend below 0.5 and 2·(1 − blend) above.
+pub mod compare {
+    pub const BASE: u8 = 1;
+    pub const TARGET: u8 = 2;
+}
+
+/// The compare blend of a frame (0 = base, 1 = target).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Compare {
+    pub blend: f32,
 }
 
 /// Reflection analysis: an equirectangular environment image (uploaded
@@ -258,7 +280,13 @@ impl Instance {
             pick_base: 0,
             zebra: None,
             reflection: None,
+            compare: 0,
         }
+    }
+    /// The version this instance draws in compare mode ([`compare`]).
+    pub fn compare_layer(mut self, layer: u8) -> Self {
+        self.compare = layer;
+        self
     }
     /// Draw an opaque mesh after the transparent meshes ([`Instance::over_transparent`]).
     pub fn over_transparent(mut self) -> Self {
@@ -413,6 +441,45 @@ pub fn srgb(r: u8, g: u8, b: u8) -> [f32; 4] {
 pub struct ClipPlane {
     pub normal: Vec3,
     pub d: f32,
+    /// The cap hatching's frame (Onshape's section plane center and
+    /// tangent): a point on the plane and a unit direction in it.
+    pub center: Vec3,
+    pub tangent: Vec3,
+}
+
+impl ClipPlane {
+    /// `normal` points to the removed side. The cap frame is Onshape's for a
+    /// plane parallel to a standard one (live G44): its tangent is the
+    /// standard plane's x axis (Top: X, normal Z; Right: Y, normal X;
+    /// Front: X, normal -Y), negated when the normal is the standard
+    /// plane's (a cut from Right +20 mm: tangent (0, -1, 0)); else any
+    /// in-plane direction. Centered at the point nearest the origin.
+    pub fn new(normal: Vec3, d: f32) -> Self {
+        let n = normal.normalize_or_zero();
+        let (axis, x) = if n.z.abs() > 0.999 {
+            (Vec3::Z, Vec3::X)
+        } else if n.x.abs() > 0.999 {
+            (Vec3::X, Vec3::Y)
+        } else if n.y.abs() > 0.999 {
+            (Vec3::NEG_Y, Vec3::X)
+        } else {
+            (n, n.any_orthonormal_vector())
+        };
+        let x = -x * n.dot(axis).signum();
+        Self { normal, d, center: n * d, tangent: (x - n * x.dot(n)).normalize_or_zero() }
+    }
+
+    /// This plane with a cap frame through `center` with x along `tangent`
+    /// (projected into the plane).
+    pub fn with_frame(mut self, center: Vec3, tangent: Vec3) -> Self {
+        let n = self.normal.normalize_or_zero();
+        let t = (tangent - n * tangent.dot(n)).normalize_or_zero();
+        if t != Vec3::ZERO {
+            self.center = center - n * (center.dot(n) - self.d);
+            self.tangent = t;
+        }
+        self
+    }
 }
 
 #[derive(Clone, Default)]
@@ -424,6 +491,9 @@ pub struct Scene {
     /// Up to two more section planes (with `clip`): geometry is removed
     /// where all planes clip it.
     pub clip_extra: Vec<ClipPlane>,
+    /// Compare mode: instances tagged [`Instance::compare`] are the two
+    /// versions (see [`compare`]).
+    pub compare: Option<Compare>,
 }
 
 impl Scene {

@@ -694,6 +694,10 @@ impl RenderOnce for Input {
             })
             .read(cx)
             .clone();
+        // NOSHAPE PATCH: Esc in the text moves the focus past this frame.
+        if let TextInputState::Input(input) = &state {
+            input.update(cx, |input, _| input.set_frame_focus(&frame_focus_handle));
+        }
         let focused = !presentation.is_disabled()
             && (state.has_selection_focus(window, cx)
                 || frame_focus_handle.contains_focused(window, cx));

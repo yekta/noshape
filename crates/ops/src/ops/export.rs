@@ -17,7 +17,7 @@ pub fn ops() -> Vec<Op> {
             doc_field(),
             tab_field(),
             req("format", json!({ "type": "string", "enum": PartFormat::ALL.iter().map(|f| f.label()).collect::<Vec<_>>() }), "File format."),
-            req("file", s(), "Output path (its extension is not changed, except .zip for individual files)."),
+            req("file", s(), "Output path; without an extension the format's is added (\"part\" -> \"part.x_t\"); individual files go in a .zip."),
             opt("parts", strings(), "Part ids (`body:…`) or names; default all visible parts."),
             opt("y_up", json!({ "type": "boolean" }), "Export models oriented Y axis up."),
             opt("version", s(), "Format version (e.g. \"AP214\", \"35.1\", \"7\")."),
@@ -94,7 +94,10 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         })
         .collect();
     let n = list.len();
-    let file = std::path::PathBuf::from(a.str("file")?);
+    let mut file = std::path::PathBuf::from(a.str("file")?);
+    if file.extension().is_none() {
+        file.set_extension(format.ext());
+    }
     if let Some(dir) = file.parent().filter(|d| !d.as_os_str().is_empty()) {
         std::fs::create_dir_all(dir).map_err(|e| OpError::new("io", format!("{}: {e}", dir.display())).with_param("file"))?;
     }

@@ -137,7 +137,7 @@ impl DrawingEditor {
         if !matches!(self.tool, Tool::InsertView { .. }) || self.insert.simp_value.is_some() || simplification_text(s, mm).is_empty() {
             return;
         }
-        let st = cx.new(|cx| InputState::new(window, cx).default_value(simplification_text(s, mm)));
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(simplification_text(s, mm)));
         let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change)
                 && let Some(n) = parse_simplification(this.insert.simplification, &st.read(cx).value(), this.drawing.units_mm)
@@ -164,7 +164,7 @@ impl DrawingEditor {
         self.doc.read(cx).session.doc.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| SourceKey::studio(t.id)).collect()
     }
 
-    fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
+    pub(crate) fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
         self.insert.chooser = None;
         if let (Some(old), Some(old_part)) = (self.insert.replace, self.insert.replace_part.take()) {
             // Sheets panel reference › Replace: on every sheet (help H:sheets).
@@ -220,7 +220,7 @@ impl DrawingEditor {
         self.set_tool(Tool::InsertView { source, orientation, part }, cx);
     }
 
-    fn set_insert_orientation(&mut self, o: ViewOrientation, cx: &mut Context<Self>) {
+    pub(crate) fn set_insert_orientation(&mut self, o: ViewOrientation, cx: &mut Context<Self>) {
         if let Tool::InsertView { orientation, .. } = &mut self.tool {
             *orientation = o;
         }
@@ -381,7 +381,7 @@ impl DrawingEditor {
                         .h(px(28.))
                         .pl(px(6.))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Insert view"))
-                        .child(Button::new("div-close").ghost().child(crate::drawing_chrome::cancel_x(cx)).w(px(28.)).h(px(28.)).p_0().tooltip("Cancel (Esc)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(Button::new("div-close").ghost().child(crate::drawing_chrome::cancel_x(cx)).w(px(28.)).h(px(28.)).p_0().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.insert.chooser = None;
                             this.cancel(cx);
                         }))),
@@ -555,10 +555,4 @@ impl DrawingEditor {
         self.update_preview(cx);
     }
 
-    /// The view frame of the sketch being inserted (looking at its plane).
-    pub fn insert_sketch_frame(&self, source: noshape_model::document::TabId) -> Option<[[f64; 3]; 2]> {
-        let f = self.insert.sketch.as_ref()?;
-        let key = noshape_model::drawing::views::SourceKey { tab: source, config: Default::default(), explode: None, version: None, position: None, display: None };
-        noshape_model::drawing::views::sketch_frame(&self.sources.get(&key)?.context, f)
-    }
 }

@@ -283,14 +283,14 @@ impl OsMenu {
         self.submenu_with_icon(None, label, window, cx, f)
     }
 
-    /// A submenu row with an icon (the camera menu's ✓ rows).
-    pub fn submenu_with_icon(mut self, icon: Option<Icon>, label: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Self {
+    /// A submenu row with an app icon (the camera menu's ✓ rows: menu-check).
+    pub fn submenu_with_icon(mut self, icon: Option<&str>, label: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Self {
         let menu = Self::build(window, cx, f);
         let me = cx.weak_entity();
         menu.update(cx, |m, _| m.parent = Some(me));
         // A click in the submenu closes the whole menu.
         self._subs.push(cx.subscribe(&menu, |_, _, _: &DismissEvent, cx| cx.emit(DismissEvent)));
-        self.items.push(OsMenuItem::Submenu { label: label.into(), icon: icon.map(|i| MenuIcon::Kit(Box::new(i))), menu });
+        self.items.push(OsMenuItem::Submenu { label: label.into(), icon: icon.map(|n| MenuIcon::Named(SharedString::from(n.to_string()))), menu });
         self
     }
 
@@ -488,7 +488,7 @@ impl Render for OsMenu {
                         .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1967d2 } else { 0x1651b0 })).text_color(gpui_kit::rgb(0xffffff)))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
-                            d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(Icon::new(gpui_kit::component::IconName::Check).xsmall().text_color(pal.text)))
+                            d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(crate::assets::icon("menu-check", 16., cx)))
                         })
                         .child(label_el(label))
                         .when(!keys.is_empty(), |d| {

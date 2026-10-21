@@ -175,3 +175,66 @@ pub fn show_all(ps: &mut PartStudio) {
     }
     ps.hidden_defaults.clear();
 }
+
+/// Parts list › Rename: "Rename : <name>".
+pub fn rename_part_description(name: &str) -> String {
+    format!("Rename : {name}")
+}
+
+/// Parts list › Rename: the part's name.
+pub fn rename_part(ps: &mut PartStudio, body: &BodyId, name: &str) {
+    ps.part_properties.entry(body.clone()).or_default().name = Some(name.to_string());
+}
+
+/// The part Properties dialog's values.
+#[derive(Clone, Debug, Default)]
+pub struct PartPropertyValues {
+    pub name: String,
+    pub description: String,
+    pub part_number: String,
+    pub revision: String,
+    pub meta: noshape_model::partstudio::ItemMeta,
+    /// Mass override, kg.
+    pub mass_override: Option<f64>,
+}
+
+/// Properties › Save: "Properties : <name>".
+pub fn properties_description(name: &str) -> String {
+    format!("Properties : {name}")
+}
+
+/// Properties › Save: the part's values. Fields configured for the active
+/// configuration (`configured`, by their label: "Name", "Description",
+/// "Part number", "Revision", "Vendor", "Project", "Product line", "Title
+/// 1"…"Title 3") keep the part's own value; empty texts clear.
+pub fn set_part_properties(ps: &mut PartStudio, body: &BodyId, v: &PartPropertyValues, configured: &[&str]) {
+    let has = |f: &str| configured.contains(&f);
+    let p = ps.part_properties.entry(body.clone()).or_default();
+    let old = p.meta.clone();
+    if !has("Name") {
+        p.name = Some(v.name.clone());
+    }
+    if !has("Description") {
+        p.description = Some(v.description.clone()).filter(|s| !s.is_empty());
+    }
+    if !has("Part number") {
+        p.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
+    }
+    if !has("Revision") {
+        p.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
+    }
+    p.meta = v.meta.clone();
+    for (f, new, was) in [
+        ("Vendor", &mut p.meta.vendor, old.vendor),
+        ("Project", &mut p.meta.project, old.project),
+        ("Product line", &mut p.meta.product_line, old.product_line),
+        ("Title 1", &mut p.meta.title1, old.title1),
+        ("Title 2", &mut p.meta.title2, old.title2),
+        ("Title 3", &mut p.meta.title3, old.title3),
+    ] {
+        if has(f) {
+            *new = was;
+        }
+    }
+    p.mass_override = v.mass_override;
+}

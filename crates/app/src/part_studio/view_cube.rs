@@ -1,7 +1,11 @@
 //! Onshape's View cube (upper right of the graphics area): it turns with
 //! the camera; clicking a face or corner animates to that view;
 //! arrows around it rotate 15° (Shift 90°, Ctrl 5°) and roll; the
-//! dropdown under it is the *Camera and render options* menu.
+//! dropdown under it is the *Camera and render options* menu. Dragging the
+//! cube moves it (webgl bundle `updateDragPosition`): it keeps its offset
+//! from the graphics area's top-right corner, at least 15 px from the left,
+//! right and top and 40 px from the bottom (`updateCenter`); a press that
+//! moves at most LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE (2 px) is a click.
 
 use super::PartStudioView;
 use crate::scene_builder::{DisplayMode, TangentEdges};
@@ -17,6 +21,34 @@ use noshape_render::{Projection, StandardView};
 pub use noshape_render::overlay::view_cube::{Arrow, CubeCell, WIDGET_PX, widget_hit};
 
 const G: f64 = WIDGET_PX as f64;
+
+/// Onshape's LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE (px moved, |dx| + |dy|).
+const CLICK_TOLERANCE: f32 = 2.0;
+/// VIEW_CUBE_LEFT/RIGHT/TOP/BOTTOM_MARGIN_PX.
+const MARGINS: [f32; 4] = [15.0, 15.0, 15.0, 40.0];
+
+/// A cube's move from its place, and the press being dragged (per owner).
+#[derive(Default)]
+struct CubeDrag {
+    offset: Point<Pixels>,
+    /// Last pointer position, px moved, and the cell and modifiers pressed.
+    press: Option<(Point<Pixels>, f32, CubeCell, Modifiers)>,
+}
+
+thread_local! {
+    static DRAGS: std::cell::RefCell<std::collections::HashMap<EntityId, CubeDrag>> = Default::default();
+}
+
+/// `offset` kept inside the margins of a `viewport` (logical px) for a cube
+/// placed at its default spot (15 px from the top-right corner).
+fn clamp_offset(offset: Point<Pixels>, viewport: DVec2) -> Point<Pixels> {
+    let [left, right, top, bottom] = MARGINS;
+    let (w, h) = (viewport.x as f32, viewport.y as f32);
+    // Default left edge w - 15 - 150, top 15.
+    let min_x = left - (w - right - WIDGET_PX);
+    let max_y = h - bottom - WIDGET_PX - top;
+    point(px(f32::from(offset.x).clamp(min_x.min(0.0), 0.0)), px(f32::from(offset.y).clamp(0.0, max_y.max(0.0))))
+}
 
 /// See [`CubeHooks::state`].
 pub type CubeState<'a> = (&'a mut Option<CubeCell>, &'a mut Option<Point<Pixels>>);
@@ -53,28 +85,90 @@ impl<V: 'static> Copy for CubeHooks<V> {}
 /// (`noshape_render::overlay::view_cube`, so it turns with the camera without
 /// any UI layout): this element is its hit area and reports where it was
 /// laid out (`CubeHooks::placed`).
-pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, cx: &mut Context<V>) -> AnyElement {
+/// `viewport`: the graphics area's size (logical px), which a moved cube
+/// stays in.
+pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, viewport: DVec2, cx: &mut Context<V>) -> AnyElement {
     let local = |pos: Point<Pixels>, o: Point<Pixels>| {
         let d = DVec2::new(f64::from(f32::from(pos.x - o.x)), f64::from(f32::from(pos.y - o.y))) - DVec2::splat(G * 0.5);
         DVec2::new(d.x, -d.y)
     };
     let view = cx.entity();
+    let id = view.entity_id();
+    let (offset, dragging) = DRAGS.with_borrow_mut(|d| {
+        let d = d.entry(id).or_default();
+        d.offset = clamp_offset(d.offset, viewport);
+        (d.offset, d.press.is_some())
+    });
+    // A cell's action, on a click (a press that hardly moved).
+    let act = move |this: &mut V, cell: CubeCell, modifiers: Modifiers, cx: &mut Context<V>| {
+        let Some(arrow) = Arrow::of(cell) else {
+            (hooks.click)(this, cell, cx);
+            return;
+        };
+        // Onshape: click 15°, Shift+click 90°, Ctrl+click 5°.
+        let k = if modifiers.shift {
+            6.0
+        } else if modifiers.control || modifiers.platform {
+            1.0 / 3.0
+        } else {
+            1.0
+        };
+        match arrow {
+            Arrow::Up => (hooks.rotate)(this, 0.0, -15.0 * k, cx),
+            Arrow::Down => (hooks.rotate)(this, 0.0, 15.0 * k, cx),
+            Arrow::Left => (hooks.rotate)(this, -15.0 * k, 0.0, cx),
+            Arrow::Right => (hooks.rotate)(this, 15.0 * k, 0.0, cx),
+            Arrow::Ccw => (hooks.roll)(this, 15.0 * k, cx),
+            Arrow::Cw => (hooks.roll)(this, -15.0 * k, cx),
+        }
+    };
     div()
         .id("view-cube")
         .relative()
+        .left(offset.x)
+        .top(offset.y)
         .size(px(WIDGET_PX))
         // Live (dom/cursors-controls.json): the cube's faces and arrows keep
         // the default cursor (they're part of the canvas), no pointer.
         .child(
             canvas(
-                move |bounds, _, cx| {
-                    // Records the widget origin for hit testing.
-                    view.update(cx, |this, cx| {
-                        *(hooks.state)(this).1 = Some(bounds.origin);
-                        (hooks.placed)(this, bounds.origin, cx);
+                {
+                    let view = view.clone();
+                    move |bounds, _, cx| {
+                        // Records the widget origin for hit testing.
+                        view.update(cx, |this, cx| {
+                            *(hooks.state)(this).1 = Some(bounds.origin);
+                            (hooks.placed)(this, bounds.origin, cx);
+                        });
+                    }
+                },
+                move |_, _, window, _| {
+                    // While pressed, follow the pointer anywhere in the window.
+                    if !dragging {
+                        return;
+                    }
+                    let view = view.clone();
+                    window.on_mouse_event(move |e: &MouseMoveEvent, phase, _, cx| {
+                        if phase != DispatchPhase::Bubble {
+                            return;
+                        }
+                        let moved = DRAGS.with_borrow_mut(|d| {
+                            let d = d.entry(id).or_default();
+                            let Some((last, dist, _, _)) = &mut d.press else { return false };
+                            let delta = e.position - *last;
+                            *last = e.position;
+                            *dist += f32::from(delta.x).abs() + f32::from(delta.y).abs();
+                            // Moves only once it is a drag.
+                            if *dist > CLICK_TOLERANCE {
+                                d.offset += delta;
+                            }
+                            true
+                        });
+                        if moved {
+                            view.update(cx, |_, cx| cx.notify());
+                        }
                     });
                 },
-                |_, _, _, _| {},
             )
             .absolute()
             .top_0()
@@ -103,25 +197,28 @@ pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, cx: &mut Con
                 // Anything but the cube and its arrows is the graphics area's.
                 let Some(cell) = widget_hit(rot, local(e.position, o)) else { return };
                 cx.stop_propagation();
-                let Some(arrow) = Arrow::of(cell) else {
-                    (hooks.click)(this, cell, cx);
-                    return;
-                };
-                // Onshape: click 15°, Shift+click 90°, Ctrl+click 5°.
-                let k = if e.modifiers.shift {
-                    6.0
-                } else if e.modifiers.control || e.modifiers.platform {
-                    1.0 / 3.0
-                } else {
-                    1.0
-                };
-                match arrow {
-                    Arrow::Up => (hooks.rotate)(this, 0.0, -15.0 * k, cx),
-                    Arrow::Down => (hooks.rotate)(this, 0.0, 15.0 * k, cx),
-                    Arrow::Left => (hooks.rotate)(this, -15.0 * k, 0.0, cx),
-                    Arrow::Right => (hooks.rotate)(this, 15.0 * k, 0.0, cx),
-                    Arrow::Ccw => (hooks.roll)(this, 15.0 * k, cx),
-                    Arrow::Cw => (hooks.roll)(this, -15.0 * k, cx),
+                DRAGS.with_borrow_mut(|d| d.entry(id).or_default().press = Some((e.position, 0.0, cell, e.modifiers)));
+                cx.notify();
+            }),
+        )
+        .on_mouse_up(
+            MouseButton::Left,
+            cx.listener(move |this, _: &MouseUpEvent, _, cx| {
+                let press = DRAGS.with_borrow_mut(|d| d.entry(id).or_default().press.take());
+                if let Some((_, dist, cell, modifiers)) = press {
+                    cx.stop_propagation();
+                    if dist <= CLICK_TOLERANCE {
+                        act(this, cell, modifiers, cx);
+                    }
+                    cx.notify();
+                }
+            }),
+        )
+        .on_mouse_up_out(
+            MouseButton::Left,
+            cx.listener(move |_, _: &MouseUpEvent, _, cx| {
+                if DRAGS.with_borrow_mut(|d| d.entry(id).or_default().press.take()).is_some() {
+                    cx.notify();
                 }
             }),
         )
@@ -155,7 +252,8 @@ impl PartStudioView {
             roll: Self::roll_view,
             placed: |this, at, cx| this.viewport.update(cx, |vp, cx| vp.set_view_cube_origin(at, cx)),
         };
-        view_cube(menu, hooks, cx)
+        let size = self.viewport.read(cx).size();
+        view_cube(menu, hooks, size, cx)
     }
 
     /// Open Onshape's Graphics preferences dialog.
@@ -177,6 +275,8 @@ impl PartStudioView {
         let perspective = self.viewport.read(cx).camera.projection == Projection::Perspective;
         let has_selection = !self.selection.is_empty() || !self.selected_features.is_empty();
         let section = !self.ui.section.is_empty();
+        // Live (psb 10-21 f): no Section view item while a feature dialog is open.
+        let dialog_open = self.edit.is_some();
         let has_history = !self.ui.cam_history.is_empty();
         let orient = self.ui.orient_on_edit;
         let hidden_edges = self.opts.hidden_edges_visible;
@@ -241,7 +341,8 @@ impl PartStudioView {
                     })
                 }));
                 m = m.separator();
-                let check = || Some(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check));
+                // Live (analysis/01): Onshape's 11x8 #666 check.
+                let check = || Some("menu-check");
                 let v = view.clone();
                 m = m.submenu_with_icon(check(), display_label(mode), window, cx, move |mut sm, _, _| {
                     for dm in [DisplayMode::ShadedWithEdges, DisplayMode::Shaded, DisplayMode::HiddenLine, DisplayMode::Translucent] {
@@ -295,6 +396,9 @@ impl PartStudioView {
                         })
                     }
                 }));
+                if dialog_open {
+                    return m;
+                }
                 m = m.separator();
                 m.item(item(if section { "Turn off section view" } else { "Section view…" }, Box::new(|this, w, cx| this.toggle_section(w, cx))).icon_name("menu-section-view"))
                 });

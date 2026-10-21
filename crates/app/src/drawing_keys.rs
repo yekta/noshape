@@ -2,7 +2,7 @@
 //! window (drag a box, the sheet zooms to it), Ctrl+S (Sheets panel open /
 //! close), Shift+N (rename the current sheet or the selected view).
 
-use crate::drawing_sketch::SkTool;
+use crate::drawing_sketch::{SkCon, SkTool};
 use crate::drawing_view::*;
 use noshape_model::drawing::ViewId;
 use crate::theme::p;
@@ -92,60 +92,89 @@ impl DrawingEditor {
 type Act = fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>);
 
 /// Every tool the drawing S toolbar can hold (Preferences › Shortcut
-/// toolbars › Drawing), in the toolbar's order: name, tooltip, icon, action.
-pub const SHORTCUT_CATALOGUE: [(&str, &str, &str, Act); 38] = [
-    ("Insert view", "Insert view", "base-view", |e, _, cx| e.open_insert_chooser(cx)),
-    ("Projected view", "Projected view (p)", "projected-view", |e, _, cx| e.set_tool(Tool::Projected { parent: None }, cx)),
-    ("Auxiliary view", "Auxiliary view", "auxiliary-view", |e, _, cx| e.set_tool(Tool::Auxiliary { parent: None }, cx)),
-    ("Section view", "Section view", "section-view", |e, _, cx| e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false }, cx)),
-    ("Aligned section view", "Aligned section view", "section-view", |e, _, cx| e.set_tool(Tool::AlignedSection { parent: None, center: None, a: None, b: None }, cx)),
-    ("Broken-out section", "Broken-out section", "broken-out-section", |e, _, cx| e.set_tool(Tool::BrokenOut { parent: None, points: vec![], done: false }, cx)),
-    ("Detail view", "Detail view", "detail-view", |e, _, cx| e.set_tool(Tool::Detail { parent: None, center: None, radius: None }, cx)),
-    ("Break view", "Break view", "broken-view", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: true }, cx)),
-    ("Crop view", "Crop view", "crop-view", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: false }, cx)),
-    ("Dimension", "Dimension (d)", "linear-dim", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
-    ("Ordinate dimension", "Ordinate dimension", "ordinate-dim", |e, _, cx| e.set_tool(Tool::Ordinate { origin: None, horizontal: None, group: None }, cx)),
-    ("Hole/thread callout", "Hole/thread callout", "hole-callout", |e, _, cx| e.set_tool(Tool::HoleCallout { circle: None }, cx)),
-    ("Datum", "Datum", "datum", |e, _, cx| e.set_tool(Tool::Datum { anchor: None }, cx)),
-    ("Geometric tolerance", "Geometric tolerance", "gdt", |e, _, cx| e.set_tool(Tool::Gdt, cx)),
-    ("Surface finish symbol", "Surface finish symbol", "surface-finish", |e, _, cx| e.set_tool(Tool::SurfaceFinish, cx)),
-    ("Weld symbol", "Weld symbol", "weld-symbol", |e, _, cx| e.set_tool(Tool::Weld, cx)),
-    ("Note", "Note (n)", "note", |e, _, cx| e.set_tool(Tool::Note, cx)),
-    ("Callout", "Callout", "callout", |e, _, cx| e.set_tool(Tool::Balloon { anchor: None }, cx)),
-    ("Table", "Table", "table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::General, view: None, origin: None }, cx)),
-    ("BOM table", "BOM table", "drawing-bom", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Bom, view: None, origin: None }, cx)),
-    ("Cut list table", "Cut list table", "cut-list", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::CutList, view: None, origin: None }, cx)),
-    ("Hole table", "Hole table", "hole-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx)),
-    ("Custom table", "Custom table", "featurescript-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Custom, view: None, origin: None }, cx)),
-    ("2 point centerline", "2 point centerline", "centerline", |e, _, cx| e.set_tool(Tool::Centerline { first: None }, cx)),
-    ("Edge to edge centerline", "Edge to edge centerline", "centerline-edge", |e, _, cx| e.set_tool(Tool::EdgeCenterline { first: None }, cx)),
-    ("3 point circle centerline", "3 point circle centerline", "centerline-circle3", |e, _, cx| e.set_tool(Tool::CircleCenterline { three: true, points: vec![] }, cx)),
-    ("2 point circle centerline", "2 point circle centerline", "centerline-circle2", |e, _, cx| e.set_tool(Tool::CircleCenterline { three: false, points: vec![] }, cx)),
-    ("Centermark", "Centermark", "centermark", |e, _, cx| e.set_tool(Tool::Centermark, cx)),
-    ("Virtual sharp", "Virtual sharp", "virtual-sharp", |e, _, cx| e.set_tool(Tool::VirtualSharp { first: None }, cx)),
-    ("Line", "Line (l)", "line", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Line, pts: vec![], from: None }, cx)),
-    ("Center point circle", "Center point circle (c)", "circle", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Circle, pts: vec![], from: None }, cx)),
-    ("3 point circle", "3 point circle", "three-point-circle", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Circle3, pts: vec![], from: None }, cx)),
-    ("Tangent arc", "Tangent arc", "tangent-arc", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::TangentArc, pts: vec![], from: None }, cx)),
-    ("Corner rectangle", "Corner rectangle (g)", "corner-rectangle", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::CornerRect, pts: vec![], from: None }, cx)),
-    ("Center point rectangle", "Center point rectangle (r)", "center-rectangle", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::CenterRect, pts: vec![], from: None }, cx)),
-    ("Spline", "Spline", "spline", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Spline, pts: vec![], from: None }, cx)),
-    ("Sketch point", "Sketch point", "point-sketch", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Point, pts: vec![], from: None }, cx)),
-    ("Trim", "Trim (m)", "trim", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Trim, pts: vec![], from: None }, cx)),
+/// toolbars › Drawing, live REQUESTS z3: 64 tools in this order): name,
+/// icon, action.
+pub const SHORTCUT_CATALOGUE: [(&str, &str, Act); 64] = [
+    ("Dimension", "linear-dim", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
+    ("Maximum/minimum dimension", "driven-dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![] }, cx)),
+    ("2 point linear dimension", "dim-point-to-point", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Point2, picks: vec![] }, cx)),
+    ("Point to line linear dimension", "dim-point-to-line", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::PointLine, picks: vec![] }, cx)),
+    ("Line to line linear dimension", "dim-line-to-line", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::LineLine, picks: vec![] }, cx)),
+    ("Line to line angular dimension", "angular-dim", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle, picks: vec![] }, cx)),
+    ("Chamfer dimension", "chamfer-dim", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Chamfer, picks: vec![] }, cx)),
+    ("3 point angular dimension", "dim-angular-3pt", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Angle3, picks: vec![] }, cx)),
+    ("Radial dimension", "radial-dim", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Radius, picks: vec![] }, cx)),
+    ("Diameter dimension", "diameter-dim", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Diameter, picks: vec![] }, cx)),
+    ("Arc length dimension", "arc-length-dim", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::ArcLength, picks: vec![] }, cx)),
+    ("Ordinate dimension", "ordinate-dim", |e, _, cx| e.set_tool(Tool::Ordinate { origin: None, horizontal: None, group: None }, cx)),
+    ("Foreshorten dimension", "dim-foreshorten", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Foreshorten, picks: vec![] }, cx)),
+    ("Hole/thread callout", "hole-callout", |e, _, cx| e.set_tool(Tool::HoleCallout { circle: None }, cx)),
+    ("Datum", "datum", |e, _, cx| e.set_tool(Tool::Datum { anchor: None }, cx)),
+    ("Geometric tolerance", "gdt", |e, _, cx| e.set_tool(Tool::Gdt, cx)),
+    ("Surface finish symbol", "surface-finish", |e, _, cx| e.set_tool(Tool::SurfaceFinish, cx)),
+    ("Weld symbol", "weld-symbol", |e, _, cx| e.set_tool(Tool::Weld, cx)),
+    ("Note", "note", |e, _, cx| e.set_tool(Tool::Note, cx)),
+    ("Callout", "callout", |e, _, cx| e.set_tool(Tool::Balloon { anchor: None }, cx)),
+    ("Table", "table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::General, view: None, origin: None }, cx)),
+    ("Insert BOM", "drawing-bom", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Bom, view: None, origin: None }, cx)),
+    ("Hole table", "hole-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Hole, view: None, origin: None }, cx)),
+    ("Revision table", "revision-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Revision, view: None, origin: None }, cx)),
+    ("Custom table", "drawing-custom-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::Custom, view: None, origin: None }, cx)),
+    ("2 point linear centerline", "centerline", |e, _, cx| e.set_tool(Tool::Centerline { first: None }, cx)),
+    ("Edge to edge centerline", "centerline-edge", |e, _, cx| e.set_tool(Tool::EdgeCenterline { first: None }, cx)),
+    ("3 point circle centerline", "centerline-circle3", |e, _, cx| e.set_tool(Tool::CircleCenterline { three: true, points: vec![] }, cx)),
+    ("2 point circle centerline", "centerline-circle2", |e, _, cx| e.set_tool(Tool::CircleCenterline { three: false, points: vec![] }, cx)),
+    ("Centermark", "centermark", |e, _, cx| e.set_tool(Tool::Centermark, cx)),
+    ("Virtual sharp", "virtual-sharp", |e, _, cx| e.set_tool(Tool::VirtualSharp { first: None }, cx)),
+    ("Line", "drawing-line", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Line, pts: vec![], from: None }, cx)),
+    ("Center point circle", "circle", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Circle, pts: vec![], from: None }, cx)),
+    ("3 point circle", "three-point-circle", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Circle3, pts: vec![], from: None }, cx)),
+    ("Corner rectangle", "corner-rectangle", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::CornerRect, pts: vec![], from: None }, cx)),
+    ("Center point rectangle", "center-rectangle", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::CenterRect, pts: vec![], from: None }, cx)),
+    ("Spline", "spline", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Spline, pts: vec![], from: None }, cx)),
+    ("Spline control point", "spline-point", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::SplinePoint, pts: vec![], from: None }, cx)),
+    ("Sketch point", "point-sketch", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::Point, pts: vec![], from: None }, cx)),
+    ("Tangent arc", "tangent-arc", |e, _, cx| e.set_tool(Tool::Sketch { tool: SkTool::TangentArc, pts: vec![], from: None }, cx)),
+    ("Hatch region", "hatch-region", |e, w, cx| e.open_hatch_dialog(None, w, cx)),
+    ("Insert DXF or DWG", "dwg-insert", |e, w, cx| e.insert_cad_file(w, cx)),
+    ("Insert image", "image", |e, w, cx| e.insert_image(w, cx)),
+    ("Format painter", "format-painter", |e, _, cx| e.toggle_format_painter(cx)),
+    ("Insert view", "base-view", |e, _, cx| e.open_insert_chooser(cx)),
+    ("Projected view", "projected-view", |e, _, cx| e.set_tool(Tool::Projected { parent: None }, cx)),
+    ("Auxiliary view", "auxiliary-view", |e, _, cx| e.set_tool(Tool::Auxiliary { parent: None }, cx)),
+    ("Detail view", "detail-view", |e, _, cx| e.set_tool(Tool::Detail { parent: None, center: None, radius: None }, cx)),
+    ("Section view", "section-view", |e, _, cx| e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }, cx)),
+    ("Broken-out section", "broken-out-section", |e, _, cx| e.set_tool(Tool::BrokenOut { parent: None, points: vec![], done: false }, cx)),
+    ("Break view", "broken-view", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: true }, cx)),
+    ("Crop view", "crop-view", |e, _, cx| e.start_crop(cx)),
+    ("Inspection item", "inspection-item", |e, _, cx| e.open_inspection(cx)),
+    ("Hide inspection item", "inspection-hide", |e, _, cx| e.toggle_hide_inspection(cx)),
+    ("Aligned section view", "drawing-aligned-section", |e, _, cx| e.set_tool(Tool::AlignedSection { parent: None, center: None, a: None, b: None }, cx)),
+    ("Cut list table", "drawing-cutlist-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::CutList, view: None, origin: None }, cx)),
+    ("Update", "drawing-update", |e, _, cx| e.update_drawing(cx)),
+    ("Horizontal", "horizontal", |e, _, cx| e.set_tool(Tool::Constrain { kind: SkCon::Horizontal, picks: vec![] }, cx)),
+    ("Vertical", "vertical", |e, _, cx| e.set_tool(Tool::Constrain { kind: SkCon::Vertical, picks: vec![] }, cx)),
+    ("Coincident", "coincident", |e, _, cx| e.set_tool(Tool::Constrain { kind: SkCon::Coincident, picks: vec![] }, cx)),
+    ("Perpendicular", "perpendicular", |e, _, cx| e.set_tool(Tool::Constrain { kind: SkCon::Perpendicular, picks: vec![] }, cx)),
+    ("Parallel", "parallel", |e, _, cx| e.set_tool(Tool::Constrain { kind: SkCon::Parallel, picks: vec![] }, cx)),
+    ("Tangent", "tangent", |e, _, cx| e.set_tool(Tool::Constrain { kind: SkCon::Tangent, picks: vec![] }, cx)),
+    ("Measure", "measure", |e, _, cx| e.toggle_measure(cx)),
 ];
 
-/// The ten tools shown by default (provisional until the live list is
-/// captured: REQUESTS asb z3).
-pub const DEFAULT_SHORTCUT_TOOLS: [&str; 10] = ["Dimension", "Note", "Callout", "Projected view", "Section view", "Detail view", "Centermark", "2 point centerline", "Geometric tolerance", "Datum"];
+/// The 15 tools ticked by default (live z3).
+pub const DEFAULT_SHORTCUT_TOOLS: [&str; 15] = ["Dimension", "Ordinate dimension", "Hole/thread callout", "Datum", "Geometric tolerance", "Surface finish symbol", "Weld symbol", "Note", "Callout", "Table", "Insert view", "Projected view", "Detail view", "Section view", "Break view"];
 
 impl DrawingEditor {
-    /// `s`: the shortcut toolbar at the cursor (live sketch/38: its left edge
-    /// 10 px right of the cursor, its top 30 px above). Pressing `s` again
-    /// reopens it at the new cursor position; Esc or picking a tool closes it.
+    /// `s`: the shortcut toolbar at the cursor (live z3: its corner 10 px
+    /// right of and 10 px below the cursor). Pressing `s` again keeps it;
+    /// Esc, a click elsewhere or picking a tool closes it.
     pub fn toggle_shortcut_toolbar(&mut self, cx: &mut Context<Self>) {
+        if self.shortcut_toolbar.is_some() {
+            return;
+        }
         let s = self.size_px();
         let p = self.screen_of(self.cursor);
-        self.shortcut_toolbar = Some([(p[0] + 10.0).clamp(0.0, (s[0] - 177.0).max(0.0)), (p[1] - 30.0).clamp(0.0, (s[1] - 64.0).max(0.0))]);
+        self.shortcut_toolbar = Some([(p[0] + 10.0).clamp(0.0, (s[0] - 179.0).max(0.0)), (p[1] + 10.0).clamp(0.0, (s[1] - 96.0).max(0.0))]);
         cx.notify();
     }
 
@@ -155,20 +184,20 @@ impl DrawingEditor {
         [(q[0] - self.center[0]) * self.zoom + s[0] / 2.0, -(q[1] - self.center[1]) * self.zoom + s[1] / 2.0]
     }
 
-    /// Onshape's `.os-mini-toolbar-panel` (live sketch/38–39): 175 x 62,
-    /// white at 95 %, 1 px `#ccc`, square corners, shadow 0 5 10 black 20 %;
-    /// rows of five 30 x 30 buttons (20 px icons, radius 3, hover `#eaeaea`).
+    /// Onshape's drawing S toolbar (live z3, drawing/1121): the ticked
+    /// tools in list order, five per row at a 34 px pitch (177 px wide), on
+    /// white with a 1 px `#ccc` border and shadow 0 5 10 black 25 %; no
+    /// tooltips.
     pub fn render_shortcut_toolbar(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let at = self.shortcut_toolbar?;
-        let names = crate::part_studio::toolbar_prefs::ToolbarPrefs::load().drawing_shortcut_tools(&DEFAULT_SHORTCUT_TOOLS);
-        let mut row = gpui_kit::component::h_flex().w(px(175.)).flex_wrap().px(px(2.5));
-        for name in &names {
-            let Some(&(_, tip, icon, act)) = SHORTCUT_CATALOGUE.iter().find(|t| t.0 == name) else { continue };
+        let shown = crate::part_studio::toolbar_prefs::ToolbarPrefs::load().drawing_shortcut_tools(&DEFAULT_SHORTCUT_TOOLS);
+        let mut row = gpui_kit::component::h_flex().w(px(175.)).flex_wrap().px(px(2.));
+        for &(name, icon, act) in SHORTCUT_CATALOGUE.iter().filter(|t| shown.iter().any(|n| n == t.0)) {
             row = row.child(
                 div()
                     .id(SharedString::from(format!("dr-mini-{name}")))
                     .size(px(30.))
-                    .mx(px(2.5))
+                    .m(px(2.))
                     .flex()
                     .items_center()
                     .justify_center()
@@ -176,7 +205,6 @@ impl DrawingEditor {
                     .cursor_pointer()
                     .hover(|d| d.bg(rgb(0xeaeaea)))
                     .child(crate::assets::icon(&crate::assets::icon_path(icon), 20., cx))
-                    .tooltip(crate::ui::tooltip(tip))
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _: &MouseDownEvent, window, cx| {
@@ -194,11 +222,10 @@ impl DrawingEditor {
                 .absolute()
                 .left(px(at[0] as f32))
                 .top(px(at[1] as f32))
-                .py(px(1.))
-                .bg(gpui_kit::hsla(0., 0., 1., 0.95))
+                .bg(rgb(0xffffff))
                 .border_1()
                 .border_color(rgb(0xcccccc))
-                .shadow(vec![gpui_kit::BoxShadow { color: gpui_kit::hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .shadow(vec![gpui_kit::BoxShadow { color: gpui_kit::hsla(0., 0., 0., 0.25), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(row)
                 .into_any_element(),

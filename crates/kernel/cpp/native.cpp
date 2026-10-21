@@ -987,7 +987,37 @@ struct IamOccurrence
 {
   std::string            name, guid;
   std::array<double, 16> m{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+  uint32_t               id = 0; // the record's object id (see iam_browser_order)
 };
+
+// The occurrences' object ids in the assembly's browser order: each browser
+// entry ("AmPartInstEntry" / "AmAssmInstEntry") is followed by `02 <u32 id>
+// 03 00 00 00` + UTF-16 "BRx"; its placement record ends `00 07 <u32 id>
+// 03 00 00 00` + "GRx". The browser can be reordered, so it differs from the
+// record order (Wrench.iam); Onshape lists the occurrences in the reverse of
+// this order (live G42).
+std::vector<uint32_t> iam_browser_order(const std::string& d)
+{
+  // (position, id) of both kinds of entries, then in segment order.
+  std::vector<std::pair<size_t, uint32_t>> at;
+  const std::string                        brx = iam_utf16("BRx");
+  for (const char* kind : {"AmPartInstEntry", "AmAssmInstEntry"})
+  {
+    const std::string k = iam_utf16(kind);
+    for (size_t i = d.find(k); i != std::string::npos; i = d.find(k, i + 1))
+    {
+      const size_t b = d.find(brx, i + k.size());
+      if (b == std::string::npos || b > i + k.size() + 48 || b < 9 || d[b - 9] != 0x02 || iam_u32(d, b - 4) != 3)
+        continue;
+      at.emplace_back(i, iam_u32(d, b - 8));
+    }
+  }
+  std::sort(at.begin(), at.end());
+  std::vector<uint32_t> ids;
+  for (const auto& e : at)
+    ids.push_back(e.second);
+  return ids;
+}
 
 std::string iam_ufrx(const std::string& path)
 {
@@ -1045,6 +1075,7 @@ std::vector<IamOccurrence> iam_occurrences(const std::string& path)
       std::array<double, 16> r;
       if (marks[k] < 10 || !iam_placement(d, marks[k] - 10, r))
         fail_unsupported("inventor: an occurrence placement noshape can't read");
+      out[k].id = iam_u32(d, marks[k] - 8);
       // Row-major, cm → column-major, metres.
       auto& m = out[k].m;
       for (int row = 0; row < 3; ++row)
@@ -1053,6 +1084,32 @@ std::vector<IamOccurrence> iam_occurrences(const std::string& path)
       for (int row = 0; row < 3; ++row)
         m[(size_t)(12 + row)] = r[(size_t)(row * 4 + 3)] * 0.01;
     }
+    // Browser order; occurrences the browser doesn't list keep their place
+    // after the listed ones.
+    std::vector<uint32_t> order;
+    for (const std::string& q : cf.stream_paths())
+    {
+      std::string qraw, qd;
+      if (q.rfind("RSeStorage/B", 0) != 0 || !cf.stream(q, qraw) || qraw.size() < 21 || (unsigned char)qraw[18] != 0x78)
+        continue;
+      try
+      {
+        qd = pvz::inflate_raw((const unsigned char*)qraw.data() + 20, qraw.size() - 20);
+      }
+      catch (const std::runtime_error&)
+      {
+        continue;
+      }
+      if (qd.find(iam_utf16("AmBrowserArrangement")) == std::string::npos)
+        continue;
+      order = iam_browser_order(qd);
+      break;
+    }
+    auto rank = [&](const IamOccurrence& o) {
+      const auto it = std::find(order.begin(), order.end(), o.id);
+      return it == order.end() ? order.size() : (size_t)(it - order.begin());
+    };
+    std::stable_sort(out.begin(), out.end(), [&](const IamOccurrence& a, const IamOccurrence& b) { return rank(a) < rank(b); });
     return out;
   }
   if (out.empty())

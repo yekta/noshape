@@ -9,7 +9,6 @@
 use crate::drawing_view::*;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::*;
-use noshape_model::drawing::Annotation;
 
 /// The open value box of a sketch dimension.
 pub struct SketchDimEdit {
@@ -38,14 +37,6 @@ impl DrawingEditor {
         self.sketch_dim_pick = Some(e.0);
         cx.notify();
         true
-    }
-
-    /// The dimension following the pointer after a sketch entity was picked.
-    pub fn sketch_dim_preview(&self) -> Option<Annotation> {
-        let e = self.sketch_dim_pick?;
-        let mut s = self.current_sheet().clone();
-        let id = s.add_sketch_dimension(e, self.cursor)?;
-        s.annotations.into_iter().find(|a| a.id == id)
     }
 
     /// The value text of a length in the drawing's units at full precision

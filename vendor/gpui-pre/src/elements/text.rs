@@ -1034,6 +1034,8 @@ pub struct InteractiveTextState {
     hovered_index: Rc<Cell<Option<usize>>>,
     active_tooltip: Rc<RefCell<Option<ActiveTooltip>>>,
     long_press_tooltip_active: Rc<Cell<bool>>,
+    /// NOSHAPE PATCH: see `TooltipPressGate`.
+    tooltip_pressed: crate::TooltipPressGate,
 }
 
 /// InteractiveTest is a wrapper around StyledText that adds mouse interactions.
@@ -1291,6 +1293,10 @@ impl Element for InteractiveText {
                         check_is_hovered,
                         check_is_hovered_during_prepaint,
                         interactive_state.long_press_tooltip_active.clone(),
+                        (interactive_state.tooltip_pressed.clone(), {
+                            let hitbox = hitbox.clone();
+                            Rc::new(move |window: &Window| hitbox.is_hovered(window))
+                        }),
                         None,
                         window,
                     );

@@ -24,43 +24,45 @@ const CANCEL_FILL: u32 = 0xd7d7d7;
 const CANCEL_HOVER: u32 = 0xeeeeee;
 
 // Documents-page glyphs on Onshape's 20-unit grid, drawn as masks.
-pub const GLYPH_OWNED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7.7" r="3.1" fill="currentColor"/><path d="M4.5 15.5c1.2-2.3 3.2-3.5 5.5-3.5s4.3 1.2 5.5 3.5A7.6 7.6 0 0 1 10 17.8a7.6 7.6 0 0 1-5.5-2.3z" fill="currentColor"/></svg>"#;
-pub const GLYPH_RECENT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="8.25"/><path d="M10 5.25V10l3.25 2.25"/></svg>"#;
-pub const GLYPH_FOLDER: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"><path d="M2.6 4.6h5l1.6 1.8h8.2v9h-14.8z"/></svg>"#;
+pub const GLYPH_OWNED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="8.3" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="6.8" r="2.6"/><path d="M3.7 14.7c1.1-2.4 3.5-3.9 6.3-3.9s5.2 1.5 6.3 3.9a7.9 7.9 0 0 1-12.6 0z"/></svg>"#;
+pub const GLYPH_RECENT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor"><circle cx="10" cy="10" r="7.25" stroke-width="1.5"/><path d="M10 6v4.6l3 3" stroke-width="1.1"/></svg>"#;
+pub const GLYPH_FOLDER: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M1.5 3.5h6.6l1.6 2h8.8v11h-17z"/></svg>"#;
 /// Onshape's 10 px section toggles (`svg-icon-expanded` / collapsed).
-pub const GLYPH_EXPANDED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M1.6 3.2 5 6.6l3.4-3.4"/></svg>"#;
-pub const GLYPH_COLLAPSED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 1.6 6.6 5 3.2 8.4"/></svg>"#;
+pub const GLYPH_EXPANDED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M.95 3 5 6.85 9.05 3"/></svg>"#;
+pub const GLYPH_COLLAPSED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M3 .95 6.85 5 3 9.05"/></svg>"#;
 /// Onshape's overflow "•••" (`svg-icon-overflow`, 20 px).
-pub const GLYPH_OVERFLOW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="10" r="1.8"/><circle cx="10" cy="10" r="1.8"/><circle cx="17" cy="10" r="1.8"/></svg>"#;
-pub const GLYPH_WORKSPACE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="7" cy="4.6" r="2.9"/><path d="M7 7.5v5.2" stroke-linecap="round"/></svg>"#;
-pub const GLYPH_SORT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M4.2 3h1.6v10.6l2-2 1.1 1.1L5 16.6l-3.9-3.9 1.1-1.1 2 2z"/><path d="M10.5 4h8v1.6h-8zM10.5 8h6v1.6h-6zM10.5 12h4v1.6h-4z"/></svg>"#;
-pub const GLYPH_GRIP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="7.5" cy="5" r="1.4"/><circle cx="12.5" cy="5" r="1.4"/><circle cx="7.5" cy="10" r="1.4"/><circle cx="12.5" cy="10" r="1.4"/><circle cx="7.5" cy="15" r="1.4"/><circle cx="12.5" cy="15" r="1.4"/></svg>"#;
-pub const GLYPH_PLUS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 3.5v13M3.5 10h13"/></svg>"#;
-pub const GLYPH_CREATED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M3.7 2.7h12.6v14.6H3.7z"/></svg>"#;
-pub const GLYPH_TRASH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7.6 2.2h4.8l.6 1.4h3.6v1.6H3.4V3.6H7zM4.6 6.2h10.8l-.9 11.6H5.5zm2.6 1.9v7.7h1.3V8.1zm2.2 0v7.7h1.2V8.1zm2.1 0v7.7h1.3V8.1z" fill-rule="evenodd"/></svg>"#;
-pub const GLYPH_DOCUMENT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"><path d="M4.6 2.6h7.6l3.2 3.2v11.6H4.6z"/><path d="M7 10.5h6M7 13h6"/></svg>"#;
-pub const GLYPH_OPEN: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M9.3 3.4 5.2 7.5l1.1 1.1 2.4-2.4V13h1.6V6.2l2.4 2.4 1.1-1.1-4.1-4.1z"/><path d="M3.5 14.5h13V16h-13z"/></svg>"#;
-pub const GLYPH_HOME: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2.5 1.8 10h2.4v7h4.3v-4.5h3V17h4.3v-7h2.4z"/></svg>"#;
-pub const GLYPH_BACK: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg>"#;
-pub const GLYPH_SEARCH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8.2" cy="8.2" r="5.6"/><path d="m12.4 12.4 5 5"/></svg>"#;
-pub const GLYPH_CARET: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 2.25h8L4 6.25z"/></svg>"#;
-pub const GLYPH_CARET_UP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 5.75h8L4 1.75z"/></svg>"#;
-pub const GLYPH_CHEVRON_DOWN: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 7.75 4.5 4.5 4.5-4.5"/></svg>"#;
-pub const GLYPH_CHEVRON_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.75 5.5 4.5 4.5-4.5 4.5"/></svg>"#;
+pub const GLYPH_OVERFLOW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="10" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="17" cy="10" r="2"/></svg>"#;
+pub const GLYPH_WORKSPACE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="5.6" r="3.5"/><path d="M7 9v3.6"/></svg>"#;
+pub const GLYPH_SORT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3h3v9h1.8l-3.3 4.6L2.2 12H4zM10 3h8v3h-8zm0 5h8v3h-8zm0 5h8v3h-8z"/></svg>"#;
+pub const GLYPH_GRIP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><circle cx="4.4" cy="6.9" r="1.5"/><circle cx="9.4" cy="6.9" r="1.5"/><circle cx="14.4" cy="6.9" r="1.5"/><circle cx="4.4" cy="11.9" r="1.5"/><circle cx="9.4" cy="11.9" r="1.5"/><circle cx="14.4" cy="11.9" r="1.5"/></svg>"#;
+pub const GLYPH_PLUS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M8.57 1.43h2.86v17.14H8.57z"/><path d="M1.43 8.57h17.14v2.86H1.43z"/></svg>"#;
+pub const GLYPH_CREATED: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M1.7 1.7h12.3l4.3 4.5v12.1H1.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>"#;
+pub const GLYPH_TRASH: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><mask id="glyph_trash-m"><rect width="20" height="20" fill="#fff"/><path d="m6 6.8.7 8.2M9.5 6.8V15m3.5-8.2-.7 8.2" stroke="#000" stroke-linecap="round"/></mask><path d="M6 4V3.2C6 2.5 6.5 2 7.2 2h4.6c.7 0 1.2.5 1.2 1.2V4h-1V3H7v1z"/><path d="M3 4h13v1H3zm.8 1h11.4l-.8 12a1 1 0 0 1-1 .9H5.6a1 1 0 0 1-1-.9z" mask="url(#glyph_trash-m)"/></svg>"##;
+pub const GLYPH_DOCUMENT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M1.5 1.5h12.3l4.7 4.8v12.2h-17zm12 0v5h5" fill="none" stroke="currentColor"/><path d="M10 7.2 14.5 9.8 10 12.4 5.5 9.8z" fill-opacity=".5"/><path d="M5.5 9.8 10 12.4v4.4l-4.5-2.6z"/><path d="M14.5 9.8 10 12.4v4.4l4.5-2.6z" fill-opacity=".75"/></svg>"#;
+pub const GLYPH_OPEN: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2.1 15.6 8H12v6H8V8H4.4zM2 16h16v2H2z"/></svg>"#;
+pub const GLYPH_HOME: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="m10 1 4 4V2h3v6l2 2v9h-7v-6H8v6H1v-9z"/></svg>"#;
+pub const GLYPH_BACK: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M11.4 4.4 6.6 10l4.8 5.6"/></svg>"#;
+pub const GLYPH_SEARCH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="7.7" cy="7.7" r="5.6" stroke-width="2"/><path d="M12.2 12.2 17.4 17.4" stroke-width="2.6"/></svg>"#;
+pub const GLYPH_CARET: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 2h8L4 6z"/></svg>"#;
+pub const GLYPH_CARET_UP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" fill="currentColor"><path d="M0 6h8L4 2z"/></svg>"#;
+pub const GLYPH_CHEVRON_DOWN: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8"><path d="m4.4 7.3 5.6 5.2 5.6-5.2"/></svg>"#;
+pub const GLYPH_CHEVRON_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8"><path d="m7.3 4.4 5.2 5.6-5.2 5.6"/></svg>"#;
 /// Label (tag) glyph for the documents page's Labels.
-pub const GLYPH_LABEL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2.7 4.7h10.6l4 5.3-4 5.3H2.7z"/><circle cx="12.6" cy="10" r="1.2"/></svg>"#;
+pub const GLYPH_LABEL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M1.75 4.75h13.4l3.9 5.25-3.9 5.25H1.75z" stroke-width="1.5"/><circle cx="13.1" cy="10" r="1.3" stroke-width="1.1"/></svg>"#;
 /// Create-label glyph (tag with a plus).
-pub const GLYPH_LABEL_ADD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M6.7 5.7h7.6l3.4 4.3-3.4 4.3H6.7z"/><path d="M1.5 10h5M4 7.5v5" stroke-linecap="round"/></svg>"#;
+pub const GLYPH_LABEL_ADD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M1.75 8.6V4.75h13.4l3.9 5.25-3.9 5.25H7.6m-4.2 0H1.75V13" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13.1" cy="10" r="1.3" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>"#;
+/// The plus of the "create label" glyph, drawn in blue over the tag.
+pub const GLYPH_LABEL_ADD_PLUS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5 7h2v8H5zm-3 3h8v2H2z"/></svg>"#;
 /// Checklist marks (Publish FeatureScript): a heavy ✓ and a heavy ✗.
-pub const GLYPH_CHECK_BOLD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linejoin="round"><path d="m1.6 8.6 4.1 3.9L14.6 3.6"/></svg>"#;
+pub const GLYPH_CHECK_BOLD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linejoin="round"><path d="M1 7.3 6.5 12.6 15 3.3"/></svg>"#;
 pub const GLYPH_CROSS_BOLD: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m1.5 1.5 7 7M8.5 1.5l-7 7"/></svg>"#;
-pub const GLYPH_CLOSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 11 11M15.5 4.5l-11 11"/></svg>"#;
-pub const GLYPH_LIST_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.6 3.1h4.3l1.5 1.5v4.3H2.6zM2.6 11.1h4.3l1.5 1.5v4.3H2.6z" stroke-linejoin="round"/><path d="M10.5 5h7M10.5 7.5h5M10.5 13h7M10.5 15.5h5"/></svg>"#;
-pub const GLYPH_GRID_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25"><path d="M2.6 2.6h6.3v6.3H2.6zM11.1 2.6h6.3v6.3h-6.3zM2.6 11.1h6.3v6.3H2.6zM11.1 11.1h6.3v6.3h-6.3z"/></svg>"#;
+pub const GLYPH_CLOSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6.3 6.3 7.4 7.4m0-7.4-7.4 7.4"/></svg>"#;
+pub const GLYPH_LIST_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-opacity=".8"><path d="M.5 2.5h2.7l1.2.9h3.1v4.1h-7zm0 10h2.7l1.2.9h3.1v4.1h-7zM10 3.5h10M10 6.5h8m-8 7h10m-10 3h8"/></svg>"#;
+pub const GLYPH_GRID_VIEW: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-opacity=".8"><path d="M1.5 2.5h2.7l1.2.9h3.1v4.1h-7zm10 0h2.7l1.2.9h3.1v4.1h-7zm-10 10h2.7l1.2.9h3.1v4.1h-7zm10 0h2.7l1.2.9h3.1v4.1h-7z"/></svg>"#;
 
 /// The empty-list illustration: the noshape cube in outline (Onshape shows
 /// its "On" mark the same way, light gray).
-pub const GLYPH_EMPTY: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"><path d="M50 8 88 29v42L50 92 12 71V29z"/><path d="M12 29l38 21 38-21M50 50v42"/><ellipse cx="50" cy="29" rx="12" ry="6.5"/></svg>"#;
+pub const GLYPH_EMPTY: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"><mask id="glyph_empty-m"><rect width="100" height="100" fill="#fff" stroke="none"/><path d="M24.5 57 40 66l15.5-9M40 66v18" stroke="#000" stroke-width="2.6"/><ellipse cx="40" cy="57" rx="6.5" ry="3.6" fill="#000" stroke="none"/></mask><path d="M3 36.5Q19 28 38.5 22.5L59 32.5M38 25l6 11.5 11.5-2M60.5 45 80.5 79.5l-7-1.2Q50 84 25.5 93Q6 74 3 36.5M89.5 6.5 98 17 63 45.5l-16.5 5 8-15.5zM54.5 35l8.5 10.5"/><g transform="rotate(-12 40 66)"><path d="M40 48l15.5 9v18L40 84l-15.5-9V57z" fill="currentColor" stroke="none" mask="url(#glyph_empty-m)"/></g></svg>"##;
 
 /// A documents-page glyph as a tinted mask.
 /// A single-line input `h` px tall. The kit's own `Input::h` sizes only
@@ -72,6 +74,17 @@ pub fn input_h(input: gpui_kit::component::input::Input, h: f32) -> gpui_kit::co
 
 pub fn glyph(data: &'static [u8], size: f32, color: impl Into<Hsla>) -> Icon {
     Icon::empty().data(data).size(px(size)).text_color(color.into())
+}
+
+/// "Create label" (live documents/100): the tag in `color` with Onshape's
+/// blue `#1651b0` plus on top.
+pub fn label_add_glyph(size: f32, color: impl Into<Hsla>) -> Div {
+    div()
+        .relative()
+        .size(px(size))
+        .flex_none()
+        .child(glyph(GLYPH_LABEL_ADD, size, color))
+        .child(div().absolute().top_0().left_0().child(glyph(GLYPH_LABEL_ADD_PLUS, size, rgb(0x1651b0))))
 }
 
 /// Onshape's primary button: `#1651b0`, hover `#769fcc`, 34 px, radius 3,
@@ -209,6 +222,21 @@ pub fn field_label(text: impl Into<SharedString>) -> Div {
     div().pt(px(4.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(p().text).child(text.into())
 }
 
+/// The Export dialogs' "View export rules" (live: a small blue link next to
+/// the File name label): opens Preferences at User export rules; the
+/// dialog stays open.
+pub fn export_rules_link(id: &'static str) -> Stateful<Div> {
+    div()
+        .id(id)
+        .pb(px(1.))
+        .text_size(px(12.))
+        .text_color(rgb(0x094174))
+        .cursor_pointer()
+        .hover(|d| d.underline())
+        .child("View export rules")
+        .on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::ExportRules, cx))
+}
+
 /// An info box ("No additional folders"): `#def1fb`, outline `#b2ddf6`,
 /// text `#094174`.
 pub fn info_box(text: impl Into<SharedString>) -> Div {
@@ -246,17 +274,22 @@ pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bo
         .child(label.into())
 }
 
-/// A dialog row with a 13.33 px `#666` label at the left and a value field
+/// A dialog row with a 12 px `#666` label at the left and a value field
 /// (underlined, right-aligned number) at the right, 26 px tall (§3.9).
 pub fn param_row(label: impl Into<SharedString>, field: impl IntoElement) -> Div {
     let pal = p();
-    // Live (dom dialog-animate): 26 px rows, the label 5 px in.
+    // Live (dom dialog-animate): 26 px rows, the label 5 px in. A 220 px
+    // dialog's rows fill a 194 px first column (x 246–440), the 26 px right
+    // column left for a row's icon (dom/dialog-reflection-analysis.txt: the
+    // flip icon at 443).
     h_flex()
+        .flex_none()
+        .w(px(194.))
         .h(px(26.))
         .pl(px(5.))
         .pr(px(3.))
         .gap(px(6.))
-        .child(div().flex_none().text_size(px(13.33)).text_color(pal.text_muted).child(label.into()))
+        .child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(label.into()))
         .child(div().flex_1().min_w_0().h(px(26.)).border_b_1().border_color(pal.border).hover(|d| d.border_color(pal.accent)).child(field))
 }
 
@@ -447,19 +480,19 @@ pub fn select_field_with(id: impl Into<ElementId>, options: Vec<String>, disable
 }
 
 // Feature Studio toolbar and search pane glyphs (our own drawings).
-pub const GLYPH_ARROW_LEFT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 10h-13M8.5 5 3.5 10l5 5"/></svg>"#;
-pub const GLYPH_ARROW_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h13M11.5 5l5 5-5 5"/></svg>"#;
-pub const GLYPH_OUTLINE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.6" y="2.6" width="14.8" height="14.8" rx="1.5"/><path d="M5.5 6h4M7.5 6v6M5.5 12h4M12 8.5l3 3M15 8.5l-3 3" stroke-linecap="round"/></svg>"#;
-pub const GLYPH_TEXT_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.5 3.5h13v3.2h-1.6V5.1h-4.1v10.3h1.8V17H7.4v-1.6h1.8V5.1H5.1v1.6H3.5z"/></svg>"#;
-pub const GLYPH_SYMBOL_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.2 5.2c1.4 0 2.2.8 2.8 2.2l.7 1.6 2.6-3.6h2.1l-3.9 5.3 1.3 3c.3.7.6 1 1.1 1 .3 0 .6-.1.9-.3l.4 1.3c-.5.3-1 .5-1.7.5-1.3 0-2-.8-2.6-2.1l-.7-1.6-2.8 3.8H4.4l4.1-5.5-1.2-2.8c-.3-.7-.6-1-1.1-1-.3 0-.6.1-.9.3l-.4-1.3c.5-.4 1-.6 1.3-.6z"/></svg>"#;
-pub const GLYPH_IMPORT_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5c-1.6 0-2 .8-2 2v2.3c0 1.1-.6 2.2-1.6 2.2 1 0 1.6 1.1 1.6 2.2v2.3c0 1.2.4 2 2 2M14 3.5c1.6 0 2 .8 2 2v2.3c0 1.1.6 2.2 1.6 2.2-1 0-1.6 1.1-1.6 2.2v2.3c0 1.2-.4 2-2 2"/><circle cx="10" cy="10" r="2" fill="currentColor" stroke="none"/></svg>"#;
-pub const GLYPH_FUNCTION: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="16" height="16" rx="3"/><path d="M10 5v10"/><ellipse cx="10" cy="10" rx="3.6" ry="3"/></svg>"#;
-pub const GLYPH_EXPAND_ALL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h14M3 7h14M3 13h14M7 4l3-2.5L13 4M7 16l3 2.5 3-2.5"/></svg>"#;
-pub const GLYPH_COLLAPSE_ALL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h14M7 2.5l3 3 3-3M7 17.5l3-3 3 3"/></svg>"#;
-pub const GLYPH_NEW_FEATURE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M3 7.5 9 4.5l6 3v6l-6 3-6-3z"/><path d="M3 7.5l6 3 6-3M9 10.5v6"/><path d="M15.5 2v5M13 4.5h5" stroke-linecap="round"/></svg>"#;
-pub const GLYPH_FS_IMPORT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M5 2.6h7l3 3v11.8H5z"/><path d="M10 7v7M7.2 11.2 10 14l2.8-2.8" stroke-linecap="round"/></svg>"#;
-pub const GLYPH_BRUSH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M16.6 2.2c.5.4.5 1.1.1 1.6L10.4 11l-1.9-1.7 6.6-6.9c.4-.5 1.1-.5 1.5-.2z"/><path d="M7.6 10.1l2 1.8c-.3 2.6-2.4 4.8-6.6 5.1.9-1 1.1-2 1.3-3 .3-2.2 1.6-3.6 3.3-3.9z"/></svg>"#;
-pub const GLYPH_PULSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="2.6" y="2.6" width="14.8" height="14.8" rx="1.5"/><path d="M4.5 11h2.5l1.5-4 2.5 7 1.5-3h3" stroke-linecap="round"/></svg>"#;
+pub const GLYPH_ARROW_LEFT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 10H2.5M7.4 4.6 2.5 10l4.9 5.4"/></svg>"#;
+pub const GLYPH_ARROW_RIGHT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h14.5M12.6 4.6l4.9 5.4-4.9 5.4"/></svg>"#;
+pub const GLYPH_OUTLINE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 2h2v2h5v2H4v7h5v2H2z"/><g transform="matrix(.47 0 0 .47 9.9 .1)" fill="none" stroke="currentColor"><path d="M4.2 5.8C6.3 4.5 8.3 4.6 9 7.2l1.6 6.1c.5 2.1 2.5 2.3 4.7 1.4" stroke-width="2.8"/><path d="M14.6 4.6c-2.6 0-4.2 3.5-5.2 6-1 2.4-2.4 3.6-4.2 4" stroke-width="2.1"/><circle cx="14.7" cy="5.4" r="1.9" fill="currentColor" stroke="none"/><circle cx="4.6" cy="14.4" r="2.2" fill="currentColor" stroke="none"/></g><ellipse cx="14.5" cy="13.7" rx="2.85" ry="2.55" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M14 10h1v7.8h-1z"/></svg>"#;
+pub const GLYPH_TEXT_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.6 4a1 1 0 0 1 1-1h10.8a1 1 0 0 1 1 1v2h-1.8V5H11v10h2v2H7v-2h2V5H5.4v1H3.6z"/></svg>"#;
+pub const GLYPH_SYMBOL_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M4.2 5.8C6.3 4.5 8.3 4.6 9 7.2l1.6 6.1c.5 2.1 2.5 2.3 4.7 1.4" stroke-width="2.8"/><path d="M14.6 4.6c-2.6 0-4.2 3.5-5.2 6-1 2.4-2.4 3.6-4.2 4" stroke-width="2.1"/><circle cx="14.7" cy="5.4" r="1.9" fill="currentColor" stroke="none"/><circle cx="4.6" cy="14.4" r="2.2" fill="currentColor" stroke="none"/></svg>"#;
+pub const GLYPH_IMPORT_MODE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.4 3.9H4.8c-.8 0-1.3.4-1.3 1.2v3.3c0 .9-.6 1.6-1.9 1.6 1.3 0 1.9.7 1.9 1.6v3.3c0 .8.5 1.2 1.3 1.2h1.6m7.2-12.2h1.6c.8 0 1.3.4 1.3 1.2v3.3c0 .9.6 1.6 1.9 1.6-1.3 0-1.9.7-1.9 1.6v3.3c0 .8-.5 1.2-1.3 1.2h-1.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v16" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="10" r="3.8"/></svg>"#;
+pub const GLYPH_FUNCTION: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M14.4 2.8c-1.2-.5-2.5 0-3.1 1.1-.6 1.2-.9 3-1.3 5.2l-1.2 6.2c-.4 2.1-1.6 3.5-3.5 3.2" fill="none" stroke="currentColor" stroke-width="2.1"/><path d="M8.4 8.5h4.8" stroke="currentColor" stroke-width=".9"/><circle cx="15.1" cy="3.8" r="1.3"/><circle cx="5.1" cy="17.4" r="1.3"/></svg>"#;
+pub const GLYPH_EXPAND_ALL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6 5h8l-4-4zM6 16h8l-4 4zM2 7h16v1H2zm0 3h16v1H2zm0 3h16v1H2z"/></svg>"#;
+pub const GLYPH_COLLAPSE_ALL: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6 4h8l-4 3.9zM6 17h8l-4-3.9zM2 10h16v1H2z"/></svg>"#;
+pub const GLYPH_NEW_FEATURE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6 6.6l5.5 3v6l-5.5 3-5.5-3v-6zm-5.5 3 5.5 3 5.5-3M6 12.6v6M13 3.5h6m-6 3h6m-6 3h6m-6 3h6m-6 3h6" fill="none" stroke="currentColor"/><path d="M8 1v5l3.5-2.5z"/></svg>"#;
+pub const GLYPH_FS_IMPORT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7.8 8H15.6L11.5 13.8Z" fill-opacity=".45"/><g fill="none" stroke="currentColor" stroke-width="1.01"><path d="M8.5 4.5H3.5V15L6 17.5H16.5V7.5L13.5 4.5H12"/><path d="M3.5 4.5L6.5 7.5V17M6.5 7.5H16" stroke-opacity=".5"/><path d="M6.2 2.5H8.3C9.2 2.6 9.8 3.2 10.3 4C10.8 4.8 11.3 5.6 11.3 6.8V9.4" stroke-width="1.3"/></g><path d="M8.5 9H14.5L11.5 12.2Z"/></svg>"#;
+pub const GLYPH_BRUSH: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M17.2 3.3 12.9 8" stroke="currentColor" stroke-width="2.9" stroke-linecap="round"/><path d="M6.05 5.45 7.15 4.35 15.9 13.1 14.8 14.2z"/><path d="M0.95 10.25 5.2 6 14.35 15.15 10.1 19.4z"/></svg>"#;
+pub const GLYPH_PULSE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor"><rect x="1.5" y="1.5" width="17" height="17" rx="1"/><path d="M2 11.5h3.1l1.1-3.5.9 4.6 1.5-9.6 1.6 13.8 2-7 .9 2 1.5-1.9.8 1.6H18" stroke-width="1.1" stroke-miterlimit="5"/></svg>"#;
 
 /// Onshape menus on dropdown buttons (instead of the kit's `dropdown_menu`):
 /// wraps the button, and a click opens `f`'s menu under it, as a Bootstrap
@@ -491,6 +524,30 @@ pub trait OsDropdownExt: IntoElement + Sized {
             })
     }
 }
+
+/// A context-menu-style list opening upward from a button at the bottom of
+/// the window, its bottom-right corner on the button's top-right (live
+/// dom/menu-analysis-tools.txt: the Show analysis tools menu).
+pub trait OsDropupExt: IntoElement + Sized {
+    fn os_dropup_menu(self, id: impl Into<ElementId>, f: impl Fn(crate::os_menu::OsMenu, &mut Window, &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu + 'static) -> Stateful<Div> {
+        let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
+        let probe = bounds.clone();
+        let f = Rc::new(f);
+        div()
+            .id(id)
+            .relative()
+            .flex_none()
+            .child(self)
+            .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+            .on_click(move |_, window, cx| {
+                let (f, b) = (f.clone(), bounds.get());
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| f(m, window, cx));
+                crate::os_menu::open_anchored(point(b.right(), b.top()), Anchor::BottomRight, menu, window, cx);
+            })
+    }
+}
+
+impl OsDropupExt for Button {}
 
 impl OsDropdownExt for Button {}
 impl OsDropdownExt for Stateful<Div> {}

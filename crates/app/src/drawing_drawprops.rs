@@ -140,7 +140,7 @@ impl DrawingEditor {
         let inch = !self.drawing.units_mm;
         let field = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| {
             let shown = if inch { format!("{:.4} in", v / 25.4) } else { format!("{} mm", noshape_model::drawing::format::format_number(v, None, 2)) };
-            let st = cx.new(|cx| InputState::new(window, cx).default_value(shown));
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(shown));
             let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
                 if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur)
                     && let Some(v) = length_mm(&st.read(cx).value(), inch)
@@ -152,7 +152,7 @@ impl DrawingEditor {
         };
         // Text fields (label prefixes): applied on Enter / blur.
         let text_field = |v: String, set: fn(&mut DrawingProps, String), window: &mut Window, cx: &mut Context<Self>| {
-            let st = cx.new(|cx| InputState::new(window, cx).default_value(v));
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(v));
             let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
                 if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                     let v = st.read(cx).value().to_string();
@@ -598,6 +598,8 @@ impl DrawingEditor {
                 .child(check("dp-dclip", "Clip border to geometry", vt.detail_clip_border, |p, v| p.view_tab.detail_clip_border = v, cx))
                 .child(section("Auxiliary views"))
                 .child(check("dp-aind", "Show view reference indicator", vt.aux_indicator, |p, v| p.view_tab.aux_indicator = v, cx))
+                .child(row("View reference format", div().into_any_element()))
+                .child(self.aux_format_tiles(vt.aux_arrow_format, cx))
                 .child(row("View label prefix", field(3)))
                 .child(row("View label style", select("dp-alabel", if vt.aux_double_label { "A-A".into() } else { "A".into() }, aux_styles)))
                 .child(row("View label suffix", field(4)));
@@ -748,7 +750,7 @@ impl DrawingEditor {
     fn drawing_props_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
         let locked = self.drawing.props.locked;
-        let dwt = Button::new("dp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("title-block"), 18., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
+        let dwt = Button::new("dp-dwt").ghost().small().w(px(25.)).h(px(25.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
             for row in crate::drawing_create::template_rows() {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(row.file).on_click(move |_, _, cx| {
@@ -764,11 +766,66 @@ impl DrawingEditor {
             .flex_none()
             .border_t_1()
             .border_color(gpui_kit::rgb(0xdddddd))
-            .child(h_flex().h(px(36.)).px(px(10.)).gap(px(8.)).child(div().flex_1().text_size(px(13.)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…")).child(dwt))
-            .child(div().h(px(32.)).px(px(10.)).flex().items_center().child(Checkbox::new("dp-lock").label("Lock drawing properties").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
-                let v = *v;
-                this.set_drawing_prop(&move |p| p.locked = v, cx)
-            }))))
+            // Live drawing/160: an input-like row (13.33 px italic, 20 px in,
+            // a #ddd underline up to the 25 px DWT button 9 px from the edge),
+            // then the 12 px Lock checkbox 9 px in with a 12 px label and a
+            // grey help icon at the right.
+            .child(
+                h_flex()
+                    .h(px(34.))
+                    .pt(px(6.))
+                    .pr(px(9.))
+                    .gap(px(19.))
+                    .child(div().flex_1().h(px(26.)).pl(px(20.)).flex().items_center().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x666666)).child("Update properties from a template…"))
+                    .child(dwt),
+            )
+            .child(
+                h_flex()
+                    .h(px(34.))
+                    .pl(px(5.))
+                    .pr(px(9.))
+                    .child(div().flex_1().text_size(px(12.)).child(Checkbox::new("dp-lock").label("Lock drawing properties").small().checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
+                        let v = *v;
+                        this.set_drawing_prop(&move |p| p.locked = v, cx)
+                    }))))
+                    .child(div().size(px(14.)).child(crate::assets::icon("help-filled", 14., cx))),
+            )
+            .into_any_element()
+    }
+}
+
+impl DrawingEditor {
+    /// Drawing properties › Auxiliary views › View reference format: two
+    /// 96×70 tiles, "Line style" and "Arrow style" (live u-930/931; the
+    /// pressed one rgb(207,219,229), the other rgb(245,245,245)).
+    fn aux_format_tiles(&self, arrow: bool, cx: &mut Context<Self>) -> AnyElement {
+        let tile = |id: &'static str, tip: &'static str, icon: &'static str, on: bool, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .w(px(96.))
+                .h(px(70.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(3.))
+                .border_1()
+                .border_color(gpui_kit::rgb(if on { 0xb9c6d1 } else { 0xd7d7d7 }))
+                .bg(gpui_kit::rgb(if on { 0xcfdbe5 } else { 0xf5f5f5 }))
+                .cursor_pointer()
+                .tooltip(crate::ui::tooltip(tip))
+                // Live (asb/u-930): the part + reference art on a 48 px canvas.
+                .child(crate::assets::icon(icon, 48., cx))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    let arrow = id == "dp-aformat-arrow";
+                    this.set_drawing_prop(&move |p| p.view_tab.aux_arrow_format = arrow, cx);
+                }))
+        };
+        h_flex()
+            .pl(px(80.))
+            .pb(px(8.))
+            .gap(px(16.))
+            .child(tile("dp-aformat-line", "Line style", "aux-format-line", !arrow, cx))
+            .child(tile("dp-aformat-arrow", "Arrow style", "aux-format-arrow", arrow, cx))
             .into_any_element()
     }
 }

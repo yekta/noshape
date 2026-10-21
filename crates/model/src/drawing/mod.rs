@@ -421,6 +421,10 @@ pub struct DrawingView {
     /// the profile), with a leader to it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail_label_at: Option<[f64; 2]>,
+    /// The view label's move from its place under the view (sheet mm;
+    /// dragged on its own, live behaviours "view labels").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_at: Option<[f64; 2]>,
     /// Auxiliary views: the view reference indicator (letter, where it sits
     /// on the picked edge in the parent, shown or not).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -530,7 +534,7 @@ impl DrawingView {
 
 /// An auxiliary view's reference indicator: the arrow at `anchor` (parent
 /// view coordinates, on the picked edge) labelled `letter`; the view is
-/// labelled "VIEW <letter>".
+/// labelled "Auxiliary <letter> - <letter>".
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AuxRef {
     pub anchor: [f64; 2],
@@ -541,10 +545,14 @@ pub struct AuxRef {
     /// the view; dragged with the indicator's middle snap point.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offset: Option<f64>,
-    /// How far (sheet mm) the line runs to either side of the anchor
-    /// (−edge, +edge); dragged with the elbow snap points.
+    /// How far (sheet mm) the line runs to either side of its middle
+    /// (dragged with the end snap points, symmetrically; None: the edge's
+    /// extent plus 0.105 in each side).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ext: Option<[f64; 2]>,
+    /// Each letter moved by its snap point (sheet mm from its place).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub letter_at: Option<[[f64; 2]; 2]>,
 }
 
 /// Onshape's View simplification: geometry below a threshold is left out.
@@ -616,6 +624,7 @@ impl Default for DrawingView {
             detail_hide_profile: false,
             detail_clip_border: false,
             detail_label_at: None,
+            label_at: None,
             section_depth_ref: None,
             exclude_from_cut: Vec::new(),
             cut_from_section: false,
@@ -1233,6 +1242,9 @@ pub struct CellFormat {
     pub strikethrough: bool,
     #[serde(default)]
     pub valign: CellVAlign,
+    /// Font family; None = the drawing's (Noto Sans).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font: Option<String>,
 }
 
 /// Format of the cell at (`row`, `col`). Rows count every displayed row
@@ -2040,6 +2052,10 @@ pub struct Sheet {
     /// Stable id of the sheet (views linked across sheets, [`links`]).
     #[serde(default)]
     pub uid: u32,
+    /// Sheet properties › Format: the DWT the sheet's format came from
+    /// (None: Custom / a built-in template).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dwt: Option<String>,
 }
 
 /// Where zone labelling starts (Custom template › Start zones): numbers
@@ -2278,7 +2294,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0 }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None }
     }
 }
 
@@ -2294,6 +2310,13 @@ pub struct Drawing {
     /// live behaviours "Sheet properties › Select a DWT" (5)).
     #[serde(default, skip_serializing_if = "is_zero_usize")]
     pub active_sheet: usize,
+    /// A picked DWT's continuation format, for new sheets ([`dwt`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuation: Option<Box<dwt::SheetTemplate>>,
+    /// Who drew it (title block DRAWN, `{drawing.drawn_by}`): the user
+    /// that created it, kept with the drawing (qa5 D13).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drawn_by: Option<String>,
 }
 
 fn is_zero_usize(n: &usize) -> bool {
@@ -2302,7 +2325,7 @@ fn is_zero_usize(n: &usize) -> bool {
 
 impl Default for Drawing {
     fn default() -> Self {
-        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default(), active_sheet: 0 }
+        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default(), active_sheet: 0, continuation: None, drawn_by: None }
     }
 }
 
@@ -2552,6 +2575,10 @@ pub struct ViewTabProps {
     pub aux_prefix: String,
     pub aux_double_label: bool,
     pub aux_suffix: String,
+    /// View reference format: Arrow style (one arrow and letter at the
+    /// middle, no viewing line) instead of Line style.
+    #[serde(default)]
+    pub aux_arrow_format: bool,
     /// Construction geometry: centermark and centerline colors (None: ink)
     /// and how far centermark arms pass the circle (mm).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2584,8 +2611,10 @@ impl Default for ViewTabProps {
             detail_show_profile: true,
             detail_clip_border: false,
             aux_indicator: true,
-            aux_prefix: "VIEW".into(),
-            aux_double_label: false,
+            // Live dom/drawing-properties-views.txt: "Auxiliary", A-A.
+            aux_prefix: "Auxiliary".into(),
+            aux_double_label: true,
+            aux_arrow_format: false,
             aux_suffix: String::new(),
             centermark_color: None,
             centerline_color: None,
@@ -2758,6 +2787,10 @@ pub struct CalloutStyle {
     /// Leaders added with Add leader (arrows).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub leaders: Vec<Leader>,
+    /// The part clicked when the anchor has no point reference (an edge
+    /// away from its snap points): its BOM item and properties (qa5 D8).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub part: Option<BodyId>,
 }
 
 /// One stacked callout: its instance (part) and text (empty = that part's
@@ -2772,7 +2805,7 @@ pub struct StackedCallout {
 
 impl Default for CalloutStyle {
     fn default() -> Self {
-        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new(), leaders: Vec::new() }
+        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new(), leaders: Vec::new(), part: None }
     }
 }
 
@@ -3159,6 +3192,10 @@ impl Drawing {
             sheet.title_block = src.title_block.clone();
             sheet.title_style = src.title_style;
         }
+        // After a DWT was picked: its continuation format (live z2 (4)).
+        if let Some(t) = self.new_sheet_template().cloned() {
+            sheet.apply_template_format(&t);
+        }
         let at = (after + 1).min(self.sheets.len());
         self.sheets.insert(at, sheet);
         at
@@ -3340,9 +3377,12 @@ pub mod build;
 pub mod clipboard;
 pub mod create;
 pub mod cad_export;
+pub mod cad_fit;
+pub mod cad_layers;
 pub mod sheet_sketch;
 pub mod hatch_pat;
 pub mod imported;
+pub mod dwt;
 pub mod links;
 pub mod mbd;
 pub mod sketch_dims;

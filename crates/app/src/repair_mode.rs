@@ -26,11 +26,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// The panel's width (live rp-906).
-#[allow(dead_code)] // Wired in next step: the Part Studio mounts the Repair panel (after the lead's heads-up to psb / ui).
 pub const PANEL_W: f32 = 567.;
 
 pub struct RepairSession {
-    #[allow(dead_code)] // Wired in next step: the Part Studio's Repair panel reads it (after the lead's heads-up to psb / ui).
+    #[allow(dead_code)] // Wired in next step: perf's second view keys its cached scene on it.
     pub mv: MicroversionId,
     /// "V2", or "Main :: Insert new tab : ui iso" for a change.
     pub label: String,
@@ -64,14 +63,12 @@ pub fn open(doc: &Entity<DocModel>, mv: MicroversionId, label: String, cx: &mut 
 }
 
 /// The strip's "Repair panel" wrench: close the panel.
-#[allow(dead_code)] // Wired in next step: the Part Studio mounts the Repair panel (after the lead's heads-up to psb / ui).
 pub fn close(doc: &Entity<DocModel>, cx: &mut App) {
     if cx.default_global::<State>().sessions.remove(&doc.entity_id()).is_some() {
         changed(doc, cx);
     }
 }
 
-#[allow(dead_code)] // Wired in next step: the Part Studio mounts the Repair panel (after the lead's heads-up to psb / ui).
 pub fn is_open(doc: &Entity<DocModel>, cx: &App) -> bool {
     cx.try_global::<State>().is_some_and(|s| s.sessions.contains_key(&doc.entity_id()))
 }
@@ -89,21 +86,20 @@ pub fn toggle_picking(doc: &Entity<DocModel>, cx: &mut App) {
 }
 
 /// The document as it was at the repaired entry (for the second view).
-#[allow(dead_code)] // Wired in next step: the Part Studio mounts the Repair panel (after the lead's heads-up to psb / ui).
+#[allow(dead_code)] // Wired in next step: perf's second view of the Repair panel reads it.
 pub fn document(doc: &Entity<DocModel>, cx: &App) -> Option<Arc<Document>> {
     cx.try_global::<State>().and_then(|s| s.sessions.get(&doc.entity_id())).map(|s| s.doc.clone())
 }
 
 /// Whether the repair view follows the main camera ("Synchronize view", on
 /// by default).
-#[allow(dead_code)] // Wired in next step: the Part Studio mounts the Repair panel (after the lead's heads-up to psb / ui).
+#[allow(dead_code)] // Wired in next step: perf's second view of the Repair panel reads it.
 pub fn synchronized(doc: &Entity<DocModel>, cx: &App) -> bool {
     cx.try_global::<State>().and_then(|s| s.sessions.get(&doc.entity_id())).is_some_and(|s| s.synchronized)
 }
 
 /// The panel's chrome (live rp-906): title, the "Viewing …" pill and the
 /// sync toggle around `graphics` (perf's view-only second view).
-#[allow(dead_code)] // Wired in next step: the Part Studio mounts the Repair panel (after the lead's heads-up to psb / ui).
 pub fn render_panel(doc: &Entity<DocModel>, graphics: Option<AnyElement>, cx: &App) -> Option<AnyElement> {
     let s = cx.try_global::<State>()?.sessions.get(&doc.entity_id())?;
     let pal = p();

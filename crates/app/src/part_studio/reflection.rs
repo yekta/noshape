@@ -117,7 +117,7 @@ impl PartStudioView {
     }
 
     pub(super) fn open_env_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search by name, folder, or configuration"));
+        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search by name, folder, or configuration"));
         let sub = cx.subscribe_in(&search, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
                 cx.notify();

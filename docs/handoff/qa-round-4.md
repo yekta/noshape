@@ -627,3 +627,122 @@ this class. Use it for every hover-only control (no `invisible()`).
 
 ### Open live requests (REQUESTS.md, qa4): Esc / outside-click behaviour of Insert dialog, Appearance editor,
 Dependencies panel, notices panel, FS Import popover, Replace notice; navbar document name click.
+
+### R6 (10-21, after v0.4.3 GO): input behaviour, inventory gaps checked in the app (for ui, asb)
+Inventory of all ~220 input sites (read from code): /root/qa4-scratch/input-inventory.md. Checked on the
+v0.4.3-freeze binary under Xvfb against live's "Input behaviour" capture (behaviours.md "## Input behaviour").
+Screenshots /tmp/qa4/s/t1*-t7* (not kept).
+
+| # | Field (app) | App does | Live (behaviours.md) | Owner |
+|---|---|---|---|---|
+| 1 | Extrude › Depth, 1st click | caret at the click point | **selects all** (0..len); Tab into the field selects all too | ui (shared numeric field) |
+| 2 | Extrude › Depth, "30" + **Enter** | commits, keeps the dialog open, shows "30" (selected) | appends the unit on Tab **and Enter** and re-selects: "30 mm" | ui |
+| 3 | Extrude › Depth, "10+5" then refocus | refocus shows "10+5" plus an "= 15 mm" hint below | refocus shows **"(10+5) mm"** (no hint) | ui |
+| 4 | Extrude › Depth, Esc while typing | reverts to the committed value, field **stays focused** | reverts **and blurs**; the dialog stays open | ui |
+| 5 | Feature rename (list › Rename), Esc after typing | nothing; the next click away **commits** the typed name | **reverts** | ui (shared) / psb (rename sites) |
+| 6 | Variable Studio value cell, Esc after typing "20" | nothing; clicking away commits "20 mm" | **reverts** | ui / ui2 (Variable Studio) |
+| 7 | Variable Studio value cell, 1st click | caret in the text input | focuses the **cell** (no input); typing a key opens the editor with that key (type-to-edit) | ui2 |
+| 8 | Drawing › Rename sheet panel, Esc after typing | nothing: the panel stays open with the typed text | Esc reverts / cancels (as every live field) | asb (drawing panels: `DrawingEditor::input`, most panel fields) |
+| 9 | Part › Properties… dialog | opens with **no field focused**; typing a part number and pressing **Enter closes the dialog and loses the edit** (reopened: empty) | (Onshape's Properties modal keeps Enter as a field commit; must not drop edits) | ui (gpui_kit Dialog default `on_ok`) / owner of properties_dialog.rs |
+| 10 | Feature list filter, Esc | text kept | text kept (✓ same) | — |
+| 11 | Variable Studio value cell, bare "15" + Enter | "15 mm" (✓ same) | "15 mm" | — |
+| 12 | Extrude › Depth "25"/"2 in"/"10+5" + Tab | "25 mm" / "50.8 mm" / "15 mm" (✓ same) | same | — |
+| 13 | Rename / Rename sheet open | all selected (✓ same) | all selected | — |
+
+Root causes (from the inventory): Esc is bound to Cancel only in `Workspace && !Input` and `FeatureDialog` contexts
+(actions.rs:155-177) and the gpui-base input's own Escape (state.rs:2214) only clears with `clean_on_escape`; so outside
+feature dialogs nothing reverts on Esc unless a site catches it. Numeric commit-with-unit lives in feature_dialog.rs
+(Tab/blur) but Enter skips the reformat. Dialogs without `on_ok` close on Enter (gpui-base dialog.rs:437): Properties,
+Version properties, Instance properties. Not yet checked in the app (code reading only, same causes): Esc in the other
+renames (folder, default geometry, contexts, tabs, assembly rows), analysis/draft/flatten fields (plain-number parsing,
+no expressions), Version/Instance properties Enter, focus-on-open of Document details.
+
+### R7 (10-21, new qa4 session): Insert dialog layer, rows, Scene::replay, debug/release timings
+State (keep current): **in progress.**
+- **Assembly front layer (task 1).** The workspace draws the AssemblyView as a cached view plus, in front of
+  it over the list+graphics area (under the toolbar), an uncached `front` Slice (`AssemblyView::front_host` /
+  `render_front_host`): the left dialogs (`render_left_layer`: Insert, Mate, … with their fields), then the
+  cached `overlay` slice, then the customize-toolbar Tools panel: the same z-order as when they were drawn in
+  the view. The front layer has the "Assembly" key context, all the view's actions (`with_actions`, shared
+  with the root) and the click-to-focus capture (own `front_focus` counted as inside). The view observes the
+  doc. A keystroke / blink in an Insert or Mate field re-renders the Workspace root + the front layer only.
+- **gpui-pre NOSHAPE PATCH qa4 (view.rs, window.rs `noshape_frame`):** a cached view re-rendering no longer
+  forces the cached views nested in it to re-render (upstream `window.refreshing`; back with
+  `NOSHAPE_NESTED_VIEW_REFRESH=1`). Without it, caching the whole AssemblyView would re-render all its slices
+  on every instance-filter key. Safety: a cached view reuses its ranges only if it recorded them in the frame
+  just drawn (`ViewElementState::frame`); inside a reused parent its indices are stale, so it re-renders.
+  This changes rule 2 of cached_slice.rs ("no cached view inside one that re-renders") to: nested is fine,
+  but a nested slice is only reused when its parent re-rendered in the previous frame too.
+- Measured r7a (/tmp/qa4/noshape-r7a, before the focus fix below), UI-thread CPU per frame, median, typing /
+  blink: **Insert search 4.0 / 3.0 ms** (v0.4.3 binary: 5.2 / 4.8). r7a broke the instance filter: the front
+  layer's `track_focus` took every click's focus (gpui focuses the topmost tracked handle, then
+  prevent_default), so the filter never got focus. Fixed in the tree (not yet rebuilt/measured): no focus
+  handle on the front layer; its key context is "Assembly AssemblyFront" and the click-to-focus capture checks
+  `window.context_stack()` for "AssemblyFront". **To do when perf resumes:** rebuild, re-measure asm (instance
+  filter, must stay ≈3.2 / 3.2) and asmins; functional checks (Insert search filters the tree, Esc closes the
+  Insert dialog, Mate dialog fields + Flip/Reorient keys, docked BOM pane over dialogs, context menu over the
+  Insert dialog, Tools-panel customize drag, list splitter drag moves the dialogs); pixcmp.sh across tabs.
+- **Paused 10-21 ~07:45 by the lead** for the core-workflow QA pass (docs/parity/core-workflow.md). Remaining perf
+  items after task 1: Part Studio "all rows come back" frames (idea: rows clone their whole `Feature` incl. a
+  sketch's data per render, `render_feature_row_view`; measure first), Scene::replay flag measurement +
+  pixcmp.sh (`NOSHAPE_SCENE_REPLAY_ORDERS`, patch already in scene.rs/bounds_tree.rs), debug vs release timings.
+
+### R8 (10-21 07:45–08:40): core-workflow QA pass (lead's priority change)
+Checklist + findings: **docs/parity/core-workflow.md** (re-run before every release; 27 findings with owners,
+sent to the lead). Scripts: /root/qa4-scratch/cwstart.sh, s.sh. Binaries: /tmp/qa4/noshape-r7a (07:26),
+/tmp/qa4/noshape-cw (08:15, includes the Assembly front-layer focus fix: instance filter OK).
+Next: perf R7 items (see above) unless the lead says otherwise; re-run the checklist when psb/ui land fixes.
+
+### R9 (10-21 ~08:45–): perf resumed (lead: items 1–4)
+1. **Instance filter after the focus fix** (/tmp/qa4/noshape-cw): 3.8 / 3.5 ms typing / blink (v0.4.3 3.5 / 3.5, load
+   noise); Insert search 3.2 / 3.0 (v0.4.3 5.2 / 4.8). Both under 4 ms median.
+2. **Part Studio rows.** Test doc /tmp/qa4/big/big.noshape (40 sketches + 20 variables, made with
+   noshape-cli batch: /tmp/qa4/big/batch.jsonl); `measure4.sh BIN DOC NAME "240 149"` splits frames by
+   render_feature_list. Baseline (cw): BackSpace that brings all 64 rows back **≈19–20 ms**, a key leaving 6
+   matches ≈7 ms, caret 3.25. Model helpers are negligible (uprobes: filter_features, names, folders,
+   dependencies <0.1 ms/frame); the cost is ~0.3 ms per real row (build + taffy + paint, dev profile) and one
+   div per placeholder. Change (part_studio/mod.rs `render_feature_list`, behaviors.rs `list_scroll`): the list
+   tracks a ScrollHandle; Feature/Folder/"..." rows outside the view (+2 rows) are left out, each run replaced by
+   one empty block of its height (all those rows are ROW_H; other items always drawn, heights estimated). A
+   wheel scroll notifies the rows slice (gpui div scroll → `cx.notify(current_view)`), which draws the newly
+   visible rows before painting. v2 (per-row placeholders, 8 rows spare): all-rows frames ≈12–13 ms; scrolling
+   checked (no gaps). v3 (runs merged, 2 rows spare): measuring.
+3. **Scene::replay** (`NOSHAPE_SCENE_REPLAY_ORDERS`): `Scene::replay` itself is ~0.24 ms/frame with gpui's own
+   replay (uprobe, Part Studio blink), so keeping orders saves ≤0.2 ms; whole frames unchanged within noise
+   (blink 3.0–3.2 both, typing 3.5–4.0 both). `NOSHAPE_SCENE_CHECK=1`: 0 primitives out of paint order in 41
+   checked frames (PS, Assembly, Insert, FS). pixcmp.sh on v2: **0 differing pixels in all 11 scenarios**
+   (ps, ps-edit, ps-menu, ps-tip, ps-sketch, asm, asm-insert, vs, fs, dr, docs). Decision: keep it off (gain too
+   small for a scene-order change); the patch stays for a later GPU-side look.
+   **v3 had a bug** (each skipped run became a zero-height block: `mem::take` read after it zeroed the count;
+   rows after the first run vanished, e.g. below a moved rollback bar). Fixed in v4 (`let run = take(...)`).
+   v4 checked against cw: rollback bar ↑↑↑ at the list's end, rolled-back rows greyed below it, wheel scroll both
+   ways, filter "3" ("..." runs), Default geometry collapsed: identical. **v4 vs cw back to back** (big doc,
+   7/BackSpace ×20): frames that rebuild rows **16.25 → 8.75 ms** median (p90 23.25 → 11.5); caret frames
+   3.6 / 3.5. Still above 4 ms in the dev build (app crate at opt-level 1): see item 4 for release.
+4. **Debug vs release** (same tree, back to back; /root/qa4-scratch/m-relvsdbg.txt; UI-thread CPU per frame,
+   median, typing / blink; binaries in /root/qa4-scratch/bin, symlinked from /tmp/qa4):
+
+| | dev (v4) | release (thin LTO) |
+|---|---|---|
+| Part Studio filter (demo) | 3.8 / 3.0 | **3.2 / 2.5** |
+| 60-feature list: frames that rebuild rows / others | 7.0 / 3.25 | **5.75 / 3.0** |
+| Assembly instance filter | 3.8 / 3.5 | **3.0 / 3.0** |
+| Assembly Insert search | 3.8 / 3.1 | **3.0 / 2.6** |
+
+   Release is only ~15–20% below dev: dev already builds every dependency at opt-level 3 (only the app crate
+   is opt-level 1). Above 4 ms in release: only frames that rebuild a long feature list (5.75 ms, ~14 real rows
+   at ~0.2 ms each to build, lay out and paint). **Rule from the lead (10-21): no local release builds of the
+   app** (this one held 5.6 GB for 30+ min); release timings come from CI artifacts. perf.yml has no typing
+   benchmark and the artifacts are stripped, so CI needs an in-app per-frame UI-CPU log (e.g. a NOSHAPE PATCH
+   in gpui-pre `Window::draw` reading CLOCK_THREAD_CPUTIME_ID under NOSHAPE_PERF=1) plus a typing/caret run
+   in perf.yml; proposed to the lead. /root/qa4-scratch/keycpu.sh measures stripped binaries (main-thread
+   task-clock per key) meanwhile.
+   Gotcha: /tmp is tmpfs (RAM): keep test binaries in /root/qa4-scratch/bin, not /tmp.
+
+### R10 (10-21 14:30–14:50): core-workflow re-run on the 14:32 build
+Results table at the end of docs/parity/core-workflow.md: fixed F1, F3–F7, F10–F15, F17, F19–F25 (F19, F23
+to verify against live); still failing F8, F9 (kern), F26 (kern), F27 (ui2); F18 unchanged (needs a live capture);
+new F28 (Show errors defaults off), F29 (shortcuts dead after invalid dim value + Esc Esc), both psb.
+Binary: /root/qa4-scratch/bin/noshape-cw2 (app run under `timeout 1800` by cwstart.sh). Perf leftover: release
+row-rebuild frames 5.75 ms on a 60-feature list (gpui per-element cost of ~14 rows); options for the lead: reuse
+row views at shifted positions (gpui-pre change) or slimmer feature rows (psb/ui row code).

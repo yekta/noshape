@@ -60,6 +60,26 @@ const SCALES: [f64; 12] = [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05, 
 type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>)>;
 
 impl DrawingEditor {
+    /// Sheet properties › Select a DWT: the document's .dwt file tabs (or
+    /// Import…); the sheet takes the template's format.
+    fn select_dwt(&mut self, si: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let ed = cx.entity();
+        crate::file_tab_view::pick_file(self.doc.clone(), "Select a DWT", &[noshape_model::file_tab::FileKind::Template], &["dwt"], window, cx, move |file, _, cx| {
+            let result = file.bytes().ok_or_else(|| "The file can't be read".to_string()).and_then(|b| dwt::read_dwt(&b));
+            ed.update(cx, |t, cx| match result {
+                Ok(templates) => {
+                    let name = file.file_name.clone();
+                    t.edit("Select a DWT", cx, |d| d.apply_dwt(si, &name, &templates));
+                    t.fitted = false;
+                }
+                Err(e) => {
+                    t.status = Some(format!("Select a DWT failed: {e}").into());
+                    cx.notify();
+                }
+            });
+        });
+    }
+
     pub fn open_sheet_props(&mut self, sheet: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(s) = self.drawing.sheets.get(sheet) else { return };
         self.view_props = None;
@@ -67,9 +87,12 @@ impl DrawingEditor {
         let text = format_scale(s.scale);
         let (w, h) = s.size.size_mm();
         let inches = !self.drawing.units_mm;
-        let scale = cx.new(|cx| InputState::new(window, cx).default_value(text));
-        let width = cx.new(|cx| InputState::new(window, cx).default_value(sheet_len(w, inches)));
-        let height = cx.new(|cx| InputState::new(window, cx).default_value(sheet_len(h, inches)));
+        // Live (Wt widgets): the scale combo puts the caret at the click; the
+        // width / height `XeInput`s select all; Esc never reverts the text (it
+        // closes the dialog).
+        let scale = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
+        let width = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false).default_value(sheet_len(w, inches)));
+        let height = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false).default_value(sheet_len(h, inches)));
         scale.update(cx, |st, cx| st.focus(window, cx));
         self.sheet_props = Some(SheetPropsState { sheet, scale, width, height });
         cx.notify();
@@ -177,8 +200,30 @@ impl DrawingEditor {
                 (tp.name.replace(' ', "_") + ".dwt", Some(tp.name) == cur_tmpl, act)
             })
             .collect();
-        let format_label = cur_tmpl.map(|n| n.replace(' ', "_") + ".dwt").unwrap_or_else(|| "Custom".into());
-        let dwt = Button::new("sp-dwt").ghost().small().w(px(26.)).h(px(26.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("title-block"), 18., cx)).tooltip("Select a DWT").into_any_element();
+        let mut format_label = cur_tmpl.map(|n| n.replace(' ', "_") + ".dwt").unwrap_or_else(|| "Custom".into());
+        // A picked DWT (live z2): Format shows it; its list is {the DWT, Custom}
+        // and Custom detaches it.
+        let format_items = match &sheet.dwt {
+            Some(name) => {
+                format_label = name.clone();
+                let detach: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| t.edit("Format", cx, |d| d.detach_dwt(si)));
+                vec![(name.clone(), true, std::rc::Rc::new(|_: &mut DrawingEditor, _: &mut Window, _: &mut Context<DrawingEditor>| {}) as Act), ("Custom".to_string(), false, detach)]
+            }
+            None => format_items,
+        };
+        let dwt = Button::new("sp-dwt")
+            .ghost()
+            .small()
+            .w(px(26.))
+            .h(px(26.))
+            .p_0()
+            .border_1()
+            .border_color(gpui_kit::rgb(0xd3d7d9))
+            .rounded(px(0.))
+            .child(crate::assets::icon(&crate::assets::icon_path("title-block"), 18., cx))
+            .tooltip("Select a DWT")
+            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.select_dwt(si, window, cx)))
+            .into_any_element();
         // Size: Onshape lists the standard's sizes (A, A Portrait, B, C, D;
         // A4, A4 Portrait, A3 … A0), then Custom (live 825).
         let ansi = match sheet.size {
@@ -219,7 +264,7 @@ impl DrawingEditor {
         let size_label = sheet.size.list_name().to_string();
         // Size › Custom: width × height, Zones (start corner, horizontal and
         // vertical counts) and Include border.
-        let custom_rows: Vec<AnyElement> = if is_custom {
+        let custom_rows: Vec<AnyElement> = if is_custom && sheet.dwt.is_none() {
             let format = sheet.format;
             let [nx, ny] = format.zone_counts(sheet.size);
             let zone_items = |vertical: bool| -> Vec<(String, bool, Act)> {
@@ -349,7 +394,8 @@ impl DrawingEditor {
                         .p(px(3.))
                         .child(row("Scale", scale_field, None))
                         .child(row("Format", dropdown("sp-format", format_label, format_items).into_any_element(), Some(dwt)))
-                        .child(row("Size", dropdown("sp-size", size_label, size_items).into_any_element(), None))
+                        // A DWT fixes the size (live z2 (1)): no Size row.
+                        .when(sheet.dwt.is_none(), |d| d.child(row("Size", dropdown("sp-size", size_label, size_items).into_any_element(), None)))
                         .children(custom_rows)
                         .child(row("Reference", div().when(unassigned, |d| d.text_color(gpui_kit::rgb(0xaaaaaa))).child(dropdown("sp-ref", ref_label, ref_items)).into_any_element(), link)),
                 ))

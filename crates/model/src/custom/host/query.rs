@@ -95,6 +95,11 @@ struct Topo {
     vertex_faces: Vec<Vec<u32>>,
     vertex_edges: Vec<Vec<u32>>,
     edge_vertices: Vec<Vec<u32>>,
+    /// Edges and vertices Onshape's (Parasolid) topology has: no seams, no
+    /// degenerate edges, no vertices on closed curves only (live
+    /// dom/fs-stdref.txt: a cylinder is 3 faces, 2 edges, 0 vertices).
+    shown_edges: Vec<bool>,
+    shown_vertices: Vec<bool>,
 }
 
 /// Evaluation state of one query.
@@ -106,6 +111,8 @@ pub struct Snapshot {
     /// The owner's body type ("SHEET", "SOLID", ...): a sheet's edge is not
     /// followed onto a solid lying on it (sheet metal part vs definition).
     pub body_type: &'static str,
+    /// Taken from a sketch entity.
+    pub sketch: bool,
 }
 
 pub struct QueryCx<'a> {
@@ -136,9 +143,50 @@ impl<'a> QueryCx<'a> {
                 }
             }
         }
-        let t = Arc::new(Topo { edge_faces: shape.edge_faces().unwrap_or_default(), vertex_faces: shape.vertex_faces().unwrap_or_default(), vertex_edges, edge_vertices });
+        let edge_faces = shape.edge_faces().unwrap_or_default();
+        let solid = self.st.ctx.bodies[b].kind == BodyKind::Solid;
+        let faces = shape.faces();
+        let edges = shape.edges();
+        let infos: Vec<Option<k::EdgeInfo>> = edges.iter().map(|e| e.edge_info().ok()).collect();
+        let seam = |e: usize| -> bool {
+            let [f] = edge_faces[e].as_slice() else { return false };
+            if solid {
+                return true;
+            }
+            // A sheet's edge on the periodic boundary of a closed surface.
+            let (Some(face), Some(info)) = (faces.get(*f as usize), infos[e].as_ref()) else { return false };
+            let Ok([u0, u1, v0, v1]) = face.uv_bounds() else { return false };
+            let tau = std::f64::consts::TAU;
+            let Ok(p) = edges[e].point_at(info.first_param + (info.last_param - info.first_param) * 0.5) else { return false };
+            let Ok(pr) = face.project_point(p) else { return false };
+            let on = |x: f64, a: f64, b: f64| (b - a - tau).abs() < 1e-9 && ((x - a).abs() < 1e-7 || (x - b).abs() < 1e-7);
+            on(pr.u, u0, u1) || on(pr.v, v0, v1)
+        };
+        let shown_edges: Vec<bool> = (0..edges.len()).map(|e| !infos[e].as_ref().is_some_and(|i| i.degenerated) && !seam(e)).collect();
+        // A vertex counts if it ends a shown open edge, is a point body's, or
+        // is a cone's apex (live dom/fs-ophole.txt: a drill tip is a vertex;
+        // a sphere's poles and a cylinder's seam ends are not).
+        let vertex_faces = shape.vertex_faces().unwrap_or_default();
+        let shown_edge = |e: usize| shown_edges.get(e).copied().unwrap_or(false);
+        let open = |e: usize| shown_edge(e) && !infos.get(e).and_then(|i| i.as_ref()).is_some_and(|i| i.closed);
+        let cone = |f: &u32| faces.get(*f as usize).is_some_and(|f| matches!(f.face_surface(), Ok(k::Surface::Cone { .. })));
+        let shown_vertices: Vec<bool> = vertex_edges
+            .iter()
+            .enumerate()
+            .map(|(v, es)| es.is_empty() || es.iter().any(|e| open(*e as usize)) || (!es.iter().any(|e| shown_edge(*e as usize)) && vertex_faces.get(v).is_some_and(|fs| fs.iter().any(cone))))
+            .collect();
+        let t = Arc::new(Topo { edge_faces, vertex_faces, vertex_edges, edge_vertices, shown_edges, shown_vertices });
         self.topo.borrow_mut().insert(b, t.clone());
         t
+    }
+
+    /// Whether an entity exists in Onshape's topology (see [`Topo::shown_edges`]).
+    pub fn shown(&self, e: &Ent) -> bool {
+        match e {
+            Ent::Edge(b, i) => self.topo(*b).shown_edges.get(*i).copied().unwrap_or(true),
+            Ent::Vertex(b, i) => self.topo(*b).shown_vertices.get(*i).copied().unwrap_or(true),
+            _ => true,
+        }
     }
 
     // ------------------------------------------------------------ enumeration
@@ -237,10 +285,11 @@ impl<'a> QueryCx<'a> {
 
     pub fn owner(&self, e: &Ent) -> Option<Ent> {
         match e {
-            Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) => Some(e.clone()),
+            // Construction planes and points are bodies of their own in
+            // Onshape (std draft splits by `qOwnerBody` of an `opPlane`).
+            Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) | Ent::Plane(_) | Ent::Point(_) | Ent::Datum(_) | Ent::Origin => Some(e.clone()),
             Ent::Face(b, _) | Ent::Edge(b, _) | Ent::Vertex(b, _) => Some(Ent::Body(*b)),
             Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => Some(Ent::SketchBody(*s)),
-            _ => None,
         }
     }
 
@@ -494,7 +543,7 @@ impl<'a> QueryCx<'a> {
                 vec![shape.project_point(p).ok()?.point]
             }
         };
-        Some(Snapshot { etype, points, body_type: self.body_type(e) })
+        Some(Snapshot { etype, points, body_type: self.body_type(e), sketch: self.is_sketch(e) })
     }
 
     /// What a transient id stands for now. Operations rename entities, and
@@ -507,7 +556,7 @@ impl<'a> QueryCx<'a> {
         if !found.is_empty() && found.iter().all(|e| snap_matches(self, snap, e)) {
             return found;
         }
-        let tracked = self.tracked(snap);
+        let tracked = self.tracked(snap, false);
         if tracked.is_empty() {
             return found;
         }
@@ -515,10 +564,32 @@ impl<'a> QueryCx<'a> {
         if kept.is_empty() { tracked } else { kept }
     }
 
+    /// What a `startTracking` id stands for now: the entity and what was
+    /// made from it, e.g. the sheet edges std sheet metal CONVERT extracts
+    /// from the part's bend edges (live dom/fs-smprobe3-4.txt).
+    pub fn tracking(&self, id: &str) -> Vec<Ent> {
+        let mut out = self.resolve_transient(id);
+        if let Some(snap) = self.st.snapshots.get(id) {
+            out.extend(self.tracked(snap, true));
+            // A sketch vertex extruded: the straight edge it swept (std Hem
+            // tracks its profile arc's end onto the arc sheet's side edge).
+            if snap.sketch && snap.etype == EType::Vertex && let Some(p) = snap.points.first() {
+                let swept = |e: &Ent| {
+                    self.shape(e).is_some_and(|s| {
+                        matches!(s.edge_info().map(|i| i.curve), Ok(k::Curve::Line { .. })) && k::make_vertex(*p).ok().and_then(|v| k::distance(&v, &s).ok()).is_some_and(|d| d.distance < 1e-7)
+                    })
+                };
+                out.extend(self.all_with(Some(EType::Edge), true).into_iter().filter(|e| !self.is_sketch(e) && swept(e)));
+            }
+        }
+        uniq(out)
+    }
+
     /// Current entities a tracked entity became: those of its type lying on
     /// its old points (renamed or merged), or on the old edge between its
-    /// ends (split pieces).
-    fn tracked(&self, snap: &Snapshot) -> Vec<Ent> {
+    /// ends (split pieces). With `to_sheets`, a solid's entity may also
+    /// become a sheet's (extracted surfaces).
+    fn tracked(&self, snap: &Snapshot, to_sheets: bool) -> Vec<Ent> {
         const TOL: f64 = 1e-7;
         let on = |e: &Ent, p: DVec3| self.shape(e).and_then(|s| k::make_vertex(p).ok().and_then(|v| k::distance(&v, &s).ok())).is_some_and(|d| d.distance < TOL);
         // Hidden bodies too: std sheet metal tracks its (hidden) definition.
@@ -526,7 +597,10 @@ impl<'a> QueryCx<'a> {
             .into_iter()
             // Solids only to solids; sheets, wires and sketches among
             // themselves (std follows a sketch line onto a sheet's edge).
-            .filter(|e| (self.body_type(e) == "SOLID") == (snap.body_type == "SOLID"))
+            .filter(|e| {
+                let t = self.body_type(e);
+                (t == "SOLID") == (snap.body_type == "SOLID") || (to_sheets && snap.body_type == "SOLID" && t == "SHEET")
+            })
             .filter(|e| {
                 if snap.points.iter().all(|p| on(e, *p)) {
                     return true;
@@ -1081,7 +1155,19 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 })
                 .collect()
         }
-        "DEPENDENCY" | "LAMINAR_DEPENDENCY" | "PATTERN" => sub(i, "subquery")?,
+        "DEPENDENCY" => {
+            // What the operation that made each entity was made from;
+            // entities with nothing recorded stand for themselves.
+            let mut out = Vec::new();
+            for e in sub(i, "subquery")? {
+                match q.created_by(&e).and_then(|op| q.st.dependencies.get(&op)) {
+                    Some(refs) => out.extend(refs.iter().flat_map(|r| q.from_ref(r))),
+                    None => out.push(e),
+                }
+            }
+            uniq(out)
+        }
+        "LAMINAR_DEPENDENCY" | "PATTERN" => sub(i, "subquery")?,
         "TRACKING" => {
             let mut out = Vec::new();
             for key in ["subquery1", "subquery2"] {
@@ -1091,7 +1177,10 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                     v => vec![v.clone()],
                 };
                 for item in items {
-                    out.extend(eval(i, q, &item)?);
+                    match item.get("queryType").as_str().as_deref() {
+                        Some("TRANSIENT") => out.extend(q.tracking(&item.get("transientId").as_str().unwrap_or_default())),
+                        _ => out.extend(eval(i, q, &item)?),
+                    }
                 }
             }
             uniq(out)
@@ -1136,7 +1225,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         }
         other => return Err(i.error(format!("Query type {other} is not supported"))),
     };
-    Ok(r)
+    Ok(r.into_iter().filter(|e| q.shown(e)).collect())
 }
 
 /// Historical queries (`makeQuery(operationId, "SKETCH_ENTITY", ...)`).
@@ -1184,6 +1273,43 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
             };
             let picked: Vec<usize> = if made.len() > 1 && !wanted.is_empty() { made.iter().copied().filter(fits).collect() } else { made };
             picked.into_iter().map(Ent::Body).collect()
+        }
+        // `qSplitBy`: the bodies a split left on one side of its tool plane
+        // (the back: against the plane normal), or their faces the split cut.
+        "SPLIT" => {
+            if let Some(originals) = q.st.split_edges.get(&op) {
+                // Split edges: the pieces lying on the edges that were split.
+                let on = |e: &Ent| {
+                    let Ent::Edge(b, _) = e else { return false };
+                    let body = &q.st.ctx.bodies[*b].id;
+                    q.snapshot(e).and_then(|s| s.points.get(1).copied()).is_some_and(|m| originals.iter().any(|(ob, o)| ob == body && k::make_vertex(m).ok().and_then(|v| k::distance(&v, o).ok()).is_some_and(|d| d.distance < 1e-7)))
+                };
+                return q.all_with(Some(EType::Edge), true).into_iter().filter(on).collect();
+            }
+            let Some((ids, plane)) = q.st.splits.get(&op) else { return Vec::new() };
+            let back = query.get("isFromBackBody").as_bool() == Some(true);
+            let bodies: Vec<usize> = ids.iter().filter_map(|id| q.st.ctx.bodies.iter().position(|b| &b.id == id)).collect();
+            let Some((origin, normal)) = *plane else { return bodies.into_iter().map(Ent::Body).collect() };
+            let side = |e: &Ent| q.point(e).map(|p| (p - origin).dot(normal));
+            let mine: Vec<usize> = bodies.into_iter().filter(|b| side(&Ent::Body(*b)).is_some_and(|d| (d < 0.0) == back)).collect();
+            match t {
+                Some(EType::Face) => {
+                    let near = |e: &Ent, sign: f64| q.shape(e).and_then(|s| s.bounding_box(false).ok()).is_some_and(|bb| {
+                        let corners = [bb.min, bb.max];
+                        corners.iter().any(|c| sign * (*c - origin).dot(normal) < 1e-7)
+                    });
+                    mine.iter()
+                        .flat_map(|b| q.owned(&Ent::Body(*b), Some(EType::Face)))
+                        .filter(|f| {
+                            // Touches the plane but does not lie in it.
+                            let on = near(f, 1.0) && near(f, -1.0);
+                            let flat = q.plane(f).is_some_and(|p| p.normal.cross(normal).length() < 1e-9 && (p.origin - origin).dot(normal).abs() < 1e-7);
+                            on && !flat
+                        })
+                        .collect()
+                }
+                _ => mine.into_iter().map(Ent::Body).collect(),
+            }
         }
         "SKETCH_ENTITY" => {
             let Some(s) = q.st.ctx.sketches.iter().position(|x| x.feature == marker) else { return Vec::new() };

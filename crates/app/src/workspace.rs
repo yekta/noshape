@@ -90,7 +90,7 @@ impl Focusable for Workspace {
 impl Workspace {
     pub fn new(doc: Entity<DocModel>, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let subs = vec![cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
-            DocEvent::TabsChanged | DocEvent::Reloaded => {
+            DocEvent::TabsChanged | DocEvent::Reloaded | DocEvent::UnitsChanged { .. } => {
                 // Register custom feature schemas of the (new) Feature Studios.
                 let _ = this.doc.read(cx).custom_features();
                 this.sync_tabs(window, cx);
@@ -118,6 +118,9 @@ impl Workspace {
         if let Some(a) = this.active {
             cx.defer_in(window, move |this: &mut Self, window, cx| this.activate(a, window, cx));
         }
+        if crate::smoke::enabled() {
+            crate::smoke::start(window, cx);
+        }
         this
     }
 
@@ -126,6 +129,13 @@ impl Workspace {
         self.views.retain(|id, _| tabs.iter().any(|(t, _)| t == id));
         if self.active.is_none_or(|a| !tabs.iter().any(|(t, _)| *t == a)) {
             self.active = tabs.first().map(|t| t.0);
+            // The session follows (undo scope, Versions and history's wrench):
+            // another workspace may lack the tab that was open.
+            let active = self.active;
+            self.doc.update(cx, |d, _| d.session.active_tab = active);
+            if let Some(h) = &self.history {
+                h.update(cx, |_, cx| cx.notify());
+            }
         }
         // Views are created lazily for the active tab.
         if let Some(active) = self.active {
@@ -230,7 +240,7 @@ impl Workspace {
         }
     }
 
-    fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         self.reveal_active_tab = true;
         if let Some(prev) = self.active.filter(|p| *p != tab) {
             self.recent.retain(|t| *t != prev && *t != tab);
@@ -248,9 +258,22 @@ impl Workspace {
         if let Some((tm, _)) = &self.tab_manager {
             tm.update(cx, |t, cx| t.set_active(Some(tab), cx));
         }
+        // Versions and history's Repair wrench is there for Part Studios only
+        // (live ui2/950 vs document/22).
+        if let Some(h) = &self.history {
+            h.update(cx, |_, cx| cx.notify());
+        }
         self.ensure_view(tab, window, cx);
         self.focus_active(window, cx);
         cx.notify();
+    }
+
+    /// The active tab's Part Studio view, if it is one (smoke test).
+    pub(crate) fn active_part_studio(&self) -> Option<Entity<PartStudioView>> {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::PartStudio(v)) => Some(v.clone()),
+            _ => None,
+        }
     }
 
     /// Give keyboard focus to the active tab's editor.
@@ -265,7 +288,7 @@ impl Workspace {
         window.focus(&fh, cx);
     }
 
-    fn add_tab(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn add_tab(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         let mut new_id = None;
         let after = self.active;
         self.doc.update(cx, |doc, cx| {
@@ -414,6 +437,7 @@ impl Workspace {
         let viewing_version = doc.session.viewing_version();
         // The current branch (Onshape shows the workspace name, e.g. "Main").
         let branch_name = doc.session.store.branch(doc.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into());
+        let protected = doc.session.is_protected();
         TitleBar::new()
             .h(px(crate::ui::NAVBAR_H))
             .bg(pal.panel_inactive)
@@ -455,7 +479,8 @@ impl Workspace {
                                 }
                             })
                             .flex_none()
-                            .w(px(123.))
+                            // Live (part-studio/181): the ☰ ink starts at x 147.
+                            .w(px(125.))
                             .gap(px(10.))
                             .cursor_pointer()
                             // Onshape: the logo goes to the documents page.
@@ -469,6 +494,8 @@ impl Workspace {
                     // label show the I-beam (dom/cursors-controls.json).
                     // Live (navigation/301): a version shows its name ("V1", #999) in the
                     // branch's place and no banner (its view-only bar is in the toolbar row).
+                    // A protected workspace: a lock before its name (live wp-929).
+                    .when(protected && viewing_version.is_none(), |d| d.child(div().flex_none().mt(px(6.)).child(crate::assets::icon("lock", 14., cx))))
                     .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().child(match (&viewing_version, read_only) {
                         (Some(v), _) => v.clone(),
                         (None, true) => "History".to_string(),
@@ -519,7 +546,8 @@ impl Workspace {
         let view_only = self.doc.read(cx).session.view_only;
         Button::new("doc-menu")
             .custom(navbar_variant(cx))
-            .child(crate::assets::icon("menu", 20., cx))
+            // Live: the ☰ ink spans y 13–27.
+            .child(div().mt(px(1.)).child(crate::assets::icon("menu", 20., cx)))
             .tooltip("Document menu")
             .w(px(32.))
             .h(px(crate::ui::NAVBAR_H))
@@ -541,7 +569,7 @@ impl Workspace {
                         .separator()
                         .item(I::new("Copy workspace…").on_click(move |_, wi, cx| dd::copy_workspace(d5.clone(), wi, cx)))
                         .item(I::new("Update workspace…").on_click(move |_, wi, cx| dd::update_workspace(d6.clone(), wi, cx)))
-                        .item(I::new("Workspace units…").on_click(move |_, _, cx| w.update(cx, |t, cx| t.open_units_panel(cx))))
+                        .item(I::new("Workspace units…").on_click(move |_, wi, cx| w.update(cx, |t, cx| t.open_units_panel(wi, cx))))
                         .item(I::new("Workspace properties…").on_click(move |_, wi, cx| dd::workspace_properties(d7.clone(), wi, cx)))
                         .item(I::new(if view_only { "Switch to edit mode" } else { "Switch to view only mode" }).on_click(move |_, _, cx| {
                             d8.update(cx, |d, cx| {
@@ -560,7 +588,13 @@ impl Workspace {
     }
 
     /// ☰ › Workspace units…: Onshape's panel at the feature dialog's place.
-    fn open_units_panel(&mut self, cx: &mut Context<Self>) {
+    /// Live (qa4 F24, "qa4 F17/F24 placement checks"): an open sketch or
+    /// feature dialog is accepted at once and the panel takes its place
+    /// (✕ doesn't bring it back).
+    fn open_units_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(studio) = self.active_studio() {
+            studio.update(cx, |s, cx| s.accept_open_dialog(window, cx));
+        }
         let doc = self.doc.clone();
         let panel = cx.new(|cx| crate::doc_dialogs::WorkspaceUnits::new(doc, cx));
         let sub = cx.subscribe(&panel, |this: &mut Self, _, _: &crate::doc_dialogs::WorkspaceUnitsEvent, cx| {
@@ -822,7 +856,12 @@ impl Workspace {
         // Onshape's "+" menu (live, document/01): a Bootstrap dropdown opening
         // upward from the cell. Cloud items (Applications, CAM / PCB /
         // Render Studio) are not part of noshape.
-        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., gpui_kit::rgb(0x555555))).tooltip("Insert new tab").on_click(move |_, window, cx| {
+        // A protected workspace takes no new tabs: "+" greyed, inert (live wp-932).
+        let protected = self.doc.read(cx).session.is_protected();
+        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., gpui_kit::rgb(if protected { 0xc0c0c0 } else { 0x555555 }))).tooltip("Insert new tab").on_click(move |_, window, cx| {
+            if protected {
+                return;
+            }
             let (v1, v2, v3, v4, v5, v6, v7) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
             let (v8, v9) = (view.clone(), view.clone());
             let copied = cx.try_global::<crate::doc_dialogs::CopiedTab>().and_then(|c| c.0.as_ref().map(|t| t.name.clone()));
@@ -904,7 +943,7 @@ impl Workspace {
             // tabs only in the base are greyed and can't be opened.
             let compare = crate::compare_mode::tab_status(&self.doc, id, cx);
             let compare_off = compare.is_some_and(|s| s.disabled());
-            let compare_dot = compare.and_then(|s| crate::compare_mode::tab_dot(SharedString::from(format!("tab-dot-{id}")), s, &crate::compare_mode::base_label(&self.doc, cx).unwrap_or_default()));
+            let compare_dot = compare.map(|s| crate::compare_mode::tab_dot(SharedString::from(format!("tab-dot-{id}")), s, &crate::compare_mode::base_label(&self.doc, cx).unwrap_or_default()));
             let view = cx.entity();
             let tab_name = name.clone();
             let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
@@ -956,7 +995,8 @@ impl Workspace {
                         }
                         // The first click activated the tab; a double-click renames it
                         // (activating again would take the field's focus).
-                        if e.click_count() >= 2 {
+                        // A protected workspace's tabs aren't renamed (live wp-933).
+                        if e.click_count() >= 2 && !this.doc.read(cx).session.is_protected() {
                             this.start_tab_rename(id, window, cx);
                         } else {
                             this.activate(id, window, cx);
@@ -970,6 +1010,26 @@ impl Workspace {
                         }
                         let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
                         let (v5, v6, v7, v8, v9, v10, v11) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
+                        // A protected workspace (live wp-933): Properties…, Show code,
+                        // Copy to clipboard only.
+                        if view.read(cx).doc.read(cx).session.is_protected() {
+                            let menu = menu.item(I::new("Properties…").on_click(move |_, w, cx| {
+                                let doc = v6.read(cx).doc.clone();
+                                dd::tab_properties(doc, id, w, cx)
+                            }));
+                            let menu = if kind == "partstudio" {
+                                menu.item(I::new("Show code").on_click(move |_, w, cx| {
+                                    let doc = v7.read(cx).doc.clone();
+                                    dd::show_code(doc, id, w, cx)
+                                }))
+                            } else {
+                                menu
+                            };
+                            return menu.item(I::new("Copy to clipboard").on_click(move |_, _, cx| {
+                                let t = v8.read(cx).doc.read(cx).session.doc.tab(id).cloned();
+                                cx.set_global(dd::CopiedTab(t));
+                            }));
+                        }
                         // Onshape (live menus/rmb-tab-*): ⊗ Delete | Rename,
                         // Properties…, Show code | Duplicate, Copy to clipboard |
                         // (Assembly) Create Drawing of <tab>… | Select as document
@@ -1002,7 +1062,7 @@ impl Workspace {
                         // clipboard): point every view at a version of the document.
                         let menu = if kind == "drawing" {
                             let v12 = view.clone();
-                            menu.item(I::new("Change to version…").icon_name("version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
+                            menu.item(I::new("Change to version…").icon_name("legend-version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
                         } else {
                             menu
                         };
@@ -1134,35 +1194,39 @@ impl Workspace {
         let notes_open = matches!(self.doc_panel, Some((DocPanel::Notes(_), _)));
         let perf_open = matches!(self.doc_panel, Some((DocPanel::Performance(_), _)));
         let perf_error = crate::doc_panels::PerfSnapshot { adapter: self.gpu.adapter_name(), ..Default::default() }.software_renderer();
+        // Live (part-studio/181): the icons' ink starts at x 10, y 49 (20 px
+        // icons): 2 px under the rail's top border, and centred in the 40 px
+        // as if the 1 px right border weren't there (each button pads 1 px at
+        // the left; its active bar stays at the edge).
         let buttons = v_flex()
             .w(px(crate::ui::RAIL_W))
             .flex_1()
             .min_h_0()
-            .pt(px(1.))
+            .pt(px(2.))
             .gap(px(4.))
             .bg(pal.rail)
             .border_r_1()
             .border_t_1()
             .border_color(pal.border)
             .child(
-                crate::ui::rail_button("rail-history", "history", history_open, true, cx)
+                crate::ui::rail_button("rail-history", "history", history_open, true, cx).pl(px(1.))
                     .tip("Versions and history", TipSide::Right)
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_history(window, cx))),
             )
             .child(
-                crate::ui::rail_button("rail-version", "version", false, true, cx)
+                crate::ui::rail_button("rail-version", "version", false, true, cx).pl(px(1.))
                     .tip("Create version…", TipSide::Right)
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| crate::history_panel::open_create_version(this.doc.clone(), window, cx))),
             )
             // Live order: Versions and history, Create version…, (Comments),
             // Document notes, (Where used), Performance, (AI Advisor).
             .child(
-                crate::ui::rail_button("rail-notes", "doc-notes", notes_open, true, cx)
+                crate::ui::rail_button("rail-notes", "doc-notes", notes_open, true, cx).pl(px(1.))
                     .tip("Document notes", TipSide::Right)
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_doc_panel(true, cx))),
             )
             .child(
-                crate::ui::rail_button("rail-performance", "performance", perf_open, true, cx)
+                crate::ui::rail_button("rail-performance", "performance", perf_open, true, cx).pl(px(1.))
                     // A software renderer is a performance error (live: a red badge).
                     .when(perf_error, |d| d.child(div().absolute().left(px(22.)).top(px(16.)).size(px(11.)).rounded_full().bg(gpui_kit::white()).child(crate::assets::icon("error", 11., cx))))
                     .tip(if perf_error { "Performance errors detected" } else { "Performance" }, TipSide::Right)
@@ -1170,7 +1234,7 @@ impl Workspace {
             )
             // Release management (help releasedraftspanel.png).
             .child(
-                crate::ui::rail_button("rail-release-drafts", "release-drafts", self.release_drafts.is_some(), true, cx)
+                crate::ui::rail_button("rail-release-drafts", "release-drafts", self.release_drafts.is_some(), true, cx).pl(px(1.))
                     .tip("Release drafts", TipSide::Right)
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_release_drafts(cx))),
             );
@@ -1232,9 +1296,10 @@ fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: Tab
 
 fn tab_icon(kind: &'static str) -> &'static str {
     match kind {
-        "partstudio" => "part-studio",
-        "assembly" => "assembly",
-        "drawing" => "drawing",
+        // Live (tabbar captures): the tab icons are white inside.
+        "partstudio" => "tab-part-studio",
+        "assembly" => "tab-assembly",
+        "drawing" => "tab-drawing",
         "featurestudio" => "feature-studio",
         "materiallibrary" => "material-library",
         // File tabs: the kind is the icon ("file-cad", "file-pdf"...).
@@ -1322,15 +1387,30 @@ impl Render for Workspace {
             }).collect();
             panel.update(cx, |p, cx| p.set_results(results, cx));
         }
-        // Compare mode (compare_mode.rs, live ui2/952): a tab that exists only
-        // in the base shows "NOT COMPARABLE".
-        let only_in_base = self.active.and_then(|a| crate::compare_mode::tab_status(&self.doc, a, cx)) == Some(crate::compare_mode::TabStatus::OnlyInBase);
+        // Compare mode (compare_mode.rs, live ui2/952, cp-923): "NOT
+        // COMPARABLE" for tabs compare doesn't cover, the code compare for a
+        // Feature Studio.
+        crate::compare_mode::follow(&self.doc, cx);
+        let compare_view = self.active.and_then(|a| crate::compare_mode::content_override(&self.doc, a, cx));
         let content: AnyElement = match self.active.and_then(|a| self.views.get(&a)) {
-            _ if only_in_base => crate::compare_mode::render_not_comparable(&crate::compare_mode::base_label(&self.doc, cx).unwrap_or_default()),
+            _ if compare_view.is_some() => compare_view.unwrap_or_else(|| div().into_any_element()),
             Some(TabView::PartStudio(v)) => v.clone().into_any_element(),
             Some(TabView::Drawing(v)) => v.clone().into_any_element(),
             Some(TabView::Variables(v)) => v.clone().into_any_element(),
-            Some(TabView::Assembly(v)) => v.clone().into_any_element(),
+            // The assembly's left dialogs (Insert, Mate, …) and what floats
+            // over them are drawn here, in front of its view rather than in
+            // it, and the view is a cached view (see `crate::cached_slice`),
+            // so their fields' keystrokes and caret blinks don't render the
+            // assembly again (`AssemblyView::front_host`).
+            Some(TabView::Assembly(v)) => {
+                let (front, top) = v.update(cx, |v, cx| v.front_host(cx));
+                div()
+                    .size_full()
+                    .relative()
+                    .child(v.clone().cached(StyleRefinement::default().size_full()))
+                    .child(div().absolute().top(px(top)).left_0().right_0().bottom_0().child(front))
+                    .into_any_element()
+            }
             Some(TabView::FeatureStudio(v)) => v.clone().into_any_element(),
             Some(TabView::MaterialLibrary(v)) => v.clone().into_any_element(),
             Some(TabView::File(v)) => v.clone().into_any_element(),
@@ -1415,7 +1495,9 @@ impl Render for Workspace {
                                 }))
                                 // A protected workspace (workspace_protection.rs): its banner
                                 // at the top centre (not over the compare bar).
-                                .children(crate::workspace_protection::render_banner(&self.doc, cx).filter(|_| crate::compare_mode::rows(&self.doc, cx).is_none()).map(|banner| div().absolute().top_0().left_0().right_0().flex().justify_center().child(banner)))
+                                .children(crate::workspace_protection::render_banner(&self.doc, matches!(self.active.and_then(|a| self.views.get(&a)), Some(TabView::PartStudio(_))), cx).filter(|_| crate::compare_mode::rows(&self.doc, cx).is_none()).map(|banner| {
+                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(gpui_kit::white()).occlude().flex().justify_center().child(banner)
+                                }))
                                 .children(self.render_toast(cx))
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
                                 .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::left_panel_w())).child(p.clone()))),
@@ -1733,6 +1815,8 @@ impl Workspace {
                     // Sketch sources face the sketch plane.
                     let frame = src.as_ref().and_then(|s| noshape_model::drawing::create::source_frame(&doc, s));
                     let mut d = noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested, frame);
+                    // DRAWN: who created it, saved with the drawing (qa5 D13).
+                    d.drawn_by = Some(noshape_store::local_user_name()).filter(|n| !n.is_empty());
                     // Suggested views show the Part Studio's MBD datums (live behaviours "MBD datums in drawings").
                     if suggested {
                         noshape_model::drawing::mbd::place_model_datums(&mut d, &doc);

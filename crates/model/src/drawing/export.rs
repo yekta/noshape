@@ -3,6 +3,7 @@
 
 use super::font;
 use super::SheetLayer;
+use super::cad_layers::CadLayer;
 use super::sheet::{Anchor, ColorSpan, Fill2, FontSpan, LayerSpan, LineStyle, Polyline2, SheetGeometry, Text2, TextFont};
 use std::fmt::Write as _;
 
@@ -88,6 +89,14 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     // Line pens (Adjust linestyle); added lines use their style's pen.
     let mut lp: Vec<Option<(f64, Vec<f64>)>> = (0..g.lines.len()).map(|i| g.pens.iter().rev().find(|s| s.lines.contains(&i)).map(|p| (p.width_mm, p.dashes.clone()))).collect();
     let mut tl: Vec<Option<SheetLayer>> = Vec::new();
+    // Export layers (`cad_layers`) per element, kept the same way.
+    // k: 0 lines, 1 texts, 2 fills.
+    fn cad_of(spans: &[super::cad_layers::CadSpan], k: u8, i: usize) -> Option<CadLayer> {
+        spans.iter().rev().find(|s| [&s.lines, &s.texts, &s.fills][k as usize].contains(&i)).map(|s| s.layer)
+    }
+    let mut lk: Vec<Option<CadLayer>> = (0..g.lines.len()).map(|i| cad_of(&g.cad, 0, i)).collect();
+    let mut fk: Vec<Option<CadLayer>> = (0..g.fills.len()).map(|i| cad_of(&g.cad, 2, i)).collect();
+    let mut tk: Vec<Option<CadLayer>> = Vec::new();
     out.fonts.clear();
     if o.underline_overrides {
         for &i in &g.overridden {
@@ -96,16 +105,19 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             out.lines.push(Polyline2 { points: vec![b[0], b[1]], style: LineStyle::Thin, closed: false, pick: t.pick });
             lc.push(tone(g.text_color(i)));
             ll.push(g.text_sheet_layer(i));
+            lk.push(cad_of(&g.cad, 1, i));
         }
     }
     let texts = std::mem::take(&mut out.texts);
     for (i, t) in texts.into_iter().enumerate() {
         let c = tone(g.text_color(i));
         let layer = g.text_sheet_layer(i);
+        let kind = cad_of(&g.cad, 1, i);
         if !(o.explode_all || o.explode.contains(&i)) {
             out.texts.push(t);
             tc.push(c);
             tl.push(layer);
+            tk.push(kind);
             tf.push(g.text_font(i).cloned());
             continue;
         }
@@ -115,12 +127,14 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
                 out.fills.push(Fill2 { points: tri.iter().map(|&k| pts[k as usize]).collect() });
                 fc.push(c);
                 fl.push(layer);
+                fk.push(kind);
             }
         } else {
             for points in font::text_strokes(&t).into_iter().filter(|s| s.len() >= 2) {
                 out.lines.push(Polyline2 { points, style: LineStyle::Thin, closed: false, pick: t.pick });
                 lc.push(c);
                 ll.push(layer);
+                lk.push(kind);
             }
         }
     }
@@ -142,8 +156,21 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         filter(&mut ll, &keep_l);
         filter(&mut fl, &keep_f);
         filter(&mut tl, &keep_t);
+        lk.resize(keep_l.len(), None);
+        filter(&mut lk, &keep_l);
+        filter(&mut fk, &keep_f);
+        filter(&mut tk, &keep_t);
         let mut k = keep_t.iter();
         tf.retain(|_| *k.next().unwrap_or(&true));
+        // Hatch regions' line ranges after the removed lines.
+        let kept_before: Vec<usize> = std::iter::once(0).chain(keep_l.iter().scan(0, |n, k| {
+            *n += *k as usize;
+            Some(*n)
+        })).collect();
+        let at = |i: usize| kept_before.get(i).copied().unwrap_or(*kept_before.last().unwrap_or(&0));
+        for h in &mut out.hatches {
+            h.lines = at(h.lines.start)..at(h.lines.end);
+        }
         let mut k = keep_l.iter();
         out.lines.retain(|_| *k.next().unwrap_or(&true));
         let mut k = keep_f.iter();
@@ -155,6 +182,8 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     out.pens = lp.into_iter().enumerate().filter_map(|(i, p)| p.map(|(width_mm, dashes)| super::sheet::PenSpan { lines: i..i + 1, width_mm, dashes })).collect();
     let one = |i: usize, l: &Option<SheetLayer>, k: u8| l.map(|layer| LayerSpan { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, layer });
     out.layers = ll.iter().enumerate().filter_map(|(i, l)| one(i, l, 0)).chain(tl.iter().enumerate().filter_map(|(i, l)| one(i, l, 1))).chain(fl.iter().enumerate().filter_map(|(i, l)| one(i, l, 2))).collect();
+    let span = |i: usize, l: &Option<CadLayer>, k: u8| l.map(|layer| super::cad_layers::CadSpan { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, layer });
+    out.cad = lk.iter().enumerate().filter_map(|(i, l)| span(i, l, 0)).chain(tk.iter().enumerate().filter_map(|(i, l)| span(i, l, 1))).chain(fk.iter().enumerate().filter_map(|(i, l)| span(i, l, 2))).collect();
     out.fonts = tf.into_iter().enumerate().filter_map(|(i, f)| f.map(|font| FontSpan { texts: i..i + 1, font })).collect();
     out
 }
@@ -328,56 +357,45 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
     // Tables: line types and layers.
     pair(&mut s, 0, "SECTION");
     pair(&mut s, 2, "TABLES");
+    // Onshape's line types (inches, in the file's units) and its layers in
+    // capitals (R12 / R14, live qa5-sm-flat.dxf), the used ones.
+    let line_types: [(&str, &str, &[f64]); 5] = [
+        ("CONTINUOUS", "Solid line", &[]),
+        ("DASHED", "Dashed line __ __ __ __ __", &[0.5, -0.25]),
+        ("ONS_PHANTOM", "Onshape Phantom line ______ __ __ ______", &[0.25, -0.05, 0.05, -0.05, 0.05, -0.05]),
+        ("CENTER", "Center line ____ _ ____ _ ____ _", &[0.45, -0.09, 0.09, -0.09]),
+        ("HIDDEN", "Hidden line ____ ____ ____ ____", &[0.1, -0.05]),
+    ];
     pair(&mut s, 0, "TABLE");
     pair(&mut s, 2, "LTYPE");
-    pair(&mut s, 70, "4");
-    for (name, pattern) in [("CONTINUOUS", &[][..]), ("HIDDEN", &[3.0, -1.5][..]), ("CENTER", &[8.0, -1.5, 1.5, -1.5][..]), ("PHANTOM", &[8.0, -1.5, 1.5, -1.5, 1.5, -1.5][..])] {
+    pair(&mut s, 70, &line_types.len().to_string());
+    for (name, description, pattern) in line_types {
         pair(&mut s, 0, "LTYPE");
         pair(&mut s, 2, name);
         pair(&mut s, 70, "0");
-        pair(&mut s, 3, name);
+        pair(&mut s, 3, description);
         pair(&mut s, 72, "65");
         pair(&mut s, 73, &pattern.len().to_string());
-        let total: f64 = pattern.iter().map(|x: &f64| x.abs()).sum();
+        let to_units = |inch: f64| inch * 25.4 * k;
+        let total: f64 = pattern.iter().map(|x| to_units(x.abs())).sum();
         pair(&mut s, 40, &format!("{total}"));
         for p in pattern {
-            pair(&mut s, 49, &format!("{p}"));
+            pair(&mut s, 49, &format!("{}", to_units(*p)));
         }
     }
     pair(&mut s, 0, "ENDTAB");
-    let styles = [
-        LineStyle::Visible,
-        LineStyle::Hidden,
-        LineStyle::Tangent,
-        LineStyle::Phantom,
-        LineStyle::Centerline,
-        LineStyle::Thin,
-        LineStyle::Border,
-        LineStyle::Section,
-    ];
+    let mut used: std::collections::BTreeSet<CadLayer> = (0..g.lines.len()).map(|i| g.cad_line_layer(i)).collect();
+    used.extend((0..g.texts.len()).map(|i| g.cad_text_layer(i)));
+    used.extend((0..g.fills.len()).map(|i| g.cad_fill_layer(i)));
     pair(&mut s, 0, "TABLE");
     pair(&mut s, 2, "LAYER");
-    // The line styles' layers, then the format layers (Move to).
-    let format_layers = ["BORDER_ZONES", "TITLE_BLOCK"];
-    pair(&mut s, 70, &(styles.len() + format_layers.len()).to_string());
-    let layers = styles
-        .iter()
-        .map(|st| {
-            let lt = match st {
-                LineStyle::Hidden => "HIDDEN",
-                LineStyle::Centerline | LineStyle::Section => "CENTER",
-                LineStyle::Phantom => "PHANTOM",
-                _ => "CONTINUOUS",
-            };
-            (st.layer(), lt)
-        })
-        .chain(format_layers.iter().map(|l| (*l, "CONTINUOUS")));
-    for (name, lt) in layers {
+    pair(&mut s, 70, &used.len().to_string());
+    for l in &used {
         pair(&mut s, 0, "LAYER");
-        pair(&mut s, 2, name);
+        pair(&mut s, 2, l.name(true));
         pair(&mut s, 70, "0");
         pair(&mut s, 62, "7");
-        pair(&mut s, 6, lt);
+        pair(&mut s, 6, &l.line_type().to_uppercase());
     }
     pair(&mut s, 0, "ENDTAB");
     pair(&mut s, 0, "ENDSEC");
@@ -388,7 +406,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
         let color = g.line_color(li).map(|c| aci(Some(c)));
         if l.points.len() == 2 && !l.closed {
             pair(&mut s, 0, "LINE");
-            pair(&mut s, 8, g.line_layer(li));
+            pair(&mut s, 8, g.cad_line_layer(li).name(true));
             if let Some(c) = color {
                 pair(&mut s, 62, &c.to_string());
             }
@@ -398,7 +416,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             pair(&mut s, 21, &format!("{:.6}", l.points[1][1]));
         } else if l.points.len() >= 2 {
             pair(&mut s, 0, "POLYLINE");
-            pair(&mut s, 8, g.line_layer(li));
+            pair(&mut s, 8, g.cad_line_layer(li).name(true));
             if let Some(c) = color {
                 pair(&mut s, 62, &c.to_string());
             }
@@ -406,7 +424,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             pair(&mut s, 70, if l.closed { "1" } else { "0" });
             for p in &l.points {
                 pair(&mut s, 0, "VERTEX");
-                pair(&mut s, 8, g.line_layer(li));
+                pair(&mut s, 8, g.cad_line_layer(li).name(true));
                 pair(&mut s, 10, &format!("{:.6}", p[0]));
                 pair(&mut s, 20, &format!("{:.6}", p[1]));
             }
@@ -416,7 +434,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
     for (fi, f) in g.fills.iter().enumerate() {
         if f.points.len() >= 3 {
             pair(&mut s, 0, "SOLID");
-            pair(&mut s, 8, g.fill_layer(fi).unwrap_or("ANNOTATION"));
+            pair(&mut s, 8, g.cad_fill_layer(fi).name(true));
             if let Some(c) = g.fill_color(fi) {
                 pair(&mut s, 62, &aci(Some(c)).to_string());
             }
@@ -434,7 +452,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
                 continue;
             }
             pair(&mut s, 0, "POLYLINE");
-            pair(&mut s, 8, g.text_layer(ti).unwrap_or("ANNOTATION"));
+            pair(&mut s, 8, g.cad_text_layer(ti).name(true));
             if let Some(c) = g.text_color(ti) {
                 pair(&mut s, 62, &aci(Some(c)).to_string());
             }
@@ -442,7 +460,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             pair(&mut s, 70, "0");
             for p in &st {
                 pair(&mut s, 0, "VERTEX");
-                pair(&mut s, 8, g.text_layer(ti).unwrap_or("ANNOTATION"));
+                pair(&mut s, 8, g.cad_text_layer(ti).name(true));
                 pair(&mut s, 10, &format!("{:.6}", p[0]));
                 pair(&mut s, 20, &format!("{:.6}", p[1]));
             }
@@ -451,7 +469,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
     }
     for (ti, t) in g.texts.iter().enumerate().filter(|(_, t)| !needs_strokes(t)) {
         pair(&mut s, 0, "TEXT");
-        pair(&mut s, 8, g.text_layer(ti).unwrap_or("ANNOTATION"));
+        pair(&mut s, 8, g.cad_text_layer(ti).name(true));
         if let Some(c) = g.text_color(ti) {
             pair(&mut s, 62, &aci(Some(c)).to_string());
         }

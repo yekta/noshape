@@ -130,6 +130,7 @@ impl<'a> SheetPick<'a> {
                 (Sel::Hatch(a), PickTarget::Hatch(b)) => a == *b,
                 (Sel::Image(a), PickTarget::Image(b)) => a == *b,
                 (Sel::AutoCentermark(v, c), PickTarget::AutoCentermark { view, center }) => v == *view && c == *center,
+                (Sel::ViewLabel(v), PickTarget::ViewLabel(w)) | (Sel::AuxIndicator(v), PickTarget::AuxIndicator(w)) => v == *w,
                 _ => false,
             })
             .map(|(i, _)| i as u32)
@@ -146,7 +147,8 @@ impl<'a> SheetPick<'a> {
             PickTarget::SketchEntity(id) => Some(Sel::Sketch(*id)),
             PickTarget::Hatch(id) => Some(Sel::Hatch(*id)),
             PickTarget::Image(id) => Some(Sel::Image(*id)),
-            PickTarget::AuxIndicator(v) => Some(Sel::View(*v)),
+            PickTarget::AuxIndicator(v) => Some(Sel::AuxIndicator(*v)),
+            PickTarget::ViewLabel(v) => Some(Sel::ViewLabel(*v)),
             PickTarget::AutoCentermark { view, center } => Some(Sel::AutoCentermark(*view, *center)),
             _ => None,
         }
@@ -235,6 +237,24 @@ impl<'a> SheetPick<'a> {
     }
 
     /// The hovered projected edge: (view, model edge).
+    /// The part of the view edge nearest to `p` (view coordinates) within
+    /// the pick tolerance.
+    pub fn part_near(&self, view: ViewId, p: [f64; 2]) -> Option<noshape_model::BodyId> {
+        let pl = self.placement(view)?;
+        let g = self.geoms.get(&view)?;
+        let s = pl.to_sheet(p);
+        let tol = self.tol_mm(6.0);
+        g.edges
+            .iter()
+            .filter_map(|e| {
+                let me = g.model_edges.get(e.model? as usize)?;
+                let d = e.points.windows(2).map(|w| views::dist_to_segment(s, pl.to_sheet(w[0]), pl.to_sheet(w[1]))).fold(f64::INFINITY, f64::min);
+                (d < tol).then(|| (d, me.body.clone()))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, b)| b)
+    }
+
     pub fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {
         let h = self.hover?;
         let PickTarget::Edge { view, edge } = self.built?.picks.get(h as usize)?.clone() else { return None };

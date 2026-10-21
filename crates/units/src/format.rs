@@ -5,7 +5,7 @@ use crate::{AngleUnit, Dim, Quantity, UnitPrefs};
 /// Formats `v` with at most `decimals` decimal places, trimming trailing
 /// zeros and avoiding `-0`.
 pub fn format_number(v: f64, decimals: u8) -> String {
-    let mut s = format!("{:.*}", usize::from(decimals), v);
+    let mut s = to_fixed(v, decimals);
     if s.contains('.') {
         while s.ends_with('0') {
             s.pop();
@@ -18,6 +18,45 @@ pub fn format_number(v: f64, decimals: u8) -> String {
         s = "0".into();
     }
     s
+}
+
+/// `v` with `decimals` decimals, rounded as JavaScript's `toFixed` (what
+/// Onshape shows): an exact tie rounds away from zero (1.0625 → "1.063"),
+/// where Rust's `{:.3}` rounds it to even ("1.062"; qa5 SM15).
+pub fn to_fixed(v: f64, decimals: u8) -> String {
+    let d = usize::from(decimals);
+    let s = format!("{:.*}", d, v);
+    if !v.is_finite() {
+        return s;
+    }
+    // A tie has a finite expansion ending in 5 one digit past `d`; Rust
+    // prints exact digits, so 24 more show it (…5000…).
+    let long = format!("{:.*}", d + 25, v.abs());
+    let cut = long.find('.').map_or(long.len(), |p| if d == 0 { p } else { p + 1 + d });
+    let tail = long[cut..].trim_start_matches('.');
+    if !(tail.starts_with('5') && tail[1..].bytes().all(|b| b == b'0')) {
+        return s;
+    }
+    // Away from zero: the truncated digits plus one in the last place.
+    let mut digits: Vec<u8> = long[..cut].trim_end_matches('.').bytes().collect();
+    let mut i = digits.len();
+    loop {
+        if i == 0 {
+            digits.insert(0, b'1');
+            break;
+        }
+        i -= 1;
+        match digits[i] {
+            b'.' => continue,
+            b'9' => digits[i] = b'0',
+            c => {
+                digits[i] = c + 1;
+                break;
+            }
+        }
+    }
+    let out = String::from_utf8(digits).unwrap_or(s);
+    if v < 0.0 { format!("-{out}") } else { out }
 }
 
 fn superscript(e: i8) -> String {
@@ -160,5 +199,24 @@ mod tests {
                 "{text}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod to_fixed_tests {
+    use super::*;
+
+    #[test]
+    fn ties_round_away_from_zero_like_onshape() {
+        assert_eq!(to_fixed(1.0625, 3), "1.063");
+        assert_eq!(to_fixed(-1.0625, 3), "-1.063");
+        assert_eq!(to_fixed(0.125, 2), "0.13");
+        assert_eq!(to_fixed(2.5, 0), "3");
+        assert_eq!(to_fixed(9.9995, 3), "9.999"); // not a tie in binary (9.99949…)
+        assert_eq!(to_fixed(0.9995, 3), "1.000"); // 0.99950000000000005…, above the tie
+        assert_eq!(to_fixed(99.5, 0), "100");
+        assert_eq!(to_fixed(1.0624, 3), "1.062");
+        assert_eq!(to_fixed(1.25, 4), "1.2500");
+        assert_eq!(format_number(1.0625, 3), "1.063");
     }
 }

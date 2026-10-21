@@ -11,6 +11,7 @@ use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::*;
 use noshape_model::drawing::build::render_sheet_with;
+use noshape_model::drawing::cad_export::CadVersion;
 use noshape_model::drawing::export::{self, ExportOptions};
 use noshape_model::drawing::*;
 use std::cell::RefCell;
@@ -73,7 +74,32 @@ impl DrawingFormat {
     }
 }
 
-const PDF_VERSIONS: [&str; 4] = ["1.5", "1.6", "1.7", "1.4"];
+const PDF_VERSIONS: [&str; 4] = ["1.4", "1.5", "1.6", "1.7"];
+/// Live dom/dialog-export-drawing-all-formats: DWG / DXF versions (DXF
+/// Release 11-12 = our R12 writer), and DWT's.
+const CAD_VERSIONS: [(&str, CadVersion); 9] = [
+    ("Release 11-12", CadVersion::AC1009),
+    ("Release 13", CadVersion::AC1012),
+    ("Release 14", CadVersion::AC1014),
+    ("2000", CadVersion::AC1015),
+    ("2004", CadVersion::AC1018),
+    ("2007", CadVersion::AC1021),
+    ("2010", CadVersion::AC1024),
+    ("2013", CadVersion::AC1027),
+    ("2018", CadVersion::AC1032),
+];
+const DWT_VERSIONS: [(&str, CadVersion); 2] = [("2013", CadVersion::AC1027), ("2018", CadVersion::AC1032)];
+
+/// The Version a format starts with (live: PDF 1.5, DWG 2000, DXF Release
+/// 14, DWT 2013).
+fn default_version(f: DrawingFormat) -> usize {
+    match f {
+        DrawingFormat::Pdf => 1,
+        DrawingFormat::Dwg => 3,
+        DrawingFormat::Dxf => 2,
+        _ => 0,
+    }
+}
 const SHEETS: [&str; 3] = ["All sheets", "Current sheet", "Custom sheets"];
 const OVERRIDDEN: [&str; 2] = ["Show underlines", "Hide underlines"];
 const PDF_TEXT: [&str; 2] = ["Normal", "Selectable"];
@@ -107,7 +133,7 @@ pub struct ExportSettings {
 
 impl Default for ExportSettings {
     fn default() -> Self {
-        Self { format: DrawingFormat::Pdf, version: 0, sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: false, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false }
+        Self { format: DrawingFormat::Pdf, version: default_version(DrawingFormat::Pdf), sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: false, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false }
     }
 }
 
@@ -142,7 +168,6 @@ impl DrawingEditor {
         let custom = cx.new(|cx| InputState::new(window, cx).placeholder("1-3, 5"));
         let st = Rc::new(RefCell::new(ExportSettings::default()));
         let ed = cx.entity();
-        let sheet_count = self.drawing.sheets.len();
         window.open_dialog(cx, move |dialog, _, cx| {
             let s = st.borrow().clone();
             let f = s.format;
@@ -162,28 +187,28 @@ impl DrawingEditor {
             };
             let strs = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
             let mut body = crate::os_ui::modal_body()
-                .child(crate::os_ui::field_label("File name"))
+                // Live drawing/40: "View export rules" next to the label.
+                .child(gpui_kit::component::h_flex().gap(px(4.)).items_end().child(crate::os_ui::field_label("File name")).child(crate::os_ui::export_rules_link("ex-rules")))
                 .child(Input::new(&file).h(px(34.)).text_size(px(14.)))
                 .child(select("ex-format", "Format", DrawingFormat::ALL.iter().map(|f| f.label().to_string()).collect(), DrawingFormat::ALL.iter().position(|x| *x == f).unwrap_or(0), |s, i| {
                     s.format = DrawingFormat::ALL[i];
-                    s.version = 0;
+                    s.version = default_version(s.format);
                     s.text = 0;
                 }));
             if f == DrawingFormat::Pdf {
                 body = body.child(select("ex-version", "Version", strs(&PDF_VERSIONS), s.version, |s, i| s.version = i));
             }
             if f.cad() {
-                // DWT is always written as 2013 (Onshape).
-                let mut versions: Vec<String> = noshape_model::drawing::cad_export::VERSIONS.iter().map(|v| v.0.to_string()).collect();
-                if f == DrawingFormat::Dxf {
-                    versions.push("R12".into());
+                let list: &[(&str, CadVersion)] = if f == DrawingFormat::Dwt { &DWT_VERSIONS } else { &CAD_VERSIONS };
+                body = body.child(select("ex-version", "Version", list.iter().map(|v| v.0.to_string()).collect(), s.version, |s, i| s.version = i));
+                // Live: DXF Release 13 / 14 are model space only.
+                if f == DrawingFormat::Dxf && matches!(s.version, 1 | 2) {
+                    body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Model space only"));
                 }
-                if f == DrawingFormat::Dwt {
-                    versions = vec!["2013".into()];
-                }
-                body = body.child(select("ex-version", "Version", versions, s.version, |s, i| s.version = i));
             }
-            if !f.csv() && f != DrawingFormat::Dwt && sheet_count > 1 {
+            // Live: only DWG / DXF have Sheets (PDF exports every sheet; DWT,
+            // SVG and the rasters the active one), whatever the sheet count.
+            if matches!(f, DrawingFormat::Dwg | DrawingFormat::Dxf) {
                 body = body.child(select("ex-sheets", "Sheets", strs(&SHEETS), s.sheets, |s, i| s.sheets = i));
                 if s.sheets == 2 {
                     body = body.child(div().pt(px(6.)).child(Input::new(&custom).h(px(34.)).text_size(px(14.))));
@@ -328,11 +353,11 @@ impl DrawingEditor {
                 sh.tables.clear();
             }
         }
-        // DWG / DXF versions (DXF's last entry is our R12 writer); DWT is 2013.
-        let versions = noshape_model::drawing::cad_export::VERSIONS;
+        // DWG / DXF / DWT versions; DXF Release 11-12 is our R12 writer.
         let cad_version = match f {
-            DrawingFormat::Dwt => Some(acadrust_2013()),
-            DrawingFormat::Dwg | DrawingFormat::Dxf => versions.get(s.version).map(|v| v.1),
+            DrawingFormat::Dwt => Some(DWT_VERSIONS.get(s.version).unwrap_or(&DWT_VERSIONS[0]).1),
+            DrawingFormat::Dxf if s.version == 0 => None,
+            DrawingFormat::Dwg | DrawingFormat::Dxf => CAD_VERSIONS.get(s.version).map(|v| v.1),
             _ => None,
         };
         let sources = self.sources.clone();
@@ -387,8 +412,12 @@ impl DrawingEditor {
                             Some(v) => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dxf_version(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
                             None => pages.iter().map(|(n, g)| (n.clone(), export::to_dxf_units(g, insunits).into_bytes())).collect(),
                         },
-                        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg(g, insunits, cad_version.unwrap_or(versions[0].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
-                        DrawingFormat::Dwt => vec![(String::new(), noshape_model::drawing::cad_export::to_dwg_pages(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), insunits, acadrust_2013())?)],
+                        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg(g, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+                        // With the sheet formats, so Select a DWT gets them back exactly.
+                        DrawingFormat::Dwt => {
+                            let templates: Vec<noshape_model::drawing::dwt::SheetTemplate> = sheets.iter().filter_map(|i| drawing.sheets.get(*i)).map(noshape_model::drawing::dwt::SheetTemplate::of).collect();
+                            vec![(String::new(), noshape_model::drawing::dwt::to_dwt(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &templates, insunits, cad_version.unwrap_or(DWT_VERSIONS[0].1))?)]
+                        }
                         _ => pages.iter().map(|(n, g)| (n.clone(), export::to_svg(g).into_bytes())).collect(),
                     };
                     Ok(files)
@@ -448,14 +477,18 @@ fn rasterize(svg: &[u8], f: DrawingFormat, cx: &App) -> Result<Vec<u8>, String> 
     Ok(out.into_inner())
 }
 
-/// AutoCAD 2013 (DWT exports always use it).
-fn acadrust_2013() -> noshape_model::drawing::cad_export::CadVersion {
-    noshape_model::drawing::cad_export::VERSIONS[1].1
-}
-
 #[cfg(test)]
 mod tests {
-    use super::parse_sheet_range;
+    use super::{CAD_VERSIONS, DWT_VERSIONS, DrawingFormat, PDF_VERSIONS, default_version, parse_sheet_range};
+
+    #[test]
+    fn default_versions_are_onshapes() {
+        // qa5 D11 / live dialog-export-drawing-all-formats.
+        assert_eq!(PDF_VERSIONS[default_version(DrawingFormat::Pdf)], "1.5");
+        assert_eq!(CAD_VERSIONS[default_version(DrawingFormat::Dwg)].0, "2000");
+        assert_eq!(CAD_VERSIONS[default_version(DrawingFormat::Dxf)].0, "Release 14");
+        assert_eq!(DWT_VERSIONS[default_version(DrawingFormat::Dwt)].0, "2013");
+    }
 
     #[test]
     fn custom_sheet_ranges() {

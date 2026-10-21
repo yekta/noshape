@@ -13,6 +13,7 @@ pub mod perf;
 pub mod primitives;
 pub mod renderer;
 pub mod scene;
+mod section_caps;
 pub mod worker;
 
 pub use camera::{Camera, Projection, StandardView};

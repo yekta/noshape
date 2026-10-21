@@ -997,7 +997,7 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
     ctx.bodies = vec![Arc::new(body)];
     let mut display = studio.display.clone();
     display.bodies = vec![display_body];
-    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx) })
+    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false })
 }
 
 /// Sketch instance cache key: (Part Studio, sketch feature, configuration).
@@ -1062,7 +1062,7 @@ pub fn mirrored_result(src: &RegenResult, body: &BodyId, point: DVec3, normal: D
         d.bounds = mesh.positions.iter().map(|q| DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64)).fold(None, |acc: Option<(DVec3, DVec3)>, v| Some(acc.map(|(a, b)| (a.min(v), b.max(v))).unwrap_or((v, v))));
         d.mesh = Arc::new(mesh);
     }
-    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx) })
+    Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false })
 }
 
 fn hash_of<T: serde::Serialize>(v: &T) -> u64 {
@@ -2437,7 +2437,7 @@ impl AssemblyEvaluator {
                 stored.get(&rep).copied().unwrap_or_default().mul(f)
             };
             let make: Box<FollowMaker> = match &p.kind {
-                PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second } => {
+                PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, .. } => {
                     let (ab, al) = match follow_of(direction) {
                         Ok(x) => x,
                         Err(e) => {
@@ -2469,11 +2469,12 @@ impl AssemblyEvaluator {
                         None => DVec3::ZERO,
                     };
                     Box::new(move |index, _, _| {
-                        let (i, j) = ((index & 0xffff) as f64, (index >> 16) as f64);
+                        let back = if index & super::CENTERED_BACK != 0 { -1.0 } else { 1.0 };
+                        let (i, j) = ((index & 0x7fff) as f64 * back, (index >> 16) as f64);
                         Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::Z * d1 * i + v2 * j, DQuat::IDENTITY))))
                     })
                 }
-                PatternKind::Circular { axis, angle, count, opposite, equal_spacing } => {
+                PatternKind::Circular { axis, angle, count, opposite, equal_spacing, .. } => {
                     let (ab, al) = match follow_of(axis) {
                         Ok(x) => x,
                         Err(e) => {
@@ -2489,7 +2490,10 @@ impl AssemblyEvaluator {
                     if *opposite {
                         step = -step;
                     }
-                    Box::new(move |index, _, _| Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::ZERO, DQuat::from_rotation_z(step * index as f64))))))
+                    Box::new(move |index, _, _| {
+                        let back = if index & super::CENTERED_BACK != 0 { -1.0 } else { 1.0 };
+                        Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::ZERO, DQuat::from_rotation_z(step * (index & 0x7fff) as f64 * back)))))
+                    })
                 }
                 PatternKind::Mirror { plane, .. } => {
                     let (ab, al) = match follow_of(plane) {

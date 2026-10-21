@@ -387,12 +387,19 @@ fn transform_connector(c: &Connector, t: &k::Transform) -> (DVec3, DVec3, DVec3)
 }
 
 /// Copy bodies (and connectors) for each instance; returns the copies.
-fn copy_bodies(ev: &EvalCtx, bodies: &[usize], instances: &[Instance]) -> FResult<Vec<(usize, usize, BodyKind, NamedShape)>> {
+/// `copy`: duplicate the geometry, for instances that go into a boolean
+/// (moved instances share their edges, and a boolean piles one curve record
+/// per instance onto each shared edge: quadratic, 19 s of unify for ×1000);
+/// else moved (shared geometry and mesh) for instances that stay parts.
+fn copy_bodies(ev: &EvalCtx, bodies: &[usize], instances: &[Instance], copy: bool) -> FResult<Vec<(usize, usize, BodyKind, NamedShape)>> {
     let mut out = Vec::new();
     for (ii, inst) in instances.iter().enumerate() {
+        if ev.cancelled() {
+            return err("Cancelled");
+        }
         for (bj, &bi) in bodies.iter().enumerate() {
             let b = &ev.ctx.bodies[bi];
-            let res = k::transform(&b.shape, &inst.t, true).map_err(kerr("Pattern failed"))?;
+            let res = k::transform(&b.shape, &inst.t, copy).map_err(kerr("Pattern failed"))?;
             let names = copy_names(ev, &b.faces, &res, inst.code);
             out.push((ii, bj, b.kind, NamedShape::new(res.shape, names)));
         }
@@ -421,9 +428,9 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     if instances.is_empty() {
         return Ok(());
     }
-    let copies = copy_bodies(ev, &bodies, instances)?;
-    pattern_connectors(ev, refs, instances);
     let op = ev.enum_("operationType").to_string();
+    let copies = copy_bodies(ev, &bodies, instances, op != "NEW")?;
+    pattern_connectors(ev, refs, instances);
     if op == "NEW" || copies.iter().all(|c| c.2 != BodyKind::Solid) {
         let nb = bodies.len().max(1);
         for (ii, bj, kind, ns) in copies {
@@ -517,14 +524,25 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
 fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances: &[Instance]) -> FResult<()> {
     let Some(bi) = index_of_body(ev, body_id) else { return Ok(()) };
     let body = ev.ctx.bodies[bi].clone();
+    let t0 = std::time::Instant::now();
     let tool = faces_tool(ev, &body, faces)?;
+    let t_tool = t0.elapsed();
     let mut tools: Vec<NamedShape> = Vec::new();
     for inst in instances {
+        if ev.cancelled() {
+            return err("Cancelled");
+        }
+        // Copied, not moved: these go into a boolean (see copy_bodies).
         let res = k::transform(&tool.shape, &inst.t, true).map_err(kerr("Pattern failed"))?;
         let names = copy_names(ev, &tool.names, &res, inst.code);
         tools.push(NamedShape::new(res.shape, names));
     }
-    apply_tools(ev, body_id, tools, tool.add, body.kind)
+    let t_copies = t0.elapsed();
+    let r = apply_tools(ev, body_id, tools, tool.add, body.kind);
+    if crate::regen::display::perf_enabled() {
+        log::info!(target: "perf", "pattern_faces × {}: tool {:.1} ms, copies + names {:.1} ms, apply {:.1} ms", instances.len(), t_tool.as_secs_f64() * 1e3, (t_copies - t_tool).as_secs_f64() * 1e3, (t0.elapsed() - t_copies).as_secs_f64() * 1e3);
+    }
+    r
 }
 
 /// Fuse (boss) or cut (pocket) instance tools into the parts they touch.
@@ -532,9 +550,18 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
     if add {
         let Some(bi) = index_of_body(ev, seed) else { return Ok(()) };
         let seed_shape = ev.ctx.bodies[bi].shape.clone();
-        let (touch, free): (Vec<NamedShape>, Vec<NamedShape>) = tools.into_iter().partition(|t| k::distance(&seed_shape, &t.shape).map(|d| d.distance < 1e-7).unwrap_or(false));
+        // Instances whose boxes meet the part go into one fuse (one that
+        // turns out not to touch comes out of it as a separate solid, i.e. a
+        // new part, as below); an exact distance per instance cost 11 s for
+        // ×1000.
+        let seed_box = seed_shape.bounding_box(false).ok();
+        let near = |t: &NamedShape| match (&seed_box, t.shape.bounding_box(false)) {
+            (Some(a), Ok(b)) => boxes_meet(a, &b, 1e-7),
+            _ => true,
+        };
+        let (touch, free): (Vec<NamedShape>, Vec<NamedShape>) = tools.into_iter().partition(near);
         if !touch.is_empty() {
-            ev.boolean_into(&[bi], touch, k::BooleanOp::Fuse)?;
+            ev.boolean_into_with(&[bi], touch, k::BooleanOp::Fuse, &EvalCtx::many_tools_options())?;
         }
         for (i, t) in free.into_iter().enumerate() {
             push_body(ev, BodyId { feature: ev.feature, index: 30_000 + i as u32 }, kind, t.shape, t.names.faces);
@@ -548,7 +575,12 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
         targets.push(bi);
     }
     targets.sort_unstable();
-    ev.boolean_into(&targets, tools, k::BooleanOp::Cut)
+    ev.boolean_into_with(&targets, tools, k::BooleanOp::Cut, &EvalCtx::many_tools_options())
+}
+
+/// Whether two boxes meet (within `tol`).
+fn boxes_meet(a: &k::BoundingBox, b: &k::BoundingBox, tol: f64) -> bool {
+    a.min.x <= b.max.x + tol && b.min.x <= a.max.x + tol && a.min.y <= b.max.y + tol && b.min.y <= a.max.y + tol && a.min.z <= b.max.z + tol && b.min.z <= a.max.z + tol
 }
 
 fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
@@ -582,6 +614,10 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     }
     match geometric_feature_pattern(ev, &feats, instances) {
         Ok(()) => Ok(()),
+        // Onshape's own failure (live G45): no re-apply.
+        Err(e) if e.message == SWITCH_TO_PER_INSTANCE || e.message == NO_GEOMETRY_FROM_FEATURES => Err(e),
+        // Faces our face pattern can't make a tool of (Parasolid's can):
+        // the same instances by re-applying the features.
         Err(e) => {
             ev.ctx = before;
             ev.warnings.truncate(warnings_before);
@@ -602,7 +638,7 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
         let created: Vec<usize> = (0..ev.ctx.bodies.len()).filter(|i| ev.ctx.bodies[*i].id.feature == f).collect();
         if !created.is_empty() {
             found = true;
-            let copies = copy_bodies(ev, &created, instances)?;
+            let copies = copy_bodies(ev, &created, instances, false)?;
             let nb = created.len();
             for (ii, bj, kind, ns) in copies {
                 let index = (f.0 as u32 & 0xFFF).wrapping_mul(1 << 20).wrapping_add((ii * nb + bj) as u32);
@@ -622,13 +658,113 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             .collect();
         for (id, fs) in groups {
             found = true;
+            if let Some(b) = index_of_body(ev, &id).map(|bi| &ev.ctx.bodies[bi])
+                && face_pattern_fails(b, &fs, instances)
+            {
+                return err(SWITCH_TO_PER_INSTANCE);
+            }
             pattern_faces(ev, &id, &fs, instances)?;
         }
         if !found {
-            return err("A selected feature has no geometry to pattern");
+            return err(NO_GEOMETRY_FROM_FEATURES);
         }
     }
     Ok(())
+}
+
+/// Onshape's PATTERN_SWITCH_TO_PER_INSTANCE: a feature pattern whose face
+/// pattern can't make the instances (patternUtils.fs).
+const SWITCH_TO_PER_INSTANCE: &str = "Could not create all instances as entered. Try selecting \"Reapply features\" option.";
+/// Onshape's PATTERN_NO_GEOM_FROM_FEATURES.
+const NO_GEOMETRY_FROM_FEATURES: &str = "Selected features do not create any geometry that may be patterned.";
+
+/// Whether Onshape's face pattern (Parasolid's) can't place the feature's
+/// faces at the instances, so the Feature pattern fails asking for Reapply
+/// features (patternUtils.fs: any failure of the face-based pattern):
+/// - the faces merged with faces of the body around them (live G45 and
+///   "Pattern face merging": a rib as wide as the block, its sides one face
+///   with the block's): they then meet the rest of the body along concave
+///   edges (where they stand on it) and convex ones (where the merged faces
+///   carry on); a boss meets its part along concave edges only, a pocket
+///   along convex ones;
+/// - an instance's boundary leaves the surfaces it has to attach to (a hole
+///   on the block's corner, its edges on the side planes, patterned along
+///   them: qa4 F12).
+fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance]) -> bool {
+    let sel: BTreeSet<u32> = faces.iter().map(|f| *f as u32).collect();
+    let Ok(ef) = body.shape.edge_faces() else { return false };
+    let probes: Vec<DMat4> = [instances.first(), instances.last()].into_iter().flatten().map(|i| i.t.matrix()).collect();
+    let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
+    let (mut convex, mut concave) = (false, false);
+    for (e, fs) in ef.iter().enumerate() {
+        let [a, b] = fs[..] else { continue };
+        let (s, o) = match (sel.contains(&a), sel.contains(&b)) {
+            (true, false) => (a, b),
+            (false, true) => (b, a),
+            _ => continue,
+        };
+        match edge_convexity(body, e, s as usize, o as usize) {
+            1 => convex = true,
+            -1 => concave = true,
+            _ => {}
+        }
+        if convex && concave {
+            return true;
+        }
+        // The edge, moved by the instances, still on the other face's surface.
+        let (Ok(edge), Ok(other)) = (body.shape.sub_shape(ShapeType::Edge, e), body.shape.sub_shape(ShapeType::Face, o as usize)) else { continue };
+        let Ok(info) = edge.edge_info() else { continue };
+        let Ok(mid) = edge.point_at((info.first_param + info.last_param) * 0.5) else { continue };
+        if probes.iter().any(|m| !on_surface(&other, m.transform_point3(mid), tol)) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether `p` lies on the (unbounded) surface of `face`.
+fn on_surface(face: &Shape, p: DVec3, tol: f64) -> bool {
+    let off_axis = |o: DVec3, a: DVec3| {
+        let a = a.normalize_or_zero();
+        let q = p - o;
+        (q.dot(a), (q - a * q.dot(a)).length())
+    };
+    match face.face_surface() {
+        Ok(k::Surface::Plane(pl)) => (p - pl.origin).dot(pl.normal.normalize_or_zero()).abs() < tol,
+        Ok(k::Surface::Cylinder { origin, axis, radius, .. }) => (off_axis(origin, axis).1 - radius).abs() < tol,
+        Ok(k::Surface::Sphere { center, radius, .. }) => ((p - center).length() - radius).abs() < tol,
+        Ok(k::Surface::Cone { axis, half_angle, apex, .. }) => {
+            let (h, r) = off_axis(apex, axis);
+            (r - h.abs() * half_angle.tan()).abs() < tol
+        }
+        Ok(k::Surface::Torus { center, axis, major_radius, minor_radius }) => {
+            let (h, r) = off_axis(center, axis);
+            (((r - major_radius).powi(2) + h * h).sqrt() - minor_radius).abs() < tol
+        }
+        // Other surfaces: on the face itself.
+        _ => face.project_point(p).map(|x| x.distance < tol).unwrap_or(false),
+    }
+}
+
+/// How faces `fa` and `fb` meet along edge `e`: +1 convex, -1 concave, 0
+/// tangent: the sign of (n_a × n_b) · t, t the edge's tangent as face `fa`
+/// runs it, n the outward normals.
+fn edge_convexity(body: &Body, e: usize, fa: usize, fb: usize) -> i32 {
+    let (Ok(edge), Ok(a), Ok(b)) = (body.shape.sub_shape(ShapeType::Edge, e), body.shape.sub_shape(ShapeType::Face, fa), body.shape.sub_shape(ShapeType::Face, fb)) else { return 0 };
+    // The edge as face `fa` uses it (its orientation in that face).
+    let Some(ea) = a.edges().into_iter().find(|x| x.is_same(&edge)) else { return 0 };
+    let Ok(info) = ea.edge_info() else { return 0 };
+    let t = (info.first_param + info.last_param) * 0.5;
+    let (Ok(p), Ok(tan)) = (ea.point_at(t), ea.tangent_at(t)) else { return 0 };
+    let (Ok(na), Ok(nb)) = (a.normal_at_point(p), b.normal_at_point(p)) else { return 0 };
+    let c = na.normalize_or_zero().cross(nb.normalize_or_zero()).dot(tan);
+    if c > 1e-6 {
+        1
+    } else if c < -1e-6 {
+        -1
+    } else {
+        0
+    }
 }
 
 // ------------------------------------------------------------------ reapply
@@ -804,10 +940,27 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
     if seeds.is_empty() {
         return err("None of the selected features can be re-applied");
     }
+    // Add / Remove features: each instance's tool is made against the model
+    // before the pattern (as New), then all go into one boolean. Linear in
+    // the instance count; re-applying into the growing part was quadratic
+    // (a ×200 rib pattern took 167 s).
+    let ops: Option<Vec<String>> = seeds
+        .iter()
+        .map(|s| match s.params.get("operationType") {
+            Some(crate::params::ParamValue::Enum(o)) if o == "ADD" || o == "REMOVE" => Some(o.clone()),
+            _ => None,
+        })
+        .collect();
+    if let Some(ops) = ops {
+        return reapply_as_tools(ev, &seeds, &ops, instances);
+    }
     let features = ev.features;
     let mut ok = 0usize;
     let mut failures: Vec<String> = Vec::new();
     for inst in instances {
+        if ev.cancelled() {
+            return err("Cancelled");
+        }
         let m = inst.t.matrix();
         let total = match &ev.xform {
             Some(outer) => m * *outer,
@@ -849,6 +1002,113 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
     }
     if ok == 0 {
         return Err(fe(failures.into_iter().next().unwrap_or_else(|| "Pattern failed".into())));
+    }
+    if !failures.is_empty() {
+        let n = failures.len();
+        let first = failures.into_iter().next().unwrap_or_default();
+        ev.warnings.push(format!("{n} pattern instance(s) failed: {first}"));
+    }
+    Ok(())
+}
+
+/// [`reapply_features`] for Add / Remove seeds: every instance evaluated as
+/// New against the model before the pattern; their solids, renamed like
+/// re-applied instances, are then added or removed in one boolean per seed
+/// (in the seed's merge scope).
+fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String], instances: &[Instance]) -> FResult<()> {
+    let features = ev.features;
+    let base = ev.ctx.clone();
+    let (feature, units, outer_vars, xform, custom) = (ev.feature, ev.units, ev.outer_vars, ev.xform, ev.custom.clone());
+    let cancel = ev.cancel.clone();
+    // Every seed evaluated as New for one instance: per seed, its warnings
+    // and the bodies it made (renamed), or its error.
+    type Made = Vec<(BodyId, BodyKind, Shape, Vec<Name>)>;
+    type PerSeed = Vec<Result<(Vec<String>, Made), String>>;
+    let instance = |inst: &Instance| -> Option<PerSeed> {
+        if cancel.as_ref().is_some_and(crate::regen::RegenCancel::aborted) {
+            return None;
+        }
+        let m = inst.t.matrix();
+        let total = match &xform {
+            Some(outer) => m * *outer,
+            None => m,
+        };
+        let mut out = Vec::with_capacity(seeds.len());
+        for seed in seeds {
+            let tmp = FeatureId(mix(&[feature.0, seed.id.0, inst.code as u64]) | (1 << 62));
+            let mut params = crate::regen::eval::expand_query_variables(&seed.params, &base).unwrap_or_else(|| seed.params.clone());
+            params.set("operationType", crate::params::ParamValue::Enum("NEW".into()));
+            let mut scratch = base.clone();
+            let mut sk = BTreeSet::new();
+            referenced_sketches(&params, &mut sk);
+            for s in scratch.sketches.iter_mut() {
+                if sk.contains(&s.feature) {
+                    *s = Arc::new(transformed_sketch(s, &m));
+                }
+            }
+            let mut sub = EvalCtx::new(tmp, &seed.name, &params, units, scratch, outer_vars);
+            sub.features = features;
+            sub.xform = Some(total);
+            sub.custom = custom.clone();
+            sub.custom_type = crate::custom::is_custom(&seed.type_id).then(|| seed.type_id.clone());
+            let eval_fn = super::evaluator(&seed.type_id).expect("checked by the caller");
+            out.push(match eval_fn(&mut sub) {
+                Ok(()) => {
+                    let rn = Renamer { tmp, seed: seed.id, pattern: feature, code: inst.code };
+                    let made = sub.ctx.bodies.iter().filter(|b| b.id.feature == tmp).map(|b| (rn.body_id(&b.id), b.kind, b.shape.clone(), b.faces.iter().map(|n| rn.rename(n)).collect())).collect();
+                    Ok((sub.warnings, made))
+                }
+                Err(e) => Err(e.message),
+            });
+        }
+        Some(out)
+    };
+    // In parallel (each instance is independent; built-in features only:
+    // FeatureScript evaluation stays on this thread), in instance order.
+    let outs: Vec<Option<_>> = if seeds.iter().any(|s| crate::custom::is_custom(&s.type_id)) {
+        instances.iter().map(instance).collect()
+    } else {
+        use rayon::prelude::*;
+        instances.par_iter().map(instance).collect()
+    };
+    let mut tools: Vec<Vec<NamedShape>> = vec![Vec::new(); seeds.len()];
+    let mut ok = 0usize;
+    let mut failures: Vec<String> = Vec::new();
+    for out in outs {
+        let Some(out) = out else { return err("Cancelled") };
+        for (si, r) in out.into_iter().enumerate() {
+            match r {
+                Ok((warnings, made)) => {
+                    ok += 1;
+                    for w in warnings {
+                        if !ev.warnings.contains(&w) {
+                            ev.warnings.push(w);
+                        }
+                    }
+                    for (id, kind, shape, faces) in made {
+                        if kind == BodyKind::Solid {
+                            tools[si].push(NamedShape::new(shape, faces));
+                        } else {
+                            push_body(ev, id, kind, shape, faces);
+                        }
+                    }
+                }
+                Err(e) => failures.push(e),
+            }
+        }
+    }
+    if ok == 0 {
+        return Err(fe(failures.into_iter().next().unwrap_or_else(|| "Pattern failed".into())));
+    }
+    for (si, t) in tools.into_iter().enumerate() {
+        if t.is_empty() {
+            continue;
+        }
+        let scope = {
+            let sc = EvalCtx::new(ev.feature, &seeds[si].name, &seeds[si].params, ev.units, ev.ctx.clone(), ev.outer_vars);
+            super::extrude::scope(&sc)
+        };
+        ev.apply_operation(t, &ops[si], scope, BodyKind::Solid)?;
     }
     if !failures.is_empty() {
         let n = failures.len();
@@ -994,7 +1254,7 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
     let t = t.unwrap_or(k::Transform::Translate(DVec3::ZERO));
     let inst = [Instance { code: 1, t }];
     if copy {
-        let copies = copy_bodies(ev, &bodies, &inst)?;
+        let copies = copy_bodies(ev, &bodies, &inst, true)?;
         pattern_connectors(ev, refs, &inst);
         for (_, bj, kind, ns) in copies {
             push_body(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces);
@@ -1034,7 +1294,7 @@ pub fn copy_part(ev: &mut EvalCtx) -> FResult<()> {
         return err("Select parts to copy");
     }
     let inst = [Instance { code: 1, t: k::Transform::Translate(DVec3::ZERO) }];
-    for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst)? {
+    for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst, true)? {
         push_body(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces);
     }
     Ok(())

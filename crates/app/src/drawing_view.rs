@@ -263,6 +263,7 @@ pub struct DrawingEditor {
     pub aux_edit: Option<(noshape_model::drawing::ViewId, crate::drawing_aux::AuxDlg)>,
     /// Detail view dialog (see `drawing_detail`) and its label text.
     pub detail_dlg: Option<crate::drawing_detail::DetailDlg>,
+    pub crop_dlg: Option<crate::drawing_crop::CropDlg>,
     /// Revision table dialog (drawing_revision.rs).
     pub revision_dlg: Option<crate::drawing_revision::RevisionDlg>,
     /// Show/hide sketches dialog (drawing_view_sketches.rs).
@@ -275,6 +276,10 @@ pub struct DrawingEditor {
     pub ref_manager: Option<crate::drawing_refs::RefManager>,
     /// Selected table cells (drawing_cells.rs).
     pub cell_sel: Option<crate::drawing_cells::CellSel>,
+    /// The floating Cell panel of the selected general table cells.
+    pub cell_panel: Option<crate::drawing_cell_panel::CellPanel>,
+    /// The Note panel's "Note color" panel.
+    pub note_color: Option<crate::drawing_note_color::NoteColorDlg>,
     /// Paste as table: the cells waiting for the placing click.
     pub paste_table: Option<Vec<Vec<String>>>,
     /// Note tool: the leader anchored by the first click (on a snap point).
@@ -384,7 +389,7 @@ impl DrawingEditor {
         let subs = vec![cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, _window, cx| match ev {
             DocEvent::TabChanged(t) if *t == this.tab => this.reload(cx),
             DocEvent::TabChanged(t) => this.studio_changed(*t, cx),
-            DocEvent::Reloaded | DocEvent::TabsChanged => {
+            DocEvent::Reloaded | DocEvent::TabsChanged | DocEvent::UnitsChanged { .. } => {
                 this.reload(cx);
                 let mut tabs: Vec<TabId> = this.sources.keys().map(|k| k.tab).collect();
                 tabs.dedup();
@@ -466,6 +471,7 @@ impl DrawingEditor {
             section_dlg: None,
             break_dlg: None,
             detail_dlg: None,
+            crop_dlg: None,
             revision_dlg: None,
             view_sketches: None,
             hide_parts: None,
@@ -494,6 +500,8 @@ impl DrawingEditor {
             table_tool: None,
             note_leader: None,
             cell_sel: None,
+            cell_panel: None,
+            note_color: None,
             ref_manager: None,
             color_dlg: None,
             version_docs: HashMap::new(),
@@ -578,6 +586,7 @@ impl DrawingEditor {
             Sel::Hatch(h) => sheet.sketch.hatches.iter().any(|x| x.id == *h),
             Sel::Image(i) => sheet.images.iter().any(|x| x.id == *i),
             Sel::AutoCentermark(v, c) => sheet.view(*v).is_some_and(|v| !v.deleted_centermarks.contains(c)),
+            Sel::ViewLabel(v) | Sel::AuxIndicator(v) => sheet.view(*v).is_some(),
         });
         self.ensure_sources(false, cx);
         self.refresh(cx);
@@ -587,6 +596,10 @@ impl DrawingEditor {
     pub fn commit(&mut self, description: &str, mut new: Drawing, cx: &mut Context<Self>) {
         // The sheet on screen goes with the change (undo returns to it).
         new.active_sheet = self.sheet;
+        // Older drawings: DRAWN becomes the user who first edits them.
+        if new.drawn_by.is_none() && !self.info.user_name.is_empty() {
+            new.drawn_by = Some(self.info.user_name.clone());
+        }
         // Sketch dimensions stay on their geometry (moved / deleted entities).
         if let Some(s) = new.sheets.get_mut(self.sheet) {
             s.sync_sketch_dimensions();
@@ -933,6 +946,7 @@ impl DrawingEditor {
     fn rebuild_overlay(&mut self) {
         let mut overlay = self.overlay.clone();
         overlay.points.extend(self.selection_handles());
+        self.note_grip_overlay(&mut overlay);
         if overlay.is_empty() {
             self.overlay_handles = None;
             return;
@@ -1008,8 +1022,11 @@ impl DrawingEditor {
         // Hover and selection highlight states.
         if let Some(b) = &self.built {
             scene.states = vec![0; b.picks.len()];
-            for s in self.selection.iter().chain(self.panel_highlight.iter()) {
-                for p in self.picks_of(*s) {
+            // A selected view label has its own look (push_label_highlights),
+            // and so does a selected datum (push_datum_selection).
+            let datums = self.datum_selection_picks();
+            for s in self.selection.iter().chain(self.panel_highlight.iter()).filter(|s| !matches!(s, Sel::ViewLabel(_))) {
+                for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }
             }
@@ -1019,6 +1036,8 @@ impl DrawingEditor {
                     // Onshape (drawing/14): a hovered annotation turns tan with
                     // a tan label box and its grips, drawn on top below.
                     Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_hover(&mut scene, b, &self.picks_of(s)),
+                    // Hovered labels and indicators show their dots only.
+                    Some(Sel::ViewLabel(_) | Sel::AuxIndicator(_)) if !single => {}
                     _ => {
                         let group = if single { vec![h] } else { self.sel_of_pick(h).map(|s| self.picks_of(s)).unwrap_or_else(|| vec![h]) };
                         for p in group {
@@ -1031,6 +1050,9 @@ impl DrawingEditor {
             // group members (yellow).
             self.push_related_highlights(&mut scene);
             self.push_replicate_overlay(&mut scene);
+            self.push_label_highlights(&mut scene);
+            self.push_datum_selection(&mut scene);
+            self.push_aux_states(&mut scene);
         }
         scene
     }
@@ -1126,8 +1148,10 @@ impl DrawingEditor {
         let bg = crate::theme::lin(self.model_bg.unwrap_or(crate::theme::viewport::DRAWING_BG));
         style.background_top = bg;
         style.background_bottom = bg;
-        style.hover_color = crate::theme::lin(crate::theme::viewport::PREHIGHLIGHT);
-        style.select_color = crate::theme::lin(crate::theme::viewport::SELECTION);
+        // Drawings use their own (behaviours 1480, asb/u-906/907): hover
+        // #CCB292, selected #CC925C.
+        style.hover_color = crate::theme::lin(0xccb292);
+        style.select_color = crate::theme::lin(0xcc925c);
         // Other members of a hovered / selected annotation group (live
         // drawing/423: #EBEB92).
         style.accent_color = crate::theme::lin(0xebeb92);
@@ -1226,16 +1250,23 @@ impl DrawingEditor {
 
 impl Render for DrawingEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // A closed view dialog took the focus with it (its fields): the sheet
+        // takes it back, so shortcuts work at once (qa5 D5; live keeps them).
+        if window.focused(cx).is_none() {
+            window.focus(&self.focus, cx);
+        }
         self.sync_section_dlg(window, cx);
         self.sync_break_dlg(window, cx);
         self.sync_aux_dlg(window, cx);
         self.sync_detail_dlg(window, cx);
+        self.sync_crop_dlg();
         self.sync_revision_dlg(window, cx);
         self.sync_weld_dlg(window, cx);
         self.sync_callout_dlg(window, cx);
         self.sync_table_dlg();
         self.sync_custom_dlg(cx);
         self.sync_table_tool(window, cx);
+        self.sync_cell_panel(window, cx);
         self.sync_datum_dlg(window, cx);
         self.sync_gdt_dlg(window, cx);
         // The label typed in the Auxiliary view dialog (pending_view has no cx).
@@ -1324,6 +1355,7 @@ impl Render for DrawingEditor {
             .children(self.render_sketch_dim_box(cx))
             .children(self.render_cell_inplace(cx))
             .children(self.render_rotate_label())
+            .children(self.render_cell_panel(cx))
             .child(panel)
             .children(self.render_view_props(cx))
             .children(self.render_zoom_window())
@@ -1336,6 +1368,7 @@ impl Render for DrawingEditor {
             .children(self.render_aux_dlg(cx))
             .children(self.render_aux_edit(cx))
             .children(self.render_detail_dlg(cx))
+            .children(self.render_crop_dlg(cx))
             .children(self.render_revision_dlg(cx))
             .children(self.render_weld_dlg(cx))
             .children(self.render_callout_dlg(cx))
@@ -1380,10 +1413,15 @@ impl Render for DrawingEditor {
             .bg(pal.app_bg)
             .key_context("Drawing")
             .track_focus(&self.focus)
-            .on_action(cx.listener(|this, _: &Cancel, _, cx| this.cancel(cx)))
+            // Esc closes the dialog whose field had the focus: the canvas
+            // takes it back, so shortcuts (d, n, …) work at once (qa5 D5).
+            .on_action(cx.listener(|this, _: &Cancel, window, cx| {
+                this.cancel(cx);
+                window.focus(&this.focus, cx);
+            }))
             .on_action(cx.listener(|this, _: &DeleteSelection, _, cx| this.delete_selection(cx)))
             .on_action(cx.listener(|this, _: &Copy, _, cx| {
-                if !this.copy_cells(cx) {
+                if !this.copy_cells(cx) && !this.copy_labels(cx) {
                     this.copy_views(None, cx)
                 }
             }))

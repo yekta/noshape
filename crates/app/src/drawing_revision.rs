@@ -50,7 +50,7 @@ impl DrawingEditor {
             _ => (false, 5, false, false),
         };
         let corner = t.map(|t| t.corner).unwrap_or(TableCorner::TopRight);
-        let st = cx.new(|cx| InputState::new(window, cx).default_value(visible_rows.to_string()));
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(visible_rows.to_string()));
         let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change)
                 && let Ok(n) = st.read(cx).value().trim().parse::<u32>()

@@ -56,22 +56,88 @@ pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<M
     )
 }
 
+/// Tessellates a body's `shape` for the display (`quality` scales the chord
+/// tolerance; preview meshes are coarser).
+fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts: &RegenOptions) -> Arc<MeshBuffers> {
+    let bb = shape.bounding_box(false).ok();
+    let diag = bb.map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
+    // Preview meshes are ~4x coarser for instant feedback.
+    let base = RegenOptions::default().relative_deflection * quality;
+    let ang0 = if quality < 1.0 { opts.angular_deflection * quality.max(0.4) } else { opts.angular_deflection };
+    let (rel, ang) = if opts.preview_meshes { (base * 4.0, (ang0 * 1.8).min(0.9)) } else { (base, ang0) };
+    let lin = (diag * rel).max(1e-6);
+    let tt = std::time::Instant::now();
+    let tess = noshape_kernel::tessellate(shape, lin, ang, true);
+    if perf_enabled() {
+        log::info!(target: "perf", "tessellate {} ({}): {:.1} ms (linear {lin:.2e}, angular {ang:.2})", name, if opts.preview_meshes { "preview" } else { "fine" }, tt.elapsed().as_secs_f64() * 1000.0);
+    } else {
+        log::debug!("tessellate {}: {:?} (linear {lin:.2e})", name, tt.elapsed());
+    }
+    match tess {
+        Ok(t) => Arc::new(
+            MeshBuffers {
+                face_ranges: t.faces.iter().map(|f| (f.first_index, f.index_count)).collect(),
+                edges: (0..t.edges.len()).map(|i| t.edge_polyline(i).to_vec()).collect(),
+                positions: t.positions,
+                normals: t.normals,
+                indices: t.indices,
+                vertices: t.vertices,
+                mesh_lines: Vec::new(),
+            }
+            .with_mesh_lines(shape),
+        ),
+        Err(e) => {
+            log::warn!("tessellation failed for {}: {e}", name);
+            Arc::new(MeshBuffers::default())
+        }
+    }
+}
+
 /// Build the display; returns whether any body only has a preview mesh.
 pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &mut HashMap<u64, (u64, bool, Arc<MeshBuffers>)>) -> (StudioDisplay, bool) {
     let mut needs_refine = false;
     let t_all = std::time::Instant::now();
     let mut d = StudioDisplay::defaults();
     let mut used = std::collections::HashSet::new();
+    // Bodies per TShape (pattern partners share one).
+    let mut partners: HashMap<u64, usize> = HashMap::new();
     for b in &ctx.bodies {
+        *partners.entry(b.shape.partner_hash()).or_default() += 1;
+    }
+    for b in &ctx.bodies {
+        // A newer edit made this run stale (meshes made so far stay cached).
+        if opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted) {
+            return (d, needs_refine);
+        }
         // Part tessellation quality and the view-wide quality (Shift+R)
         // scale the chord tolerance; finer meshes are cached separately.
         let quality = studio.part_properties.get(&b.id).and_then(|p| p.tessellation).map(|q| q.factor()).unwrap_or(1.0) * (opts.relative_deflection / RegenOptions::default().relative_deflection);
         let key = if (quality - 1.0).abs() < 1e-9 { b.shape.hash_code() } else { b.shape.hash_code() ^ quality.to_bits().wrapping_mul(0x9E37_79B9_7F4A_7C15) };
         let nfaces = b.faces.len() as u64;
         used.insert(key);
-        let cached = meshes.get(&key).filter(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes)).map(|(_, p, m)| (*p, m.clone()));
         // An open composite's members are drawn themselves.
         let open_composite = b.composite.as_ref().is_some_and(|c| !c.closed);
+        // Rigidly moved pattern instances (one TShape): its unlocated mesh,
+        // made once for all of them; their world meshes are made from it.
+        let partner = b.shape.partner_hash();
+        let mut fresh_partner_mesh = false;
+        let partner_mesh = (partner != 0 && !open_composite && partners.get(&partner).is_some_and(|&n| n > 1)).then(|| {
+            let local_key = partner.rotate_left(17) ^ quality.to_bits().wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0x5348_4152_4544_0001;
+            used.insert(local_key);
+            if let Some((_, _, m)) = meshes.get(&local_key).filter(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes)) {
+                return m.clone();
+            }
+            let m = match b.shape.unlocated() {
+                Ok(shape) => tessellate_body(&shape, &b.name, quality, opts),
+                Err(_) => tessellate_body(&b.shape, &b.name, quality, opts),
+            };
+            meshes.insert(local_key, (nfaces, opts.preview_meshes, m.clone()));
+            fresh_partner_mesh = true;
+            m
+        });
+        // A new shared mesh replaces world meshes made without it, so every
+        // copy's world mesh matches what the GPU draws.
+        let cached = meshes.get(&key).filter(|(n, preview, _)| !fresh_partner_mesh && *n == nfaces && (!*preview || opts.preview_meshes)).map(|(_, p, m)| (*p, m.clone()));
         let mesh = match cached {
             _ if open_composite => Arc::new(MeshBuffers::default()),
             Some((preview, m)) => {
@@ -79,43 +145,20 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
                 m
             }
             _ => {
-                let bb = b.shape.bounding_box(false).ok();
-                let diag = bb.map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
-                // Preview meshes are ~4x coarser for instant feedback.
-                let base = RegenOptions::default().relative_deflection * quality;
-                let ang0 = if quality < 1.0 { opts.angular_deflection * quality.max(0.4) } else { opts.angular_deflection };
-                let (rel, ang) = if opts.preview_meshes { (base * 4.0, (ang0 * 1.8).min(0.9)) } else { (base, ang0) };
-                let lin = (diag * rel).max(1e-6);
-                let tt = std::time::Instant::now();
-                let tess = noshape_kernel::tessellate(&b.shape, lin, ang, true);
-                if perf_enabled() {
-                    log::info!(target: "perf", "tessellate {} ({}): {:.1} ms (linear {lin:.2e}, angular {ang:.2})", b.name, if opts.preview_meshes { "preview" } else { "fine" }, tt.elapsed().as_secs_f64() * 1000.0);
-                } else {
-                    log::debug!("tessellate {}: {:?} (linear {lin:.2e})", b.name, tt.elapsed());
-                }
-                let m = match tess {
-                    Ok(t) => Arc::new(
-                        MeshBuffers {
-                            face_ranges: t.faces.iter().map(|f| (f.first_index, f.index_count)).collect(),
-                            edges: (0..t.edges.len()).map(|i| t.edge_polyline(i).to_vec()).collect(),
-                            positions: t.positions,
-                            normals: t.normals,
-                            indices: t.indices,
-                            vertices: t.vertices,
-                            mesh_lines: Vec::new(),
-                        }
-                        .with_mesh_lines(&b.shape),
-                    ),
-                    Err(e) => {
-                        log::warn!("tessellation failed for {}: {e}", b.name);
-                        Arc::new(MeshBuffers::default())
-                    }
+                // Pattern partners share one mesh of the unlocated shape,
+                // placed by each copy's location.
+                let m = match &partner_mesh {
+                    Some(local) => Arc::new(local.transformed(&b.shape.location())),
+                    None => tessellate_body(&b.shape, &b.name, quality, opts),
                 };
                 meshes.insert(key, (nfaces, opts.preview_meshes, m.clone()));
                 needs_refine |= opts.preview_meshes;
                 m
             }
         };
+        if let Some(local) = partner_mesh {
+            d.shared_meshes.insert(b.id.clone(), SharedMesh { mesh: local, transform: b.shape.location(), world: mesh.clone() });
+        }
         let props = studio.part_properties.get(&b.id);
         let color = props
             .and_then(|p| p.appearance)
@@ -236,7 +279,7 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
             let Some(p) = s.sketch.point(e.id) else { continue };
             let standalone = s.sketch.users_of_point(e.id).is_empty();
             let handle = handles.contains(&e.id) && !ends.contains(&e.id);
-            points.push(SketchPointDisplay { entity: e.id.0, position: f3(frame.to_world(p)), state: state_of(e.id), standalone, handle });
+            points.push(SketchPointDisplay { entity: e.id.0, position: f3(frame.to_world(p)), state: state_of(e.id), standalone, handle, external: e.external });
         } else {
             let pts: Vec<[f32; 3]> = s.sketch.tessellate(e.id, tol).into_iter().map(|p| f3(frame.to_world(p))).collect();
             curves.push(SketchCurveDisplay { entity: e.id.0, points: pts, construction: e.construction, external: e.external && !glyph, state: state_of(e.id) });

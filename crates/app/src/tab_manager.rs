@@ -48,11 +48,16 @@ fn kind_of(c: &TabContent) -> &'static str {
         TabContent::VariableStudio(_) => "variables",
         TabContent::FeatureStudio(_) => "featurestudio",
         TabContent::MaterialLibrary(_) => "materiallibrary",
-        TabContent::File(_) => "file",
+        // Live (tabbar/icons2-filetab-tabmanager-*): one kind per file
+        // format, shown with its own icon in the rows and the filter.
+        TabContent::File(f) => crate::file_tab_view::file_icon(f),
     }
 }
 
-fn kind_info(kind: &str) -> (&'static str, &'static str) {
+fn kind_info(kind: &'static str) -> (&'static str, &'static str) {
+    if kind.starts_with("file") {
+        return (kind, "File");
+    }
     KINDS.iter().find(|k| k.0 == kind).map(|k| (k.1, k.2)).unwrap_or(("part-studio", "Part Studio"))
 }
 
@@ -115,7 +120,7 @@ impl TabSort {
 
 impl TabManager {
     pub fn new(doc: Entity<DocModel>, active: Option<TabId>, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search tabs"));
+        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search tabs"));
         let subs = vec![
             cx.subscribe_in(&search, window, |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
                 InputEvent::Change => {
@@ -389,7 +394,14 @@ impl Render for TabManager {
         let matches = self.matches(cx);
         let present: Vec<&'static str> = {
             let tabs = self.doc.read(cx).session.doc.ordered_tabs();
-            KINDS.iter().map(|k| k.0).filter(|k| tabs.iter().any(|t| kind_of(&t.content) == *k)).collect()
+            let mut v: Vec<&'static str> = KINDS.iter().map(|k| k.0).filter(|k| tabs.iter().any(|t| kind_of(&t.content) == *k)).collect();
+            for t in &tabs {
+                let k = kind_of(&t.content);
+                if k.starts_with("file") && !v.contains(&k) {
+                    v.push(k);
+                }
+            }
+            v
         };
         // Tree mode: folders and their tabs (indented); otherwise the matches.
         let entries: Vec<(TabId, usize)> = if self.tree_mode() { self.tree(false, cx) } else { matches.iter().map(|t| (t.0, 0)).collect() };

@@ -265,6 +265,29 @@ fn ev_volume(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(volume_value(sum_measure(i, &a, "bodies", EType::Body)?))
 }
 
+/// A tight box without OCCT's `Precision::Confusion` margin on curved
+/// geometry (live dom/fs-stdref.txt: a sweep's box is exactly
+/// (1597, -3, 0) (1610, 3, 43)): each side moved in to the shape.
+fn exact_box(s: &k::Shape, b: k::BoundingBox) -> k::BoundingBox {
+    let size = (b.max - b.min).length() + 1.0;
+    let mut out = b;
+    for axis in 0..3 {
+        let n = DVec3::AXES[axis];
+        let x = DVec3::AXES[(axis + 1) % 3];
+        for (at, sign) in [(b.min, 1.0), (b.max, -1.0)] {
+            let origin = at.dot(n) * n + (b.min + b.max) * 0.5 - (b.min + b.max).dot(n) * 0.5 * n;
+            let Ok(face) = k::make_plane_face(&k::Plane::new(origin, n, x), -size, size, -size, size) else { continue };
+            let Ok(d) = k::distance(s, &face) else { continue };
+            // Only the margin: a side never moves by more than OCCT's gap.
+            if d.distance > 0.0 && d.distance < 1e-6 {
+                let v = at[axis] + sign * d.distance;
+                if sign > 0.0 { out.min[axis] = v } else { out.max[axis] = v }
+            }
+        }
+    }
+    out
+}
+
 fn ev_box(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let tight = field(&a, "tight").as_bool().unwrap_or(true);
@@ -287,6 +310,10 @@ fn ev_box(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                         None => s,
                     };
                     match s.bounding_box(tight) {
+                        Ok(b) if tight => {
+                            let b = exact_box(&s, b);
+                            vec![b.min, b.max]
+                        }
                         Ok(b) => vec![b.min, b.max],
                         Err(_) => continue,
                     }

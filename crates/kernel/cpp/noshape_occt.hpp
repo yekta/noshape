@@ -165,6 +165,10 @@ uint64_t                 shape_hash(const OcShape& s);
 bool                     shape_is_same(const OcShape& a, const OcShape& b);
 bool                     shape_is_equal(const OcShape& a, const OcShape& b);
 bool                     shape_is_partner(const OcShape& a, const OcShape& b);
+// TShape identity (equal for partners), location as 3x4 row-major, shape at the identity location.
+uint64_t                 shape_partner_hash(const OcShape& s);
+rust::Vec<double>        shape_location(const OcShape& s);
+std::unique_ptr<OcShape> shape_unlocated(const OcShape& s);
 uint32_t                 sub_count(const OcShape& s, uint8_t kind);
 std::unique_ptr<OcShape> sub_shape(const OcShape& s, uint8_t kind, uint32_t index);
 std::unique_ptr<OcShapeList> sub_shapes(const OcShape& s, uint8_t kind);
@@ -281,6 +285,8 @@ OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts);
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts);
+// Cancel flag of this thread's booleans (address of a Rust AtomicBool, 0 = none).
+void set_thread_cancel(size_t flag);
 OpOut op_unify(const OcShape& s);
 OpOut op_enclose(const OcShapeList& shapes);
 OpOut op_transform(const OcShape& s, rust::Slice<const double> m, bool copy);

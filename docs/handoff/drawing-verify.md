@@ -195,3 +195,43 @@ fallback boxes — lead decision (font size; asb raised it earlier).
   Ⓤ Ⓘ ✟ ✝ ▷, Text format / Date only right after an inserted property, B pressed bg #cfdbe5 + 1 px #9aa5af.
   Next: those, then TB3 = the 590 px floating "Cell" panel on a double-click of an EMPTY general-table cell
   (text cells edit in place), then CR12 in the app (renderer was crashing on `section-count`, now fixed).
+- 21 Oct after GO: live Note panel answers applied (format.rs DRAWING_FIELDS / SHEET_REF_FIELDS / OTHER_FIELDS,
+  `is_field`, `is_date_field`, 23 DATE_FORMATS with `m` = month; build.rs `field_value` keys for all of them;
+  drawing_note.rs `note_height_text` / `parse_note_height` = "3.5000" in drawing units; popup labels / order;
+  B pressed look) — verified in the app except the date / text format popups. New, not yet compiled against a
+  green tree (others' files were broken): app/drawing_cell_panel.rs (TB3 / TB8 floating "Cell" panel,
+  `DrawingEditor.cell_panel`, `sync_cell_panel`, icons `cell-*`; double-click an EMPTY general cell selects it),
+  app/drawing_note_color.rs (A9 "Note color" panel, live 1137 palette; `DrawingEditor.note_color`),
+  `CellFormat.font`. Check them first.
+- 21 Oct ~09:00: ✅ TB3, TB8, A3 (grips as live 229b / 234 via `note_grip_overlay`, rotate dotted outline, 14 px
+  readout; live has no Flip). Note color panel (A9) and Cell panel verified in the app.
+- CR12: title block heights now the live DXF multiples of L = 1.6256 mm (ISO) / 1.2192 mm (ANSI): angular 0.9 L,
+  DO NOT SCALE 1.3 L × dns_h, sign-off values 0.84 L, material / finish 1.5 L, TITLE values 2.4 L, SIZE / DWG NO /
+  REV / SCALE / WEIGHT / SHEET labels 0.8 L, size / dwg no / rev values 3.0 L, scale / weight / sheet values 1.8 L;
+  notes wrap at the cell width minus the left margin; √ after the surface finish label; the "noshape" logo text
+  removed (live's top row is empty). Ignored test `dump_german_title_block` prints the texts to compare with
+  dom/drawing-lang-titleblock-texts.json. To check in the app: German ISO A3 vs live 820-e.
+
+## D12 (lead, 21 Oct): DXF / DWG export like Onshape's (docs/parity/workflow-drawing.md §4.4)
+Reference: live samples/drw2-asbu-aux.dxf (AC1032, "Part 1 Drawing 4", 3 sheets as layouts), asbv-layouts.dxf;
+qa5-sm-flat.dxf is a Part Studio flat export (other exporter, R14) but lists Onshape's full layer set. Scripts:
+/root/drw2-scratch/bin/dxfstat.py FILE (version, layers, entity types per layer), dxfents.py FILE TYPE N.
+Live: CIRCLE / ARC / ELLIPSE / LINE on "Visible" (mixed case in 2000+, VISIBLE in R12/R14), HATCH ANSI31 on
+VIEW_HATCHES, MTEXT everywhere (styles Onshape-Standard*, Noto fonts; notes `{\pxql;…}`), DIMENSION (dimstyles
+Onshape-Standard$N, anonymous *D blocks) and INSERT (*U blocks) on ANNOTATION_TEXT, ACAD_TABLE on TABLES, layers
+only the used ones + 0 + Defpoints, colour 7, lineweights (Visible 40, ANNOTATION_TEXT 25, ANNOTATION_LINES /
+CENTERMARKS 13, SECTION_CUTTING_LINE 70 + ONS_PHANTOM, others 15), line types DASHED / ONS_PHANTOM / CENTER /
+HIDDEN (inch patterns). Several sheets → ONE file with a layout per sheet (we zip one file per sheet: to do).
+Done (stage 1–3, model): `drawing/cad_layers.rs` (CadLayer kinds, names, line types, lineweights; `cad_since`,
+`cad_runs`, `cad_line_layer` / `cad_text_layer` / `cad_fill_layer` (fills: the touching line's layer));
+`SheetGeometry.cad` spans set in build.rs (hatch, detail border, centermarks, bends, breaks, cutting line /
+aux / detail circle, annotations by kind `annotation_cad_layers`, tables, hole origin, sketch, images) and kept
+by `export::prepare`; cad_export.rs: live layer table / line types / text styles, MTEXT, curves via
+`drawing/cad_fit.rs` (`fit_curve`: circle / arc / ellipse within 1e-4 mm); R12 writer: same layers in capitals.
+Next: HATCH entities (section_segments loops + ANSI31), DIMENSION + *D blocks with Onshape dimstyles, GD&T etc.
+as INSERT *U blocks, ACAD_TABLE, one DXF with layouts per sheet, then compare with live request drw2 10-21 k.
+
+## asb → drw2 (10-21, qa5 findings)
+- D12 (DXF entities / layer names): I see you're in model/drawing/cad_export.rs, so D12 is yours. I'm taking D11
+  (DXF options: Release 14 default, Sheets ▾) in app/drawing_export.rs only. Note: cad_export.rs:252
+  `EntityType::MText(e)` needs `Box::new(e)`, so the model crate doesn't compile until then.

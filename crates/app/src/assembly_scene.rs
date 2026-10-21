@@ -56,6 +56,15 @@ impl AsmPickMap {
     pub fn ids_for(&self, path: &InstancePath, r: &Reference) -> &[u32] {
         self.by_ref.get(&(path.clone(), r.clone())).map(|v| v.as_slice()).unwrap_or(&[])
     }
+    /// Pick ids of the edges bounding a face (edge names hold their faces').
+    pub fn boundary_ids(&self, path: &InstancePath, face: &Reference) -> Vec<u32> {
+        let Reference::Face(n) = face else { return Vec::new() };
+        self.by_ref
+            .iter()
+            .filter(|((p, r), _)| p == path && matches!(r, Reference::Edge(noshape_model::reference::TopoName::Edge { faces, .. }) if faces.iter().any(|f| **f == *n)))
+            .flat_map(|(_, v)| v.iter().copied())
+            .collect()
+    }
     pub fn priority_fn(&self) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
         let prio: Vec<i32> = self.targets.iter().map(|t| t.kind.priority()).collect();
         Arc::new(move |id| if id == 0 { -1 } else { prio.get(id as usize - 1).copied().unwrap_or(100) })
@@ -182,7 +191,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     }
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
-    let clip = |(n, d): &(DVec3, f64)| noshape_render::ClipPlane { normal: n.as_vec3(), d: *d as f32 };
+    let clip = |(n, d): &(DVec3, f64)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32);
     scene.clip = opts.section.first().map(clip);
     scene.clip_extra = opts.section.iter().skip(1).map(clip).collect();
     AsmBuilt { scene, picks, static_instances }
@@ -234,6 +243,14 @@ pub struct Highlights {
     pub triads: Vec<Triad>,
     /// Inference dots (world positions).
     pub dots: Vec<DVec3>,
+    /// Inference points of the hovered entity (live: small white dots).
+    pub light_dots: Vec<DVec3>,
+    /// The face whose boundary is outlined (live: hovering a face while
+    /// picking a mate connector outlines it, no fill).
+    pub hover_outline: Option<(InstancePath, Reference)>,
+    /// The inferred mate connector under the pointer: live's glyph, a khaki
+    /// disc with a notch and a small triad (frame, disc radius).
+    pub inference_glyph: Option<(Frame, f64)>,
     /// Move manipulator (triad with pickable axis arrows and rotation rings)
     /// and the hovered handle.
     pub manipulator: Option<(Frame, f64, Option<ManipHandle>)>,
@@ -371,7 +388,7 @@ fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32,
 }
 
 pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights, up: &Uploader) -> Scene {
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone() };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), compare: built.scene.compare };
     for top in &h.accent_tops {
         for &id in built.picks.faces_of(*top) {
             scene.add_flag(id, state::ACCENT);
@@ -404,10 +421,23 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     if let Some((p, r)) = &h.hover_entity {
         mark(p, r, state::HOVER, &mut scene);
     }
+    if let Some((p, r)) = &h.hover_outline {
+        for id in built.picks.boundary_ids(p, r) {
+            scene.add_flag(id, state::HOVER);
+        }
+    }
     for d in &h.dots {
         pts.points.push(PointSprite { position: d.as_vec3().into(), color: DARK, pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 });
     }
+    for d in &h.light_dots {
+        // Live (qa5/asm-041): white with a soft grey rim.
+        pts.points.push(PointSprite { position: d.as_vec3().into(), color: [0x9f, 0x9f, 0x9f, 255], pick_id: 0, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
+        pts.points.push(PointSprite { position: d.as_vec3().into(), color: [0xfd, 0xfd, 0xfd, 255], pick_id: 0, size: 5.0, style: LineSegment::ON_TOP, _pad: 0 });
+    }
     let mut lines = LineData::default();
+    if let Some((f, r)) = &h.inference_glyph {
+        push_connector_glyph(&mut lines, f, *r);
+    }
     for t in &h.triads {
         let w = if t.strong { 2.5 } else { 1.5 };
         push_triad(&mut lines, &t.frame, t.size, w, 0, false);
@@ -633,4 +663,37 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
 fn lin_to_u8(c: [f32; 4]) -> [u8; 4] {
     let f = |x: f32| (if x <= 0.0031308 { x * 12.92 } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 } * 255.0).round().clamp(0.0, 255.0) as u8;
     [f(c[0]), f(c[1]), f(c[2]), 255]
+}
+
+/// Onshape's mate connector glyph (live qa5/asm-041, assembly/31-*): a khaki
+/// disc in the connector's XY plane with a notch between +X and +Y, a dark
+/// rim, and a small triad (Z up from the centre, X and Y outside the disc).
+fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
+    const FILL: [u8; 4] = [187, 190, 134, 255];
+    const RIM: [u8; 4] = [42, 81, 105, 255];
+    let (u, v, n) = (f.x(), f.y(), f.z());
+    let at = |rad: f64, a: f64| -> [f32; 3] { (f.origin + u * (rad * a.cos()) + v * (rad * a.sin())).as_vec3().into() };
+    let (gap0, gap1) = (15f64.to_radians(), 75f64.to_radians());
+    let steps = 40;
+    let sweep = std::f64::consts::TAU - (gap1 - gap0);
+    let arc = |lines: &mut LineData, rad: f64, color: [u8; 4], width: f32| {
+        for i in 0..steps {
+            let (a0, a1) = (gap1 + sweep * i as f64 / steps as f64, gap1 + sweep * (i + 1) as f64 / steps as f64);
+            lines.segments.push(LineSegment { a: at(rad, a0), b: at(rad, a1), color, pick_id: 0, width, style: LineSegment::ON_TOP });
+        }
+    };
+    // Filled with concentric strokes (meshes can't draw over the parts).
+    let rings = 6;
+    for k in 1..=rings {
+        arc(lines, r * k as f64 / rings as f64 * 0.95, FILL, 3.0);
+    }
+    arc(lines, r, RIM, 1.5);
+    for a in [gap0, gap1] {
+        lines.segments.push(LineSegment { a: at(0.0, a), b: at(r, a), color: RIM, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+    }
+    let o = f.origin;
+    let seg = |lines: &mut LineData, a: DVec3, b: DVec3, color: [u8; 4]| lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color, pick_id: 0, width: 2.5, style: LineSegment::ON_TOP });
+    seg(lines, o, o + n * (r * 1.3), [0, 0, 208, 255]);
+    seg(lines, o + u * (r * 1.25), o + u * (r * 1.9), [208, 24, 24, 255]);
+    seg(lines, o + v * (r * 1.25), o + v * (r * 1.9), [24, 168, 24, 255]);
 }

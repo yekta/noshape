@@ -16,6 +16,8 @@ pub enum DocEvent {
     Reloaded,
     /// Versions/branches changed.
     HistoryChanged,
+    /// The workspace units changed (from `old`); open dialogs stay open.
+    UnitsChanged { old: noshape_units::UnitPrefs },
     Error(String),
     /// A user-facing notice (not an error), e.g. a merge result.
     Info(String),

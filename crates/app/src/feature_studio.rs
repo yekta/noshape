@@ -469,6 +469,81 @@ impl FeatureStudioView {
         self.recompile(src, cx);
     }
 
+    /// Profile results over the code (live dom/fs-profile.txt): the badge at
+    /// the top-left and a heat bar beside each line that ran; grey while the
+    /// text has uncommitted edits.
+    fn render_profile(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let Some(profile) = crate::fs_profile::result(&self.doc, cx) else { return Vec::new() };
+        let stale = self.uncommitted(cx);
+        let grey: Hsla = rgb(0xd0d0d0).into();
+        let editor = self.editor.read(cx);
+        let line_h = editor.line_height().unwrap_or(px(16.));
+        let scroll = editor.scroll_offset();
+        let mut out = Vec::new();
+        if let Some(lines) = profile.lines.get(&self.tab) {
+            for (line, t) in lines {
+                let top = line_h * (*line as f32 - 1.0) + scroll.y;
+                if top < px(-16.) || top > px(4000.) {
+                    continue;
+                }
+                let ms = t.as_secs_f64() * 1000.0;
+                let bg = if stale { grey } else { crate::fs_profile::heat(ms) };
+                let label = crate::fs_profile::label(*t);
+                out.push(
+                    div()
+                        .id(SharedString::from(format!("fs-prof-{line}")))
+                        .absolute()
+                        .top(top)
+                        .left_0()
+                        .w(px(16.))
+                        .h(px(16.))
+                        .group("fs-prof-line")
+                        .child(
+                            div()
+                                .h_full()
+                                .w(px(8.))
+                                .bg(bg)
+                                .overflow_hidden()
+                                .group_hover("fs-prof-line", |d| d.w(px(40.)))
+                                .child(div().invisible().group_hover("fs-prof-line", |d| d.visible()).px(px(2.)).text_size(px(11.2)).font_weight(FontWeight::BOLD).text_color(rgb(0x333333)).whitespace_nowrap().child(label)),
+                        )
+                        .into_any_element(),
+                );
+            }
+        }
+        // The badge: stopwatch + total; hover adds the sentence.
+        let total = crate::fs_profile::label(profile.total);
+        let long = format!("{total} to fully regenerate {}", profile.studio_name);
+        let bg = if stale { grey } else { crate::fs_profile::badge_heat(profile.total) };
+        out.push(
+            div()
+                .id("fs-prof-badge")
+                .absolute()
+                .top(px(2.))
+                .left(px(2.))
+                .group("fs-prof-badge")
+                .child(
+                    v_flex()
+                        .min_w(px(53.))
+                        .bg(bg)
+                        .rounded(px(3.))
+                        .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.25), offset: point(px(0.), px(1.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }])
+                        .child(
+                            h_flex()
+                                .h(px(20.))
+                                .px(px(4.))
+                                .gap(px(4.))
+                                .child(crate::assets::icon("regen-timer", 14., cx))
+                                .child(div().text_size(px(12.)).text_color(rgb(0x333333)).child(total.clone()))
+                                .child(div().hidden().group_hover("fs-prof-badge", |d| d.block()).text_size(px(12.)).text_color(rgb(0x333333)).whitespace_nowrap().child(long.trim_start_matches(&total).to_string())),
+                        )
+                        .child(div().hidden().group_hover("fs-prof-badge", |d| d.block()).px(px(6.)).pb(px(4.)).text_size(px(12.)).text_color(rgb(0x666666)).child("Longest execution steps in this Feature Studio:")),
+                )
+                .into_any_element(),
+        );
+        out
+    }
+
     /// Viewing a version (live std at 3095.0, dom/fs-nav-shortcuts.txt): the
     /// toolbar row holds only the view-only bar, "Versions are view only.
     /// Viewing 3095.0." and [Return to Main] (Part Studio's bar, without its
@@ -614,6 +689,7 @@ impl FeatureStudioView {
             });
             let _ = doc.custom_features();
         });
+        crate::fs_profile::committed(&self.doc, cx);
         cx.notify();
     }
 
@@ -768,7 +844,7 @@ impl FeatureStudioView {
 
     fn toggle_outline(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.outline.take().is_none() {
-            let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search symbols..."));
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search symbols..."));
             st.update(cx, |s, cx| s.focus(window, cx));
             self.outline = Some(st);
         }
@@ -935,7 +1011,11 @@ impl FeatureStudioView {
                     let doc = v.read(cx).doc.clone();
                     crate::fs_notices::set_monitored(&doc, id, cx);
                 }));
-                m = m.item(crate::os_menu::OsMenuItem::new(format!("Profile {name}")).icon_name("regen-timer").disabled(true));
+                let v = view.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new(format!("Profile {name}")).icon_name("regen-timer").on_click(move |_, _, cx| {
+                    let doc = v.read(cx).doc.clone();
+                    crate::fs_profile::start(&doc, id, cx);
+                }));
             }
             m
         });
@@ -1350,7 +1430,12 @@ impl FeatureStudioView {
         // Right side: Monitor ▾, Module outline ▾, back / forward, Line, Column.
         let d = &self.doc.read(cx).session.doc;
         let monitored = crate::fs_notices::monitored(&self.doc, cx);
-        let monitor_name = monitored.and_then(|t| d.tab(t)).map(|t| format!("Monitor {}", t.name)).unwrap_or_else(|| "Monitor".into());
+        // Live: "Profiling <studio>" while profiling (a click stops it).
+        let profiling = crate::fs_profile::profiling(&self.doc, cx);
+        let monitor_name = match profiling.and_then(|t| d.tab(t)) {
+            Some(t) => format!("Profiling {}", t.name),
+            None => monitored.and_then(|t| d.tab(t)).map(|t| format!("Monitor {}", t.name)).unwrap_or_else(|| "Monitor".into()),
+        };
         let pos = self.editor.read(cx).cursor_position();
         let symbols = outline_of(self.editor.read(cx));
         let current = symbols.iter().rev().find(|s| s.line <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
@@ -1381,8 +1466,13 @@ impl FeatureStudioView {
                     .child(div().min_w_0().pr(px(4.)).truncate().text_size(px(14.)).text_color(pal.text).child(monitor_name))
                     .child(div().w(px(14.)).flex_none().h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
                     .child(probe(&mon_anchor))
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                         let b = ma.get();
+                        // The caret cell opens the menu; the button stops profiling.
+                        if crate::fs_profile::profiling(&this.doc, cx).is_some() && e.position().x < b.right() - px(16.) {
+                            crate::fs_profile::stop(&this.doc, cx);
+                            return;
+                        }
                         this.open_monitor(point(b.left(), b.bottom() + px(2.)), window, cx);
                     })),
             )
@@ -1478,6 +1568,7 @@ impl Render for FeatureStudioView {
                         // padding (its size's), clipped off here.
                         div().absolute().top(px(-8.)).left_0().right_0().bottom_0().child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full().text_size(px(13.)).line_height(px(16.))),
                     )
+                    .children(self.render_profile(cx))
                     // The diagnostic tooltip follows the pointer (re-render only
                     // while one shows or just hid).
                     .on_mouse_move(cx.listener(|this, e: &MouseMoveEvent, _, cx| {
@@ -1606,6 +1697,29 @@ fn lex(src: &str) -> Vec<(Range<usize>, Tok)> {
         } else {
             // Advance by one UTF-8 character.
             i += src[i..].chars().next().map(|ch| ch.len_utf8()).unwrap_or(1);
+        }
+    }
+    out
+}
+
+/// The editor's colours for each line of `src` (line-relative byte ranges;
+/// only the styled runs). Used by the Feature Studio compare
+/// (compare_mode.rs), so block comments keep their colour across lines.
+pub(crate) fn line_styles(src: &str) -> Vec<Vec<(Range<usize>, HighlightStyle)>> {
+    let mut starts = vec![0];
+    starts.extend(src.match_indices('\n').map(|(i, _)| i + 1));
+    let mut out: Vec<Vec<(Range<usize>, HighlightStyle)>> = vec![Vec::new(); starts.len()];
+    for (r, t) in lex(src) {
+        let first = starts.partition_point(|s| *s <= r.start) - 1;
+        for (l, line) in out.iter_mut().enumerate().skip(first) {
+            let (s, e) = (starts[l], starts.get(l + 1).map_or(src.len(), |n| n - 1));
+            if s >= r.end {
+                break;
+            }
+            let (a, b) = (r.start.max(s), r.end.min(e));
+            if b > a {
+                line.push((a - s..b - s, tok_style(t)));
+            }
         }
     }
     out

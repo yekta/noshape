@@ -16,6 +16,9 @@ pub struct ViewClipboard {
     /// Marker so other clipboard JSON is not taken for views.
     pub noshape_drawing_views: u32,
     pub sheet: Sheet,
+    /// The point pasted at the cursor (None: the middle of the positions).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<[f64; 2]>,
 }
 
 impl ViewClipboard {
@@ -31,6 +34,9 @@ impl ViewClipboard {
 
     /// Center of the copied views' (else entities') positions (sheet mm).
     fn center(&self) -> [f64; 2] {
+        if let Some(a) = self.anchor {
+            return a;
+        }
         let pts: Vec<[f64; 2]> = if self.sheet.views.is_empty() {
             self.sheet.annotations.iter().map(|a| a.position).chain(self.sheet.tables.iter().map(|t| t.position)).collect()
         } else {
@@ -81,16 +87,16 @@ impl Drawing {
         if annotations.is_empty() && tables.is_empty() {
             return Err("Nothing to copy".into());
         }
-        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: Sheet { views: vec![], annotations, tables, ..src.clone() } })
+        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: Sheet { views: vec![], annotations, tables, ..src.clone() }, anchor: None })
     }
 
     /// Copy views `ids` of sheet `sheet` (with their derived views and attached
     /// annotations and tables).
     pub fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
-        let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0 };
+        let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0, continuation: None, drawn_by: self.drawn_by.clone() };
         tmp.move_views_to_sheet(0, ids, 1, sources)?;
-        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: tmp.sheets.swap_remove(1) })
+        Ok(ViewClipboard { noshape_drawing_views: 1, sheet: tmp.sheets.swap_remove(1), anchor: None })
     }
 }
 

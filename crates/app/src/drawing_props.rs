@@ -89,6 +89,13 @@ pub fn view_clipboard(cx: &App) -> Option<clipboard::ViewClipboard> {
     cx.read_from_clipboard().and_then(|c| c.text()).and_then(|t| clipboard::ViewClipboard::from_json(&t))
 }
 
+/// Paste, in the drawing's menus when the clipboard holds drawing content
+/// (live: u-906, u-944, 1074, 1108 have it; drawing/290, with nothing
+/// copied, doesn't).
+pub fn paste_entry(cx: &App) -> Option<MenuEntry> {
+    view_clipboard(cx).map(|_| MenuEntry::item("Paste", |t, _, cx| t.paste_views(cx)))
+}
+
 /// A View properties dropdown choice.
 type PropsAct = std::rc::Rc<dyn Fn(&mut ViewProps)>;
 
@@ -249,6 +256,8 @@ impl DrawingEditor {
             }
         }
         if v.crop.is_some() {
+            // Help Drawing › Crop view: Edit crop reopens the dialog.
+            out.push(MenuEntry::item("Edit crop", move |t, _, cx| t.edit_crop(id, cx)));
             out.push(MenuEntry::item("Remove crop", move |t, _, cx| t.edit_view("Remove crop", id, cx, |v| v.crop = None)));
         }
         if !v.broken_out.is_empty() {
@@ -324,6 +333,8 @@ impl DrawingEditor {
                 .disabled(un && rotated),
             );
         }
+        // Live drawing/1108, u-944: Paste (with something to paste), Copy.
+        out.extend(paste_entry(cx));
         out.push(MenuEntry::item("Copy", move |t, _, cx| t.copy_views(Some(id), cx)));
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
             t.start_paste_table(cx);
@@ -379,8 +390,11 @@ impl DrawingEditor {
         let Some(clip) = view_clipboard(cx) else { return };
         let at = self.cursor;
         let mut ids = Vec::new();
+        let first = self.current_sheet().next_annotation_id();
         self.edit_sheet("Paste views", cx, |s| ids = s.paste_views(&clip, Some(at)));
-        self.selection = ids.into_iter().map(Sel::View).collect();
+        // The pasted views and annotations come out selected (live u-948).
+        let anns: Vec<u64> = self.current_sheet().annotations.iter().map(|a| a.id).filter(|id| *id >= first).collect();
+        self.selection = ids.into_iter().map(Sel::View).chain(anns.into_iter().map(Sel::Annotation)).collect();
         self.redraw(cx);
     }
 
@@ -478,7 +492,7 @@ impl DrawingEditor {
             ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } | ViewKind::Detail { label, .. } => label.clone(),
             _ => v.label.clone().unwrap_or_default(),
         };
-        let input = |text: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let input = |text: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
         self.view_props = Some(ViewProps {
             view: id,
             orientation: match &v.kind {

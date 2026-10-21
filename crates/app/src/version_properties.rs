@@ -78,7 +78,10 @@ pub fn open(doc: Entity<DocModel>, item: Item, window: &mut Window, cx: &mut App
     }
     // The header's -8 px margin takes up the kit's gap under the title (the
     // body clips, so a negative top margin there would hide the tree's top).
-    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).title(modal_header("Properties", props_size().0).mb(px(-8.))).child(form.clone())));
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).title(modal_header("Properties", props_size().0).mb(px(-8.))).child(form.clone()))
+        // Enter in a field must not close the modal and drop the edit (qa4 R6
+        // #9; Onshape keeps Enter as a field commit): only Apply / Save save.
+        .on_ok(|_, _, _| false));
 }
 
 fn tab_kind(c: &TabContent) -> (String, &'static str) {

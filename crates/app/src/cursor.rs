@@ -64,13 +64,13 @@ impl AppCursor {
 }
 
 /// The black arrow (mac / Linux art), tip at 3,3.4, white outline.
-const MAC_ARROW: &str = r##"<path d="M3 3.4 L3 15.4 L6 12.4 L8.5 17.4 C8.8 17.6 9.3 17.6 9.6 17.3 C9.9 17.1 10.1 16.7 10 16.4 L7.5 11.4 L11 11.4 Z" fill="#000" stroke="#fff" stroke-width="2" stroke-linejoin="round" paint-order="stroke"/>"##;
-/// The white arrow (Windows art), tip at 1,2, dark outline.
-const WIN_ARROW: &str = r##"<path d="M1.5 2.2 L1.5 17.5 L5.2 13.9 L8 20 L10.6 18.9 L7.9 12.9 L13 12.9 Z" fill="#fff" stroke="#2b2b2b" stroke-width="1.1" stroke-linejoin="round"/>"##;
+const MAC_ARROW: &str = r##"<path d="M3 3.4 L3 15.4 L6 12.4 L8.5 17.4 C8.8 17.6 9.3 17.6 9.6 17.3 C9.9 17.1 10.1 16.7 10 16.4 L7.5 11.4 L11 11.4 Z" fill="#000" stroke="#fff" stroke-width="2" stroke-linejoin="miter" paint-order="stroke"/>"##;
+/// The white arrow (Windows art), tip at 1.5,1.8, thin navy outline.
+const WIN_ARROW: &str = r##"<path d="M1.5 1.8 L1.5 17.3 L5.6 14.2 L7.9 19.1 L10.1 18.2 L8.3 13.3 L12.6 13.25 Z" fill="#fff" stroke="#191d2f" stroke-width="1" stroke-linejoin="miter"/>"##;
 
 /// Outlined glyphs of `text` (bold Liberation Sans) as an SVG path whose ink
-/// is `height` tall, horizontally centered on `cx`, baseline at `base`.
-fn text_path(text: &str, cx: f64, base: f64, height: f64) -> String {
+/// is `height` tall, its left edge at `x0`, baseline at `base`.
+fn text_path(text: &str, x0: f64, base: f64, height: f64) -> String {
     let layout = noshape_sketch::text::layout_text(text, noshape_sketch::text::DEFAULT_FONT, true, false);
     let polys = layout.polylines(6);
     let (mut lo, mut hi) = (glam::DVec2::splat(f64::MAX), glam::DVec2::splat(f64::MIN));
@@ -79,7 +79,6 @@ fn text_path(text: &str, cx: f64, base: f64, height: f64) -> String {
         hi = hi.max(*p);
     }
     let k = height / (hi.y - lo.y).max(1e-6);
-    let x0 = cx - (hi.x - lo.x) * k * 0.5;
     let mut d = String::new();
     for poly in &polys {
         for (i, p) in poly.iter().enumerate() {
@@ -99,11 +98,14 @@ struct Art {
     hot: (f32, f32),
 }
 
-fn wrap(side: f32, body: &str) -> String {
+/// The SVG of an image cursor: `arrow` and `body` with Onshape's drop
+/// shadow. The Windows arrow casts its own softer one.
+fn wrap(side: f32, arrow: &str, body: &str, windows: bool) -> String {
+    let (soft, sharp) = if windows { (arrow, "") } else { ("", arrow) };
     format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="{side}" height="{side}" viewBox="0 0 {side} {side}">
-<defs><filter id="s" x="-20%" y="-20%" width="160%" height="160%"><feDropShadow dx="0" dy="1" stdDeviation="0.7" flood-color="#000" flood-opacity="0.35"/></filter></defs>
-<g filter="url(#s)">{body}</g>
+<defs><filter id="s" x="-20%" y="-20%" width="160%" height="160%"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000" flood-opacity="0.8"/></filter><filter id="w" x="-20%" y="-20%" width="160%" height="160%"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.4"/></filter></defs>
+<g filter="url(#w)">{soft}</g><g filter="url(#s)">{sharp}{body}</g>
 </svg>"##
     )
 }
@@ -112,15 +114,20 @@ fn wrap(side: f32, body: &str) -> String {
 fn art(cursor: AppCursor, windows: bool) -> Option<Art> {
     let arrow = if windows { WIN_ARROW } else { MAC_ARROW };
     let hot = if windows { (1., 2.) } else { (3., 3.) };
+    // Onshape's Windows files are 38 px; their art beside the arrow sits 1 px
+    // right and down of the mac one (the count label 3 right, 5 up).
+    let side = |mac: f32| -> (f32, (i32, i32)) { if windows { (38., (1, 1)) } else { (mac, (0, 0)) } };
+    let place = |side: f32, shift: (i32, i32), body: String| wrap(side, arrow, &format!(r##"<g transform="translate({} {})">{body}</g>"##, shift.0, shift.1), windows);
     // A label in black with a white outline at the arrow's lower right.
-    let label = |text: &str, cx: f64, height: f64| {
-        let d = text_path(text, cx, 24.5, height);
-        format!(r##"<path d="{d}" fill="#000" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" paint-order="stroke"/>"##)
+    let label = |text: &str| {
+        let d = text_path(text, 15.0, 24.5, 9.5);
+        format!(r##"<path d="{d}" fill="#000" stroke="#fff" stroke-width="2.4" stroke-linejoin="miter" paint-order="stroke"/>"##)
     };
     Some(match cursor {
         AppCursor::Count(n) => {
-            let body = if n >= 6 { label("5+", 21.0, 9.5) } else { label(&n.to_string(), 18.0, 9.5) };
-            Art { svg: wrap(32., &format!("{arrow}{body}")), side: 32., hot }
+            let body = if n >= 6 { format!(r##"{}<path d="M22.4 19.75h6.8v1h-6.8zM25.3 16.85h1v6.8h-1z" fill="#000" stroke="#fff" stroke-width="2.4" paint-order="stroke"/>"##, label("5")) } else { label(&n.to_string()) };
+            let (side, _) = side(32.);
+            Art { svg: place(side, if windows { (3, -5) } else { (0, 0) }, body), side, hot }
         }
         // A 15 px plus: 1 px black lines on 3 px white, white 1 px caps at
         // the ends (hot 7.5,7.5). The drawing tools' crosshair is the same.
@@ -136,29 +143,25 @@ fn art(cursor: AppCursor, windows: bool) -> Option<Art> {
             side: 15.,
             hot: (7., 7.),
         },
-        // Arrow and a mouse whose left button is green with a white check
-        // ("click to accept"), hot 1,1.
+        // The arrow beside a 19x31 mouse whose left button is green with a
+        // white check ("click to accept"), hot 1,1.
         AppCursor::Confirmation => {
-            // Onshape's is 36x37: an 18 px arrow beside a 19x32 mouse.
-            let mouse = r##"<rect x="14.5" y="2.5" width="19" height="31.5" rx="9.5" fill="#fff" stroke="#000" stroke-width="1.3"/><path d="M24 2.5 A9.5 9.5 0 0 0 14.5 12 V15.5 H24 Z" fill="#0a8a2a" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/><path d="M16.6 9.2 L19 11.7 L22.3 7" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="23.1" y="7" width="1.8" height="6.5" rx="0.9" fill="#fff" stroke="#000" stroke-width="0.8"/><path d="M14.5 15.5 H33.5" stroke="#000" stroke-width="1"/>"##;
-            let arrow = if windows { WIN_ARROW } else { MAC_ARROW };
-            // The arrow scaled to 18 px with its tip on the hot spot.
-            let tip = if windows { (1.5, 2.2) } else { (3.0, 3.4) };
-            Art { svg: wrap(37., &format!(r##"<g transform="translate(1 1) scale(1.3) translate({} {})">{arrow}</g>{mouse}"##, -tip.0, -tip.1)), side: 37., hot: (1., 1.) }
+            let mouse = r##"<path d="M14.6 11 C14.6 6 18.8 2.5 23.8 2.5 C28.8 2.5 33 6 33 11 L32.6 28.5 C32.5 31.5 30.5 33.25 27.5 33.25 H20 C17 33.25 15.1 31.5 15 28.5 Z" fill="#fff" stroke="#000" stroke-width="1"/><path d="M24 2 V15.4 H14.1 V11 C14.1 5.7 18.5 2 24 2 Z" fill="#009400"/><path d="M15.6 8.4 L18.7 11.5 L22.7 6.6" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M25 15.5 H32.8" stroke="#3c3c3c" stroke-width="0.75"/><rect x="23" y="11.9" width="1.9" height="7.2" rx="0.95" fill="#fff" stroke="#000" stroke-width="0.8"/>"##;
+            let (side, shift) = side(37.);
+            Art { svg: place(side, shift, mouse.into()), side, hot: (1., 1.) }
         }
-        // Arrow and a minus sign.
+        // The arrow and a minus sign.
         AppCursor::RemoveSelection => {
-            let minus = r##"<rect x="14.5" y="19" width="9" height="2.6" fill="#000" stroke="#fff" stroke-width="2" paint-order="stroke"/>"##;
-            Art { svg: wrap(32., &format!("{arrow}{minus}")), side: 32., hot }
+            let minus = r##"<rect x="16" y="18" width="8" height="1.5" fill="#000" stroke="#fff" stroke-width="2" paint-order="stroke"/>"##;
+            let (side, shift) = side(32.);
+            Art { svg: place(side, shift, minus.into()), side, hot }
         }
-        // Arrow and a mate connector: two disc caps joined by a stem, hot 7.5.
+        // The arrow and a mate connector: a disc on a neck, a stem, and a cup
+        // with a socket and a pin (hot 7.5,7.5).
         AppCursor::SnapMate => {
-            let cap = |y: f64, flip: bool| {
-                let (top, rim) = if flip { (y + 6.0, y) } else { (y, y + 6.0) };
-                format!(r##"<ellipse cx="22" cy="{top}" rx="6.5" ry="2.6" fill="#fff" stroke="#000" stroke-width="1.3"/><path d="M15.5 {top} V{rim} M28.5 {top} V{rim}" stroke="#000" stroke-width="1.3"/><path d="M15.5 {rim} A6.5 2.6 0 0 0 28.5 {rim}" fill="#fff" stroke="#000" stroke-width="1.3"/>"##)
-            };
-            let body = format!(r##"<path d="M22 12 V22" stroke="#000" stroke-width="1.6"/>{}{}"##, cap(4.0, false), cap(22.0, true));
-            Art { svg: wrap(32., &format!(r##"<g transform="translate(4.5 4.1)">{arrow}</g>{body}"##)), side: 32., hot: (7.5, 7.5) }
+            let body = r##"<g fill="#fff" stroke="#000" stroke-width="1.1"><path d="M16.5 5 V9.3 A7 2 0 0 0 30.5 9.3 V5"/><ellipse cx="23.5" cy="5" rx="7" ry="3.5"/><path d="M20.5 10.6 V13 Q20.5 14.5 22 14.5 H24.5 Q26 14.5 26 13 V10.6"/><path d="M23.5 14.5 V18.5" stroke-width="1"/><path d="M16.5 20.8 V27.5 A7 4 0 0 0 30.5 27.5 V20.8 A7 2.3 0 0 0 16.5 20.8 Z"/><path d="M16.9 21.7 A7 2.3 0 0 0 20.5 22.9 V27.2 H26 V22.9 A7 2.3 0 0 0 30.1 21.7" fill="none"/><rect x="23" y="21" width="1" height="3" fill="#000" stroke="none"/></g>"##;
+            let (side, shift) = side(35.);
+            Art { svg: place(side, shift, body.into()), side, hot: (7.5, 7.5) }
         }
         _ => return None,
     })
@@ -168,12 +171,14 @@ fn art(cursor: AppCursor, windows: bool) -> Option<Art> {
 /// draws its own there too): 4-way move arrows, a magnifier with "+".
 fn standard_art(cursor: AppCursor) -> Option<Art> {
     let svg = match cursor {
-        AppCursor::Move => r##"<path d="M12 1.5 L15.5 5.5 H13.3 V10.7 H18.5 V8.5 L22.5 12 L18.5 15.5 V13.3 H13.3 V18.5 H15.5 L12 22.5 L8.5 18.5 H10.7 V13.3 H5.5 V15.5 L1.5 12 L5.5 8.5 V10.7 H10.7 V5.5 H8.5 Z" fill="#000" stroke="#fff" stroke-width="1.4" stroke-linejoin="round" paint-order="stroke"/>"##.to_string(),
+        // The same art as GPUI's `CursorStyle::Move` on macOS
+        // (vendor/gpui-pre-macos/src/cursors/src/move.svg).
+        AppCursor::Move => r##"<path d="M11.05 6 L8.3 6 L12 1.8 L15.7 6 L12.95 6 L12.95 11.05 L18 11.05 L18 8.3 L22.2 12 L18 15.7 L18 12.95 L12.95 12.95 L12.95 18 L15.7 18 L12 22.2 L8.3 18 L11.05 18 L11.05 12.95 L6 12.95 L6 15.7 L1.8 12 L6 8.3 L6 11.05 L11.05 11.05 Z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M11.05 6 L8.3 6 L12 1.8 L15.7 6 L12.95 6 L12.95 11.05 L18 11.05 L18 8.3 L22.2 12 L18 15.7 L18 12.95 L12.95 12.95 L12.95 18 L15.7 18 L12 22.2 L8.3 18 L11.05 18 L11.05 12.95 L6 12.95 L6 15.7 L1.8 12 L6 8.3 L6 11.05 L11.05 11.05 Z" fill="#000"/>"##.to_string(),
         AppCursor::ZoomIn => r##"<circle cx="9.5" cy="9.5" r="6.5" fill="#fff" stroke="#000" stroke-width="2"/><path d="M14.3 14.3 L21 21" stroke="#000" stroke-width="3.4" stroke-linecap="round"/><path d="M6.5 9.5 H12.5 M9.5 6.5 V12.5" stroke="#000" stroke-width="1.8"/>"##.to_string(),
         _ => return None,
     };
     let hot = if cursor == AppCursor::ZoomIn { (9.5, 9.5) } else { (12., 12.) };
-    Some(Art { svg: wrap(24., &svg), side: 24., hot })
+    Some(Art { svg: wrap(24., "", &svg, false), side: 24., hot })
 }
 
 /// The cursor image: straight-alpha BGRA rows, its side and hot spot in
@@ -198,6 +203,68 @@ fn render(art: Art, scale: f32, cx: &App) -> Option<CursorImage> {
 /// The image of `cursor` (custom art, or our drawing of a standard one).
 pub(crate) fn image(cursor: AppCursor, windows: bool, scale: f32, cx: &App) -> Option<CursorImage> {
     render(art(cursor, windows).or_else(|| standard_art(cursor))?, scale, cx)
+}
+
+/// A file-name stem for `cursor` ("count-3", "snap-mate").
+fn stem(cursor: AppCursor) -> String {
+    match cursor {
+        AppCursor::Count(n) => format!("count-{n}"),
+        AppCursor::Crosshair => "crosshair".into(),
+        AppCursor::CrosshairBox => "crosshair-box".into(),
+        AppCursor::Confirmation => "confirmation".into(),
+        AppCursor::RemoveSelection => "remove-selection".into(),
+        AppCursor::SnapMate => "snap-mate".into(),
+        AppCursor::Move => "move".into(),
+        AppCursor::ZoomIn => "zoom-in".into(),
+        AppCursor::NoDrop => "no-drop".into(),
+    }
+}
+
+/// `img` as a Windows .cur file: one 32-bpp image (straight alpha, bottom-up
+/// rows, an empty AND mask) with its hot spot.
+fn cur_file(img: &CursorImage) -> Vec<u8> {
+    let side = img.side;
+    let mask_row = side.div_ceil(32) * 4;
+    let bmp_len = 40 + side * side * 4 + mask_row * side;
+    let mut out = Vec::with_capacity(22 + bmp_len as usize);
+    out.extend_from_slice(&[0, 0, 2, 0, 1, 0]);
+    // 256 is written as 0.
+    out.extend_from_slice(&[(side % 256) as u8, (side % 256) as u8, 0, 0]);
+    out.extend_from_slice(&(img.hot.0 as u16).to_le_bytes());
+    out.extend_from_slice(&(img.hot.1 as u16).to_le_bytes());
+    out.extend_from_slice(&bmp_len.to_le_bytes());
+    out.extend_from_slice(&22u32.to_le_bytes());
+    for v in [40u32, side, side * 2] {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&32u16.to_le_bytes());
+    out.extend_from_slice(&[0; 24]);
+    for row in (0..side as usize).rev() {
+        let w = side as usize * 4;
+        out.extend_from_slice(&img.bgra[row * w..(row + 1) * w]);
+    }
+    out.resize(out.len() + (mask_row * side) as usize, 0);
+    out
+}
+
+/// Writes every image cursor of `cursors` into `dir` as Windows .cur files,
+/// `<name>-<win|mac>-<1|2>x.cur`, so a real Windows machine can load and draw
+/// them (perf's smoke job, `NOSHAPE_CURSOR_DUMP`). Returns how many.
+pub fn dump(dir: &std::path::Path, cursors: &[AppCursor], cx: &App) -> std::io::Result<usize> {
+    std::fs::create_dir_all(dir)?;
+    let mut n = 0;
+    for &c in cursors {
+        for windows in [true, false] {
+            for scale in [1.0f32, 2.0] {
+                let Some(img) = image(c, windows, scale, cx) else { continue };
+                let name = format!("{}-{}-{}x.cur", stem(c), if windows { "win" } else { "mac" }, scale as u32);
+                std::fs::write(dir.join(name), cur_file(&img))?;
+                n += 1;
+            }
+        }
+    }
+    Ok(n)
 }
 
 /// Show `cursor` over `window` (`None`: GPUI's own cursor). Returns false

@@ -91,6 +91,17 @@ fn menu_icon(icon: Option<String>) -> Option<String> {
     icon.map(|i| i.replacen("weld-", "weld-menu-", 1))
 }
 
+/// The joint picker box's icon: Onshape shows the upright list icon on both
+/// sides (never the mirrored reference-line glyph); spot and seam use a
+/// smaller circle than their full-cell list icons.
+fn picker_icon(j: WeldJoint) -> Option<String> {
+    match j {
+        WeldJoint::Spot => Some("weld-picker-spot".into()),
+        WeldJoint::Seam => Some("weld-picker-seam".into()),
+        _ => menu_icon(joint_icon(j, false)),
+    }
+}
+
 fn spacer_icon(s: JointSpacer) -> Option<&'static str> {
     Some(match s {
         JointSpacer::None => return None,
@@ -106,7 +117,7 @@ fn spacer_icon(s: JointSpacer) -> Option<&'static str> {
 impl DrawingEditor {
     fn new_weld_dlg(&mut self, spec: WeldSpec, edit: Option<u64>, window: &mut Window, cx: &mut Context<Self>) -> WeldDlg {
         let vals = |s: &WeldSide| [s.size.clone(), s.depth.clone(), s.length.clone(), s.pitch.clone(), s.root.clone(), s.groove.clone()];
-        let inputs = vals(&spec.arrow).into_iter().chain(vals(&spec.other)).map(|v| cx.new(|cx| InputState::new(window, cx).default_value(v))).collect();
+        let inputs = vals(&spec.arrow).into_iter().chain(vals(&spec.other)).map(|v| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(v))).collect();
         let reference = cx.new(|cx| TextareaState::new(window, cx).rows(3).default_value(spec.reference.clone().unwrap_or_default()));
         WeldDlg { spec, edit, placed: false, target: None, inputs, reference }
     }
@@ -240,7 +251,9 @@ impl DrawingEditor {
             let ed = ed.clone();
             let btn = Button::new(id.clone()).ghost().xsmall().w(px(BOX)).h(px(30.)).dropdown_caret(true).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(3.));
             let btn = match icon {
-                Some(i) => btn.child(crate::ui::glyph(&i, 20., ink)),
+                // Live (icons2, weld-joint-*-raw): the icon 10 px from the box's
+                // left and the caret at +34 (10 px in from both sides).
+                Some(i) => btn.px(px(10.)).child(crate::ui::glyph(&i, 20., ink)),
                 None => btn.label(label),
             };
             btn.os_dropdown_menu(SharedString::from(format!("{id}-dd")), false, move |mut m, _, _| {
@@ -286,9 +299,9 @@ impl DrawingEditor {
                 .collect();
             let id = if other { "weld-joint-o" } else { "weld-joint-a" };
             let picker = if picker_on {
-                dropdown(id.into(), joint_icon(side.joint, !other), String::new(), joints).into_any_element()
+                dropdown(id.into(), picker_icon(side.joint), String::new(), joints).into_any_element()
             } else {
-                div().w(px(BOX)).h(px(30.)).flex().items_center().justify_center().children(joint_icon(joint, !other).map(|i| crate::ui::glyph(&i, 20., gpui_kit::rgb(0x999999)))).into_any_element()
+                div().w(px(BOX)).h(px(30.)).flex().items_center().justify_center().children(picker_icon(joint).map(|i| crate::ui::glyph(&i, 20., gpui_kit::rgb(0x999999)))).into_any_element()
             };
             if joint == WeldJoint::None {
                 return vec![h_flex().h(px(ROW)).pl(px(ROW_LEFT + 2. * (BOX + 2.))).child(picker).into_any_element()];

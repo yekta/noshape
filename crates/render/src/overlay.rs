@@ -30,7 +30,30 @@ pub type Contours = Arc<Vec<Vec<DVec3>>>;
 pub struct Overlay {
     /// Filled text or shapes lying in model planes, drawn first.
     pub world_fills: Vec<WorldFill>,
+    /// Boxes with text at projected points (value boxes, labels), drawn
+    /// after the fills, in order.
+    pub labels: Vec<Label>,
+    /// The frame's top-left corner in the window, logical px: GPUI rounds
+    /// positions in the window, so labels round from there.
+    pub window_origin: [f32; 2],
     pub view_cube: Option<ViewCube>,
+}
+
+/// A box with text at a model point, drawn as GPUI draws an absolutely
+/// positioned div at the point's projection plus `offset` (logical px):
+/// GPUI's layout rounds the box's corner to device pixels (half toward
+/// zero) and everything inside sits at fixed device offsets from it, so the
+/// shapes and text masks (rasterized by GPUI once, at those offsets) are
+/// given relative to the rounded corner and only the corner moves with the
+/// camera.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Label {
+    pub anchor: DVec3,
+    pub offset: [f32; 2],
+    /// Filled rectangles (x0, y0, x1, y1), device px from the corner.
+    pub rects: Vec<([f32; 4], Rgba)>,
+    /// Text masks: top-left in device px from the corner, color.
+    pub masks: Vec<(Mask, [i32; 2], Rgba)>,
 }
 
 /// Contours in world space, filled even-odd in one color (one GPUI path).
@@ -169,6 +192,21 @@ impl OverlayDraw {
         self.indices.extend(buf.indices.iter().map(|i| base + i));
     }
 
+    /// A filled axis-aligned rectangle in device px (a GPUI quad on whole
+    /// pixels).
+    fn rect(&mut self, r: [f32; 4], color: Rgba) {
+        if r[2] <= r[0] || r[3] <= r[1] {
+            return;
+        }
+        let base = self.vertices.len() as u32;
+        let premul = [color[0] * color[3], color[1] * color[3], color[2] * color[3], color[3]];
+        for (x, y) in [(r[0], r[1]), (r[2], r[1]), (r[2], r[3]), (r[0], r[3])] {
+            self.grow(x, y);
+            self.vertices.push(OverlayVertex { position: [x, y], color: premul, bounds: r });
+        }
+        self.indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+    }
+
     /// `gpui::PathBuilder::fill()` + `paint_path`: polygons (logical px) as
     /// one even-odd path.
     fn fill(&mut self, polys: &[Vec<DVec2>], color: Rgba, dpr: f32) {
@@ -208,7 +246,7 @@ impl OverlayDraw {
 impl Overlay {
     /// Whether there is nothing to draw.
     pub fn is_empty(&self) -> bool {
-        self.world_fills.is_empty() && self.view_cube.is_none()
+        self.world_fills.is_empty() && self.labels.is_empty() && self.view_cube.is_none()
     }
 
     /// The triangles and masks of one frame: `view_proj` is the frame's
@@ -228,6 +266,24 @@ impl Overlay {
             // the Part Studio's `in_plane_text`).
             let polys: Vec<Vec<DVec2>> = fill.contours.iter().filter_map(|c| c.iter().map(|p| project(*p)).collect::<Option<Vec<_>>>()).filter(|p| p.len() >= 3).collect();
             out.fill(&polys, fill.color, dpr);
+        }
+        for label in &self.labels {
+            let Some(at) = project(label.anchor) else { continue };
+            // In f32, as the owner computes the div's left and top; GPUI
+            // rounds the div's position in the window, the frame's corner
+            // is at the window origin rounded the same way.
+            let o = self.window_origin;
+            let round = |frame: f32, local: f32, off: f32| round_half_toward_zero((frame + local + off) * dpr) - round_half_toward_zero(frame * dpr);
+            let corner = [round(o[0], at.x as f32, label.offset[0]), round(o[1], at.y as f32, label.offset[1])];
+            for (r, color) in &label.rects {
+                out.rect([corner[0] + r[0], corner[1] + r[1], corner[0] + r[2], corner[1] + r[3]], *color);
+            }
+            for (mask, at, color) in &label.masks {
+                let top_left = [corner[0] as i32 + at[0], corner[1] as i32 + at[1]];
+                out.grow(top_left[0] as f32, top_left[1] as f32);
+                out.grow((top_left[0] + mask.width as i32) as f32, (top_left[1] + mask.height as i32) as f32);
+                out.masks.push((mask.clone(), top_left, *color));
+            }
         }
         if let Some(cube) = &self.view_cube {
             view_cube::build(cube, camera.rotation, dpr, &mut out);

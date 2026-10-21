@@ -909,6 +909,55 @@ new render flags into `DrawMode` rather than new arguments.
   - Dimension / Geometric tolerance / Weld symbol placement and Set coincident / parallel / text
     alignment (live psb 10-21 a pending); the other tolerance types' Characteristics text (psb 10-21 b).
 
+## From ui (21 Oct): the sketch dimension box and the shared input rules (lead: coordinate here)
+The lead asked us to agree on one behaviour for the dimension box (your fix of the user's bare "1" and Enter in
+the sketch). Split proposal; tell me here if you want it differently:
+- **Yours:** `commit_dimension` (what the stored expression becomes), the on-canvas label text, and the sketch's
+  Enter / Esc (accepting the sketch, what Enter does after a dimension commit). The live answer is "lead sketch
+  dim" in REQUESTS.md.
+- **Mine, already in the tree (please keep, or tell me):**
+  - **Shared rule `crate::quantity_field`** (spec in docs/handoff/input-behaviour.md, from the bundle and live).
+    - `commit_text(text, dim, prefs, scope)` adds the workspace unit on commit: `1` → `1 mm`, `.5` → `0.5 mm`,
+      `5mm` → `5 mm`, `1,5` → `1.5 mm` with comma decimals, `2 in` unchanged, angles `30` → `30 deg`.
+    - A unitless expression is wrapped: `2*5` → `(2*5) mm`. That's live's feature-dialog behaviour, from the
+      bundle.
+    - Please call it from `commit_dimension` with the dimension's `Dim` (`Dim::LENGTH` / `Dim::ANGLE`) rather
+      than a second formatter. If the live capture shows the sketch box formats differently (e.g. no
+      parentheses), change `commit_text` and its test, and note it here so the feature dialog follows too.
+    - **Confirmed by live** ("Sketch dimension display + Enter/Esc"): the reopened box is exactly
+      `commit_text`'s output. `1` → `1 mm`, `2*5` → `(2*5) mm`, `1 in` and `#var` are kept, and in an inch
+      workspace `1` → `1 in`. So `commit_text` needs no change for the sketch.
+    - `noshape_model::variable_table::with_workspace_unit` is the model-side twin. It handles bare numbers
+      only, and the two must agree.
+  - **↑ / ↓ / wheel in the box:** `step_dimension` plus the `.capture_key_down` / `.on_scroll_wheel` on the
+    `dim-box` element in part_studio/sketch.rs. Same steps as dialog fields: mm 1, Shift ×10, Ctrl ×0.1, wheel
+    only while focused. It applies live and keeps the box open; configured dimensions don't step.
+  - **The kit input** (vendor/gpui-base `InputState`, all single-line fields):
+    - focusing selects all;
+    - Esc after an edit reverts to the text at focus and moves the focus out of the field (a second Esc then
+      reaches the box / dialog);
+    - Esc with nothing edited passes on;
+    - Enter emits `PressEnter` (your `sync_dim_edit` subscription commits).
+
+    For the sketch, Esc with an edited box therefore only reverts the text. Whether live closes the box on that
+    first Esc is in the capture. If it does, handle it in the box (e.g. `.on_action` for Escape, or
+    `revert_on_escape(false)` on that one `InputState`) rather than in the kit.
+  - **Invalid state, for the dimension box (qa4 F7):**
+    - Use `crate::quantity_field::invalid_field(box, invalid)` on the box's `Stateful<Div>` (the one with the
+      bottom border). It draws live's pink `#f9ebec` fill, the 2 px `#bd3039` underline and the hover
+      "Enter a valid expression." (`INVALID_TIP`).
+    - The feature dialog's number fields use the same helper.
+    - The raw parser toast and the ✓ staying enabled are yours.
+
+## From ui (21 Oct): qa4 F23/F24, Workspace units while a sketch is open
+- Live ("qa4 F17/F24 placement checks" in behaviours.md): choosing ☰ › Workspace units… accepts the open sketch
+  at once. A line drawn just before is kept. The units panel then opens in the feature-dialog spot, and ✕ doesn't
+  bring the sketch back.
+- Done in `workspace.rs` `open_units_panel`: it calls the new `PartStudioView::accept_open_dialog` (your
+  `accept_edit`) before opening the panel.
+- With that, F23 (✓ in the units panel cancelling the sketch) has no sketch left to cancel. Check that your ✓ path
+  doesn't touch a sketch accepted this way.
+
 ## From ui (20 Oct): input hit area (lead's high-priority bug)
 - Cause: the kit's input frame (`gpui_base::InputBase`, used by `Input`) draws the border and
   padding, but only the inner text element (`InputBaseState`'s root) took presses and set the
@@ -1025,3 +1074,190 @@ nothing visual is guessed.
 **Order after GO:** (1) read "Pending state" in behaviours.md; (2) cancellation plus cache resume (with kern);
 (3) the pending struct and indicators; (4) ✓ / Esc semantics; (5) app verification with a 1000-instance pattern;
 (6) hand perf the scene-build profile.
+
+### kern → psb (10-21, pattern performance + your cancellation hook)
+- Your `RegenCancel` / `EvalCtx::cancelled()` checkpoints in `pattern.rs` (copy_bodies, pattern_faces, reapply) stay as
+  they are; I edited around them (instances are now *moved*, not copied; AABB pre-tests in `apply_tools` and
+  `auto_scope`; pattern booleans use `EvalCtx::many_tools_options()` = checked GlueShift + OBB + parallel through
+  `boolean_into_with`; UnifySameDomain is skipped in the kernel when nothing could merge).
+- After this work the long part of a 1000-instance pattern is **one kernel boolean** (seconds), which instance
+  checkpoints can't interrupt. I'll add a kernel hook for it: `k::BooleanOptions.cancel` (an `Arc<AtomicBool>` read
+  by an OCCT `Message_ProgressIndicator::UserBreak`), so `boolean_into_with` can pass `ev.cancel`'s flag and an
+  aborted run stops inside the boolean within ~100 ms. Tell me (here) if you'd rather have a different shape;
+  until then I won't touch `regen/mod.rs`.
+- Perf test: `crates/model/tests/pattern_perf.rs` (Feature on top / through, Part; ×200 vs ×1000 must stay linear).
+- kern (10-21 04:29): `RegenResult.cancelled` broke `assembly/eval.rs:1000,1065` (initializers without it); I added
+  `cancelled: false` there to keep the tree compiling.
+
+### Pass 14 (21 Oct, after v0.4.3 GO): pending state, done so far
+Implemented from live's "Pending state" (behaviours.md):
+- **Model** (`regen/mod.rs`, `regen/eval.rs`; for kern):
+  - `RegenOptions.cancel: Option<RegenCancel>`; `RegenResult.cancelled`.
+  - `RegenCancel::abort` stops at the next feature, or the next pattern instance through `EvalCtx::cancelled()`.
+    Checks are in `pattern.rs`: `copy_bodies`, `pattern_faces` and the `reapply_features` instance loop. A half-done
+    feature isn't cached.
+  - `supersede` lets the run finish its features (cached) but skips `display::build`.
+  - The kernel boolean in `apply_tools` can't be interrupted. That's kern's speed work: one compound boolean instead
+    of per-instance ones would also make the cancel latency small.
+  - Test: `engine.rs::cancelled_regeneration_is_discarded_and_superseded_one_is_reused`.
+- **App** (`part_studio/pending.rs`, `schedule_regen`):
+  - `InFlight` remembers what the running regeneration computes. A newer request **aborts** it when it changes any
+    feature up to its `upto` (or the configuration / variables / edited sketch). It only **supersedes** it when the
+    newer request extends it, e.g. ✓ after the preview: the same features up to the edited one, with the rest of the
+    list after. The expensive feature then isn't computed twice.
+  - `Pending { seq, since, opening }` is set when a regeneration starts. It keeps its start time across follow-up
+    requests and ends when the final result (after the refine pass) is shown.
+  - The working overlay appears after 1.2 s: Onshape's spinner (`Spinner`, its own view so its animation frames
+    don't re-render the Part Studio) at the bottom centre of the graphics. Its 41 px box ends 85 px above the bottom.
+    While an edit dialog opens on a slow model, "Opening <feature>…" sits under it.
+  - Nothing else changes while pending, as live: no dialog spinner, the feature list unchanged, the old result shown
+    as it is, the cursor unchanged.
+  - ✓ commits and closes at once (as before). Esc doesn't cancel the final regeneration (as live: there is no
+    cancel).
+  - Not built:
+    - The dialog's brief ✓ disable (22–47 ms while Onshape sends the edit to its server). We have no round trip.
+    - The small spinner in a dialog that is loading. Ours open instantly.
+- **Verified in the app (21 Oct)** with a Part pattern of the demo's Part 1, 1000 instances, typing the count and then
+  Tab:
+  - the old preview stays exactly as it was;
+  - the spinner shows at the bottom centre after 1.2 s;
+  - the new result replaces the old in one go;
+  - ✓ 0.4 s after Tab closes the dialog at once ("Features (8)"); the old result stays with the spinner until the
+    final one is in;
+  - Esc doesn't cancel it.
+  - Tessellation now also stops when aborted (`display::build` checks the token per body). Meshes made so far stay
+    in the shape-hash cache, so no work is lost.
+- **For kern and perf: profile of that 1000-instance pattern** (NOSHAPE_PERF=1, this llvmpipe machine):
+  - Linear pattern eval: **0.78 s**.
+  - `display::build` tessellation: **12.1 s** for the preview meshes, then **11.5 s** for the refine pass. That's
+    1000 × ~12 ms, each copy tessellated from scratch, 2.79 M triangles.
+  - Frames then take 100–150 ms to present.
+  - Biggest win (perf / kern): a pattern copy is a rigid transform of its seed body, so it could reuse the seed's
+    mesh with a per-instance transform (instanced drawing) instead of re-tessellating its transformed shape (a
+    different hash, so a cache miss today).
+  - The fine pass doubles the cost for patterns. It could start from the seed's fine mesh too.
+
+### Pass 14: tolerance and Characteristics fixes (live psb 10-21 b/c)
+- `annotations::Characteristic::cells(factor, decimals, standard)` → [nominal, tolerance, upper, lower], exactly as
+  live's table:
+  - Deviation and Limits read "+0.200/-0.100" (Limits values are deviations too);
+  - Min "MIN | -- | n"; Max "MAX | n | --"; Basic "-- | -- | --";
+  - the precision applies to the row's four numbers;
+  - rolled-back features read Nominal 0.000 on pink (the panel uses `effective_studio`, so a feature after the one
+    being edited is rolled back).
+- **Default rows** take the applied standard (`default_tolerance`):
+  - ISO 2768 linear table by nominal for Distance; the radii table for "Fillet radius" (new Type name for a Fillet's
+    radius);
+  - the Precision type: ±0.127 / ±0.25 / ±0.0127 mm by the row's precision, angles ±1°.
+  - Angles use the 10–50 mm band, the only one that matches live's single data point (ISO 2768-c 90° → ±1°). Asked
+    in psb 10-21 d. Also asked: which Types box keeps Fillet radius (Fillet for now), and the Diameter / Chamfer rows.
+- **Picker:**
+  - the grade list is in live's order c, f, m, v;
+  - Type ▾ offers ISO 2768-1 and "Precision (.xxx default)"; with Precision, a stacked "Default tolerances" label over
+    the Type select and no grade;
+  - a changed select applies at once (live); ✕ and Select keep the standard.
+  - The Precision section (`default_tolerance_groups`): Linear (Workspace precision ±0.127 mm, X.XX ±0.25 mm, X.XXX
+    ±0.127 mm, X.XXXX ±0.0127 mm), Angular ±1°, Chamfer angles ±5°.
+- **Header and filters:**
+  - Hide default tolerances hides type-Default rows, with or without a standard;
+  - Show derived tolerances' tooltip flips to "Hide derived tolerances" while pressed;
+  - Types ▾ turns blue with a count badge when a type is ticked;
+  - the chip's × shows on hover only.
+- **Rows:**
+  - hovering a cell darkens that row's Type cell and that column's header, pre-highlights the feature's geometry and
+    lights up its feature-list row (`ui.insp.hover_feature`, via `highlighted_hover` / `related_features`);
+  - a click gives the cell a 2 px blue border and selects nothing;
+  - no menu, and double-click does nothing (as live).
+- Not built: the hovered dimension label's orange background in the graphics. We draw no tolerance labels there yet
+  (live "16.000±0.500" viewport dimensions are part of the Dimension tool work, psb 10-21 a).
+
+### Pass 15 (21 Oct, new psb after a quota handover): kernel cancel, urgent sketch bugs, qa4 core-workflow list
+- **Pending state, finished:** the kernel cancel hook kern promised is in (kern's next session confirmed it):
+  - `k::with_cancel(&AtomicBool, ..)` sets a thread-scoped flag (`ffi::set_thread_cancel`).
+  - `op_boolean` builds through a `CancelIndicator` (`Message_ProgressIndicator::UserBreak`), and `fuse_trimmed`'s parallel
+    cuts check it. A cancelled boolean fails with "cancelled".
+  - `RegenCancel` is now two `AtomicBool`s with `scope()`, which `boolean_into_with` wraps around `k::boolean`.
+  - Test `engine.rs::aborted_pattern_regeneration_stops_quickly`: a ×1000 rib Feature pattern stops **231 ms** after the
+    abort, inside the boolean.
+  - g++-13 syntax check is clean.
+  - Clip for the in-app check: `engine.rs::write_pending_pattern_clip` (ignored) writes `/tmp/noshape-pending-clip.json`
+    (block + rib + Feature pattern, Reapply). Paste it, open the pattern and type 1000.
+  - **Still open:** the in-app ×1000 Feature-pattern check (urgent user bugs came first).
+- **User bugs (lead, urgent), from live "Sketch dimension display + Enter/Esc" (lead sketch dim) and "Dialog ✓ / ✕
+  tooltips" (psb 10-21 e):**
+  - **Enter:**
+    - In Onshape neither Enter nor Esc ever accepts or cancels a sketch; only ✓ / ✕ do. The "Enter" text the user saw
+      was our ✓ tooltip "Accept (Enter)". Live: ✓ and ✕ have **no tooltip in any dialog**.
+    - Removed from `feature_dialog.rs` (✓ and ✕), dynamic suppression (behaviors.rs) and in-context (in_context.rs).
+    - **Still there:** assembly_* and drawing_insert dialogs (skb / asb files); told the lead.
+    - Enter in a sketch is now `SketchEditor::enter_target()` (scene). It commits the pending step (text, slot, corner,
+      polygon, pattern, offset, on-the-fly box), else does nothing.
+    - Tests: scene `enter_never_accepts_the_sketch_and_esc_keeps_the_selection`.
+  - **Labels:**
+    - The bare number is right: live shows "1", "25.4", "Ø10", "30°", 3 decimals, no unit.
+    - New: a `#var` label gets the grey italic **ƒx**, any other expression the italic **ƒ**
+      (`sketch_mode::dimension_label_text`, `VARIABLE_MARK` / `EXPRESSION_MARK`, drawn by `sketch.rs::dim_label_parts`).
+    - Test: scene `dimension_labels_read_as_live`.
+- **qa4 core workflow (docs/parity/core-workflow.md):**
+  - **F3 data loss / F5:**
+    - `noshape_model::quantity_text` (the commit rule moved out of the app's quantity_field).
+    - `apply_dimension` and `commit_otf` store "1 mm" and "(10+5) mm"; "1 in" and "#var" stay as typed.
+    - Older documents: `pin_sketch_units` / `pin_sketch_data` give the old unit to unitless sketch dimension texts
+      (configured values too) when the units change. Callers: `Session::set_units` (ops; the app dialog and the agent
+      API `set_units` both use it).
+    - Test `engine.rs::workspace_unit_change_keeps_unitless_sketch_dimensions`.
+  - **F23:** Workspace units ✓ now emits `DocEvent::UnitsChanged { old }` instead of `Reloaded`. The Part Studio keeps
+    the open dialog and pins its draft sketch. Assembly, drawing, workspace and thumbnail views treat it as a reload.
+  - **F6 / F7:**
+    - Text that doesn't evaluate puts the dimension box in the invalid state (`quantity_field::invalid_field`: pink,
+      red underline, "Enter a valid expression."), with ✓ pale green and no toast. Typing clears it.
+    - An unknown `#w` opens the Sketch dialog's own Create variable popup next to the box
+      (`FeatureDialog::open_external_create_variable` / `external_create_variable_popup`; path `__sketch_dimension`).
+    - Not yet verified in the app.
+  - **F1:** Show constraints is on by default (`SketchOptions::default`, test `sketch_options_default_as_live`).
+  - **F10:**
+    - Live: the vertical inference to the origin makes no point, and the Hole shows one chip, "Vertices of Sketch 2".
+    - `SketchPointDisplay.external`; `sketch_points` skips external (projected) points.
+    - `FeatureDialog.sketch_vertices` groups the whole set into "Vertices of Sketch N".
+  - **F12:**
+    - Not reproduced with a single hole (test `feature_pattern_of_a_hole_keeps_the_part`, also after the depth edit).
+    - qa4's wreck came from the extra corner hole (F10). That one now fails with Onshape's
+      PATTERN_SWITCH_TO_PER_INSTANCE (kern's G45) and leaves the part unchanged (same test).
+  - **F11:** `behaviors::field_takes_points`. A Direction field (edges + mate connectors) takes the edge at its midpoint.
+    Unit test included.
+  - **F14:** live, Shift+X does nothing while a feature dialog is open, and the camera menu then has no Section view
+    item (`section.rs::toggle_section`, `view_cube.rs`).
+  - **F18 / F19:** live shows **no** "no material" notice at all, only the red part name and blank values. The notice is
+    removed (`menus.rs::set_show_mass`).
+  - **F15:** the Delete handler looks right (`on_delete` takes `selected_features`). To check in the app: does the row
+    click's focus (`ui.list_focus`, key context FeatureList) reach "Workspace && !Input"?
+  - **F20 / F21** (live psb 10-21 g, built; not yet tried in the app):
+    - `render_configure_banner` (mod.rs): a white veil over the toolbar and the yellow bar "Select sketches or
+      features to configure" (with a dialog open: "Select parameters to configure") with [Done], which ends the mode
+      and closes the dialog. The panel's [+ Configure features] fades to 0.4.
+    - Configure-mode dialog: ✕ only, no outlines before a click, "Unsuppressed" checkbox last (`SUPPRESSED_PARAM`).
+    - A click configures at once and the dialog stays open (`config_panel.rs::configure_dialog_param`), with the
+      toast "Extrude 1 Depth added to Size" for 6.7 s (`flash_for`).
+    - Configured parameters: a 2 px dashed amber outline and the tooltip "Configured" (`FeatureDialog.configured`).
+    - Right-click with a list / checkbox input (`FeatureDialog.configurable_inputs`): numbers and choices show
+      Configure / Unconfigure (capture phase, over the input's own menu); selections show Clear all + Configure
+      (field and pick rows); checkboxes show Convert to expression + Unconfigure. Event `UnconfigureParam`.
+    - Still to match live: the sketch dimension menu reads "Configure dimension" with a single input (ours says
+      "Configure dimension with <name>"), and Esc with a context menu open should also cancel the dialog.
+- **Verified in the app (21 Oct, 12:50–13:20; load average 22 on 16 cores):**
+  - F15: Delete on a selected feature row deletes it (Fillet 1, Features 7 → 6).
+  - F1: Show constraints is ticked when a sketch opens.
+  - F7: "abc" + Enter in the dimension box gives the pink field, red underline, pale ✓ and the tooltip "Enter a
+    valid expression.", with no toast.
+  - F6: "#w" + Enter opens Create variable (Name w, Value 100 mm selected). Its Enter creates "#w = 100 mm" before
+    Sketch 1, and Enter in the box then applies it. The label reads grey "ƒx 100".
+    - The popup overlapped the box near the window's right edge (window-snapped). It now goes left of the box when
+      there's no room; that fix is not yet seen in the app.
+  - Enter / Esc after the commit leave the sketch open. ✓ shows no tooltip.
+  - ×1000 Feature pattern (the clip, pasted into the demo, so it overlaps Part 1), count typed then Tab:
+    - the old preview stays as it was, the dialog doesn't change, and the bottom-centre spinner shows by 2.6 s (the
+      next frame after 1.4 s);
+    - the result replaced the preview in one go at ~56 s. The machine was heavily loaded; the model test takes
+      ~7 s unloaded.
+  - **Open:** that result shows **Parts (911)**: most ribs didn't fuse into the block (see the ignored test
+    `engine.rs::pending_pattern_clip_at_1000_is_one_part`; pasting over Part 1 may be the cause).

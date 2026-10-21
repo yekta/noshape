@@ -155,7 +155,7 @@ impl PartStudioView {
                 .border_color(gpui_kit::rgb(0xbdbdbd))
                 .text_size(px(12.))
                 .text_color(pal.text)
-                .child(format!("{angle:.2}°"))
+                .child(format!("{}°", noshape_units::to_fixed(angle, 2)))
                 .into_any_element(),
         )
     }
@@ -252,7 +252,7 @@ impl PartStudioView {
                                 .cursor_pointer()
                                 .rounded(px(2.))
                                 .when(flipped, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
-                                .child(crate::assets::icon("flip-direction", 20., cx))
+                                .child(crate::assets::icon("flip-direction-opposite", 20., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     if let Some(d) = &mut this.ui.draft {
                                         d.flipped = !d.flipped;

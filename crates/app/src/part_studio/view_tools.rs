@@ -499,7 +499,7 @@ impl PartStudioView {
         self.ui.shortcut_query.clear();
         if self.show_shortcuts {
             self.ui.shortcut_tab = 0;
-            let st = cx.new(|cx| InputState::new(window, cx).placeholder("Search shortcuts"));
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search shortcuts"));
             let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
                 if matches!(ev, InputEvent::Change) {
                     this.ui.shortcut_query = st.read(cx).value().to_string();
@@ -673,6 +673,7 @@ impl PartStudioView {
             v_flex()
                 .id("named-views")
                 .occlude()
+                .child(crate::ui::panel_probe("ps-named-views"))
                 .absolute()
                 .top(px(3.))
                 .left(px(0.))

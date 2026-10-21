@@ -732,6 +732,114 @@ fn x_axis_connector(id: u64) -> AsmMateConnector {
     c
 }
 
+/// qa5 A9 (live "qa5 assembly" 6): a linear pattern whose direction is a
+/// part edge copies along that edge, not along the face normal.
+/// qa5 A4 (live "qa5 assembly" 3): a Slider's Flip primary axis turns the
+/// moving block over, like Fastened's.
+#[test]
+fn slider_flip_primary_turns_the_part_over() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.07, 0.03, -0.02), false),
+        ],
+        mates: vec![mate(10, MateType::Slider, conn(2, bottom, Inference::Centroid), conn(1, top, Inference::Centroid))],
+        ..Default::default()
+    };
+    let up = |asm: &Assembly, ev: &mut AssemblyEvaluator| {
+        let res = ev.evaluate(&f.doc, asm, &SolveOptions::default(), None);
+        assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+        let p = res.solved.placement(InstanceId(2)).unwrap();
+        DQuat::from_xyzw(p.rotation[0], p.rotation[1], p.rotation[2], p.rotation[3]) * DVec3::Z
+    };
+    assert!(up(&asm, &mut ev).z > 0.999, "upright before the flip");
+    asm.mates[0].flip_primary = true;
+    let z = up(&asm, &mut ev);
+    assert!(z.z < -0.999, "turned over after the flip: {z:?}");
+}
+
+#[test]
+fn linear_pattern_along_an_edge() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    // A straight edge of the 40 x 20 block running along X.
+    let b = &r.context.bodies[0];
+    let edge = b
+        .edges
+        .iter()
+        .enumerate()
+        .find_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok()?.edge_info().ok()?.curve {
+            noshape_kernel::Curve::Line { direction, .. } if direction.x.abs() > 0.99 => Some(Reference::Edge((**n).clone())),
+            _ => None,
+        })
+        .unwrap();
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <1>", f.studios[0], body.clone(), DVec3::new(0.0, 0.1, 0.0), false)],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        ..Default::default()
+    };
+    let direction = conn(1, edge, Inference::Midpoint).linear_direction();
+    asm.patterns.push(InstancePattern {
+        id: MateId(70),
+        name: "Linear pattern 1".into(),
+        kind: PatternKind::Linear { direction, distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
+        seeds: vec![InstanceId(2)],
+        generated: vec![],
+        suppressed: false,
+    });
+    let created = asm.sync_pattern(MateId(70));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
+    let seed = origin_of(&res, 2);
+    for (k, id) in created.iter().enumerate() {
+        let d = DVec3::from(res.solved.placement(*id).unwrap().translation) - seed;
+        assert!((d.x.abs() - 0.025 * (k + 1) as f64).abs() < 1e-6 && d.y.abs() < 1e-6 && d.z.abs() < 1e-6, "copy {k} along the edge (X): {d:?}");
+    }
+}
+
+/// Help "Assembly linear pattern" 7 / live qa5 dialog: Centered puts the
+/// seed in the middle, `count` instances (with the seed) each way.
+#[test]
+fn centered_linear_pattern_goes_both_ways() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <1>", f.studios[0], body.clone(), DVec3::new(0.0, 0.1, 0.0), false)],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        connectors: vec![x_axis_connector(60)],
+        ..Default::default()
+    };
+    asm.patterns.push(InstancePattern {
+        id: MateId(70),
+        name: "Linear pattern 1".into(),
+        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: true },
+        seeds: vec![InstanceId(2)],
+        generated: vec![],
+        suppressed: false,
+    });
+    let created = asm.sync_pattern(MateId(70));
+    assert_eq!(created.len(), 4, "two each way");
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
+    let seed = origin_of(&res, 2);
+    let mut xs: Vec<f64> = created.iter().map(|id| (DVec3::from(res.solved.placement(*id).unwrap().translation) - seed).x).collect();
+    xs.sort_by(f64::total_cmp);
+    for (x, want) in xs.iter().zip([-0.05, -0.025, 0.025, 0.05]) {
+        assert!((x - want).abs() < 1e-6, "{xs:?}");
+    }
+}
+
 #[test]
 fn linear_and_circular_instance_patterns() {
     let f = doc_with(vec![block_studio()]);
@@ -748,7 +856,7 @@ fn linear_and_circular_instance_patterns() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Linear pattern 1".into(),
-        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("50 mm"), count: 3, opposite: false, equal_spacing: false, second: None },
+        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("50 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
         seeds: vec![InstanceId(2)],
         generated: vec![],
         suppressed: false,
@@ -786,7 +894,7 @@ fn linear_and_circular_instance_patterns() {
     asm.patterns.push(InstancePattern {
         id: MateId(71),
         name: "Circular pattern 1".into(),
-        kind: PatternKind::Circular { axis: MateConnectorRef::origin(), angle: ExprValue::new("360 deg"), count: 4, opposite: false, equal_spacing: true },
+        kind: PatternKind::Circular { axis: MateConnectorRef::origin(), angle: ExprValue::new("360 deg"), count: 4, opposite: false, equal_spacing: true, centered: false },
         seeds: vec![InstanceId(1)],
         generated: vec![],
         suppressed: false,
@@ -848,6 +956,91 @@ fn plate_with_holes() -> PartStudio {
     extruded_studio(sk, "10 mm", true)
 }
 
+/// Live (behaviours "qa5 assembly" 5, qa5 A7): a seed mated on a hole's
+/// circular top edge replicates once per other matching hole (through the
+/// hole's face), on that hole's top edge; never onto the seed's own hole
+/// (its other end) nor twice into one hole.
+#[test]
+fn replicate_from_a_hole_edge_matches_holes_once() {
+    let f = doc_with(vec![plate_with_holes(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    // The top circular edge (the higher of the two) of the 5 mm hole at x = -20 mm.
+    let b = &rp.context.bodies[0];
+    let circles: Vec<(Reference, DVec3)> = b
+        .edges
+        .iter()
+        .enumerate()
+        .filter_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok()?.edge_info().ok()?.curve {
+            noshape_kernel::Curve::Circle { center, radius, .. } if (radius - 0.005).abs() < 1e-9 => Some((Reference::Edge((**n).clone()), center)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(circles.len(), 4, "two holes, two circles each");
+    let top = circles.iter().map(|(_, c)| c.z).fold(f64::MIN, f64::max);
+    let seed_edge = circles.iter().find(|(_, c)| c.x < 0.0 && (c.z - top).abs() < 1e-9).unwrap().0.clone();
+    let other_top = circles.iter().find(|(_, c)| c.x > 0.0 && (c.z - top).abs() < 1e-9).unwrap().0.clone();
+    let pf = cylinder_face(&rq);
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true), part_instance(2, "Pin <1>", f.studios[1], pin, DVec3::new(0.0, 0.05, 0.0), false)],
+        mates: vec![mate(10, MateType::Cylindrical, conn(1, seed_edge, Inference::Center), conn(2, pf, Inference::MidAxis))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok);
+    asm.patterns.push(InstancePattern { id: MateId(80), name: "Replicate 1".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: false, scope: None, scope_refs: vec![] }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
+    let targets = analysis::matched_targets(&res, &asm, &asm.patterns[0], &UnitPrefs::default()).unwrap();
+    assert_eq!(targets.len(), 1, "only the other 5 mm hole: {:?}", targets.iter().map(|t| &t.1.reference).collect::<Vec<_>>());
+    assert_eq!(targets[0].1.reference, Reference::Implicit { on: Box::new(other_top), inference: Inference::Center }, "on the other hole's top edge");
+    let created = asm.sync_matched_pattern(MateId(80), targets);
+    let res2 = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let o = DVec3::from(res2.solved.placement(created[0]).unwrap().translation);
+    let s = DVec3::from(res2.solved.placement(InstanceId(2)).unwrap().translation);
+    assert!((o - s - DVec3::new(0.04, 0.0, 0.0)).length() < 1e-6, "same relative height in the other hole: {o:?} vs seed {s:?}");
+
+    // Live's dialog (help: Replicate 6–7): the edge seed with "Match edges on
+    // plane" = the plate's top face finds the other hole's top edge only.
+    let plate_top = face_with(&rp, "CapEnd");
+    let scoped = |scope: ReplicateScope, entity: Option<Reference>| InstancePattern {
+        id: MateId(81),
+        name: "Replicate 2".into(),
+        kind: PatternKind::Replicate { mate: MateId(10), all_instances: false, scope: Some(scope), scope_refs: vec![ScopeEntity { instance: InstanceId(1), path: vec![], entity }] },
+        seeds: vec![InstanceId(2)],
+        generated: vec![],
+        suppressed: false,
+    };
+    let a0 = Assembly { patterns: vec![], ..asm.clone() };
+    let a0 = { let mut a = a0; a.instances.retain(|i| i.id.0 <= 2); a.mates.retain(|m| m.id == MateId(10)); a };
+    let r0 = ev.evaluate(&f.doc, &a0, &SolveOptions::default(), None);
+    let t = analysis::matched_targets(&r0, &a0, &scoped(ReplicateScope::EdgesOnPlane, Some(plate_top.clone())), &UnitPrefs::default()).unwrap();
+    assert_eq!(t.len(), 1, "edges on plane: {:?}", t.iter().map(|t| &t.1.reference).collect::<Vec<_>>());
+    assert_eq!(t[0].1.reference, Reference::Implicit { on: Box::new(circles.iter().find(|(_, c)| c.x > 0.0 && (c.z - top).abs() < 1e-9).unwrap().0.clone()), inference: Inference::Center });
+    // No selection yet: the dialog's "Parts to find match in" is required.
+    let mut none = scoped(ReplicateScope::EdgesOnPlane, None);
+    if let PatternKind::Replicate { scope_refs, .. } = &mut none.kind {
+        scope_refs.clear();
+    }
+    assert!(analysis::matched_targets(&r0, &a0, &none, &UnitPrefs::default()).is_err());
+    // A face seed (the hole's cylinder) with "Match faces in parts" = the plate.
+    let hole_face = {
+        let b = &rp.context.bodies[0];
+        b.faces
+            .iter()
+            .enumerate()
+            .find_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_surface().ok()? {
+                noshape_kernel::Surface::Cylinder { origin, radius, .. } if (radius - 0.005).abs() < 1e-9 && origin.x < 0.0 => Some(Reference::Face((**n).clone())),
+                _ => None,
+            })
+            .unwrap()
+    };
+    let mut a1 = a0.clone();
+    a1.mates[0] = mate(10, MateType::Cylindrical, conn(1, hole_face, Inference::MidAxis), conn(2, cylinder_face(&rq), Inference::MidAxis));
+    let r1 = ev.evaluate(&f.doc, &a1, &SolveOptions::default(), None);
+    let t = analysis::matched_targets(&r1, &a1, &scoped(ReplicateScope::FacesInParts, None), &UnitPrefs::default()).unwrap();
+    assert_eq!(t.len(), 1, "faces in parts: the other 5 mm hole");
+}
+
 #[test]
 fn replicate_on_matching_holes() {
     let f = doc_with(vec![plate_with_holes(), pin_studio()]);
@@ -873,7 +1066,7 @@ fn replicate_on_matching_holes() {
     };
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(res.mates[0].ok);
-    asm.patterns.push(InstancePattern { id: MateId(80), name: "Replicate 1".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: false }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
+    asm.patterns.push(InstancePattern { id: MateId(80), name: "Replicate 1".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: false, scope: None, scope_refs: vec![] }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
     let targets = analysis::matched_targets(&res, &asm, &asm.patterns[0], &UnitPrefs::default()).unwrap();
     assert_eq!(targets.len(), 1, "only the other 5 mm hole matches");
     let created = asm.sync_matched_pattern(MateId(80), targets);
@@ -890,7 +1083,7 @@ fn replicate_on_matching_holes() {
     a3.instances.push(plate2);
     a3.remove_mate(MateId(80));
     a3.patterns.clear();
-    a3.patterns.push(InstancePattern { id: MateId(81), name: "Replicate 2".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: true }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
+    a3.patterns.push(InstancePattern { id: MateId(81), name: "Replicate 2".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: true, scope: None, scope_refs: vec![] }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
     let r3 = ev.evaluate(&f.doc, &a3, &SolveOptions::default(), None);
     let t3 = analysis::matched_targets(&r3, &a3, &a3.patterns[0], &UnitPrefs::default()).unwrap();
     assert_eq!(t3.len(), 3, "other hole on plate 1 + both holes on plate 2");
@@ -1148,7 +1341,7 @@ fn replicate_updates_when_target_geometry_changes() {
         mates: vec![mate(10, MateType::Revolute, conn(1, hole, Inference::MidAxis), conn(2, cylinder_face(&rq), Inference::MidAxis))],
         ..Default::default()
     };
-    asm.patterns.push(InstancePattern { id: MateId(80), name: "Replicate 1".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: false }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
+    asm.patterns.push(InstancePattern { id: MateId(80), name: "Replicate 1".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: false, scope: None, scope_refs: vec![] }, seeds: vec![InstanceId(2)], generated: vec![], suppressed: false });
     let units = UnitPrefs::default();
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     // A new pattern is stale until synced; afterwards it is up to date.
@@ -2081,22 +2274,48 @@ fn measure_between_instances() {
 #[test]
 fn standard_content_parts_regenerate_with_mate_connectors() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    for c in CATALOGUE {
+    // Every component, reporting all that fail at once.
+    let mut failures: Vec<String> = Vec::new();
+    for c in CATALOGUE.iter() {
         let spec = StandardSpec::new(c);
-        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{e}"));
+        let name = format!("{} › {}", c.standard, spec.part_name());
+        let r = match standard::regenerate(&spec) {
+            Ok(r) => r,
+            Err(e) => {
+                let params = standard::part_studio(&spec).map(|ps| format!("{:?}", ps.features[0].params)).unwrap_or_default();
+                failures.push(format!("{name}: {e}\n    {params}"));
+                continue;
+            }
+        };
         let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
-        assert!(failed.is_empty(), "{}: {failed:?}", spec.part_name());
+        if !failed.is_empty() {
+            failures.push(format!("{name}: {failed:?}"));
+            continue;
+        }
         let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
-        let v = body.shape.volume().unwrap();
+        let v = match body.shape.volume() {
+            Ok(v) => v,
+            Err(e) => {
+                failures.push(format!("{name}: volume: {e:?}"));
+                continue;
+            }
+        };
         let d = c.diameter_m(c.size(&spec.size).unwrap());
-        assert!(v > d * d * d * 0.05, "{}: volume {v}", spec.part_name());
+        if v <= d * d * d * 0.05 {
+            failures.push(format!("{name}: volume {v}"));
+        }
         // Bolts: one connector under the head; nuts and washers: both faces.
         let want = if c.shape.has_length() { 1 } else { 2 };
-        assert_eq!(r.context.connectors.len(), want, "{}", spec.part_name());
-        assert!(r.context.connectors[0].origin.length() < 1e-9);
-        // Primary axis out of the contact face (mates oppose Z axes).
-        assert!((r.context.connectors[0].z + DVec3::Z).length() < 1e-9);
+        if r.context.connectors.len() != want {
+            failures.push(format!("{name}: {} connectors", r.context.connectors.len()));
+            continue;
+        }
+        // At the origin, the primary axis out of the contact face (mates oppose Z axes).
+        if r.context.connectors[0].origin.length() > 1e-9 || (r.context.connectors[0].z + DVec3::Z).length() > 1e-9 {
+            failures.push(format!("{name}: first connector misplaced"));
+        }
     }
+    assert!(failures.is_empty(), "{} of {} components fail:\n{}", failures.len(), CATALOGUE.len(), failures.join("\n"));
 }
 
 #[test]
@@ -2113,16 +2332,18 @@ fn standard_content_auto_size_and_bom() {
     assert_eq!(auto_size(bolt, 0.001), None);
     assert_eq!(standard::length_value("1 1/4 in"), Some(1.25 * 0.0254));
     let mut spec = StandardSpec::new(bolt);
-    // Live: a component opens on its first size and that size's first length.
-    assert_eq!(spec.size, "M3");
+    // Live: a component opens on its first size and that size's first length
+    // (ISO 4762: M1.6 x 2.5), metric lengths written bare.
+    assert_eq!((spec.size.as_str(), spec.length.as_deref()), ("M1.6", Some("2.5")));
     spec.set_size("M6");
-    spec.length = Some("25 mm".into());
+    assert_eq!(spec.length.as_deref(), Some("6"), "live's M6 list starts at 6");
+    spec.length = Some("25".into());
     assert_eq!(spec.part_name(), "Hex socket head cap screw M6x1.00 x 25");
     // Live's washer: 3/8, Series Narrow / Wide in the name and Description.
     let washer_a = CATALOGUE.iter().find(|c| c.name == "Type A flat washer").unwrap();
     let mut w = StandardSpec::new(washer_a);
     assert_eq!(w.description(), "Type A flat washer 3/8 Narrow Stainless Steel ");
-    w.series = Some("Wide".into());
+    w.params.insert("Series".into(), "Wide".into());
     assert_eq!(w.part_name(), "Type A flat washer 3/8 Wide");
     assert!(standard::regenerate(&w).is_ok());
     // Live's ANSI default: "Countersunk Bolt #10-24 x 0.25", the Description adds the material.
@@ -2130,7 +2351,10 @@ fn standard_content_auto_size_and_bom() {
     assert_eq!(bolt.part_name(), "Countersunk Bolt #10-24 x 0.25");
     assert_eq!(bolt.description(), "Countersunk Bolt #10-24 x 0.25 Stainless Steel ");
     let mut long = spec.clone();
-    long.length = Some("40 mm".into());
+    long.length = Some("40".into());
+    // Documents saved with "40 mm" load as live's "40".
+    let old: StandardSpec = serde_json::from_str(&serde_json::to_string(&StandardSpec { length: Some("40 mm".into()), ..long.clone() }).unwrap()).unwrap();
+    assert_eq!(old.length.as_deref(), Some("40"));
     let inst = |id: u64, spec: &StandardSpec, x: f64| Instance::new(InstanceId(id), format!("{} <{id}>", spec.part_name()), InstanceSource::Standard { spec: spec.clone() }, Placement { translation: [x, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] });
     let asm = Assembly { instances: vec![inst(1, &spec, 0.0), inst(2, &spec, 0.02), inst(3, &long, 0.04)], ..Default::default() };
     let doc = Document::new();

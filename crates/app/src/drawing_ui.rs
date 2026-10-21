@@ -4,7 +4,7 @@
 use crate::drawing_view::*;
 use crate::theme::{p, with_alpha as theme_with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputEvent, InputState, TextareaState};
+use gpui_kit::component::input::{Escape, Input, InputEvent, InputState, TextareaState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use noshape_model::drawing::*;
@@ -95,6 +95,25 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-panel")
+                // Live (qa4's input audit): Esc in Rename sheet (and the other
+                // small panels) cancels: the panel closes, nothing applied.
+                // In a field Esc is the input's Escape action (dispatched
+                // before key listeners, and it reverts an edit), so catch the
+                // action too.
+                .capture_action(cx.listener(|this, _: &Escape, window, cx| {
+                    this.panel = None;
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                    cx.notify();
+                }))
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key == "escape" {
+                        this.panel = None;
+                        window.focus(&this.focus, cx);
+                        cx.stop_propagation();
+                        cx.notify();
+                    }
+                }))
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
@@ -134,6 +153,7 @@ impl DrawingEditor {
             None => (self.note_inplace_box(cx)?, 27.0),
         };
         let rows = self.note_panel_rows(cx);
+        let color_dlg = self.render_note_color(cx);
         // Above the text (and the note's ruler).
         let bottom = (self.size_px()[1] - (b.text_top.min(b.top) - above) + 6.0) as f32;
         let left = (b.left - 3.0).max(4.0) as f32;
@@ -161,6 +181,7 @@ impl DrawingEditor {
                         .child(div().id("note-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.discard_inplace(cx)))),
                 )
                 .child(v_flex().p(px(4.)).text_size(px(12.)).children(rows))
+                .children(color_dlg)
                 .into_any_element(),
         )
     }
@@ -179,8 +200,13 @@ impl DrawingEditor {
         st
     }
 
+    /// A drawing panel field. Onshape's drawing editor uses Wt widgets, not
+    /// the Part Studio's fields (live behaviours.md "Input behaviour outside
+    /// feature dialogs"): a click puts the caret at the click point (nothing
+    /// selected) and Esc never reverts the text (it passes to the panel,
+    /// which ignores it or closes, e.g. the Note editor).
     pub fn input(&mut self, value: &str, window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
-        let st = cx.new(|cx| InputState::new(window, cx).default_value(value.to_string()));
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(value.to_string()));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, _, ev: &InputEvent, _, cx| {
             if let InputEvent::PressEnter { .. } = ev {
                 this.apply_panel(cx);
@@ -194,6 +220,17 @@ impl DrawingEditor {
         st.update(cx, |s, cx| {
             s.focus(window, cx);
             s.select_all(window, cx);
+        });
+        // Opened from a menu or a double click: focus again after their own
+        // focus handling (else Esc and typing go to the canvas).
+        let again = st.downgrade();
+        window.defer(cx, move |window, cx| {
+            if let Some(st) = again.upgrade() {
+                st.update(cx, |s, cx| {
+                    s.focus(window, cx);
+                    s.select_all(window, cx);
+                });
+            }
         });
     }
 
@@ -212,7 +249,7 @@ impl DrawingEditor {
         let input = self.textarea(&text, 5, window, cx);
         // Tab moves the text to the next tab stop of the ruler.
         input.update(cx, |s, cx| s.set_tab_size(gpui_kit::component::input::TabSize { tab_size: 4, hard_tabs: true }, cx));
-        let height = self.input(&format!("{} mm", noshape_model::drawing::format::format_number(h, None, 2)), window, cx);
+        let height = self.input(&crate::drawing_note::note_height_text(h, self.drawing.units_mm), window, cx);
         self.panel = Some(Panel::Note { input, edit, pos, height, style });
         cx.notify();
     }
@@ -232,7 +269,7 @@ impl DrawingEditor {
         match panel {
             Panel::Note { input, edit, pos, height, style } => {
                 let text = input.read(cx).value().to_string();
-                let h = height.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().ok().filter(|v| *v > 0.1);
+                let h = crate::drawing_note::parse_note_height(&height.read(cx).value(), self.drawing.units_mm);
                 if text.trim().is_empty() {
                     if let Some(id) = edit {
                         self.edit_sheet("Delete note", cx, |s| s.annotations.retain(|a| a.id != id));

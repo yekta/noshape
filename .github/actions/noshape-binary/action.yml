@@ -1,0 +1,128 @@
+name: noshape binary
+description: >
+  The app to test in perf.yml: a release's asset (input `tag`, default the
+  latest release), or a release build of `ref` from source, bundled like the
+  release on macOS. Exports BIN (the executable) and BUILD (a label).
+  The repository must be checked out at the workspace root.
+inputs:
+  tag:
+    description: Release tag (default the latest release)
+    default: ''
+  ref:
+    description: Branch or commit to build from source instead of a release
+    default: ''
+  asset:
+    description: Release asset suffix (macos-arm64.dmg, windows-x86_64.zip, linux-x86_64.tar.gz)
+    required: true
+runs:
+  using: composite
+  steps:
+    # ------------------------------------------------------------- a release
+    - name: Release
+      if: inputs.ref == ''
+      shell: bash
+      run: |
+        tag="${{ inputs.tag }}"
+        [[ -n "$tag" ]] || tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+        echo "BUILD=$tag" >> "$GITHUB_ENV"
+        gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "*-${{ inputs.asset }}" --dir "$RUNNER_TEMP/release"
+        case "$RUNNER_OS" in
+          macOS)
+            hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" "$RUNNER_TEMP"/release/*.dmg
+            cp -R "$RUNNER_TEMP/dmg/noshape.app" "$RUNNER_TEMP/noshape.app"
+            hdiutil detach "$RUNNER_TEMP/dmg"
+            echo "BIN=$RUNNER_TEMP/noshape.app/Contents/MacOS/noshape" >> "$GITHUB_ENV" ;;
+          Linux)
+            tar xzf "$RUNNER_TEMP"/release/*.tar.gz -C "$RUNNER_TEMP"
+            echo "BIN=$(ls -d "$RUNNER_TEMP"/noshape-*/)noshape" >> "$GITHUB_ENV" ;;
+          Windows)
+            pwsh -NoProfile -Command 'Expand-Archive (Get-ChildItem "$env:RUNNER_TEMP\release\*.zip").FullName -DestinationPath "$env:RUNNER_TEMP"'
+            echo "BIN=$(cygpath -w "$(ls "$RUNNER_TEMP"/noshape-*/noshape.exe)")" >> "$GITHUB_ENV" ;;
+        esac
+
+    # ----------------------------------------------------------- from source
+    - name: Source
+      if: inputs.ref != ''
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ inputs.ref }}
+        path: src
+
+    - name: Build dependencies (Linux)
+      if: inputs.ref != '' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          build-essential cmake ninja-build pkg-config \
+          libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
+          libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
+          libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev
+
+    - name: Build dependencies (macOS)
+      if: inputs.ref != '' && runner.os == 'macOS'
+      shell: bash
+      run: |
+        brew install ninja || true
+        xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
+
+    - name: MSVC developer environment (Windows)
+      if: inputs.ref != '' && runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+          if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+        }
+
+    - name: OpenCascade
+      if: inputs.ref != ''
+      uses: ./src/.github/actions/setup-occt
+
+    - name: openNURBS
+      if: inputs.ref != ''
+      uses: ./src/.github/actions/setup-opennurbs
+
+    - name: Rust toolchain
+      if: inputs.ref != ''
+      uses: dtolnay/rust-toolchain@stable
+
+    - uses: Swatinem/rust-cache@v2
+      if: inputs.ref != ''
+      with:
+        workspaces: src
+        key: occt-V8_0_1
+
+    # PowerShell on Windows: under bash, Git's coreutils `link` shadows MSVC's link.exe.
+    - name: Build (release, Windows)
+      if: inputs.ref != '' && runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        cd src
+        cargo build --release --locked -p noshape
+        New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\built" | Out-Null
+        Copy-Item target/release/noshape.exe "$env:RUNNER_TEMP\built\"
+        "BIN=$env:RUNNER_TEMP\built\noshape.exe" >> $env:GITHUB_ENV
+        "BUILD=${{ inputs.ref }}@$(git rev-parse --short HEAD)" >> $env:GITHUB_ENV
+
+    - name: Build (release)
+      if: inputs.ref != '' && runner.os != 'Windows'
+      shell: bash
+      run: |
+        cd src
+        cargo build --release --locked -p noshape
+        echo "BUILD=${{ inputs.ref }}@$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+        mkdir -p "$RUNNER_TEMP/built"
+        if [[ "$RUNNER_OS" == macOS ]]; then
+          # Bundled like the release (an unbundled binary is not a regular app).
+          app="$RUNNER_TEMP/noshape.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp target/release/noshape "$app/Contents/MacOS/noshape"
+          cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
+          sed "s/@VERSION@/0.0.0/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
+          codesign --force --deep --sign - "$app"
+          echo "BIN=$app/Contents/MacOS/noshape" >> "$GITHUB_ENV"
+        else
+          cp target/release/noshape "$RUNNER_TEMP/built/"
+          echo "BIN=$RUNNER_TEMP/built/noshape" >> "$GITHUB_ENV"
+        fi

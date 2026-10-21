@@ -21,10 +21,9 @@ pub fn command() -> Command {
         .subcommand(Command::new("mcp").about("Run the MCP server (stdio, JSON-RPC 2.0, one message per line)"))
         .subcommand(Command::new("call").about("Run an operation by MCP tool name with a JSON object of arguments (stdin when omitted)").arg(Arg::new("tool").required(true)).arg(Arg::new("json")))
         .subcommand(Command::new("batch").about("Run JSON lines {\"tool\": ..., \"args\": {...}} from a file (or stdin) in one session; prints one JSON result per line").arg(Arg::new("file")))
-        .subcommand(Command::new("tools").about("Print the MCP tool list (names, descriptions, input schemas) as JSON"));
-    let mut groups: Vec<&str> = registry::all().iter().map(|o| o.group).collect();
-    groups.dedup();
-    for g in groups {
+        .subcommand(Command::new("tools").about("Print the MCP tool list (names, descriptions, input schemas) as JSON"))
+        .subcommand(Command::new("docs").about("Print the operation reference of docs/AGENT_API.md (Markdown)"));
+    for g in registry::groups() {
         let mut gc = Command::new(g).subcommand_required(true).arg_required_else_help(true).about(format!("{g} operations"));
         for op in registry::all().iter().filter(|o| o.group == g) {
             let mut oc = Command::new(op.verb).about(op.summary).long_about(op.full_description());
@@ -82,6 +81,10 @@ pub fn run(args: Vec<OsString>) -> i32 {
             };
         }
         Some(("tools", _)) => Ok(json!({ "tools": mcp::tool_list() })),
+        Some(("docs", _)) => {
+            print!("{}", noshape_ops::reference::markdown());
+            return 0;
+        }
         Some(("call", sm)) => {
             let tool = sm.get_one::<String>("tool").cloned().unwrap_or_default();
             let text = match sm.get_one::<String>("json") {
@@ -154,5 +157,15 @@ pub fn run(args: Vec<OsString>) -> i32 {
             print(&e);
             2
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// clap's own checks (no duplicate group or verb, valid args): a
+    /// broken tree panics on every call.
+    #[test]
+    fn command_tree_is_valid() {
+        super::command().debug_assert();
     }
 }

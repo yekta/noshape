@@ -75,7 +75,7 @@ fn every_ui_command_is_listed() {
 /// Coverage only goes up: lower `PLANNED_CEILING` as operations land.
 #[test]
 fn coverage_report() {
-    const PLANNED_CEILING: usize = 87;
+    const PLANNED_CEILING: usize = 72;
     let features = feature_shortcuts().len();
     let ops = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Op(_))).count();
     let planned = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Planned)).count();
@@ -122,4 +122,18 @@ fn every_feature_type_round_trips_through_json() {
         n += 1;
     }
     assert!(n >= 86, "{n} feature types");
+}
+
+/// docs/AGENT_API.md's operation reference is the registry's (regenerate
+/// with `UPDATE_DOCS=1 cargo test -p noshape-ops --test coverage`).
+#[test]
+fn agent_api_reference_is_current() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/AGENT_API.md");
+    let doc = std::fs::read_to_string(path).expect("docs/AGENT_API.md");
+    let new = noshape_ops::reference::splice(&doc).expect("the generated-reference markers in docs/AGENT_API.md");
+    if std::env::var_os("UPDATE_DOCS").is_some() {
+        std::fs::write(path, &new).expect("write docs/AGENT_API.md");
+        return;
+    }
+    assert!(new == doc, "docs/AGENT_API.md's operation reference is out of date: run `UPDATE_DOCS=1 cargo test -p noshape-ops --test coverage`");
 }

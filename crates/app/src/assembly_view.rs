@@ -406,6 +406,19 @@ impl AssemblyView {
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let mut subs = Vec::new();
         subs.push(cx.subscribe_in(&viewport, window, Self::on_viewport_event));
+        // Typing into a selected BOM cell edits it, before any shortcut sees
+        // the key (live; qa5 A11).
+        let weak = cx.entity().downgrade();
+        subs.push(cx.intercept_keystrokes(move |ev, window, cx| {
+            let Some(text) = bom_panel::typed_text(&ev.keystroke) else { return };
+            let Some(view) = weak.upgrade() else { return };
+            if view.update(cx, |this, cx| this.bom_type_into(&text, window, cx)) {
+                cx.stop_propagation();
+            }
+        }));
+        // The workspace draws this view as a cached view (`front_host`):
+        // anything the document changes renders it again.
+        subs.push(cx.observe(&doc, |_, _, cx| cx.notify()));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             // Any tab can affect an assembly (Part Studios, sub-assemblies).
             DocEvent::TabChanged(t) => {
@@ -415,7 +428,7 @@ impl AssemblyView {
                 }
                 this.schedule_eval(window, cx)
             }
-            DocEvent::TabsChanged => this.schedule_eval(window, cx),
+            DocEvent::TabsChanged | DocEvent::UnitsChanged { .. } => this.schedule_eval(window, cx),
             DocEvent::Reloaded => {
                 this.close_mate(window, cx);
                 this.schedule_eval(window, cx)
@@ -549,6 +562,24 @@ impl AssemblyView {
         {
             for id in &s.instances {
                 asm.replace_instance(*id, source.clone(), base, s.all);
+            }
+        }
+        // A pattern dialog previews its pattern while open (live qa5 6: the
+        // pattern's copies appear as soon as it opens; qa5 A8).
+        if let Some(s) = &self.pattern
+            && let Ok(pat) = self.pattern_from_session(s, cx)
+        {
+            let id = pat.id;
+            match asm.patterns.iter().position(|p| p.id == id) {
+                Some(i) => asm.patterns[i] = pat.clone(),
+                None => asm.patterns.push(pat.clone()),
+            }
+            if s.kind.matched() {
+                if let Ok(t) = analysis::matched_targets(&self.result, &asm, &pat, &self.units(cx)) {
+                    asm.sync_matched_pattern(id, t);
+                }
+            } else {
+                asm.sync_pattern(id);
             }
         }
         let mut opts = SolveOptions::default();
@@ -741,12 +772,33 @@ impl AssemblyView {
 
     /// Push highlight state + overlays to the viewport.
     fn refresh_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
+        // Entities of instances no longer selected drop out (a list click or
+        // Space replaced the selection).
+        let before = self.ui.entity_sel.len();
+        let selected = self.selected.clone();
+        self.ui.entity_sel.retain(|(p, _)| selected.contains(&p[0]));
+        if self.ui.entity_sel.len() != before {
+            self.update_entity_measure();
+        }
+        // Instances selected through their entities show only those (amber);
+        // the others (list rows, boxes) are filled whole.
+        let tops: Vec<InstanceId> = self.selected.iter().copied().filter(|t| !self.ui.entity_sel.iter().any(|(p, _)| p[0] == *t)).collect();
         let Some(built) = &self.built else { return };
-        let mut h = Highlights { selected_tops: self.selected.clone(), ..Default::default() };
+        let mut h = Highlights { selected_tops: tops, selected_entities: self.ui.entity_sel.clone(), ..Default::default() };
+        // Mate preview: the instance that moves is drawn amber (live qa5 2.1).
+        if let Some(s) = &self.mate {
+            let d = s.dialog.read(cx);
+            if let (Some(a), Some(b), Some(asm)) = (&d.a, &d.b, self.assembly(cx)) {
+                let m = Mate::new(MateId(0), String::new(), d.mate_type(), a.clone(), b.clone());
+                h.selected_tops.push(noshape_ops::assembly::mate_preview_moving(asm, &m));
+            }
+        }
         let size = self.triad_size();
         let units = self.units(cx);
+        // (Picking a mate connector shows its own hover look, below.)
         if let Some(t) = &self.hover
             && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)
+            && self.pick_mode(cx) != Some(PickMode::Inference)
         {
             h.hover_entity = Some((t.path.clone(), t.reference.clone()));
         }
@@ -791,9 +843,8 @@ impl AssemblyView {
             h.accent_tops.push(top);
         }
         if let Some(m) = &self.ui.measure {
-            h.selected_entities = m.clone();
+            h.selected_entities.extend(m.iter().cloned());
         }
-        h.selected_entities.extend(self.std_picked_entities());
         h.selected_entities.extend(self.mass_picked_faces());
         self.interference_highlights(&mut h);
         // The instances to analyze show selected while the dialog is open;
@@ -914,17 +965,21 @@ impl AssemblyView {
             && let Some(o) = self.result.occurrences.get(*occ)
             && (self.infer_locked || self.hover.as_ref().is_some_and(|h| h.occ == *occ))
         {
-            if self.infer_locked {
-                // Shift: the locked entity stays highlighted.
-                h.hover_entity = Some((o.path.clone(), entity.clone()));
+            // Live (qa5/asm-041, assembly/31-*): a hovered face is outlined
+            // (no fill), an edge or vertex highlighted; its inference points
+            // are small white dots, the one under the pointer the mate
+            // connector glyph. Shift keeps the entity locked.
+            match entity {
+                Reference::Face(_) => h.hover_outline = Some((o.path.clone(), entity.clone())),
+                _ => h.hover_entity = Some((o.path.clone(), entity.clone())),
             }
             let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
             for (i, p) in cands.iter().enumerate() {
                 let w = t.mul(&p.frame);
                 if Some(i) == self.infer_choice {
-                    h.triads.push(Triad { frame: w, size, strong: true });
+                    h.inference_glyph = Some((w, size * 0.25));
                 } else {
-                    h.dots.push(w.origin);
+                    h.light_dots.push(w.origin);
                 }
             }
         }
@@ -1044,6 +1099,16 @@ impl AssemblyView {
         }
         if self.insert_open {
             self.ui.insert_inserted.extend(ids.iter().copied());
+        }
+        // The first insert into an empty assembly stays at the origin
+        // (origins aligned) and doesn't follow the cursor (live, help); it
+        // is selected (amber, its row too; live qa5 1.4).
+        if self.assembly(cx).is_some_and(|a| noshape_ops::assembly::inserted_into_empty(a, &ids)) {
+            self.selected = ids;
+            self.selected_mate = None;
+            self.refresh_scene(false, cx);
+            cx.notify();
+            return;
         }
         // Live Onshape: the instance following the cursor is selected (amber),
         // and deselected once it is placed (assembly/04, 06).
@@ -1696,6 +1761,46 @@ impl AssemblyView {
             .into_any_element()
     }
 
+    /// The selected entities' measurement left of the evaluation tools (live
+    /// "Assembly selection model": "Area: 2321.460 mm²", two faces "Min dist …
+    /// Center dist … Max dist …", nothing for three); as the Part Studio's.
+    fn selection_readout(&self, cx: &App) -> Option<AnyElement> {
+        use noshape_model::regen::measure::{Measurement, quick_line};
+        if self.ui.measure.is_some() || self.ui.entity_sel.is_empty() {
+            return None;
+        }
+        let line = quick_line(&self.ui.entity_measure, self.ui.entity_sel.len());
+        if line.is_empty() {
+            return None;
+        }
+        let pal = p();
+        let units = self.units(cx);
+        let fmt = |x: f64, dim: noshape_units::Dim| noshape_units::format_quantity(noshape_units::Quantity::new(x, dim), &units);
+        // "12.5 mm" -> the number (monospace, underlined) and its unit.
+        let value = |text: String| {
+            let (num, unit) = text.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((text, String::new()));
+            h_flex().gap(px(2.)).child(crate::ui::measure_value(num).text_color(pal.text)).child(div().child(unit))
+        };
+        let length = noshape_units::Dim::LENGTH;
+        let mut row = h_flex().gap(px(12.)).pr(px(6.)).text_size(px(13.)).text_color(pal.text_muted).whitespace_nowrap();
+        for (label, m) in line {
+            let item = h_flex().gap(px(4.)).child(format!("{label}:"));
+            row = row.child(match m {
+                Measurement::Point(pt) => item.child(value(fmt(pt.x, length))).child(value(fmt(pt.y, length))).child(value(fmt(pt.z, length))),
+                m => item.child(value(match m {
+                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => fmt(x, length),
+                    Measurement::Area(x) => fmt(x, noshape_units::Dim { length: 2, angle: 0 }),
+                    Measurement::Volume(x) => fmt(x, noshape_units::Dim { length: 3, angle: 0 }),
+                    Measurement::Angle(x) => fmt(x, noshape_units::Dim::ANGLE),
+                    Measurement::Percent(x) => format!("{} %", noshape_units::to_fixed(x, 2)),
+                    Measurement::Distance { distance, .. } => fmt(distance, length),
+                    Measurement::Point(_) => String::new(),
+                })),
+            });
+        }
+        Some(row.into_any_element())
+    }
+
     /// Model evaluation tools at the bottom right (live assembly/10, as the
     /// Part Studio's): Measure, Analysis tools and Mass properties, three
     /// 30x30 buttons 5 px apart on white at 75%.
@@ -1712,6 +1817,7 @@ impl AssemblyView {
             .px(px(5.))
             .gap(px(5.))
             .bg(crate::theme::with_alpha(pal.panel, 0.75))
+            .children(self.selection_readout(cx))
             .child(btn("asm-eval-measure", "measure", self.ui.measure.is_some(), cx).tooltip("Show measure details ([)").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx))))
             // Live: Show analysis tools opens the tool list; Display mass and
             // section properties toggles the Mass properties dialog.
@@ -1734,7 +1840,7 @@ impl AssemblyView {
 
     /// What viewport clicks currently feed (a dialog's connector field, snap mode...).
     fn pick_mode(&self, cx: &App) -> Option<PickMode> {
-        if self.std_auto_size_active() || self.std_picking() || self.mass_face_picking() {
+        if self.std_auto_size_active() || self.mass_face_picking() {
             return Some(PickMode::Entity);
         }
         if let Some(s) = &self.mate {
@@ -1742,6 +1848,10 @@ impl AssemblyView {
             if d.awaiting_pick() {
                 return Some(if d.picks_entities() { PickMode::Entity } else { PickMode::Inference });
             }
+        }
+        // Replicate's "Parts to find match in": parts, faces or edges.
+        if self.pattern.as_ref().is_some_and(|p| p.active == Some(2)) {
+            return Some(PickMode::Entity);
         }
         if self.mc.as_ref().is_some_and(|m| m.active) || self.pattern.as_ref().is_some_and(|p| p.active.is_some()) || self.snap.is_some() || self.mass_connector_picking() {
             return Some(PickMode::Inference);
@@ -1879,6 +1989,24 @@ impl AssemblyView {
         if let Some(p) = &mut self.pattern
             && let Some(slot) = p.active
         {
+            if slot == 2 {
+                // Replicate: toggle a part (Match faces in parts) or an entity.
+                let parts = self.pattern.as_ref().is_some_and(|p| self.replicate_scope(p, cx).takes_parts());
+                let e = noshape_model::assembly::ScopeEntity { instance: c.instance, path: c.path.clone(), entity: (!parts).then(|| c.reference.clone()) };
+                if let Some(p) = &mut self.pattern {
+                    match p.scope_refs.iter().position(|x| *x == e) {
+                        Some(i) => {
+                            p.scope_refs.remove(i);
+                        }
+                        None => p.scope_refs.push(e),
+                    }
+                }
+                self.update_pattern_preview(cx);
+                cx.notify();
+                return;
+            }
+            // A linear pattern's direction on an edge runs along the edge (live).
+            let c = if p.kind == PatternDialogKind::Linear { c.linear_direction() } else { c };
             if slot == 0 {
                 p.axis = Some(c);
                 p.active = if p.second && p.axis2.is_none() { Some(1) } else { None };
@@ -2031,13 +2159,6 @@ impl AssemblyView {
                     }
                     return;
                 }
-                if self.std_picking() {
-                    // Standard content tab: faces and edges are pre-selected for Insert.
-                    if let Some(t) = self.pick(*pick) {
-                        self.std_pick(t, cx);
-                    }
-                    return;
-                }
                 if self.mass_face_picking() {
                     // Mass and section properties › Face: Faces to measure.
                     if let Some(t) = self.pick(*pick) {
@@ -2098,9 +2219,7 @@ impl AssemblyView {
                     self.selected.clear();
                 } else {
                     let target = self.pick(*pick);
-                    self.select_target(target, modifiers.shift || modifiers.secondary(), cx);
-                    self.triad_at_click(*position, cx);
-                    self.ui.scroll_to_selection = true;
+                    self.click_select(target, *position, modifiers.shift || modifiers.secondary(), cx);
                 }
                 self.refresh_scene(false, cx);
                 cx.notify();
@@ -2334,31 +2453,33 @@ impl AssemblyView {
                         }
                     }
                 } else if d.handle.is_none() {
+                    // A press on geometry that didn't drag: a click.
                     let t = self.hover.clone();
-                    self.select_target(t, modifiers.shift || modifiers.secondary(), cx);
-                    self.triad_at_click(d.press, cx);
-                    self.ui.scroll_to_selection = true;
+                    self.click_select(t, d.press, modifiers.shift || modifiers.secondary(), cx);
                     self.refresh_scene(false, cx);
                 }
                 cx.notify();
             }
-            ViewportEvent::BoxSelect { ids, modifiers } => {
-                // Box selection selects the instances it touches (Shift/Ctrl adds).
+            ViewportEvent::BoxSelect { ids, modifiers, crossing } => {
+                // Live (behaviours "Assembly selection model" 6): a right→left
+                // (crossing) box selects the instances it touches, a left→right
+                // (window) box the faces, edges and vertices fully inside it.
                 if self.pick_mode(cx).is_some() || self.placing.is_some() {
                     return;
                 }
-                let mut tops: Vec<InstanceId> = Vec::new();
-                for t in ids.iter().filter_map(|id| self.pick(Some(*id))) {
-                    if !tops.contains(&t.path[0]) {
-                        tops.push(t.path[0]);
-                    }
-                }
                 if !(modifiers.shift || modifiers.secondary()) {
-                    self.selected.clear();
+                    self.clear_selection();
                 }
-                for t in tops {
-                    if !self.selected.contains(&t) {
-                        self.selected.push(t);
+                let picks: Vec<AsmPickTarget> = ids.iter().filter_map(|id| self.pick(Some(*id))).collect();
+                if *crossing {
+                    for t in picks {
+                        if !self.selected.contains(&t.path[0]) {
+                            self.selected.push(t.path[0]);
+                        }
+                    }
+                } else {
+                    for t in picks.into_iter().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)) {
+                        self.select_entity(t, false);
                     }
                 }
                 self.selected_mate = None;
@@ -2462,6 +2583,71 @@ impl AssemblyView {
         self.reapply_display(cx);
     }
 
+    /// A click in the graphics area outside dialogs (live behaviours
+    /// "Assembly selection model"): a double click clears the selection;
+    /// clicks on faces, edges and vertices select them (additive), their
+    /// instances' rows too; an empty click clears.
+    fn click_select(&mut self, target: Option<AsmPickTarget>, position: DVec2, additive: bool, cx: &mut Context<Self>) {
+        let now = std::time::Instant::now();
+        let double = self.ui.last_click.is_some_and(|(t, p)| now.duration_since(t) < std::time::Duration::from_millis(500) && (p - position).length() < 4.0);
+        self.ui.last_click = Some((now, position));
+        if double {
+            self.clear_selection();
+        } else {
+            match target {
+                Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.select_entity(t, !additive),
+                None if !additive => self.clear_selection(),
+                target => self.select_target(target, additive, cx),
+            }
+            self.triad_at_click(position, cx);
+        }
+        self.ui.scroll_to_selection = true;
+    }
+
+    /// A face, edge or vertex clicked: added to the selection (a click on a
+    /// selected one drops it unless Shift / Ctrl is held); its instance's
+    /// row is selected while it has selected entities.
+    fn select_entity(&mut self, t: AsmPickTarget, toggle: bool) {
+        self.selected_mate = None;
+        self.manip_value = None;
+        let key = (t.path.clone(), t.reference.clone());
+        match self.ui.entity_sel.iter().position(|k| *k == key) {
+            Some(i) if toggle => {
+                self.ui.entity_sel.remove(i);
+            }
+            Some(_) => {}
+            None => self.ui.entity_sel.push(key),
+        }
+        let top = t.path[0];
+        if self.ui.entity_sel.iter().any(|(p, _)| p[0] == top) {
+            if !self.selected.contains(&top) {
+                self.selected.push(top);
+            }
+        } else {
+            self.selected.retain(|x| *x != top);
+        }
+        self.update_entity_measure();
+        if self.triad.as_ref().is_some_and(|(ids, _)| *ids != self.selected) {
+            self.triad = None;
+        }
+        self.ui.manip_selected = None;
+    }
+
+    /// Clear the instance and entity selection.
+    fn clear_selection(&mut self) {
+        self.selected.clear();
+        self.selected_mate = None;
+        self.ui.entity_sel.clear();
+        self.update_entity_measure();
+        self.triad = None;
+        self.ui.manip_selected = None;
+    }
+
+    /// The bottom-right readout's measurements of the selected entities.
+    fn update_entity_measure(&mut self) {
+        self.ui.entity_measure = if self.ui.entity_sel.is_empty() { Vec::new() } else { analysis::measure_entities(&self.result, &self.ui.entity_sel) };
+    }
+
     fn select_target(&mut self, target: Option<AsmPickTarget>, additive: bool, _cx: &mut Context<Self>) {
         self.selected_mate = None;
         self.manip_value = None;
@@ -2553,7 +2739,7 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ render: toolbar
 
-    fn render_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_toolbar(&mut self, viewport_w: f32, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let sep = crate::ui::tool_separator;
         // Tool search's "Highlight tool in toolbar": `#fcda7f`, border `#fab601`.
@@ -2577,7 +2763,10 @@ impl AssemblyView {
         // "Editing <name> [Done]" banner at the top centre (live 105).
         let banner = self.render_np_banner(cx).or_else(|| self.explode_banner(cx));
         if let Some(banner) = banner {
+            // The row keeps its full width (only Undo / Redo are in flow):
+            // the banner centres in it (live 62: x 868–1090 of 40–1919).
             return crate::ui::toolbar()
+                .w_full()
                 .relative()
                 .child(crate::ui::undo_redo(&self.doc, cx))
                 .child(div().absolute().top(px(0.)).left_0().right_0().flex().justify_center().child(banner))
@@ -2593,7 +2782,9 @@ impl AssemblyView {
         // toolbar), each built by its id.
         let prefs = self.toolbar_prefs();
         let mut bar = crate::ui::toolbar().child(crate::ui::undo_redo(&self.doc, cx));
-        for (set, ids) in prefs.sets() {
+        let sets = prefs.sets();
+        let collapse_from = if self.ui.tb_custom.is_some() { usize::MAX } else { toolbar::collapse_from(&sets, prefs.hide_search, viewport_w) };
+        for (pos, (set, ids)) in sets.into_iter().enumerate() {
             let tools: Vec<AnyElement> = ids
                 .iter()
                 .map(|id| match *id {
@@ -2638,7 +2829,7 @@ impl AssemblyView {
                     _ => tool(self, "tb-ps-in-context", "create-partstudio-incontext", "Create Part Studio in context", self.ui.ps_in_context.is_some(), cx, |this, _, cx| this.open_ps_in_context(cx)).into_any_element(),
                 })
                 .collect();
-            bar = bar.child(sep()).child(self.render_toolset(set, tools, ids, cx));
+            bar = bar.child(sep()).child(self.render_toolset(set, tools, ids, pos >= collapse_from, cx));
         }
         let bar = bar
             .child(div().w(px(10.)))
@@ -2711,12 +2902,15 @@ impl AssemblyView {
             .flex()
             .flex_col()
             .justify_center()
+            // Centred as live's six buttons (Simulation, excluded, is the
+            // 5th): the others keep live's positions (assembly/62 y 455…554).
+            .pb(px(33.))
             // Live strip (assembly/181-*): BOM Table, Configuration panel,
             // Exploded views, Named positions, (Simulation: excluded),
             // Variable table. Interference is in the top row's menu
             // (Check interference…), Animate in the mate row's.
             .child(btn("rail-bom", "bom", "BOM Table", self.panel == Some(SidePanel::Bom), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Bom, cx))))
-            .child(btn("rail-config", "config-show", "Configuration panel", self.panel == Some(SidePanel::Configurations), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Configurations, cx))))
+            .child(btn("rail-config", "configuration", "Configuration panel", self.panel == Some(SidePanel::Configurations), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Configurations, cx))))
             .child(btn("rail-explode", "explode", "Exploded views", exploded || self.panel == Some(SidePanel::Explode), cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_explode_panel(cx))))
             .child(btn("rail-named", "named-position", "Named positions", self.panel == Some(SidePanel::Positions), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Positions, cx))))
             .child(btn("rail-variables", "variable-table", "Variable table", self.panel == Some(SidePanel::Variables), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, SidePanel::Variables, cx))))
@@ -2814,7 +3008,7 @@ impl AssemblyView {
                 None => div().min_w_0().truncate().mr(px(2.)).when(suppressed, |d| d.line_through()).when(dyn_suppressed, |d| d.italic()).child(name.clone()).into_any_element(),
             })
             .when_some(state, |d, s| d.child(Self::state_pill(s)))
-            .when(fixed, |d| d.child(div().id(SharedString::from(format!("fixed-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-fixed"), 14., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(fixed_tip.clone()).build(w, cx))))
+            .when(fixed, |d| d.child(div().id(SharedString::from(format!("fixed-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-fixed"), 20., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(fixed_tip.clone()).build(w, cx))))
             .when_some(inst.map(|i| i.lock.clone()).filter(|l| is_top && !l.is_flexible()), |d, lock| {
                 // Lock icon of a locked subassembly (click to unlock).
                 let tip = match &lock {
@@ -2835,7 +3029,7 @@ impl AssemblyView {
             })
             .when(dyn_suppressed && is_top, |d| d.child(svg().path(icon_path("function")).size(px(14.)).flex_none().text_color(pal.text_faint)))
             .when_some(dof.filter(|d| *d > 0 && !fixed && !dyn_suppressed), |d, n| {
-                d.child(div().id(SharedString::from(format!("dof-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-free"), 14., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("Has degrees of freedom ({n})")).build(w, cx)))
+                d.child(div().id(SharedString::from(format!("dof-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-free"), 20., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(format!("Has degrees of freedom ({n})")).build(w, cx)))
             })
             // In-context arrows (Assembly contexts of its Part Studio).
             .when(is_top, |d| d.children(self.context_icons(top, cx)))
@@ -3113,7 +3307,7 @@ impl AssemblyView {
                 None => div().min_w_0().truncate().child(name).into_any_element(),
             })
             // Grounded: something in the assembly is fixed (Onshape's arrow onto ground).
-            .when(grounded, |d| d.child(div().id("asm-grounded").flex_none().child(crate::assets::icon(&icon_path("list-grounded"), 14., cx)).tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Assembly is grounded").build(w, cx))))
+            .when(grounded, |d| d.child(div().id("asm-grounded").flex_none().child(crate::assets::icon(&icon_path("list-grounded"), 20., cx)).tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Assembly is grounded").build(w, cx))))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.selected = this.assembly(cx).map(|a| a.instances.iter().filter(|i| a.generated_by(i.id).is_none()).map(|i| i.id).collect()).unwrap_or_default();
                 this.selected_mate = None;
@@ -3129,7 +3323,17 @@ impl AssemblyView {
 
     /// Read-only description of a mate's offsets and limits (row tooltip).
     fn mate_tooltip(&self, m: &Mate) -> String {
-        let mut lines = vec![format!("{} mate", m.mate_type.name())];
+        // Live: "<name> (Hidden)" / "<name> has error: <message> (Hidden)",
+        // then the mate's parameter summary.
+        let error = self.result.mates.iter().find(|s| s.id == m.id).filter(|s| !s.ok).and_then(|s| s.message.clone());
+        let mut head = match error {
+            Some(e) => format!("{} has error: {e}", m.name),
+            None => m.name.clone(),
+        };
+        if m.hidden || !self.show_mates {
+            head.push_str(" (Hidden)");
+        }
+        let mut lines = vec![head, format!("{} mate", m.mate_type.name())];
         let mut offs: Vec<String> = Vec::new();
         for (label, e) in [("X", &m.offset_x), ("Y", &m.offset_y), ("Z", &m.offset_z)] {
             if let Some(e) = e.as_ref().filter(|e| !e.text.trim().is_empty()) {
@@ -3382,6 +3586,7 @@ impl AssemblyView {
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
+            .when_some(drag, |d, key| d.child(crate::ui::panel_probe(key)))
             .child(
                 h_flex()
                     .h(px(28.))
@@ -3396,7 +3601,9 @@ impl AssemblyView {
                         None => title.into_any_element(),
                     })
                     .child(if plain_close {
-                        Button::new(id).ghost().child(crate::ui::glyph("close", 16., gpui_kit::rgb(0x333333))).opacity(0.5).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
+                        // Live (dom dialog-animate): an 11 px #333 × at opacity .5; the icon
+                        // itself carries .58, so .86 here.
+                        Button::new(id).ghost().child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))).opacity(0.86).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
                     } else {
                         Button::new(id).ghost().child(svg().path(icon_path("dialog-cancel")).size(px(18.)).text_color(pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
                     }),
@@ -3505,8 +3712,9 @@ impl AssemblyView {
                     .gap(px(3.))
                     .child(type_select)
                     .child(div().flex_1())
-                    .child(icon_btn("mate-hud-flip", "flip", "Flip primary axis", cx).on_click(move |_, _, cx| d2.update(cx, |d, cx| d.flip(cx))))
-                    .child(icon_btn("mate-hud-reorient", "flip-circular", "Reorient secondary axis", cx).on_click(move |_, _, cx| d3.update(cx, |d, cx| d.reorient(cx))))
+                    // Live mate-hud.txt: the same icon as the dialog's flip.
+                    .child(icon_btn("mate-hud-flip", crate::assembly_mate_dialog::flip_icon_name(d2.read(cx).flip_primary), "Flip primary axis", cx).on_click(move |_, _, cx| d2.update(cx, |d, cx| d.flip(cx))))
+                    .child(icon_btn("mate-hud-reorient", "flip-circular-opposite", "Reorient secondary axis", cx).on_click(move |_, _, cx| d3.update(cx, |d, cx| d.reorient(cx))))
                     .child(
                         div()
                             .id("mate-hud-solve")
@@ -3837,7 +4045,7 @@ impl AssemblyView {
                                 this.ui.insert_filter.0 = !this.ui.insert_filter.0;
                                 cx.notify();
                             })))
-                            .child(toggle("rep-f-sketch", "sketch", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .child(toggle("rep-f-sketch", "insert-sketches", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.ui.insert_sketches = !this.ui.insert_sketches;
                                 cx.notify();
                             })))
@@ -3870,7 +4078,7 @@ impl AssemblyView {
                             cx.notify();
                         })))
                         .when(has_sketches, |d| {
-                            d.child(toggle("ins-f-sketch", "sketch", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            d.child(toggle("ins-f-sketch", "insert-sketches", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.ui.insert_sketches = !this.ui.insert_sketches;
                                 cx.notify();
                             })))
@@ -3882,7 +4090,7 @@ impl AssemblyView {
                             })))
                         })
                         .child(div().flex_1())
-                        .child(toggle("insert-rigid", "part-studio", "Insert entire Part Studio as rigid", rigid, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(toggle("insert-rigid", "insert-rigid", "Insert entire Part Studio as rigid", rigid, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.insert_rigid = !this.insert_rigid;
                             cx.notify();
                         }))),
@@ -3953,7 +4161,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .opacity(0.5)
                                 .cursor_pointer()
-                                .tooltip(crate::ui::tooltip("Close"))
                                 .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CLOSE, 20., pal.text))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     if let Some(s) = &mut this.replace_panel {
@@ -4151,11 +4358,9 @@ impl AssemblyView {
 
     /// The dialogs at the viewport's left (Insert, Mate, Relation, …) and
     /// what floats with them (the mate toolbar, the mass dialog's extras).
-    /// Not cached: they hold the fields being typed in, and a cached view
-    /// around them would be re-rendered, with every cached view nested in
-    /// it, on each keystroke and caret blink. They sit between the `under`
-    /// and `overlay` slices (see `AsmSlices`): over the view cube, under the
-    /// docked panes and menus.
+    /// Not cached: they hold the fields being typed in. Drawn by the
+    /// workspace in front of this view (`front_host`): over the view cube
+    /// (`under`), under the docked panes and menus (`overlay`).
     fn render_left_layer(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let mut out = Vec::new();
         // Left column: insert panel / mate dialog / relation dialog / animation.
@@ -4385,7 +4590,7 @@ impl AssemblyView {
                     .justify_center()
                     .rounded(px(3.))
                     .bg(rgb(0xffffff))
-                    .child(crate::assets::icon(&icon_path("list-fixed"), 14., cx)),
+                    .child(crate::assets::icon(&icon_path("list-fixed"), 20., cx)),
             ).into_any_element());
         }
         if let Some(el) = self.render_measure(cx) {
@@ -4428,7 +4633,8 @@ impl AssemblyView {
             },
             placed: |this, at, cx| this.viewport.update(cx, |vp, cx| vp.set_view_cube_origin(at, cx)),
         };
-        let cube = view_cube(menu, hooks, cx);
+        let size = self.viewport.read(cx).size();
+        let cube = view_cube(menu, hooks, size, cx);
         // A docked 712 px pane narrows the graphics area (live 181): the cube
         // stays 15 px from the pane's left edge.
         // The canvas is narrowed by a docked pane: the cube stays 15 px from
@@ -4516,6 +4722,9 @@ struct AsmSlices {
     insert_top: Entity<crate::cached_slice::Slice<AssemblyView>>,
     insert_filters: Entity<crate::cached_slice::Slice<AssemblyView>>,
     insert_footer: Entity<crate::cached_slice::Slice<AssemblyView>>,
+    /// The left dialogs, `overlay` and the Tools panel, drawn by the
+    /// workspace in front of this view (`front_host`); not cached.
+    front: Entity<crate::cached_slice::Slice<AssemblyView>>,
 }
 
 impl AssemblyView {
@@ -4525,7 +4734,7 @@ impl AssemblyView {
         }
         use crate::cached_slice::Slice;
         let me = cx.entity();
-        let toolbar = Slice::new(&me, |this, _, cx| this.render_toolbar(cx), cx);
+        let toolbar = Slice::new(&me, |this, window, cx| this.render_toolbar(f32::from(window.viewport_size().width), cx), cx);
         let rows = Slice::new(&me, |this, _, cx| this.render_list(cx), cx);
         let overlay = Slice::new(&me, |this, _, cx| this.render_overlay_slice(cx), cx);
         let under = Slice::new(&me, |this, _, cx| this.render_under_slice(cx), cx);
@@ -4533,6 +4742,7 @@ impl AssemblyView {
         let insert_top = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Top, cx), cx);
         let insert_filters = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Filters, cx), cx);
         let insert_footer = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Footer, cx), cx);
+        let front = Slice::new(&me, |this, window, cx| this.render_front_host(window, cx), cx);
         // The view cube and labels follow the camera, the list the
         // highlights; all read the document.
         for s in [&rows, &overlay, &under] {
@@ -4541,7 +4751,7 @@ impl AssemblyView {
         for s in [&toolbar, &rows, &overlay, &under, &insert_body, &insert_top, &insert_filters, &insert_footer] {
             Slice::observing(s, &self.doc, cx);
         }
-        let s = AsmSlices { toolbar, rows, overlay, under, insert_body, insert_top, insert_filters, insert_footer };
+        let s = AsmSlices { toolbar, rows, overlay, under, insert_body, insert_top, insert_filters, insert_footer, front };
         self.slices = Some(s.clone());
         s
     }
@@ -4551,6 +4761,46 @@ impl AssemblyView {
         if let Some(s) = &self.slices {
             s.rows.update(cx, |_, cx| cx.notify());
         }
+    }
+
+    /// The view the workspace draws in front of this one, over its list and
+    /// graphics area, and its top (under the toolbar). It holds the left
+    /// dialogs (Insert, Mate, … with their fields), so a keystroke or a caret
+    /// blink there renders it and not this view, which the workspace draws
+    /// as a cached view (gpui renders a notifying view's ancestors again).
+    pub fn front_host(&mut self, cx: &mut Context<Self>) -> (AnyView, f32) {
+        (self.slices(cx).front.into(), crate::ui::TOOLBAR_H)
+    }
+
+    /// The front layer (`front_host`), laid out as this view's area under
+    /// the toolbar: the left dialogs, the `overlay` slice and the toolbar's
+    /// Tools panel, in that order (as they were drawn in this view), with
+    /// the assembly's key context, actions and click-to-focus.
+    fn render_front_host(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let slices = self.slices(cx);
+        let list_w = if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() };
+        let tb_panel = self.render_tb_custom_panel(window, cx);
+        let graphics = div()
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .left(px(list_w))
+            .right_0()
+            .children(self.render_left_layer(cx))
+            .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()));
+        // "AssemblyFront" marks the layer in the focus path (a focus handle
+        // here would take the focus of every click in it, fields included).
+        self.with_actions(div().size_full().relative().key_context("Assembly AssemblyFront"), cx)
+            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                // As the view's own (see `render`), the front layer counting
+                // as inside it.
+                if !this.focus.contains_focused(window, cx) && !window.context_stack().iter().any(|c| c.contains("AssemblyFront")) {
+                    window.focus(&this.focus, cx);
+                }
+            }))
+            .child(graphics)
+            .children(tb_panel)
+            .into_any_element()
     }
 
     /// The Insert panel's search changed: only its catalog tree shows it.
@@ -4669,42 +4919,12 @@ impl AssemblyView {
     }
 }
 
-impl Render for AssemblyView {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let pal = p();
-        // Width taken from the graphics area by a docked pane: its 712 px
-        // and the 33 px strip at its left edge (live 181).
-        let dock_w = if self.pane_docked() { 33. + crate::ui::right_panel_w() } else { 0. };
-        self.ui.dock_w = dock_w;
-        if std::mem::take(&mut self.ui.eval_requested) {
-            self.schedule_eval(window, cx);
-        }
-        self.ensure_filter_input(window, cx);
-        if self.panel == Some(SidePanel::Configurations) {
-            self.ensure_cfg_filter(window, cx);
-        }
-        if std::mem::take(&mut self.ui.preview_done) {
-            self.finish_mate_preview(window, cx);
-        }
-        if self.panel == Some(SidePanel::Variables) {
-            self.sync_var_tables(window, cx);
-        }
-        let slices = self.slices(cx);
-        let tb_panel = self.render_tb_custom_panel(window, cx);
-        let list_head = self.render_list_head(cx);
-        // Moved panel dialogs reopen where they were left (live keeps each
-        // panel's rect: Interference detection opened at the remembered place).
-        v_flex()
-            .size_full()
-            .key_context("Assembly")
-            .track_focus(&self.focus)
-            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
-                // Keep keyboard shortcuts working after clicking the viewport or lists,
-                // without stealing focus from an input that just took it.
-                if !this.focus.contains_focused(window, cx) {
-                    window.focus(&this.focus, cx);
-                }
-            }))
+impl AssemblyView {
+    /// The assembly's actions and modifier handling, on its root and on the
+    /// front layer the workspace draws over it (`front_host`), so they reach
+    /// it from a focused field in either.
+    fn with_actions(&self, root: Div, cx: &mut Context<Self>) -> Div {
+        root
             .on_action(cx.listener(|this, _: &InsertInstance, window, cx| this.toggle_insert(window, cx)))
             .on_action(cx.listener(|this, _: &FastenMate, window, cx| this.start_mate(MateType::Fastened, window, cx)))
             .on_action(cx.listener(|this, _: &ToggleMates, _, cx| {
@@ -4753,8 +4973,7 @@ impl Render for AssemblyView {
             .on_action(cx.listener(|this, _: &FlipPrimaryAxis, window, cx| this.flip_or_reorient(true, window, cx)))
             .on_action(cx.listener(|this, _: &ReorientSecondaryAxis, window, cx| this.flip_or_reorient(false, window, cx)))
             .on_action(cx.listener(|this, _: &ClearSelection, _, cx| {
-                this.selected.clear();
-                this.selected_mate = None;
+                this.clear_selection();
                 this.refresh_scene(false, cx);
                 cx.notify();
             }))
@@ -4802,6 +5021,49 @@ impl Render for AssemblyView {
             .on_action(cx.listener(|this, _: &PanRight, _, cx| this.viewport.update(cx, |vp, cx| vp.pan_step(1.0, 0.0, cx))))
             .on_action(cx.listener(|this, _: &PanUp, _, cx| this.viewport.update(cx, |vp, cx| vp.pan_step(0.0, -1.0, cx))))
             .on_action(cx.listener(|this, _: &PanDown, _, cx| this.viewport.update(cx, |vp, cx| vp.pan_step(0.0, 1.0, cx))))
+    }
+}
+
+impl Render for AssemblyView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        // Width taken from the graphics area by a docked pane: its 712 px
+        // and the 33 px strip at its left edge (live 181).
+        let dock_w = if self.pane_docked() { 33. + crate::ui::right_panel_w() } else { 0. };
+        self.ui.dock_w = dock_w;
+        // What GPUI still draws that follows the camera (perf: otherwise
+        // camera moves are only presented): mate values and their edit
+        // boxes, the center of mass marker, the manipulator value box.
+        let follows = self.manip_value.is_some() || self.ui.com.is_some() || self.anim.as_ref().is_some_and(|a| a.preview) || (self.anim.is_none() && self.mate.is_none() && (self.ui.value_edit.is_some() || self.selected_mate.is_some()));
+        self.viewport.update(cx, |vp, _| vp.set_ui_follows_camera(follows));
+        if std::mem::take(&mut self.ui.eval_requested) {
+            self.schedule_eval(window, cx);
+        }
+        self.ensure_filter_input(window, cx);
+        if self.panel == Some(SidePanel::Configurations) {
+            self.ensure_cfg_filter(window, cx);
+        }
+        if std::mem::take(&mut self.ui.preview_done) {
+            self.finish_mate_preview(window, cx);
+        }
+        if self.panel == Some(SidePanel::Variables) {
+            self.sync_var_tables(window, cx);
+        }
+        let slices = self.slices(cx);
+        let list_head = self.render_list_head(cx);
+        // Moved panel dialogs reopen where they were left (live keeps each
+        // panel's rect: Interference detection opened at the remembered place).
+        self.with_actions(v_flex(), cx)
+            .size_full()
+            .key_context("Assembly")
+            .track_focus(&self.focus)
+            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                // Keep keyboard shortcuts working after clicking the viewport or lists,
+                // without stealing focus from an input that just took it.
+                if !this.focus.contains_focused(window, cx) {
+                    window.focus(&this.focus, cx);
+                }
+            }))
             // Customizing: drawn every frame (a dragged tool leaves the bar
             // while the drag runs, and nothing notifies the cached slice).
             .child(if self.ui.tb_custom.is_some() {
@@ -4856,12 +5118,12 @@ impl Render for AssemblyView {
                                     .when(!self.ui.list_collapsed, |d| d.child(crate::ui::left_splitter()))
                                     .child(self.render_evaluation_tools(cx)),
                             )
-                            .child(slices.under.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
-                            .children(self.render_left_layer(cx))
-                            .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full())),
-                    )
-                    // Customize toolbar's Tools panel, over the list and graphics.
-                    .children(tb_panel),
+                            // The left dialogs and `overlay` are drawn in
+                            // front of it by the workspace (`front_host`).
+                            .child(slices.under.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full())),
+                    ),
+                // So is the customize toolbar's Tools panel, over the list
+                // and graphics.
             )
     }
 }

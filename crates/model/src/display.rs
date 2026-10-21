@@ -182,6 +182,9 @@ pub struct SketchPointDisplay {
     pub standalone: bool,
     /// Interior control point of a spline (drawn smaller).
     pub handle: bool,
+    /// Projected outside geometry (the origin a point was inferred from,
+    /// Use): not one of the sketch's own vertices.
+    pub external: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -347,6 +350,53 @@ pub struct StudioDisplay {
     /// The shown Assembly context's bodies (translucent, pickable for
     /// references; not parts of this Part Studio, see `crate::in_context`).
     pub context_bodies: Vec<BodyDisplay>,
+    /// Bodies that are rigidly moved copies of one shape (pattern instances
+    /// sharing a TShape, `Shape::partner_hash`): the renderer uploads the
+    /// shared mesh once and draws each copy placed by its transform.
+    pub shared_meshes: std::collections::HashMap<BodyId, SharedMesh>,
+}
+
+/// A body's mesh as a placed copy of one its pattern partners share.
+#[derive(Clone, Debug)]
+pub struct SharedMesh {
+    /// The shape's mesh at its identity location (`Shape::unlocated`).
+    pub mesh: Arc<MeshBuffers>,
+    /// Placement: rigid 3x4 row-major matrix (`Shape::location`).
+    pub transform: [f64; 12],
+    /// The body's world mesh this stands for ([`BodyDisplay::mesh`]); a
+    /// body whose mesh was replaced since is drawn from its own mesh.
+    pub world: Arc<MeshBuffers>,
+}
+
+impl SharedMesh {
+    /// The shared mesh's stand-in for `body`, if it still is one.
+    pub fn of<'a>(display: &'a StudioDisplay, body: &BodyDisplay) -> Option<&'a SharedMesh> {
+        display.shared_meshes.get(&body.id).filter(|s| Arc::ptr_eq(&s.world, &body.mesh))
+    }
+}
+
+impl MeshBuffers {
+    /// This mesh placed by a rigid 3x4 row-major `transform`.
+    pub fn transformed(&self, transform: &[f64; 12]) -> MeshBuffers {
+        let m = transform;
+        let point = |p: &[f32; 3]| -> [f32; 3] {
+            let (x, y, z) = (p[0] as f64, p[1] as f64, p[2] as f64);
+            std::array::from_fn(|r| (m[r * 4] * x + m[r * 4 + 1] * y + m[r * 4 + 2] * z + m[r * 4 + 3]) as f32)
+        };
+        let normal = |n: &[f32; 3]| -> [f32; 3] {
+            let (x, y, z) = (n[0] as f64, n[1] as f64, n[2] as f64);
+            std::array::from_fn(|r| (m[r * 4] * x + m[r * 4 + 1] * y + m[r * 4 + 2] * z) as f32)
+        };
+        MeshBuffers {
+            positions: self.positions.iter().map(point).collect(),
+            normals: self.normals.iter().map(normal).collect(),
+            indices: self.indices.clone(),
+            face_ranges: self.face_ranges.clone(),
+            edges: self.edges.iter().map(|pl| pl.iter().map(point).collect()).collect(),
+            vertices: self.vertices.iter().map(point).collect(),
+            mesh_lines: self.mesh_lines.iter().map(point).collect(),
+        }
+    }
 }
 
 impl StudioDisplay {

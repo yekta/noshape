@@ -76,3 +76,12 @@ impl Offscreen {
         encode_png(frame.bgra, frame.width, frame.height, width, height)
     }
 }
+
+/// An inserted drawing image's pixels (RGB) from its base64 data (PDF
+/// export embeds them).
+pub fn decode_rgb(data_base64: &str) -> Option<(u32, u32, std::sync::Arc<Vec<u8>>)> {
+    let bytes = noshape_model::sketch_feature::base64_decode(data_base64)?;
+    let img = image::load_from_memory(&bytes).ok()?.to_rgb8();
+    let (w, h) = img.dimensions();
+    Some((w, h, std::sync::Arc::new(img.into_raw())))
+}

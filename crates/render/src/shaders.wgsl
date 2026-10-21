@@ -19,6 +19,9 @@ struct Globals {
     specular: vec4<f32>,     // rgb specular color, w shininess 0..1 (Graphics preferences)
     dash: vec4<f32>,         // construction lines: dash, gap, dash, gap (px)
     room: vec4<f32>,         // zebra stripes room: center xyz, radius
+    depth_unit: vec4<f32>,   // x = our depth per unit of Onshape's depth buffer (perspective: per w)
+    compare: vec4<f32>,      // compare mode: xyz Onshape's eye, w its near distance
+    compare2: vec4<f32>,     // x its far distance, y on (1), z mix alpha
 };
 
 struct Inst {
@@ -31,7 +34,16 @@ struct Inst {
 
 @group(0) @binding(0) var<uniform> g: Globals;
 @group(0) @binding(1) var<storage, read> states: array<u32>;
-@group(1) @binding(0) var<uniform> inst: Inst;
+// Instances, and the order this pass draws them in: draw calls address
+// instances by slot (instance index for meshes and images, vertex index / 6
+// for lines and points), so copies sharing a buffer draw in one call.
+@group(1) @binding(0) var<storage, read> insts: array<Inst>;
+@group(1) @binding(1) var<storage, read> slots: array<u32>;
+var<private> inst: Inst;
+
+fn load_inst(slot: u32) {
+    inst = insts[slots[slot]];
+}
 
 const HOVER: u32 = 1u;
 const SELECTED: u32 = 2u;
@@ -139,15 +151,18 @@ struct MeshOut {
     @location(1) normal: vec3<f32>,
     @location(2) @interpolate(flat) pick: u32,
     @location(3) color: vec4<f32>,
+    @location(4) @interpolate(flat) slot: u32,
 };
 
 @vertex
-fn vs_mesh(v: MeshIn) -> MeshOut {
-    return mesh_vertex(v);
+fn vs_mesh(v: MeshIn, @builtin(instance_index) slot: u32) -> MeshOut {
+    return mesh_vertex(v, slot);
 }
 
-fn mesh_vertex(v: MeshIn) -> MeshOut {
+fn mesh_vertex(v: MeshIn, slot: u32) -> MeshOut {
+    load_inst(slot);
     var o: MeshOut;
+    o.slot = slot;
     let w = inst.model * vec4(v.pos, 1.0);
     o.world = w.xyz;
     o.pos = g.view_proj * w;
@@ -219,6 +234,63 @@ fn zebra(world: vec3<f32>, normal: vec3<f32>, front: bool) -> vec3<f32> {
     return vec3(1.0);
 }
 
+// ---------------------------------------------------------------- compare
+//
+// Versions and history › Compare (Onshape's compare pass, webgl bundle;
+// renderer.rs `encode_compare`). Each version's depth and facing normal are
+// rendered first (fs_compare_dn); a face of one version is lit in the "same"
+// tint where the other version has the same surface at that pixel, else in
+// its version's tint.
+
+@group(3) @binding(0) var compare_base: texture_2d<f32>;
+@group(3) @binding(1) var compare_target: texture_2d<f32>;
+@group(3) @binding(2) var compare_over: texture_2d<f32>;
+
+// COMPARE_SAME_LIT_TINT, COMPARE_BASE_TINT, COMPARE_TARGET_TINT (sRGB).
+const COMPARE_SAME: vec3<f32> = vec3(1.0, 1.0, 1.0);
+const COMPARE_BASE: vec3<f32> = vec3(144.0, 207.0, 241.0) / 255.0;
+const COMPARE_TARGET: vec3<f32> = vec3(221.0, 82.0, 40.0) / 255.0;
+// compareFunctions: COMPARE_NEAR_ZERO, COMPARE_NORMAL_FACTOR.
+const COMPARE_NEAR_ZERO: f32 = 0.0004;
+const COMPARE_NORMAL_FACTOR: f32 = 0.98;
+
+// Onshape's vDepth: the eye distance between its near (0) and far (1).
+fn compare_depth(world: vec3<f32>) -> f32 {
+    return (dot(world - g.compare.xyz, g.camera_fwd.xyz) - g.compare.w) / (g.compare2.x - g.compare.w);
+}
+
+// The color this version's face takes at this pixel (linear).
+fn compare_tint(i: MeshOut, front: bool, own: vec3<f32>) -> vec3<f32> {
+    let layer = (inst.params.y >> 5u) & 3u;
+    if (layer == 0u || g.compare2.y < 0.5) { return own; }
+    let p = vec2<i32>(floor(i.pos.xy));
+    var other: vec4<f32>;
+    if (layer == 1u) { other = textureLoad(compare_target, p, 0); } else { other = textureLoad(compare_base, p, 0); }
+    var n = normalize(i.normal);
+    if (!front) { n = -n; }
+    let same = other.w >= 0.0 && abs(compare_depth(i.world) - other.w) < COMPARE_NEAR_ZERO && dot(n, other.xyz) > COMPARE_NORMAL_FACTOR;
+    var tint = COMPARE_SAME;
+    if (!same) { tint = select(COMPARE_TARGET, COMPARE_BASE, layer == 1u); }
+    return srgb_to_linear(tint);
+}
+
+// A version's facing normal and depth (w < 0: nothing there).
+@fragment
+fn fs_compare_dn(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    if ((state_of(i.pick) & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    var n = normalize(i.normal);
+    if (!front) { n = -n; }
+    return vec4(n, compare_depth(i.world));
+}
+
+// Both versions drawn together, mixed over the "under" version.
+@fragment
+fn fs_compare_mix(i: BgOut) -> @location(0) vec4<f32> {
+    let c = textureLoad(compare_over, vec2<i32>(floor(i.pos.xy)), 0);
+    return vec4(c.rgb, g.compare2.z);
+}
+
 fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
     let st = state_of(i.pick);
     if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
@@ -226,6 +298,7 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
     // appearances); vertices with alpha 0 keep the instance color.
     var own = inst.color.rgb;
     if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
+    own = compare_tint(i, front, own);
     // params.y bit 1: unlit (construction planes keep their flat color and
     // tint on hover). Shaded faces don't change on hover: the app outlines
     // the hovered face instead (Onshape).
@@ -252,6 +325,7 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
 
 @fragment
 fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     return mesh_color(i, front);
 }
 
@@ -260,8 +334,8 @@ fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<
 // Where they stick out past the part's own front faces they show as the
 // silhouette; everywhere else the front faces hide them.
 @vertex
-fn vs_outline(v: MeshIn) -> MeshOut {
-    var o = mesh_vertex(v);
+fn vs_outline(v: MeshIn, @builtin(instance_index) slot: u32) -> MeshOut {
+    var o = mesh_vertex(v, slot);
     let n = (g.view_proj * vec4(o.normal, 0.0)).xy;
     let len = length(n);
     if (len > 1e-6) {
@@ -273,6 +347,7 @@ fn vs_outline(v: MeshIn) -> MeshOut {
 
 @fragment
 fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     let st = state_of(i.pick);
     if ((st & OUTLINE) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
     var v: vec3<f32>;
@@ -291,79 +366,153 @@ fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
 // Depth of outlined parts only (no color): see mesh_outline_depth.
 @fragment
 fn fs_outline_depth(i: MeshOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     let st = state_of(i.pick);
     if ((st & OUTLINE) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
     return vec4(0.0);
 }
 
-struct SectionOut {
-    @location(0) color: vec4<f32>,
-    @builtin(frag_depth) depth: f32,
+// ---------------------------------------------------------------- section caps
+//
+// Onshape's stencil-free capping (webgl bundle, kern G40): every kept surface
+// adds its part's color to a float mask (+ for front faces, - for back
+// faces, alpha + 16 per part), so where the plane cuts material the mask
+// holds that part's color and part count. An edge pass outlines the regions
+// (section_caps.wgsl), then a quad on each plane draws the hatched cap.
+
+fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
+    let lo = c * 12.92;
+    let hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - vec3(0.055);
+    return select(hi, lo, c <= vec3(0.0031308));
+}
+
+// Alpha weight of one part in the mask (Onshape's partCountOrder).
+const PART_COUNT_ORDER: f32 = 16.0;
+
+@fragment
+fn fs_section_mask(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    if ((inst.params.y & 3u) != 0u || (state_of(i.pick) & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    var own = linear_to_srgb(inst.color.rgb);
+    if (inst.params.x != 0u && i.color.a > 0.0) { own = i.color.rgb; }
+    // The part's id nudges its color, so equal colors hatch differently.
+    let id = f32(inst.params.w);
+    let offset = vec3(id % 31.0, id % 71.0, id % 97.0) * 0.001;
+    let c = vec4(own + offset, inst.color.a + PART_COUNT_ORDER);
+    return select(-c, c, front);
+}
+
+struct CapPlane {
+    center: vec4<f32>,    // xyz plane point, w = half size of the quad
+    u: vec4<f32>,         // xyz tangent, w = hatch pattern scale (world)
+    v: vec4<f32>,         // xyz normal x tangent
+    selector: vec4<f32>,  // this plane's selector color
+    index: vec4<u32>,     // x = plane index
 };
 
-// Section view (separate pipeline, used only while planes cut): a back face
-// seen through the cut is replaced by the cap — the part's color, lit as
-// the cut plane and hatched, at the depth where the view ray leaves the
-// removed region (the intersection of the planes' removed half-spaces).
-@fragment
-fn fs_mesh_section(i: MeshOut, @builtin(front_facing) front: bool) -> SectionOut {
-    var o: SectionOut;
-    // Back faces only (front faces are culled); anything but a cap is
-    // already drawn by the opaque pass.
-    if (front || g.flags.x == 0u || (inst.params.y & 3u) != 0u || (state_of(i.pick) & HIDDEN) != 0u) { discard; }
-    var dir = g.camera_fwd.xyz;
-    if (g.camera_pos.w > 0.5) { dir = normalize(i.world - g.camera_pos.xyz); }
-    // Walk back toward the eye: p(s) = world - dir * s. Enter the removed
-    // region at the largest crossing of the planes the point is outside of.
-    var planes = array<vec4<f32>, 3>(g.clip, g.clip2, g.clip3);
-    var s_in = 0.0;
-    var normal = vec3<f32>(0.0);
-    for (var k = 0u; k < g.flags.x; k = k + 1u) {
-        let pl = planes[k];
-        let f = dot(i.world, pl.xyz) - pl.w;
-        if (f > 0.0) { continue; }
-        let nd = dot(pl.xyz, dir);
-        if (nd >= 0.0) { discard; }
-        let s = f / nd;
-        if (s >= s_in) { s_in = s; normal = pl.xyz; }
-    }
-    if (dot(normal, normal) == 0.0) { discard; }
-    let c = i.world - dir * s_in;
-    for (var k = 0u; k < g.flags.x; k = k + 1u) {
-        let pl = planes[k];
-        if (dot(c, pl.xyz) - pl.w < -1e-5 * max(1.0, abs(pl.w))) { discard; }
-    }
-    let clip = g.view_proj * vec4(c, 1.0);
-    o.depth = clamp(clip.z / clip.w, 0.0, 1.0);
-    var own = inst.color.rgb;
-    if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
-    var col = shade(c, normal, true, own);
-    // Hatching (live part-studio/74): 1 px lines at 45° in the cut plane's
-    // own axes (X+Y on Top), 11 px apart vertically on screen (live), half the cap's color.
-    var u = vec3<f32>(1.0, 0.0, 0.0);
-    if (abs(normal.z) < 0.9) { u = vec3<f32>(0.0, 0.0, 1.0); }
-    u = normalize(u - normal * dot(u, normal));
-    let v = cross(normal, u);
-    let across = normalize(u - v);
-    let p0 = g.view_proj * vec4(c, 1.0);
-    let p1 = g.view_proj * vec4(c + across * 0.001, 1.0);
-    let px_per_unit = length((p1.xy / p1.w - p0.xy / p0.w) * g.viewport.xy * 0.5) * 1000.0;
-    let spacing = 11.6 * g.viewport.z / max(px_per_unit, 1e-6);
-    let line_w = 1.0 * g.viewport.z / max(px_per_unit, 1e-6);
-    if (fract(dot(c, across) / spacing) < line_w / spacing) { col = col * 0.5; }
-    o.color = vec4(col, 1.0);
+@group(2) @binding(0) var<uniform> cap: CapPlane;
+@group(2) @binding(1) var cap_mask: texture_2d<f32>;
+@group(2) @binding(2) var cap_edges: texture_2d<f32>;
+
+struct CapOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) world: vec3<f32>,
+};
+
+@vertex
+fn vs_section_cap(@builtin(vertex_index) vi: u32) -> CapOut {
+    var corners = array<vec2<f32>, 6>(vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0));
+    let k = corners[vi] * cap.center.w;
+    var o: CapOut;
+    o.world = cap.center.xyz + cap.u.xyz * k.x + cap.v.xyz * k.y;
+    o.pos = g.view_proj * vec4(o.world, 1.0);
     return o;
 }
 
-// Section caps, first pass: kept surfaces only (the stencil counts them).
+fn cap_sample(p: vec2<i32>) -> vec4<f32> {
+    let size = vec2<i32>(textureDimensions(cap_mask));
+    return abs(textureLoad(cap_mask, clamp(p, vec2(0), size - 1), 0));
+}
+
+// Hash of the part color the hatch direction and pacing come from.
+fn color_hash(c: vec3<f32>) -> f32 {
+    return (c.r * 1000.0) % 1000.0 + (c.g * 1000.0) % 1000.0 + (c.b + 1000.0) % 1000.0;
+}
+
+// Hatch coverage at `t` (plane coordinates): a smooth tent of width 0.2
+// pattern scales once per period; direction and period follow the color.
+fn hatch(t: vec2<f32>, c: vec3<f32>) -> f32 {
+    const THICKNESS: f32 = 0.2;
+    const VARIATION: f32 = 1.75;
+    let rolloff = min(THICKNESS / 2.0, 0.1);
+    let interior = THICKNESS - rolloff * 2.0;
+    let h = color_hash(c);
+    let pace = mix(1.0, VARIATION * VARIATION, fract(h)) / VARIATION;
+    let period = cap.u.w * pace;
+    let along = dot(vec2(cos(h), sin(h)), t);
+    let cycle = (along - period * floor(along / period)) / period;
+    let step = rolloff / pace;
+    let up = 1.0 - step - interior / pace;
+    let rise = smoothstep(up - step, up, cycle);
+    let fall = 1.0 - smoothstep(1.0 - step, 1.0, cycle);
+    return select(fall, rise, cycle < up);
+}
+
 @fragment
-fn fs_section_count(i: MeshOut) -> @location(0) vec4<f32> {
-    if ((inst.params.y & 3u) != 0u || (state_of(i.pick) & HIDDEN) != 0u || clipped(i.world)) { discard; }
-    return vec4(0.0);
+fn fs_section_cap(i: CapOut) -> @location(0) vec4<f32> {
+    // Only where the other planes cut too.
+    var planes = array<vec4<f32>, 3>(g.clip, g.clip2, g.clip3);
+    for (var k = 0u; k < g.flags.x; k = k + 1u) {
+        let pl = planes[k];
+        if (k != cap.index.x && dot(i.world, pl.xyz) - pl.w < -CLIP_EPS) { discard; }
+    }
+    let p = vec2<i32>(floor(i.pos.xy));
+    // The sample with the median alpha of three in a row (Onshape: robust
+    // to one-pixel cracks).
+    let s0 = cap_sample(p - vec2(1, 0));
+    let s1 = cap_sample(p);
+    let s2 = cap_sample(p + vec2(1, 0));
+    var s = s1;
+    if ((s1.a <= s0.a && s0.a <= s2.a) || (s2.a <= s0.a && s0.a <= s1.a)) {
+        s = s0;
+    } else if ((s0.a <= s2.a && s2.a <= s1.a) || (s1.a <= s2.a && s2.a <= s0.a)) {
+        s = s2;
+    }
+    let edge = textureLoad(cap_edges, p, 0).r;
+    if (s.a < 0.001) {
+        if (edge <= 0.01) { discard; }
+        // Black at `edge` over what is there, as if blended in gamma space
+        // (Onshape's canvas) rather than linear (exact over white).
+        let keep = pow((1.0 - edge + 0.055) / 1.055, 2.4);
+        return vec4(0.0, 0.0, 0.0, 1.0 - keep);
+    }
+    let parts = floor(s.a / PART_COUNT_ORDER);
+    let alpha = clamp(s.a - parts * PART_COUNT_ORDER, 0.0, 1.0);
+    // Pattern colors are sRGB values, like the part color in the mask.
+    let d = i.world - cap.center.xyz;
+    let t = vec2(dot(cap.u.xyz, d), dot(cap.v.xyz, d));
+    let fade = 0.5;
+    let shade = hatch(t, s.rgb);
+    var col: vec3<f32>;
+    if (max(s.r, max(s.g, s.b)) < 0.4) {
+        // Dark parts get lighter lines.
+        let lift = mix(0.0, (1.0 - fade) * 2.0, shade);
+        col = mix(vec3(lift), s.rgb * (1.0 + lift), max(s.r, max(s.g, s.b)) / 0.4);
+    } else {
+        col = s.rgb * mix(1.0, fade, shade);
+    }
+    // Two parts' material at one point: red (Onshape's intersecting color).
+    if (parts > 1.0) { col = vec3(220.0 / 255.0, 0.0, 0.0); }
+    col = mix(col, cap.selector.rgb, 0.1);
+    col = mix(col, vec3(0.0), edge);
+    var a = alpha;
+    if (parts > 1.0) { a = clamp(alpha + 0.1, 0.0, 1.0); }
+    return vec4(srgb_to_linear(col), a);
 }
 
 @fragment
 fn fs_mesh_pick(i: MeshOut) -> @location(0) u32 {
+    load_inst(i.slot);
     let st = state_of(i.pick);
     if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
     if (inst.params.z == 0u) { return 0u; }
@@ -388,6 +537,7 @@ struct LineOut {
     @location(2) along: f32,
     @location(3) world: vec3<f32>,
     @location(4) @interpolate(flat) style: u32,
+    @location(5) @interpolate(flat) slot: u32,
 };
 
 fn clip_near(p: vec4<f32>, q: vec4<f32>) -> vec4<f32> {
@@ -398,9 +548,24 @@ fn clip_near(p: vec4<f32>, q: vec4<f32>) -> vec4<f32> {
     return mix(p, q, t);
 }
 
+// Onshape's depth offsets (webgl bundle `setZOffset`: polygonOffset(z / 29,
+// z) with faces 27, edges 15, points 9). The slope part is the pipelines'
+// depth bias (FACE/EDGE/POINT_DEPTH_BIAS in renderer.rs); the constant part
+// is here: `c` in front of the faces by `units` of Onshape's 24-bit depth
+// (renderer.rs `onshape_depth_unit`), so edges and points win only against
+// the faces they lie on, never through geometry in front of them.
+fn in_front_of_faces(c: vec4<f32>, units: f32) -> vec4<f32> {
+    var o = c;
+    o.z = c.z + units * g.depth_unit.x * select(1.0, c.w, g.camera_pos.w > 0.5);
+    return o;
+}
+
 @vertex
-fn vs_line(@builtin(vertex_index) vi: u32, l: LineIn) -> LineOut {
-    // Two triangles: corners (t, side)
+fn vs_line(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
+    // Six vertices (two triangles) per segment and slot: corners (t, side).
+    let slot = index / 6u;
+    let vi = index % 6u;
+    load_inst(slot);
     var ts = array<f32, 6>(0.0, 0.0, 1.0, 0.0, 1.0, 1.0);
     var ss = array<f32, 6>(-1.0, 1.0, 1.0, -1.0, 1.0, -1.0);
     let t = ts[vi];
@@ -435,11 +600,12 @@ fn vs_line(@builtin(vertex_index) vi: u32, l: LineIn) -> LineOut {
     if ((l.style & 2u) != 0u) {
         c.z = c.w; // on top: nearest depth
     } else {
-        // Pull lines slightly toward the camera so edges win against faces.
-        c.z = c.z * 1.0004 + 2e-5 * c.w;
+        // At the edge's own depth, offset like Onshape's (27 - 15 units).
+        c = in_front_of_faces(c, 12.0);
     }
 
     var o: LineOut;
+    o.slot = slot;
     o.pos = c;
     var base: vec3<f32>;
     var alpha: f32;
@@ -456,6 +622,7 @@ fn vs_line(@builtin(vertex_index) vi: u32, l: LineIn) -> LineOut {
 
 @fragment
 fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     if (clipped(i.world)) { discard; }
     if ((i.style & 1u) != 0u && fract(i.along / (7.0 * g.viewport.z)) > 0.55) { discard; }
     if ((i.style & 4u) != 0u) {
@@ -473,6 +640,7 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_line_pick(i: LineOut) -> @location(0) u32 {
+    load_inst(i.slot);
     if (clipped(i.world)) { discard; }
     if (inst.params.z == 0u) { discard; }
     return i.pick;
@@ -495,10 +663,15 @@ struct PointOut {
     @location(2) uv: vec2<f32>,
     @location(3) world: vec3<f32>,
     @location(4) @interpolate(flat) style: u32,
+    @location(5) @interpolate(flat) slot: u32,
 };
 
 @vertex
-fn vs_point(@builtin(vertex_index) vi: u32, p: PointIn) -> PointOut {
+fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
+    // Six vertices per point and slot.
+    let slot = index / 6u;
+    let vi = index % 6u;
+    load_inst(slot);
     var corners = array<vec2<f32>, 6>(
         vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0),
         vec2(-1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0));
@@ -511,8 +684,10 @@ fn vs_point(@builtin(vertex_index) vi: u32, p: PointIn) -> PointOut {
     if ((st & (HOVER | SELECTED)) != 0u) { size = size * 1.5 + 1.0; }
     let half = size * g.viewport.z * 0.5;
     c = vec4(c.xy + uv * half / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
-    if ((p.style & 2u) != 0u) { c.z = c.w; } else { c.z = c.z * 1.0008 + 4e-5 * c.w; }
+    // Onshape's offsets: points 9 units, faces 27.
+    if ((p.style & 2u) != 0u) { c.z = c.w; } else { c = in_front_of_faces(c, 18.0); }
     var o: PointOut;
+    o.slot = slot;
     o.pos = c;
     var base: vec3<f32>;
     var alpha: f32;
@@ -528,6 +703,7 @@ fn vs_point(@builtin(vertex_index) vi: u32, p: PointIn) -> PointOut {
 
 @fragment
 fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     let r2 = dot(i.uv, i.uv);
     if (r2 > 1.0 || clipped(i.world)) { discard; }
     // Style bit 4: a ring with a center dot (the origin).
@@ -540,6 +716,7 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_point_pick(i: PointOut) -> @location(0) u32 {
+    load_inst(i.slot);
     if (dot(i.uv, i.uv) > 1.0 || clipped(i.world)) { discard; }
     if (inst.params.z == 0u) { discard; }
     return i.pick;
@@ -561,11 +738,14 @@ struct ImageOut {
     @builtin(position) pos: vec4<f32>,
     @location(0) world: vec3<f32>,
     @location(1) uv: vec2<f32>,
+    @location(2) @interpolate(flat) slot: u32,
 };
 
 @vertex
-fn vs_image(v: ImageIn) -> ImageOut {
+fn vs_image(v: ImageIn, @builtin(instance_index) slot: u32) -> ImageOut {
+    load_inst(slot);
     var o: ImageOut;
+    o.slot = slot;
     let w = inst.model * vec4(v.pos, 1.0);
     o.world = w.xyz;
     o.pos = g.view_proj * w;
@@ -585,6 +765,7 @@ fn image_color(i: ImageOut) -> vec4<f32> {
 // Opaque instances draw twice: mostly opaque texels first, writing depth...
 @fragment
 fn fs_image_opaque(i: ImageOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     let c = image_color(i);
     if (c.a < 0.5) { discard; }
     return c;
@@ -594,6 +775,7 @@ fn fs_image_opaque(i: ImageOut) -> @location(0) vec4<f32> {
 // writing depth.
 @fragment
 fn fs_image_soft(i: ImageOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     let c = image_color(i);
     if (c.a >= 0.5 || c.a <= 0.0) { discard; }
     return c;
@@ -602,6 +784,7 @@ fn fs_image_soft(i: ImageOut) -> @location(0) vec4<f32> {
 // Faded instances (instance alpha < 1): all texels blended, no depth write.
 @fragment
 fn fs_image_blend(i: ImageOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     let c = image_color(i);
     if (c.a <= 0.0) { discard; }
     return c;
@@ -613,6 +796,7 @@ fn fs_image_blend(i: ImageOut) -> @location(0) vec4<f32> {
 // it follows the camera).
 @fragment
 fn fs_mesh_reflect(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
     let base = mesh_color(i, front);
     var n = normalize(i.normal);
     if (!front) { n = -n; }

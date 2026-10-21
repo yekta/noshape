@@ -3,9 +3,11 @@
 //! plan"). Slice 1: the tool, pick, selection, drag and overlay types and the
 //! vector helpers. Slice 2: picking ([`SheetPick`]). Slice 3: the smart
 //! dimension, grips and drags, and the pending annotation / view previews.
+//! Slice 4: the dialogs' options as plain values ([`ViewOptions`] etc.).
 
 pub mod geom;
 mod jog;
+mod opts;
 mod overlay;
 mod pending;
 mod pick;
@@ -15,6 +17,7 @@ mod types;
 
 pub use overlay::{Overlay, SnapMark};
 pub use jog::{CentermarkArms, seg_dist};
+pub use opts::*;
 pub use pending::ToolValues;
 pub use pick::SheetPick;
 pub use smart::{Refs, same, view_of};

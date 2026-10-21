@@ -66,7 +66,7 @@ fn sheet_export_with_views_and_dimensions() {
     let svg = export::to_svg(&built.geometry);
     let pdf = export::to_pdf(&built.geometry);
     let dxf = export::to_dxf(&built.geometry);
-    assert!(svg.contains("SECTION A-A") && svg.contains("DETAIL B") && svg.contains(">100<"));
+    assert!(svg.contains("SECTION A - A") && svg.contains("DETAIL B") && svg.contains(">100<"));
     let _ = std::fs::create_dir_all("/tmp/drw");
     std::fs::write("/tmp/drw/demo.svg", &svg).unwrap();
     std::fs::write("/tmp/drw/demo.pdf", &pdf).unwrap();
@@ -248,7 +248,7 @@ fn jogged_and_aligned_sections() {
     assert!(g.error.is_none(), "{:?}", g.error);
     assert!(!g.edges.is_empty() && !g.section_segments.is_empty());
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
-    assert!(texts(&built).iter().any(|t| t == "SECTION C-C"));
+    assert!(texts(&built).iter().any(|t| t == "SECTION C - C"));
 }
 
 #[test]
@@ -926,7 +926,7 @@ fn move_views_between_sheets() {
     assert!(dst.views.iter().filter(|v| v.id != new_top).all(|v| dst.parent_of(v.id) == Some(new_top)));
     let built = render_sheet(&drawing, to, &sources, &cache, false).unwrap();
     assert!(built.dangling.is_empty(), "{:?}", built.dangling);
-    assert!(texts(&built).iter().any(|t| t == "SECTION A-A"));
+    assert!(texts(&built).iter().any(|t| t == "SECTION A - A"));
     for v in &drawing.sheets[to].views {
         let g = compute_view(&drawing, &drawing.sheets[to], v.id, &sources, &cache, false);
         assert!(g.error.is_none(), "{:?}", g.error);
@@ -1836,13 +1836,14 @@ fn mbd_datum_goes_to_the_edge_on_view_and_can_be_hidden() {
     let placed: Vec<_> = drawing.sheets[0].annotations.iter().filter_map(|a| a.model.clone()).collect();
     assert_eq!(placed.len(), 1);
     assert_eq!(placed[0].view, ViewId(1), "the top face is edge-on in the Front view");
-    // Drawn on the Front view's top edge, the box above it.
+    // Drawn on the Front view's top edge, the box below it, inside the view
+    // (live drawing/1070).
     let sources = regenerate_sources(&doc, &drawing);
     let cache = ViewCache::new();
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
-    let t = built.geometry.texts.iter().find(|t| t.text == "A" && t.pos[1] > 100.0 && t.pos[1] < 160.0).expect("datum letter near the front view");
+    let t = built.geometry.texts.iter().find(|t| t.text == "A" && (t.pos[0] - 100.0).abs() < 60.0 && t.pos[1] > 40.0 && t.pos[1] < 160.0).expect("datum letter near the front view");
     let pl = built.placements.iter().find(|p| p.id == ViewId(1)).unwrap();
-    assert!(t.pos[1] > pl.max[1] - 1e-6, "box above the top edge: {:?} vs {:?}", t.pos, pl.max);
+    assert!(t.pos[1] < pl.max[1] && t.pos[1] > pl.min[1], "box under the top edge: {:?} vs {:?}", t.pos, pl.max);
     assert!(mbd::mbd_rows(&drawing, &doc, None).iter().all(|r| r.visible));
     // Delete = hide; Show brings it back.
     for a in drawing.sheets[0].annotations.iter_mut() {
@@ -1853,4 +1854,163 @@ fn mbd_datum_goes_to_the_edge_on_view_and_can_be_hidden() {
     assert!(mbd::mbd_rows(&drawing, &doc, None).iter().all(|r| !r.visible));
     assert_eq!(drawing.show_model_annotation(ps, 1), Some(true));
     assert!(mbd::mbd_rows(&drawing, &doc, None).iter().all(|r| r.visible));
+}
+
+#[test]
+fn note_property_lists_and_date_formats() {
+    // Onshape's lists (live "Note panel popups and values").
+    assert_eq!(format::DRAWING_FIELDS.len(), 22);
+    assert_eq!(format::SHEET_REF_FIELDS.len(), 19);
+    assert_eq!(format::DATE_FORMATS.len(), 23);
+    assert!(format::is_field("drawing.drawn_by") && format::is_field("part.mass") && !format::is_field("nope"));
+    assert!(format::is_date_field("drawing.date_drawn") && format::is_date_field("release.date") && !format::is_field("drawing.dates"));
+    // `m` is the month in Onshape's patterns.
+    assert_eq!(format::field_format("2026-10-21", "m/d/yy"), "10/21/26");
+    assert_eq!(format::field_format("2026-10-21", "mmm. d, yy"), "Oct. 21, 26");
+    assert_eq!(format::field_format("2026-10-21", "dddd, mmmm d, yyyy"), "Wednesday, October 21, 2026");
+    assert_eq!(format::field_format("2026-10-21", "yyyy-MM-dd"), "2026-10-21", "older notes' formats still work");
+}
+
+#[test]
+fn view_labels_move_alone_and_aux_indicator_formats() {
+    use super::sheet::LineStyle;
+    let (doc, mut drawing) = demo();
+    // An auxiliary view of the Front view (1) off its bottom edge.
+    let id = drawing.sheets[0].next_view_id();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    let e = g.edges.iter().find(|e| e.visible && e.points.len() == 2 && (e.points[0][1] - e.points[1][1]).abs() < 1e-9 && (e.points[0][0] - e.points[1][0]).abs() > 1e-3).expect("a horizontal edge");
+    let anchor = [(e.points[0][0] + e.points[1][0]) / 2.0, e.points[0][1]];
+    let front = drawing.sheets[0].view(ViewId(1)).unwrap().position;
+    drawing.sheets[0].views.push(DrawingView {
+        id,
+        kind: ViewKind::Auxiliary { parent: ViewId(1), edge_dir: [1.0, 0.0] },
+        position: [front[0], front[1] - 80.0],
+        aux_ref: Some(AuxRef { anchor, letter: "B".into(), show: true, offset: None, ext: None, letter_at: None }),
+        ..Default::default()
+    });
+    let sources = regenerate_sources(&doc, &drawing);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let label = |b: &build::BuiltSheet, v: ViewId| b.geometry.texts.iter().filter(|t| b.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(v))).map(|t| (t.text.clone(), t.pos)).collect::<Vec<_>>();
+    let before = label(&built, id);
+    assert_eq!(before.iter().map(|t| t.0.as_str()).collect::<Vec<_>>(), ["Auxiliary B - B"], "live default prefix and A-A style");
+    let ind = |b: &build::BuiltSheet| b.geometry.lines.iter().filter(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::AuxIndicator(id))).map(|l| l.style).collect::<Vec<_>>();
+    assert!(ind(&built).contains(&LineStyle::Phantom), "Line style: the viewing line");
+    // The label moves on its own.
+    drawing.sheets[0].view_mut(id).unwrap().label_at = Some([10.0, 5.0]);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let after = label(&built, id);
+    assert!((after[0].1[0] - before[0].1[0] - 10.0).abs() < 1e-9 && (after[0].1[1] - before[0].1[1] - 5.0).abs() < 1e-9);
+    // Arrow style: no viewing line, one arrow and one letter.
+    drawing.props.view_tab.aux_arrow_format = true;
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(!ind(&built).contains(&LineStyle::Phantom));
+    assert_eq!(built.geometry.texts.iter().filter(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::AuxIndicator(id))).count(), 1);
+}
+
+/// Prints the German ISO A3 title block texts (for comparing with live DXF).
+#[test]
+#[ignore]
+fn dump_german_title_block() {
+    use super::tb_lang::TitleLanguage;
+    use super::templates::{DrawingTemplate, apply_template};
+    for lang in [TitleLanguage::German, TitleLanguage::English] {
+        let mut t = DrawingTemplate::standard("ISO A3", SheetSize::A3, TitleBlockStyle::Iso, false, Projection::FirstAngle);
+        t.language = lang;
+        let mut d = Drawing::default();
+        apply_template(&mut d, 0, &t);
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_border_and_title_full(&d.sheets[0], Projection::FirstAngle, &|s| s.to_string());
+        for x in &g.texts {
+            println!("TB {:?} {:.1} {:.1} {:.3} {:?} w={:.1}", x.text, x.pos[0], x.pos[1], x.height, x.anchor, font::text_width(&x.text, x.height));
+        }
+        let [x0, y0, x1, y1] = sheet::title_block_rect(&d.sheets[0]).unwrap();
+        println!("RECT {x0:.1} {y0:.1} {x1:.1} {y1:.1}");
+    }
+}
+
+#[test]
+fn ansi_title_block_dates_read_month_day_year() {
+    // Live (CR12 data, drw2 10-21 h): ANSI shows 10/20/2026, ISO 2026-10-20.
+    let ansi = templates::default_fields(TitleBlockStyle::Ansi, true);
+    let iso = templates::default_fields(TitleBlockStyle::Iso, false);
+    let date = |f: &[(String, String)]| f.iter().find(|(k, _)| k == "Drawn date").map(|(_, v)| v.clone()).unwrap();
+    assert_eq!(date(&ansi), "{date|m/d/yyyy}");
+    assert_eq!(date(&iso), "{date}");
+    assert_eq!(format::field_format("2026-10-20", "m/d/yyyy"), "10/20/2026");
+}
+
+#[test]
+fn assembly_drawing_fields_are_the_assemblys_own() {
+    // qa5 D4: an assembly drawing's {part.number} is the assembly's part
+    // number, not its first part's.
+    let (mut doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    let ps = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap().id;
+    let mut studio = Drawing::default();
+    studio.sheets[0].views.push(base_view(1, ps, ViewOrientation::Front, [100.0, 100.0]));
+    let body = regenerate_sources(&doc, &studio)[&views::SourceKey::studio(ps)].parts[0].body.clone().unwrap();
+    if let Some(TabContent::PartStudio(p)) = doc.tabs.iter_mut().find(|t| t.id == ps).map(|t| &mut t.content) {
+        p.part_properties.entry(body).or_default().part_number = Some("PN-001".into());
+    }
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Front, [120.0, 150.0]));
+    drawing.sheets[0].annotations.push(Annotation { id: 1, kind: AnnotationKind::note("N[{part.number}] M[{part.name}]", 3.5), position: [30.0, 40.0], ..Default::default() });
+    let cache = ViewCache::new();
+    let note = |doc: &crate::Document, d: &Drawing| texts(&render_sheet(d, 0, &regenerate_sources(doc, d), &cache, false).unwrap()).into_iter().find(|t| t.starts_with("N[")).unwrap();
+    let asm_name = doc.tab(asm).unwrap().name.clone();
+    assert_eq!(note(&doc, &drawing), format!("N[----] M[{asm_name}]"));
+    if let Some(TabContent::Assembly(a)) = doc.tabs.iter_mut().find(|t| t.id == asm).map(|t| &mut t.content) {
+        a.properties.part_number = Some("ASM-9".into());
+    }
+    assert_eq!(note(&doc, &drawing), format!("N[ASM-9] M[{asm_name}]"));
+}
+
+#[test]
+fn callout_on_an_edge_shows_its_parts_bom_item() {
+    // qa5 D8: a callout clicked on an assembly part's edge (no snap point,
+    // so no point reference) shows that part's BOM item, not "----".
+    let (doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Front, [120.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let src = &sources[&views::SourceKey::studio(asm)];
+    let row = src.bom.last().expect("assembly BOM");
+    let mut kind = AnnotationKind::balloon(ViewId(1), [0.0, 0.0], "");
+    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+        callout.part = Some(row.bodies[0].clone());
+    }
+    drawing.sheets[0].annotations.push(Annotation { id: 1, kind, position: [200.0, 220.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
+    let t: Vec<&str> = built.geometry.texts.iter().filter(|t| t.pick == pick).map(|t| t.text.as_str()).collect();
+    assert_eq!(t, vec![row.item.to_string().as_str()]);
+}
+
+#[test]
+fn exact_export_clips_detail_views_to_their_circle() {
+    // qa5 D10: the PDF (exact HLR) must clip a detail view like the screen.
+    let (doc, drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let sheet = &drawing.sheets[0];
+    let detail = sheet.views.iter().find(|v| matches!(v.kind, ViewKind::Detail { .. })).expect("demo detail view");
+    let ViewKind::Detail { center, radius, .. } = detail.kind else { unreachable!() };
+    for exact in [false, true] {
+        let built = render_sheet(&drawing, 0, &sources, &cache, exact).unwrap();
+        let pick = built.picks.iter().position(|p| *p == PickTarget::View(detail.id)).unwrap() as u32;
+        let pl = built.placements.iter().find(|p| p.id == detail.id).unwrap();
+        let c = pl.to_sheet(center);
+        let r = radius * pl.scale * 1000.0;
+        let lines: Vec<_> = built.geometry.lines.iter().filter(|l| l.pick == pick).collect();
+        assert!(!lines.is_empty(), "exact {exact}");
+        for l in lines {
+            for p in &l.points {
+                let d = ((p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2)).sqrt();
+                assert!(d <= r * 1.02 + 0.5, "exact {exact}: point {p:?} at {d} outside r {r}");
+            }
+        }
+    }
 }

@@ -606,3 +606,259 @@ fn hole_feature_records_holes_for_callouts() {
     assert!(h.matches_circle(top, 0.0055, 1e-6));
     assert!(!h.matches_circle(top, 0.004, 1e-6));
 }
+
+#[test]
+fn cancelled_regeneration_is_discarded_and_superseded_one_is_reused() {
+    use noshape_model::regen::RegenCancel;
+    let mut t = T::new();
+    let (_, cut) = pocket_setup(&mut t);
+    feature_pattern(&mut t, vec![cut], "4", true);
+    let run = |t: &mut T, cancel: Option<RegenCancel>| {
+        let opts = RegenOptions { cancel, ..Default::default() };
+        t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &opts)
+    };
+    // Aborted: nothing comes back.
+    let abort = RegenCancel::default();
+    abort.abort();
+    let r = run(&mut t, Some(abort));
+    assert!(r.cancelled && r.display.features.is_empty() && r.context.bodies.is_empty());
+    // Superseded: the features run (and are cached) but no display is built.
+    let stale = RegenCancel::default();
+    stale.supersede();
+    let r = run(&mut t, Some(stale));
+    assert!(r.cancelled && r.display.features.is_empty());
+    // The next run gives the same model as an uninterrupted one.
+    let r = t.ok();
+    assert!(!r.cancelled);
+    let removed = BLOCK_V - total_volume(&r.context);
+    assert!(near(removed, 4.0 * PI * 0.003 * 0.003 * 0.005, 1e-3), "{removed}");
+}
+
+#[test]
+fn aborted_pattern_regeneration_stops_quickly() {
+    use noshape_model::regen::RegenCancel;
+    use std::time::{Duration, Instant};
+    // A 1000-instance Feature pattern (Reapply features, which patterns
+    // without error) of a rib through a block, the user's report: it takes
+    // seconds, and an abort stops it (inside the kernel boolean), so a newer
+    // edit doesn't wait behind it.
+    let mut t = T::new();
+    t.block(0.0, 0.0, 2.01, 0.02, "10 mm");
+    let rs = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.002, 0.005, 0.003, 0.015));
+    let r = t.regions(rs)[0].clone();
+    let rib = t.extrude(r, "15 mm", "ADD");
+    t.ok();
+    let pattern = feature_pattern(&mut t, vec![rib], "1000", true);
+    t.set(pattern, "distance", e("2 mm"));
+    t.set(pattern, "operationType", en("ADD"));
+    let cancel = RegenCancel::default();
+    let (latency, result) = std::thread::scope(|s| {
+        let c = cancel.clone();
+        let t = &mut t;
+        let run = s.spawn(move || {
+            let opts = RegenOptions { cancel: Some(c), ..Default::default() };
+            let r = t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &opts);
+            (Instant::now(), r)
+        });
+        std::thread::sleep(Duration::from_millis(1500));
+        let at = Instant::now();
+        cancel.abort();
+        let (end, r) = run.join().unwrap();
+        (end.saturating_duration_since(at), r)
+    });
+    // The whole pattern, uncancelled (upstream features come from the cache).
+    let t0 = Instant::now();
+    let r = t.ok();
+    let full = t0.elapsed();
+    assert!(!r.cancelled && r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count() == 1);
+    eprintln!("stopped {latency:?} after the abort; the whole pattern takes {full:?}");
+    if full < Duration::from_millis(2500) {
+        // Too fast to abort part-way on this machine: nothing to measure.
+        return;
+    }
+    assert!(result.cancelled, "the run finished before the abort: {:?}", result.display.features.iter().map(|f| (&f.status, &f.message)).collect::<Vec<_>>());
+    // Relative to the work (machine load scales both): an abort 1.5 s in
+    // stops within a fifth of the whole run.
+    assert!(latency * 5 < full, "stopped {latency:?} after the abort; the whole pattern takes {full:?}");
+}
+
+/// The live "Pending state" setup as a feature clipboard payload (paste
+/// with Ctrl+V; then set the pattern's count to 1000 in its dialog): a
+/// 520 × 60 × 10 mm block, a 0.2 × 40 mm rib extruded 15 mm (Add) and a
+/// Feature-type Linear pattern of it (Reapply features), 0.5 mm apart.
+/// `cargo test -p noshape-model --test engine write_pending_pattern_clip -- --ignored`.
+#[test]
+#[ignore]
+fn write_pending_pattern_clip() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.52, 0.06, "10 mm");
+    let rs = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.005, 0.01, 0.0052, 0.05));
+    let r = t.regions(rs)[0].clone();
+    let rib = t.extrude(r, "15 mm", "ADD");
+    // Reapply features: the rib passes through the block, whose faces it
+    // merges with (a plain feature pattern would fail as in Onshape, G45).
+    let pattern = feature_pattern(&mut t, vec![rib], "10", true);
+    t.set(pattern, "distance", e("0.5 mm"));
+    t.set(pattern, "operationType", en("ADD"));
+    t.ok();
+    let v = serde_json::json!({ "noshape_features": t.ps.features });
+    std::fs::write(std::env::temp_dir().join("noshape-pending-clip.json"), v.to_string()).unwrap();
+}
+
+/// qa4 core workflow (data loss): a sketch dimension typed as a bare
+/// number keeps its size when the workspace units change (live stores the
+/// unit on commit; older documents get it pinned on the change).
+#[test]
+fn workspace_unit_change_keeps_unitless_sketch_dimensions() {
+    use noshape_model::document::{Document, TabContent};
+    let mut t = T::new();
+    let mut sk = rect(0.0, 0.0, 0.02, 0.02);
+    let bottom = sk.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+    let cid = sk.add_reference(noshape_sketch::ConstraintKind::Length { curve: bottom, value: 0.02 }).unwrap();
+    sk.set_driving(cid, true).unwrap();
+    let mut data = SketchData { sketch: sk, ..Default::default() };
+    data.dimension_exprs.insert(cid.0, ExprValue::new("25"));
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(data)))]);
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "10 mm", "NEW");
+    let mm = total_volume(&t.ok().context);
+    // Without the pin, inch units re-solve the sketch 25.4 times larger.
+    let mut unpinned = T { ps: t.ps.clone(), units: UnitPrefs { length: noshape_units::LengthUnit::Inch, ..UnitPrefs::default() }, reg: Regenerator::new() };
+    assert!(!near(total_volume(&unpinned.ok().context), mm, 1e-3), "the test needs the unit to matter");
+    let mut doc = Document::new();
+    let tab = doc.tabs.iter_mut().find(|x| matches!(x.content, TabContent::PartStudio(_))).unwrap();
+    tab.content = TabContent::PartStudio(t.ps.clone());
+    let changed = noshape_model::quantity_text::pin_sketch_units(&mut doc, &UnitPrefs::default());
+    assert_eq!(changed.len(), 1);
+    let TabContent::PartStudio(ps) = &doc.tabs.iter().find(|x| matches!(x.content, TabContent::PartStudio(_))).unwrap().content else { unreachable!() };
+    let Some(ParamValue::Sketch(d)) = ps.features[0].params.get("sketch") else { panic!() };
+    assert_eq!(d.dimension_exprs[&cid.0].text, "25 mm");
+    t.ps = ps.clone();
+    t.units = UnitPrefs { length: noshape_units::LengthUnit::Inch, ..UnitPrefs::default() };
+    let inch = total_volume(&t.ok().context);
+    assert!(near(inch, mm, 1e-9), "the part keeps its size: {inch} vs {mm}");
+    // Unitless expressions are wrapped (live "(10+5) mm"); units and variables stay.
+    use noshape_model::quantity_text::commit_text;
+    let e = noshape_units::EmptyScope;
+    assert_eq!(commit_text("10+5", noshape_units::Dim::LENGTH, &UnitPrefs::default(), &e), "(10+5) mm");
+    assert_eq!(commit_text("1 in", noshape_units::Dim::LENGTH, &UnitPrefs::default(), &e), "1 in");
+    assert_eq!(commit_text("#var", noshape_units::Dim::LENGTH, &UnitPrefs::default(), &e), "#var");
+}
+
+// ------------------------------------------------------------------ qa4 F12
+
+/// qa4 F12: a Feature linear pattern of a Hole (two holes on the part)
+/// copies the holes; editing the block's depth keeps the part. (qa4's third
+/// location was the projected origin; live psb 10-21 f: the origin is never
+/// a location, fixed as F10.)
+#[test]
+fn feature_pattern_of_hole_copies_the_holes() {
+    let mut t = T::new();
+    let (_, x1) = t.block(0.01, 0.01, 0.06, 0.05, "30 mm");
+    let pl = t.top_plane("30 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [sk.add_point(DVec2::new(0.025, 0.025)), sk.add_point(DVec2::new(0.025, 0.035))];
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let locs = q(pts.iter().map(|p| Reference::SketchEntity { sketch: s, entity: p.0 }).collect());
+    let h = t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC"))]);
+    let one = |t: &mut T, h: f64| {
+        let r = t.regen();
+        let v = total_volume(&r.context);
+        (0.05 * 0.04 * h - v) / 2.0
+    };
+    let hole = one(&mut t, 0.03);
+    assert!(hole > 0.0);
+    t.add(
+        "linearPattern",
+        &[
+            ("patternType", en("FEATURE")),
+            ("instanceFunction", q(vec![Reference::Feature(h)])),
+            ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])),
+            ("distance", e("10 mm")),
+            ("instanceCount", e("2")),
+        ],
+    );
+    for depth in [30.0, 25.0] {
+        t.set(x1, "depth", e(&format!("{depth} mm")));
+        t.set(pl, "offset", e(&format!("{depth} mm")));
+        let r = t.ok();
+        let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).collect();
+        assert_eq!(solids.len(), 1, "depth {depth}");
+        let removed = 0.05 * 0.04 * depth * 1e-3 - total_volume(&r.context);
+        assert!(near(removed, 4.0 * hole, 1e-6), "depth {depth}: removed {removed}, 4 holes {}", 4.0 * hole);
+    }
+}
+
+/// qa4 F12: a Feature-type linear pattern of a Hole cuts holes into the
+/// part (it doesn't turn it into a shell with cylinders), and keeps doing so
+/// after the block's depth changes.
+#[test]
+fn feature_pattern_of_a_hole_keeps_the_part() {
+    hole_pattern_case();
+    // qa4's case: the projected origin also counted as a location (F10,
+    // fixed: it doesn't any more), a hole on the block's corner whose faces
+    // merge with the block's sides. Never a silently wrecked part: the
+    // pattern reports Onshape's error (G45) and the part stays as it was.
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.05, "30 mm");
+    let pl = t.top_plane("30 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p1 = sk.add_point(DVec2::new(0.02, 0.025));
+    let p0 = sk.add_point(DVec2::new(0.0, 0.0));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let locs = q(vec![Reference::SketchEntity { sketch: s, entity: p1.0 }, Reference::SketchEntity { sketch: s, entity: p0.0 }]);
+    let hole = t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC")), ("styleV2", en("SIMPLE")), ("endStyleV2", en("BLIND")), ("holeDiameterV3", e("6 mm")), ("holeDepthV3", e("12 mm"))]);
+    let before = total_volume(&t.ok().context);
+    let pattern = feature_pattern(&mut t, vec![hole], "2", false);
+    t.set(pattern, "distance", e("10 mm"));
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert!(matches!(st.status, FeatureStatus::Error), "the pattern reports its failure: {:?}", st.message);
+    assert!(near(total_volume(&r.context), before, 1e-9), "and the part is unchanged");
+}
+
+fn hole_pattern_case() {
+    let mut t = T::new();
+    let (_, block) = t.block(0.0, 0.0, 0.1, 0.05, "30 mm");
+    let pl = t.top_plane("30 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p1 = sk.add_point(DVec2::new(0.02, 0.025));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let locs = q(vec![Reference::SketchEntity { sketch: s, entity: p1.0 }]);
+    let hole = t.add("hole", &[("locations", locs), ("unitsSystem", en("METRIC")), ("styleV2", en("SIMPLE")), ("endStyleV2", en("BLIND")), ("holeDiameterV3", e("6 mm")), ("holeDepthV3", e("12 mm"))]);
+    let one = BLOCK_V3 - total_volume(&t.ok().context);
+    let pattern = feature_pattern(&mut t, vec![hole], "2", false);
+    t.set(pattern, "distance", e("10 mm"));
+    let check = |t: &mut T, depth_mm: f64| {
+        let r = t.ok();
+        let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).collect();
+        assert_eq!(solids.len(), 1, "one part");
+        let v = total_volume(&r.context);
+        let block = 0.1 * 0.05 * depth_mm * 1e-3;
+        assert!(near(block - v, 2.0 * one, 1e-3), "two holes cut: removed {} vs {}", block - v, 2.0 * one);
+    };
+    check(&mut t, 30.0);
+    t.set(block, "depth", e("25 mm"));
+    t.set(pl, "offset", e("25 mm"));
+    check(&mut t, 25.0);
+}
+
+const BLOCK_V3: f64 = 0.1 * 0.05 * 0.03;
+
+/// The live "Pending state" model at ×1000 (Reapply features): every rib
+/// fuses into the block, one part (the app showed 911 parts, 10-21).
+#[test]
+#[ignore]
+fn pending_pattern_clip_at_1000_is_one_part() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.52, 0.06, "10 mm");
+    let rs = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.005, 0.01, 0.0052, 0.05));
+    let r = t.regions(rs)[0].clone();
+    let rib = t.extrude(r, "15 mm", "ADD");
+    let pattern = feature_pattern(&mut t, vec![rib], "1000", true);
+    t.set(pattern, "distance", e("0.5 mm"));
+    t.set(pattern, "operationType", en("ADD"));
+    let r = t.ok();
+    let solids = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count();
+    assert_eq!(solids, 1, "every rib fuses into the block");
+}

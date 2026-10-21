@@ -621,7 +621,7 @@ pub struct CurvatureMap {
 
 /// A legend number: three significant decimals at most.
 fn fmt_value(v: f64) -> String {
-    let s = format!("{v:.3}");
+    let s = noshape_units::to_fixed(v, 3);
     let s = s.trim_end_matches('0').trim_end_matches('.');
     if s == "-0" { "0".into() } else { s.into() }
 }

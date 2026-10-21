@@ -180,15 +180,8 @@ impl PartStudioView {
             "Expand all in list" => self.set_all_folders_collapsed(false, cx),
             "Mass and section properties" => {
                 // As the Mass properties button at the bottom right.
-                self.show_mass = !self.show_mass;
                 self.ui.measure_pinned = false;
-                if self.show_mass {
-                    let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
-                    if self.display.bodies.iter().any(|b| props.get(&b.id).and_then(|p| p.density).is_none()) {
-                        self.message = Some((noshape_model::display::FeatureStatus::Warning, "One or more parts do not have a material defined.".into()));
-                    }
-                }
-                cx.notify();
+                self.set_show_mass(!self.show_mass, cx);
             }
             _ => {}
         }

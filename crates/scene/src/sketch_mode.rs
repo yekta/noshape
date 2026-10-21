@@ -596,7 +596,9 @@ pub struct SketchOptions {
 
 impl Default for SketchOptions {
     fn default() -> Self {
-        Self { show_constraints: false, show_expressions: false, show_errors: true }
+        // Live (sketch/311, a fresh profile: qa4 F1): Show constraints and
+        // Show errors ticked.
+        Self { show_constraints: true, show_expressions: false, show_errors: true }
     }
 }
 
@@ -698,6 +700,46 @@ pub fn tolerance_allowed(k: &ConstraintKind) -> bool {
 }
 
 /// A dimension text that is more than a plain number with an optional unit.
+/// What Enter does in sketch mode ([`SketchEditor::enter_target`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EnterTarget {
+    /// The text tool's dialog.
+    Text,
+    Slot,
+    /// A sketch fillet / chamfer preview (then its value box opens).
+    Corner,
+    PolygonSides,
+    /// A pattern / transform being set up.
+    Pattern,
+    Offset,
+    /// The on-the-fly value box becomes a driving dimension; the tool goes on.
+    OnTheFly,
+    /// Nothing: the sketch stays open.
+    Nothing,
+}
+
+/// Label prefixes of a dimension driven by a variable (`#var`: Onshape's
+/// grey "ƒx") or by another expression ("ƒ"); live sketch/992.
+pub const VARIABLE_MARK: &str = "ƒx ";
+pub const EXPRESSION_MARK: &str = "ƒ ";
+
+/// A dimension label from its formatted value and the text typed for it:
+/// a variable's or expression's marker, or the expression itself with Show
+/// expressions; numbers with a unit ("1 mm", "1 in") show just the value.
+pub fn dimension_label_text(expr: Option<&str>, value: String, show_expressions: bool) -> String {
+    match expr {
+        Some(e) if is_expression(e) && show_expressions => format!("{} = {value}", truncate_chars(e, 70)),
+        Some(e) if is_variable(e) => format!("{VARIABLE_MARK}{value}"),
+        Some(e) if is_expression(e) => format!("{EXPRESSION_MARK}{value}"),
+        _ => value,
+    }
+}
+
+/// The text is a single variable reference (`#var`).
+fn is_variable(t: &str) -> bool {
+    t.trim().strip_prefix('#').is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_alphanumeric() || c == '_'))
+}
+
 fn is_expression(t: &str) -> bool {
     let t = t.trim();
     let num_end = t.find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-' || c == '+')).unwrap_or(t.len());
@@ -2397,6 +2439,31 @@ impl SketchEditor {
     }
 
     /// The Text dialog is open (creating a new text or editing one).
+    /// What Enter commits in sketch mode (live "Sketch dimension display +
+    /// Enter/Esc"): the step being set up, if any. Enter never accepts the
+    /// sketch (only ✓ does), with or without a tool, a selection or the
+    /// focus on the Sketch dialog. (An open dimension box takes its own
+    /// Enter: it commits the value and the Dimension tool stays.)
+    pub fn enter_target(&self) -> EnterTarget {
+        if self.text_dialog_open() {
+            EnterTarget::Text
+        } else if self.slot_pending() {
+            EnterTarget::Slot
+        } else if self.corner_pending() {
+            EnterTarget::Corner
+        } else if self.polygon_sides_pending() {
+            EnterTarget::PolygonSides
+        } else if self.tool.is_pattern() && !self.selection.is_empty() {
+            EnterTarget::Pattern
+        } else if self.offset_pending.is_some() {
+            EnterTarget::Offset
+        } else if self.otf.is_some() {
+            EnterTarget::OnTheFly
+        } else {
+            EnterTarget::Nothing
+        }
+    }
+
     pub fn text_dialog_open(&self) -> bool {
         self.pending_text.is_some() || self.editing_text.is_some()
     }
@@ -2554,10 +2621,12 @@ impl SketchEditor {
     pub fn commit_otf(&mut self, data: &mut SketchData, text: &str, units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> Result<(), String> {
         let Some(o) = self.otf.clone() else { return Ok(()) };
         let Some(f) = o.fields.get(o.active).cloned() else { return Ok(()) };
-        let text = text.trim().trim_start_matches('=').trim();
         let dim = dim_unit(&f.kind);
-        let q = noshape_units::evaluate_as(text, dim, units, vars).map_err(|e| e.to_string())?;
-        let expr = is_expression(text).then_some(text);
+        // Stored with the workspace unit (live: "10+5" → "(10+5) mm"), so a
+        // later change of the workspace units keeps the geometry.
+        let text = noshape_model::quantity_text::commit_text(text.trim().trim_start_matches('=').trim(), dim, units, vars);
+        let q = noshape_units::evaluate_as(&text, dim, units, vars).map_err(|e| e.to_string())?;
+        let expr = is_expression(&text).then_some(text.as_str());
         self.commit_otf_value(data, o, f, q.value, expr)
     }
 
@@ -3403,7 +3472,11 @@ impl SketchEditor {
     pub fn apply_dimension(&mut self, data: &mut SketchData, cid: ConstraintId, text: &str, units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> Result<(), String> {
         let Some(c) = data.sketch.constraint(cid).cloned() else { return Err("Dimension no longer exists".into()) };
         let dim = dim_unit(&c.kind);
-        let text = text.trim().trim_start_matches('=').trim();
+        // Stored with the workspace unit (live: "1" reopens as "1 mm", "2*5"
+        // as "(2*5) mm"; "1 in" and "#var" stay), so a later change of the
+        // workspace units keeps the geometry.
+        let text = noshape_model::quantity_text::commit_text(text.trim().trim_start_matches('=').trim(), dim, units, vars);
+        let text = text.as_str();
         let q = noshape_units::evaluate_as(text, dim, units, vars).map_err(|e| e.to_string())?;
         let value = q.value / dim_display_scale(&c.kind);
         if !value.is_finite() {
@@ -3442,8 +3515,8 @@ impl SketchEditor {
             data.dimension_exprs.remove(&cid.0);
         } else {
             data.sketch.set_dimension_value(cid, value).map_err(|e| e.to_string())?;
-            // Plain numbers are stored as literals; expressions keep their text
-            // in the shown scale (regeneration divides by `display_scale`).
+            // The text in the shown scale (regeneration divides by
+            // `display_scale`), with its unit.
             data.dimension_exprs.insert(cid.0, ExprValue::new(text));
         }
         let report = data.sketch.solve();
@@ -3467,12 +3540,7 @@ impl SketchEditor {
             { continue; }
             let Some(pos) = self.label_pos(data, c.id, &c.kind) else { continue };
             let value = dim_value_text_tol(&c.kind, v, units, data.dimension_tolerances.get(&c.id.0));
-            // Expressions: an indicator, or the expression itself with Show expressions.
-            let mut text = match data.dimension_exprs.get(&c.id.0) {
-                Some(e) if is_expression(&e.text) && self.show_expressions => format!("{} = {value}", truncate_chars(&e.text, 70)),
-                Some(e) if is_expression(&e.text) => format!("ƒ {value}"),
-                _ => value,
-            };
+            let mut text = dimension_label_text(data.dimension_exprs.get(&c.id.0).map(|e| e.text.as_str()), value, self.show_expressions);
             if !c.driving {
                 text = format!("({text})");
             }
@@ -5529,6 +5597,75 @@ mod tests {
 
     fn count(data: &SketchData, k: EntityKind) -> usize {
         data.sketch.entities().filter(|e| e.kind() == k).count()
+    }
+
+    /// Live "Sketch dimension display + Enter/Esc" (lead sketch dim): labels
+    /// are the value in workspace units with no unit, 3 decimals with the
+    /// zeros dropped, "°" for angles, "Ø" for diameters; a variable gets
+    /// "ƒx", an expression "ƒ".
+    #[test]
+    fn dimension_labels_read_as_live() {
+        let e = EntityId(1);
+        let mm = UnitPrefs::default();
+        let inch = UnitPrefs { length: noshape_units::LengthUnit::Inch, ..UnitPrefs::default() };
+        let len = |v: f64| ConstraintKind::Length { curve: e, value: v };
+        assert_eq!(dim_value_text(&len(0.001), 0.001, &mm), "1");
+        assert_eq!(dim_value_text(&len(0.0254), 0.0254, &mm), "25.4");
+        assert_eq!(dim_value_text(&len(0.0306071), 0.0306071, &mm), "30.607");
+        assert_eq!(dim_value_text(&len(0.0254), 0.0254, &inch), "1");
+        assert_eq!(dim_value_text(&len(0.254), 0.254, &inch), "10");
+        let angle = ConstraintKind::Angle { a: e, b: EntityId(2), value: 30f64.to_radians() };
+        assert_eq!(dim_value_text(&angle, 30f64.to_radians(), &mm), "30°");
+        let dia = ConstraintKind::Diameter { curve: e, value: 0.01 };
+        assert_eq!(dim_value_text(&dia, 0.01, &mm), "Ø10");
+        let label = |expr: &str| dimension_label_text(Some(expr), "10".into(), false);
+        assert_eq!(label("10 mm"), "10");
+        assert_eq!(label("1 in"), "10");
+        assert_eq!(label("#var"), "ƒx 10");
+        assert_eq!(label("(2*5) mm"), "ƒ 10");
+        assert_eq!(label("#var*2"), "ƒ 10");
+        assert_eq!(dimension_label_text(None, "30.607".into(), false), "30.607");
+    }
+
+    /// Live (lead sketch dim): Enter never accepts the sketch: with a tool
+    /// after a commit, with no tool, with a selection. Esc ends the tool and
+    /// never clears the selection or leaves the sketch.
+    #[test]
+    fn enter_never_accepts_the_sketch_and_esc_keeps_the_selection() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.03, 0.01));
+        assert_eq!(ed.enter_target(), EnterTarget::OnTheFly, "mid-chain Enter places the boxed length");
+        assert!(ed.cancel());
+        assert_eq!(ed.enter_target(), EnterTarget::Nothing, "no tool");
+        ed.set_tool(Tool::Dimension);
+        assert_eq!(ed.enter_target(), EnterTarget::Nothing, "Dimension tool active, nothing pending");
+        assert!(ed.cancel(), "Esc ends the Dimension tool");
+        assert_eq!(ed.tool, Tool::Select);
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        assert!(!ed.selection.is_empty(), "the line is selected");
+        assert_eq!(ed.enter_target(), EnterTarget::Nothing, "a selection");
+        assert!(!ed.cancel(), "Esc with a selection does nothing");
+        assert!(!ed.selection.is_empty(), "and keeps it");
+    }
+
+    /// Live (lead sketch dim): Esc on the dimension box closes it and the
+    /// Dimension tool stays; the next Esc ends the tool (qa4 F29: the app
+    /// then gives the keys back to the sketch).
+    #[test]
+    fn esc_closes_the_dimension_box_then_the_tool() {
+        let (mut ed, _) = editor(Tool::Dimension);
+        ed.dim_edit = Some(DimEdit { constraint: ConstraintId(1), text: "abc".into(), created: false });
+        assert!(ed.cancel());
+        assert!(ed.dim_edit.is_none() && ed.tool == Tool::Dimension, "the box closes, the tool stays");
+        assert!(ed.cancel());
+        assert_eq!(ed.tool, Tool::Select);
+    }
+
+    #[test]
+    fn sketch_options_default_as_live() {
+        let o = SketchOptions::default();
+        assert!(o.show_constraints && o.show_errors && !o.show_expressions);
     }
 
     #[test]

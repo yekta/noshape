@@ -8,7 +8,6 @@
 //! time format (enabled with the caret in a property); Flag notes with the
 //! border shape and size.
 
-use crate::drawing_drawprops::COLORS;
 use crate::drawing_view::*;
 use crate::os_ui::OsDropdownExt as _;
 use crate::theme::p;
@@ -17,7 +16,7 @@ use gpui_kit::component::input::Input;
 use gpui_kit::component::{Disableable as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::format::{DATE_FORMATS, FIELDS, TEXT_FORMATS};
+use noshape_model::drawing::format::{DATE_FORMATS, DRAWING_FIELDS, SHEET_REF_FIELDS, TEXT_FORMATS, is_date_field, is_field};
 use noshape_model::drawing::note::{FlagShape, NoteAlign, NoteList, NoteStyle, NoteVAlign};
 use noshape_model::drawing::sheet::{FONT_FAMILIES, TextFont};
 
@@ -28,38 +27,37 @@ type Entry = Option<(String, Option<&'static str>, bool, Set)>;
 
 const SPACINGS: [f64; 5] = [1.0, 1.5, 2.0, 2.5, 3.0];
 
-/// Note symbols (Onshape's Symbols dropdown, in its order).
-const SYMBOLS: [(&str, &str); 14] = [
-    ("°", "Degree"),
-    ("⌀", "Diameter"),
-    ("℄", "Centerline"),
-    ("⌵", "Countersink"),
-    ("↧", "Depth"),
-    ("⌴", "Counterbore"),
-    ("□", "Square"),
-    ("⌒", "Arc length"),
-    ("±", "Plus/Minus"),
-    ("Ⓤ", "Unequally disposed profile"),
-    ("Ⓘ", "Independency"),
-    ("Ⓒ", "Continuous feature"),
-    ("⌳", "Spot face"),
-    ("▷", "Translation"),
-];
+/// Note symbols (live: Insert symbol, one column, in this order).
+const SYMBOLS: [&str; 14] = ["°", "Ø", "℄", "⌵", "↧", "⌴", "□", "⌒", "±", "Ⓤ", "Ⓘ", "✟", "✝", "▷"];
 
-/// The `{key|format}` property token around byte offset `at`: its range and key.
+/// The `{key|format}` property token ending right at byte offset `at` (live:
+/// Text format / Date time format apply just after an inserted property).
 fn field_at(text: &str, at: usize) -> Option<(std::ops::Range<usize>, String)> {
     let at = at.min(text.len());
-    let open = text[..at].rfind('{')?;
-    if text[open..at].contains('}') {
-        return None;
-    }
-    let close = at + text[at..].find('}')?;
-    if text[at..close].contains('{') {
-        return None;
-    }
-    let inner = &text[open + 1..close];
+    let before = text[..at].strip_suffix('}')?;
+    let open = before.rfind('{')?;
+    let inner = &before[open + 1..];
     let key = inner.split('|').next().unwrap_or("").to_string();
-    FIELDS.iter().any(|(k, _)| *k == key).then_some((open..close + 1, key))
+    is_field(&key).then_some((open..at, key))
+}
+
+/// The Note panel's Text height: four decimals in the drawing's units, no
+/// unit (live: "3.5000" in a mm drawing, "0.1200" in an inch one).
+pub fn note_height_text(mm: f64, units_mm: bool) -> String {
+    format!("{:.4}", if units_mm { mm } else { mm / 25.4 })
+}
+
+/// A typed Text height (drawing units, or with an explicit mm / in) in mm.
+pub fn parse_note_height(s: &str, units_mm: bool) -> Option<f64> {
+    let t = s.trim();
+    let (num, mm_per) = if let Some(n) = t.strip_suffix("mm") {
+        (n, 1.0)
+    } else if let Some(n) = t.strip_suffix("in").or_else(|| t.strip_suffix('"')) {
+        (n, 25.4)
+    } else {
+        (t, if units_mm { 1.0 } else { 25.4 })
+    };
+    num.trim().parse::<f64>().ok().map(|v| v * mm_per).filter(|v| *v > 0.1)
 }
 
 /// Index of the list item (non-empty paragraph) holding byte offset `at`.
@@ -123,7 +121,10 @@ impl DrawingEditor {
                 .rounded(px(2.))
                 .opacity(0.95)
                 .cursor_pointer()
-                .when(on, |d| d.bg(gpui_kit::rgb(0xdbe1e6)))
+                // Live 1140: pressed = #cfdbe5 with a 1 px #9aa5af border.
+                .border_1()
+                .border_color(if on { Hsla::from(gpui_kit::rgb(0x9aa5af)) } else { gpui_kit::transparent_black() })
+                .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
                 .when(!on, |d| d.hover(|d| d.bg(pal.row_hover)))
                 .tooltip(crate::ui::tooltip(tip))
                 .child(crate::assets::icon(icon, 20., cx))
@@ -142,10 +143,12 @@ impl DrawingEditor {
                 .when(enabled, |d| d.cursor_pointer().hover(|d| d.bg(pal.row_hover)))
                 .tooltip(crate::ui::tooltip(tip))
                 .child(div().size(px(28.)).flex().items_center().justify_center().child(crate::assets::icon(icon, 20., cx)))
-                .child(crate::ui::glyph("ui-caret-down", 9.6, gpui_kit::rgb(0x000000)))
+                .child(crate::ui::glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x000000)))
         };
-        let with_menu = |b: Stateful<Div>, id: &'static str, enabled: bool, items: Vec<Entry>| -> AnyElement {
-            if enabled { b.os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, menu(items)).into_any_element() } else { b.into_any_element() }
+        // Popup buttons open a menu under them; the Font / Flag selects open a
+        // list as wide as the box (`select`).
+        let with_menu = |b: Stateful<Div>, id: &'static str, enabled: bool, select: bool, items: Vec<Entry>| -> AnyElement {
+            if enabled { b.os_dropdown_menu(SharedString::from(format!("{id}-dd")), select, menu(items)).into_any_element() } else { b.into_any_element() }
         };
         let entry = |l: &str, icon: Option<&'static str>, on: bool, f: Set| -> Entry { Some((l.to_string(), icon, on, f)) };
         let free = st.leaders.is_empty();
@@ -181,18 +184,17 @@ impl DrawingEditor {
             .text_color(gpui_kit::rgb(0x555555))
             .tooltip(crate::ui::tooltip("Font"))
             .child(div().flex_1().overflow_hidden().whitespace_nowrap().child(font_label))
-            .child(crate::ui::glyph("ui-caret-down", 9.6, gpui_kit::rgb(0x555555)));
+            .child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x777777)));
         let row1 = h_flex()
             .h(px(30.))
             .ml(px(-1.))
             .gap(px(1.))
-            .child(with_menu(font_box, "note-font", true, fonts))
-            .child(field(75.).flex().items_center().pr(px(4.)).child(div().flex_1().child(Input::new(&height).appearance(false).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).xsmall())).child(crate::ui::glyph("ui-caret-down", 9.6, gpui_kit::rgb(0x555555))));
+            .child(with_menu(font_box, "note-font", true, true, fonts))
+            .child(field(75.).flex().items_center().pr(px(6.)).child(div().flex_1().child(Input::new(&height).appearance(false).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).xsmall())).child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x777777))));
 
         // Row 2: B I U S, Color, Line spacing, Horizontal alignment, List,
         // Vertical alignment, Note order.
         let toggle = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, f: fn(&mut NoteStyle), cx: &mut Context<Self>| button(id, icon, tip, on, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.note_style(&f, cx)));
-        let colors: Vec<Entry> = COLORS.iter().map(|&(n, c)| entry(n, None, st.color == c, std::rc::Rc::new(move |s: &mut NoteStyle| s.color = c))).collect();
         let swatch = match st.color {
             Some([r, g, b]) => gpui_kit::rgb(((r as u32) << 16) | ((g as u32) << 8) | b as u32),
             None => gpui_kit::rgb(0x000000),
@@ -202,23 +204,24 @@ impl DrawingEditor {
         spacing.push(None);
         spacing.push(entry(if st.space_before { "Remove space before paragraph" } else { "Add space before paragraph" }, None, false, std::rc::Rc::new(|s: &mut NoteStyle| s.space_before = !s.space_before)));
         spacing.push(entry(if st.space_after { "Remove space after paragraph" } else { "Add space after paragraph" }, None, false, std::rc::Rc::new(|s: &mut NoteStyle| s.space_after = !s.space_after)));
-        let aligns = [(NoteAlign::Left, "Align left", "note-align-left"), (NoteAlign::Center, "Align center", "note-align-center"), (NoteAlign::Right, "Align right", "note-align-right"), (NoteAlign::Justified, "Justify", "note-align-justify")];
+        let aligns = [(NoteAlign::Left, "Left", "note-align-left"), (NoteAlign::Center, "Center", "note-align-center"), (NoteAlign::Right, "Right", "note-align-right"), (NoteAlign::Justified, "Justify", "note-align-justify")];
         let aligns = &aligns[..if cell { 3 } else { 4 }];
         let align_icon = aligns.iter().find(|a| a.0 == st.align).map(|a| a.2).unwrap_or("note-align-left");
-        let align: Vec<Entry> = aligns.iter().map(|&(a, l, i)| entry(l, Some(i), st.align == a, std::rc::Rc::new(move |s: &mut NoteStyle| s.align = a))).collect();
-        let list_icon = |l: NoteList| match l {
-            // Live: the bulleted list icon until a list is chosen.
-            NoteList::None | NoteList::Bullets => "note-list-bullets",
-            NoteList::Numbers => "note-list-numbers",
-            NoteList::UpperLetters | NoteList::LowerLetters => "note-list-letters",
-        };
-        let lists: Vec<Entry> = NoteList::ALL.iter().map(|&l| entry(l.name(), Some(list_icon(l)), st.list == l, std::rc::Rc::new(move |s: &mut NoteStyle| s.list = l))).collect();
+        let align: Vec<Entry> = aligns.iter().map(|&(a, l, _)| entry(l, None, st.align == a, std::rc::Rc::new(move |s: &mut NoteStyle| s.align = a))).collect();
+        // Live (ui/icons2-note-panel, -list-numbers-*): the List button keeps the
+        // bulleted list icon whichever list is picked.
+        let list_icon = |_: NoteList| "note-list-bullets";
+        // Live: Numbers, Bullets, Uppercase / Lowercase letters (no "None");
+        // picking the current one again ends the list. The alignment, list and
+        // order menus are text only, with a check on the current option
+        // (ui/icons2-note-menu-*).
+        let lists: Vec<Entry> = NoteList::ALL.iter().skip(1).map(|&l| entry(l.name(), None, st.list == l, std::rc::Rc::new(move |s: &mut NoteStyle| s.list = if s.list == l { NoteList::None } else { l }))).collect();
         let valigns = [(NoteVAlign::Top, "Top", "note-valign-top"), (NoteVAlign::Middle, "Middle", "note-valign-middle"), (NoteVAlign::Bottom, "Bottom", "note-valign-bottom")];
         let valign_icon = if free { valigns.iter().find(|v| v.0 == st.valign).map(|v| v.2).unwrap_or("note-valign-top") } else { "note-valign-middle" };
-        let valign: Vec<Entry> = valigns.iter().map(|&(v, l, i)| entry(l, Some(i), st.valign == v, std::rc::Rc::new(move |s: &mut NoteStyle| s.valign = v))).collect();
+        let valign: Vec<Entry> = valigns.iter().map(|&(v, l, _)| entry(l, None, st.valign == v, std::rc::Rc::new(move |s: &mut NoteStyle| s.valign = v))).collect();
         let order: Vec<Entry> = vec![
-            entry("Top to bottom", Some("note-order-down"), !st.bottom_to_top, std::rc::Rc::new(|s: &mut NoteStyle| s.bottom_to_top = false)),
-            entry("Bottom to top", Some("note-order-up"), st.bottom_to_top, std::rc::Rc::new(|s: &mut NoteStyle| s.bottom_to_top = true)),
+            entry("Bottom to top", None, st.bottom_to_top, std::rc::Rc::new(|s: &mut NoteStyle| s.bottom_to_top = true)),
+            entry("Top to bottom", None, !st.bottom_to_top, std::rc::Rc::new(|s: &mut NoteStyle| s.bottom_to_top = false)),
         ];
         let row2 = h_flex()
             .h(px(30.))
@@ -234,12 +237,13 @@ impl DrawingEditor {
             }, cx))
             .child(toggle("note-u", "note-underline", "Underline", st.underline, |s| s.underline = !s.underline, cx))
             .child(toggle("note-s", "note-strike", "Strikethrough", st.strikethrough, |s| s.strikethrough = !s.strikethrough, cx))
-            .child(color.os_dropdown_menu("note-color-dd", true, menu(colors)))
-            .child(with_menu(popup("note-spacing", "note-line-spacing", "Line spacing", !cell, cx), "note-spacing", !cell, spacing))
-            .child(with_menu(popup("note-align", align_icon, "Horizontal alignment", free, cx), "note-align", free, align))
-            .child(with_menu(popup("note-list", list_icon(st.list), "List", !cell, cx), "note-list", !cell, lists))
-            .child(with_menu(popup("note-valign", valign_icon, "Vertical alignment", free, cx), "note-valign", free, valign))
-            .when(!cell, |r| r.child(with_menu(popup("note-order", if st.bottom_to_top { "note-order-up" } else { "note-order-down" }, "Note order", true, cx), "note-order", true, order)));
+            // Live 1137: opens the "Note color" panel under it.
+            .child(color.on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_note_color(window, cx))))
+            .child(with_menu(popup("note-spacing", "note-line-spacing", "Line spacing", !cell, cx), "note-spacing", !cell, false, spacing))
+            .child(with_menu(popup("note-align", align_icon, "Horizontal alignment", free, cx), "note-align", free, false, align))
+            .child(with_menu(popup("note-list", list_icon(st.list), "List", !cell, cx), "note-list", !cell, false, lists))
+            .child(with_menu(popup("note-valign", valign_icon, "Vertical alignment", free, cx), "note-valign", free, false, valign))
+            .when(!cell, |r| r.child(with_menu(popup("note-order", if st.bottom_to_top { "note-order-up" } else { "note-order-down" }, "Note order", true, cx), "note-order", true, false, order)));
 
         // Row 3: Insert symbol, Insert drawing property, Insert sheet
         // reference property, Text format, Date time format.
@@ -253,11 +257,10 @@ impl DrawingEditor {
                 m
             }
         };
-        let symbols: Vec<(String, String)> = SYMBOLS.iter().map(|(s, n)| (format!("{s}  {n}"), s.to_string())).collect();
-        let token = |key: &str| if key == "date" || key.ends_with(".date") { format!("{{{key}|{}}}", DATE_FORMATS[0]) } else { format!("{{{key}}}") };
-        let sheet_ref = |k: &str| k.starts_with("part.") || k.starts_with("model.");
-        let drawing_props: Vec<(String, String)> = FIELDS.iter().filter(|(k, _)| !sheet_ref(k)).map(|(k, n)| (n.to_string(), token(k))).collect();
-        let sheet_props: Vec<(String, String)> = FIELDS.iter().filter(|(k, _)| sheet_ref(k)).map(|(k, n)| (n.to_string(), token(k))).collect();
+        let symbols: Vec<(String, String)> = SYMBOLS.iter().map(|s| (s.to_string(), s.to_string())).collect();
+        let token = |key: &str| format!("{{{key}}}");
+        let drawing_props: Vec<(String, String)> = DRAWING_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
+        let sheet_props: Vec<(String, String)> = SHEET_REF_FIELDS.iter().map(|(k, n)| (n.to_string(), token(k))).collect();
         let symbol_btn = div()
             .id("note-symbol")
             .w(px(45.))
@@ -271,10 +274,10 @@ impl DrawingEditor {
             .hover(|d| d.bg(pal.row_hover))
             .tooltip(crate::ui::tooltip("Insert symbol"))
             .child(div().size(px(28.)).flex().items_center().justify_center().text_size(px(17.)).text_color(gpui_kit::rgb(0x333333)).child("Ø"))
-            .child(crate::ui::glyph("ui-caret-down", 9.6, gpui_kit::rgb(0x000000)));
+            .child(crate::ui::glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x000000)));
         // Text format / Date time format: for the property at the caret.
         let at = field_at(&text, cursor);
-        let is_date = at.as_ref().is_some_and(|(_, k)| k == "date" || k.ends_with(".date"));
+        let is_date = at.as_ref().is_some_and(|(_, k)| is_date_field(k));
         let reformat = |fmts: Vec<(String, String)>| {
             let (inp, range, key) = (input.clone(), at.as_ref().map(|a| a.0.clone()), at.as_ref().map(|a| a.1.clone()).unwrap_or_default());
             move |mut m: crate::os_menu::OsMenu, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| {
@@ -303,11 +306,11 @@ impl DrawingEditor {
             .h(px(30.))
             .pl(px(1.))
             .gap(px(2.))
-            .child(symbol_btn.os_dropdown_menu("note-symbol-dd", true, insert_menu(symbols)))
-            .child(popup("note-dprop", "note-drawing-prop", "Insert drawing property", true, cx).os_dropdown_menu("note-dprop-dd", true, insert_menu(drawing_props)))
-            .child(popup("note-sprop", "note-sheet-prop", "Insert sheet reference property", true, cx).os_dropdown_menu("note-sprop-dd", true, insert_menu(sheet_props)))
-            .child(if tf_on { tf_btn.os_dropdown_menu("note-tf-dd", true, reformat(text_formats)).into_any_element() } else { tf_btn.into_any_element() })
-            .child(if is_date { df_btn.os_dropdown_menu("note-df-dd", true, reformat(date_formats)).into_any_element() } else { df_btn.into_any_element() });
+            .child(symbol_btn.os_dropdown_menu("note-symbol-dd", false, insert_menu(symbols)))
+            .child(popup("note-dprop", "note-drawing-prop", "Insert drawing property", true, cx).os_dropdown_menu("note-dprop-dd", false, insert_menu(drawing_props)))
+            .child(popup("note-sprop", "note-sheet-prop", "Insert sheet reference property", true, cx).os_dropdown_menu("note-sprop-dd", false, insert_menu(sheet_props)))
+            .child(if tf_on { tf_btn.os_dropdown_menu("note-tf-dd", false, reformat(text_formats)).into_any_element() } else { tf_btn.into_any_element() })
+            .child(if is_date { df_btn.os_dropdown_menu("note-df-dd", false, reformat(date_formats)).into_any_element() } else { df_btn.into_any_element() });
 
         // Row 4: Flag notes (list items only) with the border shape and size.
         let item = if st.list != NoteList::None { item_at(&text, cursor) } else { None };
@@ -336,7 +339,7 @@ impl DrawingEditor {
                 .opacity(if flag_on { 1.0 } else { 0.5 })
                 .when(flag_on, |d| d.cursor_pointer())
                 .child(div().flex_1().whitespace_nowrap().child(label))
-                .child(crate::ui::glyph("ui-caret-down", 9.6, gpui_kit::rgb(0x555555)))
+                .child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x777777)))
         };
         let flag_box = Checkbox::new("note-flag").label("Flag notes").small().checked(flagged).disabled(item.is_none()).on_click(cx.listener(move |this, v: &bool, _, cx| {
             let (v, Some(i)) = (*v, item) else { return };
@@ -356,9 +359,9 @@ impl DrawingEditor {
             .h(px(28.))
             .child(div().w(px(85.)).pl(px(4.)).text_size(px(12.)).when(item.is_none(), |d| d.opacity(0.5)).child(flag_box))
             .child(div().w(px(14.)))
-            .child(with_menu(shape_sel, "note-flag-shape", flag_on, shapes))
+            .child(with_menu(shape_sel, "note-flag-shape", flag_on, true, shapes))
             .child(div().w(px(15.)))
-            .child(with_menu(size_sel, "note-flag-size", flag_on, sizes));
+            .child(with_menu(size_sel, "note-flag-size", flag_on, true, sizes));
 
         // The text and its ruler are edited in place on the sheet
         // (`render_note_inplace`).

@@ -133,7 +133,7 @@ impl PartStudioView {
     }
 
     pub(super) fn open_material_panel(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search by material or category"));
+        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search by material or category"));
         let mut subs = vec![cx.subscribe(&search, |this: &mut Self, _, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::Change) {
                 if let Some(m) = &mut this.ui.material_panel {
@@ -425,7 +425,7 @@ impl PartStudioView {
                 None if list_open => {}
                 None => body = body.child(div().h(px(22.)).pl(px(2.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("No material assigned")),
                 Some(e) => {
-                    let vals: Vec<String> = std::iter::once(e.name.clone()).chain(std::iter::once(format!("{:.3}", e.density / LB_IN3).trim_end_matches('0').trim_end_matches('.').to_string())).chain(e.extra.iter().cloned()).collect();
+                    let vals: Vec<String> = std::iter::once(e.name.clone()).chain(std::iter::once(noshape_units::to_fixed(e.density / LB_IN3, 3).trim_end_matches('0').trim_end_matches('.').to_string())).chain(e.extra.iter().cloned()).collect();
                     for (i, f) in FIELDS.iter().enumerate() {
                         body = body.child(h_flex().pr(px(5.)).child(label(f)).child(ro_value(vals.get(i).cloned().unwrap_or_default(), i > 0)));
                     }
@@ -436,6 +436,7 @@ impl PartStudioView {
             v_flex()
                 .id("material-panel")
                 .occlude()
+                .child(crate::ui::panel_probe("ps-material"))
                 .absolute()
                 // Live (dom/dialog-assign-material*.txt): 280x368 in every
                 // state, flush with the bottom of the graphics area.

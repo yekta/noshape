@@ -475,7 +475,7 @@ impl Render for PerformancePanel {
                 v_flex()
                     .pb(px(5.))
                     .child(row("Browser", "noshape".into(), false, cx))
-                    .child(row("Version", env!("CARGO_PKG_VERSION").into(), false, cx))
+                    .child(row("Version", crate::VERSION.into(), false, cx))
                     .child(row("Platform", platform.into(), false, cx))
                     .child(row("GL vendor", vendor, false, cx))
                     .child(row("GL renderer", renderer, software, cx))

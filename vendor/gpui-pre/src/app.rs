@@ -1288,6 +1288,13 @@ impl App {
         self.platform.is_cursor_visible()
     }
 
+    /// NOSHAPE PATCH: hands `style` to the platform at once, without a
+    /// hovered window (GPUI only sets the cursor of the hovered window). The
+    /// smoke test (crates/app/src/smoke.rs) shows every style this way.
+    pub fn set_platform_cursor_style(&self, style: CursorStyle) {
+        self.platform.set_cursor_style(style);
+    }
+
     /// Returns whether non-essential animations (e.g. loading spinners) should
     /// be rendered in a static state instead of animating.
     pub fn reduce_motion(&self) -> bool {

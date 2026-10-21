@@ -255,3 +255,137 @@ changes. I write the renderer part first (my files) and show crops before touchi
   the G40 shots are 1× renders upscaled 2×, so the true hatch period is ~12.9 px at 1×, from Onshape's
   pattern scale 30/(P[5]·viewport height); a true 2× capture and the planes' tangents are requested
   in REQUESTS.md. Next: caps (after GO), BOM-panel view cube placement, class B anchored labels.
+
+## From kern (10-21 06:30): pattern instances and TShape sharing (for instancing)
+- Pattern instances that stay parts (Part pattern New; bodies a Feature pattern creates from a New feature) are
+  rigidly *moved*, not copied: they share the seed's TShape and differ only in `TopLoc_Location`. Instances that
+  go into a boolean are copies (moved ones make the boolean quadratic), but then the result is one merged body.
+- Kernel API (uncommitted, `crates/kernel/src/shape.rs`): `Shape::partner_hash()` (TShape identity, equal for
+  partners), `Shape::location() -> [f64; 12]` (3x4 row-major rigid matrix), `Shape::unlocated()` (same TShape at
+  the identity location). Tessellate `unlocated()` once per `partner_hash`, draw each body with its `location()`.
+  BRepMesh stores triangulations on the shared TFaces, so meshing one instance already meshes all of them in OCCT.
+- Need anything else from the model/kernel: write it in docs/handoff/kernel-robustness.md ("kern ↔ perf").
+
+- **2026-10-21 07:45 (perf, new account)** Took over mid-edit. State found and finished:
+  1. **Release smoke CI** (priority 1, after v0.4.3's `+[NSCursor _moveCursor]` abort on macOS 27):
+     `crates/app/src/smoke.rs` (`NOSHAPE_SMOKE=1`, hooked in `Workspace::new`): every tab + a new tab of each kind,
+     a sketch with the Dimension tool started, every GPUI `CursorStyle` through the platform
+     (`App::set_platform_cursor_style`, gpui-pre patch) and every `AppCursor`, Extrude / Section view / shortcuts /
+     tab manager / version graph / tool search opened and closed, right-click menus of the viewport and the
+     features list (synthesized events, `os_menu::is_open` logged), an orbit, quit; `SMOKE <step>` lines on
+     stderr, 300 s watchdog (exit 3). macOS patch (`set_active_window_cursor_style`): under NOSHAPE_SMOKE any GPUI
+     window will do and the *view's* `resetCursorRects` runs at once, so each style's NSCursor is really created
+     on a runner with no pointer over the window. perf.yml job `smoke` (every Release and dispatch; input
+     `jobs=all|smoke|bench`): macOS 14, 15, 26 (newest image; `macos-27` doesn't exist yet), Windows, Linux;
+     `.github/perf/smoke.sh` (kill after 480 s, exit status + "SMOKE done" checked, macOS DiagnosticReports
+     copied), Windows LocalDumps; artifacts `smoke-<os>`. New composite `.github/actions/noshape-binary`
+     (release asset or source build of `ref`, sets BIN/BUILD), used by `smoke` and `bench`. actionlint clean.
+     Releases ≤ v0.4.4 have no smoke hook, so test with `-f ref=…`: perf-ci = v0.4.4 + smoke hunks,
+     run 39563625213 (`gh workflow run perf.yml --ref perf-ci -f ref=perf-ci -f jobs=smoke`).
+  2. **Hidden edges drawn through thin faces** (user screenshot, ribs on a block): edges were pulled toward the
+     camera by `z*1.0004 + 2e-5*w` (perspective: ~0.04% of the eye distance plus a constant in reverse-Z depth,
+     i.e. millimetres at normal zoom, more than a 1 mm rib). Now `pull_toward_camera(c, half + 1 px)` in
+     shaders.wgsl: the pull is the world size of (half line width + 1) pixels at the edge's depth (points 2 px),
+     enough to beat FACE_DEPTH_BIAS on their own faces. Test `edges_behind_faces_stay_hidden_at_close_zoom`
+     (offscreen.rs: red probe edges at each rib's hidden far corner, ortho + perspective, 3 zooms, 1x/2x);
+     `NOSHAPE_TEST_OUT=<dir>` writes probe images and app-like black-edge images.
+  3. **GPU instancing**: instances live in a storage buffer (`array<Inst>`, 96 B each instead of 256 B uniform
+     slots) and each pass uploads its draw order (`slots`, skipped when unchanged); consecutive copies sharing a
+     buffer are one instanced call (meshes/images: instance index = slot; lines/points: vertex index / 6).
+     `r.draw_calls` perf stage. Test `shared_mesh_copies_keep_their_own_picks_and_states`; bench
+     `instancing_bench` (ignored). Model side (new): `StudioDisplay::shared_meshes` (`SharedMesh`: unlocated mesh,
+     3x4 location, the world mesh it stands for): regen/display.rs meshes each TShape (`Shape::partner_hash`, kern)
+     once via `Shape::unlocated()` and derives each copy's world mesh with `MeshBuffers::transformed` (CPU users
+     keep world meshes, untouched); scene builder uploads the shared mesh once and places each copy's instances
+     by its transform (not when vertex colors / replaced meshes apply). Test crates/model/tests/shared_meshes.rs.
+     Needs: GPUs with vertex-stage storage buffers (all of Metal/Vulkan/D3D12; not GL ES).
+- **2026-10-21 08:45 (perf) Hidden edges, root cause and Onshape's exact scheme** (lead urgent; user screenshots
+  /root/onshape-research/live/user-reports/2026-10-21-fins-*.png: segments/triangles at the fin roots, 1000 fins).
+  Root cause in v0.4.4: (1) `vs_line` pulled every edge toward the camera by `z*1.0004 + 2e-5*w`, a pull
+  proportional to the *scene's* depth range, not to local geometry: orthographic depth spans ±4·max(scene radius,
+  distance), so with 1000 fins (~2 m) the pull is 1–3 mm, more than a 1 mm fin; perspective (near = distance·1e-3)
+  2e-5 of depth is ~2% of the eye distance. Edges a fin-thickness behind a face won the depth test. (2) Faces were
+  pushed back by 2 px of their own depth slope (FACE_DEPTH_BIAS slope -2), so at grazing fin sides edges behind
+  them came through near the silhouettes. Not the cause (checked): depth compare (GreaterEqual, edges after
+  opaque faces, depth write on, same MSAA pass), polygon offset sign (reverse-Z negative = away), reversed-Z
+  precision (infinite reverse-Z float; ortho range ±4 R gives ~0.5 µm at 2 m), MSAA resolve.
+  Onshape (webgl/woolsthorpe bundles): edge quads keep the vertex's exact projected depth (the shader only offsets
+  x/y, `computeTangentAndNormalOffsets`); each node type gets `setZOffset(z)` = `polygonOffset(z / 29, z)`,
+  MAXIMUM_Z_OFFSET 29, PART_FACES 27, PART_EDGES 15, PART_POINTS 9 (also SURFACE 25, SKETCH_EDGES 12, ...), on a
+  DEPTH24_STENCIL8 standard-Z buffer whose near/far `updateNearFar` fits to the scene bounds (near = max(0.01 D,
+  nearest corner - 0.1 D), far = max(D, farthest + 0.1 D); ortho eye 0.6 D before the center).
+  Ours now: slope part as pipeline depth bias (faces -27/29, edges -15/29, points -9/29: format independent);
+  constant part in the shaders (`in_front_of_faces`: edges 12, points 18 Onshape units), converted per frame by
+  `onshape_depth_unit` (Globals.depth_unit) from Onshape's near/far to our reverse-Z depth. Faces keep -16 float
+  units (~2e-6 relative) so coplanar overlays still win. The earlier "pixel pull" is gone.
+  Test: crates/ops/tests/hidden_edges.rs (`edges_behind_fins_stay_hidden`): the user's fins through noshape-ops
+  (block 100×2010×40, fin x 10..90, 1 mm, flush with the front, ×1000 at 2 mm), built as a *Part* pattern (1000 fin
+  parts, also exercising instancing) because the Feature pattern is red in the tree while kern changes
+  pattern.rs (`merged_into_body`; kern's own pattern_fins tests fail the same way). Magenta probes on each fin's
+  hidden back root and far end edge must not show; cyan controls on edges nothing hides (top front edge, near-end
+  root) must show (a fin's *front* root is hidden by the fin in front of it, so it is no control). Ortho +
+  perspective, ±4/12/40 mm, 1x/2x. With v0.4.4's offsets it fails (up to 1747 px, merged-body variant), with the
+  fix it passes. `NOSHAPE_TEST_FINS_DOC=<doc>` runs it on another document of the same fins (e.g. the merged comb
+  body /root/perf-scratch/hidden/fins1000-comb.noshape). Note: the shaded orange part color matched a "red"
+  filter, hence magenta/cyan.
+  The "two faces on the front wall" in the split-face shot is kern's face-merge bug.
+- **2026-10-21 10:40 (perf) Blank viewport after "GPU wait failed"** (lead HIGH, ui's doc "x": a 900-part studio drew one
+  line, then a small Pin studio drew nothing). Not reproducible with the 10:00 tree on an idle-ish llvmpipe
+  (/root/perf-scratch/parts/x.noshape, 900-pin Part pattern + Pin tab, both render). Cause in the code: `wait_oldest`
+  treated wgpu's `PollError::Timeout` (10 s; the only other error is a wrong submission index, device loss does not
+  come through here) as a failed frame: it popped the read, reported "the frame failed", decremented the target's
+  in-flight count and dropped the readback buffer while the GPU was still rendering it. On a software rasterizer
+  under load (ui's machine: load 30+, 900 parts + AO + pick pass) the next frames queued behind it on the GPU,
+  timed out the same way, and no frame was ever delivered: a blank viewport, also for the small studio queued behind.
+  Fix: a timeout leaves the read pending (one warning per frame, "GPU frame still running after 10s; waiting"); the
+  worker loop / blocking `render` just wait again. `Renderer::set_wait_slice` sets the wait (tests).
+  Tests: crates/ops/tests/many_parts.rs (900-pin Part pattern + a one-pin studio through noshape-ops, scene builder,
+  ortho/perspective, whole + close, with the default wait and with a 1 µs wait slice = a GPU slower than every wait;
+  asserts shaded, edge and picked pixels on every frame). Smoke (CI): `SMOKE many parts` builds a 900-pin studio in
+  the app (model API), opens it, then the first other Part Studio; each must present 5 frames (orbiting) in 60 s with
+  no failed frame (`Viewport::frame_counts`, `PartStudioView::viewport_entity`).
+- **2026-10-21 14:10 (perf) Section caps landed (Onshape's endcap scheme; the shelved freeze rewrite).** Merged onto the
+  current renderer (instancing, depth offsets) and checked line by line against the bundle's shaders:
+  mask pass (each kept surface adds its sRGB part color + (id mod 31/71/97)·0.001, alpha + partCountOrder 16, front
+  +, back −; Onshape offsets by uMeshGroupIdHash + uOccurrenceId, session ids we don't have, so we use the part's pick
+  base), 3×3 edge detect + 5-tap blur, a quad per plane: median-of-3 sample, getColorHash / getHatchingSmoothstep /
+  dark-part brightening, intersecting red rgba(220,0,0) + 0.1 alpha, 10% selector color (plane 0 black, 1 red, 2
+  green), black outline. Pattern scale = SECTION_PLANE_ORTHOGRAPHIC_PATTERN_SCALE 30 / (P[5]·viewport height);
+  perspective 10·(distanceToCenter + 0.5 D)/height with distanceToCenter = |dir·(bounds center − eye)| (fixed: was the
+  camera distance). `ClipPlane::new` gives Onshape's frame (G44: a cut from Right +20: tangent (0,−1,0); from Top:
+  (−1,0,0); v = n × u, as getSectionPlaneFrame's cross(N, −u) with N the kept-side normal = −ours). 32-bit float mask
+  (FLOAT32_BLENDABLE requested, also through GPUI's device; 16-bit fallback turns the hatch by the rounding × 1000).
+  Call sites: scene builder and assembly_scene.rs use `ClipPlane::new`. Test `section_cap_hatch_follows_onshape`
+  (direction, 15·pace px period, 90% color, outline at 1x/2x; a ~49° color so mirroring or a 16-bit mask fails);
+  the old section tests pass. Exact pixel parity with the G44 shots isn't possible (session-id offsets, and their
+  mask color is not the REST appearance: the predictable shot's cap base is (225,206,185) for a (234,234,234) part).
+- **2026-10-21 16:00 (perf) KB4 orbit rate (qa5): no rate deviation; view-cube drag added.** Onshape (webgl `onDrag`):
+  angle per px = 2π·ROTATION_CYCLES_PER_SCREEN (3; 2 for a touch pointer) / |canvas size|, deltas and canvas both
+  multiplied by the effective device pixel ratio (`onDrag(t, i·dpr, n·dpr)`), so per pointer px it is
+  2π·3 / logical canvas diagonal on every platform: what `navigation::rotation_per_px` already does. Live 0.55°/px is
+  the 1673×973 canvas of a 1919×1079 window (formula: 0.558°/px); our graphics area has Onshape's size in a window of
+  the same size (1440×900: 1194×794 in both → 0.753°/px). qa5's 0.9°/px = a ~1200 px viewport diagonal (a smaller
+  window), or the release inertia of a quick scripted drag (both apps: released < 50 ms after the last move, decays
+  ×0.77 per 60 Hz frame). Pan (rays onto the view-normal plane through the pivot), wheel zoom (0.5/120 per
+  wheelDelta, 2^(−i/6)), drag zoom (device px / DRAG_ZOOM_FACTOR 10) and inertia were already Onshape's.
+  Test `navigation::drag_rotate_rate_matches_live` (100 px → 55.80° on 1673×973, 75.32° on 1194×794).
+  **View cube:** Onshape doesn't rotate on a cube drag, it moves the cube (`updateDragPosition`, kept as an offset
+  from the top-right corner, clamped 15 px left/right/top, 40 px bottom; ≤ 2 px moved = click; actions on click,
+  not on press). Implemented in part_studio/view_cube.rs (shared with the Assembly; `view_cube(.., viewport, cx)`).
+- **Overlays (item 2), started:** `overlay::Label` (box rects + GPUI text mask at a model point, the corner
+  rounded like GPUI's layout from the window origin), `Viewport::set_overlay_labels`, app `overlay_labels.rs`
+  (`value_box`, a GPUI value-box div replicated). Moved: section offset box (section.rs `section_value_label`),
+  analysis "Min/Max/R" readouts (`analysis_labels`); `follows` no longer includes the section dialog / analysis tool
+  (NOSHAPE_GPUI_LABELS=1 draws them the old way, for pixel comparison). TODO: pixel crops vs GPUI (needs an app
+  build: the tree didn't compile at 15:00 in assembly files); then sketch dimension labels / constraint glyphs /
+  shown dims as labels with viewport hit testing, the sketch name and datums (render-thread), and drop the
+  `sketch.rs:509` CameraChanged notify.
+- **Compare (item 3), renderer done, app wiring TODO:** `scene::compare` (instances tagged BASE/TARGET,
+  `Scene::compare = Some(Compare { blend })`): per-version depth+normal prepass (Rgba32Float, Onshape's vDepth =
+  (eye distance − near)/(far − near) with its near/far rule), faces tinted per pixel in `mesh_color`
+  (COMPARE_SAME_LIT_TINT white / COMPARE_BASE_TINT (144,207,241) / COMPARE_TARGET_TINT (221,82,40); |Δdepth| < 0.0004,
+  normals dot > 0.98), the "under" version alone in the frame (base below 0.5, else target), both versions in an
+  over layer mixed by 2f / 2(1−f) (Onshape's underBasePass/underComparePass + compareBlendPass), AO on both layers.
+  Test `compare_blend_follows_onshape`. App: the Part Studio must build the target version's scene (regenerate the
+  target document's studio) tagged TARGET, its own tagged BASE, and pass `compare_mode::blend()`; edges stay
+  normal (Onshape tints only nodes `isTintedByCompare`); planes/origin/sketches hidden; picking: base only.

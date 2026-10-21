@@ -307,9 +307,9 @@ impl Focusable for StartView {
 
 impl StartView {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search documents"));
-        let label_search = cx.new(|cx| InputState::new(window, cx).placeholder("Search labels"));
-        let col_search = cx.new(|cx| InputState::new(window, cx).placeholder("Search..."));
+        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search documents"));
+        let label_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search labels"));
+        let col_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search..."));
         let subs = vec![
             cx.subscribe(&col_search, |_, _, ev: &InputEvent, cx| {
                 if let InputEvent::Change = ev {
@@ -1160,7 +1160,7 @@ impl StartView {
     /// Row menu › Labels…: check the document's labels.
     fn labels_dialog(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search labels"));
+        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search labels"));
         window.subscribe(&search, cx, |_, ev: &InputEvent, window, _| {
             if let InputEvent::Change = ev {
                 window.refresh();
@@ -1219,7 +1219,7 @@ impl StartView {
                 .border_t_1()
                 .border_color(rgb(0xcccccc))
                 .cursor_pointer()
-                .child(os::glyph(os::GLYPH_LABEL_ADD, 20., pal.text))
+                .child(os::label_add_glyph(20., pal.text))
                 .child(div().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Create new label"))
                 .on_click(move |_, window, cx| v.update(cx, |t, cx| t.create_label(Some(p2.clone()), window, cx))),
         )
@@ -1249,7 +1249,7 @@ impl StartView {
                 .child(
                     div()
                         .id("nav-label-add")
-                        .child(os::glyph(os::GLYPH_LABEL_ADD, 20., pal.text))
+                        .child(os::label_add_glyph(20., pal.text))
                         .tooltip(crate::ui::tooltip("Create label"))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             cx.stop_propagation();
@@ -2733,8 +2733,10 @@ impl StartView {
             .w_full()
             .items_center()
             .justify_center()
-            .gap(px(20.))
-            .child(os::glyph(os::GLYPH_EMPTY, 150., rgb(0xd7d7d7)))
+            // The art 166 x 150 in `#eeeeee`, 20 px over the text (live 90: the
+            // glyph's drawing fills ~95 % x 87 % of its box).
+            .gap(px(12.))
+            .child(os::glyph(os::GLYPH_EMPTY, 167., rgb(0xeeeeee)))
             .child(div().max_w(px(520.)).text_center().text_size(px(14.)).text_color(pal.text).child(text))
             .into_any_element()
     }
@@ -2751,7 +2753,8 @@ impl StartView {
             .text_size(px(11.))
             .text_color(pal.text_muted)
             .child(div().flex_1().child(format!("Documents are stored on this computer in {}", display_path(&crate::files::documents_dir()))))
-            .child(format!("noshape {}", env!("CARGO_PKG_VERSION")))
+            // Live documents/90: the build, in parentheses, at the right end.
+            .child(format!("({})", crate::build_label()))
             .into_any_element()
     }
 }
@@ -3217,7 +3220,7 @@ impl LabelPick {
 /// close the dialog.
 fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl Fn(String, &mut Window, &mut App) -> bool + 'static) {
     let NamePrompt { title, ok_label, label, default, hint, location, labels } = prompt;
-    let label_search = labels.as_ref().map(|_| cx.new(|cx| InputState::new(window, cx).placeholder("Search labels").placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(gpui_kit::FontWeight::LIGHT), color: Some(gpui_kit::rgb(0x333333).into()) })));
+    let label_search = labels.as_ref().map(|_| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search labels").placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(gpui_kit::FontWeight::LIGHT), color: Some(gpui_kit::rgb(0x333333).into()) })));
     if let Some(st) = &label_search {
         window
             .subscribe(st, cx, |_, ev: &InputEvent, window, _| {

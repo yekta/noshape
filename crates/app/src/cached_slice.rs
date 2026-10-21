@@ -14,8 +14,10 @@
 //! - No text field inside it: a field's notification re-renders the view it
 //!   is in and every view around it. Put the field in the parent (or in a
 //!   layer of its own) and the heavy parts beside it as slices.
-//! - Not inside another cached view that re-renders: gpui re-renders every
-//!   cached view nested in one it re-renders (`window.refreshing`).
+//! - Inside another cached view, it is reused when that one re-renders only
+//!   if both were drawn in the previous frame (gpui-pre view.rs NOSHAPE
+//!   PATCH; upstream re-rendered every cached view nested in one it
+//!   re-renders).
 //! - A definite size: a cached view is laid out from its style alone. A
 //!   floating, content-sized panel goes in an absolute full-size slice; a
 //!   row of content-sized height uses [`Slice::sized`].

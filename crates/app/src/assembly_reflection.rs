@@ -149,7 +149,6 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept)
                             .cursor_pointer()
-                            .tooltip(crate::ui::tooltip("Accept (Enter)"))
                             .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_reflection(true, cx))),
                     )
@@ -162,7 +161,6 @@ impl AssemblyView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                             .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_reflection(false, cx))),
                     ),
@@ -186,11 +184,11 @@ impl AssemblyView {
             )
             .child(
                 h_flex()
-                    .child(div().flex_1().child(crate::os_ui::param_row("Rotation angle", crate::os_ui::input_h(Input::new(&rotation).appearance(false).text_size(px(13.33)).text_right(), 25.))))
+                    .child(div().child(crate::os_ui::param_row("Rotation angle", crate::os_ui::input_h(Input::new(&rotation).appearance(false).text_size(px(13.33)).text_right(), 25.))))
                     .child(
+                        // Live: the 26 px column right of the 194 px row (icon at 443).
                         div()
                             .id("arefl-opposite")
-                            .mr(px(3.))
                             .size(px(26.))
                             .flex()
                             .items_center()
@@ -199,7 +197,7 @@ impl AssemblyView {
                             .cursor_pointer()
                             .when(s.opposite, |d| d.bg(rgb(0xeaeaea)))
                             .tooltip(crate::ui::tooltip("Opposite direction"))
-                            .child(crate::assets::icon("flip-circular", 20., cx))
+                            .child(crate::assets::icon("flip-circular-opposite", 20., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.ui.reflection_dialog {
                                     d.settings.opposite = !d.settings.opposite;
@@ -220,7 +218,7 @@ impl AssemblyView {
     fn toggle_env_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(d) = &mut self.ui.reflection_dialog else { return };
         if d.picker.take().is_none() {
-            let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search by name, folder, or configuration"));
+            let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search by name, folder, or configuration"));
             let choice = match &d.settings.image {
                 Some(EnvImageRef::Library(n)) => *n,
                 _ => environment_maps::NAMES[0],

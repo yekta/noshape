@@ -17,6 +17,7 @@ pub(crate) mod config_var_dialog;
 mod annotations_ui;
 mod scope;
 mod default_tolerances;
+mod pending;
 mod fab_panel;
 mod feature_ops;
 mod manipulators;
@@ -91,40 +92,6 @@ const TOOLBAR: &[&[&[&str]]] = &[
     &[&["sheetMetalStart", "sheetMetalFlange", "sheetMetalHem", "sheetMetalTab", "sheetMetalBend", "sheetMetalJog", "sheetMetalFormed", "sheetMetalLoft", "sheetMetalMakeJoint", "sheetMetalCorner", "sheetMetalBendRelief", "sheetMetalCornerBreak", "sheetMetalEnd"]],
 ];
 
-/// Whether the Part Studio toolbar fits (live part-studio/220: when it
-/// doesn't, each group after Sketch collapses into one split tool),
-/// measured from the last layout so the tools' real widths count.
-#[derive(Clone, Default)]
-pub(super) struct ToolbarFit {
-    row: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
-    tools: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
-    search: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
-    /// The tools' natural width when last shown in full, and the estimate
-    /// (`toolbar_full_width`) then, which tells when the tools changed.
-    full: std::rc::Rc<std::cell::Cell<Option<(f32, f32)>>>,
-}
-
-impl ToolbarFit {
-    fn collapses(&self, est: f32, viewport_w: f32, search_hidden: bool) -> bool {
-        // Not measured for these tools yet: show them in full once (clipped
-        // by the bar), so the next frame decides from their real width.
-        let full = match self.full.get() {
-            Some((w, e)) if e == est => w,
-            _ => return false,
-        };
-        let row = self.row.get();
-        // The bar's 2 px padding each side and gap, then "Search tools…"
-        // 10 px after the tools.
-        let avail = if row.size.width > px(0.) {
-            let search = if search_hidden { 0. } else { 10. + f32::from(self.search.get().size.width) };
-            f32::from(row.size.width) - 6. - search
-        } else {
-            viewport_w - crate::ui::RAIL_W - 4. - 172.
-        };
-        full > avail + 0.5
-    }
-}
-
 /// Customize toolbar's tool sets: the toolbar groups, then ⊞ "Add custom
 /// features" (live 341: it has a sled and is listed as a tool).
 const TOOLSETS: usize = TOOLBAR.len() + 1;
@@ -132,9 +99,8 @@ const ADD_CUSTOM_SET: usize = TOOLBAR.len();
 static ADD_CUSTOM: [&str; 1] = ["addCustomFeatures"];
 
 /// A narrow window (live part-studio/220-221, dom/toolbar-narrow-900*.txt):
-/// each group after Sketch collapses into one split tool with this face and
-/// every tool of the group in its dropdown.
-const COLLAPSED_FACE: [&str; 9] = ["sketch", "extrude", "hole", "linearPattern", "booleanBodies", "modifyFillet", "cPlane", "frame", "sheetMetalStart"];
+/// a collapsed group is one split tool, its face the tool last used from it
+/// (else its first), every tool of the group in its dropdown.
 /// `toolbar_faces` keys of the collapsed groups (apart from the full ones).
 const COLLAPSED_KEY: [&str; 9] = ["~0", "~1", "~2", "~3", "~4", "~5", "~6", "~7", "~8"];
 
@@ -176,7 +142,8 @@ pub fn feature_icon(type_id: &str) -> SharedString {
         "sheetMetalFormed" => "form",
         "endcap" => "end-cap",
         "cutlist" => "cut-list",
-        "importDerived" | "importForeign" => "import",
+        "importDerived" => "derived",
+        "importForeign" => "import-foreign",
         "externalThread" => "external-thread",
         "faceBlend" => "face-blend",
         "modifyFillet" => "modify-fillet",
@@ -264,6 +231,8 @@ pub struct PartStudioView {
     pub tab: TabId,
     doc: Entity<DocModel>,
     gpu: Gpu,
+    /// Versions and history › Compare graphics.
+    compare_gfx: crate::compare_graphics::CompareGraphics,
     viewport: Entity<Viewport>,
     display: Arc<StudioDisplay>,
     built: Option<BuiltScene>,
@@ -276,8 +245,14 @@ pub struct PartStudioView {
     regen: Arc<Mutex<Regenerator>>,
     regen_seq: u64,
     regen_task: Option<Task<()>>,
+    /// The running regeneration (pending.rs: a newer request retires it).
+    regen_inflight: Option<pending::InFlight>,
+    /// A regeneration whose result isn't shown yet, its overlay timer and
+    /// spinner.
+    pending: Option<pending::Pending>,
+    pending_timer: Option<Task<()>>,
+    pending_spinner: Option<Entity<pending::Spinner>>,
     /// Custom features shown in the toolbar (for its width).
-    custom_feature_count: usize,
     focus: FocusHandle,
     /// Cached parts of the window (toolbar, viewport overlay, lists): see `cached_slice`.
     slices: Option<PsSlices>,
@@ -337,6 +312,11 @@ impl Focusable for PartStudioView {
 }
 
 impl PartStudioView {
+    /// The 3D viewport (smoke test).
+    pub(crate) fn viewport_entity(&self) -> Entity<Viewport> {
+        self.viewport.clone()
+    }
+
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let mut subs = Vec::new();
@@ -367,6 +347,13 @@ impl PartStudioView {
                 this.cancel_edit(window, cx);
                 this.schedule_regen(window, cx)
             }
+            // Live: Workspace units ✓ keeps an open sketch or feature dialog;
+            // its unitless sketch dimensions keep their size like the stored
+            // ones (`pin_sketch_units`).
+            DocEvent::UnitsChanged { old } => {
+                this.pin_draft_units(old, cx);
+                this.schedule_regen(window, cx)
+            }
             DocEvent::Error(msg) => {
                 this.message = Some((FeatureStatus::Error, msg.clone()));
                 cx.notify();
@@ -381,6 +368,7 @@ impl PartStudioView {
             tab,
             doc,
             gpu,
+            compare_gfx: Default::default(),
             viewport,
             display: Arc::new(StudioDisplay::defaults()),
             built: None,
@@ -393,7 +381,10 @@ impl PartStudioView {
             regen: Arc::new(Mutex::new(Regenerator::new())),
             regen_seq: 0,
             regen_task: None,
-            custom_feature_count: 0,
+            regen_inflight: None,
+            pending: None,
+            pending_timer: None,
+            pending_spinner: None,
             focus: cx.focus_handle(),
             slices: None,
             filter_rows: None,
@@ -488,6 +479,8 @@ impl PartStudioView {
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // Paused regeneration (Onshape): edits wait until "Regenerate".
         if self.ui.regen_paused.is_some() && !std::mem::take(&mut self.ui.force_regen) {
+            // Nothing starts: an "Opening…" waiting for this run goes.
+            self.pending.take_if(|p| p.seq == 0);
             cx.notify();
             return;
         }
@@ -504,6 +497,16 @@ impl PartStudioView {
         self.regen_seq += 1;
         let seq = self.regen_seq;
         let editing_sketch = self.sketch.as_ref().map(|s| s.feature).or_else(|| self.editing_sketch_id(cx));
+        // The newest request wins (pending.rs): the running one is aborted, or
+        // finishes its features into the cache when this one only extends it.
+        let studio = Arc::new(studio);
+        let cancel = noshape_model::regen::RegenCancel::default();
+        if let Some(old) = self.regen_inflight.take() {
+            old.retire(&studio, &config, &doc_vars, editing_sketch);
+        }
+        self.regen_inflight = Some(pending::InFlight { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
+        self.begin_pending(seq, window, cx);
+        let cancel2 = cancel.clone();
         // View in high quality (Shift+R): a 4x finer chord tolerance.
         let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality { 0.25 } else { 1.0 };
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
@@ -511,16 +514,27 @@ impl PartStudioView {
             cx.background_executor().timer(Duration::from_millis(12)).await;
             let result = cx
                 .background_spawn(async move {
-                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), ..Default::default() };
+                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), ..Default::default() };
                     let r = regen.lock().regenerate(&studio, &config, &units, &opts);
                     (r, studio, config, units, upto, editing_sketch, doc_vars)
                 })
                 .await;
             let (result, studio, config, units, upto, editing_sketch, doc_vars) = result;
+            // A newer request took over.
+            if result.cancelled {
+                return;
+            }
             let refine = result.needs_refine;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 if seq != this.regen_seq {
                     return;
+                }
+                if let Some(p) = &mut this.pending {
+                    p.opening = None;
+                }
+                if !refine {
+                    this.regen_inflight = None;
+                    this.end_pending(seq, cx);
                 }
                 this.context = Some(result.context.clone());
                 scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
@@ -533,16 +547,21 @@ impl PartStudioView {
                 let regen2 = regen2;
                 let fine = cx
                     .background_spawn(async move {
-                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), ..Default::default() };
+                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), ..Default::default() };
                         let r = regen2.lock().regenerate(&studio, &config, &units, &opts);
                         (r, studio)
                     })
                     .await;
                 let (fine, studio) = fine;
+                if fine.cancelled {
+                    return;
+                }
                 let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                     if seq != this.regen_seq {
                         return;
                     }
+                    this.regen_inflight = None;
+                    this.end_pending(seq, cx);
                     this.context = Some(fine.context.clone());
                     scene_builder::log_regen_perf("refine", &fine.display, &studio);
                     this.apply_display(Arc::new(fine.display), window, cx);
@@ -835,6 +854,14 @@ impl PartStudioView {
             (None, None) => self.selection.len(),
             (None, Some(e)) => count_picks(&e.dialog.read(cx).feature.params),
         };
+        // Versions and history › Compare: both sides (crate::compare_graphics).
+        let (mode, up) = (self.opts.display_mode, self.gpu.uploader());
+        let owner = crate::compare_graphics::Owner::<Self> { get: |this: &mut Self| &mut this.compare_gfx, then: |this, cx| this.refresh_scene(false, cx) };
+        match self.compare_gfx.scene(&self.doc, self.tab, mode, up, owner, cx) {
+            Some(compare) => scene = compare,
+            None if crate::compare_mode::blend(&self.doc, cx).is_none() => self.compare_gfx.clear(),
+            None => {}
+        }
         let (tool_cursor, overlay_cursor) = (self.viewport_tool_cursor(), self.viewport_overlay_cursor());
         self.viewport.update(cx, |vp, cx| {
             (vp.fit_bounds, vp.fit_inset_left) = (fit_bounds, fit_inset);
@@ -973,11 +1000,17 @@ impl PartStudioView {
     }
 
     fn flash(&mut self, status: FeatureStatus, text: String, cx: &mut Context<Self>) {
+        // Onshape's auto-dismissed message bubbles last 5000 ms.
+        self.flash_for(status, text, Duration::from_secs(5), cx);
+    }
+
+    /// [`Self::flash`] for `time`.
+    pub(super) fn flash_for(&mut self, status: FeatureStatus, text: String, time: Duration, cx: &mut Context<Self>) {
         let shown = (status, text);
         self.message = Some(shown.clone());
         cx.notify();
         cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_secs(4)).await;
+            cx.background_executor().timer(time).await;
             let _ = this.update(cx, |this, cx| {
                 if this.message.as_ref() == Some(&shown) {
                     this.message = None;
@@ -1129,7 +1162,7 @@ impl PartStudioView {
                 // Clicking near a hovered edge's midpoint picks the midpoint,
                 // unless the active field takes no points (Onshape: picks
                 // follow the field's filter).
-                let takes_points = self.active_field_filter(cx).is_none_or(|f| f.intersects(QueryFilter::POINT_LIKE));
+                let takes_points = self.active_field_filter(cx).is_none_or(behaviors::field_takes_points);
                 let target = match target {
                     Some(t) if matches!(t.kind, PickKind::Edge | PickKind::SketchCurve) && takes_points => Some(self.midpoint_pick(t, *position, cx)),
                     other => other,
@@ -1153,7 +1186,7 @@ impl PartStudioView {
                 }
                 cx.notify();
             }
-            ViewportEvent::BoxSelect { ids, modifiers } => {
+            ViewportEvent::BoxSelect { ids, modifiers, .. } => {
                 // Ctrl+drag deselects (Onshape).
                 self.box_select(ids, modifiers.control || modifiers.platform, cx);
             }
@@ -1232,6 +1265,8 @@ impl PartStudioView {
             cx.notify();
             return;
         }
+        // Live: a slow model shows "Opening <feature>…" under the spinner.
+        self.pending_opening(feature.name.clone());
         self.open_dialog(feature, index, false, window, cx);
     }
 
@@ -1284,6 +1319,7 @@ impl PartStudioView {
     }
 
     fn open_dialog(&mut self, feature: Feature, index: usize, is_new: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let feature_id = feature.id;
         // The edited row shows as being edited, not selected.
         self.selected_features.clear();
         let units = self.doc.read(cx).session.doc.settings.units;
@@ -1337,17 +1373,8 @@ impl PartStudioView {
                 let d = this.display.clone();
                 this.apply_display(d, window, cx);
             }
-            DialogEvent::ConfigureParam(param) => {
-                if let Some(input) = this.ui.configure_pick.take() {
-                    let fid = this.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
-                    this.cancel_edit(window, cx);
-                    if let Some(fid) = fid {
-                        this.add_configured(fid, param, &input, cx);
-                    }
-                    this.right_panel = Some(config_panel::RightPanel::Configurations);
-                    cx.notify();
-                }
-            }
+            DialogEvent::ConfigureParam(param) => this.configure_dialog_param(param, true, cx),
+            DialogEvent::UnconfigureParam(param) => this.configure_dialog_param(param, false, cx),
             // Hovering a selection row lights its entity yellow-green (Onshape).
             DialogEvent::HoverRef(r) => {
                 if this.ui.query_hover != *r {
@@ -1370,14 +1397,19 @@ impl PartStudioView {
             r => r.depends_on().is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
         });
         let dialog_width = self.ui.dialog_width;
+        let (configured, configurable_inputs) = self.configured_of(feature_id, cx);
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
+        let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
         let studio_view = cx.entity().downgrade();
         dialog.update(cx, |d, cx| {
             if d.feature.type_id == "sketch" {
                 d.extra = Some(Self::sketch_dialog_extra(studio_view));
             }
             d.missing = missing;
+            d.configured = configured;
+            d.configurable_inputs = configurable_inputs;
             d.sketch_region_count = Arc::new(move |id| region_counts.get(&id).copied().unwrap_or(0));
+            d.sketch_vertices = Arc::new(move |id| vertex_sets.get(&id).cloned().unwrap_or_default());
             d.width = dialog_width;
             d.variables = vars;
             d.final_available = later;
@@ -1390,10 +1422,25 @@ impl PartStudioView {
         self.ui.preview_before = None;
         self.ui.before_context = None;
         self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history });
+        // Live ("Panels vs feature dialogs"): opening a feature dialog closes
+        // the tool panels (Mass and section properties, Named views) for good;
+        // Isolate stays, under the dialog.
+        if self.show_mass {
+            self.set_show_mass(false, cx);
+        }
+        self.named_views = None;
         self.auto_operation(cx);
         self.schedule_regen(window, cx);
         self.schedule_preview_before(window, cx);
         cx.notify();
+    }
+
+    /// Accepts the open feature dialog or sketch, if any (a document-level
+    /// panel such as Workspace units takes its place).
+    pub(crate) fn accept_open_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit.is_some() {
+            self.accept_edit(false, window, cx);
+        }
     }
 
     fn accept_edit(&mut self, repeat: bool, window: &mut Window, cx: &mut Context<Self>) {
@@ -1572,24 +1619,40 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ render pieces
 
-    /// Width of the full toolbar (tools, carets, separators, gaps).
-    fn toolbar_full_width(&self) -> f32 {
-        let removed = &self.ui.toolbar.removed;
-        let (cell, caret, gap, sep) = (crate::ui::TOOL_CELL, crate::ui::TOOL_CARET_W, 2., 2.);
-        // Undo + Redo, then per group a separator and its buttons.
-        let mut w = 2. * cell + gap;
-        for group in TOOLBAR {
-            w += gap + sep;
-            for items in group.iter().filter(|items| !items.iter().all(|id| removed.iter().any(|r| r == id))) {
-                w += gap + if items[0] == "sketch" { 83. } else { cell } + if items.len() > 1 { caret } else { 0. };
-            }
-        }
-        // The document's custom features (up to 4 + their menu), ⊞.
-        let custom = self.custom_feature_count.min(4);
-        if self.custom_feature_count > 0 {
-            w += gap + sep + (custom as f32 + 1.) * cell;
-        }
-        w + 2. * gap + sep + cell
+    /// Live's toolbar fit (client `Toolbar` component, woolsthorpe
+    /// @14754280; docs/handoff/theme-layout.md "Toolbar collapse"): the
+    /// longest run of tool sets from the left that fits stays expanded, every
+    /// later one collapses into one split tool (no priorities, no
+    /// hysteresis). Widths are Onshape's CSS, not ours, so the breakpoints
+    /// are live's: a tool 34 px (32 + 1 px margins), a split tool 52, the
+    /// "Sketch" label tool 85, 4 px per tool set (separator + margins); a
+    /// collapsed set 56 (38 for a single tool); Undo / Redo 70, "Search
+    /// tools…" 173, 7 px at the end; room = the window minus the 40 px rail
+    /// column. Returns the index in `order` from which sets collapse.
+    fn toolbar_collapse_from(order: &[usize], removed: &[String], custom: usize, search_hidden: bool, viewport_w: f32) -> usize {
+        let is_removed = |id: &str| removed.iter().any(|r| r == id);
+        let widths: Vec<(f32, f32)> = order
+            .iter()
+            .map(|&gi| {
+                if gi == ADD_CUSTOM_SET {
+                    let w = if is_removed(ADD_CUSTOM[0]) { 0. } else { 38. } + if custom > 0 { 56. } else { 0. };
+                    return (w, w);
+                }
+                let items: Vec<Vec<&str>> = TOOLBAR[gi].iter().map(|it| it.iter().copied().filter(|id| !is_removed(id)).collect::<Vec<_>>()).filter(|v| !v.is_empty()).collect();
+                if items.is_empty() {
+                    return (0., 0.);
+                }
+                let expanded = 4. + items.iter().map(|it| if it[0] == "sketch" { 85. } else if it.len() > 1 { 52. } else { 34. }).sum::<f32>();
+                let tools: usize = items.iter().map(Vec::len).sum();
+                (expanded, 4. + if tools > 1 { 52. } else { 34. })
+            })
+            .collect();
+        let fixed = 70. + if search_hidden { 0. } else { 173. } + 7.;
+        let room = viewport_w - 40.;
+        (0..=widths.len())
+            .rev()
+            .find(|&k| fixed + widths[..k].iter().map(|w| w.0).sum::<f32>() + widths[k..].iter().map(|w| w.1).sum::<f32>() <= room)
+            .unwrap_or(0)
     }
 
     fn render_toolbar(&mut self, viewport_w: f32, cx: &mut Context<Self>) -> AnyElement {
@@ -1602,8 +1665,8 @@ impl PartStudioView {
         // "Search tools…" at the right end.
         // Live: "Search tools…" follows the last tool (it is not pinned to
         // the right edge).
-        // The tools at their natural width (measured: `ToolbarFit`), clipped
-        // by the bar when the window is narrower still.
+        // Tool sets collapse from the right as the window narrows
+        // (`toolbar_collapse_from`); the bar clips them when narrower still.
         let mut bar = h_flex().flex_none().relative().gap(px(2.)).child(crate::ui::undo_redo(&self.doc, cx)).child(crate::ui::tool_separator());
         let customizing = self.ui.tb_custom.is_some();
         let hidden = self.ui.toolbar.hide_search;
@@ -1613,45 +1676,41 @@ impl PartStudioView {
             None => (crate::toolbar_customize::full_order(&self.ui.toolbar.group_order, TOOLSETS), self.ui.toolbar.removed.clone()),
         };
         let is_removed = |id: &str| removed.iter().any(|r| r == id);
-        // Live (part-studio/220): when the tools don't fit, every group after
-        // Sketch collapses to one split tool. Room: the window minus the left
-        // rail, the toolbar padding and "Search tools…" (172 px with its margin).
         let custom = self.doc.read(cx).custom_features().feature_types();
-        self.custom_feature_count = custom.len();
-        let est = self.toolbar_full_width();
-        let collapsed = !customizing && self.ui.tb_fit.collapses(est, viewport_w, hidden);
+        let collapse_from = if customizing { usize::MAX } else { Self::toolbar_collapse_from(&order, &removed, custom.len(), hidden, viewport_w) };
         fn field(v: &mut PartStudioView) -> Option<&mut crate::toolbar_customize::Customize> {
             v.ui.tb_custom.as_mut()
         }
         let mut first = true;
         let mut custom_shown = false;
-        for gi in order {
+        for (pos, gi) in order.into_iter().enumerate() {
+            let collapsed = pos >= collapse_from;
             // ⊞ "Add custom features" is a set of its own (live 341); the
-            // document's custom features come just before it.
+            // document's custom features follow it, after a separator (live
+            // part-studio/495: ⊞ at x 1637, the {cube} ▾ at 1675).
             if gi == ADD_CUSTOM_SET {
+                if !is_removed(ADD_CUSTOM[0]) {
+                    let btn = self.add_custom_features_button(custom.clone(), cx);
+                    let el = if customizing {
+                        let t = crate::toolbar_customize::tool(btn, &ADD_CUSTOM, crate::assets::icon_path("add-custom-features"), cx);
+                        crate::toolbar_customize::toolset(gi, t, true, field, cx)
+                    } else {
+                        btn
+                    };
+                    bar = bar.child(crate::ui::tool_separator()).child(el);
+                    first = false;
+                }
                 if !custom.is_empty() {
                     bar = bar.child(crate::ui::tool_separator()).child(self.custom_tools(custom.clone(), cx));
                     custom_shown = true;
                 }
-                if is_removed(ADD_CUSTOM[0]) {
-                    continue;
-                }
-                let btn = self.add_custom_features_button(custom.clone(), cx);
-                let el = if customizing {
-                    let t = crate::toolbar_customize::tool(btn, &ADD_CUSTOM, crate::assets::icon_path("add-custom-features"), cx);
-                    crate::toolbar_customize::toolset(gi, t, true, field, cx)
-                } else {
-                    btn
-                };
-                bar = bar.child(crate::ui::tool_separator()).child(el);
-                first = false;
                 continue;
             }
             let group = TOOLBAR[gi];
             if collapsed && gi > 0 {
                 let items = collapsed_group(gi);
                 let live: Vec<&'static str> = items.iter().copied().filter(|id| !is_removed(id)).collect();
-                let Some(rep) = live.iter().find(|id| **id == COLLAPSED_FACE[gi]).or(live.first()).and_then(|id| features::get(id)) else { continue };
+                let Some(rep) = live.first().and_then(|id| features::get(id)) else { continue };
                 let key = COLLAPSED_KEY[gi];
                 let face = self.ui.toolbar_faces.get(key).and_then(|id| features::get(id)).unwrap_or(rep);
                 if !first {
@@ -1689,44 +1748,6 @@ impl PartStudioView {
         if !custom.is_empty() && !custom_shown {
             bar = bar.child(crate::ui::tool_separator()).child(self.custom_tools(custom, cx));
         }
-        let fit = &self.ui.tb_fit;
-        let (tools_cell, full_cell, row_cell, search_cell) = (fit.tools.clone(), fit.full.clone(), fit.row.clone(), fit.search.clone());
-        bar = bar.child(
-            canvas(
-                move |b, _, _| {
-                    tools_cell.set(b);
-                    if !collapsed {
-                        full_cell.set(Some((f32::from(b.size.width), est)));
-                    }
-                },
-                |_, _, _, _| {},
-            )
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full(),
-        );
-        let watch = {
-            let fit = self.ui.tb_fit.clone();
-            let me = cx.entity().downgrade();
-            // After layout: re-render when the measured widths call for the
-            // other state (a resize, tools added or removed).
-            canvas(
-                move |b, _, _| row_cell.set(b),
-                move |_, _, _, cx| {
-                    if !customizing && fit.collapses(est, viewport_w, hidden) != collapsed {
-                        let me = me.clone();
-                        cx.defer(move |cx| {
-                            let _ = me.update(cx, |_, cx| cx.notify());
-                        });
-                    }
-                },
-            )
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full()
-        };
         let view = cx.entity();
         crate::ui::toolbar()
             .id("part-studio-toolbar")
@@ -1735,7 +1756,6 @@ impl PartStudioView {
             .w_full()
             .min_w_0()
             .relative()
-            .child(watch)
             // Right-click the toolbar (live 331z): Customize toolbar… · Hide /
             // Show "Search tools".
             .os_context_menu(move |m, _, _| {
@@ -1757,11 +1777,56 @@ impl PartStudioView {
                         .flex_none()
                         .relative()
                         .ml(px(10.))
-                        .child(canvas(move |b, _, _| search_cell.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))),
                 )
             })
+            .children(self.render_configure_banner(cx))
             .into_any_element()
+    }
+
+    /// Configure features mode (live psb 10-21 g): the toolbar greys out
+    /// under a white veil and a yellow bar centred over it reads "Select
+    /// sketches or features to configure" (with a feature open: "Select
+    /// parameters to configure") with [Done].
+    fn render_configure_banner(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        if self.ui.configure_pick.is_none() {
+            return Vec::new();
+        }
+        let text = if self.edit.is_some() { "Select parameters to configure" } else { "Select sketches or features to configure" };
+        let veil = div().id("cfg-mode-veil").absolute().top_0().left_0().size_full().bg(gpui_kit::rgba(0xffffffbf)).occlude();
+        let done = div()
+            .id("cfg-mode-done")
+            .h(px(22.))
+            .w(px(52.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .bg(gpui_kit::rgb(0xffffff))
+            .border_1()
+            .border_color(gpui_kit::rgb(0xaaaaaa))
+            .rounded(px(3.5))
+            .cursor_pointer()
+            .text_size(px(13.))
+            .text_color(p().text)
+            .child("Done")
+            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                // Done leaves the mode and closes the feature dialog.
+                this.ui.configure_pick = None;
+                this.cancel_edit(window, cx);
+                cx.notify();
+            }));
+        let bar = h_flex()
+            .h(px(28.))
+            .w(px(352.))
+            .pt(px(3.))
+            .pr(px(3.))
+            .pl(px(10.))
+            .bg(gpui_kit::rgb(0xfab601))
+            .text_size(px(13.))
+            .text_color(gpui_kit::rgb(0x333333))
+            .child(div().flex_1().child(text))
+            .child(done);
+        vec![veil.into_any_element(), div().absolute().top_0().left_0().size_full().flex().justify_center().child(bar).into_any_element()]
     }
 
     fn start_toolbar_customize(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1972,20 +2037,18 @@ impl PartStudioView {
         crate::ui::with_tooltip("tt-add-custom", "Add custom features", btn)
     }
 
-    /// Toolbar group of custom features: the first few as buttons, all of
-    /// them in a "Custom features" dropdown.
+    /// The workspace's custom features: one {cube} ▾ dropdown after ⊞ (live
+    /// part-studio/495; behaviours.md: "Custom features in this workspace"),
+    /// 52 px like a split tool.
     fn custom_tools(&mut self, custom: Vec<&'static FeatureType>, cx: &mut Context<Self>) -> AnyElement {
-        let mut group = h_flex().flex_none();
-        for ty in custom.iter().take(4) {
-            group = group.child(self.tool_button(ty, &[], ty.id, cx));
-        }
         let view = cx.entity();
-        group
+        h_flex()
+            .flex_none()
             .child(
                 crate::ui::tool_button("tb-custom-features", "custom-feature", false, cx)
-                    .w(px(crate::ui::TOOL_CELL + 15.))
+                    .w(px(crate::ui::TOOL_CELL + crate::ui::TOOL_CARET_W))
                     .child(crate::ui::glyph("tool-caret", 12., p().text))
-                    .tooltip("Custom features (Feature Studios)")
+                    .tooltip("Custom features in this workspace")
                     .dropdown_menu(move |mut menu, _, _| {
                         menu = menu.label("Custom features");
                         for t in &custom {
@@ -2187,13 +2250,13 @@ impl PartStudioView {
                         if is_plane {
                             let (vs, rs) = (view.clone(), r.clone());
                             m = m
-                                .item(crate::os_menu::OsMenuItem::new("New sketch…").icon(Icon::empty().path(icon_path("sketch"))).on_click(move |_, w, cx| {
+                                .item(crate::os_menu::OsMenuItem::new("New sketch…").icon_name("sketch").on_click(move |_, w, cx| {
                                     v1.update(cx, |this, cx| {
                                         this.selection = vec![r1.clone()];
                                         this.start_feature("sketch", w, cx);
                                     })
                                 }))
-                                .item(crate::os_menu::OsMenuItem::new("Offset plane…").icon(Icon::empty().path(icon_path("plane"))).on_click(move |_, w, cx| {
+                                .item(crate::os_menu::OsMenuItem::new("Offset plane…").icon_name("plane").on_click(move |_, w, cx| {
                                     v4.update(cx, |this, cx| {
                                         this.selection = vec![r4.clone()];
                                         this.start_feature("cPlane", w, cx);
@@ -2206,7 +2269,7 @@ impl PartStudioView {
                             }
                             m = m.separator();
                         }
-                        m = m.item(crate::os_menu::OsMenuItem::new(if hidden { "Show" } else { "Hide" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_visibility(std::slice::from_ref(&r2), !hidden, cx))));
+                        m = m.item(crate::os_menu::OsMenuItem::new(if hidden { "Show" } else { "Hide" }).icon_name(if hidden { "eye" } else { "eye-off" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_visibility(std::slice::from_ref(&r2), !hidden, cx))));
                         if is_plane {
                             let (vo, ro, va) = (view.clone(), r.clone(), view.clone());
                             let (vz, rz) = (view.clone(), r.clone());
@@ -2244,6 +2307,7 @@ impl PartStudioView {
         if filtered.is_some() {
             dg_rows.push(div().h(px(26.)).flex_none().pl(px(23.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element());
         }
+        let dg_count = dg_rows.len();
         if !dg_rows.is_empty() {
             // Onshape: a collapsible "Default geometry" folder; children are
             // indented 22 px under a 1 px guide line.
@@ -2274,7 +2338,38 @@ impl PartStudioView {
 
         let ellipsis = || div().h(px(26.)).flex_none().pl(px(5.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element();
         let indent = |indent: f32, row: AnyElement| if indent > 0. { div().pl(px(indent)).child(row).into_any_element() } else { row };
+        // Rows out of the list's view (with 2 rows to spare) are left out,
+        // each run of them replaced by one empty block of their height: a
+        // filter key that brings back every feature builds and lays out only
+        // what shows (qa4). Feature, folder and "..." rows are all ROW_H
+        // tall; the others are always drawn and only estimated here. A scroll
+        // notifies this slice, which then draws the rows that came into view.
+        let row_h = crate::ui::ROW_H;
+        let shown = {
+            let (b, offset) = (self.ui.list_scroll.bounds(), self.ui.list_scroll.offset());
+            let spare = 2. * row_h;
+            let top = -f32::from(offset.y) - spare;
+            (f32::from(b.size.height) > 0.).then(|| (top, top + f32::from(b.size.height) + 2. * spare))
+        };
+        // The "Default geometry" row and its open rows come first.
+        let mut y = if dg_count == 0 { 0. } else { row_h * (1 + if self.ui.default_geometry_collapsed { 0 } else { dg_count }) as f32 };
+        let mut skipped = 0usize;
         for item in items {
+            let h = match &item {
+                ListItem::Rollback(_) => 13.,
+                ListItem::Prompt => 60.,
+                _ => row_h,
+            };
+            let off_view = matches!(item, ListItem::Ellipsis | ListItem::Folder(..) | ListItem::Feature(..)) && shown.is_some_and(|(top, bottom)| y + h < top || y > bottom);
+            y += h;
+            if off_view {
+                skipped += 1;
+                continue;
+            }
+            let run = std::mem::take(&mut skipped);
+            if run > 0 {
+                rows.push(div().h(px(row_h * run as f32)).flex_none().into_any_element());
+            }
             rows.push(match item {
                 ListItem::Placeholder => self.render_editing_placeholder(cx),
                 ListItem::Rollback(i) => self.render_rollback_bar(i, window, cx),
@@ -2284,7 +2379,10 @@ impl PartStudioView {
                 ListItem::Prompt => self.render_folder_prompt(cx),
             });
         }
-        v_flex().id("feature-list").key_context("FeatureList").track_focus(&self.ui.list_focus).size_full().overflow_y_scroll().children(rows).child(
+        if skipped > 0 {
+            rows.push(div().h(px(row_h * skipped as f32)).flex_none().into_any_element());
+        }
+        v_flex().id("feature-list").key_context("FeatureList").track_focus(&self.ui.list_focus).track_scroll(&self.ui.list_scroll).size_full().overflow_y_scroll().children(rows).child(
             // Space below the last feature: dropping the rollback bar
             // here rolls it to the end (otherwise it could only be
             // dragged up, and back down to above the last feature).
@@ -2509,8 +2607,12 @@ impl PartStudioView {
                 })
                 // (Chrome keeps the space before the ellipsis.)
                 // Filtered: "Features (k of N)", truncating (live 564).
+                // With the error icon the title no longer fits the default
+                // panel width: live shows "Features …" (Chrome keeps the space
+                // before its ellipsis; part-studio/94, 570). A wider panel
+                // shows it whole (qa4 F16), a narrower one truncates.
                 .child(div().min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match &filtered_count {
-                    _ if errors > 0 => "Features …".to_string(),
+                    _ if errors > 0 && crate::ui::left_panel_w() < crate::ui::LEFT_PANEL_W + 10. => "Features …".to_string(),
                     Some(k) => format!("Features ({k} of {})", n_features + 4),
                     None => format!("Features ({})", n_features + 4),
                 }))
@@ -3069,7 +3171,9 @@ impl PartStudioView {
         let has_appearance = rc.appearances.contains(&id);
         let is_sketch = rc.sketches.contains(&id);
         let has_plane = is_sketch || rc.planes.contains(&id);
+        // Live (part-studio/495): the icon's ink starts at x 46, the name at 67.
         let row = crate::ui::tree_row(SharedString::from(format!("feat-{}", f.id)), selected || editing)
+            .pl(px(4.))
             .mr(px(5.))
             .pr(px(11.))
             .when(self.ui.list_menu == Some(id) && !(selected || editing), |d| d.bg(pal.row_hover))
@@ -3096,13 +3200,16 @@ impl PartStudioView {
             .when(related && !selected && !editing, |d| d.bg(gpui_kit::rgb(0xecf0f4)))
             .when(editing, |d| d.font_weight(FontWeight::SEMIBOLD))
             .child(
-                crate::ui::tree_icon(&feature_icon(&f.type_id), rolled_back || suppressed || hidden, cx)
+                div()
                     .relative()
-                    // Onshape list badges: under-defined sketch (blue) at the icon's
-                    // bottom-right. An error only turns the name red (part-studio/94).
+                    .flex_none()
+                    .child(crate::ui::tree_icon(&feature_icon(&f.type_id), rolled_back || suppressed || hidden, cx))
+                    // Onshape list badges: under-defined sketch (12 px blue circle,
+                    // undimmed, 8 px in from the icon's top-left). An error only turns
+                    // the name red (part-studio/94).
                     // Missing selections / warnings: Onshape's yellow triangle.
                     .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().right(px(-3.)).bottom(px(-5.)).text_size(px(10.)).text_color(pal.warning).child("▲")))
-                    .when(underdefined, |d| d.child(div().absolute().right(px(-1.)).bottom(px(-3.)).w(px(8.)).h(px(4.)).bg(pal.accent))),
+                    .when(underdefined, |d| d.child(div().absolute().left(px(9.5)).top(px(8.)).child(crate::assets::icon("list-underdefined-overlay", 12., cx)))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
                 Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.))).into_any_element(),
@@ -3410,6 +3517,26 @@ impl PartStudioView {
         // Message toast.
         // The tool-miss toast belongs to the open Remove / Intersect dialog.
         if let Some((st, msg)) = self.message.clone().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION) {
+            // Info messages close by themselves after 5 s however they were
+            // set (live: message bubbles auto-dismiss after 5000 ms; qa5 C5 /
+            // SM10); errors and warnings stay until closed.
+            let key = (st, msg.clone());
+            if st == FeatureStatus::Info && self.ui.message_timed.as_ref() != Some(&key) {
+                self.ui.message_timed = Some(key.clone());
+                cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(Duration::from_secs(5)).await;
+                    let _ = this.update(cx, |this, cx| {
+                        if this.message.as_ref() == Some(&key) {
+                            this.message = None;
+                            cx.notify();
+                        }
+                        if this.ui.message_timed.as_ref() == Some(&key) {
+                            this.ui.message_timed = None;
+                        }
+                    });
+                })
+                .detach();
+            }
             // Onshape alert: top-center of the viewport, info/warn/error colors (§4.9).
             let kind = match st {
                 FeatureStatus::Error => crate::os_ui::BubbleKind::Error,
@@ -3436,12 +3563,14 @@ impl PartStudioView {
             } else {
                 crate::os_ui::message_bubble("toast", kind, msg, close, cx)
             };
-            // Live document/01: centered on the window, not the graphics area.
-            // With a right panel open the graphics area is too narrow for
-            // that, so the bubble centres on it instead of running under the
-            // feature list.
-            let left = if self.right_panel.is_some() { 0. } else { crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() } };
-            out.push(div().absolute().top(px(8.)).left_0().right_0().pr(px(left)).flex().justify_center().child(bubble).into_any_element());
+            // Live (document/01; qa5 C5: 814,85 at 1920): centered on the
+            // window, not the graphics area, also with a right panel open (it
+            // then stays clear of the feature dialog at the top left).
+            // (The graphics area runs from the rail and list to the right
+            // panel: pad by what lies outside it on the other side.)
+            let left = crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() };
+            let right = if self.right_panel.is_some() { crate::ui::right_panel_w() } else { 0. };
+            out.push(div().absolute().top(px(8.)).left_0().right_0().pl(px(right)).pr(px(left)).flex().justify_center().child(bubble).into_any_element());
         }
         out
     }
@@ -3546,12 +3675,18 @@ fn edge_creator(n: &TopoName) -> Option<FeatureId> {
 /// The points a sketch offers a point field (Hole locations): its sketch
 /// points, else every vertex (curve ends and centers).
 pub(super) fn sketch_points(sk: &noshape_model::display::SketchDisplay) -> Vec<Reference> {
-    let standalone: Vec<Reference> = sk.points.iter().filter(|p| p.standalone).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect();
+    // Projected points (the origin an inference referenced) aren't the
+    // sketch's vertices (qa4 F10: live places one hole per drawn point).
+    let own = || sk.points.iter().filter(|p| !p.external);
+    let standalone: Vec<Reference> = own().filter(|p| p.standalone).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect();
     if !standalone.is_empty() {
         return standalone;
     }
-    sk.points.iter().filter(|p| !p.handle).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect()
+    own().filter(|p| !p.handle).map(|p| Reference::SketchEntity { sketch: sk.feature, entity: p.entity }).collect()
 }
+
+/// Every edge-like filter bit (edges, linear / circular edges, sketch edges).
+const EDGES: QueryFilter = QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
 
 pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     // A parts field that also takes mate connectors or point bodies
@@ -3563,11 +3698,13 @@ pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     let want = |q: QueryFilter| f.intersects(q);
     match kind {
         PickKind::Face => want(QueryFilter::ANY_FACE) || want(QueryFilter::PLANE_LIKE),
-        PickKind::Edge => want(QueryFilter::ANY_EDGE) || want(QueryFilter::AXIS),
+        // Edge bits only: AXIS also holds cylindrical faces (their axis), so
+        // a face field would take edges (qa5 I2: a hole wall in Move face).
+        PickKind::Edge => want(EDGES),
         PickKind::Vertex => want(QueryFilter::POINT_LIKE),
         PickKind::Plane => want(QueryFilter::PLANE),
         PickKind::Origin => want(QueryFilter::POINT_LIKE),
-        PickKind::SketchCurve => want(QueryFilter::SKETCH_EDGE) || want(QueryFilter::ANY_EDGE) || want(QueryFilter::AXIS),
+        PickKind::SketchCurve => want(EDGES),
         PickKind::SketchPoint => want(QueryFilter::SKETCH_POINT) || want(QueryFilter::POINT_LIKE),
         PickKind::SketchRegion => want(QueryFilter::SKETCH_REGION),
         PickKind::Connector => want(QueryFilter::MATE_CONNECTOR),
@@ -3790,6 +3927,9 @@ impl PartStudioView {
         let mut underlay = vec![div().absolute().top_0().bottom(px(16.)).left_0().flex().items_center().child(self.render_list_toggle(cx)).into_any_element()];
         underlay.extend(self.render_sketch_labels(window, cx));
         underlay.extend(self.render_viewport_underlay(cx));
+        // Live ("Panels vs feature dialogs"): Isolate stays open under a
+        // feature dialog that opens in the same top-left spot.
+        underlay.extend(self.render_isolate_panel(cx));
         div().size_full().relative().children(underlay).into_any_element()
     }
 
@@ -3805,10 +3945,17 @@ impl PartStudioView {
         overlay.push(self.render_evaluation_tools(cx));
         overlay.extend(self.render_context_menu());
         overlay.extend(self.render_section_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))));
-        overlay.extend(self.render_section_value(cx));
+        // Value boxes at model points are drawn in the 3D frame
+        // (NOSHAPE_GPUI_LABELS: as GPUI elements, for comparing).
+        if crate::overlay_labels::gpui_labels() {
+            overlay.extend(self.render_section_value(cx));
+        } else {
+            let mut labels: Vec<_> = self.section_value_label(window, cx).into_iter().collect();
+            labels.extend(self.analysis_labels(window, cx));
+            self.viewport.update(cx, |vp, cx| vp.set_overlay_labels(labels, cx));
+        }
         overlay.extend(self.render_palette(window, cx));
         overlay.extend(self.render_shortcut_sheet(cx));
-        overlay.extend(self.render_isolate_panel(cx));
         overlay.extend(self.render_create_selection(cx));
         overlay.extend(self.render_material_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-material"))));
         overlay.extend(self.render_variable_input(cx));
@@ -3842,8 +3989,11 @@ impl Render for PartStudioView {
         // moves are only presented): sketch labels, shown dimensions,
         // analysis and section labels, inspection datums (sized by the
         // projected pixel, built in the underlay).
-        let follows = self.sketch.is_some() || self.ui.shown_dims.is_some() || self.ui.analysis_tool.is_some() || self.ui.section_dialog.is_some() || self.studio(cx).is_some_and(|s| !s.annotations.is_empty());
+        let follows = self.sketch.is_some() || self.ui.shown_dims.is_some() || ((self.ui.analysis_tool.is_some() || self.ui.section_dialog.is_some()) && crate::overlay_labels::gpui_labels()) || self.studio(cx).is_some_and(|s| !s.annotations.is_empty());
         self.viewport.update(cx, |vp, _| vp.set_ui_follows_camera(follows));
+        if self.compare_gfx.changed(&self.doc, cx) {
+            self.refresh_scene(false, cx);
+        }
         if let Some(v) = self.pending_named_view.take() {
             self.apply_named_view(&v, window, cx);
         }
@@ -4014,7 +4164,7 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, _: &SelectOtherPrevious, _, cx| this.select_other(true, cx)))
             .on_action(cx.listener(|this, _: &MeasureTool, _, cx| {
                 this.ui.measure_pinned = !this.ui.measure_pinned;
-                this.show_mass = false;
+                this.set_show_mass(false, cx);
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| this.start_feature("mateConnector", window, cx)))
@@ -4208,9 +4358,15 @@ impl Render for PartStudioView {
                             // Text fields stay out of the cached slices (qa4).
                             .children(appearance_editor)
                             .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
+                            // Slow regeneration: the working overlay (pending.rs).
+                            .children(self.render_pending_overlay(cx))
                             // Compare mode: the Main ○—— V3 blend slider, top centre (live 953).
                             .children(crate::compare_mode::render_slider(&self.doc, cx).map(|slider| div().absolute().top(px(4.)).left_0().right_0().flex().justify_center().child(slider))),
                     )
+                    // Versions and history › View in repair (repair_mode.rs, live
+                    // rp-906): the 567 px Repair panel right of the graphics; its
+                    // view-only second view comes from perf.
+                    .children(crate::repair_mode::render_panel(&self.doc, None, cx))
                     .children(right),
             )
             .children(tb_panel);

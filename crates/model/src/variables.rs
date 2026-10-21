@@ -237,6 +237,134 @@ pub struct VariableStudio {
     /// theirs.
     #[serde(default)]
     pub inserted: Vec<StudioRef>,
+    /// Its configurations (help "Variable Studio Configurations"; the right
+    /// strip's Configuration panel).
+    #[serde(default, skip_serializing_if = "VsConfiguration::is_empty")]
+    pub configuration: VsConfiguration,
+}
+
+/// A Variable Studio's configuration inputs (as a Part Studio's) and the
+/// variable cells they drive: a configured Value or Description takes the
+/// text of the chosen list option / checkbox state, or a configuration
+/// variable's value ("Set to").
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct VsConfiguration {
+    pub inputs: Vec<crate::configuration::ConfigInput>,
+    #[serde(default)]
+    pub configured: Vec<VsConfigured>,
+    /// The configuration the studio itself shows (the panel's selected rows).
+    #[serde(default)]
+    pub active: crate::configuration::ConfigValues,
+}
+
+/// A configured cell of a Variable Studio.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VsConfigured {
+    pub input: String,
+    pub variable: String,
+    pub field: VsField,
+    /// Row key (list option id, "true" / "false") → the cell's text; empty
+    /// for a configuration variable ("Set to").
+    #[serde(default)]
+    pub values: BTreeMap<String, String>,
+}
+
+/// Which cell of a variable row is configured.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VsField {
+    Value,
+    Description,
+}
+
+impl VsConfiguration {
+    pub fn is_empty(&self) -> bool {
+        self.inputs.is_empty()
+    }
+
+    fn inputs_only(&self) -> crate::configuration::Configuration {
+        crate::configuration::Configuration { inputs: self.inputs.clone(), configured: Vec::new() }
+    }
+
+    /// An input's chosen value (option id, "true" / "false", the
+    /// variable's expression), its default when not chosen.
+    pub fn value_of(&self, values: &crate::configuration::ConfigValues, input: &str) -> Option<String> {
+        self.inputs_only().value_of(values, input)
+    }
+
+    /// The row keys of an input: list option ids, or "true" / "false".
+    pub fn row_keys(&self, input: &str) -> Vec<String> {
+        use crate::configuration::ConfigInputKind;
+        match self.inputs.iter().find(|i| i.id == input).map(|i| &i.kind) {
+            Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+            Some(ConfigInputKind::Checkbox { .. }) => vec!["true".into(), "false".into()],
+            _ => Vec::new(),
+        }
+    }
+
+    /// The configured entry of a cell, if any.
+    pub fn configured_cell(&self, variable: &str, field: VsField) -> Option<&VsConfigured> {
+        self.configured.iter().find(|c| c.variable == variable && c.field == field)
+    }
+
+    /// Configure a cell with `input`, every row starting from `current`
+    /// (help: "added to the table with their default values").
+    pub fn configure(&mut self, input: &str, variable: &str, field: VsField, current: &str) {
+        self.configured.retain(|c| !(c.variable == variable && c.field == field));
+        let values = self.row_keys(input).into_iter().map(|k| (k, current.to_string())).collect();
+        self.configured.push(VsConfigured { input: input.to_string(), variable: variable.to_string(), field, values });
+    }
+
+    /// Unconfigure a cell.
+    pub fn unconfigure(&mut self, variable: &str, field: VsField) {
+        self.configured.retain(|c| !(c.variable == variable && c.field == field));
+    }
+
+    /// A configured cell's text in a configuration.
+    pub fn cell_text(&self, c: &VsConfigured, values: &crate::configuration::ConfigValues) -> Option<String> {
+        use crate::configuration::ConfigInputKind;
+        let input = self.inputs.iter().find(|i| i.id == c.input)?;
+        let chosen = self.value_of(values, &c.input)?;
+        match &input.kind {
+            ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. } => Some(chosen),
+            _ => c.values.get(&chosen).cloned(),
+        }
+    }
+}
+
+impl VariableStudio {
+    /// Typing in a configured cell changes the shown configuration's row
+    /// (None: the cell isn't configured by a list or checkbox input).
+    pub fn configured_text_mut(&mut self, variable: &str, field: VsField) -> Option<&mut String> {
+        let c = self.configuration.configured.iter().position(|c| c.variable == variable && c.field == field)?;
+        let key = self.configuration.value_of(&self.configuration.active, &self.configuration.configured[c].input)?;
+        self.configuration.configured[c].values.get_mut(&key)
+    }
+
+    /// A variable renamed: its configured cells follow it.
+    pub fn rename_configured(&mut self, old: &str, new: &str) {
+        for c in self.configuration.configured.iter_mut().filter(|c| c.variable == old) {
+            c.variable = new.to_string();
+        }
+    }
+
+    /// The studio in a configuration: configured cells take that
+    /// configuration's text.
+    pub fn configured(&self, values: &crate::configuration::ConfigValues) -> std::borrow::Cow<'_, VariableStudio> {
+        if self.configuration.configured.is_empty() {
+            return std::borrow::Cow::Borrowed(self);
+        }
+        let mut out = self.clone();
+        for c in &self.configuration.configured {
+            let Some(text) = self.configuration.cell_text(c, values) else { continue };
+            if let Some(v) = out.variables.iter_mut().find(|v| v.name == c.variable) {
+                match c.field {
+                    VsField::Value => v.expr = ExprValue::new(text),
+                    VsField::Description => v.description = text,
+                }
+            }
+        }
+        std::borrow::Cow::Owned(out)
+    }
 }
 
 /// An inserted Variable Studio table: the whole studio, or only some of its
@@ -251,6 +379,10 @@ pub struct StudioRef {
     /// A studio of another document, at a version (read-only here).
     #[serde(default)]
     pub external: Option<ExternalStudio>,
+    /// A configured studio is inserted in one configuration (the Insert
+    /// Variable Studio dialog's Configuration choice).
+    #[serde(default, skip_serializing_if = "crate::configuration::ConfigValues::is_empty")]
+    pub config: crate::configuration::ConfigValues,
 }
 
 /// Where an inserted studio of another document comes from.
@@ -281,7 +413,7 @@ pub fn external_document(e: &ExternalStudio) -> Option<std::sync::Arc<crate::Doc
 
 impl StudioRef {
     pub fn whole(studio: TabId) -> Self {
-        Self { studio, variables: None, external: None }
+        Self { studio, variables: None, external: None, config: Default::default() }
     }
     fn keep(&self, name: &str) -> bool {
         self.variables.as_ref().is_none_or(|v| v.iter().any(|n| n == name))
@@ -290,7 +422,7 @@ impl StudioRef {
 
 impl Default for VariableStudio {
     fn default() -> Self {
-        Self { variables: Vec::new(), insert_into_all: true, inserted: Vec::new() }
+        Self { variables: Vec::new(), insert_into_all: true, inserted: Vec::new(), configuration: VsConfiguration::default() }
     }
 }
 
@@ -401,11 +533,13 @@ pub fn refs_studios(doc: &crate::Document, refs: &VariableStudioRefs) -> Vec<Stu
 /// (later ones override earlier ones), then its own variables evaluated
 /// with those in scope.
 pub fn studio_variables(doc: &crate::Document, studio: TabId) -> BTreeMap<String, Quantity> {
-    studio_variables_at(doc, studio, &mut Vec::new())
+    studio_variables_at(doc, studio, None, &mut Vec::new())
 }
 
-fn studio_variables_at(doc: &crate::Document, studio: TabId, visiting: &mut Vec<TabId>) -> BTreeMap<String, Quantity> {
+fn studio_variables_at(doc: &crate::Document, studio: TabId, config: Option<&crate::configuration::ConfigValues>, visiting: &mut Vec<TabId>) -> BTreeMap<String, Quantity> {
     let Some(vs) = studio_of(doc, studio) else { return BTreeMap::new() };
+    // A reference's configuration, else the one the studio shows.
+    let vs = vs.configured(config.unwrap_or(&vs.configuration.active));
     if visiting.contains(&studio) {
         return BTreeMap::new();
     }
@@ -414,7 +548,7 @@ fn studio_variables_at(doc: &crate::Document, studio: TabId, visiting: &mut Vec<
     for r in &vs.inserted {
         out.extend(ref_variables(doc, r, visiting));
     }
-    let own = resolved(vs, doc).evaluate_in(&out, &doc.settings.units);
+    let own = resolved(&vs, doc).evaluate_in(&out, &doc.settings.units);
     out.extend(own.values);
     visiting.pop();
     out
@@ -425,10 +559,10 @@ fn studio_variables_at(doc: &crate::Document, studio: TabId, visiting: &mut Vec<
 fn ref_variables(doc: &crate::Document, r: &StudioRef, visiting: &mut Vec<TabId>) -> BTreeMap<String, Quantity> {
     let mut vars = match &r.external {
         Some(e) => match external_document(e) {
-            Some(ext) => studio_variables_at(&ext, r.studio, &mut Vec::new()),
+            Some(ext) => studio_variables_at(&ext, r.studio, Some(&r.config), &mut Vec::new()),
             None => BTreeMap::new(),
         },
-        None => studio_variables_at(doc, r.studio, visiting),
+        None => studio_variables_at(doc, r.studio, Some(&r.config), visiting),
     };
     vars.retain(|k, _| r.keep(k));
     vars
@@ -438,12 +572,13 @@ fn ref_variables(doc: &crate::Document, r: &StudioRef, visiting: &mut Vec<TabId>
 /// the tables inserted into it in scope.
 pub fn studio_evaluation(doc: &crate::Document, studio: TabId) -> noshape_units::TableEvaluation {
     let Some(vs) = studio_of(doc, studio) else { return VariableStudio::default().evaluate(&doc.settings.units) };
+    let vs = vs.configured(&vs.configuration.active);
     let mut outer = BTreeMap::new();
     let mut visiting = vec![studio];
     for r in &vs.inserted {
         outer.extend(ref_variables(doc, r, &mut visiting));
     }
-    resolved(vs, doc).evaluate_in(&outer, &doc.settings.units)
+    resolved(&vs, doc).evaluate_in(&outer, &doc.settings.units)
 }
 
 /// Variables visible in a Part Studio or Assembly: those of the Variable
@@ -496,6 +631,14 @@ pub fn is_inserted(doc: &crate::Document, element: TabId, studio: TabId) -> bool
     element_studios(doc, element).iter().any(|r| r.studio == studio)
 }
 
+/// `studio`'s table is in `element`'s Variable table only through "Insert
+/// into all Part Studios and Assemblies" (live: the table header's
+/// "Automatically referenced Variable Studio" icon).
+pub fn is_auto_referenced(doc: &crate::Document, element: TabId, studio: TabId) -> bool {
+    let Some(refs) = refs_of(doc, element) else { return false };
+    studio_of(doc, studio).is_some_and(|vs| vs.insert_into_all) && !refs.removed.contains(&studio) && !refs.inserted.iter().any(|r| r.studio == studio)
+}
+
 /// Insert a table into `refs` (an element's Variable table); replaces an
 /// earlier reference to the same studio.
 pub fn insert_studio(refs: &mut VariableStudioRefs, r: StudioRef) {
@@ -543,7 +686,7 @@ mod studio_scope_tests {
     }
 
     fn vs(vars: &[(&str, &str)], all: bool) -> VariableStudio {
-        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), description_expr: false, import: None }).collect(), insert_into_all: all, inserted: Vec::new() }
+        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), description_expr: false, import: None }).collect(), insert_into_all: all, inserted: Vec::new(), configuration: VsConfiguration::default() }
     }
 
     fn doc_with(studios: Vec<VariableStudio>) -> (crate::Document, TabId, Vec<TabId>) {
@@ -561,6 +704,25 @@ mod studio_scope_tests {
 
     fn mm(q: Option<&Quantity>) -> f64 {
         q.map(|q| q.value * 1000.0).unwrap_or(f64::NAN)
+    }
+
+    #[test]
+    fn configured_studio_evaluates_per_configuration() {
+        use crate::configuration::{ConfigInput, ConfigInputKind, ConfigValues, ListOption};
+        let mut s = vs(&[("L1", "72 in"), ("W1", "#L1 / 2")], false);
+        let opts = vec![ListOption { id: "large".into(), name: "Large".into() }, ListOption { id: "small".into(), name: "Small".into() }];
+        s.configuration.inputs.push(ConfigInput { id: "c".into(), name: "Configuration".into(), kind: ConfigInputKind::List { options: opts, default: "large".into() }, visible_when: None, excluded: false });
+        s.configuration.configure("c", "L1", VsField::Value, "72 in");
+        s.configuration.configured[0].values.insert("small".into(), "10 in".into());
+        let (mut doc, ps, ids) = doc_with(vec![s]);
+        // The studio shows its active (default) configuration.
+        assert!((studio_variables(&doc, ids[0])["W1"].value - 0.9144).abs() < 1e-9);
+        // An insert in "Small".
+        let small = ConfigValues([("c".to_string(), "small".to_string())].into_iter().collect());
+        if let TabContent::PartStudio(p) = &mut doc.tab_mut(ps).unwrap().content {
+            insert_studio(&mut p.variable_studios, StudioRef { config: small, ..StudioRef::whole(ids[0]) });
+        }
+        assert!((element_variables(&doc, ps)["W1"].value - 0.127).abs() < 1e-9);
     }
 
     #[test]
@@ -626,7 +788,7 @@ mod studio_scope_tests {
     fn single_variables_can_be_inserted() {
         let (mut doc, ps, ids) = doc_with(vec![vs(&[("a", "1 mm"), ("b", "2 mm")], false)]);
         if let TabContent::PartStudio(p) = &mut doc.tab_mut(ps).unwrap().content {
-            insert_studio(&mut p.variable_studios, StudioRef { studio: ids[0], variables: Some(vec!["b".into()]), external: None });
+            insert_studio(&mut p.variable_studios, StudioRef { studio: ids[0], variables: Some(vec!["b".into()]), external: None, config: Default::default() });
         }
         let vars = element_variables(&doc, ps);
         assert!(!vars.contains_key("a"));

@@ -1068,3 +1068,39 @@ Replace instance / Interference detection. What live's `panelLayoutManager` (bun
   (Part Studio and assembly share it); skb's keys `asm-interference`, `asm-replace` map to "interference",
   "replace" with your prefix stripping. The assembly's Interference dialog now opens at live's default
   (600×80 rect snapped right: left = W − 600, top = H − 401, the 220 px dialog at its top left).
+
+## Toolbar collapse (21 Oct, ui): Onshape's exact rule, now in the Part Studio, sketch and assembly toolbars
+- Client `Toolbar` component (woolsthorpe @14751707): the longest run of tool sets from the left that fits stays
+  expanded, everything after it collapses into one split tool (face = last-used tool of the set, else the first;
+  ▾ only with >1 tool; labels drop when collapsed). No priorities, no hysteresis. Fit: toolbar content ≤ window − 40.
+- Widths are Onshape's CSS, so our breakpoints are live's whatever our own rendering measures:
+  - tool 34 (32 + 1 px margins), split tool 52, "Sketch" 85, assembly "Insert" 78;
+  - 4 px per tool set; collapsed set 56 (38 for one tool);
+  - Undo / Redo 70, "Search tools…" 173, 7 at the end.
+- Breakpoints by toolbar:
+  - **Part Studio** (default tools): full from 1835; Frames collapsed below; Plane+Frames below 1717; + Direct edit
+    below 1443 (live 1440 ✓); + Boolean 1359; + Pattern 1257; + Fillet 1223; + Extrude 1001 (live 900 ✓).
+  - **Sketch:** full from 1648; Constraints below; + Modify 1224; + Draw 982.
+  - **Assembly:** full from 1284; then Display states, Relations, Group…, Mates in turn.
+- Code:
+  - `PartStudioView::toolbar_collapse_from`;
+  - the sketch toolbar's `sets`;
+  - assembly `toolbar::collapse_from` + `run_toolbar_tool`.
+- Drawing toolbar: its collapse code isn't in the downloaded bundles (separate editor) and doesn't look fit-to-width
+  (live collapses Dimension at 1440 with ~89 px free). A live width sweep is needed; ours is unchanged.
+
+## Panels, drawing toolbar, toolbar dropdowns (21 Oct, ui; live answers)
+- **Panels vs feature dialogs** (behaviours.md "Panels vs feature dialogs at the top-left"):
+  - Isolate stays open under a feature or sketch dialog in the same spot. It is now in the Part Studio underlay
+    slice, under the dialog.
+  - Opening a feature dialog closes Mass properties and Named views for good (`open_dialog`).
+  - Snapping bounds: right of the 40 px rail (over the feature list too), top 3 px under the toolbar (snapped =
+    y 79), 5 px gap at the bottom (`snapIfNearBounds`).
+  - The feature dialog counts as a panel for edge snapping (`panel_probe("feature-dialog")`).
+- **Drawing toolbar** (behaviours.md "Drawing toolbar breakpoints"): three fixed layouts by window − 46: Full ≥1707,
+  Medium ≥1373, Compact. See `drawing_toolbar.rs`.
+- **Toolbar dropdowns** (`fit_tool_menu`):
+  - capped at 75 % of the window height;
+  - Chrome's native scrollbar (kit `PopupMenu::native_scrollbar`; shown once laid out at the cap, via
+    `request_animation_frame`);
+  - Onshape's row pitch: `tool_list`, 32 px rows 1 px apart, no padding, 2 + 33n + 1 px tall.

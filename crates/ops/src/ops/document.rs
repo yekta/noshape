@@ -226,7 +226,7 @@ fn set_units(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(p) = a.opt_u64("angle_precision")? {
         u.angle_precision = p.min(8) as u8;
     }
-    od.session.edit_settings(docedit::UNITS_DESCRIPTION, |s| s.units = u)?;
+    od.session.set_units(u, docedit::UNITS_DESCRIPTION)?;
     Ok(describe(od).into())
 }
 

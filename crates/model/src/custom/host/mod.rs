@@ -17,6 +17,7 @@ pub(crate) mod convert;
 mod evaluate;
 pub mod hole;
 mod sheetmetal;
+mod edge_change;
 mod offsets;
 mod packed;
 mod ops;
@@ -32,7 +33,7 @@ pub use query::{Ent, entity_type_of};
 use crate::reference::{BodyId, FeatureId, Reference, Role, TopoName};
 use crate::regen::context::{Body, Context};
 use crate::regen::eval::{EvalCtx, FeatureError};
-use glam::DMat4;
+use glam::{DMat4, DVec3};
 use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::{Builtin, Tag, Value, next_serial};
 use noshape_units::{Quantity, UnitPrefs};
@@ -79,6 +80,9 @@ struct Started {
     snapshot: Context,
 }
 
+/// The bodies an `opSplitPart` left, and its tool plane (origin, normal).
+pub type SplitRecord = (Vec<BodyId>, Option<(DVec3, DVec3)>);
+
 /// Mutable modeling state of one feature evaluation.
 pub struct CtxState {
     pub ctx: Context,
@@ -120,6 +124,13 @@ pub struct CtxState {
     pub hidden: HashSet<BodyId>,
     /// Holes built by each `opHole` (`qOpHoleFace` / `qOpHoleProfile`).
     pub holes: HashMap<FsId, Vec<hole::HoleRecord>>,
+    /// What each operation was made from (`qDependency`: an extruded body's
+    /// profile faces or sketch edges).
+    pub dependencies: HashMap<FsId, Vec<Reference>>,
+    /// Bodies each `opSplitPart` left and its tool plane (`qSplitBy`).
+    pub splits: HashMap<FsId, SplitRecord>,
+    /// The edges each `opSplitEdges` split (`qSplitBy` finds their pieces).
+    pub split_edges: HashMap<FsId, Vec<(BodyId, noshape_kernel::Shape)>>,
 }
 
 /// The `Context` builtin.
@@ -179,6 +190,9 @@ impl FsContext {
                 hidden,
                 snapshots: HashMap::new(),
                 holes: HashMap::new(),
+                dependencies: HashMap::new(),
+                splits: HashMap::new(),
+                split_edges: HashMap::new(),
             }),
         })
     }
@@ -203,6 +217,11 @@ impl FsContext {
 
 impl CtxState {
     /// Transient id string of an entity (stable within this evaluation).
+    /// Attach an attribute to `r`.
+    pub fn push_attribute(&mut self, r: Reference, v: Value) {
+        self.attributes.push((r, v));
+    }
+
     pub fn transient(&mut self, r: &Reference) -> Arc<str> {
         if let Some(s) = self.transient_of.get(r) {
             return s.clone();
@@ -410,6 +429,7 @@ pub fn register() {
         all.extend_from_slice(evaluate::NATIVES);
         all.extend_from_slice(hole::NATIVES);
         all.extend_from_slice(sheetmetal::NATIVES);
+        all.extend_from_slice(edge_change::NATIVES);
         all.extend_from_slice(offsets::NATIVES);
         all.extend_from_slice(packed::NATIVES);
         all.extend_from_slice(ops::NATIVES);

@@ -245,6 +245,14 @@ pub(crate) struct AsmUi {
     /// which of the instance's explicit mate connectors is the source.
     pub place_snap: Option<(MateConnectorRef, MateConnectorRef)>,
     pub place_src_ix: usize,
+    /// Faces, edges and vertices selected in the graphics area (live:
+    /// additive clicks, each filled amber; their instances' rows selected),
+    /// and their measurements for the bottom-right readout.
+    pub entity_sel: Vec<(Vec<InstanceId>, Reference)>,
+    pub entity_measure: Vec<(String, noshape_model::regen::measure::Measurement)>,
+    /// The last graphics click (time, position): a second one there soon
+    /// after is a double click, which clears the selection (live).
+    pub last_click: Option<(std::time::Instant, DVec2)>,
     /// Measure tool (`[`): picked entities and their measurements.
     pub measure: Option<Vec<(Vec<InstanceId>, Reference)>>,
     pub measure_result: Vec<(String, noshape_model::regen::measure::Measurement)>,
@@ -838,7 +846,7 @@ impl AssemblyView {
             }
         }
         let tg = targets.clone();
-        m.push(icon_item(if fixed { "Unfix" } else { "Fix" }, "fix", move |t, _, cx| t.set_fixed(tg.clone(), !fixed, cx)));
+        m.push(icon_item(if fixed { "Unfix" } else { "Fix" }, "fix-instance", move |t, _, cx| t.set_fixed(tg.clone(), !fixed, cx)));
         // Use best available tessellation (finest meshes for these instances).
         let best = inst.best_tessellation;
         let tg = targets.clone();
@@ -915,15 +923,14 @@ impl AssemblyView {
             }));
         }
         if !multi {
-            edit.push(icon_item("Add mate connector to instance origin…", "mate-connector-assembly", move |t, w, cx| t.mc_at_instance_origin(top, w, cx)));
+            edit.push(icon_item("Add mate connector to instance origin…", "add-mate-connector", move |t, w, cx| t.mc_at_instance_origin(top, w, cx)));
         }
-        edit.push(icon_item(
+        edit.push(item(
             match (graphics, multi) {
                 (_, true) => format!("Replace {} instances…", targets.len()),
                 (true, false) => format!("Replace {name}…"),
                 (false, false) => "Replace instances…".to_string(),
             },
-            "replace-part",
             move |t, _, cx| t.open_replace(top, cx),
         ));
         let switch_tab = match &inst.source {
@@ -962,7 +969,7 @@ impl AssemblyView {
             m.extend(drawing);
             let tab = self.tab;
             let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-            m.push(icon_item(format!("Create Drawing of {aname}…"), "drawing", move |_, w, cx| {
+            m.push(icon_item(format!("Create Drawing of {aname}…"), "menu-create-drawing", move |_, w, cx| {
                 let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
                 crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
             }));
@@ -970,6 +977,11 @@ impl AssemblyView {
             m.push(MenuEntry::Sep);
             m.extend(edit);
             m.push(MenuEntry::Sep);
+            // Live sel-17: Clear selection | Select other… in one group.
+            m.push(item("Clear selection", |t, _, cx| {
+                t.clear_selection();
+                t.refresh_scene(false, cx);
+            }));
             m.push(item("Select other…", |t, _, cx| t.select_other(false, cx)));
             m.push(MenuEntry::Sep);
             m.push(icon_item("Zoom to fit", "zoom-fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
@@ -996,7 +1008,7 @@ impl AssemblyView {
         }
         if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::External { .. }) {
             let tg = targets.clone();
-            m.push(icon_item("Change to version…", "version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
+            m.push(icon_item("Change to version…", "legend-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
         m.push(export);
         m.push(MenuEntry::Sep);
@@ -1050,7 +1062,7 @@ impl AssemblyView {
         }
         // The part's own name (the instance name without " <n>").
         let base = inst.name.rsplit_once(" <").map(|(b, _)| b.to_string()).unwrap_or_else(|| inst.name.clone());
-        Some(icon_item(format!("Create Drawing of {base}…"), "drawing", move |_, w, cx| {
+        Some(icon_item(format!("Create Drawing of {base}…"), "menu-create-drawing", move |_, w, cx| {
             let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: part.clone(), config: config.clone(), sketch: None });
             crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(base.clone()) }, w, cx);
         }))
@@ -1202,7 +1214,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .tooltip(crate::ui::tooltip("Accept (Enter)"))
                                 .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_folder_name(true, window, cx))),
                         )
@@ -1215,7 +1226,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_folder_name(false, window, cx))),
                         ),
@@ -1621,7 +1631,7 @@ impl AssemblyView {
         }));
         m.push(MenuEntry::Sep);
         let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-        m.push(icon_item(format!("Create Drawing of {name}…"), "drawing", move |_, w, cx| {
+        m.push(icon_item(format!("Create Drawing of {name}…"), "menu-create-drawing", move |_, w, cx| {
             let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
             crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(name.clone()) }, w, cx);
         }));
@@ -1806,7 +1816,7 @@ impl AssemblyView {
                 m.push(MenuEntry::Sep);
                 let tab = self.tab;
                 let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-                m.push(icon_item(format!("Create Drawing of {aname}…"), "drawing", move |_, w, cx| {
+                m.push(icon_item(format!("Create Drawing of {aname}…"), "menu-create-drawing", move |_, w, cx| {
                     let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None });
                     crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
                 }));
@@ -1815,8 +1825,7 @@ impl AssemblyView {
                 m.push(icon_item("Isometric", "iso-view", |t, _, cx| t.view(StandardView::Isometric, cx)));
                 if !self.selected.is_empty() || self.selected_mate.is_some() {
                     m.push(item("Clear selection", |t, _, cx| {
-                        t.selected.clear();
-                        t.selected_mate = None;
+                        t.clear_selection();
                         t.refresh_scene(false, cx);
                     }));
                 }
@@ -1968,6 +1977,7 @@ impl AssemblyView {
             self.close_mate(window, cx);
             self.insert_open = true;
             self.ui.insert_inserted.clear();
+            self.std_take_selection(cx);
             cx.notify();
         }
     }
@@ -2344,7 +2354,7 @@ impl AssemblyView {
         let fmt = |v: f64| {
             if dof == 0 {
                 // Onshape's angle fields read "360 deg".
-                let d = format!("{:.3}", v.to_degrees());
+                let d = noshape_units::to_fixed(v.to_degrees(), 3);
                 format!("{} deg", d.trim_end_matches('0').trim_end_matches('.'))
             } else {
                 noshape_units::format_quantity(noshape_units::Quantity::meters(v), &units)
@@ -2409,7 +2419,7 @@ impl AssemblyView {
         let Some(&(dof, _)) = noshape_model::assembly::eval::mate_dofs(m.mate_type).first() else { return };
         let now = self.result.solved.mate_values.get(&m.id).map(|v| v[dof]).unwrap_or(0.0);
         let (a, b, steps) = if dof == 0 {
-            let deg = |v: f64| format!("{:.6} deg", v.to_degrees());
+            let deg = |v: f64| format!("{} deg", noshape_units::to_fixed(v.to_degrees(), 6));
             (deg(now), deg(now + PREVIEW_TURNS * std::f64::consts::TAU), PREVIEW_TURNS * 360.0)
         } else {
             let (a, b) = self.anim_defaults(&m, dof, cx);
@@ -2598,12 +2608,13 @@ impl AssemblyView {
             Playback::Reciprocate => "Reciprocate",
             Playback::Loop => "Loop",
         };
+        // Live: 110 px, the text 6 px in, an 8x4 #333 caret 6 px from the right.
         let playback = Button::new("anim-playback")
-            .label(pb_label)
             .ghost()
             .small()
             .w(px(110.))
-            .dropdown_caret(true)
+            .px(px(0.))
+            .child(h_flex().w_full().pl(px(6.)).pr(px(6.)).child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(pb_label)).child(crate::ui::glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x333333))))
             .os_dropdown_menu("anim-playback-dd", true, move |mut menu, _, _| {
                 for (label, v) in [("Single", Playback::Single), ("Reciprocate", Playback::Reciprocate), ("Loop", Playback::Loop)] {
                     let view = view.clone();
@@ -2629,20 +2640,21 @@ impl AssemblyView {
                 .hover(|d| d.bg(pal.panel_hover))
                 .when(on, |d| d.bg(pal.panel_active))
                 .tooltip(crate::ui::tooltip(tip))
-                .child(crate::ui::glyph(icon, 22., pal.text))
+                .child(crate::ui::glyph(icon, 20., pal.text))
         };
         body = body
             .child(field("Start value", &a.start))
             .child(field("End value", &a.end))
             .child(field("Steps", &a.steps))
             .child(
+                // Live (dom dialog-animate): the dialog's full 220 px: an 84 px
+                // label column (5 px in), the 110 px select, the 26 px toggle.
                 h_flex()
                     .h(px(28.))
-                    .pl(px(5.))
-                    .gap(px(4.))
-                    .child(div().flex_none().whitespace_nowrap().text_size(px(13.33)).text_color(pal.text_muted).child("Playback type"))
-                    .child(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(playback))
-                    .child(icon_btn("anim-reverse", "anim-reverse", "Reverse", reversed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .mx(px(-3.))
+                    .child(div().w(px(84.)).flex_none().pl(px(5.)).whitespace_nowrap().text_size(px(12.)).text_color(pal.text_muted).child("Playback type"))
+                    .child(div().w(px(110.)).flex_none().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(playback))
+                    .child(icon_btn("anim-reverse", "flip-circular-opposite", "Reverse", reversed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(a) = &mut this.anim {
                             a.dir = -a.dir;
                         }
@@ -2651,9 +2663,11 @@ impl AssemblyView {
             )
             .child(os::param_row("Current value", div().h(px(25.)).flex().items_center().justify_end().text_size(px(13.33)).text_color(pal.text_muted).child(current)))
             .child(
+                // Live: ▶ at the dialog's left edge, ■ 29 px on (26 px buttons).
                 h_flex()
                     .h(px(30.))
-                    .gap(px(4.))
+                    .ml(px(-3.))
+                    .gap(px(3.))
                     .child(icon_btn("anim-play", "anim-play", "Play", playing).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if !this.anim.as_ref().is_some_and(|a| a.playing) {
                             this.play_animation(cx);
@@ -2879,7 +2893,7 @@ impl AssemblyView {
             .gap_2()
             .child(field)
             .child(div().text_xs().text_color(pal.text_faint).child("Select instances in the graphics area or the instance list."))
-            .child(h_flex().justify_end().child(Button::new("grp-ok").icon(Icon::empty().path(icon_path("check"))).primary().small().tooltip("Accept").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_group(cx)))));
+            .child(h_flex().justify_end().child(Button::new("grp-ok").icon(Icon::empty().path(icon_path("check"))).primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_group(cx)))));
         Self::panel_frame(&title, body, cx.listener(|this, _: &ClickEvent, _, cx| {
             this.ui.group = None;
             this.update_capture(cx);
@@ -3210,7 +3224,7 @@ impl AssemblyView {
                     }
                 };
                 let sweep = on[0].rem_euclid(std::f64::consts::TAU);
-                let text = if preview { format!("{:.0}°", sweep.to_degrees()) } else { format!("{:.3}°", sweep.to_degrees()) };
+                let text = if preview { format!("{}°", noshape_units::to_fixed(sweep.to_degrees(), 0)) } else { format!("{}°", noshape_units::to_fixed(sweep.to_degrees(), 3)) };
                 let frame = noshape_model::assembly::solver::Frame { origin: a.origin, rotation: b.rotation };
                 let mid = sweep * 0.5;
                 let center = a.origin + b.rotation * DVec3::new(mid.cos() * radius, mid.sin() * radius, 0.0);
@@ -3492,7 +3506,7 @@ impl AssemblyView {
                 Measurement::Area(x) => noshape_units::format_quantity(noshape_units::Quantity::new(*x, noshape_units::Dim { length: 2, angle: 0 }), &units),
                 Measurement::Volume(x) => noshape_units::format_quantity(noshape_units::Quantity::new(*x, noshape_units::Dim { length: 3, angle: 0 }), &units),
                 Measurement::Angle(x) => noshape_units::format_quantity(noshape_units::Quantity::radians(*x), &units),
-                Measurement::Percent(x) => format!("{x:.2} %"),
+                Measurement::Percent(x) => format!("{} %", noshape_units::to_fixed(*x, 2)),
                 Measurement::Point(p) => format!("{}, {}, {}", l(p.x), l(p.y), l(p.z)),
                 Measurement::Distance { distance, dx, dy, dz, .. } => {
                     rows.push(("ΔX / ΔY / ΔZ".into(), format!("{} / {} / {}", l(*dx), l(*dy), l(*dz))));
@@ -3750,7 +3764,7 @@ impl AssemblyView {
 
 /// A value with up to three decimals and no trailing zeros ("3.6", "12").
 fn trim_number(x: f64) -> String {
-    let t = format!("{x:.3}");
+    let t = noshape_units::to_fixed(x, 3);
     let t = t.trim_end_matches('0').trim_end_matches('.');
     if t == "-0" { "0".to_string() } else { t.to_string() }
 }

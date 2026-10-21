@@ -285,6 +285,23 @@ pub struct ConnectorMove {
 }
 
 impl MateConnectorRef {
+    /// A linear pattern's direction picked on geometry (live "qa5 assembly"
+    /// 6: "Edge of Part 1 <1>"): on an edge the copies go along the edge,
+    /// so the connector's Z follows the edge's tangent; faces keep their
+    /// normal / axis.
+    pub fn linear_direction(mut self) -> Self {
+        if self.connector.is_none() && self.align.is_none() {
+            let entity = match &self.reference {
+                Reference::Implicit { on, .. } => (**on).clone(),
+                other => other.clone(),
+            };
+            if matches!(entity, Reference::Edge(_)) {
+                self.align = Some(Box::new(entity));
+            }
+        }
+        self
+    }
+
     /// Connector at the assembly origin (world frame).
     pub fn origin() -> Self {
         Self { instance: InstanceId::ORIGIN, path: vec![], reference: Reference::Origin, flip: false, rotate_quarters: 0, connector: None, align: None, moved: None }
@@ -561,9 +578,28 @@ impl ExplodeStep {
 pub enum PatternKind {
     /// Copies along the Z axis of a mate connector (edge direction, face
     /// normal...), optionally in a second direction.
-    Linear { direction: MateConnectorRef, distance: ExprValue, count: u32, opposite: bool, equal_spacing: bool, second: Option<LinearDirection> },
+    /// `centered`: the seed in the middle, `count` instances (with the
+    /// seed) each way (help: Assembly linear pattern 7).
+    Linear {
+        direction: MateConnectorRef,
+        distance: ExprValue,
+        count: u32,
+        opposite: bool,
+        equal_spacing: bool,
+        second: Option<LinearDirection>,
+        #[serde(default)]
+        centered: bool,
+    },
     /// Copies about the Z axis of a mate connector (cylinder axis, circular edge...).
-    Circular { axis: MateConnectorRef, angle: ExprValue, count: u32, opposite: bool, equal_spacing: bool },
+    Circular {
+        axis: MateConnectorRef,
+        angle: ExprValue,
+        count: u32,
+        opposite: bool,
+        equal_spacing: bool,
+        #[serde(default)]
+        centered: bool,
+    },
     /// Mirror across the XY plane of a mate connector. By default copies are
     /// placed with a rigid transform (symmetric parts); with `handed`, part
     /// copies use a mirrored version of the part ([`InstanceSource::MirroredPart`]).
@@ -580,10 +616,74 @@ pub enum PatternKind {
     /// (`all_instances`: also on other instances of the same part).
     Replicate {
         mate: MateId,
+        /// Older documents (no `scope`): also match on other instances of
+        /// the target part.
         #[serde(default)]
         all_instances: bool,
+        /// Match scope (help: Replicate 6); None for older documents (the
+        /// target instance's geometry, by signature).
+        #[serde(default)]
+        scope: Option<ReplicateScope>,
+        /// "Parts to find match in": the parts, faces or edges the scope
+        /// searches (help: Replicate 7).
+        #[serde(default)]
+        scope_refs: Vec<ScopeEntity>,
     },
 }
+
+/// Replicate's match scope (help: Replicate 6): face options when the seed
+/// mate is on a face, edge options when it is on an edge.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReplicateScope {
+    /// Matching faces of the selected parts.
+    FacesInParts,
+    /// Matching faces made by the features of the selected faces.
+    FacesInFeatures,
+    /// The selected faces that match.
+    IndividualFaces,
+    /// Matching edges lying on the selected plane (planar face).
+    EdgesOnPlane,
+    /// Matching edges bounding the selected face.
+    EdgesOnFace,
+    /// The selected edges that match.
+    IndividualEdges,
+}
+
+impl ReplicateScope {
+    /// Live's labels, in the select's order.
+    pub const FACE: [ReplicateScope; 3] = [ReplicateScope::FacesInParts, ReplicateScope::FacesInFeatures, ReplicateScope::IndividualFaces];
+    pub const EDGE: [ReplicateScope; 3] = [ReplicateScope::EdgesOnPlane, ReplicateScope::EdgesOnFace, ReplicateScope::IndividualEdges];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ReplicateScope::FacesInParts => "Match faces in parts",
+            ReplicateScope::FacesInFeatures => "Match faces in features",
+            ReplicateScope::IndividualFaces => "Match individual faces",
+            ReplicateScope::EdgesOnPlane => "Match edges on plane",
+            ReplicateScope::EdgesOnFace => "Match edges on face",
+            ReplicateScope::IndividualEdges => "Match individual edges",
+        }
+    }
+
+    /// Whether the scope's selections are whole parts (else faces / edges).
+    pub fn takes_parts(self) -> bool {
+        self == ReplicateScope::FacesInParts
+    }
+}
+
+/// A part (no entity) or one of its faces / edges, picked in an assembly.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ScopeEntity {
+    pub instance: InstanceId,
+    #[serde(default)]
+    pub path: Vec<InstanceId>,
+    #[serde(default)]
+    pub entity: Option<Reference>,
+}
+
+/// Bit of a pattern copy's index for the copies on the far side of a
+/// centered pattern (the others go along the direction, these against it).
+pub const CENTERED_BACK: u32 = 0x8000;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LinearDirection {
@@ -633,7 +733,9 @@ impl InstancePattern {
     /// Indices the pattern should generate per seed (linear/circular only).
     pub fn grid_indices(&self) -> Vec<u32> {
         match &self.kind {
-            PatternKind::Linear { count, second, .. } => {
+            // Copy indices: i + j * 65536, CENTERED_BACK marking the copies on
+            // the far side of a centered pattern.
+            PatternKind::Linear { count, second, centered, .. } => {
                 let n1 = (*count).max(1);
                 let n2 = second.as_ref().map(|s| s.count.max(1)).unwrap_or(1);
                 let mut v = Vec::new();
@@ -642,11 +744,21 @@ impl InstancePattern {
                         if i != 0 || j != 0 {
                             v.push(i + j * 65536);
                         }
+                        if *centered && i != 0 {
+                            v.push(i | CENTERED_BACK | (j * 65536));
+                        }
                     }
                 }
                 v
             }
-            PatternKind::Circular { count, .. } => (1..(*count).max(1)).collect(),
+            PatternKind::Circular { count, centered, .. } => {
+                let n = (*count).max(1);
+                let mut v: Vec<u32> = (1..n).collect();
+                if *centered {
+                    v.extend((1..n).map(|i| i | CENTERED_BACK));
+                }
+                v
+            }
             PatternKind::Mirror { .. } => vec![0],
             _ => Vec::new(),
         }

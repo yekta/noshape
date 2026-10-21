@@ -155,6 +155,26 @@ impl Shape {
         ffi::shape_is_partner(self.raw(), other.raw()).unwrap_or(false)
     }
 
+    /// Hash consistent with [`Shape::is_partner`]: the TShape's identity.
+    /// Rigidly moved pattern instances share it with their seed, so one
+    /// mesh of [`Shape::unlocated`] serves them all, placed by
+    /// [`Shape::location`].
+    pub fn partner_hash(&self) -> u64 {
+        ffi::shape_partner_hash(self.raw()).unwrap_or(0)
+    }
+
+    /// The shape's own location: a rigid 3x4 row-major matrix (identity for
+    /// most shapes).
+    pub fn location(&self) -> [f64; 12] {
+        let m = ffi::shape_location(self.raw()).unwrap_or_default();
+        std::array::from_fn(|i| m.get(i).copied().unwrap_or(if i % 5 == 0 { 1.0 } else { 0.0 }))
+    }
+
+    /// The same TShape at the identity location.
+    pub fn unlocated(&self) -> Result<Shape> {
+        Shape::from_res(ffi::shape_unlocated(self.raw()))
+    }
+
     /// Hash consistent with [`Shape::is_same`] (`std::hash<TopoDS_Shape>`).
     pub fn hash_code(&self) -> u64 {
         ffi::shape_hash(self.raw()).unwrap_or(0)

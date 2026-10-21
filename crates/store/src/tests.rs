@@ -349,6 +349,35 @@ fn merge_without_conflicts() {
 }
 
 #[test]
+fn merge_with_per_name_picks() {
+    use crate::MergePick;
+    let dir = TempDir::new();
+    let (mut doc, main) = new_doc(&dir);
+    let root = doc.head(main).unwrap();
+    let feat = doc.create_branch(root, "feature").unwrap();
+    doc.commit(main, &[set("tab/a", b"a-main")], "Main edits a").unwrap();
+    let f = doc.commit(feat, &[set("tab/a", b"a-feat"), set("tab/b", b"b-feat"), set("tab/c", b"c-feat")], "Feature edits").unwrap();
+    // Keep a (changed on both), keep b (changed only on the source),
+    // replace nothing else: c merges as usual.
+    let pick = |n: &str| match n {
+        "tab/a" | "tab/b" => MergePick::Ours,
+        _ => MergePick::Auto,
+    };
+    let out = doc.merge_with(f, "feature", Some(feat), main, pick, |_, _, _, _| panic!("no conflicts left")).unwrap();
+    let mv = out.microversion;
+    assert_eq!(read(&doc, mv, "tab/a").as_deref(), Some("a-main"));
+    assert_eq!(read(&doc, mv, "tab/b").as_deref(), Some("b-v1"));
+    assert_eq!(read(&doc, mv, "tab/c").as_deref(), Some("c-feat"));
+    // The source is now contained: up to date, unless a name is replaced.
+    let up = doc.merge_with(f, "feature", Some(feat), main, |_| MergePick::Auto, |_, _, _, _| None).unwrap();
+    assert!(up.up_to_date);
+    let out = doc.merge_with(f, "feature", None, main, |n| if n == "tab/a" { MergePick::Theirs } else { MergePick::Auto }, |_, _, _, _| None).unwrap();
+    assert!(!out.up_to_date);
+    assert_eq!(read(&doc, out.microversion, "tab/a").as_deref(), Some("a-feat"));
+    assert_eq!(read(&doc, out.microversion, "tab/b").as_deref(), Some("b-v1"));
+}
+
+#[test]
 fn merge_identical_changes_and_into_ancestor() {
     let dir = TempDir::new();
     let (mut doc, main) = new_doc(&dir);

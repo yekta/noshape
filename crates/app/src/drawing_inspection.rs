@@ -43,7 +43,7 @@ impl DrawingEditor {
 
     /// Context menu › Reorder inspection items: type a number, click items.
     pub fn start_reorder_inspection(&mut self, from: u32, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| InputState::new(window, cx).default_value(from.to_string()));
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(from.to_string()));
         self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: Some(st), edit: None, hover: None });
         self.status = Some("Reorder inspection items: click the items in their new order".into());
         cx.notify();
@@ -53,7 +53,7 @@ impl DrawingEditor {
     /// dialog with its Number; the checkmark applies.
     pub fn edit_inspection(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
         let Some(n) = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).and_then(|a| a.inspection) else { return };
-        let st = cx.new(|cx| InputState::new(window, cx).default_value(n.to_string()));
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(n.to_string()));
         self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: Some((id, st)), hover: None });
         self.selection = vec![Sel::Annotation(id)];
         cx.notify();

@@ -48,7 +48,7 @@ impl AssemblyView {
                 let spec = MetaSpec {
                     category: "Onshape Part",
                     material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
-                    computed_mass: computed.map(|m| format!("{m:.4} kg")),
+                    computed_mass: computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
                     bom_options: None,
                     values: MetaValues {
                         name,
@@ -105,7 +105,7 @@ impl AssemblyView {
         let spec = MetaSpec {
             category: "Onshape Assembly",
             material: None,
-            computed_mass: (tab == self.tab).then(|| computed.map(|m| format!("{m:.4} kg")).unwrap_or_default()),
+            computed_mass: (tab == self.tab).then(|| computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))).unwrap_or_default()),
             bom_options: Some(BomBehavior::ALL.iter().map(|b| b.label().to_string()).collect()),
             values: MetaValues {
                 name,
@@ -296,7 +296,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .tooltip(crate::ui::tooltip("Accept (Enter)"))
                                 .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_dynamic_suppression(cx))),
                         )
@@ -309,7 +308,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.dynamic_suppression = None;
@@ -1044,7 +1042,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .tooltip(crate::ui::tooltip("Accept (Enter)"))
                                 .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_ps_in_context(cx))),
                         )
@@ -1057,7 +1054,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.ps_in_context = None;

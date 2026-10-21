@@ -155,6 +155,17 @@ pub struct Interp {
     pub native_name: Name,
     /// The predicate statement that evaluated to false: (position, text).
     failed_check: Option<(Pos, Arc<str>)>,
+    /// Per-line timing (Feature Studio "Profile"), when enabled.
+    pub profile: Option<LineProfile>,
+}
+
+/// Time spent running each source line (module, 1-based line), including
+/// what its statements call; a line is timed once while it is active
+/// (recursion is not counted twice).
+#[derive(Debug, Default)]
+pub struct LineProfile {
+    pub times: HashMap<(Arc<str>, u32), std::time::Duration>,
+    active: HashMap<(Arc<str>, u32), u32>,
 }
 
 /// The overloads a call chooses from.
@@ -183,6 +194,7 @@ impl Interp {
             merged: HashMap::new(),
             native_name: "".into(),
             failed_check: None,
+            profile: None,
         }
     }
 
@@ -518,6 +530,24 @@ impl Interp {
     }
 
     fn exec(&mut self, s: &St) -> R<Flow> {
+        let Some(p) = self.profile.as_mut() else { return self.exec_statement(s) };
+        let key = (self.module.clone(), s.pos.line);
+        let depth = p.active.entry(key.clone()).or_insert(0);
+        *depth += 1;
+        let start = (*depth == 1).then(Instant::now);
+        let r = self.exec_statement(s);
+        if let Some(p) = self.profile.as_mut() {
+            if let Some(d) = p.active.get_mut(&key) {
+                *d -= 1;
+            }
+            if let Some(t) = start {
+                *p.times.entry(key).or_default() += t.elapsed();
+            }
+        }
+        r
+    }
+
+    fn exec_statement(&mut self, s: &St) -> R<Flow> {
         self.tick()?;
         match &s.k {
             StK::Let { slot, ty, init } => {

@@ -247,6 +247,14 @@ macro_rules! map_base_root {
 }
 
 impl BaseDialogRoot {
+    /// NOSHAPE PATCH: whether Enter confirms (an alert dialog keeps its own keys).
+    fn enter_confirms(self, on: bool) -> Self {
+        match self {
+            BaseDialogRoot::Dialog(root) => BaseDialogRoot::Dialog(root.enter_confirms(on)),
+            other => other,
+        }
+    }
+
     fn layer(self, index: usize, topmost: bool) -> Self {
         map_base_root!(self, layer(index, topmost))
     }
@@ -600,6 +608,10 @@ impl RenderOnce for Dialog {
         let selection_scope = self.selection_scope;
         let on_close = self.button_props.close_handler();
         let on_ok = self.button_props.ok_handler();
+        // NOSHAPE PATCH: without an OK decision of its own, Enter must not
+        // close the dialog (it would drop the edits in its fields); a clicked
+        // OK button still confirms.
+        let enter_confirms = self.button_props.on_ok.is_some();
         let on_cancel = self.button_props.cancel_handler();
 
         let window_paddings = crate::window_border::window_paddings(window);
@@ -696,6 +708,7 @@ impl RenderOnce for Dialog {
                                         }),
                                 )
                             })
+                            .enter_confirms(enter_confirms)
                             .on_ok(move |event, window, cx| on_ok(event, window, cx))
                             .on_cancel(move |event, window, cx| on_cancel(event, window, cx))
                             .on_close(move |event, window, cx| on_close(event, window, cx))

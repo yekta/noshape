@@ -67,6 +67,7 @@ pub(crate) fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyEle
     v_flex()
         .id(SharedString::from(format!("{}-dialog", d.key)))
         .occlude()
+        .child(crate::ui::panel_probe(d.key))
         .w(px(220.))
         .bg(crate::theme::with_alpha(rgb(0xffffff), 0.95))
         .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])

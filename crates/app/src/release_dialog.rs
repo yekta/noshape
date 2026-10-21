@@ -293,7 +293,7 @@ fn open_add_dialog(doc: Entity<DocModel>, obsolete: bool, on_add: impl Fn(Vec<Re
                 cx.notify();
             }
         });
-        let url = cx.new(|cx| InputState::new(window, cx).placeholder("Search or paste URL"));
+        let url = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search or paste URL"));
         let browse = add_source::Browse { filter: None, query: None, docs: None, url };
         AddItemsDialog { doc, kind: 0, search, expanded: Vec::new(), picked: Vec::new(), pending: Default::default(), configs: Default::default(), text_inputs: Default::default(), config_menu: None, obsolete, on_add: std::rc::Rc::new(on_add), thumbs: Default::default(), requested: Default::default(), other: false, source: None, browse, error: None, _sub: sub }
     });
@@ -815,7 +815,7 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
                 let provider = d.derived_provider();
                 let ctx = if item.config.is_empty() { provider.context(&tab.to_string()) } else { provider.context_in(&tab.to_string(), &item.config) };
                 let density = |_: &BodyId| p.density;
-                computed_mass = ctx.and_then(|c| noshape_model::regen::measure::mass_properties(&c, std::slice::from_ref(b), &density)?.mass).map(|m| format!("{m:.4} kg"));
+                computed_mass = ctx.and_then(|c| noshape_model::regen::measure::mass_properties(&c, std::slice::from_ref(b), &density)?.mass).map(|m| format!("{} kg", noshape_units::to_fixed(m, 4)));
             }
             ("Onshape Part", MetaValues { name: item.name.clone(), description: p.description.unwrap_or_default(), part_number: p.part_number.unwrap_or_default(), revision: p.revision.unwrap_or_default(), meta: p.meta, mass_override: p.mass_override.map(|m| format!("{m} kg")), bom: 0 })
         }
@@ -1092,7 +1092,7 @@ impl ReleaseDialog {
             }
         }));
         let numbering = numbering_schemes();
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search"));
+        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search"));
         subs.push(cx.subscribe_in(&search, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
                 cx.notify();

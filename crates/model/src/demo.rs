@@ -362,7 +362,7 @@ pub fn demo_document_with_drawing() -> Document {
         let mut detail = view(6, ViewKind::Detail { parent: ViewId(2), center: [0.038, 0.018], radius: 0.011, label: "B".into() }, [335.0, 115.0]);
         detail.scale = Some(2.0);
         sheet.views.push(detail);
-        for (k, v) in [("Title", "Plate"), ("Drawn by", "noshape"), ("Part number", "P-001"), ("Revision", "A"), ("Material", "Aluminum 6061"), ("Sheet", "1 / 1")] {
+        for (k, v) in [("Title", "Plate"), ("Drawn by", "noshape"), ("Part number", "P-001"), ("Revision", "A"), ("Material", "Aluminum 6061"), ("Sheet", "{sheet.number} / {sheet.count}")] {
             if let Some(f) = sheet.title_block.fields.iter_mut().find(|(key, _)| key == k) {
                 f.1 = v.to_string();
             }

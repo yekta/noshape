@@ -1,0 +1,4186 @@
+[
+ {
+  "standard": "DIN",
+  "inch": false,
+  "components": [
+   {
+    "category": "Bolts & screws",
+    "class": "Cross recess head screws",
+    "name": "PH Countersunk flat head screw DIN EN ISO 7046-1",
+    "shape": "screw",
+    "form": {
+     "head": 4,
+     "drive": 3,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "PH Countersunk flat head screw M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "dk": 3.6,
+       "k": 1.0,
+       "sd": 1.6,
+       "t": 0.9,
+       "dp": 1.170596,
+       "b": 0.61
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "16": [
+        "16"
+       ]
+      }
+     },
+     {
+      "name": "M2",
+      "label": "PH Countersunk flat head screw M2x0.4",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "dk": 4.4,
+       "k": 1.2,
+       "sd": 1.9,
+       "t": 1.2,
+       "dp": 1.509252,
+       "b": 0.61
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "20": [
+        "20"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "PH Countersunk flat head screw M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "dk": 5.5,
+       "k": 1.5,
+       "sd": 2.9,
+       "t": 1.8,
+       "dp": 1.947909,
+       "b": 0.97
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "25": [
+        "25"
+       ]
+      }
+     },
+     {
+      "name": "M3",
+      "label": "PH Countersunk flat head screw M3x0.5",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 6.3,
+       "k": 1.65,
+       "sd": 3.2,
+       "t": 2.1,
+       "dp": 2.386566,
+       "b": 0.97
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "4": [
+        "4"
+       ],
+       "30": [
+        "30"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "PH Countersunk flat head screw M4x0.7",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 9.4,
+       "k": 2.7,
+       "sd": 4.6,
+       "t": 2.6,
+       "dp": 3.141192,
+       "b": 1.47
+      },
+      "lengths": [
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "5": [
+        "5"
+       ],
+       "40": [
+        "40"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "PH Countersunk flat head screw M5x0.8",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 10.4,
+       "k": 2.7,
+       "sd": 5.2,
+       "t": 3.2,
+       "dp": 4.018505,
+       "b": 1.47
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50"
+      ],
+      "threads": {
+       "6": [
+        "6"
+       ],
+       "50": [
+        "50",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "PH Countersunk flat head screw M6x1",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 12.6,
+       "k": 3.3,
+       "sd": 6.8,
+       "t": 3.5,
+       "dp": 4.773131,
+       "b": 2.41
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "8": [
+        "8"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "PH Countersunk flat head screw M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 17.3,
+       "k": 4.65,
+       "sd": 8.9,
+       "t": 4.6,
+       "dp": 6.466414,
+       "b": 3.48
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "10": [
+        "10"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M10",
+      "label": "PH Countersunk flat head screw M10x1.5",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 20.0,
+       "k": 5.0,
+       "sd": 10.0,
+       "t": 5.7,
+       "dp": 8.159696,
+       "b": 3.48
+      },
+      "lengths": [
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "12": [
+        "12"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     }
+    ],
+    "source": "ISO 7046-1:2011 (Countersunk flat head screws (common head style) with type H or type Z cross recess — Product grade A — Part 1: Steel screws of property class 4.8); https://standards.iteh.ai/catalog/standards/iso/ee90a023-eda0-419c-bd11-2bd618ba6f8f/iso-7046-1-2011 (catalog page); https://cdn.standards.iteh.ai/samples/57373/eec1f81ca47845038a18aa4c66b91e22/ISO-7046-1-2011.pdf (iTeh free preview PDF of the ISO text; contains the complete Table 1 incl. length table; primary source, values read from the PDF text layer and verified against the rendered page); https://fasten.it/Norms/Norm/DIN_EN_ISO_7046-1 (DIN EN ISO 7046-1 2011 table: subset of columns + commercial-length mass table)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Cross recess head screws",
+    "name": "PH Pan head cross recess screw with collar DIN 967",
+    "shape": "screw",
+    "form": {
+     "head": 3,
+     "drive": 3,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M3",
+      "label": "PH Pan head cross recess screw with collar M3x0.50 x 4 x 3",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 7.5,
+       "k": 2.35,
+       "rf": 3.8,
+       "c": 0.8,
+       "dc": 7.5,
+       "sd": 3.0,
+       "t": 1.8,
+       "dp": 2.386566,
+       "b": 0.97
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "4": [
+        "3"
+       ],
+       "30": [
+        "25"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "PH Pan head cross recess screw with collar M4x0.70 x 5 x 3.6",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 10.0,
+       "k": 3.05,
+       "rf": 5.8,
+       "c": 1.1,
+       "dc": 10.0,
+       "sd": 4.6,
+       "t": 2.46,
+       "dp": 3.141192,
+       "b": 1.47
+      },
+      "lengths": [
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "5": [
+        "3.6"
+       ],
+       "40": [
+        "38.6"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "PH Pan head cross recess screw with collar M5x0.80 x 6 x 4.4",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 11.5,
+       "k": 3.55,
+       "rf": 6.6,
+       "c": 1.35,
+       "dc": 11.5,
+       "sd": 5.0,
+       "t": 2.87,
+       "dp": 4.018505,
+       "b": 1.47
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45"
+      ],
+      "threads": {
+       "6": [
+        "4.4"
+       ],
+       "45": [
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "PH Pan head cross recess screw with collar M6x1.00 x 8 x 6",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 14.5,
+       "k": 4.55,
+       "rf": 8.2,
+       "c": 1.8,
+       "dc": 14.5,
+       "sd": 7.1,
+       "t": 3.66,
+       "dp": 4.773131,
+       "b": 2.41
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "8": [
+        "6"
+       ],
+       "60": [
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "PH Pan head cross recess screw with collar M8x1.25 x 10 x 7.5",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 19.0,
+       "k": 5.9,
+       "rf": 11.0,
+       "c": 2.2,
+       "dc": 19.0,
+       "sd": 9.0,
+       "t": 4.68,
+       "dp": 6.466414,
+       "b": 3.48
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "10": [
+        "7.5"
+       ],
+       "60": [
+        "38"
+       ]
+      }
+     }
+    ],
+    "source": "DIN 967:2002-12 (fasten.it); current edition DIN 967:2018-12 (not checked for changes) (Cross recessed pan head screws with collar (product grade A), metric thread M3-M8); https://www.fasteners.eu/standards/DIN/967/; https://fasten.it/Norms/Norm/DIN_967; https://fasten.it/Norms/Norm/DIN_968; https://Krepcom.ru/upload/iblock/425/DIN-967_perevod.pdf (Russian translation of DIN 967:2002-12, Table 1: all dimension rows incl. b, da, dk/k/c min, r, rf, x, recess m and penetration depths H/Z, and l min/max)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Cross recess head screws",
+    "name": "PH Pan head screw DIN EN ISO 7045",
+    "shape": "screw",
+    "form": {
+     "head": 3,
+     "drive": 3,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "PH Pan head screw M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "dk": 3.2,
+       "k": 1.3,
+       "rf": 2.5,
+       "sd": 1.7,
+       "t": 0.95,
+       "dp": 1.170596,
+       "b": 0.61
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "16": [
+        "16"
+       ]
+      }
+     },
+     {
+      "name": "M2",
+      "label": "PH Pan head screw M2x0.40",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "dk": 4.0,
+       "k": 1.6,
+       "rf": 3.2,
+       "sd": 1.9,
+       "t": 1.2,
+       "dp": 1.509252,
+       "b": 0.61
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "20": [
+        "20"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "PH Pan head screw M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "dk": 5.0,
+       "k": 2.1,
+       "rf": 4.0,
+       "sd": 2.7,
+       "t": 1.55,
+       "dp": 1.947909,
+       "b": 0.97
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "25": [
+        "25"
+       ]
+      }
+     },
+     {
+      "name": "M3",
+      "label": "PH Pan head screw M3x0.50",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 5.6,
+       "k": 2.4,
+       "rf": 5.0,
+       "sd": 3.0,
+       "t": 1.8,
+       "dp": 2.386566,
+       "b": 0.97
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "4": [
+        "4"
+       ],
+       "30": [
+        "30"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "PH Pan head screw M4x0.70",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 8.0,
+       "k": 3.1,
+       "rf": 6.5,
+       "sd": 4.4,
+       "t": 2.4,
+       "dp": 3.141192,
+       "b": 1.47
+      },
+      "lengths": [
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "5": [
+        "5"
+       ],
+       "40": [
+        "40"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "PH Pan head screw M5x0.80",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 9.5,
+       "k": 3.7,
+       "rf": 8.0,
+       "sd": 4.9,
+       "t": 2.9,
+       "dp": 4.018505,
+       "b": 1.47
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45"
+      ],
+      "threads": {
+       "6": [
+        "6"
+       ],
+       "45": [
+        "45",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "PH Pan head screw M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 12.0,
+       "k": 4.6,
+       "rf": 10.0,
+       "sd": 6.9,
+       "t": 3.6,
+       "dp": 4.773131,
+       "b": 2.41
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "8": [
+        "8"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "PH Pan head screw M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 16.0,
+       "k": 6.0,
+       "rf": 13.0,
+       "sd": 9.0,
+       "t": 4.6,
+       "dp": 6.466414,
+       "b": 3.48
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "10": [
+        "10"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M10",
+      "label": "PH Pan head screw M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 20.0,
+       "k": 7.5,
+       "rf": 16.0,
+       "sd": 10.1,
+       "t": 5.8,
+       "dp": 8.159696,
+       "b": 3.48
+      },
+      "lengths": [
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "12": [
+        "12"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     }
+    ],
+    "source": "ISO 7045:2011 (Pan head screws with type H or type Z cross recess — Product grade A); https://standards.iteh.ai/catalog/standards/iso/bcd669ac-1dcb-431f-b111-8e0fa24f186c/iso-7045-2011 (catalog page); https://cdn.standards.iteh.ai/samples/57372/fafe91d8504049fc8953281401736c79/ISO-7045-2011.pdf (iTeh free preview PDF of the ISO text; contains the complete Table 1 incl. length table; primary source, values read from the PDF text layer and verified against the rendered page); https://fasten.it/Norms/Norm/DIN_EN_ISO_7045 (DIN EN ISO 7045 2011 table: subset of columns + commercial-length mass table)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Cross recess head screws",
+    "name": "PH Raised countersunk head screw DIN EN ISO 7047",
+    "shape": "screw",
+    "form": {
+     "head": 5,
+     "drive": 3,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "PH Raised countersunk head screw M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "dk": 3.6,
+       "k": 1.0,
+       "f": 0.4,
+       "sd": 1.9,
+       "t": 1.2,
+       "dp": 1.170596,
+       "b": 0.61
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "16": [
+        "16"
+       ]
+      }
+     },
+     {
+      "name": "M2",
+      "label": "PH Raised countersunk head screw M2x0.4",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "dk": 4.4,
+       "k": 1.2,
+       "f": 0.5,
+       "sd": 2.0,
+       "t": 1.5,
+       "dp": 1.509252,
+       "b": 0.61
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "20": [
+        "20"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "PH Raised countersunk head screw M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "dk": 5.5,
+       "k": 1.5,
+       "f": 0.6,
+       "sd": 3.0,
+       "t": 1.85,
+       "dp": 1.947909,
+       "b": 0.97
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "25": [
+        "25"
+       ]
+      }
+     },
+     {
+      "name": "M3",
+      "label": "PH Raised countersunk head screw M3x0.5",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 6.3,
+       "k": 1.65,
+       "f": 0.7,
+       "sd": 3.4,
+       "t": 2.2,
+       "dp": 2.386566,
+       "b": 0.97
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "4": [
+        "4"
+       ],
+       "30": [
+        "30"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "PH Raised countersunk head screw M4x0.7",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 9.4,
+       "k": 2.7,
+       "f": 1.0,
+       "sd": 5.2,
+       "t": 3.2,
+       "dp": 3.141192,
+       "b": 1.47
+      },
+      "lengths": [
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "5": [
+        "5"
+       ],
+       "40": [
+        "40"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "PH Raised countersunk head screw M5x0.8",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 10.4,
+       "k": 2.7,
+       "f": 1.2,
+       "sd": 5.4,
+       "t": 3.4,
+       "dp": 4.018505,
+       "b": 1.47
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50"
+      ],
+      "threads": {
+       "6": [
+        "6"
+       ],
+       "50": [
+        "50",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "PH Raised countersunk head screw M6x1",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 12.6,
+       "k": 3.3,
+       "f": 1.4,
+       "sd": 7.3,
+       "t": 4.0,
+       "dp": 4.773131,
+       "b": 2.41
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "8": [
+        "8"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "PH Raised countersunk head screw M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 17.3,
+       "k": 4.65,
+       "f": 2.0,
+       "sd": 9.6,
+       "t": 5.25,
+       "dp": 6.466414,
+       "b": 3.48
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "10": [
+        "10"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M10",
+      "label": "PH Raised countersunk head screw M10x1.5",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 20.0,
+       "k": 5.0,
+       "f": 2.3,
+       "sd": 10.4,
+       "t": 6.0,
+       "dp": 8.159696,
+       "b": 3.48
+      },
+      "lengths": [
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "12": [
+        "12"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     }
+    ],
+    "source": "ISO 7047:2011 (Raised countersunk head screws (common head style) with type H or type Z cross recess — Product grade A); https://standards.iteh.ai/catalog/standards/iso/3ff4a48d-8dc6-428d-968a-d97fb91c0b3c/iso-7047-2011 (catalog page); https://cdn.standards.iteh.ai/samples/57375/1d8968c64bdc4d8495773ea6151323e8/ISO-7047-2011.pdf (iTeh free preview PDF of the ISO text; contains the complete Table 1 incl. length table; primary source, values read from the PDF text layer and verified against the rendered page); https://fasten.it/Norms/Norm/DIN_EN_ISO_7047 (DIN EN ISO 7047 2011 table: subset of columns + commercial-length mass table)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Cross recess head screws",
+    "name": "PZ Countersunk flat head screw DIN EN ISO 7046-1",
+    "shape": "screw",
+    "form": {
+     "head": 4,
+     "drive": 4,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "PZ Countersunk flat head screw M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "dk": 3.6,
+       "k": 1.0,
+       "sd": 1.6,
+       "t": 0.95,
+       "dp": 1.170596,
+       "b": 0.76
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "16": [
+        "16"
+       ]
+      }
+     },
+     {
+      "name": "M2",
+      "label": "PZ Countersunk flat head screw M2x0.40",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "dk": 4.4,
+       "k": 1.2,
+       "sd": 1.9,
+       "t": 1.2,
+       "dp": 1.509252,
+       "b": 0.76
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "20": [
+        "20"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "PZ Countersunk flat head screw M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "dk": 5.5,
+       "k": 1.5,
+       "sd": 2.8,
+       "t": 1.73,
+       "dp": 1.947909,
+       "b": 1.27
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "25": [
+        "25"
+       ]
+      }
+     },
+     {
+      "name": "M3",
+      "label": "PZ Countersunk flat head screw M3x0.50",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 6.3,
+       "k": 1.65,
+       "sd": 3.0,
+       "t": 2.01,
+       "dp": 2.386566,
+       "b": 1.27
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "4": [
+        "4"
+       ],
+       "30": [
+        "30"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "PZ Countersunk flat head screw M4x0.70",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 9.4,
+       "k": 2.7,
+       "sd": 4.4,
+       "t": 2.51,
+       "dp": 3.141192,
+       "b": 1.83
+      },
+      "lengths": [
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "5": [
+        "5"
+       ],
+       "40": [
+        "40"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "PZ Countersunk flat head screw M5x0.80",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 10.4,
+       "k": 2.7,
+       "sd": 4.9,
+       "t": 3.05,
+       "dp": 4.018505,
+       "b": 1.83
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50"
+      ],
+      "threads": {
+       "6": [
+        "6"
+       ],
+       "50": [
+        "50",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "PZ Countersunk flat head screw M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 12.6,
+       "k": 3.3,
+       "sd": 6.6,
+       "t": 3.45,
+       "dp": 4.773131,
+       "b": 2.72
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "8": [
+        "8"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "PZ Countersunk flat head screw M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 17.3,
+       "k": 4.65,
+       "sd": 8.8,
+       "t": 4.6,
+       "dp": 6.466414,
+       "b": 3.96
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "10": [
+        "10"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M10",
+      "label": "PZ Countersunk flat head screw M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 20.0,
+       "k": 5.0,
+       "sd": 9.8,
+       "t": 5.64,
+       "dp": 8.159696,
+       "b": 3.96
+      },
+      "lengths": [
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "12": [
+        "12"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     }
+    ],
+    "source": "ISO 7046-1:2011 (Countersunk flat head screws (common head style) with type H or type Z cross recess — Product grade A — Part 1: Steel screws of property class 4.8); https://standards.iteh.ai/catalog/standards/iso/ee90a023-eda0-419c-bd11-2bd618ba6f8f/iso-7046-1-2011 (catalog page); https://cdn.standards.iteh.ai/samples/57373/eec1f81ca47845038a18aa4c66b91e22/ISO-7046-1-2011.pdf (iTeh free preview PDF of the ISO text; contains the complete Table 1 incl. length table; primary source, values read from the PDF text layer and verified against the rendered page); https://fasten.it/Norms/Norm/DIN_EN_ISO_7046-1 (DIN EN ISO 7046-1 2011 table: subset of columns + commercial-length mass table)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Cross recess head screws",
+    "name": "PZ Pan head cross recess screw with collar DIN 967",
+    "shape": "screw",
+    "form": {
+     "head": 3,
+     "drive": 4,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M3",
+      "label": "PZ Pan head cross recess screw with collar M3x0.50 x 4 x 3",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 7.5,
+       "k": 2.35,
+       "rf": 3.8,
+       "c": 0.8,
+       "dc": 7.5,
+       "sd": 2.9,
+       "t": 1.83,
+       "dp": 2.386566,
+       "b": 1.27
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "4": [
+        "3"
+       ],
+       "30": [
+        "25"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "PZ Pan head cross recess screw with collar M4x0.70 x 5 x 3.6",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 10.0,
+       "k": 3.05,
+       "rf": 5.8,
+       "c": 1.1,
+       "dc": 10.0,
+       "sd": 4.3,
+       "t": 2.34,
+       "dp": 3.141192,
+       "b": 1.83
+      },
+      "lengths": [
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "5": [
+        "3.6"
+       ],
+       "40": [
+        "38.6"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "PZ Pan head cross recess screw with collar M5x0.80 x 6 x 4.4",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 11.5,
+       "k": 3.55,
+       "rf": 6.6,
+       "c": 1.35,
+       "dc": 11.5,
+       "sd": 4.7,
+       "t": 2.74,
+       "dp": 4.018505,
+       "b": 1.83
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45"
+      ],
+      "threads": {
+       "6": [
+        "4.4"
+       ],
+       "45": [
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "PZ Pan head cross recess screw with collar M6x1.00 x 8 x 6",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 14.5,
+       "k": 4.55,
+       "rf": 8.2,
+       "c": 1.8,
+       "dc": 14.5,
+       "sd": 6.7,
+       "t": 3.48,
+       "dp": 4.773131,
+       "b": 2.72
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "8": [
+        "6"
+       ],
+       "60": [
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "PZ Pan head cross recess screw with collar M8x1.25 x 10 x 7.5",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 19.0,
+       "k": 5.9,
+       "rf": 11.0,
+       "c": 2.2,
+       "dc": 19.0,
+       "sd": 8.8,
+       "t": 4.52,
+       "dp": 6.466414,
+       "b": 3.96
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "10": [
+        "7.5"
+       ],
+       "60": [
+        "38"
+       ]
+      }
+     }
+    ],
+    "source": "DIN 967:2002-12 (fasten.it); current edition DIN 967:2018-12 (not checked for changes) (Cross recessed pan head screws with collar (product grade A), metric thread M3-M8); https://www.fasteners.eu/standards/DIN/967/; https://fasten.it/Norms/Norm/DIN_967; https://fasten.it/Norms/Norm/DIN_968; https://Krepcom.ru/upload/iblock/425/DIN-967_perevod.pdf (Russian translation of DIN 967:2002-12, Table 1: all dimension rows incl. b, da, dk/k/c min, r, rf, x, recess m and penetration depths H/Z, and l min/max)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Cross recess head screws",
+    "name": "PZ Pan head screw DIN EN ISO 7045",
+    "shape": "screw",
+    "form": {
+     "head": 3,
+     "drive": 4,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "PZ Pan head screw M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "dk": 3.2,
+       "k": 1.3,
+       "rf": 2.5,
+       "sd": 1.6,
+       "t": 0.9,
+       "dp": 1.170596,
+       "b": 0.76
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "16": [
+        "16"
+       ]
+      }
+     },
+     {
+      "name": "M2",
+      "label": "PZ Pan head screw M2x0.40",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "dk": 4.0,
+       "k": 1.6,
+       "rf": 3.2,
+       "sd": 2.1,
+       "t": 1.42,
+       "dp": 1.509252,
+       "b": 0.76
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "20": [
+        "20"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "PZ Pan head screw M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "dk": 5.0,
+       "k": 2.1,
+       "rf": 4.0,
+       "sd": 2.6,
+       "t": 1.5,
+       "dp": 1.947909,
+       "b": 1.27
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "25": [
+        "25"
+       ]
+      }
+     },
+     {
+      "name": "M3",
+      "label": "PZ Pan head screw M3x0.50",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 5.6,
+       "k": 2.4,
+       "rf": 5.0,
+       "sd": 2.8,
+       "t": 1.75,
+       "dp": 2.386566,
+       "b": 1.27
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "4": [
+        "4"
+       ],
+       "30": [
+        "30"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "PZ Pan head screw M4x0.70",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 8.0,
+       "k": 3.1,
+       "rf": 6.5,
+       "sd": 4.3,
+       "t": 2.34,
+       "dp": 3.141192,
+       "b": 1.83
+      },
+      "lengths": [
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "5": [
+        "5"
+       ],
+       "40": [
+        "40"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "PZ Pan head screw M5x0.80",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 9.5,
+       "k": 3.7,
+       "rf": 8.0,
+       "sd": 4.7,
+       "t": 2.74,
+       "dp": 4.018505,
+       "b": 1.83
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45"
+      ],
+      "threads": {
+       "6": [
+        "6"
+       ],
+       "45": [
+        "45",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "PZ Pan head screw M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 12.0,
+       "k": 4.6,
+       "rf": 10.0,
+       "sd": 6.7,
+       "t": 3.46,
+       "dp": 4.773131,
+       "b": 2.72
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "8": [
+        "8"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "PZ Pan head screw M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 16.0,
+       "k": 6.0,
+       "rf": 13.0,
+       "sd": 8.8,
+       "t": 4.5,
+       "dp": 6.466414,
+       "b": 3.96
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "10": [
+        "10"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M10",
+      "label": "PZ Pan head screw M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 20.0,
+       "k": 7.5,
+       "rf": 16.0,
+       "sd": 9.9,
+       "t": 5.69,
+       "dp": 8.159696,
+       "b": 3.96
+      },
+      "lengths": [
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "12": [
+        "12"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     }
+    ],
+    "source": "ISO 7045:2011 (Pan head screws with type H or type Z cross recess — Product grade A); https://standards.iteh.ai/catalog/standards/iso/bcd669ac-1dcb-431f-b111-8e0fa24f186c/iso-7045-2011 (catalog page); https://cdn.standards.iteh.ai/samples/57372/fafe91d8504049fc8953281401736c79/ISO-7045-2011.pdf (iTeh free preview PDF of the ISO text; contains the complete Table 1 incl. length table; primary source, values read from the PDF text layer and verified against the rendered page); https://fasten.it/Norms/Norm/DIN_EN_ISO_7045 (DIN EN ISO 7045 2011 table: subset of columns + commercial-length mass table)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Cross recess head screws",
+    "name": "PZ Raised countersunk head screw DIN EN ISO 7047",
+    "shape": "screw",
+    "form": {
+     "head": 5,
+     "drive": 4,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "PZ Raised countersunk head screw M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "dk": 3.6,
+       "k": 1.0,
+       "f": 0.4,
+       "sd": 1.9,
+       "t": 1.2,
+       "dp": 1.170596,
+       "b": 0.76
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "16": [
+        "16"
+       ]
+      }
+     },
+     {
+      "name": "M2",
+      "label": "PZ Raised countersunk head screw M2x0.40",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "dk": 4.4,
+       "k": 1.2,
+       "f": 0.5,
+       "sd": 2.2,
+       "t": 1.4,
+       "dp": 1.509252,
+       "b": 0.76
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "20": [
+        "20"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "PZ Raised countersunk head screw M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "dk": 5.5,
+       "k": 1.5,
+       "f": 0.6,
+       "sd": 2.8,
+       "t": 1.75,
+       "dp": 1.947909,
+       "b": 1.27
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25"
+      ],
+      "threads": {
+       "3": [
+        "3"
+       ],
+       "25": [
+        "25"
+       ]
+      }
+     },
+     {
+      "name": "M3",
+      "label": "PZ Raised countersunk head screw M3x0.50",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dk": 6.3,
+       "k": 1.65,
+       "f": 0.7,
+       "sd": 3.1,
+       "t": 2.08,
+       "dp": 2.386566,
+       "b": 1.27
+      },
+      "lengths": [
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "4": [
+        "4"
+       ],
+       "30": [
+        "30"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "PZ Raised countersunk head screw M4x0.70",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dk": 9.4,
+       "k": 2.7,
+       "f": 1.0,
+       "sd": 5.0,
+       "t": 3.1,
+       "dp": 3.141192,
+       "b": 1.83
+      },
+      "lengths": [
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "5": [
+        "5"
+       ],
+       "40": [
+        "40"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "PZ Raised countersunk head screw M5x0.80",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 10.4,
+       "k": 2.7,
+       "f": 1.2,
+       "sd": 5.3,
+       "t": 3.35,
+       "dp": 4.018505,
+       "b": 1.83
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50"
+      ],
+      "threads": {
+       "6": [
+        "6"
+       ],
+       "50": [
+        "50",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "PZ Raised countersunk head screw M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 12.6,
+       "k": 3.3,
+       "f": 1.4,
+       "sd": 7.1,
+       "t": 3.85,
+       "dp": 4.773131,
+       "b": 2.72
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "8": [
+        "8"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "PZ Raised countersunk head screw M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 17.3,
+       "k": 4.65,
+       "f": 2.0,
+       "sd": 9.5,
+       "t": 5.2,
+       "dp": 6.466414,
+       "b": 3.96
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "10": [
+        "10"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     },
+     {
+      "name": "M10",
+      "label": "PZ Raised countersunk head screw M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 20.0,
+       "k": 5.0,
+       "f": 2.3,
+       "sd": 10.3,
+       "t": 6.05,
+       "dp": 8.159696,
+       "b": 3.96
+      },
+      "lengths": [
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "60"
+      ],
+      "threads": {
+       "12": [
+        "12"
+       ],
+       "60": [
+        "60",
+        "38"
+       ]
+      }
+     }
+    ],
+    "source": "ISO 7047:2011 (Raised countersunk head screws (common head style) with type H or type Z cross recess — Product grade A); https://standards.iteh.ai/catalog/standards/iso/3ff4a48d-8dc6-428d-968a-d97fb91c0b3c/iso-7047-2011 (catalog page); https://cdn.standards.iteh.ai/samples/57375/1d8968c64bdc4d8495773ea6151323e8/ISO-7047-2011.pdf (iTeh free preview PDF of the ISO text; contains the complete Table 1 incl. length table; primary source, values read from the PDF text layer and verified against the rendered page); https://fasten.it/Norms/Norm/DIN_EN_ISO_7047 (DIN EN ISO 7047 2011 table: subset of columns + commercial-length mass table)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Eye bolts",
+    "name": "Eye bolt DIN 444",
+    "shape": "screw",
+    "form": {
+     "head": 7,
+     "drive": 0,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M5",
+      "label": "Eye bolt M5x0.8 x 20 x 9",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dk": 5.0,
+       "e1": 10.9,
+       "s": 7.76,
+       "dp": 4.018505
+      },
+      "lengths": [
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "75",
+       "80"
+      ],
+      "threads": {
+       "20": [
+        "9"
+       ],
+       "80": [
+        "16",
+        "69"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "Eye bolt M6x1 x 20 x 6",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 6.0,
+       "e1": 12.9,
+       "s": 8.76,
+       "dp": 4.773131
+      },
+      "lengths": [
+       "20",
+       "25",
+       "35",
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "75",
+       "80",
+       "90"
+      ],
+      "threads": {
+       "20": [
+        "6"
+       ],
+       "90": [
+        "18",
+        "76"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "Eye bolt M8x1.25 x 20 x 4",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 8.0,
+       "e1": 16.9,
+       "s": 10.65,
+       "dp": 6.466414
+      },
+      "lengths": [
+       "20",
+       "25",
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "75",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140"
+      ],
+      "threads": {
+       "20": [
+        "4"
+       ],
+       "140": [
+        "28",
+        "124"
+       ]
+      }
+     },
+     {
+      "name": "M10",
+      "label": "Eye bolt M10x1.5 x 45 x 26",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 10.0,
+       "e1": 18.7,
+       "s": 13.65,
+       "dp": 8.159696
+      },
+      "lengths": [
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "75",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150"
+      ],
+      "threads": {
+       "45": [
+        "26",
+        "27"
+       ],
+       "150": [
+        "32",
+        "132"
+       ]
+      }
+     },
+     {
+      "name": "M12",
+      "label": "Eye bolt M12x1.75 x 55 x 30",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "dk": 12.0,
+       "e1": 23.7,
+       "s": 16.65,
+       "dp": 9.852979
+      },
+      "lengths": [
+       "55",
+       "60",
+       "65",
+       "70",
+       "75",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260"
+      ],
+      "threads": {
+       "55": [
+        "30",
+        "32"
+       ],
+       "260": [
+        "49",
+        "237"
+       ]
+      }
+     },
+     {
+      "name": "M16",
+      "label": "Eye bolt M16x2 x 70 x 38",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "dk": 16.0,
+       "e1": 30.4,
+       "s": 18.58,
+       "dp": 13.546262
+      },
+      "lengths": [
+       "70",
+       "75",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260"
+      ],
+      "threads": {
+       "70": [
+        "38",
+        "43"
+       ],
+       "260": [
+        "57",
+        "233"
+       ]
+      }
+     },
+     {
+      "name": "M20",
+      "label": "Eye bolt M20x2.5 x 70 x 38",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "dk": 18.0,
+       "e1": 38.4,
+       "s": 23.58,
+       "dp": 16.932828
+      },
+      "lengths": [
+       "70",
+       "75",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300"
+      ],
+      "threads": {
+       "70": [
+        "38"
+       ],
+       "300": [
+        "65",
+        "268"
+       ]
+      }
+     },
+     {
+      "name": "M24",
+      "label": "Eye bolt M24x3 x 80 x 40",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "dk": 22.0,
+       "e1": 43.4,
+       "s": 27.58,
+       "dp": 20.319393
+      },
+      "lengths": [
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260"
+      ],
+      "threads": {
+       "80": [
+        "40"
+       ],
+       "260": [
+        "73",
+        "220"
+       ]
+      }
+     },
+     {
+      "name": "M30",
+      "label": "Eye bolt M30x3.5 x 120 x 66",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "dk": 27.0,
+       "e1": 53.1,
+       "s": 33.5,
+       "dp": 25.705959
+      },
+      "lengths": [
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300"
+      ],
+      "threads": {
+       "120": [
+        "66",
+        "74"
+       ],
+       "300": [
+        "85",
+        "254"
+       ]
+      }
+     },
+     {
+      "name": "M36",
+      "label": "Eye bolt M36x4 x 160 x 84",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "dk": 32.0,
+       "e1": 63.1,
+       "s": 40.5,
+       "dp": 31.092524
+      },
+      "lengths": [
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300"
+      ],
+      "threads": {
+       "160": [
+        "84",
+        "101"
+       ],
+       "300": [
+        "97",
+        "241"
+       ]
+      }
+     }
+    ],
+    "source": "DIN 444:1983-04 (values as reproduced by fasten.it/fasteners.eu); Fuller and torqbolt tables (same values, plus alternative eye bores marked footnote c) - current edition is DIN 444:2017-04 (Eye bolts (types/forms A, B, C)); https://fullerfasteners.com/tech/din-444-specifications-eye-bolts/; https://torqbolt.com/din-444-eye-bolts-dimensions-standards-specifications; https://fasten.it/Norms/Norm/DIN_444; https://www.fasteners.eu/standards/DIN/444/",
+    "params": [
+     {
+      "label": "Type",
+      "options": [
+       "A",
+       "B",
+       "C"
+      ],
+      "default": "A"
+     }
+    ]
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Hex head bolts & screws",
+    "name": "Hex bolt structural short grade C DIN 6914",
+    "shape": "screw",
+    "form": {
+     "head": 1,
+     "drive": 0,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M12",
+      "label": "Hex bolt structural short grade C M12x1.75 x 40 x 21",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "s": 22.0,
+       "k": 8.0,
+       "dp": 9.852979
+      },
+      "lengths": [
+       "40",
+       "50",
+       "55",
+       "110",
+       "170"
+      ],
+      "threads": {
+       "40": [
+        "21"
+       ],
+       "170": [
+        "23"
+       ]
+      }
+     },
+     {
+      "name": "M16",
+      "label": "Hex bolt structural short grade C M16x2.00 x 40 x 26",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "s": 27.0,
+       "k": 10.0,
+       "dp": 13.546262
+      },
+      "lengths": [
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "75",
+       "80",
+       "85",
+       "90",
+       "95",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150"
+      ],
+      "threads": {
+       "40": [
+        "26"
+       ],
+       "150": [
+        "150",
+        "38",
+        "28"
+       ]
+      }
+     },
+     {
+      "name": "M20",
+      "label": "Hex bolt structural short grade C M20x2.50 x 50 x 31",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "s": 32.0,
+       "k": 13.0,
+       "dp": 16.932828
+      },
+      "lengths": [
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "75",
+       "80",
+       "85",
+       "90",
+       "95",
+       "100",
+       "105",
+       "110",
+       "115",
+       "120",
+       "130",
+       "140",
+       "150"
+      ],
+      "threads": {
+       "50": [
+        "31"
+       ],
+       "150": [
+        "150",
+        "43"
+       ]
+      }
+     },
+     {
+      "name": "M22",
+      "label": "Hex bolt structural short grade C M22x2.50",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "s": 36.0,
+       "k": 14.0,
+       "dp": 18.932828
+      },
+      "lengths": [
+       "60",
+       "65",
+       "70",
+       "75",
+       "80",
+       "85",
+       "90",
+       "95",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150"
+      ],
+      "threads": {
+       "60": [
+        "60",
+        "38"
+       ],
+       "150": [
+        "150",
+        "45"
+       ]
+      }
+     },
+     {
+      "name": "M24",
+      "label": "Hex bolt structural short grade C M24x3.00 x 60 x 34",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "s": 41.0,
+       "k": 15.0,
+       "dp": 20.319393
+      },
+      "lengths": [
+       "60",
+       "65",
+       "70",
+       "75",
+       "80",
+       "85",
+       "90",
+       "95",
+       "100",
+       "110",
+       "120",
+       "130",
+       "135",
+       "140",
+       "150",
+       "160",
+       "170",
+       "180",
+       "190",
+       "200"
+      ],
+      "threads": {
+       "60": [
+        "34"
+       ],
+       "200": [
+        "200",
+        "48"
+       ]
+      }
+     },
+     {
+      "name": "M27",
+      "label": "Hex bolt structural short grade C M27x3.00",
+      "d": 27.0,
+      "dims": {
+       "d": 27.0,
+       "s": 46.0,
+       "k": 17.0,
+       "dp": 23.319393
+      },
+      "lengths": [
+       "70",
+       "75",
+       "80",
+       "85",
+       "90",
+       "95",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "170",
+       "180",
+       "190",
+       "200"
+      ],
+      "threads": {
+       "70": [
+        "70",
+        "44"
+       ],
+       "200": [
+        "200",
+        "51"
+       ]
+      }
+     },
+     {
+      "name": "M30",
+      "label": "Hex bolt structural short grade C M30x3.50",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "s": 50.0,
+       "k": 19.0,
+       "dp": 25.705959
+      },
+      "lengths": [
+       "80",
+       "85",
+       "90",
+       "95",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "170",
+       "180",
+       "190",
+       "200"
+      ],
+      "threads": {
+       "80": [
+        "80",
+        "49",
+        "40"
+       ],
+       "200": [
+        "200",
+        "56"
+       ]
+      }
+     },
+     {
+      "name": "M36",
+      "label": "Hex bolt structural short grade C M36x4.00",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "s": 60.0,
+       "k": 23.0,
+       "dp": 31.092524
+      },
+      "lengths": [
+       "90",
+       "95",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "170",
+       "180",
+       "190",
+       "200"
+      ],
+      "threads": {
+       "90": [
+        "90",
+        "56"
+       ],
+       "200": [
+        "200",
+        "63"
+       ]
+      }
+     }
+    ],
+    "source": "DIN 6914:1989-10 (withdrawn; replaced by DIN EN 14399-4) (High-strength hexagon head bolts with large widths across flats for structural steel bolting (HV bolts), product grade C, property class 10.9); https://www.hamgampich.com/wp-content/uploads/2024/10/DIN-6914-1989.pdf (scan of DIN 6914:1989-10 English edition; table on page 2 read visually); https://www.fasteners.eu/standards/DIN/6914/ (dimension + ls/lg table, all values match the DIN scan except ls M20x100 = 59,4 typo -> 59,5); https://fasten.it/norms/norm/din_6914 (P, b, ds, e, k, s and length/mass table; matches); https://www.schrauben-lexikon.de/norm/DIN_6914.asp (s, e, k, b1/b2; matches, but its 'b1 bis 125 mm / b2 ab 125 mm' length labels are wrong)",
+    "thread": {
+     "rule": "iso"
+    },
+    "params": [
+     {
+      "label": "Bearing face",
+      "options": [
+       "Washer face"
+      ],
+      "default": "Washer face"
+     }
+    ]
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Hex head bolts & screws",
+    "name": "Hex head bolt grade A & B DIN EN 24014",
+    "shape": "screw",
+    "form": {
+     "head": 1,
+     "drive": 0,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "Hex head bolt grade A & B M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "s": 3.2,
+       "k": 1.1,
+       "dp": 1.170596
+      },
+      "lengths": [
+       "12",
+       "16"
+      ],
+      "threads": {
+       "12": [
+        "12",
+        "9"
+       ],
+       "16": [
+        "16",
+        "9"
+       ]
+      }
+     },
+     {
+      "name": "M2",
+      "label": "Hex head bolt grade A & B M2x0.40",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "s": 4.0,
+       "k": 1.4,
+       "dp": 1.509252
+      },
+      "lengths": [
+       "16",
+       "20"
+      ],
+      "threads": {
+       "16": [
+        "16",
+        "10"
+       ],
+       "20": [
+        "20",
+        "10"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "Hex head bolt grade A & B M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "s": 5.0,
+       "k": 1.7,
+       "dp": 1.947909
+      },
+      "lengths": [
+       "16",
+       "20",
+       "25"
+      ],
+      "threads": {
+       "16": [
+        "16",
+        "11"
+       ],
+       "25": [
+        "25",
+        "11"
+       ]
+      }
+     },
+     {
+      "name": "M3",
+      "label": "Hex head bolt grade A & B M3x0.50 x 20 x 12",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "s": 5.5,
+       "k": 2.0,
+       "dp": 2.386566
+      },
+      "lengths": [
+       "20",
+       "25",
+       "30"
+      ],
+      "threads": {
+       "20": [
+        "20",
+        "12"
+       ],
+       "30": [
+        "20",
+        "12"
+       ]
+      }
+     },
+     {
+      "name": "M4",
+      "label": "Hex head bolt grade A & B M4x0.70",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "s": 7.0,
+       "k": 2.8,
+       "dp": 3.141192
+      },
+      "lengths": [
+       "25",
+       "30",
+       "35",
+       "40"
+      ],
+      "threads": {
+       "25": [
+        "25",
+        "14"
+       ],
+       "40": [
+        "40",
+        "14"
+       ]
+      }
+     },
+     {
+      "name": "M5",
+      "label": "Hex head bolt grade A & B M5x0.80",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "s": 8.0,
+       "k": 3.5,
+       "dp": 4.018505
+      },
+      "lengths": [
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50"
+      ],
+      "threads": {
+       "25": [
+        "25",
+        "16"
+       ],
+       "50": [
+        "50",
+        "16"
+       ]
+      }
+     },
+     {
+      "name": "M6",
+      "label": "Hex head bolt grade A & B M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "s": 10.0,
+       "k": 4.0,
+       "dp": 4.773131
+      },
+      "lengths": [
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "55",
+       "60"
+      ],
+      "threads": {
+       "30": [
+        "30",
+        "18"
+       ],
+       "60": [
+        "60",
+        "18"
+       ]
+      }
+     },
+     {
+      "name": "M8",
+      "label": "Hex head bolt grade A & B M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "s": 13.0,
+       "k": 5.3,
+       "dp": 6.466414
+      },
+      "lengths": [
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80"
+      ],
+      "threads": {
+       "40": [
+        "40",
+        "22"
+       ],
+       "80": [
+        "80",
+        "22"
+       ]
+      }
+     },
+     {
+      "name": "M10",
+      "label": "Hex head bolt grade A & B M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "s": 16.0,
+       "k": 6.4,
+       "dp": 8.159696
+      },
+      "lengths": [
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90",
+       "100"
+      ],
+      "threads": {
+       "45": [
+        "45",
+        "26"
+       ],
+       "100": [
+        "100",
+        "26"
+       ]
+      }
+     },
+     {
+      "name": "M12",
+      "label": "Hex head bolt grade A & B M12x1.75",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "s": 18.0,
+       "k": 7.5,
+       "dp": 9.852979
+      },
+      "lengths": [
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120"
+      ],
+      "threads": {
+       "50": [
+        "50",
+        "30"
+       ],
+       "120": [
+        "120",
+        "30"
+       ]
+      }
+     },
+     {
+      "name": "M16",
+      "label": "Hex head bolt grade A & B M16x2.00",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "s": 24.0,
+       "k": 10.0,
+       "dp": 13.546262
+      },
+      "lengths": [
+       "65",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160"
+      ],
+      "threads": {
+       "65": [
+        "65",
+        "38"
+       ],
+       "160": [
+        "160",
+        "44"
+       ]
+      }
+     },
+     {
+      "name": "M20",
+      "label": "Hex head bolt grade A & B M20x2.50",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "s": 30.0,
+       "k": 12.5,
+       "dp": 16.932828
+      },
+      "lengths": [
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200"
+      ],
+      "threads": {
+       "80": [
+        "80",
+        "46"
+       ],
+       "200": [
+        "200",
+        "52"
+       ]
+      }
+     },
+     {
+      "name": "M24",
+      "label": "Hex head bolt grade A & B M24x3.00",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "s": 36.0,
+       "k": 15.0,
+       "dp": 20.319393
+      },
+      "lengths": [
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240"
+      ],
+      "threads": {
+       "90": [
+        "90",
+        "54"
+       ],
+       "240": [
+        "240",
+        "73"
+       ]
+      }
+     },
+     {
+      "name": "M30",
+      "label": "Hex head bolt grade A & B M30x3.50",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "s": 46.0,
+       "k": 18.7,
+       "dp": 25.705959
+      },
+      "lengths": [
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300"
+      ],
+      "threads": {
+       "110": [
+        "110",
+        "66"
+       ],
+       "300": [
+        "300",
+        "85"
+       ]
+      }
+     },
+     {
+      "name": "M36",
+      "label": "Hex head bolt grade A & B M36x4.00",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "s": 55.0,
+       "k": 22.5,
+       "dp": 31.092524
+      },
+      "lengths": [
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360"
+      ],
+      "threads": {
+       "140": [
+        "140",
+        "84"
+       ],
+       "360": [
+        "360",
+        "97"
+       ]
+      }
+     },
+     {
+      "name": "M42",
+      "label": "Hex head bolt grade A & B M42x4.50",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "s": 65.0,
+       "k": 26.0,
+       "dp": 36.47909
+      },
+      "lengths": [
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440"
+      ],
+      "threads": {
+       "160": [
+        "160",
+        "96"
+       ],
+       "440": [
+        "440",
+        "109"
+       ]
+      }
+     },
+     {
+      "name": "M48",
+      "label": "Hex head bolt grade A & B M48x5.00",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "s": 75.0,
+       "k": 30.0,
+       "dp": 41.865655
+      },
+      "lengths": [
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480"
+      ],
+      "threads": {
+       "180": [
+        "180",
+        "108"
+       ],
+       "480": [
+        "480",
+        "121"
+       ]
+      }
+     },
+     {
+      "name": "M56",
+      "label": "Hex head bolt grade A & B M56x5.50",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "s": 85.0,
+       "k": 35.0,
+       "dp": 49.25222
+      },
+      "lengths": [
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480",
+       "500"
+      ],
+      "threads": {
+       "220": [
+        "220",
+        "137"
+       ],
+       "500": [
+        "500",
+        "137"
+       ]
+      }
+     },
+     {
+      "name": "M64",
+      "label": "Hex head bolt grade A & B M64x6.00",
+      "d": 64.0,
+      "dims": {
+       "d": 64.0,
+       "s": 95.0,
+       "k": 40.0,
+       "dp": 56.638786
+      },
+      "lengths": [
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480",
+       "500"
+      ],
+      "threads": {
+       "260": [
+        "260",
+        "153"
+       ],
+       "500": [
+        "500",
+        "153"
+       ]
+      }
+     }
+    ],
+    "source": "ISO 4014:2022 (grade A M1.6-M24 and grade B M16-M27 from the 2022 tables; grade B M30-M64 and grade B values for M1.6-M14 from ISO 4014:2011 - see notes) (Fasteners - Hexagon head bolts - Product grades A and B); https://cdn.standards.iteh.ai/samples/72579/81f2b1e966b440d7a25f6734e508ea48/ISO-4014-2022.pdf (ISO 4014:2022 preview: Tables 1-4 = grade A M1.6-M24, grade B M16-M27; Table 5 (grade B M30-M64) and Annex A (grade B M1.6-M14) not in preview); https://cdn.standards.iteh.ai/samples/56447/63b5e00f45d043e6a27a45ae955b88f9/ISO-4014-2011.pdf (ISO 4014:2011 preview: Table 1 preferred sizes M1.6-M64, grades A and B); https://www.fasteners.eu/standards/ISO/4017/ (ISO 4017 head table incl. non-preferred sizes; head dims identical to ISO 4014); https://www.fasteners.eu/standards/ISO/4014/ (abbreviated); https://fasten.it/Norms/Norm/DIN_EN_ISO_4014 (DIN EN ISO 4014:2011: s, e A/B, ds min A/B, k, b for all sizes); https://cdn.standards.iteh.ai/samples/72580/9c64768295894454832fb8814acc1f52/ISO-4016-2022.pdf (same length rules/b values, used to cross-check b and length ranges for M30-M64)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Socket head screws",
+    "name": "Hex socket head cap screw DIN 912",
+    "shape": "screw",
+    "form": {
+     "head": 3,
+     "drive": 1,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "Hex socket head cap screw M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "dk": 3.0,
+       "k": 1.6,
+       "sd": 1.5,
+       "t": 0.7,
+       "dp": 1.170596
+      },
+      "lengths": [
+       "2.5",
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16"
+      ]
+     },
+     {
+      "name": "M6",
+      "label": "Hex socket head cap screw M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 10.0,
+       "k": 6.0,
+       "sd": 5.0,
+       "t": 3.0,
+       "dp": 4.773131
+      },
+      "lengths": [
+       "10",
+       "12",
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "55",
+       "60"
+      ]
+     },
+     {
+      "name": "M10",
+      "label": "Hex socket head cap screw M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 16.0,
+       "k": 10.0,
+       "sd": 8.0,
+       "t": 5.0,
+       "dp": 8.159696
+      },
+      "lengths": [
+       "16",
+       "20",
+       "25",
+       "30",
+       "35",
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90",
+       "100"
+      ]
+     }
+    ],
+    "source": "DIN 912:1983-12 (withdrawn; earlier editions 1933-10 ... 1979-09) (Hexagon socket head cap screws (Zylinderschrauben mit Innensechskant)); https://bolt.msk.ru/standards/DIN%20EN%20ISO%204762.pdf (DIN EN ISO 4762:2004-06 full text: Tabelle 1 values and length ranges used for M1.6-M64; national foreword lists DIN 912:1983-12 as predecessor and the 2004 s-tolerance change for s=1.5/2); https://www.fasteners.eu/standards/DIN/912/ (local copy /root/skb-scratch/dl/fe/din912.html; identical to its ISO 4762 page https://www.fasteners.eu/standards/ISO/4762/ - all values agree with ISO 4762:2004); https://ferrofast.com/resources/dimensional-standards/din/screws/din-912/ (DIN 912 table incl. M1.4/M18/M22/M27/M33: dk min/max(knurled), k min/max, s min/max, t); https://www.wegertseder.com/Download/techdat/DIN-912-Zylinderschrauben-mit-Innensechskant.pdf and https://www.schrauben-lexikon.de/norm/DIN_912.asp (nominal dk, k, s incl. M1.4, M18, M22, M27, M33); https://www.birkhofer-shop.com/WebRoot/Sage/Shops/BirkhoferVerbindungselemente/MediaGallery/TechData/DIN_912.pdf (nominal dk, k, s, b M1.6-M20 incl. M14, M18); https://www.ottoroth.de/media/docs/download/web_handbuch_din_en_iso.pdf (Otto Roth \"Normenumstellung DIN >>> EN und ISO\" handbook p.31: DIN 912 -> ISO 4762 changes); https://media.wuerth.com/stmedia/wuerth/documents/documents/LANG_de/18902376.pdf (Wuerth Normteile 2018: \"ISO 4762 ersetzt DIN 912. Es besteht Austauschbarkeit - Nennmassbereich geaendert - Feingewinde in ISO 12474 ueberfuehrt\"); https://www.haberkorn.com/kataloge/umstellung-din-auf-iso-uebersicht-verbindungselemente/files/assets/common/downloads/publication.pdf (DIN 912 1983-12 -> ISO 4762, nominal range changed)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Pins",
+    "class": "Parallel pins",
+    "name": "Parallel pin DIN EN ISO 8734",
+    "shape": "pin",
+    "form": {
+     "form": 0
+    },
+    "sizes": [
+     {
+      "name": "1",
+      "label": "Parallel pin 1",
+      "d": 1.0,
+      "dims": {
+       "d": 1.0,
+       "c": 0.2
+      },
+      "lengths": [
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10"
+      ]
+     }
+    ],
+    "source": "ISO 8734:1997 (2nd edition); identical values in DIN EN ISO 8734 (1998-03 and 2019-05 issues, EN ISO 8734:1997) (Parallel pins, of hardened steel and martensitic stainless steel (Dowel pins)); https://www.globalfastener.com/standards/detail_260.html (ISO 8734-1997: d m6 max/min, c); https://www.globalfastener.com/standards/detail_23243.html (DIN EN ISO 8734-2019: same d m6 max/min and c); https://fasten.it/en/Norms/Norm/DIN%20EN%20ISO%208734 (DIN EN ISO 8734 1998: d, c and commercial length matrix); https://www.fasteners.eu/standards/ISO/8734/ (d m6, c, length matrix, length min/max); https://www.opac.net/en/producto-166-iso-8734?lang=en (d m6, c, lengths per diameter, length min/max)"
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Hex head bolts & screws",
+    "name": "Hex head screw grade A & B DIN EN 24017",
+    "shape": "screw",
+    "form": {
+     "head": 1,
+     "drive": 0,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "Hex head screw grade A & B M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "s": 3.2,
+       "k": 1.1,
+       "dp": 1.170596
+      },
+      "lengths": [
+       "2",
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "16"
+      ]
+     }
+    ],
+    "source": "ISO 4017:2022 (all grade A values and grade B M16-M64; grade B values M1.6-M14 (Annex A, not in preview) from ISO 4017:2014/ISO 4014:2011) (Fasteners - Hexagon head screws - Product grades A and B); https://cdn.standards.iteh.ai/samples/72585/1179998ddd594550a909d6e13c416f3e/ISO-4017-2022.pdf (ISO 4017:2022 preview, Tables 1-4 incl. length staircases read from rendered pages - primary); https://cdn.standards.iteh.ai/samples/63206/dd63a69c4be3432aac1914bccda73b2c/ISO-4017-2014.pdf (ISO 4017:2014 preview, Table 1 M1.6-M6 grades A/B); https://www.fasteners.eu/standards/ISO/4017/ (full head table incl. non-preferred sizes, grades A/B - matches); https://fasten.it/Norms/Norm/DIN_EN_ISO_4017 (DIN EN ISO 4017:2014: s, e A/B, k)",
+    "thread": {
+     "rule": "iso"
+    }
+   },
+   {
+    "category": "Nuts",
+    "class": "Hex nuts",
+    "name": "Hex nut style 1 grade A & B DIN EN 24032",
+    "shape": "nut",
+    "form": {
+     "form": 0
+    },
+    "sizes": [
+     {
+      "name": "M1.6",
+      "label": "Hex nut style 1 grade A & B M1.6x0.35",
+      "d": 1.6,
+      "dims": {
+       "d": 1.6,
+       "s": 3.2,
+       "m": 1.3
+      }
+     },
+     {
+      "name": "M2",
+      "label": "Hex nut style 1 grade A & B M2x0.40",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "s": 4.0,
+       "m": 1.6
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "Hex nut style 1 grade A & B M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "s": 5.0,
+       "m": 2.0
+      }
+     },
+     {
+      "name": "M3",
+      "label": "Hex nut style 1 grade A & B M3x0.50",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "s": 5.5,
+       "m": 2.4
+      }
+     },
+     {
+      "name": "M4",
+      "label": "Hex nut style 1 grade A & B M4x0.70",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "s": 7.0,
+       "m": 3.2
+      }
+     },
+     {
+      "name": "M5",
+      "label": "Hex nut style 1 grade A & B M5x0.80",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "s": 8.0,
+       "m": 4.7
+      }
+     },
+     {
+      "name": "M6",
+      "label": "Hex nut style 1 grade A & B M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "s": 10.0,
+       "m": 5.2
+      }
+     },
+     {
+      "name": "M8",
+      "label": "Hex nut style 1 grade A & B M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "s": 13.0,
+       "m": 6.8
+      }
+     },
+     {
+      "name": "M10",
+      "label": "Hex nut style 1 grade A & B M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "s": 16.0,
+       "m": 8.4
+      }
+     },
+     {
+      "name": "M12",
+      "label": "Hex nut style 1 grade A & B M12x1.75",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "s": 18.0,
+       "m": 10.8
+      }
+     },
+     {
+      "name": "M16",
+      "label": "Hex nut style 1 grade A & B M16x2.00",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "s": 24.0,
+       "m": 14.8
+      }
+     },
+     {
+      "name": "M20",
+      "label": "Hex nut style 1 grade A & B M20x2.50",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "s": 30.0,
+       "m": 18.0
+      }
+     },
+     {
+      "name": "M24",
+      "label": "Hex nut style 1 grade A & B M24x3.00",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "s": 36.0,
+       "m": 21.5
+      }
+     },
+     {
+      "name": "M30",
+      "label": "Hex nut style 1 grade A & B M30x3.50",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "s": 46.0,
+       "m": 25.6
+      }
+     },
+     {
+      "name": "M36",
+      "label": "Hex nut style 1 grade A & B M36x4.00",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "s": 55.0,
+       "m": 31.0
+      }
+     },
+     {
+      "name": "M42",
+      "label": "Hex nut style 1 grade A & B M42",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "s": 65.0,
+       "m": 34.0
+      }
+     },
+     {
+      "name": "M48",
+      "label": "Hex nut style 1 grade A & B M48",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "s": 75.0,
+       "m": 38.0
+      }
+     },
+     {
+      "name": "M56",
+      "label": "Hex nut style 1 grade A & B M56",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "s": 85.0,
+       "m": 45.0
+      }
+     },
+     {
+      "name": "M64",
+      "label": "Hex nut style 1 grade A & B M64",
+      "d": 64.0,
+      "dims": {
+       "d": 64.0,
+       "s": 95.0,
+       "m": 51.0
+      }
+     }
+    ],
+    "source": "ISO 4032:2023 (fifth edition, 2023-08); annex sizes from ISO 4032:2012 (Fasteners — Hexagon regular nuts (style 1)); https://cdn.standards.iteh.ai/samples/75016/5b1f83bd2dc44fc199973e9957a75086/ISO-4032-2023.pdf (official ISO preview, Tables 1-2, M5-M39); https://standards.iteh.ai/catalog/standards/iso/1d8f87aa-0388-4a7c-a4a5-802a81b2555a/iso-4032-2023; https://cdn.standards.iteh.ai/samples/61668/93b89b8502a943499386155c44018aaa/ISO-4032-2012.pdf (official ISO 4032:2012 preview, Tables 1-2, used for annex sizes and cross-check); https://www.fasteners.eu/standards/ISO/4032/ (cross-check: matches ISO 4032:2012 values for all 29 sizes)",
+    "params": [
+     {
+      "label": "Bearing face",
+      "options": [
+       "Washer face",
+       "Chamfered"
+      ],
+      "default": "Washer face"
+     }
+    ]
+   }
+  ]
+ }
+]

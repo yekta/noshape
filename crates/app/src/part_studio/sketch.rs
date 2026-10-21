@@ -306,6 +306,17 @@ impl PartStudioView {
         r
     }
 
+    /// The workspace units changed from `old`: the open sketch's unitless
+    /// dimensions keep their size (`quantity_text::pin_sketch_data`).
+    pub(super) fn pin_draft_units(&mut self, old: &noshape_units::UnitPrefs, cx: &mut Context<Self>) {
+        let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) else { return };
+        dialog.update(cx, |d, _| {
+            if let Some(data) = d.sketch_data_mut() {
+                noshape_model::quantity_text::pin_sketch_data(data, old);
+            }
+        });
+    }
+
     fn sketch_data(&self, cx: &App) -> Option<SketchData> {
         self.edit.as_ref().and_then(|e| e.dialog.read(cx).sketch_data().cloned())
     }
@@ -930,11 +941,16 @@ impl PartStudioView {
                 let cid = edit.constraint;
                 // (Clicking the canvas closes the box; the tolerance panel next
                 // to it may take the focus without closing it.)
-                let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
-                    if let InputEvent::PressEnter { .. } = ev {
+                let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+                    InputEvent::PressEnter { .. } => {
                         let text = st.read(cx).value().to_string();
                         this.commit_dimension(cid, &text, window, cx);
                     }
+                    InputEvent::Change if this.ui.dim_invalid => {
+                        this.ui.dim_invalid = false;
+                        cx.notify();
+                    }
+                    _ => {}
                 });
                 state.update(cx, |s, cx| {
                     s.focus(window, cx);
@@ -942,9 +958,37 @@ impl PartStudioView {
                 });
                 self.dim_input = Some((cid, state, sub));
                 self.ui.dim_box_offset = Point::default();
+                self.ui.dim_invalid = false;
             }
             None => self.dim_input = None,
         }
+    }
+
+    /// ↑ / ↓ / wheel in the dimension box (live: like dialog fields, the
+    /// value steps by the workspace unit's step, Shift ×10, Ctrl ×0.1, stays
+    /// selected and the sketch follows; the box stays open). False when the
+    /// text can't step (an expression).
+    fn step_dimension(&mut self, cid: noshape_sketch::ConstraintId, st: &Entity<InputState>, up: bool, mods: crate::quantity_field::StepMods, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        // A configured dimension steps through Enter (it edits the active
+        // configuration's value, see commit_dimension).
+        if self.dimension_configuration(cid, cx).is_some() {
+            return false;
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let vars = self.sketch_variables(cx);
+        let text = st.read(cx).value().to_string();
+        let dim = noshape_units::evaluate(&text, &vars).ok().filter(|q| !q.is_unitless()).map(|q| q.dim).unwrap_or(noshape_units::Dim::LENGTH);
+        let stepping = crate::quantity_field::Stepping { dim, prefs: &units, scope: &vars, integer: false, range: (None, None) };
+        let Some(next) = crate::quantity_field::step_text(&text, up, mods, &stepping) else { return false };
+        st.update(cx, |s, cx| {
+            s.set_value(next.clone(), window, cx);
+            s.select_all(window, cx);
+        });
+        if matches!(self.with_sketch(cx, |ed, data| ed.apply_dimension(data, cid, &next, &units, &vars)), Some(Ok(()))) {
+            self.regen_sync(window, cx);
+        }
+        cx.notify();
+        true
     }
 
     fn commit_dimension(&mut self, cid: noshape_sketch::ConstraintId, text: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -965,6 +1009,21 @@ impl PartStudioView {
             return;
         }
         let vars = self.sketch_variables(cx);
+        // Live (input behaviour, qa4 F6/F7): an unknown `#w` opens the Create
+        // variable popup; other text that doesn't evaluate puts the field in
+        // its invalid state (✓ disabled, the box stays open), no message.
+        let kind = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| c.kind.clone()));
+        let dim = kind.as_ref().map(crate::sketch_mode::dim_unit).unwrap_or(noshape_units::Dim::LENGTH);
+        let typed = text.trim().trim_start_matches('=').trim();
+        if noshape_units::evaluate_as(typed, dim, &units, &vars).is_err() {
+            if let Some(name) = unknown_variable(typed, &vars) {
+                self.open_dim_create_variable(cid, dim, name, window, cx);
+            } else {
+                self.ui.dim_invalid = true;
+            }
+            cx.notify();
+            return;
+        }
         // A configured dimension edits the value of the active configuration.
         if let Some((input, option)) = self.dimension_configuration(cid, cx) {
             let (Some(feature), key, tab, text) = (self.sketch.as_ref().map(|s| s.feature), configured_dim_key(cid), self.tab, text.trim().to_string()) else { return };
@@ -986,6 +1045,7 @@ impl PartStudioView {
         }
         let res = self.with_sketch(cx, |ed, data| {
             let created = ed.dim_edit.as_ref().is_some_and(|d| d.constraint == cid && d.created);
+            // Stored with the workspace unit ("1" → "1 mm", `apply_dimension`).
             let r = ed.apply_dimension(data, cid, text, &units, &vars);
             if r.is_ok() {
                 ed.dim_edit = None;
@@ -1015,6 +1075,17 @@ impl PartStudioView {
             None => {}
         }
         cx.notify();
+    }
+
+    /// The Create variable popup for the dimension box (the Sketch dialog's
+    /// own, drawn next to the box): `name` prefilled, the dimension's value.
+    fn open_dim_create_variable(&mut self, cid: noshape_sketch::ConstraintId, dim: noshape_units::Dim, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let (Some(dialog), Some(state)) = (self.edit.as_ref().map(|e| e.dialog.clone()), self.dim_input.as_ref().filter(|d| d.0 == cid).map(|d| d.1.clone())) else { return };
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let previous = self.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units)).filter(|t| !t.contains('#')).unwrap_or_default();
+        let kind = if dim == noshape_units::Dim::ANGLE { noshape_model::params::NumKind::Angle } else if dim.is_unitless() { noshape_model::params::NumKind::Real } else { noshape_model::params::NumKind::Length };
+        let field = crate::feature_dialog::ExternalField { path: DIM_BOX_FIELD, state, kind: Some(kind), previous, name };
+        dialog.update(cx, |d, cx| d.open_external_create_variable(field, window, cx));
     }
 
     fn open_dim_edit(&mut self, cid: noshape_sketch::ConstraintId, window: &mut Window, cx: &mut Context<Self>) {
@@ -1341,12 +1412,14 @@ impl PartStudioView {
                 }),
         );
         row = row
-            .child(Button::new("sk-text-bold").label("B").ghost().xsmall().selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Bold, cx))))
-            .child(Button::new("sk-text-italic").label("I").ghost().xsmall().selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Italic, cx))));
+            // Live (dom dialog-sketch-text): a 25 px bold "B" and italic "I" in
+            // #1651b0 (33 / 30 x 30 buttons), then the two flip icons (20 px).
+            .child(Button::new("sk-text-bold").child(div().text_size(px(25.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x1651b0)).child("B")).ghost().w(px(33.)).h(px(30.)).selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Bold, cx))))
+            .child(Button::new("sk-text-italic").child(div().text_size(px(25.)).italic().text_color(gpui_kit::rgb(0x1651b0)).child("I")).ghost().w(px(30.)).h(px(30.)).selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Italic, cx))));
         if let Some((fh, fv)) = flips {
             row = row
-                .child(Button::new("sk-text-fliph").label("Flip H").ghost().xsmall().selected(fh).tooltip("Flip about the horizontal center").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipHorizontal, cx))))
-                .child(Button::new("sk-text-flipv").label("Flip V").ghost().xsmall().selected(fv).tooltip("Flip about the vertical center").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipVertical, cx))));
+                .child(Button::new("sk-text-fliph").child(crate::ui::glyph("sketch-flip-horizontal", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fh).tooltip("Flip horizontal").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipHorizontal, cx))))
+                .child(Button::new("sk-text-flipv").child(crate::ui::glyph("sketch-flip-vertical", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fv).tooltip("Flip vertical").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipVertical, cx))));
         }
         let _ = pal;
         row.into_any_element()
@@ -2216,6 +2289,8 @@ impl PartStudioView {
         if self.sketch.is_none() {
             return Vec::new();
         }
+        // Made before `data` borrows `cx` (one dimension edits at a time).
+        let mut var_popup = self.edit.as_ref().map(|e| e.dialog.clone()).and_then(|d| d.update(cx, |d, cx| d.external_create_variable_popup(DIM_BOX_FIELD, cx)));
         let Some(data) = self.sketch_data(cx) else { return Vec::new() };
         let units = self.doc.read(cx).session.doc.settings.units;
         let mut out = Vec::new();
@@ -2398,6 +2473,18 @@ impl PartStudioView {
                 && *ec == cid
             {
                 let allowed = data.sketch.constraint(cid).is_some_and(|c| crate::sketch_mode::tolerance_allowed(&c.kind));
+                let dim_invalid = self.ui.dim_invalid;
+                // The Create variable popup for an unknown `#name`, level with
+                // the box and right of it (left of it when the graphics area
+                // ends first). It is drawn 107 px right of its anchor (as next
+                // to a dialog field).
+                if let Some(popup) = var_popup.take() {
+                    let off = self.ui.dim_box_offset;
+                    let box_left = x - 104.0 + f32::from(off.x);
+                    let room = self.viewport.read(cx).size().x as f32 - (box_left + 209.0);
+                    let popup_left = if room >= 228.0 { box_left + 213.0 } else { box_left - 224.0 };
+                    out.push(div().absolute().left(px(popup_left - 107.0)).top(px(y - 17.0) + off.y).child(popup).into_any_element());
+                }
                 out.push(
                     // Onshape's dimension box (live DOM): a 13 px drag strip
                     // with "◻◻◻" over a 209 x 34 white panel (1 px `#ccc`,
@@ -2405,11 +2492,55 @@ impl PartStudioView {
                     // underlined value field, the ± toggle and 22 px ✓ / ✗.
                     // The box is centered on the label position (live sketch/12-13).
                     v_flex()
+                        .id("dim-box")
                         .absolute()
                         .left(px(x - 104.0) + self.ui.dim_box_offset.x)
                         .top(px(y - 30.0) + self.ui.dim_box_offset.y)
                         .w(px(209.))
                         .occlude()
+                        // ↑ / ↓ (Shift ×10, Ctrl ×0.1) and the wheel step the value.
+                        .capture_key_down(cx.listener({
+                            let st = st.clone();
+                            move |this, e: &KeyDownEvent, window, cx| {
+                                let k = &e.keystroke;
+                                // Esc closes the box (live: a reopened dimension
+                                // keeps its value, a new one stays with its
+                                // measured value) and the sketch gets the keys
+                                // back (qa4 F29: after an invalid value the
+                                // field's own Esc kept them).
+                                if k.key == "escape" && !k.modifiers.modified() {
+                                    cx.stop_propagation();
+                                    this.ui.dim_invalid = false;
+                                    this.sketch_cancel(cx);
+                                    window.focus(&this.focus, cx);
+                                    cx.notify();
+                                    return;
+                                }
+                                if (k.key == "up" || k.key == "down") && !k.modifiers.alt {
+                                    let mods = crate::quantity_field::StepMods { shift: k.modifiers.shift, ctrl: k.modifiers.control || k.modifiers.platform };
+                                    if this.step_dimension(cid, &st, k.key == "up", mods, window, cx) {
+                                        cx.stop_propagation();
+                                    }
+                                }
+                            }
+                        }))
+                        .on_scroll_wheel(cx.listener({
+                            let st = st.clone();
+                            move |this, e: &ScrollWheelEvent, window, cx| {
+                                if !st.read(cx).focus_handle(cx).is_focused(window) {
+                                    return;
+                                }
+                                let dy = match e.delta {
+                                    ScrollDelta::Lines(l) => l.y,
+                                    ScrollDelta::Pixels(p) => f32::from(p.y),
+                                };
+                                if dy.abs() > 1e-6 {
+                                    let mods = crate::quantity_field::StepMods { shift: e.modifiers.shift, ctrl: e.modifiers.control || e.modifiers.platform };
+                                    this.step_dimension(cid, &st, dy > 0., mods, window, cx);
+                                    cx.stop_propagation();
+                                }
+                            }
+                        }))
                         .child(
                             // `.dimension-dialog-drag { cursor: move }`: dragging it moves the box.
                             div()
@@ -2446,15 +2577,17 @@ impl PartStudioView {
                                 .border_color(rgb(0xcccccc))
                                 .shadow_md()
                                 .child(div().w(px(20.)).flex().justify_center().child(crate::ui::glyph("ui-chevron-right", 12., rgb(0xd7d7d7))))
-                                .child(gpui_kit::base::input::input_frame(
+                                .child(gpui_kit::base::input::input_frame(crate::quantity_field::invalid_field(
                                     div()
+                                        .id("sk-dim-field")
                                         .w(px(100.))
                                         .h(px(24.))
                                         .border_b_1()
                                         .border_color(pal.accent)
                                         // Live sketch/141: right-aligned, ~13.33 px, ending 7 px from the field's edge.
                                         .child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).h(px(24.))),
-                                ))
+                                    dim_invalid,
+                                )))
                                 .child(
                                     div()
                                         .id("sk-dim-tol")
@@ -2488,9 +2621,10 @@ impl PartStudioView {
                                         .items_center()
                                         .justify_center()
                                         .rounded(px(4.))
-                                        .bg(pal.accept)
+                                        // Live: pale green (disabled) while the field is invalid.
+                                        .bg(if dim_invalid { rgb(0xcce9cc) } else { pal.accept })
                                         .cursor_pointer()
-                                        .hover(|d| d.bg(rgb(0x74ce3a)))
+                                        .when(!dim_invalid, |d| d.hover(|d| d.bg(rgb(0x74ce3a))))
                                         .child(Icon::new(gpui_kit::component::IconName::Check).with_size(px(16.)).text_color(rgb(0xffffff)))
                                         .on_click(cx.listener({
                                             let st = st.clone();
@@ -2562,7 +2696,7 @@ impl PartStudioView {
                     .text_size(px(16.))
                     .text_color(fg)
                     .whitespace_nowrap()
-                    .child(text)
+                    .children(dim_label_parts(text))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         if let Some(ed) = &mut this.sketch {
                             let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
@@ -3022,61 +3156,69 @@ impl PartStudioView {
             .child(action_btn("sk-extrude", "extrude", "Extrude (Shift+E)", Box::new(Extrude), cx))
             .child(action_btn("sk-revolve", "revolve", "Revolve (Shift+W)", Box::new(Revolve), cx))
             .child(sep());
-        // Live (sketch/420-421): when the tools don't fit, the drawing tools
-        // (with Use, Intersection, Construction), the edit tools and the
-        // constraints collapse into "Line ▾", "Sketch fillet ▾" and
-        // "Coincident ▾"; Dimension stays.
-        let (cell, caret) = (crate::ui::TOOL_CELL + 2., crate::ui::TOOL_CARET_W);
-        let groups_w = |gs: &[&[Tool]]| gs.iter().map(|g| cell + if g.len() > 1 { caret } else { 0. }).sum::<f32>();
-        let full = 4. * cell + 5. * 4. + groups_w(DRAW_TOOLS) + groups_w(USE_TOOLS) + cell + groups_w(EDIT_TOOLS) + groups_w(INSERT_TOOLS) + cell + CONSTRAINT_TOOLS.len() as f32 * cell;
-        if full > viewport_w - crate::ui::RAIL_W - 4. - 172. {
+        // Live's toolbar fit (see `toolbar_collapse_from`): the tool sets
+        // collapse from the right as the window narrows, Constraints first
+        // ("Coincident ▾"), then Modify ("Sketch fillet ▾", with Insert), then
+        // Draw ("Line ▾", with Use, Intersection and Construction); Dimension
+        // has a single tool. Onshape's widths (expanded / collapsed): Draw
+        // 470 / 56, Modify 298 / 56, Dimension 38, Constraints 480 / 56, after
+        // Undo / Redo 70 and Extrude / Revolve 72 (that set collapses only
+        // under 568 px), plus "Search tools…" 173 and 7; room = window − 40.
+        let sets: [(f32, f32); 4] = [(470., 56.), (298., 56.), (38., 38.), (480., 56.)];
+        let fixed = 70. + 72. + 173. + 7.;
+        let k = (0..=sets.len())
+            .rev()
+            .find(|&k| fixed + sets[..k].iter().map(|w| w.0).sum::<f32>() + sets[k..].iter().map(|w| w.1).sum::<f32>() <= viewport_w - 40.)
+            .unwrap_or(0);
+        if k == 0 {
             let draw: Vec<Tool> = DRAW_TOOLS.iter().chain(USE_TOOLS).flat_map(|g| g.iter().copied()).collect();
-            let edit: Vec<Tool> = EDIT_TOOLS.iter().chain(INSERT_TOOLS).flat_map(|g| g.iter().copied()).collect();
-            let cons: Vec<Tool> = CONSTRAINT_TOOLS.iter().map(|c| Tool::Constraint(*c)).collect();
-            for (members, construction_item) in [(draw, true), (edit, false)] {
-                bar = self.collapsed_sketch_group(bar, members, construction_item, active, cx).child(sep());
+            bar = self.collapsed_sketch_group(bar, draw, true, active, cx);
+        } else {
+            for g in DRAW_TOOLS {
+                bar = group(bar, g, cx);
             }
-            bar = bar.child(tool_btn(Tool::Dimension, cx)).child(sep());
-            bar = self.collapsed_sketch_group(bar, cons, false, active, cx);
-            return crate::ui::toolbar()
-                .child(bar)
-                .child(crate::ui::search_tools_toggle("sk-search", self.palette.is_some()).ml(px(10.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_palette(window, cx))))
-                .into_any_element();
+            for g in USE_TOOLS {
+                bar = group(bar, g, cx);
+            }
+            bar = bar.child(crate::ui::with_tool_tooltip(
+                "sk-construction-tt",
+                "Construction (Q)",
+                crate::ui::tool_button("sk-construction", "construction", construction, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_construction(window, cx))),
+            ));
         }
-        for g in DRAW_TOOLS {
-            bar = group(bar, g, cx);
-        }
-        for g in USE_TOOLS {
-            bar = group(bar, g, cx);
-        }
-        bar = bar.child(crate::ui::with_tool_tooltip(
-            "sk-construction-tt",
-            "Construction (Q)",
-            crate::ui::tool_button("sk-construction", "construction", construction, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_construction(window, cx))),
-        ));
         bar = bar.child(sep());
-        for g in EDIT_TOOLS {
-            bar = group(bar, g, cx);
-        }
-        for g in INSERT_TOOLS {
-            bar = group(bar, g, cx);
+        if k <= 1 {
+            let edit: Vec<Tool> = EDIT_TOOLS.iter().chain(INSERT_TOOLS).flat_map(|g| g.iter().copied()).collect();
+            bar = self.collapsed_sketch_group(bar, edit, false, active, cx);
+        } else {
+            for g in EDIT_TOOLS {
+                bar = group(bar, g, cx);
+            }
+            for g in INSERT_TOOLS {
+                bar = group(bar, g, cx);
+            }
         }
         bar = bar.child(sep()).child(tool_btn(Tool::Dimension, cx)).child(sep());
-        for c in CONSTRAINT_TOOLS {
-            let tool = Tool::Constraint(*c);
-            let enabled = selection.is_empty() || data.as_ref().is_some_and(|d| crate::sketch_mode::constraint_applicable(&d.sketch, *c, &selection));
-            // Not applicable to the selection: Onshape dims the tool to 40%.
-            bar = bar.child(crate::ui::with_tool_tooltip(
-                SharedString::from(format!("skt-{tool:?}")),
-                tool.label(),
-                crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx)
-                    .opacity(if enabled { 1.0 } else { 0.4 })
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                        if enabled {
-                            this.activate_tool(tool, window, cx);
-                        }
-                    })),
-            ));
+        if k <= 3 {
+            let cons: Vec<Tool> = CONSTRAINT_TOOLS.iter().map(|c| Tool::Constraint(*c)).collect();
+            bar = self.collapsed_sketch_group(bar, cons, false, active, cx);
+        } else {
+            for c in CONSTRAINT_TOOLS {
+                let tool = Tool::Constraint(*c);
+                let enabled = selection.is_empty() || data.as_ref().is_some_and(|d| crate::sketch_mode::constraint_applicable(&d.sketch, *c, &selection));
+                // Not applicable to the selection: Onshape dims the tool to 40%.
+                bar = bar.child(crate::ui::with_tool_tooltip(
+                    SharedString::from(format!("skt-{tool:?}")),
+                    tool.label(),
+                    crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx)
+                        .opacity(if enabled { 1.0 } else { 0.4 })
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            if enabled {
+                                this.activate_tool(tool, window, cx);
+                            }
+                        })),
+                ));
+            }
         }
         // Onshape has no "Finish" button in the toolbar: the sketch dialog's
         // green check (or Enter) closes the sketch.
@@ -3470,57 +3612,53 @@ impl PartStudioView {
                 cx.notify();
                 cx.stop_propagation();
             }))
-            // Enter accepts a pattern / transform / offset being set up before
-            // it would accept the whole sketch.
             .capture_action(cx.listener(|this, _: &Accept, window, cx| {
+                use crate::sketch_mode::EnterTarget as E;
                 let Some(ed) = this.sketch.as_ref() else { return };
-                if ed.text_dialog_open() {
-                    this.accept_sketch_text(window, cx);
-                    cx.stop_propagation();
-                } else if ed.slot_pending() {
-                    if let Some(out) = this.with_sketch(cx, |ed, data| ed.commit_slot(data)) {
-                        this.apply_outcome(out, window, cx);
-                    }
-                    cx.stop_propagation();
-                } else if ed.corner_pending() {
-                    if let Some(out) = this.with_sketch(cx, |ed, data| ed.commit_corner(data)) {
-                        this.apply_outcome(out, window, cx);
-                    }
-                    // Enter opens the radius value box (live sketch/115).
-                    this.sync_dim_edit(window, cx);
-                    cx.stop_propagation();
-                } else if ed.polygon_sides_pending() {
-                    if let Some(out) = this.with_sketch(cx, |ed, data| ed.finish_polygon(data)) {
-                        this.apply_outcome(out, window, cx);
-                    }
-                    cx.stop_propagation();
-                } else if ed.tool.is_pattern() && !ed.selection.is_empty() {
-                    this.apply_pattern(window, cx);
-                    cx.stop_propagation();
-                } else if ed.offset_pending.is_some() {
-                    if let Some(out) = this.with_sketch(cx, |ed, data| ed.commit_offset(data)) {
-                        this.apply_outcome(out, window, cx);
-                    }
-                    this.sync_offset_input(window, cx);
-                    cx.stop_propagation();
-                } else if ed.otf.is_some() {
-                    // Live Onshape: Enter while drawing places the boxed
-                    // value as a driving dimension; the tool keeps going.
-                    match this.with_sketch(cx, |ed, data| ed.accept_otf(data)) {
-                        Some(Err(e)) => {
-                            if let Some(ed) = &mut this.sketch { ed.message = Some(e); }
+                // Live: Enter commits the step being set up and never accepts
+                // the sketch (`SketchEditor::enter_target`).
+                cx.stop_propagation();
+                match ed.enter_target() {
+                    E::Text => this.accept_sketch_text(window, cx),
+                    E::Slot => {
+                        if let Some(out) = this.with_sketch(cx, |ed, data| ed.commit_slot(data)) {
+                            this.apply_outcome(out, window, cx);
                         }
-                        Some(Ok(true)) => this.regen_sync(window, cx),
-                        _ => {}
                     }
-                    this.close_otf_input();
-                    this.refresh_scene(false, cx);
-                    cx.notify();
-                    cx.stop_propagation();
-                } else {
-                    // Live Onshape: Enter with nothing pending does nothing,
-                    // with or without a tool (the sketch stays open, sketch/311).
-                    cx.stop_propagation();
+                    E::Corner => {
+                        if let Some(out) = this.with_sketch(cx, |ed, data| ed.commit_corner(data)) {
+                            this.apply_outcome(out, window, cx);
+                        }
+                        // Enter opens the radius value box (live sketch/115).
+                        this.sync_dim_edit(window, cx);
+                    }
+                    E::PolygonSides => {
+                        if let Some(out) = this.with_sketch(cx, |ed, data| ed.finish_polygon(data)) {
+                            this.apply_outcome(out, window, cx);
+                        }
+                    }
+                    E::Pattern => this.apply_pattern(window, cx),
+                    E::Offset => {
+                        if let Some(out) = this.with_sketch(cx, |ed, data| ed.commit_offset(data)) {
+                            this.apply_outcome(out, window, cx);
+                        }
+                        this.sync_offset_input(window, cx);
+                    }
+                    E::OnTheFly => {
+                        // Live Onshape: Enter while drawing places the boxed
+                        // value as a driving dimension; the tool keeps going.
+                        match this.with_sketch(cx, |ed, data| ed.accept_otf(data)) {
+                            Some(Err(e)) => {
+                                if let Some(ed) = &mut this.sketch { ed.message = Some(e); }
+                            }
+                            Some(Ok(true)) => this.regen_sync(window, cx),
+                            _ => {}
+                        }
+                        this.close_otf_input();
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    }
+                    E::Nothing => {}
                 }
             }))
             // Esc in a sketch cancels the tool / chain / selection, never the
@@ -3626,4 +3764,36 @@ impl Render for DimBoxGhost {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div()
     }
+}
+
+/// A dimension label's text with its expression marker drawn as Onshape
+/// does (live sketch/992): a variable's grey italic "ƒx", an expression's
+/// italic "ƒ", left of the number.
+fn dim_label_parts(text: String) -> Vec<AnyElement> {
+    let marker = |t: &'static str, color: u32| div().italic().mr(px(4.)).text_color(rgb(color)).child(t).into_any_element();
+    if let Some(rest) = text.strip_prefix(crate::sketch_mode::VARIABLE_MARK) {
+        vec![marker("ƒx", 0x9a9a9a), rest.to_string().into_any_element()]
+    } else if let Some(rest) = text.strip_prefix(crate::sketch_mode::EXPRESSION_MARK) {
+        vec![marker("ƒ", 0x555555), rest.to_string().into_any_element()]
+    } else {
+        vec![text.into_any_element()]
+    }
+}
+
+/// The dimension box's path for the Sketch dialog's Create variable popup.
+const DIM_BOX_FIELD: &str = "__sketch_dimension";
+
+/// The first `#name` in `text` that isn't a known variable.
+fn unknown_variable(text: &str, vars: &std::collections::BTreeMap<String, noshape_units::Quantity>) -> Option<String> {
+    let mut rest = text;
+    while let Some(i) = rest.find('#') {
+        let after = &rest[i + 1..];
+        let end = after.find(|c: char| !(c.is_alphanumeric() || c == '_')).unwrap_or(after.len());
+        let name = &after[..end];
+        if noshape_model::variable_table::is_identifier(name) && !vars.contains_key(name) {
+            return Some(name.to_string());
+        }
+        rest = &after[end..];
+    }
+    None
 }

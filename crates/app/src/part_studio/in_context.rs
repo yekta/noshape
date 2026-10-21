@@ -721,7 +721,6 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .tooltip(crate::ui::tooltip("Accept (Enter)"))
                                 .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_insert_go(cx))),
                         )
@@ -734,7 +733,6 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.close_insert_go(cx);

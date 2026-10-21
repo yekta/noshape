@@ -509,7 +509,7 @@ impl BomCell {
 /// Mass of one part of a row ("No material" without a material).
 fn mass_text(result: &AssemblyResult, line: &BomLine, props: Option<&PartProperties>) -> String {
     if let Some(m) = props.and_then(|p| p.mass_override) {
-        return format!("{m:.3} kg");
+        return format!("{} kg", noshape_units::to_fixed(m, 3));
     }
     let Some(density) = props.and_then(|p| p.material.as_ref().and(p.density)) else { return NO_VALUE.into() };
     let Some(path) = line.instances.first() else { return String::new() };
@@ -520,7 +520,7 @@ fn mass_text(result: &AssemblyResult, line: &BomLine, props: Option<&PartPropert
     let Some(o) = result.occurrences.iter().find(|o| &o.path == path && &o.body == body) else { return String::new() };
     let d = |_: &BodyId| Some(density);
     match crate::regen::measure::mass_properties(&o.context, std::slice::from_ref(&o.body), &d).and_then(|m| m.mass) {
-        Some(m) => format!("{m:.3} kg"),
+        Some(m) => format!("{} kg", noshape_units::to_fixed(m, 3)),
         None => String::new(),
     }
 }

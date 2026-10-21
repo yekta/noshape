@@ -74,7 +74,7 @@ impl AssemblyView {
 
     fn kinds_menu(view: Entity<Self>, at: Point<Pixels>, anchor: Anchor, window: &mut Window, cx: &mut App) {
         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-            for (label, icon, kind) in [("List", "table", "List"), ("Checkbox", "checkbox-input", "Checkbox"), ("Configuration variable", "variable", "Variable")] {
+            for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                 let v = view.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_asm_config_input(kind, cx))));
             }
@@ -276,7 +276,7 @@ impl AssemblyView {
             .gap(px(6.))
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::assets::icon("table", 20., cx))
+            .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Configure Assembly"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)));
         let caret = div()
@@ -290,7 +290,7 @@ impl AssemblyView {
             .border_color(border)
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+            .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
             .on_click(move |e: &ClickEvent, window, cx| Self::kinds_menu(view.clone(), e.position(), Anchor::TopLeft, window, cx));
         let link = |id: &'static str, t: &'static str| {
             div()
@@ -888,7 +888,7 @@ impl AssemblyView {
             .gap(px(6.))
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::assets::icon("table", 16., cx))
+            .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Add configuration input"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)));
         let caret = div()
@@ -988,7 +988,7 @@ impl AssemblyView {
                     .into_any_element(),
                 None => div().flex_1().into_any_element(),
             };
-            let kinds = [("table", "list"), ("checkbox-input", "checkbox"), ("variable", "configuration variable")];
+            let kinds = [("cfg-filter-list", "list"), ("cfg-filter-checkbox", "checkbox"), ("cfg-filter-variable", "configuration variable")];
             let mut row = h_flex().h(px(34.)).gap(px(6.)).px(px(4.)).child(crate::ui::glyph("filter", 16., pal.text)).child(filter_el);
             for (k, (icon, what)) in kinds.into_iter().enumerate() {
                 let only = self.ui.cfg_only_kinds[k];
@@ -1143,7 +1143,7 @@ impl AssemblyView {
                     .border_color(border)
                     .cursor_pointer()
                     .hover(|d| d.bg(pal.panel_hover))
-                    .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+                    .child(crate::ui::glyph("ui-dropdown-arrow", 10., gpui_kit::rgb(0x666666)))
                     .on_click(move |e: &ClickEvent, window, cx| Self::kinds_menu(view.clone(), e.position(), Anchor::TopLeft, window, cx)),
             );
         let mut col = v_flex()

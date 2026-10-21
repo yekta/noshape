@@ -192,6 +192,7 @@ impl AssemblyView {
             v_flex()
                 .id("aintf-dialog")
                 .occlude()
+                .child(crate::ui::panel_probe("asm-interference"))
                 .w(px(220.))
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
@@ -214,7 +215,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .opacity(0.5)
                                 .cursor_pointer()
-                                .tooltip(crate::ui::tooltip("Close (Esc)"))
                                 .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CLOSE, 20., pal.text))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_interference(cx))),
                         ),

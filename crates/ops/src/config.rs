@@ -33,7 +33,10 @@ pub fn add_input(ps: &mut PartStudio, label: &str) -> String {
             default: "Default".into(),
         },
     };
-    let name = if label == "List" && n == 1 { "Configuration".to_string() } else { format!("{label} {n}") };
+    // Live: a List is "Configuration" while no input has that name (also
+    // after a configuration variable, qa5 C1).
+    let free = !ps.configuration.inputs.iter().any(|i| i.name == "Configuration");
+    let name = if label == "List" && free { "Configuration".to_string() } else { format!("{label} {n}") };
     // FeatureScript ids from the names (Edit FeatureScript IDs… shows them).
     let id = fs_identifier(&name, &taken);
     ps.configuration.inputs.push(ConfigInput { id: id.clone(), name, kind, visible_when: None, excluded: false });
@@ -230,4 +233,20 @@ pub fn current(ps: &PartStudio, chosen: &noshape_model::configuration::ConfigVal
         }
     }
     v
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// qa5 C1: the first List is "Configuration", also after a variable input.
+    #[test]
+    fn a_new_list_is_named_configuration() {
+        let mut ps = PartStudio::new();
+        add_variable_input(&mut ps, "d", "LENGTH", "10 mm", None);
+        let id = add_input(&mut ps, "List");
+        assert_eq!(ps.configuration.inputs.iter().find(|i| i.id == id).unwrap().name, "Configuration");
+        let id2 = add_input(&mut ps, "List");
+        assert_eq!(ps.configuration.inputs.iter().find(|i| i.id == id2).unwrap().name, "List 3");
+    }
 }

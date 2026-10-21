@@ -80,6 +80,10 @@ struct DialogState {
     document: Option<std::path::PathBuf>,
     version: Option<String>,
     error: Option<String>,
+    /// Configured studios: the configuration box open, and the values picked
+    /// in it (help config-insert-vs-01).
+    config_open: HashSet<(Option<std::path::PathBuf>, TabId)>,
+    config_values: std::collections::HashMap<(Option<std::path::PathBuf>, TabId), noshape_model::configuration::ConfigValues>,
 }
 
 /// .noshape documents besides `current`: recently opened, the documents
@@ -142,12 +146,12 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
         InsertTarget::Studio(t) if external.is_none() => Some(t),
         _ => None,
     };
-    let studios: Vec<(TabId, String, Vec<String>)> = src
+    let studios: Vec<(TabId, String, Vec<String>, vars::VsConfiguration)> = src
         .ordered_tabs()
         .into_iter()
         .filter(|t| Some(t.id) != own)
         .filter_map(|t| match &t.content {
-            TabContent::VariableStudio(v) => Some((t.id, t.name.clone(), v.variables.iter().map(|x| x.name.clone()).filter(|n| !n.is_empty()).collect())),
+            TabContent::VariableStudio(v) => Some((t.id, t.name.clone(), v.variables.iter().map(|x| x.name.clone()).filter(|n| !n.is_empty()).collect(), v.configuration.clone())),
             _ => None,
         })
         .collect();
@@ -157,11 +161,12 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
         return;
     }
     let path = external.as_ref().map(|e| e.path.clone());
-    for (id, name, names) in studios {
+    for (id, name, names, cfg) in studios {
         let cur = current_ref(current, target, id, &external);
         let whole = cur.as_ref().is_some_and(|r| r.variables.is_none());
         let key = (path.clone(), id);
         let open = state.borrow().expanded.contains(&key);
+        let cfg_key = key.clone();
         let (doc1, st, ext1) = (doc.clone(), state.clone(), external.clone());
         rows.push(
             h_flex()
@@ -193,12 +198,63 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                 .child(crate::assets::icon("variable-studio", 20., cx))
                 .child(div().flex_1().truncate().child(name))
                 .when(whole, |d| d.child(crate::ui::glyph("check", 14., pal.accent)))
+                // A configured studio: [▦ ▾] opens its configuration box.
+                .when(!cfg.is_empty(), |d| {
+                    let (st, key) = (state.clone(), cfg_key.clone());
+                    d.child(
+                        h_flex()
+                            .id(SharedString::from(format!("ivs-cfg-{id}")))
+                            .h(px(26.))
+                            .rounded(px(3.))
+                            .border_1()
+                            .border_color(rgb(0xaaaaaa))
+                            .bg(gpui_kit::white())
+                            .child(div().id(SharedString::from(format!("ivs-cfg-open-{id}"))).px(px(5.)).h_full().flex().items_center().child(crate::assets::icon("configuration", 18., cx)).on_click({
+                                let (st, key) = (st.clone(), key.clone());
+                                move |_, window, cx| {
+                                    cx.stop_propagation();
+                                    let mut s = st.borrow_mut();
+                                    if !s.config_open.remove(&key) {
+                                        s.config_open.insert(key.clone());
+                                    }
+                                    window.refresh();
+                                }
+                            }))
+                            // Live vs-926: Set to last viewed / Reset to default.
+                            .child(div().id(SharedString::from(format!("ivs-cfg-more-{id}"))).w(px(20.)).h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(crate::ui::glyph("drawing-tool-caret", 12., pal.text)).on_click({
+                                let (st, key, last) = (st.clone(), key.clone(), cfg.active.clone());
+                                move |e: &ClickEvent, window, cx| {
+                                    cx.stop_propagation();
+                                    let (st1, st2, k1, k2, last) = (st.clone(), st.clone(), key.clone(), key.clone(), last.clone());
+                                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                                        let (st1, st2, k1, k2, last) = (st1.clone(), st2.clone(), k1.clone(), k2.clone(), last.clone());
+                                        m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").on_click(move |_, window, _| {
+                                            let mut s = st1.borrow_mut();
+                                            s.config_values.insert(k1.clone(), last.clone());
+                                            s.config_open.insert(k1.clone());
+                                            window.refresh();
+                                        }))
+                                        .item(crate::os_menu::OsMenuItem::new("Reset to default").on_click(move |_, window, _| {
+                                            let mut s = st2.borrow_mut();
+                                            s.config_values.remove(&k2);
+                                            s.config_open.insert(k2.clone());
+                                            window.refresh();
+                                        }))
+                                    });
+                                    crate::os_menu::open(e.position(), menu, window, cx);
+                                }
+                            })),
+                    )
+                })
                 .on_click(move |_, window, cx| {
-                    set_ref(&doc1, target, id, if whole { None } else { Some(StudioRef { studio: id, variables: None, external: ext1.clone() }) }, cx);
+                    set_ref(&doc1, target, id, if whole { None } else { Some(StudioRef { studio: id, variables: None, external: ext1.clone(), config: Default::default() }) }, cx);
                     window.refresh();
                 })
                 .into_any_element(),
         );
+        if state.borrow().config_open.contains(&cfg_key) {
+            rows.push(config_box(ctx, id, &cfg_key, &cfg, external.clone()));
+        }
         if open {
             for n in &names {
                 let picked = cur.as_ref().is_some_and(|r| r.variables.as_ref().is_none_or(|v| v.contains(n)));
@@ -232,7 +288,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                                 }
                                 None => vec![n2.clone()],
                             };
-                            let next = (!list.is_empty()).then(|| StudioRef { studio: id, variables: Some(list), external: ext2.clone() });
+                            let next = (!list.is_empty()).then(|| StudioRef { studio: id, variables: Some(list), external: ext2.clone(), config: Default::default() });
                             set_ref(&doc2, target, id, next, cx);
                             window.refresh();
                         })
@@ -241,6 +297,101 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
             }
         }
     }
+}
+
+/// A configured studio's inputs in the dialog (help config-insert-vs-01):
+/// a select per list, a checkbox per checkbox, the value of a configuration
+/// variable, then [Generate], which inserts the studio in that configuration.
+fn config_box(ctx: &Rows, id: TabId, key: &(Option<std::path::PathBuf>, TabId), cfg: &vars::VsConfiguration, external: Option<vars::ExternalStudio>) -> AnyElement {
+    use noshape_model::configuration::ConfigInputKind;
+    let pal = p();
+    let (doc, target, state) = (ctx.doc.clone(), ctx.target, ctx.state.clone());
+    let values = state.borrow().config_values.get(key).cloned().unwrap_or_default();
+    let mut col = v_flex().pl(px(46.)).pr(px(10.)).pb(px(8.)).gap(px(4.)).text_size(px(13.33)).text_color(pal.text);
+    for input in &cfg.inputs {
+        let chosen = cfg.value_of(&values, &input.id).unwrap_or_default();
+        let (st, k, iid) = (state.clone(), key.clone(), input.id.clone());
+        let row: AnyElement = match &input.kind {
+            ConfigInputKind::List { options, .. } => {
+                let label = options.iter().find(|o| o.id == chosen).map(|o| o.name.clone()).unwrap_or_default();
+                let opts = options.clone();
+                h_flex()
+                    .id(SharedString::from(format!("ivs-in-{id}-{}", input.id)))
+                    .h(px(28.))
+                    .gap(px(6.))
+                    .child(div().flex_none().text_color(pal.text_muted).child(input.name.clone()))
+                    .child(
+                        h_flex()
+                            .flex_1()
+                            .h(px(26.))
+                            .border_b_1()
+                            .border_color(rgb(0xcccccc))
+                            .cursor_pointer()
+                            .child(div().flex_1().text_size(px(14.)).child(label))
+                            .child(crate::ui::glyph("ui-caret-down", 10., pal.text)),
+                    )
+                    .on_click(move |e: &ClickEvent, window, cx| {
+                        let (st, k, iid, opts) = (st.clone(), k.clone(), iid.clone(), opts.clone());
+                        let chosen = chosen.clone();
+                        let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                            m = m.select_list(200.);
+                            for o in &opts {
+                                let (st, k, iid, oid) = (st.clone(), k.clone(), iid.clone(), o.id.clone());
+                                m = m.item(crate::os_menu::OsMenuItem::new(o.name.clone()).checked(o.id == chosen).on_click(move |_, window, _| {
+                                    st.borrow_mut().config_values.entry(k.clone()).or_default().0.insert(iid.clone(), oid.clone());
+                                    window.refresh();
+                                }));
+                            }
+                            m
+                        });
+                        crate::os_menu::open(e.position(), menu, window, cx);
+                    })
+                    .into_any_element()
+            }
+            ConfigInputKind::Checkbox { .. } => {
+                let on = chosen == "true";
+                os::checkbox(SharedString::from(format!("ivs-in-{id}-{}", input.id)), input.name.clone(), on)
+                    .on_click(move |_, window, _| {
+                        st.borrow_mut().config_values.entry(k.clone()).or_default().0.insert(iid.clone(), (!on).to_string());
+                        window.refresh();
+                    })
+                    .into_any_element()
+            }
+            _ => h_flex().h(px(28.)).child(div().flex_1().text_color(pal.text_muted).child(input.name.clone())).child(chosen).into_any_element(),
+        };
+        col = col.child(row);
+    }
+    let k = key.clone();
+    // Disabled until an input changes (live vs-925).
+    let changed = state.borrow().config_values.get(key).is_some_and(|v| !v.is_empty());
+    col.child(
+        div().pt(px(4.)).child(
+            div()
+                .id(SharedString::from(format!("ivs-generate-{id}")))
+                .when(!changed, |d| d.opacity(0.5))
+                .h(px(30.))
+                .px(px(10.))
+                .flex()
+                .items_center()
+                .rounded(px(3.))
+                .border_1()
+                .border_color(rgb(0xaaaaaa))
+                .bg(gpui_kit::white())
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.panel_hover))
+                .text_size(px(14.))
+                .child("Generate")
+                .on_click(move |_, window, cx| {
+                    if !changed {
+                        return;
+                    }
+                    let config = state.borrow().config_values.get(&k).cloned().unwrap_or_default();
+                    set_ref(&doc, target, id, Some(StudioRef { studio: id, variables: None, external: external.clone(), config }), cx);
+                    window.refresh();
+                }),
+        ),
+    )
+    .into_any_element()
 }
 
 /// Open the dialog for `target`.

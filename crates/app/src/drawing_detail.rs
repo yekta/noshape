@@ -15,7 +15,7 @@ use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{DrawingView, ViewId, views};
+use noshape_model::drawing::{ViewId, views};
 
 /// Detail view dialog state.
 pub struct DetailDlg {
@@ -49,7 +49,7 @@ impl DrawingEditor {
         match (self.detail_dlg.is_some(), active) {
             (false, true) => {
                 let next = self.current_sheet().next_label();
-                let label = cx.new(|cx| InputState::new(window, cx).default_value(next));
+                let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(next));
                 self.detail_dlg = Some(DetailDlg { shape: 0, pts: Vec::new(), view: None, profile: None, scale: None, label, style: self.drawing.props.view_tab.detail_style, show_profile: self.drawing.props.view_tab.detail_show_profile, clip_border: self.drawing.props.view_tab.detail_clip_border, pick_region: false });
             }
             (true, false) => self.detail_dlg = None,
@@ -57,21 +57,6 @@ impl DrawingEditor {
         }
         if let Some(d) = &self.detail_dlg {
             self.detail_label = d.label.read(cx).value().trim().to_string();
-        }
-    }
-
-    /// The dialog's settings on the new detail view.
-    pub fn apply_detail_options(&self, v: &mut DrawingView, parent_scale: f64) {
-        let Some(d) = &self.detail_dlg else { return };
-        v.scale = Some(d.scale.unwrap_or(parent_scale * 2.0));
-        v.detail_profile = d.profile.clone();
-        v.detail_style = d.style;
-        v.detail_hide_profile = !d.show_profile;
-        v.detail_clip_border = d.clip_border;
-        if !self.detail_label.is_empty()
-            && let noshape_model::drawing::ViewKind::Detail { label, .. } = &mut v.kind
-        {
-            *label = self.detail_label.clone();
         }
     }
 

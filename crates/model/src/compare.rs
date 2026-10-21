@@ -250,6 +250,19 @@ pub struct FeatureCompare {
     pub type_id: String,
     pub status: Option<ChangeKind>,
     pub params: Vec<ParamCompare>,
+    /// The feature sits elsewhere in the other side's list (live mv-900…903):
+    /// it gets a row at each place, this one showing only one side.
+    pub moved: Option<Moved>,
+}
+
+/// A moved feature's row: the side it shows, and the way it moved.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Moved {
+    /// The row at the base position (the base side shown), else the row at
+    /// the target position.
+    pub at_base: bool,
+    /// It comes later in the target than in the base.
+    pub down: bool,
 }
 
 /// A selection as the dialog's query box names it ("Edge of Extrude 1").
@@ -344,11 +357,36 @@ pub fn compare_features(base: &PartStudio, target: &PartStudio) -> Vec<FeatureCo
             (Some(x), Some(y)) if x != y => Some(ChangeKind::Modified),
             _ => None,
         };
-        FeatureCompare { id: f.id, name: f.name.clone(), type_id: f.type_id.clone(), status, params }
+        FeatureCompare { id: f.id, name: f.name.clone(), type_id: f.type_id.clone(), status, params, moved: None }
     };
-    let mut out: Vec<FeatureCompare> = base.features.iter().map(|f| row(Some(f), target.feature(f.id))).collect();
+    // Features on both sides out of the longest common order moved (one of
+    // two swapped features, as live).
+    let common_b: Vec<_> = base.features.iter().map(|f| f.id).filter(|id| target.feature(*id).is_some()).collect();
+    let common_t: Vec<_> = target.features.iter().map(|f| f.id).filter(|id| base.feature(*id).is_some()).collect();
+    let kept = lcs_ids(&common_b, &common_t);
+    let moved = |id: crate::reference::FeatureId| !kept.contains(&id);
+    let pos = |list: &[crate::reference::FeatureId], id| list.iter().position(|x| *x == id).unwrap_or(0);
+    let mut out: Vec<FeatureCompare> = base
+        .features
+        .iter()
+        .map(|f| {
+            let mut r = row(Some(f), target.feature(f.id));
+            if target.feature(f.id).is_some() && moved(f.id) {
+                r.moved = Some(Moved { at_base: true, down: pos(&common_t, f.id) > pos(&common_b, f.id) });
+            }
+            r
+        })
+        .collect();
     for (k, f) in target.features.iter().enumerate() {
-        if base.feature(f.id).is_some() {
+        if let Some(b) = base.feature(f.id) {
+            // A moved feature's second row, after the feature it follows in
+            // the target.
+            if moved(f.id) {
+                let mut r = row(Some(b), Some(f));
+                r.moved = Some(Moved { at_base: false, down: pos(&common_t, f.id) > pos(&common_b, f.id) });
+                let after = target.features[..k].iter().rev().find_map(|p| out.iter().position(|x| x.id == p.id && x.moved.is_none_or(|m| !m.at_base)));
+                out.insert(after.map_or(0, |i| i + 1), r);
+            }
             continue;
         }
         let after = target.features[..k].iter().rev().find_map(|p| out.iter().position(|r| r.id == p.id));
@@ -357,10 +395,145 @@ pub fn compare_features(base: &PartStudio, target: &PartStudio) -> Vec<FeatureCo
     out
 }
 
+/// The ids of the longest common subsequence of `a` and `b`.
+fn lcs_ids(a: &[crate::reference::FeatureId], b: &[crate::reference::FeatureId]) -> Vec<crate::reference::FeatureId> {
+    let (n, m) = (a.len(), b.len());
+    let mut t = vec![0u32; (n + 1) * (m + 1)];
+    let at = |i: usize, j: usize| i * (m + 1) + j;
+    for i in (0..n).rev() {
+        for j in (0..m).rev() {
+            t[at(i, j)] = if a[i] == b[j] { t[at(i + 1, j + 1)] + 1 } else { t[at(i + 1, j)].max(t[at(i, j + 1)]) };
+        }
+    }
+    let (mut i, mut j, mut out) = (0, 0, Vec::new());
+    while i < n && j < m {
+        if a[i] == b[j] {
+            out.push(a[i]);
+            i += 1;
+            j += 1;
+        } else if t[at(i + 1, j)] >= t[at(i, j + 1)] {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+    out
+}
+
+/// One row of a side-by-side code compare (Onshape's Feature Studio
+/// compare, help fs-compare-01): a base line, a target line, or both.
+/// A side that is None is drawn as a hatched filler.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CodeRow {
+    /// (1-based line number, text) on each side.
+    pub base: Option<(usize, String)>,
+    pub target: Option<(usize, String)>,
+    /// `Some`: the row differs (base deleted / target added); the byte
+    /// range inside each line that changed (empty for a whole-line change).
+    pub changed: Option<(std::ops::Range<usize>, std::ops::Range<usize>)>,
+}
+
+/// Line-by-line compare of two sources: equal lines side by side, a run
+/// of deleted lines paired with the run of added lines that replaces it
+/// (the char range that differs marked on each side), the longer run's
+/// extra lines facing a filler.
+pub fn compare_code(base: &str, target: &str) -> Vec<CodeRow> {
+    let a: Vec<&str> = base.lines().collect();
+    let b: Vec<&str> = target.lines().collect();
+    // Common head and tail first: the LCS table only spans the middle.
+    let head = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
+    let tail = a[head..].iter().rev().zip(b[head..].iter().rev()).take_while(|(x, y)| x == y).count();
+    let (am, bm) = (&a[head..a.len() - tail], &b[head..b.len() - tail]);
+    let (n, m) = (am.len(), bm.len());
+    // lcs[i][j] = LCS length of am[i..], bm[j..].
+    let mut lcs = vec![0u32; (n + 1) * (m + 1)];
+    let at = |i: usize, j: usize| i * (m + 1) + j;
+    for i in (0..n).rev() {
+        for j in (0..m).rev() {
+            lcs[at(i, j)] = if am[i] == bm[j] { lcs[at(i + 1, j + 1)] + 1 } else { lcs[at(i + 1, j)].max(lcs[at(i, j + 1)]) };
+        }
+    }
+    let mut rows = Vec::with_capacity(a.len().max(b.len()));
+    let same = |rows: &mut Vec<CodeRow>, i: usize, j: usize| rows.push(CodeRow { base: Some((i + 1, a[i].to_string())), target: Some((j + 1, b[j].to_string())), changed: None });
+    for k in 0..head {
+        same(&mut rows, k, k);
+    }
+    let (mut i, mut j) = (0, 0);
+    let (mut dels, mut adds): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
+    let flush = |rows: &mut Vec<CodeRow>, dels: &mut Vec<usize>, adds: &mut Vec<usize>| {
+        for k in 0..dels.len().max(adds.len()) {
+            let l = dels.get(k).map(|&x| (x + 1, a[x].to_string()));
+            let r = adds.get(k).map(|&y| (y + 1, b[y].to_string()));
+            let changed = match (&l, &r) {
+                (Some((_, x)), Some((_, y))) => inline_change(x, y),
+                _ => (0..0, 0..0),
+            };
+            rows.push(CodeRow { base: l, target: r, changed: Some(changed) });
+        }
+        dels.clear();
+        adds.clear();
+    };
+    while i < n || j < m {
+        if i < n && j < m && am[i] == bm[j] {
+            flush(&mut rows, &mut dels, &mut adds);
+            same(&mut rows, head + i, head + j);
+            i += 1;
+            j += 1;
+        } else if j < m && (i == n || lcs[at(i, j + 1)] >= lcs[at(i + 1, j)]) {
+            adds.push(head + j);
+            j += 1;
+        } else {
+            dels.push(head + i);
+            i += 1;
+        }
+    }
+    flush(&mut rows, &mut dels, &mut adds);
+    for k in 0..tail {
+        same(&mut rows, a.len() - tail + k, b.len() - tail + k);
+    }
+    rows
+}
+
+/// The byte ranges of `x` and `y` between their common prefix and suffix
+/// (whole characters).
+fn inline_change(x: &str, y: &str) -> (std::ops::Range<usize>, std::ops::Range<usize>) {
+    let pre: usize = x.chars().zip(y.chars()).take_while(|(p, q)| p == q).map(|(p, _)| p.len_utf8()).sum();
+    let suf: usize = x[pre..].chars().rev().zip(y[pre..].chars().rev()).take_while(|(p, q)| p == q).map(|(p, _)| p.len_utf8()).sum();
+    (pre..x.len() - suf, pre..y.len() - suf)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use noshape_units::{ExprValue, UnitPrefs};
+
+    #[test]
+    fn code_side_by_side() {
+        let base = "a\nb\n  \"Slot path\"\nc\nd\ne";
+        let target = "a\n  \"Another slot path\"\nc\nx\ny\ne";
+        let rows = compare_code(base, target);
+        fn side(r: &CodeRow) -> (Option<&str>, Option<&str>) {
+            (r.base.as_ref().map(|b| b.1.as_str()), r.target.as_ref().map(|t| t.1.as_str()))
+        }
+        let got: Vec<_> = rows.iter().map(side).collect();
+        assert_eq!(
+            got,
+            vec![
+                (Some("a"), Some("a")),
+                (Some("b"), Some("  \"Another slot path\"")),
+                (Some("  \"Slot path\""), None),
+                (Some("c"), Some("c")),
+                (Some("d"), Some("x")),
+                (None, Some("y")),
+                (Some("e"), Some("e")),
+            ]
+        );
+        assert!(rows[0].changed.is_none() && rows[2].changed.is_some());
+        // Paired lines mark only what differs ("S" | "Another s").
+        let (l, r) = inline_change("  \"Slot path\"", "  \"Another slot path\"");
+        assert_eq!((&"  \"Slot path\""[l], &"  \"Another slot path\""[r]), ("S", "Another s"));
+        assert!(compare_code("same\n", "same\n").iter().all(|r| r.changed.is_none()));
+    }
 
     #[test]
     fn studio_feature_diff() {
@@ -406,6 +579,26 @@ mod tests {
         // Suppression shows as its own row.
         assert!(ex.params.iter().any(|p| p.label == "Suppressed" && !p.differs()));
         assert!(rows.iter().filter(|r| r.type_id != "extrude" && r.type_id != "chamfer").all(|r| r.status.is_none()));
+    }
+
+    #[test]
+    fn moved_features_get_two_rows() {
+        let base = crate::demo::demo_document();
+        let mut target = base.clone();
+        let tab = target.tabs.iter().position(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap();
+        let TabContent::PartStudio(ps) = &mut target.tabs[tab].content else { unreachable!() };
+        let n = ps.features.len();
+        assert!(n >= 3);
+        // The last feature moves to the front.
+        let f = ps.features.remove(n - 1);
+        ps.features.insert(0, f);
+        let (TabContent::PartStudio(a), TabContent::PartStudio(b)) = (&base.tabs[tab].content, &target.tabs[tab].content) else { unreachable!() };
+        let rows = compare_features(a, b);
+        let moved: Vec<_> = rows.iter().filter_map(|r| r.moved.map(|m| (r.id, m))).collect();
+        assert_eq!(moved.len(), 2, "{moved:?}");
+        assert_eq!(moved[0].0, moved[1].0);
+        // The target-position row first (front), then the base-position one (end).
+        assert!(!moved[0].1.at_base && moved[1].1.at_base && !moved[1].1.down);
     }
 
     #[test]

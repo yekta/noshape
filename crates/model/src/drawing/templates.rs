@@ -82,7 +82,8 @@ pub fn default_fields(style: TitleBlockStyle, inches: bool) -> Vec<(String, Stri
             // and the three TITLE lines are property fields shown as "----"
             // until set; MATERIAL starts blank.
             ("Drawn by", "{user.name}"),
-            ("Drawn date", "{date}"),
+            // Live CR12 data: ANSI dates read 10/20/2026, ISO 2026-10-20.
+            ("Drawn date", if style == TitleBlockStyle::Ansi { "{date|m/d/yyyy}" } else { "{date}" }),
             ("Checked by", ""),
             ("Checked date", ""),
             ("Approved by", "{release.approver}"),

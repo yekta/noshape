@@ -110,7 +110,9 @@ impl SheetPick<'_> {
             Tool::HoleCallout { circle: Some((view, center, radius, r)) } => Some(ann(AnnotationKind::HoleCallout { view: *view, center: *center, radius: *radius }, vec![(0, r.clone())])),
             Tool::Balloon { anchor: Some(a) } => {
                 // In assembly views a callout on a part shows its BOM item (empty text = linked).
-                let linked = views::view_source(self.current_sheet(), a.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly) && a.r.is_some();
+                // A click on an edge away from its snap points: that edge's part.
+                let part = if a.r.is_none() { self.part_near(a.view, a.p) } else { None };
+                let linked = views::view_source(self.current_sheet(), a.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly) && (a.r.is_some() || part.is_some());
                 // The Callout dialog's texts and border (empty centre = the
                 // BOM item number).
                 let (text, style) = v.callout.clone().unwrap_or_default();
@@ -119,6 +121,7 @@ impl SheetPick<'_> {
                 if let AnnotationKind::Balloon { callout, .. } = &mut kind {
                     *callout = style;
                     callout.on_face = linked;
+                    callout.part = part;
                 }
                 Some(ann(kind, vec![(0, a.r.clone())]))
             }

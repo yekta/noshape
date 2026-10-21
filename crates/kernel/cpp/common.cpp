@@ -18,6 +18,7 @@
 #include <Geom2d_BSplineCurve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <Precision.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepTools.hxx>
@@ -414,6 +415,27 @@ uint64_t shape_hash(const OcShape& s)
   return static_cast<uint64_t>(std::hash<TopoDS_Shape>{}(s.shape));
 }
 
+uint64_t shape_partner_hash(const OcShape& s)
+{
+  return s.shape.IsNull() ? 0 : static_cast<uint64_t>(reinterpret_cast<uintptr_t>(s.shape.TShape().get()));
+}
+
+rust::Vec<double> shape_location(const OcShape& s)
+{
+  const gp_Trsf     t = s.shape.Location().Transformation();
+  rust::Vec<double> m;
+  m.reserve(12);
+  for (int r = 1; r <= 3; ++r)
+    for (int c = 1; c <= 4; ++c)
+      m.push_back(t.Value(r, c));
+  return m;
+}
+
+std::unique_ptr<OcShape> shape_unlocated(const OcShape& s)
+{
+  return wrap(s.shape.Located(TopLoc_Location()));
+}
+
 bool shape_is_same(const OcShape& a, const OcShape& b) { return a.shape.IsSame(b.shape); }
 bool shape_is_equal(const OcShape& a, const OcShape& b) { return a.shape.IsEqual(b.shape); }
 bool shape_is_partner(const OcShape& a, const OcShape& b) { return a.shape.IsPartner(b.shape); }
@@ -554,7 +576,9 @@ double mesh_volume(const TopoDS_Shape& shape)
   Bnd_Box      b;
   BRepBndLib::Add(s, b);
   const double size = b.IsVoid() ? 1.0 : std::sqrt(b.SquareExtent());
-  BRepMesh_IncrementalMesh mesh(s, size * 2e-5, false, 0.05);
+  // BRepMesh rejects deflections at or under Precision::Confusion() (parts
+  // under ~5 mm across, e.g. miniature screws).
+  BRepMesh_IncrementalMesh mesh(s, std::max(size * 2e-5, 10.0 * Precision::Confusion()), false, 0.05);
   double v = 0;
   for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
   {

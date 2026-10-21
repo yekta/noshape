@@ -78,13 +78,13 @@ const ISO: [(&str, &str, SheetSize); 5] = [("ISO_A0.dwt", "ISO A0", SheetSize::A
 pub fn template_rows() -> Vec<TemplateRow> {
     let ansi = ANSI.iter().map(|&(file, name, size, inches)| TemplateRow {
         file,
-        document: "Onshape ANSI Drawing Templates",
+        document: "noshape ANSI Drawing Templates",
         standard: "ANSI",
         template: DrawingTemplate::standard(name, size, TitleBlockStyle::Ansi, inches, Projection::ThirdAngle),
     });
     let iso = ISO.iter().map(|&(file, name, size)| TemplateRow {
         file,
-        document: "Onshape ISO Drawing Templates",
+        document: "noshape ISO Drawing Templates",
         standard: "ISO",
         template: DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::FirstAngle),
     });
@@ -92,7 +92,7 @@ pub fn template_rows() -> Vec<TemplateRow> {
 }
 
 /// Template sources of the Existing templates tab (label, icon).
-const SOURCES: [(&str, &str); 6] = [("Onshape", "noshape-logo"), ("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
+const SOURCES: [(&str, &str); 6] = [("noshape", "noshape-logo"), ("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
 
 pub enum CreateDrawingEvent {
     Create { name: String, template: DrawingTemplate, source: Option<DrawingSource>, suggested: bool },
@@ -103,7 +103,7 @@ pub struct CreateDrawingDialog {
     source: Option<DrawingSource>,
     name: Entity<InputState>,
     rows: Vec<TemplateRow>,
-    /// Template source (index into [`SOURCES`]; 0 = Onshape).
+    /// Template source (index into [`SOURCES`]; 0 = the built-in templates, "noshape").
     source_filter: usize,
     /// Standard filter: "All", "ANSI", "ISO", "JIS".
     standard: &'static str,
@@ -230,13 +230,14 @@ impl CustomTemplate {
 }
 
 impl CreateDrawingDialog {
-    /// `metric`: the document works in millimeters (ISO_A3 preselected,
-    /// else ANSI_A_INCH, Onshape's first row). `default_name`: the name
+    /// `metric`: the document works in millimeters (the Custom template's
+    /// units; the list preselects ANSI_A_INCH, Onshape's first row). `default_name`: the name
     /// Onshape suggests ("Part 1 Drawing 1", or "Drawing 1" without a source).
     pub fn new(req: CreateRequest, default_name: String, metric: bool, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name = cx.new(|cx| InputState::new(window, cx).default_value(default_name));
         let rows = template_rows();
-        let selected = rows.iter().position(|r| r.file == if metric { "ISO_A3.dwt" } else { "ANSI_A_INCH.dwt" }).unwrap_or(0);
+        // Live drawing/01, qa5 D1: ANSI_A_INCH.dwt whatever the units.
+        let selected = rows.iter().position(|r| r.file == "ANSI_A_INCH.dwt").unwrap_or(0);
         Self {
             source: req.source,
             name,
@@ -571,7 +572,8 @@ impl Render for CreateDrawingDialog {
                 .when(on, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::SEMIBOLD).text_color(pal.accent))
                 .when(!on, |d| d.border_1().border_color(gpui_kit::rgb(0xcccccc)))
                 .when(!enabled, |d| d.opacity(0.5))
-                .child(crate::assets::icon(&crate::assets::icon_path(icon), 40., cx))
+                // Live drawing/01: the 55x40 tile art is drawn at 1.2x (66 px), centred on a square canvas.
+                .child(div().mb(px(-3.)).child(crate::assets::icon(&crate::assets::icon_path(icon), 66., cx)))
                 .child(label)
                 .when(enabled, |d| {
                     d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

@@ -321,7 +321,7 @@ impl PartStudioView {
             .border_color(gpui_kit::rgb(GRID))
             .cursor_pointer()
             .hover(|d| d.bg(pal.panel_hover))
-            .child(crate::assets::icon("featurescript-table", 20., cx))
+            .child(crate::assets::icon("add-custom-table", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Add custom tables"))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_add_tables(window, cx)))
             .into_any_element()
@@ -329,7 +329,7 @@ impl PartStudioView {
 
     /// Open the flyout (live: on Other documents).
     fn open_add_tables(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search tables"));
+        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search tables"));
         let path = self.doc.read(cx).session.path.clone();
         let current = doc_at(&path);
         self.ui.ct.add = Some(AddState { other: true, graph: false, current, category: None, doc: None, search, collapsed: HashSet::new() });

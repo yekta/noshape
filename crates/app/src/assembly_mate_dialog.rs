@@ -608,7 +608,10 @@ impl Render for MateDialog {
             _ => vec![self.query_box("mate-q-mc", "Mate connectors", &[0, 1], cx)],
         };
         // Live dialog-mate-revolute: flip-direction-opposite, realign-mate-dialog.
-        let (flip_icon, reorient_icon) = (crate::assets::icon("flip-direction-opposite", 20., cx), crate::assets::icon("realign-mate-dialog", 20., cx));
+        // Live (dom/dialog-mate-fastened-empty / -filled): the flip is a
+        // boolean icon parameter shown by its icon, never pressed:
+        // flip-direction while Onshape's flip flag is off, -opposite when on.
+        let (flip_icon, reorient_icon) = (crate::assets::icon(flip_icon_name(self.flip_primary), 20., cx), crate::assets::icon("realign-mate-dialog", 20., cx));
         let small_tool = |id: &'static str, icon: AnyElement, tip: &'static str, on: bool| {
             div()
                 .id(id)
@@ -656,7 +659,6 @@ impl Render for MateDialog {
                             .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
                             .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
-                            .tooltip(crate::ui::tooltip("Accept (Enter)"))
                             .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Accept))),
                     ))
@@ -669,7 +671,6 @@ impl Render for MateDialog {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                             .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Cancel))),
                     ),
@@ -713,7 +714,7 @@ impl Render for MateDialog {
                             .h(px(30.))
                             .px(px(3.))
                             .gap(px(4.))
-                            .child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", !self.flip_primary).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx))))
+                            .child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx))))
                             .child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.reorient = (this.reorient + 1) % 4;
                                 cx.emit(MateDialogEvent::Changed);
@@ -789,4 +790,10 @@ impl Render for MateDialog {
                     .when_some(self.status.clone(), |d, s| d.child(div().p(px(4.)).child(crate::ui::alert(crate::ui::AlertKind::Warning).text_size(px(12.)).child(s)))),
             )
     }
+}
+
+/// The Flip primary axis icon for a mate's alignment (`flip_primary`: the
+/// connectors' Z axes agree, which is Onshape's flip flag off).
+pub(crate) fn flip_icon_name(flip_primary: bool) -> &'static str {
+    if flip_primary { "flip-direction" } else { "flip-direction-opposite" }
 }

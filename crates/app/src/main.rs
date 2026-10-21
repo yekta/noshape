@@ -1,8 +1,12 @@
 //! noshape: a fast, fully local, parametric CAD application.
 // Release builds on Windows are GUI apps (no console window).
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+// `cargo test`/`clippy --all-targets` hit "recursion limit reached while expanding
+// `#[test]`" at the default of 128.
+#![recursion_limit = "256"]
 
 mod actions;
+mod fs_profile;
 mod std_source;
 mod assembly_mate_dialog;
 mod assembly_scene;
@@ -26,6 +30,7 @@ mod drawing_drawprops;
 mod drawing_insert;
 mod drawing_keys;
 mod drawing_sketch_dim;
+mod drawing_label;
 mod drawing_mbd;
 mod drawing_extra;
 mod drawing_more;
@@ -40,12 +45,15 @@ mod drawing_hatch;
 mod drawing_images;
 mod drawing_break;
 mod drawing_aux;
+mod drawing_crop;
 mod drawing_detail;
 mod drawing_revision;
 mod drawing_view_sketches;
 mod drawing_hide_parts;
 mod drawing_note;
+mod drawing_cell_panel;
 mod drawing_cells;
+mod drawing_note_color;
 mod drawing_refs;
 mod drawing_color;
 mod drawing_callout;
@@ -91,9 +99,11 @@ mod gpu;
 mod graphics_prefs;
 mod graphics_prefs_dialog;
 mod history_panel;
+mod compare_graphics;
 mod compare_mode;
 mod workspace_protection;
 mod repair_mode;
+mod merge_dialog;
 mod version_properties;
 mod units_prefs;
 mod doc_panels;
@@ -102,11 +112,13 @@ mod mouse_prefs;
 mod drawing_prefs;
 mod navigation;
 mod os_menu;
+mod overlay_labels;
 mod os_select;
 mod os_ui;
 mod part_studio;
 mod preferences_window;
 mod properties_dialog;
+mod quantity_field;
 mod release_dialog;
 mod scene_builder;
 mod session;
@@ -116,6 +128,7 @@ mod start_search;
 mod start_thumbnail;
 mod start_trash;
 mod shortcuts;
+mod smoke;
 mod start_window;
 mod tab_manager;
 mod tab_thumbs;
@@ -139,6 +152,22 @@ use std::path::PathBuf;
 /// closest open match. Bundled so every platform renders the same.
 const UI_FONT: &str = "Roboto";
 
+/// The app's version: the release workflow stamps the tag's (`NOSHAPE_VERSION`,
+/// "0.4.3"; "0.0.0-<sha>" for untagged runs), else the crate's.
+pub(crate) const VERSION: &str = match option_env!("NOSHAPE_VERSION") {
+    Some(v) => v,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
+/// The build as the documents page shows it, Onshape's "version.commit"
+/// ("0.4.4.c8d74e607a47"; the version alone outside a git checkout).
+pub(crate) fn build_label() -> String {
+    match option_env!("NOSHAPE_COMMIT") {
+        Some(c) => format!("{VERSION}.{c}"),
+        None => VERSION.to_string(),
+    }
+}
+
 fn load_fonts(cx: &mut App) {
     let fonts: Vec<std::borrow::Cow<'static, [u8]>> = vec![
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-Regular.ttf")),
@@ -148,6 +177,9 @@ fn load_fonts(cx: &mut App) {
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-Italic.ttf")),
         // Placeholders (Onshape: `input::placeholder { font-style: italic; font-weight: 300 }`).
         std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Roboto-LightItalic.ttf")),
+        // Measure values (Onshape's `.measurement-value`: Inconsolata 14 px / 600).
+        std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Inconsolata-Regular.ttf")),
+        std::borrow::Cow::Borrowed(include_bytes!("../assets/fonts/Inconsolata-Bold.ttf")),
     ];
     if let Err(e) = cx.text_system().add_fonts(fonts) {
         log::warn!("could not load the UI font: {e:#}");

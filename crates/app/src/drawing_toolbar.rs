@@ -1,13 +1,17 @@
 //! Drawing editor toolbar (live DOM toolbar-drawing.txt, in its order):
 //! Undo, Redo | Update | views | dimensions | symbols | notes and tables |
-//! centerlines | sketch | constraints | inserts | inspection. As in
-//! Onshape's narrow window (behaviours.md "Narrow window: toolbar collapse",
-//! part-studio/220–221): when the tools don't fit, every category collapses
-//! into one split tool (its first tool's icon + ▾ listing the whole
-//! category); there is no overflow button.
+//! centerlines | sketch | constraints | inserts | inspection. Narrow
+//! windows (live behaviours.md "Drawing toolbar breakpoints",
+//! dom/drawing-toolbar-thresholds.json): three fixed layouts by the
+//! toolbar's width (the window minus 46 px), not a fit: Full from 1707,
+//! Medium from 1373 (Dimension, the centerlines and Line…Sketch point fold
+//! into split tools), else Compact (the view, dimension, symbol, note and
+//! centerline categories fold too, side by side without separators, and
+//! the inserts); no overflow button.
 
 use crate::drawing_sketch::{SkCon, SkTool};
 use crate::drawing_view::*;
+use gpui_kit::component::button::Button;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::views;
@@ -24,6 +28,22 @@ pub struct TbTool {
     pub more: Option<(&'static str, Vec<MenuEntry>)>,
     /// Greyed (opacity 0.3) and not clickable.
     pub disabled: bool,
+}
+
+/// Live drawing toolbar (dom/drawing-toolbar-widths.json, 1920 px): 30 px
+/// buttons 2 px apart; a split tool is 1 px in, then its 30 px face, a 12 px
+/// caret and 2 px after it; a separator puts 18 px between two buttons.
+const CELL: f32 = 30.;
+const CARET_W: f32 = 12.;
+const SEP_W: f32 = 14.;
+
+fn sep() -> Div {
+    div().flex_none().w(px(SEP_W)).flex().justify_center().child(crate::ui::tool_separator())
+}
+
+/// [`crate::ui::tool_group`] at the drawing's sizes.
+fn split(name: SharedString, main: Button, caret: Button) -> Div {
+    crate::ui::tool_group(name, main.w(px(CELL)).h(px(CELL)), caret.w(px(CARET_W)).h(px(CELL))).ml(px(1.)).mr(px(2.))
 }
 
 fn tb(id: &'static str, icon: &'static str, tip: &'static str, active: bool, run: impl Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>) + 'static) -> TbTool {
@@ -44,25 +64,21 @@ impl TbTool {
         self
     }
 
-    fn width(&self) -> f32 {
-        crate::ui::TOOL_CELL + if self.more.is_some() { crate::ui::TOOL_CARET_W } else { 0. }
-    }
-
     fn render(self, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> AnyElement {
         if self.disabled {
             let b = match self.more {
-                None => crate::ui::tool_button(self.id, self.icon, false, cx).tooltip(self.tip).into_any_element(),
-                Some((caret, _)) => crate::ui::tool_group(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, false, cx).tooltip(self.tip), crate::ui::tool_caret(caret, cx).tooltip(self.tip)).into_any_element(),
+                None => crate::ui::tool_button(self.id, self.icon, false, cx).w(px(CELL)).h(px(CELL)).tooltip(self.tip).into_any_element(),
+                Some((caret, _)) => split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, false, cx).tooltip(self.tip), crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip)).into_any_element(),
             };
             return div().opacity(0.3).child(b).into_any_element();
         }
         let run = self.run.clone();
         let click = cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx));
         match self.more {
-            None => crate::ui::tool_button(self.id, self.icon, self.active, cx).tooltip(self.tip).on_click(click).into_any_element(),
+            None => crate::ui::tool_button(self.id, self.icon, self.active, cx).w(px(CELL)).h(px(CELL)).tooltip(self.tip).on_click(click).into_any_element(),
             Some((caret, items)) => {
                 let ed = ed.clone();
-                crate::ui::tool_group(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).tooltip(self.tip).on_click(click), crate::ui::tool_caret(caret, cx).tooltip(self.tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx))).into_any_element()
+                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).tooltip(self.tip).on_click(click), crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx))).into_any_element()
             }
         }
     }
@@ -97,15 +113,15 @@ fn collapsed(gi: usize, group: Vec<TbTool>, ed: &Entity<DrawingEditor>, cx: &mut
     let mut seen = std::collections::HashSet::new();
     let items: Vec<MenuEntry> = group.iter().filter(|t| !t.disabled).flat_map(|t| t.menu_rows()).filter(|m| !matches!(m, MenuEntry::Item { label, .. } if !seen.insert(label.clone()))).collect();
     if all_disabled {
-        return Some(div().opacity(0.3).child(crate::ui::tool_group(SharedString::from(format!("drg-c{gi}")), crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, false, cx).tooltip(tip), crate::ui::tool_caret(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip))).into_any_element());
+        return Some(div().opacity(0.3).child(split(SharedString::from(format!("drg-c{gi}")), crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, false, cx).tooltip(tip), crate::ui::tool_caret_blue(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip))).into_any_element());
     }
     let run = run?;
     let ed = ed.clone();
     Some(
-        crate::ui::tool_group(
+        split(
             SharedString::from(format!("drg-c{gi}")),
             crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, active, cx).tooltip(tip).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx))),
-            crate::ui::tool_caret(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)),
+            crate::ui::tool_caret_blue(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)),
         )
         .into_any_element(),
     )
@@ -123,26 +139,15 @@ impl DrawingEditor {
             MenuEntry::item("Dimension (d)", dim(DimTool::Linear)).with_icon("linear-dim"),
             MenuEntry::item("Chamfer dimension", dim(DimTool::Chamfer)).with_icon("chamfer-dim"),
             MenuEntry::item("Maximum or minimum dimension (ctrl+m)", dim(DimTool::MaxMin)).with_icon("driven-dimension"),
-            MenuEntry::item("2 point linear dimension", dim(DimTool::Point2)).with_icon("linear-dim"),
-            MenuEntry::item("Point to line dimension", dim(DimTool::PointLine)).with_icon("linear-dim"),
-            MenuEntry::item("Line to line dimension", dim(DimTool::LineLine)).with_icon("linear-dim"),
+            MenuEntry::item("2 point linear dimension", dim(DimTool::Point2)).with_icon("dim-point-to-point"),
+            MenuEntry::item("Point to line dimension", dim(DimTool::PointLine)).with_icon("dim-point-to-line"),
+            MenuEntry::item("Line to line dimension", dim(DimTool::LineLine)).with_icon("dim-line-to-line"),
             MenuEntry::item("Line to line angular dimension", dim(DimTool::Angle)).with_icon("angular-dim"),
-            MenuEntry::item("3 point angular dimension", dim(DimTool::Angle3)).with_icon("angular-dim"),
+            MenuEntry::item("3 point angular dimension", dim(DimTool::Angle3)).with_icon("dim-angular-3pt"),
             MenuEntry::item("Arc length dimension", dim(DimTool::ArcLength)).with_icon("arc-length-dim"),
             MenuEntry::item("Radial dimension (shift+r)", dim(DimTool::Radius)).with_icon("radial-dim"),
             MenuEntry::item("Diameter dimension (shift+d)", dim(DimTool::Diameter)).with_icon("diameter-dim"),
-            MenuEntry::item("Foreshorten dimension (shift+h)", dim(DimTool::Foreshorten)).with_icon("linear-dim"),
-        ];
-        let views_menu = vec![
-            MenuEntry::item("Jogged section view", |e, _, cx| e.set_tool(Tool::JoggedSection { parent: None, points: vec![], done: false }, cx)),
-            MenuEntry::item("Aligned section view", |e, _, cx| e.set_tool(Tool::AlignedSection { parent: None, center: None, a: None, b: None }, cx)),
-            MenuEntry::item("Partial section view", |e, _, cx| e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: true }, cx)),
-            MenuEntry::item("Broken-out section", |e, _, cx| e.set_tool(Tool::BrokenOut { parent: None, points: vec![], done: false }, cx)),
-            MenuEntry::Separator,
-            MenuEntry::item("Crop view (rectangle)", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: false }, cx)),
-            MenuEntry::item("Crop view (circle)", |e, _, cx| e.set_tool(Tool::Crop { parent: None, first: None, circle: true }, cx)),
-            MenuEntry::item("Crop view (polygon)", |e, _, cx| e.set_tool(Tool::CropPoly { parent: None, points: vec![], spline: false }, cx)),
-            MenuEntry::item("Crop view (spline)", |e, _, cx| e.set_tool(Tool::CropPoly { parent: None, points: vec![], spline: true }, cx)),
+            MenuEntry::item("Foreshorten dimension (shift+h)", dim(DimTool::Foreshorten)).with_icon("dim-foreshorten"),
         ];
         let table = |kind: TableTool| move || Tool::Table { kind, view: None, origin: None };
         let is_table = |k: TableTool| matches!(t, Tool::Table { kind, .. } if kind == k);
@@ -153,12 +158,16 @@ impl DrawingEditor {
                 tb("dr-insert", "base-view", "Insert view", matches!(t, Tool::InsertView { .. }) || self.insert.chooser.is_some(), |e, _, cx| e.open_insert_chooser(cx)),
                 tool("dr-proj", "projected-view", "Projected view (p)", matches!(t, Tool::Projected { .. }), || Tool::Projected { parent: None }),
                 tool("dr-aux", "auxiliary-view", "Auxiliary view", matches!(t, Tool::Auxiliary { .. }), || Tool::Auxiliary { parent: None }),
-                tool("dr-sect", "section-view", "Section view", matches!(t, Tool::Section { .. } | Tool::JoggedSection { .. }), || Tool::Section { parent: None, p0: None, line: None, partial: false }),
-                tool("dr-aligned-sect", "section-view", "Aligned section view", matches!(t, Tool::AlignedSection { .. }), || Tool::AlignedSection { parent: None, center: None, a: None, b: None }),
+                tool("dr-sect", "section-view", "Section view", matches!(t, Tool::Section { .. } | Tool::JoggedSection { .. }), || Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }),
+                tool("dr-aligned-sect", "drawing-aligned-section", "Aligned section view", matches!(t, Tool::AlignedSection { .. }), || Tool::AlignedSection { parent: None, center: None, a: None, b: None }),
                 tool("dr-brokenout", "broken-out-section", "Broken-out section", matches!(t, Tool::BrokenOut { .. }), || Tool::BrokenOut { parent: None, points: vec![], done: false }),
                 tool("dr-detail", "detail-view", "Detail view", matches!(t, Tool::Detail { .. }), || Tool::Detail { parent: None, center: None, radius: None }),
                 tool("dr-break", "broken-view", "Break view", matches!(t, Tool::Break { .. }), || Tool::Break { parent: None, first: None, vertical: true }),
-                tool("dr-crop", "crop-view", "Crop view", matches!(t, Tool::Crop { .. } | Tool::CropPoly { .. }), || Tool::Crop { parent: None, first: None, circle: false }).with_more("dr-views-more", views_menu),
+                // Live: no ▾; the shapes are in the Crop view dialog.
+                tb("dr-crop", "crop-view", "Crop view", matches!(t, Tool::Crop { .. } | Tool::CropPoly { .. }), |e, w, cx| {
+                    w.focus(&e.focus, cx);
+                    e.start_crop(cx)
+                }),
             ],
             vec![
                 tool("dr-dim", "linear-dim", "Dimension (d)", dim_kind.is_some(), || Tool::Dimension { kind: DimTool::Linear, picks: vec![] }).with_more("dr-dim-more", dims_menu),
@@ -177,9 +186,9 @@ impl DrawingEditor {
                 tool("dr-table", "table", "Table", is_table(TableTool::General), table(TableTool::General)),
                 tool("dr-bomtable", "drawing-bom", "BOM table", is_table(TableTool::Bom), table(TableTool::Bom)),
                 tool("dr-revtable", "revision-table", "Revision table", is_table(TableTool::Revision), table(TableTool::Revision)),
-                tool("dr-cutlist", "cut-list", "Cut list table", is_table(TableTool::CutList), table(TableTool::CutList)),
+                tool("dr-cutlist", "drawing-cutlist-table", "Cut list table", is_table(TableTool::CutList), table(TableTool::CutList)),
                 tool("dr-holetable", "hole-table", "Hole table", is_table(TableTool::Hole), table(TableTool::Hole)),
-                tool("dr-customtable", "featurescript-table", "Custom table", is_table(TableTool::Custom), table(TableTool::Custom)),
+                tool("dr-customtable", "drawing-custom-table", "Custom table", is_table(TableTool::Custom), table(TableTool::Custom)),
             ],
             vec![
                 tool("dr-cline", "centerline", "2 point centerline", matches!(t, Tool::Centerline { .. }), || Tool::Centerline { first: None }),
@@ -244,7 +253,7 @@ impl DrawingEditor {
         .collect();
         vec![
             vec![
-                tool("dr-sk-line", "line", "Line (l)", cur == Some(SkTool::Line), sk(SkTool::Line)),
+                tool("dr-sk-line", "drawing-line", "Line (l)", cur == Some(SkTool::Line), sk(SkTool::Line)),
                 tool("drg-sk-circle-main", "circle", "Center point circle (c)", matches!(cur, Some(SkTool::Circle | SkTool::Circle3)), sk(SkTool::Circle)).with_more("dr-sk-circle-more", menu(&[(SkTool::Circle, "Center point circle (c)", "circle"), (SkTool::Circle3, "3 point circle", "three-point-circle")])),
                 tool("dr-sk-tarc", "tangent-arc", "Tangent arc", cur == Some(SkTool::TangentArc), sk(SkTool::TangentArc)),
                 tool("drg-sk-rect-main", "corner-rectangle", "Corner rectangle (g)", matches!(cur, Some(SkTool::CornerRect | SkTool::CenterRect)), sk(SkTool::CornerRect)).with_more("dr-sk-rect-more", menu(&[(SkTool::CornerRect, "Corner rectangle (g)", "corner-rectangle"), (SkTool::CenterRect, "Center point rectangle (r)", "center-rectangle")])),
@@ -262,23 +271,20 @@ impl DrawingEditor {
 
     pub fn render_toolbar(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
-        let sep = crate::ui::tool_separator;
         let up_to_date = !self.out_of_date && self.sources.len() >= views::referenced_sources(&self.drawing).len();
         let imported = self.drawing.sheets.iter().any(|s| s.imported.is_some());
         let groups = self.toolbar_groups();
-        // Fit: undo / redo, update and every category within the window
-        // minus the left rail (live 1920 px: all tools shown, ending near
-        // x 1745; the categories collapse only when they don't fit).
-        let (cell, gap) = (crate::ui::TOOL_CELL, 2.);
-        let full: f32 = 2. * cell + gap + (gap + 2. + gap + cell) + groups.iter().map(|g| gap + 2. + g.iter().map(|t| gap + t.width()).sum::<f32>()).sum::<f32>();
-        let room = f32::from(window.viewport_size().width) - crate::ui::RAIL_W - 8.;
-        let collapse = full > room;
+        let container = f32::from(window.viewport_size().width) - 46.;
+        let (medium, compact) = (container < 1707., container < 1373.);
         let mut bar = crate::ui::toolbar()
-            .child(crate::ui::undo_redo(&self.doc, cx))
+            .pl(px(4.))
+            .child(crate::ui::undo_redo_with(&self.doc, CELL, ("Undo (ctrl+z)", "Redo (ctrl+y)"), cx))
             .child(sep())
             .child(
                 // Onshape: the update button is highlighted (#fcda7f, #fab601 border) when out of date.
                 crate::ui::tool_button("dr-update", "drawing-update", false, cx)
+                    .w(px(CELL))
+                    .h(px(CELL))
                     .when(self.out_of_date, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601)))
                     .opacity(if imported { 0.3 } else if up_to_date { 0.4 } else { 1.0 })
                     .tooltip("Update from this workspace (ctrl+q)")
@@ -288,13 +294,38 @@ impl DrawingEditor {
                         }
                     })),
             );
-        for (gi, g) in groups.into_iter().enumerate() {
-            bar = bar.child(sep());
-            if collapse {
-                bar = bar.children(collapsed(gi, g, &ed, cx));
-            } else {
-                for t in g {
-                    bar = bar.child(t.render(&ed, cx));
+        for (gi, mut g) in groups.into_iter().enumerate() {
+            // Compact: views…centerlines fold side by side (one separator
+            // before them), the inserts fold too.
+            if !(compact && (1..=4).contains(&gi)) {
+                bar = bar.child(sep());
+            }
+            match gi {
+                // Dimensions: Medium folds Ordinate and Hole callout into the
+                // Dimension ▾; Compact keeps Dimension ▾ and folds the rest
+                // into an Ordinate dimension ▾.
+                1 if compact => {
+                    let rest = g.split_off(1.min(g.len()));
+                    for t in g {
+                        bar = bar.child(t.render(&ed, cx));
+                    }
+                    bar = bar.children(collapsed(gi + 100, rest, &ed, cx));
+                }
+                1 | 4 if medium => bar = bar.children(collapsed(gi, g, &ed, cx)),
+                0 | 2 | 3 | 7 if compact => bar = bar.children(collapsed(gi, g, &ed, cx)),
+                // Sketch: Line…Sketch point fold into Line ▾; Hatch region and
+                // Trim stay.
+                5 if medium => {
+                    let keep = g.split_off(6.min(g.len()));
+                    bar = bar.children(collapsed(gi, g, &ed, cx));
+                    for t in keep {
+                        bar = bar.child(t.render(&ed, cx));
+                    }
+                }
+                _ => {
+                    for t in g {
+                        bar = bar.child(t.render(&ed, cx));
+                    }
                 }
             }
         }

@@ -96,3 +96,6 @@ Twelve agents build from this one tree. A file left non-compiling, even for a fe
 measure or think, blocks everyone's builds and the integration. Make each edit so the file still compiles:
 add the import together with its use, and change the callers in the same step. Run `cargo check -p <crate>`
 right after any multi-step change. If you have to stop mid-change, revert to compiling first.
+
+## Don't start agents
+Only the lead starts, moves or stops agents. If your work would benefit from helpers, ask the lead: every agent burns shared account quota, and unplanned ones push other agents into their usage limits.

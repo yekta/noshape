@@ -4295,7 +4295,7 @@ dependencies = [
 
 [[package]]
 name = "noshape"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4341,7 +4341,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-cli"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4352,7 +4352,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-featurescript"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "log",
  "parking_lot",
@@ -4362,7 +4362,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-kernel"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -4374,7 +4374,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-model"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "acadrust",
  "ahash",
@@ -4400,7 +4400,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-ops"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "glam 0.34.1",
@@ -4420,7 +4420,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-render"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "bytemuck",
  "glam 0.34.1",
@@ -4436,7 +4436,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-scene"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "dirs 6.0.0",
  "glam 0.34.1",
@@ -4452,7 +4452,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-sketch"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "cadkit-core",
  "cadkit-dwg",
@@ -4470,7 +4470,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-store"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "blake3",
  "log",
@@ -4484,7 +4484,7 @@ dependencies = [
 
 [[package]]
 name = "noshape-units"
-version = "0.1.0"
+version = "0.4.4"
 dependencies = [
  "indexmap",
  "serde",

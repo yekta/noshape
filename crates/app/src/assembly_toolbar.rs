@@ -4,6 +4,7 @@
 //! (`assembly_toolbar.json`).
 
 use super::*;
+use gpui_kit::component::menu::DropdownMenu as _;
 use serde::{Deserialize, Serialize};
 
 /// Onshape's assembly tool sets, in order (live dom/toolbar-assembly.txt).
@@ -141,6 +142,24 @@ impl AsmToolbarPrefs {
     }
 }
 
+/// Live's toolbar fit (client `Toolbar` component; see the Part Studio's
+/// `toolbar_collapse_from`): the longest run of tool sets from the left that
+/// fits stays expanded. Onshape's widths: a tool 34 px, "Insert" 78, 4 px
+/// per set; a collapsed set 56 (38 for one tool); Undo / Redo 70, "Search
+/// tools…" 173, 7 at the end; room = the window minus 40. Live (bundle
+/// model): everything fits from 1284 px; at 1280 Display states collapses.
+pub(super) fn collapse_from(sets: &[(usize, Vec<&'static str>)], search_hidden: bool, viewport_w: f32) -> usize {
+    let widths: Vec<(f32, f32)> = sets
+        .iter()
+        .map(|(_, ids)| (4. + ids.iter().map(|id| if *id == "tb-insert" { 78. } else { 34. }).sum::<f32>(), 4. + if ids.len() > 1 { 52. } else { 34. }))
+        .collect();
+    let fixed = 70. + if search_hidden { 0. } else { 173. } + 7.;
+    (0..=widths.len())
+        .rev()
+        .find(|&k| fixed + widths[..k].iter().map(|w| w.0).sum::<f32>() + widths[k..].iter().map(|w| w.1).sum::<f32>() <= viewport_w - 40.)
+        .unwrap_or(0)
+}
+
 impl AssemblyView {
     /// Right-click the toolbar (live 331z): Customize toolbar… · Hide / Show "Search tools".
     pub(super) fn toolbar_menu(&self, view: Entity<Self>) -> impl Fn(crate::os_menu::OsMenu, &mut Window, &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu + 'static {
@@ -216,11 +235,31 @@ impl AssemblyView {
 
     /// One tool set; in customize mode its tools drag and it gets its sled
     /// (`toolbar_customize`).
-    pub(super) fn render_toolset(&self, set: usize, tools: Vec<AnyElement>, ids: Vec<&'static str>, cx: &mut Context<Self>) -> AnyElement {
-        if self.ui.tb_custom.is_none() {
-            return h_flex().children(tools).into_any_element();
+    pub(super) fn render_toolset(&self, set: usize, tools: Vec<AnyElement>, ids: Vec<&'static str>, collapsed: bool, cx: &mut Context<Self>) -> AnyElement {
+        // A collapsed set (narrow window): its first tool with a ▾ listing
+        // every tool of the set (as the Part Studio's); a single tool stays
+        // (Insert loses its label in Onshape; ours keeps it).
+        if collapsed && tools.len() > 1 && self.ui.tb_custom.is_none() {
+            let view = cx.entity();
+            let update_enabled = self.has_newer_references(cx);
+            let face = tools.into_iter().next();
+            let caret = crate::ui::tool_caret(SharedString::from(format!("asm-tbm-{set}")), cx).dropdown_menu(move |mut menu, window, _| {
+                menu = crate::ui::fit_tool_menu(menu.min_w(px(180.)), window);
+                for id in &ids {
+                    let (name, icon) = tool_info(id);
+                    let (v, id) = (view.clone(), *id);
+                    menu = menu.item(crate::ui::menu_tool_item(name, icon, None).disabled(id == "tb-update-refs" && !update_enabled).on_click(move |_, window, cx| v.update(cx, |this, cx| this.run_toolbar_tool(id, window, cx))));
+                }
+                menu
+            });
+            return crate::ui::tool_group(SharedString::from(format!("asm-tbg-{set}")), div().children(face), caret).into_any_element();
         }
-        let mut row = h_flex();
+        // Live 1.222: 32 px buttons 2 px apart (34 px pitch, as the Part
+        // Studio's toolbar).
+        if self.ui.tb_custom.is_none() {
+            return h_flex().gap(px(2.)).children(tools).into_any_element();
+        }
+        let mut row = h_flex().gap(px(2.));
         for (el, id) in tools.into_iter().zip(ids) {
             let Some(one) = TOOLSETS[set].iter().find(|t| **t == id) else { continue };
             row = row.child(crate::toolbar_customize::tool(el, std::slice::from_ref(one), crate::assets::icon_path(tool_info(id).1), cx));

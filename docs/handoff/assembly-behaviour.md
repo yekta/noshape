@@ -585,8 +585,14 @@ State: run 5's edits were complete (no half-done code found); everything below b
     dropped, metric pitch "M6x1.00", the Series: "Type A flat washer 3/8 Narrow"). Mass dialog reference
     frame: "Mate connector for reference frame" takes a connector pick and the Part tab's inertia is about
     its origin in its axes (help; `analysis::inertia_about_frame`, test `inertia_moves_to_a_reference_frame`).
-  - Still open: live's full catalogue (more sizes per component, e.g. washers #0…3, socket head #0-80…4-12,
-    ISO M1.6…M64, more components and classes; we lack their dimensions), live's per-size Length lists, the
+  - After GO (v0.4.3): metric tables take live's sizes with published dimensions — ISO 4762 (M1.6…M64,
+    21), DIN 912 (19, no M14/M18), ISO 4017/4014 hex (21), ISO 4032 nuts (24), DIN EN 24032 (19), ISO 7089
+    washers (19), ISO 8734 / DIN pins (1…20); `LIVE_LENGTHS` holds live's exact Length lists for the 29
+    (component, size) pairs captured; metric lengths are bare numbers like live ("2.5", "16"; documents with
+    "20 mm" load as "20"). Defaults: the first size and its first length (ISO 4762 → M1.6 x 2.5). The Mass
+    reference field's chip reads "Mate connector of <instance>" (like the mate dialog).
+  - Still open: live's ANSI sizes beyond ours (washers #0…3, socket head #0-80…3/4-16, hex cap screws to 3-12,
+    …) and components / classes we have no dimensions for, per-size Length lists for uncaptured sizes, the
     Face tab with a reference connector (unverified), live's 10 px panel snapping (ui's shared code; spec in theme-layout.md
     "From skb"), the stack buttons' "face selected before opening Insert" (our assembly has no face
     pre-selection outside dialogs), DIN / ISO / NAS / PEM / SAE classes beyond ours (catalogue subset).
@@ -629,3 +635,131 @@ returns false when the part has no table or no such column; then the BOM should 
 property as today. For reading, `configured_properties::configured_value(ps, &part, prop, &config)` gives the
 configured value (None = use the part's own). Regeneration already renames parts by a configured Name and
 colours them by a configured Appearance. psb did not touch your files.
+
+## skb run 9 (21 Oct, takeover after the account move) — READ THIS FIRST
+
+State: the shared tree compiled with my files at 07:45 (other agents' files — drawing_tools.rs, custom/host/query.rs,
+a CodeRow file — were mid-edit at times; not mine). Nothing of mine is half-done in the tree; staging copies live in
+/root/skb-scratch/next/ (catalogue.rs, mod.rs, fasteners.fs, assembly_standard.rs, data/) and must be kept in sync
+with the tree when editing there.
+
+### Standard content catalogue rebuilt as data (task "close the catalogue")
+* `crates/model/src/assembly/standard/` = `mod.rs` (spec, part studio, holes), `catalogue.rs` (types, loads
+  `data/{ansi-inch,din,iso,nas,pem,sae}.json`), `fasteners.fs` (geometry), `data/*.json` (GENERATED, don't hand-edit).
+* Generator: `/root/skb-scratch/gen/build_catalogue.py <live dom> <dims dir> <out> --report [--fallback]` with
+  `/root/skb-scratch/gen/mapping.py` (per live component: family, forms, table(s), column → script symbol; standard
+  formulas only: thread minor diameter for the chamfered end, a dome's sphere radius from its diameter and height,
+  90° cone points). Then copy `next/data/*.json` into the tree. `--fallback` adds components live hasn't crawled yet
+  from dom/skb-sc-lists.json, with ONLY the Length lists live captured (other sizes are left out).
+* Dimension tables (published values, sources inside each file): /root/skb-scratch/dims/*.json (~200), schema
+  dims/README-schema.md. Each component's `source` names its standard, edition and pages.
+* Families (`Shape`): Screw (head none/hex/square/round[rf: corner or dome]/countersunk/raised/T/eye/lifting eye/wing;
+  drive none/hex socket/slot/cross H/cross Z/hexalobular; neck square/ribbed/fin/shoulder; point chamfer/cone/cup/dog/
+  cone tip/round/flat), Nut (hex/square/slotted/castle/cap/insert/weld, flange), Washer (plain/chamfered/split/teeth/
+  conical/square), Pin (parallel/dowel/taper/slotted/coiled/cotter/clevis/stud/drive stud/T-head), Key, RetainingRing,
+  ORing. Component JSON: `form` (integers), params with `forms` overrides per option (Head slot, Head type),
+  per-size `values` (selects that depend on the size), `threads` (live Thread length list per length).
+* Live crawl: REQUESTS "skb (10-21 standard content FULL crawl)" + my 07:40 addendum (Thread length for every
+  (size, length) — live's lists are NOT a rule; per-size selects; material names). Live is re-crawling into
+  dom/skb-sc-full-<Std>.json; rerun the generator as files grow. Geometry request (B-rep of one size per family)
+  is open; use it to correct head/drive/point details.
+* Known gaps (generator --report): ASME #10 countersunk bolt, DIN 580 M72–M100, ASME button 7/16 & 3/4, SHCS #12 &
+  9/16, machine dowel 7/32 (not in B18.8.2: needs live geometry), hex machine screw "Type I" recess dims, DIN 7050/7051
+  recess penetration, Hex jam nut #6–#12 (no ASME table), O-ring material names (live). Not yet crawled: ANSI Keys,
+  Retaining rings, more Nuts/Washers classes; NAS; PEM®.
+* Test `standard_content_parts_regenerate_with_mate_connectors` regenerates every component: run it after each
+  data change (it couldn't compile at 07:50 because of another agent's lib-test error).
+
+### Selection model (task 1) — coded by run 8, verify in GUI
+Entity selection outside dialogs (`AsmUi.entity_sel`, `select_entity`, `clear_selection`, readout
+`selection_readout`), double click clears, window vs crossing box, Insert takes the pre-selection
+(`std_take_selection`). Still to check against live: hover = orange boundary edges (no fill), vertex dots, row-click
+whole-instance lighter amber.
+
+### Mate flip button (icons2's report)
+Live (dom/dialog-mate-fastened-empty/-filled, mate-hud.txt): the flip is never drawn pressed; its icon shows the
+flag: `flip-direction` while Onshape's flip is off (our `flip_primary` true = Z axes agree), `flip-direction-opposite`
+when on. Dialog and HUD now use `assembly_mate_dialog::flip_icon_name`.
+
+### First insert lands at the origin (lead, from qa4)
+Help ("Insert parts and assemblies") + live behaviours "Insert dialog": inserts start with the Part Studio origin on
+the assembly origin; the same part again at a slight offset; once the cursor enters the graphics the instance
+follows it and lands at the click. Live: the first instance into an empty assembly lands at the origin. Now
+`noshape_ops::assembly::inserted_into_empty` decides it, and `start_placing` skips following the cursor for that
+insert (test `first_insert_lands_at_the_origin_later_ones_follow_the_cursor` in crates/ops). Asked live (REQUESTS
+"skb (10-21 insert placement)") for the exact offset and whether the first instance is selected.
+
+### Lead's integration try 8: the two standard content tests (fixed)
+* `concatenate(a, b)` doesn't exist in our FeatureScript std → every shank failed ("Function concatenate with 2
+  argument(s) not found"); fasteners.fs uses its own `join`.
+* Sizes live hasn't crawled had empty labels: the generator now takes live's description, else the interim
+  catalogue's label (run 8, live's naming), else a crawled sibling's label with this size's token (metric pitch with
+  two decimals). Series rows (Type A washer) end with their own series.
+* ANSI Countersunk bolt #10-24 / #10-32 (live's default component): ASME B18.5 starts at 1/4, so the #10 sizes take the
+  82° slotted flat head of ASME B18.6.3 (recorded in the component's `source`). Confirm with the live geometry request.
+* To debug catalogue tests quickly, run the lead's already-built test binary (/root/target-lead/debug/deps/noshape_model-*)
+  from /root/noshape-lead with the test name as the filter; it prints which component failed and why.
+* fasteners.fs gotchas: `box` is a FeatureScript keyword (helper is `cuboid`); optional lengths must use the script's
+  `LENGTH_0` bounds (NONNEGATIVE_ZERO_INCLUSIVE_LENGTH_BOUNDS defaults to 25 mm, which put a 25 mm flange/collar/round
+  on every part); never reuse a body query after a boolean (`solidsOf` / `uniteAll`); in `screw` work on
+  `var def = definition`. The regeneration test lists every failing component with its feature parameters.
+
+### Exploded view / named position banner (icons2 via lead)
+The banner toolbar had no width of its own, so with only Undo / Redo in flow it shrank to ~70 px: the banner was
+clipped at the far left and covered Undo / Redo. `render_toolbar` now gives that row `w_full()`; the banner centres
+in the toolbar row like live 62 (x 868–1090 of 40–1919), Undo / Redo stay at the left. Same fix for named positions.
+
+### Dialog ✓ / ✕ tooltips removed (lead: live has none)
+All "Accept (Enter)" / "Cancel (Esc)" / "Close (Esc)" / "Close" / "Accept" tooltips on the assembly dialogs' ✓ / ✕ are
+gone (mate, mass, reflection, named positions, properties, panels, standard content edit, group, interference, the
+replacement picker). The mate heads-up toolbar keeps its tooltips (live mate-hud.txt: "Commit current mate and start a
+new mate", "Cancel").
+
+### State 12:00 (21 Oct)
+`cargo test -p noshape-model --lib`: 293 passed, 0 failed (standard content tests green with the new catalogue).
+Kernel: surgical mesh-deflection clamp in cpp/common.cpp (noted in kernel-robustness.md).
+Clippy (`--locked -p noshape-ops -p noshape --all-targets -D warnings`, ~12:40): nothing in my files; remaining errors are
+other agents' (drawing_drawprops.rs, smoke.rs, variable_config.rs; earlier regen/features/pattern.rs).
+
+### GUI check 13:15 (21 Oct) — findings
+* Verified: explode banner centred with Undo/Redo kept (fix above); flip button never pressed, icon swaps on click;
+  no tooltip on dialog ✓; first insert into an empty assembly stays at the origin after moving into the graphics and
+  clicking.
+* **Assembly picking is dead** (no hover, clicks pick nothing, right-click on a face shows the empty-space menu) with
+  qa4's gpui-pre patch (nested cached views not re-rendered, R7 in qa-round-4.md). With `NOSHAPE_NESTED_VIEW_REFRESH=1`
+  picking works again. Reported to the lead (qa4 is paused); not fixed by me (qa4's vendor patch + workspace.rs).
+* Fixed (mine): a click on geometry arrives as ToolDown/ToolUp (the left button is captured to drag instances) and
+  ToolUp selected the whole instance; both click paths now go through `click_select` (live: face/edge/vertex only,
+  additive, double click clears, empty click clears).
+* Verified 13:45 (with NOSHAPE_NESTED_VIEW_REFRESH=1): a face click selects only that face (amber, row selected,
+  triad at the click, "Area: 4469.713 mm²"); an empty click clears; hovering an edge turns it orange.
+  Known gap: a click right after a jump of the pointer uses the previous hover (ToolUp takes `self.hover`).
+
+### qa5 assembly findings (lead, 21 Oct afternoon) — docs/parity/workflow-assembly.md "Findings"
+Live reference: behaviours.md "qa5 assembly" (dialogs, placements) and the Replicate / pattern help pages.
+* A7 Replicate: the model now has `ReplicateScope` (Match faces in parts / in features / individual faces; edges on
+  plane / on face / individual edges) and `scope_refs` ("Parts to find match in"); `analysis::scoped_candidates`.
+  Older documents (no scope) keep the signature search, but an edge seed now matches through its hole's face and
+  takes the edge at the same end (was: both ends of every hole = duplicates). Dialog: scope select (face or edge
+  options by the seed mate's entity), "Parts to find match in" (red / title red while empty; picks parts for
+  "faces in parts", else faces / edges; `PatternSession.scope*`, pick slot 2 in Entity mode).
+  Tests: `replicate_from_a_hole_edge_matches_holes_once` (legacy + scoped).
+* A9: `MateConnectorRef::linear_direction` (Z along a picked edge); the dialog applies it to linear directions.
+  Test `linear_pattern_along_an_edge`.
+* A4: test `slider_flip_primary_turns_the_part_over` (model); app flip path to verify in the GUI.
+* A6: the dialogs were already feature dialogs in the working tree (qa5 had an older build); now live's defaults
+  (25 mm × 2, 360 deg × 2, Instances focused) and ☐ Centered (`centered` on Linear / Circular, copies indexed with
+  `CENTERED_BACK`; help: N each way). Test `centered_linear_pattern_goes_both_ways`.
+* A8: `effective()` applies the open pattern dialog's pattern (preview copies); every dialog change requests an eval.
+  Not yet: the pattern's rows in the instance list while the dialog is open (live shows them at once).
+* A1: the first insert into an empty assembly is selected. Zoom-to-fit crop: to check in the GUI.
+* A2: the instance a mate preview moves is drawn amber (`ops::assembly::mate_preview_moving`, test).
+* A3: new mates are hidden (`ops::assembly::commit_mate`, test); tooltip header "<name> (Hidden)" / "has error: …".
+* A5: inference look: hovered face outlined (`Highlights.hover_outline`, `AsmPickMap::boundary_ids`), white dots,
+  live's khaki notched connector glyph (`push_connector_glyph`); no face fill in inference mode.
+* A11: typing into a selected BOM cell starts editing it (keystroke interceptor, `bom_panel::typed_text` + test).
+* C7: "Change configuration" dialog in live's layout (300×587, title, doc header, studio row, inputs, Generate, parts).
+* The api agent removed crates/ops/src/ops/assembly/ (patterns no longer in the agent API); my edge-direction edit
+  there went with it — re-add `.linear_direction()` if patterns come back to the API.
+* Queued: ASME B18.6.4 tapping screws (10 components; Head type Slot/Type I/IA/VI, Tip type A…T need per-size option
+  values in the catalogue; tables in dims/ASME_B18.6.4_*), askew head bolt (dims/ASME_B18.2.1_askew_head_bolt).

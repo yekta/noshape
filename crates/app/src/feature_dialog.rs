@@ -33,8 +33,10 @@ pub enum DialogEvent {
     HoverRef(Option<Reference>),
     /// Preview slider: 0 = the model before the feature, 1 = after.
     PreviewOpacity(f32),
-    /// "Configure features" mode: the user picked this parameter.
+    /// Configure this parameter (configure mode click, right-click Configure).
     ConfigureParam(String),
+    /// Right-click › Unconfigure.
+    UnconfigureParam(String),
     /// The field's "Create selection" side button was clicked.
     CreateSelection(String),
     /// A reference parameter's "Import…": add the file as a tab and pick it.
@@ -207,10 +209,16 @@ pub struct FeatureDialog {
     /// Number of regions of a sketch (a field holding all of them shows
     /// one "Faces of Sketch 1" row).
     pub sketch_region_count: Arc<dyn Fn(FeatureId) -> usize + Send + Sync>,
+    /// A sketch's vertices as a point field takes them (all of them picked
+    /// show as one "Vertices of Sketch 2" row, live Hole).
+    pub sketch_vertices: Arc<dyn Fn(FeatureId) -> Vec<Reference> + Send + Sync>,
     /// Open `#` variable autofill list of a numeric field.
     completion: Option<crate::var_complete::VarCompletion>,
     /// Open "Create variable" popup.
     create_var: Option<CreateVar>,
+    /// A field outside the dialog that opened the Create variable popup (the
+    /// sketch's dimension box): path, input, value kind.
+    external_field: Option<(String, Entity<InputState>, Option<noshape_model::params::NumKind>)>,
     /// Field text when it was focused or last applied with Enter: Enter
     /// applies a changed value and Esc reverts it before they accept or
     /// cancel the dialog (Onshape).
@@ -222,9 +230,16 @@ pub struct FeatureDialog {
     /// While a pick is dragged in reorder mode: list path, the row it would
     /// land next to, after it.
     pick_drop: Option<(String, usize, bool)>,
-    /// "Configure features" mode: configurable parameters are outlined
-    /// and clicking one configures it (Onshape: broken yellow outline).
+    /// "Configure features" mode: clicking a parameter configures it; the
+    /// header has only ✕ and an "Unsuppressed" checkbox ends the list
+    /// (live psb 10-21 g).
     pub configure_mode: bool,
+    /// This feature's configured parameters (`__suppressed` included): a
+    /// dotted amber outline and the tooltip "Configured" (live psb 10-21 g).
+    pub configured: std::collections::HashSet<String>,
+    /// The studio has a list or checkbox configuration input: parameters
+    /// get Configure / Unconfigure on right-click.
+    pub configurable_inputs: bool,
     /// Rows the owner adds under the parameters and a footer element left
     /// of `?` (the Sketch dialog's display options and diagnostics button).
     pub extra: Option<DialogExtra>,
@@ -290,6 +305,8 @@ impl FeatureDialog {
             reordering: std::collections::HashSet::new(),
             pick_drop: None,
             configure_mode: false,
+            configured: Default::default(),
+            configurable_inputs: false,
             active_query: None,
             cs_target: None,
             subs: Vec::new(),
@@ -324,8 +341,10 @@ impl FeatureDialog {
             drag_grab: Default::default(),
             missing: Arc::new(|_| false),
             sketch_region_count: Arc::new(|_| 0),
+            sketch_vertices: Arc::new(|_| Vec::new()),
             completion: None,
             create_var: None,
+            external_field: None,
             extra: None,
         };
         d.active_query = d.first_visible_query();
@@ -1016,8 +1035,9 @@ impl FeatureDialog {
             // go to it.
             InputEvent::Focus => cx.notify(),
             InputEvent::Blur => {
-                // Re-render: the field shows its converted value again.
+                // Tab / click-away commits: the value gets its unit (live).
                 this.completion = None;
+                this.commit_number(&path_s, state, window, cx);
                 cx.notify();
             }
         });
@@ -1033,10 +1053,53 @@ impl FeatureDialog {
         if self.baselines.get(path).is_none_or(|b| *b == text) {
             return false;
         }
+        // Live: "30" → "30 mm", "10+5" → "(10+5) mm", the text re-selected.
+        self.commit_number(path, state, window, cx);
+        let text = state.read(cx).value().to_string();
         self.baselines.insert(path.to_string(), text);
         state.update(cx, |s, cx| s.select_all(window, cx));
         cx.notify();
         true
+    }
+
+    /// One ↑ / ↓ / wheel step of a number field (`quantity_field::step_text`):
+    /// only a plain value unchanged since its commit steps; the new value is
+    /// committed and selected. False when it can't step.
+    fn step_number(&mut self, path: &str, state: &Entity<InputState>, up: bool, mods: crate::quantity_field::StepMods, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if self.completion.as_ref().is_some_and(|c| c.key == path) {
+            return false;
+        }
+        let Some(ParamKind::Num(n)) = self.spec_for_path(path).map(|s| s.kind.clone()) else { return false };
+        let text = state.read(cx).value().to_string();
+        if self.baselines.get(path).is_some_and(|b| *b != text) {
+            return false;
+        }
+        let integer = n.kind == noshape_model::params::NumKind::Integer;
+        let dim = if integer { noshape_units::Dim::UNITLESS } else { n.kind.dim() };
+        let f = self.units.si_factor(dim);
+        let stepping = crate::quantity_field::Stepping { dim, prefs: &self.units, scope: &self.variables, integer, range: (Some(n.min / f), Some(n.max / f)) };
+        let Some(next) = crate::quantity_field::step_text(&text, up, mods, &stepping) else { return false };
+        state.update(cx, |s, cx| {
+            s.set_value(next.clone(), window, cx);
+            s.select_all(window, cx);
+        });
+        self.baselines.insert(path.to_string(), next.clone());
+        self.on_text_changed(path, next, cx);
+        true
+    }
+
+    /// A number field's commit (Enter, Tab, blur): its text rewritten by
+    /// Onshape's rules (`quantity_field::commit_text`). An empty field keeps
+    /// its last text (live).
+    fn commit_number(&mut self, path: &str, state: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(ParamKind::Num(n)) = self.spec_for_path(path).map(|s| &s.kind) else { return };
+        let dim = if n.kind == noshape_model::params::NumKind::Integer { noshape_units::Dim::UNITLESS } else { n.kind.dim() };
+        let text = state.read(cx).value().to_string();
+        let next = if text.trim().is_empty() { self.baselines.get(path).cloned().unwrap_or_default() } else { crate::quantity_field::commit_text(&text, dim, &self.units, &self.variables) };
+        if next != text {
+            state.update(cx, |s, cx| s.set_value(next.clone(), window, cx));
+            self.on_text_changed(path, next, cx);
+        }
     }
 
     /// Insert autofill entry `index` (the selected one when `None`) into the
@@ -1113,7 +1176,7 @@ impl FeatureDialog {
     /// unit.
     fn open_create_variable(&mut self, path: String, name: String, window: &mut Window, cx: &mut Context<Self>) {
         use noshape_model::params::NumKind;
-        let kind = self.spec_for_path(&path).and_then(|s| if let ParamKind::Num(n) = &s.kind { Some(n.kind) } else { None });
+        let kind = self.spec_for_path(&path).and_then(|s| if let ParamKind::Num(n) = &s.kind { Some(n.kind) } else { None }).or_else(|| self.external_field.as_ref().filter(|f| f.0 == path).and_then(|f| f.2));
         let (k, ck, unit) = match kind {
             Some(NumKind::Angle) => (1, 1, Some(self.units.angle.symbol())),
             Some(NumKind::Integer) => (2, 2, None),
@@ -1135,6 +1198,28 @@ impl FeatureDialog {
             s.select_all(window, cx);
         });
         self.create_var = Some(CreateVar { path, initial, configuration: false, kind: k, config_kind: ck, name, value, description, min, max });
+    }
+
+    /// A field's input: the dialog's own, or the outside one that opened
+    /// the Create variable popup.
+    fn field_state(&self, path: &str) -> Option<Entity<InputState>> {
+        self.inputs.get(path).cloned().or_else(|| self.external_field.as_ref().filter(|f| f.0 == path).map(|f| f.1.clone()))
+    }
+
+    /// The Create variable popup for a field outside the dialog (the
+    /// sketch's dimension box, live: an unknown `#w` + Enter opens it with
+    /// the name prefilled and the field's previous value). The caller draws
+    /// it ([`Self::external_create_variable_popup`]).
+    pub(crate) fn open_external_create_variable(&mut self, f: ExternalField, window: &mut Window, cx: &mut Context<Self>) {
+        self.external_field = Some((f.path.to_string(), f.state, f.kind));
+        self.baselines.insert(f.path.to_string(), f.previous);
+        self.open_create_variable(f.path.to_string(), f.name, window, cx);
+        cx.notify();
+    }
+
+    /// The open Create variable popup of outside field `path`, if any.
+    pub(crate) fn external_create_variable_popup(&mut self, path: &str, cx: &mut Context<Self>) -> Option<AnyElement> {
+        self.create_var.as_ref().is_some_and(|c| c.path == path && self.external_field.as_ref().is_some_and(|f| f.0 == path)).then(|| self.render_create_variable(cx))
     }
 
     /// The "Create variable" popup (live part-studio/153, dom/dialog-create-
@@ -1265,7 +1350,7 @@ impl FeatureDialog {
     /// `focusControlAndSelectValue`).
     fn cancel_create_variable(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(c) = self.create_var.take() else { return };
-        if let Some(st) = self.inputs.get(&c.path).cloned() {
+        if let Some(st) = self.field_state(&c.path) {
             st.update(cx, |s, cx| {
                 s.focus(window, cx);
                 s.select_all(window, cx);
@@ -1295,7 +1380,7 @@ impl FeatureDialog {
         let range = (c.configuration && kind != "TEXT").then(|| (c.min.read(cx).value().to_string(), c.max.read(cx).value().to_string()));
         // The field keeps `#name` (renamed when the popup's name changed) and
         // gets the focus back (bundle `insertVariableName`).
-        if let Some(st) = self.inputs.get(&c.path).cloned() {
+        if let Some(st) = self.field_state(&c.path) {
             let text = st.read(cx).value().to_string();
             let text = noshape_model::variable_table::rename_in_expr(&text, &c.initial, &name);
             st.update(cx, |s, cx| {
@@ -1425,27 +1510,56 @@ impl FeatureDialog {
             } else {
                 self.render_param(s, &path, &values, companion, &trailing, prefix, window, cx)
             };
-            // Configure features mode: top-level numbers, checkboxes and
-            // choices are outlined and pick the parameter on click.
-            let configurable = self.configure_mode && prefix.is_none() && matches!(s.kind, ParamKind::Num(_) | ParamKind::Bool { .. } | ParamKind::Enum { .. }) && !s.hints.has(Hints::UNCONFIGURABLE);
+            // Configure features mode: a click on a top-level number,
+            // checkbox, choice or selection configures it at once (live psb
+            // 10-21 g: no outline before; the dialog stays open).
+            let can_configure = prefix.is_none() && matches!(s.kind, ParamKind::Num(_) | ParamKind::Bool { .. } | ParamKind::Enum { .. } | ParamKind::Query { .. }) && !s.hints.has(Hints::UNCONFIGURABLE);
+            let configurable = self.configure_mode && can_configure;
+            let is_configured = prefix.is_none() && self.configured.contains(s.id);
+            // Right-click (live): numbers and choices "Configure" /
+            // "Unconfigure"; selections "Clear all" first (their pick rows
+            // have it too); checkboxes keep "Convert to expression" (+
+            // "Unconfigure"), in their own menu.
+            let menu = !self.configure_mode && self.configurable_inputs && can_configure && !matches!(s.kind, ParamKind::Bool { .. });
             let row = row.map(|r| {
-                if !configurable {
-                    return r;
-                }
                 let pid = s.id.to_string();
-                div()
-                    .id(SharedString::from(format!("cfg-{pid}")))
-                    .border_1()
-                    .border_color(gpui_kit::rgb(0xfab601))
-                    .rounded(px(2.))
-                    .cursor_pointer()
-                    .hover(|d| d.bg(gpui_kit::rgb(0xfff3cf)))
-                    .child(r)
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |_, _: &MouseDownEvent, _, cx| {
-                        cx.stop_propagation();
-                        cx.emit(DialogEvent::ConfigureParam(pid.clone()));
-                    }))
-                    .into_any_element()
+                let mut el = div().id(SharedString::from(format!("cfg-{pid}"))).child(r);
+                if is_configured {
+                    el = el.border_2().border_dashed().border_color(gpui_kit::rgb(0xfab601)).tooltip(crate::ui::tooltip("Configured"));
+                }
+                if configurable {
+                    // Capture phase: the control under the click (a checkbox,
+                    // a select) must not change its own value (qa5 C2).
+                    let pid = pid.clone();
+                    el = el.cursor_pointer().capture_any_mouse_down(cx.listener(move |_, e: &MouseDownEvent, _, cx| {
+                        if e.button == MouseButton::Left {
+                            cx.stop_propagation();
+                            cx.emit(DialogEvent::ConfigureParam(pid.clone()));
+                        }
+                    }));
+                }
+                if menu {
+                    let view = cx.entity();
+                    let query = matches!(s.kind, ParamKind::Query { .. });
+                    let path = path.clone();
+                    let build = move |m: crate::os_menu::OsMenu, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| {
+                        let mut m = m;
+                        if query {
+                            let (v, p) = (view.clone(), path.clone());
+                            m = m.item(crate::os_menu::OsMenuItem::new("Clear all").on_click(move |_, _, cx| {
+                                v.update(cx, |this, cx| {
+                                    this.set_value(&p, ParamValue::Query(Vec::new()), cx);
+                                    cx.emit(DialogEvent::HoverRef(None));
+                                })
+                            }));
+                        }
+                        configure_items(m, &view, &pid, is_configured)
+                    };
+                    // Over a number field the menu wins over the input's own
+                    // Cut / Copy / Paste (live: none); pick rows keep theirs.
+                    el = if query { el.os_context_menu(build) } else { el.os_context_menu_over_inputs(build) };
+                }
+                el.into_any_element()
             });
             if s.hints.has(Hints::GROUP_HEADER) {
                 groups.push((s.id, values.bool(s.id) && !self.collapsed_groups.contains(&path), s.hints.has(Hints::GROUP_LABEL)));
@@ -1508,7 +1622,7 @@ impl FeatureDialog {
         };
         let toggle = std::rc::Rc::new(toggle);
         let t1 = toggle.clone();
-        let flip_btn = button(format!("axisflip-{path}"), if on { "flip-direction-opposite" } else { "flip-direction" }, flip.label, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| t1(this, window, cx)));
+        let flip_btn = button(format!("axisflip-{path}"), if on { "flip-direction" } else { "flip-direction-opposite" }, flip.label, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| t1(this, window, cx)));
         let mut row = h_flex().ml(px(-2.)).h(px(28.)).items_end().child(Self::tab_stop_element(flip_btn, &flip_focus, Focus::Underline, move |this, window, cx| toggle(this, window, cx), cx));
         if let Some(a) = axis {
             let apath = match prefix {
@@ -1592,12 +1706,14 @@ impl FeatureDialog {
                 let circular = f.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR);
                 // Live (dialogs/extrude-01, rib-01, draft-01): the button
                 // shows the current direction (the arrow turns round), with
-                // no pressed background.
+                // no pressed background. Unflipped, Onshape shows the art of
+                // its *-opposite symbols (big arrow down-left; circular arrow
+                // clockwise, dialogs/circular-pattern-01).
                 let icon = match (circular, on) {
-                    (true, false) => "flip-circular",
-                    (true, true) => "flip-circular-opposite",
-                    (false, false) => "flip-direction",
-                    (false, true) => "flip-direction-opposite",
+                    (true, false) => "flip-circular-opposite",
+                    (true, true) => "flip-circular",
+                    (false, false) => "flip-direction-opposite",
+                    (false, true) => "flip-direction",
                 };
                 // A Tab stop like Onshape's `os-param-icon-button` (Space /
                 // Enter press it; focused: the 2 px blue bottom line).
@@ -1721,6 +1837,7 @@ impl FeatureDialog {
                         let toggle = std::rc::Rc::new(toggle);
                         let (t1, t2) = (toggle.clone(), toggle);
                         let focus = self.tab_stop(&format!("cb:{path}"), cx);
+                        let bool_unconfigure = (prefix.is_none() && self.configured.contains(s.id)).then(|| s.id.to_string());
                         let cb = crate::ui::os_checkbox_focused(SharedString::from(format!("cb-{path}")), "", on, focus.is_focused(window))
                             // Live (psb 10-20 l, part-studio/402): a long label stays
                             // on one line, clipped with an ellipsis ("Preserve active
@@ -1734,11 +1851,12 @@ impl FeatureDialog {
                             .id(SharedString::from(format!("cbw-{path}")))
                             .min_w_0()
                             .child(Self::tab_stop_element(cb, &focus, Focus::Box, move |this, _, cx| t2(this, cx), cx))
-                            // Right-click > Convert to expression (e.g. `#Length > 3`).
+                            // Right-click > Convert to expression (e.g. `#Length > 3`),
+                            // and Unconfigure when configured (live psb 10-21 g).
                             .os_context_menu(move |m, _, _| {
                                 let v = view.clone();
                                 let p = p2.clone();
-                                m.item(crate::os_menu::OsMenuItem::new("Convert to expression").on_click(move |_, window, cx| {
+                                let m = m.item(crate::os_menu::OsMenuItem::new("Convert to expression").on_click(move |_, window, cx| {
                                     v.update(cx, |this, cx| {
                                         let text = if matches!(this.get_value(&p), Some(ParamValue::Bool(true))) { "true" } else { "false" };
                                         this.inputs.remove(&p);
@@ -1750,7 +1868,11 @@ impl FeatureDialog {
                                             s.select_all(window, cx);
                                         });
                                     })
-                                }))
+                                }));
+                                match &bool_unconfigure {
+                                    Some(pid) => configure_items(m, &view, pid, true),
+                                    None => m,
+                                }
                             })
                     });
                 if let Some(c) = companion {
@@ -1945,6 +2067,9 @@ impl FeatureDialog {
                 let takes_cs = s.hints.has(Hints::SHOW_CREATE_SELECTION);
                 let path_s = path.to_string();
                 let any_missing = refs.iter().any(|r| (self.missing)(r));
+                // Right-click on a pick: Configure (live psb 10-21 g) after
+                // Clear all, with a configuration input.
+                let pick_configure = (self.configurable_inputs && !self.configure_mode && prefix.is_none() && !s.hints.has(Hints::UNCONFIGURABLE)).then(|| (s.id.to_string(), self.configured.contains(s.id)));
                 // Every region of a sketch shows as one "Faces of Sketch 1"
                 // row (Onshape, after clicking the sketch in the list).
                 let mut rows: Vec<(String, Vec<usize>, Reference)> = Vec::new();
@@ -1955,6 +2080,16 @@ impl FeatureDialog {
                         if count >= 2 && all.len() == count {
                             if all[0] == k {
                                 rows.push((format!("Faces of {}", (self.labeler)(&Reference::Sketch(*sketch))), all, Reference::Sketch(*sketch)));
+                            }
+                            continue;
+                        }
+                    }
+                    if let Reference::SketchEntity { sketch, .. } = r {
+                        let vertices = (self.sketch_vertices)(*sketch);
+                        let all: Vec<usize> = refs.iter().enumerate().filter(|(_, x)| vertices.contains(x)).map(|(i, _)| i).collect();
+                        if vertices.len() >= 2 && all.len() == vertices.len() && all.contains(&k) {
+                            if all[0] == k {
+                                rows.push((format!("Vertices of {}", (self.labeler)(&Reference::Sketch(*sketch))), all, Reference::Sketch(*sketch)));
                             }
                             continue;
                         }
@@ -2029,6 +2164,7 @@ impl FeatureDialog {
                                 // Clear missing references when some are).
                                 let view = cx.entity();
                                 let p3 = path_s.clone();
+                                let pick_configure = pick_configure.clone();
                                 move |menu, _, _| {
                                     let v2 = view.clone();
                                     let pb = p3.clone();
@@ -2053,7 +2189,10 @@ impl FeatureDialog {
                                             })
                                         }));
                                     }
-                                    m
+                                    match &pick_configure {
+                                        Some((pid, on)) => configure_items(m, &view, pid, *on),
+                                        None => m,
+                                    }
                                 }
                             })
                             .into_any_element()
@@ -2550,11 +2689,6 @@ impl FeatureDialog {
             ParamKind::Num(n) => Some(*n),
             _ => None,
         };
-        // Onshape shows what an expression evaluates to.
-        // Onshape shows the "= value" hint for expressions only, not for a
-        // plain value with a unit (dialogs/draft-01: "3 deg", no hint).
-        let is_expression = text.trim().trim_start_matches('-').contains(|c: char| "#+-*/^()".contains(c));
-        let hint = num.filter(|_| err.is_none() && is_expression).and_then(|n| noshape_model::interaction::evaluated_hint(&text, n.kind.dim(), &self.units, &self.variables));
         // Onshape: an accepted value displays converted to the document
         // units (and an expression its result); focusing shows the text.
         let focused = state.read(cx).focus_handle(cx).is_focused(window);
@@ -2569,7 +2703,6 @@ impl FeatureDialog {
             // Dialog fields write angles "3 deg" (live dialogs/draft-01, hole).
             .map(|c| c.replace('°', " deg"))
             .filter(|c| c.replace(' ', "") != text.trim().replace(' ', ""));
-        let hint = hint.filter(|_| converted.is_none());
         let path_s = path.to_string();
         let st2 = state.clone();
         let st3 = state.clone();
@@ -2588,13 +2721,60 @@ impl FeatureDialog {
                 cx.stop_propagation();
             }
         }));
+        // ↑ / ↓ step a plain, committed value and commit it (live); with the
+        // autofill list open they move in the list (completion_keys first).
+        let field = if num.is_some() {
+            use gpui_kit::base::actions::{SelectDown, SelectUp};
+            use gpui_kit::component::input::{MoveDown, MoveUp};
+            let (p_up, st_up, p_dn, st_dn) = (path.to_string(), state.clone(), path.to_string(), state.clone());
+            let (p_su, st_su, p_sd, st_sd, p_k, st_k) = (path.to_string(), state.clone(), path.to_string(), state.clone(), path.to_string(), state.clone());
+            let shift = crate::quantity_field::StepMods { shift: true, ctrl: false };
+            field
+                // Shift+↑ / ↓ (the input's select-up / -down): ×10.
+                .capture_action(cx.listener(move |this, _: &SelectUp, window, cx| {
+                    if this.step_number(&p_su, &st_su, true, shift, window, cx) {
+                        cx.stop_propagation();
+                    }
+                }))
+                .capture_action(cx.listener(move |this, _: &SelectDown, window, cx| {
+                    if this.step_number(&p_sd, &st_sd, false, shift, window, cx) {
+                        cx.stop_propagation();
+                    }
+                }))
+                // Ctrl+↑ / ↓ (no input binding): ×0.1.
+                .capture_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
+                    let k = &e.keystroke;
+                    if (k.key == "up" || k.key == "down") && k.modifiers.control && !k.modifiers.alt {
+                        let mods = crate::quantity_field::StepMods { shift: k.modifiers.shift, ctrl: true };
+                        if this.step_number(&p_k, &st_k, k.key == "up", mods, window, cx) {
+                            cx.stop_propagation();
+                        }
+                    }
+                }))
+                .capture_action(cx.listener(move |this, _: &MoveUp, window, cx| {
+                    let mods = window.modifiers();
+                    if this.step_number(&p_up, &st_up, true, crate::quantity_field::StepMods { shift: mods.shift, ctrl: mods.control || mods.platform }, window, cx) {
+                        cx.stop_propagation();
+                    }
+                }))
+                .capture_action(cx.listener(move |this, _: &MoveDown, window, cx| {
+                    let mods = window.modifiers();
+                    if this.step_number(&p_dn, &st_dn, false, crate::quantity_field::StepMods { shift: mods.shift, ctrl: mods.control || mods.platform }, window, cx) {
+                        cx.stop_propagation();
+                    }
+                }))
+        } else {
+            field
+        };
         // Esc in a changed field reverts it; the next Esc cancels the dialog.
         let (p_esc, st_esc) = (path.to_string(), state.clone());
+        // (The kit's revert: the focus leaves the field too.)
         let field = field.capture_action(cx.listener(move |this, _: &crate::actions::Cancel, window, cx| {
-            let text = st_esc.read(cx).value().to_string();
-            let Some(base) = this.baselines.get(&p_esc).filter(|b| **b != text).cloned() else { return };
+            if !st_esc.update(cx, |s, cx| s.revert_escape(window, cx)) {
+                return;
+            }
             cx.stop_propagation();
-            st_esc.update(cx, |s, cx| s.set_value(base.clone(), window, cx));
+            let base = st_esc.read(cx).value().to_string();
             this.on_text_changed(&p_esc, base, cx);
             cx.notify();
         }));
@@ -2609,7 +2789,7 @@ impl FeatureDialog {
                         .id(SharedString::from(format!("numf-{path}")))
                         .border_b_1()
                         .border_color(if invalid { pal.error } else { pal.border })
-                        .when(invalid, |d| d.bg(pal.error_fill).tooltip(crate::ui::tooltip("Enter a valid expression.")))
+                        .map(|d| crate::quantity_field::invalid_field(d, invalid))
                         .hover(|d| d.border_color(pal.accent))
                         // Live (dialogs/variable-01): the focused field has a 2 px blue underline.
                         // (A 1 px border plus a 1 px inset line above it, so
@@ -2622,9 +2802,12 @@ impl FeatureDialog {
                         // at the sides (numbers end 3 px from the right edge).
                         .child(div().when(converted.is_some(), |d| d.opacity(0.)).child(Input::new(&state).small().appearance(false).text_size(px(13.33)).px(px(3.)).when(num.is_some(), |i| i.text_align(TextAlign::Right))))
                         .when_some(converted, |d, c| {
+                            // Live: hovering shows "Depth: 32.1 mm".
+                            let tip = format!("{}: {c}", s.label);
                             d.child(
                                 div()
                                     .id(SharedString::from(format!("numv-{path}")))
+                                    .tooltip(crate::ui::tooltip(tip))
                                     .absolute()
                                     .inset_0()
                                     .px(px(3.))
@@ -2648,9 +2831,10 @@ impl FeatureDialog {
                     d.child(c.render(&self.variables, &self.units, move |i, window, cx| view.update(cx, |this, cx| this.accept_completion(Some(i), window, cx))))
                 })
                 .children(create_var_popup)
-                .when_some(hint, |d, h| d.child(div().text_xs().text_color(pal.text_faint).child(format!("= {h}"))))
-                .when_some(num, |d, n| {
-                    // Mouse wheel over a focused numeric field: ±0.1, Ctrl ±0.01, Shift ±1.
+                .when_some(num, |d, _| {
+                    // The wheel steps a focused field like ↑ / ↓ (live: only
+                    // while focused; unfocused it does nothing).
+                    let p_wheel = path_s.clone();
                     d.on_scroll_wheel(cx.listener(move |this, e: &ScrollWheelEvent, window, cx| {
                         if !st2.read(cx).focus_handle(cx).is_focused(window) {
                             return;
@@ -2663,12 +2847,8 @@ impl FeatureDialog {
                             return;
                         }
                         cx.stop_propagation();
-                        let step = if n.kind == noshape_model::params::NumKind::Integer { 1.0 } else { noshape_model::interaction::wheel_step(e.modifiers.control || e.modifiers.platform, e.modifiers.shift) } * dy.signum();
-                        let text = st2.read(cx).value().to_string();
-                        if let Some(next) = noshape_model::interaction::nudge_value_text(&text, step, n.kind.dim(), &this.units, &this.variables, n.min, n.max) {
-                            st2.update(cx, |s, cx| s.set_value(next.clone(), window, cx));
-                            this.on_text_changed(&path_s, next, cx);
-                        }
+                        let mods = crate::quantity_field::StepMods { shift: e.modifiers.shift, ctrl: e.modifiers.control || e.modifiers.platform };
+                        this.step_number(&p_wheel, &st2, dy > 0., mods, window, cx);
                     }))
                 })
                 .into_any_element(),
@@ -2714,6 +2894,14 @@ fn param_icon(feature: &str, param: &str) -> Option<&'static str> {
         ("hole", "holeDiameterV3") => Some("hole-diameter"),
         ("hole", "holeDepthV3" | "holeDepthComputedV3") => Some("hole-depth"),
         ("hole", "tipAngleStyle" | "tipAngleV3") => Some("hole-drill-angle"),
+        // Counterbore, countersink and tap rows too (qa5 ADV4: text labels
+        // truncated the values); our own drawings of Onshape's ideas.
+        ("hole", "cBoreDiameterV3") => Some("hole-cbore-diameter"),
+        ("hole", "cBoreDepthV3") => Some("hole-cbore-depth"),
+        ("hole", "cSinkDiameterV3") => Some("hole-csink-diameter"),
+        ("hole", "cSinkAngleV3") => Some("hole-csink-angle"),
+        ("hole", "tapDrillDiameterV3") => Some("hole-tap-diameter"),
+        ("hole", "tappedDepthV3") => Some("hole-tapped-depth"),
         // Live (part-studio/102, dom/dialog-copy-here.txt): Translate by
         // XYZ rows start with an axis icon instead of a label.
         ("transform", "dx") => Some("xyz-along-x"),
@@ -2777,6 +2965,9 @@ impl Render for FeatureDialog {
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
+            // Live registers feature dialogs with its panel layout manager:
+            // moved panels snap to their edges too.
+            .child(crate::ui::panel_probe("feature-dialog"))
             .on_action(cx.listener(|_, _: &crate::actions::Accept, _, cx| cx.emit(DialogEvent::Accept { repeat: false })))
             // Tab / Shift+Tab walk the controls in paint (DOM) order; past
             // either end the focus leaves the dialog (live psb 10-19 h).
@@ -2864,7 +3055,8 @@ impl Render for FeatureDialog {
                             }))
                             .into_any_element(),
                     })
-                    .child(
+                    // Live (psb 10-21 g): a dialog in configure mode has only ✕.
+                    .when(!self.configure_mode, |d| d.child(
                         Button::new("dlg-ok")
                             // Live: the ✓ / ✕ are not Tab stops.
                             .tab_stop(false)
@@ -2884,7 +3076,8 @@ impl Render for FeatureDialog {
                             // Live (dom/cursors.txt): ✓ and ✗ show the default arrow
                             // (`.ns-dialog-button-ok/-cancel`), enabled or not.
                             .cursor(CursorStyle::Arrow)
-                            .tooltip("Accept (Enter)")
+                            // Live (psb 10-21 e): ✓ and ✕ have no tooltip in
+                            // any dialog (no title either).
                             // Onshape: the ✓ is disabled while the feature errors
                             // (Enter still commits it).
                             .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
@@ -2892,7 +3085,7 @@ impl Render for FeatureDialog {
                                     cx.emit(DialogEvent::Accept { repeat: false })
                                 }
                             })),
-                    )
+                    ))
                     .child(
                         Button::new("dlg-cancel")
                             .tab_stop(false)
@@ -2903,11 +3096,24 @@ impl Render for FeatureDialog {
                             .p_0()
                             .rounded(px(0.))
                             .cursor(CursorStyle::Arrow)
-                            .tooltip("Cancel (Esc)")
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(DialogEvent::Cancel))),
                     ),
             )
-            .child(v_flex().id("dialog-body").px(px(2.)).pb(px(4.)).overflow_y_scroll().children(rows))
+            .child(v_flex().id("dialog-body").px(px(2.)).pb(px(4.)).overflow_y_scroll().children(rows).when(self.configure_mode, |d| {
+                // Live (psb 10-21 g): configure mode ends with ☑ "Unsuppressed",
+                // so suppression can be configured too.
+                let key = noshape_model::configuration::SUPPRESSED_PARAM;
+                let mut el = div().id("cfg-unsuppressed").cursor_pointer().child(crate::ui::os_checkbox("cfg-unsuppressed-box", "Unsuppressed", !self.feature.suppressed)).capture_any_mouse_down(cx.listener(move |_, e: &MouseDownEvent, _, cx| {
+                    if e.button == MouseButton::Left {
+                        cx.stop_propagation();
+                        cx.emit(DialogEvent::ConfigureParam(key.to_string()));
+                    }
+                }));
+                if self.configured.contains(key) {
+                    el = el.border_2().border_dashed().border_color(gpui_kit::rgb(0xfab601)).tooltip(crate::ui::tooltip("Configured"));
+                }
+                d.child(el)
+            }))
             // Live (`osc-resize-handle.osc-x`, dom/cursor-rows.json): a 3 px
             // handle inside the right edge resizes the width only; there is
             // no corner grip.
@@ -3133,4 +3339,26 @@ fn split_part_value(value: &str) -> (String, Option<String>) {
         Some((t, p)) => (t.to_string(), Some(p.to_string())),
         None => (value.to_string(), None),
     }
+}
+
+/// A field outside the dialog asking for the Create variable popup
+/// ([`FeatureDialog::open_external_create_variable`]).
+pub(crate) struct ExternalField {
+    /// The field's path in the dialog (any unique key).
+    pub path: &'static str,
+    pub state: Entity<InputState>,
+    /// The variable's kind (the popup's Length / Angle / Number tab).
+    pub kind: Option<noshape_model::params::NumKind>,
+    /// The popup's Value: the field's previous value.
+    pub previous: String,
+    /// The name typed after `#`.
+    pub name: String,
+}
+
+/// A parameter's Configure / Unconfigure context-menu item (live psb 10-21 g).
+fn configure_items(m: crate::os_menu::OsMenu, view: &Entity<FeatureDialog>, param: &str, configured: bool) -> crate::os_menu::OsMenu {
+    let (v, p) = (view.clone(), param.to_string());
+    m.item(crate::os_menu::OsMenuItem::new(if configured { "Unconfigure" } else { "Configure" }).on_click(move |_, _, cx| {
+        v.update(cx, |_, cx| cx.emit(if configured { DialogEvent::UnconfigureParam(p.clone()) } else { DialogEvent::ConfigureParam(p.clone()) }))
+    }))
 }

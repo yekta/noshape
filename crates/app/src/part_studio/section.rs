@@ -125,6 +125,11 @@ impl PartStudioView {
 
     /// Shift+X: open the dialog; with a section on and no dialog, turn it off.
     pub(super) fn toggle_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Live (psb 10-21 f, qa4 F14): with a feature dialog open, Shift+X
+        // does nothing (Section view is only offered once it closes).
+        if self.edit.is_some() && self.ui.section_dialog.is_none() {
+            return;
+        }
         if self.ui.section_dialog.is_some() {
             self.close_section_dialog(false, window, cx);
         } else if !self.ui.section.is_empty() {
@@ -369,6 +374,7 @@ impl PartStudioView {
             v_flex()
                 .id("section-dialog")
                 .occlude()
+                .child(crate::ui::panel_probe("ps-section"))
                 .absolute()
                 .top(px(0.))
                 .left(px(0.))
@@ -438,6 +444,20 @@ impl PartStudioView {
                 )
                 .into_any_element(),
         )
+    }
+
+    /// The offset box beside the section arrow, drawn in the 3D frame (it
+    /// follows the camera without a window redraw); [`Self::render_section_value`]
+    /// is the GPUI element it reproduces.
+    pub(super) fn section_value_label(&self, window: &Window, cx: &App) -> Option<noshape_render::overlay::Label> {
+        let a = self.section_arrow()?;
+        let d = self.ui.section_dialog.as_ref()?;
+        let pl = self.ui.section.get(d.active)?;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let text = noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units);
+        let pal = p();
+        let b = crate::overlay_labels::ValueBox { text: &text, text_size: 12., text_color: pal.text.into(), background: gpui_kit::rgb(0xffffff).into(), border: Some(pal.accent.into()), pad_x: 4., offset: [12., -10.] };
+        crate::overlay_labels::value_box(window, cx, &b, a.base + a.dir * a.length)
     }
 
     /// The offset box beside the section arrow (live: e.g. "-0.91 in").

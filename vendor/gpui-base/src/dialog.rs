@@ -86,14 +86,24 @@ fn request_open_change(
     }
 }
 
+// NOSHAPE PATCH: Enter is its own action, so a dialog can refuse it (see
+// `Dialog::enter_confirms`) while a clicked OK button still confirms.
+gpui::actions!(ui, [ConfirmByKey]);
+
 pub fn init(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("escape", Cancel, Some(CONTEXT)),
-        KeyBinding::new("enter", Confirm { secondary: false }, Some(CONTEXT)),
+        KeyBinding::new("enter", ConfirmByKey, Some(CONTEXT)),
     ]);
 }
 
 impl Dialog {
+    /// NOSHAPE PATCH: whether Enter confirms the dialog (default true).
+    pub fn enter_confirms(mut self, on: bool) -> Self {
+        self.enter_confirms = on;
+        self
+    }
+
     pub fn on_ok(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) -> bool + 'static,
@@ -134,6 +144,9 @@ pub struct Dialog {
     popup: Option<AnyElement>,
     children: SmallVec<[AnyElement; 2]>,
     on_ok: Decision,
+    /// NOSHAPE PATCH: whether Enter confirms (a dialog without an OK
+    /// decision of its own keeps its edits on Enter).
+    enter_confirms: bool,
     on_cancel: Decision,
     on_close: Closed,
     request_close: CloseRequest,
@@ -435,6 +448,7 @@ impl Dialog {
             popup: None,
             children: SmallVec::new(),
             on_ok: Rc::new(|_, _, _| true),
+            enter_confirms: true,
             on_cancel: Rc::new(|_, _, _| true),
             on_close: Rc::new(|_, _, _| {}),
             request_close: Rc::new(|_, _, _| {}),
@@ -534,6 +548,7 @@ impl RenderOnce for Dialog {
         let request_close = self.request_close;
         let cancel = self.on_cancel.clone();
         let confirm = self.on_ok.clone();
+        let enter_confirms = self.enter_confirms;
         let closed = self.on_close.clone();
         let overlay_closable = self.overlay_closable && self.topmost;
         let dismiss_below_y = self.dismiss_below_y;
@@ -582,6 +597,11 @@ impl RenderOnce for Dialog {
                                 request_cancel(false, window, cx);
                                 closed_cancel(&event, window, cx);
                             }
+                        })
+                        .when(enter_confirms, |this| {
+                            this.on_action(|_: &ConfirmByKey, window, cx| {
+                                window.dispatch_action(Box::new(Confirm { secondary: false }), cx)
+                            })
                         })
                         .on_action(move |_: &Confirm, window, cx| {
                             let event = ClickEvent::default();

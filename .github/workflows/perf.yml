@@ -1,6 +1,7 @@
 name: Viewport performance
 
-# Viewport benchmarks (viewport.rs `OrbitBench`, docs/ARCHITECTURE.md
+# Release smoke test on every macOS / Windows / Linux runner (job `smoke`),
+# and viewport benchmarks (viewport.rs `OrbitBench`, docs/ARCHITECTURE.md
 # "Measuring") of a release, or of any ref built from source, on real runners:
 # macOS (Apple silicon, paravirtualized Metal: the reference), Windows (WARP)
 # and Linux (Xvfb, lavapipe) smoke tests. Logs, screenshots and summary.json
@@ -31,8 +32,17 @@ on:
         description: Frames per benchmark run
         required: false
         default: '300'
+      jobs:
+        description: Which jobs to run
+        type: choice
+        options: [all, smoke, bench]
+        default: all
       variants:
-        description: 'Extra texture orbit runs on macOS, e.g. msaa1:NOSHAPE_PERF_MSAA=1 nolines:NOSHAPE_PERF_SKIP=lines'
+        description: 'Extra texture orbit runs on macOS and Linux, e.g. msaa1:NOSHAPE_PERF_MSAA=1 noinst:NOSHAPE_PERF_SKIP=instancing'
+        required: false
+        default: ''
+      fixture:
+        description: 'Benchmark document in the repo (default the NIST assembly; tests/perf/parts-1000.noshape: 1000 parts, instancing). No baseline unless default'
         required: false
         default: ''
   workflow_run:
@@ -44,7 +54,7 @@ permissions:
   actions: read
 
 env:
-  FIXTURE: tests/perf/nist-mtc-crada-assembly.noshape
+  FIXTURE: ${{ inputs.fixture || 'tests/perf/nist-mtc-crada-assembly.noshape' }}
   UI_CPU_P95_MS: '4'
   GPU_P95_MS: '6'
   MAX_REGRESSION: '0.10'
@@ -52,9 +62,103 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  # Release smoke test (crates/app/src/smoke.rs, .github/perf/smoke.sh): the
+  # release build runs with NOSHAPE_SMOKE=1, which shows every cursor style
+  # through the platform (v0.4.3 aborted on macOS 27 at the first Move
+  # cursor), opens every studio, a sketch with the Dimension tool, the main
+  # dialogs, panels and right-click menus, orbits and quits. A crash, abort,
+  # hang or non-zero exit fails the job; its log and any crash reports
+  # (~/Library/Logs/DiagnosticReports, Windows LocalDumps) are uploaded.
+  # macOS: 14, 15 and the newest runner image (26; add the next one when
+  # GitHub publishes it).
+  smoke:
+    name: Smoke ${{ matrix.name }}
+    if: (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'bench'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS 14, os: macos-14, asset: macos-arm64.dmg }
+          - { name: macOS 15, os: macos-15, asset: macos-arm64.dmg }
+          - { name: macOS 26, os: macos-26, asset: macos-arm64.dmg }
+          - { name: Windows, os: windows-latest, asset: windows-x86_64.zip }
+          - { name: Linux, os: ubuntu-24.04, asset: linux-x86_64.tar.gz }
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NOSHAPE_NO_NATIVE_DIALOGS: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/noshape-binary
+        with:
+          tag: ${{ inputs.tag }}
+          ref: ${{ inputs.ref }}
+          asset: ${{ matrix.asset }}
+
+      - name: Smoke (macOS)
+        if: runner.os == 'macOS'
+        run: .github/perf/smoke.sh "$BIN" "$RUNNER_TEMP/smoke"
+
+      - name: Smoke (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb mesa-vulkan-drivers libvulkan1 \
+            libxkbcommon-x11-0 libxcb-xkb1 libx11-xcb1 libfontconfig1
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 2
+          DISPLAY=:99 .github/perf/smoke.sh "$BIN" "$RUNNER_TEMP/smoke"
+
+      - name: Smoke (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Crash dumps of the app (Windows Error Reporting LocalDumps).
+          $out = "$env:RUNNER_TEMP\smoke"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\noshape.exe'
+          New-Item -Path $key -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpFolder -Value $out -PropertyType ExpandString -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpType -Value 1 -PropertyType DWord -Force | Out-Null
+          $env:NOSHAPE_SMOKE = '1'
+          # Every cursor image as a .cur file, for the next step.
+          $env:NOSHAPE_CURSOR_DUMP = "$out\cursor-files"
+          $log = "$out\smoke.log"
+          $p = Start-Process -FilePath $env:BIN -ArgumentList '--demo-drawing' -RedirectStandardError $log -RedirectStandardOutput "$out\stdout.log" -PassThru
+          if (-not $p.WaitForExit(480000)) {
+            Stop-Process -Id $p.Id -Force
+            Add-Content $log 'SMOKE KILLED: no exit after 480s'
+          }
+          $p.WaitForExit()
+          Start-Sleep -Seconds 5
+          Select-String -Path $log -Pattern '^SMOKE' | ForEach-Object { $_.Line }
+          '--- last lines of the log'
+          Get-Content $log -Tail 40
+          "exit status $($p.ExitCode)"
+          Get-ChildItem $out
+          if ($p.ExitCode -ne 0) { "::error::noshape exited with status $($p.ExitCode) (smoke test)"; exit 1 }
+          if (-not (Select-String -Path $log -Pattern '^SMOKE done' -Quiet)) { '::error::noshape exited without finishing the smoke test'; exit 1 }
+
+      # The cursors as Windows itself loads and draws them (LoadImage and
+      # CreateIconIndirect, hot spots read back, drawn with DrawIconEx):
+      # cursors/cursors-sheet.png and cursors.txt in the smoke artifact.
+      - name: Cursors (Windows)
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        run: .github/perf/cursors.ps1 -CurDir "$env:RUNNER_TEMP\smoke\cursor-files" -OutDir "$env:RUNNER_TEMP\smoke\cursors"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: smoke-${{ matrix.os }}
+          path: ${{ runner.temp }}/smoke
+          if-no-files-found: warn
+
   bench:
     name: ${{ matrix.name }}
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    if: (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'smoke'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 240
     strategy:
@@ -87,110 +191,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # ---------------------------------------------------------------- the build
-      - name: Release
-        if: inputs.ref == ''
-        shell: bash
-        run: |
-          tag="${{ inputs.tag }}"
-          [[ -n "$tag" ]] || tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
-          echo "BUILD=$tag" >> "$GITHUB_ENV"
-          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "*-${{ matrix.asset }}" --dir "$RUNNER_TEMP/release"
-
-      - name: Source
-        if: inputs.ref != ''
-        uses: actions/checkout@v7
+      - uses: ./.github/actions/noshape-binary
         with:
+          tag: ${{ inputs.tag }}
           ref: ${{ inputs.ref }}
-          path: src
-
-      - name: Build dependencies (Linux)
-        if: inputs.ref != '' && runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build pkg-config \
-            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev \
-            libx11-dev libx11-xcb-dev libxcb1-dev libxi-dev libxcursor-dev libxrandr-dev \
-            libfontconfig-dev libfreetype-dev libssl-dev libzstd-dev libasound2-dev
-
-      - name: Build dependencies (macOS)
-        if: inputs.ref != '' && runner.os == 'macOS'
-        run: |
-          brew install ninja || true
-          xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
-
-      - name: MSVC developer environment (Windows)
-        if: inputs.ref != '' && runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
-            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
-          }
-
-      - name: OpenCascade
-        if: inputs.ref != ''
-        uses: ./src/.github/actions/setup-occt
-
-      - name: openNURBS
-        if: inputs.ref != ''
-        uses: ./src/.github/actions/setup-opennurbs
-
-      - name: Rust toolchain
-        if: inputs.ref != ''
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        if: inputs.ref != ''
-        with:
-          workspaces: src
-          key: occt-V8_0_1
-
-      # PowerShell on Windows: under bash, Git's coreutils `link` shadows MSVC's link.exe.
-      - name: Build (release, Windows)
-        if: inputs.ref != '' && runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cd src
-          cargo build --release --locked -p noshape
-          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\built" | Out-Null
-          Copy-Item target/release/noshape.exe "$env:RUNNER_TEMP\built\"
-          "BIN=$env:RUNNER_TEMP\built\noshape.exe" >> $env:GITHUB_ENV
-          "BUILD=${{ inputs.ref }}@$(git rev-parse --short HEAD)" >> $env:GITHUB_ENV
-
-      - name: Build (release)
-        if: inputs.ref != '' && runner.os != 'Windows'
-        shell: bash
-        run: |
-          cd src
-          cargo build --release --locked -p noshape
-          echo "BUILD=${{ inputs.ref }}@$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/built"
-          if [[ "$RUNNER_OS" == macOS ]]; then
-            # Bundled like the release (an unbundled binary is not a regular app).
-            app="$RUNNER_TEMP/noshape.app"
-            mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-            cp target/release/noshape "$app/Contents/MacOS/noshape"
-            cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
-            sed "s/@VERSION@/0.0.0/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
-            codesign --force --deep --sign - "$app"
-            echo "BIN=$app/Contents/MacOS/noshape" >> "$GITHUB_ENV"
-          else
-            cp target/release/noshape "$RUNNER_TEMP/built/"
-            echo "BIN=$RUNNER_TEMP/built/noshape" >> "$GITHUB_ENV"
-          fi
+          asset: ${{ matrix.asset }}
 
       # ------------------------------------------------------------ the runner
       - name: Install (macOS)
         if: runner.os == 'macOS'
         run: |
-          if [[ -z "${BIN:-}" ]]; then
-            hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" "$RUNNER_TEMP"/release/*.dmg
-            cp -R "$RUNNER_TEMP/dmg/noshape.app" "$RUNNER_TEMP/noshape.app"
-            hdiutil detach "$RUNNER_TEMP/dmg"
-            echo "BIN=$RUNNER_TEMP/noshape.app/Contents/MacOS/noshape" >> "$GITHUB_ENV"
-          fi
           echo "DELAY=60" >> "$GITHUB_ENV"
           system_profiler SPDisplaysDataType | sed -n 1,40p
           python3 -m pip install --quiet --break-system-packages pillow || python3 -m pip install --quiet --user pillow
@@ -201,10 +211,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb imagemagick mesa-vulkan-drivers libvulkan1 \
             libxkbcommon-x11-0 libxcb-xkb1 libx11-xcb1 libfontconfig1 python3-pil
-          if [[ -z "${BIN:-}" ]]; then
-            tar xzf "$RUNNER_TEMP"/release/*.tar.gz -C "$RUNNER_TEMP"
-            echo "BIN=$(ls -d "$RUNNER_TEMP"/noshape-*/)noshape" >> "$GITHUB_ENV"
-          fi
           echo "DELAY=120" >> "$GITHUB_ENV"
           echo "FRAMES=60" >> "$GITHUB_ENV"
           Xvfb :99 -screen 0 1920x1080x24 &
@@ -214,10 +220,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (-not $env:BIN) {
-            Expand-Archive (Get-ChildItem "$env:RUNNER_TEMP\release\*.zip").FullName -DestinationPath "$env:RUNNER_TEMP"
-            "BIN=$((Get-ChildItem "$env:RUNNER_TEMP\noshape-*\noshape.exe").FullName)" >> $env:GITHUB_ENV
-          }
           "DELAY=150" >> $env:GITHUB_ENV
           "FRAMES=60" >> $env:GITHUB_ENV
           python -m pip install --quiet pillow
@@ -226,7 +228,7 @@ jobs:
       - name: Benchmarks
         if: runner.os != 'Windows'
         env:
-          VARIANTS: ${{ runner.os == 'macOS' && inputs.variants || '' }}
+          VARIANTS: ${{ inputs.variants || '' }}
         run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ matrix.modes }}
 
       - name: Benchmarks (Windows)
@@ -235,6 +237,7 @@ jobs:
         run: .github/perf/bench.ps1 $env:BIN $env:FIXTURE "$env:RUNNER_TEMP\perf" ${{ matrix.modes }}
 
       - name: Baseline (last successful run on main)
+        if: inputs.fixture == ''
         continue-on-error: true
         shell: bash
         run: |

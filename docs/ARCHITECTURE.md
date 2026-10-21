@@ -157,10 +157,14 @@ small with cached views (`crate::cached_slice::Slice`, inserted with
   dialog sits between its `underlay` and `overlay` slices, the features list's
   head (with the filter) is rendered with the studio and its rows are a slice,
   the Assembly's left dialogs (`render_left_layer`) sit between `under` and
-  `overlay`, the Insert panel's search box sits between its sized slices.
-* **No cached view inside another one that re-renders.** Re-rendering a cached
-  view re-renders every cached view nested in it (`window.refreshing` in
-  vendor/gpui-pre/src/view.rs): slices are siblings under a plain view.
+  `overlay` in a layer the workspace draws in front of the Assembly, the Insert panel's search box sits between its sized slices.
+* **Nested cached views** are reused when their parent cached view
+  re-renders (NOSHAPE PATCH in vendor/gpui-pre/src/view.rs; upstream
+  re-rendered them all, `NOSHAPE_NESTED_VIEW_REFRESH=1`), but only if they
+  were drawn in the previous frame: one inside a parent that was reused last
+  frame is re-rendered. The workspace draws the Assembly as a cached view
+  with its slices inside it, and its left dialogs in front of it
+  (`AssemblyView::front_host`).
 * **A definite size.** A cached view is laid out from its style alone. A
   floating panel of content size goes in an absolute full-size slice (the
   drawing's panel layer); a row of content height uses `Slice::sized`
@@ -171,6 +175,13 @@ small with cached views (`crate::cached_slice::Slice`, inserted with
 * **A field's change notifies only what shows it,** not the whole view
   (`filter_rows_changed`, `insert_search_changed`), and only when what it
   shows changes (the Part Studio filter compares the matching features).
+* **Long lists draw only what shows.** The Part Studio feature list tracks a
+  `ScrollHandle` and leaves out the fixed-height rows outside its view (2 rows
+  to spare), each run replaced by one empty block of the same height
+  (`render_feature_list`); a wheel scroll notifies the slice, which then draws
+  the rows that came into view. A row's element tree costs ~0.3 ms (dev
+  build) to build, lay out and paint, so a 60-feature list cost ~16 ms when a
+  filter key brought every row back.
 * **Nothing heavy in render:** no clone of the model (borrow it, or plan the
   rows first: `render_feature_list`), no parse of a document per render
   (`feature_studio::outline_of` caches by the text), tooltip texts worked out

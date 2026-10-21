@@ -15,8 +15,29 @@ use gpui_kit::*;
 use noshape_model::document::{Document, TabContent, TabId};
 use noshape_model::file_tab::{FileKind, FileTab};
 
-/// The tab-bar / card icon of a file.
+/// The tab-bar / card icon of a file: Onshape's per-format art (live
+/// tabbar/icons2-filetab-*: STEP, X_T, X_B, JT, STL, PVZ, 3MF, SolidWorks,
+/// DXF/DWG, DWT, TXT, ZIP have their own; IGES, SAT, 3DM, CATIA, Inventor,
+/// Solid Edge and NX share the generic geometry card; CSV / JSON the page).
 pub fn file_icon(f: &FileTab) -> &'static str {
+    let ext = f.file_name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default();
+    match ext.as_str() {
+        "step" | "stp" => return "file-cad",
+        "x_t" | "xmt_txt" => return "file-x_t",
+        "x_b" | "xmt_bin" => return "file-x_b",
+        "jt" => return "file-jt",
+        "stl" => return "file-stl",
+        "pvz" => return "file-pvz",
+        "3mf" => return "file-3mf",
+        "sldprt" | "sldasm" | "slddrw" => return "file-sw",
+        "dxf" | "dwg" => return "file-dwg",
+        "dwt" => return "file-dwt",
+        "txt" => return "file-txt",
+        "zip" => return "file-zip",
+        "igs" | "iges" | "sat" | "sab" | "3dm" | "catpart" | "catproduct" | "ipt" | "iam" | "par" | "psm" | "asm" | "prt" | "obj" | "brep" | "x3d" => return "file-geometry",
+        "csv" | "json" => return "file",
+        _ => {}
+    }
     match f.kind() {
         FileKind::Cad => "file-cad",
         FileKind::Drawing2d | FileKind::Template => "file-dwg",
@@ -170,7 +191,7 @@ impl Render for FileTabView {
 /// insert it; "Import" brings a local file into the document (as a file
 /// tab) and inserts it.
 pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [FileKind], exts: &'static [&'static str], window: &mut Window, cx: &mut App, on_pick: impl Fn(FileTab, &mut Window, &mut App) + 'static) {
-    let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search files"));
+    let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search files"));
     let on_pick = std::rc::Rc::new(on_pick);
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();

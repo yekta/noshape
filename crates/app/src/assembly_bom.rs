@@ -58,10 +58,19 @@ impl AssemblyView {
     }
 
     fn edit_bom_cell(&mut self, row: usize, col: BomColumn, current: String, window: &mut Window, cx: &mut Context<Self>) {
-        let input = cx.new(|cx| InputState::new(window, cx).default_value(current));
+        self.edit_bom_cell_with(row, col, current, true, window, cx);
+    }
+
+    /// Edit a cell starting from `text`, selected (double-click) or with the
+    /// caret after it (typing into the selected cell).
+    fn edit_bom_cell_with(&mut self, row: usize, col: BomColumn, text: String, select: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let input = cx.new(|cx| InputState::new(window, cx));
         input.update(cx, |s, cx| {
+            s.set_value(text, window, cx);
             s.focus(window, cx);
-            s.select_all(window, cx);
+            if select {
+                s.select_all(window, cx);
+            }
         });
         let sub = cx.subscribe_in(&input, window, move |this: &mut Self, _, ev: &InputEvent, window, cx| match ev {
             InputEvent::PressEnter { .. } => {
@@ -73,6 +82,21 @@ impl AssemblyView {
         });
         self.ui.bom_edit = Some(BomEdit { row, col, input, _sub: sub });
         cx.notify();
+    }
+
+    /// Typing into the selected cell starts editing it with the typed text
+    /// (spreadsheet style, live; qa5 A11). True when the key was taken.
+    pub(super) fn bom_type_into(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if self.panel != Some(SidePanel::Bom) || self.ui.bom_edit.is_some() || !self.focus.is_focused(window) {
+            return false;
+        }
+        let Some((row, col)) = self.ui.bom_selected else { return false };
+        let Some(line) = self.bom_lines(cx).get(row).cloned() else { return false };
+        if !bom::editable(&line, col) || col.edit() != CellEdit::Text {
+            return false;
+        }
+        self.edit_bom_cell_with(row, col, text.to_string(), false, window, cx);
+        true
     }
 
     fn commit_bom_cell(&mut self, cx: &mut Context<Self>) {
@@ -474,4 +498,35 @@ fn rows_cell_input(el: &mut Stateful<Div>, st: &Entity<InputState>) {
 fn srgb(v: f32) -> f32 {
     let v = v.clamp(0.0, 1.0);
     if v <= 0.003_130_8 { v * 12.92 } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 }
+}
+
+/// The text a keystroke types into a selected BOM cell: a printable
+/// character without Ctrl / Alt / Cmd / Fn (those stay shortcuts).
+pub(crate) fn typed_text(k: &gpui_kit::Keystroke) -> Option<String> {
+    if k.modifiers.control || k.modifiers.alt || k.modifiers.platform || k.modifiers.function {
+        return None;
+    }
+    k.key_char.clone().filter(|t| !t.is_empty() && !t.chars().any(char::is_control))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::typed_text;
+
+    #[test]
+    fn typing_into_a_bom_cell_takes_printable_keys_only() {
+        // What the platform reports for a key: modifiers, key, typed character.
+        let k = |mods: &str, key: &str, ch: Option<&str>| {
+            let mut s = gpui_kit::Keystroke::parse(&if mods.is_empty() { key.to_string() } else { format!("{mods}-{key}") }).unwrap();
+            s.key_char = ch.map(String::from);
+            s
+        };
+        assert_eq!(typed_text(&k("", "p", Some("p"))).as_deref(), Some("p"));
+        assert_eq!(typed_text(&k("shift", "p", Some("P"))).as_deref(), Some("P"));
+        assert_eq!(typed_text(&k("", "space", Some(" "))).as_deref(), Some(" "));
+        assert_eq!(typed_text(&k("ctrl", "z", Some("z"))), None);
+        assert_eq!(typed_text(&k("cmd", "c", Some("c"))), None);
+        assert_eq!(typed_text(&k("", "escape", None)), None);
+        assert_eq!(typed_text(&k("", "enter", Some("\n"))), None);
+    }
 }

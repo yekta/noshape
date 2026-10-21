@@ -82,6 +82,9 @@ pub struct UiState {
     pub last_click: Option<(Reference, Instant)>,
     /// Focus of the feature list (rollback bar arrow keys).
     pub list_focus: FocusHandle,
+    /// The feature list's scroll position and size (qa4: rows out of view
+    /// are drawn as empty rows, `render_feature_list`).
+    pub list_scroll: ScrollHandle,
     /// The rollback bar took the keyboard (↑/↓ or a click on it) while these
     /// features were selected; it reads light blue until the selection changes.
     pub rollback_keyboard: Option<Vec<noshape_model::reference::FeatureId>>,
@@ -198,8 +201,9 @@ pub struct UiState {
     pub tb_custom: Option<crate::toolbar_customize::Customize>,
     /// The Isolate slider being dragged (pressed on it, button still down).
     pub iso_slider_drag: Option<&'static str>,
-    /// Whether the toolbar fits, from the last layout.
-    pub tb_fit: super::ToolbarFit,
+    /// The info message whose 5 s auto-dismiss is running (live: Onshape's
+    /// message bubbles close after 5000 ms; errors and warnings stay).
+    pub message_timed: Option<(noshape_model::display::FeatureStatus, String)>,
     /// Preview slider value and the model before the edited feature.
     pub preview_opacity: f32,
     pub preview_before: Option<Arc<StudioDisplay>>,
@@ -252,6 +256,9 @@ pub struct UiState {
     pub sized_for_wpp: f64,
     /// The sketch dimension box moved by its drag strip (reset when a box opens).
     pub dim_box_offset: Point<Pixels>,
+    /// The dimension box's text doesn't evaluate (live: the field's invalid
+    /// state, ✓ disabled, the box stays open; cleared by typing).
+    pub dim_invalid: bool,
     /// The translate triad's hovered handle and running drag (triad.rs).
     pub triad_hover: Option<usize>,
     pub triad_drag: Option<super::triad::TriadDrag>,
@@ -325,6 +332,7 @@ impl UiState {
             anchor: None,
             last_click: None,
             list_focus: cx.focus_handle(),
+            list_scroll: ScrollHandle::new(),
             rollback_keyboard: None,
             dependencies: None,
             cube_hover: None,
@@ -385,7 +393,7 @@ impl UiState {
             toolbar: super::toolbar_prefs::ToolbarPrefs::load(),
             tb_custom: None,
             iso_slider_drag: None,
-            tb_fit: Default::default(),
+            message_timed: None,
             preview_opacity: 1.0,
             preview_before: None,
             before_context: None,
@@ -411,6 +419,7 @@ impl UiState {
             manip_hover: false,
             sized_for_wpp: 0.0,
             dim_box_offset: Point::default(),
+            dim_invalid: false,
             triad_hover: None,
             triad_drag: None,
             transform_ghost: Vec::new(),
@@ -543,7 +552,7 @@ impl PartStudioView {
 
     /// Hover target in the graphics area, expanded like the selection.
     pub(super) fn highlighted_hover(&self, cx: &App) -> Vec<Reference> {
-        if let Some(f) = self.ui.list_hover.or(self.ui.list_menu) {
+        if let Some(f) = self.ui.list_hover.or(self.ui.list_menu).or(self.ui.insp.hover_feature) {
             return self.feature_geometry(f);
         }
         if self.ui.var_hover.is_some() {
@@ -604,6 +613,8 @@ impl PartStudioView {
 
     pub(super) fn related_features(&self, cx: &App) -> HashSet<FeatureId> {
         let mut out = self.variable_users(cx);
+        // A hovered Characteristics row lights up its feature (live tl-99a).
+        out.extend(self.ui.insp.hover_feature);
         // In a feature dialog: what its fields picked (live part-studio/440:
         // Part 1 in Transform's field lights up Extrude 1).
         let picked = self.edit.as_ref().map(|e| e.dialog.read(cx).selected_refs());
@@ -1214,7 +1225,6 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .tooltip(crate::ui::tooltip("Accept (Enter)"))
                                 .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_dynamic_suppression(window, cx))),
                         )
@@ -1227,7 +1237,6 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                                 .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.dyn_suppression = None;
@@ -1909,6 +1918,16 @@ impl PartStudioView {
         let transparent = self.isolation_transparent();
         let look = iso_look(iso.opacity);
         let mut d = (*self.display).clone();
+        // Live (qa5 KB3): isolating also takes the default planes and the
+        // origin out of the view (Make transparent leaves them).
+        if iso.mode == IsolateMode::Isolate {
+            for p in &mut d.planes {
+                if matches!(p.reference, Reference::Plane(_)) {
+                    p.hidden = true;
+                }
+            }
+            d.show_origin = false;
+        }
         for b in &mut d.bodies {
             if transparent.contains(&b.id) {
                 match look {
@@ -2439,7 +2458,7 @@ impl PartStudioView {
                 points.push(sprite(m, [255, 169, 10, 255], 11.0));
             }
         }
-        if self.active_field_filter(cx).is_none_or(|f| f.intersects(QueryFilter::POINT_LIKE))
+        if self.active_field_filter(cx).is_none_or(field_takes_points)
             && (self.edit.is_none() || self.active_field_filter(cx).is_some())
             && self.sketch.is_none()
             && let Some(r @ (Reference::Edge(_) | Reference::SketchEntity { .. })) = &self.hover
@@ -2455,6 +2474,7 @@ impl PartStudioView {
     }
 
     /// An edge click within ~8 px of its midpoint selects the midpoint.
+    /// (Only for fields that take points, [`field_takes_points`].)
     pub(super) fn midpoint_pick(&self, t: PickTarget, position: DVec2, cx: &App) -> PickTarget {
         if self.sketch.is_some() {
             return t;
@@ -2560,7 +2580,7 @@ impl PartStudioView {
         if self.ui.filter.is_some() {
             return;
         }
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder("Filter by name or type"));
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Filter by name or type"));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
                 // No `cx.notify()`: the field's own notification already
@@ -2964,5 +2984,42 @@ pub(super) fn iso_look(t: f32) -> IsoLook {
         IsoLook::Hidden
     } else {
         IsoLook::SeeThrough((0.66 - (t - 0.1) * 0.7625).max(0.03))
+    }
+}
+
+/// A field takes an edge's midpoint (Onshape's implicit point): it takes
+/// points, or mate connectors without taking edges. A Direction field takes
+/// mate connectors (their Z axis) and edges: a click at an edge's midpoint
+/// picks the edge (qa4 F11, live).
+pub(super) fn field_takes_points(f: QueryFilter) -> bool {
+    f.intersects(QueryFilter(QueryFilter::VERTEX.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::POINT_BODY.0)) || (f.intersects(QueryFilter::MATE_CONNECTOR) && !f.intersects(QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::LINEAR_EDGE.0)))
+}
+
+#[cfg(test)]
+mod field_point_tests {
+    use super::field_takes_points;
+    use noshape_model::params::QueryFilter;
+
+    #[test]
+    fn face_fields_take_no_edges() {
+        use crate::scene_builder::PickKind;
+        use noshape_model::reference::Reference;
+        let r = Reference::Origin;
+        let km = super::super::kind_matches;
+        assert!(!km(PickKind::Edge, &r, QueryFilter::ANY_FACE), "qa5 I2");
+        assert!(!km(PickKind::SketchCurve, &r, QueryFilter::ANY_FACE));
+        assert!(km(PickKind::Face, &r, QueryFilter::ANY_FACE));
+        assert!(km(PickKind::Edge, &r, QueryFilter::AXIS) && km(PickKind::Edge, &r, QueryFilter::DIRECTION));
+        assert!(km(PickKind::Face, &r, QueryFilter::AXIS), "a cylinder gives its axis");
+        assert!(km(PickKind::SketchCurve, &r, QueryFilter::ANY_EDGE));
+    }
+
+    #[test]
+    fn direction_fields_take_the_edge_not_its_midpoint() {
+        assert!(!field_takes_points(QueryFilter::DIRECTION));
+        assert!(!field_takes_points(QueryFilter::AXIS));
+        assert!(field_takes_points(QueryFilter::POINT_LIKE));
+        assert!(field_takes_points(QueryFilter::MATE_CONNECTOR));
+        assert!(field_takes_points(QueryFilter::SKETCH_POINT | QueryFilter::MATE_CONNECTOR));
     }
 }

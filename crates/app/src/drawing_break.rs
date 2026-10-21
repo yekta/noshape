@@ -33,7 +33,7 @@ impl DrawingEditor {
                 let mm = self.drawing.units_mm;
                 let text = if mm { "6 mm".to_string() } else { "0.25 in".to_string() };
                 let gap = crate::drawing_section::parse_depth(&text, mm).unwrap_or(0.006) * 1000.0;
-                let st = cx.new(|cx| InputState::new(window, cx).default_value(text));
+                let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
                 let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
                     if matches!(ev, InputEvent::Change)
                         && let Some(v) = crate::drawing_section::parse_depth(&st.read(cx).value(), mm)

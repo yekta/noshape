@@ -201,7 +201,7 @@ impl PartStudioView {
         let transparency = 1.0 - color[3].clamp(0.0, 1.0);
         let hex = cx.new(|cx| InputState::new(window, cx).default_value(hex_field(rgb)));
         let channels = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).default_value(rgb[i].to_string())));
-        let alpha = cx.new(|cx| InputState::new(window, cx).default_value(format!("{:.2}", 1.0 - transparency)));
+        let alpha = cx.new(|cx| InputState::new(window, cx).default_value(noshape_units::to_fixed(f64::from(1.0 - transparency), 2)));
         let mut subs = vec![cx.subscribe_in(&hex, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. })
                 && let Some(rgb) = parse_hex(&st.read(cx).value())
@@ -269,7 +269,7 @@ impl PartStudioView {
         let Some(e) = &mut self.ui.appearance_edit else { return };
         e.transparency = 1.0 - alpha.clamp(0.0, 1.0);
         let field = e.alpha.clone();
-        field.update(cx, |s, cx| s.set_value(format!("{alpha:.2}"), window, cx));
+        field.update(cx, |s, cx| s.set_value(noshape_units::to_fixed(f64::from(alpha), 2), window, cx));
         cx.notify();
     }
 
@@ -524,6 +524,7 @@ impl PartStudioView {
             v_flex()
                 .id("appearance-editor")
                 .occlude()
+                .child(crate::ui::panel_probe("ps-appearance"))
                 .absolute()
                 // Live: beside an open right panel at the top (part-studio/173),
                 // else at the graphics area's bottom left like Material

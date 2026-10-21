@@ -129,6 +129,9 @@ pub struct EvalCtx<'a> {
     pub custom: Option<Arc<dyn crate::custom::CustomFeatureProvider>>,
     /// Type id of the custom feature being evaluated (`custom:<tab>:<name>`).
     pub custom_type: Option<String>,
+    /// The run's [`super::RegenCancel`]: long loops (pattern instances)
+    /// stop early through [`EvalCtx::cancelled`].
+    pub cancel: Option<super::RegenCancel>,
 }
 
 /// Map a plane frame by an affine (rigid or mirror) transform. Mirrors give a
@@ -208,7 +211,13 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None }
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None, cancel: None }
+    }
+
+    /// The run was aborted (a newer edit made it stale): stop and return
+    /// any error; the result is discarded.
+    pub fn cancelled(&self) -> bool {
+        self.cancel.as_ref().is_some_and(super::RegenCancel::aborted)
     }
 
     // ------------------------------------------------------------ pattern transform
@@ -695,7 +704,9 @@ impl<'a> EvalCtx<'a> {
                     "REMOVE" => k::BooleanOp::Cut,
                     _ => k::BooleanOp::Common,
                 };
-                self.boolean_into(&targets, tools, bop)
+                // Many tools (pattern instances): the many-tools options.
+                let opts = if tools.len() >= 8 { Self::many_tools_options() } else { k::BooleanOptions::default() };
+                self.boolean_into_with(&targets, tools, bop, &opts)
             }
             other => err(format!("Unknown operation {other}")),
         }
@@ -703,17 +714,17 @@ impl<'a> EvalCtx<'a> {
 
     /// Bodies whose bounding boxes overlap any tool (auto merge scope).
     pub fn auto_scope(&self, tools: &[NamedShape]) -> Vec<usize> {
-        let tb: Vec<k::BoundingBox> = tools.iter().filter_map(|t| t.shape.bounding_box(false).ok()).collect();
+        let tb: Vec<Option<k::BoundingBox>> = tools.iter().map(|t| t.shape.bounding_box(false).ok()).collect();
         self.ctx
             .bodies
             .iter()
             .enumerate()
             .filter(|(_, b)| b.kind == BodyKind::Solid)
             .filter(|(_, b)| {
+                // The exact distance only for tools whose boxes reach the body.
                 let Ok(bb) = b.shape.bounding_box(false) else { return false };
-                tb.iter().any(|t| overlaps(&bb, t))
+                tools.iter().zip(&tb).any(|(t, tbox)| tbox.as_ref().is_none_or(|x| overlaps(&bb, x)) && k::distance(&b.shape, &t.shape).map(|d| d.distance < 1e-9).unwrap_or(false))
             })
-            .filter(|(_, b)| tools.iter().any(|t| k::distance(&b.shape, &t.shape).map(|d| d.distance < 1e-9).unwrap_or(false)))
             .map(|(i, _)| i)
             .collect()
     }
@@ -740,13 +751,46 @@ impl<'a> EvalCtx<'a> {
 
     /// Boolean tools into target bodies; results replace the targets.
     pub fn boolean_into(&mut self, targets: &[usize], tools: Vec<NamedShape>, op: k::BooleanOp) -> FResult<()> {
+        self.boolean_into_with(targets, tools, op, &k::BooleanOptions::default())
+    }
+
+    /// Options for booleans with many tools of one kind (pattern instances):
+    /// glue where the instances only touch the target (checked by volume),
+    /// oriented boxes, in parallel.
+    pub fn many_tools_options() -> k::BooleanOptions {
+        k::BooleanOptions { glue: k::Glue::ShiftChecked, obb: true, parallel: true, ..Default::default() }
+    }
+
+    /// [`Self::boolean_into`] with explicit boolean options.
+    pub fn boolean_into_with(&mut self, targets: &[usize], tools: Vec<NamedShape>, op: k::BooleanOp, opts: &k::BooleanOptions) -> FResult<()> {
         let tool_shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
         let mut new_bodies: Vec<(usize, Vec<Body>)> = Vec::new();
         for &ti in targets {
             let target = self.ctx.bodies[ti].clone();
-            let res = k::boolean(op, std::slice::from_ref(&target.shape), &tool_shapes, &k::BooleanOptions::default())?;
+            // A cut or common only needs the tools whose boxes reach this
+            // target (a fuse keeps every tool: the ones apart become parts).
+            let tb = target.shape.bounding_box(false).ok().filter(|_| op != k::BooleanOp::Fuse);
+            let near: Vec<usize> = (0..tools.len())
+                .filter(|&i| match (&tb, tool_shapes[i].bounding_box(false)) {
+                    (Some(a), Ok(b)) => overlaps(a, &b),
+                    _ => true,
+                })
+                .collect();
+            if near.is_empty() {
+                continue;
+            }
+            let near_shapes: Vec<Shape> = near.iter().map(|&i| tool_shapes[i].clone()).collect();
+            let perf = super::display::perf_enabled();
+            let t0 = std::time::Instant::now();
+            // A newer edit stops the kernel boolean too (pending state).
+            let run = || k::boolean(op, std::slice::from_ref(&target.shape), &near_shapes, opts);
+            let res = match &self.cancel {
+                Some(c) => c.scope(run),
+                None => run(),
+            }?;
+            let t_bool = t0.elapsed();
             let mut args: Vec<ShapeNames> = vec![target.shape_names()];
-            args.extend(tools.iter().map(|t| t.names.clone()));
+            args.extend(near.iter().map(|&i| tools[i].names.clone()));
             let arg_refs: Vec<&ShapeNames> = args.iter().collect();
             let face_names = self.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
             // Like Parasolid, merge faces left coplanar (or on one cylinder...) by
@@ -759,7 +803,12 @@ impl<'a> EvalCtx<'a> {
             } else {
                 (res, face_names)
             };
+            let t_named = t0.elapsed();
             let pieces = split_solids(&res.shape, &face_names);
+            if perf {
+                log::info!(target: "perf", "boolean_into {:?} × {} tools: kernel {:.1} ms, naming + unify {:.1} ms, split {:.1} ms", op, near.len(), t_bool.as_secs_f64() * 1e3, (t_named - t_bool).as_secs_f64() * 1e3, (t0.elapsed() - t_named).as_secs_f64() * 1e3);
+            }
+            let t_split = t0.elapsed();
             let mut bodies = Vec::new();
             for (j, p) in pieces.into_iter().enumerate() {
                 if p.shape.count(ShapeType::Face) == 0 {
@@ -772,6 +821,9 @@ impl<'a> EvalCtx<'a> {
                     (BodyId { feature: self.feature, index: 10_000 + (ti as u32) * 64 + j as u32 }, name, target.color)
                 };
                 bodies.push(Body::new(id, name, target.kind, p.shape, p.names.faces, color, self.feature));
+            }
+            if perf {
+                log::info!(target: "perf", "boolean_into: bodies (edge / vertex names) {:.1} ms", (t0.elapsed() - t_split).as_secs_f64() * 1e3);
             }
             new_bodies.push((ti, bodies));
         }

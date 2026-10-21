@@ -8,15 +8,22 @@
 //! app re-exports it. See `docs/AGENT_API.md`.
 
 pub mod analysis;
+pub mod analysis_tools;
+pub mod appearance;
 pub mod assembly;
 pub mod config;
 pub mod coverage;
 pub mod derived;
 pub mod doc;
+pub mod drawing;
+pub mod drawing_export;
 pub mod docedit;
 pub mod error;
 pub mod export;
+pub mod import;
+pub mod material_data;
 pub mod ops;
+pub mod reference;
 pub mod refs;
 pub mod registry;
 pub mod session;

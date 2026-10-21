@@ -274,7 +274,7 @@ impl AssemblyView {
                 }
                 cx.notify();
             })))
-            .child(field("Mate connector for reference frame", reference.iter().map(|_| "Mate connector".to_string()).collect(), connector_active, false).id("amass-reference").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            .child(field("Mate connector for reference frame", reference.iter().map(|r| format!("Mate connector of {}", self.result.node(&std::iter::once(r.instance).chain(r.path.iter().copied()).collect::<Vec<_>>()).map(|n| n.name.clone()).unwrap_or_default())).collect(), connector_active, false).id("amass-reference").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(m) = &mut this.ui.mass {
                     m.connector_active = true;
                 }
@@ -373,6 +373,7 @@ impl AssemblyView {
             v_flex()
                 .id("amass-dialog")
                 .occlude()
+                .child(crate::ui::panel_probe("asm-mass"))
                 .w(px(440.))
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
@@ -395,7 +396,7 @@ impl AssemblyView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .when(!can_accept, |d| d.opacity(0.2))
-                                .when(can_accept, |d| d.cursor_pointer().tooltip(crate::ui::tooltip("Accept (Enter)")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_mass(cx))))
+                                .when(can_accept, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_mass(cx))))
                                 .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff))),
                         )
                         .child(
@@ -407,7 +408,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.mass = None;
@@ -547,7 +547,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .tooltip(crate::ui::tooltip("Accept (Enter)"))
                                 .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_zebra(true, cx))),
                         )
@@ -560,7 +559,6 @@ impl AssemblyView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_zebra(false, cx))),
                         ),
@@ -589,7 +587,7 @@ fn mass_unit(units: &noshape_units::UnitPrefs) -> (&'static str, f64) {
 /// three decimals without trailing zeros ("5.77", "11000"), and values that
 /// would read 0.000 in exponent form ("-3.307e-4").
 fn number(x: f64) -> String {
-    let fixed = format!("{x:.3}");
+    let fixed = noshape_units::to_fixed(x, 3);
     if x != 0.0 && fixed.trim_start_matches('-') == "0.000" {
         return format!("{x:.3e}");
     }

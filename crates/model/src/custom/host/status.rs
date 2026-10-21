@@ -98,7 +98,7 @@ fn set_property(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         let key = Value::map_from([("property", Value::str(kind.clone())), ("custom", def.get("customPropertyId").clone())]);
         st.attributes.retain(|(e, v)| !(*e == r && *v.get("name") == key));
-        st.attributes.push((r, Value::map_from([("name", key), ("attribute", value.clone())])));
+        st.push_attribute(r, Value::map_from([("name", key), ("attribute", value.clone())]));
     }
     Ok(Value::Undefined)
 }
@@ -375,7 +375,7 @@ fn set_attribute(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if !name.is_undefined() {
             st.attributes.retain(|(e, v)| !(*e == r && *v.get("name") == name));
         }
-        st.attributes.push((r, Value::map_from([("name", name.clone()), ("attribute", attribute.clone())])));
+        st.push_attribute(r, Value::map_from([("name", name.clone()), ("attribute", attribute.clone())]));
     }
     Ok(Value::Undefined)
 }

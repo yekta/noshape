@@ -50,7 +50,7 @@ pub use decimal::{comma_decimal, delocalize, localize, set_comma_decimal};
 pub use dim::Dim;
 pub use error::{EvalError, ExprError, ParseError, ParseErrorKind};
 pub use expr::{BinaryOp, Constant, Expr, Func, UnaryOp};
-pub use format::{format_number, format_quantity, format_quantity_exact, format_quantity_with};
+pub use format::{format_number, format_quantity, format_quantity_exact, format_quantity_with, to_fixed};
 pub use parser::parse;
 pub use quantity::Quantity;
 pub use scope::{EmptyScope, FnScope, LayeredScope, VariableScope};

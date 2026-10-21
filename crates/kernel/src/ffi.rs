@@ -235,9 +235,11 @@ pub(crate) mod ffi {
     #[derive(Debug, Clone, Copy)]
     struct BoolOpts {
         fuzzy: f64,
+        /// 0 off, 1 shift, 2 full, 3 shift checked by volume (else off)
         glue: u8,
         unify: bool,
         parallel: bool,
+        obb: bool,
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -290,6 +292,9 @@ pub(crate) mod ffi {
         fn shape_is_same(a: &OcShape, b: &OcShape) -> Result<bool>;
         fn shape_is_equal(a: &OcShape, b: &OcShape) -> Result<bool>;
         fn shape_is_partner(a: &OcShape, b: &OcShape) -> Result<bool>;
+        fn shape_partner_hash(s: &OcShape) -> Result<u64>;
+        fn shape_location(s: &OcShape) -> Result<Vec<f64>>;
+        fn shape_unlocated(s: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn sub_count(s: &OcShape, kind: u8) -> Result<u32>;
         fn sub_shape(s: &OcShape, kind: u8, index: u32) -> Result<UniquePtr<OcShape>>;
         fn sub_shapes(s: &OcShape, kind: u8) -> Result<UniquePtr<OcShapeList>>;
@@ -485,6 +490,8 @@ pub(crate) mod ffi {
             opts: &BoolOpts,
         ) -> Result<OpOut>;
         fn op_split(args: &OcShapeList, tools: &OcShapeList, opts: &BoolOpts) -> Result<OpOut>;
+        /// Cancel flag of this thread's booleans (an `AtomicBool` address, 0 = none).
+        fn set_thread_cancel(flag: usize);
         fn op_unify(s: &OcShape) -> Result<OpOut>;
         fn op_enclose(shapes: &OcShapeList) -> Result<OpOut>;
         fn op_transform(s: &OcShape, m: &[f64], copy: bool) -> Result<OpOut>;

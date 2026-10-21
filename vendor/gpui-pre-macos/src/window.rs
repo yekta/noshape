@@ -75,7 +75,7 @@ use std::{
     ptr::{self, NonNull},
     rc::Rc,
     sync::{
-        Arc, Once, Weak,
+        Arc, Weak,
         atomic::{AtomicBool, Ordering},
     },
     time::Duration,
@@ -83,14 +83,12 @@ use std::{
 
 const WINDOW_STATE_IVAR: &str = "windowState";
 
-static RESTORES_WORKSPACE_AT_LAUNCH_DEFAULT: Once = Once::new();
 
 static mut WINDOW_CLASS: *const Class = ptr::null();
 static mut PANEL_CLASS: *const Class = ptr::null();
 static mut VIEW_CLASS: *const Class = ptr::null();
 static mut BLURRED_VIEW_CLASS: *const Class = ptr::null();
 static mut WINDOW_STATE_ARCHIVER_DELEGATE_CLASS: *const Class = ptr::null();
-static mut WINDOW_STATE_UNARCHIVER_CLASS: *const Class = ptr::null();
 
 // NOSHAPE PATCH: set while the newest right-button press came from a Ctrl+left
 // click that is converted to a right click below.
@@ -295,10 +293,11 @@ unsafe fn build_classes() {
                 accepts_first_mouse as extern "C" fn(&Object, Sel, id) -> BOOL,
             );
 
+            // NOSHAPE PATCH: the public `mouseDownCanMoveWindow` instead of
+            // overriding the private `_opaqueRectForWindowMoveWhenInTitlebar`.
             decl.add_method(
-                sel!(_opaqueRectForWindowMoveWhenInTitlebar),
-                opaque_rect_for_window_move_when_in_titlebar
-                    as extern "C" fn(&Object, Sel) -> NSRect,
+                sel!(mouseDownCanMoveWindow),
+                mouse_down_can_move_window as extern "C" fn(&Object, Sel) -> BOOL,
             );
 
             decl.add_method(
@@ -329,16 +328,6 @@ unsafe fn build_classes() {
             );
             decl.register()
         };
-        WINDOW_STATE_UNARCHIVER_CLASS = {
-            let mut decl =
-                ClassDecl::new("GPUIWindowStateKeyedUnarchiver", class!(NSKeyedUnarchiver))
-                    .unwrap();
-            decl.add_method(
-                sel!(_windowRestorationOptions),
-                window_state_unarchiver_restoration_options as extern "C" fn(&Object, Sel) -> id,
-            );
-            decl.register()
-        };
     }
 }
 
@@ -364,28 +353,6 @@ extern "C" fn window_state_archiver_will_encode_object(
             nil
         } else {
             object
-        }
-    }
-}
-
-// Override of the private `_windowRestorationOptions` on our NSKeyedUnarchiver subclass.
-// Returning a default-initialized `NSWindowRestorationOptions` tells AppKit to restore the
-// window to its original Space. This is the macOS 15+ path (FB15644170: the
-// `NSWindowRestoresWorkspaceAtLaunch` user default no longer works there).
-extern "C" fn window_state_unarchiver_restoration_options(_this: &Object, _sel: Sel) -> id {
-    if !is_macos_version_at_least(NSOperatingSystemVersion::new(15, 0, 0)) {
-        return nil;
-    }
-    // SAFETY: we look the class up by name and only send it `alloc`/`init`/`autorelease`, all of
-    // which have the standard `-> id` signature. Returning `nil` when the class is absent is valid.
-    unsafe {
-        match Class::get("NSWindowRestorationOptions") {
-            Some(class) => {
-                let options: id = msg_send![class, alloc];
-                let options: id = msg_send![options, init];
-                msg_send![options, autorelease]
-            }
-            None => nil,
         }
     }
 }
@@ -420,6 +387,19 @@ pub(crate) unsafe fn set_active_window_cursor_style(style: CursorStyle) {
             None
         };
 
+        // NOSHAPE PATCH: under the smoke test (NOSHAPE_SMOKE, see
+        // crates/app/src/smoke.rs) any GPUI window will do, and its cursor
+        // rects are rebuilt at once, so every style's NSCursor is created
+        // even without a pointer over a key window (a CI runner).
+        let smoke = std::env::var_os("NOSHAPE_SMOKE").is_some();
+        let active_window = active_window.or_else(|| {
+            if !smoke {
+                return None;
+            }
+            let windows: id = msg_send![app, windows];
+            let count: usize = msg_send![windows, count];
+            (0..count).map(|i| -> id { msg_send![windows, objectAtIndex: i] }).find(|w| is_gpui_window(*w))
+        });
         let Some(active_window) = active_window else {
             return;
         };
@@ -432,6 +412,13 @@ pub(crate) unsafe fn set_active_window_cursor_style(style: CursorStyle) {
                 window_state.native_window,
                 invalidateCursorRectsForView: window_state.native_view.as_ptr()
             ];
+            if smoke {
+                // The view's own `reset_cursor_rects` (below) creates the
+                // style's NSCursor; the window's only clears its rects.
+                let native_view = window_state.native_view.as_ptr();
+                drop(window_state);
+                let _: () = msg_send![native_view, resetCursorRects];
+            }
         }
     }
 }
@@ -565,7 +552,6 @@ unsafe fn build_window_class(name: &'static str, superclass: &Class) -> *const C
 
 #[derive(Clone, Copy)]
 struct TrafficLightFrames {
-    titlebar: Objc2NSRect,
     close: Objc2NSRect,
     minimize: Objc2NSRect,
     zoom: Objc2NSRect,
@@ -704,10 +690,9 @@ struct MacWindowState {
     external_files_dragged: bool,
     // Whether the next left-mouse click is also the focusing click.
     first_mouse: bool,
-    // When true, the whole content view is reported as app-owned titlebar content via
-    // `_opaqueRectForWindowMoveWhenInTitlebar`, so AppKit does not drag the window from
-    // the titlebar or delay titlebar clicks (a delay first observed on macOS 27). Such
-    // windows draw their own titlebar and move the window via `start_window_move`.
+    // When true, the content view answers NO to `mouseDownCanMoveWindow`, so AppKit
+    // does not drag the window from the titlebar. Such windows draw their own titlebar
+    // and move the window via `start_window_move`.
     app_owns_titlebar_drag: bool,
     fullscreen_restore_bounds: Bounds<Pixels>,
     is_exiting_fullscreen: bool,
@@ -736,13 +721,9 @@ impl MacWindowState {
                 self.traffic_light_frames = self.capture_traffic_light_frames();
             }
 
-            let window_height = Pixels::from(self.native_window().frame().size.height);
             if self.traffic_light_frames.is_some() {
                 // AppKit can recreate standard buttons, so fetch the live views for each layout pass.
                 let Some(buttons) = self.traffic_light_buttons() else {
-                    return;
-                };
-                let Some(titlebar_container) = Self::titlebar_container(&buttons.close) else {
                     return;
                 };
 
@@ -753,31 +734,29 @@ impl MacWindowState {
                 let button_padding = Pixels::from(
                     minimize_frame.origin.x - close_frame.origin.x - close_frame.size.width,
                 );
-                let container_height =
-                    button_height + traffic_light_position.y + traffic_light_position.y;
-
-                let mut titlebar_frame = titlebar_container.frame();
-                titlebar_frame.size.height = container_height.to_f64();
-                titlebar_frame.origin.y = (window_height - container_height).to_f64();
+                // NOSHAPE PATCH: no resizing of AppKit's undocumented titlebar
+                // container views; the buttons move inside their own superview
+                // (public NSView API only), `traffic_light_position.y` below its top.
+                // SAFETY: `close` comes from AppKit's `standardWindowButton(_:)`;
+                // objc2 returns the superview as `Retained<NSView>`.
+                let superview = unsafe { buttons.close.superview() };
+                let y = match superview {
+                    Some(view) if !view.isFlipped() => {
+                        (Pixels::from(view.bounds().size.height) - button_height - traffic_light_position.y).max(Pixels::ZERO)
+                    }
+                    _ => traffic_light_position.y,
+                };
 
                 let minimize_x = traffic_light_position.x + button_width + button_padding;
                 let zoom_x = minimize_x + button_width + button_padding;
 
-                titlebar_container.setFrame(titlebar_frame);
                 buttons.close.setFrameOrigin(Objc2NSPoint::new(
                     traffic_light_position.x.to_f64(),
-                    traffic_light_position.y.to_f64(),
+                    y.to_f64(),
                 ));
-                buttons.minimize.setFrameOrigin(Objc2NSPoint::new(
-                    minimize_x.to_f64(),
-                    traffic_light_position.y.to_f64(),
-                ));
-                buttons.zoom.setFrameOrigin(Objc2NSPoint::new(
-                    zoom_x.to_f64(),
-                    traffic_light_position.y.to_f64(),
-                ));
+                buttons.minimize.setFrameOrigin(Objc2NSPoint::new(minimize_x.to_f64(), y.to_f64()));
+                buttons.zoom.setFrameOrigin(Objc2NSPoint::new(zoom_x.to_f64(), y.to_f64()));
 
-                titlebar_container.updateTrackingAreas();
                 buttons.close.updateTrackingAreas();
                 buttons.minimize.updateTrackingAreas();
                 buttons.zoom.updateTrackingAreas();
@@ -787,10 +766,8 @@ impl MacWindowState {
 
     fn capture_traffic_light_frames(&self) -> Option<TrafficLightFrames> {
         let buttons = self.traffic_light_buttons()?;
-        let titlebar_container = Self::titlebar_container(&buttons.close)?;
 
         Some(TrafficLightFrames {
-            titlebar: titlebar_container.frame(),
             close: buttons.close.frame(),
             minimize: buttons.minimize.frame(),
             zoom: buttons.zoom.frame(),
@@ -813,30 +790,16 @@ impl MacWindowState {
         })
     }
 
-    fn titlebar_container(close_button: &Objc2NSButton) -> Option<Retained<Objc2NSView>> {
-        // SAFETY: `close_button` comes from AppKit's `standardWindowButton(_:)`.
-        // Although `superview` is unsafe, objc2 returns each result as `Retained<NSView>`.
-        unsafe {
-            let button_container = close_button.superview()?;
-            button_container.superview()
-        }
-    }
-
     fn restore_traffic_light(&mut self) {
         if let Some(frames) = self.traffic_light_frames.take() {
             let Some(buttons) = self.traffic_light_buttons() else {
-                return;
-            };
-            let Some(titlebar_container) = Self::titlebar_container(&buttons.close) else {
                 return;
             };
 
             buttons.close.setFrame(frames.close);
             buttons.minimize.setFrame(frames.minimize);
             buttons.zoom.setFrame(frames.zoom);
-            titlebar_container.setFrame(frames.titlebar);
 
-            titlebar_container.updateTrackingAreas();
             buttons.close.updateTrackingAreas();
             buttons.minimize.updateTrackingAreas();
             buttons.zoom.updateTrackingAreas();
@@ -1358,29 +1321,14 @@ impl MacWindow {
     }
 
     pub fn get_user_tabbing_preference() -> Option<UserTabbingPreference> {
-        unsafe {
-            let defaults: id = NSUserDefaults::standardUserDefaults();
-            let domain = ns_string("NSGlobalDomain");
-            let key = ns_string("AppleWindowTabbingMode");
-
-            let dict: id = msg_send![defaults, persistentDomainForName: domain];
-            let value: id = if !dict.is_null() {
-                msg_send![dict, objectForKey: key]
-            } else {
-                nil
-            };
-
-            let value_str = if !value.is_null() {
-                CStr::from_ptr(NSString::UTF8String(value)).to_string_lossy()
-            } else {
-                "".into()
-            };
-
-            match value_str.as_ref() {
-                "manual" => Some(UserTabbingPreference::Never),
-                "always" => Some(UserTabbingPreference::Always),
-                _ => Some(UserTabbingPreference::InFullScreen),
-            }
+        // NOSHAPE PATCH: the public `+[NSWindow userTabbingPreference]` (macOS
+        // 10.12+) instead of the undocumented `AppleWindowTabbingMode` default.
+        // NSWindowUserTabbingPreference: Manual 0, Always 1, InFullScreen 2.
+        let preference: NSInteger = unsafe { msg_send![class!(NSWindow), userTabbingPreference] };
+        match preference {
+            0 => Some(UserTabbingPreference::Never),
+            1 => Some(UserTabbingPreference::Always),
+            _ => Some(UserTabbingPreference::InFullScreen),
         }
     }
 }
@@ -1592,25 +1540,11 @@ impl PlatformWindow for MacWindow {
                 return;
             }
 
-            // On macOS < 15 the `NSWindowRestoresWorkspaceAtLaunch` user default controls whether
-            // the window is restored to its original Space. On macOS 15+ that default is broken
-            // (FB15644170), and the `_windowRestorationOptions` override on our unarchiver subclass
-            // handles it instead.
-            if !is_macos_version_at_least(NSOperatingSystemVersion::new(15, 0, 0)) {
-                RESTORES_WORKSPACE_AT_LAUNCH_DEFAULT.call_once(|| {
-                    let defaults: id = NSUserDefaults::standardUserDefaults();
-                    let key = ns_string("NSWindowRestoresWorkspaceAtLaunch");
-                    let yes_value: id = msg_send![class!(NSNumber), numberWithBool: YES];
-                    let dict: id = msg_send![
-                        class!(NSDictionary),
-                        dictionaryWithObject: yes_value
-                        forKey: key
-                    ];
-                    let _: () = msg_send![defaults, registerDefaults: dict];
-                });
-            }
-
-            let unarchiver: id = msg_send![WINDOW_STATE_UNARCHIVER_CLASS, alloc];
+            // NOSHAPE PATCH: AppKit's plain unarchiver; no private
+            // `_windowRestorationOptions` override or undocumented
+            // `NSWindowRestoresWorkspaceAtLaunch` default (no private OS APIs), so a
+            // restored window opens on the current Space.
+            let unarchiver: id = msg_send![class!(NSKeyedUnarchiver), alloc];
             let mut error: id = nil;
             let unarchiver: id =
                 msg_send![unarchiver, initForReadingFromData: data error: &mut error];
@@ -2206,13 +2140,9 @@ impl PlatformWindow for MacWindow {
                                 if is_resizable {
                                     // Unlike `zoom:`, AppKit's private Fill action honors the system's
                                     // "Tiled windows have margins" setting.
-                                    let responds_to_zoom_fill: BOOL =
-                                        msg_send![window, respondsToSelector: sel!(_zoomFill:)];
-                                    if responds_to_zoom_fill == YES {
-                                        let _: () = msg_send![window, _zoomFill: nil];
-                                    } else {
-                                        window.zoom_(nil);
-                                    }
+                                    // NOSHAPE PATCH: public `zoom:` only; private AppKit
+                                    // selectors can raise on newer macOS (see image_cursor).
+                                    window.zoom_(nil);
                                 }
                             }
                             _ => {
@@ -2528,6 +2458,65 @@ fn add_mouse_tracking_area(native_view: &Objc2NSView) {
     native_view.addTrackingArea(&tracking_area);
 }
 
+// NOSHAPE PATCH: cursors from our own images (cursors/src: Chrome-on-macOS
+// look-alikes drawn by us), a 24x24 pt NSImage with 1x/2x/3x bitmaps, made
+// once on the main thread and kept for the process lifetime. Public AppKit
+// only (no private selectors anywhere: macOS 27 made `+[NSCursor _moveCursor]`
+// raise and abort the app).
+static MOVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static RESIZE_NWSE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static RESIZE_NESW: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static WAIT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// `pngs` at 1x, 2x and 3x; `hot` in points from the top left.
+unsafe fn image_cursor(slot: &std::sync::atomic::AtomicUsize, pngs: [&'static [u8]; 3], hot: (f64, f64)) -> id {
+    use std::sync::atomic::Ordering;
+    let cached = slot.load(Ordering::Relaxed);
+    if cached != 0 {
+        return cached as id;
+    }
+    // SAFETY: called from `reset_cursor_rects` on the main thread; every object
+    // created here is retained for the life of the process.
+    unsafe {
+        let image: id = msg_send![class!(NSImage), alloc];
+        let image: id = msg_send![image, initWithSize: NSSize::new(24.0, 24.0)];
+        if image == nil {
+            return msg_send![class!(NSCursor), arrowCursor];
+        }
+        let mut added = false;
+        for png in pngs {
+            let data: id = msg_send![class!(NSData), dataWithBytes: png.as_ptr() length: png.len()];
+            let rep: id = msg_send![class!(NSBitmapImageRep), imageRepWithData: data];
+            if rep == nil {
+                continue;
+            }
+            let _: () = msg_send![rep, setSize: NSSize::new(24.0, 24.0)];
+            let _: () = msg_send![image, addRepresentation: rep];
+            added = true;
+        }
+        if !added {
+            return msg_send![class!(NSCursor), arrowCursor];
+        }
+        let cursor: id = msg_send![class!(NSCursor), alloc];
+        let cursor: id = msg_send![cursor, initWithImage: image hotSpot: NSPoint::new(hot.0, hot.1)];
+        if cursor == nil {
+            return msg_send![class!(NSCursor), arrowCursor];
+        }
+        slot.store(cursor as usize, Ordering::Relaxed);
+        cursor
+    }
+}
+
+macro_rules! cursor_pngs {
+    ($name:literal) => {
+        [
+            include_bytes!(concat!("cursors/", $name, ".png")).as_slice(),
+            include_bytes!(concat!("cursors/", $name, "@2x.png")).as_slice(),
+            include_bytes!(concat!("cursors/", $name, "@3x.png")).as_slice(),
+        ]
+    };
+}
+
 extern "C" fn reset_cursor_rects(this: &Object, _: Sel) {
     // SAFETY: AppKit invokes cursor-rect updates on the main thread for GPUIView instances,
     // whose WINDOW_STATE_IVAR is initialized when the view is created. The cursor registered
@@ -2554,14 +2543,10 @@ extern "C" fn reset_cursor_rects(this: &Object, _: Sel) {
             CursorStyle::ResizeUp => msg_send![class!(NSCursor), resizeUpCursor],
             CursorStyle::ResizeDown => msg_send![class!(NSCursor), resizeDownCursor],
 
-            // Undocumented, private class methods:
-            // https://stackoverflow.com/questions/27242353/cocoa-predefined-resize-mouse-cursor
-            CursorStyle::ResizeUpLeftDownRight => {
-                msg_send![class!(NSCursor), _windowResizeNorthWestSouthEastCursor]
-            }
-            CursorStyle::ResizeUpRightDownLeft => {
-                msg_send![class!(NSCursor), _windowResizeNorthEastSouthWestCursor]
-            }
+            // NOSHAPE PATCH: no private AppKit cursor selectors (macOS 27 made
+            // `+[NSCursor _moveCursor]` raise, which aborted the app). Our own images.
+            CursorStyle::ResizeUpLeftDownRight => image_cursor(&RESIZE_NWSE, cursor_pngs!("resize-nwse"), (12.0, 12.0)),
+            CursorStyle::ResizeUpRightDownLeft => image_cursor(&RESIZE_NESW, cursor_pngs!("resize-nesw"), (12.0, 12.0)),
 
             CursorStyle::IBeamCursorForVerticalLayout => {
                 msg_send![class!(NSCursor), IBeamCursorForVerticalLayout]
@@ -2572,16 +2557,11 @@ extern "C" fn reset_cursor_rects(this: &Object, _: Sel) {
             CursorStyle::DragLink => msg_send![class!(NSCursor), dragLinkCursor],
             CursorStyle::DragCopy => msg_send![class!(NSCursor), dragCopyCursor],
             CursorStyle::ContextualMenu => msg_send![class!(NSCursor), contextualMenuCursor],
-            // NOSHAPE PATCH: Chrome's `move` / `wait` on macOS: AppKit's private
-            // move and busy cursors when present, else the open hand / arrow.
-            CursorStyle::Move => {
-                let responds: BOOL = msg_send![class!(NSCursor), respondsToSelector: sel!(_moveCursor)];
-                if responds == YES { msg_send![class!(NSCursor), _moveCursor] } else { msg_send![class!(NSCursor), openHandCursor] }
-            }
-            CursorStyle::Wait => {
-                let responds: BOOL = msg_send![class!(NSCursor), respondsToSelector: sel!(busyButClickableCursor)];
-                if responds == YES { msg_send![class!(NSCursor), busyButClickableCursor] } else { msg_send![class!(NSCursor), arrowCursor] }
-            }
+            // NOSHAPE PATCH: Chrome's `move` and `wait` (macOS busy-but-clickable:
+            // the arrow and the pinwheel, hot spot at the arrow's tip) from our
+            // own images (no private selectors, see above).
+            CursorStyle::Move => image_cursor(&MOVE, cursor_pngs!("move"), (12.0, 12.0)),
+            CursorStyle::Wait => image_cursor(&WAIT, cursor_pngs!("wait"), (4.0, 3.0)),
         };
 
         let bounds = NSView::bounds(this as *const Object as id);
@@ -3582,22 +3562,19 @@ extern "C" fn accepts_first_mouse(this: &Object, _: Sel, _: id) -> BOOL {
     YES
 }
 
-// Reports which region of the view AppKit should treat as app-owned titlebar content
-// (rather than a system-owned window-move region). When `app_owns_titlebar_drag` is
-// true, we claim the entire view so AppKit neither drags the window from the titlebar
-// nor waits to disambiguate double-clicks before delivering titlebar clicks (the macOS
-// 27 delay); such windows implement dragging themselves via [`Window::start_window_move`].
-// Otherwise we return an empty rect so AppKit's native titlebar dragging keeps working.
-// This is independent of `NSWindow.isMovable`, so the Window-menu tiling items stay
+// When `app_owns_titlebar_drag` is true, a mouse-down on the view never moves
+// the window (AppKit doesn't drag the window from the titlebar); such windows
+// implement dragging themselves via [`Window::start_window_move`]. Otherwise
+// NSView's default answer keeps AppKit's native titlebar dragging. This is
+// independent of `NSWindow.isMovable`, so the Window-menu tiling items stay
 // enabled regardless.
-extern "C" fn opaque_rect_for_window_move_when_in_titlebar(this: &Object, _: Sel) -> NSRect {
-    let zero_rect = NSRect::new(NSPoint::new(0., 0.), NSSize::new(0., 0.));
+extern "C" fn mouse_down_can_move_window(this: &Object, _: Sel) -> BOOL {
     let window_state = unsafe { get_window_state(this) };
     let app_owns_titlebar_drag = window_state.as_ref().lock().app_owns_titlebar_drag;
     if app_owns_titlebar_drag {
-        unsafe { msg_send![this, bounds] }
+        NO
     } else {
-        zero_rect
+        unsafe { msg_send![super(this, class!(NSView)), mouseDownCanMoveWindow] }
     }
 }
 
@@ -3859,41 +3836,9 @@ unsafe fn remove_layer_background(layer: id) {
     unsafe {
         let _: () = msg_send![layer, setBackgroundColor:nil];
 
-        let class_name: id = msg_send![layer, className];
-        if class_name.isEqualToString("CAChameleonLayer") {
-            // Remove the desktop tinting effect.
-            let _: () = msg_send![layer, setHidden: YES];
-            return;
-        }
-
-        let filters: id = msg_send![layer, filters];
-        if !filters.is_null() {
-            // Remove the increased saturation.
-            // The effect of a `CAFilter` or `CIFilter` is determined by its name, and the
-            // `description` reflects its name and some parameters. Currently `NSVisualEffectView`
-            // uses a `CAFilter` named "colorSaturate". If one day they switch to `CIFilter`, the
-            // `description` will still contain "Saturat" ("... inputSaturation = ...").
-            let test_string: id = ns_string("Saturat");
-            let count = NSArray::count(filters);
-            for i in 0..count {
-                let description: id = msg_send![filters.objectAtIndex(i), description];
-                let hit: BOOL = msg_send![description, containsString: test_string];
-                if hit == NO {
-                    continue;
-                }
-
-                let all_indices = NSRange {
-                    location: 0,
-                    length: count,
-                };
-                let indices: id = msg_send![class!(NSMutableIndexSet), indexSet];
-                let _: () = msg_send![indices, addIndexesInRange: all_indices];
-                let _: () = msg_send![indices, removeIndex:i];
-                let filtered: id = msg_send![filters, objectsAtIndexes: indices];
-                let _: () = msg_send![layer, setFilters: filtered];
-                break;
-            }
-        }
+        // NOSHAPE PATCH: AppKit's private layers (`CAChameleonLayer`, the
+        // colorSaturate filter) are left alone (no private OS internals): the
+        // blur keeps NSVisualEffectView's own tint.
 
         let sublayers: id = msg_send![layer, sublayers];
         if !sublayers.is_null() {

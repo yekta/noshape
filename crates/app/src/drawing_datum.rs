@@ -61,15 +61,15 @@ impl DrawingEditor {
     pub fn sync_datum_dlg(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let active = matches!(self.tool, Tool::Datum { .. } | Tool::DatumTarget { .. });
         if active && self.datum_dlg.is_none() {
-            let label = cx.new(|cx| InputState::new(window, cx).default_value(self.next_datum_label()));
+            let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(self.next_datum_label()));
             // Live 507: the label is focused with its letter selected.
             label.update(cx, |s, cx| {
                 s.focus(window, cx);
                 s.select_all(window, cx);
             });
             let mm = self.drawing.units_mm;
-            let size_a = cx.new(|cx| InputState::new(window, cx).default_value(if mm { "25 mm" } else { "1.000 in" }));
-            let size_b = cx.new(|cx| InputState::new(window, cx).default_value(if mm { "25 mm" } else { "1.000 in" }));
+            let size_a = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(if mm { "25 mm" } else { "1.000 in" }));
+            let size_b = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(if mm { "25 mm" } else { "1.000 in" }));
             let tab = u8::from(matches!(self.tool, Tool::DatumTarget { .. }));
             let label_text = self.next_datum_label();
             let sub = cx.subscribe(&label, |this: &mut Self, st, ev: &InputEvent, cx| {
@@ -131,9 +131,9 @@ impl DrawingEditor {
             AnnotationKind::DatumTarget { label, .. } => label.clone(),
             _ => String::new(),
         };
-        let lab = cx.new(|cx| InputState::new(window, cx).default_value(label));
-        let x = cx.new(|cx| InputState::new(window, cx));
-        let y = cx.new(|cx| InputState::new(window, cx));
+        let lab = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(label));
+        let x = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false));
+        let y = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false));
         let k = self.datum_dlg.as_ref().map(|d| d.rows.len()).unwrap_or(0);
         let mut subs = Vec::new();
         for st in [&lab, &x, &y] {
@@ -485,4 +485,120 @@ impl DrawingEditor {
                 .into_any_element(),
         )
     }
+}
+
+/// A selected datum's fill (live drawing/1073: rgb 204,146,92).
+const DATUM_SEL: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
+/// Its attached edge and anchor dot (live drawing/1073: rgb 144,206,241).
+const DATUM_EDGE: [u8; 4] = [0x90, 0xce, 0xf1, 255];
+
+impl DrawingEditor {
+    /// The selected datums: annotation id, its pick ids and its anchor.
+    fn selected_datums(&self) -> Vec<(u64, Vec<u32>, [f64; 2])> {
+        let Some(b) = &self.built else { return vec![] };
+        self.selection
+            .iter()
+            .filter_map(|s| {
+                let Sel::Annotation(id) = s else { return None };
+                let a = b.resolved.annotations.iter().find(|a| a.id == *id)?;
+                let AnnotationKind::Datum { anchor, .. } = &a.kind else { return None };
+                Some((*id, self.picks_of(*s), *anchor))
+            })
+            .collect()
+    }
+
+    /// Pick ids drawn by [`Self::push_datum_selection`] instead of the
+    /// plain selection tint.
+    pub fn datum_selection_picks(&self) -> Vec<u32> {
+        self.selected_datums().into_iter().flat_map(|(_, p, _)| p).collect()
+    }
+
+    /// A selected datum's look (live drawing/1073): the box, stem and
+    /// triangle filled orange with the letter black on it and a thin white
+    /// bar inside each side of the box; the edge it sits on light blue with
+    /// a light blue dot (white rim) at the anchor. Hovering changes nothing.
+    pub fn push_datum_selection(&self, scene: &mut noshape_render::scene::Scene) {
+        use noshape_model::drawing::views::dist_to_segment;
+        use noshape_model::drawing::build::PickTarget;
+        use noshape_render::{Drawable, Instance, LineData, LineSegment, MeshData, PointData, PointSprite};
+        let Some(b) = &self.built else { return };
+        let datums = self.selected_datums();
+        if datums.is_empty() {
+            return;
+        }
+        let g = &b.geometry;
+        let px = 1.0 / self.zoom.max(1e-6);
+        let mut fill = MeshData::default();
+        let quad = |m: &mut MeshData, c: [[f64; 2]; 4], z: f32| {
+            let base = m.positions.len() as u32;
+            for p in c {
+                m.positions.push([p[0] as f32, p[1] as f32, z]);
+                m.normals.push([0.0, 0.0, 1.0]);
+                m.pick_ids.push(0);
+            }
+            m.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        };
+        let mut lines = LineData::default();
+        let mut white = LineData::default();
+        let mut edges = LineData::default();
+        let mut dots = PointData::default();
+        for (_, picks, anchor) in &datums {
+            let own: Vec<_> = g.lines.iter().filter(|l| picks.contains(&l.pick)).collect();
+            for l in &own {
+                let width = crate::drawing_scene::px_width(l.style, self.zoom).max(1.5);
+                for w in l.points.windows(2) {
+                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: DATUM_SEL, pick_id: 0, width, style: LineSegment::ON_TOP });
+                }
+            }
+            // The box: the datum's closed outline.
+            let frame = own.iter().filter(|l| l.closed || (l.points.len() >= 5 && l.points.first() == l.points.last())).max_by(|a, c| bbox_area(&a.points).total_cmp(&bbox_area(&c.points)));
+            let mut reach = 4.0;
+            if let Some(f) = frame {
+                let [x0, y0, x1, y1] = bbox(&f.points);
+                quad(&mut fill, [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], -0.5);
+                let inset = 3.0 * px;
+                for x in [x0 + inset, x1 - inset] {
+                    white.segments.push(LineSegment { a: [x as f32, (y0 + inset) as f32, 0.45], b: [x as f32, (y1 - inset) as f32, 0.45], color: [255, 255, 255, 255], pick_id: 0, width: 1.0, style: LineSegment::ON_TOP });
+                }
+                reach = (x1 - x0).max(y1 - y0);
+            }
+            // The triangle: the filled triangle touching the anchor.
+            for f in g.fills.iter().filter(|f| f.points.len() == 3 && f.points.iter().any(|p| (p[0] - anchor[0]).hypot(p[1] - anchor[1]) < reach)) {
+                let tri = &f.points;
+                if tri.iter().any(|p| (p[0] - anchor[0]).hypot(p[1] - anchor[1]) < reach * 0.6) {
+                    quad(&mut fill, [tri[0], tri[1], tri[2], tri[2]], 0.35);
+                }
+            }
+            // The view edge through the anchor.
+            for l in g.lines.iter().filter(|l| matches!(b.picks.get(l.pick as usize), Some(PickTarget::Edge { .. }))) {
+                if l.points.windows(2).any(|w| dist_to_segment(*anchor, w[0], w[1]) < 0.05) {
+                    let width = crate::drawing_scene::px_width(l.style, self.zoom).max(3.0);
+                    for w in l.points.windows(2) {
+                        edges.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.3], b: [w[1][0] as f32, w[1][1] as f32, 0.3], color: DATUM_EDGE, pick_id: 0, width, style: LineSegment::ON_TOP });
+                    }
+                }
+            }
+            let at = [anchor[0] as f32, anchor[1] as f32, 0.7];
+            dots.points.push(PointSprite { position: at, color: [255, 255, 255, 255], pick_id: 0, size: 13.0, style: LineSegment::ON_TOP, _pad: 0 });
+            dots.points.push(PointSprite { position: [at[0], at[1], 0.71], color: DATUM_EDGE, pick_id: 0, size: 11.0, style: LineSegment::ON_TOP, _pad: 0 });
+        }
+        let up = self.gpu.uploader();
+        let color = crate::theme::lin(0xcc925c);
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&edges))).per_primitive_color().unpickable().layer(17));
+        if !fill.indices.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&fill))).with_color(color).unlit().unpickable().layer(-4));
+        }
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&white))).per_primitive_color().unpickable().layer(19));
+        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&dots))).per_primitive_color().unpickable().layer(22));
+    }
+}
+
+fn bbox(p: &[[f64; 2]]) -> [f64; 4] {
+    p.iter().fold([f64::MAX, f64::MAX, f64::MIN, f64::MIN], |b, q| [b[0].min(q[0]), b[1].min(q[1]), b[2].max(q[0]), b[3].max(q[1])])
+}
+
+fn bbox_area(p: &[[f64; 2]]) -> f64 {
+    let b = bbox(p);
+    (b[2] - b[0]) * (b[3] - b[1])
 }

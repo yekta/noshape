@@ -258,6 +258,22 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
     }
 }
 
+/// A measured number (Measure panel, the bottom-right readout, mass
+/// properties): Onshape's `.measurement-value` is Inconsolata 14 px / 600
+/// (the Bold face; Onshape serves only 400 and 700), on a 1 px `#d7d7d7`
+/// underline (`--os-outline-tertiary`), 3 px from the label.
+pub fn measure_value(num: impl Into<SharedString>) -> Div {
+    div()
+        .ml(px(3.))
+        .mb(px(2.))
+        .font_family("Inconsolata")
+        .text_size(px(14.))
+        .font_weight(FontWeight::BOLD)
+        .border_b_1()
+        .border_color(gpui_kit::rgb(0xd7d7d7))
+        .child(num.into())
+}
+
 /// Where an Onshape tooltip sits relative to its element (live
 /// part-studio/16-22, 95): beside list rows and left-rail buttons (Right),
 /// left of the right strip and the camera menu button (Left), over the
@@ -281,6 +297,8 @@ pub struct PlacedTooltip {
     /// The box's width, measured on the first frame (drawn hidden): a
     /// centered or left-side box can only be placed once it is known.
     width: std::rc::Rc<std::cell::Cell<Option<Pixels>>>,
+    /// Hidden after a press on the element, until the pointer leaves it.
+    pressed: std::rc::Rc<std::cell::Cell<bool>>,
 }
 
 impl Render for PlacedTooltip {
@@ -326,20 +344,39 @@ impl Render for PlacedTooltip {
             (_, None) => point(px(0.), mid_y),
         };
         let hidden = self.side != TipSide::Right && w.is_none();
-        div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(content.when(hidden, |c| c.opacity(0.)))))
+        div().when(!crate::os_menu::is_open(cx) && !self.pressed.get(), |d| d.child(anchored().position(at).snap_to_window().child(content.when(hidden, |c| c.opacity(0.)))))
     }
 }
 
 /// Gives `el` an Onshape tooltip showing `text` on `side` (see [`PlacedTooltip`]).
+/// Like a browser's, the tooltip hides when the element is pressed (a strip
+/// button opening its panel) and shows again only after the pointer has left
+/// it (qa4 F22).
 pub fn with_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide) -> Stateful<Div> {
     let text: SharedString = text.into();
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
-    let a2 = anchor.clone();
+    let pressed: std::rc::Rc<std::cell::Cell<bool>> = Default::default();
+    let (a2, p2, p3) = (anchor.clone(), pressed.clone(), pressed.clone());
     el.relative()
-        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+        .child(
+            canvas(
+                move |b, window, _| {
+                    a2.set(b);
+                    if p2.get() && !b.contains(&window.mouse_position()) {
+                        p2.set(false);
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full(),
+        )
+        .on_any_mouse_down(move |_, _, _| p3.set(true))
         .tooltip(move |_, cx| {
-            let (text, anchor) = (text.clone(), anchor.get());
-            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default() }).into()
+            let (text, anchor, pressed) = (text.clone(), anchor.get(), pressed.clone());
+            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed }).into()
         })
 }
 
@@ -368,7 +405,7 @@ pub fn with_lazy_side_tooltip(row: Stateful<Div>, text: impl Fn(&App) -> SharedS
         .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .tooltip(move |_, cx| {
             let (text, anchor) = (text(cx), anchor.get());
-            cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default() }).into()
+            cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default() }).into()
         })
 }
 
@@ -397,8 +434,24 @@ pub fn text_tool_button(id: impl Into<ElementId>, icon: &str, label: impl Into<S
 /// A toolbar dropdown kept inside the window: it scrolls when its tools don't
 /// fit under the toolbar (the collapsed Plane group has 26 tools; on a
 /// 1280x800 screen the last ones were off the window, unreachable).
+/// Live (ui/tb-912, dom/ui-toolbar-1440-groups.json): a toolbar dropdown is
+/// capped at 75 % of the window height (`max-height: 675px` at 900) and
+/// scrolls inside it with Chrome's native scrollbar; it never flips up.
 pub fn fit_tool_menu(menu: gpui_kit::component::menu::PopupMenu, window: &Window) -> gpui_kit::component::menu::PopupMenu {
-    menu.scrollable(true).max_h(window.viewport_size().height - px(84.))
+    menu.scrollable(true).native_scrollbar(true).tool_list(true).max_h(window.viewport_size().height * 0.75)
+}
+
+/// The drawing toolbar's caret cell: live drawing/08 shows a filled 8 x 4 px blue
+/// triangle (`#2767ae`) there instead of the Part Studio's dark chevron.
+pub fn tool_caret_blue(id: impl Into<ElementId>, cx: &App) -> Button {
+    Button::new(id)
+        .custom(tool_variant(cx, false, true))
+        .child(glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x2767ae)))
+        .w(px(TOOL_CARET_W))
+        .h(px(TOOL_CELL))
+        .p_0()
+        .rounded(px(0.))
+        .rounded_r(px(3.))
 }
 
 /// The 18 px dropdown caret cell next to a split tool (§3.2).
@@ -528,11 +581,17 @@ pub fn search_tools_toggle(id: impl Into<ElementId>, open: bool) -> Stateful<Div
 
 /// Toolbar undo / redo pair (Onshape puts them first in every toolbar).
 pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyElement {
+    // Onshape's titles (live dom/toolbar-partstudio.txt).
+    undo_redo_with(doc, TOOL_CELL, ("Undo (cmd+z/ctrl+z)", "Redo (ctrl+y/shift+cmd+z)"), cx)
+}
+
+/// [`undo_redo`] with `cell` px buttons and the (undo, redo) titles (the
+/// drawing toolbar: 30 px, "Undo (ctrl+z)", live drawing-toolbar-widths).
+pub fn undo_redo_with(doc: &Entity<crate::doc_model::DocModel>, cell: f32, tips: (&'static str, &'static str), cx: &App) -> AnyElement {
     let d = doc.read(cx);
     let (can_undo, can_redo) = (d.session.can_undo(), d.session.can_redo());
-    // Onshape's titles (live dom/toolbar-partstudio.txt).
-    let undo_tip: SharedString = "Undo (cmd+z/ctrl+z)".into();
-    let redo_tip: SharedString = "Redo (ctrl+y/shift+cmd+z)".into();
+    let undo_tip: SharedString = tips.0.into();
+    let redo_tip: SharedString = tips.1.into();
     let (d1, d2) = (doc.clone(), doc.clone());
     // Live: Undo @42, Redo @76 (dom/toolbar-partstudio.txt), 2 px apart like every tool.
     h_flex()
@@ -541,7 +600,7 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
         .child(with_tooltip(
             "tt-undo",
             undo_tip,
-            tool_button("tb-undo", "undo", false, cx).opacity(if can_undo { 1.0 } else { 0.4 }).when(!can_undo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
+            tool_button("tb-undo", "undo", false, cx).w(px(cell)).h(px(cell)).opacity(if can_undo { 1.0 } else { 0.4 }).when(!can_undo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
                 if can_undo {
                     d1.update(cx, |d, cx| d.undo(cx));
                 }
@@ -550,7 +609,7 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
         .child(with_tooltip(
             "tt-redo",
             redo_tip,
-            tool_button("tb-redo", "redo", false, cx).opacity(if can_redo { 1.0 } else { 0.4 }).when(!can_redo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
+            tool_button("tb-redo", "redo", false, cx).w(px(cell)).h(px(cell)).opacity(if can_redo { 1.0 } else { 0.4 }).when(!can_redo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
                 if can_redo {
                     d2.update(cx, |d, cx| d.redo(cx));
                 }
@@ -619,7 +678,8 @@ pub fn tree_row(id: impl Into<ElementId>, selected: bool) -> Stateful<Div> {
 
 /// A tree icon: 17 px at 0.8 opacity in a 20 px cell (§3.4).
 pub fn tree_icon(name: &str, dim: bool, cx: &App) -> Div {
-    div().w(px(20.)).flex_none().flex().items_center().justify_center().opacity(if dim { 0.4 } else { 0.8 }).child(assets::icon(name, LIST_ICON, cx))
+    // Live (part-studio/495): dimmed (hidden) rows' icons at 0.5.
+    div().w(px(20.)).flex_none().flex().items_center().justify_center().opacity(if dim { 0.5 } else { 0.8 }).child(assets::icon(name, LIST_ICON, cx))
 }
 
 /// Collapsible caret (▾/▸) in a 16 px column (§4.11).
@@ -629,8 +689,14 @@ pub fn tree_icon(name: &str, dim: bool, cx: &App) -> Div {
 /// placeholder over an input yourself.
 pub fn ensure_placeholder(st: &Entity<gpui_kit::component::input::InputState>, text: &str, cx: &mut App) {
     if st.read(cx).placeholder_text().as_ref() != text {
+        // Onshape's search and filter boxes don't select their text on a
+        // click and keep it on Esc (live behaviours.md "Input behaviour").
+        let search = text.starts_with("Search") || text.starts_with("Filter");
         let text = SharedString::from(text.to_string());
-        st.update(cx, |s, cx| s.put_placeholder(text, cx));
+        st.update(cx, |s, cx| {
+            s.put_placeholder(text, cx);
+            s.set_search_box(search);
+        });
     }
 }
 
@@ -717,18 +783,81 @@ pub fn hover_reveal<E: InteractiveElement + Styled>(el: E, group: impl Into<Shar
 /// Onshape's panel dialogs (Mass properties, Isolate, Named views, Section
 /// view, Appearance, Material) move by the drag area around their title
 /// (`.ns-drag-area`: `grab`, also while moving; live dom/cursor-rows.json).
-/// The drag carries the panel's key and the last pointer position.
+/// The drag carries the panel's key.
 #[derive(Clone)]
 pub struct PanelMove {
     key: &'static str,
 }
 
+/// A panel title press: where the drag starts from.
+#[derive(Clone, Copy)]
+struct PanelPress {
+    pointer: Point<Pixels>,
+    offset: Point<Pixels>,
+    /// The panel's rect (see [`panel_probe`]).
+    rect: Option<Bounds<Pixels>>,
+    generation: u64,
+}
+
 thread_local! {
-    /// The pointer when a panel title was pressed, then at the last move.
-    /// One press at a time; kept out of the drag value, which is built
-    /// anew on every render (a render between the press and the drag
-    /// start would lose it).
-    static PANEL_LAST: std::cell::Cell<Point<Pixels>> = const { std::cell::Cell::new(Point { x: Pixels::ZERO, y: Pixels::ZERO }) };
+    /// The last title press. One press at a time; kept out of the drag
+    /// value, which is built anew on every render (a render between the
+    /// press and the drag start would lose it).
+    static PANEL_PRESS: std::cell::Cell<Option<PanelPress>> = const { std::cell::Cell::new(None) };
+    /// Each panel's rect when last drawn and the drag move it was drawn
+    /// after (see [`PanelOffsets::drag`]).
+    static PANEL_RECTS: std::cell::RefCell<std::collections::HashMap<&'static str, (Bounds<Pixels>, u64)>> = std::cell::RefCell::new(std::collections::HashMap::new());
+    /// Counts panel drag moves.
+    static PANEL_GEN: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Records a moving panel's rect for the drag's snapping: a child of the
+/// panel's root, which is the panel's size (`key` as in [`panel_title`]).
+pub fn panel_probe(key: &'static str) -> impl IntoElement {
+    canvas(
+        move |b, _, _| {
+            PANEL_RECTS.with(|m| m.borrow_mut().insert(PanelOffsets::panel(key), (b, PANEL_GEN.with(|g| g.get()))));
+        },
+        |_, _, _, _| {},
+    )
+    .absolute()
+    .top_0()
+    .left_0()
+    .size_full()
+}
+
+/// Live's `panelLayoutManager.snapIfNearBounds` (tolerance 10 px): an edge
+/// within 10 px of the graphics area's edge sticks to it (left before
+/// right, top before bottom); else an edge within 10 px of another open
+/// panel's edge (side by side or aligned, the panels overlapping along it)
+/// sticks to that; then the rect is kept inside the area.
+fn snap_panel(r: Bounds<Pixels>, area: Bounds<Pixels>, others: &[Bounds<Pixels>]) -> Point<Pixels> {
+    const TOL: f32 = 10.;
+    let near = |a: Pixels, b: Pixels| f32::from(a - b).abs() <= TOL;
+    let overlaps = |a0: Pixels, a1: Pixels, b0: Pixels, b1: Pixels| a0 < b1 + px(TOL) && b0 < a1 + px(TOL);
+    // `gap`: live leaves 5 px under a panel snapped to the bottom
+    // (`bounds.bottom - t.bottom - 5`), none at the other edges.
+    let axis = |lo: Pixels, len: Pixels, area_lo: Pixels, area_hi: Pixels, gap: Pixels, others: &mut dyn Iterator<Item = (Pixels, Pixels)>| -> Pixels {
+        let hi = lo + len;
+        if lo < area_lo + px(TOL) {
+            return area_lo;
+        }
+        if hi > area_hi - px(TOL) {
+            return area_hi - gap - len;
+        }
+        for (o0, o1) in others {
+            for (edge, at) in [(hi, o0), (lo, o1), (lo, o0), (hi, o1)] {
+                if near(edge, at) {
+                    return lo + (at - edge);
+                }
+            }
+        }
+        lo
+    };
+    let x = axis(r.left(), r.size.width, area.left(), area.right(), px(0.), &mut others.iter().filter(|o| overlaps(r.top(), r.bottom(), o.top(), o.bottom())).map(|o| (o.left(), o.right())));
+    let y = axis(r.top(), r.size.height, area.top(), area.bottom(), px(5.), &mut others.iter().filter(|o| overlaps(r.left(), r.right(), o.left(), o.right())).map(|o| (o.top(), o.bottom())));
+    // keepPanelWithinBounds
+    point(x.min(area.right() - r.size.width).max(area.left()), y.min(area.bottom() - r.size.height).max(area.top()))
 }
 
 struct PanelMoveGhost;
@@ -744,7 +873,11 @@ pub fn panel_title(key: &'static str, title: Div) -> Stateful<Div> {
     title
         .id(SharedString::from(format!("panel-title-{key}")))
         .cursor(CursorStyle::OpenHand)
-        .on_mouse_down(MouseButton::Left, |e, _, _| PANEL_LAST.with(|l| l.set(e.position)))
+        .on_mouse_down(MouseButton::Left, move |e, _, _| {
+            let rect = PANEL_RECTS.with(|m| m.borrow().get(PanelOffsets::panel(key)).map(|r| r.0));
+            let press = PanelPress { pointer: e.position, offset: PanelOffsets.get(key), rect, generation: PANEL_GEN.with(|g| g.get()) };
+            PANEL_PRESS.with(|p| p.set(Some(press)));
+        })
         .on_drag(PanelMove { key }, |_, _, _, cx| cx.new(|_| PanelMoveGhost))
 }
 
@@ -765,7 +898,7 @@ thread_local! {
 pub struct PanelOffsets;
 
 impl PanelOffsets {
-    fn panel(key: &str) -> &str {
+    fn panel(key: &'static str) -> &'static str {
         key.strip_prefix("ps-").or_else(|| key.strip_prefix("asm-")).unwrap_or(key)
     }
 
@@ -773,22 +906,45 @@ impl PanelOffsets {
         PANEL_OFFSETS.with(|m| m.borrow().get(Self::panel(key)).map(|(x, y)| point(px(*x), px(*y))).unwrap_or_default())
     }
 
-    /// Follows a panel drag over `e.bounds` (the graphics area); the
-    /// pointer is held inside it, so the title stays reachable.
+    /// Follows a panel drag over `e.bounds` (the graphics area): the
+    /// panel's rect at the press moved by the pointer, snapped and kept
+    /// inside the area ([`snap_panel`]). A panel without a probe keeps the
+    /// pointer inside the area instead.
     pub fn drag(&mut self, e: &DragMoveEvent<PanelMove>, cx: &App) {
-        let d = e.drag(cx);
-        let b = e.bounds;
-        let at = point(e.event.position.x.clamp(b.left(), b.right()), e.event.position.y.clamp(b.top(), b.bottom()));
-        let last = PANEL_LAST.with(|l| l.replace(e.event.position));
-        let from = point(last.x.clamp(b.left(), b.right()), last.y.clamp(b.top(), b.bottom()));
-        let delta = at - from;
-        if delta == Point::default() {
-            return;
-        }
+        let key = Self::panel(e.drag(cx).key);
+        let Some(press) = PANEL_PRESS.with(|p| p.get()) else { return };
+        let generation = PANEL_GEN.with(|g| {
+            g.set(g.get() + 1);
+            g.get()
+        });
+        // Live's panel container: right of the 40 px rail (over the feature
+        // list too), its top 3 px under the toolbar where feature dialogs
+        // open ("Panels vs feature dialogs": snapped top = y 79).
+        let b = Bounds::from_corners(point(px(RAIL_W), e.bounds.top() + px(3.)), e.bounds.bottom_right());
+        let offset = match press.rect {
+            Some(r0) => {
+                let r = Bounds { origin: r0.origin + (e.event.position - press.pointer), size: r0.size };
+                // Open panels were drawn after the last move (none is known
+                // yet at the first).
+                let others: Vec<Bounds<Pixels>> = if generation > press.generation + 1 {
+                    PANEL_RECTS.with(|m| m.borrow().iter().filter(|(k, (_, g))| **k != key && *g + 1 >= generation).map(|(_, (r, _))| *r).collect())
+                } else {
+                    Vec::new()
+                };
+                press.offset + (snap_panel(r, b, &others) - r0.origin)
+            }
+            None => {
+                let at = point(e.event.position.x.clamp(b.left(), b.right()), e.event.position.y.clamp(b.top(), b.bottom()));
+                press.offset + (at - press.pointer)
+            }
+        };
+        let offset = (f32::from(offset.x).round(), f32::from(offset.y).round());
         PANEL_OFFSETS.with(|m| {
             let mut m = m.borrow_mut();
-            let o = m.entry(Self::panel(d.key).to_string()).or_default();
-            *o = (o.0 + f32::from(delta.x), o.1 + f32::from(delta.y));
+            if m.get(key) == Some(&offset) {
+                return;
+            }
+            m.insert(key.to_string(), offset);
             let p = crate::files::config_dir().join("panel_positions.json");
             if let Some(dir) = p.parent() {
                 let _ = std::fs::create_dir_all(dir);
@@ -983,4 +1139,31 @@ pub fn drop_line() -> Div {
         .h(px(6.))
         .child(div().absolute().left(px(5.)).right_0().top(px(2.)).h(px(2.)).bg(accent))
         .child(div().absolute().left_0().top_0().size(px(6.)).rounded_full().border_2().border_color(accent).bg(gpui_kit::rgb(0xcad8ed)))
+}
+
+#[cfg(test)]
+mod tests {
+    // `super::*` brings gpui's `test` attribute (via gpui_kit), which would
+    // shadow the built-in one and expand forever.
+    use super::*;
+
+    fn rect(x: f32, y: f32, w: f32, h: f32) -> Bounds<Pixels> {
+        Bounds { origin: point(px(x), px(y)), size: size(px(w), px(h)) }
+    }
+
+    #[::core::prelude::v1::test]
+    fn panels_snap_like_onshape() {
+        let area = rect(0., 0., 1000., 600.);
+        // Within 10 px of the area's edges: stuck to them.
+        assert_eq!(snap_panel(rect(8., 9., 200., 100.), area, &[]), point(px(0.), px(0.)));
+        assert_eq!(snap_panel(rect(791., 495., 200., 100.), area, &[]), point(px(800.), px(495.)));
+        // Farther: left as is.
+        assert_eq!(snap_panel(rect(11., 50., 200., 100.), area, &[]), point(px(11.), px(50.)));
+        // Beside another panel, overlapping it vertically.
+        assert_eq!(snap_panel(rect(306., 50., 200., 100.), area, &[rect(100., 40., 200., 300.)]), point(px(300.), px(50.)));
+        // Not beside it (no vertical overlap): no snap.
+        assert_eq!(snap_panel(rect(306., 400., 200., 100.), area, &[rect(100., 40., 200., 100.)]), point(px(306.), px(400.)));
+        // Dragged out: kept inside.
+        assert_eq!(snap_panel(rect(900., -50., 200., 100.), area, &[]), point(px(800.), px(0.)));
+    }
 }

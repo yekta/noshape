@@ -80,8 +80,8 @@ impl DrawingEditor {
     /// Open the color dialog at `cur` (None: black ink); OK calls `set`.
     pub fn open_color_dialog(&mut self, cur: Option<[u8; 3]>, set: ColorSet, window: &mut Window, cx: &mut Context<Self>) {
         let c = cur.unwrap_or([0, 0, 0]);
-        let hex_in = cx.new(|cx| InputState::new(window, cx).default_value(hex(c)));
-        let rgb_in = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).default_value(c[i].to_string())));
+        let hex_in = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(hex(c)));
+        let rgb_in = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(c[i].to_string())));
         let mut subs = vec![cx.subscribe(&hex_in, |this: &mut Self, st, ev: &InputEvent, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur)
                 && let Some(c) = parse_hex(&st.read(cx).value())

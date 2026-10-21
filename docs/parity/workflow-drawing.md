@@ -1,0 +1,86 @@
+# Workflow: full drawing of an assembly (a CAD user's session, step by step against live Onshape)
+
+Document "qa5 assembly" (see workflow-assembly.md): Assembly 1 = plate + shaft + pins (patterns) + block +
+imported bracket; BOM row 1 (Part 1 = plate) has Part number "PN-001". Drawing created from the Assembly 1 tab.
+Live reference: behaviours.md "Drawing" (Create drawing, Insert view, toolbar, Callout, GTol, Datum, Detail view,
+Auxiliary view reference indicator, Sheet properties, Export Drawing modal), live DXF samples/drw2-*.dxf.
+Status: ✅ matches live, ✗ differs (finding #), ? not verified.
+
+**Last run: 2026-10-21 (session 12:05–13:35), qa5**, binary /tmp/qa5/noshape-1206.
+
+## 1. Create, insert views
+
+| # | Step | Live | Ours | Status |
+|---|---|---|---|---|
+| 1.1 | Assembly tab › Create Drawing of Assembly 1… | modal "Create Drawing: … Drawing 1", Existing templates / Custom template, filter All/ANSI/ISO/JIS, **ANSI_A_INCH.dwt selected by default** | same layout; **no template row selected** | ✗ D1 |
+| 1.2 | ANSI_A_MM, No views, OK | new tab right after the source, A sheet, Insert view panel, view follows the cursor | same | ✅ |
+| 1.3 | Insert view panel (assembly) | Insert + reference, View orientation, View scale, View simplification, ☐ Show sketch appearances | + Explode/Position, Display state; scale list without "(Sheet)" marker | ? |
+| 1.4 | Insert › picker "Select a part or assembly" | filter icons **Part Studios / Parts / Sketches / Flat patterns**, thumbnails, "Flat pattern of Part 1" rows | tabs Part Studios / Assemblies, **no filter icons, no thumbnails, sketches always listed, no flat patterns** | ✗ D2 |
+| 1.5 | First view, projected Top/Right/iso by moving away | third-angle placement, iso by diagonal | same | ✅ |
+| 1.6 | Undo ×3 (views) | views removed | removed, but an **"Out of date — Update (Ctrl+Q)"** notice appears though nothing changed | ✗ D3 |
+| 1.7 | Title block DWG NO. of the assembly drawing | the assembly's part number ("----" when empty) | **"PN-001" = Part 1's part number** (CLI: only Part 1 has PN-001) | ✗ D4 |
+| 1.8 | Section view (Horizontal), click a hole centre, drag down, place, ✓ | "SECTION A-A", arrows, hatching | same | ✅ |
+| 1.9 | Detail view: circle centre + radius, place | "DETAIL B / SCALE 1:1" (2× parent), circle + label on the parent | same | ✅ |
+| 1.10 | Auxiliary view on a straight edge, place | "Auxiliary C - C", indicator arrows at the parent | same | ✅ |
+
+## 2. Annotations
+
+| # | Step | Live | Ours | Status |
+|---|---|---|---|---|
+| 2.1 | **d** after closing the Auxiliary view with Esc | Dimension tool | **nothing**; later (after clicking the sheet) d works | ✗ D5 |
+| 2.2 | Dimension: click an edge 7 px from its midpoint, place | ? (in the Part Studio live picks the midpoint near it, behaviours.md line 258) | picks the **midpoint** and waits for a second entity | ? D6 |
+| 2.3 | Click the edge away from the midpoint, place | "100" | "100"; tool stays | ✅ |
+| 2.4 | Circle in the top view, place | Ø10 with leader | same | ✅ |
+| 2.5 | Datum on an edge | filled triangle + leader + framed "A" | same; next label "B" | ✅ |
+| 2.6 | GTol dialog | Upper text, Prefix, Type ⌖▾, Tolerance, 3 Datums, Suffix, + / Ø, Lower text; **✓ enabled once something is entered** | same fields; **typing right after opening is lost** although Tolerance shows focus (needs a click); ✓ stays dimmed with content | ✗ D7 |
+| 2.7 | Each click places another frame, Esc ends | yes | yes | ✅ |
+| 2.8 | Note (n), click, type, ✓ | in-place editor with ruler, formatting toolbar | same | ✅ |
+
+## 3. BOM table, balloons, sheet properties
+
+| # | Step | Live | Ours | Status |
+|---|---|---|---|---|
+| 3.1 | BOM table, place top right | Item / Quantity / Part number / Description, rows from the assembly BOM | same; quantities 1/1/6/1/1, PN-001 | ✅ |
+| 3.2 | Callout on a part edge in the assembly view (BOM table present) | balloon shows the **BOM item number** | balloon shows **"----"** | ✗ D8 |
+| 3.3 | Right-click sheet › Sheet properties… | Scale / Format / Size / Reference | same; scale "1:2" Enter + ✓ updates the title block SCALE | ✅ |
+
+## 4. Export
+
+| # | Step | Live | Ours | Status |
+|---|---|---|---|---|
+| 4.1 | Tab › Export…, PDF | File name + **"View export rules" link**, Format, Version 1.5, Overridden dimensions, Text, Color, Options, ☐ Hide inspection items | same, without the "View export rules" link | ✗ D9 (minor) |
+| 4.2 | PDF content | as on screen | letter landscape, 1 page; **iso view exported shaded** (on screen: hidden-line); **Detail B circle border lost / content not clipped** | ✗ D10 |
+| 4.3 | DXF options | **Version default Release 14** (+ "Model space only" line), **Sheets ▾ All/Current/Custom** | Version default **2018**, no Sheets ▾ | ✗ D11 |
+| 4.4 | DXF content | CIRCLE/ARC/ELLIPSE, HATCH, MTEXT, DIMENSION, ACAD_TABLE, INSERT; layers Visible, TANGENT_LINES, VIEW_HATCHES, CENTERMARKS, ANNOTATION_TEXT, ANNOTATION_LINES, SECTION_CUTTING_LINE, TABLES, BORDER_*, TITLE_BLOCK | only LINE / LWPOLYLINE / SOLID / TEXT (circles, hatches, dimensions, tables exploded); layers VISIBLE, TANGENT, CENTER, ANNOTATION, SECTION, PHANTOM, BORDER_*, TITLE_BLOCK | ✗ D12 |
+
+## Findings (2026-10-21 run)
+
+| # | Finding | Repro | Owner |
+|---|---|---|---|
+| D4 | **Wrong data in the title block**: an assembly drawing shows Part 1's part number as DWG NO. | BOM: Part number of row 1; drawing of the assembly | asb |
+| D8 | Balloons (Callout) on assembly parts show "----" even with a BOM table | §3.2 | asb |
+| D12 | DXF export explodes circles/arcs, hatches, dimensions, tables into lines/polylines; layer names differ from Onshape's | §4.4 | asb / drw2 |
+| D10 | PDF: iso view comes out shaded; detail view border/clip lost | §4.2 | asb |
+| D2 | Insert view picker: no filter icons (Parts/Sketches/Flat patterns), no thumbnails, no flat-pattern entries | §1.4 | asb |
+| D6 | (unverified; may match live) Dimension: a click near an edge's midpoint picks the midpoint, not the edge | §2.2 | asb |
+| D5 | Drawing shortcuts (d) dead after closing a view dialog with Esc until the sheet is clicked | §2.1 | asb / ui2 |
+| D7 | GTol: focused Tolerance field drops keys typed on open; ✓ stays dimmed with content | §2.6 | asb |
+| D3 | Undoing views shows a spurious "Out of date" notice | §1.6 | asb |
+| D11 | DXF export options: default version 2018 (live R14), no Sheets selector | §4.3 | asb |
+| D1 | Create Drawing: no default template selected | §1.1 | asb / ui2 |
+| D9 | Export Drawing: no "View export rules" link | §4.1 | ui2 |
+
+## Re-run pass 3 (2026-10-21 15:25–15:40, /tmp/qa5/noshape-1448 = target-shared 14:48; new "Assembly 1 Drawing 2" + existing Drawing 1)
+
+| # | Row | Ours | Status |
+|---|---|---|---|
+| 1.1 | Create Drawing dialog | ANSI_A_INCH.dwt selected by default; "No views" option pre-selected (live default ?) | ✅ D1 fixed |
+| 1.4 | Insert picker | filter icons Part Studios / Parts / Sketches / Flat patterns + thumbnails | ✅ D2 fixed |
+| 1.6 | Place a view, Ctrl+Z | view removed, no "Out of date" notice ✅; **title-block SCALE changes from "1:1" (before the view) to "----" after the undo** | ✅ D3 fixed / ✗ **D14** (minor) |
+| 1.7 | DWG NO. of an assembly drawing | "----" (both drawings) | ✅ D4 fixed |
+| 2.6 | GTol: type right after opening | "0.1" lands in Tolerance, ✓ enabled | ✅ D7 fixed |
+| 3.2 | Callout balloons in the existing drawing | still "----" with a BOM table present | ✗ D8 |
+| 4.1 | Export dialog | "View export rules" link present | ✅ D9 fixed |
+| 4.3 | DXF options | Release 14 + "Model space only", Sheets ▾ "All sheets" ✅; **Units "Drawing units"** (live "Use drawing units"), **☐ Set z-height to zero…** (live ☑ by default, behaviours.md D12 answer) | ✅ D11 fixed / ✗ **D15** |
+| – | Tab menus (assembly / drawing tab) | no "Open in new browser tab" (browser-only, ok), no "Show code" | ? |
+| 2.1, 4.2, 4.4 | D5, D10, D13 | not re-run this pass | – |

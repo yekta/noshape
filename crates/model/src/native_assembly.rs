@@ -1,14 +1,23 @@
 //! Import of a native CAD assembly as Onshape does it (live G38, G38f): a
 //! flat zip named like the root assembly, holding it and the part files it
-//! references by name, becomes a Part Studio "<root> parts" with one Import
-//! feature (every part once, at its own origin, named after its component's
-//! first instance: "Shaft-1") and an Assembly "<root>" whose instances
-//! ("Shaft-1 <1>") sit where the file places them, not fixed, without mates.
-//! Parts come in the reverse of their first use in the assembly, each with
-//! its thread curves first as a wire of the same name (live G41); instances
-//! are grouped by part in that order. "Combine to a single Part Studio"
-//! instead gives one Part Studio "<root>" with every instance's bodies at
-//! their assembly positions (live G41 (5)).
+//! references by name, becomes a Part Studio "<zip> parts" with one Import
+//! feature (every part once, at its own origin) and an Assembly whose
+//! instances ("<part> <1>") sit where the file places them, not fixed,
+//! without mates. Names and order depend on the CAD system:
+//! - SOLIDWORKS (G41): Assembly "<root>"; parts named after their
+//!   component's first instance ("Shaft-1"), in the reverse of their first
+//!   use, each with its thread curves first as a wire of the same name;
+//!   instances grouped by part in that order.
+//! - Inventor (G42): Assembly "<root>.iam"; parts "<ipt>__Solid1"; the
+//!   occurrences in the reverse of the assembly's browser order, numbered per
+//!   part in that order, parts in their first use; one .iam in the zip may
+//!   have any zip name; an assembly of a single occurrence becomes only a
+//!   Part Studio "<zip>".
+//! - Solid Edge (G43): Assembly "<root>.asm"; parts "<file>.par"; the
+//!   occurrences in the reverse of the assembly's order, as Inventor.
+//!
+//! "Combine to a single Part Studio" instead gives one Part Studio "<root>"
+//! with every instance's bodies at their assembly positions (live G41 (5)).
 
 use crate::assembly::{Assembly, Instance, InstanceId, InstanceSource, Placement};
 use crate::configuration::ConfigValues;
@@ -36,9 +45,46 @@ pub const NO_ROOT: &str = "Root assembly file not found. Ensure zip file name ma
 /// A native assembly as Onshape imports it (live G38): a flat zip named like
 /// its root assembly, with the part files the assembly references by name.
 pub struct AssemblyZip {
+    /// The root assembly's name without its extension ("Wrench").
     pub root: String,
+    /// The root assembly's file name ("Wrench.iam").
+    pub root_file: String,
+    /// The zip's name without ".zip".
+    pub zip: String,
+    pub system: NativeSystem,
     pub components: Vec<k::NativeComponent>,
     pub files: Vec<PartFile>,
+}
+
+/// The CAD system a native assembly comes from (Onshape names and orders
+/// the import per system).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeSystem {
+    Solidworks,
+    Inventor,
+    SolidEdge,
+}
+
+impl NativeSystem {
+    /// By the root assembly's extension.
+    pub fn of(file: &str) -> Option<NativeSystem> {
+        let ext = file.rsplit_once('.')?.1.to_ascii_lowercase();
+        match ext.as_str() {
+            "sldasm" => Some(NativeSystem::Solidworks),
+            "iam" => Some(NativeSystem::Inventor),
+            "asm" => Some(NativeSystem::SolidEdge),
+            _ => None,
+        }
+    }
+}
+
+/// The tabs a native assembly import added.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeTabs {
+    /// The Assembly and its parts' Part Studio.
+    Assembly { studio: TabId, assembly: TabId },
+    /// Only a Part Studio (an Inventor assembly of one occurrence, live G42).
+    Studio(TabId),
 }
 
 /// Read an assembly zip: its root assembly's tree and every part file it
@@ -54,14 +100,16 @@ pub fn read_assembly_zip(path: &std::path::Path) -> Result<AssemblyZip, String> 
             return Err(NO_ROOT.to_string());
         }
         let split = |n: &str| n.rsplit_once('.').map(|(a, b)| (a.to_string(), b.to_ascii_lowercase())).unwrap_or((n.to_string(), String::new()));
-        let root = names
+        // The assembly named like the zip; Inventor: also the only .iam,
+        // whatever the zip's name (live G42).
+        let assemblies: Vec<&String> = names.iter().filter(|n| NativeSystem::of(n).is_some()).collect();
+        let iams: Vec<&&String> = assemblies.iter().filter(|n| NativeSystem::of(n) == Some(NativeSystem::Inventor)).collect();
+        let root = *assemblies
             .iter()
-            .find(|n| {
-                let (base, ext) = split(n);
-                // SOLIDWORKS, or Solid Edge (live G43 pending).
-                (ext == "sldasm" || ext == "asm") && base.eq_ignore_ascii_case(&stem)
-            })
+            .find(|n| split(n).0.eq_ignore_ascii_case(&stem))
+            .or(if iams.len() == 1 { iams.first().copied() } else { None })
             .ok_or(NO_ROOT)?;
+        let system = NativeSystem::of(root).ok_or(NO_ROOT)?;
         let components = k::read_native_assembly(&dir.join(root)).map_err(|e| e.to_string())?;
         let mut files = Vec::new();
         for n in &names {
@@ -79,7 +127,7 @@ pub fn read_assembly_zip(path: &std::path::Path) -> Result<AssemblyZip, String> 
         if files.is_empty() {
             return Err(NO_GEOMETRY.to_string());
         }
-        Ok(AssemblyZip { root: split(root).0, components, files })
+        Ok(AssemblyZip { root: split(root).0, root_file: root.clone(), zip: stem, system, components, files })
     })();
     let _ = std::fs::remove_dir_all(&dir);
     result
@@ -138,6 +186,84 @@ pub fn add_native_assembly(doc: &mut Document, root: &str, components: &[k::Nati
         order.insert(s, id);
     }
     Ok((studio, assembly))
+}
+
+/// Add a native assembly zip's tabs as Onshape imports it for its system
+/// (see the module docs).
+pub fn add_native_zip(doc: &mut Document, z: &AssemblyZip, import_appearances: bool, units: &UnitPrefs) -> Result<NativeTabs, String> {
+    if z.system == NativeSystem::Solidworks {
+        let (studio, assembly) = add_native_assembly(doc, &z.root, &z.components, &z.files, import_appearances, units)?;
+        return Ok(NativeTabs::Assembly { studio, assembly });
+    }
+    let world = world_placements(&z.components);
+    let files = &z.files;
+    let file_of = |c: &k::NativeComponent| files.iter().position(|f| f.file.eq_ignore_ascii_case(&c.file) && (f.configuration == c.configuration_id || f.configuration.is_none()));
+    // The occurrences in the reverse of the assembly's order, and the parts
+    // in their first use there.
+    let used: Vec<(usize, usize)> = z.components.iter().enumerate().rev().filter(|(_, c)| !c.assembly && !c.suppressed).filter_map(|(i, c)| Some((i, file_of(c)?))).collect();
+    let mut order: Vec<usize> = Vec::new();
+    for &(_, fi) in &used {
+        if !order.contains(&fi) {
+            order.push(fi);
+        }
+    }
+    if order.is_empty() {
+        return Err(NO_GEOMETRY.into());
+    }
+    // Part names: Inventor "<ipt>__Solid<n>" for every solid of the file,
+    // Solid Edge the file's name.
+    let base = |fi: usize| std::path::Path::new(&files[fi].file).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let solid_name = |fi: usize, n: usize| -> Option<String> {
+        match z.system {
+            NativeSystem::Inventor => Some(format!("{}__Solid{}", base(fi).rsplit_once('.').map(|x| x.0.to_string()).unwrap_or_else(|| base(fi)), n + 1)),
+            _ => (n == 0).then(|| base(fi)),
+        }
+    };
+    let mut shapes = Vec::new();
+    let mut info = Vec::new();
+    let mut part_names: Vec<Option<String>> = Vec::new();
+    for &fi in &order {
+        let first = solid_name(fi, 0).unwrap_or_default();
+        let named = part_bodies_named(&files[fi], Some(&first), None, &mut shapes, &mut info, &|n| solid_name(fi, n))?;
+        part_names.push(named.map(|_| first));
+    }
+    let brep = k::Shape::compound(&shapes).to_brep_bytes().map_err(|e| e.to_string())?;
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature("importForeign", units).ok_or("no Import feature")?;
+    f.params.set("allowFaultyParts", ParamValue::Bool(true));
+    f.params.set("blobData", ParamValue::Text(String::from_utf8_lossy(&brep).to_string()));
+    f.params.set("partInfo", ParamValue::Text(serde_json::to_string(&info).map_err(|e| e.to_string())?));
+    f.params.set("foreignId", ParamValue::Text(format!("{}.zip", z.zip)));
+    f.params.set("importAppearances", ParamValue::Bool(import_appearances));
+    ps.insert_at_rollback(f);
+    // An Inventor assembly of one occurrence: only a Part Studio "<zip>".
+    if z.system == NativeSystem::Inventor && used.len() == 1 {
+        let name = unique_name(doc, &z.zip);
+        return Ok(NativeTabs::Studio(doc.add_tab(&name, TabContent::PartStudio(ps))));
+    }
+    let regen = Regenerator::new().regenerate(&ps, &ConfigValues::default(), units, &RegenOptions::default());
+    let studio_name = unique_name(doc, &format!("{} parts", z.zip));
+    let studio = doc.add_tab(&studio_name, TabContent::PartStudio(ps));
+    let mut asm = Assembly::default();
+    let mut counts = vec![0usize; order.len()];
+    for &(ci, fi) in &used {
+        let Some(pi) = order.iter().position(|&o| o == fi) else { continue };
+        let Some(name) = &part_names[pi] else { continue };
+        let Some(body) = regen.context.bodies.iter().find(|b| &b.name == name && b.kind != crate::display::BodyKind::Wire).map(|b| b.id.clone()) else { continue };
+        counts[pi] += 1;
+        let id = InstanceId(asm.next_id());
+        let mut inst = Instance::new(id, format!("{name} <{}>", counts[pi]), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&world[ci]));
+        inst.hidden = z.components[ci].hidden;
+        asm.instances.push(inst);
+    }
+    let asm_name = unique_name(doc, &z.root_file);
+    let assembly = doc.add_tab(&asm_name, TabContent::Assembly(Box::new(asm)));
+    let order = &mut doc.settings.tab_order;
+    if let (Some(a), Some(s)) = (order.iter().position(|t| *t == assembly), order.iter().position(|t| *t == studio)) {
+        let id = order.remove(a);
+        order.insert(s, id);
+    }
+    Ok(NativeTabs::Assembly { studio, assembly })
 }
 
 /// "Combine to a single Part Studio" (live G41 (5)): one Part Studio
@@ -221,22 +347,27 @@ fn parts_of(components: &[k::NativeComponent], files: &[PartFile], used: &[(usiz
 /// cosmetic thread), then its solids, the first named like the part.
 /// Returns the index of the named solid among `shapes`.
 fn part_bodies(file: &PartFile, name: &str, at: Option<&glam::DMat4>, shapes: &mut Vec<k::Shape>, info: &mut Vec<ImportPartInfo>) -> Result<Option<usize>, String> {
+    part_bodies_named(file, Some(name), at, shapes, info, &|n| (n == 0).then(|| name.to_string()))
+}
+
+/// [`part_bodies`] with the wires named `wire_name` and the `n`-th solid
+/// named `solid_name(n)`.
+fn part_bodies_named(file: &PartFile, wire_name: Option<&str>, at: Option<&glam::DMat4>, shapes: &mut Vec<k::Shape>, info: &mut Vec<ImportPartInfo>, solid_name: &dyn Fn(usize) -> Option<String>) -> Result<Option<usize>, String> {
     let place = |s: &k::Shape| match at {
         Some(m) => s.transformed(&k::Transform::Matrix(*m)).map_err(|e| e.to_string()),
         None => Ok(s.clone()),
     };
     let is_wire = |b: &k::ImportedShape| b.shape.count(k::ShapeType::Face) == 0;
     for b in file.bodies.iter().filter(|b| is_wire(b)) {
-        info.push(ImportPartInfo { name: Some(name.to_string()), color: b.color, opacity: b.opacity, faces: Vec::new() });
+        info.push(ImportPartInfo { name: wire_name.map(str::to_string), color: b.color, opacity: b.opacity, faces: Vec::new() });
         shapes.push(place(&b.shape)?);
     }
     let mut named = None;
-    for b in file.bodies.iter().filter(|b| !is_wire(b)) {
-        let first = named.is_none();
-        if first {
+    for (n, b) in file.bodies.iter().filter(|b| !is_wire(b)).enumerate() {
+        if n == 0 {
             named = Some(shapes.len());
         }
-        info.push(ImportPartInfo { name: first.then(|| name.to_string()), color: b.color, opacity: b.opacity, faces: b.face_colors.clone() });
+        info.push(ImportPartInfo { name: solid_name(n), color: b.color, opacity: b.opacity, faces: b.face_colors.clone() });
         shapes.push(place(&b.shape)?);
     }
     Ok(named)

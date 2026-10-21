@@ -196,6 +196,18 @@ impl VersionGraph {
     }
 }
 
+/// How [`Document::merge_with`] treats one name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MergePick {
+    /// Three-way: the changed side wins; changes on both sides go to the
+    /// resolver.
+    Auto,
+    /// Keep the target's content.
+    Ours,
+    /// Take the source's content.
+    Theirs,
+}
+
 /// Result of [`Document::merge`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MergeOutcome {
@@ -897,18 +909,46 @@ impl Document {
         &mut self,
         from: BranchId,
         into: BranchId,
-        mut resolver: F,
+        resolver: F,
     ) -> Result<MergeOutcome>
     where
         F: FnMut(&str, Option<&[u8]>, Option<&[u8]>, Option<&[u8]>) -> Option<Vec<u8>>,
     {
-        self.writable()?;
         let theirs_head = self.head(from)?;
+        let from_name = self.branch(from)?.name;
+        self.merge_with(theirs_head, &from_name, Some(from), into, |_| MergePick::Auto, resolver)
+    }
+
+    /// [`Self::merge`] from any microversion (a workspace head or a
+    /// version: Onshape merges either into the current workspace), with a
+    /// per-name choice (Onshape's per-tab merge strategy): `pick(name)` =
+    /// [`MergePick::Ours`] keeps the target's content, `Theirs` takes the
+    /// source's, `Auto` merges as [`Self::merge`] does. `from_branch` is
+    /// checked not to move during the merge.
+    pub fn merge_with<P, F>(
+        &mut self,
+        theirs_head: MicroversionId,
+        from_name: &str,
+        from_branch: Option<BranchId>,
+        into: BranchId,
+        mut pick: P,
+        mut resolver: F,
+    ) -> Result<MergeOutcome>
+    where
+        P: FnMut(&str) -> MergePick,
+        F: FnMut(&str, Option<&[u8]>, Option<&[u8]>, Option<&[u8]>) -> Option<Vec<u8>>,
+    {
+        self.writable()?;
         let ours_head = self.head(into)?;
         let base = self
             .merge_base(ours_head, theirs_head)?
             .ok_or_else(|| StoreError::Corrupt("branches share no ancestor".into()))?;
-        if base == theirs_head {
+        let bm = self.manifest(base)?;
+        let om = self.manifest(ours_head)?;
+        let tm = self.manifest(theirs_head)?;
+        let names: BTreeSet<&String> = bm.keys().chain(om.keys()).chain(tm.keys()).collect();
+        // Already contained, unless a name is replaced by the source's.
+        if base == theirs_head && !names.iter().any(|n| pick(n) == MergePick::Theirs && om.get(*n) != tm.get(*n)) {
             return Ok(MergeOutcome {
                 microversion: ours_head,
                 base,
@@ -917,25 +957,25 @@ impl Document {
                 up_to_date: true,
             });
         }
-        let bm = self.manifest(base)?;
-        let om = self.manifest(ours_head)?;
-        let tm = self.manifest(theirs_head)?;
-        let from_name = self.branch(from)?.name;
         let into_name = self.branch(into)?.name;
 
-        let names: BTreeSet<&String> = bm.keys().chain(om.keys()).chain(tm.keys()).collect();
         let mut result = Manifest::new();
         let mut taken = Vec::new();
         let mut conflicts = Vec::new();
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if live_head(&tx, into)? != ours_head || live_head(&tx, from)? != theirs_head {
+        if live_head(&tx, into)? != ours_head || from_branch.map(|f| live_head(&tx, f)).transpose()?.is_some_and(|h| h != theirs_head) {
             return Err(StoreError::Corrupt("branch moved during merge".into()));
         }
         for name in names {
             let (b, o, t) = (bm.get(name), om.get(name), tm.get(name));
-            let chosen = if o == t {
+            let chosen = if let p @ (MergePick::Ours | MergePick::Theirs) = pick(name) {
+                if p == MergePick::Theirs && o != t {
+                    taken.push(name.clone());
+                }
+                if p == MergePick::Ours { o.copied() } else { t.copied() }
+            } else if o == t {
                 o.copied()
             } else if o == b {
                 taken.push(name.clone());

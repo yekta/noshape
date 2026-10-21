@@ -211,4 +211,48 @@ impl SheetPick<'_> {
             _ => None,
         }
     }
+
+    /// A click of a dimension tool that picks rather than places (the
+    /// editor's tool click): what each tool adds to `picks`. Maximum /
+    /// minimum and foreshortened dimensions pick with the editor's
+    /// `more_dimension_pick`.
+    pub fn dimension_click(&self, kind: DimTool, c: [f64; 2], picks: &mut Vec<Pick>) {
+        match kind {
+            DimTool::Radius | DimTool::Diameter => {
+                if let Some(p) = self.circle_pick(c) {
+                    *picks = vec![p];
+                }
+            }
+            DimTool::Angle | DimTool::Chamfer => {
+                if let Some(p) = self.line_pick() {
+                    picks.push(p);
+                }
+            }
+            DimTool::ArcLength => {
+                if let Some(p) = self.arc_pick() {
+                    *picks = vec![p];
+                }
+            }
+            DimTool::MaxMin | DimTool::Foreshorten => {}
+            DimTool::Angle3 => {
+                if let Some(p) = self.snap_at(c).filter(|p| picks.first().is_none_or(|f| matches!(f, Pick::Point(v) if v.view == p.view))) {
+                    picks.push(Pick::Point(p));
+                }
+            }
+            DimTool::Point2 | DimTool::PointLine | DimTool::LineLine => self.typed_linear_click(kind, c, picks),
+            DimTool::Linear => self.smart_click(c, picks),
+        }
+    }
+
+    /// With `picks` made, does a click at `c` add a pick (the smart
+    /// Dimension's second entity; linear tools until two) rather than place
+    /// the dimension?
+    pub fn dimension_takes_more(&self, kind: DimTool, c: [f64; 2], picks: &[Pick]) -> bool {
+        match kind {
+            DimTool::Linear => picks.len() == 1 && self.smart_takes(c, &picks[0]),
+            k if k.linear() => picks.len() < 2,
+            _ => false,
+        }
+    }
+
 }

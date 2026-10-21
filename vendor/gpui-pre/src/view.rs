@@ -312,7 +312,23 @@ impl<V: View> IntoElement for ViewElement<V> {
     }
 }
 
+/// NOSHAPE PATCH (agent qa4): whether re-rendering a cached view re-renders
+/// every cached view nested in it (upstream; `NOSHAPE_NESTED_VIEW_REFRESH=1`).
+/// Off by default: a nested cached view is reused unless it is dirty itself,
+/// as one under a plain view is (the app's `cached_slice::Slice`s observe
+/// what they show). Its indices must be the previous frame's
+/// (`ViewElementState::frame`): inside a reused view they aren't updated.
+fn nested_views_refresh() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_NESTED_VIEW_REFRESH").is_ok_and(|v| v == "1"))
+}
+
 struct ViewElementState {
+    /// NOSHAPE PATCH (agent qa4): the frame (`Window::noshape_frame`) whose
+    /// indices `prepaint_range` and `paint_range` are. A view inside a cached
+    /// view that was reused keeps the indices of the frame it was last drawn
+    /// in, which only that frame's successor may reuse.
+    frame: u64,
     prepaint_range: Range<PrepaintStateIndex>,
     paint_range: Range<PaintIndex>,
     cache_key: ViewElementCacheKey,
@@ -533,6 +549,7 @@ fn prepaint_view(
                     && element_state.cache_key.text_style == text_style
                     && !window.dirty_views.contains(&entity_id)
                     && !window.refreshing
+                    && element_state.frame + 1 == window.noshape_frame
                 {
                     let prepaint_start = window.prepaint_index();
                     window.reuse_prepaint(element_state.prepaint_range.clone());
@@ -540,11 +557,15 @@ fn prepaint_view(
                         .extend_accessed(&element_state.accessed_entities);
                     let prepaint_end = window.prepaint_index();
                     element_state.prepaint_range = prepaint_start..prepaint_end;
+                    element_state.frame = window.noshape_frame;
 
                     return (None, element_state);
                 }
 
-                let refreshing = mem::replace(&mut window.refreshing, true);
+                // NOSHAPE PATCH (agent qa4): upstream re-renders every cached
+                // view nested in one it re-renders; see `nested_views_refresh`.
+                let refreshing = window.refreshing;
+                window.refreshing = refreshing || nested_views_refresh();
                 let prepaint_start = window.prepaint_index();
                 let (element, accessed_entities) = cx.detect_accessed_entities(|cx| {
                     let mut element = render(window, cx);
@@ -559,6 +580,7 @@ fn prepaint_view(
                 (
                     Some(element),
                     ViewElementState {
+                        frame: window.noshape_frame,
                         accessed_entities,
                         prepaint_range: prepaint_start..prepaint_end,
                         paint_range: PaintIndex::default()..PaintIndex::default(),

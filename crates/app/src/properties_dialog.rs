@@ -597,14 +597,25 @@ pub(crate) fn modal_header(title: &'static str, width: f32) -> Div {
 }
 
 pub(crate) fn bootstrap_modal(dialog: gpui_kit::component::dialog::Dialog, title: &'static str, width: f32, top: f32) -> gpui_kit::component::dialog::Dialog {
-    dialog.w(px(width)).margin_top(px(top)).close_button(false).p_0().gap_0().rounded(px(6.)).border_color(rgb(0xdee2e6)).title(modal_header(title, width))
+    dialog
+        .w(px(width))
+        .margin_top(px(top))
+        .close_button(false)
+        .p_0()
+        .gap_0()
+        .rounded(px(6.))
+        .border_color(rgb(0xdee2e6))
+        .title(modal_header(title, width))
 }
 
 /// Open the Properties modal; `on_save` runs on Apply and Save.
 pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
     let on_save: SaveFn = Rc::new(on_save);
     let form = cx.new(|cx| MetaForm::new(spec, on_save, window, cx));
+    let name = form.read(cx).name.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
+    // Live: the first field (Name) has the focus when the modal opens.
+    name.update(cx, |s, cx| s.focus(window, cx));
 }
 
 /// [`open_properties`] for a Part Studio part, with the release-create icon
@@ -622,7 +633,10 @@ pub fn open_part_properties_configured(spec: MetaSpec, reset_to: Option<MetaValu
         f.configured = configured;
         f
     });
+    let name = form.read(cx).name.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
+    // Live: the first field (Name) has the focus when the modal opens.
+    name.update(cx, |s, cx| s.focus(window, cx));
 }
 
 /// Instance properties…: a 600 px modal with the instance's name and its

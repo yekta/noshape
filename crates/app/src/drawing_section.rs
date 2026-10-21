@@ -64,7 +64,7 @@ impl DrawingEditor {
         match (&self.section_dlg, active) {
             (None, true) => {
                 let next = self.current_sheet().next_label();
-                let label = cx.new(|cx| InputState::new(window, cx).placeholder("Section id").default_value(next));
+                let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Section id").default_value(next));
                 self.section_dlg = Some(SectionDlg { mode: 0, label, cut_only: false, depth: None, depth_value: None, up_to: false, depth_ref: None, exclude: Vec::new(), picking: 0, angle: 45.0, angle_input: None, opposite: false, flip: false, cut_from: true });
             }
             (Some(_), false) => self.section_dlg = None,
@@ -75,7 +75,7 @@ impl DrawingEditor {
             && d.mode == 2
             && d.angle_input.is_none()
         {
-            let st = cx.new(|cx| InputState::new(window, cx).default_value(format!("{} deg", d.angle)));
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(format!("{} deg", d.angle)));
             let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
                 if matches!(ev, InputEvent::Change)
                     && let Ok(a) = st.read(cx).value().trim().trim_end_matches("deg").trim_end_matches('°').trim().parse::<f64>()
@@ -108,24 +108,6 @@ impl DrawingEditor {
     pub fn section_label(&self, cx: &App) -> Option<String> {
         let t = self.section_dlg.as_ref()?.label.read(cx).value().trim().to_string();
         (!t.is_empty()).then_some(t)
-    }
-
-    /// The dialog's options on a new section view.
-    pub fn apply_section_options(&self, v: &mut noshape_model::drawing::DrawingView) {
-        if let Some(d) = &self.section_dlg {
-            v.cut_only = d.cut_only;
-            v.flip = d.flip;
-            v.section_depth = d.depth.as_ref().and(d.depth_value).filter(|_| !d.up_to);
-            v.section_depth_ref = d.depth_ref.clone().filter(|_| d.up_to && d.depth.is_some());
-            v.exclude_from_cut = d.exclude.clone();
-            // Live drawing/505: ☑ Cut from section by default, only when
-            // sectioning a section view.
-            v.cut_from_section = d.cut_from
-                && match v.kind {
-                    noshape_model::drawing::ViewKind::Section { parent, .. } => self.current_sheet().view(parent).is_some_and(|p| matches!(p.kind, noshape_model::drawing::ViewKind::Section { .. })),
-                    _ => false,
-                };
-        }
     }
 
     /// A click while a dialog field takes picks: the depth point (Up to
@@ -175,7 +157,7 @@ impl DrawingEditor {
         } else if d.depth.is_none() {
             let text = if mm { "10 mm" } else { "0.5 in" };
             d.depth_value = parse_depth(text, mm);
-            let st = cx.new(|cx| InputState::new(window, cx).default_value(text));
+            let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
             let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
                 if matches!(ev, InputEvent::Change) {
                     let v = parse_depth(&st.read(cx).value(), mm);
@@ -197,7 +179,7 @@ impl DrawingEditor {
         }
         // Start the cut again in the new mode (the view stays chosen).
         if let Tool::Section { parent, partial, .. } = self.tool.clone() {
-            self.tool = Tool::Section { parent, p0: None, line: None, partial };
+            self.tool = Tool::Section { parent, p0: None, line: None, partial, jogs: vec![] };
         }
         self.update_preview(cx);
         cx.notify();

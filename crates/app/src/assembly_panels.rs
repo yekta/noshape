@@ -38,7 +38,7 @@ impl PatternDialogKind {
             PatternDialogKind::Replicate => "Replicate",
         }
     }
-    fn matched(self) -> bool {
+    pub(crate) fn matched(self) -> bool {
         matches!(self, PatternDialogKind::PartPattern | PatternDialogKind::Replicate)
     }
 }
@@ -149,9 +149,15 @@ pub(crate) struct PatternSession {
     pub opposite: bool,
     pub opposite2: bool,
     pub equal: bool,
+    /// Centered (linear and circular patterns).
+    pub centered: bool,
     pub second: bool,
     /// Seed mate (part pattern / replicate).
     pub mate: Option<MateId>,
+    /// Replicate: the match scope (None: the default for the seed mate's
+    /// entity) and "Parts to find match in" (help: Replicate 6–7).
+    pub scope: Option<noshape_model::assembly::ReplicateScope>,
+    pub scope_refs: Vec<noshape_model::assembly::ScopeEntity>,
     /// Matches found (part pattern / replicate) or why there are none.
     pub preview: Option<Result<usize, String>>,
 }
@@ -173,6 +179,8 @@ pub(crate) struct ConfigSession {
     pub inputs: Vec<noshape_model::configuration::ConfigInput>,
     pub values: ConfigValues,
     pub texts: Vec<(String, Entity<InputState>)>,
+    /// Generate is enabled once an input changed (live: greyed at first).
+    pub generate: bool,
 }
 
 /// The Replace instance dialog (live assembly/833–836): the instances to
@@ -188,46 +196,7 @@ pub(crate) struct ReplaceSession {
     pub before: Option<Arc<AssemblyResult>>,
 }
 
-fn section(label: &str) -> Div {
-    div().pt_1().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(p().text_muted).child(label.to_string())
-}
-
-fn field_row(label: &str, el: impl IntoElement) -> Div {
-    h_flex().gap_2().child(div().w(px(84.)).text_xs().text_color(p().text_muted).child(label.to_string())).child(div().flex_1().child(el))
-}
-
 impl AssemblyView {
-    // ------------------------------------------------------------ connector fields
-
-    /// A mate connector field (click to make it receive picks).
-    fn conn_field(&self, id: &'static str, value: &Option<MateConnectorRef>, active: bool, placeholder: &'static str, cx: &mut Context<Self>, on_click: impl Fn(&mut Self, &mut Context<Self>) + 'static) -> AnyElement {
-        let pal = p();
-        let label: SharedString = match value {
-            Some(c) => (self.labeler(cx))(c).into(),
-            None => placeholder.into(),
-        };
-        let filled = value.is_some();
-        h_flex()
-            .id(id)
-            .h(px(28.))
-            .px_2()
-            .gap_2()
-            .rounded_md()
-            .border_1()
-            .border_color(if active { pal.accent } else { pal.border_strong })
-            .bg(if active { with_alpha(pal.accent, 0.10) } else { pal.panel })
-            .cursor_pointer()
-            .child(svg().path(icon_path("mate-connector")).size_3p5().text_color(if filled { pal.accent_hover } else { pal.text_faint }))
-            .child(div().flex_1().truncate().text_sm().text_color(if filled { pal.text } else { pal.text_faint }).child(label))
-            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                on_click(this, cx);
-                this.update_capture(cx);
-                this.refresh_scene(false, cx);
-                cx.notify();
-            }))
-            .into_any_element()
-    }
-
     // ------------------------------------------------------------ assembly mate connector dialog
 
     pub(super) fn open_mc(&mut self, existing: Option<AsmMateConnector>, window: &mut Window, cx: &mut Context<Self>) {
@@ -629,7 +598,6 @@ impl AssemblyView {
                         .bg(pal.accept)
                         .when(!ok, |d| d.opacity(0.2))
                         .when(ok, |d| d.cursor_pointer())
-                        .tooltip(crate::ui::tooltip("Accept (Enter)"))
                         .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_mc(window, cx))),
                 )
@@ -642,7 +610,6 @@ impl AssemblyView {
                         .justify_center()
                         .cursor_pointer()
                         .hover(|d| d.bg(pal.panel_hover))
-                        .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                         .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_mc(window, cx))),
                 )
@@ -933,9 +900,11 @@ impl AssemblyView {
     // ------------------------------------------------------------ patterns
 
     fn new_pattern_session(&self, kind: PatternDialogKind, window: &mut Window, cx: &mut Context<Self>) -> PatternSession {
+        // Live ("qa5 assembly" 6): Distance 25 mm, Angle 360 deg, Instance
+        // count 2.
         let (d, n) = match kind {
-            PatternDialogKind::Circular => ("360 deg", "4"),
-            _ => ("50 mm", "2"),
+            PatternDialogKind::Circular => ("360 deg", "2"),
+            _ => ("25 mm", "2"),
         };
         let mk = |t: &str, window: &mut Window, cx: &mut Context<Self>| {
             let t = t.to_string();
@@ -950,7 +919,8 @@ impl AssemblyView {
             seeds,
             axis: None,
             axis2: None,
-            active: if kind.matched() { None } else { Some(0) },
+            // Live: the dialog opens with Instances focused.
+            active: None,
             distance: mk(d, window, cx),
             count: mk(n, window, cx),
             distance2: mk("50 mm", window, cx),
@@ -958,10 +928,31 @@ impl AssemblyView {
             opposite: false,
             opposite2: false,
             equal: kind == PatternDialogKind::Circular,
+            centered: false,
             second: false,
             mate: None,
+            scope: None,
+            scope_refs: Vec::new(),
             preview: None,
         }
+    }
+
+    /// Replicate's match scope: the chosen one, else the first of the face
+    /// or edge options by the seed mate's entity (help: Replicate 6).
+    pub(super) fn replicate_scope(&self, s: &PatternSession, cx: &App) -> noshape_model::assembly::ReplicateScope {
+        use noshape_model::assembly::ReplicateScope;
+        s.scope.unwrap_or_else(|| if self.replicate_on_edge(s, cx) { ReplicateScope::EdgesOnPlane } else { ReplicateScope::FacesInParts })
+    }
+
+    /// Whether the seed mate's target entity is an edge (edge scopes).
+    fn replicate_on_edge(&self, s: &PatternSession, cx: &App) -> bool {
+        let Some(m) = s.mate.and_then(|id| self.assembly(cx).and_then(|a| a.mate(id).cloned())) else { return false };
+        let target = if s.seeds.first() == Some(&m.a.instance) { &m.b } else { &m.a };
+        let entity = match &target.reference {
+            Reference::Implicit { on, .. } => &**on,
+            r => r,
+        };
+        matches!(entity, Reference::Edge(_))
     }
 
     pub(super) fn open_pattern(&mut self, kind: PatternDialogKind, window: &mut Window, cx: &mut Context<Self>) {
@@ -993,12 +984,13 @@ impl AssemblyView {
         s.active = None;
         let set = |st: &Entity<InputState>, t: String, window: &mut Window, cx: &mut Context<Self>| st.update(cx, |s, cx| s.set_value(t, window, cx));
         match &pat.kind {
-            PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second } => {
+            PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, centered } => {
                 s.axis = Some(direction.clone());
                 set(&s.distance, distance.text.clone(), window, cx);
                 set(&s.count, count.to_string(), window, cx);
                 s.opposite = *opposite;
                 s.equal = *equal_spacing;
+                s.centered = *centered;
                 if let Some(sd) = second {
                     s.second = true;
                     s.axis2 = Some(sd.direction.clone());
@@ -1007,21 +999,24 @@ impl AssemblyView {
                     s.opposite2 = sd.opposite;
                 }
             }
-            PatternKind::Circular { axis, angle, count, opposite, equal_spacing } => {
+            PatternKind::Circular { axis, angle, count, opposite, equal_spacing, centered } => {
                 s.axis = Some(axis.clone());
                 set(&s.distance, angle.text.clone(), window, cx);
                 set(&s.count, count.to_string(), window, cx);
                 s.opposite = *opposite;
                 s.equal = *equal_spacing;
+                s.centered = *centered;
             }
             PatternKind::Mirror { plane, handed } => {
                 s.axis = Some(plane.clone());
                 s.second = *handed;
             }
             PatternKind::PartPattern { mate } => s.mate = Some(*mate),
-            PatternKind::Replicate { mate, all_instances } => {
+            PatternKind::Replicate { mate, all_instances, scope, scope_refs } => {
                 s.mate = Some(*mate);
                 s.second = *all_instances;
+                s.scope = *scope;
+                s.scope_refs = scope_refs.clone();
             }
         }
         self.pattern = Some(s);
@@ -1043,7 +1038,7 @@ impl AssemblyView {
         (mates.len() == 1).then(|| mates[0].id)
     }
 
-    fn pattern_from_session(&self, s: &PatternSession, cx: &App) -> Result<InstancePattern, String> {
+    pub(super) fn pattern_from_session(&self, s: &PatternSession, cx: &App) -> Result<InstancePattern, String> {
         let asm = self.assembly(cx).ok_or("No assembly")?;
         if s.seeds.is_empty() {
             return Err("Select the instances to pattern (seed)".into());
@@ -1059,12 +1054,17 @@ impl AssemblyView {
                 } else {
                     None
                 };
-                PatternKind::Linear { direction, distance: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, second }
+                PatternKind::Linear { direction, distance: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, second, centered: s.centered }
             }
-            PatternDialogKind::Circular => PatternKind::Circular { axis: s.axis.clone().ok_or("Select the axis of pattern")?, angle: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal },
+            PatternDialogKind::Circular => PatternKind::Circular { axis: s.axis.clone().ok_or("Select the axis of pattern")?, angle: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, centered: s.centered },
             PatternDialogKind::Mirror => PatternKind::Mirror { plane: s.axis.clone().ok_or("Select the mirror plane (planar face or mate connector)")?, handed: s.second },
             PatternDialogKind::PartPattern => PatternKind::PartPattern { mate: s.mate.ok_or("The seed needs exactly one mate to follow (or select the mate in the list)")? },
-            PatternDialogKind::Replicate => PatternKind::Replicate { mate: s.mate.ok_or("The seed needs exactly one mate to match (or select the mate in the list)")?, all_instances: s.second },
+            PatternDialogKind::Replicate => PatternKind::Replicate {
+                mate: s.mate.ok_or("The seed needs exactly one mate to match (or select the mate in the list)")?,
+                all_instances: false,
+                scope: Some(self.replicate_scope(s, cx)),
+                scope_refs: s.scope_refs.clone(),
+            },
         };
         let generated = s.editing.and_then(|id| asm.pattern(id)).map(|p| p.generated.clone()).unwrap_or_default();
         let id = s.editing.unwrap_or_else(|| MateId(asm.next_id()));
@@ -1075,6 +1075,8 @@ impl AssemblyView {
     /// Matches for part pattern / replicate dialogs (shown before accepting).
     pub(super) fn update_pattern_preview(&mut self, cx: &mut Context<Self>) {
         let Some(s) = &self.pattern else { return };
+        // The graphics preview the pattern (`effective`).
+        self.ui.eval_requested = true;
         if !s.kind.matched() {
             return;
         }
@@ -1134,68 +1136,122 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Replicate / Assembly linear and circular pattern / Assembly mirror as
+    /// Onshape feature dialogs (help replicate-dialog-01, linear- /
+    /// circular-pattern-dialog-01, assembly-mirror-01; qa5 A6): 220 px,
+    /// "<name>" (red until valid) ✓ ✕, the Instances query box (it takes the
+    /// selection while active), Direction / Axis of pattern / Mirror plane
+    /// with the mate connector button, the value rows with the opposite
+    /// direction toggle, checkboxes, the help ? at the bottom right.
     pub(super) fn render_pattern_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        // The active Instances box follows the selection.
+        if let Some(s) = &self.pattern
+            && s.active.is_none()
+            && !self.selected.is_empty()
+            && self.selected != s.seeds
+        {
+            let sel = self.selected.clone();
+            let mate = self.seed_mate(&sel, cx);
+            if let Some(s) = &mut self.pattern {
+                s.seeds = sel;
+                if s.kind.matched() {
+                    s.mate = mate;
+                }
+            }
+            self.update_pattern_preview(cx);
+        }
         let pal = p();
         let Some(s) = &self.pattern else { return div().into_any_element() };
         let kind = s.kind;
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let seeds_label = if s.seeds.is_empty() { "None: select instances, then Use selection".to_string() } else { s.seeds.iter().filter_map(|i| names.get(i).cloned()).collect::<Vec<_>>().join(", ") };
-        let mut body = v_flex().p_3().gap_2();
-        body = body.child(section(if kind.matched() { "SEED INSTANCE" } else { "INSTANCES" })).child(
+        let seed_rows: Vec<AnyElement> = s.seeds.iter().filter_map(|i| names.get(i).cloned()).enumerate().map(|(k, n)| os::query_row(SharedString::from(format!("pat-seed-{k}")), n).into_any_element()).collect();
+        let instances_label = if kind == PatternDialogKind::Mirror { "Instances to mirror" } else { "Instances" };
+        let instances = os::query_box("pat-instances", instances_label, s.active.is_none(), seed_rows).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            if let Some(p) = &mut this.pattern {
+                p.active = None;
+            }
+            this.update_capture(cx);
+            cx.notify();
+        }));
+        let axis_box = |this: &Self, id: &'static str, value: &Option<MateConnectorRef>, label: &'static str, field: usize, cx: &mut Context<Self>| {
+            let rows: Vec<AnyElement> = value.as_ref().map(|c| vec![os::query_row(SharedString::from(format!("{id}-v")), (this.labeler(cx))(c)).into_any_element()]).unwrap_or_default();
+            let active = this.pattern.as_ref().is_some_and(|p| p.active == Some(field));
             h_flex()
-                .gap_2()
-                .child(div().flex_1().text_sm().truncate().child(seeds_label))
-                .child(Button::new("pat-usesel").label("Use selection").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    let sel = this.selected.clone();
-                    let mate = this.seed_mate(&sel, cx);
-                    if let Some(s) = &mut this.pattern {
-                        s.seeds = sel;
-                        if s.kind.matched() {
-                            s.mate = mate;
-                        }
+                .gap(px(3.))
+                .child(div().flex_1().min_w_0().child(os::query_box(id, label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(p) = &mut this.pattern {
+                        p.active = Some(field);
                     }
+                    this.update_capture(cx);
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                }))))
+                // The query takes mate connectors: Onshape's mate connector button.
+                .child(div().flex_none().size(px(24.)).flex().items_center().justify_center().child(crate::assets::icon("mate-connector", 18., cx)))
+        };
+        let valid = !s.seeds.is_empty()
+            && match kind {
+                PatternDialogKind::Linear | PatternDialogKind::Circular | PatternDialogKind::Mirror => s.axis.is_some(),
+                PatternDialogKind::PartPattern => s.mate.is_some(),
+                PatternDialogKind::Replicate => s.mate.is_some() && !s.scope_refs.is_empty(),
+            };
+        let toggle = |id: &'static str, icon: &'static str, on: bool, cx: &mut Context<Self>, f: fn(&mut Self)| {
+            div()
+                .id(id)
+                .flex_none()
+                .size(px(24.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .when(on, |d| d.bg(pal.panel_active))
+                .child(crate::assets::icon(icon, 18., cx))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    f(this);
                     this.update_pattern_preview(cx);
                     cx.notify();
-                }))),
-        );
-        let (axis_label, axis_ph) = match kind {
-            PatternDialogKind::Linear => ("DIRECTION", "Select edge, face or mate connector"),
-            PatternDialogKind::Circular => ("AXIS OF PATTERN", "Select cylinder, circular edge or mate connector"),
-            PatternDialogKind::Mirror => ("MIRROR PLANE", "Select planar face or mate connector"),
-            _ => ("", ""),
+                }))
         };
-        if !kind.matched() {
-            let f = self.conn_field("pat-axis", &s.axis, s.active == Some(0), axis_ph, cx, |this, _| {
-                if let Some(p) = &mut this.pattern {
-                    p.active = Some(0);
-                }
-            });
-            body = body.child(section(axis_label)).child(f);
-        }
-        let (opposite, equal, second) = (s.opposite, s.equal, s.second);
+        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.));
+        let mut body = v_flex().pb(px(2.)).child(div().px(px(3.)).pt(px(5.)).child(instances));
+        let (opposite, equal, centered, second) = (s.opposite, s.equal, s.centered, s.second);
         match kind {
             PatternDialogKind::Linear | PatternDialogKind::Circular => {
-                let label = if kind == PatternDialogKind::Linear { "Distance" } else { "Angle" };
+                let circular = kind == PatternDialogKind::Circular;
+                body = body.child(div().px(px(3.)).pt(px(5.)).child(axis_box(self, "pat-axis", &s.axis, if circular { "Axis of pattern" } else { "Direction" }, 0, cx)));
+                let flip = match (circular, opposite) {
+                    (true, true) => "flip-circular-opposite",
+                    (true, false) => "flip-circular",
+                    (false, true) => "flip-direction-opposite",
+                    (false, false) => "flip-direction",
+                };
                 body = body
-                    .child(field_row(label, Input::new(&s.distance).text_size(px(13.33)).xsmall()))
-                    .child(field_row("Instance count", Input::new(&s.count).text_size(px(13.33)).xsmall()))
-                    .child(Checkbox::new("pat-opp").label("Opposite direction").checked(opposite).on_click(cx.listener(|this, v: &bool, _, cx| {
+                    .child(div().h(px(5.)))
+                    .child(value_row(if circular { "Angle" } else { "Distance" }, &s.distance))
+                    .child(h_flex().child(value_row("Instance count", &s.count)).child(toggle("pat-opp", flip, opposite, cx, |this| {
                         if let Some(p) = &mut this.pattern {
-                            p.opposite = *v;
+                            p.opposite = !p.opposite;
                         }
+                    })))
+                    .child(os::checkbox("pat-eq", "Equal spacing", equal).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if let Some(p) = &mut this.pattern {
+                            p.equal = !p.equal;
+                        }
+                        this.update_pattern_preview(cx);
                         cx.notify();
                     })))
-                    .child(Checkbox::new("pat-eq").label("Equal spacing").checked(equal).on_click(cx.listener(|this, v: &bool, _, cx| {
+                    .child(os::checkbox("pat-centered", "Centered", centered).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
-                            p.equal = *v;
+                            p.centered = !p.centered;
                         }
+                        this.update_pattern_preview(cx);
                         cx.notify();
                     })));
-                if kind == PatternDialogKind::Linear {
-                    body = body.child(Checkbox::new("pat-second").label("Second direction").checked(second).on_click(cx.listener(|this, v: &bool, _, cx| {
+                if !circular {
+                    body = body.child(os::checkbox("pat-second", "Second direction", second).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
-                            p.second = *v;
-                            if *v && p.axis2.is_none() {
+                            p.second = !p.second;
+                            if p.second && p.axis2.is_none() {
                                 p.active = Some(1);
                             }
                         }
@@ -1203,21 +1259,16 @@ impl AssemblyView {
                         cx.notify();
                     })));
                     if second {
-                        let f2 = self.conn_field("pat-axis2", &s.axis2, s.active == Some(1), "Select second direction", cx, |this, _| {
-                            if let Some(p) = &mut this.pattern {
-                                p.active = Some(1);
-                            }
-                        });
+                        let flip2 = if s.opposite2 { "flip-direction-opposite" } else { "flip-direction" };
                         let opp2 = s.opposite2;
                         body = body
-                            .child(f2)
-                            .child(field_row("Distance", Input::new(&s.distance2).text_size(px(13.33)).xsmall()))
-                            .child(field_row("Instance count", Input::new(&s.count2).text_size(px(13.33)).xsmall()))
-                            .child(Checkbox::new("pat-opp2").label("Opposite direction").checked(opp2).on_click(cx.listener(|this, v: &bool, _, cx| {
+                            .child(div().px(px(3.)).pt(px(5.)).child(axis_box(self, "pat-axis2", &s.axis2, "Direction", 1, cx)))
+                            .child(div().h(px(5.)))
+                            .child(value_row("Distance", &s.distance2))
+                            .child(h_flex().child(value_row("Instance count", &s.count2)).child(toggle("pat-opp2", flip2, opp2, cx, |this| {
                                 if let Some(p) = &mut this.pattern {
-                                    p.opposite2 = *v;
+                                    p.opposite2 = !p.opposite2;
                                 }
-                                cx.notify();
                             })));
                     }
                 }
@@ -1225,51 +1276,144 @@ impl AssemblyView {
             PatternDialogKind::Mirror => {
                 let handed = s.second;
                 body = body
-                    .child(Checkbox::new("mir-handed").label("Create mirrored (opposite-handed) parts").checked(handed).on_click(cx.listener(|this, v: &bool, _, cx| {
+                    .child(div().px(px(3.)).pt(px(5.)).child(axis_box(self, "pat-axis", &s.axis, "Mirror plane", 0, cx)))
+                    // Help assembly-mirror-01: "Mirror strategy…" (which parts get
+                    // opposite-handed copies).
+                    .child(
+                        h_flex()
+                            .id("mir-strategy")
+                            .mx(px(3.))
+                            .mt(px(5.))
+                            .h(px(28.))
+                            .px(px(6.))
+                            .gap(px(6.))
+                            .border_1()
+                            .border_color(pal.border)
+                            .rounded(px(2.))
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.panel_hover))
+                            .child(crate::assets::icon("part-studio", 18., cx))
+                            .child(div().text_size(px(13.33)).child("Mirror strategy…")),
+                    )
+                    .child(os::checkbox("mir-handed", "Create mirrored (opposite-handed) parts", handed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
-                            p.second = *v;
+                            p.second = !p.second;
                         }
-                        cx.notify();
-                    })))
-                    .child(div().text_xs().text_color(pal.text_faint).child(if handed {
-                        "Part copies use a mirrored version of the part (a true mirror image); they follow the seed."
-                    } else {
-                        "Copies are placed with a rigid transform (symmetric parts); they follow the seed."
-                    }));
-            }
-            PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {
-                let mate_name = s.mate.and_then(|m| self.assembly(cx).and_then(|a| a.mate(m).map(|x| x.name.clone()))).unwrap_or_else(|| "Seed must have one mate (or select one in the list)".into());
-                body = body.child(section("MATE TO BE MATCHED")).child(div().text_sm().child(mate_name)).child(div().text_xs().text_color(pal.text_faint).child(if kind == PatternDialogKind::Replicate {
-                    "Matches geometry identical to the mate's target (same type and size) on the target instance."
-                } else {
-                    "Follows the Part Studio pattern that created copies of the mate's target geometry."
-                }));
-                if kind == PatternDialogKind::Replicate {
-                    let all = s.second;
-                    body = body.child(Checkbox::new("rep-allinst").label("Also match on other instances of the target part").checked(all).on_click(cx.listener(|this, v: &bool, _, cx| {
-                        if let Some(p) = &mut this.pattern {
-                            p.second = *v;
-                        }
-                        this.update_pattern_preview(cx);
                         cx.notify();
                     })));
+            }
+            PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {
+                let mate_rows: Vec<AnyElement> = s.mate.and_then(|m| self.assembly(cx).and_then(|a| a.mate(m).map(|x| x.name.clone()))).map(|n| vec![os::query_row("pat-mate-v", n).into_any_element()]).unwrap_or_default();
+                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box("pat-mate", "Mate to be matched", false, mate_rows)));
+                if kind == PatternDialogKind::Replicate {
+                    // Live ("qa5 assembly" 5, help: Replicate 6–7): the match
+                    // scope, then "Parts to find match in" (red while empty).
+                    use noshape_model::assembly::ReplicateScope;
+                    let scope = self.replicate_scope(s, cx);
+                    let options: &[ReplicateScope] = if self.replicate_on_edge(s, cx) { &ReplicateScope::EDGE } else { &ReplicateScope::FACE };
+                    let current = options.iter().position(|o| *o == scope).unwrap_or(0);
+                    let opts = options.to_vec();
+                    let view = cx.entity().downgrade();
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::select_field("rep-scope", opts.iter().map(|o| o.label().to_string()).collect(), current, move |i, _, cx| {
+                        let Some(o) = opts.get(i).copied() else { return };
+                        if let Some(v) = view.upgrade() {
+                            v.update(cx, |this, cx| {
+                                if let Some(p) = &mut this.pattern {
+                                    if p.scope != Some(o) {
+                                        p.scope_refs.clear();
+                                    }
+                                    p.scope = Some(o);
+                                }
+                                this.update_pattern_preview(cx);
+                                cx.notify();
+                            });
+                        }
+                    })));
+                    let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
+                    let rows: Vec<AnyElement> = s
+                        .scope_refs
+                        .iter()
+                        .enumerate()
+                        .map(|(k, r)| {
+                            let part = names.get(&r.instance).cloned().unwrap_or_default();
+                            let label = match &r.entity {
+                                None => part,
+                                Some(Reference::Face(_)) => format!("Face of {part}"),
+                                Some(Reference::Edge(_)) => format!("Edge of {part}"),
+                                Some(_) => part,
+                            };
+                            os::query_row(SharedString::from(format!("rep-scope-{k}")), label).into_any_element()
+                        })
+                        .collect();
+                    let active = s.active == Some(2);
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box("rep-parts", "Parts to find match in", active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if let Some(p) = &mut this.pattern {
+                            p.active = Some(2);
+                        }
+                        this.update_capture(cx);
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    }))));
                 }
-                match &s.preview {
-                    Some(Ok(n)) => body = body.child(div().text_sm().text_color(pal.success).child(format!("{n} match(es) found"))),
-                    Some(Err(e)) => body = body.child(div().text_xs().text_color(pal.warning).child(e.clone())),
-                    None => {}
+                if let Some(Err(e)) = &s.preview {
+                    body = body.child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_invalid).child(e.clone()));
                 }
             }
         }
-        body = body.child(h_flex().justify_end().gap_2().child(Button::new("pat-ok").label("OK").primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_pattern(cx)))));
-        let title = s.name.clone();
-        Self::panel_frame(&title, body, cx.listener(|this, _: &ClickEvent, _, cx| {
+        // The help ? at the bottom right.
+        body = body.child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")));
+        let close = |this: &mut Self, cx: &mut Context<Self>| {
             this.pattern = None;
+            // Drop the preview.
+            this.ui.eval_requested = true;
             this.update_capture(cx);
             this.refresh_scene(false, cx);
             cx.notify();
-        }), "pat-close")
-        .into_any_element()
+        };
+        v_flex()
+            .id("pattern-dialog")
+            .w(px(220.))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .bg(pal.panel)
+                    .border_b_1()
+                    .border_color(pal.border)
+                    .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if valid { pal.text } else { pal.text_invalid }).truncate().child(s.name.clone()))
+                    .child(
+                        div()
+                            .id("pat-ok")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(if valid { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
+                            .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
+                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                if valid {
+                                    this.accept_pattern(cx);
+                                }
+                            })),
+                    )
+                    .child(
+                        div()
+                            .id("pat-cancel")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.panel_hover))
+                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| close(this, cx))),
+                    ),
+            )
+            .child(body)
+            .into_any_element()
     }
 
     // ------------------------------------------------------------ snap mode
@@ -1860,7 +2004,7 @@ impl AssemblyView {
                 texts.push((inp.id.clone(), cx.new(|cx| InputState::new(window, cx).default_value(cur))));
             }
         }
-        self.config_panel = Some(ConfigSession { instance: top, inputs, values, texts });
+        self.config_panel = Some(ConfigSession { instance: top, inputs, values, texts, generate: false });
         cx.notify();
     }
 
@@ -1878,14 +2022,19 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// An instance's configuration, as an Onshape feature dialog (qa5 C7;
+    /// the Insert dialog's configuration rows): 220 px, the instance name ✓ ✕,
+    /// a labelled select per list input, a checkbox per checkbox, a value
+    /// row per variable; ✓ applies.
     pub(super) fn render_config_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(s) = &self.config_panel else { return div().into_any_element() };
         let inputs = s.inputs.clone();
         let name = self.assembly(cx).and_then(|a| a.instance(s.instance).map(|i| i.name.clone())).unwrap_or_default();
-        let mut body = v_flex().p_3().gap_2().child(div().text_xs().text_color(pal.text_muted).child(format!("Configuration of {name}")));
+        let mut body = v_flex().pt(px(3.)).pb(px(4.));
         // Visibility conditions: hidden inputs and options don't show.
         let (shown, effective) = noshape_model::configuration::Configuration { inputs: inputs.clone(), configured: Vec::new() }.visibility(&s.values);
+        let view = cx.entity();
         for (inp, vis) in inputs.iter().zip(&shown) {
             if !vis.visible {
                 continue;
@@ -1894,40 +2043,164 @@ impl AssemblyView {
             match &inp.kind {
                 ConfigInputKind::List { options, .. } => {
                     let cur = effective.0.get(&inp.id).cloned().unwrap_or_default();
-                    let mut seg = h_flex().gap_1().flex_wrap();
-                    for o in options.iter().filter(|o| vis.options.contains(&o.id)) {
-                        let (oid, id2) = (o.id.clone(), id.clone());
-                        seg = seg.child(Button::new(SharedString::from(format!("cfg-{}-{}", inp.id, o.id))).label(o.name.clone()).xsmall().ghost().selected(cur == o.id).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    let opts: Vec<_> = options.iter().filter(|o| vis.options.contains(&o.id)).cloned().collect();
+                    let at = opts.iter().position(|o| o.id == cur).unwrap_or(0);
+                    let (v, ids) = (view.clone(), opts.iter().map(|o| o.id.clone()).collect::<Vec<_>>());
+                    let select = os::select_field(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, move |i, _, cx| {
+                        let (id, oid) = (id.clone(), ids.get(i).cloned().unwrap_or_default());
+                        v.update(cx, |this, cx| {
                             if let Some(s) = &mut this.config_panel {
-                                s.values.0.insert(id2.clone(), oid.clone());
+                                s.values.0.insert(id, oid);
+                                s.generate = true;
                             }
                             cx.notify();
-                        })));
-                    }
-                    body = body.child(section(&inp.name)).child(seg);
+                        })
+                    });
+                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(inp.name.clone())).child(div().flex_1().min_w_0().child(select)));
                 }
                 ConfigInputKind::Checkbox { .. } => {
                     let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");
-                    body = body.child(Checkbox::new(SharedString::from(format!("cfg-{}", inp.id))).label(inp.name.clone()).checked(cur).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                    body = body.child(os::checkbox(SharedString::from(format!("cfg-{}", inp.id)), inp.name.clone(), cur).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(s) = &mut this.config_panel {
-                            s.values.0.insert(id.clone(), v.to_string());
+                            s.values.0.insert(id.clone(), (!cur).to_string());
+                            s.generate = true;
                         }
                         cx.notify();
                     })));
                 }
                 ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. } => {
                     if let Some((_, st)) = s.texts.iter().find(|(k, _)| *k == inp.id) {
-                        body = body.child(field_row(&inp.name, Input::new(st).xsmall()));
+                        body = body.child(os::param_row(inp.name.clone(), crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.)));
                     }
                 }
             }
         }
-        body = body.child(h_flex().justify_end().child(Button::new("cfg-ok").label("Apply").primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_config(cx)))));
-        Self::panel_frame("Change configuration", body, cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.config_panel = None;
-            cx.notify();
-        }), "cfg-close")
-        .into_any_element()
+        // Live (qa5/cf-052): the Insert dialog's layout, titled "Change
+        // configuration": the document, the instance's Part Studio row
+        // (thumbnail, configuration button), its inputs, a Generate button,
+        // the Part Studio's parts, the ? footer.
+        let _ = name;
+        let studio = self.assembly(cx).and_then(|a| a.instance(s.instance)).and_then(|i| match &i.source {
+            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } | InstanceSource::MirroredPart { studio, .. } | InstanceSource::Sketch { studio, .. } => Some(*studio),
+            InstanceSource::Assembly { assembly, .. } => Some(*assembly),
+            _ => None,
+        });
+        let entry = studio.and_then(|t| self.catalog.studios.iter().find(|c| c.tab == t).cloned());
+        let generate_on = s.generate;
+        let thumb_row = |id: SharedString, indent: f32, icon: &'static str, thumb: Option<Arc<RenderImage>>, label: String, faded: bool, cx: &App| {
+            h_flex()
+                .id(id)
+                .flex_none()
+                .h(px(40.))
+                .pl(px(4. + indent))
+                .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match thumb {
+                    Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                    None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
+                }))
+                .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).when(faded, |d| d.text_color(pal.text_faint)).child(label))
+        };
+        let doc_name = self.doc.read(cx).name();
+        let mut list = v_flex().id("cfg-list").flex_1().min_h_0().overflow_y_scroll().child(
+            h_flex()
+                .h(px(40.))
+                .px(px(6.))
+                .border_b_1()
+                .border_color(pal.border)
+                .child(
+                    v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(doc_name))
+                        .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child("Main")),
+                ),
+        );
+        if let Some(e) = &entry {
+            let cfg_button = self.insert_config_button(e.tab, cx);
+            list = list.child(
+                thumb_row("cfg-studio".into(), 14., "part-studio", self.insert_thumb(e.tab, None), e.name.clone(), true, cx)
+                    .children(cfg_button)
+                    .child(div().w(px(4.))),
+            );
+        }
+        list = list.child(div().pl(px(40.)).pr(px(8.)).child(body)).child(
+            div().pl(px(48.)).py(px(4.)).child(
+                div()
+                    .id("cfg-generate")
+                    .w(px(80.))
+                    .h(px(28.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(2.))
+                    .border_1()
+                    .border_color(pal.border)
+                    .text_size(px(13.33))
+                    .text_color(if generate_on { pal.text } else { pal.text_faint })
+                    .when(generate_on, |d| d.cursor_pointer().hover(|d| d.bg(pal.panel_hover)))
+                    .child("Generate")
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if let Some(s) = &mut this.config_panel {
+                            s.generate = false;
+                        }
+                        cx.notify();
+                    })),
+            ),
+        );
+        if let Some(e) = &entry {
+            for (k, part) in e.parts.iter().enumerate() {
+                list = list.child(thumb_row(SharedString::from(format!("cfg-part-{k}")), 40., if part.3 { "surface-body" } else { "part" }, self.insert_thumb(e.tab, Some(&part.0)), part.1.clone(), true, cx));
+            }
+            for (k, (_, name)) in e.sketches.iter().enumerate() {
+                list = list.child(thumb_row(SharedString::from(format!("cfg-sketch-{k}")), 40., "sketch", None, name.clone(), true, cx));
+            }
+        }
+        v_flex()
+            .id("config-dialog")
+            .w(px(300.))
+            .h(px(587.))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .flex_none()
+                    .bg(pal.panel)
+                    .border_b_1()
+                    .border_color(pal.border)
+                    .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child("Change configuration"))
+                    .child(
+                        div()
+                            .id("cfg-ok")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(pal.accept)
+                            .hover(|d| d.bg(gpui_kit::rgb(0x74ce3a)))
+                            .cursor_pointer()
+                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_config(cx))),
+                    )
+                    .child(
+                        div()
+                            .id("cfg-close")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.panel_hover))
+                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.config_panel = None;
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(list)
+            .child(h_flex().h(px(26.)).flex_none().justify_end().px(px(6.)).bg(pal.panel).border_t_1().border_color(pal.border).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")))
+            .into_any_element()
     }
 
     pub(super) fn open_replace(&mut self, top: InstanceId, cx: &mut Context<Self>) {
@@ -2069,6 +2342,7 @@ impl AssemblyView {
         let dialog = v_flex()
             .id("rep-dialog")
             .occlude()
+            .child(crate::ui::panel_probe("asm-replace"))
             .w(px(220.))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
@@ -2090,7 +2364,6 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept)
                             .cursor_pointer()
-                            .tooltip(crate::ui::tooltip("Accept (Enter)"))
                             .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_replace(cx))),
                     )
@@ -2103,7 +2376,6 @@ impl AssemblyView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                             .child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_replace(cx))),
                     ),
@@ -2893,7 +3165,6 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept)
                             .cursor_pointer()
-                            .tooltip(crate::ui::tooltip("Accept (Enter)"))
                             .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_step_edit(cx))),
                     )
@@ -2906,7 +3177,6 @@ impl AssemblyView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .tooltip(crate::ui::tooltip("Cancel (Esc)"))
                             .child(crate::assets::icon("dialog-cancel", 18., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_step_edit(cx))),
                     ),

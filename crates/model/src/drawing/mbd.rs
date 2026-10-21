@@ -79,8 +79,12 @@ pub fn place_model_datums(drawing: &mut Drawing, doc: &Document) {
 }
 
 /// Where a model datum sits now: its anchor on the face's edge and its box
-/// along the projected normal (sheet mm), from the view's geometry and its
-/// sheet placement `to_sheet` (view coordinates → sheet).
+/// square to the edge (sheet mm), from the view's geometry and its sheet
+/// placement `to_sheet` (view coordinates → sheet). The model symbol lies in
+/// the face, edge-on here, so it can't choose the side: live puts the box
+/// below the edge (drawing/1070, mbd-drawing-json: A under the Front view's
+/// top edge, inside the view; B under the Top view's bottom edge). A
+/// vertical edge keeps the face's outward side.
 pub fn model_datum_points(m: &ModelAnnotation, frame: &ViewFrame, to_sheet: &dyn Fn([f64; 2]) -> [f64; 2], offset: f64) -> Option<([f64; 2], [f64; 2])> {
     let at = DVec3::from_array(m.at);
     let n = DVec3::from_array(m.normal).normalize_or_zero();
@@ -89,10 +93,13 @@ pub fn model_datum_points(m: &ModelAnnotation, frame: &ViewFrame, to_sheet: &dyn
     }
     let a = to_sheet(frame.project(at));
     let b = to_sheet(frame.project(at + n * 0.001));
-    let d = [b[0] - a[0], b[1] - a[1]];
+    let mut d = [b[0] - a[0], b[1] - a[1]];
     let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
     if l < 1e-9 {
         return None;
+    }
+    if d[1] > 1e-6 * l {
+        d = [-d[0], -d[1]];
     }
     Some((a, [a[0] + d[0] / l * offset, a[1] + d[1] / l * offset]))
 }

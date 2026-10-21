@@ -18,6 +18,7 @@ pub mod host;
 mod provider;
 pub(crate) mod reference;
 pub mod run;
+pub mod std_feature;
 pub mod studio;
 pub mod table;
 

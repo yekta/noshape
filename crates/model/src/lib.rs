@@ -6,6 +6,7 @@
 //! * [`assembly`], [`drawing`], [`variables`], [`configuration`].
 
 pub mod file_tab;
+pub mod quantity_text;
 pub mod analysis;
 pub mod thickness;
 pub mod flatten;

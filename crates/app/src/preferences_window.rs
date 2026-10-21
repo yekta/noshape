@@ -98,6 +98,9 @@ pub enum Page {
     Preferences,
     /// Preferences, scrolled to Keyboard shortcuts.
     KeyboardShortcuts,
+    /// Preferences, scrolled to User export rules (the Export dialogs' "View
+    /// export rules"; live: the section after Material libraries).
+    ExportRules,
 }
 
 struct PrefsWindow {
@@ -179,6 +182,8 @@ pub struct PreferencesView {
     /// Scroll Keyboard shortcuts into view once laid out (as the browser's
     /// `focusView`: its top at the top, or as far as the page scrolls).
     scroll_to_shortcuts: bool,
+    /// Scroll to the last sections (User export rules) once laid out.
+    scroll_to_end: bool,
     /// Shortcut toolbars: the context shown (0 = Sketch, 1 = Part Studio,
     /// 2 = Assembly).
     toolbar_context: usize,
@@ -230,6 +235,7 @@ impl PreferencesView {
             list_scroll: ScrollHandle::new(),
             edit: None,
             scroll_to_shortcuts: false,
+            scroll_to_end: false,
             toolbar_context: 0,
             toolbar: ToolbarPrefs::load(),
             toolbar_draft: ToolbarPrefs::load(),
@@ -253,6 +259,7 @@ impl PreferencesView {
         match page {
             // The sections are the scroll area's children: Keyboard shortcuts is the fourth.
             Page::KeyboardShortcuts => self.scroll_to_shortcuts = true,
+            Page::ExportRules => self.scroll_to_end = true,
             _ => self.scroll.set_offset(point(px(0.), px(0.))),
         }
         cx.notify();
@@ -776,7 +783,7 @@ impl PreferencesView {
         use crate::part_studio::shortcut_cmds as sc;
         let (items, shown): (Vec<(String, String, SharedString)>, Vec<String>) = if self.toolbar_context == 3 {
             use crate::drawing_keys as dk;
-            let all = dk::SHORTCUT_CATALOGUE.iter().map(|t| (t.0.to_string(), t.0.to_string(), crate::assets::icon_path(t.2))).collect();
+            let all = dk::SHORTCUT_CATALOGUE.iter().map(|t| (t.0.to_string(), t.0.to_string(), crate::assets::icon_path(t.1))).collect();
             (all, self.toolbar_draft.drawing_shortcut_tools(&dk::DEFAULT_SHORTCUT_TOOLS))
         } else if self.toolbar_context == 2 {
             let all = crate::assembly_view::shortcut_catalog().into_iter().map(|(id, name, icon)| (id.to_string(), name.to_string(), crate::assets::icon_path(icon))).collect();
@@ -824,7 +831,8 @@ impl PreferencesView {
             })
             .collect();
         // Live: the ticked tools in list order (a newly ticked tool takes its list place).
-        let preview_icons: Vec<SharedString> = items.iter().filter(|(i, _, _)| shown.contains(i)).map(|(_, _, icon)| icon.clone()).take(10).collect();
+        // Live (z3): every ticked tool in list order, rows of five; no cap.
+        let preview_icons: Vec<SharedString> = items.iter().filter(|(i, _, _)| shown.contains(i)).map(|(_, _, icon)| icon.clone()).collect();
         let preview = div()
             .ml(px(23.))
             .p(px(4.))
@@ -832,6 +840,7 @@ impl PreferencesView {
             .border_1()
             .border_color(pal.border)
             .shadow_sm()
+            .when(preview_icons.is_empty(), |d| d.child(div().px(px(6.)).py(px(8.)).text_size(px(13.)).italic().text_color(rgb(0x999999)).child("No tools added")))
             .child(v_flex().children(preview_icons.chunks(5).map(|row| h_flex().children(row.iter().map(|icon| div().size(px(34.)).flex().items_center().justify_center().child(crate::assets::icon(icon, 20., cx))).collect::<Vec<_>>()))));
         Self::heading("Shortcut toolbars", None)
             .mt(px(38.))
@@ -934,9 +943,9 @@ impl PreferencesView {
 }
 
 /// The ✕ of the edit popup.
-const CROSS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="m4.5 4.5 11 11M15.5 4.5l-11 11"/></svg>"#;
+const CROSS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="4"><path d="m2.9 2.9 14.2 14.2m0-14.2L2.9 17.1"/></svg>"#;
 /// The context menu key (≣) of the invalid keys list.
-const MENU_KEY: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="4" y="3" width="12" height="14" rx="1"/><path d="M6.5 7h7M6.5 10h7M6.5 13h7"/></svg>"#;
+const MENU_KEY: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M1.25 1.25h17.5V20H1.25zm1.25 1.25v16.25h15V2.5z"/><path d="M5 6.25h10V7.5H5zM5 10h10v1.25H5zm0 3.75h10V15H5z"/></svg>"#;
 
 /// Bold ranges for the conflict alert's action names.
 fn bold_names(name: &str) -> Vec<(std::ops::Range<usize>, HighlightStyle)> {
@@ -1008,6 +1017,15 @@ impl Render for PreferencesView {
                     self.scroll_to_shortcuts = false;
                 }
                 _ => window.request_animation_frame(),
+            }
+        }
+        if self.scroll_to_end {
+            let max = self.scroll.max_offset().y;
+            if max > px(0.) {
+                self.scroll.set_offset(point(px(0.), -max));
+                self.scroll_to_end = false;
+            } else {
+                window.request_animation_frame();
             }
         }
         let content: Vec<AnyElement> = if self.page == Page::Profile {

@@ -311,16 +311,22 @@ pub(super) fn commit(od: &mut OpenDoc, t: SketchTarget) -> Result<(), OpError> {
     })
 }
 
+/// Sketch coordinates in replies, without floating-point noise
+/// (`-18.000000000000004` → `-18`).
+fn r9(v: f64) -> f64 {
+    (v * 1e9).round() / 1e9
+}
+
 fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entity, k: f64) -> Value {
-    let p = |id: EntityId| data.sketch.point(id).map(|q| json!([q.x * k, q.y * k])).unwrap_or(Value::Null);
+    let p = |id: EntityId| data.sketch.point(id).map(|q| json!([r9(q.x * k), r9(q.y * k)])).unwrap_or(Value::Null);
     let eid = |id: EntityId| json!(entity_id(sketch, id));
     let mut v = match &e.geometry {
-        Geometry::Point { pos } => json!({ "type": "point", "at": [pos.x * k, pos.y * k] }),
+        Geometry::Point { pos } => json!({ "type": "point", "at": [r9(pos.x * k), r9(pos.y * k)] }),
         Geometry::Line { start, end } => json!({ "type": "line", "start": p(*start), "end": p(*end), "start_point": eid(*start), "end_point": eid(*end) }),
-        Geometry::Circle { center, radius } => json!({ "type": "circle", "center": p(*center), "radius": radius * k, "center_point": eid(*center) }),
+        Geometry::Circle { center, radius } => json!({ "type": "circle", "center": p(*center), "radius": r9(radius * k), "center_point": eid(*center) }),
         Geometry::Arc { center, start, end } => json!({ "type": "arc", "center": p(*center), "start": p(*start), "end": p(*end), "center_point": eid(*center), "start_point": eid(*start), "end_point": eid(*end) }),
-        Geometry::Ellipse { center, major, minor } => json!({ "type": "ellipse", "center": p(*center), "major": [major.x * k, major.y * k], "minor_radius": minor * k }),
-        Geometry::EllipticalArc { center, major, minor, start, end } => json!({ "type": "elliptical_arc", "center": p(*center), "major": [major.x * k, major.y * k], "minor_radius": minor * k, "start_point": eid(*start), "end_point": eid(*end) }),
+        Geometry::Ellipse { center, major, minor } => json!({ "type": "ellipse", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k) }),
+        Geometry::EllipticalArc { center, major, minor, start, end } => json!({ "type": "elliptical_arc", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k), "start_point": eid(*start), "end_point": eid(*end) }),
         Geometry::BSpline { control, degree, .. } => json!({ "type": "bspline", "degree": degree, "control_points": control.iter().map(|c| p(*c)).collect::<Vec<_>>() }),
         Geometry::FitSpline { points, .. } => json!({ "type": "spline", "points": points.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": points.iter().map(|c| eid(*c)).collect::<Vec<_>>() }),
         Geometry::Conic { start, control, end, rho } => json!({ "type": "conic", "start": p(*start), "control": p(*control), "end": p(*end), "rho": rho }),

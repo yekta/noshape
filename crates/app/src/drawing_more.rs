@@ -5,7 +5,6 @@
 //! sheets, templates and title block layouts.
 
 use crate::drawing_scene::Overlay;
-use crate::drawing_tools::{auto_orientation, dim_offset};
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -111,68 +110,8 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ previews
 
-    pub fn more_pending_annotation(&self, id: u64) -> Option<Annotation> {
-        let c = self.cursor;
-        let refs = |v: Vec<(u8, Option<PointRef>)>| v.into_iter().filter_map(|(slot, r)| r.map(|point| AnnotationRef { slot, point })).collect::<Vec<_>>();
-        match &self.tool {
-            Tool::Dimension { kind: DimTool::MaxMin, picks } if picks.len() == 2 => {
-                let Pick::CircleAt { view, center, radius, r, at } = &picks[0] else { return None };
-                let (b, rb, cb, rref) = match &picks[1] {
-                    Pick::Point(p) => (p.p, 0.0, ArcCondition::Center, p.r.clone()),
-                    Pick::CircleAt { center: c2, radius: r2, r, at: at2, .. } => {
-                        let near = dot(sub(*at2, *c2), sub(*center, *c2)) > 0.0;
-                        (*c2, *r2, if near { ArcCondition::Min } else { ArcCondition::Max }, r.clone())
-                    }
-                    _ => return None,
-                };
-                let ca = if dot(sub(*at, *center), sub(b, *center)) > 0.0 { ArcCondition::Min } else { ArcCondition::Max };
-                let pl = self.placement(*view)?;
-                let (ps, qs) = (pl.to_sheet(*center), pl.to_sheet(b));
-                let o = auto_orientation(ps, qs, c);
-                let offset = dim_offset(ps, qs, o, c);
-                Some(Annotation {
-                    id,
-                    kind: AnnotationKind::MaxMinDimension { view: *view, a: *center, ra: *radius, ca, b, rb, cb, offset, orientation: o },
-                    position: c,
-                    refs: refs(vec![(0, r.clone()), (1, rref)]),
-                    ..Default::default()
-                })
-            }
-            Tool::Dimension { kind: DimTool::Foreshorten, picks } if picks.len() == 2 => {
-                let Pick::Line { a, b } = &picks[0] else { return None };
-                let e = match &picks[1] {
-                    Pick::Point(p) => p.clone(),
-                    Pick::Line { a, .. } => a.clone(),
-                    _ => return None,
-                };
-                Some(Annotation {
-                    id,
-                    kind: AnnotationKind::ForeshortenedDiameter { view: a.view, axis: [a.p, b.p], edge: e.p, direct: false },
-                    position: c,
-                    refs: refs(vec![(0, a.r.clone()), (1, b.r.clone()), (2, e.r.clone())]),
-                    ..Default::default()
-                })
-            }
-            Tool::DatumTarget { anchor: Some(a) } => {
-                let s = self.pick_sheet(a)?;
-                if len(sub(c, s)) < 4.0 {
-                    return None;
-                }
-                // Help datum: the digit increments within a set (A1, A2…), a
-                // new set takes the next letter (B1, C1…).
-                let letter = self.datum_target_letter.unwrap_or_else(|| self.next_target_set());
-                let in_set = |x: &&Annotation| matches!(&x.kind, AnnotationKind::DatumTarget { label, .. } if label.starts_with(letter));
-                // Targets waiting in the Datum dialog count too.
-                let pending = self.datum_dlg.as_ref().map(|d| d.rows.iter().map(|r| &r.ann).filter(in_set).count()).unwrap_or(0);
-                let n = self.drawing.sheets[self.sheet].annotations.iter().filter(in_set).count() + pending + 1;
-                Some(Annotation { id, kind: AnnotationKind::DatumTarget { view: a.view, anchor: a.p, label: format!("{letter}{n}"), area: DatumTargetArea::Point }, position: c, refs: refs(vec![(0, a.r.clone())]), ..Default::default() })
-            }
-            _ => None,
-        }
-    }
-
     /// Closed profile through view points (spline or polygon) on the sheet.
-    fn profile_on_sheet(&self, view: ViewId, pts: &[[f64; 2]], spline: bool) -> Vec<[f64; 2]> {
+    pub fn profile_on_sheet(&self, view: ViewId, pts: &[[f64; 2]], spline: bool) -> Vec<[f64; 2]> {
         let Some(pl) = self.placement(view) else { return vec![] };
         let pts = if spline { views::closed_spline(pts, 12) } else { pts.to_vec() };
         let mut out: Vec<[f64; 2]> = pts.iter().map(|p| pl.to_sheet(*p)).collect();
@@ -243,6 +182,9 @@ impl DrawingEditor {
                 }
             }
             Tool::CropPoly { parent, mut points, spline } => {
+                if self.crop_add_point_click(c, cx) {
+                    return true;
+                }
                 if let Some(pp) = self.view_point(parent) {
                     if self.crop_refused(pp.view) {
                         return true;
@@ -318,9 +260,8 @@ impl DrawingEditor {
             }
             Tool::CropPoly { parent: Some(view), points, spline } if points.len() >= 3 => {
                 let crop = if spline { Crop::Spline(points) } else { Crop::Polygon(points) };
-                self.edit_view("Crop view", view, cx, |v| v.crop = Some(crop));
-                self.tool = Tool::Select;
-                self.update_preview(cx);
+                // The Crop view dialog's ✓ applies it.
+                self.crop_done(view, crop, cx);
                 true
             }
             _ => false,
@@ -342,10 +283,6 @@ impl DrawingEditor {
             let Some(pl) = self.placement(parent) else { continue };
             out.extend(pts.iter().map(|p| pl.to_sheet(*p)));
         }
-        if let Some((_, grips)) = self.note_grips() {
-            out.extend(grips.into_iter().map(|(_, p)| p));
-        }
-        out.extend(self.aux_grips());
         out
     }
 

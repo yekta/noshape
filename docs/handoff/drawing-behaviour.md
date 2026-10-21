@@ -683,3 +683,127 @@ matches live 164. DRAWN shows "----" only because the test env has no USER.
 - Known gaps: MBD datum A in live sits inside the view (box on −normal) while ours sits outside; MBD characteristics
   rows (needs MBD dimensions placed in views, CR18); S13 Select a DWT not started; live REQUESTS z3 (drawing S
   toolbar defaults) still open.
+
+## asb (new account, 10-21 day): state
+- Took over mid-edit. The tree failed on `Sel::AuxIndicator` not covered in `context_entries` (drawing_tools.rs;
+  V54 / aux-indicator selection work by the previous asb): the indicator's menu is now
+  `DrawingEditor::aux_indicator_entries(id)`, a match arm (multi-selection menu comes first, as for any entity).
+- **Rename sheet Esc** (lead): with ui's revert-on-Esc input patch (vendor/gpui-base input `escape`), Esc after an edit is
+  consumed by the input's Escape *action*, which GPUI dispatches before key listeners, so the dr-panel's
+  `capture_key_down` never saw it and the panel stayed open. `render_panel` (drawing_ui.rs) now also has
+  `capture_action::<Escape>`: panel closed, nothing applied, focus back to the canvas. Same for every small dr-panel.
+- **"Onshape" strings**: drawing_create.rs SOURCES / template documents read "noshape" (done before me). A grep of
+  app/drawing*.rs, model/drawing, scene/drawing_tools finds "Onshape" only in comments (and a FeatureScript import path
+  in a test), nothing user-visible.
+- **MBD datum side** (known gap): live drawing/1070 + dom/mbd-drawing-json.json put both boxes *below* the edge
+  (A inside the Front view under its top edge, B outside under the Top view's bottom edge): the model symbol lies in
+  the face, edge-on in the view, so the box goes sheet-down. `mbd::model_datum_points` flips the projected normal
+  when it points up; vertical edges keep the outward side (no live sample). Test updated.
+- Parity: the only ❌ row left was V54 (view label Ctrl+C / Alt+drag), whose code is in drawing_label.rs (selection,
+  drag, Copy, Ctrl+C note, Alt+drag note): needs the app check.
+- api's slice-4 freeze (21 Oct): don't edit drawing_tools.rs `pending_view`/view_options, drawing_section.rs
+  `apply_section_options`, drawing_detail.rs `apply_detail_options`, drawing_insert.rs `insert_sketch_frame`,
+  drawing_hatch.rs `parse_auto`/`impl HatchDlg`, drawing_table_tool.rs COL_W/table_tool_size/table_tool_table,
+  drawing_gdt.rs GDT_TYPES/gdt_values until the lead lifts it.
+- **Queued for after the freeze (lead, from icons2's live check; keep the Revision table button):**
+  - Toolbar pitch: live dom/drawing-toolbar-widths.json (w1920): buttons 30 px wide on a 32 px pitch (Undo @44, Redo @76,
+    Update @124; Insert view @172 … Crop view @428; Dimension @477 + caret 12 px @507, Ordinate @523). A separator
+    takes 18–19 px between groups. Ours uses ui::TOOL_CELL 32 + 2 gap → make the drawing toolbar 30 + 2.
+  - Crop view's ▾ (`views_menu` in drawing_toolbar.rs): live has none; drop it (the jogged / partial / crop-shape
+    choices live in the tools' own dialogs).
+  - Styles panel empty-state box (live drawing/95-panel-styles; classes IntimationMessageheadingStyle /
+    IntimationMessageStyle): box at panel x+4 / y+5, right margin 7, padding 15, 1 px border #BCE8F1, bg #D9EDF7,
+    text #31708F; heading bold 14 px, body 13 px, both 20 px line height, no gap.
+  - Drawing right rail ~25 px lower than live (live 95: rail icons at y 511 / 545 / 578 / 612, 34 px pitch).
+- Model drawing tests: 102 passed after fixing stale `jogged_and_aligned_sections` (labels are live's spaced
+  "SECTION C - C" since the view-label work; tests.rs:251 updated) and the MBD test (box under the edge).
+- App build blocked (21 Oct) by others' WIP: model custom/host/query.rs (fixed by its owner), then
+  app part_studio/sketch.rs (sketch_mode move). App checks still pending: Rename sheet Esc, MBD datums, linked views,
+  assembly view menu, V54.
+  - Drawing properties footer (lead via icons2; live drawing/160): "Update properties from a template..." larger and
+    underlined; "Lock drawing properties" greyed (disabled) with a ? help icon at the right.
+- **App checks (21 Oct, asb):** Rename sheet: type "XYZ", Esc → panel closed, name kept "Sheet1" ✅. MBD: datums A (top
+  face) and B (front face) via Model definitions › Datum; Create Drawing › Suggested views → B under the Top view's bottom
+  edge, A inside the Front view under its top edge (= live 1070), badge ✓ (and red ! in the other drawing), drag only
+  along the normal ✅. Linked views: Move to sheet… › Sheet2 moves the section alone at the same place, ↗ badge row,
+  Sheet1 keeps the A–A line ✅. Assembly base-view menu = live 1108 except Paste (now shown when the clipboard has drawing
+  content, before Copy). V54 label: hover / selected look, Copy menu, Ctrl+C/V note at the cursor, Alt+drag copy ✅.
+- Written after those checks, awaiting a build (others' WIP blocked: assembly_panels.rs, assembly_standard.rs):
+  - `push_datum_selection` (drawing_datum.rs) + `datum_selection_picks` (skipped in the SELECTED flags, drawing_view.rs):
+    live 1073 selected-datum look.
+  - Label menu without the view's duplicate Copy (drawing_label.rs); view menu Paste (drawing_props.rs);
+    `paste_views` selects pasted annotations too (live u-948).
+  - Demo drawing's Sheet field is `{sheet.number} / {sheet.count}` (was literal "1 / 1", copied to new sheets).
+- Script: /root/asb-scratch/bin/retry_build.sh (rebuild after a change, max 15 tries, cp --remove-destination);
+  ddk.sh = dd.sh keeping ct.noshape (datums / drawings survive restarts).
+
+## asb 10-21 afternoon (freeze lifted): done
+- Insert view dialog: ✕ tooltip removed (live dialogs have none; psb's rule).
+- Toolbar pitch to live (dom/drawing-toolbar-widths.json): drawing_toolbar.rs consts CELL 30 / CARET_W 12 / GAP 2 /
+  SEP_W 14, `split()` (1 px in, 2 px after the caret), `sep()`, toolbar pl 4; `ui::undo_redo_with(doc, cell, titles)`
+  (drawing titles "Undo (ctrl+z)" / "Redo (ctrl+y)"). Checked: icons at live x up to the table group; ours then runs
+  32 px right because of the Revision table button (kept, lead).
+- Crop view: no ▾ (live); new **Crop view dialog** `drawing_crop.rs` (help crop-view images): Circle | Spline ▾ (Add
+  spline point) | Polygon, Spline first; "Create closed profile" → "Edit closed profile" + Profile ×; the closed profile
+  waits for ✓ (Enter too); view menu **Edit crop** reopens it. `crop_done` replaces the direct commits in drawing_extra
+  (circle) / drawing_more (polygon, spline). `Overlay.dots` (scene) for coloured points. Checked in the app (spline,
+  ✓, Edit crop). The jogged / partial section entries of the old ▾ are next (Section tool extra snap points, live).
+- Styles panel: info box to live 95; header 39 px (37 + 2 underline, live); footer pinned with the refresh button,
+  "Revert to drawing properties" #666 and the help icon (`styles_with_footer`, all three states).
+- Right rail centred (`top 50% − 66`): icons at y 512 / 545 / 579 / 612 = live.
+- Drawing properties footer to live 160 (underlined italic field, 25 px DWT, 12 px Lock + help icon).
+- Clippy fix lead asked: drawing_aux.rs `type SegFn`.
+- Live request filed: REQUESTS "asb (10-21 a)" (Section tool jogs, Crop view dialog details).
+
+## From ui (21 Oct): drawing fields are Wt widgets, not Part Studio fields (live, lead's input task)
+Live ("Input behaviour outside feature dialogs" in behaviours.md, dom/oi-*.json) shows the drawing editor's fields
+behave unlike the Part Studio's.
+
+**Done (shared input side):**
+- `DrawingEditor::input()` and the direct `InputState::new` sites in the drawing panel files now use
+  `.select_on_focus(false).revert_on_escape(false)`: caret at the click, and Esc never reverts the text (it passes
+  to your panel).
+- Sheet properties width/height (`XeInput`) keep select-all and only drop the revert.
+- Not changed: drawing_create.rs, drawing_export.rs (Angular/Bootstrap dialogs, so Part Studio fields) and
+  drawing_sketch_dim.rs (unknown; please check).
+
+**Yours (value rules per widget, from live):**
+- **Dropdown with a number (`XeDropdown`, e.g. Text height ▾ 0.1200 in):**
+  - Commit (Enter, Tab, click away) parses the leading number only, ignores any unit (`3 mm` → 3.0000 in), and shows
+    4 decimals.
+  - Non-numbers silently revert to the last value (no error look).
+  - ↑/↓ and the wheel do nothing.
+  - Esc does nothing in Drawing properties. The Note editor closes on Esc (note discarded).
+- **Spin box (`XeSpinBox`: Stack gap 0.0500, Text gap 0.0900, Dashes 1.00):**
+  - Strict number. Invalid shows pale orange `rgba(221,82,40,0.1)` with the hover "Must be a number".
+  - ↑/↓ step by the field's step (0.05 in for gaps, 0.10 for Dashes), clamped at 0. The wheel does nothing. Spinner
+    arrow clicks step.
+  - Esc does nothing. Commit on Tab or click away. Decimals as shown (4 for in, 2 for Dashes).
+- **`XeInput` with a unit (Sheet properties custom width, "11 in"):**
+  - Selects all on focus. `12` → "12 in"; `300 mm` is kept; `1+1` → "1 in" (leading number); non-numbers silently
+    revert.
+  - Esc closes the whole Sheet properties dialog (cancel).
+- Section view › Depth wasn't captured.
+
+## asb 10-21 evening: qa5 drawing findings (docs/parity/workflow-drawing.md)
+Written; tests added; NOT yet compiled together (the model crate kept failing on others' WIP: units `to_fixed`,
+drw2's cad_export.rs). Check first: `cargo test -p noshape-model --lib drawing::tests::`, app check, clippy.
+- **D4** assembly title block: `SourceModel.own` (the assembly's Properties) feeds `{part.*}` for assembly views;
+  `part_mass` sums parts (or the assembly override). Test `assembly_drawing_fields_are_the_assemblys_own`.
+- **D8** callouts on an edge away from snap points: `CalloutStyle.part` (pending.rs `part_near`, pick.rs), used by
+  `balloon_text`. Test `callout_on_an_edge_shows_its_parts_bom_item`.
+- **D10** PDF: qa5's PDF had a hidden-line iso and a detail border; the detail lines over the circle are probably other
+  views under it. Test `exact_export_clips_detail_views_to_their_circle` (exact + fast). Re-check with qa5 if it passes.
+- **D11** DXF/DWG/DWT versions (live lists + defaults 2000 / Release 14 / 2013), "Model space only" for DXF R13/R14,
+  Sheets ▾ for DWG/DXF only (any sheet count), PDF versions 1.4–1.7 default 1.5. Test `default_versions_are_onshapes`.
+- **D7** GTol: Tolerance input focused (deferred) on open; ✓ enabled once anything is entered.
+- **D5** Esc (Cancel action) gives the canvas the focus back.
+- **D3** hypothesis test `source_hashes_survive_a_store_round_trip` (if it fails: some field serializes differently
+  after a store round trip → spurious "Out of date" after undo). Not fixed yet.
+- **D1** already done by someone (ANSI_A_INCH preselected); verify the highlight in the app.
+- **D13** DRAWN persisted: `Drawing.drawn_by` set at creation (workspace.rs, ops/drawing.rs) and on the first commit
+  of older drawings; `{user.name}` / `{drawing.drawn_by}` read it. Test crates/ops/tests/drawing_drawn_by.rs.
+- **D2** new `drawing_chooser.rs` (live 170–173 flyout, filters, tree, thumbnails); old modal removed from
+  drawing_insert.rs. Not yet done: Other documents tab content, the two document buttons, Import… footer, flat-pattern
+  thumbnails (use the part's picture).
+- **D12** left to drw2 (they're in cad_export.rs); note left in drawing-verify.md.

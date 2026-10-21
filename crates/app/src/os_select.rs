@@ -128,7 +128,8 @@ impl OsSelect {
 
     fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         bind_keys(cx);
-        let st = cx.new(|cx| InputState::new(window, cx));
+        // A search box: Esc closes the list (below), it doesn't revert the query.
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false));
         let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
                 this.query = st.read(cx).value().to_string();
@@ -217,14 +218,15 @@ impl OsSelect {
             // the field's centre, the caret 5 px from the end.
             .pt(px(2.))
             .pl(px(6.))
-            .pr(px(5.))
+            .pr(px(4.))
             .border_b_1()
             .border_color(pal.border)
             // `#def1fb` hover (§4.5).
             .hover(|d| d.bg(pal.row_hover))
             .cursor_pointer()
             .child(div().flex_1().min_w_0().text_size(px(14.)).text_color(pal.text).truncate().child(label))
-            .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+            // Live: the 8x4 bootstrap caret, 6 px from the end.
+            .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
             // Focused (bootstrap .btn-default-focus inside os-enum-parameter):
             // the soft blue glow, no outline.
             .when(focused, |d| d.shadow(vec![BoxShadow { color: hsla(207. / 360., 0.74, 0.66, 0.6), offset: point(px(0.), px(0.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }]))
@@ -340,7 +342,28 @@ impl Render for OsSelect {
             .relative()
             .w_full()
             .key_context("OsSelect")
-            .on_action(cx.listener(|this, _: &SelectDismiss, window, cx| this.close(window, cx)))
+            // Esc with the list closed goes on to the dialog (cancel; qa5 SM9).
+            .on_action(cx.listener(|this, _: &SelectDismiss, window, cx| {
+                if this.search.is_some() {
+                    this.close(window, cx);
+                } else {
+                    cx.propagate();
+                }
+            }))
+            // Esc with the list open closes only the list, whichever binding
+            // won (the dialog's Esc = Cancel binding can outrank ours when the
+            // app's keys are bound again later): caught before the dialog.
+            .capture_action(cx.listener(|this, _: &crate::actions::Cancel, window, cx| {
+                if this.search.is_some() {
+                    cx.stop_propagation();
+                    this.close(window, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| {
+                if this.search.is_some() {
+                    this.close(window, cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &SelectDown, _, cx| {
                 let n = this.matches().len();
                 if n > 0 {

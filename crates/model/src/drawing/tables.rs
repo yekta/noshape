@@ -659,9 +659,10 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
                     CellAlign::Right => ([xb - pad - tw, y - h / 2.0], Anchor::BottomLeft),
                 };
                 g.texts.push(Text2 { pos, height: h, text: text.to_string(), angle: 0.0, anchor, pick });
-                if fmt.bold || fmt.italic {
+                if fmt.bold || fmt.italic || fmt.font.is_some() {
                     let i = g.texts.len() - 1;
-                    g.fonts.push(super::sheet::FontSpan { texts: i..i + 1, font: super::sheet::TextFont { family: font::DEFAULT_FAMILY.into(), bold: fmt.bold, italic: fmt.italic } });
+                    let family = fmt.font.clone().unwrap_or_else(|| font::DEFAULT_FAMILY.into());
+                    g.fonts.push(super::sheet::FontSpan { texts: i..i + 1, font: super::sheet::TextFont { family, bold: fmt.bold, italic: fmt.italic } });
                 }
                 // Underline / strikethrough as on notes.
                 let x0 = if anchor == Anchor::Center { pos[0] - tw / 2.0 } else { pos[0] };

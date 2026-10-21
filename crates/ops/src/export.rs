@@ -290,6 +290,8 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
                     let mut all = k::Tessellation::default();
                     for (_, m, _) in &meshes {
                         let base = all.positions.len() as u32;
+                        let first = all.indices.len() as u32;
+                        all.faces.extend(m.faces.iter().map(|r| k::FaceRange { first_index: r.first_index + first, index_count: r.index_count, first_vertex: r.first_vertex + base, vertex_count: r.vertex_count }));
                         all.positions.extend(m.positions.iter().map(|p| [p[0] * scale, p[1] * scale, p[2] * scale]));
                         all.normals.extend_from_slice(&m.normals);
                         all.indices.extend(m.indices.iter().map(|i| i + base));

@@ -503,3 +503,98 @@ Next: RIP joints, corners & bend reliefs (live probes), std Flange/Hem/Tab (thei
   Feature Studios now show the version view-only bar.
 - Profile ▾ (Monitor menu, from ui2): waiting for live capture REQUESTS "fs (22:55)".
 - Next: rips / corners / bend reliefs / hem / tab (live "fs (21:10)" pending), flat pattern, ctx.sheet_metal for std parts.
+
+## 21 Oct (after v0.4.3): Profile, CONVERT, corners, speed
+
+- **Monitor › Profile** done in code (crates/app/src/fs_profile.rs, interp `LineProfile`,
+  `custom::run::{set_profiling, profile}`, feature_studio.rs `render_profile`): total badge +
+  per-line heat bars, grey while uncommitted, commit re-profiles, Variable Studios too. App check
+  on :108 still to do.
+- **Tracking** (host/query.rs `QueryCx::tracking`): a `startTracking` id now also yields what was
+  made from the entity, a solid's edge carrying over to a sheet (std CONVERT extracts the box
+  faces and finds its bend edges this way). sm4 now has 4 BEND + 4 RIP like live.
+- **Simple corners and rips** (host/sheetmetal.rs `build_part`): walls stop `minimalClearance`
+  short of a rip; a bend runs only where both its walls' pulled-back sides run (it ends where the
+  neighbouring bend starts). From live sm4/sm6.
+- **Closed Hem (sm7) matches live**: new `@opEdgeChange` (host/edge_change.rs, offset option on
+  planar sheets; `transformList` / `replaceFace` not yet), a tracked sketch vertex follows onto the
+  edge it swept (`QueryCx::tracking`), and curved definition faces are rolled bends thickened as
+  they are (`rolled_bend`). sm4 and sm7 face areas are asserted in std_sheet_metal_matches_onshape.
+- **Queries**: `qDependency` returns an extrude's / revolve's profile (`CtxState::dependencies`);
+  `qSplitBy` bodies by side of the split plane and the faces the split cut (`CtxState::splits`);
+  construction planes / points are their own owner body (std draft splits with `qOwnerBody(opPlane)`).
+- Next: ROUND / RECTANGLE corner reliefs (sm6b/c) and bend reliefs (sm5) once the live variants
+  arrive (REQUESTS.md fs 10-21: dom/fs-smprobe4-*.txt), Tab (sm8).
+- Speed: perf on the std harness shows std lex/parse/compile is the biggest single cost, but it
+  is paid once per process (STD_CACHE) and studios are cached by source hash; per-regen cost is
+  interpreter + kernel. Release-build profiling still to do.
+- tests/fs/std_reference.fs: all 23 cases run (revolve takes `fullRevolve`/`endBound`; `cube`
+  clashed with std's cube feature; `opSphere` for the intersect tool). Live numbers requested
+  (dom/fs-stdref.txt); then fill them into std_features_match_onshape and drop its #[ignore].
+
+### 21 Oct, later (fs)
+- **Tab (sm8) matches live**: sheet unions are sewn and same-domain unified (ops.rs
+  `merge_sheet_faces`), so a tab merges into its wall's face (850 mm²).
+- **Reliefs** (host/sheetmetal.rs; live dom/fs-smprobe4-*.txt, rules in the doc comments):
+  - bend relief (partial flange): `BendRelief` from the model (`defaultBendReliefStyle` is a bare
+    enum in the attribute); slot `scale × T` wide, straight `depth scale × r`, OBROUND half circle /
+    RECTANGLE squared at D + w/2 / TEAR none; collinear sides pulled differently end in a step
+    (`pulled_sides`). Harness cases sm5/5b/5c/5d (needs `flipFlangeBounds` for the partial flange).
+  - corner relief (`corner_reliefs`, style from `defaultThreeCornerStyle`): plain styles scale with
+    the bend-allowance square (RECTANGLE: side scale × BA; ROUND: radius scale × half diagonal),
+    SIZED ones use the width / diameter (too small: not applied; live warns "A corner relief is too
+    small…", not reported yet). sm6, sm6c, sm6e, sm6f, sm6g match live exactly; ROUND (sm6b/6d) is
+    within ~1e-4 relative (the bend cut is a loft through the wrapped circle; check the mapping);
+    CLOSED (sm6h) not done.
+- **Onshape topology in queries** (host/query.rs `Topo::shown_*`, applied at the end of `eval`): no
+  seam or degenerate edges, no vertices on closed curves only, cone apex kept (opHole tip).
+- **std reference vs live** (dom/fs-stdref.txt): `box` is a reserved word (lexer `Kw::Box`); revolve
+  reads std's `endBoundAngle`/`startBoundAngle`; draft reads `pullVec`; boolean INTERSECTION is
+  tools-only, BOOLEAN_BAD_INPUT with fewer than two (as status, so std rethrows); `evBox3d` tight
+  boxes lose OCCT's 1e-7 m margin. Remaining: sweep/loft come out of the kernel slightly different
+  (sweep box 1610.0001 vs 1610; loft square→circle 7/15/10 vs live 6/12/8: Onshape splits the circle
+  into 4 arcs to match the square), filletCorner volume differs at 1e-6 mm³.
+
+## From ui (21 Oct): qa5 SM4, the "Sheet metal table and flat view" panel; split proposal (lead: fs + ui)
+Live spec: behaviours.md "(8) Sheet metal table and flat view" (sm-090…105) and "(10) Export DXF/DWG of Flat pattern".
+- **Yours (model):**
+  - per sheet-metal model, a list of **bends**: name "Bend A…", radius, angle, Up/Down direction (SM5: ours says Down
+    where live says Up), K factor;
+  - **other joints**: name, type Rip|Bend, style Edge joint|…;
+  - a **"Modify joint N"** feature appended when a table cell is edited (live: a bare "3" + Tab on Bend B's radius
+    added it);
+  - the flat body: a single solid with bend-zone strips, relief cut-outs (SM6), and bend centre lines as wire bodies
+    "Bend line 1…".
+  - The API I need: `fn sheet_metal_table(studio, model_feature) -> { bends: Vec<{name, radius, angle_deg, up, k}>,
+    joints: Vec<{name, kind, style}> }`, an edit entry that appends Modify joint, and the flat solid + bend lines as a
+    display body.
+- **Mine (UI):**
+  - the 717 px right panel: "Sheet metal context: [model ▾]";
+  - collapsible **Bends** grid (# · Name · Radius(mm) · Angle(deg) · Bend direction · K Factor; horizontal
+    scrollbar) and **Other joints** grid (Name · Type ▾ · Style ▾);
+  - "#" click selects the row (highlighted in both views); Name click gives a cell outline; double-click edits
+    (pink invalid, "Sheet metal model could not be rebuilt…" title);
+  - the **flat view**: a second shaded viewport with its own view cube, dashed centre bend lines, and the
+    right-click menu (Copy / Create Drawing / Export DXF/DWG of Flat pattern…).
+- Until your API lands I'll build the panel on what `fab_panel.rs` has today. Tell me here if you'd split it
+  differently.
+
+### 21 Oct evening: built-in sheet metal by std (fs), qa5 SM findings
+- `custom/std_feature.rs`: built-in feature types run by std's own feature (`sheetMetalFlange` of
+  sheetMetalFlange.fs, ...), the definition built from std's precondition (`run::run_feature`, shared
+  with custom features). Switched on by `set_std_sheet_metal(true)` / `NOSHAPE_STD_SHEET_METAL=1`
+  (hook at the top of `regen::features::evaluator`); default off until the bridge below exists.
+- tests/sheetmetal_std.rs: built-in Sheet metal model + Flange through std = live G34 exactly
+  (8511.4987 mm³, 24 faces; qa5 SM1). Tab on the top face (SM2) added.
+- Plan for the qa5 list (docs/parity/workflow-sheet-metal.md):
+  - SM1/SM2/SM3/SM16: std route (+ std editing logic for Tab's auto-fill).
+  - SM4/SM5/SM6/SM13/SM14/SM17: bridge the std definition into `SheetMetalData` (walls, bends with
+    Up/Down from the geometry, rips, relief marks) so the panel, DXF and flat follow; DXF format
+    per SM14; panel/export UI with ui + psb.
+  - SM7: per-vertex bend relief attributes (like the per-vertex Corner ones now read in
+    `corner_overrides`). SM8: our fields follow std's precondition (SIZED_* = absolute size),
+    matching live sm6g; my request text "SIZED_RECTANGLE scale 2" was wrong, not live.
+  - SM12: pcbStart.fs / pcbEnd.fs exist in std; types via std + toolbar entries (ui).
+- Attributes now follow renamed entities (`CtxState::remap_attributes`, snapshots per attribute):
+  definition vertices lost their association attributes when a flange renamed them, so Corner at
+  a vertex failed (SHEET_METAL_RIP_NO_CORNER).

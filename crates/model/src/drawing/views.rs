@@ -68,6 +68,12 @@ pub struct PartInfo {
     pub description: String,
     /// Density of the part's material (kg/m³), None without a material.
     pub density: Option<f64>,
+    /// Properties › Revision and the other metadata (State, Vendor, …).
+    pub revision: String,
+    pub meta: crate::partstudio::ItemMeta,
+    /// Mass properties › Override (kg).
+    pub mass_override: Option<f64>,
+    pub tessellation: Option<crate::partstudio::TessQuality>,
 }
 
 /// One bill-of-materials row of an assembly source.
@@ -102,6 +108,9 @@ pub struct SourceModel {
     pub bom_structured: Vec<StructuredBomRow>,
     /// Part Studios: their MBD annotations (Model definitions datums).
     pub model_annotations: Vec<crate::annotations::Annotation>,
+    /// Assemblies: the assembly's own Properties (name, part number, …),
+    /// which an assembly drawing's part property fields show.
+    pub own: Option<PartInfo>,
 }
 
 /// One row of a Structured BOM.
@@ -258,6 +267,10 @@ fn part_info(ps: &PartStudio, b: &Body) -> PartInfo {
         material: get(|p| &p.material),
         description: get(|p| &p.description),
         density: props.and_then(|p| p.material.as_ref().and(p.density)),
+        revision: get(|p| &p.revision),
+        meta: props.map(|p| p.meta.clone()).unwrap_or_default(),
+        mass_override: props.and_then(|p| p.mass_override),
+        tessellation: props.and_then(|p| p.tessellation),
     }
 }
 
@@ -272,7 +285,7 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
             let opts = RegenOptions { custom_features: has_scripts.then(|| crate::custom::DocumentScripts::from_document(doc) as Arc<dyn crate::custom::CustomFeatureProvider>), ..Default::default() };
             let r = regen.regenerate(ps, &key.config, &doc.settings.units, &opts);
             let parts = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| part_info(ps, b)).collect();
-            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], model_annotations: ps.annotations.clone() })
+            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], model_annotations: ps.annotations.clone(), own: None })
         }
         TabContent::Assembly(asm) => {
             // A named position: its placements and mate values; a display
@@ -288,6 +301,8 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
             let result = assemblies.evaluate(doc, asm, &opts, key.explode);
             let mut s = assembly_source(doc, &result, hash, tab.name.clone(), hidden.as_deref());
             s.bom_structured = structured_bom(doc, key.tab, &result);
+            let p = &asm.properties;
+            s.own = Some(PartInfo { name: tab.name.clone(), number: p.part_number.clone().unwrap_or_default(), description: p.description.clone().unwrap_or_default(), revision: p.revision.clone().unwrap_or_default(), meta: p.meta.clone(), mass_override: p.mass_override, ..Default::default() });
             Some(s)
         }
         _ => None,
@@ -351,7 +366,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
             row.name = r.name.clone();
         }
     }
-    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), model_annotations: Vec::new() }
+    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), model_annotations: Vec::new(), own: None }
 }
 
 /// Regenerate every source a drawing references (headless helper for

@@ -269,7 +269,10 @@ pub fn rotate_about(camera: &mut Camera, axis: DVec3, angle: f64, pivot: DVec3) 
     camera.target = pivot + q * (camera.target - pivot);
 }
 
-/// Radians per logical pixel of drag (`2π × cycles / viewport diagonal`).
+/// Radians per pointer pixel of drag (`2π × cycles / canvas diagonal`).
+/// Onshape scales both the drag (`onDrag(t, i·dpr, n·dpr)`) and the canvas
+/// size by its device pixel ratio, so per logical pixel it is this at any
+/// ratio.
 pub fn rotation_per_px(viewport: DVec2, touch: bool) -> f64 {
     let cycles = if touch { POINTER_ROTATION_CYCLES_PER_SCREEN } else { ROTATION_CYCLES_PER_SCREEN };
     std::f64::consts::TAU * cycles / viewport.length().max(1.0)
@@ -954,6 +957,24 @@ mod tests {
     }
 
     #[test]
+    fn drag_rotate_rate_matches_live() {
+        // Onshape (webgl `onDrag`): 2π · ROTATION_CYCLES_PER_SCREEN (3) /
+        // the canvas diagonal per pixel, drag and canvas both in device
+        // pixels (so the ratio cancels). Live at 1919×1079 (canvas
+        // 1673×973): a 100 px drag turns 55.80° (qa5 KB4: ≈0.55°/px). The
+        // graphics area is the same size in a window of the same size
+        // (1440×900: 1194×794 in both), where 100 px turn 75.3°.
+        for (vp, want) in [(DVec2::new(1673.0, 973.0), 55.80), (DVec2::new(1194.0, 794.0), 75.32)] {
+            let mut c = Camera::default();
+            let start = c.rotation;
+            let pivot = c.target;
+            drag_rotate(&mut c, DVec2::new(100.0, 0.0), vp, pivot, false);
+            let deg = c.rotation.angle_between(start).to_degrees();
+            assert!((deg - want).abs() < 0.05, "{vp:?}: 100 px turned {deg:.2}°, Onshape {want}°");
+        }
+    }
+
+    #[test]
     fn drag_rotate_speed_is_three_turns_per_diagonal() {
         let vp = DVec2::new(1600.0, 1000.0);
         let mut c = Camera::default();
@@ -991,6 +1012,24 @@ mod tests {
         drag_rotate(&mut c, DVec2::new(37.0, -12.0), vp, pivot, false);
         let after = c.project(pivot, vp, 1.0).unwrap();
         assert!((before - after).length() < 1e-6);
+    }
+
+    #[test]
+    fn drag_pan_keeps_the_grabbed_point_under_the_cursor() {
+        // Onshape `pan`: the rays through the old and new pointer positions
+        // meet the view-normal plane through the pan center; the camera
+        // moves by their difference, so that point follows the pointer
+        // exactly, in both projections and off the view axis.
+        let vp = DVec2::new(1194.0, 794.0);
+        for projection in [Projection::Orthographic, Projection::Perspective] {
+            let mut c = Camera { projection, ..Camera::default() };
+            let pivot = DVec3::new(0.03, -0.02, 0.01);
+            let before = c.project(pivot, vp, 1.0).unwrap();
+            let delta = DVec2::new(37.0, -12.0);
+            pan(&mut c, delta, vp, Some(pivot));
+            let after = c.project(pivot, vp, 1.0).unwrap();
+            assert!((after - before - delta).length() < 1e-6, "{projection:?}: moved {:?}, pointer {delta:?}", after - before);
+        }
     }
 
     #[test]

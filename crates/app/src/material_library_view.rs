@@ -37,7 +37,7 @@ impl Focusable for MaterialLibraryView {
 
 impl MaterialLibraryView {
     pub fn new(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let filter = cx.new(|cx| InputState::new(window, cx).placeholder("Filter by name"));
+        let filter = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Filter by name"));
         let subs = vec![
             cx.subscribe_in(&doc, window, |_: &mut Self, _, _: &DocEvent, _, cx| cx.notify()),
             cx.subscribe_in(&filter, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {

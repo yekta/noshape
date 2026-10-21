@@ -80,20 +80,21 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 | Agent | Motile id | Account / model | Display, target | Handoff |
 |---|---|---|---|---|
 | ui: Part Studio chrome, dialogs, viewport | 3f25493a-a7a1-4328-848b-ae8f86537929 | Ngyekta / Opus 5.5 | :101, target-shared | `docs/handoff/theme-layout.md` |
-| ui2: sketch/assembly/drawing/start-window/document visuals | 73f8d178-6349-40d3-8581-fdad4d67f77d | Stablecog / Opus 5.5 | :105, target-shared | `docs/handoff/theme-studios.md` |
+| ui2: sketch/assembly/drawing/start-window/document visuals | e197d9fc-d255-4e6d-8004-e99ab4a60c25 | Stablecog / Opus 5.5 (moved 06:55 from Unbind db9e1762) | :105, target-shared | `docs/handoff/theme-studios.md` |
 | nav: view navigation (FINISHED; only real-hardware touch checks remain, see docs/handoff/navigation.md) | 98da8819-1a7a-4be9-a814-e167275fcc08 | Motile / Opus 5.5 | :109, target-shared | `docs/handoff/navigation.md`, `docs/parity/navigation.md` |
 | icons: redrew 21 icons copied from Onshape + added no_onshape_assets guard test (FINISHED) | ddea0979-7067-4399-9ade-2a18dbe32300 | Yekta / Opus 5.5 | - | report to lead |
-| qa4: QA round 4 done (see qa-round-4.md); now Part Studio keystroke latency profiling + fix | 51fa0c4b-5d3d-4c38-a63d-0b7b3cdd979d | Stablecog / Opus 5.5 | :110, target-shared | `docs/handoff/qa-round-4.md` |
+| qa4: QA round 4 done (see qa-round-4.md); now Part Studio keystroke latency profiling + fix | fee4041d-e4c7-446a-8275-9eac41bb5af6 | Ngyekta / Opus 5.5 (moved 06:08 from Stablecog 51fa0c4b) | :110, target-shared | `docs/handoff/qa-round-4.md` |
 | drw2: verifies/finishes the 🔧 rows of docs/parity/drawing.md | 2a0c08de-2087-4fea-8be7-2b0dd812e3dc | Ngyekta / Opus 5.5 (moved 21:20 from Motile 0885a73c) | :111, target-behave | `docs/handoff/drawing-verify.md` |
 | live: answers `live/REQUESTS.md` | 6ea36fb4-0912-49b5-b7ba-350760f91b49 | Ngyekta / Opus 5.5 | Chrome on :107, CDP 9333 | `live/behaviours.md`, `live/REQUESTS.md` |
-| psb: Part Studio behaviour (+ release workflow, materials) | 76bd77b6-fcaf-41ed-a850-3e55a5059984 | Yekta / Opus 5.5 | :102, target-behave | `docs/handoff/part-studio-behaviour.md` |
-| skb: assembly behaviour (+ sketch leftovers) | aa1eb197-2aaf-49c7-856b-2ae23186c55e | Stablecog / Opus 5.5 | :103, target-behave | `docs/handoff/assembly-behaviour.md`, `sketch-behaviour.md` |
-| asb: drawing behaviour | 60ec2ad1-134a-4423-ac7a-cf0af0d24763 | Unbind / Opus 5.5 (moved 21:15 from Motile 330203cf) | :104, target-behave | `docs/handoff/drawing-behaviour.md` |
+| psb: Part Studio behaviour (+ release workflow, materials) | 64e2935c-56ea-42b4-8703-d1eeced48f2a | Motile / Opus 5.5 (moved 06:00 from Yekta 76bd77b6) | :102, target-behave | `docs/handoff/part-studio-behaviour.md` |
+| skb: assembly behaviour (+ sketch leftovers) | 870c0d67-ce63-4414-beb3-ecd4d7077f2d | Stablecog / Opus 5.5 (moved 06:55 from Unbind 9d432d37) | :103, target-behave | `docs/handoff/assembly-behaviour.md`, `sketch-behaviour.md` |
+| asb: drawing behaviour | 4ade3a23-24dd-4151-a02a-8a43b8e83456 | Yekta / Opus 5.5 (moved 06:55 from Unbind 60ec2ad1) | :104, target-behave | `docs/handoff/drawing-behaviour.md` |
 | qa3: user-level QA after the restyle (finished; findings forwarded) | 212b596b-0639-475a-87aa-543ce8f4d12d | Unbind / Opus 5.5 | - | `docs/handoff/qa-round-3.md` |
-| kern: kernel robustness + import/export | 1d8d27a8-3e1e-408a-9059-12bf7ecef977 | Yekta / Opus 5.5 | :106, target-engine | `docs/handoff/kernel-robustness.md` |
+| kern: kernel robustness + import/export | 3eeb6d7c-fa99-48bd-8b12-8045c904cf3e | Motile / Opus 5.5 (moved 06:05 from Yekta 1d8d27a8) | :106, target-engine | `docs/handoff/kernel-robustness.md` |
 | api: agent API — CLI + MCP server (all app features usable by agents) | 795820ea-9646-44ea-876d-f0d78071221d | Motile / Opus 5.5 (moved 00:20 from Stablecog d1f2526f) | target-engine | `docs/handoff/agent-api.md` |
-| icons2: icon parity, every icon matching Onshape at 1×/2× as our own redrawn artwork | 4ddbc863-ac67-443b-ac43-5988915eec70 | Yekta / Opus 5.5 | :115, target-shared | `docs/handoff/icons2.md` |
-| perf: viewport performance (60/120 fps at Retina; zero-copy presentation) | b16dc34d-5789-4fb1-b97d-de6fd94b84c8 | Unbind / Opus 5.5 | :113, target-engine | `docs/handoff/viewport-performance.md` |
+| icons2: icon parity, every icon matching Onshape at 1×/2× as our own redrawn artwork | b7f0af4f-28e8-4443-a9d2-6680ebde0c34 | Motile / Opus 5.5 (moved 14:50 from Yekta bf88a139) | :115, target-shared | `docs/handoff/icons2.md` |
+| qa5: workflow QA vs live Onshape (sheet metal, assembly, drawing, import, surfaces, configurations), no building | f741a4b8-e08a-4d16-bd28-eb2252ae91df | Motile / Opus 5.5 (moved 14:35 from Unbind 99df3478) | :120, copies target-shared binary | `docs/handoff/qa5.md` |
+| perf: viewport performance (60/120 fps at Retina; zero-copy presentation) | 1e01a3a3-b95e-4ce6-8772-6efc3767fc9f | Unbind / Opus 5.5 (moved 14:55 from Yekta ee9f7d90) | :113, target-engine | `docs/handoff/viewport-performance.md` |
 | fs: FeatureScript language + std library (resumed 08:20; first: green tests + model clippy) | 80461700-2f11-4bd2-afd0-170152385f77 | Ngyekta / Opus 5.5 | :108, target-engine | `docs/handoff/featurescript.md` |
 
 Use Opus 5.5 for all agents (user, 2026-10-18; not Fable). Unbind and Codex hit session limits on 2026-10-18; their agents were moved.

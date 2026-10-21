@@ -271,29 +271,69 @@ pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, sym
 
 // ------------------------------------------------------------ property fields
 
-/// Property fields available in notes, tables and title block values.
-pub const FIELDS: &[(&str, &str)] = &[
-    ("part.name", "Part name"),
-    ("part.number", "Part number"),
-    ("part.material", "Material"),
-    ("part.description", "Description"),
-    ("model.name", "Source tab name"),
-    ("doc.name", "Document name"),
-    ("user.name", "User name"),
-    ("drawing.title1", "Title 1"),
-    ("drawing.title2", "Title 2"),
-    ("drawing.title3", "Title 3"),
-    ("release.approver", "Approved by"),
-    ("release.date", "Approved date"),
-    ("drawing.name", "Drawing tab name"),
-    ("sheet.name", "Sheet name"),
+/// Note panel › Insert drawing property, in Onshape's order (live
+/// behaviours.md "Note panel popups and values").
+pub const DRAWING_FIELDS: &[(&str, &str)] = &[
+    ("drawing.drawn_by", "Drawing drawn by"),
+    ("drawing.date_drawn", "Drawing date drawn"),
+    ("drawing.changed_by", "Drawing last changed by"),
+    ("drawing.changed_date", "Drawing last changed date"),
+    ("drawing.name", "Drawing name"),
+    ("drawing.description", "Drawing description"),
+    ("drawing.number", "Drawing part number"),
+    ("drawing.revision", "Drawing revision"),
+    ("drawing.state", "Drawing state"),
+    ("drawing.title1", "Drawing title 1"),
+    ("drawing.title2", "Drawing title 2"),
+    ("drawing.title3", "Drawing title 3"),
     ("sheet.number", "Sheet number"),
-    ("sheet.count", "Number of sheets"),
     ("sheet.scale", "Sheet scale"),
     ("sheet.size", "Sheet size"),
-    ("date", "Today's date"),
-    ("units", "Drawing units"),
+    ("sheet.count", "Total sheets"),
+    ("release.approver", "Drawing approved by"),
+    ("release.date", "Drawing approved date"),
+    ("drawing.category", "Category"),
+    ("drawing.not_revision_managed", "Not revision managed"),
+    ("drawing.revision_description", "Revision description"),
+    ("drawing.inspection_count", "Inspection count"),
 ];
+
+/// Note panel › Insert sheet reference property (the sheet's part), in
+/// Onshape's order.
+pub const SHEET_REF_FIELDS: &[(&str, &str)] = &[
+    ("part.name", "Name"),
+    ("part.description", "Description"),
+    ("part.number", "Part number"),
+    ("part.revision", "Revision"),
+    ("part.state", "State"),
+    ("part.vendor", "Vendor"),
+    ("part.project", "Project"),
+    ("part.product_line", "Product line"),
+    ("part.title1", "Title 1"),
+    ("part.title2", "Title 2"),
+    ("part.title3", "Title 3"),
+    ("part.material", "Material"),
+    ("part.category", "Category"),
+    ("part.not_revision_managed", "Not revision managed"),
+    ("part.exclude_from_bom", "Exclude from all BOMs"),
+    ("part.unit_of_measure", "Unit of measure"),
+    ("part.mass", "Mass"),
+    ("part.subassembly_bom", "Subassembly BOM behavior"),
+    ("part.tessellation", "Tessellation quality"),
+];
+
+/// Other property keys notes and title blocks use.
+pub const OTHER_FIELDS: &[(&str, &str)] = &[("model.name", "Source tab name"), ("doc.name", "Document name"), ("user.name", "User name"), ("sheet.name", "Sheet name"), ("date", "Today's date"), ("units", "Drawing units")];
+
+/// Whether `key` is a property field.
+pub fn is_field(key: &str) -> bool {
+    DRAWING_FIELDS.iter().chain(SHEET_REF_FIELDS).chain(OTHER_FIELDS).any(|(k, _)| *k == key)
+}
+
+/// Whether a property field holds a date (Date time format applies).
+pub fn is_date_field(key: &str) -> bool {
+    key == "date" || key.ends_with("date") || key.ends_with("date_drawn")
+}
 
 /// Replace `{key}` occurrences using `lookup`; unknown keys are kept as
 /// typed, known but empty values become "----" (like Onshape).
@@ -346,7 +386,33 @@ pub fn expand_fields_with(text: &str, lookup: &dyn Fn(&str) -> Option<String>, p
 pub const TEXT_FORMATS: [(&str, &str); 5] = [("upper", "All uppercase"), ("lower", "All lowercase"), ("sentence", "Sentence case"), ("title", "Title case"), ("", "Unmodified")];
 
 /// Date time formats of date properties.
-pub const DATE_FORMATS: [&str; 5] = ["yyyy-MM-dd", "M/d/yyyy", "dd.MM.yyyy", "d-MMM-yy", "dddd,MMMM d,yyyy"];
+/// Onshape's list (live behaviours.md "Note panel popups and values"); `m` is
+/// the month, as in Onshape's patterns.
+pub const DATE_FORMATS: [&str; 23] = [
+    "yyyy-m-d",
+    "yyyy-mm-dd",
+    "yyyy/mm/dd",
+    "m.d.yyyy",
+    "m/d/yyyy",
+    "m/d/yy",
+    "mm-yy",
+    "mm/dd/yyyy",
+    "mmm. d, yy",
+    "mmmm yy",
+    "mmmm d, yyyy",
+    "d-mmm-yy",
+    "d mmmm yy",
+    "dd.mm.yyyy",
+    "dd/mm/yyyy",
+    "dd/mm/yy",
+    "dd.mm.yy",
+    "d-mmm-yyyy",
+    "dd-mm-yyyy",
+    "dddd, mmmm d, yyyy",
+    "dd mmm yy",
+    "yyyy",
+    "mm/dd/yy",
+];
 
 /// Apply a property's text format (`upper`, `lower`, `sentence`, `title`)
 /// or, to YYYY-MM-DD dates, a date time format (`yyyy`, `yy`, `MMMM`,
@@ -401,10 +467,10 @@ pub fn field_format(v: &str, fmt: &str) -> String {
         match (c, n) {
             ('y', 4) => out.push_str(&format!("{y:04}")),
             ('y', _) => out.push_str(&format!("{:02}", y % 100)),
-            ('M', 4) => out.push_str(MONTHS[m as usize - 1]),
-            ('M', 3) => out.push_str(&MONTHS[m as usize - 1][..3]),
-            ('M', 2) => out.push_str(&format!("{m:02}")),
-            ('M', _) => out.push_str(&m.to_string()),
+            ('M' | 'm', 4) => out.push_str(MONTHS[m as usize - 1]),
+            ('M' | 'm', 3) => out.push_str(&MONTHS[m as usize - 1][..3]),
+            ('M' | 'm', 2) => out.push_str(&format!("{m:02}")),
+            ('M' | 'm', _) => out.push_str(&m.to_string()),
             ('d', 4) => out.push_str(DAYS[days.rem_euclid(7) as usize]),
             ('d', 2) => out.push_str(&format!("{d:02}")),
             ('d', _) => out.push_str(&d.to_string()),

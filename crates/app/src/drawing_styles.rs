@@ -126,35 +126,24 @@ impl DrawingEditor {
         let angle_label = if h.angle.abs() < 1e-9 { "Auto".to_string() } else { format!("{:.1}°", h.angle + base) };
         let color_label = crate::drawing_drawprops::COLORS.iter().find(|x| x.1 == h.color).map(|x| x.0.to_string()).unwrap_or_else(|| "Custom".into());
         let general = h.standard == 2;
-        v_flex()
+        let revert = cx.listener(|this, _: &ClickEvent, _, cx| {
+            this.edit_hatch_styles(
+                std::rc::Rc::new(|x: &mut HatchRegion| {
+                    x.standard = 0;
+                    x.pattern = hatch_pat::default_pattern(0);
+                    x.scale = 1.0;
+                    x.angle = 0.0;
+                    x.color = None;
+                }),
+                cx,
+            )
+        });
+        let rows = v_flex()
             .child(row("Hatch pattern", select("st-h-group", GROUPS[h.standard.min(2)].0.to_string(), false, groups)))
             .child(row("", select("st-h-pattern", pat_label, true, patterns)))
             .when(!general, |e| e.child(row("Scale", select("st-h-scale", scale_label, false, scales))).child(row("Angle", select("st-h-angle", angle_label, false, angles))))
-            .child(row("Color", select("st-h-color", color_label, false, colors)))
-            .child(
-                h_flex()
-                    .id("st-h-revert")
-                    .h(px(36.))
-                    .px(px(12.))
-                    .gap(px(6.))
-                    .cursor_pointer()
-                    .text_size(px(13.))
-                    .text_color(gpui_kit::rgb(0x1651b0))
-                    .child("↺ Revert to drawing properties")
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.edit_hatch_styles(
-                            std::rc::Rc::new(|x: &mut HatchRegion| {
-                                x.standard = 0;
-                                x.pattern = hatch_pat::default_pattern(0);
-                                x.scale = 1.0;
-                                x.angle = 0.0;
-                                x.color = None;
-                            }),
-                            cx,
-                        )
-                    })),
-            )
-            .into_any_element()
+            .child(row("Color", select("st-h-color", color_label, false, colors)));
+        Self::styles_with_footer(rows.into_any_element(), "st-h-revert", revert, cx)
     }
 
     pub fn render_styles_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -166,18 +155,25 @@ impl DrawingEditor {
             return self.render_hatch_styles(h, cx);
         }
         if sel.is_empty() {
-            return div()
-                .m(px(8.))
-                .p(px(8.))
+            // Live drawing/95-panel-styles (IntimationMessageheadingStyle /
+            // IntimationMessageStyle): 4 px in and below the header, 7 px
+            // right, padding 15,
+            // #bce8f1 border, #d9edf7 fill, #31708f text; a bold 14 px heading
+            // and a 13 px body on 20 px lines.
+            let info = div()
+                .ml(px(4.))
+                .mt(px(4.))
+                .mr(px(7.))
+                .p(px(15.))
                 .rounded(px(4.))
                 .border_1()
-                .border_color(gpui_kit::rgb(0xb2ddf6))
-                .bg(gpui_kit::rgb(0xdef1fb))
-                .text_size(px(13.))
-                .text_color(gpui_kit::rgb(0x094174))
-                .child("Select a dimension or annotation or hatch region to change its style")
-                .child(div().pt(px(6.)).child("Select any dimension or annotation or hatch region to apply a different style from the drawing property."))
-                .into_any_element();
+                .border_color(gpui_kit::rgb(0xbce8f1))
+                .bg(gpui_kit::rgb(0xd9edf7))
+                .text_color(gpui_kit::rgb(0x31708f))
+                .line_height(px(20.))
+                .child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).child("Select a dimension or annotation or hatch region to change its style"))
+                .child(div().text_size(px(13.)).child("Select any dimension or annotation or hatch region to apply a different style from the drawing property."));
+            return Self::styles_with_footer(info.into_any_element(), "st-revert", |_, _, _| {}, cx);
         }
         let dims = sel.iter().all(|a| a.kind.is_dimension());
         let props = self.drawing.props.clone();
@@ -322,7 +318,7 @@ impl DrawingEditor {
             let gap_text = num(gap);
             let fresh = !self.styles_gap.as_ref().is_some_and(|(id, _, _)| *id == first.id);
             if fresh {
-                let stx = cx.new(|cx| InputState::new(window, cx).default_value(gap_text.clone()));
+                let stx = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(gap_text.clone()));
                 let meters = u.meters();
                 let sub = cx.subscribe(&stx, move |this: &mut Self, stx, ev: &InputEvent, cx| {
                     if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
@@ -370,19 +366,31 @@ impl DrawingEditor {
                     this.edit_styles(std::rc::Rc::new(move |a: &mut Annotation| if let AnnotationKind::RadialDimension { dim_line, .. } = &mut a.kind { *dim_line = v }), cx);
                 }))));
         }
+        let revert = cx.listener(|this, _: &ClickEvent, _, cx| this.edit_styles(std::rc::Rc::new(|a: &mut Annotation| a.style = None), cx));
+        Self::styles_with_footer(body.into_any_element(), "st-revert", revert, cx)
+    }
+
+    /// The panel body over its footer (live drawing/95, 474): pinned to the
+    /// bottom, a #dcdcdc top line on #f9f9f9; a 28 px white button with the
+    /// refresh icon, "Revert to drawing properties" (13.33 px #666) and a
+    /// help icon at the right.
+    fn styles_with_footer(body: AnyElement, id: &'static str, revert: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, cx: &mut Context<Self>) -> AnyElement {
         v_flex()
-            .child(body)
+            .size_full()
+            .child(div().flex_1().min_h_0().child(body))
             .child(
                 h_flex()
-                    .id("st-revert")
-                    .h(px(36.))
-                    .px(px(12.))
-                    .gap(px(6.))
-                    .cursor_pointer()
-                    .text_size(px(13.))
-                    .text_color(gpui_kit::rgb(0x1651b0))
-                    .child("↺ Revert to drawing properties")
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.edit_styles(std::rc::Rc::new(|a: &mut Annotation| a.style = None), cx))),
+                    .flex_none()
+                    .h(px(40.))
+                    .pl(px(4.))
+                    .pr(px(9.))
+                    .gap(px(5.))
+                    .border_t_1()
+                    .border_color(gpui_kit::rgb(0xdcdcdc))
+                    .bg(gpui_kit::rgb(0xf9f9f9))
+                    .child(div().id(id).size(px(28.)).flex().items_center().justify_center().rounded(px(3.)).bg(gpui_kit::white()).cursor_pointer().child(crate::assets::icon("refresh", 20., cx)).on_click(revert))
+                    .child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child("Revert to drawing properties"))
+                    .child(div().size(px(14.)).child(crate::assets::icon("help-filled", 14., cx))),
             )
             .into_any_element()
     }

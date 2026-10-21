@@ -51,7 +51,7 @@ impl DrawingEditor {
         let height = if self.drawing.units_mm { noshape_model::drawing::format::format_number(h, None, 2).to_string() } else { format!("{:.4}", h / 25.4) };
         let vals = [style.above.clone(), style.left.clone(), text.to_string(), style.right.clone(), style.below.clone(), height];
         let phs = ["", "", "Table: Item No.", "", "", ""];
-        let inputs = vals.into_iter().zip(phs).map(|(v, ph)| cx.new(|cx| InputState::new(window, cx).placeholder(ph).default_value(v))).collect();
+        let inputs = vals.into_iter().zip(phs).map(|(v, ph)| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder(ph).default_value(v))).collect();
         CalloutDlg { edit, cached: (text.to_string(), style.clone()), style, inputs, target: CENTRE }
     }
 

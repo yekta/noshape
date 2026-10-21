@@ -71,57 +71,69 @@ pub const DATUM_TRIANGLE: [[f64; 2]; 3] = [[-5.0, 0.0], [5.0, 0.0], [0.0, 8.0]];
 pub const DATUM_LETTER: (f64, f64) = (9.0, 11.0);
 
 /// A row of Model definitions › Characteristics: a toleranced feature
-/// parameter (live qa4 10-20 07:40, part-studio/598: "Distance | 20.000 |
-/// ±0.000 | 20.000 | 20.000").
+/// parameter (live qa4 598, psb 10-21 b).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Characteristic {
     pub feature: crate::reference::FeatureId,
     pub param: String,
-    /// "Distance", "Angle" or "Diameter".
+    /// "Distance", "Angle", "Diameter" or "Fillet radius".
     pub kind: &'static str,
     pub dim: noshape_units::Dim,
     /// SI value.
     pub nominal: f64,
     pub tolerance: crate::fits::Tolerance,
+    /// The feature is after the rollback bar (or after the feature being
+    /// edited): live shows Nominal 0.000 on pink.
+    pub rolled_back: bool,
 }
 
 impl Characteristic {
-    /// Tolerance, upper and lower limit cells, numbers in `unit_factor`
-    /// (SI per display unit) with `decimals`. Live shows "--" while the type
-    /// is Default; Symmetrical is "±d". The other types follow their
-    /// definitions (Deviation "+u/−l", Limits / Min / Max / Basic) and are
-    /// not captured live yet.
-    pub fn cells(&self, unit_factor: f64, decimals: usize) -> [String; 3] {
+    /// The tolerance's type is Default: its value comes from the applied
+    /// default tolerances ("Hide default tolerances" hides these rows).
+    pub fn is_default(&self) -> bool {
+        !matches!(self.tolerance.kind.as_str(), "Symmetrical" | "Deviation" | "Limits" | "Min" | "Max" | "Basic")
+    }
+
+    /// Nominal, tolerance, upper and lower limit cells (live psb 10-21 b),
+    /// numbers in `unit_factor` (SI per display unit) with the tolerance's
+    /// precision or `decimals`; `standard` is the Part Studio's default
+    /// tolerances (a Default row takes its value).
+    pub fn cells(&self, unit_factor: f64, decimals: usize, standard: Option<&str>) -> [String; 4] {
         let t = &self.tolerance;
-        // The tolerance's own precision, else the workspace's.
         let decimals = t.precision.map(usize::from).unwrap_or(decimals);
-        let n = |x: f64| format!("{:.*}", decimals, x / unit_factor);
+        let n = |x: f64| noshape_units::to_fixed(x / unit_factor, decimals as u8);
+        let nominal = if self.rolled_back { 0.0 } else { self.nominal };
         // Deviations are typed in the document unit; bare numbers mean that unit.
         let dev = |s: &str| s.trim().parse::<f64>().map(|v| v * unit_factor).unwrap_or_else(|_| noshape_units::evaluate_as(s, self.dim, &noshape_units::UnitPrefs::default(), &noshape_units::EmptyScope).map(|q| q.value).unwrap_or(0.0));
         let (u, l) = (dev(&t.upper), dev(&t.lower));
-        let nom = self.nominal;
-        match t.kind.as_str() {
-            "Symmetrical" => [format!("±{}", n(u)), n(nom + u), n(nom - u)],
-            "Deviation" => [format!("+{}/−{}", n(u), n(l)), n(nom + u), n(nom - l)],
-            "Limits" => [format!("{} / {}", n(nom + u), n(nom - l)), n(nom + u), n(nom - l)],
-            "Min" => ["MIN".into(), "--".into(), n(nom)],
-            "Max" => ["MAX".into(), n(nom), "--".into()],
-            "Basic" => ["BASIC".into(), n(nom), n(nom)],
-            _ => ["--".into(), "--".into(), "--".into()],
-        }
+        let none = || "--".to_string();
+        let [tol, upper, lower] = match t.kind.as_str() {
+            "Symmetrical" => [format!("±{}", n(u)), n(nominal + u), n(nominal - u)],
+            // Limits are typed as deviations too and read the same.
+            "Deviation" | "Limits" => [format!("+{}/-{}", n(u), n(l)), n(nominal + u), n(nominal - l)],
+            "Min" => ["MIN".into(), none(), n(nominal)],
+            "Max" => ["MAX".into(), n(nominal), none()],
+            "Basic" => [none(), none(), none()],
+            _ => match standard.and_then(|s| default_tolerance(s, self.kind, self.nominal, t.precision)) {
+                Some(d) => [format!("±{}", n(d)), n(nominal + d), n(nominal - d)],
+                None => [none(), none(), none()],
+            },
+        };
+        [n(nominal), tol, upper, lower]
     }
 }
 
 /// The toleranced parameters of `ps`'s features, in feature order (`draft`:
 /// a feature open in its dialog, whose parameters replace the stored ones
 /// or which is added at the end; the panel fills while the dialog is open).
-pub fn characteristics(ps: &crate::partstudio::PartStudio, draft: Option<&crate::partstudio::Feature>) -> Vec<Characteristic> {
+/// Features from index `upto` on are rolled back.
+pub fn characteristics(ps: &crate::partstudio::PartStudio, draft: Option<&crate::partstudio::Feature>, upto: usize) -> Vec<Characteristic> {
     let mut feats: Vec<&crate::partstudio::Feature> = ps.features.iter().map(|f| draft.filter(|d| d.id == f.id).unwrap_or(f)).collect();
     if let Some(d) = draft.filter(|d| !ps.features.iter().any(|f| f.id == d.id)) {
         feats.push(d);
     }
     let mut out = Vec::new();
-    for f in feats.into_iter().filter(|f| !f.suppressed) {
+    for (i, f) in feats.into_iter().enumerate().filter(|(_, f)| !f.suppressed) {
         for (key, v) in &f.params.0 {
             let Some(param) = key.strip_suffix("__tolerance") else { continue };
             let Some(tolerance) = crate::fits::Tolerance::parse(Some(v)) else { continue };
@@ -132,20 +144,64 @@ pub fn characteristics(ps: &crate::partstudio::PartStudio, draft: Option<&crate:
                 "Diameter"
             } else if q.dim == noshape_units::Dim::ANGLE {
                 "Angle"
+            } else if f.type_id == "fillet" && param == "radius" {
+                "Fillet radius"
             } else {
                 "Distance"
             };
-            out.push(Characteristic { feature: f.id, param: param.to_string(), kind, dim: q.dim, nominal: q.value, tolerance });
+            out.push(Characteristic { feature: f.id, param: param.to_string(), kind, dim: q.dim, nominal: q.value, tolerance, rolled_back: i >= upto });
         }
     }
     out
 }
 
+/// The default tolerance (SI: metres, radians) a Default row gets from
+/// `standard` (live psb 10-21 c, ISO 2768-c: Distance 30 → ±0.5, Fillet
+/// radius 6 → ±1, Angle 90° → ±1°; Precision: ±0.127, angles ±1°).
+pub fn default_tolerance(standard: &str, kind: &str, nominal: f64, precision: Option<u8>) -> Option<f64> {
+    let deg = std::f64::consts::PI / 180.0;
+    if standard == PRECISION_STANDARD {
+        return Some(match kind {
+            "Angle" => deg,
+            _ => match precision {
+                Some(2) => 0.25e-3,
+                Some(4) => 0.0127e-3,
+                _ => 0.127e-3,
+            },
+        });
+    }
+    let groups = iso_2768(standard)?;
+    let mm = nominal.abs() * 1000.0;
+    let pick = |g: &ToleranceGroup, x: f64| -> Option<f64> {
+        let row = g.rows.iter().find(|(label, _)| match label.split_whitespace().collect::<Vec<_>>().as_slice() {
+            ["Up", "to", v, ..] => v.parse::<f64>().is_ok_and(|v| x <= v),
+            ["Over", ..] => true,
+            _ => false,
+        })?;
+        row.1.trim_start_matches('±').trim_end_matches(" mm").trim_end_matches('°').parse::<f64>().ok()
+    };
+    match kind {
+        "Fillet radius" => pick(&groups[3], mm).map(|v| v * 1e-3),
+        // ISO 2768 sizes an angle by its shorter leg, which a parameter
+        // doesn't have: the 10–50 mm band, the one that gives live's ±1° on
+        // ISO 2768-c (to confirm on another grade).
+        "Angle" => pick(&groups[1], 50.0).map(|v| v * deg),
+        _ => pick(&groups[0], mm).map(|v| v * 1e-3),
+    }
+}
+
 /// Library "Onshape default tolerances", Type "ISO 2768-1": the classes of
 /// the picker's "Default tolerances" list (live qa4 599 applies ISO 2768-c
 /// when the picker opens).
-pub const DEFAULT_TOLERANCES: [&str; 4] = ["ISO 2768-f", "ISO 2768-m", "ISO 2768-c", "ISO 2768-v"];
+pub const DEFAULT_TOLERANCES: [&str; 4] = ["ISO 2768-c", "ISO 2768-f", "ISO 2768-m", "ISO 2768-v"];
 pub const DEFAULT_TOLERANCE_CLASS: &str = "ISO 2768-c";
+/// The picker's Type list (live psb 10-21 c); the Precision type has no
+/// grade.
+pub const ISO_2768_1: &str = "ISO 2768-1";
+pub const PRECISION_STANDARD: &str = "Precision (.xxx default)";
+pub const TOLERANCE_TYPES: [&str; 2] = [ISO_2768_1, PRECISION_STANDARD];
+/// The grades in the standard's own order (the tables' columns).
+const ISO_2768_GRADES: [&str; 4] = ["ISO 2768-f", "ISO 2768-m", "ISO 2768-c", "ISO 2768-v"];
 
 /// One block of Model definitions › Default tolerances: a title and
 /// ("Up to 3 mm", "±0.2 mm") rows; an empty value where the standard gives
@@ -162,9 +218,9 @@ pub struct ToleranceGroup {
 /// Fillet radii use the standard's "external radii and chamfer heights"
 /// row, like the chamfers.
 pub fn iso_2768(name: &str) -> Option<Vec<ToleranceGroup>> {
-    let class = DEFAULT_TOLERANCES.iter().position(|n| *n == name)?;
+    let class = ISO_2768_GRADES.iter().position(|n| *n == name)?;
     let num = |v: f64| {
-        let s = format!("{v:.3}");
+        let s = noshape_units::to_fixed(v, 3);
         s.trim_end_matches('0').trim_end_matches('.').to_string()
     };
     let len = |v: Option<f64>| v.map(|v| format!("±{} mm", num(v))).unwrap_or_default();
@@ -203,6 +259,20 @@ pub fn iso_2768(name: &str) -> Option<Vec<ToleranceGroup>> {
     ])
 }
 
+/// The "Default tolerances" section of `standard` (live psb 10-21 c; the
+/// Precision type lists its rows as sub-tables).
+pub fn default_tolerance_groups(standard: &str) -> Option<Vec<ToleranceGroup>> {
+    if standard != PRECISION_STANDARD {
+        return iso_2768(standard);
+    }
+    let rows = |r: &[(&str, &str)]| r.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
+    Some(vec![
+        ToleranceGroup { title: "Linear tolerances", rows: rows(&[("Workspace precision", "±0.127 mm"), ("X.XX", "±0.25 mm"), ("X.XXX", "±0.127 mm"), ("X.XXXX", "±0.0127 mm")]) },
+        ToleranceGroup { title: "Angular tolerances", rows: rows(&[("", "±1°")]) },
+        ToleranceGroup { title: "Chamfer angles", rows: rows(&[("", "±5°")]) },
+    ])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,13 +299,30 @@ mod tests {
     #[test]
     fn toleranced_parameters_are_characteristics() {
         use crate::fits::Tolerance;
-        let c = Characteristic { feature: crate::reference::FeatureId(1), param: "depth".into(), kind: "Distance", dim: noshape_units::Dim::LENGTH, nominal: 0.020, tolerance: Tolerance { kind: "Symmetrical".into(), upper: "0".into(), ..Tolerance::default() } };
-        // Live 598: Distance | 20.000 | ±0.000 | 20.000 | 20.000 (mm, 3 decimals).
-        assert_eq!(c.cells(0.001, 3), ["±0.000", "20.000", "20.000"]);
-        let c2 = Characteristic { tolerance: Tolerance::default(), ..c.clone() };
-        assert_eq!(c2.cells(0.001, 3), ["--", "--", "--"]);
-        let c3 = Characteristic { tolerance: Tolerance { kind: "Symmetrical".into(), upper: "0.1".into(), ..Tolerance::default() }, ..c };
-        assert_eq!(c3.cells(0.001, 3), ["±0.100", "20.100", "19.900"]);
+        let c = Characteristic { feature: crate::reference::FeatureId(1), param: "depth".into(), kind: "Distance", dim: noshape_units::Dim::LENGTH, nominal: 0.020, tolerance: Tolerance { kind: "Symmetrical".into(), upper: "0".into(), ..Tolerance::default() }, rolled_back: false };
+        let tol = |kind: &str, upper: &str, lower: &str| Characteristic { tolerance: Tolerance { kind: kind.into(), upper: upper.into(), lower: lower.into(), ..Tolerance::default() }, ..c.clone() };
+        // Live psb 10-21 b (mm, 3 decimals).
+        assert_eq!(c.cells(0.001, 3, None), ["20.000", "±0.000", "20.000", "20.000"]);
+        assert_eq!(tol("Default", "", "").cells(0.001, 3, None), ["20.000", "--", "--", "--"]);
+        assert_eq!(tol("Symmetrical", "0.1", "").cells(0.001, 3, None), ["20.000", "±0.100", "20.100", "19.900"]);
+        assert_eq!(tol("Deviation", "0.2", "0.1").cells(0.001, 3, None), ["20.000", "+0.200/-0.100", "20.200", "19.900"]);
+        assert_eq!(tol("Limits", "0.2", "0.1").cells(0.001, 3, None), ["20.000", "+0.200/-0.100", "20.200", "19.900"]);
+        assert_eq!(tol("Min", "", "").cells(0.001, 3, None), ["20.000", "MIN", "--", "20.000"]);
+        assert_eq!(tol("Max", "", "").cells(0.001, 3, None), ["20.000", "MAX", "20.000", "--"]);
+        assert_eq!(tol("Basic", "", "").cells(0.001, 3, None), ["20.000", "--", "--", "--"]);
+        let p1 = Characteristic { tolerance: Tolerance { precision: Some(1), ..tol("Symmetrical", "0.1", "").tolerance }, ..c.clone() };
+        assert_eq!(p1.cells(0.001, 3, None), ["20.0", "±0.1", "20.1", "19.9"]);
+        // A Default row takes the applied standard's value (live 10-21 c).
+        let d30 = Characteristic { nominal: 0.030, ..tol("Default", "", "") };
+        assert_eq!(d30.cells(0.001, 3, Some("ISO 2768-c")), ["30.000", "±0.500", "30.500", "29.500"]);
+        assert_eq!(d30.cells(0.001, 3, Some(PRECISION_STANDARD))[1], "±0.127");
+        let r6 = Characteristic { kind: "Fillet radius", nominal: 0.006, ..tol("Default", "", "") };
+        assert_eq!(r6.cells(0.001, 3, Some("ISO 2768-c"))[1], "±1.000");
+        let deg = std::f64::consts::PI / 180.0;
+        let a90 = Characteristic { kind: "Angle", dim: noshape_units::Dim::ANGLE, nominal: 90.0 * deg, ..tol("Default", "", "") };
+        assert_eq!(a90.cells(deg, 3, Some("ISO 2768-c"))[1], "±1.000");
+        // Rolled back: Nominal 0.000.
+        assert_eq!(Characteristic { rolled_back: true, ..c }.cells(0.001, 3, None)[0], "0.000");
     }
 
     #[test]

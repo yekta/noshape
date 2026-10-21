@@ -102,7 +102,9 @@ pub enum Tool {
     Auxiliary { parent: Option<(ViewId, [f64; 2])> },
     /// Section view; `partial`: the cutting line is used as clicked (not
     /// extended across the view) and only cuts along its length.
-    Section { parent: Option<ViewId>, p0: Option<[f64; 2]>, line: Option<([f64; 2], [f64; 2])>, partial: bool },
+    /// `jogs`: snap points clicked after the line, each jogging the cutting
+    /// line through it (help drawing_section_view step 7).
+    Section { parent: Option<ViewId>, p0: Option<[f64; 2]>, line: Option<([f64; 2], [f64; 2])>, partial: bool, jogs: Vec<[f64; 2]> },
     Detail { parent: Option<ViewId>, center: Option<[f64; 2]>, radius: Option<f64> },
     Dimension { kind: DimTool, picks: Vec<Pick> },
     Note,
@@ -215,6 +217,12 @@ pub enum Sel {
     Image(u64),
     /// An automatic centermark of a view (`build::centermark_key`).
     AutoCentermark(ViewId, [i64; 2]),
+    /// The label under a view, selected on its own (live: orange fill, a
+    /// grip at each end; dragged freely).
+    ViewLabel(ViewId),
+    /// An auxiliary view's reference indicator, selected on its own (live
+    /// u-906: orange, its parent edge orange, the view framed light blue).
+    AuxIndicator(ViewId),
 }
 
 #[derive(Clone, Debug)]
@@ -250,6 +258,8 @@ pub enum Drag {
     /// Drag a snap point of an auxiliary view's reference indicator (0 / 1
     /// an end, 2 the middle).
     AuxIndicator { view: ViewId, grip: usize, orig: noshape_model::drawing::AuxRef },
+    /// Move view `view`'s label on its own (`orig`: its `label_at`).
+    MoveViewLabel { view: ViewId, start: [f64; 2], orig: Option<[f64; 2]> },
     /// Move one point of a section view's cutting line.
     MoveSectionPoint { view: ViewId, index: usize, orig: Vec<[f64; 2]> },
     /// Drag annotation `0`'s inspection item onto another annotation.

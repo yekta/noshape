@@ -160,6 +160,19 @@ impl Session {
         Ok(r)
     }
 
+    /// Change the workspace units (one microversion). Sketch dimensions
+    /// stored without a unit are pinned to the old one first, so the
+    /// geometry doesn't change (`quantity_text::pin_sketch_units`).
+    pub fn set_units(&mut self, units: noshape_units::UnitPrefs, description: &str) -> Result<()> {
+        anyhow::ensure!(!self.read_only(), "{READ_ONLY_MESSAGE}");
+        self.ensure_unprotected()?;
+        let old = self.doc.settings.units;
+        let tabs = if old.length != units.length || old.angle != units.angle { noshape_model::quantity_text::pin_sketch_units(&mut self.doc, &old) } else { Vec::new() };
+        self.doc.settings.units = units;
+        self.commit(&tabs, true, description)?;
+        Ok(())
+    }
+
     /// Commit changed tabs (and settings) as one microversion.
     pub fn commit(&mut self, tabs: &[TabId], settings: bool, description: &str) -> Result<MicroversionId> {
         anyhow::ensure!(self.viewing.is_none(), "viewing history is read-only");
@@ -320,16 +333,27 @@ impl Session {
 
     /// Merge another branch into the current one, feature-by-feature for Part Studios.
     pub fn merge_from(&mut self, from: BranchId) -> Result<noshape_store::MergeOutcome> {
+        let head = self.store.head(from)?;
+        let name = self.store.branch(from)?.name;
+        self.merge_picked(head, &name, Some(from), |_| noshape_store::MergePick::Auto)
+    }
+
+    /// Onshape's Merge dialog: merge `from` (a workspace head or a version)
+    /// into the current workspace with each name's strategy (`pick`: Keep =
+    /// `Ours`, Replace = `Theirs`, Merge changes = `Auto`).
+    pub fn merge_picked(&mut self, from: MicroversionId, from_name: &str, from_branch: Option<BranchId>, pick: impl FnMut(&str) -> noshape_store::MergePick) -> Result<noshape_store::MergeOutcome> {
         let before = self.head()?;
-        let outcome = self.store.merge(from, self.branch, |name, base, ours, theirs| {
+        let outcome = self.store.merge_with(from, from_name, from_branch, self.branch, pick, |name, base, ours, theirs| {
             if name.starts_with("tab/") {
                 noshape_model::merge::merge_tab_blobs(base, ours, theirs)
             } else {
                 ours.map(|o| o.to_vec())
             }
         })?;
-        self.undo.record(before, outcome.microversion, "Merge");
-        self.reload(outcome.microversion)?;
+        if !outcome.up_to_date {
+            self.undo.record(before, outcome.microversion, "Merge");
+            self.reload(outcome.microversion)?;
+        }
         Ok(outcome)
     }
 }

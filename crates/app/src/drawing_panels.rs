@@ -94,7 +94,11 @@ impl DrawingEditor {
         v_flex()
             .id("dr-panel-strip")
             .absolute()
-            .top(relative(0.46))
+            // Live drawing/95: centred on the canvas (icons at y 511 / 545 /
+            // 578 / 612 between the toolbar and the tab bar): 4 × 34 px rows
+            // overlapping by 1 px.
+            .top(relative(0.5))
+            .mt(px(-66.))
             .right(px(if open { PANEL_W - 1. } else { -1. }))
             .occlude()
             // Live order (drawing/09).
@@ -107,7 +111,7 @@ impl DrawingEditor {
 
     /// Double-click a number in the Inspection table: edit it in place.
     fn edit_table_number(&mut self, key: (usize, u64), n: String, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| InputState::new(window, cx).default_value(n));
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(n));
         st.update(cx, |s, cx| s.focus(window, cx));
         let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
             if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
@@ -430,12 +434,12 @@ impl DrawingEditor {
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                // Live dom/drawing-panel-*.txt: a 34 px header, the title
-                // centred (18.67 px / 500, #1b5faa) over a 2 px #1b5faa
+                // Live dom/drawing-panel-*.txt, drawing/95: a 37 px header, the
+                // title centred (18.67 px / 500, #1b5faa) over a 2 px #1b5faa
                 // underline; no close button (the strip icon closes it).
                 .child(
                     h_flex()
-                        .h(px(34.))
+                        .h(px(39.))
                         .flex_none()
                         .border_b(px(2.))
                         .border_color(gpui_kit::rgb(0x1b5faa))

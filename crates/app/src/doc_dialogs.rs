@@ -117,7 +117,7 @@ pub fn restore_deleted_workspaces(doc: Entity<DocModel>, window: &mut Window, cx
         let pal = p();
         let deleted: Vec<noshape_store::BranchInfo> = doc.read(cx).session.store.graph().map(|g| g.branches.into_iter().filter(|b| b.deleted).collect()).unwrap_or_default();
         let rows: Vec<AnyElement> = if deleted.is_empty() {
-            vec![os::info_box("There are no deleted workspaces.").into_any_element()]
+            vec![os::info_box("No deleted workspaces found in this document.").into_any_element()]
         } else {
             deleted
                 .into_iter()
@@ -370,12 +370,13 @@ impl WorkspaceUnits {
 
     fn apply(&mut self, cx: &mut Context<Self>) {
         let units = self.draft;
+        let old = self.doc.read(cx).session.doc.settings.units;
         self.doc.update(cx, |doc, cx| {
-            doc.session.doc.settings.units = units;
-            if let Err(e) = doc.session.commit(&[], true, "Change workspace units") {
+            // Unitless sketch dimensions keep their size (session.set_units).
+            if let Err(e) = doc.session.set_units(units, "Change workspace units") {
                 cx.emit(DocEvent::Error(format!("{e:#}")));
             }
-            cx.emit(DocEvent::Reloaded);
+            cx.emit(DocEvent::UnitsChanged { old });
         });
         cx.emit(WorkspaceUnitsEvent::Close);
     }

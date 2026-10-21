@@ -10,6 +10,7 @@
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
+#include <GeomAPI_Interpolate.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRepFill_Filling.hxx>
 #include <BRepLib.hxx>
@@ -807,7 +808,10 @@ private:
       gp_Dir z(ax), x(ux);
       if (std::abs(x.Dot(z)) > 1e-9)
         x = gp_Dir(z.XYZ().Crossed(gp::DX().XYZ()).Modulus() > 1e-6 ? z.XYZ().Crossed(gp::DX().XYZ()) : z.XYZ().Crossed(gp::DY().XYZ()));
-      if (R * mm <= std::abs(r) * mm)
+      // An apple torus (0 < R <= |r|: fillets around small holes, Inventor's
+      // Wrench_Bar) is fine for OCCT's surface, whose faces keep to the part
+      // outside the self-intersection; a lemon (R <= 0) isn't.
+      if (R * mm <= 0)
         fail_unsupported("acis: self-intersecting torus");
       return new Geom_ToroidalSurface(gp_Ax3(P(o), z, x), R * mm, std::abs(r) * mm);
     }
@@ -896,6 +900,42 @@ private:
     return new Geom_TrimmedCurve(c, f, l);
   }
 
+  // A helix intcurve without stored B-spline data (Inventor threads):
+  // "helix_int_cur [version] <t range> root major minor pitch axis …" with
+  // P(t) = root + cos t major + sin t minor + t / 2π pitch (exact on the
+  // Wrench thread edges' vertices). Interpolated as a C2 B-spline keeping t
+  // as its parameter, 48 points per turn.
+  occ::handle<Geom_Curve> helix(Cursor b, const std::string& name)
+  {
+    if (b.more() && b.peek().k == Tok::Num && b.i + 1 < b.rec->toks.size() && b.rec->toks[b.i + 1].k != Tok::Num)
+      b.skip(); // the subtype's version (ASM)
+    auto bound = [&]() {
+      const Tok& t = b.next();
+      if (!((t.k == Tok::Word && (t.s == "F" || t.s == "T")) || (t.k == Tok::Bool && t.b)))
+        fail_unsupported("acis: intcurve \"" + name + "\" without bounds");
+      return b.num();
+    };
+    const double t0 = bound(), t1 = bound();
+    const gp_XYZ root = b.xyz(), major = b.xyz(), minor = b.xyz(), pitch = b.xyz();
+    const double turns = std::abs(t1 - t0) / (2 * M_PI);
+    if (!(turns > 0) || turns > 1e4)
+      fail_invalid("acis: intcurve \"" + name + "\" with a bad range");
+    const int                                n  = std::max(8, (int)std::ceil(turns * 48)) + 1;
+    occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, n);
+    occ::handle<NCollection_HArray1<double>> par = new NCollection_HArray1<double>(1, n);
+    for (int i = 1; i <= n; ++i)
+    {
+      const double t = t0 + (t1 - t0) * (i - 1) / (n - 1);
+      pts->SetValue(i, P(root + major * std::cos(t) + minor * std::sin(t) + pitch * (t / (2 * M_PI))));
+      par->SetValue(i, t);
+    }
+    GeomAPI_Interpolate ip(pts, par, false, 1e-12);
+    ip.Perform();
+    if (!ip.IsDone())
+      fail_op("acis: could not build intcurve \"" + name + "\"");
+    return occ::handle<Geom_Curve>(ip.Curve());
+  }
+
   // A 2D B-spline: "nubs|nurbs d form n knots… (u v [w])…".
   occ::handle<Geom2d_BSplineCurve> bs2_curve(Cursor& c)
   {
@@ -961,9 +1001,12 @@ private:
       std::string name;
       Cursor      b = subtype(c, name);
       std::optional<Cursor> at_bs = stored_bs(b, false);
-      if (!at_bs)
+      if (!at_bs && name == "helix_int_cur")
+        out = helix(b, name);
+      else if (!at_bs)
         fail_unsupported("acis: intcurve \"" + name + "\" without B-spline data");
-      out = at_bs_is_3d(b, *at_bs) ? occ::handle<Geom_Curve>(bs3_curve(*at_bs)) : on_surface(b, name);
+      else
+        out = at_bs_is_3d(b, *at_bs) ? occ::handle<Geom_Curve>(bs3_curve(*at_bs)) : on_surface(b, name);
       if (rev)
         out = out->Reversed();
     }

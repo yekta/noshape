@@ -130,6 +130,7 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let end_bound = def_enum(&def, "endBound").unwrap_or_else(|| "BLIND".into());
     let start_bound = def_enum(&def, "startBound");
     let start_opposite = def_bool(&def, "isStartBoundOpposite", true);
+    cx.state.lock().dependencies.insert(id.clone(), refs.clone());
     run_op(i, &cx, &id, "EXTRUDE_FAILED", |ev| {
         let Some(d) = dir.filter(|d| *d != DVec3::ZERO) else { return err("Cannot compute extrude direction") };
         let end = bound_depth(ev, &def, &end_bound, "endDepth")?;
@@ -198,6 +199,43 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::Undefined)
 }
 
+/// A united sheet's faces sewn into shells and coplanar neighbours merged:
+/// the fuse leaves loose faces, which the same-domain unify does not join
+/// (std Tab: the tab and its wall become one 850 mm² face, live
+/// dom/fs-smprobe3-8.txt).
+fn merge_sheet_faces(ev: &mut EvalCtx, bi: usize) -> FResult<()> {
+    let body = ev.ctx.bodies[bi].clone();
+    if body.kind != BodyKind::Surface {
+        return Ok(());
+    }
+    let faces = body.shape.faces();
+    if faces.len() < 2 {
+        return Ok(());
+    }
+    let Ok(sewn) = k::sew(&faces, 1e-7, false) else { return Ok(()) };
+    let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
+    let keys: Vec<_> = faces.iter().map(key).collect();
+    let names: Option<Vec<Name>> = sewn
+        .shape
+        .faces()
+        .iter()
+        .map(|f| {
+            let kf = key(f)?;
+            let i = keys.iter().position(|k| k.is_some_and(|k| k.0.distance(kf.0) < 1e-9 && (k.1 - kf.1).abs() < 1e-9))?;
+            body.faces.get(i).cloned()
+        })
+        .collect();
+    let Some(names) = names else { return Ok(()) };
+    let unified = k::unify_same_domain(&sewn.shape)?;
+    if unified.shape.count(ShapeType::Face) >= sewn.shape.count(ShapeType::Face) {
+        return Ok(());
+    }
+    let before = crate::regen::eval::names_for(&sewn.shape, names);
+    let merged = ev.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, unified.shape, merged);
+    Ok(())
+}
+
 /// Sheets sewn along their shared edges (each connected set one shell);
 /// faces keep their names.
 fn sew_sheets(sheets: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {
@@ -241,8 +279,16 @@ fn op_revolve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let refs = evaluate_refs(i, &cx, def.get("entities"))?;
     let Some((origin, axis)) = line_of(def.get("axis")) else { return Err(i.error("opRevolve: axis should be a Line")) };
-    let fwd = angle_of(def.get("angleForward")).unwrap_or(std::f64::consts::TAU);
-    let back = angle_of(def.get("angleBack")).unwrap_or(0.0);
+    // std revolve.fs passes blind bounds as `endBoundAngle` and
+    // `startBoundAngle`, the start's position in [0, 2π) (symmetric: 2π - a/2).
+    let (fwd, back) = match angle_of(def.get("endBoundAngle")) {
+        Some(end) if angle_of(def.get("angleForward")).is_none() => {
+            let start = angle_of(def.get("startBoundAngle")).unwrap_or(0.0).rem_euclid(std::f64::consts::TAU);
+            (end, if start > 0.0 { std::f64::consts::TAU - start } else { 0.0 })
+        }
+        _ => (angle_of(def.get("angleForward")).unwrap_or(std::f64::consts::TAU), angle_of(def.get("angleBack")).unwrap_or(0.0)),
+    };
+    cx.state.lock().dependencies.insert(id.clone(), refs.clone());
     run_op(i, &cx, &id, "REVOLVE_FAILED", |ev| {
         let tau = std::f64::consts::TAU;
         let norm = |x: f64| if x >= tau - 1e-12 { tau } else { x.rem_euclid(tau) };
@@ -305,12 +351,17 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 ev.ctx.bodies.retain(|b| !remove.contains(&b.id));
                 let first = index(ev, &all[0]).unwrap_or(first);
                 ev.boolean_into(&[first], others, k::BooleanOp::Fuse)?;
+                if let Some(bi) = index(ev, &all[0]) {
+                    merge_sheet_faces(ev, bi)?;
+                }
                 Ok(Some(all))
             }
-            "INTERSECTION" if targets.is_empty() => {
-                // Tools only: their common volume, kept in the first tool.
+            "INTERSECTION" => {
+                // Tools only: their common volume, kept in the first tool
+                // (live dom/fs-stdref.txt: a box target and one sphere tool
+                // give BOOLEAN_BAD_INPUT, as the feature's status too).
                 if tools.len() < 2 {
-                    return err("Need at least two parts or surfaces for a Boolean operation.");
+                    return Err(super::code_error("BOOLEAN_BAD_INPUT"));
                 }
                 let first = index(ev, &tools[0]).ok_or_else(|| fe("missing body"))?;
                 let others: Vec<NamedShape> = tools[1..].iter().filter_map(|id| index(ev, id)).map(|i| body_named(ev, i)).collect();
@@ -794,10 +845,12 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let targets = evaluate_refs(i, &cx, def.get("targets"))?;
     let tool_refs = evaluate_refs(i, &cx, def.get("tool"))?;
     let keep_tools = def_bool(&def, "keepTools", false);
-    let split_targets = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
+    let (split_targets, plane) = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
         let mut tools: Vec<Shape> = Vec::new();
+        let mut plane = None;
         for r in &tool_refs {
             if let Some(p) = matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_)).then(|| ev.resolve_plane(r)).flatten() {
+                plane.get_or_insert((p.origin, p.normal));
                 tools.push(k::make_plane_face(&kernel_plane(&p), -1e3, 1e3, -1e3, 1e3)?);
             }
         }
@@ -819,15 +872,17 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let ids: Vec<BodyId> = tool_bodies.iter().filter_map(|b| ev.ctx.bodies.get(*b).map(|x| x.id.clone())).collect();
             ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
         }
-        Ok(target_ids)
+        Ok((target_ids, plane))
     })?;
     // Split pieces are "created by" the split and by the original's creator
     // (std query.fs, qCreatedBy).
     let mut st = cx.state.lock();
     let pieces: Vec<BodyId> = st.ctx.bodies.iter().map(|b| b.id.clone()).filter(|b| !split_targets.contains(b) && st.body_creator(b).as_deref() == Some(&id[..])).collect();
-    for piece in pieces {
-        st.record_merge(&piece, &split_targets, &id);
+    for piece in &pieces {
+        st.record_merge(piece, &split_targets, &id);
     }
+    let all = split_targets.iter().chain(&pieces).cloned().collect();
+    st.splits.insert(id.clone(), (all, plane));
     Ok(Value::Undefined)
 }
 
@@ -836,7 +891,8 @@ fn op_draft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let faces = evaluate_refs(i, &cx, def.get("draftFaces"))?;
     let neutral = evaluate_refs(i, &cx, def.get("neutralPlane"))?;
     let angle = def_angle(i, &def, "angle")?;
-    let pull = vec3_of(def.get("pullDirection"));
+    // std passes `pullVec` (extrude's draft flips it for the second side).
+    let pull = vec3_of(def.get("pullVec")).or_else(|| vec3_of(def.get("pullDirection")));
     run_op(i, &cx, &id, "DRAFT_FAILED", |ev| {
         let Some(np) = neutral.first().and_then(|r| ev.resolve_plane(r)) else { return err("Could not resolve the neutral plane.") };
         let dir = pull.unwrap_or(np.normal).normalize_or_zero();
@@ -970,7 +1026,8 @@ fn op_split_edges(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let plane = plane_of(def.get("splittingSurface"));
     let params: Vec<Vec<f64>> = def.get("parameters").as_array().map(|a| a.iter().map(|p| p.as_array().map(|x| x.iter().filter_map(|v| v.as_number()).collect()).unwrap_or_default()).collect()).unwrap_or_default();
     let arc = def_bool(&def, "arcLengthParameterization", true);
-    run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+    let originals = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+        let mut originals = Vec::new();
         let mut tools: Vec<Shape> = Vec::new();
         if let Some(p) = &plane {
             tools.push(k::make_plane_face(&kernel_plane(p), -1e3, 1e3, -1e3, 1e3)?);
@@ -982,6 +1039,7 @@ fn op_split_edges(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let body = &ev.ctx.bodies[*bi];
             let edge = body.shape.sub_shape(ShapeType::Edge, *ei)?;
             let info = edge.edge_info()?;
+            originals.push((body.id.clone(), edge.clone()));
             for t in params.get(k_).into_iter().flatten() {
                 let u = super::evaluate::edge_param(&edge, &info, *t, arc);
                 per_body.entry(*bi).or_default().push(k::make_vertex(edge.point_at(u)?)?);
@@ -1000,8 +1058,10 @@ fn op_split_edges(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let faces = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
             ev.replace_body(bi, res.shape, faces);
         }
-        Ok(())
+        Ok(originals)
     })?;
+    // `qSplitBy(id, EDGE)`: the pieces of these edges (std partial flange).
+    cx.state.lock().split_edges.insert(id.clone(), originals);
     Ok(Value::Undefined)
 }
 

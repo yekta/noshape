@@ -110,7 +110,7 @@ pub struct Thumbnailer {
 impl Thumbnailer {
     pub fn new(doc: Entity<DocModel>, gpu: Gpu, cx: &mut Context<Self>) -> Self {
         let sub = cx.subscribe(&doc, |this: &mut Self, _, ev: &DocEvent, cx| match ev {
-            DocEvent::TabChanged(_) | DocEvent::TabsChanged | DocEvent::Reloaded => this.schedule(cx),
+            DocEvent::TabChanged(_) | DocEvent::TabsChanged | DocEvent::Reloaded | DocEvent::UnitsChanged { .. } => this.schedule(cx),
             DocEvent::HistoryChanged | DocEvent::Error(_) | DocEvent::Info(_) => {}
         });
         // Finish a pending thumbnail when the window goes away.

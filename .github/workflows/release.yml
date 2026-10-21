@@ -39,6 +39,8 @@ jobs:
           v="${GITHUB_REF_NAME#v}"
           [[ "$GITHUB_REF_TYPE" == tag ]] || v="0.0.0-${GITHUB_SHA::7}"
           echo "VERSION=$v" >> "$GITHUB_ENV"
+          # The app shows it (crates/app main.rs `VERSION`).
+          echo "NOSHAPE_VERSION=$v" >> "$GITHUB_ENV"
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'

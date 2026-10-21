@@ -3,6 +3,7 @@
 
 use super::PartStudioView;
 use crate::os_menu::{OsMenu, OsMenuItem};
+use crate::os_ui::OsDropupExt as _;
 use crate::scene_builder::{PickKind, PickTarget};
 use crate::theme::{p, with_alpha};
 use crate::ui::{TipExt as _, TipSide};
@@ -499,7 +500,7 @@ impl PartStudioView {
         let spec = MetaSpec {
             category: "Onshape Part",
             material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
-            computed_mass: computed.map(|m| format!("{m:.4} kg")),
+            computed_mass: computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
             bom_options: None,
             values: MetaValues {
                 name,
@@ -673,7 +674,7 @@ impl PartStudioView {
             }
         }
         // The Measure panel closes.
-        self.show_mass = false;
+        self.set_show_mass(false, cx);
         self.ui.measure_pinned = false;
         self.selection.clear();
         self.open_dialog(feature, index, true, window, cx);
@@ -724,7 +725,7 @@ impl PartStudioView {
             let (num, unit) = text.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((text, String::new()));
             h_flex()
                 .gap(px(2.))
-                .child(div().font_family("monospace").text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(num))
+                .child(crate::ui::measure_value(num).text_color(pal.text))
                 .child(div().child(unit))
         };
         let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
@@ -740,7 +741,7 @@ impl PartStudioView {
                         Measurement::Area(x) => self.measure_fmt(Quantity::new(x, Dim { length: 2, angle: 0 }), cx),
                         Measurement::Volume(x) => self.measure_fmt(Quantity::new(x, Dim { length: 3, angle: 0 }), cx),
                         Measurement::Angle(x) => self.measure_fmt(Quantity::new(x, Dim::ANGLE), cx),
-                        Measurement::Percent(x) => format!("{x:.2} %"),
+                        Measurement::Percent(x) => format!("{} %", noshape_units::to_fixed(x, 2)),
                         Measurement::Distance { distance, .. } => l(distance),
                         Measurement::Point(_) => String::new(),
                     };
@@ -780,46 +781,46 @@ impl PartStudioView {
             .child(
                 div().id("eval-measure-tip").child(btn("eval-measure", "measure", measure_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.ui.measure_pinned = !this.ui.measure_pinned;
-                    this.show_mass = false;
+                    this.set_show_mass(false, cx);
                     cx.notify();
                 }))).tip("Show measure details ([)", TipSide::Above),
             )
             // Onshape's "Show analysis tools" menu (Help: Analysis tools), in its order.
-            .child(div().id("eval-analysis-tip").child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some(), cx).dropdown_menu(move |m, _, _| {
-                let (v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
-                let v11 = view.clone();
-                let v12 = view.clone();
-                let v13 = view.clone();
-                m.item(PopupMenuItem::new("Curve/surface analysis…").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx))))
-                    .item(PopupMenuItem::new("Deviation analysis…").on_click(move |_, w, cx| v5.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Deviation, w, cx))))
-                    .item(PopupMenuItem::new("Connection analysis…").on_click(move |_, w, cx| v6.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Connection, w, cx))))
-                    .item(PopupMenuItem::new("Dihedral analysis…").on_click(move |_, w, cx| v2.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Dihedral, w, cx))))
-                    .item(PopupMenuItem::new("Interference detection…").on_click(move |_, w, cx| v13.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Interference, w, cx))))
-                    .item(PopupMenuItem::new("Zebra stripes…").on_click(move |_, w, cx| v7.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Zebra, w, cx))))
-                    .item(PopupMenuItem::new("Reflection analysis…").on_click(move |_, w, cx| v8.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Reflection, w, cx))))
-                    .item(PopupMenuItem::new("Curvature color map").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
-                    .item(PopupMenuItem::new("Draft analysis…").on_click(move |_, w, cx| v4.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Draft, w, cx))))
-                    // Thickness analysis: once on, the menu edits or turns it off.
-                    .when(!thickness_on, |m| m.item(PopupMenuItem::new("Thickness analysis…").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Thickness, w, cx)))))
-                    .when(thickness_on, |m| {
-                        m.item(PopupMenuItem::new("Edit thickness analysis").on_click(move |_, w, cx| v11.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Thickness, w, cx))))
-                            .item(PopupMenuItem::new("Turn thickness analysis off").on_click(move |_, _, cx| v10.update(cx, |this, cx| this.thickness_off(cx))))
-                    })
-                    .item(PopupMenuItem::new("Flatten surfaces…").on_click(move |_, w, cx| v12.update(cx, |this, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Flatten, w, cx))))
+            // Live (dom/menu-analysis-tools.txt): a 157 px context-menu list of
+            // 22 px rows above the button. Thickness analysis is only offered
+            // on paid plans (Help View__thickness_analysis: "Only available
+            // for", in this menu; the free account's capture has 10 items).
+            .child(div().id("eval-analysis-tip").child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some(), cx).os_dropup_menu("eval-analysis-menu", move |m, _, _| {
+                use super::analysis_tools::ToolKind as K;
+                let tool = |label: &'static str, kind: K| {
+                    let v = view.clone();
+                    crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_analysis_tool(kind, w, cx)))
+                };
+                let v = view.clone();
+                let (v9, v10, v11) = (view.clone(), view.clone(), view.clone());
+                let m = m.min_width(157.)
+                    .item(tool("Curve/surface analysis…", K::CurveSurface))
+                    .item(tool("Deviation analysis…", K::Deviation))
+                    .item(tool("Connection analysis…", K::Connection))
+                    .item(tool("Dihedral analysis…", K::Dihedral))
+                    .item(tool("Interference detection…", K::Interference))
+                    .item(tool("Zebra stripes…", K::Zebra))
+                    .item(tool("Reflection analysis…", K::Reflection))
+                    .item(crate::os_menu::OsMenuItem::new("Curvature color map").on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
+                    .item(tool("Draft analysis…", K::Draft));
+                // Once on, the menu edits or turns it off (Help).
+                let m = if thickness_on {
+                    m.item(crate::os_menu::OsMenuItem::new("Edit thickness analysis").on_click(move |_, w, cx| v11.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
+                        .item(crate::os_menu::OsMenuItem::new("Turn thickness analysis off").on_click(move |_, _, cx| v10.update(cx, |this, cx| this.thickness_off(cx))))
+                } else {
+                    m.item(crate::os_menu::OsMenuItem::new("Thickness analysis…").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
+                };
+                m.item(tool("Flatten surfaces…", K::Flatten))
             })).tip("Show analysis tools", TipSide::Above))
             .child(
                 div().id("eval-mass-tip").child(btn("eval-mass", "mass-properties", mass_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.show_mass = !this.show_mass;
                     this.ui.measure_pinned = false;
-                    // Onshape: a yellow warning under the toolbar when a part
-                    // has no material (live part-studio/80).
-                    if this.show_mass {
-                        let props = this.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
-                        if this.display.bodies.iter().any(|b| props.get(&b.id).and_then(|p| p.density).is_none()) {
-                            this.message = Some((noshape_model::display::FeatureStatus::Warning, "One or more parts do not have a material defined.".into()));
-                        }
-                    }
-                    cx.notify();
+                    this.set_show_mass(!this.show_mass, cx);
                 }))).tip("Display mass and section properties", TipSide::Above),
             )
             .into_any_element()
@@ -880,11 +881,11 @@ impl PartStudioView {
                 let f = units.si_factor(Dim::LENGTH).powi(2);
                 let sym = units.length.symbol();
                 let i = mp.inertia;
-                let v = |x: f64| format!("{:.4}", x / f);
+                let v = |x: f64| noshape_units::to_fixed(x / f, 4);
                 mass_view = Some(MassView {
                     volume: self.fmt(Quantity::new(mp.volume, len3), cx),
                     area: self.fmt(Quantity::new(mp.surface_area, len2), cx),
-                    mass: mp.mass.map(|m| format!("{m:.4} kg")),
+                    mass: mp.mass.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
                     // Without a material Onshape leaves the center of mass empty.
                     center: if mp.mass.is_some() { [l(c.x), l(c.y), l(c.z)] } else { Default::default() },
                     inertia_unit: format!("{sym}² kg"),
@@ -926,7 +927,7 @@ impl PartStudioView {
                     Measurement::Area(x) => f(Quantity::new(x, Dim { length: 2, angle: 0 })),
                     Measurement::Volume(x) => f(Quantity::new(x, Dim { length: 3, angle: 0 })),
                     Measurement::Angle(x) => f(Quantity::new(x, Dim::ANGLE)),
-                    Measurement::Percent(x) => format!("{x:.2} %"),
+                    Measurement::Percent(x) => format!("{} %", noshape_units::to_fixed(x, 2)),
                     // Live: "Point: 0.000 in 0.197 in 0.787 in".
                     Measurement::Point(p) => format!("{} {} {}", l(p.x), l(p.y), l(p.z)),
                     Measurement::Distance { distance, .. } => l(distance),
@@ -962,7 +963,7 @@ impl PartStudioView {
                 .hover(|d| d.bg(pal.panel_hover))
                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.show_mass = false;
+                    this.set_show_mass(false, cx);
                     this.ui.measure_pinned = false;
                     this.selection.clear();
                     this.refresh_scene(false, cx);
@@ -982,7 +983,9 @@ impl PartStudioView {
                 .border_1()
                 .border_color(if active { pal.accent } else { pal.border })
                 .when(active, |d| d.bg(pal.row_hover))
-                .child(div().px(px(6.)).when(empty, |d| d.py(px(5.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(gpui_kit::rgb(0x555555)).child(label.to_string()))
+                // Live (dom/dialog-mass-properties.txt): 26 px empty, 42 with one
+                // chip (16 px label strip + 24 px chip rows) with the border.
+                .child(div().px(px(6.)).flex().items_center().when(empty, |d| d.h(px(24.)).text_size(px(12.))).when(!empty, |d| d.h(px(16.)).pt(px(2.)).text_size(px(10.))).text_color(gpui_kit::rgb(0x555555)).child(label.to_string()))
                 .children(items.into_iter().map(|t| h_flex().h(px(24.)).px(px(6.)).text_size(px(13.33)).text_color(if invalid { pal.text_invalid } else { gpui_kit::rgb(0x555555) }).child(div().flex_1().truncate().child(t)).child(div().text_color(pal.text_muted).child("×"))))
         };
         // Label and right-aligned read-only value on an underline (12 px `#666` label).
@@ -1022,28 +1025,33 @@ impl PartStudioView {
             };
             // Read-only Override (live: a gray `#999` filled box).
             let disabled_check = |id: &'static str| h_flex().id(id).h(px(27.)).pl(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(pal.text_muted).child(div().size(px(12.)).rounded(px(3.)).bg(gpui_kit::rgb(0x999999))).child("Override");
-            let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(5.)).gap(px(1.)).text_size(px(12.)).text_color(gpui_kit::rgb(c)).child(l).child(glyph);
+            // Live (part-studio/121): the letter in #999, a coloured arrow glyph.
+            let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(6.)).text_size(px(15.)).text_color(gpui_kit::rgb(0x999999)).child(l).child(crate::ui::glyph(glyph, 14., gpui_kit::rgb(c)));
             let mut body = v_flex().w_full().child(h_flex().w_full().mb(px(2.)).child(tab("mass-tab-part", "Part", false, cx)).child(tab("mass-tab-face", "Face", true, cx)));
             match mass_view {
                 Some(m) => {
                     body = body
-                        .child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, m.parts.clone(), true, m.mass.is_none()))
-                        .child(field("Mate connector for reference frame", m.reference.clone().into_iter().collect(), false, false))
-                        .child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", false))
-                        .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(crate::ui::os_checkbox("mass-override", "Override", false)).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(m.mass.clone().unwrap_or_default())))
-                        .child(value_row("Volume".into(), m.volume.clone()))
-                        .child(value_row("Surface area".into(), m.area.clone()))
-                        .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(disabled_check("com-override")))
-                        .children([("X", 0xcd0000u32, "↘"), ("Y", 0x009400, "↗"), ("Z", 0x0000d0, "↑")].into_iter().zip(m.center.iter()).map(|((l, c, g), v)| {
-                            h_flex().h(px(26.)).child(axis(l, c, g)).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v.clone()))
+                        // Live: 5 px between the tabs and the two fields, 8 under them.
+                        .child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, m.parts.clone(), true, m.mass.is_none()).mt(px(5.)).mb(px(0.)))
+                        .child(field("Mate connector for reference frame", m.reference.clone().into_iter().collect(), false, false).mt(px(5.)).mb(px(0.)))
+                        // Live (dom/dialog-mass-properties.txt): the rows from here are
+                        // 27 / 26 / 29 px tall, 2 px apart (3 px above X): X, Y and Z
+                        // sit 31 px apart, the inertia rows 28.
+                        .child(div().mt(px(9.)).h(px(27.)).child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", false)))
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(crate::ui::os_checkbox("mass-override", "Override", false)).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(m.mass.clone().unwrap_or_default())))
+                        .child(value_row("Volume".into(), m.volume.clone()).mt(px(2.)).h(px(26.)))
+                        .child(value_row("Surface area".into(), m.area.clone()).mt(px(2.)).h(px(26.)))
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(disabled_check("com-override")))
+                        .children([("X", 0xbd3039u32, "axis-arrow-x"), ("Y", 0x009400, "axis-arrow-y"), ("Z", 0x1651b0, "axis-arrow-z")].into_iter().zip(m.center.iter()).enumerate().map(|(k, ((l, c, g), v))| {
+                            h_flex().mt(px(if k == 0 { 3. } else { 2. })).h(px(29.)).child(axis(l, c, g)).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v.clone()))
                         }))
-                        .child(h_flex().h(px(28.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({})", m.inertia_unit))).child(disabled_check("moi-override")));
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({})", m.inertia_unit))).child(disabled_check("moi-override")));
                     let names = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
                     for (r, row_names) in names.iter().enumerate() {
-                        let mut row = h_flex().h(px(26.)).px(px(5.)).gap(px(8.));
+                        let mut row = h_flex().mt(px(2.)).h(px(26.)).px(px(5.)).gap(px(8.));
                         for (c, n) in row_names.iter().enumerate() {
                             let v = m.inertia.as_ref().map(|i| i[r][c].clone()).unwrap_or_default();
-                            row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v)));
+                            row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v)));
                         }
                         body = body.child(row);
                     }
@@ -1059,6 +1067,7 @@ impl PartStudioView {
                 v_flex()
                     .id("mass-dialog")
                     .occlude()
+                    .child(crate::ui::panel_probe("ps-mass"))
                     .absolute()
                     .top(px(3.))
                     .left(px(0.))
@@ -1077,7 +1086,9 @@ impl PartStudioView {
                             .child(div().size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xcce9cc)).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx)))
                             .child(close("mass-close", cx)),
                     )
-                    .child(body.px(px(0.)).pb(px(4.)))
+                    // Live: 46 px from the last inertia row to the dialog's
+                    // bottom (the list's 2 px, a 22 px band, the 22 px ? row).
+                    .child(body.px(px(0.)).pb(px(23.)))
                     .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(help())),
                 self.ui.panels.get("ps-mass"),
             )];
@@ -1161,6 +1172,8 @@ impl PartStudioView {
         let length_menu = unit_menu("measure-length-unit", length_name, length_items, cx);
         let angle_menu = unit_menu("measure-angle-unit", angle_name, angle_items, cx);
         let view_rows = cx.entity();
+        // The distance row an X/Y/Z row belongs to (picks its glyph).
+        let mut parent = String::new();
         vec![
             v_flex()
                 .id("measure-panel")
@@ -1179,18 +1192,24 @@ impl PartStudioView {
                 .child(select_row("Angle unit:", SharedString::default(), Some(angle_menu)))
                 .child(crate::ui::os_checkbox("measure-ref", "Reference coordinate system", false))
                 .children(mrows.into_iter().enumerate().map(|(n, (k, v, axis, var))| {
+                    if axis.is_none() {
+                        parent = k.to_string();
+                    }
                     // "12.5 in" -> monospace number on an underline and the unit.
                     let (num, unit) = v.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((v, String::new()));
                     let value = h_flex()
                         .gap(px(2.))
-                        .child(div().font_family("monospace").text_size(px(12.)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(num))
+                        .child(crate::ui::measure_value(num))
                         .child(div().text_size(px(12.)).child(unit));
                     let row = h_flex().min_h(px(26.)).px(px(4.)).gap(px(4.)).text_size(px(12.)).text_color(pal.text);
                     let row = match axis {
-                        // Live: "X↘", "Y↗", "Z↑" in the axis colours, indented.
+                        // Live (part-studio/495): the letter, then a glyph in the axis
+                        // colour: arrows under a distance, converging arrows under
+                        // Min dist, an I-beam under Max dist.
                         Some(i) => {
-                            let (name, color, glyph) = [("X", 0xd52b1e, "↘"), ("Y", 0x2e9b2e, "↗"), ("Z", 0x2a5bd7, "↑")][i];
-                            row.pl(px(20.)).child(h_flex().child(div().text_color(pal.text_muted).child(name)).child(div().text_color(gpui_kit::rgb(color)).child(glyph))).child(value)
+                            let (name, color, arrow) = [("X", 0xbd3039, "axis-arrow-x"), ("Y", 0x009400, "axis-arrow-y"), ("Z", 0x1651b0, "axis-arrow-z")][i];
+                            let glyph = if parent.starts_with("Min") { crate::ui::glyph("measure-min-dist", 16., gpui_kit::rgb(color)) } else if parent.starts_with("Max") { crate::ui::glyph("measure-max-dist", 16., gpui_kit::rgb(color)) } else { crate::ui::glyph(arrow, 14., gpui_kit::rgb(color)) };
+                            row.pl(px(20.)).child(h_flex().child(div().text_size(px(15.)).text_color(gpui_kit::rgb(0x999999)).child(name)).child(glyph)).child(value)
                         }
                         None => row.child(div().child(format!("{k}:"))).child(value),
                     };
@@ -1275,7 +1294,7 @@ fn measure_filter_type(label: &str) -> Option<&'static str> {
 fn measure_fmt_in(q: Quantity, units: &noshape_units::UnitPrefs) -> String {
     let angle = q.dim == Dim::ANGLE;
     let decimals = usize::from(if angle { units.angle_precision } else { units.length_precision });
-    let mut num = format!("{:.*}", decimals, q.value / units.si_factor(q.dim));
+    let mut num = noshape_units::to_fixed(q.value / units.si_factor(q.dim), decimals as u8);
     if num.starts_with('-') && num[1..].chars().all(|c| c == '0' || c == '.') {
         num.remove(0);
     }
@@ -1292,3 +1311,33 @@ fn measure_fmt_in(q: Quantity, units: &noshape_units::UnitPrefs) -> String {
     format!("{num} {unit}")
 }
 
+/// The notice for parts without a material (live F19, behaviours.md "Mass
+/// properties without material + the material-not-defined notice").
+const NO_MATERIAL: &str = "One or more parts do not have a material defined.";
+
+/// Live shows the notice once per page load: once per app session here.
+static NO_MATERIAL_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+impl PartStudioView {
+    /// Open or close the Mass properties panel. A part without a material
+    /// has a red chip and blank mass, centre of mass and inertia; Onshape's
+    /// yellow top-centre toast "One or more parts do not have a material
+    /// defined." follows ≈3.6 s after the panel opens (when its computation
+    /// is done) and hides itself ≈4.6 s later, once per session, whether or
+    /// not the panel is still open (qa4 F19).
+    pub(super) fn set_show_mass(&mut self, show: bool, cx: &mut Context<Self>) {
+        self.show_mass = show;
+        if show && !NO_MATERIAL_SHOWN.load(std::sync::atomic::Ordering::Relaxed) {
+            let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
+            if self.display.bodies.iter().any(|b| props.get(&b.id).and_then(|p| p.density).is_none()) {
+                NO_MATERIAL_SHOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+                cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(std::time::Duration::from_millis(3600)).await;
+                    let _ = this.update(cx, |this, cx| this.flash_for(noshape_model::display::FeatureStatus::Warning, NO_MATERIAL.into(), std::time::Duration::from_millis(4600), cx));
+                })
+                .detach();
+            }
+        }
+        cx.notify();
+    }
+}

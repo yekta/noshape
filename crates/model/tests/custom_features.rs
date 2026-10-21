@@ -374,8 +374,8 @@ export const ringOfPegs = defineFeature(function(context is Context, id is Id, d
         const parts = qAllModifiableSolidBodies();
         if (size(evaluateQuery(context, parts)) != 1)
             throw "union failed";
-        const box = evBox3d(context, { "topology" : parts });
-        if (abs(box.maxCorner[2] - box.minCorner[2] - 13 * millimeter) > 1e-9 * meter)
+        const bx = evBox3d(context, { "topology" : parts });
+        if (abs(bx.maxCorner[2] - bx.minCorner[2] - 13 * millimeter) > 1e-9 * meter)
             throw "height";
         if (evVolume(context, { "entities" : parts }) <= 0 * meter ^ 3)
             throw "volume";
@@ -995,9 +995,9 @@ export const partSizes = defineTable(function(context is Context, definition is 
         var rows = [];
         for (var body in evaluateQuery(context, qAllModifiableSolidBodies()))
         {
-            const box = evBox3d(context, { "topology" : body });
+            const bx = evBox3d(context, { "topology" : body });
             const faces = size(evaluateQuery(context, qOwnedByBody(body, EntityType.FACE)));
-            rows = append(rows, tableRow({ "name" : templateString({ "template" : "Body #n", "n" : faces }), "faces" : faces, "x" : box.maxCorner[0] - box.minCorner[0] }, body));
+            rows = append(rows, tableRow({ "name" : templateString({ "template" : "Body #n", "n" : faces }), "faces" : faces, "x" : bx.maxCorner[0] - bx.minCorner[0] }, body));
         }
         rows = append(rows, tableRow({ "name" : tableCellError("?", "no body"), "faces" : tableCellWithInfo(0, "an info"), "x" : valueWithUnitsAndPrecision(25.4 * millimeter, 4) }));
         rows = append(rows, tableRow({ "name" : "area", "x" : 2 * inch * inch, "faces" : 1 / 3 }));
@@ -1268,10 +1268,88 @@ fn std_sheet_metal_matches_onshape() {
     let mut reg = Regenerator::new();
     let _ = fx.regen(&mut reg, &ps);
     let out = custom::run::output_of(fid).expect("output");
-    let notices: Vec<String> = out.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message)).collect();
+    // With each notice's call trace (innermost last).
+    let notices: Vec<String> = out.notices.iter().map(|n| format!("{} {}: {}{}", n.module, n.pos, n.message, n.trace.iter().map(|f| format!("\n    {} {} {}", f.function, f.module, f.pos)).collect::<String>())).collect();
     println!("{}\n{}", out.output, notices.join("\n"));
     // Face areas (mm², largest first) of the live parts (sm2 = sm1 + std Flange).
-    let want = ["sm1 parts 1 areas [ 800 , 800 , 80 , 80 , 40 , 40 ]", "sm3 parts 1 areas [ 420 , 420 , 270 , 270 , 82.4668 , 47.1239 , 42 , 42 , 27 , 27 , 22.5 , 22.5 , 6.4795 , 6.4795 ]", "sm2 parts 1 areas [ 760 , 760 , 280 , 280 , 188.4956 , 80 , 80 , 62.8319 , 38 , 38 , 14 , 14 , 6.2832 , 6.2832 ]", "parts 3", "sm3 definitions { EDGE : 8 , FACE : 4 , NONE : 0 , VERTEX : 2 }"];
+    let want = [
+        "sm1 parts 1 areas [ 800 , 800 , 80 , 80 , 40 , 40 ]", "sm3 parts 1 areas [ 420 , 420 , 270 , 270 , 82.4668 , 47.1239 , 42 , 42 , 27 , 27 , 22.5 , 22.5 , 6.4795 , 6.4795 ]", "sm2 parts 1 areas [ 760 , 760 , 280 , 280 , 188.4956 , 80 , 80 , 62.8319 , 38 , 38 , 14 , 14 , 6.2832 , 6.2832 ]", "sm2 flat ok", "parts 3", "sm3 definitions { EDGE : 8 , FACE : 4 , NONE : 0 , VERTEX : 2 }",
+        // sm4: CONVERT tray, rips with the minimal clearance and simple corners (live dom/fs-smprobe3-4.txt).
+        "sm4 parts 1 areas [ 1064 , 1064 , 759.24 , 759.24 , 759.24 , 759.24 , 569.24 , 569.24 , 569.24 , 569.24 , 119.3805 , 119.3805 , 87.9646 , 87.9646 , 59.6903 , 59.6903 , 43.9823 , 43.9823 , 39.96 , 39.96 , 29.96 , 29.96 , 19 , 19 , 19 , 19 , 19 , 19 , 19 , 19 , 2.3562 , 2.3562 , 2.3562 , 2.3562 , 2.3562 , 2.3562 , 2.3562 , 2.3562 , 0.98 , 0.98 , 0.98 , 0.98 , 0.98 , 0.98 , 0.98 , 0.98 ]",
+        "sm4 joints { BEND : 4 , RIP : 4 }",
+        // sm7: closed Hem, a rolled 180° bend in the definition (live dom/fs-smprobe3-7.txt).
+        "sm7 parts 1 areas [ 719.6 , 719.6 , 419.6 , 419.6 , 252.584 , 80 , 80 , 35.98 , 35.98 , 20.98 , 20.98 , 6.346 , 6.346 , 1.2566 ]",
+        // sm8: a Tab merged into the plate (live dom/fs-smprobe3-8.txt).
+        "sm8 parts 1 areas [ 850 , 850 , 80 , 40 , 40 , 30 , 30 , 20 , 10 , 10 ]",
+    ];
     let lines: Vec<&str> = out.output.lines().collect();
     assert!(want.iter().all(|w| lines.contains(w)), "{}\n{}", out.output, notices.join("\n"));
+}
+
+/// Exact numbers of common std features (tests/fs/std_reference.fs, the same
+/// file run live: dom/fs-stdref.txt). Each line: volume, area, face/edge/vertex
+/// counts, box. Not yet equal, from the kernel: filletCorner (volume 1e-6 mm³
+/// off), sweepLineArc (box 1610.0001 vs 1610), loftSquareCircle (live splits
+/// the circle into four arcs: 6/12/8 faces/edges/vertices, ours 7/15/10).
+#[test]
+fn std_features_match_onshape() {
+    let fx = Fixture::new(include_str!("fs/std_reference.fs"));
+    let compiled = custom::compile(fx.fs, include_str!("fs/std_reference.fs"));
+    assert!(!compiled.has_errors(), "{:?}", compiled.diagnostics);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("stdReference"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let _ = fx.regen(&mut reg, &ps);
+    let out = custom::run::output_of(fid).expect("output");
+    let notices: Vec<String> = out.notices.iter().map(|n| format!("{} {}: {}{}", n.module, n.pos, n.message, n.trace.iter().map(|f| format!("\n    {} {} {}", f.function, f.module, f.pos)).collect::<String>())).collect();
+    println!("{}\n{}", out.output, notices.join("\n"));
+    assert!(out.output.ends_with("done\n"), "{}\n{}", out.output, notices.join("\n"));
+    let want = [
+        "extrudeBlind v 3000 a 1300 f/e/v 6/12/8 box (0, 0, 0) (20, 10, 15)",
+        "extrudeSymmetricDraft v 856.115481 a 514.921821 f/e/v 4/3/0 box (94.562557, -5.437443, -5) (105.437443, 5.437443, 5)",
+        "extrudeSecondDirection v 1400 a 760 f/e/v 6/12/8 box (200, 0, -4) (210, 10, 10)",
+        "revolve90 v 471.238898 a 386.305284 f/e/v 6/12/8 box (300, 0, 0) (310, 10, 8)",
+        "filletEdge v 7961.371669 a 2370.384947 f/e/v 7/15/10 box (400, 0, 0) (420, 20, 20)",
+        "chamferEqual v 7960 a 2372.568542 f/e/v 7/15/10 box (600, 0, 0) (620, 20, 20)",
+        "chamferTwoOffsets v 7920 a 2361.442719 f/e/v 7/15/10 box (700, 0, 0) (720, 20, 20)",
+        "chamferOffsetAngle v 7948.038476 a 2369.444864 f/e/v 7/15/10 box (800, 0, 0) (820, 20, 20)",
+        "shellTop v 2653.5 a 3658 f/e/v 11/24/16 box (900, 0, 0) (920, 20, 20)",
+        "draftTwoFaces v 8699.909308 a 2543.037732 f/e/v 6/12/8 box (998.250227, 0, 0) (1021.749773, 20, 20)",
+        "booleanSubtract v 6994.690351 a 2802.12386 f/e/v 7/14/8 box (1100, 0, 0) (1120, 20, 20)",
+        "booleanIntersect threw { message : BOOLEAN_BAD_INPUT }",
+        "linearPatternPart v 24000 a 7200 f/e/v 18/36/24 box (1300, 0, 0) (1320, 70, 20)",
+        "circularPatternPart v 251.327412 a 351.858377 f/e/v 12/8/0 box (1408, 8, 0) (1432, 32, 5)",
+        "mirrorPart v 16000 a 4800 f/e/v 12/24/16 box (1500, 0, 0) (1540, 20, 20)",
+        "thickenFace v 800 a 960 f/e/v 6/12/8 box (1800, 0, 20) (1820, 20, 22)",
+        "moveFaceOffset v 9200 a 2640 f/e/v 6/12/8 box (1900, 0, 0) (1923, 20, 20)",
+        "splitByPlane v 8000 a 3243.274043 f/e/v 12/24/16 box (2000, 0, 0) (2020, 20, 20)",
+        "deleteFilletFace v 8000 a 2400 f/e/v 6/12/8 box (2100, 0, 0) (2120, 20, 20)",
+    ];
+    let lines: Vec<&str> = out.output.lines().collect();
+    let missing: Vec<&&str> = want.iter().filter(|w| !lines.contains(w)).collect();
+    assert!(missing.is_empty(), "missing {:?}\n{}", missing, out.output);
+}
+
+/// Regeneration time of std features run from FeatureScript (sheet metal
+/// set, tests/fs/sm_harness.fs; extrude, fillet & co., tests/fs/std_reference.fs).
+/// Run in release: `cargo test --release --test custom_features -- --ignored --nocapture bench_std_regen`.
+#[test]
+#[ignore = "benchmark"]
+fn bench_std_regen() {
+    for (name, source, ty) in [("sheet metal", include_str!("fs/sm_harness.fs"), "smHarness"), ("std reference", include_str!("fs/std_reference.fs"), "stdReference")] {
+        let fx = Fixture::new(source);
+        let mut ps = PartStudio::new();
+        let f = ps.new_feature(&fx.ty(ty), &fx.units).unwrap();
+        ps.features.push(f);
+        // The first run compiles std and the studio.
+        let _ = fx.regen(&mut Regenerator::new(), &ps);
+        let runs = 5;
+        let start = std::time::Instant::now();
+        for _ in 0..runs {
+            let _ = fx.regen(&mut Regenerator::new(), &ps);
+        }
+        println!("{name}: {:.1} ms per regen", start.elapsed().as_secs_f64() * 1000.0 / runs as f64);
+    }
 }

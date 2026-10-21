@@ -358,3 +358,165 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   callers were inside moved bodies). Files to freeze: drawing_view.rs, drawing_tools.rs, drawing_extra.rs, drawing_more.rs,
   drawing_sketch_dim.rs, drawing_smart.rs, drawing_jog.rs. Deferred to slice 4 (they read dialogs): pending_view
   (insert/aux/section/detail options), start_drag (note grips, extra_start_drag, inspection_at), the overlays.
+- 2026-10-21 (api): v0.4.3 freeze + GO. During slice-3 prep I broke the app for a while: I added fields
+  (drawing/selection/sources) to the shared `SheetPick` before updating the app's `pk()`. Fixed (pk() line in drawing_view.rs).
+  RULE FOR SUCCESSORS: a shared-type change and its app call site land in the same step; `cargo check -p noshape` before saying done.
+  Freeze verification: workspace clippy (--locked --workspace --all-targets -D warnings) clean; `cargo test -p noshape-ops` green 3x
+  (lib 9, coverage 3, e2e 9). Integration's `sketch_fillet_chamfer_offset` failure (e2e.rs:336) was a snapshot taken before
+  the offset `toward` fix; the test is deterministic (gaps 13 vs 17 mm, 3 vs 7 mm). A transient wgpu "Validation Error" in
+  `sketch_extrude_fillet_pattern_export_render` came from another agent's in-progress section-cap render work, gone since.
+  My files shipped in v0.4.3 (5d5808e) unchanged.
+  SLICE 3: app sources re-extracted after GO = identical to the scene copies. apply.py dry run OK (pk() step removed: done).
+  Freeze asked of the lead (asb + drw2): drawing_tools.rs, drawing_extra.rs, drawing_more.rs, drawing_sketch_dim.rs,
+  drawing_smart.rs, drawing_jog.rs (drawing_view.rs not needed). After applying: drop now-unused leftovers the compiler
+  names (likely drawing_smart.rs free fns same/view_of + local vector helpers, drawing_jog.rs CentermarkArms/seg_dist,
+  imports), then check + clippy -p noshape + quick in-app drawing check (smart dimension, grips/drags, previews).
+- 2026-10-21 (api): SLICE 3 APPLIED (lead froze asb/drw2 files; no new hunks since the dry run; backups /root/api-scratch/pre-slice3/).
+  apply.py's forwarding generator mis-parsed signatures whose return type holds a tuple (5 calls got type names as
+  arguments) -> fixed by hand at once (smart_dimension, angular_from_lines, jog/centermark/attach_grip_at). LESSON: compile
+  a generated patch before reporting; parse params by paren matching. Then removed what the move left unused: drawing_smart.rs
+  is now 3 forwarding methods (typed_linear_click, smart_takes, smart_click); drawing_jog.rs seg_dist/CentermarkArms;
+  drawing_extra.rs next_target_set/ordinate_normal/section_position; unused imports. tool_values() fills datum_label with
+  DrawingEditor::datum_dialog_label() (keeps drawing_datum.rs untouched; same fallback). App clippy: nothing from these files
+  (only fs's WIP fs_profile.rs:17/76 -> reported to the lead).
+  In-app check (Xvfb :114, --demo-drawing-full, fresh build): smart Dimension on a circle -> hover highlight + center snap,
+  live "Ø28" preview following the pointer, placed; dragging the placed diameter swings its leader (dragged_annotation);
+  smart Dimension on a straight edge -> "100" length preview. Told the lead "slice 3 done".
+  NEXT: slice 4 (dialog option structs: Aux, Section, Detail, Insert, Callout, TableTool, Weld, GDT, Hatch, Datum ->
+  plain *Opts in scene, the app's dialogs keep their Entity<InputState> fields around them) together with what it unblocks:
+  pending_view, start_drag (note grips, extra_start_drag, inspection_at), the overlays. Survey + send the freeze list first.
+- 2026-10-21 (api): SLICE 4 started. Design: no dialog struct changes; plain option structs in scene built from the dialogs on
+  demand (like SheetPick/ToolValues). `drawing_tools/opts.rs`: ViewOptions {insert: InsertOpts, aux, section, detail} +
+  SheetPick::pending_view(&ViewOptions) (extracted verbatim from the app), insert_sketch_frame, apply_section_options,
+  apply_detail_options; HatchOpts (parse_auto, scale/angle_value, regions); table_size + general_table (TABLE_COL_W);
+  GDT_TYPES + GdtRowValues + gdt_values. Weld/Callout need nothing: the API builds WeldSpec / (String, CalloutStyle) directly.
+  MISTAKE: I registered opts.rs before it compiled (derive(Default) on InsertOpts: Simplification/AsmPosition have no Default)
+  -> clippy broke for everyone; fixed (manual Default = the app's InsertViewState values) and UNREGISTERED it until verified.
+  RULE: a new module is registered only by a command that compiles it and unregisters it on failure
+  (/root/api-scratch/slice4/mod.clean.rs is the clean mod.rs). Also: never `pkill -f` a cargo pattern (it matched my own shell).
+  opts.rs verified (scene clippy clean) and registered 10-21 ~06:00. App patch ready: /root/api-scratch/slice4/apply.py (dry run OK;
+  params parsed by paren matching): drawing_tools.rs pending_view -> pk().pending_view(&view_options()) + new view_options();
+  drop apply_section_options (drawing_section.rs 114-129), apply_detail_options (drawing_detail.rs 64-76),
+  insert_sketch_frame (drawing_insert.rs 559-563); drawing_hatch.rs parse_auto removed, HatchDlg::opts(cx) + scale/angle/regions
+  forward (61-95); drawing_table_tool.rs COL_W removed, table_tool_size/table (49-66) forward; drawing_gdt.rs GDT_TYPES ->
+  `pub use` of scene's, gdt_values (183-217) builds GdtRowValues. At registration the app check failed only in asb/drw2 WIP
+  (new drawing_label.rs missing imports; drawing_aux.rs:451 Fill2.pick not yet in the model) -> not from opts.
+- 2026-10-21 (api): slice-4 freeze list re-verified and sent to the lead (the earlier message didn't reach them): drawing_tools.rs
+  (pending_view 377-486, view_options() at 364), drawing_section.rs 114-129, drawing_detail.rs 64-76, drawing_insert.rs 559-563,
+  drawing_hatch.rs 56-95, drawing_table_tool.rs 16-17 + 49-66, drawing_gdt.rs 22-37 + 183-217. On "frozen": re-extract/compare,
+  apply /root/api-scratch/slice4/apply.py, app clippy, in-app check, then continue WITHOUT ending the turn: drawing ops on
+  SheetPick/smart -> second real-client MCP test (assembly + drawing) -> analysis ops -> AGENT_API.md.
+- 2026-10-21 (api): SLICE 4 APPLIED (frozen by the lead; asb now 4ade3a23). pending_view in the app had gained AuxRef.letter_at,
+  which asb had already mirrored into opts.rs -> nothing lost. Backups /root/api-scratch/pre-slice4/. Leftovers removed:
+  drawing_detail.rs DrawingView import, drawing_table_tool.rs TableKind import, drawing_extra.rs extra_pending_view.
+  App clippy: nothing from my files (foreign: ui.rs:1100 recursion limit in #[test], assembly_standard.rs:18, drawing_aux.rs:443,
+  compare_mode.rs:737, part_studio/sketch.rs:2461, smoke.rs:155).
+  Also in this freeze: drawing_tools.rs Dimension click dispatch -> scene SheetPick::dimension_click / dimension_takes_more
+  (smart.rs), applied through /root/api-scratch/guard.sh (keeps an edit only if the build finishes with no diagnostics in
+  the edited files; reverts otherwise; retries when other agents' WIP breaks the build).
+  DRAWING OPS written, NOT registered yet: crates/ops/src/drawing.rs (SheetModel::build = sources (+versions) + exact view
+  geometry + assemble_sheet; pick() -> SheetPick at API_ZOOM 20 px/mm with hover; sheet_info (release log meta "releases");
+  finish_edit = the editor's commit prep; new_drawing = Create Drawing's background job; template_rows COPY of the app's
+  drawing_create.rs (switch the app to it at its next freeze)); crates/ops/src/ops/drawing.rs (drawing_templates, _create,
+  _get (views with edges in sheet mm, annotations, tables), _insert_view, _projected_view, _dimension (kinds smart,
+  point_to_point, point_to_line, line_to_line, radius, diameter, angle, angle_3_point, arc_length)). Next: drawing export
+  extraction (drawing_export.rs write_export_with background job -> ops) needs its own freeze.
+- 2026-10-21 (api): dimension click dispatch shared (scene SheetPick::dimension_click / dimension_takes_more; app
+  drawing_tools.rs calls them; now-unused app forwarders removed: drawing_smart.rs is docs-only, DrawingEditor::arc_pick gone)
+  -> verified by guard.sh ("CLEAN in my files"). guard.sh now waits for the cargo lock (flock .cargo-lock) before editing.
+  DON'T kill a running guard: `cargo clippy`'s `cargo check` grandchild survives as an orphan (I had to kill 2 by PID).
+  Analysis: crates/ops/src/analysis_tools.rs = the Part Studio analysis tools' computation (from part_studio/
+  analysis_tools.rs recompute_analysis_tool, minus GPU/colors; AnalysisKind/Options/Result, CombKind) -> app switch at
+  psb's next freeze; ops/src/ops/analysis.rs (analysis_curvature/deviation/connection/dihedral/interference).
+  Second MCP test prepared: /root/api-scratch/mcp2/{config.json,prompt.txt} (hinge: block + pin, revolute, drawing with
+  views + Ø and 80 dims). Drawing e2e test draft: /root/api-scratch/e2e_drawing.rs (append once ops are registered).
+  AGENT_API.md: drawing + analysis sections added.
+- 2026-10-21 ~09:20 (api): REGISTERED + VERIFIED (guard CLEAN): drawing ops (templates, create, get, insert_view,
+  projected_view, dimension, export), analysis ops (curvature, deviation, connection, dihedral, interference), modules
+  ops::drawing, ops::drawing_export (= the app's Export Drawing writers: DrawingFormat, ExportSettings, consts,
+  parse_sheet_range, export_sheets_of, zipped, export_files, bundle; raster = caller rasterizes the SVG), ops::analysis_tools;
+  scene png::decode_rgb. Coverage planned 72. Tests drawing_views_and_dimensions + analysis_tools green.
+  drawing_get: a closed circle has a seam vertex at both ends (not `ends[0] == None`) -> classified by coinciding ends.
+  NOTE for pick.rs snap_at (and the app before): Shift+Q mid/quadrant snaps treat a circle as closed only when
+  `ends[0].is_none()` -> full circles with a seam vertex get a "midpoint" snap; check vs live with the snap capture.
+  App switch patches READY (need freezes): /root/api-scratch/patch_drawing_export.py (drawing_export.rs, asb/drw2),
+  /root/api-scratch/patch_analysis_tools.py (part_studio/analysis_tools.rs, psb). Also pending: drawing_create.rs
+  template_rows -> ops::drawing::template_rows; workspace.rs create_drawing_tab job -> ops::drawing::new_drawing;
+  document_set_units op -> Session::set_units (someone added it 10-21 ~09:00: pins unitless sketch dimensions).
+  Slice-4 in-app check still pending: the app didn't build (foreign WIP part_studio/sketch.rs:2473 E0500).
+- 2026-10-21 ~10:00 (api): SECOND REAL-CLIENT MCP TEST PASSED (/root/api-scratch/mcp2/run1.jsonl): claude built block + pin,
+  revolute mate (1 DOF left), ISO A3 drawing (front/top/side/iso), Ø10 + 80 dims: 28 calls, 1 error, 72 s. Gaps it found ->
+  fixed: no part rename (new ops part_rename / part_set_properties; shared studio::rename_part / set_part_properties /
+  PartPropertyValues = the app's parts-list Rename and Properties save -> app switch at psb's next freeze: behaviors.rs
+  start_part_rename, menus.rs Properties on_save); drawing_get now gives base views' orientation, projected views' side
+  (projection) and each annotation's shown text. document_set_units already switched to Session::set_units by its owner.
+  Slice 4: applied + verified (compile, my files lint-clean); told the lead "slice 4 done" with the in-app check still
+  pending (app build broken by foreign WIP part_studio/sketch.rs:2473 E0500). Do the in-app check when the app builds:
+  Insert / Projected / Section / Detail / Auxiliary previews, hatch, table, GTol.
+- 2026-10-21 ~10:15 (api): SLICE 4 IN-APP CHECK DONE (Xvfb :114, --demo-drawing-full, build 09:43 with slice 4): Projected view
+  preview follows the pointer; Section view (vertical) placed "SECTION C-C" with cut hatching; Detail view preview "DETAIL D"
+  scale 2:1 from the dialog follows the pointer; Geometric tolerance 0.2 / datum A placed (⌖|0.2|A); Table 3 rows x 4 cols +
+  header placed (cell editor opens). Not exercised: hatch, auxiliary view.
+- 2026-10-21 ~12:30 (api): THIRD REAL-CLIENT MCP TEST (/root/api-scratch/mcp3: prompt.txt, run1.jsonl, plate.pdf) PASSED:
+  claude built Plate 100x60x10 with 2 Ø8 holes + Bolt Ø8x30 (renamed parts), assembly Plate + 2 Bolts with cylindrical
+  mates (4 DOF), ISO A3 drawing (front/top/side/iso) with Ø8, 100, 60, 60, PDF export: 42 calls, 1 error, 105 s.
+  COMPARED IN THE APP (copy of clamp.noshape, build 09:43): parts list Plate/Bolt; app Mass properties Plate 58994.69 mm³
+  = API; assembly Plate fixed, mates "Bolt 1 in hole -X"/"+X", dragging a bolt only slides it along its hole axis; the
+  drawing tab shows the same views/dims as the API's PDF (the PDF hides "----" placeholders, as the app's export does).
+  SAME PLATE BUILT BY HAND IN THE APP UI (Part Studio 2: sketch, center rectangle, Dimension 100/60, circles, Ø8 x2, 30/30,
+  Extrude 10): 58994.69 mm³, 15501.593 mm² = the MCP-built Plate exactly.
+  Gaps from the run, fixed (guard): query part lookup now matches the parts list's (renamed) names; drawing_get emits other
+  drawn edges (iso ellipses, splines) as sampled `curve`s. Example session for AGENT_API.md: /root/api-scratch/example/
+  session.py (runs through `noshape-cli call`, writes session.md). New: ops/src/reference.rs (generated reference, not yet
+  registered).
+- 2026-10-21 ~13:30 (api): GAP FILLING (item 2, worst first). Written, registering one at a time through
+  /root/api-scratch/guard2.sh (= guard.sh that also removes new files on revert) via /root/api-scratch/chain.sh
+  (log /tmp/api/chain.log):
+  1. import_files (ops/src/import.rs + ops/import.rs; the Import dialog: CAD/mesh files, combine, CAD Imports folder) +
+     generated reference (ops/src/reference.rs, `noshape-cli docs`, coverage test agent_api_reference_is_current).
+  2. materials/appearances (ops/src/appearance.rs, material_data.rs, ops/appearance.rs: material_list, part_set_material,
+     part_set_appearance, part_remove_appearance, part_appearances).
+  3. assembly_pattern (linear / circular / mirror / part pattern / replicate, insert + edit; shared
+     ops::assembly::commit_pattern, pattern_description, pattern_defaults, seed_mate), assembly_dissolve_pattern,
+     assembly_bom (+csv), assembly_bom_settings (one edit per change, the panel's texts), assembly_interference (shared
+     ops::assembly::interference_rows); assembly_delete also deletes patterns/groups/connectors; assembly_list lists
+     patterns. delete_mate_description now names patterns and connectors (app bug: deleting a pattern logged "Delete : ").
+  App switches to queue (need freezes): assembly_panels.rs accept_pattern/seed_mate/new_pattern_session defaults ->
+  ops::assembly; assembly_interference.rs interference_rows -> ops::assembly::interference_rows.
+  Rule (self): never edit registered ops files directly while a guard is pending; stage in /root/api-scratch and apply
+  through the guard (I briefly had unverified assembly ops in the tree at ~13:20 and backed them out).
+  ~14:00: stage 2 written (ops/src/ops/assembly/features.rs: assembly_group, assembly_relation, assembly_mate_connector,
+  assembly_replace, assembly_rename, assembly_set_feature_state; shared ops::assembly commit_group, check_relation,
+  commit_relation, relation_default_ratio, commit_connector, toggle_mate_suppressed, replace_instance, replace_message;
+  mates take {"connector": "Mate connector 1"}), chain2.sh. Stage 3 written (ops/src/ops/assembly/positions.rs:
+  assembly_named_position (add/update/apply/duplicate/delete/rename/move/set_value), assembly_named_position_drivers,
+  assembly_exploded_view, assembly_explode_step; shared driven_dofs, capture/apply_named_position...), chain3.sh
+  (also re-runs fix_names_curves, which the guard had reverted for a clippy is_multiple_of lint in my code).
+  App switch ready for psb's freeze: /root/api-scratch/patch_part_rename_props.py (behaviors.rs start_part_rename,
+  menus.rs Properties on_save -> ops::studio), dry-run OK on the current tree (keeps psb's hunks).
+  Drawing gaps (section/detail/aux views, notes, centerlines, tables, GD&T) need slices 5-6 (the click state machine
+  in drawing_tools.rs tool_click and the dialogs' click handlers) -> next, scene side first.
+- 2026-10-21 ~15:00 (api): LANDED (guard-clean): import_files (+ generated reference / `noshape-cli docs` / coverage
+  test agent_api_reference_is_current) and materials/appearances; ops tests green (e2e 13). FOUND + FIXING: the CLI
+  panicked at start ("command name `part` is duplicated": appearance ops put `material` between `part` groups and the
+  CLI/reference only merged adjacent groups) -> registry::groups() (each group once) + cli test command_tree_is_valid
+  (clap debug_assert) via guard (fix_groups.py). Assembly stage 1/2 failed once (field descriptions built with
+  format! must be &'static) -> fixed, re-queued in chain4.sh with stage 3 and the names/curves fix.
+  Lead (I6, qa5: no import op in CLI/MCP): import_files covers STEP/IGES/Parasolid/ACIS/JT/Rhino/PVZ/BREP,
+  native parts + assembly zips, STL/OBJ/3MF/glTF/GLB; qa5 most likely hit the CLI start-up panic. New tests queued
+  (chain5.sh): import_every_format (export each part format, import back; B-rep keeps the volume),
+  import_options_and_errors (combine, keep_files=false, mesh units, non-native zip / unknown type / missing file).
+  Native assembly success path can't be tested here: no SolidWorks/Inventor/NX sample files exist on the server.
+  Also queued: featurestudio_get / featurestudio_edit / featurestudio_commit (+ e2e custom feature used in a Part Studio).
+  Drawing click state machine (slices 5-6): drw2 is changing the Section tool in drawing_tools.rs now -> needs lead timing.
+- 2026-10-21 ~15:40 (api): CLI START-UP FIX LANDED (registry::groups(), cli test command_tree_is_valid); CLI works again.
+  Import probe (export each format, import back, /root/api-scratch/import_probe/probe.py): Parasolid, ACIS, STEP,
+  IGES, JT exact volume; PVZ / glTF / GLB / 3MF within 1e-4; STL needs matching units (unitless). BUG FOUND: OBJ export
+  wrote no faces (ops/src/export.rs merged the parts' meshes without their face ranges; write_obj_mesh writes per face)
+  -> affects the app's Export dialog too; fix + "file without extension gets the format's" queued (fix_export.py,
+  chain7.sh after chain6.sh). Rhino export needs openNURBS (not in this build). Assembly stage 1 now applies as a
+  patch over another agent's ops/src/assembly.rs hunks (mate_preview_moving, hidden new mates).
+  ~16:00: stage 1 failed again: the model's PatternKind gained `centered` (Linear/Circular) and Replicate
+  `scope`/`scope_refs` (assembly owner, in progress). assembly_pattern now takes `centered`, `scope`, `scope_refs`;
+  the default scope moved to shared ops::assembly::default_replicate_scope (app's replicate_scope to switch to it).
+  Re-queued as chain8.sh after chain7.sh (export/OBJ fix).

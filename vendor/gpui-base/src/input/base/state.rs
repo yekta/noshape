@@ -473,6 +473,25 @@ pub struct InputBaseState<M: InputModeKind> {
     pub(crate) text_align: TextAlign,
     pub(super) masked: bool,
     pub(super) clean_on_escape: bool,
+    /// NOSHAPE PATCH (Onshape's fields, docs/handoff input-behaviour spec):
+    /// a single-line input selects all its text when it gains the focus
+    /// (a click into it, Tab, or `focus()`); a click while focused places
+    /// the caret.
+    pub(super) select_on_focus: bool,
+    /// NOSHAPE PATCH: Esc after an edit restores the text the input had when
+    /// it got the focus (or at the last Enter / `set_value`) and drops the
+    /// focus; Esc without an edit passes on (a dialog cancels).
+    pub(super) revert_on_escape: bool,
+    /// NOSHAPE PATCH: the text Esc goes back to.
+    pub(super) escape_baseline: Option<SharedString>,
+    /// NOSHAPE PATCH: `focus()` was called and the focus hasn't landed yet;
+    /// `.1`: the caller set a selection meanwhile (it keeps it).
+    pub(super) focus_requested: std::cell::Cell<(bool, bool)>,
+    /// NOSHAPE PATCH: the focus handle of the frame drawn around the text
+    /// (gpui-component's `Input`); Esc moves the focus past it.
+    frame_focus: Option<WeakFocusHandle>,
+    /// NOSHAPE PATCH: the text when `focus()` was called (see `focus`).
+    focus_text: std::cell::RefCell<Option<SharedString>>,
     pub(super) submit_on_enter: bool,
     pub(super) show_whitespaces: bool,
     /// This flag tells the renderer to prefer the end of the current visual line.
@@ -769,6 +788,13 @@ impl<M: InputModeKind> InputBaseState<M> {
     }
 
     /// Whether the input or its associated selection popup has focus.
+    /// NOSHAPE PATCH: the frame around the text (see `frame_focus`).
+    pub fn set_frame_focus(&mut self, frame: &FocusHandle) {
+        if self.frame_focus.as_ref().and_then(WeakFocusHandle::upgrade).as_ref() != Some(frame) {
+            self.frame_focus = Some(frame.downgrade());
+        }
+    }
+
     pub fn has_selection_focus(&self, window: &Window, cx: &App) -> bool {
         self.focus_handle.is_focused(window)
             || self
@@ -861,6 +887,12 @@ impl<M: InputModeKind> InputBaseState<M> {
             text_align: TextAlign::Left,
             masked: false,
             clean_on_escape: false,
+            select_on_focus: true,
+            revert_on_escape: true,
+            escape_baseline: None,
+            focus_requested: std::cell::Cell::new((false, false)),
+            frame_focus: None,
+            focus_text: std::cell::RefCell::new(None),
             submit_on_enter: false,
             show_whitespaces: false,
             loading: false,
@@ -1100,6 +1132,11 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.reset_scroll_to_start();
 
         self.undo_manager.clear();
+        // NOSHAPE PATCH: a value set while editing (a commit's formatted
+        // text) is what Esc returns to.
+        if self.escape_baseline.is_some() {
+            self.escape_baseline = Some(self.text.to_string().into());
+        }
         cx.notify();
     }
 
@@ -1287,6 +1324,32 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.clean_on_escape = clean;
     }
 
+    /// NOSHAPE PATCH: whether gaining the focus selects all the text
+    /// (default true; Onshape's search boxes don't).
+    pub fn select_on_focus(mut self, on: bool) -> Self {
+        self.select_on_focus = on;
+        self
+    }
+
+    /// NOSHAPE PATCH: whether Esc after an edit reverts it (default true;
+    /// Onshape's search boxes keep their text).
+    pub fn revert_on_escape(mut self, on: bool) -> Self {
+        self.revert_on_escape = on;
+        self
+    }
+
+    /// NOSHAPE PATCH: [`Self::select_on_focus`] and [`Self::revert_on_escape`]
+    /// on an existing input (a search box: neither).
+    pub fn set_search_box(&mut self, on: bool) {
+        self.select_on_focus = !on;
+        self.revert_on_escape = !on;
+    }
+
+    /// The Onshape focus rules apply to one-line text fields only.
+    fn onshape_field(&self) -> bool {
+        !self.is_multi_line() && !self.is_code_editor()
+    }
+
     /// Set true to treat `Enter` as a submit action in multi-line mode,
     /// while `Shift+Enter` inserts a newline.
     ///
@@ -1448,6 +1511,12 @@ impl<M: InputModeKind> InputBaseState<M> {
 
     /// Focus the input field.
     pub fn focus(&self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.focus_handle.is_focused(window) {
+            self.focus_requested.set((true, false));
+            // NOSHAPE PATCH: Esc's baseline is the text before this focus
+            // (a caller may put text in before the focus lands: type-to-edit).
+            self.focus_text.replace(Some(self.text.to_string().into()));
+        }
         self.focus_handle.focus(window, cx);
         self.blink_cursor.update(cx, |cursor, cx| {
             cursor.start(cx);
@@ -2199,6 +2268,9 @@ impl<M: InputModeKind> InputBaseState<M> {
             cx.propagate();
         }
 
+        if self.escape_baseline.is_some() {
+            self.escape_baseline = Some(self.text.to_string().into());
+        }
         cx.emit(InputEvent::PressEnter {
             secondary: action.secondary,
             shift: action.shift,
@@ -2248,7 +2320,33 @@ impl<M: InputModeKind> InputBaseState<M> {
             return self.clean(window, cx);
         }
 
+        if self.revert_escape(window, cx) {
+            return;
+        }
+
         cx.propagate();
+    }
+
+    /// NOSHAPE PATCH: Onshape's Esc in an edited field: back to the text it
+    /// had when focused (its last committed value), the focus leaves the
+    /// field, its dialog stays open. False (nothing done) when nothing was
+    /// edited, so Esc passes on (cancels the dialog). Views that bind Esc to
+    /// an action of their own call this first.
+    pub fn revert_escape(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(base) = self.escape_baseline.clone() else { return false };
+        if !self.revert_on_escape || !self.onshape_field() || self.text.to_string() == base.as_ref() {
+            return false;
+        }
+        self.replace_text(base, window, cx);
+        self.set_selection(0, 0);
+        self.scroll_to(0, None, cx);
+        // The text sits in the kit's input frame, which has a focus handle of
+        // its own: the focus goes past it to the view.
+        match self.frame_focus.as_ref().and_then(WeakFocusHandle::upgrade) {
+            Some(frame) => window.focus_parent_of(&frame, cx),
+            None => window.focus_parent_of(&self.focus_handle, cx),
+        }
+        true
     }
 
     /// Show the right-click context menu as a native OS menu.
@@ -3205,6 +3303,12 @@ impl<M: InputModeKind> InputBaseState<M> {
     /// Non-empty ranges expand to character boundaries. Empty ranges remain empty and are
     /// clipped to the preceding character boundary.
     pub fn set_selected_range(&mut self, range: Range<usize>, cx: &mut Context<Self>) {
+        // NOSHAPE PATCH: a selection set right after `focus()` (type-to-edit
+        // puts the caret after the typed key) wins over select-on-focus.
+        let (requested, _) = self.focus_requested.get();
+        if requested {
+            self.focus_requested.set((true, true));
+        }
         let range = self.normalize_token_range(range);
         let end_bias = if range.start == range.end {
             Bias::Left
@@ -3605,10 +3709,22 @@ impl<M: InputModeKind> InputBaseState<M> {
             && window.is_window_active()
     }
 
-    fn on_focus(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+    fn on_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.blink_cursor.update(cx, |cursor, cx| {
             cursor.start(cx);
         });
+        if self.onshape_field() {
+            // NOSHAPE PATCH: Esc's baseline, and the whole text selected
+            // (the click that focused the field doesn't place the caret or
+            // drag a selection).
+            let requested_text = self.focus_text.take();
+            self.escape_baseline = Some(requested_text.unwrap_or_else(|| self.text.to_string().into()));
+            let (_, caller_selected) = self.focus_requested.replace((false, false));
+            if self.select_on_focus && !caller_selected {
+                self.selecting = false;
+                self.select_all(window, cx);
+            }
+        }
         cx.emit(InputEvent::Focus);
     }
 
@@ -3619,6 +3735,7 @@ impl<M: InputModeKind> InputBaseState<M> {
 
         M::hide_context_menu(self, cx);
         self.undo_manager.break_transaction_coalescing();
+        self.focus_text.take();
 
         // NOTE: Do not cancel select, when blur.
         // Because maybe user want to copy the selected text by AppMenuBar (will take focus handle).
@@ -3631,6 +3748,14 @@ impl<M: InputModeKind> InputBaseState<M> {
             cursor.stop(cx);
         });
         self.clamp_number_value(window, cx);
+        if self.onshape_field() {
+            // NOSHAPE PATCH: unfocused, a field shows the start of its text.
+            self.escape_baseline = None;
+            if self.select_on_focus {
+                self.set_selection(0, 0);
+                self.scroll_to(0, None, cx);
+            }
+        }
         cx.emit(InputEvent::Blur);
         cx.notify();
     }

@@ -16,6 +16,8 @@ pub struct Overlay {
     /// Polylines with their own color and width (px), e.g. table cell
     /// selections.
     pub tinted: Vec<(Vec<[f64; 2]>, [u8; 4], f32)>,
+    /// Points with their own color (e.g. a pending crop profile's points).
+    pub dots: Vec<([f64; 2], [u8; 4])>,
 }
 
 /// Shape of a snap point marker.
@@ -42,7 +44,7 @@ impl SnapMark {
 
 impl Overlay {
     pub fn is_empty(&self) -> bool {
-        self.lines.is_empty() && self.points.is_empty() && self.infer.is_empty() && self.marks.is_empty() && self.tinted.is_empty()
+        self.lines.is_empty() && self.points.is_empty() && self.infer.is_empty() && self.marks.is_empty() && self.tinted.is_empty() && self.dots.is_empty()
     }
     pub fn circle(&mut self, c: [f64; 2], r: f64, dashed: bool) {
         let pts = (0..=72).map(|i| {
@@ -96,6 +98,9 @@ impl Overlay {
         let mut p = PointData::default();
         for q in &self.points {
             p.points.push(PointSprite { position: [q[0] as f32, q[1] as f32, 0.5], color: [255, 140, 0, 255], pick_id: 0, size: 9.0, style: 2, _pad: 0 });
+        }
+        for (q, color) in &self.dots {
+            p.points.push(PointSprite { position: [q[0] as f32, q[1] as f32, 0.5], color: *color, pick_id: 0, size: 9.0, style: 2, _pad: 0 });
         }
         (l, p)
     }

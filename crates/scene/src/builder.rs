@@ -9,7 +9,7 @@
 
 use crate::palette as theme;
 use glam::DVec3;
-use noshape_model::display::{BodyKind, SketchEntityState, StudioDisplay};
+use noshape_model::display::{BodyKind, SharedMesh, SketchEntityState, StudioDisplay};
 use noshape_model::reference::{FeatureId, Reference};
 use noshape_render::renderer::Uploader;
 use noshape_render::{Drawable, ImageData, ImageHandle, Instance, LineData, LineSegment, LinesHandle, MeshData, MeshHandle, PointData, PointSprite, PointsHandle, Scene, state};
@@ -237,12 +237,19 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
     for b in display.bodies.iter().filter(|b| !b.hidden) {
-        let key = Arc::as_ptr(&b.mesh) as usize;
+        let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
+        let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
+        // Pattern copies sharing one mesh (`SharedMesh`): uploaded once and
+        // drawn placed by their transforms, so the renderer draws all the
+        // copies with one instanced call.
+        let shared = SharedMesh::of(display, b).filter(|_| colors.is_none() && replaced.is_none() && !noshape_render::renderer::instancing_disabled());
+        let gmesh = shared.map_or(&b.mesh, |s| &s.mesh);
+        let key = Arc::as_ptr(gmesh) as usize;
         let cached = match cache.bodies.get(&key) {
             Some((_, c)) => c.clone(),
             None => {
-                let c = Arc::new(upload_body(&b.mesh, up));
-                cache.bodies.insert(key, (Arc::downgrade(&b.mesh), c.clone()));
+                let c = Arc::new(upload_body(gmesh, up));
+                cache.bodies.insert(key, (Arc::downgrade(gmesh), c.clone()));
                 c
             }
         };
@@ -273,12 +280,10 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             color[3] = color[3].min(if b.kind == BodyKind::Surface { 0.85 } else { 0.35 });
         }
         if b.kind != BodyKind::Wire {
-            let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
-            let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
             let mesh = match colors {
                 _ if replaced.is_some() => Instance::new(Drawable::Mesh(replaced.cloned().expect("checked"))).pick_base(face_base).per_primitive_color(),
                 Some(c) => {
-                    let ckey = (key, Arc::as_ptr(c) as usize);
+                    let ckey = (Arc::as_ptr(&b.mesh) as usize, Arc::as_ptr(c) as usize);
                     let handle = match cache.colored.get(&ckey) {
                         Some((_, h)) => h.clone(),
                         None => {
@@ -324,9 +329,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             match cache.tangent.get(&key) {
                 Some((_, t)) => t.clone(),
                 None => {
-                    let smooth = b.mesh.smooth_edges();
+                    let smooth = gmesh.smooth_edges();
                     let (mut sharp, mut phantom) = (LineData::default(), LineData::default());
-                    for (ei, pl) in b.mesh.edges.iter().enumerate() {
+                    for (ei, pl) in gmesh.edges.iter().enumerate() {
                         if smooth.get(ei).copied().unwrap_or(false) {
                             phantom.push_polyline(pl, [0, 0, 0, 255], 0, 1.0, LineSegment::DASH_DOT);
                         } else {
@@ -334,7 +339,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                         }
                     }
                     let t = TangentLines { sharp: up.upload_lines(&sharp), phantom: up.upload_lines(&phantom) };
-                    cache.tangent.insert(key, (Arc::downgrade(&b.mesh), t.clone()));
+                    cache.tangent.insert(key, (Arc::downgrade(gmesh), t.clone()));
                     t
                 }
             }
@@ -359,11 +364,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 Some((_, h)) => h.clone(),
                 None => {
                     let mut l = LineData::default();
-                    for pl in &b.mesh.edges {
+                    for pl in &gmesh.edges {
                         l.push_polyline(pl, [90, 90, 90, 140], 0, 1.0, LineSegment::DASHED | LineSegment::ON_TOP);
                     }
                     let h = up.upload_lines(&l);
-                    cache.hidden_edges.insert(key, (Arc::downgrade(&b.mesh), h.clone()));
+                    cache.hidden_edges.insert(key, (Arc::downgrade(gmesh), h.clone()));
                     h
                 }
             };
@@ -373,14 +378,14 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             let lines = match cache.boundary.get(&key) {
                 Some((_, l)) => l.clone(),
                 None => {
-                    let laminar = laminar_edges(&b.mesh);
+                    let laminar = laminar_edges(gmesh);
                     let (mut solid, mut dashed) = (LineData::default(), LineData::default());
-                    for (pl, _) in b.mesh.edges.iter().zip(&laminar).filter(|(_, l)| **l) {
+                    for (pl, _) in gmesh.edges.iter().zip(&laminar).filter(|(_, l)| **l) {
                         solid.push_polyline(pl, [0, 0, 0, 255], 0, 2.0, 0);
                         dashed.push_polyline(pl, [0, 0, 0, 255], 0, 1.5, LineSegment::DASHED | LineSegment::ON_TOP);
                     }
                     let l = (!solid.segments.is_empty()).then(|| (up.upload_lines(&solid), up.upload_lines(&dashed)));
-                    cache.boundary.insert(key, (Arc::downgrade(&b.mesh), l.clone()));
+                    cache.boundary.insert(key, (Arc::downgrade(gmesh), l.clone()));
                     l
                 }
             };
@@ -388,6 +393,12 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let red = theme::lin(theme::viewport::BOUNDARY_EDGE);
                 scene.instances.push(Instance::new(Drawable::Lines(solid)).with_color(red).unpickable().layer(3));
                 scene.instances.push(Instance::new(Drawable::Lines(dashed)).with_color(red).unpickable().layer(3));
+            }
+        }
+        if let Some(s) = shared {
+            let placement = placement_matrix(&s.transform);
+            for i in &mut scene.instances[first_instance..] {
+                i.transform = placement;
             }
         }
         if display_only {
@@ -562,7 +573,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().ignore_clip().layer(12));
     }
 
-    let mut planes = opts.section.iter().map(|(n, d)| noshape_render::ClipPlane { normal: n.as_vec3(), d: *d as f32 });
+    let mut planes = opts.section.iter().map(|(n, d)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32));
     scene.clip = planes.next();
     scene.clip_extra = planes.take(2).collect();
     let static_instances = scene.instances.len();
@@ -592,6 +603,12 @@ fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState,
 }
 
 /// Per-vertex local face id (1-based) from face index ranges.
+/// A rigid 3x4 row-major placement (`SharedMesh::transform`) as a matrix.
+fn placement_matrix(m: &[f64; 12]) -> glam::Mat4 {
+    let c = |i: usize| m[i] as f32;
+    glam::Mat4::from_cols(glam::Vec4::new(c(0), c(4), c(8), 0.0), glam::Vec4::new(c(1), c(5), c(9), 0.0), glam::Vec4::new(c(2), c(6), c(10), 0.0), glam::Vec4::new(c(3), c(7), c(11), 1.0))
+}
+
 fn face_pick_ids(m: &noshape_model::display::MeshBuffers) -> Vec<u32> {
     let mut pick_ids = vec![0u32; m.positions.len()];
     for (fi, &(start, count)) in m.face_ranges.iter().enumerate() {
@@ -639,7 +656,7 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
 /// elements. Returns a new scene sharing all static GPU buffers.
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, up: &Uploader) -> Scene {
     let _t = noshape_render::perf::scope("s.with_highlights");
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone() };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), compare: built.scene.compare };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4])> = Vec::new();
     let mut overlay_lines = LineData::default();

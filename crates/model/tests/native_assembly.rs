@@ -188,3 +188,134 @@ fn solid_edge_assembly_zip() {
     assert!(((hi - lo) * 1e3 - DVec3::new(420.0, 75.0, 280.0)).length() < 0.1, "{:?}", (hi - lo) * 1e3);
     assert!((lo.z * 1e3 + 270.0).abs() < 0.1 && (hi.z * 1e3 - 10.0).abs() < 0.1);
 }
+
+/// An imported assembly's instances: (name, translation in mm).
+fn instances_of(doc: &Document, assembly: noshape_model::document::TabId) -> Vec<(String, DVec3)> {
+    let TabContent::Assembly(a) = &doc.tabs.iter().find(|t| t.id == assembly).unwrap().content else { panic!() };
+    a.instances.iter().map(|i| (i.name.clone(), i.placement.to_dmat4().w_axis.truncate() * 1e3)).collect()
+}
+
+#[test]
+fn inventor_assembly_zips() {
+    use noshape_model::native_assembly::{NativeSystem, NativeTabs, add_native_zip, read_assembly_zip};
+    // MIT-licensed Autodesk sets (iam-sets/LICENSES.md); Onshape's imports
+    // of the same zips: live G42.
+    let dir = std::path::Path::new("/root/kern-native-samples/iam-sets");
+    if !dir.exists() {
+        return;
+    }
+    let units = UnitPrefs::default();
+    let tab = |doc: &Document, id| doc.tabs.iter().find(|t| t.id == id).unwrap().name.clone();
+    // One .iam: any zip name. Assembly "<root>.iam", Part Studio "<zip> parts";
+    // the occurrences in the reverse of the browser's order.
+    let z = read_assembly_zip(&dir.join("dl-boxasm/BoxAssembly.zip")).unwrap();
+    assert_eq!((z.system, z.root_file.as_str(), z.zip.as_str()), (NativeSystem::Inventor, "boxAssy.iam", "BoxAssembly"));
+    let mut doc = Document::new();
+    let NativeTabs::Assembly { studio, assembly } = add_native_zip(&mut doc, &z, true, &units).unwrap() else { panic!() };
+    assert_eq!((tab(&doc, studio), tab(&doc, assembly)), ("BoxAssembly parts".to_string(), "boxAssy.iam".to_string()));
+    let want = [("simpleHandle__Solid1 <1>", DVec3::new(914.4, 304.8, 228.6)), ("simpleHandle__Solid1 <2>", DVec3::new(0.0, 304.8, 228.6)), ("box__Solid1 <1>", DVec3::ZERO)];
+    let got = instances_of(&doc, assembly);
+    assert_eq!(got.len(), want.len());
+    for ((n, t), (wn, wt)) in got.iter().zip(want) {
+        assert!(n == wn && (*t - wt).length() < 1e-6, "{n} {t} vs {wn} {wt}");
+    }
+    // Part Studio: the parts in their first use (teeHandle.ipt unused).
+    let TabContent::PartStudio(ps) = &doc.tabs.iter().find(|t| t.id == studio).unwrap().content else { panic!() };
+    let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let parts: Vec<&str> = r.context.bodies.iter().map(|b| b.name.as_str()).collect();
+    assert_eq!(parts, ["simpleHandle__Solid1", "box__Solid1"]);
+    // Wrench: browser reordered against the records (07:2 becomes <1>).
+    let z = read_assembly_zip(&dir.join("dl-WrenchForm_2023/WrenchForm_2023.zip")).unwrap();
+    let mut doc = Document::new();
+    let NativeTabs::Assembly { assembly, .. } = add_native_zip(&mut doc, &z, true, &units).unwrap() else { panic!() };
+    let want = [
+        ("DS51F1496-08_Forms__Solid1 <1>", [-96.053, -21.466, -7.598]),
+        ("DS51F1496-07_Forms__Solid1 <1>", [-9.475, -31.291, -0.461]),
+        ("DS51F1496-07_Forms__Solid1 <2>", [-89.551, -6.99, -4.273]),
+        ("DS51F1496-06_Forms__Solid1 <1>", [-0.427, -20.382, 2.473]),
+        ("DS51F1496-05_Forms__Solid1 <1>", [0.266, 2.315, -8.794]),
+        ("DS51F1496-04_Forms__Solid1 <1>", [49.89, 8.409, 12.945]),
+        ("DS51F1496-03_Forms__Solid1 <1>", [-49.155, 1.619, 1.475]),
+        ("DS51F1496-02_Forms__Solid1 <1>", [-23.74, 19.087, 7.301]),
+        ("Wrench_Bar_Complete__Solid1 <1>", [-1.266, -0.405, 6.048]),
+    ];
+    let got = instances_of(&doc, assembly);
+    assert_eq!(got.len(), want.len());
+    for ((n, t), (wn, wt)) in got.iter().zip(want) {
+        assert!(n == wn && (*t - DVec3::from(wt)).length() < 2e-3, "{n} {t} vs {wn} {wt:?}");
+    }
+    // A zip with folders, two .iam not named like the zip, no part files:
+    // Onshape's errors.
+    for (zip, err) in [("dl-WrenchForm_2023/WrenchForm_folder.zip", noshape_model::native_assembly::NO_ROOT), ("dl-SimpleBox2asm/SimpleBox2asm.zip", noshape_model::native_assembly::NO_ROOT), ("dl-WrenchForm_2023/WrenchOnly.zip", noshape_model::native_assembly::NO_GEOMETRY)] {
+        assert_eq!(read_assembly_zip(&dir.join(zip)).err().as_deref(), Some(err), "{zip}");
+    }
+    // One occurrence: only a Part Studio named like the zip.
+    let z = read_assembly_zip(&dir.join("dl-SimpleBox2asm/Assembly1.zip")).unwrap();
+    let mut doc = Document::new();
+    let NativeTabs::Studio(studio) = add_native_zip(&mut doc, &z, true, &units).unwrap() else { panic!() };
+    assert_eq!(tab(&doc, studio), "Assembly1");
+}
+
+#[test]
+fn solid_edge_assembly_names_and_order() {
+    use noshape_model::native_assembly::{NativeTabs, add_native_zip, read_assembly_zip};
+    let zip = std::path::Path::new("/root/kern-native-samples/se-zip/SingleHull.zip");
+    if !zip.exists() {
+        return;
+    }
+    // Live G43: Assembly "SingleHull.asm", Part Studio "SingleHull parts",
+    // parts named like their files, the occurrences reversed.
+    let z = read_assembly_zip(zip).unwrap();
+    let units = UnitPrefs::default();
+    let mut doc = Document::new();
+    let NativeTabs::Assembly { studio, assembly } = add_native_zip(&mut doc, &z, true, &units).unwrap() else { panic!() };
+    let tab = |id| doc.tabs.iter().find(|t| t.id == id).unwrap().name.clone();
+    assert_eq!((tab(studio), tab(assembly)), ("SingleHull parts".to_string(), "SingleHull.asm".to_string()));
+    let want = [
+        ("Hull_ModuleHolder_Short.par <1>", [280.0, 5.0, -260.0]),
+        ("Hull_ModuleHolder_Short.par <2>", [140.0, 5.0, -260.0]),
+        ("Hull_ModuleHolder_Long.par <1>", [10.0, 5.0, -130.0]),
+        ("Hull_Top.par <1>", [0.0, 75.0, -260.0]),
+        ("Hull_Left.par <1>", [410.0, 0.0, 10.0]),
+        ("Hull_Left.par <2>", [10.0, 0.0, -270.0]),
+        ("Hull_Top.par <2>", [0.0, 0.0, 0.0]),
+    ];
+    let got = instances_of(&doc, assembly);
+    assert_eq!(got.len(), want.len());
+    for ((n, t), (wn, wt)) in got.iter().zip(want) {
+        assert!(n == wn && (*t - DVec3::from(wt)).length() < 1e-6, "{n} {t} vs {wn} {wt:?}");
+    }
+    let TabContent::PartStudio(ps) = &doc.tabs.iter().find(|t| t.id == studio).unwrap().content else { panic!() };
+    let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let parts: Vec<&str> = r.context.bodies.iter().map(|b| b.name.as_str()).collect();
+    assert_eq!(parts, ["Hull_ModuleHolder_Short.par", "Hull_ModuleHolder_Long.par", "Hull_Top.par", "Hull_Left.par"]);
+}
+
+/// Live G42: the Wrench's 8 parts are solids with Onshape's boxes. Ignored
+/// until the ACIS reader builds `helix_spl_line` surfaces (the thread flanks
+/// of parts 02 and 04 have no stored B-spline data: 02 comes back open) and
+/// Inventor's hidden surface bodies are dropped (03 and 04 carry some).
+#[test]
+#[ignore]
+fn inventor_wrench_parts_are_onshapes_solids() {
+    use noshape_model::native_assembly::{NativeTabs, add_native_zip, read_assembly_zip};
+    let dir = std::path::Path::new("/root/kern-native-samples/iam-sets");
+    if !dir.exists() {
+        return;
+    }
+    let units = UnitPrefs::default();
+    let z = read_assembly_zip(&dir.join("dl-WrenchForm_2023/WrenchForm_2023.zip")).unwrap();
+    let mut doc = Document::new();
+    let NativeTabs::Assembly { studio, .. } = add_native_zip(&mut doc, &z, true, &units).unwrap() else { panic!() };
+    // The parts at their own origins, Onshape's boxes (02 and 04 have helical
+    // threads: ACIS helix intcurves).
+    let TabContent::PartStudio(ps) = &doc.tabs.iter().find(|t| t.id == studio).unwrap().content else { panic!() };
+    let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    assert_eq!(r.context.bodies.len(), 8, "{:?}", r.context.bodies.iter().map(|b| (b.kind, b.name.clone(), b.shape.count(k::ShapeType::Face), b.shape.count(k::ShapeType::Edge))).collect::<Vec<_>>());
+    for (name, lo, hi) in [("DS51F1496-02_Forms__Solid1", [-20.0, -20.0, -9.76], [20.0, 20.0, 9.76]), ("DS51F1496-04_Forms__Solid1", [-135.51, -42.0, -12.75], [39.08, 28.48, 12.75])] {
+        let b = r.context.bodies.iter().find(|b| b.name == name).unwrap();
+        assert!(b.shape.is_valid(), "{name}");
+        let bb = b.shape.bounding_box(true).unwrap();
+        assert!((bb.min * 1e3 - DVec3::from(lo)).length() < 0.02 && (bb.max * 1e3 - DVec3::from(hi)).length() < 0.02, "{name}: {:?} {:?}", bb.min * 1e3, bb.max * 1e3);
+    }
+}

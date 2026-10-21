@@ -36,7 +36,7 @@ mod undo;
 mod tests;
 
 pub use document::{
-    BranchInfo, DEFAULT_BRANCH_NAME, Document, DocumentMeta, MergeOutcome, MicroversionInfo,
+    BranchInfo, DEFAULT_BRANCH_NAME, Document, DocumentMeta, MergeOutcome, MergePick, MicroversionInfo,
     StoreStats, Timestamp, VersionGraph, VersionInfo, local_user_name, os_login, os_user_name, owner_and_last_author, set_default_author,
 };
 pub use error::{Result, StoreError};

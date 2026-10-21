@@ -55,6 +55,8 @@ keywords! {
     Var = "var", While = "while", If = "if", Else = "else", False = "false", Inf = "inf", True = "true",
     Undefined = "undefined", Catch = "catch", Throw = "throw", Try = "try", Switch = "switch",
     Assert = "assert", Case = "case", Default = "default", Do = "do",
+    // Reserved (live: `const box = ...` is "mismatched input 'box' expecting ID").
+    Box = "box",
 }
 
 macro_rules! operators {

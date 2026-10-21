@@ -131,6 +131,11 @@ pub struct SheetGeometry {
     pub layers: Vec<LayerSpan>,
     /// Lines drawn with their own pen (Adjust linestyle).
     pub pens: Vec<PenSpan>,
+    /// What the elements are, for the DXF / DWG layers (`cad_layers`; last
+    /// span wins, untagged ones by style).
+    pub cad: Vec<super::cad_layers::CadSpan>,
+    /// Hatched sections, written as HATCH entities by the DXF / DWG export.
+    pub hatches: Vec<super::cad_layers::HatchRegion>,
 }
 
 /// Chamfer dimension settings (Drawing properties › Dimensions › Chamfer).
@@ -607,7 +612,8 @@ impl SheetGeometry {
         }
         let value_of = |k: &str, v: &str| -> String {
             match k {
-                "Scale" if v.is_empty() => format_scale(sheet.scale),
+                // The sheet scale property ("----" until the first view, live 820).
+                "Scale" if v.is_empty() => expand("{sheet.scale}"),
                 "Size" if v.is_empty() => sheet.size.label().to_string(),
                 _ => expand(v),
             }
@@ -697,7 +703,9 @@ impl SheetGeometry {
         let size_cols = if iso { [0.576, 0.9516] } else { [0.5543, 0.9706] };
         let scale_cols = if iso { [0.620, 0.8346] } else { [0.6033, 0.8258] };
         let k = bh / 38.2;
-        let (lab, val) = (1.25 * k, 2.2 * k);
+        // Text heights (live DXF, drw2 10-20 e): every one a multiple of the
+        // label height L = 0.064 in (ISO) / 0.048 in (ANSI).
+        let lab = if iso { 1.6256 } else { 1.2192 };
         // Frame and grid (live 164: thin lines throughout).
         self.rect(x0, y0, x1, y1, LineStyle::Thin);
         self.line([px(left), y0], [px(left), y1], LineStyle::Thin);
@@ -741,33 +749,35 @@ impl SheetGeometry {
                 u => u,
             };
             let h = lab * tr.unless_h;
-            for (i, line) in wrap_text(&tr.unless.replace("{u}", word), h, left * bw - 1.6 * k).iter().enumerate() {
+            // Live wraps at the full cell width (the text may touch the border).
+            for (i, line) in wrap_text(&tr.unless.replace("{u}", word), h, left * bw).iter().enumerate() {
                 label_h(self, 0.0, top - i as f64 * 0.055, line, h);
             }
         }
         let angular = tr.angular.to_string();
         if iso {
-            self.text([px(0.11), py(0.80)], lab, angular, Anchor::BottomLeft);
+            self.text([px(0.11), py(0.80)], 0.9 * lab, angular, Anchor::BottomLeft);
         } else {
             for (i, t) in [".XX = ±.0-", ".XXX = ±.00-", ".XXXX = ±.000-"].iter().enumerate() {
                 self.text([x0 + 1.0 * k, py(0.81 - i as f64 * 0.05)], lab, t.to_string(), Anchor::BottomLeft);
             }
-            self.text([px(0.1), py(0.79)], lab, angular, Anchor::BottomLeft);
-            self.text([px(0.1), py(0.74)], lab, tr.fractional.unwrap_or("FRACTIONAL = ±").to_string(), Anchor::BottomLeft);
+            self.text([px(0.1), py(0.79)], 0.9 * lab, angular, Anchor::BottomLeft);
+            self.text([px(0.1), py(0.74)], 0.9 * lab, tr.fractional.unwrap_or("FRACTIONAL = ±").to_string(), Anchor::BottomLeft);
         }
         self.text([x0 + 0.8 * k, py(left_rows[1] + 0.09)], lab * tr.surface_h, tr.surface_finish.to_string(), Anchor::BottomLeft);
-        let sf = [px(0.098), py(left_rows[1] + 0.12)];
+        // The surface finish mark after the label (long translations push it right).
+        let sf_x = px(0.098).max(x0 + 1.4 * k + font::text_width(tr.surface_finish, lab * tr.surface_h));
+        let sf = [sf_x, py(left_rows[1] + 0.12)];
         self.lines.push(Polyline2 { points: vec![[sf[0], sf[1]], [sf[0] + 0.8 * k, sf[1] - 1.6 * k], [sf[0] + 2.4 * k, sf[1] + 1.6 * k], [sf[0] + 5.0 * k, sf[1] + 1.6 * k]], style: LineStyle::Thin, closed: false, pick: 0 });
         let centred = |g: &mut Self, v0: f64, v1: f64, h: f64, t: &str| g.text([px(left / 2.0), (py(v0) + py(v1)) / 2.0], h, t.to_string(), Anchor::Center);
-        // Sized to its cell (live: it fits with a margin).
+        // 1.3 L, smaller in some languages (live).
         let dns = tr.do_not_scale;
-        let dns_h = (1.8 * k).min(left * bw * 0.86 / font::text_width(dns, 1.0).max(1e-9));
-        centred(self, left_rows[1], left_rows[2], dns_h, dns);
+        centred(self, left_rows[1], left_rows[2], 1.3 * lab * tr.dns_h, dns);
         if en {
             self.text([px(left / 2.0), py(left_rows[2]) - 1.4 * k], lab, "BREAK ALL SHARP EDGES AND".to_string(), Anchor::Center);
             self.text([px(left / 2.0), py(left_rows[3]) + 1.4 * k], lab, "REMOVE BURRS".to_string(), Anchor::Center);
         } else {
-            let lines = wrap_text(tr.break_edges, lab, left * bw - 1.6 * k);
+            let lines = wrap_text(tr.break_edges, lab, left * bw);
             let n = lines.len() as f64;
             let cy = (py(left_rows[2]) + py(left_rows[3])) / 2.0;
             for (i, l) in lines.iter().enumerate() {
@@ -776,7 +786,7 @@ impl SheetGeometry {
         }
         let proj = if projection == Projection::FirstAngle { tr.first_angle } else { tr.third_angle.unwrap_or("THIRD ANGLE PROJECTION") };
         centred(self, left_rows[3], left_rows[4], lab, proj);
-        self.projection_symbol([px(left / 2.0), py(left_rows[4] / 2.0)], projection);
+        self.projection_symbol([px(left / 2.0), py(left_rows[4] / 2.0)], projection, left_rows[4] * bh);
         // Middle: NAME (SIGNATURE) / DATE, DRAWN / CHECKED / APPROVED.
         let heads: Vec<&str> = if iso { vec![tr.name, tr.signature, tr.date] } else { vec![tr.name, tr.date] };
         for (i, h) in heads.iter().enumerate() {
@@ -796,42 +806,46 @@ impl SheetGeometry {
         };
         for (r, (l, name, date)) in fields.iter().enumerate() {
             label_h(self, cols[0], rows[r + 1], l, lab * tr.signoff_h);
-            value_in(self, cols[1], cols[2], rows[r + 2], rows[r + 1], name, lab);
+            value_in(self, cols[1], cols[2], rows[r + 2], rows[r + 1], name, 0.84 * lab);
             let dc = cols.len() - 2;
-            value_in(self, cols[dc], cols[dc + 1], rows[r + 2], rows[r + 1], date, lab);
+            value_in(self, cols[dc], cols[dc + 1], rows[r + 2], rows[r + 1], date, 0.84 * lab);
         }
         label(self, cols[0], rows[6], tr.material);
         label(self, split, rows[6], tr.finish);
-        value_in(self, cols[0], split, 0.0, rows[6] - 0.08, "Material", val * 0.8);
-        value_in(self, split, mid, 0.0, rows[6] - 0.08, "Finish", val * 0.8);
-        // Right: the logo row, TITLE, SIZE / DWG NO. / REV., SCALE / WEIGHT / SHEET.
-        if iso {
-            self.text([px((mid + 1.0) / 2.0), (py(right_rows[0]) + py(right_rows[1])) / 2.0], 3.5 * k, "noshape".to_string(), Anchor::Center);
-        }
+        value_in(self, cols[0], split, 0.0, rows[6] - 0.08, "Material", 1.5 * lab);
+        value_in(self, split, mid, 0.0, rows[6] - 0.08, "Finish", 1.5 * lab);
+        // Right: the (empty) top row, TITLE, SIZE / DWG NO. / REV., SCALE /
+        // WEIGHT / SHEET (live: no text in the top row).
         label(self, mid, right_rows[1], tr.title);
-        value_in(self, mid, 1.0, right_rows[2], right_rows[1], "Title", val);
-        label(self, mid, right_rows[2], tr.size);
-        label(self, size_cols[0], right_rows[2], tr.dwg_no);
-        label(self, size_cols[1], right_rows[2], tr.rev);
+        value_in(self, mid, 1.0, right_rows[2], right_rows[1], "Title", 2.4 * lab);
+        let small = 0.8 * lab;
+        label_h(self, mid, right_rows[2], tr.size, small);
+        label_h(self, size_cols[0], right_rows[2], tr.dwg_no, small);
+        label_h(self, size_cols[1], right_rows[2], tr.rev, small);
         let size = value_of("Size", sheet.title_field("Size").unwrap_or(""));
-        self.text([(px(mid) + px(size_cols[0])) / 2.0, (py(right_rows[3]) + py(right_rows[2])) / 2.0 - 0.6 * k], val * 1.4, size, Anchor::Center);
-        value_in(self, size_cols[0], size_cols[1], right_rows[3], right_rows[2] - 0.05, "Part number", val);
-        value_in(self, size_cols[1], 1.0, right_rows[3], right_rows[2] - 0.05, "Revision", val);
-        label(self, mid, right_rows[3], tr.scale);
-        label(self, scale_cols[0], right_rows[3], tr.weight);
-        label(self, scale_cols[1], right_rows[3], tr.sheet);
-        value_in(self, mid + 0.03, scale_cols[0], 0.0, right_rows[3] - 0.03, "Scale", val);
-        value_in(self, scale_cols[0], scale_cols[1], 0.0, right_rows[3] - 0.03, "Weight", val);
-        value_in(self, scale_cols[1] + 0.03, 1.0, 0.0, right_rows[3] - 0.03, "Sheet", val);
+        self.text([(px(mid) + px(size_cols[0])) / 2.0, (py(right_rows[3]) + py(right_rows[2])) / 2.0 - 0.6 * k], 3.0 * lab, size, Anchor::Center);
+        value_in(self, size_cols[0], size_cols[1], right_rows[3], right_rows[2] - 0.05, "Part number", 3.0 * lab);
+        value_in(self, size_cols[1], 1.0, right_rows[3], right_rows[2] - 0.05, "Revision", 3.0 * lab);
+        label_h(self, mid, right_rows[3], tr.scale, small);
+        label_h(self, scale_cols[0], right_rows[3], tr.weight, small);
+        label_h(self, scale_cols[1], right_rows[3], tr.sheet, small);
+        value_in(self, mid + 0.03, scale_cols[0], 0.0, right_rows[3] - 0.03, "Scale", 1.8 * lab);
+        value_in(self, scale_cols[0], scale_cols[1], 0.0, right_rows[3] - 0.03, "Weight", 1.8 * lab);
+        value_in(self, scale_cols[1] + 0.03, 1.0, 0.0, right_rows[3] - 0.03, "Sheet", 1.8 * lab);
     }
 
     /// First / third angle projection symbol (a truncated cone) centered at `c`.
-    pub fn projection_symbol(&mut self, c: [f64; 2], projection: Projection) {
-        let (big, small, len) = (3.0, 1.5, 8.0);
+    pub fn projection_symbol(&mut self, c: [f64; 2], projection: Projection, cell_h: f64) {
+        // Live 820 (ISO A3, an 8.4 mm cell): circles r 3.7 / 1.85 mm, the cone
+        // 7.7 mm long from 1.95 to 3.7 mm half height, 2.3 mm apart, centred;
+        // the same proportions in other cells (live 831-en, ANSI A).
+        let f = cell_h / 8.4;
+        let (big, small, len, gap) = (3.7 * f, 1.85 * f, 7.7 * f, 2.3 * f);
+        let half = (len + gap + 2.0 * big) / 2.0;
         // Third angle: end view left of the side view; first angle: right.
         let (circ_x, trap_x) = match projection {
-            Projection::ThirdAngle => (c[0] - 6.5, c[0] - 1.0),
-            Projection::FirstAngle => (c[0] + 6.5, c[0] - 9.5),
+            Projection::ThirdAngle => (c[0] - half + big, c[0] - half + 2.0 * big + gap),
+            Projection::FirstAngle => (c[0] + half - big, c[0] - half),
         };
         let y = c[1];
         let n = 32;
@@ -844,7 +858,13 @@ impl SheetGeometry {
         }
         // Narrow end on the left in both conventions.
         self.lines.push(Polyline2 { points: vec![[trap_x, y - small], [trap_x + len, y - big], [trap_x + len, y + big], [trap_x, y + small]], style: LineStyle::Thin, closed: true, pick: 0 });
-        self.line([circ_x - big - 1.0, y], [trap_x + len + 1.0, y], LineStyle::Centerline);
+        // Centre lines: the axis from the cone's far end to 0.8 mm past the
+        // circle, and a vertical one through the circles.
+        let over = 0.8 * f;
+        let x0 = trap_x.min(circ_x - big - over);
+        let x1 = (trap_x + len).max(circ_x + big + over);
+        self.line([x0, y], [x1, y], LineStyle::Centerline);
+        self.line([circ_x, y - big - over], [circ_x, y + big + over], LineStyle::Centerline);
     }
 
     /// An inspection item: the number in its border shape, left of `at`

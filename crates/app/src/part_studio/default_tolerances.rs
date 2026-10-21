@@ -31,6 +31,11 @@ pub struct InspectionView {
     /// Ticked Types (none ticked: every type shows).
     pub types: Vec<&'static str>,
     pub types_open: bool,
+    /// Characteristics: the hovered cell (row, column) and its feature, the
+    /// clicked cell.
+    pub hover_cell: Option<(usize, usize)>,
+    pub hover_feature: Option<noshape_model::reference::FeatureId>,
+    pub focus_cell: Option<(usize, usize)>,
     /// The Types button's bounds (the list drops from its bottom-left).
     pub types_at: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
 }
@@ -42,7 +47,10 @@ impl InspectionView {
     }
 
     pub fn shows(&self, c: &Characteristic) -> bool {
-        self.types.is_empty() || self.types.contains(&c.kind)
+        // Live (psb 10-21 d): a "Fillet radius" row matches both the Fillet
+        // and the Radius type.
+        let kinds: &[&str] = if c.kind == "Fillet radius" { &["Fillet", "Radius"] } else { std::slice::from_ref(&c.kind) };
+        (self.types.is_empty() || kinds.iter().any(|k| self.types.contains(k))) && !(self.hide_default && c.is_default())
     }
 }
 
@@ -98,6 +106,7 @@ impl PartStudioView {
         let field = match self.applied_default_tolerances(cx) {
             Some(name) => h_flex()
                 .id("insp-default-tol")
+                .group("dtol-chip")
                 .h(px(26.))
                 .pl(px(4.))
                 .gap(px(4.))
@@ -118,6 +127,9 @@ impl PartStudioView {
                         .justify_center()
                         .cursor_pointer()
                         .text_color(rgb(0x666666))
+                        // Live: the × shows on hover only.
+                        .invisible()
+                        .group_hover("dtol-chip", |d| d.visible())
                         .child("×")
                         .tooltip(crate::ui::tooltip("Remove"))
                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -184,11 +196,16 @@ impl PartStudioView {
             .rounded(px(3.))
             .border_1()
             .border_color(if types_open { pal.accent } else { rgb(0xbbbbbb) })
-            .bg(rgb(0xffffff))
+            // Live 10-21 c: a ticked type turns the button blue with a count
+            // badge.
+            .bg(if ticked.is_empty() { rgb(0xffffff) } else { rgb(0x9fd0f5) })
             .cursor_pointer()
             .text_size(px(12.))
             .text_color(pal.text)
             .child("Types")
+            .when(!ticked.is_empty(), |d| {
+                d.child(div().min_w(px(16.)).h(px(16.)).px(px(4.)).rounded(px(8.)).bg(pal.accent).text_color(rgb(0xffffff)).text_size(px(11.)).flex().items_center().justify_center().child(ticked.len().to_string()))
+            })
             .child(crate::ui::glyph("ui-caret-down", 6., rgb(0x666666)))
             .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             .when(!types_open, |d| d.tooltip(crate::ui::tooltip("Select dimension and annotation types to show")))
@@ -228,7 +245,9 @@ impl PartStudioView {
                     .with_priority(3),
                 )
             });
-        let derived = icon_button("insp-derived", "insp-derived", !self.ui.insp.derived_off, cx).tooltip(crate::ui::tooltip("Show derived tolerances")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+        let derived_on = !self.ui.insp.derived_off;
+        // Live: pressed "Hide derived tolerances", released "Show derived tolerances".
+        let derived = icon_button("insp-derived", "insp-derived", derived_on, cx).tooltip(crate::ui::tooltip(if derived_on { "Hide derived tolerances" } else { "Show derived tolerances" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
             this.ui.insp.derived_off = !this.ui.insp.derived_off;
             cx.notify();
         }));
@@ -257,7 +276,7 @@ impl PartStudioView {
     /// it, groups split by a rule.
     pub(super) fn render_default_tolerances_section(&self, cx: &App) -> Option<AnyElement> {
         let name = self.applied_default_tolerances(cx)?;
-        let groups = ann::iso_2768(&name)?;
+        let groups = ann::default_tolerance_groups(&name)?;
         let pal = p();
         let row = |l: String, r: String, bold: bool| {
             h_flex()
@@ -293,6 +312,7 @@ impl PartStudioView {
         let pal = p();
         let tab = self.ui.insp.picker_tab;
         let applied = self.applied_default_tolerances(cx).unwrap_or_default();
+        let precision = applied == ann::PRECISION_STANDARD;
         let tab_button = |i: u8, l1: &'static str, l2: &'static str, cx: &mut Context<Self>| {
             v_flex()
                 .id(SharedString::from(format!("dtol-tab-{i}")))
@@ -345,8 +365,20 @@ impl PartStudioView {
                                 for o in options {
                                     let v = v.clone();
                                     m = m.item(crate::os_menu::OsMenuItem::new(o).checked(o == value).on_click(move |_, _, cx| {
-                                        if ann::DEFAULT_TOLERANCES.contains(&o) {
-                                            v.update(cx, |this, cx| this.set_default_tolerances(Some(o.into()), cx));
+                                        // A grade, or a Type: Precision applies at once, ISO 2768-1 its
+                                        // default grade (live: changing a select applies it).
+                                        let standard = match o {
+                                            ann::ISO_2768_1 => Some(ann::DEFAULT_TOLERANCE_CLASS),
+                                            o if o == ann::PRECISION_STANDARD || ann::DEFAULT_TOLERANCES.contains(&o) => Some(o),
+                                            _ => None,
+                                        };
+                                        if let Some(sd) = standard {
+                                            v.update(cx, |this, cx| {
+                                                if this.applied_default_tolerances(cx).as_deref().is_some_and(|a| a == sd || (o == ann::ISO_2768_1 && a != ann::PRECISION_STANDARD)) {
+                                                    return;
+                                                }
+                                                this.set_default_tolerances(Some(sd.into()), cx)
+                                            });
                                         }
                                     }));
                                 }
@@ -379,8 +411,16 @@ impl PartStudioView {
             body = body
                 .child(div().h(px(8.)))
                 .child(select("dtol-library", "Library", "Onshape default tolerances".into(), vec!["Onshape default tolerances"], cx))
-                .child(select("dtol-type", "Type", "ISO 2768-1".into(), vec!["ISO 2768-1"], cx))
-                .child(select("dtol-class", "Default tolerances", applied, ann::DEFAULT_TOLERANCES.to_vec(), cx))
+                .when(!precision, |d| {
+                    d.child(select("dtol-type", "Type", ann::ISO_2768_1.into(), ann::TOLERANCE_TYPES.to_vec(), cx))
+                        .child(select("dtol-class", "Default tolerances", applied.clone(), ann::DEFAULT_TOLERANCES.to_vec(), cx))
+                })
+                // Live: with the Precision type, a stacked "Default
+                // tolerances" label over a select of the two types.
+                .when(precision, |d| {
+                    d.child(div().px(px(10.)).pt(px(6.)).text_size(px(11.)).text_color(pal.text).child("Default tolerances"))
+                        .child(select("dtol-type", "", ann::PRECISION_STANDARD.into(), ann::TOLERANCE_TYPES.to_vec(), cx))
+                })
                 .child(h_flex().mt(px(16.)).justify_center().child(crate::assets::icon("insp-default-tol", 140., cx)));
         }
         Some(

@@ -465,3 +465,157 @@ fn workspace_protection() {
     assert_eq!(info["protected"], false);
     call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[20, 0], [25, 0]] }));
 }
+
+// ------------------------------------------------------------ drawings
+
+/// A block 80 x 40 x 20 with a Ø10 through hole at its center.
+fn block_with_hole(ctx: &mut Ctx, file: &str) {
+    let sk = new_sketch(ctx, file, "plane:top");
+    call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-40, -20], [40, 20]] }));
+    call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    let st = call(ctx, "sketch_get", json!({ "sketch": sk }));
+    let plate = st["regions"].as_array().unwrap().iter().find(|r| r["holes"] == 1).unwrap()["id"].as_str().unwrap().to_string();
+    let ex = call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [plate], "depth": "20 mm" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+}
+
+#[test]
+fn drawing_views_and_dimensions() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing.noshape");
+    let t = call(&mut ctx, "drawing_templates", json!({}));
+    assert!(t["templates"].as_array().unwrap().iter().any(|r| r["name"] == "ISO A3"));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    assert!(tab.ends_with("Drawing 1"), "{d}");
+    let views = d["views"].as_array().unwrap();
+    assert!(views.len() >= 3, "suggested views: {d}");
+    // The view that shows the hole as a circle (the top view).
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let (view, circle) = g["views"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone()))))
+        .unwrap_or_else(|| panic!("no view shows the hole: {g}"));
+    let (cx, cy, r) = (num(&circle["center"][0]), num(&circle["center"][1]), num(&circle["radius"]));
+    let dia = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "diameter", "picks": [[cx + r, cy]], "place": [cx + r + 15.0, cy + 15.0] }));
+    assert!(dia["text"].as_str().unwrap().contains("10"), "{dia}");
+    // The smart Dimension on the 80 mm edge of the same view.
+    let long = view["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["type"] == "line")
+        .max_by(|a, b| {
+            let l = |e: &Value| ((num(&e["b"][0]) - num(&e["a"][0])).powi(2) + (num(&e["b"][1]) - num(&e["a"][1])).powi(2)).sqrt();
+            l(a).total_cmp(&l(b))
+        })
+        .unwrap()
+        .clone();
+    let mid = [(num(&long["a"][0]) + num(&long["b"][0])) / 2.0, (num(&long["a"][1]) + num(&long["b"][1])) / 2.0];
+    let lin = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [mid], "place": [mid[0], mid[1] + 20.0] }));
+    assert!(lin["text"].as_str().unwrap().contains("80"), "{lin}");
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert!(hist["history"][0]["description"].as_str().unwrap().ends_with(":: Linear dimension"), "{hist}");
+    // An isometric base view, and a view projected from it.
+    let iv = call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "orientation": "isometric", "position": [330, 230], "scale": 1.0 }));
+    let base = iv["view"].as_u64().unwrap();
+    let pv = call(&mut ctx, "drawing_projected_view", json!({ "drawing": tab, "parent": base, "position": [330, 120] }));
+    let pv_id = pv["view"].as_u64().unwrap();
+    let after = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    let pvj = after["views"].as_array().unwrap().iter().find(|v| v["id"] == pv_id).unwrap().clone();
+    assert_eq!(pvj["parent"], base, "{pvj}");
+    // Errors: a click on nothing.
+    let e = try_call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [[5, 5]], "place": [10, 10] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("picks[0]"), "{}", e.to_json());
+    // Export: one PDF page, and DXF.
+    let pdf = scratch("drawing.pdf");
+    let x = call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "PDF", "file": pdf.to_str().unwrap() }));
+    assert!(std::fs::read(&pdf).unwrap().starts_with(b"%PDF"), "{x}");
+    let dxf = scratch("drawing.dxf");
+    call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "file": dxf.to_str().unwrap() }));
+    assert!(std::fs::read_to_string(&dxf).unwrap().contains("ENTITIES"));
+}
+
+#[test]
+fn analysis_tools() {
+    let mut ctx = Ctx::new();
+    // A 20 x 20 x 10 block and a Ø10 x 30 cylinder through it (two parts).
+    let sk = new_sketch(&mut ctx, "analysis.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "center_rectangle", "points": [[0, 0], [10, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    let disk = call(&mut ctx, "sketch_get", json!({ "sketch": s2 }))["regions"][0]["id"].as_str().unwrap().to_string();
+    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disk], "depth": "30 mm", "operationType": "NEW" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+    assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 2);
+    // Interference: the cylinder inside the block, π·5²·10.
+    let i = call(&mut ctx, "analysis_interference", json!({}));
+    let list = i["interferences"].as_array().unwrap();
+    assert_eq!(list.len(), 1, "{i}");
+    let v = num(&list[0]["volume"]);
+    assert!((v - std::f64::consts::PI * 25.0 * 10.0).abs() < 1.0, "overlap {v}");
+    // Curvature: the cylinder's circular edges have radius 5.
+    let circles = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "circle" }));
+    let edge = circles["edges"][0]["id"].as_str().unwrap().to_string();
+    let c = call(&mut ctx, "analysis_curvature", json!({ "entities": [edge] }));
+    assert!((num(&c["min_radius"]["radius"]) - 5.0).abs() < 0.05, "{c}");
+    // Dihedral: a vertical block edge is 90°.
+    let lines = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }));
+    let vertical = lines["edges"].as_array().unwrap().iter().find(|e| num(&e["direction"][2]).abs() > 0.99).unwrap()["id"].as_str().unwrap().to_string();
+    let d = call(&mut ctx, "analysis_dihedral", json!({ "entities": [vertical] }));
+    assert!((num(&d["min_deg"]) - 90.0).abs() < 0.5 && (num(&d["max_deg"]) - 90.0).abs() < 0.5, "{d}");
+}
+
+#[test]
+fn import_step_round_trip() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "import.noshape");
+    let v0 = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    let step = scratch("block.step");
+    call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": step.to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let tabs = r["tabs"].as_array().unwrap();
+    assert!(tabs.iter().any(|t| t["name"] == "block" && t["kind"] == "Part Studio"), "{r}");
+    assert!(tabs.iter().any(|t| t["name"] == "block.step"), "the file tab in CAD Imports: {r}");
+    assert_eq!(r["parts"].as_array().unwrap().len(), 1, "{r}");
+    let v1 = num(&call(&mut ctx, "query_parts", json!({ "tab": "block" }))["parts"][0]["volume"]);
+    assert!((v1 - v0).abs() < 1.0, "imported volume {v1} vs {v0}");
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Import block.step");
+    // Errors name the file.
+    let e = try_call(&mut ctx, "import_files", json!({ "files": ["/tmp/nope.xyz"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("files[0]"));
+}
+
+#[test]
+fn materials_and_appearances() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "material.noshape");
+    let lib = call(&mut ctx, "material_list", json!({ "search": "6061" }));
+    let al = lib["materials"].as_array().unwrap().first().unwrap_or_else(|| panic!("no 6061: {lib}")).clone();
+    let name = al["name"].as_str().unwrap().to_string();
+    let density = num(&al["density_kg_m3"]);
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_material", json!({ "parts": [part.clone()], "material": name.clone() }));
+    // Mass = volume x density.
+    let m = call(&mut ctx, "query_mass_properties", json!({}));
+    let vol_m3 = num(&m["volume"]) * 1e-9;
+    assert!((num(&m["mass_kg"]) - vol_m3 * density).abs() < 1e-5, "{m}");
+    // Colors: the part, and a face of it.
+    call(&mut ctx, "part_set_appearance", json!({ "parts": [part.clone()], "color": "#3b61b4", "transparency": 0.25 }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "faces": [top], "color": [255, 0, 0] }));
+    let a = call(&mut ctx, "part_appearances", json!({}));
+    assert_eq!(a["parts"][0]["material"], name.as_str());
+    assert_eq!(a["parts"][0]["appearance"]["color"], "#3b61b4", "{a}");
+    assert_eq!(a["parts"][0]["appearance"]["transparency"], 0.25);
+    assert_eq!(a["appearances"][0]["color"], "#ff0000", "{a}");
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Part Studio 1 :: Edit appearance");
+    let after = call(&mut ctx, "part_remove_appearance", json!({ "parts": [part], "appearances": [0] }));
+    assert!(after["appearances"].as_array().unwrap().is_empty() && after["parts"][0].get("appearance").is_none(), "{after}");
+}

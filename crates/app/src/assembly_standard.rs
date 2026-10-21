@@ -8,15 +8,13 @@
 //! Fastened mate (`a` flips the part); Edit standard content instance.
 
 use super::*;
-use noshape_model::assembly::eval::{InstancePath, PartOccurrence};
+use noshape_model::assembly::eval::PartOccurrence;
 use noshape_model::assembly::standard::{self, Shape, StandardSpec};
 
-/// A face or edge picked while the tab is open (live: pre-select hole
+/// A face or edge selected before Insert opened (live: pre-select hole
 /// edges or faces, or planar faces with holes, then Insert).
 #[derive(Clone)]
 pub(crate) struct StdPick {
-    pub path: InstancePath,
-    pub reference: Reference,
     /// The holes it gives (connector on each hole's edge).
     pub holes: Vec<MateConnectorRef>,
     /// A planar face (enables Insert closest / furthest when it has holes).
@@ -32,7 +30,7 @@ pub(crate) struct StdUi {
     pub auto_size: bool,
     /// Holes picked with auto-size: Insert fastens a part in each.
     pub holes: Vec<MateConnectorRef>,
-    /// Faces and edges picked in the graphics area while the tab is open.
+    /// The faces and edges selected when Insert opened (`std_take_selection`).
     pub picks: Vec<StdPick>,
     /// Edit standard content instance: the instances being edited.
     pub editing: Option<Vec<InstanceId>>,
@@ -75,7 +73,7 @@ impl AssemblyView {
             let options: Vec<&str> = match l {
                 1 => standard::categories(&path[0]),
                 2 => standard::classes(&path[0], &path[1]),
-                _ => standard::components(&path[0], &path[1], &path[2]).iter().map(|c| c.name).collect(),
+                _ => standard::components(&path[0], &path[1], &path[2]).iter().map(|c| c.name.as_str()).collect(),
             };
             if !options.contains(&path[l].as_str()) {
                 path[l] = options.first().map(|s| s.to_string()).unwrap_or_default();
@@ -113,42 +111,29 @@ impl AssemblyView {
         self.ui.std.auto_size && self.insert_open
     }
 
-    /// The Standard content tab is shown: graphics clicks pick faces and edges.
-    pub(super) fn std_picking(&self) -> bool {
-        self.insert_open && self.ui.insert_source == 2 && !self.ui.std.auto_size && self.placing.is_none()
-    }
-
-    /// The picks drawn selected while the tab is shown.
-    pub(super) fn std_picked_entities(&self) -> Vec<(InstancePath, Reference)> {
-        if !self.std_picking() {
-            return Vec::new();
-        }
-        self.ui.std.picks.iter().map(|p| (p.path.clone(), p.reference.clone())).collect()
-    }
-
     /// The camera direction toward the viewer in an occurrence's coordinates.
     fn std_toward(&self, o: &PartOccurrence, cx: &App) -> DVec3 {
         let forward = self.viewport.read(cx).camera.forward();
         o.transform.inverse().transform_vector3(-forward).normalize_or_zero()
     }
 
-    /// A click on a face or edge while the tab is shown: picked (again: dropped).
-    pub(super) fn std_pick(&mut self, t: AsmPickTarget, cx: &mut Context<Self>) {
-        if !matches!(t.kind, PickKind::Face | PickKind::Edge) {
-            return;
-        }
-        if let Some(i) = self.ui.std.picks.iter().position(|p| p.path == t.path && p.reference == t.reference) {
-            self.ui.std.picks.remove(i);
-        } else {
-            let Some(o) = self.result.occurrences.get(t.occ) else { return };
-            let units = self.units(cx);
+    /// Insert opened: the faces and edges selected before are what Insert
+    /// fastens into and what enables the stack buttons (live: a selection
+    /// made while the panel is open doesn't).
+    pub(super) fn std_take_selection(&mut self, cx: &App) {
+        let units = self.units(cx);
+        let mut picks = Vec::new();
+        for (path, reference) in self.ui.entity_sel.clone() {
+            if !matches!(reference, Reference::Face(_) | Reference::Edge(_)) {
+                continue;
+            }
+            let Some(o) = self.result.occurrences.iter().find(|o| o.path == path && (o.face_refs.contains(&reference) || o.edge_refs.contains(&reference))) else { continue };
             let toward = self.std_toward(o, cx);
-            let holes = standard::hole_connectors(&o.context, Some(&o.body), &t.reference, toward, &units).iter().map(|(p, _)| p.connector(&t.path)).collect();
-            let planar = standard::planar_face(&o.context, Some(&o.body), &t.reference);
-            self.ui.std.picks.push(StdPick { path: t.path.clone(), reference: t.reference.clone(), holes, planar });
+            let holes = standard::hole_connectors(&o.context, Some(&o.body), &reference, toward, &units).iter().map(|(p, _)| p.connector(&path)).collect();
+            let planar = standard::planar_face(&o.context, Some(&o.body), &reference);
+            picks.push(StdPick { holes, planar });
         }
-        self.refresh_scene(false, cx);
-        cx.notify();
+        self.ui.std.picks = picks;
     }
 
     /// Insert closest / furthest are enabled by a picked planar face with holes.
@@ -322,10 +307,12 @@ impl AssemblyView {
     }
 
     /// Live's select: white, a 1 px `#d7d7d7` underline, 5 px in, a caret at the right.
-    fn std_select(id: &'static str, w: f32, current: String, options: Vec<String>, disabled: bool, on_pick: fn(&mut AssemblyView, &str, &mut Context<AssemblyView>), cx: &mut Context<Self>) -> AnyElement {
+    fn std_select(id: impl Into<SharedString>, w: f32, current: String, options: Vec<String>, disabled: bool, on_pick: impl Fn(&mut AssemblyView, &str, &mut Context<AssemblyView>) + 'static, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        let id: SharedString = id.into();
+        let on_pick = std::rc::Rc::new(on_pick);
         let field = div()
-            .id(id)
+            .id(id.clone())
             .w(px(w))
             .h(px(26.))
             .flex_none()
@@ -351,7 +338,8 @@ impl AssemblyView {
                 for o in &options {
                     let v = view.clone();
                     let o2 = o.clone();
-                    menu = menu.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(*o == current).on_click(move |_, _, cx| v.update(cx, |this, cx| on_pick(this, &o2, cx))));
+                    let pick = on_pick.clone();
+                    menu = menu.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(*o == current).on_click(move |_, _, cx| v.update(cx, |this, cx| pick(this, &o2, cx))));
                 }
                 menu
             })
@@ -367,7 +355,7 @@ impl AssemblyView {
         let locked = props_edit.is_some();
         let props = std_props(&spec);
         // Live: rows of 12 px #333 labels in a 90 px column, 7 px in.
-        let row = |name: &'static str, h: f32, field: AnyElement| h_flex().h(px(h)).flex_none().px(px(7.)).child(div().w(px(90.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x333333)).child(name)).child(field).into_any_element();
+        let row = |name: &str, h: f32, field: AnyElement| h_flex().h(px(h)).flex_none().px(px(7.)).child(div().w(px(90.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x333333)).child(name.to_string())).child(field).into_any_element();
         let rule = || div().h(px(1.)).flex_none().bg(gpui_kit::rgb(0xd7d7d7)).into_any_element();
         // Group 1 (105 px, scrolls): Standard › Category › Class › Component, 181 px selects.
         let levels: [(&'static str, &'static str, String, Vec<String>); 4] = [
@@ -388,7 +376,7 @@ impl AssemblyView {
         let Some(c) = standard::component(&spec) else { return body.into_any_element() };
         // Group 2 (114 px, scrolls): the component's parameters, 146 px selects.
         let mut params = v_flex().id("std-params").h(px(114.)).flex_none().overflow_y_scroll().track_scroll(&self.ui.std.param_scroll).on_scroll_wheel(cx.listener(|_, _: &ScrollWheelEvent, _, cx| cx.notify()));
-        let sizes: Vec<String> = c.sizes.iter().map(|s| s.name.to_string()).collect();
+        let sizes: Vec<String> = c.size_names().into_iter().map(String::from).collect();
         let size_select = Self::std_select("std-size", 146., spec.size.clone(), sizes, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.set_size(v)), cx);
         // Live: a 26 px borderless icon button 9 px right of the select.
         let auto = div()
@@ -405,40 +393,45 @@ impl AssemblyView {
             .child(crate::assets::icon(&icon_path("auto-size"), 20., cx))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_toggle_auto_size(cx)));
         let auto = crate::ui::with_rich_tooltip("std-auto-size", "Auto-size fastener", "Set the standard content diameter to a selected hole. 1. Select Auto-size. 2. Select a circular edge or cylindrical face on a part.", auto);
-        params = params.child(row("Size", 27., h_flex().child(size_select).when(!editing, |d| d.child(auto)).into_any_element()));
-        // Live's per-component rows after Size: Drive type (socket heads),
-        // Series (ANSI washers), Bearing face (nuts).
-        if let Some(drive) = c.drive_type() {
-            params = params.child(row("Drive type", 27., Self::std_select("std-drive", 146., drive.into(), vec![drive.into()], locked, |_, _, _| {}, cx)));
+        params = params.child(row(c.size_label(), 27., h_flex().child(size_select).when(!editing, |d| d.child(auto)).into_any_element()));
+        // The component's own selects after Size (live: Drive type, Series,
+        // Bearing face, Head slot, Head type…), then Length and Thread length.
+        for p in &c.params {
+            let label = p.label.clone();
+            let value = spec.param(&p.label).to_string();
+            let id = SharedString::from(format!("std-param-{}", p.label));
+            let el = if p.checkbox {
+                let on = value == standard::CHECKED;
+                crate::os_ui::checkbox(id, "", on)
+                    .pl(px(0.))
+                    .when(locked, |d| d.opacity(0.5))
+                    .when(!locked, |d| d.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.std_edit_spec(cx, |s| {
+                        s.params.insert(label.clone(), if on { standard::UNCHECKED } else { standard::CHECKED }.into());
+                    }))))
+                    .into_any_element()
+            } else {
+                Self::std_select(id, 146., value, c.param_options(p, spec.size_row()).to_vec(), locked, move |t, v, cx| t.std_edit_spec(cx, |s| {
+                    s.params.insert(label.clone(), v.to_string());
+                }), cx)
+            };
+            params = params.child(row(&p.label, 27., el));
         }
-        if !c.series().is_empty() {
-            let options = c.series().iter().map(|s| s.to_string()).collect();
-            params = params.child(row("Series", 27., Self::std_select("std-series", 146., spec.series().to_string(), options, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.series = Some(v.to_string())), cx)));
-        }
-        if !c.bearing_faces().is_empty() {
-            let options = c.bearing_faces().iter().map(|s| s.to_string()).collect();
-            params = params.child(row("Bearing face", 27., Self::std_select("std-bearing", 146., spec.bearing_face().to_string(), options, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.bearing_face = Some(v.to_string())), cx)));
-        }
-        if c.head_slot {
-            let on = spec.slotted();
-            params = params.child(row(
-                "Head slot",
-                27.,
-                crate::os_ui::checkbox("std-head-slot", "", on).pl(px(0.)).when(locked, |d| d.opacity(0.5)).when(!locked, |d| d.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.std_edit_spec(cx, |s| s.head_slot = Some(!on))))).into_any_element(),
-            ));
-        }
-        if let Some(size) = c.size(&spec.size)
+        if let Some(size) = spec.size_row()
             && c.shape.has_length()
         {
             let cur = spec.length.clone().unwrap_or_default();
-            params = params.child(row("Length", 27., Self::std_select("std-length", 146., cur.clone(), c.lengths(size), locked, |t, v, cx| t.std_edit_spec(cx, |s| s.length = Some(v.to_string())), cx)));
-            if let Some(t) = c.thread_length(size, &cur) {
-                params = params.child(row("Thread length", 27., Self::std_select("std-thread", 146., t.clone(), vec![t], locked, |_, _, _| {}, cx)));
+            params = params.child(row(c.length_label(), 27., Self::std_select("std-length", 146., cur.clone(), c.lengths(size), locked, |t, v, cx| t.std_edit_spec(cx, |s| s.length = Some(v.to_string())), cx)));
+            let threads = c.thread_lengths(size, &cur);
+            if let Some(first) = threads.first().cloned() {
+                let chosen = spec.params.get(standard::THREAD_LENGTH).filter(|t| threads.contains(*t)).cloned().unwrap_or(first);
+                params = params.child(row("Thread length", 27., Self::std_select("std-thread", 146., chosen, threads, locked, |t, v, cx| t.std_edit_spec(cx, |s| {
+                    s.params.insert(standard::THREAD_LENGTH.into(), v.to_string());
+                }), cx)));
             }
         }
-        let materials: Vec<String> = standard::MATERIALS.iter().map(|s| s.to_string()).collect();
+        let materials: Vec<String> = c.materials().iter().map(|s| s.to_string()).collect();
         params = params.child(row("Material", 27., Self::std_select("std-material", 146., spec.material().to_string(), materials, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.material = Some(v.to_string())), cx)));
-        let finishes: Vec<String> = standard::FINISHES.iter().map(|s| s.to_string()).collect();
+        let finishes: Vec<String> = c.finishes().iter().map(|s| s.to_string()).collect();
         params = params.child(row("Finish", 27., Self::std_select("std-finish", 146., spec.finish().to_string(), finishes, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.finish = Some(v.to_string())), cx)));
         body = body.child(div().relative().child(params).child(Self::std_scrollbar("std-param-sb", &self.ui.std.param_scroll, 114., cx))).child(div().mt(px(5.)).child(rule()));
         // Part number / Description: read-only, 161 px, #eee on a #ccc underline.
@@ -496,8 +489,10 @@ impl AssemblyView {
         }
         // The component's line drawing (end view and side view), 242 x 105.
         // Live: the drawing is the component's, whatever Head slot says.
-        let (shape, slotted) = (c.shape, c.head_slot);
-        body = body.child(div().pt(px(6.)).h(px(111.)).flex_none().flex().justify_center().child(canvas(|_, _, _| (), move |b, _, window, _| paint_fastener(b, shape, slotted, window)).w(px(242.)).h(px(105.))));
+        let mut plain = spec.clone();
+        plain.params.clear();
+        let pv = Preview::of(c, &plain);
+        body = body.child(div().pt(px(6.)).h(px(111.)).flex_none().flex().justify_center().child(canvas(|_, _, _| (), move |b, _, window, _| paint_fastener(b, pv, window)).w(px(242.)).h(px(105.))));
         if locked {
             // The edit mode's Save / Cancel stand in for the Insert group.
             return body.into_any_element();
@@ -633,8 +628,8 @@ impl AssemblyView {
             .border_b_1()
             .border_color(gpui_kit::rgb(0xd7d7d7))
             .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Edit standard content"))
-            .child(div().id("std-edit-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().tooltip(crate::ui::tooltip("Accept (Enter)")).child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx))))
-            .child(div().id("std-edit-close").size(px(28.)).flex().items_center().justify_center().cursor_pointer().hover(|d| d.bg(pal.panel_hover)).tooltip(crate::ui::tooltip("Cancel (Esc)")).child(crate::assets::icon("dialog-cancel", 18., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| close(this, cx))));
+            .child(div().id("std-edit-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx))))
+            .child(div().id("std-edit-close").size(px(28.)).flex().items_center().justify_center().cursor_pointer().hover(|d| d.bg(pal.panel_hover)).child(crate::assets::icon("dialog-cancel", 18., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| close(this, cx))));
         v_flex()
             .id("std-edit-panel")
             .occlude()
@@ -674,10 +669,37 @@ impl AssemblyView {
 /// A polyline painter (points, closed).
 type Stroke<'a> = &'a mut dyn FnMut(&[(f32, f32)], bool);
 
+/// What the preview draws: the family and its forms (`fasteners.fs`).
+#[derive(Clone, Copy)]
+struct Preview {
+    shape: Shape,
+    head: i32,
+    drive: i32,
+    point: i32,
+    form: i32,
+    /// A dome rather than a flat top (button, pan, round heads).
+    dome: bool,
+}
+
+impl Preview {
+    fn of(c: &standard::Component, spec: &StandardSpec) -> Self {
+        let mut form = c.form.clone();
+        for p in &c.params {
+            if let Some(over) = p.forms.get(spec.param(&p.label)) {
+                form.extend(over.iter().map(|(k, v)| (k.clone(), *v)));
+            }
+        }
+        let get = |k: &str| form.get(k).copied().unwrap_or(0.0) as i32;
+        let dome = spec.size_row().is_some_and(|s| s.dims.get("rf").copied().unwrap_or(0.0) * 2.0 >= s.dims.get("dk").copied().unwrap_or(f64::MAX) * 0.9);
+        Preview { shape: c.shape, head: get("head"), drive: get("drive"), point: get("point"), form: get("form"), dome }
+    }
+}
+
 /// The component's line drawing in a 242 x 105 box, like live's preview
 /// (assembly/70): an end view at the left and a side view at the right,
-/// thin dark lines on white. Generic proportions per shape, not to scale.
-fn paint_fastener(b: Bounds<Pixels>, shape: Shape, slotted: bool, window: &mut Window) {
+/// thin dark lines on white, drawn from the component's family and forms.
+fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
+    use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, TAU};
     let o = b.origin;
     let at = |x: f32, y: f32| o + point(px(x), px(y));
     let color = gpui_kit::rgb(0x333333);
@@ -696,73 +718,125 @@ fn paint_fastener(b: Bounds<Pixels>, shape: Shape, slotted: bool, window: &mut W
         }
     };
     let arc = |cx: f32, cy: f32, r: f32, a0: f32, a1: f32| -> Vec<(f32, f32)> {
-        let n = (((a1 - a0).abs() / std::f32::consts::TAU) * 72.0).ceil().max(2.0) as usize;
+        let n = (((a1 - a0).abs() / TAU) * 72.0).ceil().max(2.0) as usize;
         (0..=n).map(|i| a0 + (a1 - a0) * i as f32 / n as f32).map(|a| (cx + r * a.cos(), cy + r * a.sin())).collect()
     };
-    let hexagon = |cx: f32, cy: f32, r: f32, flat_top: bool| -> Vec<(f32, f32)> {
-        let start = if flat_top { 0.0 } else { std::f32::consts::FRAC_PI_6 };
-        (0..6).map(|k| start + k as f32 * std::f32::consts::FRAC_PI_3).map(|a| (cx + r * a.cos(), cy + r * a.sin())).collect()
-    };
+    let polygon = |cx: f32, cy: f32, r: f32, n: usize, start: f32| -> Vec<(f32, f32)> { (0..n).map(|k| start + k as f32 * TAU / n as f32).map(|a| (cx + r * a.cos(), cy + r * a.sin())).collect() };
+    let circle = |cx: f32, cy: f32, r: f32| arc(cx, cy, r, 0.0, TAU);
     let (ex, ey, r) = (54.0f32, 52.0f32, 32.0f32);
-    // End view.
-    match shape {
-        Shape::Countersunk if slotted => {
-            // A circle split by the slot; the slot's floor between.
-            let w = 4.5f32;
-            let t = (w / r).asin();
-            let mut left = arc(ex, ey, r, std::f32::consts::FRAC_PI_2 + t, 3.0 * std::f32::consts::FRAC_PI_2 - t);
-            left.push(left[0]);
-            stroke(&left, false);
-            let mut right = arc(ex, ey, r, -std::f32::consts::FRAC_PI_2 + t, std::f32::consts::FRAC_PI_2 - t);
-            right.push(right[0]);
-            stroke(&right, false);
-            let f = r * 0.72;
-            stroke(&[(ex - w + 1.0, ey - f), (ex + w - 1.0, ey - f), (ex + w - 1.0, ey + f), (ex - w + 1.0, ey + f)], true);
+    // Script forms (fasteners.fs).
+    let (hex_head, square_head, round_head, countersunk, raised) = (pv.head == 1, pv.head == 2, pv.head == 3, pv.head == 4 || pv.head == 5, pv.head == 5);
+    let drive = |stroke: Stroke, rr: f32| match pv.drive {
+        1 => stroke(&polygon(ex, ey, rr * 0.42, 6, FRAC_PI_6), true),
+        2 => {
+            let (w, f) = (rr * 0.14, rr * 0.98);
+            stroke(&[(ex - w, ey - f), (ex + w, ey - f), (ex + w, ey + f), (ex - w, ey + f)], true);
         }
-        Shape::HexBolt | Shape::HexNut => {
-            stroke(&hexagon(ex, ey, r, true), true);
-            stroke(&arc(ex, ey, r * 0.866, 0.0, std::f32::consts::TAU), false);
-            if shape == Shape::HexNut {
-                stroke(&arc(ex, ey, r * 0.45, 0.0, std::f32::consts::TAU), false);
+        3 | 4 => {
+            let (w, f) = (rr * 0.1, rr * 0.4);
+            stroke(&[(ex - w, ey - f), (ex + w, ey - f), (ex + w, ey - w), (ex + f, ey - w), (ex + f, ey + w), (ex + w, ey + w), (ex + w, ey + f), (ex - w, ey + f), (ex - w, ey + w), (ex - f, ey + w), (ex - f, ey - w), (ex - w, ey - w)], true);
+            if pv.drive == 4 {
+                for k in 0..4 {
+                    let a = FRAC_PI_4 + k as f32 * FRAC_PI_2;
+                    stroke(&[(ex + w * 1.5 * a.cos(), ey + w * 1.5 * a.sin()), (ex + f * 0.7 * a.cos(), ey + f * 0.7 * a.sin())], false);
+                }
             }
         }
+        5 => {
+            let (ra, rb) = (rr * 0.42, rr * 0.3);
+            let mut pts = Vec::new();
+            for k in 0..6 {
+                let a = k as f32 * FRAC_PI_3;
+                pts.push((ex + rb * (a - FRAC_PI_6).cos(), ey + rb * (a - FRAC_PI_6).sin()));
+                pts.push((ex + ra * a.cos(), ey + ra * a.sin()));
+            }
+            stroke(&pts, true);
+        }
+        _ => {}
+    };
+    // End view.
+    match pv.shape {
+        Shape::Screw if hex_head || square_head => {
+            let n = if hex_head { 6 } else { 4 };
+            stroke(&polygon(ex, ey, r, n, if hex_head { 0.0 } else { FRAC_PI_4 }), true);
+            stroke(&circle(ex, ey, r * if hex_head { 0.866 } else { 0.707 }), false);
+            drive(&mut stroke, r);
+        }
+        Shape::Screw if pv.head == 0 => {
+            stroke(&circle(ex, ey, r * 0.6), false);
+            drive(&mut stroke, r * 0.6);
+        }
+        Shape::Screw => {
+            stroke(&circle(ex, ey, r), false);
+            drive(&mut stroke, r);
+        }
+        Shape::Nut => {
+            let n = if pv.form == 1 || pv.form == 6 { 4 } else { 6 };
+            stroke(&polygon(ex, ey, r, n, if n == 6 { 0.0 } else { FRAC_PI_4 }), true);
+            stroke(&circle(ex, ey, r * if n == 6 { 0.866 } else { 0.707 }), false);
+            stroke(&circle(ex, ey, r * 0.45), false);
+        }
         Shape::Washer => {
-            stroke(&arc(ex, ey, r, 0.0, std::f32::consts::TAU), false);
-            stroke(&arc(ex, ey, r * 0.5, 0.0, std::f32::consts::TAU), false);
+            if pv.form == 7 {
+                stroke(&polygon(ex, ey, r, 4, FRAC_PI_4), true);
+            } else {
+                stroke(&circle(ex, ey, r), false);
+            }
+            stroke(&circle(ex, ey, r * 0.5), false);
         }
-        Shape::Pin => stroke(&arc(ex, ey, r * 0.6, 0.0, std::f32::consts::TAU), false),
-        Shape::SetScrew => {
-            stroke(&arc(ex, ey, r * 0.6, 0.0, std::f32::consts::TAU), false);
-            stroke(&hexagon(ex, ey, r * 0.3, false), true);
+        Shape::Pin => stroke(&circle(ex, ey, r * 0.6), false),
+        Shape::Key => stroke(&[(ex - r * 0.5, ey - r * 0.5), (ex + r * 0.5, ey - r * 0.5), (ex + r * 0.5, ey + r * 0.5), (ex - r * 0.5, ey + r * 0.5)], true),
+        Shape::RetainingRing => {
+            stroke(&arc(ex, ey, r, 0.35, TAU - 0.35), false);
+            stroke(&arc(ex, ey, r * 0.75, 0.45, TAU - 0.45), false);
         }
-        _ => {
-            stroke(&arc(ex, ey, r, 0.0, std::f32::consts::TAU), false);
-            stroke(&hexagon(ex, ey, r * 0.42, false), true);
+        Shape::ORing => {
+            stroke(&circle(ex, ey, r), false);
+            stroke(&circle(ex, ey, r * 0.78), false);
         }
     }
     // Side view: the head at the left (x 110), the shank to the right.
     let (sx, end) = (110.0f32, 216.0f32);
+    let point = pv.point;
     let shank = |stroke: Stroke, x0: f32, hr: f32| {
-        stroke(&[(x0, ey - hr), (end, ey - hr), (end + 3.0, ey - hr + 3.0), (end + 3.0, ey + hr - 3.0), (end, ey + hr), (x0, ey + hr)], false);
-        stroke(&[(end, ey - hr), (end, ey + hr)], false);
+        match point {
+            1 | 4 => {
+                let tip = if point == 4 { 0.0 } else { hr * 0.35 };
+                stroke(&[(x0, ey - hr), (end - hr * 0.6, ey - hr), (end, ey - tip), (end, ey + tip), (end - hr * 0.6, ey + hr), (x0, ey + hr)], false);
+            }
+            3 => {
+                let dog = hr * 0.6;
+                stroke(&[(x0, ey - hr), (end - 18.0, ey - hr), (end - 18.0 + hr - dog, ey - dog), (end, ey - dog), (end, ey + dog), (end - 18.0 + hr - dog, ey + dog), (end - 18.0, ey + hr), (x0, ey + hr)], false);
+            }
+            _ => {
+                stroke(&[(x0, ey - hr), (end, ey - hr), (end + 3.0, ey - hr + 3.0), (end + 3.0, ey + hr - 3.0), (end, ey + hr), (x0, ey + hr)], false);
+                stroke(&[(end, ey - hr), (end, ey + hr)], false);
+            }
+        }
     };
-    match shape {
-        Shape::Countersunk => {
+    match pv.shape {
+        Shape::Screw if countersunk => {
             let (hr, x1) = (17.5f32, sx + 18.0);
             stroke(&[(x1, ey - hr), (sx, ey - r), (sx, ey + r), (x1, ey + hr)], false);
             stroke(&[(x1, ey - hr), (x1, ey + hr)], false);
+            if raised {
+                let pts: Vec<(f32, f32)> = (0..=24).map(|i| -1.0 + 2.0 * i as f32 / 24.0).map(|t| (sx - 6.0 * (1.0 - t * t), ey + r * t)).collect();
+                stroke(&pts, false);
+            }
             shank(&mut stroke, x1, hr);
         }
-        Shape::HexBolt => {
+        Shape::Screw if hex_head || square_head => {
             let (hr, x1) = (14.0f32, sx + 22.0);
             stroke(&[(sx, ey - r), (x1, ey - r), (x1, ey + r), (sx, ey + r)], true);
-            stroke(&[(sx, ey - r * 0.5), (x1, ey - r * 0.5)], false);
-            stroke(&[(sx, ey + r * 0.5), (x1, ey + r * 0.5)], false);
+            if hex_head {
+                stroke(&[(sx, ey - r * 0.5), (x1, ey - r * 0.5)], false);
+                stroke(&[(sx, ey + r * 0.5), (x1, ey + r * 0.5)], false);
+            }
             shank(&mut stroke, x1, hr);
         }
-        Shape::SocketHead | Shape::ButtonHead => {
-            let (hr, x1) = (14.0f32, sx + if shape == Shape::ButtonHead { 16.0 } else { 26.0 });
-            if shape == Shape::ButtonHead {
+        Shape::Screw if round_head || pv.head > 5 => {
+            let (hr, x1) = (14.0f32, sx + if pv.dome { 16.0 } else { 26.0 });
+            if pv.dome {
                 // The dome: an arc through the head's top corners.
                 let rr = (r * r + 16.0 * 16.0) / 32.0;
                 let a = (r / rr).asin();
@@ -774,21 +848,35 @@ fn paint_fastener(b: Bounds<Pixels>, shape: Shape, slotted: bool, window: &mut W
             }
             shank(&mut stroke, x1, hr);
         }
-        Shape::SetScrew | Shape::Pin => {
+        Shape::Screw | Shape::Pin => {
             let hr = 19.0f32;
             stroke(&[(sx + 3.0, ey - hr), (sx, ey - hr + 3.0), (sx, ey + hr - 3.0), (sx + 3.0, ey + hr)], false);
             stroke(&[(sx + 3.0, ey - hr), (sx + 3.0, ey + hr)], false);
             shank(&mut stroke, sx + 3.0, hr);
         }
-        Shape::HexNut => {
+        Shape::Nut => {
             let x1 = sx + 30.0;
             stroke(&[(sx, ey - r), (x1, ey - r), (x1, ey + r), (sx, ey + r)], true);
-            stroke(&[(sx, ey - r * 0.5), (x1, ey - r * 0.5)], false);
-            stroke(&[(sx, ey + r * 0.5), (x1, ey + r * 0.5)], false);
+            if pv.form != 1 && pv.form != 6 {
+                stroke(&[(sx, ey - r * 0.5), (x1, ey - r * 0.5)], false);
+                stroke(&[(sx, ey + r * 0.5), (x1, ey + r * 0.5)], false);
+            }
         }
-        Shape::Washer => {
+        Shape::Washer | Shape::RetainingRing => {
             let x1 = sx + 8.0;
             stroke(&[(sx, ey - r), (x1, ey - r), (x1, ey + r), (sx, ey + r)], true);
+        }
+        Shape::Key => {
+            let (x1, h) = (end, 16.0f32);
+            stroke(&[(sx + h, ey - h), (x1 - h, ey - h)], false);
+            stroke(&[(sx + h, ey + h), (x1 - h, ey + h)], false);
+            stroke(&arc(sx + h, ey, h, FRAC_PI_2, 3.0 * FRAC_PI_2), false);
+            stroke(&arc(x1 - h, ey, h, -FRAC_PI_2, FRAC_PI_2), false);
+        }
+        Shape::ORing => {
+            stroke(&circle(sx + 8.0, ey - r + 8.0, 8.0), false);
+            stroke(&circle(sx + 8.0, ey + r - 8.0, 8.0), false);
+            stroke(&[(sx + 8.0, ey - r), (sx + 8.0, ey - r + 16.0)], false);
         }
     }
 }
@@ -845,14 +933,19 @@ fn std_props_key(spec: &StandardSpec) -> String {
     let mut s = spec.clone();
     s.material = Some(spec.material().to_string());
     s.finish = Some(spec.finish().to_string());
-    s.head_slot = Some(spec.slotted());
-    s.series = Some(spec.series().to_string());
-    s.bearing_face = Some(spec.bearing_face().to_string());
+    if let Some(c) = standard::component(spec) {
+        for p in &c.params {
+            s.params.insert(p.label.clone(), spec.param(&p.label).to_string());
+        }
+    }
     serde_json::to_string(&s).unwrap_or_default()
 }
 
 fn load_std_props() -> std::collections::BTreeMap<String, StdProps> {
-    std::fs::read_to_string(std_props_path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+    let saved: std::collections::BTreeMap<String, StdProps> = std::fs::read_to_string(std_props_path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    // Keys saved before the generic parameters (head_slot, series…) read
+    // again as specs and keyed the current way.
+    saved.into_iter().map(|(k, v)| (serde_json::from_str::<StandardSpec>(&k).map(|s| std_props_key(&s)).unwrap_or(k), v)).collect()
 }
 
 pub(crate) fn std_props(spec: &StandardSpec) -> StdProps {

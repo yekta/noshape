@@ -169,7 +169,8 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
-    let res = k::fill_surface(&boundary, &points).map_err(|e| FeatureError::new(format!("Could not fill the boundary: {e}")))?;
+    // Onshape's FILL_SURFACE_FAIL text, not the kernel's (qa5 SF5).
+    let res = k::fill_surface(&boundary, &points).map_err(|_| FeatureError::new(crate::custom::host::error_text("FILL_SURFACE_FAIL")))?;
     let names = new_face_names(ev, &res.shape);
     surface_result(ev, NamedShape::new(res.shape, names))
 }
@@ -207,9 +208,12 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
         }
         let face = &faces[0];
         let outer = face.wires().into_iter().next().ok_or_else(|| FeatureError::new("Surface has no boundary"))?;
-        let moved = k::offset_wire_2d(&outer, d, k::JoinType::Intersection, false)?;
+        // A kernel failure reads as Onshape's EXTEND_FAILED ("Unable to move
+        // selected entities."), not the kernel's own text (qa5 SF5).
+        let failed = |_| FeatureError::new(crate::custom::host::error_text("EXTEND_FAILED"));
+        let moved = k::offset_wire_2d(&outer, d, k::JoinType::Intersection, false).map_err(failed)?;
         let wire = moved.wires().into_iter().next().unwrap_or(moved);
-        let new_face = k::make_face_from_wire(&wire, true)?;
+        let new_face = k::make_face_from_wire(&wire, true).map_err(failed)?;
         let names = vec![b.faces[0].clone()];
         let body = Body::new(b.id.clone(), b.name.clone(), b.kind, new_face, names, b.color, ev.feature);
         ev.ctx.bodies[bi] = Arc::new(body);

@@ -95,3 +95,9 @@ drawn from scratch on the ISO 128 projection symbols).
 `note-bold`, `note-italic`, `note-underline`, `note-strike`, `note-line-spacing`, `note-align-left|center|right|justify`,
 `note-list-bullets|numbers|letters`, `note-valign-top|middle|bottom`, `note-order-down|up`, `note-drawing-prop`,
 `note-sheet-prop`, `note-text-format`, `note-date` (the floating Note panel, live drawing/225; agent drw2).
+
+## Versions dialog icons (agent ui2, drawn from scratch)
+
+`merge-card-keep`, `merge-card-keep-x`, `merge-card-merge`, `merge-card-replace` (Merge dialog › Overall merge
+strategy cards, 24x48, monochrome masks tinted by `svg()`), `merge-keep`, `merge-both`, `merge-replace` (the per-tab
+Tab merge strategy select). Help images merge-dialog-*.
