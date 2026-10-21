@@ -69,3 +69,32 @@
   add-custom-features gear was redone from hand-written shapes after an early scripted attempt (rule 7). White
   fills removed from 7 icons. Ref fixes: show-preview, plus (live crops), document -> sprite:document,
   part-studio -> partstudio, section-view-3d -> lui-section-view.
+- g9-hatch-weld DONE: 91 redrawn (54 hatch swatches, hatch-region, 36 weld glyphs), median 29.9 -> 6.5, guard 0.
+  11 swatches had line positions first fitted by a script against Onshape pixels; script deleted, values
+  re-entered by hand (rule 7). Noisy textures (concrete, wood, ...) match in tone, not pixel for pixel.
+  22 weld joint glyphs (+ -below) are sized from the small sprite icons: requested live captures in
+  live/REQUESTS.md; refine when they land.
+- TODO (cross-area, drawing_weld.rs, for asb/drw2 after GO): the joint picker box should show Onshape's small
+  upright icon (our weld-menu-*), not the reference-line glyph (incl. the mirrored -below one); the weld flag
+  buttons sit ~7 px lower than Onshape's.
+- g7-ui-b DONE: 56 redrawn + 4 already exact; median 20.2 -> 1.5 (51/60 < 5, worst 10.6), guard 0.
+  Ref fixes: version -> create-version-button, delete -> clear-field-button (gray circled X; verified in
+  live/menus/rmb-asm-list-instance.png), create-variable -> add-variablestudio-button, dialog-ok -> ok-button
+  (white check on the green accept button; white kept on purpose, it is only drawn via assets::icon on green).
+  menu-section-view moved from its 103-unit frame to the 24 grid.
+- g10-unmapped DONE: 60 redrawn (59 with a reference: median 26.97 -> 4.73), 21 left unchanged (no Onshape
+  counterpart: noshape-logo, refold/unfold/sheet-metal-rip, camera-menu display modes, suppress/unsuppress/
+  rollback, interference, unused leftovers; tab-card-notch keeps its white border cover; ui-corner-mark exact).
+  new-document uses noshape's cube instead of the "On" mark (rule 6). Synthetic refs (guesses, not captures):
+  note-align-right/center/justify, note-valign-bottom.
+- file-pdf: g10 had matched Onshape's Adobe Acrobat ribbon (a third-party mark); replaced by icons2 with a
+  neutral hand-drawn "PDF" glyph in the same frame as the other file-tab icons.
+- TODO (cross-area, post-GO size check): inspection-illustration shown 130 px wide (Onshape 172); import-arrow
+  18 px (Onshape 23-24); anim-reverse glyph 22 (Onshape ~16); limit-* glyphs sit in the cell's right half as in
+  Onshape, so the app's separate axis letter should overlap into the cell.
+- g1-sketch-assembly DONE: 76/76 redrawn, median 22.6 -> 1.32, worst 4.29, guard 0. Ref fixes: assembly ->
+  sprite:assembly, show-mates -> HoverMate, group -> mateGroup. A gear-parameter search script (scored against
+  the reference) was deleted and rack-pinion reverted to hand-picked values (rule 7).
+- Gotcha: resvg/tiny-skia draws strokes <= 1 device px as hairlines (lighter, 75% corner coverage). Onshape's
+  icons are fills, so thin lines are drawn as filled outlines or stroke-width 1.01. The app renders with resvg
+  0.45.1 / tiny-skia 0.11.4 (scratch tools use resvg CLI 0.48.1, same tiny-skia line): confirm in the app after GO.
