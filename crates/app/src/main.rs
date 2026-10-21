@@ -111,6 +111,7 @@ mod release_dialog;
 mod scene_builder;
 mod session;
 mod sketch_mode;
+mod smoke;
 mod start_library;
 mod start_search;
 mod start_thumbnail;

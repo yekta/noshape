@@ -420,6 +420,19 @@ pub(crate) unsafe fn set_active_window_cursor_style(style: CursorStyle) {
             None
         };
 
+        // NOSHAPE PATCH: under the smoke test (NOSHAPE_SMOKE, see
+        // crates/app/src/smoke.rs) any GPUI window will do, and its cursor
+        // rects are rebuilt at once, so every style's NSCursor is created
+        // even without a pointer over a key window (a CI runner).
+        let smoke = std::env::var_os("NOSHAPE_SMOKE").is_some();
+        let active_window = active_window.or_else(|| {
+            if !smoke {
+                return None;
+            }
+            let windows: id = msg_send![app, windows];
+            let count: usize = msg_send![windows, count];
+            (0..count).map(|i| -> id { msg_send![windows, objectAtIndex: i] }).find(|w| is_gpui_window(*w))
+        });
         let Some(active_window) = active_window else {
             return;
         };
@@ -432,6 +445,13 @@ pub(crate) unsafe fn set_active_window_cursor_style(style: CursorStyle) {
                 window_state.native_window,
                 invalidateCursorRectsForView: window_state.native_view.as_ptr()
             ];
+            if smoke {
+                // The view's own `reset_cursor_rects` (below) creates the
+                // style's NSCursor; the window's only clears its rects.
+                let native_view = window_state.native_view.as_ptr();
+                drop(window_state);
+                let _: () = msg_send![native_view, resetCursorRects];
+            }
         }
     }
 }

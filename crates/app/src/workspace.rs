@@ -118,6 +118,9 @@ impl Workspace {
         if let Some(a) = this.active {
             cx.defer_in(window, move |this: &mut Self, window, cx| this.activate(a, window, cx));
         }
+        if crate::smoke::enabled() {
+            crate::smoke::start(window, cx);
+        }
         this
     }
 
@@ -230,7 +233,7 @@ impl Workspace {
         }
     }
 
-    fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         self.reveal_active_tab = true;
         if let Some(prev) = self.active.filter(|p| *p != tab) {
             self.recent.retain(|t| *t != prev && *t != tab);
@@ -253,6 +256,14 @@ impl Workspace {
         cx.notify();
     }
 
+    /// The active tab's Part Studio view, if it is one (smoke test).
+    pub(crate) fn active_part_studio(&self) -> Option<Entity<PartStudioView>> {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::PartStudio(v)) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
     /// Give keyboard focus to the active tab's editor.
     fn focus_active(&self, window: &mut Window, cx: &mut Context<Self>) {
         let fh = match self.active.and_then(|t| self.views.get(&t)) {
@@ -265,7 +276,7 @@ impl Workspace {
         window.focus(&fh, cx);
     }
 
-    fn add_tab(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn add_tab(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         let mut new_id = None;
         let after = self.active;
         self.doc.update(cx, |doc, cx| {
