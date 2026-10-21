@@ -9,11 +9,9 @@ use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use crate::ui::TipExt as _;
-use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam, ListOption, VariableKind};
+use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam};
 use noshape_model::params::ParamValue;
 use noshape_model::partstudio::PartStudio;
-use noshape_units::ExprValue;
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RightPanel {
@@ -269,22 +267,9 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let (name, kind, value, description) = (v.name.as_str(), v.kind, v.value.as_str(), v.description.as_str());
         if v.configuration {
-            let vkind = match kind {
-                "ANGLE" => VariableKind::Angle,
-                "INTEGER" => VariableKind::Integer,
-                "REAL" => VariableKind::Real,
-                "TEXT" => VariableKind::Text,
-                _ => VariableKind::Length,
-            };
-            let (name, value) = (name.to_string(), value.to_string());
-            let (min, max) = match v.range.clone() {
-                Some((lo, hi)) => (Some(ExprValue::new(lo)), Some(ExprValue::new(hi))),
-                None => (None, None),
-            };
-            self.edit_config("Add configuration variable", cx, |ps| {
-                let taken: Vec<String> = ps.configuration.inputs.iter().map(|i| i.id.clone()).collect();
-                let id = noshape_model::configuration::fs_identifier(&name, &taken);
-                ps.configuration.inputs.push(ConfigInput { id, name, kind: ConfigInputKind::Variable { kind: vkind, default: ExprValue::new(value), min, max }, visible_when: None, excluded: false });
+            let range = v.range.clone();
+            self.edit_config(noshape_ops::config::ADD_VARIABLE_INPUT, cx, |ps| {
+                noshape_ops::config::add_variable_input(ps, name, kind, value, range);
             });
         } else {
             // A new feature is drafted at `index` too, so the variable takes
@@ -565,33 +550,107 @@ impl PartStudioView {
                     }
                 }),
         );
-        // Variable Studio tables inserted here (Onshape: below the Part
-        // Studio's own table; same-document ones are editable).
+        // Variable Studio tables inserted here: above the Part Studio's own
+        // table, in their stored order (the lowest wins a name clash); same-
+        // document ones are editable. Their headers drag to reorder (live
+        // psb 10-20 t): a 1 px blue line with a circle shows the drop place,
+        // and the Part Studio's own table can't be passed (red line).
         let refs = noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, self.tab);
         let studios: Vec<noshape_model::document::TabId> = refs.iter().map(|r| r.studio).collect();
         self.ui.var_tables.retain(|k, _| studios.contains(k));
+        if !cx.has_active_drag() {
+            self.ui.var_drop = None;
+        }
+        let drop_at = self.ui.var_drop;
+        // `top`: the line's offset from the table's top; None: at its bottom.
+        let line = |color: Rgba, top: Option<f32>| {
+            div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .h(px(1.))
+                .bg(color)
+                .map(|d| match top {
+                    Some(t) => d.top(px(t)),
+                    None => d.bottom(px(4.)),
+                })
+                .child(div().absolute().left(px(1.)).top(px(-3.)).size(px(7.)).rounded_full().border_1().border_color(color).bg(gpui_kit::rgb(0xffffff)))
+        };
+        let blue = gpui_kit::rgb(0x1651b0);
         let mut tables: Vec<AnyElement> = Vec::new();
         for (k, r) in refs.iter().enumerate() {
             // Another document's studio: read-only (Onshape).
-            if r.external.is_some() {
+            let body: AnyElement = if r.external.is_some() {
                 let target = crate::variable_insert::InsertTarget::Element(self.tab);
-                tables.extend(crate::variable_insert::readonly_table(&self.doc, target, r, k, refs.len(), cx).map(|t| div().pt(px(10.)).child(t).into_any_element()));
-                continue;
-            }
-            let (doc, host, s) = (self.doc.clone(), self.tab, r.studio);
-            let view = self.ui.var_tables.entry(s).or_insert_with(|| cx.new(|cx| crate::variable_studio::VariableStudioView::new_in_panel(doc, s, host, window, cx)));
-            tables.push(div().pt(px(10.)).child(view.clone()).into_any_element());
+                match crate::variable_insert::readonly_table(&self.doc, target, r, k, refs.len(), cx) {
+                    Some(t) => t.into_any_element(),
+                    None => continue,
+                }
+            } else {
+                let (doc, host, s) = (self.doc.clone(), self.tab, r.studio);
+                self.ui.var_tables.entry(s).or_insert_with(|| cx.new(|cx| crate::variable_studio::VariableStudioView::new_in_panel(doc, s, host, window, cx))).clone().into_any_element()
+            };
+            // The header's title area is the drag handle (between the fold
+            // chevron and ⋯, which stay clickable).
+            let name: SharedString = self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id == r.studio).map(|t| t.name.clone()).unwrap_or_default().into();
+            let handle = var_table_drag_source(div().id(SharedString::from(format!("var-table-drag-{k}"))).absolute().top_0().left(px(24.)).right(px(48.)).h(px(35.)), r.studio, name);
+            tables.push(
+                div()
+                    .id(SharedString::from(format!("var-table-{k}")))
+                    .relative()
+                    .pb(px(10.))
+                    .child(body)
+                    .child(handle)
+                    // Between tables (the first table's at its top edge, which
+                    // the panel would clip above).
+                    .when(drop_at == Some(k), |d| d.child(line(blue, Some(if k == 0 { 0. } else { -6. }))))
+                    .when(drop_at == Some(k + 1) && k + 1 == refs.len(), |d| d.child(line(blue, None)))
+                    // Over the upper half: before this table; the lower: after.
+                    .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<VarTableDrag>, _, cx| {
+                        if !e.bounds.contains(&e.event.position) {
+                            return;
+                        }
+                        let after = e.event.position.y > e.bounds.center().y;
+                        let at = Some(if after { k + 1 } else { k });
+                        if this.ui.var_drop != at {
+                            this.ui.var_drop = at;
+                            cx.notify();
+                        }
+                    }))
+                    .on_drop(cx.listener(move |this, d: &VarTableDrag, _, cx| {
+                        let to = this.ui.var_drop.take().unwrap_or(k);
+                        this.move_var_table(d.studio, to, cx);
+                    }))
+                    .into_any_element(),
+            );
         }
+        // Over the Part Studio's own table: refused, a red line.
+        let refused = drop_at == Some(usize::MAX);
         let empty = self.display.variables.is_empty() && studios.is_empty();
         // Live (164): the tables run flush with the pane (the body has 5 px
         // padding), the first header 2 px under the title's underline, and
         // every table ends with the italic "Name" row.
+        let own = v_flex()
+            .id("var-own-table")
+            .relative()
+            .child(header)
+            .when(!self.ui.var_folded, |d| d.child(columns).children(rows).child(new_row))
+            .when(refused, |d| d.child(line(gpui_kit::rgb(0xd52b1e), None)))
+            .on_drag_move(cx.listener(|this, e: &DragMoveEvent<VarTableDrag>, _, cx| {
+                if e.bounds.contains(&e.event.position) && this.ui.var_drop != Some(usize::MAX) {
+                    this.ui.var_drop = Some(usize::MAX);
+                    cx.notify();
+                }
+            }))
+            .on_drop(cx.listener(|this, _: &VarTableDrag, _, cx| {
+                this.ui.var_drop = None;
+                cx.notify();
+            }));
         v_flex()
             .mx(px(-5.))
             .mt(px(-3.))
-            .child(header)
-            .when(!self.ui.var_folded, |d| d.child(columns).children(rows).child(new_row))
             .children(tables)
+            .child(own)
             .when(empty, |d| {
                 d.child(
                         v_flex()
@@ -605,6 +664,31 @@ impl PartStudioView {
             .into_any_element()
     }
 
+    /// Drop a dragged Variable Studio table at position `to` among the
+    /// inserted tables; the whole order is stored with this Part Studio.
+    fn move_var_table(&mut self, studio: noshape_model::document::TabId, to: usize, cx: &mut Context<Self>) {
+        let list = noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, self.tab);
+        let Some(from) = list.iter().position(|r| r.studio == studio) else { return };
+        let mut order = list.clone();
+        let r = order.remove(from);
+        let to = if to > from { to - 1 } else { to }.min(order.len());
+        order.insert(to, r);
+        if order == list {
+            return;
+        }
+        let tab = self.tab;
+        self.doc.update(cx, |d, cx| {
+            d.edit_tab(tab, "Move table", cx, |c| {
+                if let noshape_model::document::TabContent::PartStudio(ps) = c {
+                    ps.variable_studios.removed.retain(|t| !order.iter().any(|r| r.studio == *t));
+                    ps.variable_studios.inserted = order.clone();
+                }
+            });
+        });
+        self.ui.var_drop = None;
+        self.config_dirty(cx);
+    }
+
     /// The Variable table footer (live, part-studio/77): a split button
     /// "Create Variable Studio | ▴" whose menu also has Insert Variable Studio.
     fn variable_panel_footer(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -613,22 +697,8 @@ impl PartStudioView {
 
     /// Add a configuration input of one of Onshape's kinds (List, Checkbox, Variable).
     fn add_config_input(&mut self, label: &'static str, cx: &mut Context<Self>) {
-        self.edit_config("Add configuration input", cx, |ps| {
-            let n = ps.configuration.inputs.len() + 1;
-            let taken: Vec<String> = ps.configuration.inputs.iter().map(|i| i.id.clone()).collect();
-            let kind = match label {
-                "Checkbox" => ConfigInputKind::Checkbox { default: false },
-                "Variable" => ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None },
-                _ => ConfigInputKind::List {
-                    // Live (part-studio/182): a new List has the one "Default" row.
-                    options: vec![ListOption { id: "Default".into(), name: "Default".into() }],
-                    default: "Default".into(),
-                },
-            };
-            let name = if label == "List" && n == 1 { "Configuration".to_string() } else { format!("{label} {n}") };
-            // FeatureScript ids from the names (Edit FeatureScript IDs… shows them).
-            let id = noshape_model::configuration::fs_identifier(&name, &taken);
-            ps.configuration.inputs.push(ConfigInput { id, name, kind, visible_when: None, excluded: false });
+        self.edit_config(noshape_ops::config::ADD_INPUT, cx, |ps| {
+            noshape_ops::config::add_input(ps, label);
         })
     }
 
@@ -951,11 +1021,7 @@ impl PartStudioView {
             })
             .child(self.config_name_cell(format!("in-name-{iid}"), input.name.clone(), (px(16.), FontWeight::MEDIUM), window, cx, move |this, v, cx| {
                 let id = i2.clone();
-                this.edit_config("Rename configuration input", cx, |ps| {
-                    if let Some(i) = ps.configuration.inputs.iter_mut().find(|i| i.id == id) {
-                        i.name = v;
-                    }
-                });
+                this.edit_config(noshape_ops::config::RENAME_INPUT, cx, |ps| noshape_ops::config::rename_input(ps, &id, v));
             }))
             .children(variable_ref.map(|r| div().flex_none().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(r)))
             .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x999999)).child(format!("Default: {default_text}")))
@@ -1064,10 +1130,7 @@ impl PartStudioView {
                             let i8 = id.clone();
                             m.item(item("Delete", Box::new(move |this, _, cx| {
                                 let id = i8.clone();
-                                this.edit_config("Delete configuration input", cx, |ps| {
-                                    ps.configuration.inputs.retain(|i| i.id != id);
-                                    ps.configuration.configured.retain(|c| c.input != id);
-                                });
+                                this.edit_config(noshape_ops::config::DELETE_INPUT, cx, |ps| noshape_ops::config::delete_input(ps, &id));
                             })))
                         });
                         crate::os_menu::open(e.position(), menu, window, cx);
@@ -1091,16 +1154,18 @@ impl PartStudioView {
         const ROW_H: f32 = 34.;
         let cell = |w: f32| div().w(px(w)).h(px(ROW_H)).flex_none().px(px(3.)).flex().items_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.));
         let head = |w: f32| cell(w).bg(gpui_kit::rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD);
+        // Column widths: live's grips (`ui::col_grip`), per input table (live:
+        // widening Size's Name left Shape's alone).
+        let table = format!("config-{iid}");
+        let name_w = crate::ui::col_w(&table, "name", NAME_W);
+        let col_key = |c: &ConfiguredParam| format!("{:?}-{}", c.feature, c.param);
+        let col_ws: Vec<f32> = columns.iter().map(|(_, c)| crate::ui::col_w(&table, &col_key(c), COL_W)).collect();
         match &input.kind {
             ConfigInputKind::Variable { default, .. } => {
                 let a = iid.clone();
                 let value = self.config_name_cell(format!("var-def-{iid}"), default.text.clone(), (px(13.33), FontWeight::NORMAL), window, cx, move |this, v, cx| {
                     let a = a.clone();
-                    this.edit_config("Edit configuration variable", cx, |ps| {
-                        if let Some(ConfigInput { kind: ConfigInputKind::Variable { default, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == a) {
-                            *default = ExprValue::new(v);
-                        }
-                    });
+                    this.edit_config(noshape_ops::config::EDIT_VARIABLE_INPUT, cx, |ps| noshape_ops::config::set_variable_default(ps, &a, v));
                 });
                 let _ = value;
                 section = self.render_usages(section, &input.name, grid, cx);
@@ -1120,7 +1185,7 @@ impl PartStudioView {
                     studio.feature(c.feature).and_then(|f| f.feature_type()).and_then(|t| t.param(&c.param)).map(|p| p.label.to_string()).unwrap_or_else(|| if c.param == noshape_model::configuration::SUPPRESSED_PARAM { "Suppressed".into() } else { "?".into() })
                 };
                 if columns.is_empty() {
-                    section = section.child(h_flex().border_l_1().border_color(grid).child(head(NAME_W).child(first)));
+                    section = section.child(h_flex().border_l_1().border_color(grid).child(head(name_w).relative().child(first).child(crate::ui::col_grip(&table, "name", NAME_W))));
                 } else {
                     let mut groups = h_flex();
                     let mut params = h_flex();
@@ -1129,9 +1194,9 @@ impl PartStudioView {
                         let f = columns[k].1.feature;
                         let n = columns[k..].iter().take_while(|(_, c)| c.feature == f).count();
                         let fname = studio.feature(f).map(|f| f.name.clone()).unwrap_or_else(|| "Deleted feature".into());
-                        groups = groups.child(head(COL_W * n as f32).child(div().truncate().child(fname)));
-                        for (_, c) in &columns[k..k + n] {
-                            params = params.child(head(COL_W).child(div().truncate().child(label_of(c))));
+                        groups = groups.child(head(col_ws[k..k + n].iter().sum()).child(div().truncate().child(fname)));
+                        for (q, (_, c)) in columns[k..k + n].iter().enumerate() {
+                            params = params.child(head(col_ws[k + q]).relative().child(div().truncate().child(label_of(c))).child(crate::ui::col_grip(&table, &col_key(c), COL_W)));
                         }
                         k += n;
                     }
@@ -1139,7 +1204,7 @@ impl PartStudioView {
                         h_flex()
                             .border_l_1()
                             .border_color(grid)
-                            .child(div().w(px(NAME_W)).h(px(ROW_H * 2.)).flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).bg(gpui_kit::rgb(0xeaeaea)).font_weight(FontWeight::BOLD).text_size(px(14.)).child(first))
+                            .child(div().w(px(name_w)).h(px(ROW_H * 2.)).relative().flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).bg(gpui_kit::rgb(0xeaeaea)).font_weight(FontWeight::BOLD).text_size(px(14.)).child(first).child(crate::ui::col_grip(&table, "name", NAME_W)))
                             .child(v_flex().child(groups).child(params)),
                     );
                 }
@@ -1150,13 +1215,7 @@ impl PartStudioView {
                         let (a, b) = (iid.clone(), rk.clone());
                         self.config_name_cell(format!("opt-{iid}-{rk}"), rname.clone(), (px(13.33), if active { FontWeight::MEDIUM } else { FontWeight::NORMAL }), window, cx, move |this, v, cx| {
                             let (a, b) = (a.clone(), b.clone());
-                            this.edit_config("Rename configuration", cx, |ps| {
-                                if let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == a)
-                                    && let Some(o) = options.iter_mut().find(|o| o.id == b)
-                                {
-                                    o.name = v;
-                                }
-                            });
+                            this.edit_config(noshape_ops::config::RENAME_OPTION, cx, |ps| noshape_ops::config::rename_option(ps, &a, &b, v));
                         })
                     } else {
                         // A checkbox's rows show its states as read-only boxes
@@ -1178,7 +1237,7 @@ impl PartStudioView {
                         .border_l_1()
                         .border_color(grid)
                         .child(
-                            cell(NAME_W)
+                            cell(name_w)
                                 .relative()
                                 .cursor_pointer()
                                 .pl(px(6.))
@@ -1198,22 +1257,13 @@ impl PartStudioView {
                                 m.item(crate::os_menu::OsMenuItem::new("Delete").icon_name("menu-delete").on_click(move |_, _, cx| {
                                     let (a, b) = (a.clone(), b.clone());
                                     v.update(cx, |this, cx| {
-                                        this.edit_config("Delete configuration", cx, |ps| {
-                                            if let Some(ConfigInput { kind: ConfigInputKind::List { options, default }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == a)
-                                                && options.len() > 1
-                                            {
-                                                options.retain(|o| o.id != b);
-                                                if *default == b {
-                                                    *default = options[0].id.clone();
-                                                }
-                                            }
-                                        });
+                                        this.edit_config(noshape_ops::config::DELETE_OPTION, cx, |ps| noshape_ops::config::delete_option(ps, &a, &b));
                                     })
                                 }))
                             })
                         });
-                    for (ci, c) in &columns {
-                        row = row.child(cell(COL_W).child(self.configured_value_cell(*ci, c, rk, window, cx)));
+                    for (q, (ci, c)) in columns.iter().enumerate() {
+                        row = row.child(cell(col_ws[q]).child(self.configured_value_cell(*ci, c, rk, window, cx)));
                     }
                     section = section.child(row);
                 }
@@ -1228,16 +1278,13 @@ impl PartStudioView {
                             return;
                         }
                         let a = a.clone();
-                        this.edit_config("Add configuration", cx, |ps| {
-                            if let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == a) {
-                                let taken: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
-                                options.push(ListOption { id: noshape_model::configuration::fs_identifier(&name, &taken), name });
-                            }
+                        this.edit_config(noshape_ops::config::ADD_OPTION, cx, |ps| {
+                            noshape_ops::config::add_option(ps, &a, name);
                         });
                     });
                     section = section.child(
                         h_flex().border_l_1().border_color(grid).child(
-                            cell(NAME_W)
+                            cell(name_w)
                                 .relative()
                                 .child(crate::ui::input_with_placeholder(&st, "Name", cx).appearance(false).text_size(px(13.33)).pl(px(3.))),
                         ),
@@ -1352,11 +1399,7 @@ impl PartStudioView {
                             m = m.item(crate::os_menu::OsMenuItem::new(n.clone()).on_click(move |_, _, cx| {
                                 let (kk, o) = (kk.clone(), o.clone());
                                 v.update(cx, |this, cx| {
-                                    this.edit_config("Edit configured value", cx, |ps| {
-                                        if let Some(cp) = ps.configuration.configured.get_mut(ci) {
-                                            cp.values.insert(kk, ParamValue::Text(o));
-                                        }
-                                    });
+                                    this.edit_config(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |ps| noshape_ops::config::set_configured_value(ps, ci, &kk, ParamValue::Text(o)));
                                 })
                             }));
                         }
@@ -1373,11 +1416,7 @@ impl PartStudioView {
                 .justify_center()
                 .child(crate::ui::os_checkbox(SharedString::from(format!("cpv-{ci}-{key}")), "", b).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     let kk = kk.clone();
-                    this.edit_config("Edit configured value", cx, |ps| {
-                        if let Some(cp) = ps.configuration.configured.get_mut(ci) {
-                            cp.values.insert(kk, ParamValue::Bool(!b));
-                        }
-                    });
+                    this.edit_config(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |ps| noshape_ops::config::set_configured_value(ps, ci, &kk, ParamValue::Bool(!b)));
                 })))
                 .into_any_element();
         }
@@ -1388,16 +1427,7 @@ impl PartStudioView {
         };
         self.config_name_cell(format!("cp-{ci}-{key}"), text, (px(13.33), FontWeight::NORMAL), window, cx, move |this, v, cx| {
             let kk = kk.clone();
-            this.edit_config("Edit configured value", cx, |ps| {
-                if let Some(cp) = ps.configuration.configured.get_mut(ci) {
-                    let new = match cp.values.get(&kk) {
-                        Some(ParamValue::Enum(_)) => ParamValue::Enum(v.trim().to_string()),
-                        Some(ParamValue::Text(_)) => ParamValue::Text(v),
-                        _ => ParamValue::Expr(ExprValue::new(v)),
-                    };
-                    cp.values.insert(kk.clone(), new);
-                }
-            });
+            this.edit_config(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |ps| noshape_ops::config::set_configured_text(ps, ci, &kk, v));
         })
     }
 
@@ -2060,8 +2090,13 @@ impl PartStudioView {
     fn render_inspection(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let letters = self.studio(cx).map(|s| noshape_model::annotations::datum_letters(&s.annotations)).unwrap_or_default();
-        if !letters.is_empty() {
-            return self.render_inspection_filled(letters, cx);
+        // Toleranced parameters, the open dialog's included (live 596, 598:
+        // the panel fills while the feature dialog is still open).
+        let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.clone());
+        let chars = self.studio(cx).map(|s| noshape_model::annotations::characteristics(s, draft.as_ref())).unwrap_or_default();
+        let standard = self.studio(cx).is_some_and(|s| s.default_tolerances.is_some());
+        if !letters.is_empty() || !chars.is_empty() || standard {
+            return self.render_inspection_filled(letters, chars, cx);
         }
         v_flex()
             .child(
@@ -2132,11 +2167,13 @@ impl PartStudioView {
     /// Part 1 ▾", the default tolerances field and ⋯; the tools; "⌄ Datums
     /// (n/n)" with one cell per letter; "⌄ Characteristics (0/0)" with its
     /// table header.
-    fn render_inspection_filled(&mut self, letters: Vec<String>, cx: &mut Context<Self>) -> AnyElement {
+    fn render_inspection_filled(&mut self, letters: Vec<String>, chars: Vec<noshape_model::annotations::Characteristic>, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let grid = gpui_kit::rgb(0xaaaaaa);
-        let part = self.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.name.clone()).unwrap_or_default();
-        let section = |title: &'static str, count: usize| {
+        let solid = self.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid);
+        let part = solid.map(|b| b.name.clone()).unwrap_or_default();
+        let part_id = solid.map(|b| b.id.clone());
+        let section = |title: &'static str, shown: usize, count: usize| {
             h_flex()
                 .h(px(34.))
                 .px(px(6.))
@@ -2146,10 +2183,25 @@ impl PartStudioView {
                 .border_color(gpui_kit::rgb(0xcccccc))
                 .child(crate::ui::glyph("ui-chevron-down", 10., pal.text))
                 .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
-                .child(div().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(format!("({count}/{count})")))
+                .child(div().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(format!("({shown}/{count})")))
+        };
+        let section_plain = |title: &'static str| {
+            h_flex()
+                .h(px(34.))
+                .px(px(6.))
+                .gap(px(4.))
+                .bg(gpui_kit::rgb(0xeaeaea))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xcccccc))
+                .child(crate::ui::glyph("ui-chevron-down", 10., pal.text))
+                .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
         };
         let cell = |t: String, bold: bool| div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text).when(bold, |d| d.font_weight(FontWeight::BOLD).bg(gpui_kit::rgb(0xeaeaea))).child(t);
         let n = letters.len();
+        let units = self.doc.read(cx).session.doc.settings.units;
+        // Types ▾ (live 599-click-types): nothing ticked shows every row.
+        let shown: Vec<&noshape_model::annotations::Characteristic> = chars.iter().filter(|c| self.ui.insp.shows(c)).collect();
+        let defaults = self.render_default_tolerances_section(cx);
         v_flex()
             .mx(px(-5.))
             .child(
@@ -2160,15 +2212,32 @@ impl PartStudioView {
                     .text_size(px(13.33))
                     .child(div().text_color(pal.text).child("Model"))
                     .child(h_flex().w(px(170.)).h(px(26.)).px(px(4.)).justify_between().border_b_1().border_color(grid).child(div().text_color(pal.text).child(part)).child(crate::ui::glyph("ui-caret-down", 8., gpui_kit::rgb(0x666666))))
+                    .child(self.render_insp_model_tools(part_id, cx))
                     .child(div().flex_1())
                     .child(div().id("insp-more").child(crate::assets::icon("more", 20., cx))),
             )
             .child(self.render_inspection_tools(cx))
-            .child(section("Datums", n))
+            .child(section("Datums", n, n))
             .child(h_flex().border_l_1().border_color(grid).children(letters.into_iter().map(|l| cell(l, true))))
             .child(div().h(px(8.)))
-            .child(section("Characteristics", 0))
+            .child(section("Characteristics", shown.len(), chars.len()).child(self.render_characteristics_tools(cx)))
             .child(h_flex().border_l_1().border_color(grid).children(["Type", "Nominal value", "Tolerance", "Upper limit", "Lower limit"].map(|h| cell(h.to_string(), true))))
+            // Live 598: "Distance | 20.000 | ±0.000 | 20.000 | 20.000", the
+            // type bold, numbers without their unit.
+            .children(shown.iter().map(|c| {
+                let factor = units.si_factor(c.dim);
+                let decimals = usize::from(if c.dim == noshape_units::Dim::ANGLE { units.angle_precision } else { units.length_precision });
+                let [tol, upper, lower] = c.cells(factor, decimals);
+                h_flex()
+                    .border_l_1()
+                    .border_color(grid)
+                    .child(cell(c.kind.to_string(), false).font_weight(FontWeight::BOLD))
+                    .child(cell(format!("{:.*}", c.tolerance.precision.map(usize::from).unwrap_or(decimals), c.nominal / factor), false))
+                    .child(cell(tol, false))
+                    .child(cell(upper, false))
+                    .child(cell(lower, false))
+            }))
+            .when_some(defaults, |d, body| d.child(div().h(px(8.))).child(section_plain("Default tolerances")).child(body))
             .into_any_element()
     }
 
@@ -2299,17 +2368,8 @@ impl PartStudioView {
     pub(super) fn add_configured(&mut self, feature: noshape_model::FeatureId, param: &str, input: &str, cx: &mut Context<Self>) {
         let param = param.to_string();
         let input = input.to_string();
-        self.edit_config("Configure parameter", cx, |ps| {
-            let Some(f) = ps.feature(feature) else { return };
-            let current = if param == noshape_model::configuration::SUPPRESSED_PARAM { Some(ParamValue::Bool(f.suppressed)) } else { f.params.get(&param).cloned() };
-            let Some(current) = current else { return };
-            let keys: Vec<String> = match ps.configuration.inputs.iter().find(|i| i.id == input).map(|i| &i.kind) {
-                Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
-                Some(ConfigInputKind::Checkbox { .. }) => vec!["true".into(), "false".into()],
-                _ => return,
-            };
-            let values = keys.into_iter().map(|k| (k, current.clone())).collect();
-            ps.configuration.configured.push(ConfiguredParam { input, feature, param, values });
+        self.edit_config(noshape_ops::config::CONFIGURE_PARAMETER, cx, |ps| {
+            noshape_ops::config::configure_parameter(ps, feature, &param, &input);
         });
     }
 
@@ -2441,15 +2501,7 @@ fn var_row_menu(menu: crate::os_menu::OsMenu, view: Entity<PartStudioView>, fid:
 /// "Enter a value between 0 and 20.0. Current value is 50.", numbers in the
 /// range's unit without it).
 fn config_value_error(input: &ConfigInput, text: &str, units: &noshape_units::UnitPrefs) -> Option<String> {
-    let ConfigInputKind::Variable { kind, min, max, .. } = &input.kind else { return None };
-    let dim = super::config_var_dialog::kind_dim(*kind)?;
-    let eval = |t: &str| noshape_units::evaluate_as(t, dim, units, &noshape_units::EmptyScope).ok().map(|q| q.value / units.si_factor(dim));
-    let v = eval(text)?;
-    let lo = min.as_ref().and_then(|m| eval(&m.text));
-    let hi = max.as_ref().and_then(|m| eval(&m.text));
-    let fmt = |x: f64| if x.fract() == 0.0 { format!("{x:.0}") } else { format!("{x}") };
-    let out = lo.is_some_and(|l| v < l) || hi.is_some_and(|h| v > h);
-    out.then(|| format!("Enter a value between {} and {}. Current value is {}.", lo.map(fmt).unwrap_or_default(), hi.map(fmt).unwrap_or_default(), fmt(v)))
+    noshape_ops::config::value_error(input, text, units)
 }
 
 /// Dragging the splitter under the feature list's Configurations block.
@@ -2476,40 +2528,8 @@ struct CfgDragPill {
 
 impl Render for CfgDragPill {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        // GPUI draws the drag view at the pointer less the grab offset, laid
-        // out at its least size (a root margin is lost): pad it back.
-        div()
-            .pl(self.offset.x)
-            .pt(self.offset.y)
-            .child(
-                div()
-                    .mt(px(-15.))
-                    .h(px(31.))
-                    .px(px(10.))
-                    .flex()
-                    .items_center()
-                    .rounded(px(15.5))
-                    .bg(gpui_kit::rgb(0x1651b0))
-                    .text_size(px(14.))
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(gpui_kit::rgb(0xffffff))
-                    .child(self.name.clone()),
-            )
-            .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())
+        crate::ui::name_pill(self.name.clone(), self.offset)
     }
-}
-
-/// The drop line (live cursors/670): 2 px `#1651b0`, starting at a 6 px open
-/// circle, across the panel in the gap between two sections.
-fn cfg_drop_line() -> Div {
-    let accent = gpui_kit::rgb(0x1651b0);
-    div()
-        .absolute()
-        .left_0()
-        .right_0()
-        .h(px(6.))
-        .child(div().absolute().left(px(5.)).right_0().top(px(2.)).h(px(2.)).bg(accent))
-        .child(div().absolute().left_0().top_0().size(px(6.)).rounded_full().border_2().border_color(accent).bg(gpui_kit::rgb(0xcad8ed)))
 }
 
 impl PartStudioView {
@@ -2523,7 +2543,7 @@ impl PartStudioView {
             .relative()
             .child(section)
             // Sections are 10 px apart: the line is centred in the gap.
-            .when_some(line, |d, after| d.child(if after { cfg_drop_line().bottom(px(2.)) } else { cfg_drop_line().top(px(-8.)) }))
+            .when_some(line, |d, after| d.child(if after { crate::ui::drop_line().bottom(px(2.)) } else { crate::ui::drop_line().top(px(-8.)) }))
             .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<CfgInputDrag>, _, cx| {
                 if !e.bounds.contains(&e.event.position) {
                     return;
@@ -2540,18 +2560,38 @@ impl PartStudioView {
             .on_drop(cx.listener(move |this, d: &CfgInputDrag, _, cx| {
                 this.ui.cfg_drop = None;
                 let (from_id, to_id) = (d.0.clone(), dropped.clone());
-                this.edit_config("Reorder configuration inputs", cx, |ps| {
-                    let inputs = &mut ps.configuration.inputs;
-                    if let (Some(from), Some(to)) = (inputs.iter().position(|i| i.id == from_id), inputs.iter().position(|i| i.id == to_id))
-                        && from != to
-                    {
-                        let input = inputs.remove(from);
-                        inputs.insert(to, input);
-                    }
-                });
+                this.edit_config(noshape_ops::config::REORDER_INPUTS, cx, |ps| noshape_ops::config::reorder_inputs(ps, &from_id, &to_id));
                 cx.notify();
             }))
             .into_any_element()
     }
 }
 
+/// A Variable Studio table being dragged by its header (live psb 10-20 t):
+/// the ghost is a dark-blue pill with the table name, and the pointer shows
+/// `grabbing` meanwhile.
+#[derive(Clone)]
+struct VarTableDrag {
+    studio: noshape_model::document::TabId,
+    name: SharedString,
+}
+
+impl Render for VarTableDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .px(px(10.))
+            .py(px(3.))
+            .rounded_full()
+            .bg(gpui_kit::rgb(0x0b3d78))
+            .text_size(px(13.))
+            .text_color(gpui_kit::rgb(0xffffff))
+            .child(self.name.clone())
+            .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())
+    }
+}
+
+/// Make `el` (over an inserted table's header) the drag handle for
+/// reordering.
+fn var_table_drag_source<E: StatefulInteractiveElement>(el: E, studio: noshape_model::document::TabId, name: SharedString) -> E {
+    el.on_drag(VarTableDrag { studio, name }, |d, _, _, cx| cx.new(|_| d.clone()))
+}

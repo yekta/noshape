@@ -179,8 +179,12 @@ pub struct PreferencesView {
     /// Scroll Keyboard shortcuts into view once laid out (as the browser's
     /// `focusView`: its top at the top, or as far as the page scrolls).
     scroll_to_shortcuts: bool,
-    /// Shortcut toolbars: the context shown (0 = Sketch, 1 = Part Studio).
+    /// Shortcut toolbars: the context shown (0 = Sketch, 1 = Part Studio,
+    /// 2 = Assembly).
     toolbar_context: usize,
+    /// The assembly's S toolbar (skb, assembly_toolbar.rs): saved and draft.
+    asm_toolbar: crate::assembly_view::AsmToolbarPrefs,
+    asm_toolbar_draft: crate::assembly_view::AsmToolbarPrefs,
     /// Saved toolbar preferences, and the Shortcut toolbars draft that
     /// "Save shortcut toolbar settings" writes (live: ticks apply on Save).
     toolbar: ToolbarPrefs,
@@ -193,6 +197,8 @@ pub struct PreferencesView {
     mouse: Entity<crate::mouse_prefs::MousePrefsView>,
     /// Units section (units_prefs.rs).
     units: Entity<crate::units_prefs::UnitsPrefsView>,
+    /// Decimal format section (units_prefs.rs).
+    decimal: Entity<crate::units_prefs::DecimalPrefsView>,
     /// Drawings section (drawing_prefs.rs).
     drawings: Entity<crate::drawing_prefs::DrawingPrefsView>,
     _subs: Vec<Subscription>,
@@ -227,11 +233,14 @@ impl PreferencesView {
             toolbar_context: 0,
             toolbar: ToolbarPrefs::load(),
             toolbar_draft: ToolbarPrefs::load(),
+            asm_toolbar: crate::assembly_view::AsmToolbarPrefs::load(),
+            asm_toolbar_draft: crate::assembly_view::AsmToolbarPrefs::load(),
             name,
             name_saved,
             release: cx.new(|cx| crate::release_prefs::ReleasePrefsView::new(window, cx)),
             mouse: cx.new(|_| crate::mouse_prefs::MousePrefsView::new()),
             units: cx.new(|_| crate::units_prefs::UnitsPrefsView::new()),
+            decimal: cx.new(|_| crate::units_prefs::DecimalPrefsView::default()),
             drawings: cx.new(|_| crate::drawing_prefs::DrawingPrefsView::new()),
             _subs: subs,
         };
@@ -751,9 +760,8 @@ impl PreferencesView {
 
     fn render_toolbars(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        // Live: Sketch (the default) | Part Studio | Assembly | Drawing; the
-        // assembly and drawing S toolbars are not customizable here yet.
-        let contexts = vec!["Sketch".to_string(), "Part Studio".to_string()];
+        // Live: Sketch (the default) | Part Studio | Assembly | Drawing.
+        let contexts = vec!["Sketch".to_string(), "Part Studio".to_string(), "Assembly".to_string(), "Drawing".to_string()];
         let select = os::select_field("tb-context", contexts, self.toolbar_context, {
             let view = cx.entity().downgrade();
             move |i, _, cx| {
@@ -766,7 +774,14 @@ impl PreferencesView {
         .w(px(150.));
         // Tools that can be on the 5x2 S toolbar (id, name, icon), and the ones shown.
         use crate::part_studio::shortcut_cmds as sc;
-        let (items, shown): (Vec<(String, String, SharedString)>, Vec<String>) = if self.toolbar_context == 1 {
+        let (items, shown): (Vec<(String, String, SharedString)>, Vec<String>) = if self.toolbar_context == 3 {
+            use crate::drawing_keys as dk;
+            let all = dk::SHORTCUT_CATALOGUE.iter().map(|t| (t.0.to_string(), t.0.to_string(), crate::assets::icon_path(t.2))).collect();
+            (all, self.toolbar_draft.drawing_shortcut_tools(&dk::DEFAULT_SHORTCUT_TOOLS))
+        } else if self.toolbar_context == 2 {
+            let all = crate::assembly_view::shortcut_catalog().into_iter().map(|(id, name, icon)| (id.to_string(), name.to_string(), crate::assets::icon_path(icon))).collect();
+            (all, self.asm_toolbar_draft.shortcut_tools())
+        } else if self.toolbar_context == 1 {
             let all = sc::toolbar_feature_ids()
                 .into_iter()
                 .filter_map(|id| noshape_model::features::get(id).map(|t| (id.to_string(), t.name.to_string(), crate::part_studio::feature_icon(id))))
@@ -777,7 +792,7 @@ impl PreferencesView {
             (all, self.toolbar_draft.sketch_shortcut_tools(&sc::default_sketch_shortcut_names()))
         };
         let context = self.toolbar_context;
-        let changed = self.toolbar_draft.shortcut_tools != self.toolbar.shortcut_tools || self.toolbar_draft.sketch_shortcut_tools != self.toolbar.sketch_shortcut_tools;
+        let changed = self.toolbar_draft.shortcut_tools != self.toolbar.shortcut_tools || self.toolbar_draft.sketch_shortcut_tools != self.toolbar.sketch_shortcut_tools || self.asm_toolbar_draft.shortcut_tools != self.asm_toolbar.shortcut_tools || self.toolbar_draft.drawing_shortcut_tools != self.toolbar.drawing_shortcut_tools;
         let rows: Vec<AnyElement> = items
             .iter()
             .enumerate()
@@ -794,7 +809,11 @@ impl PreferencesView {
                     .child(crate::assets::icon(icon, 20., cx))
                     .child(div().text_size(px(14.)).text_color(pal.text).child(name.clone()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if context == 1 {
+                        if context == 3 {
+                            this.toolbar_draft.toggle_drawing_shortcut(&id2, &crate::drawing_keys::DEFAULT_SHORTCUT_TOOLS);
+                        } else if context == 2 {
+                            this.asm_toolbar_draft.toggle_shortcut(&id2);
+                        } else if context == 1 {
                             this.toolbar_draft.toggle_shortcut(&id2);
                         } else {
                             this.toolbar_draft.toggle_sketch_shortcut(&id2, &sc::default_sketch_shortcut_names());
@@ -804,7 +823,8 @@ impl PreferencesView {
                     .into_any_element()
             })
             .collect();
-        let preview_icons: Vec<SharedString> = shown.iter().filter_map(|id| items.iter().find(|(i, _, _)| i == id).map(|(_, _, icon)| icon.clone())).take(10).collect();
+        // Live: the ticked tools in list order (a newly ticked tool takes its list place).
+        let preview_icons: Vec<SharedString> = items.iter().filter(|(i, _, _)| shown.contains(i)).map(|(_, _, icon)| icon.clone()).take(10).collect();
         let preview = div()
             .ml(px(23.))
             .p(px(4.))
@@ -830,8 +850,14 @@ impl PreferencesView {
                     let mut saved = ToolbarPrefs::load();
                     saved.shortcut_tools = this.toolbar_draft.shortcut_tools.clone();
                     saved.sketch_shortcut_tools = this.toolbar_draft.sketch_shortcut_tools.clone();
+                    saved.drawing_shortcut_tools = this.toolbar_draft.drawing_shortcut_tools.clone();
                     saved.save();
                     this.toolbar = saved;
+                    // The assembly's S toolbar (its other toolbar settings kept).
+                    let mut asm = crate::assembly_view::AsmToolbarPrefs::load();
+                    asm.shortcut_tools = this.asm_toolbar_draft.shortcut_tools.clone();
+                    asm.save();
+                    this.asm_toolbar = asm;
                     cx.notify();
                 }))
             })))
@@ -846,14 +872,20 @@ impl PreferencesView {
                         ps.hide_search = false;
                         ps.save();
                         this.toolbar = ps;
-                        // The assembly toolbar's prefs file (assembly_toolbar.rs): none = defaults.
-                        let _ = std::fs::remove_file(crate::files::config_dir().join("assembly_toolbar.json"));
+                        // The assembly toolbar (assembly_toolbar.rs): tool sets, removed
+                        // tools and Search tools back; its S toolbar kept, like the Part Studio's.
+                        let mut asm = crate::assembly_view::AsmToolbarPrefs::load();
+                        asm.order.clear();
+                        asm.removed.clear();
+                        asm.hide_search = false;
+                        asm.save();
                         window.refresh();
                         cx.notify();
                     }))),
                 ),
             )
-            .child(div().h(px(31.)))
+            // Live drawing/482: 15 px to the Drawings heading.
+            .child(div().h(px(15.)))
             .into_any_element()
     }
 
@@ -966,8 +998,8 @@ impl Render for PreferencesView {
         let pal = p();
         crate::assets::set_scale_factor(window.scale_factor());
         if self.scroll_to_shortcuts {
-            // The sections are the scroll area's children: Keyboard shortcuts is the fifth.
-            match self.scroll.bounds_for_item(4) {
+            // The sections are the scroll area's children: Keyboard shortcuts is the sixth.
+            match self.scroll.bounds_for_item(5) {
                 Some(section) if self.page != Page::Profile => {
                     let off = self.scroll.offset();
                     let top = section.top() - self.scroll.bounds().top() - off.y;
@@ -982,7 +1014,7 @@ impl Render for PreferencesView {
             vec![self.render_profile(cx)]
         } else {
             let (ps, asm) = self.render_list_settings(cx);
-            vec![self.units.clone().into_any_element(), self.mouse.clone().into_any_element(), ps, asm, self.render_shortcuts(window, cx), self.render_toolbars(cx), self.drawings.clone().into_any_element(), self.release.clone().into_any_element()]
+            vec![self.decimal.clone().into_any_element(), self.units.clone().into_any_element(), self.mouse.clone().into_any_element(), ps, asm, self.render_shortcuts(window, cx), self.render_toolbars(cx), self.drawings.clone().into_any_element(), self.release.clone().into_any_element()]
         };
         v_flex()
             .size_full()

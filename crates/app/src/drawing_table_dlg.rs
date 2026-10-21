@@ -37,7 +37,7 @@ impl DrawingEditor {
         let sheet = self.current_sheet();
         let mut seen: Vec<SourceKey> = Vec::new();
         let mut out = Vec::new();
-        for v in &sheet.views {
+        for v in sheet.real_views() {
             let Some((key, _)) = views::view_source(sheet, v.id) else { continue };
             let Some(src) = self.sources.get(&key) else { continue };
             let fits = match kind {

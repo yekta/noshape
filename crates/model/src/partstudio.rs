@@ -200,6 +200,9 @@ pub struct PartStudio {
     /// Inspection panel annotations (datums…); not features.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub annotations: Vec<crate::annotations::Annotation>,
+    /// Inspection panel: the applied default tolerances ("ISO 2768-c").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_tolerances: Option<String>,
     #[serde(default)]
     pub next_folder_id: u32,
     /// Saved camera views (Shift+V).

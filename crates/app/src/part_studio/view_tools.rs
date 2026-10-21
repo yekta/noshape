@@ -534,12 +534,7 @@ impl PartStudioView {
                 this.renaming = None;
                 if !v.trim().is_empty() {
                     this.doc.update(cx, |doc, cx| {
-                        doc.edit_studio(this.tab, &format!("Rename : {v}"), cx, |ps| {
-                            if let Some(f) = ps.feature_mut(id) {
-                                f.name = v.trim().to_string();
-                                f.custom_name = true;
-                            }
-                        });
+                        doc.edit_studio(this.tab, &noshape_ops::studio::rename_description(&v), cx, |ps| noshape_ops::studio::rename_feature(ps, id, &v));
                     });
                 }
                 cx.notify();

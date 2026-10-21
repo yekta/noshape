@@ -488,3 +488,18 @@ Next: RIP joints, corners & bend reliefs (live probes), std Flange/Hem/Tab (thei
   (std's internal-flange offset of one bend-relief width fires at both ends) and the joint becomes RIP instead of
   BEND (the tracked bend edge doesn't map to the merged edge). Its assertion is left out (comment with live's
   areas in custom_features.rs) until fixed. Live request "fs (21:10)" pending for rips/corners/reliefs/hem/tab.
+
+## 21 Oct: std Flange matches live (sm2)
+- std `sheetMetalFlange` now gives live sm2's exact part (760,760,280,280,188.4956,80,80,62.8319,38,38,14,14,6.2832,6.2832);
+  asserted in `std_sheet_metal_matches_onshape`. Fixes (host, shared query/eval code):
+  - `edge_param`: parameters run along the edge's own direction (reversed edges flipped points vs tangents; std's
+    getVectorForEdge then saw the neighbour edge pointing out → "internal flange" relief offset → 44.25 mm wall).
+  - `evEdgeTangentLines` with "face", `evFaceTangentPlanesAtEdge` (x = edge direction, `usingFaceOrientation`):
+    face on the left, as std documents.
+  - Transient ids / TRACKING: point snapshots per id (faces, edges, vertices, sketch curves; owner body type);
+    `QueryCx::resolve_transient` keeps the name's result only if it still lies there, else what lies there
+    (hidden bodies included, solids only ↔ solids); moved entities (nothing there) keep their name.
+- Ctrl+click on a std symbol verified on :108: "std 3095.0" window, view-only bar + [Return to Main], evaluate.fs:152.
+  Feature Studios now show the version view-only bar.
+- Profile ▾ (Monitor menu, from ui2): waiting for live capture REQUESTS "fs (22:55)".
+- Next: rips / corners / bend reliefs / hem / tab (live "fs (21:10)" pending), flat pattern, ctx.sheet_metal for std parts.

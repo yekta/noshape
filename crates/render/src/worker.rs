@@ -37,6 +37,7 @@ enum Msg {
     Pick { target: u64, token: u64, rect: PickRect },
     SetPresent(u64, Present),
     SetOverlay(u64, Option<Arc<crate::overlay::Overlay>>),
+    SetCameraGeometry(u64, Vec<Arc<dyn crate::camera_geometry::CameraGeometry>>),
     SetTextShading(crate::overlay::TextShading),
     Drop(u64),
 }
@@ -87,6 +88,7 @@ impl RenderWorker {
                     Msg::Pick { target, token, rect } => picks.push((target, token, rect)),
                     Msg::SetPresent(target, present) => renderer.set_present(target, present),
                     Msg::SetOverlay(target, overlay) => renderer.set_overlay(target, overlay),
+                    Msg::SetCameraGeometry(target, geometry) => renderer.set_camera_geometry(target, geometry),
                     Msg::SetTextShading(shading) => renderer.set_text_shading(shading),
                     Msg::Drop(target) => {
                         jobs.retain(|j| j.target != target);
@@ -201,6 +203,11 @@ impl RenderWorker {
     /// Draw `overlay` into every frame of `target` from now on.
     pub fn set_overlay(&self, target: u64, overlay: Option<Arc<crate::overlay::Overlay>>) {
         let _ = self.tx.send(Msg::SetOverlay(target, overlay));
+    }
+
+    /// Build `geometry` for every frame of `target` from the frame's camera.
+    pub fn set_camera_geometry(&self, target: u64, geometry: Vec<Arc<dyn crate::camera_geometry::CameraGeometry>>) {
+        let _ = self.tx.send(Msg::SetCameraGeometry(target, geometry));
     }
 
     /// How overlay text masks are shaded.

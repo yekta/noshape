@@ -466,6 +466,31 @@ pub fn refs_variables(doc: &crate::Document, refs: &VariableStudioRefs) -> BTree
     out
 }
 
+/// Names in `studio`'s table that another of `element`'s tables overrides:
+/// a lower inserted table, or one of `own` (the element's own variables).
+/// Their rows get an ⓘ "Overwritten in another variable table." (live psb
+/// 10-20 t).
+pub fn overwritten_names(doc: &crate::Document, element: TabId, studio: TabId, own: &[String]) -> std::collections::BTreeSet<String> {
+    let list = element_studios(doc, element);
+    let Some(k) = list.iter().position(|r| r.studio == studio) else { return Default::default() };
+    let mine = ref_variables(doc, &list[k], &mut Vec::new());
+    let mut later: std::collections::BTreeSet<String> = own.iter().cloned().collect();
+    for r in &list[k + 1..] {
+        later.extend(ref_variables(doc, r, &mut Vec::new()).into_keys());
+    }
+    mine.into_keys().filter(|n| later.contains(n)).collect()
+}
+
+/// [`overwritten_names`] with the element's own variables (a Part Studio's
+/// Variable features with valid names).
+pub fn overwritten(doc: &crate::Document, element: TabId, studio: TabId) -> std::collections::BTreeSet<String> {
+    let own: Vec<String> = match doc.tabs.iter().find(|t| t.id == element).map(|t| &t.content) {
+        Some(crate::TabContent::PartStudio(ps)) => crate::variable_table::rows(ps).into_iter().map(|r| r.name).collect(),
+        _ => Vec::new(),
+    };
+    overwritten_names(doc, element, studio, &own)
+}
+
 /// Whether `studio` shows in `element`'s Variable table.
 pub fn is_inserted(doc: &crate::Document, element: TabId, studio: TabId) -> bool {
     element_studios(doc, element).iter().any(|r| r.studio == studio)
@@ -536,6 +561,26 @@ mod studio_scope_tests {
 
     fn mm(q: Option<&Quantity>) -> f64 {
         q.map(|q| q.value * 1000.0).unwrap_or(f64::NAN)
+    }
+
+    #[test]
+    fn lowest_table_wins_and_shadowed_rows_are_known() {
+        // Live psb 10-20 t: qa4 (all) → vs1 → vs2; the lowest `w` wins.
+        let (mut doc, ps, ids) = doc_with(vec![vs(&[("w", "10 mm")], true), vs(&[("w", "15 mm")], false), vs(&[("w", "20 mm")], false)]);
+        if let TabContent::PartStudio(p) = &mut doc.tab_mut(ps).unwrap().content {
+            insert_studio(&mut p.variable_studios, StudioRef::whole(ids[1]));
+            insert_studio(&mut p.variable_studios, StudioRef::whole(ids[2]));
+        }
+        assert_eq!(mm(element_variables(&doc, ps).get("w")), 20.0);
+        assert_eq!(overwritten_names(&doc, ps, ids[1], &[]).into_iter().collect::<Vec<_>>(), ["w"]);
+        assert!(overwritten_names(&doc, ps, ids[2], &[]).is_empty());
+        // The Part Studio's own `w` shadows every table.
+        assert_eq!(overwritten_names(&doc, ps, ids[2], &["w".to_string()]).len(), 1);
+        // Reordered (vs2 above vs1): vs1 wins.
+        if let TabContent::PartStudio(p) = &mut doc.tab_mut(ps).unwrap().content {
+            p.variable_studios.inserted = vec![StudioRef::whole(ids[0]), StudioRef::whole(ids[2]), StudioRef::whole(ids[1])];
+        }
+        assert_eq!(mm(element_variables(&doc, ps).get("w")), 15.0);
     }
 
     #[test]

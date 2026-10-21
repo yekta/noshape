@@ -1,8 +1,10 @@
-//! Preferences › Units (live prefs/00–01, dom/preferences-full.txt): the
-//! default units of newly created documents, each quantity's "Display
-//! decimals", and the Time format. Kept in the config dir; new documents
-//! (`new_document`) start with these units, and document times follow the
-//! time format (`start_library::format_onshape_time`).
+//! Preferences › Decimal format and Units (live prefs/00–01,
+//! dom/preferences-full.txt): "Use comma as decimal separator"
+//! (`noshape_units::set_comma_decimal`: typed expressions accept `1,5`, values
+//! show with a comma), the default units of newly created documents, each
+//! quantity's "Display decimals", and the Time format. Kept in the config
+//! dir; new documents (`new_document`) start with these units, and document
+//! times follow the time format (`start_library::format_onshape_time`).
 
 use crate::doc_dialogs::{DECIMALS, OTHER_DECIMALS};
 use crate::theme::p;
@@ -27,6 +29,8 @@ pub struct UserUnits {
     pub units: UnitPrefs,
     /// Time format "24 hour" (default "12 hour").
     pub time_24h: bool,
+    /// Decimal format › Use comma as decimal separator.
+    pub comma_decimal: bool,
 }
 
 fn path() -> std::path::PathBuf {
@@ -54,6 +58,11 @@ fn save(u: UserUnits) {
         }
         let _ = std::fs::write(p, t);
     }
+}
+
+/// Applies the saved decimal separator (at startup).
+pub fn apply() {
+    noshape_units::set_comma_decimal(current().comma_decimal);
 }
 
 /// A new, empty document with the user's default units.
@@ -275,7 +284,11 @@ impl Render for UnitsPrefsView {
                                 .when(!changed, |d| d.opacity(0.4))
                                 .when(changed, |d| {
                                     d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                        save(this.edited);
+                                        // The Decimal format section saves its own field.
+                                        let mut u = current();
+                                        u.units = this.edited.units;
+                                        u.time_24h = this.edited.time_24h;
+                                        save(u);
                                         this.saved = this.edited;
                                         // Document times shown elsewhere follow the new format.
                                         window.refresh();
@@ -283,6 +296,98 @@ impl Render for UnitsPrefsView {
                                     }))
                                 })
                                 .child("Save changes"),
+                        ),
+                    ),
+            )
+    }
+}
+
+/// Preferences › Decimal format (live prefs/00): the checkbox and "Save
+/// decimal format".
+pub struct DecimalPrefsView {
+    saved: bool,
+    edited: bool,
+}
+
+impl Default for DecimalPrefsView {
+    fn default() -> Self {
+        let saved = current().comma_decimal;
+        Self { saved, edited: saved }
+    }
+}
+
+impl Render for DecimalPrefsView {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        let (on, changed) = (self.edited, self.edited != self.saved);
+        v_flex()
+            .mb(px(38.))
+            .child(
+                h_flex()
+                    .h(px(32.))
+                    .pl(px(15.))
+                    .border_b_1()
+                    .border_color(pal.text)
+                    .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Decimal format")),
+            )
+            .child(
+                v_flex()
+                    .pl(px(15.))
+                    .pt(px(16.))
+                    .child(
+                        // A browser checkbox: 13 px box, the label 3 px after it (live 686).
+                        h_flex()
+                            .id("decimal-comma")
+                            .h(px(21.))
+                            .gap(px(3.))
+                            .cursor_pointer()
+                            .text_size(px(14.))
+                            .text_color(pal.text)
+                            .child(
+                                div()
+                                    .size(px(13.))
+                                    .flex_none()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .rounded(px(2.))
+                                    .border_1()
+                                    .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
+                                    .bg(if on { rgb(0x0075ff) } else { rgb(0xffffff) })
+                                    .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(rgb(0xffffff)))),
+                            )
+                            .child("Use comma as decimal separator")
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.edited = !this.edited;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        h_flex().mt(px(30.)).child(
+                            div()
+                                .id("decimal-save")
+                                .h(px(34.))
+                                .px(px(10.5))
+                                .flex()
+                                .items_center()
+                                .rounded(px(5.25))
+                                .bg(rgb(0x1651b0))
+                                .text_size(px(14.))
+                                .text_color(rgb(0xffffff))
+                                .when(!changed, |d| d.opacity(0.4))
+                                .when(changed, |d| {
+                                    d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                        let mut u = current();
+                                        u.comma_decimal = this.edited;
+                                        save(u);
+                                        noshape_units::set_comma_decimal(this.edited);
+                                        this.saved = this.edited;
+                                        // Values on screen follow the new separator.
+                                        window.refresh();
+                                        cx.notify();
+                                    }))
+                                })
+                                .child("Save decimal format"),
                         ),
                     ),
             )
@@ -323,7 +428,7 @@ mod tests {
 
     #[test]
     fn prefs_round_trip() {
-        let u = UserUnits { units: UnitPrefs::imperial(), time_24h: true };
+        let u = UserUnits { units: UnitPrefs::imperial(), time_24h: true, comma_decimal: true };
         let t = serde_json::to_string(&u).unwrap_or_default();
         assert_eq!(serde_json::from_str::<UserUnits>(&t).ok(), Some(u));
         assert_eq!(serde_json::from_str::<UserUnits>("{}").ok(), Some(UserUnits::default()));

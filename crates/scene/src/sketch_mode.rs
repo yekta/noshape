@@ -4645,6 +4645,30 @@ fn image_box(a: DVec2, b: DVec2, aspect: f64) -> (DVec2, f64) {
     (DVec2::new(x, y), h)
 }
 
+/// The Insert DXF or DWG panel's Units choices (meters per drawing unit;
+/// `None`: the file's own units, else millimeters).
+pub const DXF_UNITS: &[(&str, Option<f64>)] = &[("From file", None), ("Millimeter", Some(0.001)), ("Centimeter", Some(0.01)), ("Meter", Some(1.0)), ("Inch", Some(0.0254)), ("Foot", Some(0.3048)), ("Yard", Some(0.9144))];
+
+/// Insert DXF or DWG from a file: parse it and add its geometry in the
+/// chosen units (see [`DXF_UNITS`]). Errors carry the message the panel shows.
+pub fn insert_dxf_file(data: &mut SketchData, path: &std::path::Path, unit_scale: Option<f64>, use_origin: bool) -> Result<Vec<EntityId>, String> {
+    let drawing = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| noshape_sketch::dwg::parse_cad(&b).map_err(|e| e.to_string())).map_err(|e| format!("Could not insert the drawing: {e}"))?;
+    let scale = unit_scale.or(drawing.unit_scale).unwrap_or(0.001);
+    Ok(insert_dxf(data, &drawing, scale, use_origin))
+}
+
+/// Insert image: an image file's name, bytes and aspect ratio (width /
+/// height), what the editor's `pending_image` holds. Errors carry the
+/// message the panel shows.
+pub fn load_image(path: &std::path::Path) -> Result<(String, Vec<u8>, f64), String> {
+    let (bytes, w, h) = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| image::load_from_memory(&b).map(|img| (b, img.width(), img.height())).map_err(|e| e.to_string())).map_err(|e| format!("Could not read the image: {e}"))?;
+    if w == 0 || h == 0 {
+        return Err("The image is empty".into());
+    }
+    let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| "image".into());
+    Ok((name, bytes, w as f64 / h as f64))
+}
+
 /// Insert DXF: add a drawing's geometry (`scale` meters per drawing unit),
 /// centered on the sketch origin unless `use_origin`.
 pub fn insert_dxf(data: &mut SketchData, drawing: &noshape_sketch::dxf::DxfDrawing, scale: f64, use_origin: bool) -> Vec<EntityId> {

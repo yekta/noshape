@@ -36,17 +36,23 @@ pub struct SourceKey {
     /// Pinned to a version (its id as text): the source comes from the
     /// document at that version; None: the live workspace.
     pub version: Option<String>,
+    /// Assemblies: a named position (index) instead of the solved assembly.
+    pub position: Option<usize>,
+    /// Assemblies: a display state (by name); None: Show all.
+    pub display: Option<String>,
 }
 
 impl SourceKey {
     pub fn studio(tab: TabId) -> Self {
-        Self { tab, config: ConfigValues::default(), explode: None, version: None }
+        Self { tab, config: ConfigValues::default(), explode: None, version: None, position: None, display: None }
     }
 
     /// The source of a base view (and its part), with its pinned version.
     pub fn of_view(v: &super::DrawingView) -> Option<(Self, Option<BodyId>)> {
         match &v.kind {
-            ViewKind::Base { source, config, part, .. } => Some((Self { tab: *source, config: config.clone(), explode: v.explode, version: v.pinned.as_ref().map(|p| p.id.clone()) }, part.clone())),
+            ViewKind::Base { source, config, part, .. } => {
+                Some((Self { tab: *source, config: config.clone(), explode: v.explode, version: v.pinned.as_ref().map(|p| p.id.clone()), position: v.named_position, display: v.display_state.clone() }, part.clone()))
+            }
             _ => None,
         }
     }
@@ -94,6 +100,8 @@ pub struct SourceModel {
     /// Assemblies only: the Structured BOM (item "3.1", depth, name,
     /// part number, material, quantity).
     pub bom_structured: Vec<StructuredBomRow>,
+    /// Part Studios: their MBD annotations (Model definitions datums).
+    pub model_annotations: Vec<crate::annotations::Annotation>,
 }
 
 /// One row of a Structured BOM.
@@ -161,6 +169,8 @@ pub fn source_hash(doc: &Document, key: &SourceKey) -> Option<u64> {
             let mut h = std::collections::hash_map::DefaultHasher::new();
             serde_json::to_vec(asm).unwrap_or_default().hash(&mut h);
             key.explode.hash(&mut h);
+            key.position.hash(&mut h);
+            key.display.hash(&mut h);
             for t in &doc.tabs {
                 match &t.content {
                     TabContent::PartStudio(ps) => {
@@ -202,7 +212,8 @@ pub fn referenced_sources(drawing: &Drawing) -> Vec<SourceKey> {
     let mut out: Vec<SourceKey> = Vec::new();
     for sheet in &drawing.sheets {
         for v in &sheet.views {
-            if let Some((k, _)) = SourceKey::of_view(v)
+            // Child views with their own assembly state need their own source.
+            if let Some((k, _)) = view_source(sheet, v.id)
                 && !out.contains(&k)
             {
                 out.push(k);
@@ -261,11 +272,21 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
             let opts = RegenOptions { custom_features: has_scripts.then(|| crate::custom::DocumentScripts::from_document(doc) as Arc<dyn crate::custom::CustomFeatureProvider>), ..Default::default() };
             let r = regen.regenerate(ps, &key.config, &doc.settings.units, &opts);
             let parts = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| part_info(ps, b)).collect();
-            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![] })
+            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], model_annotations: ps.annotations.clone() })
         }
         TabContent::Assembly(asm) => {
-            let result = assemblies.evaluate(doc, asm, &SolveOptions::default(), key.explode);
-            let mut s = assembly_source(doc, &result, hash, tab.name.clone());
+            // A named position: its placements and mate values; a display
+            // state that no longer exists can't be resolved (the view fails).
+            let opts = match key.position.and_then(|i| asm.named_positions.get(i)) {
+                Some(np) => SolveOptions { start: Some(np.placements.iter().cloned().collect()), locks: np.mate_values.clone(), ..Default::default() },
+                None => SolveOptions::default(),
+            };
+            let hidden = match &key.display {
+                Some(name) => Some(asm.display_states.iter().find(|d| &d.name == name)?.hidden_instances.clone()),
+                None => None,
+            };
+            let result = assemblies.evaluate(doc, asm, &opts, key.explode);
+            let mut s = assembly_source(doc, &result, hash, tab.name.clone(), hidden.as_deref());
             s.bom_structured = structured_bom(doc, key.tab, &result);
             Some(s)
         }
@@ -277,12 +298,14 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
 /// Occurrence `i` gets the body id `{feature: original feature, index:
 /// (i + 1) << 16 | original index}` and keeps the original face, edge and
 /// vertex names, so annotation references resolve like in Part Studios.
-pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name: String) -> SourceModel {
+/// `hidden`: the display state's hidden instances (None: Show all, every
+/// occurrence whatever the assembly currently hides).
+pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name: String, hidden: Option<&[crate::assembly::InstanceId]>) -> SourceModel {
     let mut ctx = Context::default();
     let mut parts = Vec::new();
     let mut occ_body: Vec<(usize, BodyId)> = Vec::new();
     for (i, o) in result.occurrences.iter().enumerate() {
-        if o.hidden || o.kind != BodyKind::Solid {
+        if o.kind != BodyKind::Solid || hidden.is_some_and(|h| o.path.iter().any(|p| h.contains(p))) {
             continue;
         }
         let Some(b) = o.context.body(&o.body) else { continue };
@@ -328,7 +351,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
             row.name = r.name.clone();
         }
     }
-    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new() }
+    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), model_annotations: Vec::new() }
 }
 
 /// Regenerate every source a drawing references (headless helper for
@@ -632,7 +655,31 @@ pub fn root_view(sheet: &Sheet, id: ViewId) -> Option<ViewId> {
 
 /// Source and part filter of a view.
 pub fn view_source(sheet: &Sheet, id: ViewId) -> Option<(SourceKey, Option<BodyId>)> {
-    SourceKey::of_view(sheet.view(root_view(sheet, id)?)?)
+    let (mut key, part) = SourceKey::of_view(sheet.view(root_view(sheet, id)?)?)?;
+    // Child views follow their parent's Explode/Position and Display state
+    // unless they choose their own (the nearest choice up the chain wins).
+    let (mut pos, mut disp) = (false, false);
+    let mut cur = Some(id);
+    for _ in 0..64 {
+        let Some(v) = cur.and_then(|c| sheet.view(c)) else { break };
+        if !pos && let Some(p) = v.own_position {
+            (key.explode, key.position) = match p {
+                super::AsmPosition::Default => (None, None),
+                super::AsmPosition::Explode(e) => (Some(e), None),
+                super::AsmPosition::Position(n) => (None, Some(n)),
+            };
+            pos = true;
+        }
+        if !disp && let Some(d) = &v.own_display {
+            key.display = match d {
+                super::DisplayChoice::ShowAll => None,
+                super::DisplayChoice::State(s) => Some(s.clone()),
+            };
+            disp = true;
+        }
+        cur = sheet.parent_of(v.id);
+    }
+    Some((key, part))
 }
 
 /// Effective scale (paper length / model length) of a view.
@@ -1363,6 +1410,8 @@ impl ViewCache {
 /// Cache key of a view's geometry; `None` when the view cannot be computed
 /// (missing parent or source).
 pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources, exact: bool) -> Option<u64> {
+    // View render mode › Best quality: always exact.
+    let exact = exact || sheet.view(id).is_some_and(|v| v.best_quality);
     let v = sheet.view(id)?;
     let frame = view_frame(drawing, sheet, id)?;
     let (key, part) = view_source(sheet, id)?;
@@ -1451,6 +1500,7 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
 
 /// Compute (or fetch from the cache) a view's geometry.
 pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources, cache: &ViewCache, exact: bool) -> Arc<ViewGeometry> {
+    let exact = exact || sheet.view(id).is_some_and(|v| v.best_quality);
     let fail = |msg: &str| Arc::new(ViewGeometry { id, error: Some(msg.to_string()), ..Default::default() });
     let Some(key) = view_key(drawing, sheet, id, sources, exact) else {
         return fail("The view's source is not available");

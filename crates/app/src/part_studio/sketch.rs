@@ -714,34 +714,6 @@ impl PartStudioView {
         out
     }
 
-    /// Edges of a hovered model face (or the hovered edge itself).
-    fn hovered_edge_refs(&self) -> Vec<Reference> {
-        let Some(r) = self.hover.clone() else { return Vec::new() };
-        let Some(ctx) = self.context.clone() else { return Vec::new() };
-        let mut refs: Vec<Reference> = Vec::new();
-        match &r {
-            Reference::Edge(_) => refs.push(r.clone()),
-            Reference::Face(_) => {
-                if let Some(b) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)) {
-                    let fi = b.face_refs.iter().position(|x| *x == r).unwrap_or(0);
-                    if let Some(body) = ctx.body(&b.id)
-                        && let Ok(face) = body.shape.sub_shape(noshape_kernel::ShapeType::Face, fi)
-                    {
-                        for e in face.edges() {
-                            if let Some(i) = body.shape.index_of(&e, noshape_kernel::ShapeType::Edge)
-                                && let Some(n) = body.edges.get(i)
-                            {
-                                refs.push(Reference::Edge((**n).clone()));
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-        refs
-    }
-
     /// Use tool: preview the projection of the hovered edge / face edges.
     fn update_use_preview(&mut self) {
         let Some(ed) = &self.sketch else { return };
@@ -758,27 +730,13 @@ impl PartStudioView {
             return;
         }
         let (frame, tol) = (ed.frame, ed.world_per_px);
-        let mut out = Vec::new();
-        // A curved face previews its silhouettes.
-        if let (Some(r @ Reference::Face(_)), Some(ctx)) = (self.hover.clone(), self.context.clone())
-            && self.curved_face(&r)
-        {
-            if let Some(face) = noshape_model::regen::measure::resolve_shapes(&ctx, &r).into_iter().next() {
-                out.extend(noshape_model::regen::features::sketch::face_silhouettes(&face, &frame).iter().map(|c| c.tessellate(tol)));
+        let out = match (self.hover.clone(), self.context.clone()) {
+            (Some(r), Some(ctx)) => {
+                let display = self.display.clone();
+                noshape_ops::sketch_use::Model { context: &ctx, display: &display, frame: &frame }.use_preview(&r, tol)
             }
-        } else if let Some(ctx) = self.context.clone() {
-            let refs = if matches!(self.hover, Some(Reference::SketchEntity { .. })) {
-                self.hover.clone().into_iter().collect()
-            } else { self.hovered_edge_refs() };
-            for er in refs {
-                let shapes = noshape_model::regen::measure::resolve_shapes(&ctx, &er);
-                match shapes.first().and_then(|e| noshape_model::regen::features::sketch::project_edge_any(e, &frame)) {
-                    Some(noshape_model::regen::features::sketch::SectionCurve::Exact(c)) => out.push(c.tessellate(tol)),
-                    Some(noshape_model::regen::features::sketch::SectionCurve::Sampled(p)) => out.push(p),
-                    None => {}
-                }
-            }
-        }
+            _ => Vec::new(),
+        };
         if let Some(ed) = &mut self.sketch {
             ed.use_preview = out;
         }
@@ -790,36 +748,21 @@ impl PartStudioView {
     /// Project the hovered model edge (or all edges of a hovered face, or a vertex).
     fn use_hovered(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(r) = self.hover.clone() else { return };
-        let mut changed = false;
-        match &r {
-            Reference::Vertex(_) | Reference::SketchEntity { .. } | Reference::Edge(_) => {
-                changed = self.external_entity(&r, false, false, cx).is_some();
+        let Some(ed) = self.sketch.as_ref() else { return };
+        let (frame, wpp, cursor) = (ed.frame, ed.world_per_px, ed.cursor.unwrap_or_default());
+        let changed = match self.context.clone() {
+            Some(ctx) => {
+                let display = self.display.clone();
+                self.with_sketch(cx, |_, data| noshape_ops::sketch_use::use_reference(data, noshape_ops::sketch_use::Model { context: &ctx, display: &display, frame: &frame }, wpp, cursor, &r)) == Some(true)
             }
-            Reference::Face(_) => {
-                // A curved face gives its silhouette edges, a planar face its edges.
-                let curved = self.curved_face(&r);
-                if curved {
-                    changed = self.external_entity(&r, false, false, cx).is_some();
-                } else {
-                    for er in self.hovered_edge_refs() {
-                        changed |= self.external_entity(&er, false, false, cx).is_some();
-                    }
-                }
-            }
-            _ => {}
-        }
+            None => false,
+        };
         if changed {
             self.regen_sync(window, cx);
         } else if let Some(ed) = &mut self.sketch {
-            ed.message = Some("That geometry can't be used in this sketch".into());
+            ed.message = Some(noshape_ops::sketch_use::USE_FAILED.into());
         }
         cx.notify();
-    }
-
-    /// Is the referenced face curved (not planar)?
-    fn curved_face(&self, r: &Reference) -> bool {
-        let Some(ctx) = self.context.as_ref() else { return false };
-        noshape_model::regen::measure::resolve_shapes(ctx, r).first().is_some_and(|f| !f.is_planar())
     }
 
     /// The plane or face the edited sketch lies on (or a plane coincident with it).
@@ -839,17 +782,9 @@ impl PartStudioView {
 
     /// Plane frame of a plane-like reference (datum / feature plane, planar face).
     fn reference_plane(&self, r: &Reference) -> Option<PlaneFrame> {
-        match r {
-            Reference::Plane(_) | Reference::FeaturePlane(_) => self.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
-            Reference::Face(_) => {
-                let ctx = self.context.as_ref()?;
-                let f = noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next()?;
-                let pl = f.face_plane().ok()??;
-                let (n, x) = (pl.unit_normal(), pl.unit_x());
-                Some(PlaneFrame { origin: pl.origin, x, y: n.cross(x), normal: n })
-            }
-            _ => None,
-        }
+        let (ctx, frame) = (self.context.clone()?, self.sketch.as_ref().map(|s| s.frame).unwrap_or(PlaneFrame::TOP));
+        let display = self.display.clone();
+        noshape_ops::sketch_use::Model { context: &ctx, display: &display, frame: &frame }.reference_plane(r)
     }
 
     /// The external sketch entity standing for a model reference, created
@@ -859,96 +794,28 @@ impl PartStudioView {
     /// sketch plane. `construction` marks reference-only geometry (picked
     /// by the dimension / constraint tools rather than used).
     pub(super) fn external_entity(&mut self, r: &Reference, pierce: bool, construction: bool, cx: &mut Context<Self>) -> Option<noshape_sketch::EntityId> {
-        use noshape_model::regen::features::sketch as sk_feat;
         let ed = self.sketch.as_ref()?;
         let (frame, wpp, cursor) = (ed.frame, ed.world_per_px, ed.cursor.unwrap_or_default());
-        let data = self.sketch_data(cx)?;
-        let want_point = pierce || matches!(r, Reference::Vertex(_));
-        if let Some((id, _)) = data.external_refs.iter().find(|(id, v)| *v == r && data.sketch.entity(noshape_sketch::EntityId(**id)).is_some_and(|e| (e.kind() == noshape_sketch::EntityKind::Point) == want_point)) {
-            return Some(noshape_sketch::EntityId(*id));
-        }
         let ctx = self.context.clone()?;
-        let shape = noshape_model::regen::measure::resolve_shapes(&ctx, r).into_iter().next();
-        enum Made {
-            Point(DVec2),
-            Curves(Vec<sk_feat::SectionCurve>),
-        }
-        let made = if let Some(pl) = self.reference_plane(r).filter(|_| !matches!(r, Reference::Face(_)) || !self.curved_face(r)) {
-            let (p, d) = sk_feat::plane_trace(&pl, &frame)?;
-            let half = (data.sketch.bbox().size().length() * 0.6).max(wpp * 150.0);
-            let c = p + d * (cursor - p).dot(d);
-            Made::Curves(vec![sk_feat::SectionCurve::Exact(noshape_sketch::Curve2::Line { a: c - d * half, b: c + d * half })])
-        } else if matches!(r, Reference::Face(_)) {
-            let face = shape?;
-            Made::Curves(sk_feat::face_silhouettes(&face, &frame).into_iter().map(sk_feat::SectionCurve::Exact).collect())
-        } else {
-            let sh = shape?;
-            if let Ok(p) = sh.vertex_point() {
-                Made::Point(frame.to_local(p))
-            } else if pierce {
-                Made::Point(sk_feat::pierce_point(&sh, &frame)?)
-            } else {
-                Made::Curves(vec![sk_feat::project_edge_any(&sh, &frame)?])
-            }
-        };
-        let r = r.clone();
-        self.with_sketch(cx, move |_, data| {
-            let mut first = None;
-            match made {
-                Made::Point(p) => {
-                    let id = data.sketch.use_external_point(p);
-                    data.external_refs.insert(id.0, r.clone());
-                    first = Some(id);
-                }
-                Made::Curves(curves) => {
-                    for id in sk_feat::add_section_curves(&mut data.sketch, &curves) {
-                        if construction {
-                            let _ = data.sketch.set_construction(id, true);
-                        }
-                        data.external_refs.insert(id.0, r.clone());
-                        first.get_or_insert(id);
-                    }
-                }
-            }
-            data.sketch.solve();
-            first
-        })?
+        let display = self.display.clone();
+        self.with_sketch(cx, |_, data| noshape_ops::sketch_use::external_entity(data, noshape_ops::sketch_use::Model { context: &ctx, display: &display, frame: &frame }, wpp, cursor, r, pierce, construction))?
     }
 
     /// Intersection tool: section the hovered face with the sketch plane and
     /// add the resulting curves as fixed external geometry.
     fn intersect_hovered(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(r @ Reference::Face(_)) = self.hover.clone() else {
-            if let Some(ed) = &mut self.sketch {
-                ed.message = Some("Click a model face that crosses the sketch plane".into());
-            }
-            cx.notify();
-            return;
-        };
-        let Some(ctx) = self.context.clone() else { return };
-        let Some(frame) = self.sketch.as_ref().map(|s| s.frame) else { return };
-        let shapes = noshape_model::regen::measure::resolve_shapes(&ctx, &r);
-        let Some(face) = shapes.first() else { return };
-        let curves = match noshape_model::regen::features::sketch::section_face(face, &frame) {
-            Ok(c) => c,
-            Err(e) => {
+        let (Some(ctx), Some(frame)) = (self.context.clone(), self.sketch.as_ref().map(|s| s.frame)) else { return };
+        let r = self.hover.clone().unwrap_or(Reference::Origin);
+        let display = self.display.clone();
+        match self.with_sketch(cx, |ed, data| noshape_ops::sketch_use::intersect_face(ed, data, noshape_ops::sketch_use::Model { context: &ctx, display: &display, frame: &frame }, &r)) {
+            // The curves stay linked to the face and follow model changes.
+            Some(Ok(())) => self.regen_sync(window, cx),
+            Some(Err(m)) => {
                 if let Some(ed) = &mut self.sketch {
-                    ed.message = Some(format!("Intersection failed: {e}"));
+                    ed.message = Some(m);
                 }
-                cx.notify();
-                return;
             }
-        };
-        if curves.is_empty() {
-            if let Some(ed) = &mut self.sketch {
-                ed.message = Some("That face does not cross the sketch plane".into());
-            }
-            cx.notify();
-            return;
-        }
-        // The curves stay linked to the face and follow model changes.
-        if self.with_sketch(cx, |ed, data| ed.add_intersection(data, r.clone(), &curves)) == Some(true) {
-            self.regen_sync(window, cx);
+            None => {}
         }
         cx.notify();
     }
@@ -1097,7 +964,7 @@ impl PartStudioView {
             cx.notify();
             return;
         }
-        let vars = self.display.variables.clone();
+        let vars = self.sketch_variables(cx);
         // A configured dimension edits the value of the active configuration.
         if let Some((input, option)) = self.dimension_configuration(cid, cx) {
             let (Some(feature), key, tab, text) = (self.sketch.as_ref().map(|s| s.feature), configured_dim_key(cid), self.tab, text.trim().to_string()) else { return };
@@ -1260,7 +1127,7 @@ impl PartStudioView {
                     let text = st.read(cx).value().to_string();
                     if let Some(dim) = pattern_value_dim(h) {
                         let units = this.doc.read(cx).session.doc.settings.units;
-                        let vars = this.display.variables.clone();
+                        let vars = this.sketch_variables(cx);
                         match noshape_units::evaluate_as(text.trim().trim_start_matches('='), dim, &units, &vars) {
                             Ok(q) => {
                                 if let Some(ed) = &mut this.sketch {
@@ -1315,7 +1182,7 @@ impl PartStudioView {
 
     fn commit_otf_input(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         let units = self.doc.read(cx).session.doc.settings.units;
-        let vars = self.display.variables.clone();
+        let vars = self.sketch_variables(cx);
         let res = self.with_sketch(cx, |ed, data| ed.commit_otf(data, text, &units, &vars));
         match res {
             Some(Err(e)) => {
@@ -1410,7 +1277,7 @@ impl PartStudioView {
 
     fn set_option(&mut self, key: &str, kind: OptKind, text: &str, cx: &mut Context<Self>) {
         let units = self.doc.read(cx).session.doc.settings.units;
-        let vars = self.display.variables.clone();
+        let vars = self.sketch_variables(cx);
         let t = text.trim();
         let val = match kind {
             OptKind::Length => noshape_units::evaluate_as(t, Dim::LENGTH, &units, &vars).ok().map(|q| q.value),
@@ -1840,7 +1707,7 @@ impl PartStudioView {
         let st = cx.new(|cx| InputState::new(window, cx).default_value(noshape_units::format_quantity(Quantity::new(d, Dim::LENGTH), &units)));
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
             let units = this.doc.read(cx).session.doc.settings.units;
-            let vars = this.display.variables.clone();
+            let vars = this.sketch_variables(cx);
             let parsed = noshape_units::evaluate_as(st.read(cx).value().trim(), Dim::LENGTH, &units, &vars).ok().map(|q| q.value).filter(|v| v.is_finite() && *v != 0.0);
             match ev {
                 InputEvent::Change => {
@@ -2139,7 +2006,7 @@ impl PartStudioView {
             let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
                 if let InputEvent::Change = ev {
                     let units = this.doc.read(cx).session.doc.settings.units;
-                    let vars = this.display.variables.clone();
+                    let vars = this.sketch_variables(cx);
                     if let Ok(q) = noshape_units::evaluate_as(st.read(cx).value().trim(), dim, &units, &vars) {
                         this.set_tolerance(cid, window, cx, |t| if upper { t.upper = q.value.abs() } else { t.lower = q.value.abs() });
                     }

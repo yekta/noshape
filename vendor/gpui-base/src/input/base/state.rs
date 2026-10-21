@@ -439,6 +439,8 @@ pub struct InputBaseState<M: InputModeKind> {
     pub(super) scroll_beyond_last_line: Option<usize>,
     pub(super) cursor_surrounding_lines: Option<usize>,
     pub(super) blink_cursor: Entity<BlinkCursor>,
+    /// NOSHAPE PATCH (agent qa4): a multi-line input's text (see `TextLayer`).
+    pub(super) text_layer: Option<Entity<super::text_layer::TextLayer<M>>>,
     pub(super) loading: bool,
     /// The cursors and selections.
     ///
@@ -795,7 +797,14 @@ impl<M: InputModeKind> InputBaseState<M> {
                 }
             }),
             // Observe the blink cursor to repaint the view when it changes.
-            cx.observe(&blink_cursor, |_, _, cx| cx.notify()),
+            // NOSHAPE PATCH (agent qa4): not a multi-line input's: its caret
+            // is the blink cursor's own view (see `TextLayer`), and notifying
+            // here would repaint its text on every blink.
+            cx.observe(&blink_cursor, |this: &mut Self, _, cx| {
+                if !this.is_multi_line() {
+                    cx.notify();
+                }
+            }),
             // Blink the cursor when the window is active, pause when it's not.
             cx.observe_window_activation(window, |input, window, cx| {
                 if window.is_window_active() {
@@ -828,6 +837,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             scroll_beyond_last_line: None,
             cursor_surrounding_lines: None,
             blink_cursor,
+            text_layer: None,
             undo_manager,
             inline_tokens: None,
             pending_token: None,
@@ -4800,7 +4810,35 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
             // NOSHAPE PATCH: presses in the frame's padding and the I-beam
             // over the whole frame (see `frame_hit`).
             .child(super::frame_hit::FrameHitArea::new(entity.clone(), self.disabled))
-            .child(TextElement::new(entity.clone()).placeholder(self.placeholder.clone()))
+            // NOSHAPE PATCH (agent qa4): a multi-line input's text is a
+            // cached view and its caret the blink cursor's view, so a caret
+            // blink repaints only the caret (see `TextLayer`).
+            .map(|this| {
+                if !self.is_multi_line() {
+                    return this.child(TextElement::new(entity.clone()).placeholder(self.placeholder.clone()));
+                }
+                let shown = (self.focus_handle.is_focused(window) || M::is_context_menu_open(self, cx))
+                    && !self.disabled
+                    && window.is_window_active();
+                self.blink_cursor.read(cx).caret.borrow_mut().shown = shown;
+                let layer = self
+                    .text_layer
+                    .get_or_insert_with(|| {
+                        let state = entity.clone();
+                        cx.new(|cx| super::text_layer::TextLayer::new(&state, cx))
+                    })
+                    .clone();
+                // `TextElement`'s own layout style (a cached view is laid out
+                // from its style alone).
+                let rows = self.mode.max_rows().min(self.mode.rows());
+                this.child(layer.cached(
+                    gpui::StyleRefinement::default()
+                        .w_full()
+                        .h_full()
+                        .min_h(rows * window.line_height()),
+                ))
+                .child(self.blink_cursor.clone())
+            })
             .when(self.shows_scrollbar(), |this| {
                 this.child(EditorScrollbar::new(entity.clone()))
             });

@@ -186,7 +186,7 @@ impl AssemblyView {
             )
             .child(
                 h_flex()
-                    .child(div().flex_1().child(crate::os_ui::param_row("Rotation angle", Input::new(&rotation).appearance(false).text_size(px(13.33)).text_right().h(px(25.)))))
+                    .child(div().flex_1().child(crate::os_ui::param_row("Rotation angle", crate::os_ui::input_h(Input::new(&rotation).appearance(false).text_size(px(13.33)).text_right(), 25.))))
                     .child(
                         div()
                             .id("arefl-opposite")

@@ -902,3 +902,40 @@ fn view_cube_overlay_is_drawn_in_the_top_right_corner_only() {
     let changed_outside = (0..h).flat_map(|y| (0..w).map(move |x| (x, y))).filter(|&(x, y)| !(x >= w - 165 && y < 165)).filter(|&(x, y)| px(&plain, x, y) != px(&with, x, y)).count();
     assert_eq!(changed_outside, 0);
 }
+
+#[test]
+fn overlay_path_pixel_clip_drops_pixels_outside_path_bounds() {
+    use noshape_render::overlay::{CubeColors, Overlay, TextShading, ViewCube};
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let scene = std::sync::Arc::new(Scene::default());
+    let (w, h) = (400u32, 300u32);
+    let req = || FrameRequest { scene: scene.clone(), camera: Camera::default(), width: w, height: h, device_pixel_ratio: 2.0, style: Style::default(), invalidate_pick: false };
+    let frame = |r: &mut Renderer, seq: u64| {
+        r.submit_frame(6, seq, req()).unwrap();
+        loop {
+            r.wait_oldest();
+            if let Some(Completed::Frame { result, .. }) = r.collect().into_iter().next() {
+                return result.unwrap();
+            }
+        }
+    };
+    let colors = CubeColors { face: [1.0; 4], frame: [0.808, 0.859, 0.898, 0.6], highlight: [0.565, 0.808, 0.945, 0.6], label: [0.0, 0.0, 0.0, 0.85], axes: [[0.804, 0.0, 0.0, 1.0], [0.0, 0.58, 0.0, 1.0], [0.0, 0.0, 0.816, 1.0]] };
+    // Half-pixel origin: the up arrow's base lies on a pixel boundary.
+    let cube = ViewCube { origin: [61.0, 0.5], hover: None, face_labels: Vec::new(), axis_labels: None, colors };
+    r.set_overlay(6, Some(std::sync::Arc::new(Overlay { world_fills: Vec::new(), view_cube: Some(cube) })));
+    let soft = frame(&mut r, 1);
+    r.set_text_shading(TextShading { clip_path_pixels: true, ..Default::default() });
+    let clipped = frame(&mut r, 2);
+    for y in 17..23u32 {
+        let row = |f: &Frame| (205..218u32).map(|x| f.bgra[((y * w + x) * 4) as usize]).collect::<Vec<_>>();
+        eprintln!("{y}: soft {:?} clipped {:?}", row(&soft), row(&clipped));
+    }
+    let changed = soft.bgra.chunks(4).zip(clipped.bgra.chunks(4)).filter(|(a, b)| a != b).count();
+    assert!(changed > 0, "clipping path pixels changed nothing");
+}

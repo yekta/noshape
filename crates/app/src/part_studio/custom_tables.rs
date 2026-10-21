@@ -249,9 +249,14 @@ impl PartStudioView {
         }
         let grid = gpui_kit::rgb(GRID);
         // Live: 140 px columns + their 1 px right border, a 1 px left border per row.
-        let cell = |content: AnyElement| div().w(px(140.)).h_full().flex_none().border_r_1().border_b_1().border_color(grid).child(content);
-        let head = h_flex().h(px(34.)).bg(gpui_kit::rgb(0xeaeaea)).border_l_1().border_color(grid).children(t.columns.iter().map(|c| {
-            cell(div().size_full().flex().items_center().justify_center().px(px(3.)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(div().truncate().child(c.name.clone())).into_any_element())
+        // Column widths: live's grips (`ui::col_grip`, 140 px until dragged), per table.
+        let key = format!("custom-table-{}", t.title);
+        let widths: Vec<f32> = t.columns.iter().map(|c| crate::ui::col_w(&key, &c.id, 140.)).collect();
+        let cell = |w: f32, content: AnyElement| div().w(px(w)).h_full().flex_none().border_r_1().border_b_1().border_color(grid).child(content);
+        let head = h_flex().h(px(34.)).bg(gpui_kit::rgb(0xeaeaea)).border_l_1().border_color(grid).children(t.columns.iter().zip(&widths).map(|(c, w)| {
+            cell(*w, div().size_full().flex().items_center().justify_center().px(px(3.)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(div().truncate().child(c.name.clone())).into_any_element())
+                .relative()
+                .child(crate::ui::col_grip(&key, &c.id, 140.))
         }));
         section = section.child(h_flex().child(head));
         for (ri, row) in t.rows.iter().enumerate() {
@@ -288,7 +293,7 @@ impl PartStudioView {
                     .child(div().truncate().child(text))
                     .when_some(info, |d, tip| d.child(div().id(SharedString::from(format!("ct-info-{index}-{ri}-{ci}"))).pl(px(3.)).tooltip(crate::ui::tooltip(tip)).child(crate::ui::glyph("info", 14., gpui_kit::rgb(0x888888)))))
                     .when_some(error, |d, tip| d.tooltip(crate::ui::tooltip(tip)));
-                r = r.child(cell(content.into_any_element()));
+                r = r.child(cell(widths[ci], content.into_any_element()));
             }
             section = section.child(r);
         }

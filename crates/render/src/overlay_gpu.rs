@@ -21,6 +21,7 @@ struct Globals {
     size: [f32; 2],
     shading: [f32; 4],
     gamma_ratios: [f32; 4],
+    flags: [f32; 4],
 }
 
 #[repr(C)]
@@ -132,7 +133,7 @@ impl OverlayGpu {
                 cache: None,
             })
         };
-        let fill_attrs = wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4];
+        let fill_attrs = wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4, 2 => Float32x4];
         let fill_buffers = [wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<OverlayVertex>() as u64, step_mode: wgpu::VertexStepMode::Vertex, attributes: &fill_attrs }];
         let mask_attrs = wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x4];
         let mask_buffers = [wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<MaskVertex>() as u64, step_mode: wgpu::VertexStepMode::Vertex, attributes: &mask_attrs }];
@@ -246,8 +247,9 @@ impl OverlayGpu {
             (l.width, l.height)
         };
         let shading_v = [if shading.correct { 1.0 } else { 0.0 }, shading.grayscale_enhanced_contrast, w as f32, h as f32];
-        queue.write_buffer(&self.layer_globals, 0, bytemuck::bytes_of(&Globals { origin: [x0 as f32, y0 as f32], size: [layer_size.0 as f32, layer_size.1 as f32], shading: shading_v, gamma_ratios: shading.gamma_ratios }));
-        queue.write_buffer(&self.composite_globals, 0, bytemuck::bytes_of(&Globals { origin: [x0 as f32, y0 as f32], size: [frame_size.0 as f32, frame_size.1 as f32], shading: shading_v, gamma_ratios: shading.gamma_ratios }));
+        let flags = [if shading.clip_path_pixels { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0];
+        queue.write_buffer(&self.layer_globals, 0, bytemuck::bytes_of(&Globals { origin: [x0 as f32, y0 as f32], size: [layer_size.0 as f32, layer_size.1 as f32], shading: shading_v, gamma_ratios: shading.gamma_ratios, flags }));
+        queue.write_buffer(&self.composite_globals, 0, bytemuck::bytes_of(&Globals { origin: [x0 as f32, y0 as f32], size: [frame_size.0 as f32, frame_size.1 as f32], shading: shading_v, gamma_ratios: shading.gamma_ratios, flags }));
         let vertices = (!draw.indices.is_empty()).then(|| self.vertices.write(device, queue, bytemuck::cast_slice(&draw.vertices)).clone());
         let indices = (!draw.indices.is_empty()).then(|| self.indices.write(device, queue, bytemuck::cast_slice(&draw.indices)).clone());
         let quads: Vec<MaskVertex> = draw

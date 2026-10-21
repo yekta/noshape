@@ -73,16 +73,22 @@ fn item_at(text: &str, at: usize) -> Option<usize> {
 impl DrawingEditor {
     /// Change the open note editor's style.
     fn note_style(&mut self, f: &dyn Fn(&mut NoteStyle), cx: &mut Context<Self>) {
-        if let Some(Panel::Note { style, .. }) = &mut self.panel {
-            f(style);
+        match &mut self.panel {
+            Some(Panel::Note { style, .. }) => f(style),
+            Some(Panel::Cell { note: Some(n), .. }) => f(&mut n.style),
+            _ => {}
         }
         cx.notify();
     }
 
-    /// The Note panel's rows (live 225).
+    /// The Note panel's rows (live 225; for a general table cell live 743–750:
+    /// no Note order and no Flag notes, Line spacing and List disabled).
     pub fn note_panel_rows(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let Some(Panel::Note { input, height, style, .. }) = &self.panel else { return Vec::new() };
-        let (input, height, st) = (input.clone(), height.clone(), style.clone());
+        let (input, height, st, cell) = match &self.panel {
+            Some(Panel::Note { input, height, style, .. }) => (input.clone(), height.clone(), style.clone(), false),
+            Some(Panel::Cell { input, note: Some(n), .. }) => (input.clone(), n.height.clone(), n.style.clone(), true),
+            _ => return Vec::new(),
+        };
         let pal = p();
         let ed = cx.entity();
         let text = input.read(cx).value().to_string();
@@ -197,12 +203,13 @@ impl DrawingEditor {
         spacing.push(entry(if st.space_before { "Remove space before paragraph" } else { "Add space before paragraph" }, None, false, std::rc::Rc::new(|s: &mut NoteStyle| s.space_before = !s.space_before)));
         spacing.push(entry(if st.space_after { "Remove space after paragraph" } else { "Add space after paragraph" }, None, false, std::rc::Rc::new(|s: &mut NoteStyle| s.space_after = !s.space_after)));
         let aligns = [(NoteAlign::Left, "Align left", "note-align-left"), (NoteAlign::Center, "Align center", "note-align-center"), (NoteAlign::Right, "Align right", "note-align-right"), (NoteAlign::Justified, "Justify", "note-align-justify")];
+        let aligns = &aligns[..if cell { 3 } else { 4 }];
         let align_icon = aligns.iter().find(|a| a.0 == st.align).map(|a| a.2).unwrap_or("note-align-left");
         let align: Vec<Entry> = aligns.iter().map(|&(a, l, i)| entry(l, Some(i), st.align == a, std::rc::Rc::new(move |s: &mut NoteStyle| s.align = a))).collect();
         let list_icon = |l: NoteList| match l {
-            NoteList::None => "note-list-none",
+            // Live: the bulleted list icon until a list is chosen.
+            NoteList::None | NoteList::Bullets => "note-list-bullets",
             NoteList::Numbers => "note-list-numbers",
-            NoteList::Bullets => "note-list-bullets",
             NoteList::UpperLetters | NoteList::LowerLetters => "note-list-letters",
         };
         let lists: Vec<Entry> = NoteList::ALL.iter().map(|&l| entry(l.name(), Some(list_icon(l)), st.list == l, std::rc::Rc::new(move |s: &mut NoteStyle| s.list = l))).collect();
@@ -228,11 +235,11 @@ impl DrawingEditor {
             .child(toggle("note-u", "note-underline", "Underline", st.underline, |s| s.underline = !s.underline, cx))
             .child(toggle("note-s", "note-strike", "Strikethrough", st.strikethrough, |s| s.strikethrough = !s.strikethrough, cx))
             .child(color.os_dropdown_menu("note-color-dd", true, menu(colors)))
-            .child(with_menu(popup("note-spacing", "note-line-spacing", "Line spacing", true, cx), "note-spacing", true, spacing))
+            .child(with_menu(popup("note-spacing", "note-line-spacing", "Line spacing", !cell, cx), "note-spacing", !cell, spacing))
             .child(with_menu(popup("note-align", align_icon, "Horizontal alignment", free, cx), "note-align", free, align))
-            .child(with_menu(popup("note-list", list_icon(st.list), "List", true, cx), "note-list", true, lists))
+            .child(with_menu(popup("note-list", list_icon(st.list), "List", !cell, cx), "note-list", !cell, lists))
             .child(with_menu(popup("note-valign", valign_icon, "Vertical alignment", free, cx), "note-valign", free, valign))
-            .child(with_menu(popup("note-order", if st.bottom_to_top { "note-order-up" } else { "note-order-down" }, "Note order", true, cx), "note-order", true, order));
+            .when(!cell, |r| r.child(with_menu(popup("note-order", if st.bottom_to_top { "note-order-up" } else { "note-order-down" }, "Note order", true, cx), "note-order", true, order)));
 
         // Row 3: Insert symbol, Insert drawing property, Insert sheet
         // reference property, Text format, Date time format.
@@ -307,7 +314,9 @@ impl DrawingEditor {
         let flagged = item.is_some_and(|i| st.flags.contains(&i));
         let default_shape = self.drawing.props.flag_shape;
         let flag_on = flagged;
-        let shape_label = if st.flag_shape == default_shape { format!("{} (Drawing)", st.flag_shape.name()) } else { st.flag_shape.name().to_string() };
+        // Unflagged notes show the drawing's shape ("Flag (Drawing)").
+        let shown_shape = if st.flags.is_empty() { default_shape } else { st.flag_shape };
+        let shape_label = if shown_shape == default_shape { format!("{} (Drawing)", shown_shape.name()) } else { shown_shape.name().to_string() };
         let shapes: Vec<Entry> = FlagShape::ALL.iter().map(|&k| entry(k.name(), None, st.flag_shape == k, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_shape = k))).collect();
         let sizes: Vec<Entry> = (1..=4u8).map(|n| entry(&format!("{n} Character{}", if n > 1 { "s" } else { "" }), None, st.flag_chars == n, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_chars = n))).collect();
         let flag_select = |id: &'static str, w: f32, label: String| {
@@ -353,6 +362,10 @@ impl DrawingEditor {
 
         // The text and its ruler are edited in place on the sheet
         // (`render_note_inplace`).
-        vec![row1.into_any_element(), row2.into_any_element(), row3.into_any_element(), row4.into_any_element()]
+        let mut rows = vec![row1.into_any_element(), row2.into_any_element(), row3.into_any_element()];
+        if !cell {
+            rows.push(row4.into_any_element());
+        }
+        rows
     }
 }

@@ -10,12 +10,19 @@
 
 use super::*;
 use gpui_kit::component::input::InputEvent;
-use noshape_model::assembly::analysis::{AssemblyMass, assembly_mass_properties};
+use noshape_model::assembly::analysis::{AssemblyMass, assembly_mass_properties, face_section_properties};
+use noshape_model::assembly::eval::InstancePath;
 
 /// Mass properties dialog state.
 pub(crate) struct AsmMassUi {
     /// Face tab (else Part).
     pub faces: bool,
+    /// Faces to measure (Face tab; picked in the graphics area).
+    pub face_picks: Vec<(InstancePath, Reference)>,
+    /// "Mate connector for reference frame": the field takes picks, and the
+    /// connector picked (the moments are then about it; help).
+    pub connector_active: bool,
+    pub reference: Option<MateConnectorRef>,
     /// The "material not defined" warning was dismissed.
     pub warning_closed: bool,
     /// The assembly's Mass ☑ Override (top-level row) and its field.
@@ -71,9 +78,51 @@ impl AssemblyView {
                     cx.notify();
                 }
             });
-            self.ui.mass = Some(AsmMassUi { faces: false, warning_closed: false, override_on: stored.is_some(), override_input, _override_sub: sub });
+            self.ui.mass = Some(AsmMassUi { faces: false, face_picks: Vec::new(), connector_active: false, reference: None, warning_closed: false, override_on: stored.is_some(), override_input, _override_sub: sub });
         }
         cx.notify();
+    }
+
+    /// The Face tab takes face picks from the graphics area (not while the
+    /// reference connector field is active).
+    pub(super) fn mass_face_picking(&self) -> bool {
+        self.ui.mass.as_ref().is_some_and(|m| m.faces && !m.connector_active)
+    }
+
+    /// The reference connector field is waiting for a mate connector pick.
+    pub(super) fn mass_connector_picking(&self) -> bool {
+        self.ui.mass.as_ref().is_some_and(|m| m.connector_active)
+    }
+
+    /// A mate connector picked for the reference frame.
+    pub(super) fn mass_set_reference(&mut self, c: MateConnectorRef, cx: &mut Context<Self>) -> bool {
+        let Some(m) = self.ui.mass.as_mut().filter(|m| m.connector_active) else { return false };
+        m.reference = Some(c);
+        m.connector_active = false;
+        cx.notify();
+        true
+    }
+
+    /// A face clicked while the Face tab is shown: added (again: removed).
+    pub(super) fn mass_pick_face(&mut self, t: AsmPickTarget, cx: &mut Context<Self>) {
+        let Some(m) = &mut self.ui.mass else { return };
+        if !matches!(t.reference, Reference::Face(_)) {
+            return;
+        }
+        let key = (t.path.clone(), t.reference.clone());
+        match m.face_picks.iter().position(|k| *k == key) {
+            Some(i) => {
+                m.face_picks.remove(i);
+            }
+            None => m.face_picks.push(key),
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// The Face tab's picks, drawn selected.
+    pub(super) fn mass_picked_faces(&self) -> Vec<(InstancePath, Reference)> {
+        self.ui.mass.as_ref().filter(|m| m.faces).map(|m| m.face_picks.clone()).unwrap_or_default()
     }
 
     /// Computed mass of the whole assembly (kg), for its Properties….
@@ -139,8 +188,11 @@ impl AssemblyView {
         // The top-level row selects every instance: the field then holds the
         // assembly itself (live 739), whose Mass can be overridden.
         let top_level = self.assembly(cx).is_some_and(|a| !self.selected.is_empty() && a.instances.iter().filter(|i| a.generated_by(i.id).is_none()).all(|i| self.selected.contains(&i.id)));
+        let face_picks = self.ui.mass.as_ref().map(|m| m.face_picks.clone()).unwrap_or_default();
+        let (connector_active, reference) = self.ui.mass.as_ref().map(|m| (m.connector_active, m.reference.clone())).unwrap_or((false, None));
+        let reference_frame = reference.as_ref().and_then(|r| self.result.connector_world(r, &units));
         let names: Vec<String> = if faces {
-            Vec::new()
+            face_picks.iter().map(|(path, _)| format!("Face of {}", self.result.node(path).map(|n| n.name.clone()).unwrap_or_default())).collect()
         } else if top_level {
             self.doc.read(cx).session.doc.tab(self.tab).map(|t| vec![t.name.clone()]).unwrap_or_default()
         } else {
@@ -216,61 +268,105 @@ impl AssemblyView {
         let axis = |l: &'static str, c: u32, glyph: &'static str| h_flex().w(px(30.)).pl(px(5.)).gap(px(1.)).child(div().text_size(px(14.)).text_color(rgb(0x999999)).child(l)).child(div().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(rgb(c)).child(glyph));
         let mut body = v_flex().w_full().child(h_flex().w_full().child(tab("amass-tab-part", "Part", false, cx)).child(tab("amass-tab-face", "Face", true, cx)));
         body = body
-            .child(field(if faces { "Faces to measure" } else { "Instances to measure" }, names, true, missing))
-            .child(field("Mate connector for reference frame", Vec::new(), false, false))
+            .child(field(if faces { "Faces to measure" } else { "Instances to measure" }, names, !connector_active, missing).id("amass-measure").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(m) = &mut this.ui.mass {
+                    m.connector_active = false;
+                }
+                cx.notify();
+            })))
+            .child(field("Mate connector for reference frame", reference.iter().map(|_| "Mate connector".to_string()).collect(), connector_active, false).id("amass-reference").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some(m) = &mut this.ui.mass {
+                    m.connector_active = true;
+                }
+                cx.notify();
+            })))
             .child(div().mt(px(8.)).child(crate::ui::os_checkbox("amass-variance", "Show calculation variance", false)));
-        // Every row is shown; values only once something is measured.
-        let props = mass.as_ref().map(|m| &m.props);
-        // Without a material Onshape leaves mass, center of mass and inertia empty.
-        let have = props.is_some_and(|p| p.mass.is_some());
-        let length = noshape_units::Dim::LENGTH;
-        let with_unit = |v: Option<String>, unit: String| v.map(|v| format!("{v} {unit}")).unwrap_or_default();
-        let c = props.map(|p| p.center_of_mass).unwrap_or_default();
-        let com = |v: f64| with_unit(have.then(|| in_units(v, length)), len_sym.to_string());
-        body = body
-            .child({
-                let check: AnyElement = if top_level {
-                    crate::ui::os_checkbox("amass-override", "Override", override_on)
-                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                            let computed = this.assembly_mass(cx).and_then(|m| m.props.mass);
-                            let (sym, factor) = mass_unit(&this.units(cx));
-                            if let Some(m) = &mut this.ui.mass {
-                                m.override_on = !m.override_on;
-                                // Ticked: the field starts at the computed mass.
-                                if m.override_on && m.override_input.read(cx).value().trim().is_empty() {
-                                    let text = computed.map(|c| format!("{} {sym}", number(c * factor))).unwrap_or_default();
-                                    m.override_input.update(cx, |s, cx| s.set_value(text, window, cx));
-                                }
-                            }
-                            cx.notify();
-                        }))
-                        .into_any_element()
-                } else {
-                    override_check("amass-override", false).into_any_element()
-                };
-                let shown: AnyElement = if overriding {
-                    gpui_kit::base::input::input_frame(div().flex_1().mr(px(5.)).h(px(24.)).border_b_1().border_color(pal.border).child(Input::new(&override_input).appearance(false).text_size(px(13.33)).text_right().h(px(23.))).into_any_element()).into_any_element()
-                } else {
-                    value(with_unit(props.and_then(|p| p.mass).map(|m| number(m * mass_factor)), mass_sym.to_string())).into_any_element()
-                };
-                h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(check).child(shown)
-            })
-            .child(value_row("Volume", with_unit(props.map(|p| in_units(p.volume, noshape_units::Dim { length: 3, angle: 0 })), format!("{len_sym}³"))))
-            .child(value_row("Surface area", with_unit(props.map(|p| in_units(p.surface_area, noshape_units::Dim { length: 2, angle: 0 })), format!("{len_sym}²"))))
-            .child(h_flex().h(px(30.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(override_check("amass-com-override", false)))
-            .children([("X", 0xcd0000u32, "↘", c.x), ("Y", 0x009400, "↗", c.y), ("Z", 0x0000d0, "↑", c.z)].into_iter().map(|(l, col, g, v)| h_flex().h(px(31.)).child(axis(l, col, g)).child(value(com(v)))))
-            .child(h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({mass_sym} {len_sym}²)"))).child(override_check("amass-moi-override", false)));
-        let f = units.si_factor(length).powi(2);
-        let i = props.map(|p| p.inertia).unwrap_or(glam::DMat3::ZERO);
-        let iv = |x: f64| if have { number(x * scale * mass_factor / f) } else { String::new() };
-        let grid = [[i.x_axis.x, i.y_axis.x, i.z_axis.x], [i.x_axis.y, i.y_axis.y, i.z_axis.y], [i.x_axis.z, i.y_axis.z, i.z_axis.z]];
-        let labels = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
-        for (r, row_names) in labels.iter().enumerate() {
-            let mut row = h_flex().h(px(28.)).px(px(5.)).gap(px(8.));
-            for (k, n) in row_names.iter().enumerate() {
-                row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(iv(grid[r][k]))));
+        // Face tab (live 851–854): Surface area, Perimeter, the 2×2 area
+        // moments and the polar moment (mm⁴), no Override boxes; blank with a
+        // red title while the faces aren't coplanar.
+        let section = if faces { face_section_properties(&self.result, &face_picks) } else { None };
+        let not_coplanar = faces && !face_picks.is_empty() && section.is_none();
+        if faces {
+            let area_dim = noshape_units::Dim { length: 2, angle: 0 };
+            let f4 = units.si_factor(noshape_units::Dim::LENGTH).powi(4);
+            let v = |x: Option<f64>| x.map(number).unwrap_or_default();
+            body = body
+                .child(value_row("Surface area", with_unit_opt(section.as_ref().map(|s| in_units(s.area, area_dim)), format!("{len_sym}²"))))
+                .child(value_row("Perimeter", with_unit_opt(section.as_ref().map(|s| in_units(s.perimeter, noshape_units::Dim::LENGTH)), len_sym.to_string())))
+                .child(h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Area moment of inertia ({len_sym}⁴)"))));
+            let m = section.as_ref().map(|s| s.moments);
+            for (r, names) in [["Lxx", "Lxy"], ["Lyx", "Lyy"]].iter().enumerate() {
+                let mut row = h_flex().h(px(28.)).px(px(5.)).gap(px(8.));
+                for (k, n) in names.iter().enumerate() {
+                    row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v(m.map(|m| m[r][k] / f4)))));
+                }
+                body = body.child(row);
             }
-            body = body.child(row);
+            body = body.child(h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Polar moment of inertia ({len_sym}⁴)")))).child(
+                h_flex().h(px(28.)).px(px(5.)).gap(px(8.)).child(
+                    h_flex().w(px(200.)).gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child("Lzz")).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(v(section.as_ref().map(|s| s.polar / f4)))),
+                ),
+            );
+        } else {
+            // Every row is shown; values only once something is measured.
+            let props = mass.as_ref().map(|m| &m.props);
+            // Without a material Onshape leaves mass, center of mass and inertia empty.
+            let have = props.is_some_and(|p| p.mass.is_some());
+            let length = noshape_units::Dim::LENGTH;
+            let with_unit = |v: Option<String>, unit: String| v.map(|v| format!("{v} {unit}")).unwrap_or_default();
+            let c = props.map(|p| p.center_of_mass).unwrap_or_default();
+            let com = |v: f64| with_unit(have.then(|| in_units(v, length)), len_sym.to_string());
+            body = body
+                .child({
+                    let check: AnyElement = if top_level {
+                        crate::ui::os_checkbox("amass-override", "Override", override_on)
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                let computed = this.assembly_mass(cx).and_then(|m| m.props.mass);
+                                let (sym, factor) = mass_unit(&this.units(cx));
+                                if let Some(m) = &mut this.ui.mass {
+                                    m.override_on = !m.override_on;
+                                    // Ticked: the field starts at the computed mass.
+                                    if m.override_on && m.override_input.read(cx).value().trim().is_empty() {
+                                        let text = computed.map(|c| format!("{} {sym}", number(c * factor))).unwrap_or_default();
+                                        m.override_input.update(cx, |s, cx| s.set_value(text, window, cx));
+                                    }
+                                }
+                                cx.notify();
+                            }))
+                            .into_any_element()
+                    } else {
+                        override_check("amass-override", false).into_any_element()
+                    };
+                    let shown: AnyElement = if overriding {
+                        gpui_kit::base::input::input_frame(div().flex_1().mr(px(5.)).h(px(24.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(&override_input).appearance(false).text_size(px(13.33)).text_right(), 23.)).into_any_element()).into_any_element()
+                    } else {
+                        value(with_unit(props.and_then(|p| p.mass).map(|m| number(m * mass_factor)), mass_sym.to_string())).into_any_element()
+                    };
+                    h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(check).child(shown)
+                })
+                .child(value_row("Volume", with_unit(props.map(|p| in_units(p.volume, noshape_units::Dim { length: 3, angle: 0 })), format!("{len_sym}³"))))
+                .child(value_row("Surface area", with_unit(props.map(|p| in_units(p.surface_area, noshape_units::Dim { length: 2, angle: 0 })), format!("{len_sym}²"))))
+                .child(h_flex().h(px(30.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(override_check("amass-com-override", false)))
+                .children([("X", 0xcd0000u32, "↘", c.x), ("Y", 0x009400, "↗", c.y), ("Z", 0x0000d0, "↑", c.z)].into_iter().map(|(l, col, g, v)| h_flex().h(px(31.)).child(axis(l, col, g)).child(value(com(v)))))
+                .child(h_flex().h(px(29.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Mass moments of inertia ({mass_sym} {len_sym}²)"))).child(override_check("amass-moi-override", false)));
+            let f = units.si_factor(length).powi(2);
+            // With a reference connector: about its origin, in its axes (help).
+            let i = props
+                .map(|p| match (&reference_frame, p.mass) {
+                    (Some(f), Some(m)) => noshape_model::assembly::analysis::inertia_about_frame(p.inertia, m, p.center_of_mass, f),
+                    _ => p.inertia,
+                })
+                .unwrap_or(glam::DMat3::ZERO);
+            let iv = |x: f64| if have { number(x * scale * mass_factor / f) } else { String::new() };
+            let grid = [[i.x_axis.x, i.y_axis.x, i.z_axis.x], [i.x_axis.y, i.y_axis.y, i.z_axis.y], [i.x_axis.z, i.y_axis.z, i.z_axis.z]];
+            let labels = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
+            for (r, row_names) in labels.iter().enumerate() {
+                let mut row = h_flex().h(px(28.)).px(px(5.)).gap(px(8.));
+                for (k, n) in row_names.iter().enumerate() {
+                    row = row.child(h_flex().flex_1().gap(px(4.)).child(div().w(px(24.)).text_size(px(12.)).text_color(pal.text_muted).child(*n)).child(div().flex_1().h(px(22.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(iv(grid[r][k]))));
+                }
+                body = body.child(row);
+            }
         }
         let help = super::props::help_dot();
         let mut out = vec![
@@ -288,7 +384,7 @@ impl AssemblyView {
                         .bg(rgb(0xffffff))
                         .border_b_1()
                         .border_color(rgb(0xd7d7d7))
-                        .child(crate::ui::panel_title("asm-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties")))
+                        .child(crate::ui::panel_title("asm-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(not_coplanar, |d| d.text_color(pal.text_invalid)).child("Mass and section properties")).when(not_coplanar, |d| d.tooltip(crate::ui::tooltip("Face selections are not coplanar"))))
                         // Live: the ✓ is pale (op .2) until the Mass override is in play.
                         .child(
                             div()
@@ -469,7 +565,7 @@ impl AssemblyView {
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_zebra(false, cx))),
                         ),
                 )
-                .child(crate::os_ui::param_row("Stripe count", Input::new(&d.stripes).appearance(false).text_size(px(13.33)).text_right().h(px(25.))))
+                .child(crate::os_ui::param_row("Stripe count", crate::os_ui::input_h(Input::new(&d.stripes).appearance(false).text_size(px(13.33)).text_right(), 25.)))
                 .child(check("azebra-flip", "Flip stripes", flip, |s| s.flip = !s.flip, cx))
                 .child(check("azebra-edges", "Show edges", edges, |s| s.show_edges = !s.show_edges, cx))
                 .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(super::props::help_dot()))
@@ -499,6 +595,11 @@ fn number(x: f64) -> String {
     }
     let t = fixed.trim_end_matches('0').trim_end_matches('.');
     if t == "-0" { "0".into() } else { t.to_string() }
+}
+
+/// "<value> <unit>", or empty without a value.
+fn with_unit_opt(v: Option<String>, unit: String) -> String {
+    v.map(|v| format!("{v} {unit}")).unwrap_or_default()
 }
 
 #[cfg(test)]

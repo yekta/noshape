@@ -145,6 +145,44 @@ string plus its evaluated SI value; the document has default units.
 * The UI thread never blocks on the kernel or the GPU: device creation and
   pipeline compilation run on background threads at startup.
 
+**UI frames (GPUI), target < 4 ms UI-thread CPU per keystroke or caret blink.**
+GPUI re-renders, lays out and paints a view, and every view around it, when
+anything inside it notifies; a caret blinks twice a second. Keep that work
+small with cached views (`crate::cached_slice::Slice`, inserted with
+`Entity::cached(style)`), following these rules:
+* **Text fields outside cached views.** A field's notification (each
+  keystroke, each blink of a single-line field) re-renders the view it is in
+  and every view around it. Render the field in the parent (or a layer of its
+  own) and put the heavy parts beside it as slices: the Part Studio's feature
+  dialog sits between its `underlay` and `overlay` slices, the features list's
+  head (with the filter) is rendered with the studio and its rows are a slice,
+  the Assembly's left dialogs (`render_left_layer`) sit between `under` and
+  `overlay`, the Insert panel's search box sits between its sized slices.
+* **No cached view inside another one that re-renders.** Re-rendering a cached
+  view re-renders every cached view nested in it (`window.refreshing` in
+  vendor/gpui-pre/src/view.rs): slices are siblings under a plain view.
+* **A definite size.** A cached view is laid out from its style alone. A
+  floating panel of content size goes in an absolute full-size slice (the
+  drawing's panel layer); a row of content height uses `Slice::sized`
+  (laid out normally after each change, then reused at the measured height).
+* **Tell a slice what it shows.** It re-renders when its parent notifies;
+  reading another entity doesn't subscribe: `Slice::observing` (the doc, the
+  viewport), `Slice::follow` (the field being edited).
+* **A field's change notifies only what shows it,** not the whole view
+  (`filter_rows_changed`, `insert_search_changed`), and only when what it
+  shows changes (the Part Studio filter compares the matching features).
+* **Nothing heavy in render:** no clone of the model (borrow it, or plan the
+  rows first: `render_feature_list`), no parse of a document per render
+  (`feature_studio::outline_of` caches by the text), tooltip texts worked out
+  when the tooltip opens (`ui::with_lazy_side_tooltip`).
+* Multi-line inputs (code editors, textareas) paint their caret in their own
+  view and their text in a cached one (vendor/gpui-base `TextLayer`), so a
+  blink repaints only the caret; shaped text lines are kept across frames
+  (gpui-pre `RecentLines`), so only changed lines are shaped again.
+* Measure with perf uprobes on `<gpui::window::Window>::draw` and the UI
+  thread's cpu-clock samples inside it (scripts: /root/qa4-scratch,
+  `measure3.sh`, `ft2.sh`); see docs/handoff/qa-round-4.md R4/R5.
+
 ### Measuring (`NOSHAPE_PERF=1`)
 `noshape_render::perf` collects stage timings and logs mean/p50/p95/max every
 120 samples with log target `perf`:

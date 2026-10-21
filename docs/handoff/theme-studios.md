@@ -276,6 +276,105 @@ Preferences, Release/Publish):**
 - **Feature Studio Monitor ▾:** items carry the pulse (Monitor, new own `fs-monitor.svg`) and stopwatch
   (Profile, `regen-timer`) icons as live 71. "Profile …" stays disabled: FeatureScript profiling is
   not implemented (fs agent).
+- **Preferences, psb's sections (visual only):** release_prefs.rs / numbering_prefs.rs headings now use
+  the page's section look (18 px / 500 over a 1 px `#333` rule, content 15 px in; they were 20 px over
+  `#ccc` flush at the edge). Material libraries is live's table (prefs/05): three 425 px columns
+  (cells 22 px in), 44 px bold header row ruled `#d0dbe5`, 48 px rows, a small primary **Remove**
+  (26 px, 12 px) right-aligned. For psb: live also offers Remove on "Onshape Material Library" and an
+  **[Add material library…]** button under the table (ours has neither); "Release management" and
+  "Numbering scheme settings" are company settings in Onshape (not in user Preferences).
+- **Lead's decisions (20 Oct, late):** Compare = ui2 (full compare mode; renderer side via perf if
+  needed; tell the lead before editing workspace.rs / the Part Studio feature panel); comma decimals =
+  ui2 with psb; Environment profile → perf; User export rules → kern; Theming → ui; Language = own
+  workstream (❌ in docs/parity/account.md, new: the Preferences page checklist); Onshape Labs /
+  Co-complete = cloud, excluded; the other agents' `input_h` call sites → ui.
+- **"View in repair" and "Workspace protection…": both work locally → building them** (help
+  Document__repairing.md: a side-by-side Repair panel showing the Part Studio at a history change,
+  Synchronize view, hover highlight of broken references, "Edit healthy moment", the panel header's
+  wrench icon; Document__workspace_protections.md: a per-workspace lock — "Enable workspace protection"
+  dialog, lock icon in the graph, a banner on the protected workspace, geometry / drawing / tab
+  changes refused there, versions / branches / merges / release metadata allowed). Not cloud and not
+  permissions-only (non-Enterprise: anyone with edit access). Live captures requested (REQUESTS ui2
+  10-20 23:30 ×3, also Compare details).
+- **Comma decimal separator (Preferences › Decimal format), ui2 + psb.** Units crate: new
+  `decimal.rs` — `set_comma_decimal` / `comma_decimal`, `localize` (canonical → user text: `1.5` →
+  `1,5`, a list comma `1,4` → `1, 4`, string literals untouched) and `delocalize` (typed `1,5` →
+  `1.5`). Expressions are **stored canonically**: `ExprValue::new` / `from_quantity` delocalize, so a
+  document reads the same with the setting on or off (serde does not go through `new`). The lexer is
+  unchanged. `format_quantity*` show the comma; `format_number` does not (drawings have their own
+  separator). App: "Decimal format" section (checkbox + Save decimal format) in units_prefs.rs,
+  applied at startup (main.rs `units_prefs::apply()`). psb's `variable_table::with_workspace_unit`
+  delocalizes first (one line). Variable Studio value cells show `localize(text)`.
+  **For psb / ui (fields seeded from stored expression text):** show `noshape_units::localize(&text)`
+  wherever an input is filled from `ExprValue.text` (feature dialog number fields, Part Studio variable
+  table, sketch dimension edit box, configuration tables, mate/assembly fields); commits already go
+  through `ExprValue::new`. Code that evaluates typed text *before* storing it (live previews) should
+  `delocalize` it first.
+- **Compare (in progress, ui2):** `compare_mode.rs` (new) holds the per-window compare session (base /
+  target documents, labels, rows, blend, Only show differences, selected feature) and the UI pieces:
+  `render_bar` (Comparing **Main** and **V3** [Reverse compare] (?), live 953 metrics), `tab_status` /
+  `tab_dot` (yellow / white / red, live tooltips), `render_not_comparable`, `render_panel` (400 px
+  Part Studio compare panel: Main / V3 + units, Features, Only show differences, parameter table),
+  `render_slider` (Main ○—— V3, 300 px), `blend()`, `target_document()`. history_panel.rs: row ›
+  Compare enters compare mode, base row `#b2ddf6` + blue bar, target row light pink + red bar, any row
+  click leaves it; the old in-panel diff list is gone. model compare.rs: `compare_features` (+ test).
+  Waiting on the lead's go to mount the bar / tab dots in workspace.rs and the panel / slider in the
+  Part Studio; the grey + blend graphics need perf. Until mounted, compare_mode.rs has dead-code
+  warnings. Feature-row status marks (+ − ~) are placeholders until the requested capture.
+- **Compare mounted (lead's go):** workspace.rs — in compare mode a white strip over the toolbar row
+  with `compare_mode::render_bar` centred, the tab dots after names, drawings / tabs only in the base
+  greyed (`#e1e1e1`, content 50 %) and not clickable, a tab only in the base shows
+  `render_not_comparable`; part_studio/mod.rs — `render_panel` in place of the Features / parts list
+  and `render_slider` top centre of the viewport area. perf wires `compare_mode::blend()` /
+  `target_document()` into the renderer (grey, blended graphics).
+- **Workspace protection built:** ops `session.rs` (api's crate, small): `PROTECTED_KEY`,
+  `PROTECTED_MESSAGE`, `branch_protected` / `is_protected` / `set_branch_protected`,
+  `with_protection_lifted` (release metadata), and a check in `commit`, `commit_all`,
+  `commit_all_not_undoable`, the `edit_*` helpers (before they touch the document), `restore`,
+  `undo`, `redo`; versions, branches and merges are untouched (test
+  `protected_workspace_takes_merges_not_edits`). App: `workspace_protection.rs` (new) — workspace
+  row › "Workspace protection…" dialog (Enable workspace protection + the help's allowed / refused
+  lists, Apply) and the banner (white bar, lock, the message) at the top centre while the protected
+  workspace is active; history rows show a lock. For psb: release code that writes part numbers on a
+  protected workspace should run inside `session.with_protection_lifted(..)`. Look of dialog and
+  banner to be checked against the live capture.
+- **Compare, second pass (live cp-920/921 landed):** the panel's Features list is base | marker |
+  target (29 px rows, `#dee2e6` rules): changed "≠" gold `#daa300` (white when selected), only in the
+  base ">" red, only in the target "<" green `#74ce3a`, sketches greyed; "Only show differences"
+  off lists every feature. Clicking a feature shows two read-only dialogs side by side (name header,
+  query box / select / number field / checkbox rows), changed fields outlined `#fab601`. Model
+  `compare_features` rows carry `ParamShape` and selection labels ("Edge of Extrude 1"), Name and
+  Suppressed first, only the dialog's visible parameters (test). Checked in the app: Part Studio 1
+  yellow dot after suppressing Fillet 1, V1-only tabs red / drawings white, Reverse compare swaps.
+  Live's "Unknown of Extrude 1" (edge ids no longer resolving) needs geometry resolution: not done.
+- **Workspace protection dialog = live wp-902:** "Workspace protection for [name]" (yellow chip), ☐
+  Enable workspace protection, the blue "Workspace protection restrictions" box (4 restrictions, 3
+  allowed actions, Learn more), Apply pale until changed. Live's yellow "These tabs should be
+  updated: …" notice (disables the box) needs an out-of-date-drawing check (asb; Create version's
+  "These drawings should be updated" notice needs the same). Workspace-row menu now Open · Compare ·
+  Merge into current workspace… · Workspace protection… · Properties… (live wp-901; Delete pending);
+  change rows lose "Branch to create workspace…" (live rp-904).
+- **View in repair (my side done, mount on hold for v0.4.3):** `repair_mode.rs` — state, header wrench
+  "Repair" (Part Studios) + banner "Select a history entry to repair this Part Studio", picking then
+  clicking an entry opens it, "View in repair" on version / change rows, the 567 px panel chrome
+  (`render_panel`: blue Repair title, "Viewing <entry>" pill with ↗ / ?, Synchronize view toggle).
+  New own icons repair.svg, open-external.svg, sync-view.svg. After the release: mount in the Part
+  Studio (right of the viewport) + the strip's "Repair panel" wrench (psb / ui heads-up via lead), perf
+  renders `repair_mode::document()` as the second view (following the camera while
+  `synchronized()`). Until then `repair_mode.rs` carries narrow commented `#[allow(dead_code)]`s.
+- **Workspace protection — plan:** store meta `workspace_protected:<branch>`; history panel: the
+  workspace-row menu item "Workspace protection…" + dialog (look after the live capture) and a lock
+  icon on protected workspaces; ops session (api): a `protected()` check refusing tab content edits
+  and tab create / delete / rename on that branch while versions, branches, merges and release
+  metadata stay allowed (today `read_only()` gates every edit, including version creation paths, so
+  protection needs its own check); workspace.rs: the banner on the protected workspace. Needs api's
+  and ui's files → through the lead.
+- **View in repair — plan:** history panel header wrench + version/change row "View in repair": a
+  Repair panel at the right of the Part Studio showing that Part Studio at the chosen history change
+  (view-only viewport: Synchronize view toggle, close, its own right-click menu Zoom to fit /
+  Isometric), hovering a broken reference highlights where it pointed; feature menu "Edit healthy
+  moment". Needs the Part Studio view (a second viewport) → psb / ui / perf through the lead, after the
+  live capture.
 - Release dialog: no live reference possible (Free plan shows only the premium upsell; behaviours.md
   "Release management is not available").
 - **For the lead / other agents:**
@@ -930,3 +1029,28 @@ through the shared model helper
 anything else). Please call it in `variable_studio.rs`'s Value cell commit (`v.expr = ExprValue::new(val)`,
 around line 448), passing "LENGTH" for `VarKind::Length` and "ANGLE" for `VarKind::Angle`. psb didn't edit
 your file.
+
+## From psb (20 Oct): reordering inserted tables + "Overwritten" ⓘ (lead / ui request, live psb 10-20 t)
+Live: in a Part Studio's Variable table the inserted Variable Studio tables sit **above** the Part Studio's own table
+(psb now renders that order). The **lowest inserted table wins** a name clash, and the Part Studio's own `#w` before
+a feature beats every table. Each shadowed row gets an **ⓘ in its Name cell** with the tooltip **"Overwritten in
+another variable table."** Inserted tables **drag by their header** to reorder (hover cursor `auto`, `grabbing`
+while dragging, ghost = a dark-blue pill with the table name, drop line = 1 px blue with a small circle at its left;
+the Part Studio's own table can't be passed). psb built the whole drag in config_panel.rs: a transparent handle
+over each inserted table's header title, plus the drop side, order storage and ghost. **Your** `variable_studio.rs`
+needs one hook, in panel mode only (`host` is Some): in the Name cell, when
+`noshape_model::variables::overwritten(doc, host, self.tab).contains(&v.name)`, show an ⓘ at the cell's right
+with that tooltip. psb didn't edit your file because you have uncommitted work in it.
+
+### From skb (20 Oct, late): Assembly shortcut toolbar (surgical edits in preferences_window.rs)
+- Preferences › Shortcut toolbars now lists **Assembly** (context 2): every assembly toolbar tool
+  (`crate::assembly_view::shortcut_catalog()`, toolbar order) with its own draft
+  (`asm_toolbar` / `asm_toolbar_draft: crate::assembly_view::AsmToolbarPrefs`); "Save shortcut toolbar
+  settings" also writes the assembly's `shortcut_tools` into `assembly_toolbar.json` (its other settings
+  kept). Toolbars › Reset to defaults now clears the assembly's tool sets / removed tools / Search tools
+  instead of deleting `assembly_toolbar.json`, so the S toolbar choice survives (like the Part Studio's).
+- The assembly's S toolbar reads it (live look: rows of five 30 px buttons, 20 px icons, at cursor +10/−30,
+  95 % white, 1 px #ccc, square, 0 5 10 shadow). Live's Assembly defaults / list are asked (REQUESTS
+  "skb (10-20 assembly shortcut toolbar)"); ours default to Insert, Mate connector and 8 mates meanwhile.
+- Your Round 9 input-height note: the assembly call sites now go through `os_ui::input_h` (dialog
+  fields 25–26 px; live `input.os-param-text` 26 px).

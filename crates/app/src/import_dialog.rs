@@ -12,7 +12,8 @@
 //! Mesh files (live G35, G35b): STL has no tiles, no Import appearances and
 //! a Units select defaulting to the document's unit; OBJ keeps the tiles and
 //! Import appearances, its Units default to Meter; 3MF is OBJ without Units.
-//! None of them has Join adjacent surfaces.
+//! None of them has Join adjacent surfaces. A native assembly zip (live
+//! G38h): the tiles and the five checkboxes, no Units.
 
 use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
@@ -62,6 +63,10 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
     let (native, stl, obj) = (all_of(NATIVE_PARTS), all_of(&["stl"]), all_of(&["obj"]));
     let (mesh, units_select) = (all_of(&["stl", "obj", "3mf"]), stl || obj);
+    // Native assemblies (a zip; live G38h) keep the tiles and add Import
+    // material density like native parts.
+    let zip = all_of(&["zip"]);
+    let density = native || zip;
     let doc_unit = doc.read(cx).session.doc.settings.units.length;
     let default_unit = if obj { noshape_units::LengthUnit::Meter } else { doc_unit };
     let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
@@ -161,9 +166,10 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                     .when(!native && !stl, |d| d.child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone()))))
                     // Live document/77: the checkbox rows are 34 px apart.
                     .child(v_flex().gap(px(13.)).when(!stl, |d| d.child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
-                    .when(native, |d| d.child(check("imp-dens", "Import material density", "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
+                    .when(density, |d| d.child(check("imp-dens", "Import material density", "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
                     .child(check("imp-yup", "Orient imported models with Y Axis Up", "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
-                    .child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone()))
+                    // Live G41: Combine hides it for an assembly zip.
+                    .when(!(zip && c.combine), |d| d.child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone())))
                     .when(!mesh, |d| d.child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))))
                     // Live dom/dialog-import-stl.txt: "Units" (14 px / 600) over a 212 px select.
                     .when(units_select, |d| {
@@ -196,10 +202,10 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
     let units = doc.read(cx).session.doc.settings.units;
     let mut read: Vec<(String, String, crate::workspace::Foreign)> = Vec::new();
     // Native assemblies (a zip named like the root assembly; live G38).
-    let mut assemblies: Vec<crate::workspace::AssemblyZip> = Vec::new();
+    let mut assemblies: Vec<noshape_model::native_assembly::AssemblyZip> = Vec::new();
     for path in paths {
         if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
-            match crate::workspace::read_assembly_zip(path) {
+            match noshape_model::native_assembly::read_assembly_zip(path) {
                 Ok(a) => assemblies.push(a),
                 Err(e) => doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Import failed: {}: {e:#}", path.display())))),
             }
@@ -237,6 +243,18 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
             }
             let mut at = after;
             for a in &assemblies {
+                // Combine: one Part Studio, no Assembly (live G41 (5)).
+                if c.combine {
+                    match noshape_model::native_assembly::add_native_assembly_combined(d, &a.root, &a.components, &a.files, c.appearances, &units) {
+                        Ok(studio) => {
+                            crate::workspace::place_after(d, studio, at);
+                            at = Some(studio);
+                            first.get_or_insert(studio);
+                        }
+                        Err(e) => errors.push(format!("Import failed: {}: {e}", a.root)),
+                    }
+                    continue;
+                }
                 match noshape_model::native_assembly::add_native_assembly(d, &a.root, &a.components, &a.files, c.appearances, &units) {
                     Ok((studio, assembly)) => {
                         crate::workspace::place_after(d, assembly, at);

@@ -103,11 +103,6 @@ impl DrawingEditor {
         }
     }
 
-    /// The image under a sheet point (topmost).
-    pub fn image_at(&self, c: [f64; 2]) -> Option<u64> {
-        self.current_sheet().images.iter().rev().find(|i| c[0] >= i.pos[0] && c[1] >= i.pos[1] && c[0] <= i.pos[0] + i.size[0] && c[1] <= i.pos[1] + i.size[1]).map(|i| i.id)
-    }
-
     /// Upload the current sheet's images (textures cached by their data).
     pub fn sync_images(&mut self) {
         let sheet = self.current_sheet().clone();

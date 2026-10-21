@@ -1687,6 +1687,42 @@ fn inference_points_match_onshape() {
 }
 
 #[test]
+fn inertia_moves_to_a_reference_frame() {
+    use super::solver::Frame;
+    // A 2 kg point-like body at (1, 2, 0) with no inertia of its own: about
+    // the origin Ixx = m·y² = 8, Iyy = m·x² = 2, Izz = m·(x²+y²) = 10, Ixy = −m·x·y = −4.
+    let i = analysis::inertia_about_frame(glam::DMat3::ZERO, 2.0, DVec3::new(1.0, 2.0, 0.0), &Frame { origin: DVec3::ZERO, rotation: DQuat::IDENTITY });
+    assert!((i.x_axis.x - 8.0).abs() < 1e-12 && (i.y_axis.y - 2.0).abs() < 1e-12 && (i.z_axis.z - 10.0).abs() < 1e-12 && (i.y_axis.x + 4.0).abs() < 1e-12, "{i:?}");
+    // A frame turned 90° about Z swaps the x and y moments.
+    let j = analysis::inertia_about_frame(glam::DMat3::ZERO, 2.0, DVec3::new(1.0, 2.0, 0.0), &Frame { origin: DVec3::ZERO, rotation: DQuat::from_rotation_z(std::f64::consts::FRAC_PI_2) });
+    assert!((j.x_axis.x - 2.0).abs() < 1e-9 && (j.y_axis.y - 8.0).abs() < 1e-9, "{j:?}");
+}
+
+#[test]
+fn face_section_properties_like_live() {
+    // Live (behaviours "Face tab"): the 40×20 face of a 40×20×10 block gives
+    // 800 mm², 120 mm, Lxx 26666.667, Lyy 106666.667, Lzz 133333.333 mm⁴.
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let asm = Assembly { instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.05), false)], ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let top = face_with(&r, "CapEnd");
+    let s = analysis::face_section_properties(&res, &[(vec![InstanceId(1)], top.clone())]).unwrap();
+    let mm4 = 1e-12;
+    assert!((s.area - 8e-4).abs() < 1e-10 && (s.perimeter - 0.12).abs() < 1e-9, "{s:?}");
+    let mut m = [s.moments[0][0] / mm4, s.moments[1][1] / mm4];
+    m.sort_by(f64::total_cmp);
+    // The mesh is f32: compare to 1e-5 relative.
+    let near = |x: f64, want: f64| (x - want).abs() < want * 1e-5;
+    assert!(near(m[0], 26666.667) && near(m[1], 106666.667), "{m:?}");
+    assert!(near(s.polar / mm4, 133333.333) && (s.moments[0][1] / mm4).abs() < 1e-2, "{} {}", s.polar / mm4, s.moments[0][1] / mm4);
+    assert!((s.centroid - DVec3::new(0.02, 0.01, 0.01)).length() < 1e-9);
+    // The same face of the raised block is parallel but not coplanar: no values.
+    assert!(analysis::face_section_properties(&res, &[(vec![InstanceId(1)], top.clone()), (vec![InstanceId(2)], top)]).is_none());
+}
+
+#[test]
 fn torus_face_inferences_lie_on_the_axis() {
     use super::eval::inference_candidates;
     // A fillet ring (pin with a 2 mm fillet on its top edge): the centers of
@@ -2077,9 +2113,22 @@ fn standard_content_auto_size_and_bom() {
     assert_eq!(auto_size(bolt, 0.001), None);
     assert_eq!(standard::length_value("1 1/4 in"), Some(1.25 * 0.0254));
     let mut spec = StandardSpec::new(bolt);
-    assert_eq!(spec.size, "M8");
+    // Live: a component opens on its first size and that size's first length.
+    assert_eq!(spec.size, "M3");
     spec.set_size("M6");
-    assert_eq!(spec.part_name(), "Hex socket head cap screw ISO 4762 - M6 x 25 mm");
+    spec.length = Some("25 mm".into());
+    assert_eq!(spec.part_name(), "Hex socket head cap screw M6x1.00 x 25");
+    // Live's washer: 3/8, Series Narrow / Wide in the name and Description.
+    let washer_a = CATALOGUE.iter().find(|c| c.name == "Type A flat washer").unwrap();
+    let mut w = StandardSpec::new(washer_a);
+    assert_eq!(w.description(), "Type A flat washer 3/8 Narrow Stainless Steel ");
+    w.series = Some("Wide".into());
+    assert_eq!(w.part_name(), "Type A flat washer 3/8 Wide");
+    assert!(standard::regenerate(&w).is_ok());
+    // Live's ANSI default: "Countersunk Bolt #10-24 x 0.25", the Description adds the material.
+    let bolt = StandardSpec::new(standard::default_component());
+    assert_eq!(bolt.part_name(), "Countersunk Bolt #10-24 x 0.25");
+    assert_eq!(bolt.description(), "Countersunk Bolt #10-24 x 0.25 Stainless Steel ");
     let mut long = spec.clone();
     long.length = Some("40 mm".into());
     let inst = |id: u64, spec: &StandardSpec, x: f64| Instance::new(InstanceId(id), format!("{} <{id}>", spec.part_name()), InstanceSource::Standard { spec: spec.clone() }, Placement { translation: [x, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] });

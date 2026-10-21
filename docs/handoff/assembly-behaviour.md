@@ -556,13 +556,40 @@ State: run 5's edits were complete (no half-done code found); everything below b
     `flat-pattern` icon). An instance already named after the replacement keeps its name.
   - Draggable panels (ui's request): Replace instance (its picker moves with it) and Interference detection
     take ui's shared panel drag (`ui::panel_title` keys `asm-replace` / `asm-interference`, `nudged_panel`):
-    they follow the pointer with the grab cursor. Moved assembly panels now reopen where they were left (the
-    `panels.retain` that forgot closed ones is gone; live remembers each panel's rect). Open: live keeps the
-    rect across sessions and shares it with the Part Studio (same panelId); ours lasts for the open tab.
-  - Still open: the replaced instance's name when the replacement is named differently (asked live), the
-    Face tab and reference connector in the Mass dialog (asked live: REQUESTS "skb (10-20 assembly mass
-    dialog…)"), the Part number pencil (asked live), DIN / ISO / NAS / PEM / SAE classes beyond ours
-    (catalogue subset).
+    they follow the pointer with the grab cursor. Moved assembly panels reopen where they were left, in later
+    sessions too and shared with the Part Studio (ui's `PanelOffsets`, `panel_positions.json`, `ps-` / `asm-`
+    prefixes stripped; verified across sessions). Interference detection opens at live's default place (600×80
+    rect snapped to the graphics area's right edge, left = W − 600, top = H − 401). Open (ui's shared code,
+    spec in theme-layout.md "From skb"): live's 10 px edge / panel snapping and keeping snapped edges on resize.
+  - Assembly S shortcut toolbar (ui2's handover): `AsmToolbarPrefs::shortcut_tools` (assembly_toolbar.json,
+    defaults `DEFAULT_SHORTCUT_TOOLS` until live answers), `run_toolbar_tool(id)`, `shortcut_catalog()`;
+    `render_mini_toolbar` in live's look (rows of five 30 px buttons at cursor +10/−30, #ccc border, 95 %
+    white). Preferences › Shortcut toolbars › Assembly edits it (surgical in ui2's preferences_window.rs,
+    noted in theme-studios.md). Single-line dialog inputs use `os_ui::input_h` (live 26 px).
+  - Preferences › Assembly settings › Display instance list properties now drives the instance list at
+    open, and the list menu's Show / Hide instance list properties saves it (`ListPrefs`). Animate mate:
+    Current value stays empty until ▶ (live 53; `AnimState::played`). Single-line dialog inputs: 26 px
+    via `os_ui::input_h` (live `input.os-param-text` 26 px).
+  - Live answers 10-20 applied (GUI-verified): Animate steps/format; S toolbar list/defaults/look; standard
+    content naming (`StandardSpec::part_name` = "Countersunk Bolt #10-24 x 0.25", `description` adds the
+    material), stacking per live (`std_insert`, `stack_end`, `held`), Part number pencil edit mode (user-wide
+    `standard_content_properties.json`, `StdProps`), Edit standard content frame; Mass Face tab
+    (`analysis::face_section_properties`, `mass_pick_face`). Replace naming: a part of another name takes its
+    name (live 830–841), same name keeps it — as implemented. Asked live 10-21: the standard content option
+    lists (Series, other classes, DIN/ISO lists).
+  - Live 10-21 option lists (dom/skb-sc-lists.json) applied where our catalogue can build the geometry:
+    Series Narrow / Wide (ASME B18.22.1 Wide dims, `ANSI_WASHER_WIDE`, `StandardSpec::series`), Drive type
+    (socket heads "Hex"), Bearing face (ANSI nuts Chamfered; ISO Washer face / Chamfered,
+    `StandardSpec::bearing_face`), Thread length on bolts and screws (inch 2D + 1/4, metric 2d + 6), the
+    first size and its first length as defaults (the ANSI Type A washer 3/8), live's naming (standard code
+    dropped, metric pitch "M6x1.00", the Series: "Type A flat washer 3/8 Narrow"). Mass dialog reference
+    frame: "Mate connector for reference frame" takes a connector pick and the Part tab's inertia is about
+    its origin in its axes (help; `analysis::inertia_about_frame`, test `inertia_moves_to_a_reference_frame`).
+  - Still open: live's full catalogue (more sizes per component, e.g. washers #0…3, socket head #0-80…4-12,
+    ISO M1.6…M64, more components and classes; we lack their dimensions), live's per-size Length lists, the
+    Face tab with a reference connector (unverified), live's 10 px panel snapping (ui's shared code; spec in theme-layout.md
+    "From skb"), the stack buttons' "face selected before opening Insert" (our assembly has no face
+    pre-selection outside dialogs), DIN / ISO / NAS / PEM / SAE classes beyond ours (catalogue subset).
 
 ### From psb (20 Oct): visibility conditions in assemblies (surgical edits in your files)
 

@@ -101,7 +101,7 @@ impl DrawingEditor {
             .child(btn("drp-insp", "inspection-table", "Inspection table", Some(RightPanel::InspectionTable), rp == Some(RightPanel::InspectionTable), cx))
             .child(btn("drp-styles", "drawing-styles", "Styles", Some(RightPanel::Styles), rp == Some(RightPanel::Styles), cx))
             .child(btn("drp-props", "drawing-props", "Drawing properties", None, self.drawing_props.open, cx))
-            .child(btn("drp-mbd", "mbd-status", "MBD status", Some(RightPanel::MbdStatus), rp == Some(RightPanel::MbdStatus), cx))
+            .child(btn("drp-mbd", "mbd-status", "MBD status", Some(RightPanel::MbdStatus), rp == Some(RightPanel::MbdStatus), cx).children(self.mbd_badge(cx)))
             .into_any_element()
     }
 
@@ -307,6 +307,8 @@ impl DrawingEditor {
                 .child(div().text_size(px(16.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x333333)).child(label))
         };
         let mut models: Vec<String> = vec!["Current sheet".into(), "All models".into()];
+        // The source tab behind each entry after the two fixed ones.
+        let mut model_tabs: Vec<noshape_model::document::TabId> = Vec::new();
         // The referenced parts (or Part Studios / assemblies shown whole).
         for v in self.drawing.sheets.iter().flat_map(|s| &s.views) {
             let ViewKind::Base { source, part, .. } = &v.kind else { continue };
@@ -318,6 +320,7 @@ impl DrawingEditor {
                 && !models.contains(&name)
             {
                 models.push(name);
+                model_tabs.push(*source);
             }
         }
         let current = self.mbd_model.min(models.len() - 1);
@@ -331,11 +334,56 @@ impl DrawingEditor {
         .w(px(130.))
         .h(px(26.))
         .text_size(px(13.));
+        // The MBD requirements (Part Studio datums) and which are shown
+        // (live drawing/1077–1084): missing ones listed in grey, a right-click
+        // "Show" restores them.
+        let rows = self.mbd_status_rows(current, current.checked_sub(2).and_then(|k| model_tabs.get(k).copied()), cx);
+        let missing: Vec<&noshape_model::drawing::mbd::MbdRow> = rows.iter().filter(|r| !r.visible).collect();
+        let header = |cells: &[&'static str]| {
+            h_flex().h(px(30.)).bg(gpui_kit::rgb(0xf5f5f5)).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).children(cells.iter().map(|c| div().w(px(140.)).px(px(3.)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x333333)).child(*c)))
+        };
+        let mut datums = v_flex().child(header(&["Name"]));
+        for r in &missing {
+            let (tab, id) = (r.tab, r.id);
+            datums = datums.child(
+                h_flex()
+                    .id(SharedString::from(format!("mbd-row-{}-{id}", tab.0)))
+                    .h(px(34.))
+                    .px(px(3.))
+                    .border_b_1()
+                    .border_color(gpui_kit::rgb(0xeeeeee))
+                    .text_size(px(13.))
+                    .text_color(gpui_kit::rgb(0x999999))
+                    .hover(|d| d.bg(gpui_kit::rgb(0xf0f0f0)))
+                    .child(r.name.clone())
+                    .on_mouse_down(
+                        MouseButton::Right,
+                        cx.listener(move |_, e: &MouseDownEvent, window, cx| {
+                            cx.stop_propagation();
+                            let ed = cx.entity();
+                            let entries = vec![MenuEntry::item("Show", move |t, _, cx| t.show_model_annotation(tab, id, cx))];
+                            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                            crate::os_menu::open(e.position, menu, window, cx);
+                        }),
+                    ),
+            );
+        }
+        let message: (&str, Option<&str>) = if rows.is_empty() {
+            ("Add dimensions and annotations to build an MBD status table.", Some("An MBD status table reveals all the MBD requirements within the document."))
+        } else if missing.is_empty() {
+            ("All MBD requirements are visible in the drawing.", None)
+        } else {
+            ("", None)
+        };
+        let missing_text = format!("{} of {} MBD requirements are not yet visible in any drawing view.", missing.len(), rows.len());
+        let headline = if message.0.is_empty() { missing_text } else { message.0.to_string() };
         v_flex()
             .size_full()
             .child(h_flex().h(px(36.)).mt(px(5.)).px(px(7.)).gap(px(5.)).child(div().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Model:")).child(model))
             .child(section("Datums").mt(px(5.)))
+            .when(!rows.is_empty(), |d| d.child(datums))
             .child(section("Characteristics").mt(px(5.)))
+            .when(!rows.is_empty(), |d| d.child(header(&["Type", "Nominal Value", "Tolerance", "Upper Limit", "Lower Limit"])))
             .child(
                 v_flex()
                     .m(px(5.))
@@ -348,8 +396,8 @@ impl DrawingEditor {
                     .text_size(px(14.))
                     .line_height(px(20.))
                     .text_color(gpui_kit::rgb(0x31708f))
-                    .child(div().font_weight(FontWeight::BOLD).child("Add dimensions and annotations to build an MBD status table."))
-                    .child(div().child("An MBD status table reveals all the MBD requirements within the document.")),
+                    .child(div().font_weight(FontWeight::BOLD).child(headline))
+                    .children(message.1.map(|t| div().child(t))),
             )
             .into_any_element()
     }

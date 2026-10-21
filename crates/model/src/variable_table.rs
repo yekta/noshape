@@ -258,6 +258,8 @@ pub fn set_value(ps: &mut PartStudio, feature: FeatureId, value: &str, units: &U
 /// a bare number in a `LENGTH` / `ANGLE` variable gets the workspace unit
 /// (live qa4 10-20 13:30: `5` + Enter → `5 mm`); anything else is kept.
 pub fn with_workspace_unit(kind: &str, value: &str, units: &UnitPrefs) -> String {
+    // A comma-decimal "1,5" (Preferences › Decimal format) is a bare number too.
+    let value = &noshape_units::delocalize(value);
     let bare = value.trim().parse::<f64>().is_ok();
     match kind {
         "LENGTH" if bare => format!("{} {}", value.trim(), units.length.symbol()),

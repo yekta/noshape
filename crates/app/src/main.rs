@@ -9,6 +9,7 @@ mod assembly_scene;
 mod assembly_view;
 mod assets;
 mod cached_slice;
+mod color_mixer;
 mod config_visibility;
 mod material_libraries;
 mod numbering_prefs;
@@ -24,12 +25,15 @@ mod drawing_create;
 mod drawing_drawprops;
 mod drawing_insert;
 mod drawing_keys;
+mod drawing_sketch_dim;
+mod drawing_mbd;
 mod drawing_extra;
 mod drawing_more;
 mod drawing_painter;
 mod drawing_inspection;
 mod drawing_panels;
 mod drawing_export;
+mod export_naming;
 mod drawing_smart;
 mod drawing_sketch;
 mod drawing_hatch;
@@ -87,6 +91,9 @@ mod gpu;
 mod graphics_prefs;
 mod graphics_prefs_dialog;
 mod history_panel;
+mod compare_mode;
+mod workspace_protection;
+mod repair_mode;
 mod version_properties;
 mod units_prefs;
 mod doc_panels;
@@ -279,6 +286,8 @@ fn main() {
         feature_studio::bind_keys(cx);
         // Mouse controls (also hands "Use pen input as mouse" to the platform).
         navigation::MouseControls::current();
+        // Preferences › Decimal format (comma decimals in expressions and values).
+        units_prefs::apply();
         cx.set_global(gpu::GpuGlobal(gpu.clone()));
         cx.on_action(|_: &actions::Quit, cx| cx.quit());
 

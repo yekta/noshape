@@ -852,7 +852,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // as the title block.
     let mark_l = g.lines.len();
     let mark_t = g.texts.len();
-    g.add_border_and_title_full(sheet, drawing.projection, &expand);
+    match &sheet.imported {
+        Some(space) => g.add_imported(space),
+        None => g.add_border_and_title_full(sheet, drawing.projection, &expand),
+    }
     let title_rect = super::sheet::title_block_rect(sheet);
     let tb_rect = title_rect.unwrap_or([0.0; 4]);
     let in_tb = |p: &[f64; 2]| p[0] >= tb_rect[0] - 0.01 && p[1] <= tb_rect[3] + 0.01 && p[0] <= tb_rect[2] + 0.01 && p[1] >= tb_rect[1] - 0.01;
@@ -887,338 +890,355 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
 
     let mut placements: Vec<ViewPlacement> = Vec::new();
-    for v in &sheet.views {
+    // Parent mirrors of linked views have no place on this sheet.
+    for v in sheet.views.iter().filter(|v| !v.id.is_ghost() || v.id.is_child_ghost()) {
         let Some(geo) = views.get(&v.id) else { continue };
         let Some(pl) = placement_of(sheet, v.id, geo) else { continue };
         placements.push(pl);
     }
+    // The sheet itself, for dimensions on drawing sketch geometry.
+    placements.push(ViewPlacement::new(super::SHEET_VIEW, [0.0, 0.0], [0.0, 0.0], 1.0));
     let place = |id: ViewId| placements.iter().find(|p| p.id == id).copied();
 
     for v in &sheet.views {
+        if v.id.is_ghost() && !v.id.is_child_ghost() {
+            continue;
+        }
         let (Some(geo), Some(pl)) = (views.get(&v.id), place(v.id)) else { continue };
         let view_pick = picks.id(PickTarget::View(v.id));
-        // Projected edges: visible ones, then tangent and hidden ones (each
-        // a run, so Drawing properties › Views colors them with one span).
-        let vt = &drawing.props.view_tab;
-        for pass in 0..3 {
-            let mark = g.mark();
-            for (i, e) in geo.edges.iter().enumerate() {
-                // Show/hide edges: hidden edges are left out, except while
-                // the dialog is open (thick grey, like occluded edges).
-                let marked = !v.hidden_edges.is_empty()
-                    && e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| v.hidden_edges.iter().any(|(b, n)| *b == me.body && n == &*me.name));
-                if marked && !v.editing_edges {
-                    continue;
-                }
-                let style = match (e.visible, e.class) {
-                    (_, EdgeClass::Seam) => continue,
-                    (_, _) if marked => LineStyle::Visible,
-                    (false, EdgeClass::Sharp | EdgeClass::Outline) if v.editing_edges => LineStyle::Hidden,
-                    (true, EdgeClass::Smooth) if v.show_tangent_edges && v.tangent_phantom => LineStyle::Phantom,
-                    (true, EdgeClass::Smooth) if v.show_tangent_edges => LineStyle::Tangent,
-                    (true, EdgeClass::Smooth) => continue,
-                    (false, EdgeClass::Smooth) => continue,
-                    (true, _) => LineStyle::Visible,
-                    (false, _) if v.style == RenderStyle::HiddenLinesVisible => LineStyle::Hidden,
-                    (false, _) => continue,
-                };
-                let p = match style {
-                    LineStyle::Phantom | LineStyle::Tangent => 1,
-                    LineStyle::Hidden => 2,
-                    _ => 0,
-                };
-                if p != pass {
-                    continue;
-                }
-                let pick = picks.id(PickTarget::Edge { view: v.id, edge: i as u32 });
-                let l0 = g.lines.len();
-                for piece in map_polyline(&pl, &e.points) {
-                    g.lines.push(Polyline2 { points: piece, style, closed: false, pick });
-                }
-                if v.editing_edges && (marked || !e.visible) {
-                    let lines = l0..g.lines.len();
-                    if marked {
-                        g.pens.push(super::sheet::PenSpan { lines: lines.clone(), width_mm: 0.7, dashes: Vec::new() });
-                    }
-                    g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb: [170, 170, 170] });
-                    continue;
-                }
-                // Adjust linestyle: this edge's own pen and color.
-                if let Some(es) = e.model.and_then(|m| geo.model_edges.get(m as usize)).and_then(|me| v.edge_styles.iter().find(|s| s.body == me.body && s.name == *me.name)) {
-                    let lines = l0..g.lines.len();
-                    g.pens.push(super::sheet::PenSpan { lines: lines.clone(), width_mm: es.thickness, dashes: es.pattern.dashes(es.dashes) });
-                    if let Some(rgb) = es.color {
-                        g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb });
-                    }
-                }
+        // Mirrors of views on other sheets draw nothing of their own; a
+        // linked child's mirror draws only its indicator on the parent.
+        'own: {
+            if v.id.is_ghost() {
+                break 'own;
             }
-            match (pass, vt.tangent_color, vt.hidden_color) {
-                (1, Some(c), _) | (2, _, Some(c)) => g.color_since(mark, c),
-                _ => {}
-            }
-        }
-        // Section hatching: computed on the unbroken view, then cropped and
-        // broken in view coordinates.
-        if !geo.section_segments.is_empty() {
-            let ub = pl.unbroken();
-            let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
-            for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
-                let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
-                if let Some(poly) = &geo.clip_poly {
-                    pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_polygon(&p, poly)).collect();
-                } else if let Some((c, r)) = geo.clip {
-                    pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_circle(&p, c, r)).collect();
-                }
-                if let Some(crop) = &geo.crop {
-                    pieces = pieces.into_iter().flat_map(|p| views::clip_to_crop(&p, crop)).collect();
-                }
-                for p in pieces {
-                    for q in map_polyline(&pl, &p) {
-                        g.lines.push(Polyline2 { points: q, style: LineStyle::Thin, closed: false, pick: view_pick });
-                    }
-                }
-            }
-        }
-        // Detail boundary ("Show detail view profile"; none with "Clip
-        // border to geometry").
-        // Detail profile lines: Phantom / Dashed / Solid.
-        let detail_line = match vt.detail_line {
-            0 => LineStyle::Phantom,
-            1 => LineStyle::Hidden,
-            _ => LineStyle::Thin,
-        };
-        if !v.detail_hide_profile && !v.detail_clip_border {
-            if let Some(poly) = &geo.clip_poly {
-                g.lines.push(Polyline2 { points: poly.iter().map(|p| pl.to_sheet(*p)).collect(), style: detail_line, closed: true, pick: view_pick });
-            } else if let Some((c, r)) = geo.clip {
-                g.lines.push(Polyline2 { points: circle_points(pl.to_sheet(c), pl.len_to_sheet(r), 96), style: detail_line, closed: true, pick: view_pick });
-            }
-        }
-        // Automatic centermarks on face-on circles and centerlines on
-        // cylinders seen from the side.
-        let auto_lines = v.auto_centerlines.unwrap_or(v.show_centerlines);
-        if v.show_centerlines || auto_lines {
-            let (ux, uy) = (pl.dir_to_sheet([1.0, 0.0]), pl.dir_to_sheet([0.0, 1.0]));
-            let in_band = |p: [f64; 2]| pl.breaks().iter().any(|b| p[b.axis as usize] > b.a && p[b.axis as usize] < b.b);
-            let mark = g.mark();
-            for (c, r, _) in geo.circles().into_iter().filter(|_| v.show_centerlines) {
-                // Deleted one by one (select + Delete).
-                let key = centermark_key(c);
-                if in_band(c) || v.deleted_centermarks.contains(&key) {
-                    continue;
-                }
-                let view_pick = picks.id(PickTarget::AutoCentermark { view: v.id, center: key });
-                // Construction geometry › Centermarks: the arms pass the circle by the extension.
-                let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r) * 1.15 + vt.centermark_extension);
-                g.lines.push(Polyline2 { points: vec![[c[0] - ux[0] * r, c[1] - ux[1] * r], [c[0] + ux[0] * r, c[1] + ux[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });
-                g.lines.push(Polyline2 { points: vec![[c[0] - uy[0] * r, c[1] - uy[1] * r], [c[0] + uy[0] * r, c[1] + uy[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });
-            }
-            if let Some(c) = vt.centermark_color {
-                g.color_since(mark, c);
-            }
-            let mark = g.mark();
-            for a in geo.axes.iter().filter(|_| auto_lines) {
-                for piece in map_polyline(&pl, &[a[0], a[1]]) {
-                    let (p, q) = (piece[0], piece[piece.len() - 1]);
-                    let d = [q[0] - p[0], q[1] - p[1]];
-                    let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
-                    if l < 1e-6 {
+            // Projected edges: visible ones, then tangent and hidden ones (each
+            // a run, so Drawing properties › Views colors them with one span).
+            let vt = &drawing.props.view_tab;
+            for pass in 0..3 {
+                let mark = g.mark();
+                for (i, e) in geo.edges.iter().enumerate() {
+                    // Show/hide edges: hidden edges are left out, except while
+                    // the dialog is open (thick grey, like occluded edges).
+                    let marked = !v.hidden_edges.is_empty()
+                        && e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| v.hidden_edges.iter().any(|(b, n)| *b == me.body && n == &*me.name));
+                    if marked && !v.editing_edges {
                         continue;
                     }
-                    let u = [d[0] / l * 2.5, d[1] / l * 2.5];
-                    g.lines.push(Polyline2 { points: vec![[p[0] - u[0], p[1] - u[1]], [q[0] + u[0], q[1] + u[1]]], style: LineStyle::Centerline, closed: false, pick: view_pick });
-                }
-            }
-            if let Some(c) = vt.centerline_color {
-                g.color_since(mark, c);
-            }
-        }
-        // Center of mass indicator: a circle with two opposite quarters filled.
-        if let Some(com) = geo.com {
-            let c = pl.to_sheet(com);
-            let r = drawing.props.com_diameter / 2.0;
-            g.lines.push(Polyline2 { points: circle_points(c, r, 48), style: LineStyle::Thin, closed: true, pick: view_pick });
-            for q in [0.0, std::f64::consts::PI] {
-                let mut pts = vec![c];
-                pts.extend((0..=8).map(|i| {
-                    let t = q + i as f64 / 8.0 * std::f64::consts::FRAC_PI_2;
-                    [c[0] + r * t.cos(), c[1] + r * t.sin()]
-                }));
-                g.fills.push(Fill2 { points: pts });
-            }
-            g.lines.push(Polyline2 { points: vec![[c[0] - r, c[1]], [c[0] + r, c[1]]], style: LineStyle::Thin, closed: false, pick: view_pick });
-            g.lines.push(Polyline2 { points: vec![[c[0], c[1] - r], [c[0], c[1] + r]], style: LineStyle::Thin, closed: false, pick: view_pick });
-        }
-        // Flat pattern views: each bend region's two tangent edges (solid)
-        // with its bend line between them (Views › Flat pattern views: up /
-        // down line style and color), the bend note along it on its left
-        // ("UP 90.0° R.091"), and form centermarks.
-        let vt = &drawing.props.view_tab;
-        if !v.hide_bend_lines {
-            for b in &geo.bends {
-                let d = [b.b[0] - b.a[0], b.b[1] - b.a[1]];
-                let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
-                let n = [-d[1] / l * b.width / 2.0, d[0] / l * b.width / 2.0];
-                let mark = g.mark();
-                for k in [-1.0, 1.0] {
-                    let side = [[b.a[0] + n[0] * k, b.a[1] + n[1] * k], [b.b[0] + n[0] * k, b.b[1] + n[1] * k]];
-                    for piece in map_polyline(&pl, &side) {
-                        g.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick: view_pick });
+                    let style = match (e.visible, e.class) {
+                        (_, EdgeClass::Seam) => continue,
+                        (_, _) if marked => LineStyle::Visible,
+                        (false, EdgeClass::Sharp | EdgeClass::Outline) if v.editing_edges => LineStyle::Hidden,
+                        (true, EdgeClass::Smooth) if v.show_tangent_edges && v.tangent_phantom => LineStyle::Phantom,
+                        (true, EdgeClass::Smooth) if v.show_tangent_edges => LineStyle::Tangent,
+                        (true, EdgeClass::Smooth) => continue,
+                        (false, EdgeClass::Smooth) => continue,
+                        (true, _) => LineStyle::Visible,
+                        (false, _) if v.style == RenderStyle::HiddenLinesVisible => LineStyle::Hidden,
+                        (false, _) => continue,
+                    };
+                    let p = match style {
+                        LineStyle::Phantom | LineStyle::Tangent => 1,
+                        LineStyle::Hidden => 2,
+                        _ => 0,
+                    };
+                    if p != pass {
+                        continue;
+                    }
+                    let pick = picks.id(PickTarget::Edge { view: v.id, edge: i as u32 });
+                    let l0 = g.lines.len();
+                    for piece in map_polyline(&pl, &e.points) {
+                        g.lines.push(Polyline2 { points: piece, style, closed: false, pick });
+                    }
+                    if v.editing_edges && (marked || !e.visible) {
+                        let lines = l0..g.lines.len();
+                        if marked {
+                            g.pens.push(super::sheet::PenSpan { lines: lines.clone(), width_mm: 0.7, dashes: Vec::new() });
+                        }
+                        g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb: [170, 170, 170] });
+                        continue;
+                    }
+                    // Adjust linestyle: this edge's own pen and color.
+                    if let Some(es) = e.model.and_then(|m| geo.model_edges.get(m as usize)).and_then(|me| v.edge_styles.iter().find(|s| s.body == me.body && s.name == *me.name)) {
+                        let lines = l0..g.lines.len();
+                        g.pens.push(super::sheet::PenSpan { lines: lines.clone(), width_mm: es.thickness, dashes: es.pattern.dashes(es.dashes) });
+                        if let Some(rgb) = es.color {
+                            g.colors.push(super::sheet::ColorSpan { lines, texts: 0..0, fills: 0..0, rgb });
+                        }
                     }
                 }
-                if let Some(c) = vt.bend_tangent_color {
+                match (pass, vt.tangent_color, vt.hidden_color) {
+                    (1, Some(c), _) | (2, _, Some(c)) => g.color_since(mark, c),
+                    _ => {}
+                }
+            }
+            // Section hatching: computed on the unbroken view, then cropped and
+            // broken in view coordinates.
+            if !geo.section_segments.is_empty() {
+                let ub = pl.unbroken();
+                let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
+                for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
+                    let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
+                    if let Some(poly) = &geo.clip_poly {
+                        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_polygon(&p, poly)).collect();
+                    } else if let Some((c, r)) = geo.clip {
+                        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_circle(&p, c, r)).collect();
+                    }
+                    if let Some(crop) = &geo.crop {
+                        pieces = pieces.into_iter().flat_map(|p| views::clip_to_crop(&p, crop)).collect();
+                    }
+                    for p in pieces {
+                        for q in map_polyline(&pl, &p) {
+                            g.lines.push(Polyline2 { points: q, style: LineStyle::Thin, closed: false, pick: view_pick });
+                        }
+                    }
+                }
+            }
+            // Detail boundary ("Show detail view profile"; none with "Clip
+            // border to geometry").
+            // Detail profile lines: Phantom / Dashed / Solid.
+            let detail_line = match vt.detail_line {
+                0 => LineStyle::Phantom,
+                1 => LineStyle::Hidden,
+                _ => LineStyle::Thin,
+            };
+            if !v.detail_hide_profile && !v.detail_clip_border {
+                if let Some(poly) = &geo.clip_poly {
+                    g.lines.push(Polyline2 { points: poly.iter().map(|p| pl.to_sheet(*p)).collect(), style: detail_line, closed: true, pick: view_pick });
+                } else if let Some((c, r)) = geo.clip {
+                    g.lines.push(Polyline2 { points: circle_points(pl.to_sheet(c), pl.len_to_sheet(r), 96), style: detail_line, closed: true, pick: view_pick });
+                }
+            }
+            // Automatic centermarks on face-on circles and centerlines on
+            // cylinders seen from the side.
+            let auto_lines = v.auto_centerlines.unwrap_or(v.show_centerlines);
+            if v.show_centerlines || auto_lines {
+                let (ux, uy) = (pl.dir_to_sheet([1.0, 0.0]), pl.dir_to_sheet([0.0, 1.0]));
+                let in_band = |p: [f64; 2]| pl.breaks().iter().any(|b| p[b.axis as usize] > b.a && p[b.axis as usize] < b.b);
+                let mark = g.mark();
+                for (c, r, _) in geo.circles().into_iter().filter(|_| v.show_centerlines) {
+                    // Deleted one by one (select + Delete).
+                    let key = centermark_key(c);
+                    if in_band(c) || v.deleted_centermarks.contains(&key) {
+                        continue;
+                    }
+                    let view_pick = picks.id(PickTarget::AutoCentermark { view: v.id, center: key });
+                    // Construction geometry › Centermarks: the arms pass the circle by the extension.
+                    let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r) * 1.15 + vt.centermark_extension);
+                    g.lines.push(Polyline2 { points: vec![[c[0] - ux[0] * r, c[1] - ux[1] * r], [c[0] + ux[0] * r, c[1] + ux[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });
+                    g.lines.push(Polyline2 { points: vec![[c[0] - uy[0] * r, c[1] - uy[1] * r], [c[0] + uy[0] * r, c[1] + uy[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });
+                }
+                if let Some(c) = vt.centermark_color {
                     g.color_since(mark, c);
                 }
-                let (kind, color) = if b.up { (vt.bend_up_line, vt.bend_up_color) } else { (vt.bend_down_line, vt.bend_down_color) };
-                let style = match kind {
-                    0 => LineStyle::Thin,
-                    1 => LineStyle::Hidden,
-                    _ => LineStyle::Centerline,
-                };
                 let mark = g.mark();
-                for piece in map_polyline(&pl, &[b.a, b.b]) {
-                    g.lines.push(Polyline2 { points: piece, style, closed: false, pick: view_pick });
+                for a in geo.axes.iter().filter(|_| auto_lines) {
+                    for piece in map_polyline(&pl, &[a[0], a[1]]) {
+                        let (p, q) = (piece[0], piece[piece.len() - 1]);
+                        let d = [q[0] - p[0], q[1] - p[1]];
+                        let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+                        if l < 1e-6 {
+                            continue;
+                        }
+                        let u = [d[0] / l * 2.5, d[1] / l * 2.5];
+                        g.lines.push(Polyline2 { points: vec![[p[0] - u[0], p[1] - u[1]], [q[0] + u[0], q[1] + u[1]]], style: LineStyle::Centerline, closed: false, pick: view_pick });
+                    }
                 }
-                if let Some(c) = color {
+                if let Some(c) = vt.centerline_color {
                     g.color_since(mark, c);
                 }
             }
-        }
-        if !v.hide_bend_notes && !geo.bends.is_empty() {
-            let ts = drawing.props.ann_type(super::sheet::AnnType::BendNotes);
-            let th = ts.height.unwrap_or(drawing.props.ann_text_height);
-            let mark = g.mark();
-            for b in &geo.bends {
-                let (pa, pb) = (pl.to_sheet(b.a), pl.to_sheet(b.b));
-                let mut ang = (pb[1] - pa[1]).atan2(pb[0] - pa[0]);
-                if ang > std::f64::consts::FRAC_PI_2 + 1e-9 {
-                    ang -= std::f64::consts::PI;
-                } else if ang <= -std::f64::consts::FRAC_PI_2 + 1e-9 {
-                    ang += std::f64::consts::PI;
+            // Center of mass indicator: a circle with two opposite quarters filled.
+            if let Some(com) = geo.com {
+                let c = pl.to_sheet(com);
+                let r = drawing.props.com_diameter / 2.0;
+                g.lines.push(Polyline2 { points: circle_points(c, r, 48), style: LineStyle::Thin, closed: true, pick: view_pick });
+                for q in [0.0, std::f64::consts::PI] {
+                    let mut pts = vec![c];
+                    pts.extend((0..=8).map(|i| {
+                        let t = q + i as f64 / 8.0 * std::f64::consts::FRAC_PI_2;
+                        [c[0] + r * t.cos(), c[1] + r * t.sin()]
+                    }));
+                    g.fills.push(Fill2 { points: pts });
                 }
-                let f = super::DimFormat::default();
-                let text = format!("{} {} R{}", if b.up { "UP" } else { "DOWN" }, format::dim_text(drawing, &f, b.angle, true, "").main, format::format_len(drawing, &f, b.radius));
-                let mid = [(pa[0] + pb[0]) / 2.0, (pa[1] + pb[1]) / 2.0];
-                // Beside the bend region, on its left.
-                let off = b.width / 2.0 * pl.scale * 1000.0 + th * 0.4;
-                g.texts.push(Text2 { pos: [mid[0] - ang.sin() * off, mid[1] + ang.cos() * off], height: th, text, angle: ang, anchor: Anchor::BottomCenter, pick: view_pick });
+                g.lines.push(Polyline2 { points: vec![[c[0] - r, c[1]], [c[0] + r, c[1]]], style: LineStyle::Thin, closed: false, pick: view_pick });
+                g.lines.push(Polyline2 { points: vec![[c[0], c[1] - r], [c[0], c[1] + r]], style: LineStyle::Thin, closed: false, pick: view_pick });
             }
-            if let Some(c) = ts.color.or(drawing.props.ann_color) {
-                g.color_since(mark, c);
-            }
-        }
-        // Cosmetic threads: ANSI a dashed circle at the major diameter, ISO
-        // a thin three-quarter circle (the gap in the upper right).
-        if !geo.threads.is_empty() {
-            let ansi = sheet.size.is_ansi();
-            for (c, r) in &geo.threads {
-                let (a0, a1) = if ansi { (0.0, std::f64::consts::TAU) } else { (std::f64::consts::FRAC_PI_2, std::f64::consts::TAU) };
-                let n = 48;
-                let pts: Vec<[f64; 2]> = (0..=n).map(|i| a0 + (a1 - a0) * i as f64 / n as f64).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect();
-                for piece in map_polyline(&pl, &pts) {
-                    g.lines.push(Polyline2 { points: piece, style: if ansi { LineStyle::Hidden } else { LineStyle::Thin }, closed: false, pick: view_pick });
+            // Flat pattern views: each bend region's two tangent edges (solid)
+            // with its bend line between them (Views › Flat pattern views: up /
+            // down line style and color), the bend note along it on its left
+            // ("UP 90.0° R.091"), and form centermarks.
+            let vt = &drawing.props.view_tab;
+            if !v.hide_bend_lines {
+                for b in &geo.bends {
+                    let d = [b.b[0] - b.a[0], b.b[1] - b.a[1]];
+                    let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
+                    let n = [-d[1] / l * b.width / 2.0, d[0] / l * b.width / 2.0];
+                    let mark = g.mark();
+                    for k in [-1.0, 1.0] {
+                        let side = [[b.a[0] + n[0] * k, b.a[1] + n[1] * k], [b.b[0] + n[0] * k, b.b[1] + n[1] * k]];
+                        for piece in map_polyline(&pl, &side) {
+                            g.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick: view_pick });
+                        }
+                    }
+                    if let Some(c) = vt.bend_tangent_color {
+                        g.color_since(mark, c);
+                    }
+                    let (kind, color) = if b.up { (vt.bend_up_line, vt.bend_up_color) } else { (vt.bend_down_line, vt.bend_down_color) };
+                    let style = match kind {
+                        0 => LineStyle::Thin,
+                        1 => LineStyle::Hidden,
+                        _ => LineStyle::Centerline,
+                    };
+                    let mark = g.mark();
+                    for piece in map_polyline(&pl, &[b.a, b.b]) {
+                        g.lines.push(Polyline2 { points: piece, style, closed: false, pick: view_pick });
+                    }
+                    if let Some(c) = color {
+                        g.color_since(mark, c);
+                    }
                 }
             }
-        }
-        for m in &geo.form_marks {
-            let c = pl.to_sheet(*m);
-            let arm = 1.5;
-            g.lines.push(Polyline2 { points: vec![[c[0] - arm, c[1]], [c[0] + arm, c[1]]], style: LineStyle::Centerline, closed: false, pick: view_pick });
-            g.lines.push(Polyline2 { points: vec![[c[0], c[1] - arm], [c[0], c[1] + arm]], style: LineStyle::Centerline, closed: false, pick: view_pick });
-        }
-        // Break lines.
-        for br in pl.breaks() {
-            let pick = picks.id(PickTarget::BreakLine { view: v.id, index: br.index as usize });
-            let style = v.breaks.get(br.index as usize).map(|b| b.style).unwrap_or_default();
-            let other = 1 - br.axis as usize;
-            let margin = 3.0 / (pl.scale * 1000.0);
-            let (o0, o1) = (geo.min[other] - margin, geo.max[other] + margin);
-            let nrm = pl.dir_to_sheet(if br.axis == 0 { [1.0, 0.0] } else { [0.0, 1.0] });
-            for at in [br.a, br.b] {
-                let pt = |o: f64| {
-                    let mut q = [0.0; 2];
-                    q[br.axis as usize] = at;
-                    q[other] = o;
-                    pl.to_sheet(q)
-                };
-                let (s0, s1) = (pt(o0), pt(o1));
-                let pts: Vec<[f64; 2]> = match style {
-                    BreakStyle::Straight => vec![s0, s1],
-                    BreakStyle::ZigZag => {
-                        let m = [(s0[0] + s1[0]) / 2.0, (s0[1] + s1[1]) / 2.0];
-                        let d = [s1[0] - s0[0], s1[1] - s0[1]];
-                        let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-                        let u = [d[0] / l, d[1] / l];
-                        let at = |t: f64, o: f64| [m[0] + u[0] * t + nrm[0] * o, m[1] + u[1] * t + nrm[1] * o];
-                        vec![s0, at(-3.0, 0.0), at(-1.5, 2.0), at(1.5, -2.0), at(3.0, 0.0), s1]
+            if !v.hide_bend_notes && !geo.bends.is_empty() {
+                let ts = drawing.props.ann_type(super::sheet::AnnType::BendNotes);
+                let th = ts.height.unwrap_or(drawing.props.ann_text_height);
+                let mark = g.mark();
+                for b in &geo.bends {
+                    let (pa, pb) = (pl.to_sheet(b.a), pl.to_sheet(b.b));
+                    let mut ang = (pb[1] - pa[1]).atan2(pb[0] - pa[0]);
+                    if ang > std::f64::consts::FRAC_PI_2 + 1e-9 {
+                        ang -= std::f64::consts::PI;
+                    } else if ang <= -std::f64::consts::FRAC_PI_2 + 1e-9 {
+                        ang += std::f64::consts::PI;
                     }
-                    BreakStyle::SmallZigZag => {
-                        // Small teeth along the whole line.
-                        let d = [s1[0] - s0[0], s1[1] - s0[1]];
-                        let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
-                        let n = ((l / 2.0).round() as usize).clamp(2, 400);
-                        (0..=n)
-                            .map(|i| {
-                                let t = i as f64 / n as f64;
-                                let o = if i == 0 || i == n { 0.0 } else if i % 2 == 1 { 0.6 } else { -0.6 };
-                                [s0[0] + d[0] * t + nrm[0] * o, s0[1] + d[1] * t + nrm[1] * o]
-                            })
-                            .collect()
-                    }
-                    BreakStyle::Curve => {
-                        let n = 24;
-                        (0..=n)
-                            .map(|i| {
-                                let t = i as f64 / n as f64;
-                                let o = (t * std::f64::consts::TAU).sin() * 1.5;
-                                [s0[0] + (s1[0] - s0[0]) * t + nrm[0] * o, s0[1] + (s1[1] - s0[1]) * t + nrm[1] * o]
-                            })
-                            .collect()
-                    }
-                };
-                g.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                    let f = super::DimFormat::default();
+                    let text = format!("{} {} R{}", if b.up { "UP" } else { "DOWN" }, format::dim_text(drawing, &f, b.angle, true, "").main, format::format_len(drawing, &f, b.radius));
+                    let mid = [(pa[0] + pb[0]) / 2.0, (pa[1] + pb[1]) / 2.0];
+                    // Beside the bend region, on its left.
+                    let off = b.width / 2.0 * pl.scale * 1000.0 + th * 0.4;
+                    g.texts.push(Text2 { pos: [mid[0] - ang.sin() * off, mid[1] + ang.cos() * off], height: th, text, angle: ang, anchor: Anchor::BottomCenter, pick: view_pick });
+                }
+                if let Some(c) = ts.color.or(drawing.props.ann_color) {
+                    g.color_since(mark, c);
+                }
             }
-        }
-        if let Some(err) = &geo.error
-            && geo.edges.is_empty()
-        {
-            g.texts.push(Text2 { pos: pl.position, height: 3.0, text: err.clone(), angle: 0.0, anchor: Anchor::Center, pick: view_pick });
-            g.rect(pl.min[0], pl.min[1], pl.max[0], pl.max[1], LineStyle::Thin);
-            if let Some(l) = g.lines.last_mut() {
-                l.pick = view_pick;
+            // Cosmetic threads: ANSI a dashed circle at the major diameter, ISO
+            // a thin three-quarter circle (the gap in the upper right).
+            if !geo.threads.is_empty() {
+                let ansi = sheet.size.is_ansi();
+                for (c, r) in &geo.threads {
+                    let (a0, a1) = if ansi { (0.0, std::f64::consts::TAU) } else { (std::f64::consts::FRAC_PI_2, std::f64::consts::TAU) };
+                    let n = 48;
+                    let pts: Vec<[f64; 2]> = (0..=n).map(|i| a0 + (a1 - a0) * i as f64 / n as f64).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect();
+                    for piece in map_polyline(&pl, &pts) {
+                        g.lines.push(Polyline2 { points: piece, style: if ansi { LineStyle::Hidden } else { LineStyle::Thin }, closed: false, pick: view_pick });
+                    }
+                }
             }
-        }
-        // Labels below the view.
-        let mut label_lines: Vec<(String, f64)> = Vec::new();
-        match &v.kind {
-            ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.push((format!("{} {label}-{label}", vt.section_prefix).trim().to_string(), 5.0)),
-            ViewKind::Detail { label, .. } => {
-                label_lines.push((format!("{} {label}", vt.detail_prefix).trim().to_string(), 5.0));
+            for m in &geo.form_marks {
+                let c = pl.to_sheet(*m);
+                let arm = 1.5;
+                g.lines.push(Polyline2 { points: vec![[c[0] - arm, c[1]], [c[0] + arm, c[1]]], style: LineStyle::Centerline, closed: false, pick: view_pick });
+                g.lines.push(Polyline2 { points: vec![[c[0], c[1] - arm], [c[0], c[1] + arm]], style: LineStyle::Centerline, closed: false, pick: view_pick });
+            }
+            // Break lines.
+            for br in pl.breaks() {
+                let pick = picks.id(PickTarget::BreakLine { view: v.id, index: br.index as usize });
+                let style = v.breaks.get(br.index as usize).map(|b| b.style).unwrap_or_default();
+                let other = 1 - br.axis as usize;
+                let margin = 3.0 / (pl.scale * 1000.0);
+                let (o0, o1) = (geo.min[other] - margin, geo.max[other] + margin);
+                let nrm = pl.dir_to_sheet(if br.axis == 0 { [1.0, 0.0] } else { [0.0, 1.0] });
+                for at in [br.a, br.b] {
+                    let pt = |o: f64| {
+                        let mut q = [0.0; 2];
+                        q[br.axis as usize] = at;
+                        q[other] = o;
+                        pl.to_sheet(q)
+                    };
+                    let (s0, s1) = (pt(o0), pt(o1));
+                    let pts: Vec<[f64; 2]> = match style {
+                        BreakStyle::Straight => vec![s0, s1],
+                        BreakStyle::ZigZag => {
+                            let m = [(s0[0] + s1[0]) / 2.0, (s0[1] + s1[1]) / 2.0];
+                            let d = [s1[0] - s0[0], s1[1] - s0[1]];
+                            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+                            let u = [d[0] / l, d[1] / l];
+                            let at = |t: f64, o: f64| [m[0] + u[0] * t + nrm[0] * o, m[1] + u[1] * t + nrm[1] * o];
+                            vec![s0, at(-3.0, 0.0), at(-1.5, 2.0), at(1.5, -2.0), at(3.0, 0.0), s1]
+                        }
+                        BreakStyle::SmallZigZag => {
+                            // Small teeth along the whole line.
+                            let d = [s1[0] - s0[0], s1[1] - s0[1]];
+                            let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+                            let n = ((l / 2.0).round() as usize).clamp(2, 400);
+                            (0..=n)
+                                .map(|i| {
+                                    let t = i as f64 / n as f64;
+                                    let o = if i == 0 || i == n { 0.0 } else if i % 2 == 1 { 0.6 } else { -0.6 };
+                                    [s0[0] + d[0] * t + nrm[0] * o, s0[1] + d[1] * t + nrm[1] * o]
+                                })
+                                .collect()
+                        }
+                        BreakStyle::Curve => {
+                            let n = 24;
+                            (0..=n)
+                                .map(|i| {
+                                    let t = i as f64 / n as f64;
+                                    let o = (t * std::f64::consts::TAU).sin() * 1.5;
+                                    [s0[0] + (s1[0] - s0[0]) * t + nrm[0] * o, s0[1] + (s1[1] - s0[1]) * t + nrm[1] * o]
+                                })
+                                .collect()
+                        }
+                    };
+                    g.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                }
+            }
+            if let Some(err) = &geo.error
+                && geo.edges.is_empty()
+            {
+                g.texts.push(Text2 { pos: pl.position, height: 3.0, text: err.clone(), angle: 0.0, anchor: Anchor::Center, pick: view_pick });
+                g.rect(pl.min[0], pl.min[1], pl.max[0], pl.max[1], LineStyle::Thin);
+                if let Some(l) = g.lines.last_mut() {
+                    l.pick = view_pick;
+                }
+            }
+            // Labels below the view.
+            let mut label_lines: Vec<(String, f64)> = Vec::new();
+            match &v.kind {
+                ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => label_lines.push((format!("{} {label}-{label}", vt.section_prefix).trim().to_string(), 5.0)),
+                ViewKind::Detail { label, .. } => {
+                    label_lines.push((format!("{} {label}", vt.detail_prefix).trim().to_string(), 5.0));
+                    label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
+                }
+                ViewKind::Auxiliary { .. } => {
+                    if let Some(a) = v.aux_ref.as_ref().filter(|a| !a.letter.is_empty()) {
+                        let l = if vt.aux_double_label { format!("{0}-{0}", a.letter) } else { a.letter.clone() };
+                        label_lines.push((format!("{} {l} {}", vt.aux_prefix, vt.aux_suffix).trim().to_string(), 5.0));
+                    }
+                }
+                _ => {}
+            }
+            let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
+            let user_label = v.label.as_ref().filter(|l| !l.is_empty() && !auto_label);
+            if let Some(l) = user_label {
+                label_lines.push((expand(l), 5.0));
+            }
+            // Scale label: View properties › Scale label, else with a view label
+            // when the view has its own scale.
+            if !matches!(v.kind, ViewKind::Detail { .. }) && v.scale_label.unwrap_or(user_label.is_some() && v.scale.is_some()) {
                 label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
             }
-            ViewKind::Auxiliary { .. } => {
-                if let Some(a) = v.aux_ref.as_ref().filter(|a| !a.letter.is_empty()) {
-                    let l = if vt.aux_double_label { format!("{0}-{0}", a.letter) } else { a.letter.clone() };
-                    label_lines.push((format!("{} {l} {}", vt.aux_prefix, vt.aux_suffix).trim().to_string(), 5.0));
-                }
+            let mut y = pl.min[1] - 6.0;
+            for (text, height) in label_lines {
+                y -= height;
+                g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0, y], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: view_pick });
+                y -= 2.0;
             }
-            _ => {}
         }
-        let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
-        let user_label = v.label.as_ref().filter(|l| !l.is_empty() && !auto_label);
-        if let Some(l) = user_label {
-            label_lines.push((expand(l), 5.0));
-        }
-        // Scale label: View properties › Scale label, else with a view label
-        // when the view has its own scale.
-        if !matches!(v.kind, ViewKind::Detail { .. }) && v.scale_label.unwrap_or(user_label.is_some() && v.scale.is_some()) {
-            label_lines.push((format!("SCALE {}", format_scale(pl.scale)), 3.5));
-        }
-        let mut y = pl.min[1] - 6.0;
-        for (text, height) in label_lines {
-            y -= height;
-            g.texts.push(Text2 { pos: [(pl.min[0] + pl.max[0]) / 2.0, y], height, text, angle: 0.0, anchor: Anchor::BottomCenter, pick: view_pick });
-            y -= 2.0;
+        // A linked view's parent is on another sheet: its indicator is drawn there.
+        if sheet.parent_of(v.id).is_some_and(|p| p.is_ghost()) {
+            continue;
         }
         // Cutting line / detail circle in the parent.
         match &v.kind {
@@ -1319,7 +1339,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
 
     // Annotations with resolved references.
-    let (resolved, dangling) = resolve_annotations(drawing, sheet, views, sources);
+    let (mut resolved, dangling) = resolve_annotations(drawing, sheet, views, sources);
+    // MBD datums from the Part Studio: anchored on their face in their view.
+    let to_sheet_in = |id: ViewId, p: [f64; 2]| placements.iter().find(|pl| pl.id == id).map(|pl| pl.to_sheet(p)).unwrap_or(p);
+    super::mbd::resolve_model_annotations(&mut resolved, views, sources, &to_sheet_in);
     let (ml, mt, mg) = (g.lines.len(), g.texts.len(), g.grips.len());
     // Note fields are matched only against annotation texts.
     let used_notes = std::cell::RefCell::new(Vec::<String>::new());
@@ -1455,6 +1478,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let hit = |list: &[String], t: &Text2| !t.text.trim().is_empty() && list.iter().any(|u| u.trim() == t.text.trim());
         g.field_backdrops = g.texts.iter().enumerate().filter(|(i, t)| (*i >= mark_t && *i < end_t && in_tb(&t.pos) && hit(&used, t)) || (*i >= mt && hit(&used_notes, t))).map(|(_, t)| super::font::text_box(t).to_vec()).collect();
     }
+    // Mirrors aren't views of this sheet (not picked, not listed).
+    placements.retain(|p| !p.id.is_ghost());
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, tables: table_layouts, title_rect }
 }
 

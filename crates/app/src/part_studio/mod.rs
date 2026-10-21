@@ -15,6 +15,8 @@ pub(crate) mod input_propagation;
 mod config_ids;
 pub(crate) mod config_var_dialog;
 mod annotations_ui;
+mod scope;
+mod default_tolerances;
 mod fab_panel;
 mod feature_ops;
 mod manipulators;
@@ -282,9 +284,8 @@ pub struct PartStudioView {
     /// The features the list's rows last showed for the filter (None: no
     /// filter), so a keystroke that keeps them re-renders only the head.
     filter_rows: Option<std::collections::HashSet<FeatureId>>,
-    /// One cached view per feature row (see `feature_row_view`), and what
-    /// the rows read from the list as a whole, set when the list renders.
-    feature_rows: std::collections::HashMap<FeatureId, Entity<crate::cached_slice::Slice<PartStudioView>>>,
+    /// What the feature rows read from the list as a whole, set when the
+    /// list renders.
     row_ctx: RowCtx,
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
@@ -396,7 +397,6 @@ impl PartStudioView {
             focus: cx.focus_handle(),
             slices: None,
             filter_rows: None,
-            feature_rows: std::collections::HashMap::new(),
             row_ctx: RowCtx::default(),
             fitted_once: false,
             message: None,
@@ -766,7 +766,10 @@ impl PartStudioView {
             selection.extend(seeds.iter().cloned());
         }
         let mut extra = self.sketch_overlay(&mut selection, &mut accent, cx);
-        extra.extend(self.manipulator_overlay(cx));
+        // The manipulator's glyph follows the camera: the renderer builds it
+        // for every frame (camera_geometry.rs).
+        let manip: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = self.manipulator_geometry(cx).into_iter().map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>).collect();
+        self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         extra.extend(self.consumed_picks_overlay(&selection, &accent));
         extra.extend(self.measure_overlay(cx));
         extra.extend(self.midpoint_overlay(cx));
@@ -1029,6 +1032,22 @@ impl PartStudioView {
             ViewportEvent::ToolDrag { position } if self.annotation_drag_move(*position, cx) => return,
             ViewportEvent::ToolUp { .. } if self.annotation_drag_end(cx) => return,
             _ => {}
+        }
+        // Screen-sized geometry built here follows the zoom: resize it when
+        // the scale changes, without re-rendering (perf; the manipulators'
+        // glyphs are built by the renderer per frame).
+        if matches!(ev, ViewportEvent::CameraChanged) && self.sketch.is_none() {
+            let wpp = {
+                let v = vp.read(cx);
+                v.camera.world_per_pixel(v.size().y.max(1.0))
+            };
+            if (wpp - self.ui.sized_for_wpp).abs() > wpp * 1e-6 {
+                self.ui.sized_for_wpp = wpp;
+                if self.edit.is_some() {
+                    self.refresh_scene(false, cx);
+                    self.sync_manipulator(cx);
+                }
+            }
         }
         match ev {
             ViewportEvent::PointerMove { position, .. } => {
@@ -1339,14 +1358,9 @@ impl PartStudioView {
         });
         // Variables for evaluated-value hints; "Final" only when later
         // features exist (Onshape).
-        let mut vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
-        vars.extend(self.display.variables.iter().map(|(k, v)| (k.clone(), *v)));
-        // Only variables that exist where this feature evaluates (Onshape).
-        if let Some(s) = self.studio(cx) {
-            for name in noshape_model::variables::variables_defined_later(s, index) {
-                vars.remove(&name);
-            }
-        }
+        // Only variables that exist where this feature evaluates (Onshape),
+        // configuration variables included.
+        let vars = self.scope_variables(Some(index), cx);
         let later = self.studio(cx).is_some_and(|s| !is_new && index + 1 < s.features.len());
         // Missing references: their creating feature is gone or suppressed.
         let live: std::collections::HashSet<FeatureId> = self.studio(cx).map(|s| s.features.iter().filter(|f| !f.suppressed).map(|f| f.id).collect()).unwrap_or_default();
@@ -1716,6 +1730,10 @@ impl PartStudioView {
         let view = cx.entity();
         crate::ui::toolbar()
             .id("part-studio-toolbar")
+            // The slice's width, not the tools': they are clipped (and the
+            // fit measures this row).
+            .w_full()
+            .min_w_0()
             .relative()
             .child(watch)
             // Right-click the toolbar (live 331z): Customize toolbar… · Hide /
@@ -1736,6 +1754,7 @@ impl PartStudioView {
             .when(!hidden, |d| {
                 d.child(
                     crate::ui::search_tools_toggle("tb-search", self.palette.is_some())
+                        .flex_none()
                         .relative()
                         .ml(px(10.))
                         .child(canvas(move |b, _, _| search_cell.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
@@ -2059,12 +2078,34 @@ impl PartStudioView {
         if prompt_anchor == Some(None) {
             items.push(ListItem::Prompt);
         }
-        // Rows of deleted features go.
-        if self.feature_rows.len() > n_features {
-            let ids: std::collections::HashSet<FeatureId> = studio.features.iter().map(|f| f.id).collect();
-            self.feature_rows.retain(|id, _| ids.contains(id));
-        }
-        self.row_ctx = RowCtx { rollback, editing_id, related: self.related_features(cx) };
+        let (appearances, first_config_input) = match self.studio(cx) {
+            Some(s) => (
+                s.appearances
+                    .iter()
+                    .filter_map(|a| match a.target {
+                        noshape_model::partstudio::AppearanceTarget::Feature(id) => Some(id),
+                        _ => None,
+                    })
+                    .collect(),
+                s.configuration.inputs.first().map(|i| i.id.clone()),
+            ),
+            None => Default::default(),
+        };
+        let d = &self.display;
+        self.row_ctx = RowCtx {
+            rollback,
+            editing_id,
+            related: self.related_features(cx),
+            makes_faces: d.bodies.iter().flat_map(|b| b.face_refs.iter().filter_map(|r| r.depends_on())).collect(),
+            sketches: d.sketches.iter().map(|s| s.feature).collect(),
+            planes: d.planes.iter().filter_map(|p| match p.reference {
+                Reference::FeaturePlane(id) => Some(id),
+                _ => None,
+            }).collect(),
+            appearances,
+            first_config_input,
+            n_features,
+        };
         self.filter_rows.clone_from(&filtered);
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut dg_rows: Vec<AnyElement> = Vec::new();
@@ -2239,7 +2280,7 @@ impl PartStudioView {
                 ListItem::Rollback(i) => self.render_rollback_bar(i, window, cx),
                 ListItem::Ellipsis => ellipsis(),
                 ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, cx)),
-                ListItem::Feature(x, id) => indent(x, self.feature_row_view(id, cx).cached(StyleRefinement::default().w_full().h(px(crate::ui::ROW_H)).flex_none()).into_any_element()),
+                ListItem::Feature(x, id) => indent(x, self.render_feature_row_view(id, cx)),
                 ListItem::Prompt => self.render_folder_prompt(cx),
             });
         }
@@ -2514,21 +2555,8 @@ impl PartStudioView {
         head
     }
 
-    /// The cached view of one feature's row: it re-renders when the studio
-    /// notifies (or the doc / viewport), not when the list around it changes
-    /// (filtering, a row above added).
-    fn feature_row_view(&mut self, id: FeatureId, cx: &mut Context<Self>) -> Entity<crate::cached_slice::Slice<PartStudioView>> {
-        if let Some(v) = self.feature_rows.get(&id) {
-            return v.clone();
-        }
-        use crate::cached_slice::Slice;
-        let v = Slice::with(&cx.entity(), move |this: &mut Self, _, cx| this.render_feature_row_view(id, cx), cx);
-        Slice::observing(&v, &self.viewport, cx);
-        Slice::observing(&v, &self.doc, cx);
-        self.feature_rows.insert(id, v.clone());
-        v
-    }
-
+    /// One feature's row. (Not a cached view of its own: gpui re-renders
+    /// every cached view nested in one being re-rendered, here the list's.)
     fn render_feature_row_view(&mut self, id: FeatureId, cx: &mut Context<Self>) -> AnyElement {
         let Some((i, f)) = self.studio(cx).and_then(|s| s.features.iter().position(|f| f.id == id).map(|i| (i, s.features[i].clone()))) else {
             return div().into_any_element();
@@ -3033,13 +3061,14 @@ impl PartStudioView {
         let manually_suppressed = f.suppressed;
         let hidden = f.hidden;
         // Sketches, planes and mate connectors can be hidden from the list.
-        let hideable = matches!(f.type_id.as_str(), "sketch" | "cPlane" | "mateConnector") || self.display.sketches.iter().any(|s| s.feature == id);
-        let first_config_input = self.studio(cx).and_then(|s| s.configuration.inputs.first().map(|i| i.id.clone()));
+        let rc = &self.row_ctx;
+        let hideable = matches!(f.type_id.as_str(), "sketch" | "cPlane" | "mateConnector") || rc.sketches.contains(&id);
+        let first_config_input = rc.first_config_input.clone();
         let dyn_expr = f.suppression_expr.clone();
-        let makes_faces = self.display.bodies.iter().any(|b| b.face_refs.iter().any(|r| r.depends_on() == Some(id)));
-        let has_appearance = self.studio(cx).is_some_and(|s| s.appearances.iter().any(|a| a.target == noshape_model::partstudio::AppearanceTarget::Feature(id)));
-        let is_sketch = self.display.sketches.iter().any(|s| s.feature == id);
-        let has_plane = is_sketch || self.display.planes.iter().any(|p| p.reference == Reference::FeaturePlane(id));
+        let makes_faces = rc.makes_faces.contains(&id);
+        let has_appearance = rc.appearances.contains(&id);
+        let is_sketch = rc.sketches.contains(&id);
+        let has_plane = is_sketch || rc.planes.contains(&id);
         let row = crate::ui::tree_row(SharedString::from(format!("feat-{}", f.id)), selected || editing)
             .mr(px(5.))
             .pr(px(11.))
@@ -3157,7 +3186,7 @@ impl PartStudioView {
             .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.drop_features(d.id, i, cx)));
         let row = crate::ui::with_lazy_side_tooltip(row, tip);
         let view = cx.entity();
-        let is_last = self.studio(cx).is_some_and(|s| i + 1 >= s.features.len());
+        let is_last = i + 1 >= self.row_ctx.n_features;
         let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone()))));
         let feature_name = f.name.clone();
         row.os_context_menu(move |menu, window, cx| {
@@ -3323,55 +3352,31 @@ impl PartStudioView {
         let pal = p();
         let mut out = Vec::new();
         // Plane labels: Onshape draws the name *in the plane* (blue, at the
-        // top-left corner, inside), so it skews with the view. The glyph
-        // outlines are laid out in the plane and painted as projected paths.
-        if crate::viewport::wgpu_overlays() {
-            // Drawn into the 3D frame (perf): the same contours, in world space.
-            let mut contours: Vec<Vec<glam::DVec3>> = Vec::new();
-            if self.opts.show_planes {
-                for pl in self.display.planes.iter().filter(|p| !p.hidden) {
-                    let f = &pl.frame;
-                    let asc = 0.031 * 2.0 * pl.half_height;
-                    let top_left = f.origin + f.x * (-pl.half_width) + f.y * pl.half_height;
-                    in_plane_contours(&pl.name, top_left, f.x, f.y, asc, &mut contours);
-                }
-            }
-            let c = Rgba::from(Hsla::from(pal.accent));
-            let mut fills = if contours.is_empty() { Vec::new() } else { vec![noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] }] };
-            // Inspection datums: black, the selected one in the selection
-            // color.
-            let sel = Rgba::from(Hsla::from(pal.accent));
-            for (contours, selected) in self.annotation_contours(cx) {
-                let color = if selected { [sel.r, sel.g, sel.b, 1.0] } else { [0.0, 0.0, 0.0, 1.0] };
-                fills.push(noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color });
-            }
-            // The boxes keep their screen size: their drag handles follow the camera.
-            if self.studio(cx).is_some_and(|s| !s.annotations.is_empty()) {
-                self.sync_manipulator(cx);
-            }
-            self.viewport.update(cx, |vp, cx| vp.set_plane_labels(fills, cx));
-        } else if self.opts.show_planes {
-            let vp = self.viewport.read(cx);
-            let mut polys: Vec<Vec<Point<Pixels>>> = Vec::new();
+        // top-left corner, inside), so it skews with the view: glyph outlines
+        // laid out in the plane, drawn into the 3D frame (overlay.rs).
+        let mut contours: Vec<Vec<glam::DVec3>> = Vec::new();
+        if self.opts.show_planes {
             for pl in self.display.planes.iter().filter(|p| !p.hidden) {
                 let f = &pl.frame;
-                // Ascender height relative to the plane (measured live: about 20 px on a 700 px plane).
                 let asc = 0.031 * 2.0 * pl.half_height;
                 let top_left = f.origin + f.x * (-pl.half_width) + f.y * pl.half_height;
-                in_plane_text(vp, &pl.name, top_left, f.x, f.y, asc, &mut polys);
-            }
-            if !polys.is_empty() {
-                out.push(paint_paths(polys, pal.accent.into()));
+                in_plane_contours(&pl.name, top_left, f.x, f.y, asc, &mut contours);
             }
         }
-        // Inspection datums without the GPU overlay: projected and painted.
-        if !crate::viewport::wgpu_overlays() {
-            for (contours, selected) in self.annotation_contours(cx) {
-                let vp = self.viewport.read(cx);
-                let polys: Vec<Vec<Point<Pixels>>> = contours.iter().map(|c| c.iter().filter_map(|p| vp.project(*p)).map(|q| point(px(q.x as f32), px(q.y as f32))).collect()).collect();
-                out.push(paint_paths(polys, if selected { pal.accent.into() } else { gpui_kit::rgb(0x000000).into() }));
-            }
+        let c = Rgba::from(Hsla::from(pal.accent));
+        let mut fills = if contours.is_empty() { Vec::new() } else { vec![noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] }] };
+        // Inspection datums: black, the selected one in the selection
+        // color.
+        let sel = Rgba::from(Hsla::from(pal.accent));
+        for (contours, selected) in self.annotation_contours(cx) {
+            let color = if selected { [sel.r, sel.g, sel.b, 1.0] } else { [0.0, 0.0, 0.0, 1.0] };
+            fills.push(noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color });
         }
+        // The boxes keep their screen size: their drag handles follow the camera.
+        if self.studio(cx).is_some_and(|s| !s.annotations.is_empty()) {
+            self.sync_manipulator(cx);
+        }
+        self.viewport.update(cx, |vp, cx| vp.set_plane_labels(fills, cx));
         // Graphics preferences (Camera and render options), in the dialog place.
         if let Some((d, _)) = &self.ui.graphics_dialog {
             out.push(div().absolute().top(px(3.)).left(px(0.)).child(d.clone()).into_any_element());
@@ -3712,6 +3717,15 @@ struct RowCtx {
     rollback: usize,
     editing_id: Option<FeatureId>,
     related: std::collections::HashSet<FeatureId>,
+    /// Gathered once per list instead of per row (each was a scan of the
+    /// display or the model): features whose faces are in a part, sketches,
+    /// features with a plane, features with an appearance.
+    makes_faces: std::collections::HashSet<FeatureId>,
+    sketches: std::collections::HashSet<FeatureId>,
+    planes: std::collections::HashSet<FeatureId>,
+    appearances: std::collections::HashSet<FeatureId>,
+    first_config_input: Option<String>,
+    n_features: usize,
 }
 
 /// The Part Studio's cached slices (see `crate::cached_slice`): a keystroke
@@ -3795,11 +3809,11 @@ impl PartStudioView {
         overlay.extend(self.render_palette(window, cx));
         overlay.extend(self.render_shortcut_sheet(cx));
         overlay.extend(self.render_isolate_panel(cx));
-        overlay.extend(self.render_appearance_editor(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-appearance"))));
         overlay.extend(self.render_create_selection(cx));
         overlay.extend(self.render_material_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-material"))));
         overlay.extend(self.render_variable_input(cx));
         overlay.extend(self.render_datum_dialog(cx));
+        overlay.extend(self.render_default_tolerances_picker(cx));
         overlay.extend(self.render_dynamic_suppression(cx));
         overlay.extend(self.render_insert_go(cx));
         overlay.extend(self.render_regen_panels(cx));
@@ -3824,13 +3838,12 @@ impl PartStudioView {
 impl Render for PartStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        if crate::viewport::wgpu_overlays() {
-            // What GPUI draws that follows the camera (perf: otherwise camera
-            // moves are only presented): sketch labels, dialogs' manipulators
-            // and triads, shown dimensions, analysis and section labels.
-            let follows = self.sketch.is_some() || self.edit.is_some() || self.ui.shown_dims.is_some() || self.ui.analysis_tool.is_some() || self.ui.section_dialog.is_some();
-            self.viewport.update(cx, |vp, _| vp.set_ui_follows_camera(follows));
-        }
+        // What GPUI still draws that follows the camera (perf: otherwise camera
+        // moves are only presented): sketch labels, shown dimensions,
+        // analysis and section labels, inspection datums (sized by the
+        // projected pixel, built in the underlay).
+        let follows = self.sketch.is_some() || self.ui.shown_dims.is_some() || self.ui.analysis_tool.is_some() || self.ui.section_dialog.is_some() || self.studio(cx).is_some_and(|s| !s.annotations.is_empty());
+        self.viewport.update(cx, |vp, _| vp.set_ui_follows_camera(follows));
         if let Some(v) = self.pending_named_view.take() {
             self.apply_named_view(&v, window, cx);
         }
@@ -3849,6 +3862,7 @@ impl Render for PartStudioView {
         }
         let right = self.render_right_panel(window, cx);
         let tb_panel = self.render_toolbar_customize_panel(window, cx);
+        let appearance_editor = self.render_appearance_editor(window, cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-appearance")));
         let in_sketch = self.sketch.is_some();
         let root = v_flex()
             .size_full()
@@ -4098,7 +4112,11 @@ impl Render for PartStudioView {
                             cx.notify();
                         }
                     }))
-                    .child(if self.ui.list_collapsed {
+                    // Compare mode (compare_mode.rs, live ui2/953): the compare
+                    // panel takes the Features and parts list's place.
+                    .child(if let Some(panel) = crate::compare_mode::render_panel(&self.doc, self.tab, cx) {
+                        panel
+                    } else if self.ui.list_collapsed {
                         // Collapsed Features and parts list: Onshape collapses it
                         // to nothing; the toggle tab at the viewport's left edge reopens it.
                         div().into_any_element()
@@ -4187,7 +4205,11 @@ impl Render for PartStudioView {
                             .when(!self.ui.list_collapsed, |d| d.child(crate::ui::left_splitter()))
                             .child(slices.underlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
                             .children(self.render_dialog_layer())
-                            .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full())),
+                            // Text fields stay out of the cached slices (qa4).
+                            .children(appearance_editor)
+                            .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
+                            // Compare mode: the Main ○—— V3 blend slider, top centre (live 953).
+                            .children(crate::compare_mode::render_slider(&self.doc, cx).map(|slider| div().absolute().top(px(4.)).left_0().right_0().flex().justify_center().child(slider))),
                     )
                     .children(right),
             )

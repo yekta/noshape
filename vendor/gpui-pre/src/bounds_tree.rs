@@ -135,6 +135,23 @@ where
         ordering
     }
 
+    /// NOSHAPE PATCH (agent qa4): the maximum ordering among the bounds that
+    /// intersect `query` (0 if none), without inserting anything.
+    pub fn max_intersecting(&mut self, query: &Bounds<U>) -> u32 {
+        self.find_max_ordering(query)
+    }
+
+    /// NOSHAPE PATCH (agent qa4): inserts `bounds` with a given ordering (the
+    /// top of a replayed range, see `Scene::replay`).
+    pub fn insert_with_order(&mut self, bounds: Bounds<U>, ordering: u32) {
+        let new_leaf_idx = self.insert_leaf(bounds, ordering);
+        self.max_leaf = match self.max_leaf {
+            None => Some(new_leaf_idx),
+            Some(old_idx) if self.nodes[old_idx].max_order < ordering => Some(new_leaf_idx),
+            some => some,
+        };
+    }
+
     /// Finds the maximum ordering among all bounds that intersect with the query.
     fn find_max_ordering(&mut self, query: &Bounds<U>) -> u32 {
         let Some(root_idx) = self.root else {

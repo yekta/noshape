@@ -321,7 +321,7 @@ StepImport               read_parasolid_parts(rust::Str path);
 StepImport               read_rhino_parts_ffi(rust::Str path);
 StepImport               read_native_parts_ffi(rust::Str path);
 StepImport               read_native_parts_config_ffi(rust::Str path, int32_t config);
-rust::Vec<AsmNodeF>      read_sldasm_tree_ffi(rust::Str path);
+rust::Vec<AsmNodeF>      read_native_tree_ffi(rust::Str path, rust::Str dir);
 rust::Vec<rust::String>  extract_zip_ffi(rust::Str zip, rust::Str dir);
 StepImport               read_sat_parts_ffi(rust::Str path);
 StepImport               read_jt_parts_ffi(rust::Str path);

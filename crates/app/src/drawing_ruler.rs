@@ -34,13 +34,19 @@ pub struct RulerState {
     pub kind: TabKind,
     drag: Option<(Handle, bool)>,
     bounds: Rc<Cell<Bounds<Pixels>>>,
+    /// px per mm when the ruler sits on the sheet over the note (the
+    /// sheet's zoom; live 225 / 414), else the ruler fits [`RULER_W`].
+    pub sheet_k: Option<f32>,
 }
 
 impl Default for RulerState {
     fn default() -> Self {
-        Self { kind: TabKind::Left, drag: None, bounds: Rc::new(Cell::new(Bounds::default())) }
+        Self { kind: TabKind::Left, drag: None, bounds: Rc::new(Cell::new(Bounds::default())), sheet_k: None }
     }
 }
+
+/// On the sheet: the grey part right of the box, with the ◁▷ width handle.
+const TAIL: f32 = 40.;
 
 /// The selector's glyph for an alignment.
 fn glyph(k: TabKind) -> &'static str {
@@ -55,7 +61,10 @@ fn glyph(k: TabKind) -> &'static str {
 impl DrawingEditor {
     /// Millimeters shown on the ruler and px per mm for a note style
     /// (`text_w`: the laid-out box width).
-    fn ruler_scale(st: &NoteStyle, text_w: f64) -> (f64, f32) {
+    fn ruler_scale(st: &NoteStyle, text_w: f64, sheet_k: Option<f32>) -> (f64, f32) {
+        if let Some(k) = sheet_k {
+            return (st.width.unwrap_or(text_w).max(1.0), k);
+        }
         let w = st.width.unwrap_or(text_w).max(10.0);
         let shown = w * 1.15 + 5.0;
         (w, RULER_W / shown as f32)
@@ -65,8 +74,9 @@ impl DrawingEditor {
     fn ruler_drag_to(&mut self, x: Pixels, y: Pixels, text_w: f64, cx: &mut Context<Self>) {
         let Some((h, _)) = self.ruler.drag else { return };
         let b = self.ruler.bounds.get();
+        let sheet_k = self.ruler.sheet_k;
         let Some(Panel::Note { style, .. }) = &mut self.panel else { return };
-        let (w, k) = Self::ruler_scale(style, text_w);
+        let (w, k) = Self::ruler_scale(style, text_w, sheet_k);
         let mm = (f32::from(x - b.origin.x) / k).max(0.0) as f64;
         let off = f32::from(y - b.origin.y) < -OFF || f32::from(y - b.origin.y) > f32::from(b.size.height) + OFF;
         match h {
@@ -100,8 +110,9 @@ impl DrawingEditor {
     fn ruler_press(&mut self, x: Pixels, y: Pixels, text_w: f64, cx: &mut Context<Self>) {
         let b = self.ruler.bounds.get();
         let kind = self.ruler.kind;
+        let sheet_k = self.ruler.sheet_k;
         let Some(Panel::Note { style, .. }) = &mut self.panel else { return };
-        let (w, k) = Self::ruler_scale(style, text_w);
+        let (w, k) = Self::ruler_scale(style, text_w, sheet_k);
         let px_of = |mm: f64| mm as f32 * k;
         let (lx, ly) = (f32::from(x - b.origin.x), f32::from(y - b.origin.y));
         let top = ly < f32::from(b.size.height) / 2.0;
@@ -130,7 +141,8 @@ impl DrawingEditor {
     /// The ruler row of the note editor.
     pub fn note_ruler(&mut self, st: &NoteStyle, text_w: f64, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let (w, k) = Self::ruler_scale(st, text_w);
+        let (w, k) = Self::ruler_scale(st, text_w, self.ruler.sheet_k);
+        let ruler_w = if self.ruler.sheet_k.is_some() { w as f32 * k + TAIL } else { RULER_W };
         let ink = gpui_kit::rgb(0x333333);
         let px_of = |mm: f64| px(mm as f32 * k);
         let dragging_off = matches!(self.ruler.drag, Some((Handle::Tab(_), true)));
@@ -138,12 +150,12 @@ impl DrawingEditor {
             Some((Handle::Tab(i), _)) => Some(i),
             _ => None,
         };
-        let mut ruler = div().id("note-ruler").relative().w(px(RULER_W)).h(px(22.)).bg(gpui_kit::white()).border_1().border_color(gpui_kit::rgb(0xbbbbbb)).overflow_hidden();
+        let mut ruler = div().id("note-ruler").relative().w(px(ruler_w)).h(px(22.)).bg(gpui_kit::white()).border_1().border_color(gpui_kit::rgb(0xbbbbbb)).overflow_hidden();
         // Outside the box: grey.
         ruler = ruler.child(div().absolute().top_0().bottom_0().left(px_of(w)).right_0().bg(gpui_kit::rgb(0xe6e6e6)));
         // Ticks: every mm, longer every 5 and 10.
         let mut mm = 1;
-        while (mm as f32) * k < RULER_W {
+        while (mm as f32) * k < ruler_w {
             let len = if mm % 10 == 0 { 9. } else if mm % 5 == 0 { 6. } else { 3. };
             if k >= 3.0 || mm % 5 == 0 {
                 ruler = ruler.child(div().absolute().left(px_of(mm as f64)).bottom(px(0.)).w(px(1.)).h(px(len)).bg(gpui_kit::rgb(0x888888)));
@@ -160,6 +172,10 @@ impl DrawingEditor {
             .child(marker(px_of(st.left_indent), false, "▲"))
             .child(marker(px_of(w - st.right_indent), false, "▲"))
             .child(div().absolute().left(px_of(w) - px(2.)).top_0().bottom_0().w(px(4.)).bg(pal.accent));
+        if self.ruler.sheet_k.is_some() {
+            // Live 414: the ◁▷ box-width handle in the grey tail.
+            ruler = ruler.child(div().absolute().left(px_of(w) + px(6.)).top_0().bottom_0().flex().items_center().text_size(px(9.)).text_color(ink).child("◁▷"));
+        }
         for (i, t) in st.tabs.iter().enumerate() {
             if dragging_off && dragged == Some(i) {
                 continue;

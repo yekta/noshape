@@ -112,6 +112,12 @@ pub struct ViewProps {
     sketch_appearances: bool,
     model_annotations: bool,
     tangent: TangentMode,
+    /// View render mode › Best quality.
+    best_quality: bool,
+    /// Assemblies: Explode/Position and Display state (children: None =
+    /// Follow parent; base views: None = Show all for the display state).
+    asm_position: Option<AsmPosition>,
+    display: Option<DisplayChoice>,
     sheet: usize,
     name: Entity<InputState>,
     view_label: bool,
@@ -216,6 +222,18 @@ impl DrawingEditor {
             }
             out.push(MenuEntry::Submenu("View orientation".into(), entries));
         }
+        // Configuration / Explode/Position / Display state of the source,
+        // right after View orientation (live drawing/1108).
+        for e in self.view_extra_entries(id, cx) {
+            if let MenuEntry::Submenu(label, children) = e {
+                match label.as_ref() {
+                    "Configuration" => out.push(MenuEntry::Submenu(label, children)),
+                    "Exploded view" => out.push(MenuEntry::Submenu("Explode/Position".into(), children)),
+                    "Display state" => out.push(MenuEntry::Submenu(label, children)),
+                    _ => {}
+                }
+            }
+        }
         // Tangent edges ▸ Hidden / Solid / Phantom.
         let tm = TangentMode::of(&v);
         let tangent = [TangentMode::Hidden, TangentMode::Solid, TangentMode::Phantom].into_iter().map(|m| MenuEntry::check(m.label(), m == tm, move |t, _, cx| t.edit_view("Tangent edges", id, cx, |v| m.apply(v)))).collect();
@@ -239,22 +257,17 @@ impl DrawingEditor {
             out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_broken_out_panel(id, last, w, cx)));
             out.push(MenuEntry::item("Remove section", move |t, _, cx| t.edit_view("Remove broken-out sections", id, cx, |v| v.broken_out.clear())));
         }
-        // Configuration / Explode/Position of the source (help: view context menu).
-        for e in self.view_extra_entries(id, cx) {
-            if let MenuEntry::Submenu(label, children) = e {
-                match label.as_ref() {
-                    "Configuration" => out.push(MenuEntry::Submenu(label, children)),
-                    "Exploded view" => out.push(MenuEntry::Submenu("Explode/Position".into(), children)),
-                    _ => {}
-                }
-            }
-        }
-        // Live (drawing context menu): "Insert custom table of Part Studio 1…".
+        // Live (drawing context menu): "Insert custom table of Part Studio 1…";
+        // assemblies: "Insert BOM for Assembly 1 ..." (live drawing/1108).
         if let Some(root) = views::root_view(sheet, id).and_then(|r| sheet.view(r))
             && let ViewKind::Base { source, .. } = &root.kind
-            && let Some(t) = self.doc.read(cx).session.doc.tab(*source).filter(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_)))
+            && let Some(t) = self.doc.read(cx).session.doc.tab(*source)
         {
-            out.push(MenuEntry::item(format!("Insert custom table of {}...", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Custom, view: Some(id), origin: None }, cx)));
+            match t.content {
+                noshape_model::TabContent::PartStudio(_) => out.push(MenuEntry::item(format!("Insert custom table of {}...", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Custom, view: Some(id), origin: None }, cx))),
+                noshape_model::TabContent::Assembly(_) => out.push(MenuEntry::item(format!("Insert BOM for {} ...", t.name), move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Bom, view: Some(id), origin: None }, cx))),
+                _ => {}
+            }
         }
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("View properties...", move |t, w, cx| t.open_view_props(id, w, cx)));
@@ -274,10 +287,18 @@ impl DrawingEditor {
         ));
         // Rotate view vertically / horizontally: pick a straight edge (views
         // without a parent or children, like the rotation angle).
-        let free = sheet.parent_of(id).is_none() && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
+        // A view linked to a parent on another sheet doesn't align with it (live x (4)).
+        let free = sheet.parent_of(id).is_none_or(|p| p.is_ghost()) && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
+        // Live (behaviours "Replicate annotations with real annotations" (5)):
+        // a "Rotate view" submenu "Vertical to… | Horizontal to…".
         if free {
-            out.push(MenuEntry::item("Rotate view vertically", move |t, _, cx| t.start_rotate_to_edge(id, true, cx)));
-            out.push(MenuEntry::item("Rotate view horizontally", move |t, _, cx| t.start_rotate_to_edge(id, false, cx)));
+            out.push(MenuEntry::Submenu(
+                "Rotate view".into(),
+                vec![
+                    MenuEntry::item("Vertical to...", move |t, _, cx| t.start_rotate_to_edge(id, true, cx)),
+                    MenuEntry::item("Horizontal to...", move |t, _, cx| t.start_rotate_to_edge(id, false, cx)),
+                ],
+            ));
         }
         out.push(MenuEntry::Separator);
         // Switch to <source tab>.
@@ -474,6 +495,9 @@ impl DrawingEditor {
             sketch_appearances: v.sketch_appearances,
             model_annotations: v.model_annotations,
             tangent: TangentMode::of(&v),
+            best_quality: v.best_quality,
+            asm_position: if matches!(v.kind, ViewKind::Base { .. }) { Some(v.asm_position()) } else { v.own_position },
+            display: if matches!(v.kind, ViewKind::Base { .. }) { Some(v.display_state.clone().map_or(DisplayChoice::ShowAll, DisplayChoice::State)) } else { v.own_display.clone() },
             sheet: self.sheet,
             name: input(name, window, cx),
             view_label: auto_label || v.label.as_ref().is_some_and(|l| !l.is_empty()),
@@ -500,6 +524,8 @@ impl DrawingEditor {
         let label = p.label.read(cx).value().trim().to_string();
         let (view_label, scale_label, tangent, orientation) = (p.view_label, p.scale_label, p.tangent, p.orientation);
         let named = p.named.clone();
+        let best_quality = p.best_quality;
+        let (asm_position, display) = (p.asm_position, p.display.clone());
         let simplification = p.simplification.map(|k| crate::drawing_insert::parse_simplification(k, &p.simp_value.read(cx).value(), self.drawing.units_mm).unwrap_or(k));
         let Some(old) = self.current_sheet().view(id).cloned() else { return };
         let default_name = default_view_name(&self.drawing, self.current_sheet(), &old);
@@ -510,6 +536,17 @@ impl DrawingEditor {
                 v.rotation = r.to_radians();
             }
             tangent.apply(v);
+            v.best_quality = best_quality;
+            if matches!(v.kind, ViewKind::Base { .. }) {
+                v.set_asm_position(asm_position.unwrap_or(AsmPosition::Default));
+                v.display_state = match display {
+                    Some(DisplayChoice::State(n)) => Some(n),
+                    _ => None,
+                };
+            } else if !matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }) {
+                v.own_position = asm_position;
+                v.own_display = display;
+            }
             v.unaligned = unaligned;
             v.cut_from_section = parent_cut;
             v.sketch_appearances = sketch_appearances;
@@ -541,7 +578,8 @@ impl DrawingEditor {
             }
         }
         if p.sheet != self.sheet {
-            match d.move_views_to_sheet(self.sheet, &[id], p.sheet, Some(&self.sources)) {
+            // Live (behaviours "Views linked across sheets"): the view moves alone, linked to its parent.
+            match d.move_views_to_sheet_linked(self.sheet, &[id], p.sheet) {
                 Ok(_) => {
                     self.commit("View properties", d, cx);
                     self.switch_sheet(p.sheet, cx);
@@ -637,8 +675,13 @@ impl DrawingEditor {
             info_row("Type", text(if is_asm { "Assembly".into() } else { "Part".into() })),
             info_row("Reference", reference),
             h_flex().child(badge).into_any_element(),
-            div().h(px(6.)).into_any_element(),
         ];
+        // A named view's base view: its name, read-only (live drawing/1104).
+        if let Some(n) = &v.named_view {
+            rows.push(div().h(px(4.)).into_any_element());
+            rows.push(info_row("Named view", text(n.clone())));
+        }
+        rows.push(div().h(px(6.)).into_any_element());
         // View orientation (base views choose it; derived views show theirs).
         if let Some(cur) = props.orientation {
             let cur_named = props.named.clone();
@@ -653,16 +696,70 @@ impl DrawingEditor {
                 })
                 .collect();
             if let ViewKind::Base { source, .. } = &v.kind {
-                for nv in crate::drawing_insert::named_views(&self.doc.read(cx).session.doc, *source) {
+                let named = crate::drawing_insert::named_views(&self.doc.read(cx).session.doc, *source);
+                for nv in named {
                     let name = nv.name.clone();
                     let f: PropsAct = std::rc::Rc::new(move |p| p.named = Some(name.clone()));
                     items.push((nv.name.clone(), cur_named.as_ref() == Some(&nv.name), f));
+                }
+                // Deleted from the source: still listed (stored in the drawing; live drawing/1117).
+                if let Some(n) = v.named_view.clone().filter(|n| !named.iter().any(|x| &x.name == n)) {
+                    let name = n.clone();
+                    let f: PropsAct = std::rc::Rc::new(move |p| p.named = Some(name.clone()));
+                    items.push((n.clone(), cur_named.as_ref() == Some(&n), f));
                 }
             }
             let label = cur_named.unwrap_or_else(|| orientation_name(cur).into());
             rows.push(row("View orientation", select("vp-orient", label, items, true)));
         } else {
             rows.push(row("View orientation", value(default_view_name(&self.drawing, sheet, &v))));
+        }
+        // Assemblies: Explode/Position and Display state (live drawing/1110,
+        // 1111, 1115). Child views add "Follow parent" (sections and details
+        // always follow); a deleted display state shows an empty pink field.
+        if is_asm && let Some(src) = source_tab {
+            let doc = &self.doc.read(cx).session.doc;
+            if let Some(TabContent::Assembly(asm)) = doc.tab(src).map(|t| &t.content) {
+                let is_base = matches!(v.kind, ViewKind::Base { .. });
+                let follows = matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. });
+                let cur_p = props.asm_position;
+                let mut pos_items: Vec<(String, bool, PropsAct)> = Vec::new();
+                for (name, p) in crate::drawing_insert::asm_positions(asm) {
+                    let f: PropsAct = std::rc::Rc::new(move |pr| pr.asm_position = Some(p));
+                    pos_items.push((name, cur_p == Some(p), f));
+                    if !is_base && p == AsmPosition::Default {
+                        let f: PropsAct = std::rc::Rc::new(|pr| pr.asm_position = None);
+                        pos_items.push(("Follow parent".into(), cur_p.is_none(), f));
+                    }
+                }
+                let pos_label = match cur_p {
+                    Some(p) => crate::drawing_insert::asm_position_name(asm, p),
+                    None => "Follow parent".into(),
+                };
+                rows.push(row("Explode/Position", select("vp-explode", pos_label, pos_items, !follows)));
+                let cur_d = props.display.clone();
+                let missing = matches!(&cur_d, Some(DisplayChoice::State(n)) if !asm.display_states.iter().any(|d| &d.name == n));
+                let mut ds_items: Vec<(String, bool, PropsAct)> = Vec::new();
+                let f: PropsAct = std::rc::Rc::new(|pr| pr.display = Some(DisplayChoice::ShowAll));
+                ds_items.push(("Show all".into(), cur_d == Some(DisplayChoice::ShowAll), f));
+                if !is_base {
+                    let f: PropsAct = std::rc::Rc::new(|pr| pr.display = None);
+                    ds_items.push(("Follow parent".into(), cur_d.is_none(), f));
+                }
+                for d in &asm.display_states {
+                    let n = d.name.clone();
+                    let f: PropsAct = std::rc::Rc::new(move |pr| pr.display = Some(DisplayChoice::State(n.clone())));
+                    ds_items.push((d.name.clone(), cur_d == Some(DisplayChoice::State(d.name.clone())), f));
+                }
+                let ds_label = match &cur_d {
+                    _ if missing => String::new(),
+                    Some(DisplayChoice::ShowAll) => "Show all".into(),
+                    Some(DisplayChoice::State(n)) => n.clone(),
+                    None => "Follow parent".into(),
+                };
+                let field = select("vp-display", ds_label, ds_items, !follows);
+                rows.push(row("Display state", if missing { div().bg(gpui_kit::rgb(0xfde8e1)).child(field).into_any_element() } else { field }));
+            }
         }
         // Scale: one combo ("1:1 (Sheet)" / "(Parent)" or a scale): type N:N
         // or N/N, or pick one from its menu.
@@ -761,6 +858,16 @@ impl DrawingEditor {
             })
             .collect();
         rows.push(row("Tangent edges", select("vp-tangent", props.tangent.label().into(), tangent_items, true)));
+        // View render mode (live drawing/1104): Best quality / Best performance (default).
+        let bq = props.best_quality;
+        let mode_items: Vec<(String, bool, PropsAct)> = [("Best quality", true), ("Best performance", false)]
+            .into_iter()
+            .map(|(n, q)| {
+                let f: PropsAct = std::rc::Rc::new(move |p| p.best_quality = q);
+                (n.to_string(), q == bq, f)
+            })
+            .collect();
+        rows.push(row("View render mode", select("vp-render-mode", if bq { "Best quality" } else { "Best performance" }.into(), mode_items, true)));
         // View simplification (child views follow the parent unless set).
         let eff = props.simplification.unwrap_or_else(|| sheet.parent_of(props.view).map(|p| views::view_simplification(sheet, p)).unwrap_or(Simplification::Auto));
         let simp_items = crate::drawing_insert::simplification_choices(eff)

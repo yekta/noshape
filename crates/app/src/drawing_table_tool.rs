@@ -90,10 +90,11 @@ impl DrawingEditor {
             let id = self.current_sheet().next_table_id();
             t.id = id;
             self.edit_sheet("Table", cx, |s| s.tables.push(t));
-            self.selection = vec![Sel::Table(id)];
-            // Live 741: ✓ starts typing in the first cell.
+            // Live 743: ✓ starts typing in the first cell; the table is not selected.
+            self.selection.clear();
             let input = self.textarea("", 1, window, cx);
-            self.panel = Some(Panel::Cell { table: id, row: 0, col: 0, input });
+            let note = self.cell_note(id, 0, 0, window, cx);
+            self.panel = Some(Panel::Cell { table: id, row: 0, col: 0, input, note });
         }
         self.table_tool = None;
         self.tool = Tool::Select;
@@ -133,13 +134,13 @@ impl DrawingEditor {
                     .into_any_element()
             })
             .collect();
-        // Live 530: 28 px rows, 13.33 px labels 10 px in, borderless 121 px
+        // Live 530 / 740: 28 px rows, 12 px labels 10 px in, borderless 121 px
         // fields on a `#ddd` underline from x 77.
         let row = |label: &'static str, input: &Entity<InputState>| {
             h_flex()
                 .h(px(28.))
                 .pl(px(10.))
-                .child(div().w(px(67.)).text_size(px(13.33)).child(label))
+                .child(div().w(px(67.)).text_size(px(12.)).child(label))
                 .child(div().w(px(121.)).h(px(26.)).flex().items_end().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).child(Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()))
                 .into_any_element()
         };
@@ -188,7 +189,7 @@ impl DrawingEditor {
                     }
                     cx.notify();
                 }))))
-                .child(div().pl(px(11.)).pt(px(4.)).h(px(24.)).text_size(px(13.33)).child("Select fixed corner"))
+                .child(div().pl(px(11.)).pt(px(4.)).h(px(24.)).text_size(px(12.)).child("Select fixed corner"))
                 .child(h_flex().pl(px(16.)).pt(px(6.)).gap(px(24.)).children(corners))
                 .into_any_element(),
         )

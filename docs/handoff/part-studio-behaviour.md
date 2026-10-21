@@ -809,14 +809,15 @@ new render flags into `DrawMode` rather than new arguments.
     view and constant in screen size (`pixel_frame`).
   - It's drawn as world fills next to the plane labels, so it's not in scene_builder.
   - Right-click on it: Show all | Select | Zoom to fit | Delete annotation (verified, including Delete,
-    which empties the panel again). "Select other…" and "Add comment" are missing; Add comment is cloud
-    and excluded.
+    which empties the panel again). "Select other…" was added on 21 Oct; "Add comment" is cloud and
+    excluded.
   - Model definitions then shows "Model <part>", the tools, "⌄ Datums (n/n)" with a cell per letter, and
     "⌄ Characteristics (0/0)" with the Type | Nominal value | Tolerance | Upper limit | Lower limit header.
   - Still missing:
     - the copy icon, "Select default tolerances…" and the Characteristics header icons (the picker and
       the Types filter are captured; the rest need work);
-    - dragging the box is built (not yet verified). Each box's middle line is a viewport manipulator
+    - dragging the box is built and verified: the box moves and a dashed leader runs back to the
+      triangle. Symbol size verified too: about 18×26 px on the slanted top face, upright "A". Each box's middle line is a viewport manipulator
       handle (`annotation_handles`, merged in `sync_manipulator` and refreshed on every underlay
       render), so a press there arrives as ToolDown / ToolDrag / ToolUp. The screen delta splits along
       the symbol's projected axes into a pixel `offset`, and release is one "Move annotation" step,
@@ -824,11 +825,89 @@ new render flags into `DrawMode` rather than new arguments.
       isn't captured);
     - Geometric tolerance and Weld placement, the Dimension tool and the Set tools: not captured (the
       live agent ran out of machine; request r is marked partial).
+- **Variable Studio tables: order and clashes** (live psb 10-20 t, lead / ui request):
+  - Inserted tables now render **above** the Part Studio's own table, in the stored order
+    (`VariableStudioRefs.inserted`, per Part Studio).
+  - The lowest table wins a clash, which the evaluation already did; the own Variable feature before a
+    feature wins positionally. Model test: `lowest_table_wins_and_shadowed_rows_are_known`.
+  - Drag reorder in `render_variables`: each table wrapper is a drop target. The upper or lower half
+    gives before or after, drawn as a 1 px blue line with a circle in the gap; over the own table it's
+    refused with a red line. Dropping stores the whole order (`move_var_table`, "Move table").
+  - The drag starts from a transparent handle over each inserted table's header title
+    (`var_table_drag_source`, between the chevron and ⋯).
+  - Verified in the app: the inserted table sits above the own table; dragging shows the dark-blue
+    pill; over the own table a red line shows and the drop is refused. The blue drop line between two
+    inserted tables wasn't tried (only one table was inserted).
+  - The shadowed-row ⓘ ("Overwritten in another variable table.") belongs in ui2's
+    `variable_studio.rs`. psb provided `variables::overwritten` and asked ui2 in theme-studios.md
+    ("From psb").
+- **Material libraries in Preferences** (ui2's Round 9 hand-over, live prefs/05):
+  - The Onshape Material Library row has Remove too: an account flag
+    (`material_libraries::onshape_listed`, a marker file in the config dir). The Material panel then
+    stops listing it.
+  - [Add material library…] under the table opens the existing "Add material library" modal. Picking
+    "Onshape" lists the built-in library again; a document library is appended.
+  - Not captured: what the Material panel shows with no library at all.
+- **Bug (lead): configuration and Variable Studio variables in sketch dimensions.**
+  - Sketch dimension entry only knew `display.variables` (the own Variable features).
+  - New `part_studio/scope.rs::scope_variables(at)` layers them as regeneration does: Variable Studio
+    tables (`element_variables`), then `Configuration::variable_values` for the active configuration,
+    then own variables defined before `at`.
+  - `sketch_variables` (the sketch feature's index) replaces the six `display.variables` uses in
+    sketch.rs.
+  - The feature dialog's variables use `scope_variables` too; they were missing configuration
+    variables as well.
+  - Verified in the app (21 Oct):
+    - Sketch 1 Ø dimension `#cv` (configuration variable 30 mm) gives "ƒ Ø30", and the hole regenerates
+      at Ø30.
+    - `#vsw` from a Variable Studio (40 mm) gives "ƒ Ø40".
+- **Model definitions › Characteristics** (live qa4 596–598):
+  - Feature parameters with tolerance options on (`<param>__tolerance`) are listed by
+    `annotations::characteristics`, the open dialog's draft included, so the table fills while the
+    dialog is open.
+  - Cells: Type (Distance / Angle / Diameter), nominal value, tolerance, upper and lower limit; numbers in
+    the document unit without it, with the tolerance's or the workspace's precision.
+  - Default shows "--" and Symmetrical "±d"; both are captured. Deviation, Limits, Min, Max and Basic are
+    built from their definitions; asked live in psb 10-21 b.
+  - The panel switches to its filled layout when there are datums or characteristics.
+- **Preferences › Material libraries, after the first look** (21 Oct):
+  - The fixed 425 px columns pushed Remove out of narrower windows, so they now share the width (max
+    425).
+  - [Add material library…] is sized to its text and opens the modal (verified).
+  - Verified (21 Oct, second session): Remove on the Onshape row empties the table; the Material panel's
+    library dropdown is then empty ("No material assigned" under "- None -"); its + opens the same modal and
+    Onshape → Add restores the library and its materials; the Preferences button does the same.
+  - The row cells sat left of their titles (the rows' trailing spacer shared the width with the cells, the
+    header had none). Header and rows now both end in the spacer and a 90 px action column.
+- **Variable Studio table drop line:** verified between two inserted tables. The first table's line
+  was clipped above the panel, so it now sits at that table's top edge; the circle moved in from the
+  edge. Drop reorders (verified: VS2 above VS1). Re-verified after the fix with two fresh Variable
+  Studios: the line and circle show at the first table's top edge, the drop puts VS2 first, and Undo
+  is enabled.
+- **Characteristics verified in the app** (21 Oct): Extrude 1 › Depth 12 mm, Tolerance options on,
+  Symmetrical 0.1 → "Distance | 12.000 | ±0.100 | 12.100 | 11.900" while the dialog is open; Cancel
+  empties the panel again ("No models." and the empty state).
+- **Model definitions › default tolerances and filters** (live qa4 598–599; new `part_studio/default_tolerances.rs`):
+  - Row 1 now has **Isolate active part** (the existing Isolate on the first solid; pressed and "Show entire Part
+    Studio" while isolated) and the **"Select default tolerances…"** field.
+  - The field opens the "Select default tolerances ✕" picker (300 px at the viewport's right edge; tabs Current
+    document | Other documents | Default tolerances; search; Library / Type / Default tolerances selects; preview;
+    [Select]). As live, opening it already applies ISO 2768-c (`PartStudio.default_tolerances`, undoable "Select
+    default tolerances"); the field becomes the chip `ISO 2768-c ×` (× "Remove").
+  - A "▾ Default tolerances" section lists `annotations::iso_2768(class)`: Linear, Angular, Chamfer distances,
+    Fillet radii. Class c matches 599; f / m / v and the Fillet radii rows come from the ISO 2768-1 tables
+    (live stops at "Fillet radii"; asked in psb 10-21 c).
+  - Characteristics header: Hide / Show default tolerances (toggle), Types ▾ (checkbox list of the nine types; none
+    ticked shows all; the count becomes shown/total), Show derived tolerances (pressed by default), | Reset filters
+    (dimmed until a filter changes). What Hide default / derived actually hide isn't captured (psb 10-21 c), so they
+    only toggle for now.
+  - New icons (own drawings): insp-default-tol.svg, insp-derived.svg; reused isolate.svg and reset-default.svg.
 - **Still open (mine)**:
   - The Variable Studio (variable_studio.rs, ui2's) should also turn a bare `5` into `5 mm`. The rule is
     now the shared `variable_table::with_workspace_unit`; the request is in theme-studios.md under "From
     psb".
-  - Datum / GD&T / Weld dialogs; Edit definition…
+  - Dimension / Geometric tolerance / Weld symbol placement and Set coincident / parallel / text
+    alignment (live psb 10-21 a pending); the other tolerance types' Characteristics text (psb 10-21 b).
 
 ## From ui (20 Oct): input hit area (lead's high-priority bug)
 - Cause: the kit's input frame (`gpui_base::InputBase`, used by `Input`) draws the border and
@@ -867,3 +946,82 @@ import's tab only; the view is yours. Live capture of the tab's UI is requested 
   code, not a Part Studio view. So the import needs no new `TabContent` variant. If you want the element for
   round-tripping, keep it hidden (not listed, not openable) and agree it with asb and the lead first. psb has
   nothing to build for it.
+
+## Plan after GO (v0.4.3 freeze, 21 Oct): pending state for slow regenerations (user report, top priority)
+
+User report: a 1000-instance Linear pattern is slow and shows nothing. ✓ can be clicked at once and the old state
+stays on screen with no sign of work. Target: Onshape's pending-state handling exactly. Live is capturing it as
+"Pending state" in behaviours.md. The indicator look and the ✓ semantics below follow that capture once it lands;
+nothing visual is guessed.
+
+**What the code does today** (read during the freeze):
+- `PartStudioView::schedule_regen` (part_studio/mod.rs ~488):
+  - It already runs `Regenerator::regenerate` on the background executor: a 12 ms coalescing timer, a coarse
+    `preview_meshes` pass, then a fine "refine" pass.
+  - It bumps `regen_seq`. A stale result is dropped when it arrives (`seq != this.regen_seq`).
+- **No real cancellation.** Replacing `regen_task` drops the gpui Task, but the closure already running inside
+  `background_spawn` runs to the end. It holds `self.regen.lock()` (the incremental cache), so the newer
+  regeneration waits behind the stale one. With a 1000-instance pattern, every keystroke in the dialog queues
+  another full pattern.
+- **No pending state anywhere.** Not in the dialog, the feature list, the graphics or the cursor.
+  - `accept_edit` (mod.rs ~1399) commits at once (`doc.edit_studio` → `session.commit`, a fast store commit) and
+    schedules another regeneration. Meanwhile the last applied display (the pre-edit model) stays shown.
+- `apply_display` → scene build runs on the UI thread. With 1000 bodies this can stall frames (perf's area:
+  instancing / shared meshes).
+- The tool preview (`behaviors.rs` ~1711, `ui.preview_task`) has the same lock / no-cancel shape.
+- Synchronous regenerations on the UI thread to check: entering a sketch (`sketch.rs` ~327), the derived and
+  in-context providers (`ops/src/derived.rs`, they run inside the background regeneration, OK), and
+  `DocEvent::TabChanged` listeners (assemblies, drawings) re-deriving after ✓.
+
+**Design**
+1. **Cancellation** (model; touches `regen/mod.rs` and the pattern loop, so agree with kern first):
+   - `RegenOptions.cancel: Option<Arc<AtomicU64>>` plus the generation the run was started for.
+   - `regenerate` checks it between features. Patterns check it every N instances (kern's loop, which also
+     takes the speed work).
+   - A cancelled run returns `RegenResult { cancelled: true, .. }`. It leaves the incremental cache valid up to
+     the last finished feature, so the next run resumes from there instead of starting over.
+   - `schedule_regen` / the tool preview store the new generation before spawning, so a newer edit cancels the
+     stale computation within one feature or N instances. That releases the lock quickly.
+2. **Pending state in the view** (`PartStudioView.pending: Option<Pending { seq, since: Instant, feature:
+   Option<FeatureId>, accepted: bool }>`):
+   - Set when a regeneration starts; cleared when its own result (not a stale one) is applied.
+   - Indicators appear only after Onshape's delay (from the capture) so fast edits don't flicker. The look comes
+     from "Pending state":
+     - the dialog (e.g. a spinner or greyed ✓);
+     - the feature list row (spinner or "regenerating" icon on the feature, rows after it);
+     - the graphics (overlay or message bubble; whether the old geometry stays, dims or hides);
+     - the cursor (busy / progress cursor over the graphics; `window.set_window_cursor_style`).
+   - A 60 fps repaint timer runs only while pending, for the spinner.
+3. **✓ while a preview is pending:** exactly as the capture says. Two possibilities:
+   - Onshape commits at once and the feature list and graphics show the pending state until the result arrives
+     (likely). Then `accept_edit` keeps the running computation, doesn't restart it, and marks `pending.accepted`.
+     The committed feature equals the previewed one, so the in-flight result is valid. We skip the duplicate
+     regeneration by comparing the studio hash.
+   - Or ✓ is disabled or deferred while pending. Then the ✓ button gets the captured disabled look and Enter
+     waits.
+   - Esc / ✕ while pending: cancel the computation and show the pre-edit model (cache resume makes it quick).
+4. **Previous result while computing:** keep the last applied display as Onshape shows it (the capture says
+   whether the pre-edit geometry stays normal, dims or hides). The coarse `preview_meshes` pass stays; the fine
+   refine pass must also be cancellable.
+5. **UI-thread budget** (perf):
+   - `scene_builder` work for big displays moves to the background. Build the GPU-independent mesh and instance
+     buffers off-thread and only upload on the UI thread.
+   - Pattern instances of one tool body share a mesh plus per-instance transforms (perf's instancing), so 1000
+     instances don't mean 1000 tessellations or draw calls.
+6. **Tests:**
+   - model: a cancelled regeneration returns early and the next one gives the same display as an uncancelled run;
+     pattern cancellation latency stays under ~50 ms at 1000 instances.
+   - app: verify with screenshots. Linear pattern 1000 instances: type a count, see the pending indicators;
+     retype, and the stale computation stops; ✓ during pending; Esc during pending.
+
+**Coordination** (messages to send after GO, through the lead if needed):
+- kern: pattern speed (shared tool body, one boolean of the instance compound instead of 1000 sequential
+  booleans), plus the cancel checks in the pattern loop. Agree on the `RegenOptions.cancel` API before either of
+  us edits `regen/mod.rs`.
+- perf: instanced drawing of pattern bodies; whether the scene build can move off the UI thread
+  (viewport-performance.md).
+- api: `noshape_ops` callers of `regenerate` (agent API) just pass `cancel: None`.
+
+**Order after GO:** (1) read "Pending state" in behaviours.md; (2) cancellation plus cache resume (with kern);
+(3) the pending struct and indicators; (4) ✓ / Esc semantics; (5) app verification with a 1000-instance pattern;
+(6) hand perf the scene-build profile.

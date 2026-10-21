@@ -1,6 +1,6 @@
 //! Drawing editor: Onshape's color dialog, opened from the color swatches
 //! of Drawing properties. "Palette": pick a swatch, or enter a hex code or
-//! RGB values; "Mixer": pick a hue, then a saturation / brightness; "+"
+//! RGB values; "Mixer": the saturation / value square and the hue strip (`color_mixer`); "+"
 //! under Custom colors saves the current color (kept with the drawing).
 
 use crate::drawing_view::*;
@@ -19,8 +19,8 @@ pub type ColorSet = std::rc::Rc<dyn Fn(&mut DrawingProps, Option<[u8; 3]>)>;
 pub struct ColorDlg {
     pub color: [u8; 3],
     pub mixer: bool,
-    /// Mixer hue (0–360).
-    pub hue: f64,
+    /// The Mixer tab (`color_mixer`).
+    pub mix: crate::color_mixer::MixerState,
     hex: Entity<InputState>,
     rgb: [Entity<InputState>; 3],
     set: ColorSet,
@@ -102,7 +102,7 @@ impl DrawingEditor {
                 }
             }));
         }
-        self.color_dlg = Some(ColorDlg { color: c, mixer: false, hue: 0.0, hex: hex_in, rgb: rgb_in, set, _subs: subs });
+        self.color_dlg = Some(ColorDlg { color: c, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(c), hex: hex_in, rgb: rgb_in, set, _subs: subs });
         cx.notify();
     }
 
@@ -131,7 +131,7 @@ impl DrawingEditor {
     pub fn render_color_dialog(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.color_dlg.as_ref()?;
         let pal = p();
-        let (color, mixer, hue) = (d.color, d.mixer, d.hue);
+        let (color, mixer, mix) = (d.color, d.mixer, d.mix);
         let swatch = |id: SharedString, c: [u8; 3], size: f32, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -156,33 +156,20 @@ impl DrawingEditor {
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(d) = &mut this.color_dlg {
                         d.mixer = m;
+                        // The mixer opens on the current colour.
+                        if m {
+                            let used = d.mix.hue_used;
+                            d.mix = crate::color_mixer::MixerState::from_rgb(d.color);
+                            d.mix.hue_used = used;
+                        }
                     }
                     cx.notify();
                 }))
         };
         let mut body = v_flex().p(px(10.)).gap(px(8.));
         if mixer {
-            // Hue strip, then a saturation x brightness field for that hue.
-            let mut hues = h_flex();
-            for i in 0..36 {
-                let h = i as f64 * 10.0;
-                hues = hues.child(div().id(("cd-hue", i as usize)).w(px(8.)).h(px(16.)).bg(rgba(hsv(h, 1.0, 1.0))).cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    if let Some(d) = &mut this.color_dlg {
-                        d.hue = h;
-                    }
-                    cx.notify();
-                })));
-            }
-            let mut field = v_flex();
-            for vi in 0..8 {
-                let mut row = h_flex();
-                for si in 0..18 {
-                    let c = hsv(hue, si as f64 / 17.0, 1.0 - vi as f64 / 8.0);
-                    row = row.child(swatch(SharedString::from(format!("cd-mix-{vi}-{si}")), c, 16., cx));
-                }
-                field = field.child(row);
-            }
-            body = body.child(hues).child(field);
+            // Live 712: the saturation / value square and the hue strip.
+            body = body.child(crate::color_mixer::mixer(&mix, |v: &mut Self| v.color_dlg.as_mut().map(|d| &mut d.mix), |v: &mut Self, c, window, cx| v.pick_color(c, window, cx), cx));
         } else {
             let mut grid = v_flex().gap(px(2.));
             for (r, chunk) in palette().chunks(8).enumerate() {

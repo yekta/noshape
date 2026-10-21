@@ -6,80 +6,10 @@ use crate::navigation as nav;
 use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_model::drawing::build::PickTarget;
-use noshape_model::drawing::views::{self, EdgeGeom, SnapKind};
+use noshape_model::drawing::views;
 use noshape_model::drawing::*;
 
-fn sub(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
-    [a[0] - b[0], a[1] - b[1]]
-}
-fn dot(a: [f64; 2], b: [f64; 2]) -> f64 {
-    a[0] * b[0] + a[1] * b[1]
-}
-fn len(a: [f64; 2]) -> f64 {
-    dot(a, a).sqrt()
-}
-fn add2(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
-    [a[0] + b[0], a[1] + b[1]]
-}
-fn norm(a: [f64; 2]) -> [f64; 2] {
-    let l = len(a).max(1e-12);
-    [a[0] / l, a[1] / l]
-}
-
-/// Dimension offset that puts the dimension line through the cursor
-/// (mirrors `SheetGeometry::linear_dimension`).
-/// Whether `c` lies in the angle swept counterclockwise from leg point `a`
-/// to leg point `b` around `v`.
-pub fn in_sweep(v: [f64; 2], a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> bool {
-    let ang = |p: [f64; 2]| (p[1] - v[1]).atan2(p[0] - v[0]);
-    let norm = |x: f64| x.rem_euclid(std::f64::consts::TAU);
-    norm(ang(c) - ang(a)) <= norm(ang(b) - ang(a))
-}
-
-pub fn dim_offset(p: [f64; 2], q: [f64; 2], o: DimOrientation, c: [f64; 2]) -> f64 {
-    let nrm = match o {
-        DimOrientation::Horizontal => [0.0, 1.0],
-        DimOrientation::Vertical => [1.0, 0.0],
-        DimOrientation::Aligned => {
-            let d = norm(sub(q, p));
-            [-d[1], d[0]]
-        }
-    };
-    dot(c, nrm) - dot(p, nrm).max(dot(q, nrm))
-}
-
-/// Orientation of a smart linear dimension from the cursor position.
-pub(crate) fn auto_orientation(p: [f64; 2], q: [f64; 2], c: [f64; 2]) -> DimOrientation {
-    let (x0, x1) = (p[0].min(q[0]), p[0].max(q[0]));
-    let (y0, y1) = (p[1].min(q[1]), p[1].max(q[1]));
-    let ex = if c[0] < x0 { x0 - c[0] } else if c[0] > x1 { c[0] - x1 } else { 0.0 };
-    let ey = if c[1] < y0 { y0 - c[1] } else if c[1] > y1 { c[1] - y1 } else { 0.0 };
-    if (x1 - x0) < 1e-6 {
-        return DimOrientation::Vertical;
-    }
-    if (y1 - y0) < 1e-6 {
-        return DimOrientation::Horizontal;
-    }
-    if ex > ey && ex > 0.0 {
-        DimOrientation::Vertical
-    } else if ey > 0.0 {
-        DimOrientation::Horizontal
-    } else {
-        DimOrientation::Aligned
-    }
-}
-
-/// Intersection of two infinite 2D lines.
-pub(crate) fn intersect(a0: [f64; 2], a1: [f64; 2], b0: [f64; 2], b1: [f64; 2]) -> Option<[f64; 2]> {
-    let r = sub(a1, a0);
-    let s = sub(b1, b0);
-    let den = r[0] * s[1] - r[1] * s[0];
-    if den.abs() < 1e-14 * (len(r) * len(s)).max(1e-30) {
-        return None;
-    }
-    let t = ((b0[0] - a0[0]) * s[1] - (b0[1] - a0[1]) * s[0]) / den;
-    Some([a0[0] + r[0] * t, a0[1] + r[1] * t])
-}
+pub(crate) use noshape_scene::drawing_tools::geom::*;
 
 impl DrawingEditor {
     // ------------------------------------------------------------ tools
@@ -88,6 +18,7 @@ impl DrawingEditor {
         self.woken_centers.clear();
         self.woken_points.clear();
         self.datum_on = None;
+        self.sketch_dim_pick = None;
         // Choosing a tool keeps the palette's changes (like a click away).
         if self.palette.is_some() {
             self.close_palette(true, cx);
@@ -258,6 +189,12 @@ impl DrawingEditor {
                 match x {
                     Sel::View(v) => s.remove_view(*v),
                     // Callouts grouped with the annotation go with it.
+                    // A datum from the model is hidden, not removed (MBD status › Show).
+                    Sel::Annotation(a) if s.annotations.iter().any(|n| n.id == *a && n.model.is_some()) => {
+                        if let Some(m) = s.annotations.iter_mut().find(|n| n.id == *a).and_then(|n| n.model.as_mut()) {
+                            m.hidden = true;
+                        }
+                    }
                     Sel::Annotation(a) => s.annotations.retain(|n| n.id != *a && n.group != Some(*a) && !matches!(n.kind, AnnotationKind::RevisionCallout { group: Some(g), .. } if g == *a)),
                     Sel::Table(t) => s.tables.retain(|n| n.id != *t),
                     Sel::Sketch(e) => {
@@ -375,157 +312,41 @@ impl DrawingEditor {
     /// The entity under the cursor: the picked geometry/annotation, else the
     /// view whose rectangle contains the point.
     pub fn sel_at(&self, pick: Option<u32>, s: [f64; 2]) -> Option<Sel> {
-        if let Some(sel) = pick.and_then(|p| self.sel_of_pick(p)) {
-            return Some(sel);
-        }
-        // Inserted images (borderless images have no pickable lines).
-        if let Some(id) = self.image_at(s) {
-            return Some(Sel::Image(id));
-        }
-        let b = self.built.as_ref()?;
-        b.placements
-            .iter()
-            .filter(|p| p.contains(s, 1.0))
-            .min_by(|a, c| ((a.max[0] - a.min[0]) * (a.max[1] - a.min[1])).total_cmp(&((c.max[0] - c.min[0]) * (c.max[1] - c.min[1]))))
-            .map(|p| Sel::View(p.id))
+        self.pk().sel_at(pick, s)
     }
 
     /// Snap point (vertex / circle center) of a view near a sheet point.
     pub fn snap_at(&self, s: [f64; 2]) -> Option<PickedPoint> {
-        let built = self.built.as_ref()?;
-        let mut best: Option<(f64, PickedPoint)> = None;
-        for pl in &built.placements {
-            if !pl.contains(s, 3.0) {
-                continue;
-            }
-            let Some(g) = self.geoms.get(&pl.id) else { continue };
-            let vp = pl.to_view(s);
-            let tol = self.tol_mm(8.0) / (pl.scale * 1000.0);
-            if let Some(sn) = g.snap_near(vp, tol) {
-                let d = len(sub(sn.p, vp)) * pl.scale * 1000.0;
-                // Prefer vertices over centers at equal distance.
-                let d = if sn.kind == SnapKind::Center { d + 0.01 } else { d };
-                if best.as_ref().is_none_or(|(bd, _)| d < *bd) {
-                    best = Some((d, PickedPoint { view: pl.id, p: sn.p, r: sn.point.clone() }));
-                }
-            }
-            // Construction annotations: virtual sharps and circle centerline
-            // centers (and their quadrants) are snap points too.
-            for a in self.current_sheet().annotations.iter().filter(|a| a.kind.view() == Some(pl.id)) {
-                let cand: Option<([f64; 2], Option<PointRef>)> = match &a.kind {
-                    AnnotationKind::VirtualSharp { a1, b1, a2, b2, .. } => AnnotationKind::line_intersection(*a1, *b1, *a2, *b2).map(|x| (x, a.refs.iter().find(|r| r.slot == 4).map(|r| r.point.clone()))),
-                    AnnotationKind::CircleCenterline { points, .. } => AnnotationKind::circle_centerline(points).map(|(cc, _)| (cc, None)),
-                    _ => None,
-                };
-                if let Some((p, r)) = cand {
-                    let d = len(sub(p, vp)) * pl.scale * 1000.0;
-                    if len(sub(p, vp)) <= tol && best.as_ref().is_none_or(|(bd, _)| d < *bd) {
-                        best = Some((d, PickedPoint { view: pl.id, p, r }));
-                    }
-                }
-            }
-            // Shift+Q: edge midpoints and circle quadrant points.
-            if self.snap_mid_quad && matches!(self.tool, Tool::Dimension { .. }) {
-                for me in &g.model_edges {
-                    let mut cand: Vec<([f64; 2], PointRef)> = Vec::new();
-                    match me.geom {
-                        views::EdgeGeom::Line { a, b } => cand.push(([(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5], PointRef::Midpoint { body: me.body.clone(), name: (*me.name).clone() })),
-                        views::EdgeGeom::Circle { center, radius, face_on: true, mid, .. } => {
-                            let closed = me.ends[0].is_none();
-                            if !closed {
-                                cand.push((mid, PointRef::Midpoint { body: me.body.clone(), name: (*me.name).clone() }));
-                            }
-                            for k in 0..4u8 {
-                                let a = f64::from(k) * std::f64::consts::FRAC_PI_2;
-                                cand.push(([center[0] + radius * a.cos(), center[1] + radius * a.sin()], PointRef::Quadrant { body: me.body.clone(), name: (*me.name).clone(), k }));
-                            }
-                        }
-                        _ => {}
-                    }
-                    for (p, r) in cand {
-                        let d = len(sub(p, vp)) * pl.scale * 1000.0;
-                        if len(sub(p, vp)) <= tol && best.as_ref().is_none_or(|(bd, _)| d + 0.02 < *bd) {
-                            best = Some((d, PickedPoint { view: pl.id, p, r: Some(r) }));
-                        }
-                    }
-                }
-            }
-        }
-        best.map(|(_, p)| p)
+        self.pk().snap_at(s)
     }
 
     /// The hovered projected edge: (view, model edge).
     pub fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {
-        let h = self.hover?;
-        let PickTarget::Edge { view, edge } = self.built.as_ref()?.picks.get(h as usize)?.clone() else { return None };
-        let g = self.geoms.get(&view)?;
-        let m = g.edges.get(edge as usize)?.model?;
-        Some((view, g.model_edges.get(m as usize)?.clone()))
+        self.pk().hovered_edge()
     }
 
     pub fn line_pick(&self) -> Option<Pick> {
-        let (view, me) = self.hovered_edge()?;
-        let EdgeGeom::Line { a, b } = me.geom else { return None };
-        let pa = me.ends[0].clone().map(|(r, p)| PickedPoint { view, p, r: Some(r) }).unwrap_or(PickedPoint { view, p: a, r: None });
-        let pb = me.ends[1].clone().map(|(r, p)| PickedPoint { view, p, r: Some(r) }).unwrap_or(PickedPoint { view, p: b, r: None });
-        if len(sub(pa.p, pb.p)) < 1e-9 {
-            return None;
-        }
-        Some(Pick::Line { a: pa, b: pb })
+        self.pk().line_pick()
     }
 
     /// The hovered arc (open circular edge).
     pub fn arc_pick(&self) -> Option<Pick> {
-        let (view, me) = self.hovered_edge()?;
-        let EdgeGeom::Circle { center, radius, mid, .. } = me.geom else { return None };
-        let (Some((ra, pa)), Some((rb, pb))) = (me.ends[0].clone(), me.ends[1].clone()) else { return None };
-        if len(sub(pa, pb)) < 1e-9 {
-            return None;
-        }
-        Some(Pick::Arc { view, center, radius, a: PickedPoint { view, p: pa, r: Some(ra) }, b: PickedPoint { view, p: pb, r: Some(rb) }, mid, r: me.center_ref() })
+        self.pk().arc_pick()
     }
 
     pub fn circle_pick(&self, s: [f64; 2]) -> Option<Pick> {
-        if let Some((view, me)) = self.hovered_edge()
-            && let EdgeGeom::Circle { center, radius, .. } = me.geom
-        {
-            return Some(Pick::Circle { view, center, radius, r: me.center_ref() });
-        }
-        let view = self.view_at(s)?;
-        let pl = self.placement(view)?;
-        let g = self.geoms.get(&view)?;
-        let vp = pl.to_view(s);
-        let tol = self.tol_mm(6.0) / (pl.scale * 1000.0);
-        // Circle centerlines (bolt circles) can be dimensioned too.
-        let construction: Vec<([f64; 2], f64, Option<PointRef>)> = self
-            .current_sheet()
-            .annotations
-            .iter()
-            .filter(|a| a.kind.view() == Some(view))
-            .filter_map(|a| if let AnnotationKind::CircleCenterline { points, .. } = &a.kind { AnnotationKind::circle_centerline(points).map(|(c, r)| (c, r, None)) } else { None })
-            .collect();
-        g.circles()
-            .into_iter()
-            .chain(construction)
-            .filter(|(c, r, _)| (len(sub(vp, *c)) - r).abs() < tol)
-            .min_by(|a, b| (len(sub(vp, a.0)) - a.1).abs().total_cmp(&(len(sub(vp, b.0)) - b.1).abs()))
-            .map(|(center, radius, r)| Pick::Circle { view, center, radius, r })
+        self.pk().circle_pick(s)
     }
 
     /// A point in a view: snap, else the point on a hovered edge, else free.
     pub fn any_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
-        if let Some(p) = self.snap_at(s) {
-            return Some(p);
-        }
-        let view = self.view_at(s)?;
-        let pl = self.placement(view)?;
-        Some(PickedPoint { view, p: pl.to_view(s), r: None })
+        self.pk().any_point(s)
     }
 
     // ------------------------------------------------------------ previews
 
     pub fn pick_sheet(&self, p: &PickedPoint) -> Option<[f64; 2]> {
-        Some(self.placement(p.view)?.to_sheet(p.p))
+        self.pk().pick_sheet(p)
     }
 
     /// The annotation the active dimension tool would create at the cursor.
@@ -547,6 +368,9 @@ impl DrawingEditor {
             ..Default::default()
         };
         if let Some(a) = self.extra_pending_annotation(id) {
+            return Some(a);
+        }
+        if let Some(a) = self.sketch_dim_preview() {
             return Some(a);
         }
         match &self.tool {
@@ -657,6 +481,9 @@ impl DrawingEditor {
                 v.flat = self.insert.flat;
                 v.sketch_appearances = self.insert.sketch_appearances;
                 v.model_annotations = self.insert.model_annotations;
+                // Assemblies: Explode/Position and Display state.
+                v.set_asm_position(self.insert.asm_position);
+                v.display_state = self.insert.display_state.clone();
                 // All views of a part use the same version: a pinned
                 // reference pins the new view too.
                 v.pinned = self.drawing.sheets.iter().flat_map(|s| &s.views).find(|o| matches!(&o.kind, ViewKind::Base { source: s2, part: p2, .. } if s2 == source && p2 == part) && o.pinned.is_some()).and_then(|o| o.pinned.clone());
@@ -1077,6 +904,11 @@ impl DrawingEditor {
                     }
                 }
             }
+            Tool::Dimension { kind: DimTool::Linear, ref picks } if picks.is_empty() && (self.sketch_dim_pick.is_some() || self.sketch_entity_at().is_some()) => {
+                // Drawing sketch geometry (SK7): pick, then place + value box.
+                self.tool = Tool::Dimension { kind: DimTool::Linear, picks: vec![] };
+                self.sketch_dim_click(c, window, cx);
+            }
             Tool::Dimension { kind, mut picks } => {
                 // Smart Dimension: a click on another entity adds it (a second
                 // pick) instead of placing; on a picked edge it deselects it.
@@ -1355,7 +1187,7 @@ impl DrawingEditor {
             return;
         }
         self.update_hover(cx);
-        self.drag = Drag::Pending { button: e.button, start: self.cursor, start_px: lp, pick: self.hover };
+        self.drag = Drag::Pending { button: drag_button(e.button), start: self.cursor, start_px: lp, pick: self.hover };
         cx.stop_propagation();
     }
 
@@ -1369,11 +1201,11 @@ impl DrawingEditor {
             && len(sub(lp, start_px)) > 3.0
         {
             self.drag = match button {
-                MouseButton::Right | MouseButton::Middle => {
+                Button::Right | Button::Middle => {
                     // Preferences › Mouse controls, "2D Drawing" column
                     // (default: right or middle drag, with or without Ctrl, pans).
                     let mut buttons = nav::Buttons::default();
-                    buttons.set(button, true);
+                    buttons.set(mouse_button(button), true);
                     let r = nav::ModeResolver::new(nav::MouseControls::current(), nav::Space::Drawing);
                     match r.resolve(buttons, r.input_key(e.modifiers.into()), nav::Mode::None) {
                         nav::Mode::Pan => Drag::Pan { last_px: start_px },
@@ -1381,7 +1213,7 @@ impl DrawingEditor {
                         _ => Drag::None,
                     }
                 }
-                MouseButton::Left if matches!(self.tool, Tool::Select) => {
+                Button::Left if matches!(self.tool, Tool::Select) => {
                     // Alt+drag copies: a duplicate stays, the dragged one moves.
                     if e.modifiers.alt {
                         self.alt_duplicate(pick, start, cx);
@@ -1429,6 +1261,8 @@ impl DrawingEditor {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
             }
+            // A datum from the model moves along its face normal only.
+            Drag::MoveAnnotation { start, orig } if orig.model.is_some() => self.drag_model_datum(&orig, start, cx),
             Drag::MoveAnnotation { start, orig } => {
                 self.infer_lines.clear();
                 if !e.modifiers.shift {
@@ -1610,14 +1444,14 @@ impl DrawingEditor {
         }
         let drag = std::mem::replace(&mut self.drag, Drag::None);
         match drag {
-            Drag::Pending { button: MouseButton::Left, pick, .. } => {
+            Drag::Pending { button: Button::Left, pick, .. } => {
                 if matches!(self.tool, Tool::Select) {
                     self.select_click(pick, e.modifiers, cx);
                 } else {
                     self.tool_click(window, cx);
                 }
             }
-            Drag::Pending { button: MouseButton::Right, pick, .. } => self.open_context_menu(pick, e.position, window, cx),
+            Drag::Pending { button: Button::Right, pick, .. } => self.open_context_menu(pick, e.position, window, cx),
             Drag::MoveViews { .. } => {
                 if let Some(p) = self.preview.take() {
                     self.commit("Move view", p, cx);
@@ -1846,10 +1680,11 @@ impl DrawingEditor {
                 // Move the view with all views derived from it; a projected
                 // (or section/auxiliary) view slides along its alignment axis.
                 // Views with "Suppress alignment with parent" stay where they are.
-                let ids: Vec<ViewId> = sheet.descendants(id).into_iter().filter(|v| *v == id || !sheet.view(*v).is_some_and(|x| x.unaligned)).collect();
+                let ids: Vec<ViewId> = sheet.descendants(id).into_iter().filter(|v| !v.is_ghost() && (*v == id || !sheet.view(*v).is_some_and(|x| x.unaligned))).collect();
                 let orig = ids.iter().filter_map(|v| sheet.view(*v).map(|x| (*v, x.position))).collect();
                 let prot = sheet.parent_of(id).map(|p| views::view_rotation(sheet, p)).unwrap_or(0.0);
-                let unaligned = sheet.view(id).is_some_and(|v| v.unaligned);
+                // A view linked to a parent on another sheet moves freely (live x (5)).
+                let unaligned = sheet.view(id).is_some_and(|v| v.unaligned) || sheet.linked_parent(id).is_some();
                 let constraint = match &sheet.view(id).map(|v| v.kind.clone()).filter(|_| !unaligned) {
                     Some(ViewKind::Projected { .. }) => views::projected_direction(sheet, id).filter(|d| d[0] == 0.0 || d[1] == 0.0).map(|d| views::rotate2(d, prot)).map(|d| (d, d)),
                     Some(ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) => views::section_cut(sheet, id).map(|c| views::rotate2(c.toward_view, prot)).map(|d| (d, d)),
@@ -2224,8 +2059,11 @@ impl DrawingEditor {
     }
 
     pub fn edit_view(&mut self, description: &str, id: ViewId, cx: &mut Context<Self>, f: impl FnOnce(&mut DrawingView)) {
-        self.edit_sheet(description, cx, |s| {
-            if let Some(v) = s.view_mut(id) {
+        // A mirror of a view on another sheet (a linked section's cutting
+        // line on its parent): edit the real view.
+        let (si, id) = self.drawing.real_view_of(self.sheet, id);
+        self.edit(description, cx, |d| {
+            if let Some(v) = d.sheets.get_mut(si).and_then(|s| s.view_mut(id)) {
                 f(v);
             }
         });

@@ -6,6 +6,7 @@
 //! (the Expand select, the expand slider, ?).
 
 use gpui_kit::component::{Icon, IconName, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::rc::Rc;
 
@@ -42,7 +43,12 @@ pub(crate) struct IsoDialog<V> {
     pub transparency: f32,
     pub expand: f32,
     pub expand_options: Vec<String>,
+    /// Options shown greyed (live Part Studio: connectivity, no mates).
+    pub expand_disabled: Vec<usize>,
     pub expand_ix: usize,
+    /// The transparency slider's legend fill (live: `#777` to 10 %, then
+    /// `#3e94ff` fading to white).
+    pub legend: bool,
     pub expand_tip: &'static str,
     pub drag: SliderDrag<V>,
     pub close: Act<V>,
@@ -90,10 +96,10 @@ pub(crate) fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyEle
                 .tooltip(crate::ui::tooltip("Enable selection of parts, faces, and edges from transparent bodies"))
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| toggle(this, window, cx))),
         )
-        .child(div().mt(px(6.)).child(slider(d.key, "transparency", d.transparency, "Show/hide internal geometry", d.drag, d.set_transparency, cx)))
+        .child(div().mt(px(6.)).child(slider(Slider { key: d.key, name: "transparency", t: d.transparency, tip: "Show/hide internal geometry", track: Track::Legend(d.legend) }, d.drag, d.set_transparency, cx)))
         .child(section("Component controls"))
         .child(
-            crate::os_ui::select_field(SharedString::from(format!("{}-type", d.key)), d.expand_options, d.expand_ix, move |i, window, cx| pick(i, window, cx))
+            crate::os_ui::select_field_with(SharedString::from(format!("{}-type", d.key)), d.expand_options, d.expand_disabled, d.expand_ix, move |i, window, cx| pick(i, window, cx))
                 .h(px(26.))
                 .w(px(194.))
                 .pl(px(6.))
@@ -107,16 +113,36 @@ pub(crate) fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyEle
             h_flex()
                 .mt(px(5.))
                 .mb(px(5.))
-                .child(div().flex_1().child(slider(d.key, "expand", d.expand, d.expand_tip, d.drag, d.set_expand, cx)))
+                .child(div().flex_1().child(slider(Slider { key: d.key, name: "expand", t: d.expand, tip: d.expand_tip, track: Track::Line }, d.drag, d.set_expand, cx)))
                 .child(div().mr(px(4.)).size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")),
         )
         .into_any_element()
 }
 
-/// One slider: a 7 px rounded `#777` track and an 11 px white knob. Only a
-/// press that started on it drags it (a box select or a dialog drag passing
-/// over must not), so the view keeps the dragged slider (`drag`).
-fn slider<V: 'static>(key: &'static str, name: &'static str, t: f32, tip: &'static str, drag: SliderDrag<V>, set: SetT<V>, cx: &mut Context<V>) -> AnyElement {
+/// What a slider shows.
+struct Slider {
+    key: &'static str,
+    name: &'static str,
+    /// Knob position, 0 to 1.
+    t: f32,
+    tip: &'static str,
+    track: Track,
+}
+
+/// A slider's track (live noUiSlider, 183 px, 11 px in).
+enum Track {
+    /// 7 px, radius 6, a 2 px inset `#777` ring; with the legend fill.
+    Legend(bool),
+    /// A 2 px `#777` line.
+    Line,
+}
+
+/// One slider: its track and an 11 px white knob (1 px `#888`, a 3 px dark
+/// glow). Only a press that started on it drags it (a box select or a
+/// dialog drag passing over must not), so the view keeps the dragged slider
+/// (`drag`).
+fn slider<V: 'static>(spec: Slider, drag: SliderDrag<V>, set: SetT<V>, cx: &mut Context<V>) -> AnyElement {
+    let Slider { key, name, t, tip, track: track_kind } = spec;
     let track: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
     let (t1, t2, t3) = (track.clone(), track.clone(), track);
     let s2 = set.clone();
@@ -126,10 +152,27 @@ fn slider<V: 'static>(key: &'static str, name: &'static str, t: f32, tip: &'stat
         .id(SharedString::from(format!("{key}-{name}")))
         .relative()
         .h(px(15.))
-        .mx(px(11.))
+        .ml(px(11.))
+        .w(px(183.))
         .cursor_pointer()
         .tooltip(crate::ui::tooltip(tip))
-        .child(div().absolute().left_0().right_0().top(px(4.)).h(px(7.)).rounded(px(6.)).border_2().border_color(rgb(0x777777)))
+        .child(match track_kind {
+            Track::Legend(legend) => div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .top(px(4.))
+                .h(px(7.))
+                .rounded(px(6.))
+                .overflow_hidden()
+                .when(legend, |d| {
+                    d.child(div().absolute().top_0().bottom_0().left_0().w(relative(0.1)).bg(rgb(0x777777))).child(
+                        div().absolute().top_0().bottom_0().left(relative(0.1)).right_0().bg(linear_gradient(90., linear_color_stop(rgb(0x3e94ff), 0.), linear_color_stop(rgb(0xffffff), 1.))),
+                    )
+                })
+                .child(div().absolute().top_0().left_0().size_full().rounded(px(6.)).border_2().border_color(rgb(0x777777))),
+            Track::Line => div().absolute().left_0().right_0().top(px(6.)).h(px(2.)).bg(rgb(0x777777)),
+        })
         .child(
             div()
                 .absolute()

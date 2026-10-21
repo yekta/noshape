@@ -875,3 +875,112 @@ pub fn right_resizable<E: InteractiveElement + ParentElement>(panel: E, inset: f
             }
         })
 }
+
+thread_local! {
+    /// Table column widths the user dragged, by table and column; kept
+    /// across sessions as live keeps them (reopen and reload).
+    static COL_WIDTHS: std::cell::RefCell<std::collections::HashMap<String, f32>> = std::cell::RefCell::new(
+        std::fs::read_to_string(crate::files::config_dir().join("table_columns.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default(),
+    );
+    /// The column width and the pointer x when a grip was pressed.
+    static COL_PRESS: std::cell::Cell<(f32, Pixels)> = const { std::cell::Cell::new((0., Pixels::ZERO)) };
+}
+
+/// The width of column `col` of table `table` (`default` until dragged).
+pub fn col_w(table: &str, col: &str, default: f32) -> f32 {
+    COL_WIDTHS.with(|m| m.borrow().get(&format!("{table}/{col}")).copied().unwrap_or(default))
+}
+
+/// A column grip being dragged.
+#[derive(Clone)]
+pub struct ColResize {
+    key: SharedString,
+}
+
+impl Render for ColResize {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// Live's table column grip (`.table-cell--header .drag-handle`, behaviours.md
+/// "Table column resize"): 5 px inside the header cell's right edge,
+/// `col-resize`. Dragging changes only that column (the ones to its right
+/// shift), at least 40 px, no maximum; double-click does nothing. The header
+/// cell must be positioned and sized with [`col_w`].
+pub fn col_grip(table: &str, col: &str, default: f32) -> Stateful<Div> {
+    let key = SharedString::from(format!("{table}/{col}"));
+    let w0 = col_w(table, col, default);
+    div()
+        .id(SharedString::from(format!("col-grip-{key}")))
+        .absolute()
+        .top_0()
+        .bottom_0()
+        .right_0()
+        .w(px(5.))
+        .cursor(CursorStyle::ResizeColumn)
+        .on_mouse_down(MouseButton::Left, move |e, _, _| COL_PRESS.with(|p| p.set((w0, e.position.x))))
+        .on_drag(ColResize { key }, |d, _, _, cx| cx.new(|_| d.clone()))
+        .on_drag_move(|e: &DragMoveEvent<ColResize>, window, cx| {
+            let key = e.drag(cx).key.to_string();
+            let (w0, x0) = COL_PRESS.with(|p| p.get());
+            let w = (w0 + f32::from(e.event.position.x - x0)).round().max(40.);
+            let changed = COL_WIDTHS.with(|m| {
+                let mut m = m.borrow_mut();
+                if m.get(&key) == Some(&w) {
+                    return false;
+                }
+                m.insert(key, w);
+                let p = crate::files::config_dir().join("table_columns.json");
+                if let Some(dir) = p.parent() {
+                    let _ = std::fs::create_dir_all(dir);
+                }
+                if let Ok(t) = serde_json::to_string(&*m) {
+                    let _ = std::fs::write(p, t);
+                }
+                true
+            });
+            if changed {
+                window.refresh();
+            }
+        })
+}
+
+/// Live's drag image for reordering (Configurations headers, selection lists,
+/// cursors/670, ui/966): a `#1651b0` pill with the name in white bold at the
+/// pointer; the pointer shows `grabbing` meanwhile. `offset` is where the
+/// dragged element was grabbed (GPUI draws the drag view at the pointer less
+/// it, at its least size: pad it back).
+pub fn name_pill(name: SharedString, offset: Point<Pixels>) -> Div {
+    div()
+        .pl(offset.x)
+        .pt(offset.y)
+        .child(
+            div()
+                .mt(px(-15.))
+                .h(px(31.))
+                .px(px(10.))
+                .flex()
+                .items_center()
+                .rounded(px(15.5))
+                .bg(gpui_kit::rgb(0x1651b0))
+                .text_size(px(14.))
+                .font_weight(FontWeight::BOLD)
+                .text_color(gpui_kit::rgb(0xffffff))
+                .child(name),
+        )
+        .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())
+}
+
+/// Live's reorder drop line (cursors/670, ui/966): 2 px `#1651b0` from a 6 px
+/// open circle, across the list; 6 px tall, place it centred on the gap.
+pub fn drop_line() -> Div {
+    let accent = gpui_kit::rgb(0x1651b0);
+    div()
+        .absolute()
+        .left_0()
+        .right_0()
+        .h(px(6.))
+        .child(div().absolute().left(px(5.)).right_0().top(px(2.)).h(px(2.)).bg(accent))
+        .child(div().absolute().left_0().top_0().size(px(6.)).rounded_full().border_2().border_color(accent).bg(gpui_kit::rgb(0xcad8ed)))
+}

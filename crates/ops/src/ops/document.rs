@@ -40,7 +40,7 @@ pub fn ops() -> Vec<Op> {
             group: "document",
             verb: "info",
             summary: "Describe a document: tabs, units, history state",
-            description: "Lists the tabs in tab-bar order (id, name, kind), the workspace units, the branch and whether undo/redo are available.",
+            description: "Lists the tabs in tab-bar order (id, name, kind), the workspace units, the branch, whether it is protected (workspace protection) or read-only, and whether undo/redo are available.",
             fields: vec![doc_field()],
             mutates: false,
             destructive: false,
@@ -55,6 +55,26 @@ pub fn ops() -> Vec<Op> {
             mutates: false,
             destructive: false,
             run: close,
+        },
+        Op {
+            group: "document",
+            verb: "protect",
+            summary: "Turn on workspace protection for a branch",
+            description: "Versions and history › workspace row › Workspace protection… › Enable workspace protection. A protected workspace takes no direct model edits (geometry, drawings, tabs, settings, undo/redo, restore): those fail with error `protected`. Make changes on another branch and merge them in; versions, branches and merges stay allowed.",
+            fields: vec![doc_field(), opt("branch", s(), "Branch name or id (default: the current one).")],
+            mutates: true,
+            destructive: false,
+            run: protect,
+        },
+        Op {
+            group: "document",
+            verb: "unprotect",
+            summary: "Turn off workspace protection for a branch",
+            description: "Clears Enable workspace protection: the workspace takes edits again.",
+            fields: vec![doc_field(), opt("branch", s(), "Branch name or id (default: the current one).")],
+            mutates: true,
+            destructive: false,
+            run: unprotect,
         },
         Op {
             group: "document",
@@ -140,6 +160,8 @@ pub(crate) fn describe(od: &OpenDoc) -> Value {
         "can_undo": od.session.can_undo(),
         "can_redo": od.session.can_redo(),
         "read_only": od.session.read_only(),
+        "branch": od.session.store.list_branches().ok().and_then(|l| l.into_iter().find(|b| b.id == od.session.branch)).map(|b| b.name),
+        "protected": od.session.is_protected(),
     })
 }
 
@@ -167,6 +189,26 @@ fn info(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn close(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let p = ctx.close(a.opt_str("doc")?)?;
     Ok(json!({ "closed": p.display().to_string() }).into())
+}
+
+fn set_protected(ctx: &mut Ctx, a: &Args, on: bool) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let b = match a.opt_str("branch")? {
+        Some(k) => super::history::branch_id(od, k)?,
+        None => od.session.branch,
+    };
+    od.session.set_branch_protected(b, on)?;
+    let mut v = describe(od);
+    v["changed_branch"] = json!(b.to_string());
+    Ok(v.into())
+}
+
+fn protect(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    set_protected(ctx, a, true)
+}
+
+fn unprotect(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    set_protected(ctx, a, false)
 }
 
 fn set_units(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

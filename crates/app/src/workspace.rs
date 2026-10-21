@@ -613,8 +613,8 @@ impl Workspace {
     /// "+" › Import…: the OS picker (several files), then Onshape's "Import
     /// to Onshape" modal (import_dialog.rs); the new tab opens.
     /// "+" › Import…: any file. CAD files go through the Import dialog
-    /// (Part Studio plus the file in "CAD Imports"); DXF / DWG become a file
-    /// tab and a Drawing; other files a file tab (Onshape).
+    /// (Part Studio plus the file in "CAD Imports"); other files, DXF / DWG
+    /// too, a file tab (Onshape).
     fn import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let ws = cx.entity();
         let handle = window.window_handle();
@@ -626,17 +626,14 @@ impl Workspace {
             for p in rest {
                 let Ok(bytes) = std::fs::read(&p) else { continue };
                 let (stem, file) = import_names(&p);
-                let drawing = if is(&p, &["dxf", "dwg"]) { crate::file_tab_view::drawing_from_cad(&bytes).ok() } else { None };
+                let _ = stem;
+                // Live (behaviours "Imported DWG/DXF drawings"): a DXF / DWG
+                // becomes a plain file tab; its menu's "Create Drawing of …"
+                // makes the drawing.
                 doc.update(cx, |d, cx| {
                     d.edit_document(&format!("Import {file}"), cx, |d| {
                         let f = crate::file_tab_view::add_file_tab(d, noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now()), None, after);
                         last = Some(f);
-                        if let Some(dr) = drawing {
-                            let name = if d.tabs.iter().any(|t| t.name == stem) { d.next_tab_name(&stem) } else { stem.clone() };
-                            let id = d.add_tab(&name, TabContent::Drawing(dr));
-                            place_after(d, id, Some(f));
-                            last = Some(id);
-                        }
                     })
                 });
             }
@@ -654,30 +651,41 @@ impl Workspace {
         });
     }
 
-    /// File tab › Translate…: a CAD file through the Import dialog (Part
-    /// Studio), a DXF / DWG into a new Drawing.
+    /// DXF / DWG file tab › "Create Drawing of <file>…" (live, no dialog): a
+    /// new drawing "<file> Drawing N" right after the file tab: the file's
+    /// model space as the sheet "Model", then its layouts; it opens on the
+    /// first layout, else on Model.
+    fn create_cad_drawing(&mut self, id: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(t) = self.doc.read(cx).session.doc.tab(id).cloned() else { return };
+        let TabContent::File(f) = &t.content else { return };
+        let Some(bytes) = f.bytes() else { return };
+        match noshape_model::drawing::imported::drawing_from_cad(&bytes) {
+            // The drawing opens on its `active_sheet` (the first layout, else Model).
+            Ok((dr, _)) => {
+                let mut new_id = None;
+                self.doc.update(cx, |d, cx| {
+                    d.edit_document(&format!("Create Drawing of {}", t.name), cx, |d| {
+                        let name = (1..).map(|n| format!("{} Drawing {n}", t.name)).find(|n| !d.tabs.iter().any(|x| &x.name == n)).unwrap_or_default();
+                        let nt = d.add_tab(&name, TabContent::Drawing(dr));
+                        place_after(d, nt, Some(id));
+                        new_id = Some(nt);
+                    })
+                });
+                if let Some(nt) = new_id {
+                    self.activate(nt, window, cx);
+                }
+            }
+            Err(e) => self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(format!("Create drawing failed: {e}")))),
+        }
+    }
+
+    /// File tab › Import… (CAD files): the file through the Import dialog
+    /// (Part Studio); a DXF / DWG makes a drawing.
     fn translate_file(&mut self, id: TabId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(TabContent::File(f)) = self.doc.read(cx).session.doc.tab(id).map(|t| t.content.clone()) else { return };
         let Some(bytes) = f.bytes() else { return };
         match f.kind() {
-            noshape_model::file_tab::FileKind::Drawing2d => match crate::file_tab_view::drawing_from_cad(&bytes) {
-                Ok(dr) => {
-                    let stem = std::path::Path::new(&f.file_name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Drawing".into());
-                    let mut new_id = None;
-                    self.doc.update(cx, |d, cx| {
-                        d.edit_document(&format!("Translate {}", f.file_name), cx, |d| {
-                            let name = if d.tabs.iter().any(|t| t.name == stem) { d.next_tab_name(&stem) } else { stem.clone() };
-                            let t = d.add_tab(&name, TabContent::Drawing(dr));
-                            place_after(d, t, Some(id));
-                            new_id = Some(t);
-                        })
-                    });
-                    if let Some(t) = new_id {
-                        self.activate(t, window, cx);
-                    }
-                }
-                Err(e) => self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(format!("Translate failed: {e}")))),
-            },
+            noshape_model::file_tab::FileKind::Drawing2d => self.create_cad_drawing(id, window, cx),
             _ => {
                 // The Import dialog reads files from disk: hand it a temporary copy.
                 let dir = std::env::temp_dir().join(format!("noshape-translate-{}", id));
@@ -892,6 +900,11 @@ impl Workspace {
                 continue;
             };
             let active = self.active == Some(id);
+            // Compare mode (live 952): a status dot after the name; drawings and
+            // tabs only in the base are greyed and can't be opened.
+            let compare = crate::compare_mode::tab_status(&self.doc, id, cx);
+            let compare_off = compare.is_some_and(|s| s.disabled());
+            let compare_dot = compare.and_then(|s| crate::compare_mode::tab_dot(SharedString::from(format!("tab-dot-{id}")), s, &crate::compare_mode::base_label(&self.doc, cx).unwrap_or_default()));
             let view = cx.entity();
             let tab_name = name.clone();
             let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
@@ -913,14 +926,15 @@ impl Workspace {
                     .text_size(px(14.))
                     // Live: inactive tabs pointer, the active tab default.
                     .when(!active, |d| d.cursor_pointer())
-                    .bg(if active { pal.panel } else { pal.tab_inactive })
+                    .bg(if active { pal.panel } else if compare_off { gpui_kit::rgb(0xe1e1e1) } else { pal.tab_inactive })
                     .text_color(if active { pal.text } else { pal.text_muted })
-                    .child(crate::assets::icon(tab_icon(kind), 20., cx))
+                    .child(div().flex_none().when(compare_off, |d| d.opacity(0.5)).child(crate::assets::icon(tab_icon(kind), 20., cx)))
                     .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
                         // Tab › Rename / double-click: the name becomes a field.
                         Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
-                        None => div().truncate().child(name).into_any_element(),
+                        None => div().truncate().when(compare_off, |d| d.opacity(0.5)).child(name).into_any_element(),
                     })
+                    .children(compare_dot.map(|dot| div().flex_none().ml(px(3.)).when(compare_off, |d| d.opacity(0.55)).child(dot)))
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                     .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                     // Live (part-studio/17): an inactive tab shows its element's
@@ -937,6 +951,9 @@ impl Workspace {
                     .drag_over::<TabDrag>(|st, _, _, _| st.border_l_2().border_color(gpui_kit::rgb(0x1651b0)))
                     .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_before(drag.id, id, cx)))
                     .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                        if compare_off {
+                            return;
+                        }
                         // The first click activated the tab; a double-click renames it
                         // (activating again would take the field's focus).
                         if e.click_count() >= 2 {
@@ -948,6 +965,9 @@ impl Workspace {
                     .tab_context_menu(bounds, move |menu, _, cx| {
                         use crate::doc_dialogs as dd;
                         use crate::os_menu::OsMenuItem as I;
+                        if kind.starts_with("file") {
+                            return file_tab_menu(menu, &view, id, &tab_name, cx);
+                        }
                         let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
                         let (v5, v6, v7, v8, v9, v10, v11) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
                         // Onshape (live menus/rmb-tab-*): ⊗ Delete | Rename,
@@ -1030,19 +1050,6 @@ impl Workspace {
                             } else {
                                 menu
                             }
-                        } else {
-                            menu
-                        };
-                        // File tabs: Download, Update…, and Translate… for CAD / DXF / DWG files.
-                        let menu = if kind.starts_with("file") {
-                            let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
-                            let translatable = matches!(view.read(cx).doc.read(cx).session.doc.tab(id).map(|t| &t.content), Some(TabContent::File(f)) if f.translatable());
-                            let v12 = view.clone();
-                            let menu = menu
-                                .separator()
-                                .item(I::new("Download").on_click(move |_, w, cx| crate::file_tab_view::download(&d1, id, w, cx)))
-                                .item(I::new("Update…").on_click(move |_, w, cx| crate::file_tab_view::update(&d2, id, w, cx)));
-                            if translatable { menu.item(I::new("Translate…").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.translate_file(id, w, cx)))) } else { menu }
                         } else {
                             menu
                         };
@@ -1178,6 +1185,51 @@ enum DocPanel {
     Performance(Entity<crate::doc_panels::PerformancePanel>),
 }
 
+/// A file tab's right-click menu (live menus/rmb-tab-file-*, behaviours
+/// "File tabs" and "Imported DWG/DXF drawings"): Delete | Rename,
+/// Properties… | (CAD) Import…, (DXF / DWG) Create Drawing of <file>…,
+/// Update… | (images) Select as document thumbnail | Move to document… |
+/// Release… | Download. No Translate…; "Open in new browser tab" is the
+/// browser's.
+fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: TabId, tab_name: &str, cx: &App) -> crate::os_menu::OsMenu {
+    use crate::doc_dialogs as dd;
+    use crate::os_menu::OsMenuItem as I;
+    use noshape_model::file_tab::FileKind;
+    let doc = view.read(cx).doc.clone();
+    let file_kind = match doc.read(cx).session.doc.tab(id).map(|t| &t.content) {
+        Some(TabContent::File(f)) => Some(f.kind()),
+        _ => None,
+    };
+    let (v1, v2, v3, v4, v5) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
+    let (d1, d2, d3, d4) = (doc.clone(), doc.clone(), doc.clone(), doc.clone());
+    let mut menu = menu
+        .item(I::new("Delete").icon_name("menu-delete").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.delete_tab(id, w, cx))))
+        .separator()
+        .item(I::new("Rename").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
+        .item(I::new("Properties…").on_click(move |_, w, cx| dd::tab_properties(d1.clone(), id, w, cx)))
+        .separator();
+    match file_kind {
+        Some(FileKind::Cad) => menu = menu.item(I::new("Import…").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.translate_file(id, w, cx)))),
+        Some(FileKind::Drawing2d) => menu = menu.item(I::new(format!("Create Drawing of {tab_name}…")).icon_name("menu-create-drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.create_cad_drawing(id, w, cx)))),
+        _ => {}
+    }
+    menu = menu.item(I::new("Update…").on_click(move |_, w, cx| crate::file_tab_view::update(&d2, id, w, cx))).separator();
+    if file_kind == Some(FileKind::Image) {
+        menu = menu.item(I::new("Select as document thumbnail").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.select_thumbnail(id, cx)))).separator();
+    }
+    menu.item(I::new("Move to document…").on_click(move |_, w, cx| dd::move_to_document(d3.clone(), vec![id], w, cx)))
+        .separator()
+        .item(I::new("Release…").on_click(move |_, w, cx| {
+            let items = crate::release_dialog::tab_items(d4.read(cx), id);
+            crate::release_dialog::open_release_candidate(d4.clone(), items, w, cx)
+        }))
+        .separator()
+        .item(I::new("Download").on_click(move |_, w, cx| {
+            let doc = v5.read(cx).doc.clone();
+            crate::file_tab_view::download(&doc, id, w, cx)
+        }))
+}
+
 fn tab_icon(kind: &'static str) -> &'static str {
     match kind {
         "partstudio" => "part-studio",
@@ -1270,7 +1322,11 @@ impl Render for Workspace {
             }).collect();
             panel.update(cx, |p, cx| p.set_results(results, cx));
         }
+        // Compare mode (compare_mode.rs, live ui2/952): a tab that exists only
+        // in the base shows "NOT COMPARABLE".
+        let only_in_base = self.active.and_then(|a| crate::compare_mode::tab_status(&self.doc, a, cx)) == Some(crate::compare_mode::TabStatus::OnlyInBase);
         let content: AnyElement = match self.active.and_then(|a| self.views.get(&a)) {
+            _ if only_in_base => crate::compare_mode::render_not_comparable(&crate::compare_mode::base_label(&self.doc, cx).unwrap_or_default()),
             Some(TabView::PartStudio(v)) => v.clone().into_any_element(),
             Some(TabView::Drawing(v)) => v.clone().into_any_element(),
             Some(TabView::Variables(v)) => v.clone().into_any_element(),
@@ -1352,6 +1408,14 @@ impl Render for Workspace {
                                 .min_h_0()
                                 .relative()
                                 .child(content)
+                                // Compare mode: the toolbar row becomes white with the
+                                // centred "Comparing Main and V3" bar (live 953).
+                                .children(crate::compare_mode::render_bar(&self.doc, cx).map(|bar| {
+                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(gpui_kit::white()).occlude().flex().justify_center().child(bar)
+                                }))
+                                // A protected workspace (workspace_protection.rs): its banner
+                                // at the top centre (not over the compare bar).
+                                .children(crate::workspace_protection::render_banner(&self.doc, cx).filter(|_| crate::compare_mode::rows(&self.doc, cx).is_none()).map(|banner| div().absolute().top_0().left_0().right_0().flex().justify_center().child(banner)))
                                 .children(self.render_toast(cx))
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
                                 .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::left_panel_w())).child(p.clone()))),
@@ -1668,7 +1732,12 @@ impl Workspace {
                     let bounds = if suggested { src.as_ref().and_then(|s| noshape_model::drawing::create::source_bounds(&doc, s)) } else { None };
                     // Sketch sources face the sketch plane.
                     let frame = src.as_ref().and_then(|s| noshape_model::drawing::create::source_frame(&doc, s));
-                    noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested, frame)
+                    let mut d = noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested, frame);
+                    // Suggested views show the Part Studio's MBD datums (live behaviours "MBD datums in drawings").
+                    if suggested {
+                        noshape_model::drawing::mbd::place_model_datums(&mut d, &doc);
+                    }
+                    d
                 })
                 .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
@@ -1685,7 +1754,16 @@ impl Workspace {
                         Some(s) => {
                             let tool = crate::drawing_view::Tool::InsertView { source: s.tab, orientation: noshape_model::drawing::ViewOrientation::Front, part: s.part.clone() };
                             let sketch = s.sketch;
+                            // An assembly's last applied named position and display state (live drawing/1106).
+                            let prefill = match this.views.get(&s.tab) {
+                                Some(TabView::Assembly(a)) => Some(a.read(cx).drawing_prefill(cx)),
+                                _ => None,
+                            };
                             v.update(cx, |v, cx| {
+                                if let Some((pos, ds)) = prefill {
+                                    v.insert.asm_position = pos;
+                                    v.insert.display_state = ds;
+                                }
                                 v.set_tool(tool, cx);
                                 v.insert_sketch(sketch, cx);
                             });
@@ -1839,55 +1917,6 @@ pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPr
     };
     let parts = if info.is_empty() { String::new() } else { serde_json::to_string(&info)? };
     Ok(Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts })
-}
-
-/// A native assembly as Onshape imports it (live G38): a flat zip named like
-/// its root assembly, with the part files the assembly references by name.
-pub(crate) struct AssemblyZip {
-    pub root: String,
-    pub components: Vec<noshape_kernel::NativeComponent>,
-    pub files: Vec<noshape_model::native_assembly::PartFile>,
-}
-
-pub(crate) fn read_assembly_zip(path: &std::path::Path) -> anyhow::Result<AssemblyZip> {
-    use noshape_kernel as k;
-    const NO_ROOT: &str = "Root assembly file not found. Ensure zip file name matches root assembly name and the archive does not have folders";
-    let dir = std::env::temp_dir().join(format!("noshape-zip-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)));
-    std::fs::create_dir_all(&dir)?;
-    let result = (|| {
-        let names = k::extract_zip(path, &dir)?;
-        let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-        if names.iter().any(|n| n.contains('/') || n.contains('\\')) {
-            anyhow::bail!(NO_ROOT);
-        }
-        let split = |n: &str| n.rsplit_once('.').map(|(a, b)| (a.to_string(), b.to_ascii_lowercase())).unwrap_or((n.to_string(), String::new()));
-        let Some(root) = names.iter().find(|n| {
-            let (base, ext) = split(n);
-            ext == "sldasm" && base.eq_ignore_ascii_case(&stem)
-        }) else {
-            anyhow::bail!(NO_ROOT)
-        };
-        let components = k::read_native_assembly(&dir.join(root))?;
-        let mut files = Vec::new();
-        for n in &names {
-            let mut configs: Vec<Option<i32>> = Vec::new();
-            for c in components.iter().filter(|c| !c.assembly && c.file.eq_ignore_ascii_case(n)) {
-                if !configs.contains(&c.configuration_id) {
-                    configs.push(c.configuration_id);
-                }
-            }
-            for configuration in configs {
-                let bodies = k::read_native_parts_configuration(&dir.join(n), k::LengthUnit::Meter, configuration)?;
-                files.push(noshape_model::native_assembly::PartFile { file: n.clone(), configuration, bodies });
-            }
-        }
-        if files.is_empty() {
-            anyhow::bail!(noshape_model::native_assembly::NO_GEOMETRY);
-        }
-        Ok(AssemblyZip { root: split(root).0, components, files })
-    })();
-    let _ = std::fs::remove_dir_all(&dir);
-    result
 }
 
 /// Append an Import feature ("Import N") holding `brep` to `ps`.

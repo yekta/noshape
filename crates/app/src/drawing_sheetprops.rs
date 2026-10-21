@@ -100,7 +100,7 @@ impl DrawingEditor {
 
     /// The source tab of the sheet's first base view (title block properties).
     fn sheet_reference(&self, sheet: &Sheet, cx: &App) -> Option<(noshape_model::document::TabId, String)> {
-        sheet.views.iter().find_map(|v| match &v.kind {
+        sheet.real_views().find_map(|v| match &v.kind {
             ViewKind::Base { source, part, .. } => {
                 let tab = self.doc.read(cx).session.doc.tab(*source)?.name.clone();
                 let part_name = part.as_ref().and_then(|b| self.sources.get(&SourceKey::studio(*source)).and_then(|s| s.context.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone())));
@@ -339,7 +339,12 @@ impl DrawingEditor {
                                 })),
                         ),
                 )
-                .child(
+                // An imported model space (live drawing/970): only its Size,
+                // "Letter (8.50 x 11.00 Inches)", greyed and read-only.
+                .when(sheet.imported.as_ref().is_some_and(|m| m.model), |d| {
+                    d.child(v_flex().p(px(3.)).child(row("Size", div().opacity(0.5).px(px(8.)).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).child("Letter (8.50 x 11.00 Inches)").into_any_element(), None)))
+                })
+                .when(!sheet.imported.as_ref().is_some_and(|m| m.model), |d| d.child(
                     v_flex()
                         .p(px(3.))
                         .child(row("Scale", scale_field, None))
@@ -347,7 +352,7 @@ impl DrawingEditor {
                         .child(row("Size", dropdown("sp-size", size_label, size_items).into_any_element(), None))
                         .children(custom_rows)
                         .child(row("Reference", div().when(unassigned, |d| d.text_color(gpui_kit::rgb(0xaaaaaa))).child(dropdown("sp-ref", ref_label, ref_items)).into_any_element(), link)),
-                )
+                ))
                 .into_any_element(),
         )
     }

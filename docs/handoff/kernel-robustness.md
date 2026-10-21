@@ -499,13 +499,15 @@ sheet metal gaps (closed corners, side-face joins, loft into existing), slab-she
   the edges, unpickable, colour `noshape_scene::builder::MESH_LINE_COLOR` — now `pub`). The scene builder lives in
   `crates/scene/src/builder.rs` (the app's `scene_builder.rs` only re-exports it): edit mesh-line drawing there.
 - **Build note**: the kernel build script panics without `OCCT_ROOT=/root/occt` (a resumed shell loses it).
-- **Mesh section caps (live G35-retry, part-studio/672–673)**: a cut mesh part's cap is the part colour, **not
-  hatched**, crossed by its triangulation's lines. `MeshBuffers::section_cap_lines(planes)` (model/display.rs: plane ∩
-  triangles → loops keyed by the cut mesh sides, holes by nesting, earcut without interior points, each plane's cap
-  clipped to the other planes' removed half-spaces); scene builder draws them (#464646, unpickable, not clipped,
-  cached per mesh + planes) and marks the part's mesh `plain_cap` (render: `Instance::plain_cap`, params.y bit 5;
-  `fs_mesh_section` skips the hatching). Test `display::tests::section_caps_are_triangulated_cross_sections`.
-  Onshape's own cap triangulation (Parasolid facetter) may pair different vertices; the look is the same.
+- **Mesh section caps — reverted (live G40)**: Onshape's caps (mesh parts too) have **no triangle lines**; they are
+  the same stencil caps as B-rep parts (GPU stencil mask + plane quad, hatch from shader pattern functions, per-part
+  hatch offset), so the G35-retry "triangle lines" were the hatch. The CPU cap triangulation, `plain_cap` flag and
+  scene cap lines are removed; mesh parts get the normal hatched caps. G40 notes for the cap renderer's owner: hatch
+  spacing ≈ 26 device px at 2× constant on screen, angle tied to the section plane's frame (45° on box x=20 and the
+  cylinder, ≈20–25° on box z=5 / L z=15), a solid red fill where a cut region is inverted/overlapping (G35 x=30).
+- **Mesh part hover/selection (live G35)**: a part face without edges (a mesh face) gets the part silhouette outline
+  (scene builder `with_highlights` → `state::OUTLINE`); the outline is light orange (hover colour) when hovered and
+  not selected (shaders `fs_outline`), orange when selected (with the selected tint).
 - **Mesh part colour (live G35)**: an imported mesh part without a colour of its own is Onshape's generated orange
   rgb(248,135,1) (`importing.rs::MESH_PART_COLOR`; asserted in `features_b::mesh_parts_split_transform_union`).
 - **Import dialog, mesh variants (live G35b)**: STL no tiles / no Import appearances, Units = the document unit;
@@ -529,6 +531,71 @@ sheet metal gaps (closed corners, side-face joins, loft into existing), slab-she
   - **Solid Edge .asm**: `Preview/Structure/Sites` gives component paths; only identity matrices found
     (PSMcluster0, PartsLiteData) — occurrence transforms not located.
   - **SOLIDWORKS**: done (Round 9); sub-assemblies flattened, no ground truth yet.
+- **Lead (10-21) priorities**: (1) cap lines must match Onshape's diagonal rule (no known differences): live **G40**
+  (box/cylinder/L/tube STLs in /root/kern-scratch/caps, cuts listed; also where Onshape triangulates caps).
+  (2a) SOLIDWORKS assembly import end to end: zip reading moved to `model::native_assembly::read_assembly_zip`
+  (app calls it); zip dialog = tiles + five checkboxes incl. Import material density (G38h); test
+  `native_assembly::nist_crada_assembly_zip` (zip in /root/kern-native-samples/sldasm-zip: tabs, parts in zip order,
+  36 instances, BOM quantities 1,4,1,4,1,1,14,10, nuts on screw axes). Live **G41** (Onshape's import of the same
+  zip, and "Combine to a single Part Studio" for zips) to pin names/order/transforms/BOM. (2b) Inventor: live
+  **G42** (Autodesk sample sets + licenses into /root/kern-native-samples/iam-sets, Onshape import as ground truth;
+  Autodesk's page 403s scripted fetches). (2c) Solid Edge placements, NX after.
+- **Inventor .iam occurrence placements — cracked offline (2026-10-21)** on the Autodesk sample sets (local reading
+  only: never commit/upload/fixture them; lead decision G42). Format:
+  - Segments `RSeStorage/B*`: 18-byte header, then zlib. The browser segment (UTF-16 "AmBrowserArrangement") lists
+    occurrences "<name>:<k>" each followed by its kind string AmPartInstEntry / AmAssmInstEntry, in record order.
+  - The occurrence segment holds one record per occurrence, in that order; each ends with
+    `00 07 <u32> 03 00 00 00` + UTF-16 "GRx" + `01 00` + u32 record index (9, 10, …). The placement ends right
+    before the `00 07`: a u32 flag word, then doubles. The flag describes the row-major 4x4: low 16 bits = entries
+    equal to 1, high 16 bits = entries equal to 0, both bits = −1 (`flag & 0x70008000 == 0x70008000`: the last row
+    0 0 0 1); every other entry follows as a double, in order. Identity = 0x7BDE8421 (no doubles); a general
+    placement = 0x70008000 + 12 doubles. Translation in **cm**; transforms are relative to the parent assembly.
+  - Verified: record count = browser occurrences on 4 assemblies (Fishing Rod: 5, 4, 6, 19, 37 incl. sub-assemblies);
+    Winding Handle grips coaxial with their spindles (from the .ipt boxes); captive / pan-head screw pairs on common
+    axes; mirrored bearings. Scratch decoder `/root/kern-scratch/iam/py/occ2.py`.
+  - **Occurrence → file**: the assembly's `UFRxDoc` holds, after the referenced-file list (path, library, the file's
+    RSeDb GUID, revision GUID), one property set per occurrence **in record order** (not browser order: the browser
+    can be reordered, e.g. Back Side Cover Assembly). Each starts `01 13 01 00 00 00 13` + 16-byte GUID (the
+    referenced document's internal id; found in that file's own `UFRxDoc`, also in new-format files) and holds the
+    name (`05 01 00 00 00 05` + u32 length + UTF-16), part number (0x1e), …. Resolve each occurrence to the file whose
+    `UFRxDoc` contains the GUID (prefer .ipt for parts; mirrored `_MIR` copies share it → break ties by name);
+    names "<entry name>:<k>" numbered per name in record order. Checked on all 71 assemblies of the three sets:
+    entries = records everywhere, every placement decodes; 1031/1033 occurrences resolve (Car Seat: 2 left,
+    27 mirrored ties). Prototype: `/root/kern-scratch/iam/py/{occ2,tree,check_all}.py`.
+  - **Kernel reader done**: `native.cpp::read_iam_tree(path, search_dir)` (FFI `read_iam_tree_ffi`; Rust
+    `read_native_assembly` dispatches .iam, `read_native_assembly_in(path, dir)`): AsmNodes with parent, name +
+    per-name number, column-major transform in metres, `file` relative to `dir`. Out-of-repo probe
+    `/root/kern-scratch/iamprobe/iamtree` (includes the repo's cpp): Fishing Reel 105 / Car Seat 420 / Jet Engine 860
+    nodes, 0 unresolved, < 2 s. **Open**: Onshape's naming and zip rules for Inventor (live G42 permissive set:
+    names "<entry>:<k>" vs Inventor's own numbering with gaps, e.g. "Back Drive Transfer Gear:2"; folders in the zip),
+    then `read_assembly_zip` for .iam (extract folders) and a repo test on the permissive set.
+- **Solid Edge .asm placements — cracked (2026-10-21)**: `Preview/Structure/IDS` lists the occurrences ("Atts"): each
+  "Att" entry ends with 16 doubles (row-major, row-vector convention like SOLIDWORKS' swTransform, metres), then
+  u32 length + UTF-16 "<file>:<k>" (e.g. "Hull_Top.par:2"); the same matrices sit in `Attachments` and (3x3 + t) in
+  `PSMcluster0`. Kernel `read_se_tree` (recursing into .asm occurrences), `read_native_tree` dispatches
+  .sldasm/.iam/.asm (FFI `read_native_tree_ffi`, replaces `read_sldasm_tree_ffi`). Checked offline on the ktane
+  SingleHull: the 7 occurrences close up exactly (plates z 0..10 / −270..−260, walls x 0..10 / 410..420, holders on
+  the grid). `read_assembly_zip` accepts an .asm root; test `native_assembly::solid_edge_assembly_zip`
+  (/root/kern-native-samples/se-zip). Live **G43** (Onshape's import of SingleHull.zip) for names/order/BOM.
+- **NX assembly placements — not readable short-term**: the SPLMSSTR streams other than `UG_PART/UG_PART` hold names,
+  file references (`ExternalReferences`), arrangements XML and attributes, no transforms (no orthonormal matrix in
+  any encoding); `UG_PART` is NX's packed object format (no zlib; the NIST crada plate offset (16.2, 15.22, 17.4) mm
+  appears in no float/double form, mm/m/in). Live **G44**: does Onshape import NX assemblies at all, and how.
+- **SOLIDWORKS assembly import end to end (live G41) — done and verified in the app** (NIST zip: dialog tiles + 5
+  checkboxes, Combine hides "composite"; Assembly + "… parts" after the active tab; 36 instances in Onshape's order,
+  free; BOM Flattened 10/14/1/1/4/1/4/1; Part Studio 8 parts in reverse first-use order + 4 thread wires named like
+  their solids). `native_assembly.rs`: `parts_of` (reverse first use), `part_bodies` (wires first, same name),
+  `add_native_assembly_combined` (Combine: one "<root>" Part Studio, bodies at assembly positions, repeats `_1`…,
+  no Assembly), `unique_name` "(n)"; Import feature keeps wires at their file position (`importing.rs`). Tests
+  `native_assembly::{shaft_with_plate_assembly, nist_crada_assembly_zip, nist_crada_assembly_combined}`.
+  Seen in the app, not mine: with the BOM panel open the view cube shrinks to the panel edge (Onshape keeps it top
+  right of the viewport).
+- **User export rules groundwork**: `model::export_rules` (rules, `${Property}` expansion, sanitising; tests) and
+  `app/src/export_naming.rs` (`export_rules.json` in the config dir); the Part Studio, Assembly and Drawing export
+  dialogs' default file names go through it (no rules = unchanged). Fields/tokens/precedence wait for live G39.
+- **Queued (lead, 10-20 23:00)**: Preferences › "User export rules" — exact UI (Add export rule… dialog, rules table)
+  and its effect on export file names (Export dialogs' File name, "View export rules", downloads, per-part names),
+  implemented with the export code. Live request **G39** filed; implement when answered.
 
 ## Paused 2026-10-19 (lead: machine overloaded) — state for resuming
 **Tree state:** everything of mine compiles and is tested: `noshape-kernel` (tests incl. export.rs, blend.rs,

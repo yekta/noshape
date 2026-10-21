@@ -156,6 +156,7 @@ mod reflection;
 mod config_panel;
 #[path = "assembly_toolbar.rs"]
 mod toolbar;
+pub(crate) use toolbar::{AsmToolbarPrefs, shortcut_catalog};
 use noshape_model::assembly::config::{self as acfg, ConfigTarget};
 use noshape_model::params::ParamValue;
 pub(crate) use standard_content::*;
@@ -391,6 +392,16 @@ fn contains_assembly(doc: &Document, tab: TabId, target: TabId, depth: usize) ->
 }
 
 impl AssemblyView {
+    /// Create Drawing… of this assembly: the Insert view panel starts with the
+    /// last applied named position and the chosen display state (live
+    /// drawing/1106; asb).
+    pub fn drawing_prefill(&self, cx: &App) -> (noshape_model::drawing::AsmPosition, Option<String>) {
+        let asm = self.assembly(cx);
+        let pos = self.ui.np_applied.filter(|i| asm.is_some_and(|a| *i < a.named_positions.len())).map_or(noshape_model::drawing::AsmPosition::Default, noshape_model::drawing::AsmPosition::Position);
+        let ds = self.ui.ds_selected.and_then(|i| asm.and_then(|a| a.display_states.get(i)).map(|d| d.name.clone()));
+        (pos, ds)
+    }
+
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let mut subs = Vec::new();
@@ -463,7 +474,7 @@ impl AssemblyView {
             show_mates: false,
             show_connectors: false,
             // Onshape's Insert dialog starts with the Parts filter on.
-            ui: AsmUi { insert_filter: (true, false), tb_prefs: toolbar::AsmToolbarPrefs::load(), ..Default::default() },
+            ui: AsmUi { insert_filter: (true, false), tb_prefs: toolbar::AsmToolbarPrefs::load(), list_properties: crate::preferences_window::ListPrefs::load().instance_list_properties, ..Default::default() },
             expanded: HashSet::new(),
             message: None,
             mc: None,
@@ -783,6 +794,7 @@ impl AssemblyView {
             h.selected_entities = m.clone();
         }
         h.selected_entities.extend(self.std_picked_entities());
+        h.selected_entities.extend(self.mass_picked_faces());
         self.interference_highlights(&mut h);
         // The instances to analyze show selected while the dialog is open;
         // around red overlaps they are see-through and neutral (live 736).
@@ -1001,24 +1013,12 @@ impl AssemblyView {
 
     /// Commit a change to the assembly, folding in the latest solved placements.
     fn edit<R>(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly) -> R) -> Option<R> {
-        let solved = self.result.solved.placements.clone();
-        let nested = self.result.solved.nested.clone();
-        let flexible = self.result.prepared.flexible.clone();
+        let result = &self.result;
         let tab = self.tab;
         self.doc.update(cx, |doc, cx| {
             doc.edit_tab(tab, desc, cx, |c| {
                 if let TabContent::Assembly(a) = c {
-                    for (id, p) in &solved {
-                        if let Some(i) = a.instance_mut(*id) {
-                            i.placement = *p;
-                            // Flexible subassemblies keep their parts' positions here.
-                            if flexible.contains(id) {
-                                let mut n: Vec<(InstanceId, Placement)> = nested.iter().filter(|((s, _), _)| s == id).map(|((_, c), q)| (*c, *q)).collect();
-                                n.sort_by_key(|(c, _)| *c);
-                                i.nested = n;
-                            }
-                        }
-                    }
+                    noshape_ops::assembly::fold_solved(a, result);
                     Some(f(a))
                 } else {
                     None
@@ -1030,25 +1030,11 @@ impl AssemblyView {
 
     fn insert_part(&mut self, studio: TabId, body: Option<CatalogPart>, cx: &mut Context<Self>) -> Option<InstanceId> {
         let studio_name = self.doc.read(cx).session.doc.tab(studio).map(|t| t.name.clone()).unwrap_or_default();
-        let desc = match &body {
-            Some((_, n, _, _)) => format!("Insert : {n}"),
-            None => format!("Insert : {studio_name}"),
-        };
+        let part = body.map(|(b, n, bb, _)| (b, n, bb));
+        let desc = noshape_ops::assembly::insert_description(&studio_name, part.as_ref());
         // Configuration chosen in the Insert dialog (Onshape: set it before clicking the item).
         let config = self.ui.insert_config.get(&studio).cloned().unwrap_or_default();
-        self.edit(&desc, cx, |a| {
-            let id = InstanceId(a.next_id());
-            let (source, base, width) = match body {
-                Some((b, n, bb, _)) => (InstanceSource::Part { studio, body: b, config }, n, bb.map(|(lo, hi)| hi.x - lo.x).unwrap_or(0.02)),
-                None => (InstanceSource::PartStudio { studio, config }, studio_name.clone(), 0.05),
-            };
-            // Later instances of the same item are offset so they don't overlap.
-            let same = a.instances.iter().filter(|i| i.source == source).count();
-            let placement = Placement { translation: [same as f64 * (width + 0.01), 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
-            let name = a.next_instance_name(&base);
-            a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
-            id
-        })
+        self.edit(&desc, cx, |a| noshape_ops::assembly::insert_part(a, studio, &studio_name, part, config))
     }
 
     /// Start placing freshly inserted instances: they follow the cursor until a click.
@@ -1240,13 +1226,7 @@ impl AssemblyView {
             cx.notify();
             return;
         }
-        self.edit(if fixed { "Fix" } else { "Unfix" }, cx, |a| {
-            for id in &ids {
-                if let Some(i) = a.instance_mut(*id) {
-                    i.fixed = fixed;
-                }
-            }
-        });
+        self.edit(noshape_ops::assembly::fix_description(fixed), cx, |a| noshape_ops::assembly::set_fixed(a, &ids, fixed));
     }
 
     /// Instance menu "Use best available tessellation" / "Use automatic
@@ -1262,49 +1242,25 @@ impl AssemblyView {
     }
 
     fn set_hidden(&mut self, ids: Vec<InstanceId>, hidden: bool, cx: &mut Context<Self>) {
-        self.edit(if hidden { "Hide" } else { "Show" }, cx, |a| {
-            for id in &ids {
-                if let Some(i) = a.instance_mut(*id) {
-                    i.hidden = hidden;
-                }
-            }
-        });
+        self.edit(noshape_ops::assembly::hide_description(hidden), cx, |a| noshape_ops::assembly::set_hidden(a, &ids, hidden));
     }
 
     fn set_suppressed(&mut self, ids: Vec<InstanceId>, s: bool, cx: &mut Context<Self>) {
         let values = self.ui.config_values.clone();
-        self.edit(if s { "Suppress" } else { "Unsuppress" }, cx, |a| {
-            for id in &ids {
-                // A configured suppression changes the current configuration.
-                if a.set_configured_value(ConfigTarget::Instance(*id), acfg::param::UNSUPPRESSED, &values, ParamValue::Bool(!s)) {
-                    continue;
-                }
-                if let Some(i) = a.instance_mut(*id) {
-                    i.suppressed = s;
-                }
-            }
-        });
+        self.edit(noshape_ops::assembly::suppress_description(s), cx, |a| noshape_ops::assembly::set_suppressed(a, &ids, s, &values));
     }
 
     fn delete_instances(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
         if ids.is_empty() {
             return;
         }
-        self.edit("Delete instances", cx, |a| {
-            for id in &ids {
-                a.remove_instance(*id);
-            }
-            a.prune_configured();
-        });
+        self.edit(noshape_ops::assembly::DELETE_INSTANCES, cx, |a| noshape_ops::assembly::delete_instances(a, &ids));
         self.selected.retain(|i| !ids.contains(i));
     }
 
     fn delete_mate(&mut self, id: MateId, cx: &mut Context<Self>) {
-        let name = self.assembly(cx).and_then(|a| a.mate(id).map(|m| m.name.clone()).or_else(|| a.relations.iter().find(|r| r.id == id).map(|r| r.name.clone())).or_else(|| a.groups.iter().find(|g| g.id == id).map(|g| g.name.clone())));
-        self.edit(&format!("Delete : {}", name.unwrap_or_default()), cx, |a| {
-            a.remove_mate(id);
-            a.prune_configured();
-        });
+        let Some(desc) = self.assembly(cx).map(|a| noshape_ops::assembly::delete_mate_description(a, id)) else { return };
+        self.edit(&desc, cx, |a| noshape_ops::assembly::delete_mate(a, id));
         if self.selected_mate == Some(id) {
             self.selected_mate = None;
         }
@@ -1484,18 +1440,10 @@ impl AssemblyView {
         if self.anim.as_ref().is_some_and(|a| a.preview) {
             self.anim = None;
         }
-        let desc = if editing.is_some() { format!("Edit : {}", m.name) } else { format!("Insert : {}", m.name) };
+        let desc = noshape_ops::assembly::mate_description(&m, editing.is_some());
         let values = self.ui.config_values.clone();
-        let mut m = m;
         // Solved placements of the preview (which includes this mate) are folded in.
-        self.edit(&desc, cx, |a| match editing.and_then(|id| a.mates.iter().position(|x| x.id == id)) {
-            Some(i) => {
-                // Configured parameters go to the current configuration's row.
-                a.store_mate_edit(&mut m, &values);
-                a.mates[i] = m;
-            }
-            None => a.mates.push(m),
-        });
+        self.edit(&desc, cx, |a| noshape_ops::assembly::commit_mate(a, m, editing, &values));
         window.focus(&self.focus, cx);
         self.infer = None;
         cx.notify();
@@ -1786,7 +1734,7 @@ impl AssemblyView {
 
     /// What viewport clicks currently feed (a dialog's connector field, snap mode...).
     fn pick_mode(&self, cx: &App) -> Option<PickMode> {
-        if self.std_auto_size_active() || self.std_picking() {
+        if self.std_auto_size_active() || self.std_picking() || self.mass_face_picking() {
             return Some(PickMode::Entity);
         }
         if let Some(s) = &self.mate {
@@ -1795,7 +1743,7 @@ impl AssemblyView {
                 return Some(if d.picks_entities() { PickMode::Entity } else { PickMode::Inference });
             }
         }
-        if self.mc.as_ref().is_some_and(|m| m.active) || self.pattern.as_ref().is_some_and(|p| p.active.is_some()) || self.snap.is_some() {
+        if self.mc.as_ref().is_some_and(|m| m.active) || self.pattern.as_ref().is_some_and(|p| p.active.is_some()) || self.snap.is_some() || self.mass_connector_picking() {
             return Some(PickMode::Inference);
         }
         None
@@ -1878,6 +1826,10 @@ impl AssemblyView {
 
     /// Feed a picked connector to whatever is waiting for one.
     fn deliver_connector(&mut self, c: MateConnectorRef, window: &mut Window, cx: &mut Context<Self>) {
+        // Mass and section properties' "Mate connector for reference frame".
+        if self.mass_set_reference(c.clone(), cx) {
+            return;
+        }
         if let Some(dialog) = self.mate.as_ref().map(|s| s.dialog.clone())
             && dialog.read(cx).awaiting_pick()
         {
@@ -2083,6 +2035,13 @@ impl AssemblyView {
                     // Standard content tab: faces and edges are pre-selected for Insert.
                     if let Some(t) = self.pick(*pick) {
                         self.std_pick(t, cx);
+                    }
+                    return;
+                }
+                if self.mass_face_picking() {
+                    // Mass and section properties › Face: Faces to measure.
+                    if let Some(t) = self.pick(*pick) {
+                        self.mass_pick_face(t, cx);
                     }
                     return;
                 }
@@ -3600,10 +3559,156 @@ impl AssemblyView {
             .into_any_element()
     }
 
+    /// The Insert panel's catalog tree (see `AsmSlices::insert_body`).
+    fn render_insert_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let query = self.ui.insert_query.trim().to_lowercase();
+        let hit = |name: &str| query.is_empty() || name.to_lowercase().contains(&query);
+        let (source, tab) = (self.ui.insert_source, self.ui.insert_tab);
+        // Tree rows: expander, 70x40 thumbnail cell, name (13.33 px light).
+        self.request_insert_thumbs(cx);
+        let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
+            h_flex()
+                .id(id)
+                .flex_none()
+                .h(px(40.))
+                .pl(px(4. + indent))
+                .cursor_pointer()
+                .hover(|d| d.bg(pal.row_hover))
+                .child(div().w(px(14.)).h_full().flex_none().flex().items_center().children(expander))
+                .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match thumb {
+                    Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
+                    None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
+                }))
+                .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(name))
+        };
+        let mut body = v_flex().id("insert-body").size_full().overflow_y_scroll();
+        if source == 2 {
+            body = body.child(div().pt(px(1.)).child(self.render_standard_content(false, cx)));
+        } else if source == 1 {
+            body = body.child(self.render_insert_other(cx));
+        } else if tab == 0 {
+            let mut any = false;
+            for s in self.catalog.studios.clone() {
+                let studio_hit = hit(&s.name);
+                // Type filters: none on shows everything, else the union of the
+                // selected types (Parts, Sketches, Surfaces).
+                let (only_parts, only_surfaces) = self.ui.insert_filter;
+                let only_sketches = self.ui.insert_sketches;
+                let composites_on = self.ui.insert_composites;
+                // Flat patterns (picker only): none are listed, so it narrows to nothing.
+                let any_filter = only_parts || only_surfaces || only_sketches || composites_on || (self.ui.insert_flat && self.picking_replacement());
+                let is_composite = |p: &CatalogPart| s.composites.contains(&p.0);
+                let kind_ok = |p: &CatalogPart| if is_composite(p) { composites_on } else { !any_filter || (only_parts && !p.3) || (only_surfaces && p.3) };
+                // Composite parts first, then the parts (live 320).
+                let mut parts: Vec<CatalogPart> = s.parts.iter().filter(|p| (studio_hit || hit(&p.1)) && kind_ok(p)).cloned().collect();
+                parts.sort_by_key(|p| !is_composite(p));
+                let sketches: Vec<(FeatureId, String)> = if !any_filter || only_sketches { s.sketches.iter().filter(|k| studio_hit || hit(&k.1)).cloned().collect() } else { Vec::new() };
+                if !studio_hit && parts.is_empty() && sketches.is_empty() {
+                    continue;
+                }
+                any = true;
+                let s2 = s.clone();
+                let open = !self.ui.insert_collapsed.contains(&s.tab) && !self.insert_rigid;
+                let st = s.tab;
+                // The chevron expands / collapses; the rest of the row inserts the studio.
+                let expander = (!self.insert_rigid).then(|| {
+                    div()
+                        .id(SharedString::from(format!("ins-ps-exp-{}", s.tab)))
+                        .size(px(14.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 10., pal.text))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if !this.ui.insert_collapsed.remove(&st) {
+                                this.ui.insert_collapsed.insert(st);
+                            }
+                            cx.stop_propagation();
+                            cx.notify();
+                        }))
+                        .into_any_element()
+                });
+                let cfg_button = self.insert_config_button(s.tab, cx);
+                body = body.child(item_row(SharedString::from(format!("ins-ps-{}", s.tab)), 0., expander, "part-studio", self.insert_thumb(s.tab, None), s.name.clone(), cx).children(cfg_button).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))));
+                if open && let Some(el) = self.render_insert_config(s.tab, cx) {
+                    body = body.child(div().pl(px(50.)).pr_2().child(el));
+                }
+                if open {
+                    for part in parts {
+                        let part2 = part.clone();
+                        let tab = s.tab;
+                        body = body.child(
+                            item_row(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)), 22., None, if s.composites.contains(&part.0) { "composite-part" } else if part.3 { "surface-body" } else { "part" }, self.insert_thumb(s.tab, Some(&part.0)), part.1.clone(), cx)
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_and_place(tab, Some(part2.clone()), cx))),
+                        );
+                    }
+                    // Sketches are listed under the parts (live assembly/121).
+                    for (feature, name) in sketches {
+                        let tab = s.tab;
+                        let n2 = name.clone();
+                        let thumb = self.insert_thumb(s.tab, Some(&noshape_model::assembly::eval::sketch_body_id(feature)));
+                        body = body.child(
+                            item_row(SharedString::from(format!("ins-sk-{}-{}", s.tab, feature.0)), 22., None, "sketch", thumb, name, cx)
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_sketch(tab, feature, n2.clone(), cx))),
+                        );
+                    }
+                }
+            }
+            if !any {
+                body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child(if query.is_empty() { "No Part Studios with parts." } else { "No results." }));
+            }
+        } else {
+            let list: Vec<(TabId, String)> = self.catalog.assemblies.iter().filter(|(_, n)| hit(n)).cloned().collect();
+            if list.is_empty() {
+                body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child(if self.catalog.assemblies.is_empty() { "No other assemblies can be inserted." } else { "No results." }));
+            }
+            for (tab, name) in list {
+                let n2 = name.clone();
+                let cfg_button = self.insert_config_button(tab, cx);
+                body = body.child(item_row(SharedString::from(format!("ins-asm-{tab}")), 0., None, "assembly", None, name, cx).children(cfg_button).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))));
+                // A configured assembly: its configuration inputs before inserting.
+                if let Some(el) = self.render_insert_config(tab, cx) {
+                    body = body.child(div().pl(px(40.)).pr_2().child(el));
+                }
+            }
+        }
+        body.into_any_element()
+    }
+
+    /// The Insert panel: its parts are cached views around the search box
+    /// (`AsmSlices::insert_*`), so a keystroke or caret blink in the box
+    /// rebuilds none of them.
     fn render_insert_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let query = self.ui.insert_search.as_ref().map(|s| s.read(cx).value().trim().to_lowercase()).unwrap_or_default();
-        let hit = |name: &str| query.is_empty() || name.to_lowercase().contains(&query);
+        let s = self.slices(cx);
+        let picking = self.picking_replacement();
+        let source0 = self.ui.insert_source == 0;
+        let row = || StyleRefinement::default().w_full().flex_none();
+        let frame = v_flex()
+            .id(if picking { "rep-picker" } else { "insert-panel" })
+            .when(picking, |d| d.occlude().h(px(559.)))
+            .when(!picking, |d| d.h(px(587.)))
+            .w(px(300.))
+            .max_h_full()
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(crate::cached_slice::Slice::sized(&s.insert_top, row(), cx))
+            .children(if source0 { self.insert_search_box(cx) } else { None })
+            .when(source0 && self.ui.insert_tab == 0, |d| d.child(crate::cached_slice::Slice::sized(&s.insert_filters, row(), cx)))
+            // The catalog tree (the search notifies it).
+            .child(s.insert_body.cached(StyleRefinement::default().w_full().flex_1().min_h_0()));
+        if picking {
+            frame.into_any_element()
+        } else {
+            frame.child(crate::cached_slice::Slice::sized(&s.insert_footer, row(), cx)).into_any_element()
+        }
+    }
+
+    /// A part of the Insert panel (see `render_insert_panel`).
+    fn render_insert_part(&mut self, part: InsertPart, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
         let (source, tab) = (self.ui.insert_source, self.ui.insert_tab);
         // Onshape dialog tabs: 12 px, the active one blue (500) with a 2 px
         // blue bottom line, a light gray line under the group.
@@ -3686,9 +3791,11 @@ impl AssemblyView {
                         .child(dtab("ins-tab-ps", "Part Studios", tab == 0, 150., 32., cx, |u| u.insert_tab = 0))
                         .child(dtab("ins-tab-asm", "Assemblies", tab == 1, 150., 32., cx, |u| u.insert_tab = 1)),
                 );
-            if let Some(b) = self.insert_search_box(cx) {
-                head = head.child(b);
+            // The search box is the panel's own (see `render_insert_panel`).
+            if part == InsertPart::Top {
+                return v_flex().child(self.render_insert_header(cx)).child(head).into_any_element();
             }
+            head = v_flex().flex_none();
             if tab == 0 {
                 // Type filters (Parts, and Surfaces when there are any) and
                 // "Insert entire Part Studio as rigid" at the right.
@@ -3783,113 +3890,11 @@ impl AssemblyView {
                 }
             }
         }
-        // Tree rows: expander, 70x40 thumbnail cell, name (13.33 px light).
-        self.request_insert_thumbs(cx);
-        let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
-            h_flex()
-                .id(id)
-                .flex_none()
-                .h(px(40.))
-                .pl(px(4. + indent))
-                .cursor_pointer()
-                .hover(|d| d.bg(pal.row_hover))
-                .child(div().w(px(14.)).h_full().flex_none().flex().items_center().children(expander))
-                .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match thumb {
-                    Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
-                    None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
-                }))
-                .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(name))
-        };
-        let mut body = v_flex().id("insert-body").flex_1().min_h_0().overflow_y_scroll();
-        if source == 2 {
-            body = body.child(div().pt(px(1.)).child(self.render_standard_content(false, cx)));
-        } else if source == 1 {
-            body = body.child(self.render_insert_other(cx));
-        } else if tab == 0 {
-            let mut any = false;
-            for s in self.catalog.studios.clone() {
-                let studio_hit = hit(&s.name);
-                // Type filters: none on shows everything, else the union of the
-                // selected types (Parts, Sketches, Surfaces).
-                let (only_parts, only_surfaces) = self.ui.insert_filter;
-                let only_sketches = self.ui.insert_sketches;
-                let composites_on = self.ui.insert_composites;
-                // Flat patterns (picker only): none are listed, so it narrows to nothing.
-                let any_filter = only_parts || only_surfaces || only_sketches || composites_on || (self.ui.insert_flat && self.picking_replacement());
-                let is_composite = |p: &CatalogPart| s.composites.contains(&p.0);
-                let kind_ok = |p: &CatalogPart| if is_composite(p) { composites_on } else { !any_filter || (only_parts && !p.3) || (only_surfaces && p.3) };
-                // Composite parts first, then the parts (live 320).
-                let mut parts: Vec<CatalogPart> = s.parts.iter().filter(|p| (studio_hit || hit(&p.1)) && kind_ok(p)).cloned().collect();
-                parts.sort_by_key(|p| !is_composite(p));
-                let sketches: Vec<(FeatureId, String)> = if !any_filter || only_sketches { s.sketches.iter().filter(|k| studio_hit || hit(&k.1)).cloned().collect() } else { Vec::new() };
-                if !studio_hit && parts.is_empty() && sketches.is_empty() {
-                    continue;
-                }
-                any = true;
-                let s2 = s.clone();
-                let open = !self.ui.insert_collapsed.contains(&s.tab) && !self.insert_rigid;
-                let st = s.tab;
-                // The chevron expands / collapses; the rest of the row inserts the studio.
-                let expander = (!self.insert_rigid).then(|| {
-                    div()
-                        .id(SharedString::from(format!("ins-ps-exp-{}", s.tab)))
-                        .size(px(14.))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 10., pal.text))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            if !this.ui.insert_collapsed.remove(&st) {
-                                this.ui.insert_collapsed.insert(st);
-                            }
-                            cx.stop_propagation();
-                            cx.notify();
-                        }))
-                        .into_any_element()
-                });
-                let cfg_button = self.insert_config_button(s.tab, cx);
-                body = body.child(item_row(SharedString::from(format!("ins-ps-{}", s.tab)), 0., expander, "part-studio", self.insert_thumb(s.tab, None), s.name.clone(), cx).children(cfg_button).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))));
-                if open && let Some(el) = self.render_insert_config(s.tab, cx) {
-                    body = body.child(div().pl(px(50.)).pr_2().child(el));
-                }
-                if open {
-                    for part in parts {
-                        let part2 = part.clone();
-                        let tab = s.tab;
-                        body = body.child(
-                            item_row(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)), 22., None, if s.composites.contains(&part.0) { "composite-part" } else if part.3 { "surface-body" } else { "part" }, self.insert_thumb(s.tab, Some(&part.0)), part.1.clone(), cx)
-                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_and_place(tab, Some(part2.clone()), cx))),
-                        );
-                    }
-                    // Sketches are listed under the parts (live assembly/121).
-                    for (feature, name) in sketches {
-                        let tab = s.tab;
-                        let n2 = name.clone();
-                        let thumb = self.insert_thumb(s.tab, Some(&noshape_model::assembly::eval::sketch_body_id(feature)));
-                        body = body.child(
-                            item_row(SharedString::from(format!("ins-sk-{}-{}", s.tab, feature.0)), 22., None, "sketch", thumb, name, cx)
-                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_sketch(tab, feature, n2.clone(), cx))),
-                        );
-                    }
-                }
-            }
-            if !any {
-                body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child(if query.is_empty() { "No Part Studios with parts." } else { "No results." }));
-            }
-        } else {
-            let list: Vec<(TabId, String)> = self.catalog.assemblies.iter().filter(|(_, n)| hit(n)).cloned().collect();
-            if list.is_empty() {
-                body = body.child(div().p_2().text_xs().text_color(pal.text_faint).child(if self.catalog.assemblies.is_empty() { "No other assemblies can be inserted." } else { "No results." }));
-            }
-            for (tab, name) in list {
-                let n2 = name.clone();
-                let cfg_button = self.insert_config_button(tab, cx);
-                body = body.child(item_row(SharedString::from(format!("ins-asm-{tab}")), 0., None, "assembly", None, name, cx).children(cfg_button).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))));
-                // A configured assembly: its configuration inputs before inserting.
-                if let Some(el) = self.render_insert_config(tab, cx) {
-                    body = body.child(div().pl(px(40.)).pr_2().child(el));
-                }
-            }
+        match part {
+            // Not the current document: no search box, the head is all top.
+            InsertPart::Top => return v_flex().child(self.render_insert_header(cx)).child(head).into_any_element(),
+            InsertPart::Filters => return head.into_any_element(),
+            InsertPart::Footer => {}
         }
         // Footer: inserted count, then the gray "Undo to remove instances" info row.
         let inserted = self.inserted_count(cx);
@@ -3921,22 +3926,17 @@ impl AssemblyView {
                     .relative()
                     .child(div().absolute().right(px(4.)).bottom(px(4.)).child(props::help_dot())),
             );
+        footer.into_any_element()
+    }
+
+    /// The Insert panel's title bar (or the replacement picker's).
+    fn render_insert_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         // Replace instance's "Select replacement component" picker (live
         // 840–841): the same panel, 559 px, titled so, with only ✕ and no
         // Inserted / Undo footer.
         if self.picking_replacement() {
-            return v_flex()
-                .id("rep-picker")
-                .occlude()
-                .w(px(300.))
-                .h(px(559.))
-                .max_h_full()
-                .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
-                .text_color(pal.text)
-                .child(
-                    h_flex()
+            return h_flex()
                         .h(px(29.))
                         .flex_none()
                         .pl(px(6.))
@@ -3961,21 +3961,11 @@ impl AssemblyView {
                                     }
                                     cx.notify();
                                 })),
-                        ),
-                )
-                .child(head)
-                .child(body)
-                .into_any_element();
+                        )
+                        .into_any_element();
         }
-        v_flex()
-            .w(px(300.))
-            .h(px(587.))
-            .max_h_full()
-            .bg(pal.dialog_bg)
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
-            .text_color(pal.text)
-            .child(
-                // Header: title, green check (dim until something is inserted), red X.
+        let inserted = self.inserted_count(cx);
+        // Header: title, green check (dim until something is inserted), red X.
                 h_flex()
                     .h(px(29.))
                     .flex_none()
@@ -3997,12 +3987,8 @@ impl AssemblyView {
                             .child(crate::ui::glyph("check", 18., gpui_kit::white()))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))),
                     )
-                    .child(Button::new("insert-close").ghost().cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx)))),
-            )
-            .child(head)
-            .child(body)
-            .child(footer)
-            .into_any_element()
+                    .child(Button::new("insert-close").ghost().cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))))
+                    .into_any_element()
     }
 
     fn render_relation_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -4163,8 +4149,14 @@ impl AssemblyView {
             .into_any_element()
     }
 
-    fn render_overlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let pal = p();
+    /// The dialogs at the viewport's left (Insert, Mate, Relation, …) and
+    /// what floats with them (the mate toolbar, the mass dialog's extras).
+    /// Not cached: they hold the fields being typed in, and a cached view
+    /// around them would be re-rendered, with every cached view nested in
+    /// it, on each keystroke and caret blink. They sit between the `under`
+    /// and `overlay` slices (see `AsmSlices`): over the view cube, under the
+    /// docked panes and menus.
+    fn render_left_layer(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let mut out = Vec::new();
         // Left column: insert panel / mate dialog / relation dialog / animation.
         // Live (dom dialog-assembly-insert, dialog-mate-*, dialog-animate): the
@@ -4214,9 +4206,12 @@ impl AssemblyView {
             left = left.child(z);
             any_left = true;
         }
+        // Interference detection opens at live's default place, not in the
+        // left column: a 600 x 80 rect snapped to the graphics area's right
+        // edge, left = W - 600, top = H - 401, the dialog at its top left
+        // (behaviours.md, analysis/90–91; shared with the Part Studio).
         if let Some(d) = self.render_interference_dialog(cx) {
-            left = left.child(crate::ui::nudged_panel(d, self.ui.panels.get("asm-interference")));
-            any_left = true;
+            out.push(div().absolute().right(px(600. - 220.)).bottom(px(401.)).w(px(220.)).h(px(0.)).child(crate::ui::nudged_panel(d, self.ui.panels.get("asm-interference"))).into_any_element());
         }
         if self.ui.mass.is_some() {
             let mut els = self.render_mass_dialog(cx).into_iter();
@@ -4280,13 +4275,15 @@ impl AssemblyView {
             left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-isolate")));
             any_left = true;
         }
-        // The view cube and the canvas tools under the dialogs: a dialog
-        // reaching the cube (the replacement picker beside Replace instance
-        // with a docked pane) is drawn over it, like live.
-        out.push(self.render_view_controls(cx));
         if any_left {
             out.push(left.into_any_element());
         }
+        out
+    }
+
+    fn render_overlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let pal = p();
+        let mut out = Vec::new();
         if self.panel == Some(SidePanel::Variables) {
             out.push(self.render_variables_panel(cx));
         } else if self.panel == Some(SidePanel::Configurations) {
@@ -4413,12 +4410,9 @@ impl AssemblyView {
         // Onshape: the same View cube as the Part Studio, 15 px from the
         // graphics area's top-right corner, with the camera menu under it.
         use crate::part_studio::view_cube::{CubeHooks, view_cube};
-        let rotation = self.viewport.read(cx).camera.rotation;
-        if crate::viewport::wgpu_overlays() {
-            // Drawn into the 3D frame (perf).
-            let hover = self.cube_hover;
-            self.viewport.update(cx, |vp, cx| vp.set_view_cube(Some(hover), cx));
-        }
+        // The cube is drawn into the 3D frame (perf).
+        let hover = self.cube_hover;
+        self.viewport.update(cx, |vp, cx| vp.set_view_cube(Some(hover), cx));
         let menu = self.render_camera_menu(cx);
         let hooks = CubeHooks {
             state: |this: &mut Self| (&mut this.cube_hover, &mut this.cube_origin),
@@ -4434,7 +4428,7 @@ impl AssemblyView {
             },
             placed: |this, at, cx| this.viewport.update(cx, |vp, cx| vp.set_view_cube_origin(at, cx)),
         };
-        let cube = view_cube(rotation, self.cube_hover, menu, hooks, cx);
+        let cube = view_cube(menu, hooks, cx);
         // A docked 712 px pane narrows the graphics area (live 181): the cube
         // stays 15 px from the pane's left edge.
         // The canvas is narrowed by a docked pane: the cube stays 15 px from
@@ -4493,6 +4487,16 @@ impl AssemblyView {
     }
 }
 
+/// A part of the Insert panel (`render_insert_part`).
+#[derive(Clone, Copy, PartialEq)]
+enum InsertPart {
+    /// The title bar and what is above the search box.
+    Top,
+    /// The type filters under it.
+    Filters,
+    Footer,
+}
+
 /// The assembly's cached slices (see `crate::cached_slice`): a keystroke or a
 /// caret blink in the list filter re-renders the view but reuses these.
 #[derive(Clone)]
@@ -4500,9 +4504,18 @@ struct AsmSlices {
     toolbar: Entity<crate::cached_slice::Slice<AssemblyView>>,
     /// The instance list's rows (the filter notifies them when it changes).
     rows: Entity<crate::cached_slice::Slice<AssemblyView>>,
-    /// Everything over the graphics area: list toggle, dialogs, view cube,
-    /// panels, the right strip.
+    /// Over the left dialogs: docked panes, the mate toolbar's menus, notices,
+    /// the right strip (`render_left_layer` is between `under` and this).
     overlay: Entity<crate::cached_slice::Slice<AssemblyView>>,
+    /// Under the left dialogs: the list toggle and the view cube (it follows
+    /// the camera). `overlay` is over them.
+    under: Entity<crate::cached_slice::Slice<AssemblyView>>,
+    /// The Insert panel's catalog tree (its search notifies it), and its
+    /// parts around the search box.
+    insert_body: Entity<crate::cached_slice::Slice<AssemblyView>>,
+    insert_top: Entity<crate::cached_slice::Slice<AssemblyView>>,
+    insert_filters: Entity<crate::cached_slice::Slice<AssemblyView>>,
+    insert_footer: Entity<crate::cached_slice::Slice<AssemblyView>>,
 }
 
 impl AssemblyView {
@@ -4515,15 +4528,20 @@ impl AssemblyView {
         let toolbar = Slice::new(&me, |this, _, cx| this.render_toolbar(cx), cx);
         let rows = Slice::new(&me, |this, _, cx| this.render_list(cx), cx);
         let overlay = Slice::new(&me, |this, _, cx| this.render_overlay_slice(cx), cx);
+        let under = Slice::new(&me, |this, _, cx| this.render_under_slice(cx), cx);
+        let insert_body = Slice::new(&me, |this, _, cx| this.render_insert_body(cx), cx);
+        let insert_top = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Top, cx), cx);
+        let insert_filters = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Filters, cx), cx);
+        let insert_footer = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Footer, cx), cx);
         // The view cube and labels follow the camera, the list the
         // highlights; all read the document.
-        for s in [&rows, &overlay] {
+        for s in [&rows, &overlay, &under] {
             Slice::observing(s, &self.viewport, cx);
         }
-        for s in [&toolbar, &rows, &overlay] {
+        for s in [&toolbar, &rows, &overlay, &under, &insert_body, &insert_top, &insert_filters, &insert_footer] {
             Slice::observing(s, &self.doc, cx);
         }
-        let s = AsmSlices { toolbar, rows, overlay };
+        let s = AsmSlices { toolbar, rows, overlay, under, insert_body, insert_top, insert_filters, insert_footer };
         self.slices = Some(s.clone());
         s
     }
@@ -4535,17 +4553,119 @@ impl AssemblyView {
         }
     }
 
-    fn render_overlay_slice(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let overlay = self.render_overlay(cx);
-        let rail = self.render_panel_rail(cx);
+    /// The Insert panel's search changed: only its catalog tree shows it.
+    pub(super) fn insert_search_changed(&self, cx: &mut Context<Self>) {
+        if let Some(s) = &self.slices {
+            s.insert_body.update(cx, |_, cx| cx.notify());
+        }
+    }
+
+    fn render_under_slice(&mut self, cx: &mut Context<Self>) -> AnyElement {
         div()
             .size_full()
             .relative()
             // Live assembly/10: the Part Studio's list toggle and evaluation tools.
             .child(div().absolute().top_0().bottom_0().left_0().flex().items_center().child(self.render_list_toggle(cx)))
-            .children(overlay)
-            .child(rail)
+            // The view cube and the canvas tools under the dialogs: a dialog
+            // reaching the cube (the replacement picker beside Replace instance
+            // with a docked pane) is drawn over it, like live.
+            .child(self.render_view_controls(cx))
             .into_any_element()
+    }
+
+    fn render_overlay_slice(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let overlay = self.render_overlay(cx);
+        let rail = self.render_panel_rail(cx);
+        div().size_full().relative().children(overlay).child(rail).into_any_element()
+    }
+}
+
+impl AssemblyView {
+    /// Esc.
+    fn on_cancel(&mut self, _: &Cancel, window: &mut Window, cx: &mut Context<Self>) {
+        // Esc also dismisses an info notice (Onshape's go with Esc).
+        if self.message.as_ref().is_some_and(|(err, _)| !*err) {
+            self.message = None;
+        }
+        if self.cancel_bom_cell(cx) {
+            window.focus(&self.focus, cx);
+        } else if self.triad_menu.is_some() {
+            self.triad_menu = None;
+            cx.notify();
+        } else if self.step_edit.is_some() {
+            self.cancel_step_edit(cx);
+            cx.notify();
+        } else if self.placing.is_some() || self.insert_open {
+            // Esc ends the insertion: placed instances stay (Undo removes them).
+            self.close_insert(window, cx);
+        } else if self.mate.is_some() {
+            self.close_mate(window, cx);
+        } else if self.anim.is_some() {
+            // The Animate mate dialog (it stayed open on Esc).
+            self.close_animation(window, cx);
+        } else if self.ui.cfg_mode.is_some() {
+            self.finish_configure_features(window, cx);
+        } else if self.snap.is_some() {
+            self.toggle_snap(window, cx);
+        } else if self.mc.is_some() {
+            self.close_mc(window, cx);
+        } else if self.ui.folder_name.is_some() {
+            self.close_folder_name(false, window, cx);
+        } else if self.replace_panel.is_some() {
+            self.close_replace(cx);
+        } else if self.ui.interference.is_some() {
+            self.close_interference(cx);
+        } else if self.ui.reflection_dialog.is_some() {
+            self.close_reflection(false, cx);
+        } else if self.ui.zebra_dialog.is_some() {
+            self.close_zebra(false, cx);
+        } else if self.ui.mass.is_some() {
+            self.ui.mass = None;
+            cx.notify();
+        } else if self.pattern.is_some() {
+            self.pattern = None;
+            cx.notify();
+        } else if self.ui.group.is_some() {
+            self.ui.group = None;
+            self.update_capture(cx);
+            cx.notify();
+        } else if self.ui.np_driver.is_some() {
+            self.ui.np_driver = None;
+            cx.notify();
+        } else if self.ui.ps_in_context.is_some() || self.ui.ref_manager.is_some() {
+            self.ui.ps_in_context = None;
+            self.ui.ref_manager = None;
+            cx.notify();
+        } else if self.ui.dynamic_suppression.is_some() {
+            self.ui.dynamic_suppression = None;
+            cx.notify();
+        } else if self.show_mates_mode {
+            self.show_mates_mode = false;
+            self.mates_pinned = None;
+            self.update_capture(cx);
+            self.refresh_scene(false, cx);
+            cx.notify();
+        } else if self.explode_edit {
+            self.explode_edit = false;
+            cx.notify();
+        } else if self.ui.ctx_menu.is_some() || self.ui.mini_toolbar.is_some() || self.ui.show_shortcuts || self.ui.select_other.is_some() {
+            self.ui.select_other = None;
+            self.ui.ctx_menu = None;
+            self.ui.mini_toolbar = None;
+            self.ui.show_shortcuts = false;
+            cx.notify();
+        } else if self.ui.measure.is_some() {
+            self.toggle_measure(cx);
+        } else if self.ui.section.is_some() {
+            self.toggle_section(window, cx);
+        } else if self.exit_isolate(cx) {
+        } else {
+            // Esc keeps the selection (live 312; Space clears it).
+            self.insert_open = false;
+            self.relation = None;
+            self.refresh_scene(false, cx);
+            cx.notify();
+        }
     }
 }
 
@@ -4654,91 +4774,7 @@ impl Render for AssemblyView {
                 }
             }))
             .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_tool_search(window, cx)))
-            .on_action(cx.listener(|this, _: &Cancel, window, cx| {
-                // Esc also dismisses an info notice (Onshape's go with Esc).
-                if this.message.as_ref().is_some_and(|(err, _)| !*err) {
-                    this.message = None;
-                }
-                if this.cancel_bom_cell(cx) {
-                    window.focus(&this.focus, cx);
-                } else if this.triad_menu.is_some() {
-                    this.triad_menu = None;
-                    cx.notify();
-                } else if this.step_edit.is_some() {
-                    this.cancel_step_edit(cx);
-                    cx.notify();
-                } else if this.placing.is_some() || this.insert_open {
-                    // Esc ends the insertion: placed instances stay (Undo removes them).
-                    this.close_insert(window, cx);
-                } else if this.mate.is_some() {
-                    this.close_mate(window, cx);
-                } else if this.anim.is_some() {
-                    // The Animate mate dialog (it stayed open on Esc).
-                    this.close_animation(window, cx);
-                } else if this.ui.cfg_mode.is_some() {
-                    this.finish_configure_features(window, cx);
-                } else if this.snap.is_some() {
-                    this.toggle_snap(window, cx);
-                } else if this.mc.is_some() {
-                    this.close_mc(window, cx);
-                } else if this.ui.folder_name.is_some() {
-                    this.close_folder_name(false, window, cx);
-                } else if this.replace_panel.is_some() {
-                    this.close_replace(cx);
-                } else if this.ui.interference.is_some() {
-                    this.close_interference(cx);
-                } else if this.ui.reflection_dialog.is_some() {
-                    this.close_reflection(false, cx);
-                } else if this.ui.zebra_dialog.is_some() {
-                    this.close_zebra(false, cx);
-                } else if this.ui.mass.is_some() {
-                    this.ui.mass = None;
-                    cx.notify();
-                } else if this.pattern.is_some() {
-                    this.pattern = None;
-                    cx.notify();
-                } else if this.ui.group.is_some() {
-                    this.ui.group = None;
-                    this.update_capture(cx);
-                    cx.notify();
-                } else if this.ui.np_driver.is_some() {
-                    this.ui.np_driver = None;
-                    cx.notify();
-                } else if this.ui.ps_in_context.is_some() || this.ui.ref_manager.is_some() {
-                    this.ui.ps_in_context = None;
-                    this.ui.ref_manager = None;
-                    cx.notify();
-                } else if this.ui.dynamic_suppression.is_some() {
-                    this.ui.dynamic_suppression = None;
-                    cx.notify();
-                } else if this.show_mates_mode {
-                    this.show_mates_mode = false;
-                    this.mates_pinned = None;
-                    this.update_capture(cx);
-                    this.refresh_scene(false, cx);
-                    cx.notify();
-                } else if this.explode_edit {
-                    this.explode_edit = false;
-                    cx.notify();
-                } else if this.ui.ctx_menu.is_some() || this.ui.mini_toolbar.is_some() || this.ui.show_shortcuts || this.ui.select_other.is_some() {
-                    this.ui.select_other = None;
-                    this.ui.ctx_menu = None;
-                    this.ui.mini_toolbar = None;
-                    this.ui.show_shortcuts = false;
-                    cx.notify();
-                } else if this.ui.measure.is_some() {
-                    this.toggle_measure(cx);
-                } else if this.ui.section.is_some() {
-                    this.toggle_section(window, cx);
-                } else if this.exit_isolate(cx) {
-                } else {
-                    // Esc keeps the selection (live 312; Space clears it).
-                    this.insert_open = false;
-                    this.relation = None;
-                    this.refresh_scene(false, cx);
-                    cx.notify();
-                }
-            }))
+            .on_action(cx.listener(Self::on_cancel))
             .on_action(cx.listener(|this, _: &ViewFront, _, cx| this.view(StandardView::Front, cx)))
             .on_action(cx.listener(|this, _: &ViewBack, _, cx| this.view(StandardView::Back, cx)))
             .on_action(cx.listener(|this, _: &ViewLeft, _, cx| this.view(StandardView::Left, cx)))
@@ -4820,6 +4856,8 @@ impl Render for AssemblyView {
                                     .when(!self.ui.list_collapsed, |d| d.child(crate::ui::left_splitter()))
                                     .child(self.render_evaluation_tools(cx)),
                             )
+                            .child(slices.under.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
+                            .children(self.render_left_layer(cx))
                             .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full())),
                     )
                     // Customize toolbar's Tools panel, over the list and graphics.

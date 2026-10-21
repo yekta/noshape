@@ -218,7 +218,7 @@ impl DrawingEditor {
             (false, None) => return,
         };
         let input = self.textarea(&text, 2, window, cx);
-        self.panel = Some(Panel::Cell { table: t.id, row, col, input });
+        self.panel = Some(Panel::Cell { table: t.id, row, col, input, note: None });
         cx.notify();
     }
 

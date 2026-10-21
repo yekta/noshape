@@ -423,6 +423,9 @@ struct TargetState {
     /// Screen overlays drawn into every frame, and their layer.
     overlay: Option<Arc<crate::overlay::Overlay>>,
     overlay_layer: Option<crate::overlay_gpu::OverlayLayer>,
+    /// Camera-dependent geometry, and its instances for the last view built.
+    camera_geometry: Vec<Arc<dyn crate::camera_geometry::CameraGeometry>>,
+    camera_geometry_built: Option<(crate::camera_geometry::View, Vec<Instance>)>,
     /// Parameters of the newest submitted frame (for lazy pick rendering).
     last: Option<FrameState>,
     /// The pick texture matches `last`.
@@ -1480,7 +1483,7 @@ impl Renderer {
                 model: inst.transform.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | ((inst.plain_cap as u32) << 5) | zebra_bits(inst.zebra), inst.pickable as u32, inst.pick_base],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra), inst.pickable as u32, inst.pick_base],
                 extra: match &inst.reflection {
                     Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, r.lock as u32 as f32],
                     None => [inst.line_scale, 0.0, 0.0, 0.0],
@@ -1521,6 +1524,37 @@ impl Renderer {
     /// Draw `overlay` into every frame of `target` from now on (none: `None`).
     pub fn set_overlay(&mut self, target: u64, overlay: Option<Arc<crate::overlay::Overlay>>) {
         self.targets.entry(target).or_default().overlay = overlay.filter(|o| !o.is_empty());
+    }
+
+    /// Build `geometry` for every frame of `target` from now on, from the
+    /// frame's camera.
+    pub fn set_camera_geometry(&mut self, target: u64, geometry: Vec<Arc<dyn crate::camera_geometry::CameraGeometry>>) {
+        let ts = self.targets.entry(target).or_default();
+        ts.camera_geometry = geometry;
+        ts.camera_geometry_built = None;
+    }
+
+    /// `req` with the target's camera geometry for its view added to the scene.
+    fn with_camera_geometry(&mut self, target: u64, mut req: FrameRequest) -> FrameRequest {
+        let uploader = self.uploader();
+        let Some(ts) = self.targets.get_mut(&target) else { return req };
+        if ts.camera_geometry.is_empty() {
+            return req;
+        }
+        let dpr = req.device_pixel_ratio.max(1e-3) as f64;
+        let view = crate::camera_geometry::View { camera: req.camera, size: glam::DVec2::new(req.width as f64 / dpr, req.height as f64 / dpr) };
+        if ts.camera_geometry_built.as_ref().is_none_or(|b| b.0 != view) {
+            let _t = perf::scope("r.camera_geometry");
+            let instances = ts.camera_geometry.iter().flat_map(|g| g.build(&view, &uploader)).collect();
+            ts.camera_geometry_built = Some((view, instances));
+        }
+        let built = &ts.camera_geometry_built.as_ref().expect("built").1;
+        if !built.is_empty() {
+            let mut scene = (*req.scene).clone();
+            scene.instances.extend(built.iter().cloned());
+            req.scene = Arc::new(scene);
+        }
+        req
     }
 
     /// How overlay text masks are shaded (the UI toolkit's text shading).
@@ -1578,6 +1612,7 @@ impl Renderer {
     /// by [`Self::collect`] once the GPU finished. Never waits for the GPU.
     pub fn submit_frame(&mut self, target: u64, seq: u64, req: FrameRequest) -> Result<(), RenderError> {
         let t_prep = perf::scope("r.prep");
+        let req = self.with_camera_geometry(target, req);
         let width = req.width.clamp(1, 8192);
         let height = req.height.clamp(1, 8192);
         let msaa = msaa_of(&req.style);

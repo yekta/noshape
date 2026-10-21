@@ -321,19 +321,24 @@ impl AssemblyView {
         let cell = |w: f32| div().w(px(w)).h(px(34.)).flex_none().flex().items_center().px(px(6.)).border_r_1().border_b_1().border_color(border).text_size(px(14.));
         let drivers = asm.position_drivers.clone();
         let two_level = !drivers.is_empty();
+        // Column widths: live's grips (`ui::col_grip`, 140 px until dragged).
+        const T: &str = "named-positions";
+        let name_w = crate::ui::col_w(T, "name", 140.);
+        let dof_key = |m: &MateId, ix: &u8| format!("{m:?}-{ix}");
+        let dof_w: Vec<f32> = drivers.iter().map(|(m, ix)| crate::ui::col_w(T, &dof_key(m, ix), 140.)).collect();
         // Header: Name (spanning both levels) + mate name over DOF label.
         let mut head = h_flex().items_start().border_l_1().border_color(border).bg(head_bg).font_weight(FontWeight::BOLD);
-        head = head.child(cell(140.).h(px(if two_level { 68. } else { 34. })).justify_center().bg(if two_level { rgb(0xd7d7d7) } else { head_bg }).child("Name"));
+        head = head.child(cell(name_w).relative().h(px(if two_level { 68. } else { 34. })).justify_center().bg(if two_level { rgb(0xd7d7d7) } else { head_bg }).child("Name").child(crate::ui::col_grip(T, "name", 140.)));
         let mut i = 0;
         while i < drivers.len() {
             let m = drivers[i].0;
             let span = drivers[i..].iter().take_while(|(x, _)| *x == m).count();
             let mname = asm.mate(m).map(|x| x.name.clone()).unwrap_or_default();
             let mut sub = h_flex();
-            for (_, ix) in &drivers[i..i + span] {
-                sub = sub.child(cell(140.).justify_center().child(dof_label(*ix)));
+            for (k, (m, ix)) in drivers[i..i + span].iter().enumerate() {
+                sub = sub.child(cell(dof_w[i + k]).relative().justify_center().child(dof_label(*ix)).child(crate::ui::col_grip(T, &dof_key(m, ix), 140.)));
             }
-            head = head.child(v_flex().child(cell(140. * span as f32).justify_center().child(mname)).child(sub));
+            head = head.child(v_flex().child(cell(dof_w[i..i + span].iter().sum()).justify_center().child(mname)).child(sub));
             i += span;
         }
         let editing_cell = |row: usize, col: usize| self.ui.np_cell.as_ref().filter(|c| c.row == row && c.col == col).map(|c| c.input.clone());
@@ -343,10 +348,10 @@ impl AssemblyView {
             let view = cx.entity();
             let name = np.name.clone();
             let name_cell = match editing_cell(r, 0) {
-                Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
+                Some(st) => gpui_kit::base::input::input_frame(cell(name_w).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
                 None => {
                     let n2 = name.clone();
-                    cell(140.)
+                    cell(name_w)
                         .relative()
                         .when(applied, |d| d.text_color(rgb(0x1651b0)).child(div().absolute().left_0().top_0().bottom_0().w(px(2.)).bg(rgb(0x1651b0))))
                         .child(div().truncate().child(name.clone()))
@@ -360,8 +365,8 @@ impl AssemblyView {
                 let v = np.mate_values.iter().find(|(x, _)| x == m).map(|(_, v)| v[*ix as usize]).unwrap_or(0.0);
                 let text = self.np_value_text(v, *ix, cx);
                 row = row.child(match editing_cell(r, c + 1) {
-                    Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
-                    None => cell(140.)
+                    Some(st) => gpui_kit::base::input::input_frame(cell(dof_w[c]).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
+                    None => cell(dof_w[c])
                         .id(SharedString::from(format!("np-v-{r}-{c}")))
                         .child(text.clone())
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_np_cell(r, c + 1, text.clone(), window, cx)))
@@ -374,8 +379,8 @@ impl AssemblyView {
         // The italic "Name" add row.
         let n = asm.named_positions.len();
         rows = rows.child(match editing_cell(n, 0) {
-            Some(st) => gpui_kit::base::input::input_frame(cell(140.).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
-            None => cell(140.)
+            Some(st) => gpui_kit::base::input::input_frame(cell(name_w).border_2().border_color(rgb(0x1651b0)).px(px(1.)).child(Input::new(&st).appearance(false).text_size(px(13.33)).pl(px(3.))).into_any_element()).into_any_element(),
+            None => cell(name_w)
                 .id("np-add-row")
                 .italic()
                 .text_color(rgb(0x999999))

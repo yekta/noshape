@@ -130,7 +130,7 @@ fn create_version(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(json!({ "version": v.to_string(), "name": a.str("name")? }).into())
 }
 
-fn branch_id(od: &crate::OpenDoc, key: &str) -> Result<noshape_store::BranchId, OpError> {
+pub(super) fn branch_id(od: &crate::OpenDoc, key: &str) -> Result<noshape_store::BranchId, OpError> {
     let list = od.session.store.list_branches().map_err(|e| OpError::new("io", e.to_string()))?;
     list.iter().find(|b| b.id.to_string() == key || b.name == key).map(|b| b.id).ok_or_else(|| OpError::not_found(format!("no branch `{key}`; branches: {}", list.iter().map(|b| b.name.clone()).collect::<Vec<_>>().join(", "))).with_param("branch"))
 }

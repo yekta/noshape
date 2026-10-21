@@ -879,6 +879,68 @@ final-tooltips.png, final-sketch-dimension.png (ours left).
   `#3e94ff` with no glow (the live crop shows none), text kept 11 px in. This is specific to that field, not
   the shared focus style (the Details labels search is 1 px).
 
+## Round 16 (2026-10-20 late, Customize toolbar, Isolate dialog, panel positions)
+
+- **Customize toolbar** is shared by both studios: `toolbar_customize.rs` (live part-studio/340–347,
+  dom/customize-toolbar-*.txt).
+  - Tool sets are `#f5f5f5`, with a `deferred` 10 px "•••" sled hanging under the bar (cursor `move`;
+    drop a sled on a set or on its sled to move the set).
+  - Tools take a cover that drags them (a split tool with its dropdown) and keeps clicks off; a dragged
+    tool leaves the bar meanwhile (`DRAGGED` thread-local: GPUI drag values aren't readable from views).
+  - The 600 px Tools panel: header 43, body `#f5f5f5` (bold empty note, or 3 × 186 px columns of 34 px rows,
+    greyed when in the bar), footer 42 (☐ Show items · Save · Reset to default · Cancel, 25 % when idle).
+    While a toolbar tool is dragged it is only the red (`#bd3039`) dashed drop zone.
+  - Part Studio: `ui.tb_custom`, sets = the 9 groups + ⊞ "Add custom features"; `ToolbarPrefs` gained
+    `hide_search` (right-click › Hide / Show "Search tools"). The old arrow mode, "Removed (n)",
+    "Shortcut toolbar (S)" and the "Reset toolbar to default" menu item are gone (the S toolbars are in
+    Preferences).
+  - Assembly: `AsmToolbarPrefs` stays and the old panel and drag types are gone.
+  - Both toolbar slices render uncached while customizing (the dragged tool must leave the bar).
+- **Part Studio toolbar fit** (`ToolbarFit` in part_studio/mod.rs): collapse when the measured tools
+  (natural width, measured when shown in full; `toolbar_full_width` only keys a change) don't fit beside
+  "Search tools…". A watcher re-renders when a resize changes the answer. The toolbar row needed
+  `w_full().min_w_0()` (it sized to its content and pushed the view 32 px wide).
+  - Gap found: our custom-features group (up to 4 buttons + a menu button, before ⊞) differs from live
+    641 (one icon + ▾ split after ⊞). Owner: Part Studio toolbar (me): next.
+- **Isolate / Make transparent** dialog shared: `isolate_ui.rs` (live behaviours.md "Part Studio
+  Isolate…", dom/ui-isolate-*).
+  - 220 px, ✕ only; the Expand select with disabled options (`os_ui::select_field_with`).
+  - The transparency slider has live's static legend: `#777` to 10 %, then `#3e94ff` → white, inside a
+    2 px `#777` ring. The expand slider is a 2 px line; tracks 183 px, 11 px in. Sliders drag only from
+    their own press (`*_slider_drag`).
+  - Part Studio semantics (`iso_look`): under 10 % light opaque ghosts; from 10 % see-through
+    (opacity 0.66 → 0.05 by 90 %); hidden from 95 %.
+  - Expand snaps in 10 % steps and joins parts within 0.815 × diagonal × step² of the chosen ones
+    (fits live's 20 / 40 / 50 / 70 %).
+  - The Part Studio Isolate opens at 0 (ghosts), like live.
+- **Panel positions** are now app-wide and persisted (config_dir/panel_positions.json), keyed by panel and
+  shared by both studios. `ps-` / `asm-` prefixes are stripped: live remembers a panel's rect per panel id.
+- **Kit patch**: `Input::h()` now sizes single-line inputs too (gpui-component input.rs, NOSHAPE PATCH).
+  It was multi-line only, so every `.h(px(N))` rendered at 28. This covers the ~40 sites listed in
+  theme-studios.md Round 9 at once; `os_ui::input_h` is now equivalent. Still to do: check those sites
+  against live heights in the input-size audit.
+- **Next (lead's list, in order)**:
+  1. table column grips (row 64; live answered: 5 px `.drag-handle`, only that column, min 40, no max,
+     scrollbar, persists per table);
+  2. Reorder items mode for ordered query lists (row 67; live answered);
+  3. colour Mixer (row 69; live answered: 152 SV square crosshair, 50×152 hue strip ns-resize, alpha in
+     the Appearance editor);
+  4. the custom-features toolbar group;
+  5. the input-height audit;
+  6. **Dark theme**.
+- **Dark theme plan** (REQUESTS.md 20 Oct "DARK THEME"):
+  - Ask live for every `--os-*` CSS variable in light and dark, plus per-area computed colours.
+  - `theme::Palette` already centralises most colours, but there are about a thousand hard-coded
+    `rgb(0x…)` in the app crate. Grep them, map each light value to its `--os-*` token (light values are
+    unique enough), and add those tokens to the palette with light/dark values.
+  - Replace the literals file by file, with a lint script listing the remaining literals.
+  - The Preferences Theme select switches the palette (a global; views re-render) and persists it.
+  - Then pixel-check each area against the dark captures.
+  - Kit components (gpui-component theme) need their dark colours too: set `Theme` from the palette.
+  - Graphics background, view cube and selection colours come from the viewport palette, now in
+    noshape_scene (coordinate with perf/api).
+  - Estimate: large; best done when the app is quiet (it touches every view).
+
 ## Render regression test `plate_edges` (fixed 2026-10-18 ~14:00, for the lead)
 
 - It failed with "13 of 315 edge samples covered by faces", luminance 102-109, after the lighting
@@ -984,3 +1046,25 @@ container.
   `write_export(settings, path, parts)` (module fns); `open_part_export` / `write_part_export` call them.
   Added `PartFormat::Urdf`, `PartFormat::list(assembly)`, `missing_writer`, URDF rows/writer, individual
   files zipped (Onshape). `mod export` is `pub(crate)`; the old `ExportFormat` enum (BREP) is gone.
+
+### From skb (20 Oct): live's panel snapping, for the shared panel drag (not done; your code)
+
+Your uncommitted `PanelOffsets` (persisted `panel_positions.json`, one entry per panel shared by `ps-` /
+`asm-` keys) covers live's per-user, per-panel memory; skb verified it across sessions with the assembly's
+Replace instance / Interference detection. What live's `panelLayoutManager` (bundle woolsthorpe, class with
+`snapIfNearBounds` / `keepPanelsSnapped`, `new m(10)`) also does, and ours doesn't yet:
+- **Tolerance 10 px.** On every drag move the panel's rect = its rect before the drag + the pointer delta
+  (unsnapped), then snapped: an edge within 10 px of the graphics bounds' edge sticks to it and is recorded
+  in `snappedEdges` (LEFT 1, RIGHT 2, TOP 4, BOTTOM 8; a left snap wins over right; top+bottom both near =
+  full height). It also snaps edge-to-edge to other open panels within 10 px (left↔right, top↔bottom, and
+  aligned edges), then is clamped inside the bounds (`keepPanelWithinBounds`).
+- **Stored:** `{id, rect {left,top,right,bottom} in graphics-area coordinates, hidden, snappedEdges}` per
+  user (`panelLayoutManager.<userId>.<panelId>`).
+- **Resize:** when the graphics area grows, a RIGHT-snapped panel keeps its offset from the right edge
+  (and BOTTOM from the bottom); others keep their left/top. On reopen a snapped panel is moved to its edges
+  (`moveToEdges`).
+- Needs the panel's own rect (a canvas probe on the placed panel) and the graphics bounds at render.
+- Panel ids live: e.g. Interference detection "interference-dialog"/"interference-detection-dialog"
+  (Part Studio and assembly share it); skb's keys `asm-interference`, `asm-replace` map to "interference",
+  "replace" with your prefix stripping. The assembly's Interference dialog now opens at live's default
+  (600×80 rect snapped right: left = W − 600, top = H − 401, the 220 px dialog at its top left).

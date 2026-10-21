@@ -15,6 +15,20 @@ use std::{
     slice,
 };
 
+/// NOSHAPE PATCH (agent qa4): `Scene::replay` keeps draw orders only with
+/// `NOSHAPE_SCENE_REPLAY_ORDERS=1` (off until proven pixel-identical).
+fn replay_keeps_orders() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_SCENE_REPLAY_ORDERS").is_ok_and(|v| v == "1"))
+}
+
+/// NOSHAPE PATCH (agent qa4): `Scene::finish` checks the painter's rule when
+/// `NOSHAPE_SCENE_CHECK=1`.
+fn scene_check() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_SCENE_CHECK").is_ok_and(|v| v == "1"))
+}
+
 #[allow(non_camel_case_types, unused)]
 #[expect(missing_docs)]
 pub type PathVertex_ScaledPixels = PathVertex<ScaledPixels>;
@@ -139,6 +153,11 @@ impl Scene {
     }
 
     pub fn replay(&mut self, range: Range<usize>, prev_scene: &Scene) {
+        // NOSHAPE PATCH (agent qa4): see `replay_keeping_orders`.
+        if self.layer_stack.is_empty() && replay_keeps_orders() {
+            self.replay_keeping_orders(range, prev_scene);
+            return;
+        }
         for operation in &prev_scene.paint_operations[range] {
             match operation {
                 PaintOperation::Primitive(primitive) => self.insert_primitive(primitive.clone()),
@@ -148,7 +167,120 @@ impl Scene {
         }
     }
 
+    /// NOSHAPE PATCH (agent qa4): logs primitives drawn under one painted
+    /// before them that they overlap (a draw order breaking the painter's
+    /// rule). Within a layer all share the layer's order.
+    fn check_painter_order(&self) {
+        let mut items: Vec<(DrawOrder, Bounds<ScaledPixels>)> = Vec::new();
+        for op in &self.paint_operations {
+            if let PaintOperation::Primitive(p) = op {
+                items.push((p.order(), p.bounds().intersect(&p.content_mask().bounds)));
+            }
+        }
+        let mut bad = 0usize;
+        for (i, (oa, ba)) in items.iter().enumerate() {
+            for (ob, bb) in &items[i + 1..] {
+                if oa > ob && ba.intersects(bb) {
+                    bad += 1;
+                }
+            }
+        }
+        if bad > 0 {
+            log::error!("scene: {bad} overlapping primitive pairs drawn out of paint order ({} primitives)", items.len());
+        } else {
+            log::info!("scene: paint order ok ({} primitives)", items.len());
+        }
+    }
+
+    /// NOSHAPE PATCH (agent qa4): replays a cached view's primitives keeping
+    /// the draw orders they had, shifted as a block above whatever they
+    /// overlap in this frame, instead of giving each one its order again in
+    /// the bounds tree (each insert is a tree query; a window reuses
+    /// thousands of primitives a frame). Their order among themselves is the
+    /// same, so is every overlapping pair's, and the primitives painted after
+    /// them see them as one entry (their bounds, their top order). On with
+    /// `NOSHAPE_SCENE_REPLAY_ORDERS=1`. Not inside a layer, whose primitives
+    /// all take the layer's order.
+    fn replay_keeping_orders(&mut self, range: Range<usize>, prev_scene: &Scene) {
+        let operations = &prev_scene.paint_operations[range];
+        let mut union: Option<Bounds<ScaledPixels>> = None;
+        let (mut min_order, mut max_order) = (DrawOrder::MAX, 0);
+        for operation in operations {
+            if let PaintOperation::Primitive(primitive) = operation {
+                let clipped = primitive.bounds().intersect(&primitive.content_mask().bounds);
+                union = Some(match union {
+                    Some(u) => u.union(&clipped),
+                    None => clipped,
+                });
+                let order = primitive.order();
+                min_order = min_order.min(order);
+                max_order = max_order.max(order);
+            }
+        }
+        let Some(union) = union else {
+            self.paint_operations.extend(operations.iter().filter_map(|op| match op {
+                PaintOperation::StartLayer(bounds) => Some(PaintOperation::StartLayer(*bounds)),
+                PaintOperation::EndLayer => Some(PaintOperation::EndLayer),
+                PaintOperation::Primitive(_) => None,
+            }));
+            return;
+        };
+        let base = self.primitive_bounds.max_intersecting(&union) + 1;
+        let shift = |order: DrawOrder| order - min_order + base;
+        for operation in operations {
+            match operation {
+                PaintOperation::Primitive(primitive) => {
+                    let mut primitive = primitive.clone();
+                    match &mut primitive {
+                        Primitive::Shadow(shadow) => {
+                            shadow.order = shift(shadow.order);
+                            self.shadows.push(*shadow);
+                        }
+                        Primitive::Quad(quad) => {
+                            quad.order = shift(quad.order);
+                            self.quads.push(*quad);
+                        }
+                        Primitive::Path(path) => {
+                            path.order = shift(path.order);
+                            path.id = PathId(self.paths.len());
+                            self.paths.push(path.clone());
+                        }
+                        Primitive::Underline(underline) => {
+                            underline.order = shift(underline.order);
+                            self.underlines.push(*underline);
+                        }
+                        Primitive::MonochromeSprite(sprite) => {
+                            sprite.order = shift(sprite.order);
+                            self.monochrome_sprites.push(*sprite);
+                        }
+                        Primitive::SubpixelSprite(sprite) => {
+                            sprite.order = shift(sprite.order);
+                            self.subpixel_sprites.push(*sprite);
+                        }
+                        Primitive::PolychromeSprite(sprite) => {
+                            sprite.order = shift(sprite.order);
+                            self.polychrome_sprites.push(*sprite);
+                        }
+                        Primitive::Surface(surface) => {
+                            surface.order = shift(surface.order);
+                            self.surfaces.push(surface.clone());
+                        }
+                    }
+                    self.paint_operations.push(PaintOperation::Primitive(primitive));
+                }
+                PaintOperation::StartLayer(bounds) => self.paint_operations.push(PaintOperation::StartLayer(*bounds)),
+                PaintOperation::EndLayer => self.paint_operations.push(PaintOperation::EndLayer),
+            }
+        }
+        self.primitive_bounds.insert_with_order(union, shift(max_order));
+    }
+
     pub fn finish(&mut self) {
+        // NOSHAPE PATCH (agent qa4): `NOSHAPE_SCENE_CHECK=1` checks the
+        // painter's rule on every frame (slow: every pair of primitives).
+        if scene_check() {
+            self.check_painter_order();
+        }
         self.shadows.sort_by_key(|shadow| shadow.order);
         self.quads.sort_by_key(|quad| quad.order);
         self.paths.sort_by_key(|path| path.order);
@@ -242,6 +374,20 @@ impl Primitive {
             Primitive::SubpixelSprite(sprite) => &sprite.bounds,
             Primitive::PolychromeSprite(sprite) => &sprite.bounds,
             Primitive::Surface(surface) => &surface.bounds,
+        }
+    }
+
+    /// NOSHAPE PATCH (agent qa4): the draw order it was given.
+    pub fn order(&self) -> DrawOrder {
+        match self {
+            Primitive::Shadow(shadow) => shadow.order,
+            Primitive::Quad(quad) => quad.order,
+            Primitive::Path(path) => path.order,
+            Primitive::Underline(underline) => underline.order,
+            Primitive::MonochromeSprite(sprite) => sprite.order,
+            Primitive::SubpixelSprite(sprite) => sprite.order,
+            Primitive::PolychromeSprite(sprite) => sprite.order,
+            Primitive::Surface(surface) => surface.order,
         }
     }
 
@@ -947,3 +1093,4 @@ impl PathVertex<Pixels> {
         }
     }
 }
+

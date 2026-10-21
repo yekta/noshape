@@ -9,10 +9,12 @@
 //! cell ends.
 
 use crate::drawing_view::*;
-use gpui_kit::component::input::Textarea;
+use gpui_kit::component::Sizable as _;
+use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::component::input::{Enter, Escape, IndentInline, OutdentInline, Textarea};
 use gpui_kit::*;
 use noshape_model::drawing::note;
-use noshape_model::drawing::TableKind;
+use noshape_model::drawing::{AnnotationKind, TableKind};
 
 /// Em metrics of the drawing fonts: cap height, ascent, descent (their hhea
 /// tables), so the editor draws the same cap height on the same baseline.
@@ -47,7 +49,21 @@ pub struct InplaceBox {
 /// Height (px) of the ruler above the edited text.
 const RULER_H: f64 = 24.0;
 
+/// The xsmall Textarea's own left / right padding (`Size::input_px`; no
+/// vertical padding).
+const TEXT_PX: f64 = 4.0;
+
 impl DrawingEditor {
+    /// Close the in-place note / cell editor without applying it (Esc, ✕);
+    /// the hidden sheet text shows again at once.
+    pub fn discard_inplace(&mut self, cx: &mut Context<Self>) {
+        self.panel = None;
+        self.inplace_hidden = None;
+        self.inplace_cell = None;
+        self.refresh(cx);
+        cx.notify();
+    }
+
     /// Sheet millimeters to canvas pixels (inverse of `to_sheet`).
     pub fn sheet_to_local(&self, p: [f64; 2]) -> [f64; 2] {
         let s = self.size_px();
@@ -90,6 +106,8 @@ impl DrawingEditor {
         let (input, style) = (input.clone(), style.clone());
         let lines = input.read(cx).value().split('\n').count().max(1);
         let pad = 3.0;
+        // The ruler at the sheet's scale over the note's box (live 414).
+        self.ruler.sheet_k = Some(self.zoom as f32);
         let ruler = self.note_ruler(&style, b.width / self.zoom, cx);
         let ink = match style.color {
             Some([r, g, bl]) => gpui_kit::rgb(((r as u32) << 16) | ((g as u32) << 8) | bl as u32),
@@ -97,8 +115,8 @@ impl DrawingEditor {
         };
         let mut text = Textarea::new(&input)
             .appearance(false)
-            .p_0()
-            .w(px((b.width + b.font_px * 2.0) as f32))
+            .xsmall()
+            .w(px((b.width + b.font_px * 2.0 + 2.0 * TEXT_PX) as f32))
             .h(px((b.pitch_px * lines as f64 + 2.0) as f32))
             .text_size(px(b.font_px as f32))
             .line_height(px(b.pitch_px as f32))
@@ -115,17 +133,95 @@ impl DrawingEditor {
             div()
                 .id("dr-note-inplace")
                 .absolute()
-                .left(px((b.left - pad) as f32))
-                .top(px((top - pad - RULER_H) as f32))
+                // The text's first glyph on the note's: the box border (1 px),
+                // its padding and the Textarea's own padding go to the left.
+                .left(px((b.left - pad - 1.0 - TEXT_PX) as f32))
+                .top(px((top - pad - 1.0 - RULER_H) as f32))
+                // Live: Esc ends editing and discards the change.
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                    if e.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.discard_inplace(cx);
+                    }
+                }))
                 .flex()
                 .flex_col()
                 // Clicks in the editor stay in it (a click away commits).
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(div().h(px(RULER_H as f32)).child(ruler))
+                // The ruler's zero on the text's left edge (the tab stop
+                // selector, 22 px + 3 px gap, to the left of it), and the text
+                // box not stretched to the ruler's width.
+                .items_start()
+                .child(div().h(px(RULER_H as f32)).ml(px((pad + 1.0 + TEXT_PX - 25.0) as f32)).child(ruler))
                 .child(div().p(px(pad as f32)).border_1().border_dashed().border_color(gpui_kit::rgb(0x8a8a8a)).child(text))
                 .into_any_element(),
         )
+    }
+
+    /// While a free note's rotate grip is dragged: its angle in a box by the
+    /// pointer (live 235 / 236: "335deg", 2 px orange border).
+    pub fn render_rotate_label(&self) -> Option<AnyElement> {
+        let Drag::NoteGrip { id, grip: 2, .. } = &self.drag else { return None };
+        let a = self.display().sheets.get(self.sheet)?.annotations.iter().find(|a| a.id == *id)?;
+        let AnnotationKind::Note { style, .. } = &a.kind else { return None };
+        let deg = style.angle.to_degrees().round().rem_euclid(360.0) as i64;
+        let p = self.sheet_to_local(self.cursor);
+        Some(
+            div()
+                .absolute()
+                .left(px(p[0] as f32 + 18.0))
+                .top(px(p[1] as f32 - 34.0))
+                .px(px(2.))
+                .bg(gpui_kit::white())
+                .border_2()
+                .border_color(gpui_kit::rgb(0xf5a623))
+                .text_size(px(12.))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(gpui_kit::rgb(0x000000))
+                .child(format!("{deg}deg"))
+                .into_any_element(),
+        )
+    }
+
+    /// Byte offset in a general table cell's `text` under the pointer
+    /// (live 756: a double-click puts the caret there, nothing selected);
+    /// the cell's lines laid out as `tables::render` draws them.
+    pub fn cell_click_offset(&self, table: u64, row: usize, col: usize, text: &str) -> usize {
+        use noshape_model::drawing::font::text_width;
+        use noshape_model::drawing::{CellAlign, CellVAlign};
+        let (Some(t), Some(l)) = (self.current_sheet().table(table), self.built.as_ref().and_then(|b| b.table_layout(table))) else { return text.len() };
+        let r = row + l.title as usize;
+        let (Some(&xa), Some(&xb), Some(&ya), Some(&yb)) = (l.xs.get(col), l.xs.get(col + 1), l.ys.get(r), l.ys.get(r + 1)) else { return text.len() };
+        let f = t.shown_cell_format(row, col);
+        let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
+        let lines: Vec<&str> = text.split('\n').collect();
+        let n = lines.len().max(1) as f64;
+        let line_h = h * 1.5;
+        let y0 = match f.valign {
+            CellVAlign::Top => ya - h,
+            CellVAlign::Middle => (ya + yb) / 2.0 + (n - 1.0) * line_h / 2.0,
+            CellVAlign::Bottom => yb + h + (n - 1.0) * line_h,
+        };
+        let [cx_, cy] = self.cursor;
+        let k = (((y0 - cy) / line_h).round().max(0.0) as usize).min(lines.len() - 1);
+        let line = lines[k];
+        let tw = text_width(line, h);
+        let x0 = match f.align {
+            CellAlign::Left => xa,
+            CellAlign::Center => (xa + xb - tw) / 2.0,
+            CellAlign::Right => xb - tw,
+        };
+        let before: usize = lines[..k].iter().map(|l| l.len() + 1).sum();
+        let mut at = line.len();
+        for (i, c) in line.char_indices() {
+            let mid = x0 + text_width(&line[..i], h) + text_width(&c.to_string(), h) / 2.0;
+            if cx_ < mid {
+                at = i;
+                break;
+            }
+        }
+        before + at
     }
 
     /// The general table cell being edited (`Panel::Cell`) on the canvas.
@@ -139,8 +235,13 @@ impl DrawingEditor {
         let r = row + l.title as usize;
         let (x0, x1) = (*l.xs.get(*col)?, *l.xs.get(col + 1)?);
         let (ya, yb) = (*l.ys.get(r)?, *l.ys.get(r + 1)?);
-        let f = t.cell_format(*row, *col);
+        let f = t.shown_cell_format(*row, *col);
         let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
+        // The Note panel's B / I show at once.
+        let (bold, italic) = match &self.panel {
+            Some(Panel::Cell { note: Some(n), .. }) => n.style.font.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false)),
+            _ => (f.bold, f.italic),
+        };
         let family = noshape_model::drawing::font::DEFAULT_FAMILY.to_string();
         let (cap, asc, desc) = metrics(&family);
         let font_px = h * self.zoom / cap;
@@ -151,26 +252,44 @@ impl DrawingEditor {
         let mid = (tl[1] + br[1]) / 2.0;
         let base = mid + h * self.zoom / 2.0;
         let text_top = base - ((pitch_px - (asc + desc) * font_px) / 2.0 + asc * font_px);
-        Some(InplaceBox { left: tl[0], top: tl[1], width: br[0] - tl[0], height: br[1] - tl[1], font_px, pitch_px, family, bold: f.bold, italic: false, text_top })
+        Some(InplaceBox { left: tl[0], top: tl[1], width: br[0] - tl[0], height: br[1] - tl[1], font_px, pitch_px, family, bold, italic, text_top })
     }
 
     /// The cell's text editor: the caret in the cell, a blue cell outline
     /// with a dashed text box (live 740–757).
     pub fn render_cell_inplace(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let b = self.cell_inplace_box()?;
-        let Some(Panel::Cell { input, .. }) = &self.panel else { return None };
+        let Some(Panel::Cell { input, note, .. }) = &self.panel else { return None };
+        let align = note.as_ref().map(|n| n.style.align).unwrap_or_default();
         let pad = 2.0;
+        // Centred / right-aligned cells: the editor is as wide as its text
+        // and placed by the alignment (a multi-line Textarea aligns left).
+        let value = input.read(cx).value().to_string();
+        let text_px = value.split('\n').map(|l| noshape_model::drawing::font::text_width(l, b.font_px * metrics(&b.family).0)).fold(0.0, f64::max) * if b.bold { 1.08 } else { 1.0 };
+        let inner = (b.width - 2.0 * pad).max(b.font_px);
+        // One character's slack so GPUI's shaping never wraps the line.
+        let fit = (text_px + 2.0 * TEXT_PX + b.font_px).min(inner);
+        // Alt+Enter lines make the editor taller (live 750: the cell grows).
+        let lines = value.split('\n').count().max(1) as f64;
+        let (w, justify) = match align {
+            note::NoteAlign::Center => (fit, 1),
+            note::NoteAlign::Right => (fit, 2),
+            _ => (inner, 0),
+        };
         let mut text = Textarea::new(input)
             .appearance(false)
-            .p_0()
-            .w(px((b.width - 2.0 * pad).max(b.font_px) as f32))
-            .h(px(b.pitch_px.max(b.height - 2.0 * pad) as f32))
+            .xsmall()
+            .w(px(w as f32))
+            .h(px((b.pitch_px * lines).max(b.height - 2.0 * pad) as f32))
             .text_size(px(b.font_px as f32))
             .line_height(px(b.pitch_px as f32))
             .font_family(SharedString::from(b.family.clone()))
             .text_color(gpui_kit::rgb(0x000000));
         if b.bold {
             text = text.font_weight(FontWeight::BOLD);
+        }
+        if b.italic {
+            text = text.italic();
         }
         Some(
             div()
@@ -187,28 +306,47 @@ impl DrawingEditor {
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // Live: Tab → the next cell, Shift+Tab → the previous one,
-                // Enter → the cell below, Alt+Enter → a new line in the cell.
-                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
-                    let k = &e.keystroke;
-                    let step = match (k.key.as_str(), k.modifiers.shift, k.modifiers.alt) {
-                        ("tab", false, _) => Some(1),
-                        ("tab", true, _) => Some(-1),
-                        ("enter", _, true) => {
-                            if let Some(Panel::Cell { input, .. }) = &this.panel {
-                                input.update(cx, |s, cx| s.insert("\n", window, cx));
-                            }
-                            cx.stop_propagation();
-                            None
-                        }
-                        ("enter", _, false) => Some(2),
-                        _ => None,
-                    };
-                    if let Some(step) = step {
+                // Enter → the cell below, Alt+Enter → a new line in the cell,
+                // Esc discards. Tab / Enter / Esc are the Textarea's key
+                // bindings, so they are taken as actions before it sees them.
+                .capture_action(cx.listener(|this, _: &IndentInline, window, cx| {
+                    cx.stop_propagation();
+                    this.cell_step(1, window, cx);
+                }))
+                .capture_action(cx.listener(|this, _: &OutdentInline, window, cx| {
+                    cx.stop_propagation();
+                    this.cell_step(-1, window, cx);
+                }))
+                .capture_action(cx.listener(|this, e: &Enter, window, cx| {
+                    if !e.shift && !e.secondary {
                         cx.stop_propagation();
-                        this.cell_step(step, window, cx);
+                        this.cell_step(2, window, cx);
                     }
                 }))
-                .child(div().border_1().border_dashed().border_color(gpui_kit::rgb(0x8a8a8a)).pt(px(((b.text_top - b.top - pad).max(0.0)) as f32)).child(text))
+                .capture_action(cx.listener(|this, _: &Escape, _, cx| {
+                    cx.stop_propagation();
+                    this.discard_inplace(cx);
+                }))
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                    let k = &e.keystroke;
+                    if k.key == "enter" && k.modifiers.alt {
+                        if let Some(Panel::Cell { input, .. }) = &this.panel {
+                            input.update(cx, |s, cx| s.insert("\n", window, cx));
+                        }
+                        cx.stop_propagation();
+                    }
+                }))
+                .child(
+                    div()
+                        .flex()
+                        .when(justify == 1, |d| d.justify_center())
+                        .when(justify == 2, |d| d.justify_end())
+                        .border_1()
+                        .border_dashed()
+                        .border_color(gpui_kit::rgb(0x8a8a8a))
+                        .pt(px(((b.text_top - b.top - pad).max(0.0)) as f32))
+                        .child(text),
+                )
                 .into_any_element(),
         )
     }

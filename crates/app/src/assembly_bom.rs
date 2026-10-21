@@ -208,7 +208,9 @@ impl AssemblyView {
         let s = self.bom_settings(cx);
         let lines = self.bom_lines(cx);
         let view = cx.entity();
-        let cell = || div().w(px(COL_W)).h(px(ROW_H)).flex_none().flex().items_center().px(px(3.)).border_r_1().border_b_1().border_color(border).text_size(px(14.));
+        // Column widths: live's grips (`ui::col_grip`, 140 px until dragged).
+        let col_w = |c: &BomColumn| crate::ui::col_w("bom", &format!("{c:?}"), COL_W);
+        let cell = |w: f32| div().w(px(w)).h(px(ROW_H)).flex_none().flex().items_center().px(px(3.)).border_r_1().border_b_1().border_color(border).text_size(px(14.));
 
         // Header row: BOM type ▾ | Add column ▾ ⋯.
         let v = view.clone();
@@ -303,8 +305,10 @@ impl AssemblyView {
             // Mass carries Onshape's italic ƒ (computed) marker.
             let label = if *c == BomColumn::Mass { h_flex().gap(px(3.)).child(label).child(div().italic().font_weight(FontWeight::NORMAL).child("ƒ")).into_any_element() } else { label.into_any_element() };
             head = head.child(
-                cell()
+                cell(col_w(c))
                     .id(SharedString::from(format!("bom-h-{c:?}")))
+                    .relative()
+                    .child(crate::ui::col_grip("bom", &format!("{c:?}"), COL_W))
                     .justify_center()
                     .when(sel_col == Some(*c), |d| d.bg(rgb(0xd7d7d7)))
                     .tooltip(crate::ui::tooltip(c.label()))
@@ -325,7 +329,7 @@ impl AssemblyView {
                 let frozen = c.frozen();
                 let is_sel = selected == Some((r, *c));
                 let missing = bom::is_missing_value(&content, *c);
-                let mut el = cell()
+                let mut el = cell(col_w(c))
                     .id(SharedString::from(format!("bom-{r}-{c:?}")))
                     .relative()
                     .when(frozen, |d| d.bg(if selected.is_some_and(|(sr, _)| sr == r) { rgb(0xd7d7d7) } else { head_bg }).font_weight(FontWeight::BOLD))
@@ -442,7 +446,8 @@ impl AssemblyView {
                 ),
             )
             .child(div().pt(px(4.)).child(header))
-            .child(v_flex().id("bom-table").flex_1().min_h_0().overflow_y_scroll().child(v_flex().items_start().child(head).child(rows)))
+            // Live: a horizontal scrollbar once the columns are wider than the pane.
+            .child(v_flex().id("bom-table").flex_1().min_h_0().overflow_scroll().child(v_flex().items_start().child(head).child(rows)))
             .child(
                 h_flex()
                     .h(px(40.))

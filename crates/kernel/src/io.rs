@@ -332,10 +332,20 @@ pub struct NativeComponent {
     pub assembly: bool,
 }
 
-/// The components of a SOLIDWORKS assembly (.sldasm) in its active
-/// configuration, as a flattened tree.
+/// The components of a native assembly as a flattened tree: a SOLIDWORKS
+/// assembly (.sldasm) in its active configuration, an Inventor assembly
+/// (.iam; its documents looked up next to it, see
+/// [`read_native_assembly_in`]) or a Solid Edge assembly (.asm).
 pub fn read_native_assembly(path: &Path) -> Result<Vec<NativeComponent>> {
-    let nodes = ck(ffi::read_sldasm_tree_ffi(path_str(path)?))?;
+    let dir = path.parent().unwrap_or(Path::new("."));
+    read_native_assembly_in(path, dir)
+}
+
+/// [`read_native_assembly`]; an Inventor assembly's documents are found by
+/// their internal ids anywhere under `dir`, and each component's `file` is
+/// its path relative to `dir`.
+pub fn read_native_assembly_in(path: &Path, dir: &Path) -> Result<Vec<NativeComponent>> {
+    let nodes = ck(ffi::read_native_tree_ffi(path_str(path)?, path_str(dir)?))?;
     Ok(nodes
         .into_iter()
         .map(|n| {

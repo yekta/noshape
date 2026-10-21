@@ -192,6 +192,9 @@ pub(crate) struct AsmUi {
     /// documents) and element tab (0 Part Studios, 1 Assemblies).
     pub insert_search: Option<Entity<InputState>>,
     pub insert_search_sub: Option<Subscription>,
+    /// The search box's text, kept here so the cached catalog tree doesn't
+    /// read the box (which would re-render it on every caret blink).
+    pub insert_query: String,
     /// Insert › Other documents (live 71): the "Search or paste URL" box, the
     /// open category (0 Owned by me … 4 Public) and the scanned documents.
     pub insert_url: Option<Entity<InputState>>,
@@ -469,7 +472,9 @@ impl AssemblyView {
                 transparency: crate::isolate_ui::alpha_t(alpha),
                 expand: if max_steps == 0 { 0.0 } else { steps as f32 / max_steps as f32 },
                 expand_options: vec!["Expand: connectivity".to_string(), "Expand: distance".to_string()],
+                expand_disabled: Vec::new(),
                 expand_ix: if connectivity { 0 } else { 1 },
+                legend: true,
                 expand_tip: if connectivity { "Expand isolate by mate connectivity" } else { "Expand isolate by distance" },
                 drag: |v: &mut Self| &mut v.ui.iso_slider_drag,
                 close: |v: &mut Self, _, cx| {
@@ -1597,6 +1602,8 @@ impl AssemblyView {
             item("Properties…", move |t, w, cx| t.open_assembly_properties(tab, w, cx)),
             item(if list_props { "Hide instance list properties" } else { "Show instance list properties" }, move |t, _, cx| {
                 t.ui.list_properties = !list_props;
+                // Kept as Preferences › Assembly settings › Display instance list properties.
+                crate::preferences_window::set_instance_list_properties(!list_props);
                 cx.notify();
             }),
             MenuEntry::Sep,
@@ -1931,9 +1938,13 @@ impl AssemblyView {
         self.ui.filter_sub = Some(sub);
         // Its placeholder is drawn italic over the empty box (`insert_search_box`).
         let st = cx.new(|cx| InputState::new(window, cx));
-        self.ui.insert_search_sub = Some(cx.subscribe(&st, |_: &mut Self, _, ev: &InputEvent, cx| {
+        self.ui.insert_search_sub = Some(cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
+            // No `cx.notify()`: the field's own notification re-renders the
+            // panel around it; of the cached slices only the catalog tree
+            // shows the query.
             if matches!(ev, InputEvent::Change) {
-                cx.notify();
+                this.ui.insert_query = st.read(cx).value().to_string();
+                this.insert_search_changed(cx);
             }
         }));
         self.ui.insert_search = Some(st);
@@ -2115,71 +2126,54 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// The S shortcut toolbar (live behaviours "Assembly" S toolbar): at the
+    /// cursor (left = x + 10, top = y − 30), 30 px tools at a 34 px pitch,
+    /// five per row, on rgba(255,255,255,.95), no border, square corners, a
+    /// 0 5 10 shadow, no tooltips; the ticked tools of Preferences › Shortcut
+    /// toolbars › Assembly in list order (`AsmToolbarPrefs`).
     pub(super) fn render_mini_toolbar(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let at = self.ui.mini_toolbar?;
-        let pal = p();
-        // Keep the toolbar inside the graphics area.
-        let size = self.viewport.read(cx).size();
-        let at = DVec2::new(at.x.min(size.x - 440.0 + 60.0).max(64.0), at.y.max(48.0));
-        type Act = fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>);
-        let tools: [(&str, &str, Act); 14] = [
-            ("Insert parts and assemblies (I)", "insert", |t, _, cx| {
-                t.insert_open = true;
-                cx.notify();
-            }),
-            ("Mate connector (Ctrl+M)", "mate-connector-assembly", |t, w, cx| t.open_mc(None, w, cx)),
-            ("Fastened mate (M)", "fastened", |t, w, cx| t.start_mate(MateType::Fastened, w, cx)),
-            ("Revolute mate", "revolute", |t, w, cx| t.start_mate(MateType::Revolute, w, cx)),
-            ("Slider mate", "slider", |t, w, cx| t.start_mate(MateType::Slider, w, cx)),
-            ("Planar mate", "planar", |t, w, cx| t.start_mate(MateType::Planar, w, cx)),
-            ("Cylindrical mate", "cylindrical", |t, w, cx| t.start_mate(MateType::Cylindrical, w, cx)),
-            ("Pin slot mate", "pin-slot", |t, w, cx| t.start_mate(MateType::PinSlot, w, cx)),
-            ("Ball mate", "ball", |t, w, cx| t.start_mate(MateType::Ball, w, cx)),
-            ("Parallel mate", "parallel-mate", |t, w, cx| t.start_mate(MateType::Parallel, w, cx)),
-            ("Tangent mate", "tangent-mate", |t, w, cx| t.start_mate(MateType::Tangent, w, cx)),
-            ("Group", "group", |t, _, cx| t.create_group(cx)),
-            ("Linear pattern", "linear-pattern", |t, w, cx| t.open_pattern(PatternDialogKind::Linear, w, cx)),
-            ("Replicate", "replicate", |t, w, cx| t.open_pattern(PatternDialogKind::Replicate, w, cx)),
-        ];
-        let mut row = h_flex().gap_0p5();
-        for (tip, icon, act) in tools {
-            row = row.child(
-                div()
-                    .id(SharedString::from(format!("asm-mini-{icon}")))
-                    .size(px(30.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded_md()
-                    .cursor_pointer()
-                    .hover(|d| d.bg(pal.panel_hover))
-                    .child(svg().path(icon_path(icon)).size(px(18.)).text_color(pal.text))
-                    .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx))
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                            cx.stop_propagation();
-                            this.ui.mini_toolbar = None;
-                            act(this, window, cx);
-                            cx.notify();
-                        }),
-                    ),
-            );
+        let ticked = AsmToolbarPrefs::load().shortcut_tools();
+        let shown: Vec<(&'static str, &'static str)> = shortcut_catalog().into_iter().filter(|(id, _, _)| ticked.iter().any(|t| t == id)).map(|(id, _, icon)| (id, icon)).collect();
+        let mut rows = v_flex().gap(px(1.));
+        for chunk in shown.chunks(5) {
+            let mut row = h_flex().gap(px(4.));
+            for &(id, icon) in chunk {
+                row = row.child(
+                    div()
+                        .id(SharedString::from(format!("asm-mini-{id}")))
+                        .size(px(30.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(3.))
+                        .cursor_pointer()
+                        .hover(|d| d.bg(rgb(0xeaeaea)))
+                        .child(crate::assets::icon(icon, 20., cx))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                                cx.stop_propagation();
+                                this.ui.mini_toolbar = None;
+                                this.run_toolbar_tool(id, window, cx);
+                                cx.notify();
+                            }),
+                        ),
+                );
+            }
+            rows = rows.child(row);
         }
         Some(
             div()
                 .id("asm-mini-toolbar")
                 .occlude()
                 .absolute()
-                .left(px((at.x as f32 - 60.0).max(4.0)))
-                .top(px((at.y as f32 - 44.0).max(4.0)))
-                .p_1()
-                .rounded_lg()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
-                .child(row)
+                .left(px(at.x as f32 + 10.))
+                .top(px((at.y as f32 - 30.).max(0.)))
+                .px(px(4.5))
+                .bg(hsla(0., 0., 1., 0.95))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .child(rows)
                 .into_any_element(),
         )
     }
@@ -2266,6 +2260,8 @@ pub(crate) struct AnimState {
     pub t: f64,
     pub dir: f64,
     pub playing: bool,
+    /// ▶ was pressed once: Current value shows (live 53: empty before).
+    pub played: bool,
     pub playback: Playback,
     pub busy: bool,
     pub current: f64,
@@ -2388,7 +2384,7 @@ impl AssemblyView {
         let steps = mk("300".into(), window, cx);
         let current = self.result.solved.mate_values.get(&m.id).map(|v| v[dof]).unwrap_or(0.0);
         self.selected_mate = Some(m.id);
-        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, playback: Playback::Reciprocate, busy: false, current, task: None, preview: false });
+        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: false, playback: Playback::Reciprocate, busy: false, current, task: None, preview: false });
         cx.notify();
     }
 
@@ -2423,7 +2419,7 @@ impl AssemblyView {
         let start = mk(a, window, cx);
         let end = mk(b, window, cx);
         let steps = mk(format!("{steps}"), window, cx);
-        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, playback: Playback::Single, busy: false, current: now, task: None, preview: true });
+        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: true, playback: Playback::Single, busy: false, current: now, task: None, preview: true });
         self.play_animation(cx);
     }
 
@@ -2476,9 +2472,12 @@ impl AssemblyView {
             a.t = if a.dir > 0.0 { 0.0 } else { 1.0 };
         }
         a.playing = true;
+        a.played = true;
         // 60 steps per second, so more steps play slower; time based, so a
         // slow frame (solve + redraw) skips steps instead of slowing down.
-        let step = 1.0 / (steps - 1) as f64;
+        // Live steps by (end − start) / Steps and stays on those values
+        // (behaviours "Animate mate: Current value": 1.2° steps, 3.6, 4.8, 12).
+        let step = 1.0 / steps.max(1) as f64;
         let mut last = std::time::Instant::now();
         a.task = Some(cx.spawn(async move |this, cx| {
             loop {
@@ -2489,9 +2488,9 @@ impl AssemblyView {
                         return a.playing.then_some(None);
                     }
                     let now = std::time::Instant::now();
-                    let frames = (now.duration_since(last).as_secs_f64() * 60.0).clamp(1.0, 30.0);
+                    let frames = (now.duration_since(last).as_secs_f64() * 60.0).clamp(1.0, 30.0).round();
                     last = now;
-                    a.t += a.dir * step * frames;
+                    a.t = ((a.t / step).round() + a.dir * frames) * step;
                     if a.t > 1.0 + 1e-9 || a.t < -1e-9 {
                         match a.playback {
                             Playback::Single => {
@@ -2556,14 +2555,21 @@ impl AssemblyView {
         let Some(a) = &self.anim else { return div().into_any_element() };
         let Some(m) = self.assembly(cx).and_then(|x| x.mate(a.mate).cloned()) else { return div().into_any_element() };
         let units = self.units(cx);
-        let q = if a.angular() { noshape_units::Quantity::radians(a.current) } else { noshape_units::Quantity::meters(a.current) };
-        let current = noshape_units::format_quantity(q, &units);
+        // Live: the needed decimals only, a space, the unit ("3.6 deg"; no °).
+        let current = if !a.played {
+            String::new()
+        } else if a.angular() {
+            format!("{} deg", trim_number(a.current.to_degrees()))
+        } else {
+            let f = units.si_factor(noshape_units::Dim::LENGTH);
+            format!("{} {}", trim_number(a.current / f), units.length.symbol())
+        };
         let (playing, pb, dof, reversed) = (a.playing, a.playback, a.dof, a.dir < 0.0);
         let dofs = noshape_model::assembly::eval::mate_dofs(m.mate_type);
         // Onshape's "Animate mate" dialog: the DOF chip box, right-aligned
         // fields, Playback type ▾ + reverse, Current value, ▶ ■ and ?.
         use crate::os_ui as os;
-        let field = |label: &'static str, st: &Entity<InputState>| os::param_row(label, Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.))).into_any_element();
+        let field = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.)).into_any_element();
         let axis_of = |ix: usize| match ix {
             0 => ("⟳", "z"),
             1 => ("↔", "x"),
@@ -3639,6 +3645,10 @@ impl AssemblyView {
             Some([one]) => self.assembly(cx).and_then(|a| a.instance(*one).map(|i| i.name.clone())).unwrap_or_default(),
             _ => self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into()),
         };
+        // Through the user's export rules (Preferences › User export rules).
+        let tab_name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        let values = crate::export_naming::values(&self.doc.read(cx).name(), &tab_name, &base, None);
+        let base = crate::export_naming::default_name(noshape_model::export_rules::ExportElement::Assembly, crate::part_studio::export::ExportSettings::default().format.label(), &values, base);
         let run: crate::part_studio::export::RunExport = std::rc::Rc::new(move |s, name, window, cx| {
             let (v, ids) = (view.clone(), ids.clone());
             if let Some(msg) = crate::part_studio::export::missing_writer(s.format) {
@@ -3736,6 +3746,13 @@ impl AssemblyView {
         let p = vp.project(*at)?;
         Some(div().absolute().left(px(p.x as f32 - 9.)).top(px(p.y as f32 - 9.)).child(crate::assets::icon(&icon_path("com-indicator"), 18., cx)).into_any_element())
     }
+}
+
+/// A value with up to three decimals and no trailing zeros ("3.6", "12").
+fn trim_number(x: f64) -> String {
+    let t = format!("{x:.3}");
+    let t = t.trim_end_matches('0').trim_end_matches('.');
+    if t == "-0" { "0".to_string() } else { t.to_string() }
 }
 
 #[cfg(test)]

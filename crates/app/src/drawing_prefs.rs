@@ -108,7 +108,6 @@ impl Render for DrawingPrefsView {
         let changed = self.edited != self.saved;
         let select = self.select(cx);
         v_flex()
-            .mt(px(38.))
             .child(
                 h_flex()
                     .h(px(32.))

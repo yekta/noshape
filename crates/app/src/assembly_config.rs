@@ -614,6 +614,10 @@ impl AssemblyView {
         }
         let cell = |w: f32| div().w(px(w)).h(px(ROW_H)).flex_none().px(px(3.)).flex().items_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.));
         let head = |w: f32| cell(w).bg(rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD);
+        // Column widths: live's grips (`ui::col_grip`), per input table.
+        let table = format!("asm-config-{iid}");
+        let name_w = crate::ui::col_w(&table, "name", NAME_W);
+        let grip = |col: &str, default: f32| crate::ui::col_grip(&table, col, default);
         match &input.kind {
             ConfigInputKind::Variable { default, .. } => {
                 let a = iid.clone();
@@ -626,8 +630,9 @@ impl AssemblyView {
                     });
                 });
                 let value = self.cfg_cell_text(format!("var-def-{iid}"), default.text.clone(), (px(13.33), FontWeight::NORMAL), false, commit, cx);
-                section = section.child(h_flex().border_l_1().border_color(grid).child(head(NAME_W).child("Name")).child(head(COL_W).child("Default value")));
-                section = section.child(h_flex().border_l_1().border_color(grid).child(cell(NAME_W).child(format!("#{}", input.name))).child(cell(COL_W).child(value)));
+                let value_w = crate::ui::col_w(&table, "default", COL_W);
+                section = section.child(h_flex().border_l_1().border_color(grid).child(head(name_w).relative().child("Name").child(grip("name", NAME_W))).child(head(value_w).relative().child("Default value").child(grip("default", COL_W))));
+                section = section.child(h_flex().border_l_1().border_color(grid).child(cell(name_w).child(format!("#{}", input.name))).child(cell(value_w).child(value)));
             }
             ConfigInputKind::Text { .. } => {}
             _ => {
@@ -636,19 +641,21 @@ impl AssemblyView {
                     _ => vec![("true".into(), "Checked".into()), ("false".into(), "Unchecked".into())],
                 };
                 let columns: Vec<(usize, acfg::AsmConfiguredParam)> = cfg.configured.iter().cloned().enumerate().filter(|(_, c)| c.input == iid).collect();
+                let col_key = |c: &acfg::AsmConfiguredParam| format!("{:?}-{:?}", c.target, c.param);
+                let col_ws: Vec<f32> = columns.iter().map(|(_, c)| crate::ui::col_w(&table, &col_key(c), COL_W)).collect();
                 // Two-level header: feature name spanning its parameters.
                 let two_level = !columns.is_empty();
-                let mut hrow = h_flex().items_start().border_l_1().border_color(grid).child(head(NAME_W).h(px(if two_level { ROW_H * 2. } else { ROW_H })).child("Name"));
+                let mut hrow = h_flex().items_start().border_l_1().border_color(grid).child(head(name_w).relative().h(px(if two_level { ROW_H * 2. } else { ROW_H })).child("Name").child(grip("name", NAME_W)));
                 let mut i = 0;
                 while i < columns.len() {
                     let t = columns[i].1.target;
                     let span = columns[i..].iter().take_while(|(_, c)| c.target == t).count();
                     let (fname, _) = self.cfg_column_names(t, &columns[i].1.param, cx);
                     let mut sub = h_flex();
-                    for (_, c) in &columns[i..i + span] {
-                        sub = sub.child(head(COL_W).child(div().truncate().child(self.cfg_param_label(c.target, &c.param, cx))));
+                    for (k, (_, c)) in columns[i..i + span].iter().enumerate() {
+                        sub = sub.child(head(col_ws[i + k]).relative().child(div().truncate().child(self.cfg_param_label(c.target, &c.param, cx))).child(grip(&col_key(c), COL_W)));
                     }
-                    hrow = hrow.child(v_flex().child(head(COL_W * span as f32).child(div().truncate().child(fname))).child(sub));
+                    hrow = hrow.child(v_flex().child(head(col_ws[i..i + span].iter().sum()).child(div().truncate().child(fname))).child(sub));
                     i += span;
                 }
                 section = section.child(hrow);
@@ -681,7 +688,7 @@ impl AssemblyView {
                         .border_l_1()
                         .border_color(grid)
                         .child(
-                            cell(NAME_W)
+                            cell(name_w)
                                 .relative()
                                 .cursor_pointer()
                                 .pl(px(6.))
@@ -717,9 +724,9 @@ impl AssemblyView {
                                 }))
                             })
                         });
-                    for (ci, c) in &columns {
+                    for (k, (ci, c)) in columns.iter().enumerate() {
                         let el = self.cfg_value_cell(*ci, c, rk, cx);
-                        row = row.child(cell(COL_W).child(el));
+                        row = row.child(cell(col_ws[k]).child(el));
                     }
                     section = section.child(row);
                 }
@@ -739,7 +746,7 @@ impl AssemblyView {
                     let el = self.cfg_cell_text(key, String::new(), (px(13.33), FontWeight::NORMAL), false, commit, cx);
                     section = section.child(
                         h_flex().border_l_1().border_color(grid).child(
-                            cell(NAME_W)
+                            cell(name_w)
                                 .relative()
                                 .child(el)
                                 .when(!editing, |d| d.child(div().absolute().left(px(6.)).top_0().bottom_0().flex().items_center().italic().text_size(px(14.)).text_color(pal.text_faint).child("Name"))),

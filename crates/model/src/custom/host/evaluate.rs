@@ -122,6 +122,9 @@ fn ev_owner_sketch_plane(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 
 /// Edge parameter (0..1) to curve parameter, by arc length when asked.
 pub(super) fn edge_param(s: &k::Shape, info: &k::EdgeInfo, t: f64, arc_length: bool) -> f64 {
+    // Parameters run along the edge's direction (its tangent is flipped for a
+    // reversed edge, so its points must be too: std's flange relies on it).
+    let t = if s.orientation() == k::Orientation::Reversed { 1.0 - t } else { t };
     let lin = info.first_param + (info.last_param - info.first_param) * t;
     if !arc_length || matches!(info.curve, k::Curve::Line { .. } | k::Curve::Circle { .. }) {
         return lin;
@@ -165,19 +168,22 @@ fn ev_edge_tangent_lines(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let mut d = s.tangent_at(u).ok()?.normalize_or_zero();
             if let Some(f) = &face
                 && let Ok(n) = f.normal_at_point(p)
+                && !face_on_left(f, &info, p, n, d)
             {
-                let eps = (info.length * 1e-4).clamp(1e-9, 1e-5);
-                let left = p + n.cross(d).normalize_or_zero() * eps;
-                let inside = f.project_point(left).is_ok_and(|pr| pr.point.distance(left) < eps * 1e-3);
-                if !inside {
-                    d = -d;
-                }
+                d = -d;
             }
             out.push(line_value(p, d));
         }
         Some(out)
     })?;
     Ok(Value::array(lines))
+}
+
+/// Whether `face` lies on the left of direction `d` at edge point `p` (up = `n`).
+fn face_on_left(face: &k::Shape, info: &k::EdgeInfo, p: DVec3, n: DVec3, d: DVec3) -> bool {
+    let eps = (info.length * 1e-4).clamp(1e-9, 1e-5);
+    let left = p + n.cross(d).normalize_or_zero() * eps;
+    face.project_point(left).is_ok_and(|pr| pr.point.distance(left) < eps * 1e-3)
 }
 
 fn face_tangent_plane(s: &k::Shape, uv: DVec2) -> Option<crate::display::PlaneFrame> {
@@ -216,15 +222,23 @@ fn ev_face_tangent_planes_at_edge(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let face_q = field(&a, "face");
     let face = with_ents(i, &cx, &face_q, |_, q, e| Ok(e.first().and_then(|f| q.shape(f))))?;
     let Some(face) = face else { return Err(raise_error(i, "NO_TANGENT_PLANE", None)) };
+    // std: x is the edge's direction; with `usingFaceOrientation` the one
+    // that keeps the face on the left (up being the face normal).
+    let face_oriented = field(&a, "usingFaceOrientation").as_bool().unwrap_or(false);
+    let arc = field(&a, "arcLengthParameterization").as_bool().unwrap_or(true);
     let planes = on_first(i, &cx, &a, "edge", "NO_TANGENT_PLANE", |q, e| {
         let s = q.shape(e)?;
         let info = s.edge_info().ok()?;
         params
             .iter()
             .map(|t| {
-                let p = s.point_at(edge_param(&s, &info, *t, true)).ok()?;
+                let u = edge_param(&s, &info, *t, arc);
+                let p = s.point_at(u).ok()?;
                 let n = face.normal_at_point(p).ok()?.normalize_or_zero();
-                let x = any_perpendicular(n);
+                let mut x = s.tangent_at(u).ok().map(|d| (d - n * d.dot(n)).normalize_or_zero()).filter(|d| *d != DVec3::ZERO).unwrap_or_else(|| any_perpendicular(n));
+                if face_oriented && !face_on_left(&face, &info, p, n, x) {
+                    x = -x;
+                }
                 Some(plane_value(&crate::display::PlaneFrame { origin: p, x, y: n.cross(x), normal: n }))
             })
             .collect()

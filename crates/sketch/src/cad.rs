@@ -246,6 +246,73 @@ pub fn from_document(doc: &Document, format: &str) -> Result<DxfDrawing> {
     Ok(out)
 }
 
+/// One space of a CAD file for an imported drawing: model space or a
+/// paper-space layout, with display colours (ACI 7 resolves to black, the
+/// light-background foreground) and texts.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CadSpace {
+    pub name: String,
+    /// Model space (else a paper-space layout).
+    pub model: bool,
+    pub entities: Vec<(DxfEntity, (u8, u8, u8))>,
+    pub texts: Vec<CadText>,
+}
+
+/// A TEXT / MTEXT of a [`CadSpace`] (plain text, lines split by `\n`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct CadText {
+    pub position: DVec2,
+    pub height: f64,
+    pub rotation: f64,
+    pub text: String,
+    pub color: (u8, u8, u8),
+}
+
+/// Every space of a DWG / DXF file (model space first, then the layouts in
+/// file order) and meters per drawing unit.
+pub fn parse_cad_spaces(bytes: &[u8]) -> Result<(Vec<CadSpace>, Option<f64>)> {
+    let doc = if bytes.starts_with(b"AC10") {
+        if !cadkit_dwg::sniff(bytes) {
+            return Err(SketchError::OperationFailed("unsupported DWG version (R13 to 2018 are supported)".into()));
+        }
+        cadkit_dwg::read(bytes, &ReadOptions::default()).map_err(|e| SketchError::OperationFailed(format!("cannot read the DWG file: {e}")))?
+    } else {
+        let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+        if !cadkit_dxf::sniff(bytes) {
+            return Err(SketchError::OperationFailed("not a DXF file".into()));
+        }
+        cadkit_dxf::read(bytes, &ReadOptions::default()).map_err(|e| SketchError::OperationFailed(format!("cannot read the DXF file: {e}")))?
+    };
+    let unit_scale = insunits(doc.units.unit.to_insunits() as i64);
+    let mut spaces: Vec<CadSpace> = Vec::new();
+    for (i, m) in doc.models.iter().enumerate() {
+        let model = m.kind == ModelKind::Model;
+        let mut space = CadSpace { name: m.name.clone(), model, ..Default::default() };
+        doc.walk(i, 32, |e, ctx| {
+            if matches!(e.kind, EntityKind::Dimension { .. }) || !e.visible {
+                return;
+            }
+            let color = e.resolved_color_in(&doc, ctx);
+            let map = Map::from(&ctx.transform);
+            match &e.kind {
+                EntityKind::Text { position, height, rotation, value, .. } => space.texts.push(CadText { position: map.point(p3(*position)), height: *height, rotation: *rotation, text: value.clone(), color }),
+                EntityKind::MText { position, height, rotation, plain, .. } => space.texts.push(CadText { position: map.point(p3(*position)), height: *height, rotation: *rotation, text: plain.clone(), color }),
+                kind => {
+                    let mut out = Vec::new();
+                    convert(kind, &map, &mut out);
+                    space.entities.extend(out.into_iter().map(|c| (c, color)));
+                }
+            }
+        });
+        if model {
+            spaces.insert(spaces.iter().position(|s| !s.model).unwrap_or(spaces.len()), space);
+        } else {
+            spaces.push(space);
+        }
+    }
+    Ok((spaces, unit_scale))
+}
+
 /// Reads an ASCII or binary DXF file.
 pub fn read_dxf(bytes: &[u8]) -> Result<DxfDrawing> {
     if !cadkit_dxf::sniff(bytes) {
@@ -276,6 +343,18 @@ mod tests {
 
     fn approx(a: DVec2, b: DVec2) -> bool {
         (a - b).length() < 1e-9
+    }
+
+    #[test]
+    fn spaces_keep_colours_and_texts() {
+        // Model space: a red (ACI 1) line, an ACI 7 circle and a TEXT.
+        let dxf = "0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n0\n62\n1\n10\n0\n20\n0\n11\n10\n21\n0\n0\nCIRCLE\n8\n0\n62\n7\n10\n5\n20\n5\n40\n2\n0\nTEXT\n8\n0\n10\n1\n20\n8\n40\n2.5\n1\nHELLO\n0\nENDSEC\n0\nEOF\n";
+        let (spaces, _) = parse_cad_spaces(dxf.as_bytes()).unwrap();
+        let model = spaces.iter().find(|s| s.model).expect("model space");
+        assert!(model.entities.iter().any(|(e, c)| matches!(e, DxfEntity::Curve(Curve2::Line { .. })) && *c == (255, 0, 0)), "{:?}", model.entities);
+        assert!(model.entities.iter().any(|(e, c)| matches!(e, DxfEntity::Curve(Curve2::Circle { .. })) && *c == (0, 0, 0)));
+        let t = model.texts.iter().find(|t| t.text == "HELLO").expect("text");
+        assert!((t.height - 2.5).abs() < 1e-9 && (t.position - DVec2::new(1.0, 8.0)).length() < 1e-9);
     }
 
     #[test]

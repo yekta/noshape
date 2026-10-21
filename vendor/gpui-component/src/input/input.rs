@@ -289,7 +289,7 @@ impl Input {
         self
     }
 
-    /// Set height of the input (Multi-line only).
+    /// Set height of the input (NOSHAPE PATCH: single-line ones too).
     pub fn h(mut self, height: impl Into<DefiniteLength>) -> Self {
         self.height = Some(height.into());
         self
@@ -790,6 +790,12 @@ impl RenderOnce for Input {
             .when(presentation.is_multi_line(), |this| {
                 this.h_auto()
                     .when_some(self.height, |this, height| this.h(height))
+            })
+            // NOSHAPE PATCH: `h()` sizes single-line inputs too (it was
+            // multi-line only, so every `Input::new(..).h(px(34.))` stayed at
+            // the preset's 28 px).
+            .when(!presentation.is_multi_line(), |this| {
+                this.when_some(self.height, |this, height| this.h(height))
             })
             .when(self.appearance, |this| {
                 this.bg(bg)

@@ -143,6 +143,9 @@ mod search;
 mod selection;
 #[path = "base/state.rs"]
 mod state;
+// NOSHAPE PATCH (agent qa4): a multi-line input's text as a cached view.
+#[path = "base/text_layer.rs"]
+mod text_layer;
 mod textarea;
 #[path = "base/touch.rs"]
 mod touch;

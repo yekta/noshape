@@ -516,7 +516,7 @@ impl Render for MateDialog {
                     .w(px(194.))
                     .h(px(29.))
                     .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
-                    .child(gpui_kit::base::input::input_frame(div().w(px(168.)).h(px(26.)).border_b_1().border_color(pal.border).child(Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.)))))
+                    .child(gpui_kit::base::input::input_frame(div().w(px(168.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.))))
             };
             if ox {
                 offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_X, axis_row("xyz-along-x", &self.offsets[0], cx), cx));
@@ -561,7 +561,7 @@ impl Render for MateDialog {
                     .w(px(194.))
                     .h(px(26.))
                     .child(div().w(px(86.)).h_full().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Rotation angle"))
-                    .child(gpui_kit::base::input::input_frame(div().w(px(108.)).h(px(26.)).border_b_1().border_color(pal.border).child(Input::new(&self.offsets[3]).appearance(false).text_size(px(13.33)).text_right().h(px(25.)))));
+                    .child(gpui_kit::base::input::input_frame(div().w(px(108.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(&self.offsets[3]).appearance(false).text_size(px(13.33)).text_right(), 25.))));
                 offset_rows = offset_rows.child(div().py(px(1.5)).child(select)).child(self.cfg_param(noshape_model::assembly::config::param::ROTATION, angle, cx));
             }
         }
@@ -590,7 +590,7 @@ impl Render for MateDialog {
                     .tooltip(crate::ui::tooltip(format!("{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key))))
                     .child(div().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(letter))
                     .child(crate::assets::icon(&icon_path(icon), 18., cx))
-                    .child(gpui_kit::base::input::input_frame(div().flex_1().ml(px(6.)).border_b_1().border_color(pal.border).child(Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.)))))
+                    .child(gpui_kit::base::input::input_frame(div().flex_1().ml(px(6.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.))))
             };
             for key in lkeys {
                 let (lo, hi) = &self.limits[key];

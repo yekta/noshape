@@ -273,7 +273,7 @@ impl AssemblyView {
     pub(super) fn render_dynamic_suppression(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (_, st, _) = self.ui.dynamic_suppression.as_ref()?;
         let pal = p();
-        let field = Input::new(st).appearance(false).text_size(px(13.33)).h(px(25.));
+        let field = crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)), 25.);
         Some(
             v_flex()
                 .w(px(220.))

@@ -30,6 +30,7 @@
 //! Booleans are unitless 1/0; any non-zero value is true.
 
 pub mod complete;
+mod decimal;
 mod dim;
 mod error;
 mod expr;
@@ -45,6 +46,7 @@ mod variables;
 #[cfg(test)]
 mod tests;
 
+pub use decimal::{comma_decimal, delocalize, localize, set_comma_decimal};
 pub use dim::Dim;
 pub use error::{EvalError, ExprError, ParseError, ParseErrorKind};
 pub use expr::{BinaryOp, Constant, Expr, Func, UnaryOp};

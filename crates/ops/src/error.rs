@@ -5,7 +5,8 @@ use serde_json::{Value, json};
 
 #[derive(Debug, Clone)]
 pub struct OpError {
-    /// `invalid_argument`, `not_found`, `regeneration_failed`, `read_only`, `io`, `internal`.
+    /// `invalid_argument`, `not_found`, `regeneration_failed`, `read_only`,
+    /// `protected` (workspace protection), `io`, `internal`.
     pub code: &'static str,
     pub message: String,
     /// The argument (path into the arguments, e.g. `params.depth`) at fault.
@@ -70,6 +71,15 @@ impl std::error::Error for OpError {}
 
 impl From<anyhow::Error> for OpError {
     fn from(e: anyhow::Error) -> Self {
-        OpError::new("io", format!("{e:#}"))
+        let m = format!("{e:#}");
+        // The session's refusals: a protected workspace, a read-only view.
+        let code = if m.contains(crate::session::PROTECTED_MESSAGE) {
+            "protected"
+        } else if m.contains(crate::session::READ_ONLY_MESSAGE) {
+            "read_only"
+        } else {
+            "io"
+        };
+        OpError::new(code, m)
     }
 }

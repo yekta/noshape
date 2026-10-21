@@ -10,6 +10,7 @@ mod meta;
 mod query;
 mod render;
 mod sketch;
+mod sketch_edit;
 mod variables;
 
 use crate::doc::{self, OpenDoc};
@@ -25,6 +26,7 @@ pub fn all() -> Vec<Op> {
     v.extend(document::ops());
     v.extend(feature::ops());
     v.extend(sketch::ops());
+    v.extend(sketch_edit::ops());
     v.extend(variables::ops());
     v.extend(configuration::ops());
     v.extend(assembly::ops());

@@ -10,6 +10,8 @@ struct OverlayGlobals {
     // grayscale enhanced contrast.
     shading: vec4<f32>,
     gamma_ratios: vec4<f32>,
+    // x: 1 = clip path pixels to the path's bounds (GPUI's wgpu path shader).
+    flags: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> g: OverlayGlobals;
@@ -24,18 +26,27 @@ fn to_clip(p: vec2<f32>) -> vec4<f32> {
 struct FillOut {
     @builtin(position) position: vec4<f32>,
     @location(0) color: vec4<f32>,
+    @location(1) @interpolate(flat) bounds: vec4<f32>,
 }
 
 @vertex
-fn vs_fill(@location(0) position: vec2<f32>, @location(1) color: vec4<f32>) -> FillOut {
+fn vs_fill(@location(0) position: vec2<f32>, @location(1) color: vec4<f32>, @location(2) bounds: vec4<f32>) -> FillOut {
     var out: FillOut;
     out.position = to_clip(position);
     out.color = color;
+    out.bounds = bounds;
     return out;
 }
 
 @fragment
 fn fs_fill(input: FillOut) -> @location(0) vec4<f32> {
+    // GPUI's wgpu path shader clips pixel centers to the path's bounds
+    // (measured: a center on the right or bottom bound is dropped, one on
+    // the left or top bound kept).
+    let p = input.position.xy + g.origin;
+    if (g.flags.x > 0.5 && (any(p < input.bounds.xy) || any(p >= input.bounds.zw))) {
+        return vec4<f32>(0.0);
+    }
     return input.color;
 }
 

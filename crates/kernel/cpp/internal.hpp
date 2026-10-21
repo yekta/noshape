@@ -206,6 +206,13 @@ struct AsmNode
   bool                   suppressed = false, hidden = false, exclude_bom = false, assembly = false;
 };
 std::vector<AsmNode> read_sldasm_tree(const std::string& path);
+// An Inventor assembly's occurrence tree; `file`: the referenced document,
+// relative to `search_dir` (where the assembly and its documents are).
+std::vector<AsmNode> read_iam_tree(const std::string& path, const std::string& search_dir);
+// A Solid Edge assembly's occurrence tree (`file`: the document's name).
+std::vector<AsmNode> read_se_tree(const std::string& path, const std::string& search_dir);
+// Any native assembly: SOLIDWORKS, Inventor or Solid Edge, by extension.
+std::vector<AsmNode> read_native_tree(const std::string& path, const std::string& search_dir);
 // Extract a zip's top-level files into `dir` (folders are listed, not
 // extracted); returns every entry name.
 std::vector<std::string> extract_zip(const std::string& zip, const std::string& dir);

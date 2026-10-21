@@ -6,9 +6,8 @@ use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
-use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
@@ -146,7 +145,6 @@ pub struct HistoryPanel {
     /// Tabs each microversion changed (store diffs, for the Tab filters).
     changed_tabs: HashMap<MicroversionId, Vec<TabId>>,
     /// Result of "Compare": (description of the older point, diff).
-    compare: Option<(String, Vec<noshape_model::compare::TabDiff>)>,
     _subs: Vec<Subscription>,
 }
 
@@ -181,7 +179,6 @@ impl HistoryPanel {
             date_from,
             date_to,
             changed_tabs: HashMap::new(),
-            compare: None,
             _subs: subs,
         }
     }
@@ -424,81 +421,21 @@ impl HistoryPanel {
         }
     }
 
-    /// Compare a point in history with the current branch head.
+    /// Compare: the document enters compare mode between the current
+    /// workspace (base) and the row (target) (live ui2/950–954).
     fn compare_with_current(&mut self, mv: MicroversionId, label: String, cx: &mut Context<Self>) {
-        let r = (|| -> anyhow::Result<Vec<noshape_model::compare::TabDiff>> {
+        let r = (|| -> anyhow::Result<(String, noshape_model::document::Document, noshape_model::document::Document)> {
             let s = &self.doc.read(cx).session;
-            let old = noshape_model::document::Document::from_blobs(&s.store.read_all(mv)?)?;
-            let new = noshape_model::document::Document::from_blobs(&s.store.read_all(s.head()?)?)?;
-            Ok(noshape_model::compare::compare_documents(&old, &new))
+            let target = noshape_model::document::Document::from_blobs(&s.store.read_all(mv)?)?;
+            let base = noshape_model::document::Document::from_blobs(&s.store.read_all(s.head()?)?)?;
+            let name = s.store.branch(s.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into());
+            Ok((name, base, target))
         })();
         match r {
-            Ok(d) => self.compare = Some((label, d)),
+            Ok((name, base, target)) => crate::compare_mode::start(&self.doc, (None, name, base), (Some(mv), label, target), cx),
             Err(e) => self.error(e, cx),
         }
         cx.notify();
-    }
-
-    fn render_compare(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        use noshape_model::compare::ChangeKind;
-        let (label, diffs) = self.compare.as_ref()?;
-        let pal = p();
-        let color = |k: &ChangeKind| match k {
-            ChangeKind::Added => pal.success,
-            ChangeKind::Removed => pal.error,
-            ChangeKind::Modified => pal.warning,
-        };
-        let sign = |k: &ChangeKind| match k {
-            ChangeKind::Added => "+",
-            ChangeKind::Removed => "−",
-            ChangeKind::Modified => "~",
-        };
-        let mut body: Vec<AnyElement> = Vec::new();
-        if diffs.is_empty() {
-            body.push(div().text_xs().text_color(pal.text_faint).child("No differences.").into_any_element());
-        }
-        for d in diffs {
-            body.push(
-                h_flex()
-                    .gap_1p5()
-                    .pt_1()
-                    .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(color(&d.status)).child(sign(&d.status)))
-                    .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(d.tab.clone()))
-                    .child(div().text_xs().text_color(pal.text_faint).child(d.kind_name))
-                    .into_any_element(),
-            );
-            for c in &d.changes {
-                body.push(
-                    h_flex()
-                        .pl_3()
-                        .gap_1p5()
-                        .items_start()
-                        .child(div().text_xs().text_color(color(&c.kind)).child(sign(&c.kind)))
-                        .child(div().text_xs().text_color(pal.text_muted).child(c.text.clone()))
-                        .into_any_element(),
-                );
-            }
-        }
-        Some(
-            v_flex()
-                .max_h(px(320.))
-                .border_b_1()
-                .border_color(pal.border)
-                .child(
-                    h_flex()
-                        .px_2()
-                        .pt_2()
-                        .justify_between()
-                        .child(div().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(pal.text_muted).child("COMPARE WITH CURRENT"))
-                        .child(Button::new("cmp-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.compare = None;
-                            cx.notify();
-                        }))),
-                )
-                .child(div().px_2().text_xs().text_color(pal.text_faint).truncate().child(format!("From: {label}")))
-                .child(v_flex().id("cmp-body").px_2().pb_2().overflow_y_scroll().children(body))
-                .into_any_element(),
-        )
     }
 
     fn restore(&mut self, mv: MicroversionId, cx: &mut Context<Self>) {
@@ -1126,22 +1063,56 @@ impl Render for HistoryPanel {
 
         let view = cx.entity();
         let doc = self.doc.clone();
+        // Compare mode (live 952): the base row light blue with a blue bar,
+        // the target row light pink with a red bar.
+        let comparing = crate::compare_mode::rows(&self.doc, cx);
+        let repair_picking = crate::repair_mode::picking(&self.doc, cx);
+        // Repair is offered from a Part Studio (live rp-900).
+        let repair_here = {
+            let s = &self.doc.read(cx).session;
+            s.active_tab.and_then(|t| s.doc.tab(t)).is_some_and(|t| matches!(t.content, TabContent::PartStudio(_)))
+        };
         let mut list: Vec<AnyElement> = Vec::new();
+        // A version made with no change since the row before it shares its
+        // microversion (V1 right after Start): the version row is the one meant.
+        let version_at = |mv: MicroversionId| placed.iter().any(|p| p.row.kind == RowKind::Version && p.row.mv == mv);
         for pl in &placed {
             let r = pl.row.clone();
-            let selected = match r.kind {
-                RowKind::Workspace(b) => b == current_branch && viewing.is_none(),
-                _ => viewing == Some(r.mv),
+            let is_row = |side: Option<MicroversionId>| match r.kind {
+                RowKind::Workspace(b) => b == current_branch && side.is_none(),
+                RowKind::Version => side == Some(r.mv),
+                _ => side == Some(r.mv) && !version_at(r.mv),
             };
+            let compare_side = comparing.map(|(base, target)| (is_row(base), is_row(target))).filter(|(b, t)| *b || *t);
+            let selected = comparing.is_none()
+                && match r.kind {
+                    RowKind::Workspace(b) => b == current_branch && viewing.is_none(),
+                    _ => viewing == Some(r.mv),
+                };
             let (mv, kind, name) = (r.mv, r.kind, r.name.clone());
+            // Clicking a row leaves compare mode and opens it (live 954).
+            let repair_label = if kind == RowKind::Change { format!("{current_name} :: {name}") } else { name.clone() };
+            let repair_label2 = repair_label.clone();
             let open = cx.listener(move |this, e: &ClickEvent, _, cx| match kind {
+                // The header wrench is on: this entry opens in Repair.
+                RowKind::Version | RowKind::Change | RowKind::Start if crate::repair_mode::picking(&this.doc, cx) => {
+                    if let Err(err) = crate::repair_mode::open(&this.doc, mv, repair_label.clone(), cx) {
+                        this.error(err, cx);
+                    }
+                }
                 RowKind::Workspace(b) if b != current_branch => {
                     if e.click_count() >= 2 {
                         this.switch_branch(b, cx)
                     }
                 }
-                RowKind::Workspace(_) => this.view_mv(None, cx),
-                _ => this.view_mv(Some(mv), cx),
+                RowKind::Workspace(_) => {
+                    crate::compare_mode::stop(&this.doc, cx);
+                    this.view_mv(None, cx)
+                }
+                _ => {
+                    crate::compare_mode::stop(&this.doc, cx);
+                    this.view_mv(Some(mv), cx)
+                }
             });
             let (v, d, cur) = (view.clone(), doc.clone(), current_name.clone());
             let row_packages = if r.kind == RowKind::Version { packages_at.get(&mv).cloned().unwrap_or_default() } else { Vec::new() };
@@ -1163,7 +1134,11 @@ impl Render for HistoryPanel {
                 let key = r.key.clone();
                 let open_changes = self.filter.is_active() || self.expanded.contains(&key);
                 let name_el = match r.kind {
-                    RowKind::Workspace(_) => div().px(px(3.)).rounded(px(3.)).border_1().border_color(rgb(LANES[r.lane % LANES.len()])).bg(if r.lane == 0 { rgb(0xd0dbe5) } else { rgb(0xfff4d6) }).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(r.name.clone()),
+                    // A protected workspace carries a lock (help "Workspace Protections").
+                    RowKind::Workspace(b) => h_flex()
+                        .gap(px(4.))
+                        .child(div().px(px(3.)).rounded(px(3.)).border_1().border_color(rgb(LANES[r.lane % LANES.len()])).bg(if r.lane == 0 { rgb(0xd0dbe5) } else { rgb(0xfff4d6) }).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(r.name.clone()))
+                        .when(self.doc.read(cx).session.branch_protected(b), |d| d.child(crate::assets::icon("lock", 14., cx))),
                     _ => div().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(r.name.clone()),
                 };
                 h_flex()
@@ -1177,7 +1152,11 @@ impl Render for HistoryPanel {
                     .line_height(px(21.))
                     .text_color(pal.text_muted)
                     .when(selected, |d| d.bg(pal.accent_soft))
-                    .when(!selected, |d| d.hover(|d| d.bg(pal.panel_hover)))
+                    .when_some(compare_side, |d, (base, _)| {
+                        let (fill, bar) = if base { (crate::compare_mode::BASE_ROW, crate::compare_mode::BASE_BLUE) } else { (crate::compare_mode::TARGET_ROW, crate::compare_mode::TARGET_RED) };
+                        d.bg(rgb(fill)).border_l(px(3.)).border_color(rgb(bar))
+                    })
+                    .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(pal.panel_hover)))
                     .tooltip(crate::ui::tooltip(match r.kind {
                         RowKind::Workspace(_) => format!("Open workspace {}", r.name),
                         _ => format!("Open version {}", r.name),
@@ -1230,18 +1209,37 @@ impl Render for HistoryPanel {
                 let (v1, v2, v3, v4) = (v.clone(), v.clone(), v.clone(), v.clone());
                 let (d5, d6) = (d.clone(), d.clone());
                 let (name1, name2, cur1) = (name.clone(), name.clone(), cur.clone());
+                let (v5r, rl) = (v.clone(), repair_label2.clone());
                 let d1 = d.clone();
                 match kind {
                     RowKind::Workspace(b) => {
                         let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| if b == current_branch { t.view_mv(None, cx) } else { t.switch_branch(b, cx) })));
-                        let m = if b != current_branch { m.item(crate::os_menu::OsMenuItem::new(format!("Merge into {cur1}…")).on_click(move |_, _, cx| v2.update(cx, |t, cx| t.merge(b, cx)))) } else { m };
+                        // Live wp-901: Open · Compare · Merge into current workspace… ·
+                        // Workspace protection… · Properties… (browser tab / copy link
+                        // are web-only; Delete awaits its capture).
+                        let m = if b != current_branch {
+                            m.item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(mv, name2.clone(), cx))))
+                                .item(crate::os_menu::OsMenuItem::new("Merge into current workspace…").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.merge(b, cx))))
+                        } else {
+                            m
+                        };
+                        let dp = d5.clone();
+                        let m = m.item(crate::os_menu::OsMenuItem::new("Workspace protection…").on_click(move |_, window, cx| crate::workspace_protection::open_dialog(dp.clone(), b, window, cx)));
                         m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Workspace(b), window, cx)))
                     }
                     _ => {
+                        let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(mv), cx))));
+                        // Live rp-904: change rows have no "Branch to create workspace…".
+                        let m = if kind == RowKind::Change { m } else { m.item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx))) };
                         let m = m
-                            .item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.view_mv(Some(mv), cx))))
-                            .item(crate::os_menu::OsMenuItem::new("Branch to create workspace…").on_click(move |_, window, cx| open_branch_dialog(d1.clone(), mv, name1.clone(), window, cx)))
                             .item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(mv, name2.clone(), cx))))
+                            // Live rp-904/905: change and version rows.
+                            .item(crate::os_menu::OsMenuItem::new("View in repair").on_click(move |_, _, cx| {
+                                let doc = v5r.read(cx).doc.clone();
+                                if let Err(e) = crate::repair_mode::open(&doc, mv, rl.clone(), cx) {
+                                    v5r.update(cx, |t, cx| t.error(e, cx));
+                                }
+                            }))
                             .item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx))));
                         match version_id {
                             Some(id) => {
@@ -1301,8 +1299,16 @@ impl Render for HistoryPanel {
                             this.compare_with_current(mv, name, cx);
                         }
                     })))
+                    // Live rp-900/901: "Repair" (Part Studios): pick a history entry to repair from.
+                    .when(repair_here, |d| {
+                        let doc = self.doc.clone();
+                        d.child(crate::ui::icon_button("hist-repair", "repair", 30., repair_picking, cx).tooltip("Repair").on_click(move |_, _, cx| crate::repair_mode::toggle_picking(&doc, cx)))
+                    })
                     .child(crate::ui::icon_button("hist-close", "close", 30., false, cx).tooltip("Close").on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
             )
+            .when(repair_picking, |d| {
+                d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select a history entry to repair this Part Studio"))
+            })
             .child(
                 // Live document/22: the box with its ▾ (filter panel) and the
                 // square search button, 6 px under the header.
@@ -1372,7 +1378,6 @@ impl Render for HistoryPanel {
                     .child(div().w(px(118.)).flex_none().child("Name"))
                     .child(div().child("Modified")),
             )
-            .children(self.render_compare(cx))
             .child(
                 div()
                     .id("history-rows")

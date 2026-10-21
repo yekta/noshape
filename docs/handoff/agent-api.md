@@ -248,3 +248,113 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   are clean. Fixed scene/builder.rs:124 type_complexity (kern's mesh-cap cache -> `type CapLines`). Foreign errors
   reported to the lead: app drawing_props.rs:663 (useless conversion), units_prefs.rs:78/293 (type complexity,
   `#[test]` recursion limit). Now: enabling config/assembly ops.
+- 2026-10-20 22:30 (api): config + assembly ops ENABLED (lib.rs `pub mod assembly; pub mod config;`, ops/mod.rs
+  registers configuration + assembly). Clippy -p noshape-model -p noshape-ops clean. assembly_with_mates e2e passes.
+  Added `config_activate` (the Configurations box's chosen values; `OpenDoc::active_config`, view state, used by
+  every default regenerate and by feature_edit), `config_list.active`, `config::{kind_dim, value_error, current}`
+  (copies of config_panel.rs `config_value_error` / config_var_dialog `kind_dim` / mod.rs `current_config`; the app
+  switches to them with the config_panel switch). Found: sketch dimensions couldn't use configuration or Variable
+  Studio variables (`display.variables` holds only the studio's own). Fixed for ops via new model fn
+  `Configuration::variable_values` (extracted from regen/mod.rs, same behaviour); the APP has the same gap in
+  part_studio/sketch.rs (dimension edits use display.variables) -> reported to the lead. Test `configurations`
+  in e2e.rs written; full `cargo test -p noshape-ops` running (log /root/api-scratch/test.log). Coverage: assembly
+  Mate/Tangent/Width/Insert dialog -> ops, PLANNED_CEILING 104. AGENT_API.md + mcp_instructions.md updated.
+  Lead's clippy report: part_studio/mod.rs:19 + config_panel.rs:2671 (`var_table_drag_source`, unused) are NOT
+  from the ops switch; told the lead.
+  NEXT: confirm tests -> patches view_tools/behaviors/menus (lead told) -> config_panel.rs + assembly_view.rs
+  switches -> drawing slices.
+- 2026-10-20 23:45 (api): `cargo test -p noshape-ops` all green (lib 8, coverage 3, e2e 3: part, assembly_with_mates,
+  configurations). APPLIED (lead told 22:30): view_tools.rs start_rename, behaviors.rs set_visibility/show_everything/
+  body_of, menus.rs mass block -> noshape_ops (patch_*.py); config_panel.rs (add input, add variable input, rename/
+  delete input, variable default, rename/delete/add option, configured values x3, configure parameter, reorder,
+  config_value_error) + config_var_dialog.rs (kind_dim re-export, Variable dialog add/edit) -> noshape_ops::config
+  (patch_config_panel.py; new ops fns push_variable_input, edit_variable_input; config_edit_input takes `range`).
+  App clippy after these: nothing from my files (only compare_mode.rs dead code, someone's WIP; model
+  drawing/tables.rs:233 needless struct update, drawing agent). assembly_view.rs (edit/fold_solved, insert_part,
+  set_fixed/hidden/suppressed, delete_instances, delete_mate, accept_mate -> noshape_ops::assembly;
+  patch_assembly_view.py) applied 23:45, clippy running.
+- 2026-10-20 23:50 (api): assembly_view.rs switch verified (app clippy: nothing from my files; only compare_mode.rs
+  dead code = ui2's Compare WIP). All step-5 switches + config/assembly switches DONE.
+  PENDING (lead FYI 23:46): ui2 adds a Workspace protection flag to ops/src/session.rs (blocks model edits, allows
+  versions/branches/merges). When it lands: ops `document_protect` / `document_unprotect`, map the session's protected
+  error to OpError code `protected` (registry::run / From<anyhow>), document_info shows it, e2e test. ui2 is editing
+  workspace.rs + part_studio/mod.rs (Compare): re-read before touching them.
+  NEXT: drawing slice 1 (types) -- waiting for the lead to freeze drawing_view.rs, drawing_tools.rs, drawing_scene.rs.
+- 2026-10-21 00:10 (api): DRAWING SLICE 1 DONE (lead froze drawing_view/tools/scene; script /root/api-scratch/slice1.py).
+  New `crates/scene/src/drawing_tools/` {types.rs: Button, DimTool, PickedPoint, Pick, TableTool, EdgeRef, Tool, Sel,
+  Drag (Pending.button: scene `Button`); sketch.rs: SkTool, SkCon (`needs` now pub); overlay.rs: Overlay + SnapMark
+  + to_render; geom.rs: sub/dot/len/add2/norm/in_sweep/dim_offset/auto_orientation/intersect}. App re-exports:
+  drawing_view.rs (`pub use ...{Button, DimTool, Drag, Pick, PickedPoint, Sel, TableTool, Tool}` + `drag_button` /
+  `mouse_button` converters; ColoredHandles + DIALOG_TOP stay), drawing_tools.rs (`pub(crate) use ...geom::*`; 4
+  button sites), drawing_scene.rs (Overlay, SnapMark), drawing_sketch.rs (SkTool, SkCon; tiny edit, file was idle).
+  Agents' uncommitted changes in those files (Panel::Cell note, failed_sources, insert asm_position) untouched.
+  Clippy -p noshape-scene -p noshape: nothing from these files. NEXT: sketch edit tools + import ops while the lead
+  sets up slice 2.
+- 2026-10-21 (api, new successor on Motile): read brief/rules/log; tree state as logged.
+  STEP 1 written (clippy -p noshape-ops clean; e2e tests written, run pending): new `crates/ops/src/ops/sketch_edit.rs`
+  (16 ops: sketch_trim/extend/split (clicks or a trim `path`), spline_point, fillet/chamfer (one tool session: first
+  dimensioned, rest equal; size via the value box = apply_dimension), offset (`toward` point flips the arrow), mirror,
+  linear/circular_pattern (+ edit by `pattern` id), transform, use, intersection, text (+ edit), insert_dxf,
+  insert_image); `sketch_draw` gained elliptical_arc. New shared module `crates/ops/src/sketch_use.rs` = the app's
+  part_studio/sketch.rs external_entity / use_hovered / curved_face / reference_plane / hovered_edge_refs /
+  update_use_preview / intersect_hovered logic, GUI-free (`Model{context, display, frame}`); the APP STILL HAS ITS COPY
+  -> switch part_studio/sketch.rs to it (tell the lead; owner psb/skb). scene sketch_mode.rs: `DXF_UNITS`,
+  `insert_dxf_file`, `load_image` (same messages as the app's insert_dxf_file / load_image_file; app switch pending);
+  scene's `image` dep gained jpeg/gif/bmp features (app already enables them: no Cargo.lock change).
+  Sketch ops now regenerate up to the sketch (`OpenDoc::regenerate_with`, upto = index+1, editing_sketch) like sketch
+  mode; tool defaults via `apply_unit_defaults`; sketch_constrain/sketch_dimension accept model edge/vertex/face/plane
+  ids (linked construction entity, pierce for Pierce) like the UI's tools; sketch_get lists patterns/texts/images.
+  Coverage: 17 sketch commands -> ops, PLANNED_CEILING 87.
+  STEP 2 written: document_protect/unprotect (optional `branch`), document_info `protected` + `branch`, OpError code
+  `protected` (and `read_only`) from the session's messages (error.rs From<anyhow>). Test `workspace_protection`.
+  SLICE 2 prepared (scene only, not yet used by the app): `drawing_tools/pick.rs` `SheetPick<'a>` (borrowed view:
+  display, sheet, built, geoms, tool, hover, cursor, zoom, snap_mid_quad) with hover_at, placement, view_at, picks_of,
+  sel_of_pick, image_at, sel_at, snap_at, hovered_edge, line/arc/circle_pick, any_point, pick_sheet, axis_pick,
+  raw_line_pick, circle_at, smart_pick (verbatim from the app). DECISION: no Deref-to-DrawingTools (autoderef borrows
+  all of `self`, which breaks the app's many disjoint field borrows); the app keeps its fields and gets
+  `fn pk(&self) -> SheetPick<'_>`, each moved method becoming a one-line delegation (callers unchanged).
+- 2026-10-21 (api): STEP 1 + STEP 2 VERIFIED. `cargo test -p noshape-ops` all green (lib 9, coverage 3, e2e 9: + sketch_trim_extend_split,
+  sketch_fillet_chamfer_offset, sketch_mirror_patterns_transform, sketch_use_intersection_and_model_references,
+  sketch_text_and_imports, workspace_protection). Clippy -p noshape-ops -p noshape-scene -p noshape-cli --all-targets clean
+  (the lead's too_many_arguments report on sketch_use.rs was a transient state, fixed by putting the plane frame in `Model`).
+  Offset `toward` = the side whose trial offset passes nearer the point (arrow dot product was wrong for closed loops).
+  Docs: AGENT_API.md (sketch edit tools, protection), mcp_instructions.md.
+  WAITING ON THE LEAD (asked 2026-10-21): freeze for slice 2 = /root/api-scratch/slice2.py (signature-matched, prints
+  "patched"; `--dry` checks): drawing_view.rs (new `pk()` before current_sheet ~538; bodies of picks_of ~959, sel_of_pick
+  ~980, tol_mm ~1195, the hover computation inside update_hover ~1199-1250, placement ~1258, view_at ~1263),
+  drawing_tools.rs 304-460 (sel_at, snap_at, hovered_edge, line/arc/circle_pick, any_point, pick_sheet), drawing_more.rs
+  62-107 (axis_pick, raw_line_pick, circle_at), drawing_smart.rs 76-84 (smart_pick), drawing_images.rs 106-109 (image_at).
+  And part_studio/sketch.rs 718-955 (hovered_edge_refs, update_use_preview, use_hovered, curved_face, reference_plane,
+  external_entity, intersect_hovered) = /root/api-scratch/patch_sketch_use.py -> noshape_ops::sketch_use.
+  After applying: possibly unused imports (views::SnapKind/EdgeGeom in drawing_tools.rs, sk_feat in sketch.rs) -> remove.
+- 2026-10-21 (api): DRAWING SLICE 2 DONE + part_studio/sketch.rs Use/Intersection switch DONE (lead approved + froze asb/drw2/
+  psb/ui). Before applying, compared every frozen body with the scene copy (normalized): only one new hunk since the copy,
+  update_hover's SK7 arm (smart dimension picks drawing sketch entities) -> added to SheetPick::hover_at; the rest equal.
+  Applied slice2.py + patch_sketch_use.py; removed the now-unused app leftovers (EdgeGeom/SnapKind imports in
+  drawing_tools.rs, DrawingEditor::image_at, PartStudioView::hovered_edge_refs/curved_face). Pre-patch copies:
+  /root/api-scratch/pre-slice2/. `cargo clippy --locked -p noshape --all-targets -D warnings` clean (also covers check).
+  In-app (Xvfb :114, --demo-drawing-full): Use preview + click projects a hole edge; Intersection on the Front plane gives the
+  top face's section line (and "That face does not cross the sketch plane" for a bore touching a face plane); drawing
+  Select hover highlights the view under the pointer, click selects the view; dimension tool edge hover + vertex snap
+  marker; a 2-click linear dimension snaps and places. Told the lead "slice 2 done".
+  NEXT: slice 3 (pure builders: drawing_smart.rs, drawing_jog.rs pure half, pending_annotation(_raw),
+  extra_/more_pending_annotation, pending_view, extra_pending_view, dragged_*, start_drag, overlays) with the same
+  borrowed-view pattern; send the lead the file/line list first.
+- 2026-10-21 (api): lead lifted the slice-2 freeze. Snap near a filleted corner: filed live REQUESTS "api (10-21 a)" (does
+  Onshape's drawing Dimension snap to the fillet's tangent vertex like ours (98), or give 100? snap radius px?). If Onshape
+  differs: fix in scene drawing_tools/pick.rs `snap_at` and tell asb. The drawing engine's snap code is NOT in bundle-raw.
+  SLICE 3 written in scene (not compiled yet: kern's kernel bridge was mid-edit, read_iam_tree_ffi):
+  drawing_tools/{smart.rs (smart dimension: cylinder_silhouettes, typed_linear_click, smart_takes, smart_click,
+  angular_from_lines, linear, point_to_line, smart_dimension; free fns same/view_of, type Refs), jog.rs (seg_dist,
+  dimension_frame, resolved_annotation, extension_line_at, jog/attach/centermark grips, dragged_centermark, reattached,
+  dragged_jog, dragged_annotation), pending.rs (pending_annotation(+raw), extra_/more_pending_annotation, ordinate_normal,
+  section_position, extra_pending_view, next_target_set, next_datum_label, sketch_dim_preview; dialog/tool inputs as plain
+  `ToolValues`)}; geom.rs gained `mul`; SheetPick gained drawing, selection, sources. Bodies extracted mechanically
+  (/root/api-scratch/slice3/extract.py) then 9 hand edits for ToolValues.
+  App patch ready: /root/api-scratch/slice3/apply.py (dry run OK): pk() gets the 3 fields; new DrawingEditor::tool_values();
+  delegations in drawing_tools.rs (pending_annotation, dragged_annotation), drawing_extra.rs (ordinate_normal,
+  section_position, extra_pending_view, next_target_set, next_datum_label), drawing_smart.rs (6), drawing_jog.rs (9); drops
+  pending_annotation_raw, extra_/more_pending_annotation, sketch_dim_preview, linear, point_to_line, centermark_arms (all
+  callers were inside moved bodies). Files to freeze: drawing_view.rs, drawing_tools.rs, drawing_extra.rs, drawing_more.rs,
+  drawing_sketch_dim.rs, drawing_smart.rs, drawing_jog.rs. Deferred to slice 4 (they read dialogs): pending_view
+  (insert/aux/section/detail options), start_drag (note grips, extra_start_drag, inspection_at), the overlays.

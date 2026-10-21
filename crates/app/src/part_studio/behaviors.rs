@@ -34,11 +34,12 @@ pub enum IsolateMode {
 pub struct Isolation {
     pub mode: IsolateMode,
     pub bodies: Vec<BodyId>,
-    /// Opacity of the transparent parts (Onshape's transparency slider).
+    /// The transparency slider, 0 to 1 (`iso_look`).
     pub opacity: f32,
     /// "Select transparent geometry": picks may land on transparent parts.
     pub select_transparent: bool,
-    /// "Expand: distance": this many nearest parts join the chosen ones.
+    /// "Expand: distance" slider step, 0 to 10: parts within a growing
+    /// distance join the chosen ones (`isolation_transparent`).
     pub expand: usize,
 }
 
@@ -129,9 +130,14 @@ pub struct UiState {
     /// An annotation picked with its menu's Select.
     pub annotation_selected: Option<u32>,
     pub annotation_drag: Option<super::annotations_ui::AnnotationDrag>,
+    /// Variable table: where a dragged Variable Studio table would drop
+    /// (`usize::MAX`: over the Part Studio's own table, refused).
+    pub var_drop: Option<usize>,
     /// Inspection panel: the pressed tool (a pick mode until Esc) and the open ⋯.
     pub inspection_tool: Option<&'static str>,
     pub inspection_more: bool,
+    /// Inspection panel: default tolerances picker and Characteristics filters.
+    pub insp: super::default_tolerances::InspectionView,
     /// Custom tables panel (selected table, its result, the hovered row).
     pub ct: super::custom_tables::CtState,
     /// Variable Studio tables shown in the Variable table panel.
@@ -240,6 +246,10 @@ pub struct UiState {
     pub query_hover: Option<Reference>,
     /// The pointer is over the manipulator arrow (drawn outlined).
     pub manip_hover: bool,
+    /// The view's world length per pixel when the screen-sized geometry the
+    /// Part Studio builds itself (hole callouts, triad hit areas, datum
+    /// boxes) was last sized (perf: rebuilt on zoom, not on render).
+    pub sized_for_wpp: f64,
     /// The sketch dimension box moved by its drag strip (reset when a box opens).
     pub dim_box_offset: Point<Pixels>,
     /// The translate triad's hovered handle and running drag (triad.rs).
@@ -338,8 +348,10 @@ impl UiState {
             datum_edit: None,
             annotation_selected: None,
             annotation_drag: None,
+            var_drop: None,
             inspection_tool: None,
             inspection_more: false,
+            insp: Default::default(),
             ct: Default::default(),
             var_tables: Default::default(),
             section: Vec::new(),
@@ -397,6 +409,7 @@ impl UiState {
             shown_dims: None,
             query_hover: None,
             manip_hover: false,
+            sized_for_wpp: 0.0,
             dim_box_offset: Point::default(),
             triad_hover: None,
             triad_drag: None,
@@ -476,10 +489,7 @@ impl PartStudioView {
 
     /// Body owning a reference (faces, edges, vertices, the body itself).
     pub(super) fn body_of(&self, r: &Reference) -> Option<BodyId> {
-        match r {
-            Reference::Body(b) => Some(b.clone()),
-            _ => self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r) || b.vertex_refs.contains(r)).map(|b| b.id.clone()),
-        }
+        noshape_ops::studio::body_of(&self.display, r)
     }
 
     /// Entities that light up when a feature is hovered or selected in the
@@ -1528,53 +1538,16 @@ impl PartStudioView {
 
     /// Hide or show parts, sketches, planes and default geometry.
     pub(super) fn set_visibility(&mut self, targets: &[Reference], hidden: bool, cx: &mut Context<Self>) {
-        let mut bodies: Vec<BodyId> = Vec::new();
-        let mut feats: Vec<FeatureId> = Vec::new();
-        let mut defaults: Vec<Reference> = Vec::new();
-        for r in targets {
-            match r {
-                Reference::Origin | Reference::Plane(_) => defaults.push(r.clone()),
-                Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => feats.push(*sketch),
-                Reference::FeaturePlane(f) | Reference::MateConnector { feature: f, .. } => feats.push(*f),
-                Reference::Feature(f) => {
-                    // A feature that made parts hides its parts; sketches,
-                    // planes and connectors hide themselves.
-                    let made: Vec<BodyId> = self.display.bodies.iter().filter(|b| b.id.feature == *f).map(|b| b.id.clone()).collect();
-                    if made.is_empty() {
-                        feats.push(*f);
-                    } else {
-                        bodies.extend(made);
-                    }
-                }
-                r => {
-                    if let Some(b) = self.body_of(r) {
-                        bodies.push(b);
-                    }
-                }
-            }
-        }
-        if bodies.is_empty() && feats.is_empty() && defaults.is_empty() {
+        // A feature that made parts hides its parts; sketches, planes and
+        // connectors hide themselves.
+        let t = noshape_ops::studio::visibility_targets(targets, |f| self.display.bodies.iter().filter(|b| b.id.feature == f).map(|b| b.id.clone()).collect(), |r| self.body_of(r));
+        if t.is_empty() {
             return;
         }
-        let verb = if hidden { "Hide" } else { "Show" };
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, verb, cx, |ps| {
-                for b in &bodies {
-                    ps.part_properties.entry(b.clone()).or_default().hidden = hidden;
-                }
-                for f in &feats {
-                    if let Some(f) = ps.feature_mut(*f) {
-                        f.hidden = hidden;
-                    }
-                }
-                for d in &defaults {
-                    ps.hidden_defaults.retain(|x| x != d);
-                    if hidden {
-                        ps.hidden_defaults.push(d.clone());
-                    }
-                }
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::visibility_description(hidden), cx, |ps| noshape_ops::studio::set_visibility(ps, &t, hidden));
         });
+        let (feats, defaults) = (&t.features, &t.defaults);
         // Default geometry is shown from the regeneration's display, which a
         // visibility change doesn't regenerate: update it here (it stayed
         // drawn after Hide, user bug v0.4.0).
@@ -1612,15 +1585,7 @@ impl PartStudioView {
     /// Context menu "Show all": parts, sketches, planes and default geometry.
     pub(super) fn show_everything(&mut self, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Show all", cx, |ps| {
-                for p in ps.part_properties.values_mut() {
-                    p.hidden = false;
-                }
-                for f in &mut ps.features {
-                    f.hidden = false;
-                }
-                ps.hidden_defaults.clear();
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::SHOW_ALL_DESCRIPTION, cx, noshape_ops::studio::show_all);
         });
         let display = std::sync::Arc::make_mut(&mut self.display);
         for p in &mut display.planes {
@@ -1674,7 +1639,7 @@ impl PartStudioView {
                     }
                 }
             }
-            _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: crate::isolate_ui::ALPHA_MIN, select_transparent: false, expand: 0 }),
+            _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: 0.0, select_transparent: false, expand: 0 }),
         }
         let d = self.display.clone();
         self.apply_display(d, window, cx);
@@ -1692,24 +1657,28 @@ impl PartStudioView {
     /// Display to build the scene from: the regenerated display with
     /// isolate/transparency applied to part colors.
     /// Parts made transparent by Isolate / Make transparent, with the
-    /// "Expand: distance" neighbors (nearest bounding-box centers first).
+    /// "Expand: distance" neighbours: live (behaviours.md "Part Studio
+    /// Isolate…") joins parts whose gap to the chosen ones is within a radius
+    /// growing with the square of the step (gaps 5 / 30 / 55 / 80 mm joined
+    /// at 20 / 40 / 50 / 70 % in a 271 mm model: 0.815 × diagonal × step²).
     pub(super) fn isolation_transparent(&self) -> HashSet<BodyId> {
         let Some(iso) = &self.ui.isolate else { return HashSet::new() };
-        let center = |b: &BodyId| self.display.body(b).and_then(|b| b.bounds).map(|(lo, hi)| (lo + hi) * 0.5);
+        let bounds = |b: &BodyId| self.display.body(b).and_then(|b| b.bounds);
+        let gap = |a: (glam::DVec3, glam::DVec3), b: (glam::DVec3, glam::DVec3)| ((a.0 - b.1).max(b.0 - a.1)).max(glam::DVec3::ZERO).length();
+        let all = self.display.bodies.iter().filter_map(|b| b.bounds).reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)));
+        let radius = all.map_or(0.0, |(lo, hi)| (hi - lo).length() * 0.815 * (iso.expand as f64 / 10.).powi(2));
         let mut chosen: Vec<BodyId> = iso.bodies.clone();
-        let mut others: Vec<(f64, BodyId)> = self
-            .display
-            .bodies
-            .iter()
-            .filter(|b| !chosen.contains(&b.id))
-            .filter_map(|b| {
-                let c = center(&b.id)?;
-                let d = iso.bodies.iter().filter_map(center).map(|x| x.distance(c)).fold(f64::INFINITY, f64::min);
-                Some((d, b.id.clone()))
-            })
-            .collect();
-        others.sort_by(|a, b| a.0.total_cmp(&b.0));
-        chosen.extend(others.into_iter().take(iso.expand).map(|(_, b)| b));
+        if iso.expand > 0 {
+            let seeds: Vec<_> = iso.bodies.iter().filter_map(bounds).collect();
+            for b in &self.display.bodies {
+                if !chosen.contains(&b.id)
+                    && let Some(bb) = b.bounds
+                    && seeds.iter().any(|s| gap(*s, bb) <= radius)
+                {
+                    chosen.push(b.id.clone());
+                }
+            }
+        }
         self.display
             .bodies
             .iter()
@@ -1938,10 +1907,19 @@ impl PartStudioView {
         }
         let Some(iso) = &self.ui.isolate else { return self.display.clone() };
         let transparent = self.isolation_transparent();
+        let look = iso_look(iso.opacity);
         let mut d = (*self.display).clone();
         for b in &mut d.bodies {
             if transparent.contains(&b.id) {
-                b.color[3] = b.color[3].min(iso.opacity);
+                match look {
+                    IsoLook::Ghost => {
+                        for c in &mut b.color[..3] {
+                            *c += (1.0 - *c) * 0.7;
+                        }
+                    }
+                    IsoLook::SeeThrough(a) => b.color[3] = b.color[3].min(a),
+                    IsoLook::Hidden => b.hidden = true,
+                }
             }
         }
         Arc::new(d)
@@ -1978,17 +1956,19 @@ impl PartStudioView {
             IsolateMode::Isolate => "Isolate",
             IsolateMode::Transparent => "Make transparent",
         };
-        let n = self.display.bodies.len();
         let dialog = crate::isolate_ui::dialog(
             crate::isolate_ui::IsoDialog {
                 key: "ps-isolate",
                 title,
                 select_transparent: iso.select_transparent,
-                transparency: crate::isolate_ui::alpha_t(iso.opacity),
-                expand: if n == 0 { 0.0 } else { iso.expand as f32 / n as f32 },
-                expand_options: vec!["Expand: distance".to_string()],
-                expand_ix: 0,
-                expand_tip: "Expand isolate by distance",
+                transparency: iso.opacity,
+                expand: iso.expand as f32 / 10.,
+                // Live: connectivity is offered but disabled (no mates here).
+                expand_options: vec!["Expand: connectivity".to_string(), "Expand: distance".to_string()],
+                expand_disabled: vec![0],
+                expand_ix: 1,
+                expand_tip: "Expand isolate by physical proximity",
+                legend: true,
                 drag: |v: &mut Self| &mut v.ui.iso_slider_drag,
                 close: |v: &mut Self, window, cx| {
                     v.exit_isolate(window, cx);
@@ -2001,13 +1981,14 @@ impl PartStudioView {
                 },
                 set_transparency: std::rc::Rc::new(|v: &mut Self, f, window, cx| {
                     if let Some(iso) = &mut v.ui.isolate {
-                        iso.opacity = crate::isolate_ui::t_alpha(f);
+                        iso.opacity = f;
                     }
                     let d = v.display.clone();
                     v.apply_display(d, window, cx);
                 }),
+                // Live: snaps in 10 % steps.
                 set_expand: std::rc::Rc::new(move |v: &mut Self, f, window, cx| {
-                    let want = (f * n as f32).round() as usize;
+                    let want = (f * 10.).round() as usize;
                     if let Some(iso) = &mut v.ui.isolate
                         && iso.expand != want
                     {
@@ -2961,5 +2942,27 @@ mod tests {
         assert_eq!(m, "Select sketch regions or faces.");
         let m = filter_description(QueryFilter::PLANE_LIKE);
         assert_eq!(m, "Select planar faces, planes or mate connectors.");
+    }
+}
+
+/// How the parts left out look at transparency slider position `t` (live
+/// pixel samples, behaviours.md "Part Studio Isolate…"): under 10 % light
+/// opaque ghosts (back edges hidden); from 10 % see-through, most opaque
+/// there and fading linearly (≈ 166 → 248 grey on white by 90 %); hidden
+/// from ~95 %.
+#[derive(Clone, Copy, PartialEq)]
+pub(super) enum IsoLook {
+    Ghost,
+    SeeThrough(f32),
+    Hidden,
+}
+
+pub(super) fn iso_look(t: f32) -> IsoLook {
+    if t < 0.1 {
+        IsoLook::Ghost
+    } else if t >= 0.95 {
+        IsoLook::Hidden
+    } else {
+        IsoLook::SeeThrough((0.66 - (t - 0.1) * 0.7625).max(0.03))
     }
 }

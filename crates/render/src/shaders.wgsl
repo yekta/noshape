@@ -282,6 +282,9 @@ fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
         v = -g.camera_fwd.xyz;
     }
     if (dot(normalize(i.normal), v) > 0.0) { discard; }
+    // Hovered, not selected: the light-orange hover color (live G35, a
+    // hovered mesh part).
+    if ((st & HOVER) != 0u && (st & SELECTED) == 0u) { return vec4(g.hover.rgb, 1.0); }
     return vec4(g.select.rgb, 1.0);
 }
 
@@ -335,22 +338,19 @@ fn fs_mesh_section(i: MeshOut, @builtin(front_facing) front: bool) -> SectionOut
     var own = inst.color.rgb;
     if (inst.params.x != 0u && i.color.a > 0.0) { own = srgb_to_linear(i.color.rgb); }
     var col = shade(c, normal, true, own);
-    // Mesh parts' caps (params.y bit 5) are not hatched (live G35).
-    if ((inst.params.y & 32u) == 0u) {
-        // Hatching (live part-studio/74): 1 px lines at 45° in the cut plane's
-        // own axes (X+Y on Top), 11 px apart vertically on screen (live), half the cap's color.
-        var u = vec3<f32>(1.0, 0.0, 0.0);
-        if (abs(normal.z) < 0.9) { u = vec3<f32>(0.0, 0.0, 1.0); }
-        u = normalize(u - normal * dot(u, normal));
-        let v = cross(normal, u);
-        let across = normalize(u - v);
-        let p0 = g.view_proj * vec4(c, 1.0);
-        let p1 = g.view_proj * vec4(c + across * 0.001, 1.0);
-        let px_per_unit = length((p1.xy / p1.w - p0.xy / p0.w) * g.viewport.xy * 0.5) * 1000.0;
-        let spacing = 11.6 * g.viewport.z / max(px_per_unit, 1e-6);
-        let line_w = 1.0 * g.viewport.z / max(px_per_unit, 1e-6);
-        if (fract(dot(c, across) / spacing) < line_w / spacing) { col = col * 0.5; }
-    }
+    // Hatching (live part-studio/74): 1 px lines at 45° in the cut plane's
+    // own axes (X+Y on Top), 11 px apart vertically on screen (live), half the cap's color.
+    var u = vec3<f32>(1.0, 0.0, 0.0);
+    if (abs(normal.z) < 0.9) { u = vec3<f32>(0.0, 0.0, 1.0); }
+    u = normalize(u - normal * dot(u, normal));
+    let v = cross(normal, u);
+    let across = normalize(u - v);
+    let p0 = g.view_proj * vec4(c, 1.0);
+    let p1 = g.view_proj * vec4(c + across * 0.001, 1.0);
+    let px_per_unit = length((p1.xy / p1.w - p0.xy / p0.w) * g.viewport.xy * 0.5) * 1000.0;
+    let spacing = 11.6 * g.viewport.z / max(px_per_unit, 1e-6);
+    let line_w = 1.0 * g.viewport.z / max(px_per_unit, 1e-6);
+    if (fract(dot(c, across) / spacing) < line_w / spacing) { col = col * 0.5; }
     o.color = vec4(col, 1.0);
     return o;
 }

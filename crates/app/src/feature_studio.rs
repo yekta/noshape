@@ -396,6 +396,8 @@ pub struct FeatureStudioView {
     outline_anchor: BoundsCell,
     /// The pointer over the code (the diagnostic tooltip follows it).
     hover_at: Option<Point<Pixels>>,
+    /// The toolbar as a cached view (see `render`).
+    toolbar: Option<Entity<crate::cached_slice::Slice<FeatureStudioView>>>,
     _subs: Vec<Subscription>,
 }
 
@@ -439,7 +441,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, toolbar: None, _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -465,6 +467,56 @@ impl FeatureStudioView {
             self.editor.update(cx, |e, cx| e.set_value(src.clone(), window, cx));
         }
         self.recompile(src, cx);
+    }
+
+    /// Viewing a version (live std at 3095.0, dom/fs-nav-shortcuts.txt): the
+    /// toolbar row holds only the view-only bar, "Versions are view only.
+    /// Viewing 3095.0." and [Return to Main] (Part Studio's bar, without its
+    /// custom features button).
+    fn render_version_bar(&self, version: &str, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let branch = {
+            let s = &self.doc.read(cx).session;
+            s.store.branch(s.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into())
+        };
+        let doc = self.doc.clone();
+        let back = div()
+            .id("fs-vb-return")
+            .h(px(24.))
+            .px(px(8.))
+            .flex()
+            .items_center()
+            .rounded(px(3.))
+            .bg(pal.accent)
+            .cursor_pointer()
+            .text_size(px(12.))
+            .text_color(rgb(0xffffff))
+            .child(format!("Return to {branch}"))
+            .on_click(move |_, _, cx| {
+                doc.update(cx, |d, cx| {
+                    if d.session.view_microversion(None).is_ok() {
+                        d.reloaded(cx);
+                    }
+                })
+            });
+        let text = format!("Versions are view only. Viewing {version}.");
+        crate::ui::toolbar()
+            .id("fs-version-bar")
+            .justify_center()
+            .child(
+                h_flex()
+                    .h(px(32.))
+                    .mt(px(-4.))
+                    .px(px(20.))
+                    .gap(px(10.))
+                    .bg(rgb(0xffffff))
+                    .rounded_b(px(10.))
+                    .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(rgb(0x333333)).child(text))
+                    .child(back),
+            )
+            .border_b_1()
+            .border_color(rgb(0xd7d7d7))
+            .into_any_element()
     }
 
     /// Ace's tooltip over a squiggle (live document/fs-gutter-tooltip): `#f5f5f5`,
@@ -1117,17 +1169,13 @@ fn text_of(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<String> {
     }
 }
 
-impl Render for FeatureStudioView {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl FeatureStudioView {
+    /// The toolbar (a cached view: see `render`).
+    fn render_toolbar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let read_only = self.read_only(cx);
         let probe = |cell: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
             let c = cell.clone();
             canvas(move |b, _, _| c.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()
-        };
-        let below = |cell: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
-            let b = cell.get();
-            point(b.left(), b.bottom() + px(2.))
         };
         // Toolbar cells: 32 px, transparent, `#d7d7d7` hover (live toolbar tooltips list).
         let cell = |id: SharedString| h_flex().id(id).relative().flex_none().h(px(32.)).px(px(6.)).gap(px(2.)).rounded(px(3.)).cursor_pointer().hover(|d| d.bg(pal.border));
@@ -1378,6 +1426,28 @@ impl Render for FeatureStudioView {
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(1, window, cx))),
             )
             .child(div().flex_none().relative().px(px(8.)).text_size(px(14.)).text_color(pal.text).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)).child(probe(&self.tb.end)));
+        toolbar.border_b_1().border_color(rgb(0xd7d7d7)).into_any_element()
+    }
+}
+
+impl Render for FeatureStudioView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let read_only = self.read_only(cx);
+        let toolbar = self.toolbar.get_or_insert_with(|| {
+            // A cached view (see `crate::cached_slice`): a caret blink in the
+            // editor doesn't rebuild it. It shows the caret's line and
+            // symbol, so it follows the editor's edits and cursor moves.
+            let t = crate::cached_slice::Slice::new(&cx.entity(), |this, _, cx| this.render_toolbar(cx), cx);
+            crate::cached_slice::Slice::observing(&t, &self.editor, cx);
+            crate::cached_slice::Slice::observing(&t, &self.doc, cx);
+            t
+        });
+        let toolbar = toolbar.clone().cached(StyleRefinement::default().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none());
+        let below = |cell: &Rc<std::cell::Cell<Bounds<Pixels>>>| {
+            let b = cell.get();
+            point(b.left(), b.bottom() + px(2.))
+        };
+        let out_anchor = self.outline_anchor.clone();
         let outline_at = below(&out_anchor);
         let outline = self.render_outline(outline_at, window, cx);
         v_flex()
@@ -1391,7 +1461,10 @@ impl Render for FeatureStudioView {
             .on_action(cx.listener(|this, _: &BackReference, window, cx| this.navigate(-1, window, cx)))
             .on_action(cx.listener(|this, _: &ForwardReference, window, cx| this.navigate(1, window, cx)))
             .bg(rgb(0xffffff))
-            .child(toolbar.border_b_1().border_color(rgb(0xd7d7d7)))
+            .child(match self.doc.read(cx).session.viewing_version() {
+                Some(version) => self.render_version_bar(&version, cx),
+                None => toolbar.into_any_element(),
+            })
             .child(
                 div()
                     .id("fs-code")

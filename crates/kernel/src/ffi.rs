@@ -542,7 +542,7 @@ pub(crate) mod ffi {
         fn read_rhino_parts_ffi(path: &str) -> Result<StepImport>;
         fn read_native_parts_ffi(path: &str) -> Result<StepImport>;
         fn read_native_parts_config_ffi(path: &str, config: i32) -> Result<StepImport>;
-        fn read_sldasm_tree_ffi(path: &str) -> Result<Vec<AsmNodeF>>;
+        fn read_native_tree_ffi(path: &str, dir: &str) -> Result<Vec<AsmNodeF>>;
         fn extract_zip_ffi(zip: &str, dir: &str) -> Result<Vec<String>>;
         fn read_sat_parts_ffi(path: &str) -> Result<StepImport>;
         fn read_jt_parts_ffi(path: &str) -> Result<StepImport>;

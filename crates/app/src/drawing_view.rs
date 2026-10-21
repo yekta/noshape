@@ -34,85 +34,28 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum DimTool {
-    Linear,
-    Radius,
-    Diameter,
-    Angle,
-    /// 3 point angular: the vertex, then a point on each leg.
-    Angle3,
-    Chamfer,
-    ArcLength,
-    /// Maximum / minimum (arc condition) dimension.
-    MaxMin,
-    /// Foreshortened (half) diameter from an axis.
-    Foreshorten,
-    /// 2 point linear: two points only (help H:drawing_-_2_point_linear_dimension).
-    Point2,
-    /// Point to line: one point and one line.
-    PointLine,
-    /// Line to line: two parallel lines.
-    LineLine,
-}
+// The tool, pick, selection and drag types are GUI-free (shared with the
+// agent API): noshape_scene::drawing_tools.
+pub use noshape_scene::drawing_tools::{Button, DimTool, Drag, Pick, PickedPoint, Sel, TableTool, Tool};
 
-impl DimTool {
-    /// The linear dimension tools (smart Dimension and the typed ones).
-    pub fn linear(self) -> bool {
-        matches!(self, DimTool::Linear | DimTool::Point2 | DimTool::PointLine | DimTool::LineLine)
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            DimTool::Linear => "Linear dimension",
-            DimTool::Point2 => "2 point linear dimension",
-            DimTool::PointLine => "Point to line dimension",
-            DimTool::LineLine => "Line to line dimension",
-            DimTool::Radius => "Radial dimension",
-            DimTool::Diameter => "Diameter dimension",
-            DimTool::Angle => "Angular dimension",
-            DimTool::Angle3 => "3 point angular dimension",
-            DimTool::Chamfer => "Chamfer dimension",
-            DimTool::ArcLength => "Arc length dimension",
-            DimTool::MaxMin => "Maximum / minimum dimension",
-            DimTool::Foreshorten => "Foreshortened diameter",
-        }
+/// The drag's mouse button.
+pub fn drag_button(b: MouseButton) -> Button {
+    match b {
+        MouseButton::Left => Button::Left,
+        MouseButton::Right => Button::Right,
+        MouseButton::Middle => Button::Middle,
+        _ => Button::Other,
     }
 }
 
-/// A point picked in a view (view coordinates) with its model reference.
-#[derive(Clone, Debug)]
-pub struct PickedPoint {
-    pub view: ViewId,
-    pub p: [f64; 2],
-    pub r: Option<PointRef>,
+/// The gpui mouse button of a drag's button (`Other`: navigation buttons).
+pub fn mouse_button(b: Button) -> MouseButton {
+    match b {
+        Button::Left => MouseButton::Left,
+        Button::Right => MouseButton::Right,
+        Button::Middle | Button::Other => MouseButton::Middle,
+    }
 }
-
-#[derive(Clone, Debug)]
-pub enum Pick {
-    Point(PickedPoint),
-    Line { a: PickedPoint, b: PickedPoint },
-    Circle { view: ViewId, center: [f64; 2], radius: f64, r: Option<PointRef> },
-    /// An arc edge: center, radius, end points and a point on the arc.
-    Arc { view: ViewId, center: [f64; 2], radius: f64, a: PickedPoint, b: PickedPoint, mid: [f64; 2], r: Option<PointRef> },
-    /// A circle clicked at `at` (view coordinates; max/min dimensions).
-    CircleAt { view: ViewId, center: [f64; 2], radius: f64, r: Option<PointRef>, at: [f64; 2] },
-}
-
-/// Kinds of drawing tables the table tools create.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TableTool {
-    General,
-    Bom,
-    Hole,
-    Revision,
-    CutList,
-    /// FeatureScript custom table of a Part Studio.
-    Custom,
-}
-
-/// A model edge (body and topological name), for associative references.
-pub type EdgeRef = (noshape_model::BodyId, noshape_model::reference::TopoName);
 
 /// Uploaded meshes with their linear colors.
 pub type ColoredHandles = Vec<(MeshHandle, [f32; 4])>;
@@ -121,182 +64,15 @@ pub type ColoredHandles = Vec<(MeshHandle, [f32; 4])>;
 /// the sheet chips (live drawing/122, 124, 127, 180, 200, 468, 494: y 76).
 pub const DIALOG_TOP: f32 = 0.;
 
-#[derive(Clone, Debug)]
-pub enum Tool {
-    Select,
-    InsertView { source: TabId, orientation: ViewOrientation, part: Option<noshape_model::BodyId> },
-    Projected { parent: Option<ViewId> },
-    Auxiliary { parent: Option<(ViewId, [f64; 2])> },
-    /// Section view; `partial`: the cutting line is used as clicked (not
-    /// extended across the view) and only cuts along its length.
-    Section { parent: Option<ViewId>, p0: Option<[f64; 2]>, line: Option<([f64; 2], [f64; 2])>, partial: bool },
-    Detail { parent: Option<ViewId>, center: Option<[f64; 2]>, radius: Option<f64> },
-    Dimension { kind: DimTool, picks: Vec<Pick> },
-    Note,
-    Centermark,
-    Centerline { first: Option<PickedPoint> },
-    /// Hole / thread callout: the picked hole circle, then the placement.
-    HoleCallout { circle: Option<(ViewId, [f64; 2], f64, Option<PointRef>)> },
-    /// Edge-to-edge centerline: one cylinder silhouette edge, or two edges.
-    EdgeCenterline { first: Option<(PickedPoint, PickedPoint)> },
-    /// Circle centerline through 3 points, or (`three` false) center + point.
-    CircleCenterline { three: bool, points: Vec<PickedPoint> },
-    /// Virtual sharp: two straight edges (with the first edge's reference).
-    VirtualSharp { first: Option<(PickedPoint, PickedPoint, Option<EdgeRef>)> },
-    Balloon { anchor: Option<PickedPoint> },
-    /// Jogged section: orthogonal cutting line points (parent view coords);
-    /// `done` once the line is finished (Enter / double-click).
-    JoggedSection { parent: Option<ViewId>, points: Vec<[f64; 2]>, done: bool },
-    AlignedSection { parent: Option<ViewId>, center: Option<[f64; 2]>, a: Option<[f64; 2]>, b: Option<[f64; 2]> },
-    /// Crop a view with a rectangle (two corners) or a circle (center, radius).
-    Crop { parent: Option<ViewId>, first: Option<[f64; 2]>, circle: bool },
-    /// Break a view: two clicks give the removed band.
-    Break { parent: Option<ViewId>, first: Option<[f64; 2]>, vertical: bool },
-    /// Ordinate dimensions: datum, then the side/level of the values, then
-    /// points, all in one ordinate group (`group` once created).
-    Ordinate { origin: Option<PickedPoint>, horizontal: Option<bool>, group: Option<u64> },
-    /// Place a table: BOM / hole tables need a view (and hole tables an origin).
-    Table { kind: TableTool, view: Option<ViewId>, origin: Option<PickedPoint> },
-    Gdt,
-    Datum { anchor: Option<[f64; 2]> },
-    SurfaceFinish,
-    /// Weld symbol (drawing_weld.rs): click the joint, then the place.
-    Weld,
-    /// Place a revision callout of `revision` (drawing_revision.rs).
-    RevisionCallout { revision: String },
-    /// Broken-out section: profile points in the view (view coordinates),
-    /// closed with Enter / double-click; then a depth (panel) or a depth point.
-    BrokenOut { parent: Option<ViewId>, points: Vec<[f64; 2]>, done: bool },
-    /// Polygon or spline crop: points in the view (view coordinates).
-    CropPoly { parent: Option<ViewId>, points: Vec<[f64; 2]>, spline: bool },
-    DatumTarget { anchor: Option<PickedPoint> },
-    /// Add a leader to geometric tolerance `id`.
-    GdtLeader { id: u64 },
-    /// Drawing sketch tools (see `drawing_sketch`): the clicked points and
-    /// the sketch point the next segment starts from.
-    Sketch { tool: crate::drawing_sketch::SkTool, pts: Vec<[f64; 2]>, from: Option<u32> },
-    /// Drawing constraints: the picked sketch entities.
-    Constrain { kind: crate::drawing_sketch::SkCon, picks: Vec<u32> },
-    /// Insert image: the file, its aspect ratio and the drag start.
-    PlaceImage { name: String, data: std::sync::Arc<str>, aspect: f64, start: Option<[f64; 2]> },
-}
-
-impl Tool {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Tool::Select => "Select",
-            Tool::InsertView { .. } => "Insert view",
-            Tool::Projected { .. } => "Projected view",
-            Tool::Auxiliary { .. } => "Auxiliary view",
-            Tool::Section { .. } => "Section view",
-            Tool::Detail { .. } => "Detail view",
-            Tool::Dimension { kind, .. } => kind.name(),
-            Tool::Note => "Note",
-            Tool::Centermark => "Centermark",
-            Tool::Centerline { .. } => "Centerline",
-            Tool::EdgeCenterline { .. } => "Edge to edge centerline",
-            Tool::HoleCallout { .. } => "Hole/thread callout",
-            Tool::CircleCenterline { three: true, .. } => "3 point circle centerline",
-            Tool::CircleCenterline { .. } => "2 point circle centerline",
-            Tool::VirtualSharp { .. } => "Virtual sharp",
-            Tool::Balloon { .. } => "Callout",
-            Tool::JoggedSection { .. } => "Jogged section view",
-            Tool::AlignedSection { .. } => "Aligned section view",
-            Tool::Crop { .. } => "Crop view",
-            Tool::Break { .. } => "Break view",
-            Tool::Ordinate { .. } => "Ordinate dimension",
-            Tool::Table { kind: TableTool::General, .. } => "Table",
-            Tool::Table { kind: TableTool::Bom, .. } => "BOM table",
-            Tool::Table { kind: TableTool::Hole, .. } => "Hole table",
-            Tool::Table { kind: TableTool::Revision, .. } => "Revision table",
-            Tool::Table { kind: TableTool::CutList, .. } => "Cut list table",
-            Tool::Table { kind: TableTool::Custom, .. } => "Custom table",
-            Tool::Gdt => "Geometric tolerance",
-            Tool::Datum { .. } => "Datum",
-            Tool::SurfaceFinish => "Surface finish",
-            Tool::Weld => "Weld symbol",
-            Tool::RevisionCallout { .. } => "Revision callout",
-            Tool::BrokenOut { .. } => "Broken-out section",
-            Tool::CropPoly { spline: false, .. } => "Crop view (polygon)",
-            Tool::CropPoly { .. } => "Crop view (spline)",
-            Tool::DatumTarget { .. } => "Datum target",
-            Tool::GdtLeader { .. } => "Add leader",
-            Tool::Sketch { tool, .. } => tool.name(),
-            Tool::Constrain { kind, .. } => kind.name(),
-            Tool::PlaceImage { .. } => "Insert image",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Sel {
-    View(ViewId),
-    Annotation(u64),
-    Table(u64),
-    /// Break `1` of view `0`.
-    Break(ViewId, usize),
-    /// A drawing sketch entity / hatch region.
-    Sketch(u32),
-    Hatch(u64),
-    /// An inserted image.
-    Image(u64),
-    /// An automatic centermark of a view (`build::centermark_key`).
-    AutoCentermark(ViewId, [i64; 2]),
-}
-
-#[derive(Clone, Debug)]
-pub enum Drag {
-    None,
-    Pending { button: MouseButton, start: [f64; 2], start_px: [f64; 2], pick: Option<u32> },
-    Pan { last_px: [f64; 2] },
-    /// Drag zoom about `anchor` (mouse-control presets with a zoom drag).
-    Zoom { anchor: [f64; 2], last_px: [f64; 2] },
-    MoveViews { start: [f64; 2], orig: Vec<(ViewId, [f64; 2])>, constraint: Option<([f64; 2], [f64; 2])> },
-    MoveAnnotation { start: [f64; 2], orig: Annotation },
-    /// A jog snap point of a linear dimension (extension line `k`; `far`:
-    /// the diagonal's end).
-    Jog { orig: Annotation, k: usize, far: bool },
-    /// An attachment point (end `k`) of a linear dimension dragged to
-    /// another edge, point or center (re-attaches that end).
-    Reattach { orig: Annotation, k: usize },
-    /// An arm end of a centermark.
-    CentermarkArm { orig: Annotation, k: usize },
-    MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },
-    /// Drag-select table cells: a rubber band from `start` (help H:table:
-    /// the cells it touches are selected on release).
-    SelectCells { id: u64, start: [f64; 2] },
-    /// Resize a table from its free corner (scales column widths and rows).
-    ResizeTable { id: u64, start: [f64; 2], orig: Table, size: [f64; 2], widths: Vec<f64> },
-    /// A table divider: column boundary `col` or row boundary `row` (index
-    /// into the layout's xs / ys), with the widths and heights at the start.
-    TableDivider { id: u64, col: Option<usize>, row: Option<usize>, start: [f64; 2], widths: Vec<f64>, heights: Vec<f64> },
-    /// Move a section view's cutting line (parallel offset).
-    MoveSectionLine { view: ViewId, start: [f64; 2], orig: ViewKind },
-    /// Move a detail view's circle in its parent.
-    MoveDetailCircle { view: ViewId, start: [f64; 2], orig: [f64; 2] },
-    /// Drag a snap point of an auxiliary view's reference indicator (0 / 1
-    /// an end, 2 the middle).
-    AuxIndicator { view: ViewId, grip: usize, orig: noshape_model::drawing::AuxRef },
-    /// Move one point of a section view's cutting line.
-    MoveSectionPoint { view: ViewId, index: usize, orig: Vec<[f64; 2]> },
-    /// Drag annotation `0`'s inspection item onto another annotation.
-    MoveInspection(u64),
-    /// Move an inserted image.
-    MoveImage { id: u64, start: [f64; 2], orig: [f64; 2] },
-    /// A selected note's grip: 0 / 1 the left / right side (bounding box
-    /// width), 2 the middle (rotate; notes without leaders).
-    NoteGrip { id: u64, grip: u8, start: [f64; 2], orig: Annotation },
-    /// Drag a drawing sketch entity (from `orig`).
-    MoveSketch { id: u32, start: [f64; 2], orig: noshape_model::drawing::sheet_sketch::SheetSketch },
-}
-
 /// Inline property panels shown over the canvas.
 pub enum Panel {
     Note { input: Entity<TextareaState>, edit: Option<u64>, pos: [f64; 2], height: Entity<InputState>, style: noshape_model::drawing::note::NoteStyle },
     /// Dimension properties (precision, units, tolerance, texts).
     Datum { edit: Option<u64>, anchor: [f64; 2], input: Entity<InputState> },
     SurfaceFinish { edit: Option<u64>, pos: [f64; 2], input: Entity<InputState> },
-    Cell { table: u64, row: usize, col: usize, input: Entity<TextareaState> },
+    /// A table cell's text; `note`: the Note panel's style of a general
+    /// table cell (live 743: the cell is a note).
+    Cell { table: u64, row: usize, col: usize, input: Entity<TextareaState>, note: Option<Box<CellNote>> },
     SheetName { index: usize, input: Entity<InputState> },
     Rotation { view: ViewId, input: Entity<InputState> },
     TitleBlock { inputs: Vec<(String, Entity<InputState>)> },
@@ -311,6 +87,13 @@ pub enum Panel {
     /// Table cell › Resize: the column's width and the row height (sheet mm).
     CellResize { table: u64, col: usize, width: Entity<InputState>, height: Entity<InputState> },
     DatumTarget { id: u64, label: Entity<InputState>, area: usize, width: Entity<InputState>, height: Entity<InputState> },
+}
+
+/// The Note panel of a general table cell edited in place: its style (font,
+/// bold, italic, underline, strikethrough, alignments) and text height.
+pub struct CellNote {
+    pub style: noshape_model::drawing::note::NoteStyle,
+    pub height: Entity<InputState>,
 }
 
 /// A context/dropdown menu entry acting on the editor.
@@ -386,7 +169,7 @@ pub struct DrawingEditor {
     pub(crate) gpu: Gpu,
     target_id: u64,
     pub focus: FocusHandle,
-    /// Cached parts of the editor (the toolbar): see `crate::cached_slice`.
+    /// Cached parts of the editor (toolbar, panel layer): see `crate::cached_slice`.
     slices: Option<DrSlices>,
 
     pub drawing: Drawing,
@@ -400,6 +183,15 @@ pub struct DrawingEditor {
     regens: HashMap<SourceKey, Arc<Mutex<Regenerator>>>,
     assemblies: Arc<Mutex<AssemblyEvaluator>>,
     regenerating: HashSet<SourceKey>,
+    /// Sources that couldn't be resolved (a deleted display state): retried
+    /// only on Update.
+    failed_sources: HashSet<SourceKey>,
+    /// The current sheet is an imported DWG / DXF's model space: its
+    /// background (Preferences › Drawings: Dark view black, Light view white).
+    model_bg: Option<u32>,
+    /// Dimension tool: the sketch entity picked (SK7), and the open value box.
+    pub sketch_dim_pick: Option<u32>,
+    pub sketch_dim_edit: Option<crate::drawing_sketch_dim::SketchDimEdit>,
     pub info: SheetInfo,
     pub out_of_date: bool,
     pub cache: Arc<ViewCache>,
@@ -606,6 +398,8 @@ impl DrawingEditor {
             Some(TabContent::Drawing(d)) => d.clone(),
             _ => Drawing::default(),
         };
+        // The drawing opens on the sheet last shown.
+        let first_sheet = drawing.active_sheet.min(drawing.sheets.len().saturating_sub(1));
         let mut this = Self {
             doc,
             tab,
@@ -615,13 +409,17 @@ impl DrawingEditor {
             slices: None,
             drawing,
             preview: None,
-            sheet: 0,
+            sheet: first_sheet,
             sheets_open: false,
             sheets_by_ref: false,
             sources: Sources::new(),
             regens: HashMap::new(),
             assemblies: Arc::new(Mutex::new(AssemblyEvaluator::new())),
             regenerating: HashSet::new(),
+            failed_sources: HashSet::new(),
+            model_bg: None,
+            sketch_dim_pick: None,
+            sketch_dim_edit: None,
             info: SheetInfo::default(),
             out_of_date: false,
             cache: Arc::new(ViewCache::new()),
@@ -737,6 +535,11 @@ impl DrawingEditor {
         self.preview.as_ref().unwrap_or(&self.drawing)
     }
 
+    /// The editor state picking reads (see `noshape_scene::drawing_tools::SheetPick`).
+    pub fn pk(&self) -> noshape_scene::drawing_tools::SheetPick<'_> {
+        noshape_scene::drawing_tools::SheetPick { display: self.display(), sheet: self.sheet, built: self.built.as_deref(), geoms: &self.geoms, tool: &self.tool, hover: self.hover, cursor: self.cursor, zoom: self.zoom, snap_mid_quad: self.snap_mid_quad, drawing: &self.drawing, selection: &self.selection, sources: &self.sources }
+    }
+
     pub fn current_sheet(&self) -> &Sheet {
         let d = self.display();
         &d.sheets[self.sheet.min(d.sheets.len().saturating_sub(1))]
@@ -757,6 +560,11 @@ impl DrawingEditor {
         if self.drawing.sheets.is_empty() {
             self.drawing.sheets.push(Sheet::default());
         }
+        // Undo / redo of a sheet switch: show the stored sheet.
+        let active = self.drawing.active_sheet.min(self.drawing.sheets.len() - 1);
+        if active != self.sheet {
+            self.show_sheet(active, cx);
+        }
         self.sheet = self.sheet.min(self.drawing.sheets.len() - 1);
         let n = self.drawing.sheets.len();
         self.sheet_rows.retain(|i| *i < n);
@@ -776,7 +584,15 @@ impl DrawingEditor {
     }
 
     /// Commit a new drawing state as one undoable change.
-    pub fn commit(&mut self, description: &str, new: Drawing, cx: &mut Context<Self>) {
+    pub fn commit(&mut self, description: &str, mut new: Drawing, cx: &mut Context<Self>) {
+        // The sheet on screen goes with the change (undo returns to it).
+        new.active_sheet = self.sheet;
+        // Sketch dimensions stay on their geometry (moved / deleted entities).
+        if let Some(s) = new.sheets.get_mut(self.sheet) {
+            s.sync_sketch_dimensions();
+        }
+        // Views linked across sheets: their mirrors follow the real views.
+        new.sync_links();
         self.drawing = new.clone();
         self.preview = None;
         let tab = self.tab;
@@ -843,8 +659,17 @@ impl DrawingEditor {
         let mut wanted = views::referenced_sources(self.display());
         if let Tool::InsertView { source, .. } = &self.tool {
             let k = SourceKey::studio(*source);
-            if !wanted.contains(&k) {
-                wanted.push(k);
+            // The preview of an assembly uses the panel's Explode/Position and Display state.
+            let (explode, position) = match self.insert.asm_position {
+                AsmPosition::Explode(e) => (Some(e), None),
+                AsmPosition::Position(p) => (None, Some(p)),
+                AsmPosition::Default => (None, None),
+            };
+            let k2 = SourceKey { explode, position, display: self.insert.display_state.clone(), ..k.clone() };
+            for k in [k, k2] {
+                if !wanted.contains(&k) {
+                    wanted.push(k);
+                }
             }
         }
         // The Insert view chooser lists the parts of every Part Studio.
@@ -854,7 +679,7 @@ impl DrawingEditor {
             }
         }
         for key in wanted {
-            if self.regenerating.contains(&key) || (!all && self.sources.contains_key(&key)) {
+            if self.regenerating.contains(&key) || (!all && (self.sources.contains_key(&key) || self.failed_sources.contains(&key))) {
                 continue;
             }
             // Pinned sources come from the document at their version.
@@ -876,8 +701,20 @@ impl DrawingEditor {
                 let src = cx.background_spawn(async move { views::regenerate_source(&doc, &k2, &mut regen.lock(), &mut assemblies.lock()) }).await;
                 this.update(cx, |this, cx| {
                     this.regenerating.remove(&key);
-                    if let Some(src) = src {
-                        this.sources.insert(key, src);
+                    match src {
+                        Some(src) => {
+                            this.failed_sources.remove(&key);
+                            this.sources.insert(key, src);
+                        }
+                        // A display state deleted from the assembly: its views
+                        // go blank, with Onshape's info toast (live drawing/1112).
+                        None => {
+                            if key.display.is_some() {
+                                this.status = Some("Failed to resolve display state.".into());
+                            }
+                            this.sources.remove(&key);
+                            this.failed_sources.insert(key);
+                        }
                     }
                     if this.regenerating.is_empty() {
                         this.out_of_date = false;
@@ -953,7 +790,18 @@ impl DrawingEditor {
         } else if need_exact && !interactive {
             self.schedule_compute(true, cx);
         }
-        let built = assemble_sheet(&d, si, &self.geoms, &self.sources, &self.info);
+        let mut built = assemble_sheet(&d, si, &self.geoms, &self.sources, &self.info);
+        // Model space (live behaviours "Imported DWG/DXF drawings"): no paper,
+        // the canvas in the model-space colour; on Dark view the foreground
+        // ink (ACI 7) draws white, other colours stay.
+        let model = d.sheets.get(si).and_then(|s| s.imported.as_ref()).is_some_and(|i| i.model);
+        let dark = model && !crate::preferences_window::ListPrefs::load().drawing_light_model_space;
+        self.model_bg = model.then_some(if dark { 0x000000 } else { 0xffffff });
+        if dark {
+            let g = &mut built.geometry;
+            let all = noshape_model::drawing::sheet::ColorSpan { lines: 0..g.lines.len(), texts: 0..g.texts.len(), fills: 0..g.fills.len(), rgb: [255, 255, 255] };
+            g.colors.insert(0, all);
+        }
         self.built = Some(Arc::new(built));
         self.geometry_dirty = true;
         self.update_hover(cx);
@@ -1007,9 +855,17 @@ impl DrawingEditor {
         if s[0] < 10.0 || s[1] < 10.0 {
             return;
         }
-        let (w, h) = self.current_sheet().size.size_mm();
-        self.zoom = ((s[0] - 40.0) / w).min((s[1] - 40.0) / h).max(0.05);
-        self.center = [w / 2.0, h / 2.0];
+        // A model space has no paper: fit its content.
+        let content = self.current_sheet().imported.as_ref().filter(|m| m.model).and_then(|m| m.extents());
+        let (x0, y0, w, h) = match content {
+            Some(b) => (b[0], b[1], (b[2] - b[0]).max(1.0), (b[3] - b[1]).max(1.0)),
+            None => {
+                let (w, h) = self.current_sheet().size.size_mm();
+                (0.0, 0.0, w, h)
+            }
+        };
+        self.zoom = ((s[0] - 40.0) / w).min((s[1] - 40.0) / h).clamp(0.05, 200.0);
+        self.center = [x0 + w / 2.0, y0 + h / 2.0];
         self.fitted = true;
         self.frame_dirty = true;
         cx.notify();
@@ -1108,45 +964,18 @@ impl DrawingEditor {
 
     /// Pick ids belonging to a selection entry.
     pub fn picks_of(&self, sel: Sel) -> Vec<u32> {
-        let Some(b) = &self.built else { return vec![] };
-        b.picks
-            .iter()
-            .enumerate()
-            .filter(|(_, t)| match (sel, t) {
-                (Sel::View(v), t) => t.view() == Some(v),
-                (Sel::Annotation(a), PickTarget::Annotation(b) | PickTarget::Inspection(b)) => a == *b,
-                (Sel::Table(a), PickTarget::Table(b)) => a == *b,
-                (Sel::Break(v, i), PickTarget::BreakLine { view, index }) => v == *view && i == *index,
-                (Sel::Sketch(a), PickTarget::SketchEntity(b)) => a == *b,
-                (Sel::Hatch(a), PickTarget::Hatch(b)) => a == *b,
-                (Sel::Image(a), PickTarget::Image(b)) => a == *b,
-                (Sel::AutoCentermark(v, c), PickTarget::AutoCentermark { view, center }) => v == *view && c == *center,
-                _ => false,
-            })
-            .map(|(i, _)| i as u32)
-            .collect()
+        self.pk().picks_of(sel)
     }
 
     /// The selectable entity a pick id belongs to.
     pub fn sel_of_pick(&self, pick: u32) -> Option<Sel> {
-        match self.built.as_ref()?.picks.get(pick as usize)? {
-            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) => Some(Sel::View(*v)),
-            PickTarget::Annotation(a) | PickTarget::Inspection(a) => Some(Sel::Annotation(*a)),
-            PickTarget::Table(t) => Some(Sel::Table(*t)),
-            PickTarget::BreakLine { view, index } => Some(Sel::Break(*view, *index)),
-            PickTarget::SketchEntity(id) => Some(Sel::Sketch(*id)),
-            PickTarget::Hatch(id) => Some(Sel::Hatch(*id)),
-            PickTarget::Image(id) => Some(Sel::Image(*id)),
-            PickTarget::AuxIndicator(v) => Some(Sel::View(*v)),
-            PickTarget::AutoCentermark { view, center } => Some(Sel::AutoCentermark(*view, *center)),
-            _ => None,
-        }
+        self.pk().sel_of_pick(pick)
     }
 
     fn build_scene(&self) -> Scene {
         let mut scene = Scene::default();
         // Onshape: the white sheet sits flat on the gray surround (no shadow).
-        if let Some((_shadow, paper, _)) = &self.paper {
+        if let Some((_shadow, paper, _)) = self.paper.as_ref().filter(|_| self.model_bg.is_none()) {
             scene.instances.push(Instance::new(Drawable::Mesh(paper.clone())).with_color([1.0, 1.0, 1.0, 1.0]).unlit().unpickable().layer(-5));
         }
         // Inserted images and backdrops, under the sheet geometry.
@@ -1294,7 +1123,7 @@ impl DrawingEditor {
         self.rebuild_overlay();
         let mut style = Style::default();
         // Gray drawing area around the white sheet; Onshape highlight colors.
-        let bg = crate::theme::lin(crate::theme::viewport::DRAWING_BG);
+        let bg = crate::theme::lin(self.model_bg.unwrap_or(crate::theme::viewport::DRAWING_BG));
         style.background_top = bg;
         style.background_bottom = bg;
         style.hover_color = crate::theme::lin(crate::theme::viewport::PREHIGHLIGHT);
@@ -1344,54 +1173,11 @@ impl DrawingEditor {
     // ------------------------------------------------------------ hover
 
     pub fn tol_mm(&self, px: f64) -> f64 {
-        px / self.zoom
+        self.pk().tol_mm(px)
     }
 
     pub fn update_hover(&mut self, cx: &mut Context<Self>) {
-        let tol = self.tol_mm(5.0);
-        let hover = self.built.as_ref().and_then(|b| b.hit(self.cursor, tol));
-        let hover = match (&self.tool, hover) {
-            // 2 point linear takes points only: no edge highlight.
-            (Tool::Dimension { kind: DimTool::Point2, .. }, _) => None,
-            // Dimension-like tools only care about view edges.
-            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }, Some(h)) => {
-                match self.built.as_ref().and_then(|b| b.picks.get(h as usize)) {
-                    Some(PickTarget::Edge { .. }) => Some(h),
-                    _ => None,
-                }
-            }
-            // Sketch tools and constraints: sketch geometry and view edges.
-            (Tool::Sketch { .. } | Tool::Constrain { .. }, Some(h)) => match self.built.as_ref().and_then(|b| b.picks.get(h as usize)) {
-                Some(PickTarget::Edge { .. } | PickTarget::SketchEntity(_)) => Some(h),
-                _ => None,
-            },
-            (
-                Tool::Select
-                | Tool::Projected { parent: None }
-                | Tool::Section { parent: None, .. }
-                | Tool::BrokenOut { parent: None, .. }
-                | Tool::CropPoly { parent: None, .. }
-                | Tool::Detail { parent: None, .. }
-                | Tool::JoggedSection { parent: None, .. }
-                | Tool::AlignedSection { parent: None, .. }
-                | Tool::Crop { parent: None, .. }
-                | Tool::Break { parent: None, .. }
-                | Tool::Table { kind: TableTool::Bom | TableTool::Hole | TableTool::CutList, view: None, .. },
-                h,
-            ) => h,
-            _ => None,
-        };
-        // In select mode, hovering anywhere inside a view highlights it.
-        let hover = match (hover, &self.tool, self.built.as_ref()) {
-            (None, Tool::Select, Some(b)) => b
-                .placements
-                .iter()
-                .filter(|p| p.contains(self.cursor, 1.0))
-                .min_by(|a, c| ((a.max[0] - a.min[0]) * (a.max[1] - a.min[1])).total_cmp(&((c.max[0] - c.min[0]) * (c.max[1] - c.min[1]))))
-                .and_then(|p| b.picks.iter().position(|t| *t == PickTarget::View(p.id)))
-                .map(|i| i as u32),
-            (h, _, _) => h,
-        };
+        let hover = self.pk().hover_at();
         if hover != self.hover {
             self.hover = hover;
             self.redraw(cx);
@@ -1402,22 +1188,12 @@ impl DrawingEditor {
     }
 
     pub fn placement(&self, view: ViewId) -> Option<noshape_model::drawing::build::ViewPlacement> {
-        self.built.as_ref()?.placement(view).copied()
+        self.pk().placement(view)
     }
 
     /// The view under a sheet point (smallest containing view rectangle).
     pub fn view_at(&self, s: [f64; 2]) -> Option<ViewId> {
-        if let Some(h) = self.hover
-            && let Some(Sel::View(v)) = self.sel_of_pick(h)
-        {
-            return Some(v);
-        }
-        let b = self.built.as_ref()?;
-        b.placements
-            .iter()
-            .filter(|p| p.contains(s, 2.0))
-            .min_by(|a, c| ((a.max[0] - a.min[0]) * (a.max[1] - a.min[1])).total_cmp(&((c.max[0] - c.min[0]) * (c.max[1] - c.min[1]))))
-            .map(|p| p.id)
+        self.pk().view_at(s)
     }
 }
 
@@ -1426,6 +1202,7 @@ impl DrawingEditor {
 #[derive(Clone)]
 struct DrSlices {
     toolbar: Entity<crate::cached_slice::Slice<DrawingEditor>>,
+    panel: Entity<crate::cached_slice::Slice<DrawingEditor>>,
 }
 
 impl DrawingEditor {
@@ -1436,9 +1213,12 @@ impl DrawingEditor {
         use crate::cached_slice::Slice;
         let me = cx.entity();
         let toolbar = Slice::new(&me, |this, window, cx| this.render_toolbar(window, cx), cx);
+        let panel = Slice::new(&me, |this, _, cx| div().size_full().relative().children(this.render_panel(cx)).into_any_element(), cx);
         // Undo state comes from the document.
-        Slice::observing(&toolbar, &self.doc, cx);
-        let s = DrSlices { toolbar };
+        for s in [&toolbar, &panel] {
+            Slice::observing(s, &self.doc, cx);
+        }
+        let s = DrSlices { toolbar, panel };
         self.slices = Some(s.clone());
         s
     }
@@ -1498,14 +1278,23 @@ impl Render for DrawingEditor {
             self.refresh(cx);
         }
         let sheet_bar = self.render_sheet_bar(cx);
-        let panel = self.render_panel(cx);
+        // The panel (the Note ✓ ✕ panel above a note typed in place, …) as a
+        // cached layer: a keystroke or caret blink in the note re-renders
+        // the editor, not the panel. It reads the note's text and caret, so
+        // it follows the note's field.
+        let editing_text = match &self.panel {
+            Some(Panel::Note { input, .. } | Panel::Cell { input, .. }) => Some(input.clone()),
+            _ => None,
+        };
+        crate::cached_slice::Slice::follow(&slices.panel, editing_text.as_ref(), cx);
+        let panel = slices.panel.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full());
         let canvas_el = div()
             .id("drawing-canvas")
             .flex_1()
             .min_h_0()
             .relative()
             .overflow_hidden()
-            .bg(rgb(crate::theme::viewport::DRAWING_BG))
+            .bg(rgb(self.model_bg.unwrap_or(crate::theme::viewport::DRAWING_BG)))
             // Live (dom/cursors.txt): no tool `auto`; the tools Onshape's
             // DrawingCrosshair-01.cur, Centermark DrawingCrosshairBox3-01.cur.
             .on_hover(cx.listener(|this, h: &bool, _, cx| {
@@ -1532,8 +1321,10 @@ impl Render for DrawingEditor {
             .child(self.sheets_toggle(0., cx))
             .child(status)
             .children(self.render_note_inplace(cx))
+            .children(self.render_sketch_dim_box(cx))
             .children(self.render_cell_inplace(cx))
-            .children(panel)
+            .children(self.render_rotate_label())
+            .child(panel)
             .children(self.render_view_props(cx))
             .children(self.render_zoom_window())
             .children(self.render_shortcut_toolbar(cx))

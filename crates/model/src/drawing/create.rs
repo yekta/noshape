@@ -28,7 +28,7 @@ const SCALES: [f64; 19] = [10.0, 5.0, 4.0, 2.5, 2.0, 1.5, 1.0, 0.75, 0.5, 0.4, 0
 
 /// Model bounds (meters) of a drawing source, regenerated from the document.
 pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec3)> {
-    let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None };
+    let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None, position: None, display: None };
     let model = regenerate_source(doc, &key, &mut Regenerator::new(), &mut AssemblyEvaluator::new())?;
     let mut acc: Option<(DVec3, DVec3)> = None;
     // A sketch source: the bounds of its curves.
@@ -71,7 +71,7 @@ pub fn suggested_scale(extent: DVec3, w: f64, h: f64) -> f64 {
 /// The view frame of a sketch source (looking at the sketch plane).
 pub fn source_frame(doc: &Document, src: &DrawingSource) -> Option<[[f64; 3]; 2]> {
     let f = src.sketch.as_ref()?;
-    let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None };
+    let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None, position: None, display: None };
     let model = regenerate_source(doc, &key, &mut Regenerator::new(), &mut AssemblyEvaluator::new())?;
     super::views::sketch_frame(&model.context, f)
 }

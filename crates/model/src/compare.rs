@@ -209,6 +209,154 @@ fn feature_changes(a: &Feature, b: &Feature) -> Vec<String> {
     d
 }
 
+/// One parameter of a feature in a Part Studio compare: its label and the
+/// value text on each side (None: the side lacks the parameter).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParamCompare {
+    pub label: String,
+    pub base: Option<String>,
+    pub target: Option<String>,
+    /// How the feature dialog shows it (the compare panel draws read-only
+    /// dialogs side by side, live cp-921).
+    pub shape: ParamShape,
+}
+
+/// A parameter's control in a feature dialog.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ParamShape {
+    /// The feature's name (the dialog header).
+    Name,
+    /// Suppression (no dialog control; a checkbox row here).
+    Bool,
+    Query,
+    Enum,
+    Number,
+    Text,
+    Other,
+}
+
+impl ParamCompare {
+    pub fn differs(&self) -> bool {
+        self.base != self.target
+    }
+}
+
+/// One feature of a Part Studio compare (Onshape's Compare panel ›
+/// Features), matched by id: `status` None = the same on both sides.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FeatureCompare {
+    pub id: crate::reference::FeatureId,
+    pub name: String,
+    pub type_id: String,
+    pub status: Option<ChangeKind>,
+    pub params: Vec<ParamCompare>,
+}
+
+/// A selection as the dialog's query box names it ("Edge of Extrude 1").
+fn reference_label(r: &crate::reference::Reference, studio: &PartStudio) -> String {
+    use crate::reference::{DatumPlane, Reference, TopoName};
+    let fname = |id: crate::reference::FeatureId| studio.feature(id).map(|f| f.name.clone()).unwrap_or_else(|| "deleted feature".into());
+    let creator = |n: &TopoName| match n {
+        TopoName::Edge { faces, .. } => faces[1].creator().or_else(|| faces[0].creator()),
+        TopoName::Boundary { face, .. } => face.creator(),
+        other => other.creator(),
+    };
+    match r {
+        Reference::Origin => "Origin".into(),
+        Reference::Plane(DatumPlane::Top) => "Top plane".into(),
+        Reference::Plane(DatumPlane::Front) => "Front plane".into(),
+        Reference::Plane(DatumPlane::Right) => "Right plane".into(),
+        Reference::Face(n) => format!("Face of {}", n.creator().map(fname).unwrap_or_else(|| "part".into())),
+        Reference::Edge(n) => format!("Edge of {}", creator(n).map(fname).unwrap_or_else(|| "part".into())),
+        Reference::Vertex(_) => "Vertex".into(),
+        Reference::Body(_) => "Part".into(),
+        Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => fname(*sketch),
+        Reference::FeaturePlane(f) | Reference::Feature(f) | Reference::MateConnector { feature: f, .. } => fname(*f),
+        Reference::Implicit { .. } => "Mate connector".into(),
+        Reference::QueryVariable(name) => format!("#{name}"),
+    }
+}
+
+fn shape_of(v: &ParamValue) -> ParamShape {
+    match v {
+        ParamValue::Bool(_) => ParamShape::Bool,
+        ParamValue::Enum(_) => ParamShape::Enum,
+        ParamValue::Expr(_) => ParamShape::Number,
+        ParamValue::Text(_) => ParamShape::Text,
+        ParamValue::Query(_) => ParamShape::Query,
+        _ => ParamShape::Other,
+    }
+}
+
+/// A parameter value as the compare panel shows it.
+fn param_text(v: &ParamValue, spec: Option<&crate::params::ParamSpec>, studio: &PartStudio) -> String {
+    match v {
+        ParamValue::Bool(b) => if *b { "true" } else { "false" }.into(),
+        ParamValue::Enum(e) => match spec.map(|s| &s.kind) {
+            Some(crate::params::ParamKind::Enum { options, .. }) => options.iter().find(|o| o.0 == e).map(|o| o.1.to_string()).unwrap_or_else(|| e.clone()),
+            _ => e.clone(),
+        },
+        ParamValue::Expr(x) => x.text.clone(),
+        ParamValue::Text(t) => t.clone(),
+        ParamValue::Query(q) => q.iter().map(|r| reference_label(r, studio)).collect::<Vec<_>>().join(", "),
+        ParamValue::Array(a) => format!("{} items", a.len()),
+        ParamValue::Sketch(_) => "Sketch".into(),
+        ParamValue::Lookup(l) => l.join(" › "),
+    }
+}
+
+/// The features of two Part Studio states side by side: `base`'s order,
+/// features only in `target` after the feature they follow there.
+pub fn compare_features(base: &PartStudio, target: &PartStudio) -> Vec<FeatureCompare> {
+    let row = |a: Option<&Feature>, b: Option<&Feature>| -> FeatureCompare {
+        let f = b.or(a).expect("one side");
+        let ty = f.feature_type();
+        let mut ids: Vec<&str> = Vec::new();
+        for side in [a, b].into_iter().flatten() {
+            for id in side.params.0.keys() {
+                if !ids.contains(&id.as_str()) {
+                    ids.push(id);
+                }
+            }
+        }
+        // The feature type's order, and only what its dialog shows on either
+        // side (live cp-921: the read-only dialogs).
+        if let Some(t) = ty {
+            ids.retain(|id| t.params.iter().any(|s| s.id == *id && [a, b].into_iter().flatten().any(|x| s.is_visible(&x.params))));
+            ids.sort_by_key(|id| t.params.iter().position(|s| s.id == *id).unwrap_or(usize::MAX));
+        }
+        // The feature's own name and suppression first, then its parameters.
+        let own = |label: &str, shape: ParamShape, f: fn(&Feature) -> String| ParamCompare { label: label.to_string(), base: a.map(f), target: b.map(f), shape };
+        let head = [own("Name", ParamShape::Name, |x| x.name.clone()), own("Suppressed", ParamShape::Bool, |x| x.suppressed.to_string())];
+        let params = head
+            .into_iter()
+            .chain(ids.into_iter()
+            .map(|id| {
+                let spec = ty.and_then(|t| t.params.iter().find(|s| s.id == id));
+                let text = |side: Option<&Feature>, studio: &PartStudio| side.and_then(|x| x.params.get(id)).map(|v| param_text(v, spec, studio));
+                let shape = [a, b].into_iter().flatten().find_map(|x| x.params.get(id)).map(shape_of).unwrap_or(ParamShape::Other);
+                ParamCompare { label: spec.map(|s| s.label.to_string()).unwrap_or_else(|| id.to_string()), base: text(a, base), target: text(b, target), shape }
+            }))
+            .collect();
+        let status = match (a, b) {
+            (Some(_), None) => Some(ChangeKind::Removed),
+            (None, Some(_)) => Some(ChangeKind::Added),
+            (Some(x), Some(y)) if x != y => Some(ChangeKind::Modified),
+            _ => None,
+        };
+        FeatureCompare { id: f.id, name: f.name.clone(), type_id: f.type_id.clone(), status, params }
+    };
+    let mut out: Vec<FeatureCompare> = base.features.iter().map(|f| row(Some(f), target.feature(f.id))).collect();
+    for (k, f) in target.features.iter().enumerate() {
+        if base.feature(f.id).is_some() {
+            continue;
+        }
+        let after = target.features[..k].iter().rev().find_map(|p| out.iter().position(|r| r.id == p.id));
+        out.insert(after.map_or(0, |i| i + 1), row(None, Some(f)));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,6 +382,30 @@ mod tests {
         assert!(texts.iter().any(|t| t.starts_with("Added feature \"Chamfer")), "{texts:?}");
         assert!(compare_documents(&new, &new).is_empty());
         assert!(!texts.iter().any(|t| t.contains("Rollback")), "bar at the end did not move: {texts:?}");
+    }
+
+    #[test]
+    fn features_side_by_side() {
+        let base = crate::demo::demo_document();
+        let mut target = base.clone();
+        let units = UnitPrefs::default();
+        let tab = target.tabs.iter().position(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap();
+        let TabContent::PartStudio(ps) = &mut target.tabs[tab].content else { unreachable!() };
+        let ex = ps.features.iter_mut().find(|f| f.type_id == "extrude").unwrap();
+        ex.params.set("depth", ParamValue::Expr(ExprValue::new("30 mm")));
+        let f = ps.new_feature("chamfer", &units).unwrap();
+        ps.features.push(f);
+        let (TabContent::PartStudio(a), TabContent::PartStudio(b)) = (&base.tabs[tab].content, &target.tabs[tab].content) else { unreachable!() };
+        let rows = compare_features(a, b);
+        assert_eq!(rows.len(), a.features.len() + 1);
+        let ex = rows.iter().find(|r| r.type_id == "extrude").unwrap();
+        assert_eq!(ex.status, Some(ChangeKind::Modified));
+        let depth = ex.params.iter().find(|p| p.target.as_deref() == Some("30 mm")).unwrap();
+        assert!(depth.differs());
+        assert_eq!(rows.last().unwrap().status, Some(ChangeKind::Added));
+        // Suppression shows as its own row.
+        assert!(ex.params.iter().any(|p| p.label == "Suppressed" && !p.differs()));
+        assert!(rows.iter().filter(|r| r.type_id != "extrude" && r.type_id != "chamfer").all(|r| r.status.is_none()));
     }
 
     #[test]

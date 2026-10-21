@@ -76,10 +76,7 @@ impl DrawingEditor {
     /// What the smart tool picks under the cursor: a vertex or center
     /// snap, else the hovered edge (line, arc or circle).
     pub fn smart_pick(&self, c: [f64; 2]) -> Option<Pick> {
-        if let Some(p) = self.snap_at(c) {
-            return Some(Pick::Point(p));
-        }
-        self.line_pick().or_else(|| self.arc_pick()).or_else(|| self.hovered_edge().and_then(|_| self.circle_pick(c)))
+        self.pk().smart_pick(c)
     }
 
     /// 2 point linear, Point to line and Line to line: the click adds only

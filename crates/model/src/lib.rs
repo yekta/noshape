@@ -21,6 +21,7 @@ pub mod demo_fab;
 pub mod display;
 pub mod document;
 pub mod drawing;
+pub mod export_rules;
 pub mod features;
 pub mod in_context;
 pub mod interaction;

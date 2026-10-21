@@ -53,6 +53,9 @@ pub fn open(module: &str, line: usize, column: usize, gpu: Gpu, cx: &mut App) ->
     let head = crate::session::Session::open(&path)?.head()?;
     let (handle, ws) = crate::files::open_version_window(path, head, gpu, cx)?;
     let module = module.to_string();
-    handle.update(cx, |_, window, cx| ws.update(cx, |w, cx| w.goto_studio(&module, line, column, window, cx)))?;
+    // After the new window has shown its first tab.
+    handle.update(cx, |_, window, cx| {
+        window.defer(cx, move |window, cx| ws.update(cx, |w, cx| w.goto_studio(&module, line, column, window, cx)));
+    })?;
     Ok(())
 }

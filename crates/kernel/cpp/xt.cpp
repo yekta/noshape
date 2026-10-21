@@ -1675,15 +1675,15 @@ StepImport read_native_parts_config_ffi(rust::Str path, int32_t config)
   return import_of(read_native_parts(std::string(path), config));
 }
 
-rust::Vec<AsmNodeF> read_sldasm_tree_ffi(rust::Str path)
+rust::Vec<AsmNodeF> read_native_tree_ffi(rust::Str path, rust::Str dir)
 {
   rust::Vec<AsmNodeF> out;
-  for (const AsmNode& n : read_sldasm_tree(std::string(path)))
+  for (const AsmNode& n : read_native_tree(std::string(path), std::string(dir)))
   {
     AsmNodeF f;
-    f.parent        = n.parent;
-    f.name          = rust::String(n.name);
-    f.file          = rust::String(n.file);
+    f.parent = n.parent;
+    f.name   = rust::String(n.name);
+    f.file   = rust::String(n.file);
     f.configuration = rust::String(n.configuration);
     f.config_id     = n.config_id;
     f.number        = n.number;

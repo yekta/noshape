@@ -1,5 +1,6 @@
-use gpui::{Context, Pixels, Task, px};
+use gpui::{Bounds, ContentMask, Context, Hsla, IntoElement, Pixels, Render, Styled as _, Task, Window, canvas, fill, px};
 use instant::Duration;
+use std::{cell::RefCell, rc::Rc};
 
 static INTERVAL: Duration = Duration::from_millis(500);
 static PAUSE_DELAY: Duration = Duration::from_millis(300);
@@ -18,6 +19,9 @@ pub(crate) struct BlinkCursor {
     visible: bool,
     paused: bool,
     epoch: usize,
+    /// NOSHAPE PATCH (agent qa4): what a multi-line input's caret looks like,
+    /// for this view to paint (see `Render for BlinkCursor`).
+    pub(crate) caret: Rc<RefCell<CaretPaint>>,
 
     _task: Task<()>,
 }
@@ -28,6 +32,7 @@ impl BlinkCursor {
             visible: false,
             paused: false,
             epoch: 0,
+            caret: Rc::default(),
             _task: Task::ready(()),
         }
     }
@@ -113,6 +118,47 @@ impl BlinkCursor {
                 });
             }
         });
+    }
+}
+
+// NOSHAPE PATCH (agent qa4): a multi-line input (code editor, textarea) draws
+// its caret with this view instead of with its text. The input's text is a
+// cached view (`TextLayer`) that the blink doesn't notify, so a blink repaints
+// the caret, not every visible line (~2.7 ms a blink for a full-screen
+// editor). The text element leaves the caret quads here when it paints; the
+// input sets `shown` when it renders.
+/// A multi-line input's caret, as its text element last laid it out.
+#[derive(Default)]
+pub(crate) struct CaretPaint {
+    pub(crate) quads: Vec<Bounds<Pixels>>,
+    pub(crate) color: Hsla,
+    /// The clip the text painted under.
+    pub(crate) mask: Option<ContentMask<Pixels>>,
+    /// Focused (or its context menu open), enabled, in the active window.
+    pub(crate) shown: bool,
+}
+
+impl Render for BlinkCursor {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let (caret, visible) = (self.caret.clone(), self.visible());
+        canvas(
+            |_, _, _| {},
+            move |_, _, window, _| {
+                let caret = caret.borrow();
+                if !(visible && caret.shown) {
+                    return;
+                }
+                window.with_content_mask(caret.mask.clone(), |window| {
+                    for bounds in &caret.quads {
+                        window.paint_quad(fill(*bounds, caret.color));
+                    }
+                });
+            },
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
     }
 }
 

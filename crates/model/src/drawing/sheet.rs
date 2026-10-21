@@ -393,6 +393,23 @@ impl SheetGeometry {
         let (w0, w1) = (*line.points.get(i)?, if i + 1 < n { line.points[i + 1] } else if line.closed && n > 2 { line.points[0] } else { return None });
         Some(([w0[0] + (w1[0] - w0[0]) * o.t, w0[1] + (w1[1] - w0[1]) * o.t], w0, w1, line.closed))
     }
+
+    /// A datum on a dimension hides the arrowheads it covers (help H:datum):
+    /// the dimension's filled triangles with a corner within `r` of `at` are
+    /// emptied (not removed, so later indices stay valid).
+    fn hide_covered_arrows(&mut self, starts: &Starts, ann: u64, at: [f64; 2], r: f64) {
+        let Some(k) = starts.iter().position(|s| s.0.id == ann) else { return };
+        if !starts[k].0.kind.is_dimension() {
+            return;
+        }
+        let f1 = starts.get(k + 1).map(|s| s.3).unwrap_or(self.fills.len());
+        for f in &mut self.fills[starts[k].3..f1] {
+            // An arrowhead (a filled triangle) with a corner under the datum's triangle.
+            if f.points.len() == 3 && f.points.iter().any(|p| ((p[0] - at[0]).powi(2) + (p[1] - at[1]).powi(2)).sqrt() < r) {
+                f.points.clear();
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -538,6 +555,26 @@ impl SheetGeometry {
     }
 
     /// Border frame with zone markers and an ISO-style title block.
+    /// An imported DWG / DXF space: its geometry in its own colours (black,
+    /// the foreground, stays the default ink) and texts; no border or title
+    /// block.
+    pub fn add_imported(&mut self, s: &super::imported::ImportedSpace) {
+        for (pts, c) in &s.lines {
+            let i = self.lines.len();
+            self.lines.push(Polyline2 { points: pts.clone(), style: LineStyle::Thin, closed: false, pick: 0 });
+            if *c != [0, 0, 0] {
+                self.colors.push(ColorSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, rgb: *c });
+            }
+        }
+        for t in &s.texts {
+            let i = self.texts.len();
+            self.texts.push(Text2 { pos: t.pos, height: t.height, text: t.text.clone(), angle: t.angle, anchor: Anchor::BottomLeft, pick: 0 });
+            if t.color != [0, 0, 0] {
+                self.colors.push(ColorSpan { lines: 0..0, texts: i..i + 1, fills: 0..0, rgb: t.color });
+            }
+        }
+    }
+
     pub fn add_border_and_title(&mut self, sheet: &Sheet) {
         self.add_border_and_title_with(sheet, &|s| s.to_string());
     }
@@ -1281,6 +1318,9 @@ impl SheetGeometry {
                             }
                             let n = [-d[1] / dd.sqrt(), d[0] / dd.sqrt()];
                             let side = if (c[0] - q[0]) * n[0] + (c[1] - q[1]) * n[1] < 0.0 { -1.0 } else { 1.0 };
+                            if let Some(o) = on {
+                                self.hide_covered_arrows(&starts, o.ann, q, self.style.datum_size * 0.6);
+                            }
                             (q, c, Some([n[0] * side, n[1] * side]))
                         }
                         None => (*anchor, a.position, None),
@@ -1296,8 +1336,9 @@ impl SheetGeometry {
                         let ds = self.style.datum_size;
                         let apex = [anchor[0] + u[0] * ds, anchor[1] + u[1] * ds];
                         self.fills.push(Fill2 { points: vec![[anchor[0] + w[0] * ds * 0.6, anchor[1] + w[1] * ds * 0.6], apex, [anchor[0] - w[0] * ds * 0.6, anchor[1] - w[1] * ds * 0.6]] });
-                        // Leader from the triangle to the box edge.
-                        let hit = box_exit(c, bw / 2.0, bh / 2.0, [-u[0], -u[1]]);
+                        // Leader from the triangle to the box's near edge
+                        // (`box_exit` walks from the centre against `d`).
+                        let hit = box_exit(c, bw / 2.0, bh / 2.0, u);
                         self.lines.push(Polyline2 { points: vec![apex, hit], style: LineStyle::Thin, closed: false, pick });
                     }
                 }
@@ -2210,6 +2251,10 @@ pub fn ordinate_text_positions(along: &[f64], gap: f64) -> Vec<f64> {
 
 /// Sheet rectangle [x0, y0, x1, y1] (mm) of a sheet's title block.
 pub fn title_block_rect(sheet: &Sheet) -> Option<[f64; 4]> {
+    // Imported DWG / DXF sheets have no title block of ours.
+    if sheet.imported.is_some() {
+        return None;
+    }
     let (w, _) = sheet.size.size_mm();
     let m = 10.0;
     let (bw, bh) = match sheet.title_style {

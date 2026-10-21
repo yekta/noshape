@@ -67,7 +67,7 @@ pub fn format_quantity(q: Quantity, prefs: &UnitPrefs) -> String {
 /// Like [`format_quantity`] with an explicit number of decimals.
 pub fn format_quantity_with(q: Quantity, prefs: &UnitPrefs, decimals: u8) -> String {
     let v = q.value / prefs.si_factor(q.dim);
-    let num = format_number(v, decimals);
+    let num = crate::decimal::localize_number(format_number(v, decimals));
     if q.dim.is_unitless() {
         return num;
     }

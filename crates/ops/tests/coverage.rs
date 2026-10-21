@@ -75,7 +75,7 @@ fn every_ui_command_is_listed() {
 /// Coverage only goes up: lower `PLANNED_CEILING` as operations land.
 #[test]
 fn coverage_report() {
-    const PLANNED_CEILING: usize = 108;
+    const PLANNED_CEILING: usize = 87;
     let features = feature_shortcuts().len();
     let ops = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Op(_))).count();
     let planned = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Planned)).count();

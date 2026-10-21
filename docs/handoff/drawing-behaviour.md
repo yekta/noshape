@@ -606,23 +606,80 @@ matches live 164. DRAWN shows "----" only because the test env has no USER.
 
 ## asb (new account, 10-20 night): state
 - Fixed `datum_on_gdt_frame_follows_it` (label "Q", so it no longer matches the zone letter "D"); passes.
-- New, uncompiled/unverified at the time of writing (check after the build):
-  - **EX19** Preferences › Drawings: `app/drawing_prefs.rs` (`DrawingPrefsView`, select Dark view (default) /
-    Light view + Save drawing settings, live drawing/482), between Toolbars and Release/Material libraries in
-    preferences_window.rs; stored as `ListPrefs.drawing_light_model_space` (preferences.json). Where the model
-    space background applies is waiting on REQUESTS "asb (10-20 v)" (how Onshape shows an imported DWG's model space).
-  - **V3 / V41 named views**: `DrawingView.named_view` (model mod.rs) + `views::named_view_frame` (camera
-    rotation → frame; test `named_view_frame_is_the_camera`). Insert view panel lists the source Part Studio's named
-    views after Isometric (`InsertViewState.named` = (name, frame)); the view context menu › View orientation and
-    View properties list them too (deleted one shown checked + grayed in the menu). Choosing a standard orientation
-    clears `named_view` and `custom_frame` (`set_standard_orientation`; it used to leave a custom frame in place).
-    `default_view_name` = the named view's name. Section planes of named views: not applied yet (REQUESTS w).
-  - **EX13 Print…**: document menu (workspace.rs) › Print… between separators after "Switch to view only mode"
-    (live 478). In a drawing: `DrawingEditor::print` writes every sheet as PDF to $TMP/noshape-print/<name>.pdf and
-    opens it in the system viewer (`ExportSettings.print`). Part Studio / Assembly print setup (dotted page border,
-    help Home__printing_part_studios_and_assemblies) is not done: psb / skb area, reported to the lead.
+- Full `cargo clippy --locked --workspace --all-targets -- -D warnings` was clean at 22:05 (before the last edits below).
+- Checked in the app (Xvfb :104, screenshots /root/asb-scratch/c*.png, v*.png, a*.png, s*.png):
+  - **V3 / V41 named views**: `DrawingView.named_view` + `views::named_view_frame` (camera → frame; test
+    `named_view_frame_is_the_camera`). Insert view panel, view menu › View orientation and View properties list the
+    source Part Studio's named views after Isometric; a deleted one stays checked + grayed in the menu; choosing a
+    standard orientation clears `named_view` / `custom_frame` (`set_standard_orientation`). Section planes of named
+    views: not applied (REQUESTS w).
+  - **EX13 Print…** (document menu, live 478): `DrawingEditor::print` → all sheets as PDF in $TMP/noshape-print,
+    opened with the system viewer. Part Studio / Assembly print setup: psb / skb (reported to the lead).
+  - **EX19** Preferences › Drawings (`drawing_prefs.rs`, `ListPrefs.drawing_light_model_space`), spacing matched
+    to live 482 (Toolbars' trailing spacer 31 → 15 px in preferences_window.rs). Applying it waits on REQUESTS v.
+  - **K27** Drawing tab in Keyboard shortcuts: present (someone else's work) → ✅.
+  - **V15** aux indicator: edge highlight, 5 grips, elbow lengthens its side, middle slides it → ✅.
+  - **A30** datum on a GD&T frame edge / extension line: crosshair, attach, follows the frame, line carried past the
+    end. Found + fixed: every datum's leader ran through its box to the far edge (`box_exit` was passed `-u`; it
+    walks against `d`), also in main. New: a datum on a dimension hides the arrowheads it covers
+    (`SheetGeometry::hide_covered_arrows`; test `datum_on_dimension_arrow_hides_it`). Not yet rebuilt/checked.
+    Still missing: dragging the attached datum's base along the line.
 - Capture requests filed (REQUESTS.md): v (DWG model space), w (named views / assembly insert / prefill: CR16, V6,
   V70, V71), x (cross-sheet linked views V52 — Onshape moves views alone and keeps them linked; ours moves
   descendants and orphans become base views), y (SK7 driving sketch dimensions), z (MBD datums in drawings: V5,
   CR18, A65; psb's Part Studio datums exist in model/annotations.rs), z2 (Select a DWT, S13).
-- K27 looks done by someone else (shortcuts.rs has a Drawing tab, customizable); verify in Preferences and set ✅.
+- Noted for ui2 / lead: `file_tab_view::pick_file` (Insert image / DXF / CSV) is a centred 560 px modal; live
+  (behaviours.md 1729, drawing/123–125) is a 300 px panel with Current / Other documents tabs and an Import… footer.
+
+### asb, 10-20/21 night (after the live answers v–z2): written, not yet built / checked in the app
+- **Drawing S toolbar** (from ui2): `drawing_keys.rs` `SHORTCUT_CATALOGUE` (38 tools, toolbar order) and
+  `DEFAULT_SHORTCUT_TOOLS` (provisional until REQUESTS z3), panel to the live sketch/38 spec (175×62, 2×5, cursor
+  +10 / −30, S again reopens). `ToolbarPrefs.drawing_shortcut_tools`; Preferences › Shortcut toolbars has
+  Sketch | Part Studio | Assembly | Drawing (Drawing = index 3; skb added Assembly = 2 meanwhile).
+- **View properties**: read-only "Named view" row (live 1104), a deleted named view still listed (live 1117–1119),
+  "View render mode" Best quality / Best performance (`DrawingView.best_quality` → exact HLR; V45).
+- **Assembly views (V6 / V70 / V71 / CR16, live w)**: `DrawingView.named_position`, `display_state` (base),
+  `own_position: Option<AsmPosition>`, `own_display: Option<DisplayChoice>` (children; None = Follow parent);
+  `views::view_source` applies the nearest override; `SourceKey.position / display`; regenerate_source solves the
+  named position (start + locks) and filters occurrences by the display state (None = Show all, which now also
+  shows instances the assembly hides). A missing display state → no source → blank views + toast "Failed to resolve
+  display state." (`failed_sources`, retried on Update). Insert view rows Explode/Position + Display state (no
+  "Show annotations from model" for assemblies), prefilled from the open assembly (`AssemblyView::drawing_prefill`:
+  `ui.np_applied`, `ui.ds_selected`). View menu Explode/Position ▸ / Display state ▸ (current greyed; sections and
+  details change their root). View properties rows with "Follow parent" for children, pink empty field when the
+  display state is gone. Test `assembly_views_display_state_and_follow_parent`.
+- **Imported DWG / DXF (EX19, live v)**: + › Import… of a DXF / DWG now only adds the file tab. File tabs got their
+  own menu (`workspace::file_tab_menu`, live file-tab menus; no Translate…): DXF / DWG › "Create Drawing of <file>…"
+  → `create_cad_drawing` → `model::drawing::imported::drawing_from_cad` (sheets "Model" + layouts with colours and
+  texts via the new `noshape_sketch::cad::parse_cad_spaces`; R12 paper space locked). Model sheet: no paper / border /
+  title block; canvas black (Dark view) or white (Light view) from Preferences › Drawings, foreground ink white on
+  dark (`DrawingEditor.model_bg`, a white ColorSpan at the front). Sheets panel: "Model" unnumbered, layouts numbered
+  from 1, locked rows grey (greyed menu, can't open), Model has no menu, double-click on the active Model → Sheet
+  properties with only Size "Letter (8.50 x 11.00 Inches)" greyed. Toolbar: view tools + model tables greyed
+  (`TbTool.disabled`, also in collapsed categories). Tests `spaces_keep_colours_and_texts` (sketch),
+  `model_space_sheet_keeps_colours` (model). Not done: layout paper size from the DWG's page setup (extents used),
+  the layout icon, start_window.rs's documents-page import still makes a drawing (ui2's file).
+- **Sheet switches are undoable** (live z2 (5)): `Drawing.active_sheet`; `commit` stores the sheet on screen;
+  `switch_sheet` commits "Switch sheet"; `reload` shows the stored sheet (undo / redo); editors open on it.
+- **Datums**: leader stops at the box (box_exit sign bug, also in main); a datum on a dimension hides the covered
+  arrowhead (`hide_covered_arrows`, test `datum_on_dimension_arrow_hides_it`).
+- Still to do from the live answers: V52 linked views across sheets (x), SK7 driving sketch dimensions (y; sign
+  ignored, not flipped), MBD datums V5 / CR18 / A65 (z), S13 Select a DWT (z2), named views with section planes (w).
+
+### asb, 10-21 (v0.4.3 code freeze): state
+- Tree state at the freeze: `cargo clippy --locked --workspace --all-targets -- -D warnings` clean; model drawing tests
+  99 passed.
+- Checked in the app this round: S toolbar, View render mode row, assembly Insert view rows / menu, sheet-switch
+  undo, imported DXF (file tab only → Create Drawing of … → black Model sheet, colours, Model row, Size-only Sheet
+  properties), SK7 sketch dimensions (line 80 → left end fixed; circle Ø30 about its centre).
+- Built but NOT yet checked in the app: SK7 reopen focus (deferred focus on double-click), assembly view menu
+  order (Explode/Position + Display state right after View orientation, "Insert BOM for <asm> ...", Rotate view ▸
+  Vertical to... / Horizontal to...), model-space zoom to fit, **MBD datums** (`drawing/mbd.rs`, `drawing_mbd.rs`,
+  MBD status panel rows / message / badge / Show; test `mbd_datum_goes_to_the_edge_on_view_and_can_be_hidden`),
+  **V52 linked views** (`drawing/links.rs`: hidden mirror views with ids encoding sheet uid + view, rebuilt by
+  `Drawing::sync_links` in every commit; `move_views_to_sheet_linked` used by Move to sheet / View properties ›
+  Sheet; Sheets panel ↗ badge; linked views drag freely; edits to a mirror go to the real view; test
+  `moving_a_parent_leaves_its_children_linked`).
+- Known gaps: MBD datum A in live sits inside the view (box on −normal) while ours sits outside; MBD characteristics
+  rows (needs MBD dimensions placed in views, CR18); S13 Select a DWT not started; live REQUESTS z3 (drawing S
+  toolbar defaults) still open.

@@ -188,6 +188,11 @@ impl Gpu {
         self.worker().set_overlay(target, overlay);
     }
 
+    /// Geometry the render thread builds for every frame from its camera.
+    pub fn set_camera_geometry(&self, target: u64, geometry: Vec<Arc<dyn noshape_render::camera_geometry::CameraGeometry>>) {
+        self.worker().set_camera_geometry(target, geometry);
+    }
+
     /// Shade overlay text like GPUI's text (its renderer's parameters).
     pub fn set_text_shading(&self, shading: noshape_render::overlay::TextShading) {
         self.worker().set_text_shading(shading);

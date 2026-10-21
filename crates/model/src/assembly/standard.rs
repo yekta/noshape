@@ -55,6 +55,12 @@ pub struct StandardSpec {
     pub material: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finish: Option<String>,
+    /// Washer Series (ANSI Type A: Narrow / Wide; None = Narrow).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub series: Option<String>,
+    /// Nut Bearing face (metric: Washer face / Chamfered; None = the first).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bearing_face: Option<String>,
 }
 
 /// A spec as stored; documents saved before the catalogue took Onshape's
@@ -75,6 +81,10 @@ struct SpecFile {
     material: Option<String>,
     #[serde(default)]
     finish: Option<String>,
+    #[serde(default)]
+    series: Option<String>,
+    #[serde(default)]
+    bearing_face: Option<String>,
 }
 
 impl From<SpecFile> for StandardSpec {
@@ -85,7 +95,7 @@ impl From<SpecFile> for StandardSpec {
             "Pins & Studs" => ANSI_PINS.to_string(),
             _ => s,
         };
-        let mut spec = StandardSpec { standard: rename(f.standard), category: rename(f.category), class: f.class, component: f.component, size: f.size, length: f.length, head_slot: f.head_slot, material: f.material, finish: f.finish };
+        let mut spec = StandardSpec { standard: rename(f.standard), category: rename(f.category), class: f.class, component: f.component, size: f.size, length: f.length, head_slot: f.head_slot, material: f.material, finish: f.finish, series: f.series, bearing_face: f.bearing_face };
         if let Some(c) = component(&spec)
             && c.inch
         {
@@ -204,35 +214,48 @@ impl Component {
             _ => (1.25 * s.d, 12.0 * s.d),
         }
     }
-    /// Default length for a size: ANSI inch the first (live assembly/70),
-    /// metric about three diameters.
+    /// Default length for a size: the first offered (live: "the first
+    /// Length for that size").
     pub fn default_length(&self, size: &Size) -> Option<String> {
-        let all = self.lengths(size);
-        if self.inch {
-            return all.first().cloned();
-        }
-        let target = 3.0 * size.d;
-        let value = |n: &str| self.length_m(n).map(|m| m * 1000.0 / self.unit()).unwrap_or(0.0);
-        all.iter().min_by(|a, b| (value(a) - target).abs().total_cmp(&(value(b) - target).abs())).cloned()
+        self.lengths(size).first().cloned()
     }
     /// A length name in meters: "20 mm", "1 1/4 in", or a bare number in
     /// the component's unit (ANSI inch "0.25").
     pub fn length_m(&self, name: &str) -> Option<f64> {
         length_value(name).or_else(|| name.trim().parse::<f64>().ok().map(|v| v * self.unit() * 1e-3))
     }
-    /// Thread length offered for a size and length (components with the
-    /// row): ASME B18.2.1, 2D + 1/4 in, never longer than the bolt.
+    /// The Series select (live: ANSI Type A flat washer, Narrow / Wide).
+    pub fn series(&self) -> &'static [&'static str] {
+        if self.inch && self.shape == Shape::Washer { &["Narrow", "Wide"] } else { &[] }
+    }
+    /// The Drive type select (live: socket head screws "Hex").
+    pub fn drive_type(&self) -> Option<&'static str> {
+        matches!(self.shape, Shape::SocketHead | Shape::ButtonHead | Shape::SetScrew).then_some("Hex").or((self.shape == Shape::Countersunk && !self.head_slot).then_some("Hex"))
+    }
+    /// The Bearing face select (live: ANSI hex nuts Chamfered; ISO 4032
+    /// Washer face / Chamfered).
+    pub fn bearing_faces(&self) -> &'static [&'static str] {
+        match self.shape {
+            Shape::HexNut if self.inch => &["Chamfered"],
+            Shape::HexNut => &["Washer face", "Chamfered"],
+            _ => &[],
+        }
+    }
+    /// Thread length offered for a size and length (bolts and screws, live):
+    /// inch 2D + 1/4 in (ASME B18.2.1), metric 2d + 6 mm (ISO 4014), never
+    /// longer than the bolt.
     pub fn thread_length(&self, size: &Size, length: &str) -> Option<String> {
-        if !self.thread_length {
+        if !(self.thread_length || matches!(self.shape, Shape::HexBolt | Shape::SocketHead | Shape::ButtonHead | Shape::Countersunk)) {
             return None;
         }
         let l = self.length_m(length)?;
-        let t = (2.0 * size.d + 0.25) * self.unit() * 1e-3;
+        let t = if self.inch { (2.0 * size.d + 0.25) * self.unit() * 1e-3 } else { (2.0 * size.d + 6.0) * 1e-3 };
         if t >= l - 1e-9 {
             return Some(length.to_string());
         }
         let v = t * 1e3 / self.unit();
-        Some(format!("{}", (v * 1e4).round() / 1e4))
+        let v = format!("{}", (v * 1e4).round() / 1e4);
+        Some(if self.inch { v } else { format!("{v} mm") })
     }
     /// Nominal diameter in meters.
     pub fn diameter_m(&self, size: &Size) -> f64 {
@@ -373,6 +396,13 @@ const ISO_PIN: &[Size] = &[
     sz("20", 20., 0., 0., 0.),
 ];
 
+/// ISO coarse thread pitch of a metric size ("M6" → 1.0 mm).
+fn metric_pitch(size: &str) -> Option<f64> {
+    let d: f64 = size.strip_prefix('M')?.parse().ok()?;
+    const P: [(f64, f64); 16] = [(1.6, 0.35), (2.0, 0.4), (2.5, 0.45), (3.0, 0.5), (4.0, 0.7), (5.0, 0.8), (6.0, 1.0), (8.0, 1.25), (10.0, 1.5), (12.0, 1.75), (14.0, 2.0), (16.0, 2.0), (20.0, 2.5), (24.0, 3.0), (30.0, 3.5), (36.0, 4.0)];
+    P.iter().find(|(dd, _)| (*dd - d).abs() < 1e-9).map(|(_, p)| *p)
+}
+
 /// ANSI inch lengths, as live lists them (assembly/70, dom/ui2-standard-content-panel.html).
 pub const INCH_LENGTHS: [&str; 23] = ["0.25", "0.3125", "0.375", "0.4375", "0.5", "0.5625", "0.625", "0.75", "0.88", "1", "1.125", "1.25", "1.5", "1.75", "2", "2.25", "2.5", "2.75", "3", "3.25", "3.5", "3.75", "4"];
 
@@ -485,6 +515,17 @@ const ANSI_WASHER: &[Size] = &[
     sz("3/4", 0.812, 1.469, 0.134, 0.),
     sz("1", 1.062, 2.0, 0.134, 0.),
 ];
+/// ASME B18.22.1 Type A plain washers, Wide series (same sizes as Narrow).
+const ANSI_WASHER_WIDE: &[Size] = &[
+    sz("1/4", 0.312, 0.734, 0.065, 0.),
+    sz("5/16", 0.375, 0.875, 0.083, 0.),
+    sz("3/8", 0.438, 1.0, 0.083, 0.),
+    sz("7/16", 0.5, 1.25, 0.083, 0.),
+    sz("1/2", 0.562, 1.375, 0.109, 0.),
+    sz("5/8", 0.688, 1.75, 0.134, 0.),
+    sz("3/4", 0.812, 2.0, 0.148, 0.),
+    sz("1", 1.062, 2.5, 0.165, 0.),
+];
 const ANSI_PIN: &[Size] = &[
     sz("1/16", 0.0625, 0., 0., 0.),
     sz("3/32", 0.09375, 0., 0., 0.),
@@ -591,10 +632,10 @@ pub fn component(spec: &StandardSpec) -> Option<&'static Component> {
 }
 
 impl StandardSpec {
-    /// A spec for a component with its default size (ANSI inch the first,
-    /// like live; metric the middle one) and length.
+    /// A spec for a component with its default size (live: the first size;
+    /// the ANSI Type A washer 3/8) and the first length for it.
     pub fn new(c: &Component) -> Self {
-        let size = if c.inch { &c.sizes[0] } else { &c.sizes[c.sizes.len().saturating_sub(1) / 2] };
+        let size = if c.inch && c.shape == Shape::Washer { c.size("3/8").unwrap_or(&c.sizes[0]) } else { &c.sizes[0] };
         StandardSpec {
             standard: c.standard.into(),
             category: c.category.into(),
@@ -605,15 +646,42 @@ impl StandardSpec {
             head_slot: None,
             material: None,
             finish: None,
+            series: None,
+            bearing_face: None,
         }
     }
 
-    /// Instance name, like Onshape's "<component> - <size> x <length>".
+    /// The part's name, which instances take ("<Name> <n>") and the
+    /// Description starts with (live): the component's name without its
+    /// standard code ("Hex socket head cap screw", live spells the ANSI
+    /// countersunk bolt "Countersunk Bolt"), the size (metric threads with
+    /// their pitch, "M6x1.00"), the Series, " x <length>" without its unit.
     pub fn part_name(&self) -> String {
+        let name = match self.component.as_str() {
+            "Countersunk bolt" => "Countersunk Bolt".to_string(),
+            n => [" ISO ", " DIN "].iter().filter_map(|code| n.find(code)).min().map_or(n, |i| &n[..i]).to_string(),
+        };
+        let c = component(self);
+        let threaded = c.is_some_and(|c| !c.inch && !matches!(c.shape, Shape::Washer | Shape::Pin));
+        let size = match metric_pitch(&self.size).filter(|_| threaded) {
+            Some(p) => format!("{}x{p:.2}", self.size),
+            None => self.size.clone(),
+        };
+        let series = c.filter(|c| !c.series().is_empty()).map(|_| format!(" {}", self.series())).unwrap_or_default();
         match &self.length {
-            Some(l) => format!("{} - {} x {l}", self.component, self.size),
-            None => format!("{} - {}", self.component, self.size),
+            Some(l) => format!("{name} {size}{series} x {}", l.trim_end_matches(" mm").trim_end_matches(" in")),
+            None => format!("{name} {size}{series}"),
         }
+    }
+
+    /// Washer Series (Narrow unless chosen).
+    pub fn series(&self) -> &str {
+        self.series.as_deref().unwrap_or("Narrow")
+    }
+
+    /// Nut Bearing face (the component's first unless chosen).
+    pub fn bearing_face(&self) -> &str {
+        self.bearing_face.as_deref().or_else(|| component(self).and_then(|c| c.bearing_faces().first().copied())).unwrap_or("")
     }
 
     pub fn material(&self) -> &str {
@@ -630,23 +698,11 @@ impl StandardSpec {
     }
 
     /// The Description field and BOM column, like live's "Countersunk Bolt
-    /// #10-24 x 0.25 Stainless Steel " (words capitalised, the length
-    /// without its unit, the finish unless Plain).
+    /// #10-24 x 0.25 Stainless Steel " (the part name, the material, the
+    /// finish unless Plain).
     pub fn description(&self) -> String {
-        let name: Vec<String> = self
-            .component
-            .split(' ')
-            .map(|w| {
-                let mut c = w.chars();
-                c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
-            })
-            .collect();
         let finish = if self.finish() == FINISHES[0] { "" } else { self.finish() };
-        let size = match &self.length {
-            Some(l) => format!("{} x {}", self.size, l.trim_end_matches(" mm").trim_end_matches(" in")),
-            None => self.size.clone(),
-        };
-        format!("{} {size} {} {finish}", name.join(" "), self.material())
+        format!("{} {} {finish}", self.part_name(), self.material())
     }
 
     /// Change the size, keeping the length when it is still offered.
@@ -716,6 +772,8 @@ fn mm(v: f64) -> ParamValue {
 pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
     let c = component(spec)?;
     let s = c.size(&spec.size)?;
+    // Wide washers: the Wide series' dimensions for the size.
+    let s = if !c.series().is_empty() && spec.series() == "Wide" { ANSI_WASHER_WIDE.iter().find(|w| w.name == s.name).unwrap_or(s) } else { s };
     let u = c.unit();
     let units = UnitPrefs::default();
     scripts();

@@ -12,6 +12,7 @@ use noshape_model::display::PlaneFrame;
 use noshape_model::document::TabId;
 use noshape_model::params::ParamValue;
 use noshape_model::reference::{FeatureId, Reference};
+use noshape_model::regen::RegenResult;
 use noshape_model::sketch_feature::SketchData;
 use noshape_scene::sketch_mode::{self as sm, ConstraintTool, SketchEditor, Tool};
 use noshape_sketch::{ConstraintId, ConstraintKind, DistanceMode, EntityId, Geometry};
@@ -20,10 +21,10 @@ use serde_json::{Value, json};
 
 /// Sketch units per pixel of the headless editor: the 9 px snap radius is
 /// 9 µm, so clicks snap to geometry only at (practically) the same place.
-const WORLD_PER_PX: f64 = 1e-6;
+pub(super) const WORLD_PER_PX: f64 = 1e-6;
 
 /// Drawing tools: (name, tool, clicks it takes, how).
-const DRAW_TOOLS: [(&str, Tool, &str); 18] = [
+const DRAW_TOOLS: [(&str, Tool, &str); 19] = [
     ("line", Tool::Line, "Clicks chain segments: [p0, p1, p2...] makes p0-p1, p1-p2...; repeat the first point to close the loop."),
     ("midpoint_line", Tool::MidpointLine, "[midpoint, end]."),
     ("corner_rectangle", Tool::CornerRect, "[corner, opposite corner]. Horizontal/vertical and coincident constraints, like the UI."),
@@ -42,6 +43,7 @@ const DRAW_TOOLS: [(&str, Tool, &str); 18] = [
     ("inscribed_polygon", Tool::Polygon, "[center, vertex]; `sides` sets the number of sides (default 6)."),
     ("circumscribed_polygon", Tool::CircumPolygon, "[center, edge midpoint]; `sides` as above."),
     ("ellipse", Tool::Ellipse, "[center, major axis end, point setting the minor radius]."),
+    ("elliptical_arc", Tool::EllipticalArc, "[center, major axis end, start point (also sets the minor radius), end point] (counter-clockwise)."),
 ];
 
 const CONSTRAINTS: [(&str, ConstraintTool, &str); 14] = [
@@ -202,16 +204,16 @@ pub(crate) fn length_value(v: &Value, units: &UnitPrefs) -> Result<f64, OpError>
     noshape_units::evaluate_as(&text, Dim::LENGTH, units, &noshape_units::EmptyScope).map(|q| q.value).map_err(|e| OpError::invalid(format!("`{text}`: {e}")))
 }
 
-fn point_value(v: &Value, units: &UnitPrefs) -> Result<DVec2, OpError> {
+pub(super) fn point_value(v: &Value, units: &UnitPrefs) -> Result<DVec2, OpError> {
     let a = v.as_array().filter(|a| a.len() == 2).ok_or_else(|| OpError::invalid("a point is [x, y]"))?;
     Ok(DVec2::new(length_value(&a[0], units)?, length_value(&a[1], units)?))
 }
 
-fn entity_id(sketch: FeatureId, e: EntityId) -> String {
+pub(super) fn entity_id(sketch: FeatureId, e: EntityId) -> String {
     refs::to_id(&Reference::SketchEntity { sketch, entity: e.0 })
 }
 
-fn constraint_id(c: ConstraintId, dimension: bool) -> String {
+pub(super) fn constraint_id(c: ConstraintId, dimension: bool) -> String {
     format!("{}:{}", if dimension { "dim" } else { "con" }, c.0)
 }
 
@@ -221,16 +223,29 @@ fn parse_constraint_id(s: &str) -> Option<ConstraintId> {
 }
 
 /// A sketch entity argument: `entity:F…:n` of this sketch, `origin` (the
-/// sketch's origin point, created on demand like the UI's origin snaps).
-fn parse_entity(v: &Value, sketch: FeatureId, data: &mut SketchData) -> Result<EntityId, OpError> {
+/// sketch's origin point, created on demand like the UI's origin snaps), or
+/// model geometry (`edge:…`, `vertex:…`, `face:…`, a plane, another
+/// sketch's entity) when `external` allows it: as when the dimension and
+/// constraint tools pick it, a linked construction entity stands in
+/// (`pierce`: the point where an edge crosses the sketch plane).
+pub(super) fn parse_entity(v: &Value, t: &mut SketchTarget, external: bool, pierce: bool) -> Result<EntityId, OpError> {
     let s = v.as_str().ok_or_else(|| OpError::invalid("entity id string"))?;
     if s == "origin" {
-        return Ok(sm::origin_point(&mut data.sketch));
+        return Ok(sm::origin_point(&mut t.data.sketch));
     }
-    match refs::parse_str(s) {
-        Some(Reference::SketchEntity { sketch: sk, entity }) if sk == sketch => {
+    let r = refs::parse_str(s);
+    match r {
+        Some(Reference::SketchEntity { sketch: sk, entity }) if sk == t.id => {
             let id = EntityId(entity);
-            data.sketch.entity(id).map(|_| id).ok_or_else(|| OpError::not_found(format!("`{s}` is not in the sketch (deleted?)")))
+            t.data.sketch.entity(id).map(|_| id).ok_or_else(|| OpError::not_found(format!("`{s}` is not in the sketch (deleted?)")))
+        }
+        Some(r @ (Reference::SketchEntity { .. } | Reference::Edge(_) | Reference::Vertex(_) | Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_))) if external => {
+            let pierce = pierce && matches!(r, Reference::Edge(_));
+            let bb = t.data.sketch.bbox();
+            let cursor = if bb.is_empty() { DVec2::ZERO } else { bb.center() };
+            let model = crate::sketch_use::Model { context: &t.regen.context, display: &t.regen.display, frame: &t.frame };
+            crate::sketch_use::external_entity(&mut t.data, model, WORLD_PER_PX, cursor, &r, pierce, true)
+                .ok_or_else(|| OpError::invalid(format!("`{s}` can't be referenced in this sketch (not found in the model up to the sketch, or parallel to the sketch plane)")))
         }
         Some(Reference::SketchEntity { .. }) => Err(OpError::invalid(format!("`{s}` belongs to another sketch"))),
         _ => Err(OpError::invalid(format!("`{s}` is not a sketch entity id (`entity:…`)"))),
@@ -239,16 +254,20 @@ fn parse_entity(v: &Value, sketch: FeatureId, data: &mut SketchData) -> Result<E
 
 // ------------------------------------------------------------ helpers
 
-struct SketchTarget {
-    tab: TabId,
-    id: FeatureId,
-    index: usize,
-    name: String,
-    data: SketchData,
-    frame: PlaneFrame,
+pub(super) struct SketchTarget {
+    pub tab: TabId,
+    pub id: FeatureId,
+    pub index: usize,
+    pub name: String,
+    pub data: SketchData,
+    pub frame: PlaneFrame,
+    /// The Part Studio regenerated up to the sketch, as while editing it.
+    pub regen: RegenResult,
+    pub units: UnitPrefs,
 }
 
-fn target(od: &mut OpenDoc, tab: TabId, a: &Args) -> Result<SketchTarget, OpError> {
+
+pub(super) fn target(od: &mut OpenDoc, tab: TabId, a: &Args) -> Result<SketchTarget, OpError> {
     let ps = doc::studio(od.doc(), tab)?;
     let id = feature_arg(ps, a, "sketch")?;
     let f = ps.feature(id).expect("found");
@@ -261,19 +280,27 @@ fn target(od: &mut OpenDoc, tab: TabId, a: &Args) -> Result<SketchTarget, OpErro
         _ => SketchData::default(),
     };
     let name = f.name.clone();
-    let r = od.regenerate(tab, None)?;
-    let frame = r.context.sketch(id).map(|s| s.frame).unwrap_or(PlaneFrame::TOP);
-    Ok(SketchTarget { tab, id, index, name, data, frame })
+    // The sketch mode regenerates up to the sketch being edited.
+    let regen = od.regenerate_with(tab, None, |o| {
+        o.upto = Some(index + 1);
+        o.editing_sketch = Some(id);
+    })?;
+    let frame = regen.context.sketch(id).map(|s| s.frame).unwrap_or(PlaneFrame::TOP);
+    let units = od.doc().settings.units;
+    Ok(SketchTarget { tab, id, index, name, data, frame, regen, units })
 }
 
-fn editor(t: &SketchTarget) -> SketchEditor {
+pub(super) fn editor(t: &SketchTarget) -> SketchEditor {
     let mut ed = SketchEditor::new(t.id, t.frame);
     ed.world_per_px = WORLD_PER_PX;
+    // Tool sizes (fillet radius, offset, pattern spacing...) as the sketch
+    // mode sets them for the workspace unit.
+    ed.apply_unit_defaults(t.units.length);
     ed
 }
 
 /// Commit the edited sketch data ("Edit : Sketch 1").
-fn commit(od: &mut OpenDoc, t: SketchTarget) -> Result<(), OpError> {
+pub(super) fn commit(od: &mut OpenDoc, t: SketchTarget) -> Result<(), OpError> {
     let ps = doc::studio(od.doc(), t.tab)?;
     let config = ps.configuration.defaults();
     let mut feature = ps.configuration.for_editing(&ps.features[t.index], &config);
@@ -329,7 +356,7 @@ fn constraint_json(data: &SketchData, sketch: FeatureId, c: &noshape_sketch::Con
 }
 
 /// What the reply shows after a sketch edit: new entities, solve state, regions.
-fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: Option<&[EntityId]>) -> Result<Value, OpError> {
+pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: Option<&[EntityId]>) -> Result<Value, OpError> {
     let units = od.doc().settings.units;
     let k = crate::ops::query::len_scale(&units);
     let ps = doc::studio(od.doc(), tab)?;
@@ -343,6 +370,15 @@ fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: Option<&[En
     v[if before.is_some() { "created" } else { "entities" }] = json!(entities);
     if before.is_none() {
         v["constraints"] = json!(data.sketch.constraints().map(|c| constraint_json(&data, id, c, &units)).collect::<Vec<_>>());
+        if !data.patterns.is_empty() {
+            v["patterns"] = super::sketch_edit::patterns_json(&data, id, k);
+        }
+        if !data.texts.is_empty() {
+            v["texts"] = json!(data.texts.iter().map(|t| json!({ "text": t.text, "font": t.font, "box_lines": t.box_lines.iter().map(|l| entity_id(id, EntityId(*l))).collect::<Vec<_>>() })).collect::<Vec<_>>());
+        }
+        if !data.images.is_empty() {
+            v["images"] = json!(data.images.iter().map(|i| json!({ "name": i.name, "box_lines": i.box_lines.iter().map(|l| entity_id(id, EntityId(*l))).collect::<Vec<_>>() })).collect::<Vec<_>>());
+        }
     }
     if let Some(sr) = r.context.sketch(id) {
         let status = match &sr.report.status {
@@ -414,7 +450,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 /// Move to `p` and click (press and release in place), as the editor's
 /// pointer events arrive from the viewport.
-fn click(ed: &mut SketchEditor, data: &mut SketchData, p: DVec2) {
+pub(super) fn click(ed: &mut SketchEditor, data: &mut SketchData, p: DVec2) {
     ed.pointer_move(data, p, false, false);
     let h = data.sketch.pick(p, WORLD_PER_PX * 4.0);
     ed.hover = h;
@@ -468,7 +504,8 @@ fn constrain(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut t = target(od, tab, a)?;
     let name = a.str("constraint")?;
     let c = CONSTRAINTS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param("constraint", "unknown constraint"))?;
-    let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, t.id, &mut t.data).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+    let pierce = c == ConstraintTool::Pierce;
+    let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, true, pierce).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     let before: Vec<ConstraintId> = t.data.sketch.constraints().map(|c| c.id).collect();
     let mut ed = editor(&t);
     ed.selection = ids;
@@ -537,7 +574,7 @@ fn entity_anchor(sk: &noshape_sketch::Sketch, e: EntityId) -> Option<DVec2> {
     (!pts.is_empty()).then(|| pts.iter().sum::<DVec2>() / pts.len() as f64)
 }
 
-fn value_text(v: &Value) -> Result<String, OpError> {
+pub(super) fn value_text(v: &Value) -> Result<String, OpError> {
     match v {
         Value::Number(n) => Ok(n.to_string()),
         Value::String(s) if !s.trim().is_empty() => Ok(s.trim().to_string()),
@@ -547,7 +584,7 @@ fn value_text(v: &Value) -> Result<String, OpError> {
 
 /// Variables visible to a sketch's dimensions (Part Studio, Variable Studio
 /// and configuration variables at the sketch).
-fn variables_at(od: &mut OpenDoc, tab: TabId) -> Result<std::collections::BTreeMap<String, noshape_units::Quantity>, OpError> {
+pub(super) fn variables_at(od: &mut OpenDoc, tab: TabId) -> Result<std::collections::BTreeMap<String, noshape_units::Quantity>, OpError> {
     // As regeneration layers them: Variable Studio and configuration
     // variables, then the Part Studio's own.
     let config = od.current_config(tab)?;
@@ -563,7 +600,7 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let vars = variables_at(od, tab)?;
     let mut t = target(od, tab, a)?;
-    let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, t.id, &mut t.data).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+    let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, true, false).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     let mode = match a.opt_str("mode")? {
         None | Some("center") => DistanceMode::Center,
         Some("minimum") => DistanceMode::Minimum,
@@ -614,7 +651,7 @@ fn delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut t = target(od, tab, a)?;
     let mut ed = editor(&t);
     if let Some(list) = a.opt_array("entities")? {
-        ed.selection = list.iter().enumerate().map(|(i, v)| parse_entity(v, t.id, &mut t.data).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+        ed.selection = list.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, false, false).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     }
     if let Some(list) = a.opt_array("constraints")? {
         ed.selected_constraints = list
@@ -635,7 +672,7 @@ fn set_construction(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let mut t = target(od, tab, a)?;
     let on = a.bool_or("construction", true)?;
-    let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, t.id, &mut t.data).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+    let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, false, false).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     for e in &ids {
         t.data.sketch.set_construction(*e, on).map_err(|e| OpError::invalid(e.to_string()))?;
     }

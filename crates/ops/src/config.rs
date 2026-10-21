@@ -52,13 +52,15 @@ pub fn add_variable_input(ps: &mut PartStudio, name: &str, kind: &str, value: &s
         "TEXT" => VariableKind::Text,
         _ => VariableKind::Length,
     };
-    let (min, max) = match range {
-        Some((lo, hi)) => (Some(ExprValue::new(lo)), Some(ExprValue::new(hi))),
-        None => (None, None),
-    };
+    push_variable_input(ps, name.to_string(), vkind, ExprValue::new(value), range.map(|(lo, hi)| (ExprValue::new(lo), ExprValue::new(hi))))
+}
+
+/// The configuration Variable dialog's new input. Returns its id.
+pub fn push_variable_input(ps: &mut PartStudio, name: String, kind: VariableKind, default: ExprValue, range: Option<(ExprValue, ExprValue)>) -> String {
+    let (min, max) = range.map(|(a, b)| (Some(a), Some(b))).unwrap_or((None, None));
     let taken: Vec<String> = ps.configuration.inputs.iter().map(|i| i.id.clone()).collect();
-    let id = fs_identifier(name, &taken);
-    ps.configuration.inputs.push(ConfigInput { id: id.clone(), name: name.to_string(), kind: ConfigInputKind::Variable { kind: vkind, default: ExprValue::new(value), min, max }, visible_when: None, excluded: false });
+    let id = fs_identifier(&name, &taken);
+    ps.configuration.inputs.push(ConfigInput { id: id.clone(), name, kind: ConfigInputKind::Variable { kind, default, min, max }, visible_when: None, excluded: false });
     id
 }
 
@@ -84,6 +86,18 @@ pub const EDIT_VARIABLE_INPUT: &str = "Edit configuration variable";
 pub fn set_variable_default(ps: &mut PartStudio, input: &str, value: String) {
     if let Some(ConfigInput { kind: ConfigInputKind::Variable { default, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == input) {
         *default = ExprValue::new(value);
+    }
+}
+
+/// The configuration Variable dialog's edit: default and (for a kind
+/// with units) range.
+pub fn edit_variable_input(ps: &mut PartStudio, input: &str, value: ExprValue, range: Option<(ExprValue, ExprValue)>) {
+    if let Some(ConfigInput { kind: ConfigInputKind::Variable { default, min, max, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == input) {
+        *default = value;
+        if let Some((lo, hi)) = range {
+            *min = Some(lo);
+            *max = Some(hi);
+        }
     }
 }
 

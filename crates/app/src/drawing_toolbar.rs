@@ -22,10 +22,12 @@ pub struct TbTool {
     pub active: bool,
     pub run: EditorAction,
     pub more: Option<(&'static str, Vec<MenuEntry>)>,
+    /// Greyed (opacity 0.3) and not clickable.
+    pub disabled: bool,
 }
 
 fn tb(id: &'static str, icon: &'static str, tip: &'static str, active: bool, run: impl Fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>) + 'static) -> TbTool {
-    TbTool { id, icon, tip, active, run: Rc::new(run), more: None }
+    TbTool { id, icon, tip, active, run: Rc::new(run), more: None, disabled: false }
 }
 
 /// A tool that just switches to `tool`.
@@ -47,6 +49,13 @@ impl TbTool {
     }
 
     fn render(self, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> AnyElement {
+        if self.disabled {
+            let b = match self.more {
+                None => crate::ui::tool_button(self.id, self.icon, false, cx).tooltip(self.tip).into_any_element(),
+                Some((caret, _)) => crate::ui::tool_group(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, false, cx).tooltip(self.tip), crate::ui::tool_caret(caret, cx).tooltip(self.tip)).into_any_element(),
+            };
+            return div().opacity(0.3).child(b).into_any_element();
+        }
         let run = self.run.clone();
         let click = cx.listener(move |this, _: &ClickEvent, window, cx| run(this, window, cx));
         match self.more {
@@ -78,12 +87,19 @@ impl TbTool {
 /// A category collapsed to one split tool (`gi`: its index, for ids).
 fn collapsed(gi: usize, group: Vec<TbTool>, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> Option<AnyElement> {
     let first = group.first()?;
-    let (icon, tip, run) = (first.icon, first.tip, first.run.clone());
+    let (icon, tip) = (first.icon, first.tip);
+    // Greyed tools stay out of the ▾ and the face runs the first one left.
+    let all_disabled = group.iter().all(|t| t.disabled);
+    let run = group.iter().find(|t| !t.disabled).map(|t| t.run.clone());
     let active = group.iter().any(|t| t.active);
     // A tool also listed in another's ▾ (Aligned section view, Broken-out
     // section) shows once.
     let mut seen = std::collections::HashSet::new();
-    let items: Vec<MenuEntry> = group.iter().flat_map(|t| t.menu_rows()).filter(|m| !matches!(m, MenuEntry::Item { label, .. } if !seen.insert(label.clone()))).collect();
+    let items: Vec<MenuEntry> = group.iter().filter(|t| !t.disabled).flat_map(|t| t.menu_rows()).filter(|m| !matches!(m, MenuEntry::Item { label, .. } if !seen.insert(label.clone()))).collect();
+    if all_disabled {
+        return Some(div().opacity(0.3).child(crate::ui::tool_group(SharedString::from(format!("drg-c{gi}")), crate::ui::split_tool_button(SharedString::from(format!("dr-c{gi}")), icon, false, cx).tooltip(tip), crate::ui::tool_caret(SharedString::from(format!("dr-c{gi}-more")), cx).tooltip(tip))).into_any_element());
+    }
+    let run = run?;
     let ed = ed.clone();
     Some(
         crate::ui::tool_group(
@@ -175,6 +191,14 @@ impl DrawingEditor {
             ],
         ];
         groups.extend(self.sketch_groups());
+        // A drawing of an imported DWG / DXF has no model reference: the view
+        // tools and the model tables are greyed (live dom/dwg-toolbar-sheet-vs-model.json).
+        if self.drawing.sheets.iter().any(|s| s.imported.is_some()) {
+            const NEEDS_MODEL: [&str; 13] = ["dr-insert", "dr-proj", "dr-aux", "dr-sect", "dr-aligned-sect", "dr-brokenout", "dr-detail", "dr-break", "dr-crop", "dr-bomtable", "dr-cutlist", "dr-holetable", "dr-customtable"];
+            for t in groups.iter_mut().flatten().filter(|t| NEEDS_MODEL.contains(&t.id)) {
+                t.disabled = true;
+            }
+        }
         groups.push(vec![
             tb("dr-dwg-insert", "dwg-insert", "Insert DXF or DWG", false, |e, w, cx| e.insert_cad_file(w, cx)),
             tb("dr-image", "image", "Insert image", matches!(t, Tool::PlaceImage { .. }), |e, w, cx| e.insert_image(w, cx)),
@@ -240,6 +264,7 @@ impl DrawingEditor {
         let ed = cx.entity();
         let sep = crate::ui::tool_separator;
         let up_to_date = !self.out_of_date && self.sources.len() >= views::referenced_sources(&self.drawing).len();
+        let imported = self.drawing.sheets.iter().any(|s| s.imported.is_some());
         let groups = self.toolbar_groups();
         // Fit: undo / redo, update and every category within the window
         // minus the left rail (live 1920 px: all tools shown, ending near
@@ -255,7 +280,7 @@ impl DrawingEditor {
                 // Onshape: the update button is highlighted (#fcda7f, #fab601 border) when out of date.
                 crate::ui::tool_button("dr-update", "drawing-update", false, cx)
                     .when(self.out_of_date, |b| b.bg(gpui_kit::rgb(0xfcda7f)).border_2().border_color(gpui_kit::rgb(0xfab601)))
-                    .opacity(if up_to_date { 0.4 } else { 1.0 })
+                    .opacity(if imported { 0.3 } else if up_to_date { 0.4 } else { 1.0 })
                     .tooltip("Update from this workspace (ctrl+q)")
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if !up_to_date {

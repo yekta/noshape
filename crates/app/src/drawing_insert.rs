@@ -44,11 +44,15 @@ pub struct InsertViewState {
     /// View orientation › one of the source's named views and its frame
     /// (replaces the standard orientation while set).
     pub named: Option<(String, [[f64; 3]; 2])>,
+    /// Assemblies: Explode/Position and Display state (None: Show all) of
+    /// new views (prefilled from the assembly's last applied ones).
+    pub asm_position: AsmPosition,
+    pub display_state: Option<String>,
 }
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None, named: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None }
     }
 }
 
@@ -90,6 +94,24 @@ pub fn parse_simplification(kind: Simplification, text: &str, mm: bool) -> Optio
 }
 
 type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
+
+/// An assembly's Explode/Position choices in Onshape's order: Default, the
+/// exploded views, then the named positions.
+pub fn asm_positions(asm: &noshape_model::assembly::Assembly) -> Vec<(String, AsmPosition)> {
+    let mut out = vec![("Default".to_string(), AsmPosition::Default)];
+    out.extend(asm.exploded_views.iter().enumerate().map(|(i, e)| (e.name.clone(), AsmPosition::Explode(i))));
+    out.extend(asm.named_positions.iter().enumerate().map(|(i, n)| (n.name.clone(), AsmPosition::Position(i))));
+    out
+}
+
+/// The name shown for an Explode/Position choice.
+pub fn asm_position_name(asm: &noshape_model::assembly::Assembly, p: AsmPosition) -> String {
+    match p {
+        AsmPosition::Default => "Default".into(),
+        AsmPosition::Explode(i) => asm.exploded_views.get(i).map(|e| e.name.clone()).unwrap_or_default(),
+        AsmPosition::Position(i) => asm.named_positions.get(i).map(|n| n.name.clone()).unwrap_or_default(),
+    }
+}
 
 /// The named views a source offers in View orientation (Part Studios).
 pub fn named_views(doc: &noshape_model::document::Document, source: TabId) -> &[noshape_model::partstudio::NamedView] {
@@ -177,14 +199,18 @@ impl DrawingEditor {
         }
         let orientation = match &self.tool {
             Tool::InsertView { orientation, source: old, .. } => {
-                // Named views belong to their source.
+                // Named views and assembly states belong to their source.
                 if *old != source {
                     self.insert.named = None;
+                    self.insert.asm_position = AsmPosition::Default;
+                    self.insert.display_state = None;
                 }
                 *orientation
             }
             _ => {
                 self.insert.named = None;
+                self.insert.asm_position = AsmPosition::Default;
+                self.insert.display_state = None;
                 ViewOrientation::Front
             }
         };
@@ -303,6 +329,40 @@ impl DrawingEditor {
             })
             .collect();
         let row = |l: &'static str, body: AnyElement| h_flex().h(px(28.)).px(px(6.)).child(label(l)).child(div().flex_1().min_w_0().child(body));
+        // Assemblies: Explode/Position and Display state (live drawing/1106).
+        let asm_rows: Vec<AnyElement> = match self.doc.read(cx).session.doc.tab(source).map(|t| &t.content) {
+            Some(TabContent::Assembly(asm)) => {
+                let cur = self.insert.asm_position;
+                let mut pos_items: Vec<(String, bool, Act)> = Vec::new();
+                for (name, p) in asm_positions(asm) {
+                    pos_items.push((name, p == cur, std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| {
+                        t.insert.asm_position = p;
+                        t.update_preview(cx);
+                        cx.notify();
+                    }) as Act));
+                }
+                let cur_d = self.insert.display_state.clone();
+                let mut ds_items: Vec<(String, bool, Act)> = vec![("Show all".into(), cur_d.is_none(), std::rc::Rc::new(|t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| {
+                    t.insert.display_state = None;
+                    t.update_preview(cx);
+                    cx.notify();
+                }) as Act)];
+                for d in &asm.display_states {
+                    let n = d.name.clone();
+                    ds_items.push((d.name.clone(), cur_d.as_ref() == Some(&d.name), std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| {
+                        t.insert.display_state = Some(n.clone());
+                        t.update_preview(cx);
+                        cx.notify();
+                    }) as Act));
+                }
+                let pos_label = asm_position_name(asm, cur);
+                vec![
+                    row("Explode/Position", select("div-explode", pos_label, pos_items)).into_any_element(),
+                    row("Display state", select("div-display", cur_d.unwrap_or_else(|| "Show all".into()), ds_items)).into_any_element(),
+                ]
+            }
+            _ => Vec::new(),
+        };
         let source_label = self.insert_source_label(source, part.as_ref(), cx);
         Some(
             v_flex()
@@ -335,6 +395,7 @@ impl DrawingEditor {
                         .child(div().flex_1().min_w_0().child(if src_items.is_empty() { div().px_1().truncate().text_size(px(13.33)).child(source_label).into_any_element() } else { select("div-source", source_label, src_items) })),
                 )
                 .child(row("View orientation", select("div-orient", orient_label, orient_items)))
+                .children(asm_rows)
                 .child(row("View scale", select("div-scale", format_scale(cur_scale.unwrap_or(sheet_scale)), scale_items)))
                 .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items)))
                 .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| row("", Input::new(st).small().into_any_element())))
@@ -344,12 +405,14 @@ impl DrawingEditor {
                         cx.notify();
                     }))),
                 )
-                .child(
+                // Assemblies have no model annotations (live drawing/1106).
+                .when(is_asm, |d| d.child(div().h(px(3.))))
+                .when(!is_asm, |d| d.child(
                     div().px(px(6.)).pt(px(3.)).pb(px(6.)).child(Checkbox::new("div-model-ann").label("Show annotations from model").small().checked(self.insert.model_annotations).on_click(cx.listener(|this, on: &bool, _, cx| {
                         this.insert.model_annotations = *on;
                         cx.notify();
                     }))),
-                )
+                ))
                 .into_any_element(),
         )
     }
@@ -495,7 +558,7 @@ impl DrawingEditor {
     /// The view frame of the sketch being inserted (looking at its plane).
     pub fn insert_sketch_frame(&self, source: noshape_model::document::TabId) -> Option<[[f64; 3]; 2]> {
         let f = self.insert.sketch.as_ref()?;
-        let key = noshape_model::drawing::views::SourceKey { tab: source, config: Default::default(), explode: None, version: None };
+        let key = noshape_model::drawing::views::SourceKey { tab: source, config: Default::default(), explode: None, version: None, position: None, display: None };
         noshape_model::drawing::views::sketch_frame(&self.sources.get(&key)?.context, f)
     }
 }

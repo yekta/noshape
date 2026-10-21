@@ -153,3 +153,45 @@ fallback boxes — lead decision (font size; asb raised it earlier).
    V59 (connecting lines of patterned auto centermarks), EX10 (strikethrough only from DXF/DWG 2013), then asb's
    "For drw2" list in drawing-behaviour.md (D31–D38 palette vs live drawing/15, A57 / A58, V68, V63, V23, D42 / A64,
    …) and the rest of the 🔧 rows.
+
+## drw2 (new account, 20 Oct ~22:00) — progress
+- CR12 compiles; `cargo test -p noshape-model --lib drawing::` green (91) before the font change. App check of the
+  German title block still to do.
+- **Drawing default font = Noto Sans** (Onshape "Noto Sans ( Note )"): model drawing/font.rs `DEFAULT_FAMILY`,
+  `char_width` (Noto advances per cap height, cached; stroke-glyph advances only for chars Noto lacks), `text_width`
+  now sums those; `text_strokes` centres each stroke glyph in its Noto slot; `text_fill_font(None)` draws Noto Sans
+  (was Liberation Sans squeezed to the stroke widths, which made the in-place editor's text wider than the sheet's).
+  font.rs is asb's file — tell asb / lead.
+- **Note panel rebuilt to live 225 / dom/drawing-note-edit-dialog.txt** (app/drawing_note.rs, 394 px): Font combo
+  "Noto Sans ( Note )" 238 px + height 75 px; B I U S (30 px) + colour swatch + 45 px popups Line spacing,
+  Horizontal alignment, List, Vertical alignment, Note order; Ø symbols, Insert drawing / sheet reference property,
+  Text format / Date time format (enabled with the caret in a `{property}`, they rewrite it); Flag notes ☐ (the list
+  item at the caret) + Flag (Drawing) + N Characters. New icons `note-*` (README). `note_field_fmt` removed.
+- In-place note: Textarea xsmall (its own 4 px padding offset), no grips while editing (`note_grips`), Esc discards.
+- **Cells as notes** (live 743–750): `Panel::Cell.note: Option<Box<CellNote>>` (style + height) for general
+  tables; the same Note panel above the cell (no Note order / Flag row, Line spacing and List disabled); on commit
+  `cell_note_format` writes the cell format. Model: `CellFormat.italic / underline / strikethrough / valign`
+  (`CellVAlign`), `Table::shown_cell_format` (general tables: header bold centred, body left — live), bold / italic
+  via real Noto Bold / Italic font spans (was 3× offset stroke text), `set_cell_format` compares with the cell's
+  default.
+- Live request "drw2 (10-20 f)": Note panel popup items, mm height text, colour palette, B pressed look.
+- Fixed clippy needless `.into()` in drawing_props.rs:663 (asb's named-view code) as the lead asked.
+- 21 Oct: **verified in the app**: in-place note (text exactly over the sheet text, no grips while editing, typing,
+  click away commits, Esc discards and the sheet redraws at once via `discard_inplace`, new note via Note tool);
+  Table tool ✓ → Note panel + caret in cell (1,1), Tab / Enter / Shift+Tab / Alt+Enter, Enter in the last cell
+  ends, double-click a filled cell → caret at the click ("aZbc"), Esc discards. Rows ✅: K24, TB1.
+  Key gotcha: the Textarea binds tab / shift-tab / enter / escape to actions (IndentInline, OutdentInline, Enter,
+  Escape) which GPUI dispatches BEFORE key_down listeners — intercept them with `capture_action`.
+- Also done: in-place ruler at the sheet scale (`RulerState.sheet_k`, ◁▷ tail), cell editor sized to its text for
+  centred / right cells (multi-line Textarea ignores text_align), trailing empty cell line keeps its height
+  (tables.rs `split('\n')`), general table cells edited with the table unselected, note rotate label "Ndeg"
+  (`render_rotate_label`, whole degrees). Not yet seen in the app: ruler, rotate label (build blocked by others).
+- api moved drawing tool / overlay / pick types to crates/scene/src/drawing_tools/ (pick.rs `SheetPick`): edit
+  picking there.
+- v0.4.3 freeze (21 Oct): ✅ A2, K24, TB1. Reverted (not started again yet): live Note-panel lists from behaviours.md
+  "Note panel popups and values" — Onshape's DRAWING / SHEET_REF property lists (need new keys in build.rs
+  `field_value`), the 23 date formats (lowercase `m` = month in `field_format`), height "3.5000" in drawing units,
+  popup labels Left/Center/Right/Justify, List without None, Note order Bottom-first, symbol list ° Ø ℄ ⌵ ↧ ⌴ □ ⌒ ±
+  Ⓤ Ⓘ ✟ ✝ ▷, Text format / Date only right after an inserted property, B pressed bg #cfdbe5 + 1 px #9aa5af.
+  Next: those, then TB3 = the 590 px floating "Cell" panel on a double-click of an EMPTY general-table cell
+  (text cells edit in place), then CR12 in the app (renderer was crashing on `section-count`, now fixed).

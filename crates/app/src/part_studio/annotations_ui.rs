@@ -300,11 +300,12 @@ impl PartStudioView {
         })
     }
 
-    /// Right-click on an annotation (live psb/r-918).
+    /// Right-click on an annotation (live psb/r-918): Show all, Select,
+    /// Select other… | Zoom to fit | Delete annotation.
     pub(super) fn open_annotation_menu(&mut self, id: u32, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-            let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+            let (v1, v2, v3, v4, v5) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
             m.item(crate::os_menu::OsMenuItem::new("Show all").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.show_everything(cx))))
                 .item(crate::os_menu::OsMenuItem::new("Select").on_click(move |_, _, cx| {
                     v2.update(cx, |this, cx| {
@@ -312,6 +313,8 @@ impl PartStudioView {
                         this.redraw_annotations(cx);
                     })
                 }))
+                // Live 918 also has "Add comment" (cloud, not built).
+                .item(crate::os_menu::OsMenuItem::new("Select other…").on_click(move |_, _, cx| v5.update(cx, |this, cx| this.select_other(false, cx))))
                 .separator()
                 .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.zoom_fit(cx))))
                 .separator()

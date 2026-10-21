@@ -6,7 +6,7 @@
 use super::PartStudioView;
 use crate::scene_builder::{DisplayMode, TangentEdges};
 use crate::theme::{p, with_alpha};
-use glam::{DQuat, DVec2, DVec3};
+use glam::{DQuat, DVec2};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::h_flex;
 use gpui_kit::*;
@@ -14,11 +14,9 @@ use noshape_render::{Projection, StandardView};
 
 // The cube's geometry is shared with its drawing in the 3D frame
 // (`noshape_render::overlay::view_cube`, `NOSHAPE_OVERLAY=wgpu`).
-pub use noshape_render::overlay::view_cube::{Arrow, CubeCell, FACES, HALF_EDGE, HIDDEN_AXIS_OPACITY, WIDGET_PX, behind_cube, cube_shapes, face_axes, point_in_poly, widget_hit};
+pub use noshape_render::overlay::view_cube::{Arrow, CubeCell, WIDGET_PX, widget_hit};
 
 const G: f64 = WIDGET_PX as f64;
-/// The axis lines start `VIEW_CUBE_AXIS_GAP` outside the cube's corner.
-const AXIS_GAP: f64 = 1.0;
 
 /// See [`CubeHooks::state`].
 pub type CubeState<'a> = (&'a mut Option<CubeCell>, &'a mut Option<Point<Pixels>>);
@@ -48,100 +46,14 @@ impl<V: 'static> Clone for CubeHooks<V> {
 
 impl<V: 'static> Copy for CubeHooks<V> {}
 
-fn fill_polys(window: &mut Window, polys: &[Vec<DVec2>], at: &impl Fn(DVec2) -> Point<Pixels>, color: Hsla) {
-    let mut b = PathBuilder::fill();
-    for poly in polys.iter().filter(|p| p.len() >= 3) {
-        b.move_to(at(poly[0]));
-        for q in &poly[1..] {
-            b.line_to(at(*q));
-        }
-        b.close();
-    }
-    if let Ok(path) = b.build() {
-        window.paint_path(path, color);
-    }
-}
-
 /// Onshape's 150 px View cube widget with its arrows and `menu` (the
 /// camera and render options button) at the bottom right. Shared by the
 /// Part Studio and the Assembly: place it 15 px from the graphics area's
-/// top-right corner.
-pub fn view_cube<V: 'static>(rotation: DQuat, hover: Option<CubeCell>, menu: AnyElement, hooks: CubeHooks<V>, cx: &mut Context<V>) -> AnyElement {
-    let inv = rotation.inverse();
-    let eye = rotation * DVec3::Z;
-    let to_view = move |w: DVec3| (inv * w).truncate();
-    // Onshape (tokens): faces and corners white, frames and arrows
-    // #cedbe5 at 60%, the hovered piece #90cef1 at 60%, black labels.
-    let white: Hsla = gpui_kit::rgb(0xffffff).into();
-    let harbor: Hsla = with_alpha(gpui_kit::rgb(0xcedbe5), 0.6).into();
-    let highlight: Hsla = with_alpha(gpui_kit::rgb(0x90cef1), 0.6).into();
-    let lit = move |cell: CubeCell, base: Hsla| if hover == Some(cell) { highlight } else { base };
-    let arrows: Vec<(Vec<Vec<DVec2>>, Hsla)> = Arrow::ALL.into_iter().map(|a| (a.polys(), lit(a.cell(), harbor))).collect();
-    let pieces = cube_shapes(rotation);
-    // Hidden = behind the cube and under something drawn: the rounded
-    // corners leave the axes visible next to them (live).
-    let covered = |p: DVec3| behind_cube(p, eye) && pieces.iter().any(|s| point_in_poly(to_view(p), &s.poly));
-    let shapes: Vec<(Vec<DVec2>, Hsla)> = pieces.iter().map(|s| (s.poly.clone(), lit(s.cell, if s.frame { harbor } else { white }))).collect();
-    // Labels drawn *on* the near faces, like Onshape's label textures:
-    // glyph outlines laid out in the face plane and projected.
-    let label_polys: Vec<Vec<Vec<DVec2>>> = FACES
-        .iter()
-        .filter(|(n, _)| (inv * CubeCell(*n).dir()).z > 1e-6)
-        .map(|(n, name)| {
-            let (right, up) = face_axes(*n);
-            let layout = noshape_sketch::text::layout_text(name, noshape_sketch::text::DEFAULT_FONT, false, false);
-            // Ascender height in cube units (a face spans -1..1).
-            let asc = 0.4;
-            let base = CubeCell(*n).dir() - right * (layout.width * asc * 0.5) - up * (asc * 0.36);
-            layout.polylines(5).into_iter().map(|c| c.into_iter().map(|q| to_view((base + right * (q.x * asc) + up * (q.y * asc)) * HALF_EDGE)).collect()).collect()
-        })
-        .collect();
-    // The triad runs along the cube's edges from just outside its
-    // back-bottom-left corner; what the cube hides shows through faintly.
-    let origin = DVec3::splat(-(HALF_EDGE + AXIS_GAP));
-    let mut axis_runs: Vec<(DVec2, DVec2, Hsla, bool)> = Vec::new();
-    let mut axis_labels: Vec<AnyElement> = Vec::new();
-    for (axis, rgb, name) in [(DVec3::X, 0xcd0000u32, "X"), (DVec3::Y, 0x009400, "Y"), (DVec3::Z, 0x0000d0, "Z")] {
-        let color: Hsla = gpui_kit::rgb(rgb).into();
-        let len = 2.0 * HALF_EDGE;
-        let steps = 48;
-        let hidden = |k: usize| covered(origin + axis * (len * (k as f64 + 0.5) / steps as f64));
-        let mut k0 = 0;
-        while k0 < steps {
-            let h = hidden(k0);
-            let mut k1 = k0 + 1;
-            while k1 < steps && hidden(k1) == h {
-                k1 += 1;
-            }
-            let at = |k: usize| to_view(origin + axis * (len * k as f64 / steps as f64));
-            axis_runs.push((at(k0), at(k1), if h { Hsla { a: HIDDEN_AXIS_OPACITY, ..color } } else { color }, h));
-            k0 = k1;
-        }
-        // Past the tip by half the label's diagonal plus 3 px; faded out
-        // as the axis turns end-on (8° to 2°), faint behind the cube.
-        let at = origin + axis * (len + (7.5f64.hypot(12.0) / 2.0 + 3.0));
-        let t = (((eye.dot(axis).abs().min(1.0).acos()).to_degrees() - 2.0) / 6.0).clamp(0.0, 1.0);
-        let fade = (t * t * (3.0 - 2.0 * t)) as f32;
-        let alpha = if covered(at) { fade.min(HIDDEN_AXIS_OPACITY) } else { fade };
-        let v = to_view(at);
-        axis_labels.push(
-            div()
-                .absolute()
-                .left(px(WIDGET_PX * 0.5 + v.x as f32 - 10.0))
-                .top(px(WIDGET_PX * 0.5 - v.y as f32 - 8.0))
-                .w(px(20.))
-                .h(px(16.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_size(px(12.))
-                .line_height(px(16.))
-                .font_weight(FontWeight::MEDIUM)
-                .text_color(Hsla { a: alpha, ..color })
-                .child(name)
-                .into_any_element(),
-        );
-    }
+/// top-right corner. The cube itself is drawn into the 3D frame
+/// (`noshape_render::overlay::view_cube`, so it turns with the camera without
+/// any UI layout): this element is its hit area and reports where it was
+/// laid out (`CubeHooks::placed`).
+pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, cx: &mut Context<V>) -> AnyElement {
     let local = |pos: Point<Pixels>, o: Point<Pixels>| {
         let d = DVec2::new(f64::from(f32::from(pos.x - o.x)), f64::from(f32::from(pos.y - o.y))) - DVec2::splat(G * 0.5);
         DVec2::new(d.x, -d.y)
@@ -159,49 +71,16 @@ pub fn view_cube<V: 'static>(rotation: DQuat, hover: Option<CubeCell>, menu: Any
                     // Records the widget origin for hit testing.
                     view.update(cx, |this, cx| {
                         *(hooks.state)(this).1 = Some(bounds.origin);
-                        if crate::viewport::wgpu_overlays() {
-                            (hooks.placed)(this, bounds.origin, cx);
-                        }
+                        (hooks.placed)(this, bounds.origin, cx);
                     });
                 },
-                move |bounds, _, window, _| {
-                    // Drawn into the 3D frame instead (the canvas stays the hit area).
-                    if crate::viewport::wgpu_overlays() {
-                        return;
-                    }
-                    let o = bounds.origin;
-                    let at = |v: DVec2| point(o.x + px((G * 0.5 + v.x) as f32), o.y + px((G * 0.5 - v.y) as f32));
-                    for (polys, color) in &arrows {
-                        fill_polys(window, polys, &at, *color);
-                    }
-                    for (poly, color) in &shapes {
-                        fill_polys(window, std::slice::from_ref(poly), &at, *color);
-                    }
-                    for polys in &label_polys {
-                        fill_polys(window, polys, &at, with_alpha(gpui_kit::rgb(0x000000), 0.85).into());
-                    }
-                    // Hidden axis parts show through first, then the visible ones.
-                    for hidden_pass in [true, false] {
-                        for (a, b, color, hidden) in &axis_runs {
-                            if *hidden != hidden_pass {
-                                continue;
-                            }
-                            let mut p = PathBuilder::stroke(px(1.));
-                            p.move_to(at(*a));
-                            p.line_to(at(*b));
-                            if let Ok(path) = p.build() {
-                                window.paint_path(path, *color);
-                            }
-                        }
-                    }
-                },
+                |_, _, _, _| {},
             )
             .absolute()
             .top_0()
             .left_0()
             .size_full(),
         )
-        .children(axis_labels.into_iter().filter(|_| !crate::viewport::wgpu_overlays()))
         .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
             let rot = (hooks.rotation)(this, cx);
             let (hover, origin) = (hooks.state)(this);
@@ -265,11 +144,8 @@ impl PartStudioView {
     }
 
     pub(super) fn render_view_cube(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let rotation = self.viewport.read(cx).camera.rotation;
-        if crate::viewport::wgpu_overlays() {
-            let hover = self.ui.cube_hover;
-            self.viewport.update(cx, |vp, cx| vp.set_view_cube(Some(hover), cx));
-        }
+        let hover = self.ui.cube_hover;
+        self.viewport.update(cx, |vp, cx| vp.set_view_cube(Some(hover), cx));
         let menu = self.render_camera_menu(cx);
         let hooks = CubeHooks {
             state: |this: &mut Self| (&mut this.ui.cube_hover, &mut this.ui.cube_origin),
@@ -279,7 +155,7 @@ impl PartStudioView {
             roll: Self::roll_view,
             placed: |this, at, cx| this.viewport.update(cx, |vp, cx| vp.set_view_cube_origin(at, cx)),
         };
-        view_cube(rotation, self.ui.cube_hover, menu, hooks, cx)
+        view_cube(menu, hooks, cx)
     }
 
     /// Open Onshape's Graphics preferences dialog.
@@ -443,7 +319,8 @@ fn display_label(m: DisplayMode) -> &'static str {
 mod tests {
     use super::*;
     use noshape_render::Camera;
-    use noshape_render::overlay::view_cube::cube_hit;
+    use glam::DVec3;
+    use noshape_render::overlay::view_cube::{HALF_EDGE, cube_hit, cube_shapes};
     // The glob import brings GPUI's `test` attribute; use the built-in one.
     use std::prelude::v1::test;
 

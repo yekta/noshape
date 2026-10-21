@@ -398,6 +398,12 @@ pub fn message_bubble_with_link(
 /// (`#1967d2` highlight, live assembly/182) and the field shows the 2 px
 /// `#3e94ff` focus ring while it is open.
 pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_with(id, options, Vec::new(), current, on_select)
+}
+
+/// [`select_field`] with `disabled` options (greyed, not pickable: an
+/// `<option disabled>`).
+pub fn select_field_with(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
     let pal = p();
     let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
     let on_select = Rc::new(on_select);
@@ -423,13 +429,13 @@ pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usi
         .child(div().flex_1().truncate().child(label))
         .child(glyph(GLYPH_CARET, 8., rgb(0x777777))) // live assembly/181-182: `#777`
         .on_click(move |_, window, cx| {
-            let (options, on_select, b) = (options.clone(), on_select.clone(), bounds.get());
+            let (options, disabled, on_select, b) = (options.clone(), disabled.clone(), on_select.clone(), bounds.get());
             let width = f32::from(b.size.width);
             let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                 m = m.native_select(width).focus_ring(b);
                 for (i, o) in options.iter().enumerate() {
                     let f = on_select.clone();
-                    m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).on_click(move |_, window, cx| {
+                    m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).disabled(disabled.contains(&i)).on_click(move |_, window, cx| {
                         f(i, window, cx);
                         window.refresh();
                     }));

@@ -25,6 +25,10 @@ pub struct ToolbarPrefs {
     /// Preferences › Shortcut toolbars › Sketch).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sketch_shortcut_tools: Option<Vec<String>>,
+    /// The drawing S toolbar's tools, by name (None = defaults; Preferences ›
+    /// Shortcut toolbars › Drawing; `drawing_keys::SHORTCUT_CATALOGUE`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drawing_shortcut_tools: Option<Vec<String>>,
 }
 
 impl ToolbarPrefs {
@@ -64,6 +68,22 @@ impl ToolbarPrefs {
             None => tools.push(name.to_string()),
         }
         self.sketch_shortcut_tools = Some(tools);
+    }
+
+    /// Drawing S toolbar tool names (`defaults`: Onshape's ten).
+    pub fn drawing_shortcut_tools(&self, defaults: &[&str]) -> Vec<String> {
+        self.drawing_shortcut_tools.clone().unwrap_or_else(|| defaults.iter().map(|s| s.to_string()).collect())
+    }
+
+    pub fn toggle_drawing_shortcut(&mut self, name: &str, defaults: &[&str]) {
+        let mut tools = self.drawing_shortcut_tools(defaults);
+        match tools.iter().position(|t| t == name) {
+            Some(i) => {
+                tools.remove(i);
+            }
+            None => tools.push(name.to_string()),
+        }
+        self.drawing_shortcut_tools = Some(tools);
     }
 
     pub fn toggle_shortcut(&mut self, id: &str) {

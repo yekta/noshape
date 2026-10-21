@@ -4,6 +4,7 @@
 //! and offscreen PNG rendering ([`png`]).
 
 pub mod builder;
+pub mod drawing_tools;
 pub mod graphics_prefs;
 pub mod palette;
 pub mod png;

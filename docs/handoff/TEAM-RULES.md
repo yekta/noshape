@@ -90,3 +90,9 @@ absolute path. So building /root/noshape-<you> into /root/target-shared (or targ
 overwrites artifacts that the shared tree then treats as up to date. Symptoms: "required to be available in
 rlib format", or missing gpui items. A private worktree needs its own CARGO_TARGET_DIR (ask the lead first,
 since it costs disk) or no build at all. Use it only to read and diff.
+
+## Keep the shared tree compiling (2026-10-21)
+Twelve agents build from this one tree. A file left non-compiling, even for a few minutes while you build,
+measure or think, blocks everyone's builds and the integration. Make each edit so the file still compiles:
+add the import together with its use, and change the callers in the same step. Run `cargo check -p <crate>`
+right after any multi-step change. If you have to stop mid-change, revert to compiling first.

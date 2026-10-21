@@ -532,7 +532,7 @@ impl AssemblyView {
                 cx.notify();
             }))
         };
-        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, Input::new(st).appearance(false).text_size(px(13.33)).text_right().h(px(25.)));
+        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.));
         let icon_tool = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -2856,7 +2856,7 @@ impl AssemblyView {
             body = body.child(div().mx(px(3.)).my(px(4.)).child(crate::os_ui::query_box("se-direction", if rotation { "Axis" } else { "Direction" }, active == 1, dir_rows).on_click(Self::step_edit_activate(1, cx))));
         }
         body = body
-            .child(crate::os_ui::param_row(if rotation { "Rotation angle" } else { "Distance" }, gpui_kit::base::input::input_frame(div().w(px(110.)).child(Input::new(&value).appearance(false).text_size(px(13.33)).text_right().h(px(25.))))))
+            .child(crate::os_ui::param_row(if rotation { "Rotation angle" } else { "Distance" }, gpui_kit::base::input::input_frame(div().w(px(110.)).child(crate::os_ui::input_h(Input::new(&value).appearance(false).text_size(px(13.33)).text_right(), 25.)))))
             .child(crate::os_ui::checkbox("se-lines", "Explode lines", lines).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(s) = &mut this.step_edit {
                     s.lines = !s.lines;
@@ -3343,7 +3343,7 @@ impl AssemblyView {
                         ),
                 );
             }
-            let query = self.ui.insert_search.as_ref().map(|s| s.read(cx).value().trim().to_lowercase()).unwrap_or_default();
+            let query = self.ui.insert_query.trim().to_lowercase();
             let tabs: Vec<(String, String, bool)> = d.tabs.iter().filter(|t| t.2 == (tab == 1) && (query.is_empty() || t.1.to_lowercase().contains(&query))).cloned().collect();
             if tabs.is_empty() {
                 col = col.child(div().pl(px(10.)).h(px(28.)).flex().items_center().text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(if tab == 0 { "No Part Studios available." } else { "No Assemblies available." }));

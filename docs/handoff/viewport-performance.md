@@ -157,6 +157,10 @@ interval mean/p50/p95/p99/max, frames over 16.7 ms / 8.3 ms, and UI-thread CPU p
    with qa4's slices; then measure orbit UI CPU again.
 5. Intel Macs with two GPUs: GPUI picks the low-power GPU, wgpu the high-performance one → readback there;
    pick the wgpu adapter whose `registryID` matches `gpui::renderer_gpus()`.
+6. (lead, 2026-10-20) Preferences › "Environment profile / pixel density": take the exact options from
+   live and implement their effect on rendering quality (renderer side).
+7. (lead) Compare mode (ui2 builds it): grey compare graphics and a Main↔V3 blend slider in the viewport;
+   ui2 asks through the lead for renderer support.
 - **2026-10-20 19:00 (perf) CI run 39477961638, v0.4.2:** zero-copy on a real Metal GPU is **correct**
   (macOS 14/15 and Linux: texture still vs read-back still 0.00% pixels differ, not black; screenshots
   in the artifacts). Orbit, heavy fixture:
@@ -223,3 +227,31 @@ changes. I write the renderer part first (my files) and show crops before touchi
   First crops (demo, Xvfb): plane names identical (0 px at 1x, 1 px at 2x); cube ≤0.84% of pixels differ
   (sub-pixel widget offset + label placement), fixed by using GPUI's own widget position
   (`CubeHooks::placed`) and GPUI's glyph quantization; re-measuring.
+- **2026-10-21 00:40 (perf) Item 4, look and speed (local, Xvfb/lavapipe, debug build):**
+  - Pixel match old (GPUI) vs new (wgpu overlay), demo document, default view, whole widget crop:
+    cube 1x 233 px differ, **2 by more than 8 levels** (max 16); 2x 529 px, **5** (max 32); the rest are 1-level
+    rounding; plane names **0 px** at 1x and 2x. Hover (Top face, up arrow) and click (Front) states ≤2 px.
+    What it took (GPUI's exact behaviour, measured): the widget origin from GPUI's layout (`CubeHooks::placed`);
+    path pixels clipped to the path's bounds, half-open [min, max) by pixel center (GPUI's wgpu path shader;
+    Metal clips geometrically, so off there: `TextShading::clip_path_pixels`); X/Y/Z glyphs placed like
+    `taffy.rs` lays out (authored offsets rounded half toward zero to device px, text leaf width rounded up,
+    centered, absolute position rounded half toward zero) and `paint_glyph` quantizes (4 x-variants, one mask
+    each); Linux text gamma/contrast from GPUI's renderer.
+    Crops (not in the repo: they include a live Onshape crop): /root/perf-scratch/crops/cube-compare-sheet.png,
+    planes-compare-sheet.png, hover-wgpu-row.png.
+  - Orbit bench, demo at scale 2 (2388x1588), texture frames, same binary: GPUI overlays: 61 window renders
+    for 60 frames, UI CPU per frame mean 12.20 p95 14.88 ms (prepaint 10.1, paint 8.1 ms); **wgpu overlays:
+    2 window renders (start, fit), 60 present-only frames, UI CPU mean 2.43 p95 6.92 ms.** Needed:
+    `request_frame`'s "on screen" test no longer goes stale during present-only streaks.
+  - Built and measured in a private worktree (/root/perf-scratch/wt/noshape, HEAD + perf's hunks) because the
+    shared tree kept failing in other files; every change is also in the shared tree. CI: run 39520247805
+    (perf-dev with `NOSHAPE_OVERLAY=wgpu` as a variant).
+- **2026-10-21 (perf) Freeze for v0.4.3.** In the tree: wgpu view cube + plane names (default, GPUI
+  drawing removed; crops approved); manipulators/triads built per frame on the render thread from the
+  frame's camera (`render::camera_geometry`, `ManipGeometry`), so they no longer re-render the window
+  while orbiting (pixel crops still to do). Reverted for the freeze: a rewrite of the section caps in
+  Onshape's way (float mask of ± part colors with +16 alpha per part, 3×3 edge detect + 5-tap blur,
+  plane quad with hash-driven hatch, red overlap; saved at /root/perf-scratch/caps/wip). G40 finding:
+  the G40 shots are 1× renders upscaled 2×, so the true hatch period is ~12.9 px at 1×, from Onshape's
+  pattern scale 30/(P[5]·viewport height); a true 2× capture and the planes' tangents are requested
+  in REQUESTS.md. Next: caps (after GO), BOM-panel view cube placement, class B anchored labels.

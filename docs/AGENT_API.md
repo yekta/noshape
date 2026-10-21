@@ -83,18 +83,39 @@ noshape-cli render image --doc /tmp/plate.noshape --view isometric --file /tmp/p
 | group | operations |
 |---|---|
 | ops | `ops_list` |
-| document | `document_create`, `document_open`, `document_info`, `document_close`, `document_set_units` |
+| document | `document_create`, `document_open`, `document_info`, `document_close`, `document_set_units`, `document_protect`, `document_unprotect` |
 | tab | `tab_create`, `tab_rename`, `tab_duplicate`, `tab_delete` |
 | feature | `feature_types`, `feature_schema`, `feature_add`, `feature_edit`, `feature_get`, `feature_list`, `feature_delete`, `feature_suppress`, `feature_rollback`, `feature_rename`, `feature_reorder`, `feature_set_visibility`, `feature_show_all` |
-| sketch | `sketch_create`, `sketch_draw`, `sketch_constrain`, `sketch_dimension`, `sketch_set_dimension`, `sketch_delete`, `sketch_set_construction`, `sketch_get` |
+| sketch | `sketch_create`, `sketch_draw`, `sketch_constrain`, `sketch_dimension`, `sketch_set_dimension`, `sketch_delete`, `sketch_set_construction`, `sketch_get`, `sketch_trim`, `sketch_extend`, `sketch_split`, `sketch_spline_point`, `sketch_fillet`, `sketch_chamfer`, `sketch_offset`, `sketch_mirror`, `sketch_linear_pattern`, `sketch_circular_pattern`, `sketch_transform`, `sketch_use`, `sketch_intersection`, `sketch_text`, `sketch_insert_dxf`, `sketch_insert_image` |
+| variable | `variable_list`, `variable_create`, `variable_set`, `variable_delete`, `variable_move` |
+| config | `config_list`, `config_add_input`, `config_edit_input`, `config_delete_input`, `config_add_option`, `config_edit_option`, `config_configure`, `config_set_value`, `config_activate`, `config_reorder_inputs` |
+| assembly | `assembly_insert`, `assembly_list`, `assembly_entities`, `assembly_connectors`, `assembly_mate`, `assembly_transform`, `assembly_set_state`, `assembly_delete` |
 | query | `query_parts`, `query_entities`, `query_datums`, `query_measure`, `query_mass_properties` |
 | render | `render_image` |
 | export | `export_parts` |
 | history | `history_undo`, `history_redo`, `history_list`, `history_create_version`, `history_create_branch`, `history_switch_branch`, `history_merge`, `history_restore` |
 
-Coming next: variables and configurations, assemblies, drawings, import, the sketch edit tools (trim,
-offset, fillet, patterns, use/project), analysis tools, and live mode (attaching to the running app so edits
-appear in its window).
+Coming next: assembly patterns, groups, exploded views, named positions and BOM, drawings, Part Studio import,
+analysis tools, and live mode (attaching to the running app so edits appear in its window).
+
+### Sketch edit tools
+
+Each runs the sketch editor's tool on the clicks and values you give, as one "Edit : Sketch N":
+
+```text
+sketch_fillet     {"sketch": "Sketch 1", "entities": ["entity:F…:3", "entity:F…:5"], "radius": "4 mm"}   corner points; the first gets R4, the rest are equal to it
+sketch_offset     {"sketch": "Sketch 1", "entities": ["entity:F…:9"], "distance": "2 mm", "toward": [60, 30]}
+sketch_trim       {"sketch": "Sketch 1", "points": [[5, 0]]}                       the piece under the click goes
+sketch_linear_pattern {"sketch": "Sketch 1", "entities": ["entity:F…:9"], "count": 3, "distance": "10 mm", "angle": "90 deg"}   -> pattern id (edit with `pattern`)
+sketch_use        {"sketch": "Sketch 2", "references": ["face:…"]}                  the face's edges, linked to the model
+sketch_dimension  {"sketch": "Sketch 3", "kind": "distance", "entities": ["entity:F…:2", "edge:…"], "value": "15 mm"}   model geometry is referenced directly
+```
+
+### Workspace protection
+
+`document_protect` turns on Onshape's workspace protection for a branch: edits to the model, tabs, settings,
+undo/redo and restore fail with error code `protected`; versions, branches and merges still work.
+`document_info` reports `protected`.
 
 ## Worked example (MCP tool calls)
 
@@ -113,7 +134,31 @@ export_parts      {"format": "STEP", "file": "/tmp/plate.step"}
 render_image      {"view": "isometric", "file": "/tmp/plate.png"}           -> PNG (MCP image content)
 ```
 
-This sequence is the end-to-end test `crates/ops/tests/e2e.rs`.
+This sequence is the end-to-end test `crates/ops/tests/e2e.rs`, which also builds a configured block
+(`configurations`) and a pin mated into a block (`assembly_with_mates`).
+
+### Configurations
+
+```text
+config_add_input  {"kind": "list", "name": "Size"}                         -> input id
+config_add_option {"input": "Size", "name": "Large"}
+config_configure  {"feature": "Extrude 1", "param": "depth", "input": "Size"}
+config_set_value  {"feature": "Extrude 1", "param": "depth", "configuration": "Large", "value": "30 mm"}
+config_activate   {"values": {"Size": "Large"}}                            -> later queries, renders, exports use Large
+```
+
+The active configuration is view state, as in the app's Configurations box: it lasts for the session (the
+MCP server, or one `batch`), and `feature_edit` edits the active configuration's configured values.
+
+### Assemblies
+
+```text
+assembly_insert    {"source": "Part Studio 1", "part": "body:F….0"}        -> instance id
+assembly_set_state {"instances": ["…"], "fixed": true}
+assembly_entities  {"instance": "…", "kind": "faces", "surface": "cylinder"} -> face ids with axis, normal, area
+assembly_mate      {"type": "revolute", "a": {"instance": "…", "entity": "face:…"}, "b": {"instance": "…", "entity": "face:…"}}
+assembly_list      {}                                                        -> instances, mates, degrees of freedom
+```
 
 ## For developers
 

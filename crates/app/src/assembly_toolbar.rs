@@ -60,6 +60,33 @@ pub(crate) struct AsmToolbarPrefs {
     pub removed: Vec<String>,
     #[serde(default)]
     pub hide_search: bool,
+    /// S shortcut toolbar tools (toolbar tool ids; None = the defaults;
+    /// Preferences › Shortcut toolbars › Assembly).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shortcut_tools: Option<Vec<String>>,
+}
+
+/// The S shortcut toolbar's default tools (live behaviours "Assembly":
+/// 11 ticked of 30).
+pub(crate) const DEFAULT_SHORTCUT_TOOLS: [&str; 11] = ["tb-insert", "tb-mc", "tb-fastened", "tb-revolute", "tb-slider", "tb-planar", "tb-group", "tb-replicate", "tb-replace", "tb-linpat", "tb-circpat"];
+
+/// Tools the S toolbar offers besides the toolbar's (live: Section view,
+/// Mass and section properties, Measure at the end of the list).
+const SHORTCUT_EXTRAS: [(&str, &str, &str); 3] = [("tb-section", "Section view", "section-view-3d"), ("tb-mass", "Mass and section properties", "mass-properties"), ("tb-measure", "Measure", "measure")];
+
+/// Every tool the S toolbar can hold (Preferences › Shortcut toolbars ›
+/// Assembly, live's 30): (id, name, icon), in list order; the toolbar shows
+/// the ticked ones in this order.
+pub(crate) fn shortcut_catalog() -> Vec<(&'static str, &'static str, &'static str)> {
+    TOOLSETS
+        .iter()
+        .flat_map(|s| s.iter())
+        .map(|id| {
+            let (name, icon) = tool_info(id);
+            (*id, name, icon)
+        })
+        .chain(SHORTCUT_EXTRAS)
+        .collect()
 }
 
 impl AsmToolbarPrefs {
@@ -93,6 +120,21 @@ impl AsmToolbarPrefs {
         out
     }
 
+    pub fn shortcut_tools(&self) -> Vec<String> {
+        self.shortcut_tools.clone().unwrap_or_else(|| DEFAULT_SHORTCUT_TOOLS.iter().map(|s| s.to_string()).collect())
+    }
+
+    pub fn toggle_shortcut(&mut self, id: &str) {
+        let mut tools = self.shortcut_tools();
+        match tools.iter().position(|t| t == id) {
+            Some(i) => {
+                tools.remove(i);
+            }
+            None => tools.push(id.to_string()),
+        }
+        self.shortcut_tools = Some(tools);
+    }
+
     /// Tool sets as shown: (default index, tools still in the toolbar).
     pub fn sets(&self) -> Vec<(usize, Vec<&'static str>)> {
         self.set_order().into_iter().map(|i| (i, TOOLSETS[i].iter().copied().filter(|t| !self.removed.iter().any(|r| r == t)).collect::<Vec<_>>())).filter(|(_, t)| !t.is_empty()).collect()
@@ -117,6 +159,47 @@ impl AssemblyView {
         }
     }
 
+    /// Runs a toolbar tool by id (the S shortcut toolbar).
+    pub(super) fn run_toolbar_tool(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        match id {
+            "tb-update-refs" => {
+                if self.has_newer_references(cx) {
+                    self.open_reference_manager(None, cx);
+                }
+            }
+            "tb-insert" => self.toggle_insert(window, cx),
+            "tb-mc" => self.open_mc(None, window, cx),
+            "tb-fastened" => self.start_mate(MateType::Fastened, window, cx),
+            "tb-revolute" => self.start_mate(MateType::Revolute, window, cx),
+            "tb-slider" => self.start_mate(MateType::Slider, window, cx),
+            "tb-planar" => self.start_mate(MateType::Planar, window, cx),
+            "tb-cyl" => self.start_mate(MateType::Cylindrical, window, cx),
+            "tb-pinslot" => self.start_mate(MateType::PinSlot, window, cx),
+            "tb-ball" => self.start_mate(MateType::Ball, window, cx),
+            "tb-parallel" => self.start_mate(MateType::Parallel, window, cx),
+            "tb-tangent" => self.start_mate(MateType::Tangent, window, cx),
+            "tb-width" => self.start_mate(MateType::Width, window, cx),
+            "tb-group" => self.create_group(cx),
+            "tb-snap" => self.toggle_snap(window, cx),
+            "tb-show-mates" => self.toggle_show_mates_mode(cx),
+            "tb-replicate" => self.open_pattern(PatternDialogKind::Replicate, window, cx),
+            "tb-replace" => self.replace_selected(cx),
+            "tb-linpat" => self.open_pattern(PatternDialogKind::Linear, window, cx),
+            "tb-circpat" => self.open_pattern(PatternDialogKind::Circular, window, cx),
+            "tb-mirror" => self.open_pattern(PatternDialogKind::Mirror, window, cx),
+            "tb-gear" => self.open_relation(RelationType::Gear, None, window, cx),
+            "tb-rack" => self.open_relation(RelationType::RackAndPinion, None, window, cx),
+            "tb-screw" => self.open_relation(RelationType::Screw, None, window, cx),
+            "tb-linear" => self.open_relation(RelationType::Linear, None, window, cx),
+            "tb-display-states" => self.toggle_display_states(window, cx),
+            "tb-ps-in-context" => self.open_ps_in_context(cx),
+            "tb-section" => self.toggle_section(window, cx),
+            "tb-mass" => self.toggle_mass(window, cx),
+            "tb-measure" => self.toggle_measure(cx),
+            _ => {}
+        }
+    }
+
     pub(super) fn start_toolbar_customize(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let (order, removed) = (self.ui.tb_prefs.order.clone(), self.ui.tb_prefs.removed.clone());
         self.ui.tb_custom = Some(crate::toolbar_customize::Customize::new(TOOLSETS.len(), &order, &removed, window, cx));
@@ -126,7 +209,7 @@ impl AssemblyView {
     /// The prefs the toolbar shows (the draft while customizing).
     pub(super) fn toolbar_prefs(&self) -> AsmToolbarPrefs {
         match &self.ui.tb_custom {
-            Some(c) => AsmToolbarPrefs { order: c.order.clone(), removed: c.removed.clone(), hide_search: self.ui.tb_prefs.hide_search },
+            Some(c) => AsmToolbarPrefs { order: c.order.clone(), removed: c.removed.clone(), hide_search: self.ui.tb_prefs.hide_search, shortcut_tools: self.ui.tb_prefs.shortcut_tools.clone() },
             None => self.ui.tb_prefs.clone(),
         }
     }

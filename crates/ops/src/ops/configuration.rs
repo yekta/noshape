@@ -43,9 +43,16 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "config",
             verb: "edit_input",
-            summary: "Rename a configuration input or change a configuration variable's default",
+            summary: "Rename a configuration input or change a configuration variable's default and range",
             description: "",
-            fields: vec![doc_field(), tab_field(), req("input", s(), "Input id or name."), opt("name", s(), "New name."), opt("value", json!({ "type": ["string", "number"] }), "Variable input: new default.")],
+            fields: vec![
+                doc_field(),
+                tab_field(),
+                req("input", s(), "Input id or name."),
+                opt("name", s(), "New name."),
+                opt("value", json!({ "type": ["string", "number"] }), "Variable input: new default."),
+                opt("range", json!({ "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }), "Variable input: new [min, max] expressions (with `value`)."),
+            ],
             mutates: true,
             destructive: false,
             run: edit_input,
@@ -333,10 +340,20 @@ fn edit_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     if let Some(v) = a.get("value") {
         let v = text(v, "value")?;
+        let range = match a.opt_array("range")? {
+            Some(r) => Some((noshape_units::ExprValue::new(text(&r[0], "range")?), noshape_units::ExprValue::new(text(&r[1], "range")?))),
+            None => None,
+        };
         out = Some(edit(od, tab, config::EDIT_VARIABLE_INPUT, |ps| {
-            config::set_variable_default(ps, &id, v);
+            // The panel's default cell, or the Variable dialog with a range.
+            match range {
+                Some(r) => config::edit_variable_input(ps, &id, noshape_units::ExprValue::new(v), Some(r)),
+                None => config::set_variable_default(ps, &id, v),
+            }
             Ok(json!({ "input": id }))
         })?);
+    } else if a.get("range").is_some() {
+        return Err(OpError::param("range", "give `value` with `range`"));
     }
     out.ok_or_else(|| OpError::invalid("nothing to change: give `name` or `value`"))
 }

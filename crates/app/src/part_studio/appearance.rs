@@ -4,12 +4,9 @@
 //! Face and feature colors reach the renderer as per-vertex colors.
 
 use super::PartStudioView;
-use crate::theme::p;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use crate::theme::{p, with_alpha};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
-use gpui_kit::component::{IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
@@ -21,12 +18,27 @@ use std::sync::Arc;
 
 pub use crate::scene_builder::VertexColors;
 
-/// Palette of the color picker (sRGB), Onshape-like hues in light/dark rows.
-pub const PALETTE: &[u32] = &[
-    0xffffff, 0xd9d9d9, 0xa6a6a6, 0x737373, 0x404040, 0x000000, 0x8ab5cf, 0x4e6fb7, //
-    0xc8e6f5, 0x9a9a9a, 0xfd9c28, 0xebb115, 0xd9534f, 0xe67e22, 0xf1c40f, 0x2ecc71, //
-    0x1abc9c, 0x3498db, 0x9b59b6, 0xe84393, 0x7f8c8d, 0x8e5a3c, 0x2c3e50, 0x16a085,
+/// The Appearance editor's Palette tab (live dom/dialog-appearance-editor.txt):
+/// a top row of black / blue / red, then the 8 default part colours; under
+/// them a 3-column ramp of greys (7 rows) and an 8-column colour grid (7 rows).
+pub const PALETTE_TOP_A: [u32; 3] = [0x000000, 0x0000ff, 0xff0000];
+pub const PALETTE_TOP_B: [u32; 8] = [0x9dcfed, 0xa5a5a5, 0x3b61b4, 0xeaeaea, 0xc4e2f3, 0xf88701, 0x7f7f7f, 0xfab601];
+pub const PALETTE_GREYS: [u32; 21] = [
+    0xe6e6e6, 0xe6e0cf, 0xcfdbe5, 0xcccccc, 0xccc6b6, 0xb6c2cc, 0xb3b3b3, 0xb3ae9f, 0x9faab3, 0x999999, 0x999487, 0x879199, 0x808080, 0x807c70, 0x707980, 0x666666, 0x666359, 0x596066, 0x4d4d4d,
+    0x4d4a43, 0x43484d,
 ];
+pub const PALETTE_GRID: [u32; 56] = [
+    0xe3b2a3, 0xebcca7, 0xf0dfad, 0xcbe7be, 0xbcefea, 0xc2d6ec, 0xccbfe9, 0xd9c1dd, 0xe1927a, 0xeab97d, 0xf5d578, 0xa7d293, 0x89dad3, 0x8aaed6, 0xa795d2, 0xc38bcd, 0xdf7251, 0xe9a554, 0xfacb43,
+    0x83bc68, 0x57c6bd, 0x5387c0, 0x836abb, 0xae55bc, 0xdd5228, 0xe8922a, 0xffc10e, 0x5fa73d, 0x24b1a6, 0x1651b0, 0x5e40a4, 0x981fac, 0xba401b, 0xc1761c, 0xd29f09, 0x488c29, 0x18948b, 0x165294,
+    0x4b2e8f, 0x7d168e, 0x982d0d, 0x995a0e, 0xa67c05, 0x327014, 0x0c786f, 0x10447d, 0x371b7a, 0x610c6f, 0x751b00, 0x723e00, 0x795a00, 0x1b5500, 0x005b54, 0x0b3767, 0x240965, 0x460351,
+];
+
+/// The editor field a colour was typed in (it keeps its own text).
+#[derive(Clone, Copy, PartialEq)]
+enum ColorField {
+    Hex,
+    Channel(usize),
+}
 
 /// What the open Appearance editor edits.
 #[derive(Clone, Debug, PartialEq)]
@@ -47,8 +59,18 @@ pub struct AppearanceEdit {
     /// 0 = opaque, 1 = invisible (Onshape "Part transparency").
     pub transparency: f32,
     pub tessellation: TessQuality,
+    /// The Mixer tab is showing (else Palette).
+    pub mixer: bool,
+    pub mix: crate::color_mixer::MixerState,
+    /// The A slider is being dragged.
+    alpha_drag: bool,
+    /// Colour, transparency and quality at opening: ✓ stays at 20 % until
+    /// one changes (live).
+    initial: ([u8; 3], f32, TessQuality),
     hex: Entity<InputState>,
-    slider: Entity<SliderState>,
+    /// R, G, B.
+    channels: [Entity<InputState>; 3],
+    alpha: Entity<InputState>,
     _subs: Vec<Subscription>,
 }
 
@@ -77,8 +99,9 @@ pub fn parse_hex(text: &str) -> Option<[u8; 3]> {
     Some([(v >> 16) as u8, (v >> 8) as u8, v as u8])
 }
 
-pub fn hex_of(rgb: [u8; 3]) -> String {
-    format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2])
+/// The editor's # field (live "3B61B4": upper case, the # is its label).
+fn hex_field(rgb: [u8; 3]) -> String {
+    format!("{:02X}{:02X}{:02X}", rgb[0], rgb[1], rgb[2])
 }
 
 /// Per-vertex sRGB colors of a body mesh: faces with a custom appearance
@@ -176,36 +199,77 @@ impl PartStudioView {
         };
         let rgb = [lin_to_srgb(color[0]), lin_to_srgb(color[1]), lin_to_srgb(color[2])];
         let transparency = 1.0 - color[3].clamp(0.0, 1.0);
-        let hex = cx.new(|cx| InputState::new(window, cx).default_value(hex_of(rgb)));
-        // A configured Appearance cell's slider is the alpha ("A"), the
-        // part editor's the transparency.
-        let alpha = matches!(target, EditTarget::ConfiguredCell(..));
-        let slider = cx.new(|_| SliderState::new().min(0.0).max(1.0).step(0.01).default_value(if alpha { 1.0 - transparency } else { transparency }));
-        let s1 = cx.subscribe_in(&hex, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
+        let hex = cx.new(|cx| InputState::new(window, cx).default_value(hex_field(rgb)));
+        let channels = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).default_value(rgb[i].to_string())));
+        let alpha = cx.new(|cx| InputState::new(window, cx).default_value(format!("{:.2}", 1.0 - transparency)));
+        let mut subs = vec![cx.subscribe_in(&hex, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. })
                 && let Some(rgb) = parse_hex(&st.read(cx).value())
+            {
+                this.set_edit_color_from(rgb, Some(ColorField::Hex), window, cx);
+            }
+        })];
+        for (i, ch) in channels.iter().enumerate() {
+            subs.push(cx.subscribe_in(ch, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+                if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. })
+                    && let Ok(v) = st.read(cx).value().trim().parse::<u8>()
+                    && let Some(mut rgb) = this.ui.appearance_edit.as_ref().map(|e| e.rgb)
+                {
+                    rgb[i] = v;
+                    this.set_edit_color_from(rgb, Some(ColorField::Channel(i)), window, cx);
+                }
+            }));
+        }
+        subs.push(cx.subscribe_in(&alpha, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
+            if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. })
+                && let Ok(v) = st.read(cx).value().trim().parse::<f32>()
                 && let Some(e) = &mut this.ui.appearance_edit
             {
-                e.rgb = rgb;
+                e.transparency = 1.0 - v.clamp(0.0, 1.0);
                 cx.notify();
             }
+        }));
+        // Live 173: the hex field has the focus, its text selected.
+        hex.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
         });
-        let s2 = cx.subscribe_in(&slider, window, move |this: &mut Self, _, ev: &SliderEvent, _, cx| {
-            let (SliderEvent::Change(v) | SliderEvent::Release(v)) = ev;
-            if let Some(e) = &mut this.ui.appearance_edit {
-                e.transparency = if alpha { 1.0 - v.start() } else { v.start() };
-                cx.notify();
-            }
-        });
-        self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, hex, slider, _subs: vec![s1, s2] });
+        self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(rgb), alpha_drag: false, initial: (rgb, transparency, tess), hex, channels, alpha, _subs: subs });
         cx.notify();
     }
 
     fn set_edit_color(&mut self, rgb: [u8; 3], window: &mut Window, cx: &mut Context<Self>) {
+        self.set_edit_color_from(rgb, None, window, cx);
+    }
+
+    /// The editor's colour, from a swatch or the mixer (`from` None) or one
+    /// of its fields, which keeps its own text.
+    fn set_edit_color_from(&mut self, rgb: [u8; 3], from: Option<ColorField>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(e) = &mut self.ui.appearance_edit else { return };
         e.rgb = rgb;
-        let hex = e.hex.clone();
-        hex.update(cx, |s, cx| s.set_value(hex_of(rgb), window, cx));
+        if from.is_some() {
+            let used = e.mix.hue_used;
+            e.mix = crate::color_mixer::MixerState::from_rgb(rgb);
+            e.mix.hue_used = used;
+        }
+        let (hex, channels) = (e.hex.clone(), e.channels.clone());
+        if from != Some(ColorField::Hex) {
+            hex.update(cx, |s, cx| s.set_value(hex_field(rgb), window, cx));
+        }
+        for (i, ch) in channels.iter().enumerate() {
+            if from != Some(ColorField::Channel(i)) {
+                ch.update(cx, |s, cx| s.set_value(rgb[i].to_string(), window, cx));
+            }
+        }
+        cx.notify();
+    }
+
+    /// The A slider and field (`alpha` 0–1).
+    fn set_edit_alpha(&mut self, alpha: f32, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = &mut self.ui.appearance_edit else { return };
+        e.transparency = 1.0 - alpha.clamp(0.0, 1.0);
+        let field = e.alpha.clone();
+        field.update(cx, |s, cx| s.set_value(format!("{alpha:.2}"), window, cx));
         cx.notify();
     }
 
@@ -279,141 +343,273 @@ impl PartStudioView {
         self.selection.iter().filter(|r| matches!(r, Reference::Face(_))).cloned().collect()
     }
 
-    /// The floating Appearance editor.
-    pub(super) fn render_appearance_editor(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// The floating Appearance editor (live dom/dialog-appearance-editor.txt,
+    /// part-studio/173–174): 220 x 400; header (title, ✓ ✕); tabs Palette |
+    /// Mixer; the swatches or the mixer (162 px); the current colour, the A
+    /// slider and field; # R G B; Custom colors; Tessellation quality; ?.
+    pub(super) fn render_appearance_editor(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let e = self.ui.appearance_edit.as_ref()?;
         let pal = p();
-        let names = self.labeler(cx);
-        let (title, subject, is_part) = match &e.target {
-            EditTarget::Parts(b) => ("Appearance", b.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect::<Vec<_>>().join(", "), true),
-            EditTarget::Faces(f, _) => ("Face appearance", format!("{} face{}", f.len(), if f.len() == 1 { "" } else { "s" }), false),
-            EditTarget::Feature(f, _) => ("Appearance", names(&Reference::Feature(*f)), false),
-            EditTarget::ConfiguredCell(b, _) => ("Appearance", self.display.body(b).map(|d| d.name.clone()).unwrap_or_default(), false),
+        let title = match &e.target {
+            EditTarget::Faces(..) => "Face appearance",
+            _ => "Appearance",
         };
-        // A configured Appearance cell: color and alpha, no tessellation
-        // (live 634: "A 1.00").
-        let is_cell = matches!(e.target, EditTarget::ConfiguredCell(..));
-        let is_faces = matches!(e.target, EditTarget::Faces(..));
+        let is_part = matches!(e.target, EditTarget::Parts(..));
+        // Live 175: a face appearance starts with its "Faces or features" field.
+        let faces = match &e.target {
+            EditTarget::Faces(f, _) => Some(f.len()),
+            _ => None,
+        };
+        let changed = e.initial != (e.rgb, e.transparency, e.tessellation);
         let rgb = e.rgb;
+        let alpha = 1.0 - e.transparency;
+        let (mixer, mix) = (e.mixer, e.mix);
+        let color = |c: [u8; 3], a: f32| gpui_kit::Rgba { r: c[0] as f32 / 255.0, g: c[1] as f32 / 255.0, b: c[2] as f32 / 255.0, a };
+        // Live: an 18 px white swatch with a 16 px colour; the current one
+        // has a 2 px `#1651b0` glow and a white ✓.
         let swatch = |hex: u32, cx: &mut Context<Self>| {
             let c = [(hex >> 16) as u8, (hex >> 8) as u8, hex as u8];
             let on = c == rgb;
             div()
                 .id(SharedString::from(format!("ap-sw-{hex:06x}")))
-                .size(px(20.))
-                .rounded_sm()
-                .bg(rgb_u32(hex))
-                .border_1()
-                .border_color(if on { pal.accent } else { pal.border })
-                .when(on, |d| d.border_2())
+                .size(px(18.))
+                .p(px(1.))
+                .bg(gpui_kit::rgb(0xffffff))
                 .cursor_pointer()
+                .child(
+                    div()
+                        .size(px(16.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .bg(rgb_u32(hex))
+                        .when(on, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(1.), spread_radius: px(0.), inset: false }]).child(crate::ui::glyph("check", 12., gpui_kit::rgb(0xffffff)))),
+                )
                 .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.set_edit_color(c, w, cx)))
+                .into_any_element()
         };
-        let swatches: Vec<AnyElement> = PALETTE.iter().map(|h| swatch(*h, cx).into_any_element()).collect();
-        let channel = |i: usize, label: &'static str, cx: &mut Context<Self>| {
-            let v = rgb[i];
+        let grid = |colors: &[u32], cols: usize, cx: &mut Context<Self>| {
+            let mut col = v_flex();
+            for row in colors.chunks(cols) {
+                col = col.child(h_flex().children(row.iter().map(|h| swatch(*h, cx))));
+            }
+            col
+        };
+        let tab = |id: &'static str, label: &'static str, on: bool, to_mixer: bool, w: f32, cx: &mut Context<Self>| {
+            div()
+                .id(id)
+                .w(px(w))
+                .h(px(26.))
+                .relative()
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_size(px(12.))
+                .cursor_pointer()
+                .when(on, |d| d.text_color(gpui_kit::rgb(0x1651b0)).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(gpui_kit::rgb(0x1651b0))))
+                .when(!on, |d| d.text_color(pal.text))
+                .child(label)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(e) = &mut this.ui.appearance_edit {
+                        e.mixer = to_mixer;
+                    }
+                    cx.notify();
+                }))
+        };
+        let body: AnyElement = if mixer {
+            div()
+                .h(px(162.))
+                .w(px(218.))
+                .p(px(5.))
+                .rounded(px(5.))
+                .bg(gpui_kit::rgb(0xffffff))
+                .child(crate::color_mixer::mixer(&mix, |v: &mut Self| v.ui.appearance_edit.as_mut().map(|e| &mut e.mix), |v: &mut Self, c, w, cx| v.set_edit_color(c, w, cx), cx))
+                .into_any_element()
+        } else {
+            v_flex()
+                .h(px(162.))
+                .child(h_flex().h(px(27.)).child(h_flex().w(px(64.)).pt(px(6.)).px(px(5.)).children(PALETTE_TOP_A.iter().map(|h| swatch(*h, cx)))).child(h_flex().pt(px(6.)).px(px(5.)).children(PALETTE_TOP_B.iter().map(|h| swatch(*h, cx)))))
+                .child(h_flex().items_start().child(div().w(px(65.)).pt(px(6.)).px(px(5.)).child(grid(&PALETTE_GREYS, 3, cx))).child(div().pt(px(6.)).px(px(5.)).child(grid(&PALETTE_GRID, 8, cx))))
+                .into_any_element()
+        };
+        // Live: a 12 px `#666` label 5 px in, a 13 px black value over a
+        // 1 px `#d7d7d7` rule (`#1651b0` while focused).
+        let field = |label: &'static str, input: &Entity<InputState>, w: f32, focused: bool| {
             h_flex()
-                .gap_1()
-                .child(div().w(px(12.)).text_xs().text_color(pal.text_muted).child(label))
-                .child(Button::new(SharedString::from(format!("ap-{label}-m"))).label("−").xsmall().ghost().on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
-                    let step = if ev.modifiers().shift { 16 } else { 1 };
-                    let mut c = rgb;
-                    c[i] = c[i].saturating_sub(step);
-                    this.set_edit_color(c, w, cx);
-                })))
-                .child(div().w(px(26.)).text_center().text_xs().text_color(pal.text).child(v.to_string()))
-                .child(Button::new(SharedString::from(format!("ap-{label}-p"))).label("+").xsmall().ghost().on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
-                    let step = if ev.modifiers().shift { 16 } else { 1 };
-                    let mut c = rgb;
-                    c[i] = c[i].saturating_add(step);
-                    this.set_edit_color(c, w, cx);
-                })))
+                .h(px(27.))
+                .pr(px(4.))
+                .items_start()
+                // Live: the label box is 12 px (its 5 px padding overlaps the text).
+                .child(div().w(px(12.)).flex_none().pt(px(6.)).pl(px(2.)).h(px(21.)).text_size(px(12.)).line_height(px(16.)).text_color(gpui_kit::rgb(0x666666)).child(label))
+                .child(
+                    div()
+                        .w(px(w))
+                        .h(px(27.))
+                        .border_b_1()
+                        .border_color(if focused { gpui_kit::rgb(0x1651b0) } else { gpui_kit::rgb(0xd7d7d7) })
+                        .child(Input::new(input).appearance(false).h(px(26.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x000000)).pl(px(3.)).pr(px(2.))),
+                )
         };
+        let (hex, ch, a_in) = (e.hex.clone(), e.channels.clone(), e.alpha.clone());
+        let on = |st: &Entity<InputState>| st.read(cx).focus_handle(cx).is_focused(window);
+        let (f_hex, f_ch, f_a) = (on(&hex), [on(&ch[0]), on(&ch[1]), on(&ch[2])], on(&a_in));
+        // The A slider (live noUiSlider, 84 x 10, "Change part transparency"):
+        // a 2 px line, an 11 px knob; only a press on it drags it.
+        let track: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let (t1, t2, t3) = (track.clone(), track.clone(), track);
+        let frac = |x: Pixels, b: Bounds<Pixels>| (f32::from(x - b.left()) / f32::from(b.size.width).max(1.)).clamp(0., 1.);
+        let slider = div()
+            .id("ap-alpha")
+            .relative()
+            .ml(px(7.))
+            .w(px(84.))
+            .h(px(20.))
+            .cursor_pointer()
+            .tooltip(crate::ui::tooltip("Change part transparency"))
+            .child(canvas(move |b, _, _| t1.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+            .child(div().absolute().left_0().right_0().top(px(9.)).h(px(2.)).bg(gpui_kit::rgb(0x777777)))
+            .child(
+                div()
+                    .absolute()
+                    .top(px(5.))
+                    .left(relative(alpha))
+                    .ml(px(-6.))
+                    .size(px(11.))
+                    .rounded_full()
+                    .bg(gpui_kit::rgb(0xffffff))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0x888888))
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]),
+            )
+            .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, w, cx| {
+                if let Some(e) = &mut this.ui.appearance_edit {
+                    e.alpha_drag = true;
+                }
+                this.set_edit_alpha(frac(ev.position.x, t2.get()), w, cx);
+            }))
+            .on_mouse_move(cx.listener(move |this, ev: &MouseMoveEvent, w, cx| {
+                let dragging = this.ui.appearance_edit.as_ref().is_some_and(|e| e.alpha_drag);
+                if ev.pressed_button != Some(MouseButton::Left) {
+                    if let Some(e) = &mut this.ui.appearance_edit {
+                        e.alpha_drag = false;
+                    }
+                } else if dragging {
+                    this.set_edit_alpha(frac(ev.position.x, t3.get()), w, cx);
+                }
+            }));
         let tess = e.tessellation;
         let view = cx.entity();
-        let tess_menu = Button::new("ap-tess").label(tess.label()).outline().xsmall().dropdown_caret(true).dropdown_menu(move |mut m, _, _| {
-            for q in TessQuality::ALL {
-                let v = view.clone();
-                m = m.item(PopupMenuItem::new(q.label()).checked(q == tess).on_click(move |_, _, cx| {
-                    v.update(cx, |this, cx| {
-                        if let Some(e) = &mut this.ui.appearance_edit {
-                            e.tessellation = q;
-                        }
-                        cx.notify();
-                    })
-                }));
-            }
-            m
-        });
+        let tess_select = crate::os_ui::select_field("ap-tess", TessQuality::ALL.iter().map(|q| q.label().to_string()).collect(), TessQuality::ALL.iter().position(|q| *q == tess).unwrap_or(0), move |i, _, cx| {
+            view.update(cx, |this, cx| {
+                if let Some(e) = &mut this.ui.appearance_edit {
+                    e.tessellation = TessQuality::ALL[i];
+                }
+                cx.notify();
+            })
+        })
+        .h(px(26.))
+        .w(px(97.))
+        .pl(px(6.))
+        .rounded(px(0.))
+        .border_0()
+        .border_b_1()
+        .border_color(gpui_kit::rgb(0xd7d7d7))
+        .text_size(px(14.));
+        let parts = match &e.target {
+            EditTarget::Parts(b) => b.len(),
+            _ => 0,
+        };
+        let tess_note = format!("{parts} {} part{}", tess.label().to_lowercase().replace("auto", "fine"), if parts == 1 { "" } else { "s" });
         Some(
             v_flex()
                 .id("appearance-editor")
                 .occlude()
                 .absolute()
-                .top_3()
-                // Live (part-studio/173): beside an open right panel (it
-                // covered the editor's right half and its ✓ ✕ here).
-                .map(|d| if self.right_panel.is_some() { d.right(px(4.)) } else { d.left(px(340.)) })
-                .w(px(250.))
-                .p_2()
-                .gap_2()
-                .rounded_md()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
+                // Live: beside an open right panel at the top (part-studio/173),
+                // else at the graphics area's bottom left like Material
+                // (dom/cursor-rows.json: from the part menu, x 241 y 647).
+                .map(|d| if self.right_panel.is_some() { d.top(px(3.)).right(px(4.)) } else { d.left_0().bottom_0() })
+                .w(px(220.))
+                .h(px(if faces.is_some() { 431. } else { 400. }))
+                .bg(with_alpha(gpui_kit::rgb(0xffffff), 0.95))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
                 .child(
                     h_flex()
-                        .gap_2()
-                        .child(crate::ui::panel_title("ps-appearance", div().flex_1().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title)))
-                        .child(Button::new("ap-ok").icon(IconName::Check).xsmall().ghost().tooltip("Accept").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_appearance(cx))))
-                        .child(Button::new("ap-cancel").icon(IconName::Close).xsmall().ghost().tooltip("Cancel").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.ui.appearance_edit = None;
-                            cx.notify();
-                        }))),
+                        .h(px(29.))
+                        .flex_none()
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xd7d7d7))
+                        .child(crate::ui::panel_title("ps-appearance", div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)))
+                        .child(div().id("ap-ok").size(px(28.)).flex().items_center().justify_center().bg(if changed { pal.accept } else { gpui_kit::rgb(0xcce9cc) }).cursor(CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if changed {
+                                this.accept_appearance(cx);
+                            }
+                        })))
+                        .child(
+                            div()
+                                .id("ap-cancel")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor(CursorStyle::Arrow)
+                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.ui.appearance_edit = None;
+                                    cx.notify();
+                                })),
+                        ),
                 )
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .child(div().flex_1().truncate().text_xs().text_color(pal.text_muted).child(subject))
-                        .when(is_faces, |d| {
-                            d.child(Button::new("ap-use-sel").label("Use selection").xsmall().ghost().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                let faces = this.selected_faces();
-                                if let Some(EditTarget::Faces(f, _)) = this.ui.appearance_edit.as_mut().map(|e| &mut e.target)
-                                    && !faces.is_empty()
-                                {
-                                    *f = faces;
-                                }
-                                cx.notify();
-                            })))
-                        }),
-                )
-                .child(h_flex().flex_wrap().gap_1().children(swatches))
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .child(div().size(px(28.)).rounded_sm().border_1().border_color(pal.border).bg(gpui_kit::Rgba { r: rgb[0] as f32 / 255.0, g: rgb[1] as f32 / 255.0, b: rgb[2] as f32 / 255.0, a: 1.0 }))
-                        .child(div().text_xs().text_color(pal.text_muted).child("#"))
-                        .child(div().flex_1().child(Input::new(&e.hex).text_size(px(13.)).xsmall())),
-                )
-                .child(v_flex().gap_0p5().child(channel(0, "R", cx)).child(channel(1, "G", cx)).child(channel(2, "B", cx)))
-                .when(is_cell, |d| {
+                .when_some(faces, |d, n| {
                     d.child(
-                        v_flex()
-                            .gap_1()
-                            .child(h_flex().justify_between().child(div().text_xs().text_color(pal.text_muted).child("A")).child(div().text_xs().text_color(pal.text).child(format!("{:.2}", 1.0 - e.transparency))))
-                            .child(Slider::new(&e.slider)),
+                        div().px(px(3.)).pt(px(5.)).child(
+                            v_flex()
+                                .id("ap-faces")
+                                .min_h(px(26.))
+                                .px(px(6.))
+                                .pb(px(4.))
+                                .rounded(px(2.))
+                                .border_1()
+                                .border_color(pal.accent)
+                                .bg(pal.row_hover)
+                                .cursor_pointer()
+                                .child(div().pt(px(7.)).text_size(px(10.)).line_height(px(9.)).text_color(pal.text_muted).child("Faces or features"))
+                                .child(div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).child(format!("{n} face{}", if n == 1 { "" } else { "s" })))
+                                // A click takes the selected faces.
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    let sel = this.selected_faces();
+                                    if let Some(EditTarget::Faces(f, _)) = this.ui.appearance_edit.as_mut().map(|e| &mut e.target)
+                                        && !sel.is_empty()
+                                    {
+                                        *f = sel;
+                                    }
+                                    cx.notify();
+                                })),
+                        ),
                     )
                 })
+                .child(h_flex().h(px(26.)).flex_none().border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).child(tab("ap-tab-palette", "Palette", !mixer, false, 115., cx)).child(tab("ap-tab-mixer", "Mixer", mixer, true, 105., cx)))
+                .child(body)
+                .child(
+                    h_flex()
+                        .h(px(27.))
+                        .flex_none()
+                        .child(div().ml(px(6.)).w(px(66.)).h(px(22.)).bg(gpui_kit::rgb(0xffffff)).child(div().size_full().bg(color(rgb, alpha))))
+                        .child(slider)
+                        .child(div().flex_1())
+                        .child(field("A", &a_in, 30., f_a)),
+                )
+                .child(h_flex().h(px(27.)).flex_none().child(field("#", &hex, 60., f_hex)).child(field("R", &ch[0], 30., f_ch[0])).child(field("G", &ch[1], 30., f_ch[1])).child(field("B", &ch[2], 30., f_ch[2])))
+                .child(div().h(px(26.)).flex_none().pt(px(5.)).px(px(5.)).text_size(px(12.)).line_height(px(16.)).text_color(gpui_kit::rgb(0x666666)).child("Custom colors"))
+                .child(h_flex().h(px(26.)).flex_none().pl(px(6.)).child(div().size(px(19.)).flex().items_center().justify_center().border_1().border_color(gpui_kit::rgb(0x999999)).text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child("+")))
                 .when(is_part, |d| {
-                    d.child(
-                        v_flex()
-                            .gap_1()
-                            .child(h_flex().justify_between().child(div().text_xs().text_color(pal.text_muted).child("Part transparency")).child(div().text_xs().text_color(pal.text).child(format!("{:.2}", e.transparency))))
-                            .child(Slider::new(&e.slider)),
-                    )
-                    .child(h_flex().gap_2().child(div().text_xs().text_color(pal.text_muted).child("Tessellation quality")).child(tess_menu))
+                    d.child(h_flex().h(px(32.)).flex_none().px(px(5.)).justify_between().child(div().text_size(px(12.)).child("Tessellation quality")).child(tess_select))
+                        .child(div().h(px(19.)).flex_none().px(px(5.)).pt(px(3.)).text_size(px(12.)).line_height(px(13.2)).child(tess_note))
                 })
+                .child(div().flex_1())
+                .child(h_flex().h(px(26.)).flex_none().justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")))
                 .into_any_element(),
         )
     }
@@ -628,7 +824,7 @@ mod tests {
         assert_eq!(parse_hex("#ff8000"), Some([255, 128, 0]));
         assert_eq!(parse_hex("f80"), Some([255, 136, 0]));
         assert_eq!(parse_hex("nope"), None);
-        assert_eq!(hex_of([1, 2, 255]), "#0102ff");
+        assert_eq!(hex_field([1, 2, 255]), "0102FF");
         for c in [0u8, 17, 128, 200, 255] {
             assert_eq!(lin_to_srgb(srgb_to_lin(c)), c);
         }

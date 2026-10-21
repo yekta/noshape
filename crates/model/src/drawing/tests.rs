@@ -833,10 +833,10 @@ fn table_cell_formats_and_merged_cells() {
     assert!(t.merge_cells((0, 0), (0, 1)));
     assert!(!t.merge_cells((0, 1), (1, 1)), "partial overlap rejected");
     assert_eq!(t.anchor_cell(0, 1), (0, 0));
-    t.set_cell_format(1, 0, CellFormat { align: CellAlign::Left, height: Some(4.0), bold: true });
+    t.set_cell_format(1, 0, CellFormat { align: CellAlign::Left, height: Some(4.0), bold: true, ..Default::default() });
     t.set_cell_format(2, 2, CellFormat { align: CellAlign::Right, ..Default::default() });
     assert_eq!(t.cell_format(1, 0).height, Some(4.0));
-    t.set_cell_format(2, 1, CellFormat::default());
+    t.set_cell_format(2, 1, t.shown_cell_format(2, 1));
     assert_eq!(t.cell_formats.len(), 2, "default formats are not stored");
     let d = tables::table_data(&Drawing::default(), &t, None, None, None, &[], &|s| s.to_string());
     let l = tables::layout(&t, &d);
@@ -848,10 +848,12 @@ fn table_cell_formats_and_merged_cells() {
     // No divider crosses the merged cell.
     let y_hdr = (l.ys[1] + l.ys[2]) / 2.0;
     assert!(!g.lines.iter().any(|ln| ln.points.len() == 2 && (ln.points[0][0] - l.xs[1]).abs() < 1e-9 && (ln.points[1][0] - l.xs[1]).abs() < 1e-9 && ln.points[0][1].min(ln.points[1][1]) < y_hdr && ln.points[0][1].max(ln.points[1][1]) > y_hdr));
-    // Bold: drawn three times; left aligned; bigger text makes the row taller.
-    let br: Vec<&sheet::Text2> = g.texts.iter().filter(|x| x.text == "Bracket").collect();
-    assert_eq!(br.len(), 3);
-    assert!(br[0].height == 4.0 && br[0].pos[0] < l.xs[0] + 3.0);
+    // Bold: once, in Noto Sans Bold; left aligned; bigger text makes the row taller.
+    let bi: Vec<usize> = g.texts.iter().enumerate().filter(|(_, x)| x.text == "Bracket").map(|(i, _)| i).collect();
+    assert_eq!(bi.len(), 1);
+    assert!(g.text_font(bi[0]).is_some_and(|f| f.bold && f.family == font::DEFAULT_FAMILY));
+    let br = &g.texts[bi[0]];
+    assert!(br.height == 4.0 && br.pos[0] < l.xs[0] + 3.0);
     assert!(l.ys[2] - l.ys[3] > l.ys[3] - l.ys[4]);
     let four = g.texts.iter().find(|x| x.text == "4").unwrap();
     assert!(four.pos[0] > (l.xs[2] + l.xs[3]) / 2.0, "right aligned");
@@ -1700,6 +1702,11 @@ fn datum_on_gdt_frame_follows_it() {
     assert!((t[0] - mid[0] - 3.0).abs() < 1e-6 && (t[1] - y + 15.0).abs() < 1e-6, "{t:?}");
     let tri = tri.unwrap();
     assert!(tri.iter().filter(|p| (p[1] - y).abs() < 1e-6).count() == 2 && tri.iter().all(|p| (p[0] - mid[0] - 3.0).abs() < 3.0), "{tri:?}");
+    // The leader stops at the box's top edge (it doesn't cross the box).
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let dpick = built.picks.iter().position(|p| *p == PickTarget::Annotation(gid + 1)).unwrap() as u32;
+    let leader = built.geometry.lines.iter().find(|l| l.pick == dpick && !l.closed && l.points.len() == 2).unwrap();
+    assert!(leader.points.iter().all(|p| p[1] > t[1] + 3.5 - 1e-6), "{:?}", leader.points);
     // Moving the frame moves the datum with it.
     let g = drawing.sheets[0].annotations.iter_mut().find(|a| a.id == gid).unwrap();
     g.position = [50.0, 50.0];
@@ -1708,4 +1715,142 @@ fn datum_on_gdt_frame_follows_it() {
     }
     let (t, _) = at(&drawing);
     assert!((t[0] - mid[0] - 13.0).abs() < 1e-6 && (t[1] - y + 5.0).abs() < 1e-6, "{t:?}");
+}
+
+#[test]
+fn datum_on_dimension_arrow_hides_it() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    // A dimension whose line ends at an arrowhead tip.
+    let mut found = None;
+    'outer: for a in drawing.sheets[0].annotations.iter().filter(|a| a.kind.is_dimension()) {
+        let Some(pick) = built.picks.iter().position(|p| *p == PickTarget::Annotation(a.id)) else { continue };
+        let lines: Vec<_> = built.geometry.lines.iter().filter(|l| l.pick == pick as u32).collect();
+        for f in built.geometry.fills.iter().filter(|f| f.points.len() == 3) {
+            for (li, l) in lines.iter().enumerate() {
+                for seg in 0..l.points.len().saturating_sub(1) {
+                    for (t, p) in [(0.0, l.points[seg]), (1.0, l.points[seg + 1])] {
+                        if f.points.iter().any(|q| (q[0] - p[0]).abs() < 1e-6 && (q[1] - p[1]).abs() < 1e-6) {
+                            found = Some((a.id, li as u32, seg as u32, t, p, f.points.clone()));
+                            break 'outer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let (ann, line, seg, t, tip, arrow) = found.expect("a dimension with an arrowhead");
+    let id = drawing.sheets[0].next_annotation_id();
+    let on = DatumOn { ann, line, seg, t };
+    drawing.sheets[0].annotations.push(Annotation { id, kind: AnnotationKind::Datum { anchor: tip, label: "Q".into(), on: Some(on) }, position: [tip[0], tip[1] - 15.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(!built.geometry.fills.iter().any(|f| f.points == arrow), "the covered arrowhead is still drawn");
+}
+
+#[test]
+fn noto_sans_metrics_and_general_cell_defaults() {
+    // Sheet text is laid out in Noto Sans (Onshape's "Noto Sans ( Note )").
+    let h = font::text_width("H", 1.0);
+    assert!(h > 0.9 && h < 1.2, "H advance {h}");
+    assert!(font::text_width("iiii", 3.5) < font::text_width("MMMM", 3.5) / 2.0);
+    // GD&T symbols keep their stroke glyph's advance.
+    assert!(font::text_width("⌖", 3.5) > 0.0);
+    // General tables: header cells bold and centred, body cells left (live 744–750).
+    let cells = vec![vec!["H".into(), "".into()], vec!["a\nx".into(), "b".into()]];
+    let mut t = Table::new(1, TableKind::General { cells, title: None, header: true }, [300.0, 200.0]);
+    assert_eq!((t.shown_cell_format(0, 1).bold, t.shown_cell_format(0, 1).align), (true, CellAlign::Center));
+    assert_eq!((t.shown_cell_format(1, 0).bold, t.shown_cell_format(1, 0).align), (false, CellAlign::Left));
+    t.set_cell_format(1, 0, CellFormat { align: CellAlign::Center, ..Default::default() });
+    assert_eq!(t.shown_cell_format(1, 0).align, CellAlign::Center, "centre differs from a body cell's default");
+    t.set_cell_format(1, 1, CellFormat { italic: true, underline: true, valign: CellVAlign::Top, ..t.shown_cell_format(1, 1) });
+    let d = tables::table_data(&Drawing::default(), &t, None, None, None, &[], &|s| s.to_string());
+    let l = tables::layout(&t, &d);
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    tables::render(&mut g, &t, &d, &l, 1);
+    let i = g.texts.iter().position(|x| x.text == "b").unwrap();
+    assert!(g.text_font(i).is_some_and(|f| f.italic && !f.bold));
+    let b = &g.texts[i];
+    // Top aligned (the row is two lines tall): above the row's middle; underlined.
+    assert!(b.pos[1] + b.height / 2.0 > (l.ys[1] + l.ys[2]) / 2.0 + 0.1);
+    assert!(g.lines.iter().any(|ln| ln.points.len() == 2 && (ln.points[0][1] - ln.points[1][1]).abs() < 1e-9 && ln.points[0][1] < b.pos[1] && ln.points[0][0] >= l.xs[1] - 1e-9));
+}
+
+#[test]
+fn assembly_views_display_state_and_follow_parent() {
+    let (mut doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    if let Some(TabContent::Assembly(a)) = doc.tabs.iter_mut().find(|t| t.id == asm).map(|t| &mut t.content) {
+        let first = a.instances[0].id;
+        a.display_states.push(crate::assembly::DisplayState { name: "hide1".into(), hidden_instances: vec![first], hidden_features: vec![], known: vec![] });
+        // Hidden in the assembly right now: Show all still shows it.
+        a.instances[0].hidden = true;
+    }
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Front, [120.0, 150.0]));
+    drawing.sheets[0].views.push(DrawingView { id: ViewId(2), kind: ViewKind::Projected { parent: ViewId(1), direction: Some([0.0, 1.0]) }, position: [120.0, 230.0], ..Default::default() });
+    let sources = regenerate_sources(&doc, &drawing);
+    let all = sources[&views::SourceKey::studio(asm)].context.bodies.len();
+    assert!(all >= 2, "{all}");
+    // A child with its own display state; the base keeps Show all.
+    drawing.sheets[0].views[1].own_display = Some(DisplayChoice::State("hide1".into()));
+    let sources = regenerate_sources(&doc, &drawing);
+    let (k, _) = views::view_source(&drawing.sheets[0], ViewId(2)).unwrap();
+    assert_eq!(k.display.as_deref(), Some("hide1"));
+    assert!(sources[&k].context.bodies.len() < all);
+    assert!(views::view_source(&drawing.sheets[0], ViewId(1)).unwrap().0.display.is_none());
+    // Follow parent: a display state deleted from the assembly can't be resolved.
+    drawing.sheets[0].views[0].display_state = Some("gone".into());
+    drawing.sheets[0].views[1].own_display = None;
+    let sources = regenerate_sources(&doc, &drawing);
+    let (k, _) = views::view_source(&drawing.sheets[0], ViewId(2)).unwrap();
+    assert_eq!(k.display.as_deref(), Some("gone"));
+    assert!(!sources.contains_key(&k));
+}
+
+#[test]
+fn mbd_datum_goes_to_the_edge_on_view_and_can_be_hidden() {
+    let (mut doc, _) = demo();
+    let ps = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap().id;
+    // The plate's top face: find its height from the regenerated bodies.
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Front, [100.0, 100.0]));
+    drawing.sheets[0].views.push(base_view(2, ps, ViewOrientation::Top, [100.0, 200.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let src = &sources[&views::SourceKey::studio(ps)];
+    let bb = src.context.bodies.iter().fold(None::<(glam::DVec3, glam::DVec3)>, |acc, b| {
+        let bb = b.shape.bounding_box(true).ok()?;
+        let (lo, hi) = (bb.min, bb.max);
+        Some(match acc {
+            None => (lo, hi),
+            Some((a, c)) => (a.min(lo), c.max(hi)),
+        })
+    });
+    let (lo, hi) = bb.unwrap();
+    let top = [(lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0, hi.z];
+    if let Some(TabContent::PartStudio(p)) = doc.tabs.iter_mut().find(|t| t.id == ps).map(|t| &mut t.content) {
+        p.annotations.push(crate::annotations::Annotation { id: 1, kind: crate::annotations::AnnotationKind::Datum { letter: "A".into() }, face: crate::reference::Reference::Origin, at: top, normal: [0.0, 0.0, 1.0], up: [0.0, 1.0, 0.0], offset: None });
+    }
+    mbd::place_model_datums(&mut drawing, &doc);
+    let placed: Vec<_> = drawing.sheets[0].annotations.iter().filter_map(|a| a.model.clone()).collect();
+    assert_eq!(placed.len(), 1);
+    assert_eq!(placed[0].view, ViewId(1), "the top face is edge-on in the Front view");
+    // Drawn on the Front view's top edge, the box above it.
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let t = built.geometry.texts.iter().find(|t| t.text == "A" && t.pos[1] > 100.0 && t.pos[1] < 160.0).expect("datum letter near the front view");
+    let pl = built.placements.iter().find(|p| p.id == ViewId(1)).unwrap();
+    assert!(t.pos[1] > pl.max[1] - 1e-6, "box above the top edge: {:?} vs {:?}", t.pos, pl.max);
+    assert!(mbd::mbd_rows(&drawing, &doc, None).iter().all(|r| r.visible));
+    // Delete = hide; Show brings it back.
+    for a in drawing.sheets[0].annotations.iter_mut() {
+        if let Some(m) = &mut a.model {
+            m.hidden = true;
+        }
+    }
+    assert!(mbd::mbd_rows(&drawing, &doc, None).iter().all(|r| !r.visible));
+    assert_eq!(drawing.show_model_annotation(ps, 1), Some(true));
+    assert!(mbd::mbd_rows(&drawing, &doc, None).iter().all(|r| r.visible));
 }

@@ -446,7 +446,8 @@ impl Render for VariableStudioView {
             // Live (qa4 10-20): a bare number gets the workspace unit of a Length
             // / Angle variable ("5" → "5 mm"), as in the Part Studio table.
             let cell_units = units;
-            let expr = self.cell(format!("e{i}"), v.expr.text.clone(), window, cx, move |this, val, cx| {
+            // Shown in the user's decimal separator (stored canonically).
+            let expr = self.cell(format!("e{i}"), noshape_units::localize(&v.expr.text), window, cx, move |this, val, cx| {
                 this.edit("Edit variable", cx, |s| {
                     if let Some(v) = s.variables.get_mut(i) {
                         let kind = match v.kind {

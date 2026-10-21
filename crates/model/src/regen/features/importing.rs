@@ -172,7 +172,9 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     let mut tools = Vec::new();
     // Per tool: its name, colour and faces' colours (sub-shapes of it).
     let mut looks: Vec<Look> = Vec::new();
-    let mut wires: Vec<(k::Shape, Look)> = Vec::new();
+    // Wire bodies, each with the number of tools before it in the file (a
+    // native assembly's thread curves come before their part, live G41).
+    let mut wires: Vec<(usize, k::Shape, Look)> = Vec::new();
     // Mesh imports (STL, OBJ, PVZ; Onshape G22/G27): per part, its closed
     // pieces make a mesh part; the open pieces of a part whose mesh doesn't
     // close become surfaces grouped in a closed composite part.
@@ -201,7 +203,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             if p.count(ShapeType::Face) == 0 {
                 // Wire bodies come in as curves ("Curve 1", live G38/G38d).
                 if p.count(ShapeType::Edge) > 0 {
-                    wires.push((p, Look { name: part.name.clone(), color: part.color, opacity: part.opacity, faces: Vec::new() }));
+                    wires.push((tools.len(), p, Look { name: part.name.clone(), color: part.color, opacity: part.opacity, faces: Vec::new() }));
                 }
                 continue;
             }
@@ -242,7 +244,16 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         }
         Ok(())
     };
-    for (p, look) in tools.into_iter().zip(looks) {
+    // In the file's order: each wire before the tool that followed it.
+    let mut wires = wires.into_iter().peekable();
+    for (ti, (p, look)) in tools.into_iter().zip(looks).enumerate() {
+        while let Some((_, w, wl)) = wires.next_if(|(at, _, _)| *at <= ti) {
+            let before = ev.ctx.bodies.len();
+            add(ev, w, BodyKind::Wire)?;
+            for bi in before..ev.ctx.bodies.len() {
+                apply_look(ev, bi, &wl, appearances);
+            }
+        }
         let kind = if p.count(ShapeType::Solid) > 0 { BodyKind::Solid } else { BodyKind::Surface };
         let before = ev.ctx.bodies.len();
         add(ev, p, kind)?;
@@ -250,7 +261,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
             apply_look(ev, bi, &look, appearances);
         }
     }
-    for (p, look) in wires {
+    for (_, p, look) in wires {
         let before = ev.ctx.bodies.len();
         add(ev, p, BodyKind::Wire)?;
         for bi in before..ev.ctx.bodies.len() {

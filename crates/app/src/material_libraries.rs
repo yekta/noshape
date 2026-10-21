@@ -42,6 +42,26 @@ pub fn set_added(list: &[AddedLibrary]) {
     let _ = std::fs::write(prefs_path(), serde_json::to_vec_pretty(list).unwrap_or_default());
 }
 
+fn onshape_removed_path() -> PathBuf {
+    crate::files::config_dir().join("material_library_onshape_removed")
+}
+
+/// Whether the Onshape Material Library is listed (Preferences › Material
+/// libraries can remove it too, live prefs/05; Add material library… →
+/// Onshape brings it back).
+pub fn onshape_listed() -> bool {
+    !onshape_removed_path().exists()
+}
+
+pub fn set_onshape_listed(on: bool) {
+    let p = onshape_removed_path();
+    if on {
+        let _ = std::fs::remove_file(p);
+    } else {
+        let _ = std::fs::write(p, b"");
+    }
+}
+
 /// The materials of an added library (its document's current state).
 pub fn materials_of(lib: &AddedLibrary) -> MaterialLibrary {
     (|| -> anyhow::Result<MaterialLibrary> {
@@ -202,12 +222,15 @@ impl Render for AddLibraryDialog {
                     .child(div().when(!can_add, |d| d.opacity(0.4)).child(os::primary_button("matlib-add", "Add").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         let Some(i) = this.selected else { return };
                         let Some(r) = this.rows().get(i).cloned() else { return };
-                        if let Some(l) = &r {
-                            let mut list = added();
-                            if !list.contains(l) {
-                                list.push(l.clone());
-                                set_added(&list);
+                        match &r {
+                            Some(l) => {
+                                let mut list = added();
+                                if !list.contains(l) {
+                                    list.push(l.clone());
+                                    set_added(&list);
+                                }
                             }
+                            None => set_onshape_listed(true),
                         }
                         let f = this.on_add.clone();
                         window.close_dialog(cx);

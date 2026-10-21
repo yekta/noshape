@@ -91,7 +91,8 @@ Agents run on different accounts through Motile (`list_accounts` / `start_agent`
 | asb: drawing behaviour | 60ec2ad1-134a-4423-ac7a-cf0af0d24763 | Unbind / Opus 5.5 (moved 21:15 from Motile 330203cf) | :104, target-behave | `docs/handoff/drawing-behaviour.md` |
 | qa3: user-level QA after the restyle (finished; findings forwarded) | 212b596b-0639-475a-87aa-543ce8f4d12d | Unbind / Opus 5.5 | - | `docs/handoff/qa-round-3.md` |
 | kern: kernel robustness + import/export | 1d8d27a8-3e1e-408a-9059-12bf7ecef977 | Yekta / Opus 5.5 | :106, target-engine | `docs/handoff/kernel-robustness.md` |
-| api: agent API — CLI + MCP server (all app features usable by agents) | d1f2526f-a1b9-4456-aa94-d3414dfd6cfb | Stablecog / Opus 5.5 (moved 21:25 from Motile a96efc40) | target-engine | `docs/handoff/agent-api.md` |
+| api: agent API — CLI + MCP server (all app features usable by agents) | 795820ea-9646-44ea-876d-f0d78071221d | Motile / Opus 5.5 (moved 00:20 from Stablecog d1f2526f) | target-engine | `docs/handoff/agent-api.md` |
+| icons2: icon parity, every icon matching Onshape at 1×/2× as our own redrawn artwork | 4ddbc863-ac67-443b-ac43-5988915eec70 | Yekta / Opus 5.5 | :115, target-shared | `docs/handoff/icons2.md` |
 | perf: viewport performance (60/120 fps at Retina; zero-copy presentation) | b16dc34d-5789-4fb1-b97d-de6fd94b84c8 | Unbind / Opus 5.5 | :113, target-engine | `docs/handoff/viewport-performance.md` |
 | fs: FeatureScript language + std library (resumed 08:20; first: green tests + model clippy) | 80461700-2f11-4bd2-afd0-170152385f77 | Ngyekta / Opus 5.5 | :108, target-engine | `docs/handoff/featurescript.md` |
 

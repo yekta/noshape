@@ -50,6 +50,18 @@ impl DrawingEditor {
         if i == self.sheet {
             return;
         }
+        // Onshape: a sheet switch is an undoable change (Undo goes back to
+        // the previous sheet).
+        if self.drawing.active_sheet != i {
+            self.sheet = i;
+            let d = self.drawing.clone();
+            self.commit("Switch sheet", d, cx);
+        }
+        self.show_sheet(i, cx);
+    }
+
+    /// Show sheet `i` (no undo entry: undo / redo and reloads).
+    pub(crate) fn show_sheet(&mut self, i: usize, cx: &mut Context<Self>) {
         self.sheet = i;
         self.selection.clear();
         self.tool = Tool::Select;
@@ -94,15 +106,14 @@ impl DrawingEditor {
         let mv = |label: &'static str, to: usize| {
             MenuEntry::item(label, move |t, _, cx| {
                 let cur = t.sheet;
-                t.edit("Move sheet", cx, |d| {
-                    d.move_sheet(i, to);
-                });
                 if cur == i {
                     t.sheet = to;
                 } else if cur == to {
                     t.sheet = i;
                 }
-                t.refresh(cx);
+                t.edit("Move sheet", cx, |d| {
+                    d.move_sheet(i, to);
+                });
             })
         };
         if n > 1 {
@@ -183,7 +194,19 @@ impl DrawingEditor {
         } else if !self.sheet_rows.contains(&i) {
             self.sheet_rows.push(i);
         }
-        let entries = if self.sheet_rows.len() > 1 { self.sheet_multi_entries(self.sheet_rows.clone(), cx) } else { self.sheet_entries(i, cx) };
+        // Imported sheets (live drawing/951): Model has no menu; a locked R12
+        // paper space only Rename… · Duplicate · Paste · Copy, greyed.
+        let imported = self.drawing.sheets.get(i).and_then(|s| s.imported.clone());
+        if imported.as_ref().is_some_and(|m| m.model) {
+            return;
+        }
+        let entries = if imported.as_ref().is_some_and(|m| m.locked) {
+            ["Rename...", "Duplicate", "Paste", "Copy"].into_iter().map(|l| MenuEntry::item(l, |_, _, _| {}).disabled(true)).collect()
+        } else if self.sheet_rows.len() > 1 {
+            self.sheet_multi_entries(self.sheet_rows.clone(), cx)
+        } else {
+            self.sheet_entries(i, cx)
+        };
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
@@ -347,12 +370,15 @@ impl DrawingEditor {
 
     fn sheet_view_row(&self, sheet: &Sheet, v: &DrawingView, indent: f32, cx: &mut Context<Self>) -> AnyElement {
         // Derived views nest under their parent (20 px per level).
+        // A view linked to a parent on another sheet sits at the top level
+        // with an ↗ badge on its icon (live drawing/1040).
         let mut depth = 0;
         let mut cur = v.id;
-        while let Some(p) = sheet.parent_of(cur) {
+        while let Some(p) = sheet.parent_of(cur).filter(|p| !p.is_ghost()) {
             depth += 1;
             cur = p;
         }
+        let linked = sheet.linked_parent(v.id).is_some();
         let named = |fallback: String| v.name.clone().unwrap_or(fallback);
         let (label, icon) = match &v.kind {
             // Onshape lists views by name: "Front", and projected views by the
@@ -369,7 +395,12 @@ impl DrawingEditor {
         crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), false)
             .pl(px(indent + 20. * depth as f32))
             .text_color(rgb(0x666666))
-            .child(crate::ui::tree_icon(icon, false, cx))
+            .child(
+                div()
+                    .relative()
+                    .child(crate::ui::tree_icon(icon, false, cx))
+                    .when(linked, |d| d.opacity(0.6).child(div().absolute().top(px(-4.)).right(px(-3.)).text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0x000000)).child("↗"))),
+            )
             .child(div().flex_1().truncate().child(label))
             // Onshape's view row menu (live dom/context-menus-drawing-sheets.txt):
             // Properties... | Replace... (the view's reference) | Delete.
@@ -458,6 +489,9 @@ impl DrawingEditor {
                     .when(!active, |d| d.hover(|d| d.bg(rgb(0xd0d0d0))))
                     .child(s.name.clone())
                     .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                        if this.drawing.sheets.get(i).and_then(|s| s.imported.as_ref()).is_some_and(|m| m.locked) {
+                            return;
+                        }
                         if e.click_count() >= 2 {
                             this.open_sheet_name_panel(i, window, cx);
                         } else {
@@ -534,6 +568,9 @@ impl DrawingEditor {
         let si = self.sheet;
         let by_ref = self.sheets_by_ref;
         let mut list = gpui_kit::component::v_flex().id("dr-sheets").flex_1().min_h_0().pt(px(2.)).overflow_y_scroll();
+        // Sheets before `i` that are an imported model space (not numbered).
+        let models: Vec<bool> = self.drawing.sheets.iter().map(|s| s.imported.as_ref().is_some_and(|m| m.model)).collect();
+        let model_before = move |i: usize| models[..i.min(models.len())].iter().filter(|m| **m).count();
         let sheet_row = |i: usize, s: &Sheet, active: bool, selected: bool, cx: &mut Context<Self>| {
             crate::ui::tree_row(("dr-sheet-tab", i), selected && !active)
                 .relative()
@@ -543,14 +580,26 @@ impl DrawingEditor {
                 .when(active, |d| d.bg(rgb(0xe9eef2)).text_color(blue).font_weight(FontWeight::SEMIBOLD).border_b_1().border_color(rgb(0x90cef1)))
                 .child(crate::ui::caret(active))
                 .child(div().w(px(20.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon("sheet-page", 18., cx)))
-                // Live: "Sheet2 (2)" = the name and the sheet's position.
-                .child(div().flex_1().truncate().child(format!("{} ({})", s.name, i + 1)))
+                // Live: "Sheet2 (2)" = the name and the sheet's position; an
+                // imported model space is "Model" (unnumbered, the layouts count
+                // from 1 after it) and a locked R12 paper space is grey.
+                .child(div().flex_1().truncate().child(match &s.imported {
+                    Some(m) if m.model => s.name.clone(),
+                    _ => format!("{} ({})", s.name, i + 1 - model_before(i)),
+                }))
+                .when(s.imported.as_ref().is_some_and(|m| m.locked), |d| d.text_color(rgb(0x666666)))
                 .when(active, |d| d.child(div().absolute().left(px(3.)).top_0().bottom_0().w(px(4.)).bg(blue)))
                 // Live: a click selects the row (Ctrl+click adds), a
                 // double-click makes the sheet active.
-                .on_click(cx.listener(move |this, e: &ClickEvent, _, cx| {
+                .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                     let m = e.modifiers();
-                    if e.click_count() >= 2 {
+                    let imported = this.drawing.sheets.get(i).and_then(|s| s.imported.clone());
+                    if e.click_count() >= 2 && imported.as_ref().is_some_and(|m| m.locked) {
+                        // A locked paper space can't be opened.
+                    } else if e.click_count() >= 2 && i == this.sheet && imported.as_ref().is_some_and(|m| m.model) {
+                        // Live drawing/970: the active Model's Sheet properties (Size only).
+                        this.open_sheet_props(i, window, cx);
+                    } else if e.click_count() >= 2 {
                         this.sheet_rows = vec![i];
                         this.switch_sheet(i, cx);
                     } else if m.control || m.platform {
@@ -610,7 +659,7 @@ impl DrawingEditor {
         // (reference, views) groups of a sheet, in first-view order.
         let groups = |this: &Self, s: &Sheet, cx: &App| {
             let mut g: Vec<(String, Vec<DrawingView>)> = Vec::new();
-            for v in &s.views {
+            for v in s.real_views() {
                 let r = this.view_reference(s, v.id, cx);
                 match g.iter_mut().find(|(n, _)| *n == r) {
                     Some((_, vs)) => vs.push(v.clone()),
@@ -1188,6 +1237,10 @@ impl DrawingEditor {
             return None;
         }
         let [Sel::Annotation(id)] = self.selection.as_slice() else { return None };
+        // None while the note is edited in place (live 225).
+        if self.inplace_hidden == Some(*id) {
+            return None;
+        }
         let a = self.current_sheet().annotations.iter().find(|a| a.id == *id)?;
         let (b, angle) = note_box(a)?;
         let AnnotationKind::Note { style, .. } = &a.kind else { return None };
@@ -1357,7 +1410,8 @@ impl DrawingEditor {
                     }
                     _ => {
                         let ang = |p: [f64; 2]| (p[1] - mid[1]).atan2(p[0] - mid[0]);
-                        style.angle = angle + ang(c) - ang(*start);
+                        // Whole degrees, as the live angle readout ("335deg").
+                        style.angle = (angle + ang(c) - ang(*start)).to_degrees().round().to_radians();
                     }
                 }
             }
@@ -1535,12 +1589,54 @@ impl DrawingEditor {
                     }
                 }
                 Some(TabContent::Assembly(asm)) => {
-                    let cur = root.explode;
-                    let mut ex = vec![MenuEntry::check("Not exploded", cur.is_none(), move |t, _, cx| t.edit_view("Exploded view", rid, cx, |v| v.explode = None))];
-                    for (i, e) in asm.exploded_views.iter().enumerate() {
-                        ex.push(MenuEntry::check(e.name.clone(), cur == Some(i), move |t, _, cx| t.edit_view("Exploded view", rid, cx, |v| v.explode = Some(i))));
+                    // Live drawing/1109: Explode/Position ▸ Default | explodes |
+                    // positions, Display state ▸ Show all | states; the current
+                    // one greyed. A child view gets its own choice.
+                    let key = noshape_model::drawing::views::view_source(sheet, id).map(|k| k.0);
+                    let cur = match key.as_ref().map(|k| (k.explode, k.position)) {
+                        Some((Some(e), _)) => AsmPosition::Explode(e),
+                        Some((None, Some(p))) => AsmPosition::Position(p),
+                        _ => AsmPosition::Default,
+                    };
+                    // Section and detail views always follow their parent (help H:view_context_menu).
+                    let target = if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. } | ViewKind::Detail { .. }) { rid } else { id };
+                    let is_root = rid == target;
+                    let mut ex = Vec::new();
+                    let mut last_group = 0;
+                    for (name, p) in crate::drawing_insert::asm_positions(asm) {
+                        let group = match p {
+                            AsmPosition::Default => 0,
+                            AsmPosition::Explode(_) => 1,
+                            AsmPosition::Position(_) => 2,
+                        };
+                        if group != last_group {
+                            ex.push(MenuEntry::Separator);
+                            last_group = group;
+                        }
+                        ex.push(
+                            MenuEntry::item(name, move |t, _, cx| {
+                                t.edit_view("Explode/Position", target, cx, |v| if is_root { v.set_asm_position(p) } else { v.own_position = Some(p) })
+                            })
+                            .disabled(p == cur),
+                        );
                     }
                     out.push(MenuEntry::Submenu("Exploded view".into(), ex));
+                    let cur_d = key.and_then(|k| k.display);
+                    let mut ds = vec![
+                        MenuEntry::item("Show all", move |t, _, cx| t.edit_view("Display state", target, cx, |v| if is_root { v.display_state = None } else { v.own_display = Some(DisplayChoice::ShowAll) }))
+                            .disabled(cur_d.is_none()),
+                    ];
+                    for d in &asm.display_states {
+                        let n = d.name.clone();
+                        ds.push(
+                            MenuEntry::item(d.name.clone(), move |t, _, cx| {
+                                let n = n.clone();
+                                t.edit_view("Display state", target, cx, |v| if is_root { v.display_state = Some(n) } else { v.own_display = Some(DisplayChoice::State(n)) })
+                            })
+                            .disabled(cur_d.as_ref() == Some(&d.name)),
+                        );
+                    }
+                    out.push(MenuEntry::Submenu("Display state".into(), ds));
                     out.push(MenuEntry::item("Insert BOM table", move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Bom, view: Some(id), origin: None }, cx)));
                 }
                 _ => {}
@@ -1772,13 +1868,76 @@ impl DrawingEditor {
         let nrows = cells.len().max(1);
         let at = (row * ncols + col) as i64 + if step == 2 { ncols as i64 } else { step as i64 };
         if at < 0 || at >= (nrows * ncols) as i64 {
+            // Live 752: editing ends with nothing selected.
+            self.selection.clear();
             return;
         }
         let (r, c) = (at as usize / ncols, at as usize % ncols);
         let text = cells.get(r).and_then(|x| x.get(c)).cloned().unwrap_or_default();
         let input = self.textarea(&text, 3, window, cx);
-        self.panel = Some(Panel::Cell { table, row: r, col: c, input });
+        let note = self.cell_note(table, r, c, window, cx);
+        self.panel = Some(Panel::Cell { table, row: r, col: c, input, note });
         cx.notify();
+    }
+
+    /// The Note panel style of a general table cell, from its format.
+    pub fn cell_note(&mut self, table: u64, row: usize, col: usize, window: &mut Window, cx: &mut Context<Self>) -> Option<Box<CellNote>> {
+        use noshape_model::drawing::note::{NoteAlign, NoteStyle, NoteVAlign};
+        use noshape_model::drawing::{CellAlign, CellVAlign};
+        let t = self.current_sheet().table(table)?;
+        if !matches!(t.kind, TableKind::General { .. }) {
+            return None;
+        }
+        let f = t.shown_cell_format(row, col);
+        let h = f.height.filter(|v| *v > 0.0).unwrap_or(t.text_height);
+        let style = NoteStyle {
+            font: (f.bold || f.italic).then(|| noshape_model::drawing::sheet::TextFont { family: noshape_model::drawing::font::DEFAULT_FAMILY.into(), bold: f.bold, italic: f.italic }),
+            underline: f.underline,
+            strikethrough: f.strikethrough,
+            align: match f.align {
+                CellAlign::Left => NoteAlign::Left,
+                CellAlign::Center => NoteAlign::Center,
+                CellAlign::Right => NoteAlign::Right,
+            },
+            valign: match f.valign {
+                CellVAlign::Top => NoteVAlign::Top,
+                CellVAlign::Middle => NoteVAlign::Middle,
+                CellVAlign::Bottom => NoteVAlign::Bottom,
+            },
+            ..Default::default()
+        };
+        let height = self.input(&format!("{} mm", format::format_number(h, None, 2)), window, cx);
+        Some(Box::new(CellNote { style, height }))
+    }
+
+    /// The cell format the Note panel of a general table cell sets.
+    fn cell_note_format(t: &noshape_model::drawing::Table, row: usize, col: usize, note: &CellNote, cx: &App) -> noshape_model::drawing::CellFormat {
+        use noshape_model::drawing::note::{NoteAlign, NoteVAlign};
+        use noshape_model::drawing::{CellAlign, CellVAlign};
+        let st = &note.style;
+        let h = note.height.read(cx).value().trim().trim_end_matches("mm").trim().parse::<f64>().ok().filter(|v| *v > 0.1);
+        let (bold, italic) = st.font.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
+        noshape_model::drawing::CellFormat {
+            align: match st.align {
+                NoteAlign::Left | NoteAlign::Justified => CellAlign::Left,
+                NoteAlign::Center => CellAlign::Center,
+                NoteAlign::Right => CellAlign::Right,
+            },
+            valign: match st.valign {
+                NoteVAlign::Top => CellVAlign::Top,
+                NoteVAlign::Middle => CellVAlign::Middle,
+                NoteVAlign::Bottom => CellVAlign::Bottom,
+            },
+            height: match h {
+                Some(h) if (h - t.text_height).abs() > 1e-6 => Some(h),
+                Some(_) => None,
+                None => t.shown_cell_format(row, col).height,
+            },
+            bold,
+            italic,
+            underline: st.underline,
+            strikethrough: st.strikethrough,
+        }
     }
 
     pub fn open_cell_panel(&mut self, table: u64, window: &mut Window, cx: &mut Context<Self>) {
@@ -1803,7 +1962,15 @@ impl DrawingEditor {
         let (row, col) = self.built.as_ref().and_then(|b| b.table_layout(table)).and_then(|l| l.cell_at(self.cursor)).map(|(r, c)| t.anchor_cell(r, c)).unwrap_or((0, 0));
         let text = cells.get(row).and_then(|r| r.get(col)).cloned().unwrap_or_default();
         let input = self.textarea(&text, 3, window, cx);
-        self.panel = Some(Panel::Cell { table, row, col, input });
+        let note = self.cell_note(table, row, col, window, cx);
+        // Live 755 / 756: a general table cell is edited with the table
+        // unselected and the caret where it was clicked.
+        if note.is_some() {
+            self.selection.clear();
+            let at = self.cell_click_offset(table, row, col, &text);
+            input.update(cx, |s, cx| s.set_selected_range(at..at, cx));
+        }
+        self.panel = Some(Panel::Cell { table, row, col, input, note });
         cx.notify();
     }
 
@@ -1858,6 +2025,8 @@ impl DrawingEditor {
             }
             AnnotationKind::Balloon { .. } => self.open_callout_edit(a.id, window, cx),
             AnnotationKind::HoleCallout { .. } => self.open_hole_callout(a.id, window, cx),
+            // A dimension on sketch geometry: its value box (live drawing/921).
+            k if k.is_dimension() && a.sketch_dim.is_some() => self.open_sketch_dim_box(a.id, window, cx),
             k if k.is_dimension() => self.open_dim_palette(a.id, window, cx),
             _ => self.open_more_panel(&a, window, cx),
         }
@@ -1924,13 +2093,17 @@ impl DrawingEditor {
                 Ok(deg) => self.edit_view("Rotate view", view, cx, |v| v.rotation = deg.to_radians()),
                 Err(_) => self.status = Some("Invalid angle".into()),
             },
-            Panel::Cell { table, row, col, input } if self.current_sheet().table(table).is_some_and(|t| matches!(t.kind, TableKind::Revision { .. })) => {
+            Panel::Cell { table, row, col, input, .. } if self.current_sheet().table(table).is_some_and(|t| matches!(t.kind, TableKind::Revision { .. })) => {
                 let text = input.read(cx).value().to_string();
                 self.apply_revision_cell(table, row, col, text, cx);
             }
-            Panel::Cell { table, row, col, input } => {
+            Panel::Cell { table, row, col, input, note } => {
                 let text = input.read(cx).value().to_string();
+                let format = note.as_ref().and_then(|n| self.current_sheet().table(table).map(|t| Self::cell_note_format(t, row, col, n, cx)));
                 self.edit_table(table, "Edit cell", cx, |t| {
+                    if let Some(f) = format.clone() {
+                        t.set_cell_format(row, col, f);
+                    }
                     if let TableKind::General { cells, .. } = &mut t.kind {
                         while cells.len() <= row {
                             cells.push(vec![]);

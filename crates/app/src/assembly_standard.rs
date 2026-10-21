@@ -38,6 +38,9 @@ pub(crate) struct StdUi {
     pub editing: Option<Vec<InstanceId>>,
     /// `a` while inserting: the part is flipped on its mate connector.
     pub flip: bool,
+    /// Part number pencil (live skb/800): the panel's in-place edit of the
+    /// company/user wide part properties (Part number, Description).
+    pub props_edit: Option<(Entity<InputState>, Entity<InputState>)>,
     /// The two scroll groups (hierarchy, parameters).
     pub hier_scroll: ScrollHandle,
     pub param_scroll: ScrollHandle,
@@ -208,6 +211,13 @@ impl AssemblyView {
                 }
             }
         }
+        // Furthest onto a stack topped by a bolt is refused (live, behaviours
+        // "Standard content: … stacking").
+        if mode == Stack::Furthest && self.assembly(cx).is_some_and(|a| holes.iter().any(|h| stack_end(a, h).is_none())) {
+            self.message = Some((true, "Component on top of existing stack cannot accept additional top stack components.".into()));
+            cx.notify();
+            return;
+        }
         let flip = self.ui.std.flip;
         let base = spec.part_name();
         let ids = self.edit(&format!("Insert : {base}"), cx, |a| {
@@ -218,48 +228,36 @@ impl AssemblyView {
                 a.instances.push(Instance::new(id, name, InstanceSource::Standard { spec: spec.clone() }, Placement::default()));
                 ids.push(id);
             }
-            // Nuts and washers have a second connector on their top face.
-            let stacks = |a: &Assembly, id: InstanceId| a.instance(id).and_then(|i| i.source.standard()).and_then(standard::component).is_some_and(|c| !c.shape.has_length());
-            let same = |c: &MateConnectorRef, at: &MateConnectorRef| c.instance == at.instance && c.path == at.path && c.reference == at.reference && c.align == at.align;
-            // The fastened mate on connector `at` (its index, and whether `at` is its `b` side).
-            let held = |a: &Assembly, at: &MateConnectorRef| a.mates.iter().position(|m| !m.suppressed && m.mate_type == MateType::Fastened && (same(&m.b, at) || same(&m.a, at))).map(|k| (k, same(&a.mates[k].b, at)));
             for (id, hole) in ids.iter().zip(&holes) {
                 let mut src = MateConnectorRef::on(*id, vec![], standard::connector_reference(0));
                 src.flip = flip;
                 let top = MateConnectorRef::on(*id, vec![], standard::connector_reference(1));
-                let new_stacks = stacks(a, *id);
-                let mut at = hole.clone();
+                let fastened = |a: &mut Assembly, x: MateConnectorRef, y: MateConnectorRef| {
+                    let mid = MateId(a.next_id());
+                    let n = a.next_feature_name("Fastened");
+                    a.mates.push(Mate::new(mid, n, MateType::Fastened, x, y));
+                };
                 if mode == Stack::Furthest {
-                    // Walk out along the stack: past every nut and washer, to
-                    // the free face of the last one (or under a bolt's head).
-                    for _ in 0..32 {
-                        let Some((k, at_is_b)) = held(a, &at) else { break };
-                        let other = if at_is_b { a.mates[k].a.clone() } else { a.mates[k].b.clone() };
-                        if !stacks(a, other.instance) {
-                            break;
-                        }
-                        let next = if other.reference == standard::connector_reference(0) { 1 } else { 0 };
-                        at = MateConnectorRef::on(other.instance, other.path.clone(), standard::connector_reference(next));
-                    }
+                    let at = stack_end(a, hole).unwrap_or_else(|| hole.clone());
+                    fastened(a, src, at);
+                    continue;
                 }
-                // What sits where the new part goes moves onto its top face:
-                // closest / furthest anything, Insert a bolt (Onshape puts a
-                // washer or nut under the bolt head).
-                if new_stacks && let Some((k, at_is_b)) = held(a, &at) {
-                    let other = if at_is_b { &a.mates[k].a } else { &a.mates[k].b };
-                    let bolt = !stacks(a, other.instance);
-                    if mode != Stack::Plain || bolt {
+                // Closest (and Insert of a washer / nut into a hole holding a
+                // bolt): the part goes against the face. Live: the face's
+                // Fastened is re-pointed from what sat there to the new part,
+                // and a new Fastened joins the new part's top to it.
+                let under = held(a, hole).filter(|(k, at_is_b)| {
+                    let other = if *at_is_b { &a.mates[*k].a } else { &a.mates[*k].b };
+                    stacks(a, *id) && (mode == Stack::Closest || !stacks(a, other.instance))
+                });
+                match under {
+                    Some((k, at_is_b)) => {
                         let m = &mut a.mates[k];
-                        if at_is_b {
-                            m.b = top.clone();
-                        } else {
-                            m.a = top.clone();
-                        }
+                        let was = if at_is_b { std::mem::replace(&mut m.a, src) } else { std::mem::replace(&mut m.b, src) };
+                        fastened(a, top, was);
                     }
+                    None => fastened(a, src, hole.clone()),
                 }
-                let mid = MateId(a.next_id());
-                let n = a.next_feature_name("Fastened");
-                a.mates.push(Mate::new(mid, n, MateType::Fastened, src, at));
             }
             ids
         });
@@ -335,7 +333,8 @@ impl AssemblyView {
             .items_center()
             .pl(px(5.))
             .pr(px(6.))
-            .bg(gpui_kit::rgb(0xffffff))
+            // Live skb/800, 807: disabled selects are filled grey.
+            .bg(gpui_kit::rgb(if disabled { 0xeeeeee } else { 0xffffff }))
             .border_b_1()
             .border_color(gpui_kit::rgb(0xd7d7d7))
             .text_size(px(12.))
@@ -363,6 +362,10 @@ impl AssemblyView {
     /// where the Standard › Component pickers are greyed).
     pub(super) fn render_standard_content(&mut self, editing: bool, cx: &mut Context<Self>) -> AnyElement {
         let spec = self.std_spec();
+        // The pencil's edit mode locks every selector (live skb/800).
+        let props_edit = self.ui.std.props_edit.clone();
+        let locked = props_edit.is_some();
+        let props = std_props(&spec);
         // Live: rows of 12 px #333 labels in a 90 px column, 7 px in.
         let row = |name: &'static str, h: f32, field: AnyElement| h_flex().h(px(h)).flex_none().px(px(7.)).child(div().w(px(90.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x333333)).child(name)).child(field).into_any_element();
         let rule = || div().h(px(1.)).flex_none().bg(gpui_kit::rgb(0xd7d7d7)).into_any_element();
@@ -376,17 +379,17 @@ impl AssemblyView {
         let pickers: [fn(&mut AssemblyView, &str, &mut Context<AssemblyView>); 4] = [|t, v, cx| t.std_choose(0, v, cx), |t, v, cx| t.std_choose(1, v, cx), |t, v, cx| t.std_choose(2, v, cx), |t, v, cx| t.std_choose(3, v, cx)];
         let mut hierarchy = v_flex().id("std-hierarchy").h(px(105.)).flex_none().overflow_y_scroll().track_scroll(&self.ui.std.hier_scroll).on_scroll_wheel(cx.listener(|_, _: &ScrollWheelEvent, _, cx| cx.notify()));
         for ((id, name, cur, options), pick) in levels.into_iter().zip(pickers) {
-            hierarchy = hierarchy.child(row(name, 26.5, Self::std_select(id, 181., cur, options, editing, pick, cx)));
+            hierarchy = hierarchy.child(row(name, 26.5, Self::std_select(id, 181., cur, options, editing || locked, pick, cx)));
         }
         // Live: 106 px of rows in the 105 px group, so it scrolls a little
         // and shows its scrollbar.
-        hierarchy = hierarchy.child(div().h(px(1.5)).flex_none());
+        hierarchy = hierarchy.child(div().h(px(4.)).flex_none());
         let mut body = v_flex().child(div().relative().child(hierarchy).child(Self::std_scrollbar("std-hier-sb", &self.ui.std.hier_scroll, 105., cx))).child(rule());
         let Some(c) = standard::component(&spec) else { return body.into_any_element() };
         // Group 2 (114 px, scrolls): the component's parameters, 146 px selects.
         let mut params = v_flex().id("std-params").h(px(114.)).flex_none().overflow_y_scroll().track_scroll(&self.ui.std.param_scroll).on_scroll_wheel(cx.listener(|_, _: &ScrollWheelEvent, _, cx| cx.notify()));
         let sizes: Vec<String> = c.sizes.iter().map(|s| s.name.to_string()).collect();
-        let size_select = Self::std_select("std-size", 146., spec.size.clone(), sizes, false, |t, v, cx| t.std_edit_spec(cx, |s| s.set_size(v)), cx);
+        let size_select = Self::std_select("std-size", 146., spec.size.clone(), sizes, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.set_size(v)), cx);
         // Live: a 26 px borderless icon button 9 px right of the select.
         let auto = div()
             .id("std-auto-size-btn")
@@ -403,32 +406,45 @@ impl AssemblyView {
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_toggle_auto_size(cx)));
         let auto = crate::ui::with_rich_tooltip("std-auto-size", "Auto-size fastener", "Set the standard content diameter to a selected hole. 1. Select Auto-size. 2. Select a circular edge or cylindrical face on a part.", auto);
         params = params.child(row("Size", 27., h_flex().child(size_select).when(!editing, |d| d.child(auto)).into_any_element()));
+        // Live's per-component rows after Size: Drive type (socket heads),
+        // Series (ANSI washers), Bearing face (nuts).
+        if let Some(drive) = c.drive_type() {
+            params = params.child(row("Drive type", 27., Self::std_select("std-drive", 146., drive.into(), vec![drive.into()], locked, |_, _, _| {}, cx)));
+        }
+        if !c.series().is_empty() {
+            let options = c.series().iter().map(|s| s.to_string()).collect();
+            params = params.child(row("Series", 27., Self::std_select("std-series", 146., spec.series().to_string(), options, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.series = Some(v.to_string())), cx)));
+        }
+        if !c.bearing_faces().is_empty() {
+            let options = c.bearing_faces().iter().map(|s| s.to_string()).collect();
+            params = params.child(row("Bearing face", 27., Self::std_select("std-bearing", 146., spec.bearing_face().to_string(), options, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.bearing_face = Some(v.to_string())), cx)));
+        }
         if c.head_slot {
             let on = spec.slotted();
             params = params.child(row(
                 "Head slot",
                 27.,
-                crate::os_ui::checkbox("std-head-slot", "", on).pl(px(0.)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.std_edit_spec(cx, |s| s.head_slot = Some(!on)))).into_any_element(),
+                crate::os_ui::checkbox("std-head-slot", "", on).pl(px(0.)).when(locked, |d| d.opacity(0.5)).when(!locked, |d| d.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.std_edit_spec(cx, |s| s.head_slot = Some(!on))))).into_any_element(),
             ));
         }
         if let Some(size) = c.size(&spec.size)
             && c.shape.has_length()
         {
             let cur = spec.length.clone().unwrap_or_default();
-            params = params.child(row("Length", 27., Self::std_select("std-length", 146., cur.clone(), c.lengths(size), false, |t, v, cx| t.std_edit_spec(cx, |s| s.length = Some(v.to_string())), cx)));
+            params = params.child(row("Length", 27., Self::std_select("std-length", 146., cur.clone(), c.lengths(size), locked, |t, v, cx| t.std_edit_spec(cx, |s| s.length = Some(v.to_string())), cx)));
             if let Some(t) = c.thread_length(size, &cur) {
-                params = params.child(row("Thread length", 27., Self::std_select("std-thread", 146., t.clone(), vec![t], false, |_, _, _| {}, cx)));
+                params = params.child(row("Thread length", 27., Self::std_select("std-thread", 146., t.clone(), vec![t], locked, |_, _, _| {}, cx)));
             }
         }
         let materials: Vec<String> = standard::MATERIALS.iter().map(|s| s.to_string()).collect();
-        params = params.child(row("Material", 27., Self::std_select("std-material", 146., spec.material().to_string(), materials, false, |t, v, cx| t.std_edit_spec(cx, |s| s.material = Some(v.to_string())), cx)));
+        params = params.child(row("Material", 27., Self::std_select("std-material", 146., spec.material().to_string(), materials, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.material = Some(v.to_string())), cx)));
         let finishes: Vec<String> = standard::FINISHES.iter().map(|s| s.to_string()).collect();
-        params = params.child(row("Finish", 27., Self::std_select("std-finish", 146., spec.finish().to_string(), finishes, false, |t, v, cx| t.std_edit_spec(cx, |s| s.finish = Some(v.to_string())), cx)));
+        params = params.child(row("Finish", 27., Self::std_select("std-finish", 146., spec.finish().to_string(), finishes, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.finish = Some(v.to_string())), cx)));
         body = body.child(div().relative().child(params).child(Self::std_scrollbar("std-param-sb", &self.ui.std.param_scroll, 114., cx))).child(div().mt(px(5.)).child(rule()));
         // Part number / Description: read-only, 161 px, #eee on a #ccc underline.
         let readonly = |text: String| div().w(px(161.)).h(px(26.)).flex_none().flex().items_center().px(px(2.)).bg(gpui_kit::rgb(0xeeeeee)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).overflow_hidden().whitespace_nowrap().child(text);
-        let pencil = div()
-            .id("std-part-number-edit")
+        let small_button = |id: &'static str| div()
+            .id(id)
             .w(px(32.))
             .h(px(24.))
             .ml(px(3.))
@@ -439,18 +455,72 @@ impl AssemblyView {
             .border_1()
             .border_color(gpui_kit::rgb(0xaaaaaa))
             .rounded(px(3.5))
-            .child(crate::assets::icon(&icon_path("edit-pencil"), 20., cx))
-            .tooltip(crate::ui::tooltip("Edit company/user wide part properties for this configuration"));
-        body = body
-            .child(div().h(px(6.)))
-            .child(row("Part number", 27., h_flex().child(readonly(String::new())).child(pencil).into_any_element()))
-            .child(row("Description", 27., readonly(spec.description()).into_any_element()))
-            .child(div().mt(px(4.)).child(rule()));
+            .cursor_pointer()
+            .hover(|d| d.bg(gpui_kit::rgb(0xeeeeee)));
+        body = body.child(div().h(px(6.)));
+        if let Some((number, description)) = &props_edit {
+            // Live skb/800: both fields editable (white), ⟲ resets the
+            // Description, the note, then [Save] [Cancel].
+            let field = |st: &Entity<InputState>| {
+                gpui_kit::base::input::input_frame(div().w(px(161.)).h(px(26.)).flex_none().bg(gpui_kit::rgb(0xffffff)).border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(12.)), 25.))).into_any_element()
+            };
+            let reset = small_button("std-description-reset").child(crate::assets::icon(&icon_path("reset-default"), 18., cx)).tooltip(crate::ui::tooltip("Reset to default")).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                let d = this.std_spec().description();
+                if let Some((_, st)) = &this.ui.std.props_edit {
+                    st.update(cx, |st, cx| st.set_value(d, window, cx));
+                }
+            }));
+            let btn = |id: &'static str, label: &'static str| div().id(id).h(px(34.)).px(px(12.)).flex().items_center().bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0xaaaaaa)).rounded(px(5.25)).text_size(px(14.)).text_color(gpui_kit::rgb(0x333333)).cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xeeeeee))).child(label);
+            body = body
+                .child(row("Part number", 27., field(number)))
+                .child(row("Description", 27., h_flex().child(field(description)).child(reset).into_any_element()))
+                .child(div().mx(px(7.)).mt(px(6.)).py(px(6.)).flex().justify_center().bg(gpui_kit::rgb(0xd9edf7)).border_1().border_color(gpui_kit::rgb(0xbce8f1)).rounded(px(3.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x1651b0)).child("Property changes apply company/user wide."))
+                .child(
+                    h_flex()
+                        .justify_center()
+                        .gap(px(4.))
+                        .py(px(6.))
+                        .child(btn("std-props-save", "Save").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_props_done(true, cx))))
+                        .child(btn("std-props-cancel", "Cancel").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_props_done(false, cx)))),
+                )
+                .child(rule());
+        } else {
+            let pencil = small_button("std-part-number-edit")
+                .child(crate::assets::icon(&icon_path("edit-pencil"), 20., cx))
+                .tooltip(crate::ui::tooltip("Edit company/user wide part properties for this configuration"))
+                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.std_props_open(window, cx)));
+            body = body
+                .child(row("Part number", 27., h_flex().child(readonly(props.part_number.clone())).child(pencil).into_any_element()))
+                .child(row("Description", 27., readonly(props.description.clone().unwrap_or_else(|| spec.description())).into_any_element()))
+                .child(div().mt(px(4.)).child(rule()));
+        }
         // The component's line drawing (end view and side view), 242 x 105.
-        let (shape, slotted) = (c.shape, spec.slotted());
+        // Live: the drawing is the component's, whatever Head slot says.
+        let (shape, slotted) = (c.shape, c.head_slot);
         body = body.child(div().pt(px(6.)).h(px(111.)).flex_none().flex().justify_center().child(canvas(|_, _, _| (), move |b, _, window, _| paint_fastener(b, shape, slotted, window)).w(px(242.)).h(px(105.))));
+        if locked {
+            // The edit mode's Save / Cancel stand in for the Insert group.
+            return body.into_any_element();
+        }
         let action = if editing {
-            Button::new("std-update").label("Update").outline().h(px(30.)).px(px(10.)).rounded(px(3.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx))).into_any_element()
+            // Live 807: one white [Update] button under the preview.
+            div()
+                .id("std-update")
+                .h(px(34.))
+                .px(px(12.))
+                .flex()
+                .items_center()
+                .bg(gpui_kit::rgb(0xffffff))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xaaaaaa))
+                .rounded(px(5.25))
+                .text_size(px(14.))
+                .text_color(gpui_kit::rgb(0x333333))
+                .cursor_pointer()
+                .hover(|d| d.bg(gpui_kit::rgb(0xeeeeee)))
+                .child("Update")
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx)))
+                .into_any_element()
         } else {
             self.std_insert_buttons(cx)
         };
@@ -547,14 +617,57 @@ impl AssemblyView {
         h_flex().h(px(34.)).child(insert).child(closest).child(furthest).into_any_element()
     }
 
-    /// Edit standard content dialog (left column).
+    /// Edit standard content (live 807): 300 px, ✓ ✕, the tab's layout
+    /// with the hierarchy locked and [Update]; the help ? at the bottom.
     pub(super) fn render_standard_edit_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let body = v_flex().p_2().child(self.render_standard_content(true, cx));
-        Self::panel_frame("Edit standard content", body, cx.listener(|this, _: &ClickEvent, _, cx| {
+        let pal = p();
+        let close = |this: &mut Self, cx: &mut Context<Self>| {
             this.ui.std.editing = None;
+            this.ui.std.props_edit = None;
             cx.notify();
-        }), "std-edit-close")
-        .into_any_element()
+        };
+        let head = h_flex()
+            .h(px(29.))
+            .pl(px(6.))
+            .bg(gpui_kit::rgb(0xffffff))
+            .border_b_1()
+            .border_color(gpui_kit::rgb(0xd7d7d7))
+            .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Edit standard content"))
+            .child(div().id("std-edit-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().tooltip(crate::ui::tooltip("Accept (Enter)")).child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx))))
+            .child(div().id("std-edit-close").size(px(28.)).flex().items_center().justify_center().cursor_pointer().hover(|d| d.bg(pal.panel_hover)).tooltip(crate::ui::tooltip("Cancel (Esc)")).child(crate::assets::icon("dialog-cancel", 18., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| close(this, cx))));
+        v_flex()
+            .id("std-edit-panel")
+            .occlude()
+            .w(px(300.))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(head)
+            .child(self.render_standard_content(true, cx))
+            .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(super::props::help_dot()))
+            .into_any_element()
+    }
+
+    /// The pencil: Part number and Description become editable in place.
+    fn std_props_open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let spec = self.std_spec();
+        let props = std_props(&spec);
+        let number = cx.new(|cx| InputState::new(window, cx).default_value(props.part_number.clone()));
+        let description = cx.new(|cx| InputState::new(window, cx).default_value(props.description.clone().unwrap_or_else(|| spec.description())));
+        self.ui.std.props_edit = Some((number, description));
+        cx.notify();
+    }
+
+    /// Save (stored user wide for this configuration) / Cancel.
+    fn std_props_done(&mut self, save: bool, cx: &mut Context<Self>) {
+        let Some((number, description)) = self.ui.std.props_edit.take() else { return };
+        if save {
+            let spec = self.std_spec();
+            let d = description.read(cx).value().to_string();
+            let props = StdProps { part_number: number.read(cx).value().trim().to_string(), description: (d != spec.description()).then_some(d) };
+            save_std_props(&spec, props);
+        }
+        cx.notify();
     }
 }
 
@@ -677,5 +790,88 @@ fn paint_fastener(b: Bounds<Pixels>, shape: Shape, slotted: bool, window: &mut W
             let x1 = sx + 8.0;
             stroke(&[(sx, ey - r), (x1, ey - r), (x1, ey + r), (sx, ey + r)], true);
         }
+    }
+}
+
+/// Nuts and washers stack: they have a second connector on their top face.
+fn stacks(a: &Assembly, id: InstanceId) -> bool {
+    a.instance(id).and_then(|i| i.source.standard()).and_then(standard::component).is_some_and(|c| !c.shape.has_length())
+}
+
+fn same_connector(c: &MateConnectorRef, at: &MateConnectorRef) -> bool {
+    c.instance == at.instance && c.path == at.path && c.reference == at.reference && c.align == at.align
+}
+
+/// The fastened mate on connector `at`: its index and whether `at` is its `b`.
+fn held(a: &Assembly, at: &MateConnectorRef) -> Option<(usize, bool)> {
+    a.mates.iter().position(|m| !m.suppressed && m.mate_type == MateType::Fastened && (same_connector(&m.b, at) || same_connector(&m.a, at))).map(|k| (k, same_connector(&a.mates[k].b, at)))
+}
+
+/// Insert furthest from selection: the free connector at the outer end of
+/// the stack on `hole` (past every nut and washer); None when a bolt or
+/// screw tops it.
+fn stack_end(a: &Assembly, hole: &MateConnectorRef) -> Option<MateConnectorRef> {
+    let mut at = hole.clone();
+    for _ in 0..32 {
+        let Some((k, at_is_b)) = held(a, &at) else { return Some(at) };
+        let other = if at_is_b { a.mates[k].a.clone() } else { a.mates[k].b.clone() };
+        if !stacks(a, other.instance) {
+            return None;
+        }
+        let next = if other.reference == standard::connector_reference(0) { 1 } else { 0 };
+        at = MateConnectorRef::on(other.instance, other.path.clone(), standard::connector_reference(next));
+    }
+    Some(at)
+}
+
+/// Company/user wide properties of a standard content configuration (the
+/// Part number pencil, live skb/800): kept in the config directory for the
+/// user, keyed by the full configuration.
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
+pub(crate) struct StdProps {
+    #[serde(default)]
+    pub part_number: String,
+    /// None = the generated description.
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+fn std_props_path() -> std::path::PathBuf {
+    crate::files::config_dir().join("standard_content_properties.json")
+}
+
+/// The configuration's key: the spec with its defaults spelt out.
+fn std_props_key(spec: &StandardSpec) -> String {
+    let mut s = spec.clone();
+    s.material = Some(spec.material().to_string());
+    s.finish = Some(spec.finish().to_string());
+    s.head_slot = Some(spec.slotted());
+    s.series = Some(spec.series().to_string());
+    s.bearing_face = Some(spec.bearing_face().to_string());
+    serde_json::to_string(&s).unwrap_or_default()
+}
+
+fn load_std_props() -> std::collections::BTreeMap<String, StdProps> {
+    std::fs::read_to_string(std_props_path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+}
+
+pub(crate) fn std_props(spec: &StandardSpec) -> StdProps {
+    load_std_props().remove(&std_props_key(spec)).unwrap_or_default()
+}
+
+fn save_std_props(spec: &StandardSpec, props: StdProps) {
+    let mut all = load_std_props();
+    let key = std_props_key(spec);
+    if props.part_number.is_empty() && props.description.is_none() {
+        all.remove(&key);
+    } else {
+        all.insert(key, props);
+    }
+    let p = std_props_path();
+    if let Some(dir) = p.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(t) = serde_json::to_string_pretty(&all) {
+        let _ = std::fs::write(p, t);
     }
 }

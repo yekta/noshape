@@ -442,6 +442,23 @@ pub struct DrawingView {
     /// named view is deleted from the source.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub named_view: Option<String>,
+    /// Assembly views › Explode/Position › a named position (index into the
+    /// assembly's named positions; exclusive with `explode`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub named_position: Option<usize>,
+    /// Assembly views › Display state (by name; None: Show all).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_state: Option<String>,
+    /// Child views: their own Explode/Position (None: Follow parent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub own_position: Option<AsmPosition>,
+    /// Child views: their own Display state (None: Follow parent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub own_display: Option<DisplayChoice>,
+    /// View properties › View render mode › Best quality (exact hidden-line
+    /// removal on the sheet too; default Best performance).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub best_quality: bool,
     /// Tangent edges drawn as phantom lines (View properties › Tangent
     /// edges › Phantom); `show_tangent_edges` off = Hidden.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -471,6 +488,44 @@ pub struct DatumOn {
     pub line: u32,
     pub seg: u32,
     pub t: f64,
+}
+
+/// An assembly view's Explode/Position choice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AsmPosition {
+    /// The assembly as solved ("Default").
+    Default,
+    /// An exploded view (index into the assembly's exploded views).
+    Explode(usize),
+    /// A named position (index into the assembly's named positions).
+    Position(usize),
+}
+
+/// An assembly view's Display state choice.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DisplayChoice {
+    ShowAll,
+    State(String),
+}
+
+impl DrawingView {
+    /// The base view's Explode/Position.
+    pub fn asm_position(&self) -> AsmPosition {
+        match (self.explode, self.named_position) {
+            (Some(e), _) => AsmPosition::Explode(e),
+            (None, Some(p)) => AsmPosition::Position(p),
+            _ => AsmPosition::Default,
+        }
+    }
+
+    /// Set the base view's Explode/Position.
+    pub fn set_asm_position(&mut self, p: AsmPosition) {
+        (self.explode, self.named_position) = match p {
+            AsmPosition::Default => (None, None),
+            AsmPosition::Explode(e) => (Some(e), None),
+            AsmPosition::Position(n) => (None, Some(n)),
+        };
+    }
 }
 
 /// An auxiliary view's reference indicator: the arrow at `anchor` (parent
@@ -567,6 +622,11 @@ impl Default for DrawingView {
             broken_out: Vec::new(),
             custom_frame: None,
             named_view: None,
+            named_position: None,
+            display_state: None,
+            own_position: None,
+            own_display: None,
+            best_quality: false,
             tangent_phantom: false,
             name: None,
             scale_label: None,
@@ -1146,6 +1206,15 @@ pub enum CellAlign {
     Right,
 }
 
+/// Vertical alignment of a table cell's text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CellVAlign {
+    Top,
+    #[default]
+    Middle,
+    Bottom,
+}
+
 /// Formatting of one table cell.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct CellFormat {
@@ -1156,6 +1225,14 @@ pub struct CellFormat {
     pub height: Option<f64>,
     #[serde(default)]
     pub bold: bool,
+    #[serde(default)]
+    pub italic: bool,
+    #[serde(default)]
+    pub underline: bool,
+    #[serde(default)]
+    pub strikethrough: bool,
+    #[serde(default)]
+    pub valign: CellVAlign,
 }
 
 /// Format of the cell at (`row`, `col`). Rows count every displayed row
@@ -1206,9 +1283,27 @@ impl Table {
         self.cell_formats.iter().find(|s| s.row == row && s.col == col).map(|s| s.format.clone()).unwrap_or_default()
     }
 
+    /// The format a general table cell is drawn with: its own, or the
+    /// default (live: header cells bold and centred, body cells left).
+    pub fn shown_cell_format(&self, row: usize, col: usize) -> CellFormat {
+        match self.cell_formats.iter().find(|s| s.row == row && s.col == col) {
+            Some(s) => s.format.clone(),
+            None => self.default_cell_format(row),
+        }
+    }
+
+    /// A cell's format when it has none of its own.
+    fn default_cell_format(&self, row: usize) -> CellFormat {
+        match &self.kind {
+            TableKind::General { header: true, .. } if row == 0 => CellFormat { bold: true, ..Default::default() },
+            TableKind::General { .. } => CellFormat { align: CellAlign::Left, ..Default::default() },
+            _ => CellFormat::default(),
+        }
+    }
+
     pub fn set_cell_format(&mut self, row: usize, col: usize, format: CellFormat) {
         self.cell_formats.retain(|s| !(s.row == row && s.col == col));
-        if format != CellFormat::default() {
+        if format != self.default_cell_format(row) {
             self.cell_formats.push(CellStyle { row, col, format });
             self.cell_formats.sort_by_key(|s| (s.row, s.col));
         }
@@ -1471,7 +1566,25 @@ pub struct Annotation {
     /// Datum targets: style, origin and its dimensions (None: the defaults).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<Box<DatumTargetOpts>>,
+    /// A dimension on drawing sketch geometry: the entity and the sketch
+    /// constraint holding its value ([`sketch_dims`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sketch_dim: Option<SketchDim>,
+    /// An MBD annotation of a Part Studio shown in a view ([`mbd`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<mbd::ModelRef>,
 }
+
+/// See [`Annotation::sketch_dim`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SketchDim {
+    pub entity: u32,
+    pub constraint: u32,
+}
+
+/// The sheet itself as a view: dimensions on drawing sketch geometry use
+/// it (view metres = sheet millimetres / 1000, no rotation).
+pub const SHEET_VIEW: ViewId = ViewId(u64::MAX);
 
 /// A datum target symbol's style (live drawing/510).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -1659,7 +1772,7 @@ impl AnnStyle {
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None }
     }
 }
 
@@ -1918,6 +2031,15 @@ pub struct Sheet {
     /// Custom template › Language of the title block's labels.
     #[serde(default, skip_serializing_if = "tb_lang::TitleLanguage::is_english_ref")]
     pub title_language: tb_lang::TitleLanguage,
+    /// A sheet of an imported DWG / DXF (its model space or a layout).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub imported: Option<imported::ImportedSpace>,
+    /// Sketch constraints made by sketch dimensions (removed with them).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sketch_dim_constraints: Vec<u32>,
+    /// Stable id of the sheet (views linked across sheets, [`links`]).
+    #[serde(default)]
+    pub uid: u32,
 }
 
 /// Where zone labelling starts (Custom template › Start zones): numbers
@@ -2119,7 +2241,7 @@ impl Sheet {
     }
 
     pub fn next_view_id(&self) -> ViewId {
-        ViewId(self.views.iter().map(|v| v.id.0).max().unwrap_or(0) + 1)
+        ViewId(self.real_views().map(|v| v.id.0).max().unwrap_or(0) + 1)
     }
 
     /// Annotation ids are small sequential numbers (they double as pick ids).
@@ -2156,7 +2278,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default() }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0 }
     }
 }
 
@@ -2168,11 +2290,19 @@ pub struct Drawing {
     /// Drawing properties › Units and precision.
     #[serde(default)]
     pub props: DrawingProps,
+    /// The sheet shown (switching sheets is an undoable change in Onshape:
+    /// live behaviours "Sheet properties › Select a DWT" (5)).
+    #[serde(default, skip_serializing_if = "is_zero_usize")]
+    pub active_sheet: usize,
+}
+
+fn is_zero_usize(n: &usize) -> bool {
+    *n == 0
 }
 
 impl Default for Drawing {
     fn default() -> Self {
-        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default() }
+        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default(), active_sheet: 0 }
     }
 }
 
@@ -3212,6 +3342,10 @@ pub mod create;
 pub mod cad_export;
 pub mod sheet_sketch;
 pub mod hatch_pat;
+pub mod imported;
+pub mod links;
+pub mod mbd;
+pub mod sketch_dims;
 pub mod export;
 pub mod font;
 pub mod format;

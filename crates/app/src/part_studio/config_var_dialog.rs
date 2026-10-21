@@ -32,14 +32,7 @@ pub struct VarInputDialog {
 }
 
 /// The dimension of a configuration variable type (`None` for Text).
-pub(crate) fn kind_dim(kind: VariableKind) -> Option<Dim> {
-    match kind {
-        VariableKind::Length => Some(Dim::LENGTH),
-        VariableKind::Angle => Some(Dim::ANGLE),
-        VariableKind::Integer | VariableKind::Real => Some(Dim::UNITLESS),
-        VariableKind::Text => None,
-    }
-}
+pub(crate) use noshape_ops::config::kind_dim;
 
 /// Default / Minimum / Maximum of a new variable of `kind` (live 702).
 fn prefill(kind: VariableKind, units: &UnitPrefs) -> [String; 3] {
@@ -145,22 +138,12 @@ impl PartStudioView {
         let range = (kind != VariableKind::Text).then(|| (ExprValue::new(lo), ExprValue::new(hi)));
         let default = ExprValue::new(dv);
         match d.editing {
-            Some(id) => self.edit_config("Edit configuration variable", cx, |ps| {
-                if let Some(ConfigInput { kind: ConfigInputKind::Variable { default: dd, min, max, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == id) {
-                    *dd = default;
-                    if let Some((lo, hi)) = range {
-                        *min = Some(lo);
-                        *max = Some(hi);
-                    }
-                }
-            }),
+            Some(id) => self.edit_config(noshape_ops::config::EDIT_VARIABLE_INPUT, cx, |ps| noshape_ops::config::edit_variable_input(ps, &id, default, range)),
             None => {
                 let name = d.name.read(cx).value().trim().to_string();
-                self.edit_config("Add configuration input", cx, |ps| {
-                    let taken: Vec<String> = ps.configuration.inputs.iter().map(|i| i.id.clone()).collect();
-                    let id = noshape_model::configuration::fs_identifier(&name, &taken);
-                    let (min, max) = range.map(|(a, b)| (Some(a), Some(b))).unwrap_or((None, None));
-                    ps.configuration.inputs.push(ConfigInput { id, name, kind: ConfigInputKind::Variable { kind, default, min, max }, visible_when: None, excluded: false });
+                // The dialog's own description (not the Create variable dialog's).
+                self.edit_config(noshape_ops::config::ADD_INPUT, cx, |ps| {
+                    noshape_ops::config::push_variable_input(ps, name, kind, default, range);
                 });
             }
         }

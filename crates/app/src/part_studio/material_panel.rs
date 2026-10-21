@@ -66,7 +66,8 @@ enum Source {
 impl PartStudioView {
     /// The libraries of the select, in order, with their names.
     fn material_sources(&self, cx: &App) -> Vec<(Source, String)> {
-        let mut out = vec![(Source::Onshape, "Onshape Material Library".to_string())];
+        // Removed in Preferences › Material libraries: not listed.
+        let mut out = if crate::material_libraries::onshape_listed() { vec![(Source::Onshape, "Onshape Material Library".to_string())] } else { Vec::new() };
         out.extend(crate::material_libraries::added().into_iter().map(|l| {
             let n = l.name.clone();
             (Source::Added(l), n)
@@ -496,9 +497,10 @@ impl PartStudioView {
         crate::material_libraries::open(
             move |lib, _, cx| {
                 view.update(cx, |this, cx| {
+                    let sources = this.material_sources(cx);
                     let i = match &lib {
-                        None => 0,
-                        Some(l) => this.material_sources(cx).iter().position(|(s, _)| matches!(s, Source::Added(a) if a == l)).unwrap_or(0),
+                        None => sources.iter().position(|(s, _)| matches!(s, Source::Onshape)).unwrap_or(0),
+                        Some(l) => sources.iter().position(|(s, _)| matches!(s, Source::Added(a) if a == l)).unwrap_or(0),
                     };
                     if let Some(m) = &mut this.ui.material_panel {
                         m.library = i;

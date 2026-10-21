@@ -3357,7 +3357,15 @@ impl<M: InputModeKind> Element for TextElement<M> {
         }
 
         // Paint blinking cursors (shared blink state for all carets)
-        if focused && show_cursor {
+        // NOSHAPE PATCH (agent qa4): a multi-line input's carets are painted
+        // by its blink cursor view (see `TextLayer`): leave them there.
+        if self.state.read(cx).is_multi_line() {
+            let caret = self.state.read(cx).blink_cursor.read(cx).caret.clone();
+            let mut caret = caret.borrow_mut();
+            caret.quads = prepaint.cursor_infos_with_scroll().iter().map(|c| c.bounds).collect();
+            caret.color = editor_style.caret;
+            caret.mask = Some(window.content_mask());
+        } else if focused && show_cursor {
             for cursor_info in prepaint.cursor_infos_with_scroll() {
                 window.paint_quad(fill(cursor_info.bounds, editor_style.caret));
             }

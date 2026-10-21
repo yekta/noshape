@@ -141,6 +141,80 @@ Planned (part_studio/mod.rs, ui's file, waiting for the lead to forward to ui):
   in-progress borrow errors). Uncommitted from qa4: part_studio/mod.rs `filter_rows` + `filter_rows_changed`
   set check, behaviors.rs one call, this file. Scripts: /root/qa4-scratch (measure2.sh, ft2.sh, frames.py,
   flat.py).
+
+### R5 (20:00–): filter case under 4 ms, then every tab (lead's task)
+Method as R4; per-tab runs: `/root/qa4-scratch/measure3.sh BIN NAME "SETUP" "FIELD_X FIELD_Y"` (opens the tab
+with xdotool, types 7 / BackSpace ×20 in the field, then idles 10 s with the caret blinking; UI-thread CPU per
+`Window::draw`, median). Setups: Assembly = tab + instance filter; Insert = Insert dialog's search; Variable
+Studio = new studio's Name cell; Feature Studio = end of line 1; Drawing = new drawing, one view, a note being
+typed; documents window = its search box (`NOARGS=1`).
+**Changes:**
+- Part Studio rows: `render_feature_list` borrows the model instead of cloning the whole Part Studio (it
+  plans the rows first, `ListItem`), and a row's hover text ("Extrude 1 <- Sketch 1", which scans the
+  features above) is worked out when its tooltip opens (`ui::with_lazy_side_tooltip`). Per-row cached views
+  were tried and removed: gpui reuses a cached view only at the same bounds (rows that move or come back
+  after filtering are rebuilt anyway) and never inside a cached view it is re-rendering (see below).
+- **Two gpui rules found on the way** (now in `cached_slice.rs`'s doc): (1) re-rendering a cached view sets
+  `window.refreshing` for its subtree (vendor/gpui-pre/src/view.rs), so a cached view nested in one that
+  re-renders is never reused; text fields must sit outside every cached view, with the heavy parts as
+  sibling slices of a non-cached parent. (2) A view whose render read an input's state re-renders on each of
+  its caret blinks. A cached view's layout comes from its style alone, so a slice needs a definite size.
+- **gpui-pre `LineLayoutCache` keeps shaped lines across frames** (`RecentLines`, two generations of 4096,
+  NOSHAPE PATCH qa4, noted in Cargo.toml). Before, a line not drawn in the previous frame was shaped again by
+  cosmic-text (~0.3 ms a line): every row shown again after filtering, every changed label.
+- **gpui-component `Button` boxes its base control, content style and loading icon** (NOSHAPE PATCH qa4): a
+  Button was ~7.3 KB and moved by value at each builder call (`tooltip`, `on_click`, `into_any_element`,
+  arena), 3–4 MB of memmove a frame for the drawing toolbar (found with a uprobe on libc memmove + the
+  caller's return address).
+- Assembly: cached toolbar, instance-list rows (head = config box, filter, "Instances (N)" rendered with the
+  view), and the graphics overlay as `under` (list toggle, view cube) / uncached left dialogs
+  (`render_left_layer`: Insert, Mate, … with their fields) / `overlay` (docked panes, notices, menus, strip);
+  the Insert panel's catalog tree is a cached view inside the left layer; the list filter and the Insert search notify only their rows /
+  tree (`filter_rows_changed`, `insert_search_changed`; the tree reads `ui.insert_query`, not the input: a
+  view that reads an input entity is re-rendered on every caret blink).
+- Drawing: cached toolbar. Documents window: the body (sidebar, list, details) is one cached view; the
+  search notifies it. Feature Studio: `outline_of` caches the module outline by the text's hash (it was parsed
+  in every render).
+**Results (UI-thread CPU per frame, median, typing / caret blink; v17 = all of R5):**
+
+| | base (dc0da0a) | v9 (R4 + Workspace slices) | v17 |
+|---|---|---|---|
+| Part Studio filter, every key changes the result | 15.5 / 16.5 | 4.75 on those keys | **3.75** on those keys (p90 5.0), 2.75 others / **3.0** |
+| Part Studio filter, "extrude" typed | 15.2 | 3.2 | **3.0** (4.25 on the 7 keys that change the rows) |
+| Assembly instance filter | 14.2 / 12.2 | 9.8 / 12.2 | **3.2 / 3.2** |
+| Assembly Insert search | 17.5 / – | 14.5 / 10.8 | 4.5 / 4.1 |
+| Variable Studio Name cell | 5.0 / 5.0 | 3.0 / 3.2 | **2.8 / 3.0** |
+| Feature Studio editor | 10.2 / 9.8 | 7.5 / 7.6 | **3.8 / 2.5** |
+| Drawing note | 12.8 / 12.0 | 10.2 / 10.2 | **4.0 / 3.0** |
+| Documents search | 4.2 / 4.2 | 4.5 / 4.5 | **3.5 / 1.8** |
+
+v17 adds: the editor caret patch (gpui-base `TextLayer` + `BlinkCursor` view, multi-line inputs only),
+the Feature Studio toolbar slice, the drawing panel layer (`Slice::follow` on the note's field), the
+Insert panel's sized slices (`Slice::sized`) around its search box, the Assembly left-dialog layer, and
+the per-row views removed. Checked in the app: the editor caret follows typing and arrows, blinks, hides
+on blur; the Insert panel (search, Current / Other documents, catalog, footer) lays out as before; the
+Note panel shows over a note typed in place. gpui-base: clippy -D warnings clean.
+**Left above 4 ms, and why:**
+- Feature Studio: a caret blink repaints the whole code editor (gpui-base `TextElement`: prepaint 1.2 ms
+  re-highlights and re-slices the visible text, paint 1.5 ms re-emits ~4000 glyphs), because the blink
+  notifies the editor's `InputState`. Needs a gpui-base change (ui's component): the blink notifies a small
+  caret entity drawn by its own element, and the text layer becomes a cached view. Proposed to the lead.
+- Drawing: render 1.8 ms (13 `sync_*` dialog syncs + ~40 `render_*` dialog calls per render), layout 1.9 ms
+  (two taffy passes); the canvas area holds the note editor, so it can't be one cached view without moving
+  the editors out (asb's code).
+- Part Studio, a key that brings back all rows: their render (~1 ms) + layout/paint; gpui can't reuse a view
+  at new bounds.
+- gpui's cached-view reuse (~1–1.4 ms a frame, every frame): split on a Part Studio blink with uprobes,
+  `Scene::replay` is the largest part (each reused primitive is copied into the new scene and gets its
+  draw order again from the `BoundsTree` R-tree, already upstream's optimized version), then the dispatch
+  subtree copy (`reuse_subtree`) and `reuse_layouts`. Element-state keys are `Arc` clones (cheap). Paths
+  are copied twice per reuse (`replay` clones the primitive, `insert_primitive` clones the path again);
+  sharing a path's vertices (`Arc`) would halve that, but it is the renderer's type (perf), and perf's
+  wgpu overlays (view cube, plane names) remove most paths. A real cut needs retained draw orders for a
+  replayed range whose prefix didn't change: an upstream-sized change to gpui's scene, not done.
+- Assembly Insert search: the panel's head (tabs, document row, filters; content-sized, so not a slice)
+  re-renders with the view on each blink (~1 ms), and reusing the window's many cached parts costs ~1.4 ms
+  (`reuse_prepaint` copies their hitboxes and element-state keys).
 ### R3 (13:10–13:45): retest on v0.4.1 / current tree (0839f5e + 3 uncommitted files), :110
 Method: click a point, wait, type `7`, wait 1 s, crop (script /tmp/qa4/probe.sh; points on every corner, edge,
 padding strip and the text area).

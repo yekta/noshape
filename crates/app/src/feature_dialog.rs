@@ -217,6 +217,11 @@ pub struct FeatureDialog {
     baselines: HashMap<String, String>,
     /// Width after the user dragged the right edge (Onshape dialogs resize).
     pub width: Option<Pixels>,
+    /// Selection lists in reorder mode (their "DONE" showing), by path.
+    reordering: std::collections::HashSet<String>,
+    /// While a pick is dragged in reorder mode: list path, the row it would
+    /// land next to, after it.
+    pick_drop: Option<(String, usize, bool)>,
     /// "Configure features" mode: configurable parameters are outlined
     /// and clicking one configures it (Onshape: broken yellow outline).
     pub configure_mode: bool,
@@ -282,6 +287,8 @@ impl FeatureDialog {
             initial_focus_done: false,
             baselines: HashMap::new(),
             width: None,
+            reordering: std::collections::HashSet::new(),
+            pick_drop: None,
             configure_mode: false,
             active_query: None,
             cs_target: None,
@@ -687,6 +694,109 @@ impl FeatureDialog {
         self.user_set.insert(path.to_string());
         cx.emit(DialogEvent::Changed);
         cx.notify();
+    }
+
+    /// Move item `from` of array `arr` to position `to` (a driven-query
+    /// array's picks, e.g. Loft profiles).
+    fn move_array_item(&mut self, arr: &str, from: usize, to: usize, cx: &mut Context<Self>) {
+        let Some(ParamValue::Array(items)) = self.feature.params.0.get_mut(arr) else { return };
+        if from >= items.len() || to >= items.len() || from == to {
+            return;
+        }
+        let it = items.remove(from);
+        items.insert(to, it);
+        self.user_set.insert(arr.to_string());
+        cx.emit(DialogEvent::Changed);
+        cx.notify();
+    }
+
+    /// The selection list's "Reorder items" button (live behaviours.md
+    /// "Selection-list reorder mode": 20 x 24 ↑↓ at the right of the caption,
+    /// for lists that may be ordered with 2+ entries), "DONE" ("Done
+    /// reordering") while the mode is on. Only DONE ends the mode.
+    fn reorder_button(&self, path: &str, cx: &mut Context<Self>) -> AnyElement {
+        let on = self.reordering.contains(path);
+        let p = path.to_string();
+        div()
+            .id(SharedString::from(format!("reorder-{path}")))
+            .absolute()
+            .top_0()
+            .right(px(2.))
+            .h(px(24.))
+            .w(px(if on { 29. } else { 20. }))
+            .flex()
+            .items_center()
+            .justify_center()
+            .cursor_pointer()
+            .tooltip(crate::ui::tooltip(if on { "Done reordering" } else { "Reorder items" }))
+            .child(if on {
+                div().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xaaaaaa)).child("DONE").into_any_element()
+            } else {
+                crate::ui::glyph("reorder-items-button", 16., gpui_kit::rgb(0x888888)).into_any_element()
+            })
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                cx.stop_propagation();
+                if !this.reordering.remove(&p) {
+                    this.reordering.insert(p.clone());
+                }
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+
+    /// A row's ≡ grip in reorder mode (live: 20 x 20, `ns-resize`, in place
+    /// of the ×; three 1 px lines 3 px apart).
+    fn reorder_grip(&self, path: &str, index: usize, label: &str, array: bool) -> AnyElement {
+        let line = || div().w(px(10.)).h(px(1.)).bg(gpui_kit::rgb(0x777777));
+        let drag = PickDrag { path: path.to_string(), index, label: SharedString::from(label.to_string()), array, offset: Point::default() };
+        v_flex()
+            .id(SharedString::from(format!("grip-{path}-{index}")))
+            .size(px(20.))
+            .flex_none()
+            .items_center()
+            .justify_center()
+            .gap(px(2.))
+            .cursor(CursorStyle::ResizeUpDown)
+            .child(line())
+            .child(line())
+            .child(line())
+            .on_drag(drag, |d, offset, _, cx| {
+                let mut d = d.clone();
+                d.offset = offset;
+                cx.new(|_| d)
+            })
+            .into_any_element()
+    }
+
+    /// A row of a list in reorder mode as a place to drop a dragged row: the
+    /// drop line goes after it when the dragged row is above, else before.
+    fn reorder_target(&self, row: Stateful<Div>, path: &str, index: usize, cx: &mut Context<Self>) -> Stateful<Div> {
+        let line = self.pick_drop.as_ref().filter(|(p, i, _)| p == path && *i == index).map(|(_, _, after)| *after);
+        let (p1, p2) = (path.to_string(), path.to_string());
+        row.relative()
+            .when_some(line, |d, after| d.child(if after { crate::ui::drop_line().bottom(px(-3.)) } else { crate::ui::drop_line().top(px(-3.)) }))
+            .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<PickDrag>, _, cx| {
+                if !e.bounds.contains(&e.event.position) {
+                    return;
+                }
+                let d = e.drag(cx);
+                let drop = (d.path == p1 && d.index != index).then(|| (p1.clone(), index, index > d.index));
+                if this.pick_drop != drop {
+                    this.pick_drop = drop;
+                    cx.notify();
+                }
+            }))
+            .on_drop(cx.listener(move |this, d: &PickDrag, _, cx| {
+                this.pick_drop = None;
+                if d.path != p2 {
+                    return;
+                }
+                if d.array {
+                    this.move_array_item(&p2, d.index, index, cx);
+                } else {
+                    this.move_pick(&p2, d.index, index, cx);
+                }
+            }))
     }
 
     /// Flash the active selection field red (a rejected pick).
@@ -1851,6 +1961,16 @@ impl FeatureDialog {
                     }
                     rows.push(((self.labeler)(r), vec![k], r.clone()));
                 }
+                // Lists that may be ordered (`ALLOW_QUERY_ORDER`) with 2+ rows get
+                // the reorder button; in the mode × gives way to the grip.
+                let can_reorder = s.hints.has(Hints::ALLOW_QUERY_ORDER) && rows.len() >= 2;
+                if !can_reorder {
+                    self.reordering.remove(path);
+                }
+                let reorder_on = can_reorder && self.reordering.contains(path);
+                if !cx.has_active_drag() && self.pick_drop.is_some() {
+                    self.pick_drop = None;
+                }
                 let chips: Vec<AnyElement> = rows
                     .into_iter()
                     .enumerate()
@@ -1877,7 +1997,8 @@ impl FeatureDialog {
                             .text_size(px(13.33))
                             .text_color(if missing { pal.error } else if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
                             .child(div().flex_1().truncate().child(label))
-                            .child(
+                            .when(reorder_on && single, |d| d.child(self.reorder_grip(path, k, &label_for_drag, false)))
+                            .when(!reorder_on, |d| d.child(
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{row}")))
                                     // Live (dialogs/extrude-13, fillet-02): the × is always shown.
@@ -1900,20 +2021,9 @@ impl FeatureDialog {
                                         cx.emit(DialogEvent::Changed);
                                         cx.notify();
                                     })),
-                            )
-                            // Drag a pick onto another to reorder (loft profiles, sweep paths…).
-                            .when(single, |d| {
-                                d.on_drag(PickDrag { path: path_s.clone(), index: k, label: SharedString::from(label_for_drag.clone()) }, |d, _, _, cx| cx.new(|_| d.clone()))
-                                    .drag_over::<PickDrag>(|st, _, _, _| st.border_t_2().border_color(p().accent))
-                                    .on_drop(cx.listener({
-                                        let pd = path_s.clone();
-                                        move |this, d: &PickDrag, _, cx| {
-                                            if d.path == pd {
-                                                this.move_pick(&pd, d.index, k, cx);
-                                            }
-                                        }
-                                    }))
-                            })
+                            ))
+                            // Reorder mode: rows take dropped rows (by their grip).
+                            .map(|d| if reorder_on && single { self.reorder_target(d, path, k, cx) } else { d })
                             .os_context_menu({
                                 // Onshape: right-click a pick > Clear all (and
                                 // Clear missing references when some are).
@@ -1998,8 +2108,10 @@ impl FeatureDialog {
                             .cursor_pointer()
                             .flex()
                             .flex_col()
+                            .relative()
                             .child(caption)
                             .children(chips)
+                            .when(can_reorder, |d| d.child(self.reorder_button(path, cx)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                 this.active_query = Some(path_s.clone());
                                 window.focus(&q_focus2, cx);
@@ -2098,21 +2210,30 @@ impl FeatureDialog {
                         .cursor_pointer()
                         .child(div().px(px(6.)).when(items == 0, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33))).when(items > 0, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.))).text_color(pal.text_muted).child(s.label));
                     let mut details: Vec<AnyElement> = Vec::new();
+                    // Arrays may be reordered (live: unless PREVENT_ARRAY_REORDER)
+                    // once they have 2+ items: the reorder button and mode.
+                    let can_reorder = items >= 2;
+                    if !can_reorder {
+                        self.reordering.remove(arr_id);
+                    }
+                    let reorder_on = can_reorder && self.reordering.contains(arr_id);
                     for k in 0..items {
                         let r = q.and_then(|q| values.array(arr_id).get(k).and_then(|it| it.query(q.id).first().cloned()));
                         let label = match (s.item_template, values.array(arr_id).get(k)) {
                             (Some(t), Some(it)) => self.item_label(t, it, item_specs, k),
                             _ => r.as_ref().map(|r| (self.labeler)(r)).unwrap_or_default(),
                         };
-                        field = field.child(
-                            h_flex()
-                                .h(px(24.))
-                                .pl(px(6.))
-                                .pr(px(4.))
-                                .text_size(px(13.33))
-                                .text_color(if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
-                                .child(div().flex_1().truncate().child(label.clone()))
-                                .child(
+                        let row = h_flex()
+                            .id(SharedString::from(format!("dq-{path}-{k}")))
+                            .h(px(24.))
+                            .pl(px(6.))
+                            .pr(px(4.))
+                            .text_size(px(13.33))
+                            .text_color(if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
+                            .child(div().flex_1().truncate().child(label.clone()))
+                            .when(reorder_on, |d| d.child(self.reorder_grip(arr_id, k, &label, true)))
+                            .when(!reorder_on, |d| {
+                                d.child(
                                     div()
                                         .id(SharedString::from(format!("dqx-{path}-{k}")))
                                         .cursor_pointer()
@@ -2120,8 +2241,9 @@ impl FeatureDialog {
                                         .hover(|d| d.text_color(pal.error))
                                         .child(Icon::new(IconName::Close).with_size(px(12.)))
                                         .on_click(cx.listener(remove(k))),
-                                ),
-                        );
+                                )
+                            });
+                        field = field.child(if reorder_on { self.reorder_target(row, arr_id, k, cx) } else { row });
                         let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
                         details.push(
                             v_flex()
@@ -2134,7 +2256,7 @@ impl FeatureDialog {
                         );
                     }
                     let path_s = path.to_string();
-                    let field = field.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    let field = field.relative().when(can_reorder, |d| d.child(self.reorder_button(arr_id, cx))).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         this.active_query = Some(path_s.clone());
                         window.focus(&this.focus, cx);
                         cx.emit(DialogEvent::QueryFocused);
@@ -2949,18 +3071,21 @@ fn dialog_icon_variant(cx: &App, on: bool) -> gpui_kit::component::button::Butto
         .shadow(false)
 }
 
-/// A selection row being dragged to a new position.
+/// A selection row dragged by its grip in reorder mode.
 #[derive(Clone)]
 struct PickDrag {
     path: String,
     index: usize,
     label: SharedString,
+    /// A driven-query array's item (else a pick in a query).
+    array: bool,
+    offset: Point<Pixels>,
 }
 
 impl Render for PickDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let pal = p();
-        div().px_2().py_0p5().rounded_sm().bg(pal.panel_raised).border_1().border_color(pal.accent).text_xs().text_color(pal.text).child(self.label.clone())
+        // Live ui/966: the same pill as the Configurations headers.
+        crate::ui::name_pill(self.label.clone(), self.offset)
     }
 }
 

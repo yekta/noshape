@@ -14,7 +14,7 @@ use crate::document::{Document, TabContent, TabId};
 use crate::regen::context::Context;
 use std::collections::HashMap;
 use std::sync::Arc;
-use super::{CellAlign, DimFormat, Drawing, Table, TableCorner, TableKind};
+use super::{CellAlign, CellVAlign, DimFormat, Drawing, Table, TableCorner, TableKind};
 
 /// Resolved table content.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -228,7 +228,9 @@ pub fn table_data(drawing: &Drawing, table: &Table, view_geo: Option<&ViewGeomet
         TableKind::General { cells, title, header } => {
             let mut rows: Vec<Vec<String>> = cells.iter().map(|r| r.iter().map(|c| expand(c)).collect()).collect();
             let header = if *header && !rows.is_empty() { Some(rows.remove(0)) } else { None };
-            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
+            // Live 744–750: header cells bold and centred, body cells left-aligned.
+            let col_align = vec![CellAlign::Left; cells.iter().map(|r| r.len()).max().unwrap_or(0)];
+            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true }
         }
         TableKind::Bom { structured, bottom_to_top, overrides, .. } => {
             // Onshape's BOM table columns (live drawing/189): Item, Quantity,
@@ -489,7 +491,7 @@ pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
                 continue;
             }
             let h = cell_height(table, ri, i);
-            let tw = c.lines().map(|l| font::text_width(l, h)).fold(0.0, f64::max) * if table.cell_format(ri, i).bold { 1.05 } else { 1.0 };
+            let tw = c.lines().map(|l| font::text_width(l, h)).fold(0.0, f64::max) * if table.shown_cell_format(ri, i).bold { 1.05 } else { 1.0 };
             w[i] = w[i].max(tw + pad);
         }
     }
@@ -512,7 +514,7 @@ pub fn row_need(table: &Table, ri: usize, row: &[String], vpad: f64) -> f64 {
             continue;
         }
         let h = cell_height(table, ri, ci);
-        let lines = c.lines().count().max(1) as f64;
+        let lines = c.split('\n').count().max(1) as f64;
         need = need.max(table.row_height - table.text_height + h + (lines - 1.0) * h * 1.5).max(h + 2.0 * vpad + (lines - 1.0) * h * 1.5);
     }
     need
@@ -634,12 +636,22 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
             let (ya, yb) = (l.ys[row0 + ri], l.ys[(row0 + ri + rows_n).min(l.ys.len() - 1)]);
             let fmt = table.cell_formats.iter().find(|s| s.row == ri && s.col == ci).map(|s| s.format.clone()).unwrap_or_else(|| data.default_format(ri, ci, nrows));
             let h = cell_height(table, ri, ci);
-            let lines: Vec<&str> = c.lines().collect();
+            let lines: Vec<&str> = c.split('\n').collect();
             let n = lines.len().max(1) as f64;
             let line_h = h * 1.5;
             let pad = data.padding[0];
+            // Centre of the first line's cap height.
+            let y0 = match fmt.valign {
+                CellVAlign::Top => ya - h,
+                CellVAlign::Middle => (ya + yb) / 2.0 + (n - 1.0) * line_h / 2.0,
+                CellVAlign::Bottom => yb + h + (n - 1.0) * line_h,
+            };
             for (k, text) in lines.iter().enumerate() {
-                let y = (ya + yb) / 2.0 + (n - 1.0) * line_h / 2.0 - k as f64 * line_h;
+                // An empty line (Alt+Enter at the end) still takes its height.
+                if text.is_empty() {
+                    continue;
+                }
+                let y = y0 - k as f64 * line_h;
                 let tw = font::text_width(text, h);
                 let (pos, anchor) = match fmt.align {
                     CellAlign::Center => ([(xa + xb) / 2.0, y], Anchor::Center),
@@ -647,10 +659,16 @@ pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableL
                     CellAlign::Right => ([xb - pad - tw, y - h / 2.0], Anchor::BottomLeft),
                 };
                 g.texts.push(Text2 { pos, height: h, text: text.to_string(), angle: 0.0, anchor, pick });
-                if fmt.bold {
-                    // Bold: the stroke text drawn again, slightly offset.
-                    for dx in [0.045, 0.09] {
-                        g.texts.push(Text2 { pos: [pos[0] + h * dx, pos[1]], height: h, text: text.to_string(), angle: 0.0, anchor, pick });
+                if fmt.bold || fmt.italic {
+                    let i = g.texts.len() - 1;
+                    g.fonts.push(super::sheet::FontSpan { texts: i..i + 1, font: super::sheet::TextFont { family: font::DEFAULT_FAMILY.into(), bold: fmt.bold, italic: fmt.italic } });
+                }
+                // Underline / strikethrough as on notes.
+                let x0 = if anchor == Anchor::Center { pos[0] - tw / 2.0 } else { pos[0] };
+                let base = if anchor == Anchor::Center { pos[1] - h / 2.0 } else { pos[1] };
+                for (on, dy) in [(fmt.underline, -0.2), (fmt.strikethrough, 0.5)] {
+                    if on && !text.is_empty() {
+                        g.lines.push(Polyline2 { points: vec![[x0, base + h * dy], [x0 + tw, base + h * dy]], style: LineStyle::Thin, closed: false, pick });
                     }
                 }
             }

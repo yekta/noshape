@@ -81,6 +81,9 @@ pub fn merge_part_studio(base: &PartStudio, ours: &PartStudio, theirs: &PartStud
     if ours.annotations == base.annotations && theirs.annotations != base.annotations {
         result.annotations = theirs.annotations.clone();
     }
+    if ours.default_tolerances == base.default_tolerances && theirs.default_tolerances != base.default_tolerances {
+        result.default_tolerances = theirs.default_tolerances.clone();
+    }
     result.rollback = None;
     (result, report)
 }

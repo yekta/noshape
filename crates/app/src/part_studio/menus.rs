@@ -863,26 +863,11 @@ impl PartStudioView {
         } else if self.show_mass {
             title = "Mass properties";
             let bodies: Vec<BodyId> = self.selection.iter().filter_map(|r| self.owning_body(r)).collect();
-            let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
-            // Mass override (Onshape): replaces the computed mass when every
-            // part in the computation has one.
-            let all: Vec<BodyId> = if bodies.is_empty() { self.display.bodies.iter().map(|b| b.id.clone()).collect() } else { bodies.clone() };
-            let overrides: Option<f64> = all.iter().map(|b| props.get(b).and_then(|p| p.mass_override)).sum();
             // Inertia about a selected mate connector (reference coordinate system).
-            let reference = self.selection.iter().find_map(|r| self.display.connectors.iter().find(|c| &c.reference == r)).map(|c| (c.origin, c.x, c.z.cross(c.x), c.z, c.name.clone()));
-            if let Some(mut mp) = measure::mass_properties(&ctx, &bodies, &|b| props.get(b).and_then(|p| p.density)) {
-                if let Some(m) = overrides {
-                    if let Some(old) = mp.mass.filter(|o| *o > 0.0) {
-                        mp.inertia *= m / old;
-                    }
-                    mp.mass = Some(m);
-                }
-                if let (Some((o, x, y, z, name)), Some(m)) = (&reference, mp.mass) {
-                    // Parallel axis to the connector origin, then its axes.
-                    let d = mp.center_of_mass - *o;
-                    let shift = glam::DMat3::from_diagonal(glam::DVec3::splat(d.length_squared())) - glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z);
-                    let r = glam::DMat3::from_cols(*x, *y, *z);
-                    mp.inertia = r.transpose() * (mp.inertia + shift * m) * r;
+            let reference = self.selection.iter().find_map(|r| self.display.connectors.iter().find(|c| &c.reference == r)).cloned();
+            let studio = self.studio(cx).cloned().unwrap_or_default();
+            if let Some(noshape_ops::analysis::StudioMass { props: mp, reference }) = noshape_ops::analysis::studio_mass_properties(&ctx, &self.display, &studio, &bodies, reference.as_ref()) {
+                if let Some(name) = &reference {
                     rows.push(("Reference".into(), name.clone()));
                 }
                 let len3 = Dim { length: 3, angle: 0 };
@@ -905,7 +890,7 @@ impl PartStudioView {
                     inertia_unit: format!("{sym}² kg"),
                     inertia: mp.mass.map(|_| [[v(i.x_axis.x), v(i.y_axis.x), v(i.z_axis.x)], [v(i.x_axis.y), v(i.y_axis.y), v(i.z_axis.y)], [v(i.x_axis.z), v(i.y_axis.z), v(i.z_axis.z)]]),
                     parts: if bodies.is_empty() { Vec::new() } else { bodies.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect() },
-                    reference: reference.as_ref().map(|r| r.4.clone()),
+                    reference,
                 });
             }
         } else {

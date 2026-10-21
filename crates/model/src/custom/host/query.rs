@@ -103,6 +103,9 @@ struct Topo {
 pub struct Snapshot {
     pub etype: EType,
     pub points: Vec<DVec3>,
+    /// The owner's body type ("SHEET", "SOLID", ...): a sheet's edge is not
+    /// followed onto a solid lying on it (sheet metal part vs definition).
+    pub body_type: &'static str,
 }
 
 pub struct QueryCx<'a> {
@@ -473,8 +476,10 @@ impl<'a> QueryCx<'a> {
     /// inner point of a face).
     pub fn snapshot(&self, e: &Ent) -> Option<Snapshot> {
         let etype = entity_type_of(e);
+        // Sketch curves too: std tracks a sketch line onto the edge a
+        // surface made from it (sheet metal flange's bend line).
         let shape = match e {
-            Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..) => self.shape(e)?,
+            Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..) => self.shape(e)?,
             _ => return None,
         };
         let points = match etype {
@@ -489,7 +494,25 @@ impl<'a> QueryCx<'a> {
                 vec![shape.project_point(p).ok()?.point]
             }
         };
-        Some(Snapshot { etype, points })
+        Some(Snapshot { etype, points, body_type: self.body_type(e) })
+    }
+
+    /// What a transient id stands for now. Operations rename entities, and
+    /// a merged sheet's edge may even take another edge's old name: prefer
+    /// what lies where the entity was (its snapshot); an entity that moved
+    /// (flange alignment) has nothing there, and its name is all there is.
+    pub fn resolve_transient(&self, id: &str) -> Vec<Ent> {
+        let found = self.st.transient_ref(id).map(|r| self.from_ref(r)).unwrap_or_default();
+        let Some(snap) = self.st.snapshots.get(id) else { return found };
+        if !found.is_empty() && found.iter().all(|e| snap_matches(self, snap, e)) {
+            return found;
+        }
+        let tracked = self.tracked(snap);
+        if tracked.is_empty() {
+            return found;
+        }
+        let kept: Vec<Ent> = found.into_iter().filter(|e| tracked.contains(e)).collect();
+        if kept.is_empty() { tracked } else { kept }
     }
 
     /// Current entities a tracked entity became: those of its type lying on
@@ -498,8 +521,12 @@ impl<'a> QueryCx<'a> {
     fn tracked(&self, snap: &Snapshot) -> Vec<Ent> {
         const TOL: f64 = 1e-7;
         let on = |e: &Ent, p: DVec3| self.shape(e).and_then(|s| k::make_vertex(p).ok().and_then(|v| k::distance(&v, &s).ok())).is_some_and(|d| d.distance < TOL);
-        self.all(Some(snap.etype))
+        // Hidden bodies too: std sheet metal tracks its (hidden) definition.
+        self.all_with(Some(snap.etype), true)
             .into_iter()
+            // Solids only to solids; sheets, wires and sketches among
+            // themselves (std follows a sketch line onto a sheet's edge).
+            .filter(|e| (self.body_type(e) == "SOLID") == (snap.body_type == "SOLID"))
             .filter(|e| {
                 if snap.points.iter().all(|p| on(e, *p)) {
                     return true;
@@ -697,6 +724,12 @@ pub fn sketch_edge_shape(sk: &crate::regen::context::SketchResult, id: u32) -> O
     k::make_edge_2d(&crate::regen::eval::kernel_plane(&sk.frame), &seg).ok()
 }
 
+/// Whether an entity still lies on all of a snapshot's points.
+fn snap_matches(q: &QueryCx, snap: &Snapshot, e: &Ent) -> bool {
+    entity_type_of(e) == snap.etype
+        && q.shape(e).is_some_and(|s| snap.points.iter().all(|p| k::make_vertex(*p).ok().and_then(|v| k::distance(&v, &s).ok()).is_some_and(|d| d.distance < 1e-7)))
+}
+
 fn uniq(v: Vec<Ent>) -> Vec<Ent> {
     let mut seen = std::collections::HashSet::new();
     v.into_iter().filter(|e| seen.insert(e.clone())).collect()
@@ -751,10 +784,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         "EVERYTHING" => q.all(entity_type),
         "TRANSIENT" => {
             let id = query.get("transientId").as_str().unwrap_or_default();
-            match q.st.transient_ref(&id) {
-                Some(r) => q.from_ref(r),
-                None => Vec::new(),
-            }
+            q.resolve_transient(&id)
         }
         "UNION" => {
             let mut out = Vec::new();
@@ -1061,14 +1091,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                     v => vec![v.clone()],
                 };
                 for item in items {
-                    let found = eval(i, q, &item)?;
-                    // Renamed by an operation since: follow its geometry.
-                    if found.is_empty()
-                        && let Some(snap) = item.get("transientId").as_str().and_then(|id| q.st.snapshots.get(&*id))
-                    {
-                        out.extend(q.tracked(snap));
-                    }
-                    out.extend(found);
+                    out.extend(eval(i, q, &item)?);
                 }
             }
             uniq(out)

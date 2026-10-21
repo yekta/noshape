@@ -39,6 +39,13 @@ impl PartStudioView {
             [b] => format!("{} - {}", self.studio_name(cx), self.display.body(b).map(|d| d.name.clone()).unwrap_or_else(|| "Part".into())),
             _ => self.studio_name(cx),
         };
+        // Through the user's export rules (Preferences › User export rules).
+        let (element, name, props) = match bodies.as_slice() {
+            [b] => (noshape_model::export_rules::ExportElement::Part, self.display.body(b).map(|d| d.name.clone()).unwrap_or_default(), self.studio(cx).and_then(|s| s.part_properties.get(b)).cloned()),
+            _ => (noshape_model::export_rules::ExportElement::PartStudio, self.studio_name(cx), None),
+        };
+        let values = crate::export_naming::values(&self.doc.read(cx).name(), &self.studio_name(cx), &name, props.as_ref());
+        let base = crate::export_naming::default_name(element, ExportSettings::default().format.label(), &values, base);
         let parts_only = !bodies.is_empty();
         open_export_modal_with(base, false, parts_only, Rc::new(move |s, name, window, cx| {
             let bodies = bodies.clone();

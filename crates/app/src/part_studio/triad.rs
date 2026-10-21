@@ -132,54 +132,6 @@ impl PartStudioView {
         out
     }
 
-    pub(super) fn triad_overlay(&self, t: &Triad, cx: &App) -> Vec<Instance> {
-        let Some(wpp) = self.triad_wpp(t, cx) else { return Vec::new() };
-        let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
-        let vp = self.viewport.read(cx);
-        let view_dir = (vp.camera.target - vp.camera.eye()).normalize_or_zero();
-        let hover = self.ui.triad_drag.as_ref().map(|d| d.handle).or(self.ui.triad_hover);
-        let o = t.origin;
-        let mut back = LineData::default();
-        let mut front = LineData::default();
-        // Like the extrude arrow: white strokes over a light gray outline
-        // (blue on the hovered handle).
-        // Live (part-studio/444): a hovered handle turns blue, outline
-        // rgb(63,111,172) and inner rgb(151,177,217).
-        let gray = crate::theme::rgb8(0xa8adb2);
-        let blue = crate::theme::rgb8(0x3f6fac);
-        let blue_inner = crate::theme::rgb8(0x97b1d9);
-        let white = crate::theme::rgb8(0xffffff);
-        // While dragging, the other handles go translucent (part-studio/445).
-        let dragging = self.ui.triad_drag.is_some();
-        let fade = |c: [u8; 4], on: bool| if dragging && !on { [c[0], c[1], c[2], 70] } else { c };
-        let mut stroke = |pts: &[DVec3], on: bool| {
-            let p: Vec<[f32; 3]> = pts.iter().map(|w| f(*w)).collect();
-            back.push_polyline(&p, fade(if on { blue } else { gray }, on), 0, 3.0, LineSegment::ON_TOP);
-            front.push_polyline(&p, fade(if on { blue_inner } else { white }, on), 0, 1.5, LineSegment::ON_TOP);
-        };
-        for i in 0..3 {
-            let dir = axis(i);
-            let base = o + dir * SHAFT_PX * wpp;
-            let apex = base + dir * HEAD_PX * wpp;
-            let side = dir.cross(view_dir).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
-            let (l, r) = (base + side * HEAD_PX * 0.4 * wpp, base - side * HEAD_PX * 0.4 * wpp);
-            let on = hover == Some(i);
-            stroke(&[o, base], on);
-            stroke(&[l, apex, r, l], on);
-        }
-        for h in 3..6 {
-            let (i, j) = plane_axes(h);
-            let (a, b) = (axis(i) * SHAFT_PX * wpp, axis(j) * SHAFT_PX * wpp);
-            let quad = [o + a * PLANE_FROM + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_TO, o + a * PLANE_FROM + b * PLANE_TO];
-            stroke(&[quad[0], quad[1], quad[2], quad[3], quad[0]], hover == Some(h));
-        }
-        let up = self.gpu.uploader();
-        vec![
-            Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
-            Instance::new(Drawable::Lines(up.upload_lines(&front))).per_primitive_color().unpickable().ignore_clip().layer(41),
-        ]
-    }
-
     /// The point a drag of `handle` follows: on the arrow's axis, or in
     /// the planar handle's plane, under the cursor.
     fn triad_point(&self, origin: DVec3, handle: usize, p: DVec2, cx: &App) -> Option<DVec3> {
@@ -269,4 +221,50 @@ impl Manip {
             _ => None,
         }
     }
+}
+
+/// The triad's glyph for a frame's view (built by the renderer, see
+/// `manipulators::ManipGeometry`): `hover` the hovered or dragged handle.
+pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+    let Some(wpp) = view.world_per_px(t.origin) else { return Vec::new() };
+    let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
+    let view_dir = view.direction();
+    let o = t.origin;
+    let mut back = LineData::default();
+    let mut front = LineData::default();
+    // Like the extrude arrow: white strokes over a light gray outline
+    // (blue on the hovered handle).
+    // Live (part-studio/444): a hovered handle turns blue, outline
+    // rgb(63,111,172) and inner rgb(151,177,217).
+    let gray = crate::theme::rgb8(0xa8adb2);
+    let blue = crate::theme::rgb8(0x3f6fac);
+    let blue_inner = crate::theme::rgb8(0x97b1d9);
+    let white = crate::theme::rgb8(0xffffff);
+    // While dragging, the other handles go translucent (part-studio/445).
+    let fade = |c: [u8; 4], on: bool| if dragging && !on { [c[0], c[1], c[2], 70] } else { c };
+    let mut stroke = |pts: &[DVec3], on: bool| {
+        let p: Vec<[f32; 3]> = pts.iter().map(|w| f(*w)).collect();
+        back.push_polyline(&p, fade(if on { blue } else { gray }, on), 0, 3.0, LineSegment::ON_TOP);
+        front.push_polyline(&p, fade(if on { blue_inner } else { white }, on), 0, 1.5, LineSegment::ON_TOP);
+    };
+    for i in 0..3 {
+        let dir = axis(i);
+        let base = o + dir * SHAFT_PX * wpp;
+        let apex = base + dir * HEAD_PX * wpp;
+        let side = dir.cross(view_dir).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
+        let (l, r) = (base + side * HEAD_PX * 0.4 * wpp, base - side * HEAD_PX * 0.4 * wpp);
+        let on = hover == Some(i);
+        stroke(&[o, base], on);
+        stroke(&[l, apex, r, l], on);
+    }
+    for h in 3..6 {
+        let (i, j) = plane_axes(h);
+        let (a, b) = (axis(i) * SHAFT_PX * wpp, axis(j) * SHAFT_PX * wpp);
+        let quad = [o + a * PLANE_FROM + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_TO, o + a * PLANE_FROM + b * PLANE_TO];
+        stroke(&[quad[0], quad[1], quad[2], quad[3], quad[0]], hover == Some(h));
+    }
+    vec![
+        Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
+        Instance::new(Drawable::Lines(up.upload_lines(&front))).per_primitive_color().unpickable().ignore_clip().layer(41),
+    ]
 }

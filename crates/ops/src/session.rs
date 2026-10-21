@@ -11,6 +11,13 @@ use std::path::{Path, PathBuf};
 /// What edits on a historical (read-only) view report.
 pub const READ_ONLY_MESSAGE: &str = "This is a read-only view of history. Return to the workspace to edit.";
 
+/// What edits on a protected workspace report (Onshape "Workspace
+/// protections": changes are made on a branch and merged in).
+pub const PROTECTED_MESSAGE: &str = "This workspace is protected. Make changes in another workspace and merge them into this one.";
+
+/// Store meta key of a protected workspace (`workspace_protected:<branch>`).
+pub const PROTECTED_KEY: &str = "workspace_protected:";
+
 pub struct Session {
     pub path: PathBuf,
     pub store: Store,
@@ -23,6 +30,9 @@ pub struct Session {
     pub active_tab: Option<TabId>,
     /// Onshape's "Switch to view only mode" (☰ menu).
     pub view_only: bool,
+    /// Set while an allowed edit runs on a protected workspace (release
+    /// metadata; [`Session::with_protection_lifted`]).
+    protection_lifted: bool,
 }
 
 impl Session {
@@ -34,7 +44,7 @@ impl Session {
         let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Untitled".into());
         store.set_name(&name)?;
         let branch = store.default_branch()?;
-        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false })
+        Ok(Self { path, store, doc, branch, undo: UndoStack::new(branch).with_limit(500), viewing: None, active_tab: None, view_only: false, protection_lifted: false })
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -45,7 +55,7 @@ impl Session {
         let doc = Document::from_blobs(&store.read_all(head)?)?;
         // Undo works across sessions: rebuild the stack from the history.
         let undo = UndoStack::from_history(&store, branch, 500).unwrap_or_else(|_| UndoStack::new(branch).with_limit(500));
-        Ok(Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false })
+        Ok(Self { path, store, doc, branch, undo, viewing: None, active_tab: None, view_only: false, protection_lifted: false })
     }
 
     pub fn name(&self) -> String {
@@ -69,6 +79,36 @@ impl Session {
         graph.microversions.iter().find(|m| m.id == mv && m.parents.is_empty()).map(|_| "Start".to_string())
     }
 
+    /// Onshape's workspace protection: the branch takes no model edits (tab
+    /// content, tabs, settings, restore, undo / redo); versions, branches and
+    /// merges into it are still allowed.
+    pub fn branch_protected(&self, b: BranchId) -> bool {
+        self.store.get_meta(&format!("{PROTECTED_KEY}{b}")).ok().flatten().is_some()
+    }
+
+    /// The current workspace is protected.
+    pub fn is_protected(&self) -> bool {
+        self.viewing.is_none() && self.branch_protected(self.branch)
+    }
+
+    pub fn set_branch_protected(&mut self, b: BranchId, on: bool) -> Result<()> {
+        Ok(self.store.set_meta(&format!("{PROTECTED_KEY}{b}"), on.then_some(b"1".as_slice()))?)
+    }
+
+    /// Runs an edit a protected workspace allows (release management
+    /// metadata).
+    pub fn with_protection_lifted<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let was = std::mem::replace(&mut self.protection_lifted, true);
+        let r = f(self);
+        self.protection_lifted = was;
+        r
+    }
+
+    fn ensure_unprotected(&self) -> Result<()> {
+        anyhow::ensure!(self.protection_lifted || !self.is_protected(), "{PROTECTED_MESSAGE}");
+        Ok(())
+    }
+
     /// No edits: viewing a point in history, or Onshape's "view only mode".
     pub fn read_only(&self) -> bool {
         self.viewing.is_some() || self.view_only
@@ -79,6 +119,8 @@ impl Session {
     /// `None` when the tab doesn't exist.
     pub fn edit_tab<R>(&mut self, tab: TabId, description: &str, f: impl FnOnce(&mut noshape_model::document::TabContent) -> R) -> Result<Option<R>> {
         anyhow::ensure!(!self.read_only(), "{READ_ONLY_MESSAGE}");
+        // Refused before the edit touches the in-memory document.
+        self.ensure_unprotected()?;
         let tab_name = self.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         let Some(t) = self.doc.tab_mut(tab) else { return Ok(None) };
         let r = f(&mut t.content);
@@ -90,6 +132,8 @@ impl Session {
     /// committed as one undoable microversion.
     pub fn edit_document<R>(&mut self, description: &str, f: impl FnOnce(&mut Document) -> R) -> Result<R> {
         anyhow::ensure!(!self.read_only(), "{READ_ONLY_MESSAGE}");
+        // Refused before the edit touches the in-memory document.
+        self.ensure_unprotected()?;
         let r = f(&mut self.doc);
         self.commit_all(description)?;
         Ok(r)
@@ -99,6 +143,8 @@ impl Session {
     /// Versions and history panel restores it).
     pub fn edit_document_not_undoable<R>(&mut self, description: &str, f: impl FnOnce(&mut Document) -> R) -> Result<R> {
         anyhow::ensure!(!self.read_only(), "{READ_ONLY_MESSAGE}");
+        // Refused before the edit touches the in-memory document.
+        self.ensure_unprotected()?;
         let r = f(&mut self.doc);
         self.commit_all_not_undoable(description)?;
         Ok(r)
@@ -107,6 +153,8 @@ impl Session {
     /// Edit the document settings (units) as one microversion.
     pub fn edit_settings<R>(&mut self, description: &str, f: impl FnOnce(&mut noshape_model::document::DocumentSettings) -> R) -> Result<R> {
         anyhow::ensure!(!self.read_only(), "{READ_ONLY_MESSAGE}");
+        // Refused before the edit touches the in-memory document.
+        self.ensure_unprotected()?;
         let r = f(&mut self.doc.settings);
         self.commit(&[], true, description)?;
         Ok(r)
@@ -115,6 +163,7 @@ impl Session {
     /// Commit changed tabs (and settings) as one microversion.
     pub fn commit(&mut self, tabs: &[TabId], settings: bool, description: &str) -> Result<MicroversionId> {
         anyhow::ensure!(self.viewing.is_none(), "viewing history is read-only");
+        self.ensure_unprotected()?;
         let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
         for &t in tabs {
             changes.push((Document::blob_name(t), self.doc.tab_blob(t)));
@@ -128,6 +177,7 @@ impl Session {
     /// Commit the whole document as an edit Ctrl+Z can't undo (deleting a
     /// tab, as in Onshape; history restores it).
     pub fn commit_all_not_undoable(&mut self, description: &str) -> Result<MicroversionId> {
+        self.ensure_unprotected()?;
         let changes = self.all_changes()?;
         Ok(self.undo.commit_not_undoable(&mut self.store, &changes, description)?)
     }
@@ -147,6 +197,7 @@ impl Session {
 
     /// Commit the whole document (used after structural changes).
     pub fn commit_all(&mut self, description: &str) -> Result<MicroversionId> {
+        self.ensure_unprotected()?;
         let head = self.head()?;
         let existing: Vec<String> = self.store.names(head)?;
         let blobs = self.doc.to_blobs();
@@ -185,6 +236,7 @@ impl Session {
     }
 
     pub fn undo(&mut self) -> Result<bool> {
+        self.ensure_unprotected()?;
         let mv = match self.tab_scope() {
             Some(scope) => self.undo.undo_in(&mut self.store, &scope)?,
             None => self.undo.undo(&mut self.store)?,
@@ -199,6 +251,7 @@ impl Session {
     }
 
     pub fn redo(&mut self) -> Result<bool> {
+        self.ensure_unprotected()?;
         let mv = match self.tab_scope() {
             Some(scope) => self.undo.redo_in(&mut self.store, &scope)?,
             None => self.undo.redo(&mut self.store)?,
@@ -224,6 +277,7 @@ impl Session {
     }
 
     pub fn restore(&mut self, to: MicroversionId) -> Result<()> {
+        self.ensure_unprotected()?;
         let before = self.head()?;
         let after = self.store.restore(self.branch, to)?;
         self.undo.record(before, after, "Restore");
@@ -283,6 +337,39 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn protected_workspace_takes_merges_not_edits() {
+        let dir = std::env::temp_dir().join(format!("noshape-session-protect-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("p.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut s = Session::create(&path, Document::new()).unwrap();
+        let (main, tab) = (s.branch, s.doc.tabs[0].id);
+        s.set_branch_protected(main, true).unwrap();
+        assert!(s.is_protected());
+        // Model edits are refused, with Onshape's reason.
+        let e = s.edit_tab(tab, "Rename", |_| ()).unwrap_err();
+        assert!(e.to_string().contains("protected"), "{e}");
+        assert!(s.edit_document("Add tab", |_| ()).is_err());
+        assert!(s.undo().is_err());
+        // Versions and branches are allowed.
+        s.create_version("V1", "").unwrap();
+        let head = s.head().unwrap();
+        let b = s.branch_from(head, "B1").unwrap();
+        assert!(!s.is_protected());
+        s.doc.tab_mut(tab).unwrap().name = "Changed on B1".into();
+        s.commit(&[tab], false, "Rename tab").unwrap();
+        // Merging the branch into the protected workspace is allowed.
+        s.switch_branch(main).unwrap();
+        s.merge_from(b).unwrap();
+        assert_eq!(s.doc.tab(tab).unwrap().name, "Changed on B1");
+        // Release metadata may be written through the escape hatch.
+        s.with_protection_lifted(|s| s.edit_tab(tab, "Release", |_| ())).unwrap();
+        s.set_branch_protected(main, false).unwrap();
+        s.edit_tab(tab, "Rename", |_| ()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn create_commit_undo_reopen() {

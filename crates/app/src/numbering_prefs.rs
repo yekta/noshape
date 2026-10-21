@@ -272,10 +272,13 @@ impl Render for NumberingPrefsView {
         };
         let changed = self.tab_changed();
         let reuse = self.edited.drawing_reuse;
+        // The Preferences page's section look: 18 px / 500 heading over a 1 px
+        // `#333` rule, the content 15 px in.
         v_flex()
             .w_full()
             .mt(px(38.))
-            .child(h_flex().gap(px(6.)).pb(px(6.)).border_b_1().border_color(rgb(0xcccccc)).child(div().text_size(px(20.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Numbering scheme settings")).child(crate::assets::icon("help", 18., cx)))
+            .pl(px(15.))
+            .child(h_flex().ml(px(-15.)).h(px(32.)).pl(px(15.)).gap(px(6.)).border_b_1().border_color(pal.text).child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Numbering scheme settings")).child(crate::assets::icon("help-gray", 20., cx)))
             .child(div().pt(px(10.)).child(tabs))
             .child(
                 v_flex()

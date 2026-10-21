@@ -54,18 +54,21 @@ pub struct Mask {
 /// GPUI's horizontal sub-pixel glyph variants (`SUBPIXEL_VARIANTS_X`).
 pub const SUBPIXEL_VARIANTS_X: usize = 4;
 
-/// How masks are shaded: GPUI's monochrome-sprite text shading.
+/// How GPUI's renderer on this platform draws what the overlay imitates.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextShading {
-    /// Apply GPUI's (wgpu) contrast and gamma correction to the coverage.
+    /// Apply GPUI's (wgpu) contrast and gamma correction to text coverage.
     pub correct: bool,
     pub grayscale_enhanced_contrast: f32,
     pub gamma_ratios: [f32; 4],
+    /// Drop path pixels whose center is outside the path's bounds (GPUI's
+    /// wgpu path shader; Metal clips geometrically, which changes nothing).
+    pub clip_path_pixels: bool,
 }
 
 impl Default for TextShading {
     fn default() -> Self {
-        Self { correct: false, grayscale_enhanced_contrast: 1.0, gamma_ratios: [0.0; 4] }
+        Self { correct: false, grayscale_enhanced_contrast: 1.0, gamma_ratios: [0.0; 4], clip_path_pixels: false }
     }
 }
 
@@ -75,8 +78,12 @@ impl Default for TextShading {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AxisLabel {
     pub masks: [Mask; SUBPIXEL_VARIANTS_X],
-    /// The glyph's origin in device pixels from the label box's top-left
-    /// corner (centered in the 20x16 px box, on the baseline).
+    /// Device pixels from the label box's left edge to the text element:
+    /// centered in the 20 px box, whose width and the text's (rounded up)
+    /// are whole device pixels in GPUI's layout, so this may be a half pixel.
+    pub text_x: f32,
+    /// The glyph's origin in device pixels from the text element's top-left
+    /// corner (its x in the line, the 16 px line's baseline).
     pub glyph: [f32; 2],
     pub color: Rgba,
 }
@@ -128,6 +135,9 @@ pub struct OverlayVertex {
     pub position: [f32; 2],
     /// Premultiplied.
     pub color: [f32; 4],
+    /// The path's bounds (x0, y0, x1, y1): like GPUI's path shader, pixels
+    /// whose center lies outside them are not drawn.
+    pub bounds: [f32; 4],
 }
 
 impl OverlayDraw {
@@ -146,10 +156,15 @@ impl OverlayDraw {
         }
         let base = self.vertices.len() as u32;
         let premul = [color[0] * color[3], color[1] * color[3], color[2] * color[3], color[3]];
+        let mut bounds = [f32::MAX, f32::MAX, f32::MIN, f32::MIN];
+        for v in &buf.vertices {
+            let (x, y) = (v.x * dpr, v.y * dpr);
+            bounds = [bounds[0].min(x), bounds[1].min(y), bounds[2].max(x), bounds[3].max(y)];
+        }
         for v in &buf.vertices {
             let (x, y) = (v.x * dpr, v.y * dpr);
             self.grow(x, y);
-            self.vertices.push(OverlayVertex { position: [x, y], color: premul });
+            self.vertices.push(OverlayVertex { position: [x, y], color: premul, bounds });
         }
         self.indices.extend(buf.indices.iter().map(|i| base + i));
     }
@@ -581,11 +596,19 @@ pub mod view_cube {
                 if alpha <= 0.0 {
                     continue;
                 }
-                // The label's 20x16 box is centered on the point; the glyph
-                // goes where `Window::paint_glyph` puts it.
-                let p = at(v);
-                let gx = (p.x - 10.0) as f32 * dpr + label.glyph[0];
-                let gy = (p.y - 8.0) as f32 * dpr + label.glyph[1];
+                // The label's 20x16 box is centered on the point, laid out like
+                // GPUI's layout does it (gpui `taffy.rs`): its offset in the
+                // widget is rounded to device pixels before layout (half toward
+                // zero), the text element centered in it, and the text's
+                // absolute position rounded again. The glyph then goes where
+                // `Window::paint_glyph` puts it.
+                // In f32, as the widget computes it (`left(px(WIDGET_PX * 0.5 + v.x as f32 - 10.0))`).
+                let local = [WIDGET_PX * 0.5 + v.x as f32 - 10.0, WIDGET_PX * 0.5 - v.y as f32 - 8.0];
+                let bx = cube.origin[0] + round_half_toward_zero(local[0] * dpr);
+                let by = cube.origin[1] + round_half_toward_zero(local[1] * dpr);
+                let tx = round_half_toward_zero(bx + label.text_x);
+                let ty = round_half_toward_zero(by);
+                let (gx, gy) = (tx + label.glyph[0], ty + label.glyph[1]);
                 let n = SUBPIXEL_VARIANTS_X as f32;
                 let qx = round_half_toward_zero(gx * n) / n;
                 let variant = ((qx.fract() * n) as usize).min(SUBPIXEL_VARIANTS_X - 1);

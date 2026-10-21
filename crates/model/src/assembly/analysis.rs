@@ -728,6 +728,95 @@ pub fn assembly_mass_properties(result: &AssemblyResult, tops: &[InstanceId], de
     })
 }
 
+/// Mass moments of inertia moved to a reference frame (Mass and section
+/// properties' "Mate connector for reference frame"; help: the moments are
+/// taken about the connector instead of the centre of gravity): about the
+/// frame's origin (parallel-axis theorem), in its axes.
+pub fn inertia_about_frame(inertia_cm: glam::DMat3, mass: f64, center: DVec3, frame: &super::solver::Frame) -> glam::DMat3 {
+    let d = center - frame.origin;
+    let shifted = inertia_cm + (glam::DMat3::IDENTITY * d.length_squared() - glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z)) * mass;
+    let r = glam::DMat3::from_quat(frame.rotation);
+    r.transpose() * shifted * r
+}
+
+/// Mass and section properties › Face tab (live behaviours "Assembly Mass
+/// and section properties: Face tab"): area, perimeter, and the area
+/// moments about the faces' centroid in the plane's own axes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FaceSection {
+    pub area: f64,
+    pub perimeter: f64,
+    /// Centroid (world).
+    pub centroid: DVec3,
+    /// [[Lxx, Lxy], [Lyx, Lyy]] (m⁴); Lxx = ∫y² dA about the centroid's x axis.
+    pub moments: [[f64; 2]; 2],
+    /// Polar moment Lzz = Lxx + Lyy (m⁴).
+    pub polar: f64,
+}
+
+/// The Face tab's values for faces of the assembly (path, face); None when
+/// a face isn't planar or the faces aren't coplanar (live: blank values, a
+/// red title, "Face selections are not coplanar").
+pub fn face_section_properties(result: &AssemblyResult, faces: &[(InstancePath, Reference)]) -> Option<FaceSection> {
+    if faces.is_empty() {
+        return None;
+    }
+    // (world triangles, area, perimeter, plane origin, normal, x axis) per face.
+    let mut tris: Vec<[DVec3; 3]> = Vec::new();
+    let (mut area, mut perimeter) = (0.0, 0.0);
+    let mut plane: Option<(DVec3, DVec3, DVec3)> = None;
+    for (path, reference) in faces {
+        let Reference::Face(name) = reference else { return None };
+        let (o, fi) = result.occurrences.iter().find_map(|o| (&o.path == path).then(|| o.face_refs.iter().position(|r| r == reference).map(|fi| (o, fi))).flatten())?;
+        let body = o.context.body(&o.body)?;
+        let &kfi = body.find_faces(name).first()?;
+        let face = body.shape.sub_shape(k::ShapeType::Face, kfi).ok()?;
+        let k::Surface::Plane(pl) = face.face_surface().ok()? else { return None };
+        let rot = |v: DVec3| o.transform.transform_vector3(v).normalize_or_zero();
+        let (origin, normal, x) = (o.transform.transform_point3(pl.origin), rot(pl.normal), rot(pl.x_dir));
+        match plane {
+            None => plane = Some((origin, normal, x)),
+            Some((o0, n0, _)) => {
+                if n0.cross(normal).length() > 1e-6 || n0.dot(origin - o0).abs() > 1e-9 {
+                    return None;
+                }
+            }
+        }
+        area += face.area().ok()?;
+        perimeter += face.edges().iter().map(|e| e.length().unwrap_or(0.0)).sum::<f64>();
+        let &(first, count) = o.mesh.face_ranges.get(fi)?;
+        let idx = o.mesh.indices.get(first as usize..(first + count) as usize)?;
+        let p = |i: u32| o.mesh.positions.get(i as usize).map(|q| o.transform.transform_point3(DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64)));
+        for t in idx.chunks(3) {
+            if let [a, b, c] = *t
+                && let (Some(a), Some(b), Some(c)) = (p(a), p(b), p(c))
+            {
+                tris.push([a, b, c]);
+            }
+        }
+    }
+    let (_, normal, x) = plane?;
+    let y = normal.cross(x).normalize_or_zero();
+    // Centroid (area-weighted triangle centroids), then the second moments.
+    let tri_area = |t: &[DVec3; 3]| (t[1] - t[0]).cross(t[2] - t[0]).length() * 0.5;
+    let total: f64 = tris.iter().map(tri_area).sum();
+    if total <= 0.0 {
+        return None;
+    }
+    let centroid = tris.iter().map(|t| (t[0] + t[1] + t[2]) / 3.0 * tri_area(t)).sum::<DVec3>() / total;
+    let (mut ixx, mut iyy, mut ixy) = (0.0, 0.0, 0.0);
+    for t in &tris {
+        let a = tri_area(t);
+        let uv: Vec<(f64, f64)> = t.iter().map(|q| ((*q - centroid).dot(x), (*q - centroid).dot(y))).collect();
+        let (u, v) = ([uv[0].0, uv[1].0, uv[2].0], [uv[0].1, uv[1].1, uv[2].1]);
+        let sq = |w: [f64; 3]| w[0] * w[0] + w[1] * w[1] + w[2] * w[2] + w[0] * w[1] + w[1] * w[2] + w[2] * w[0];
+        ixx += a / 6.0 * sq(v);
+        iyy += a / 6.0 * sq(u);
+        ixy += a / 12.0 * (2.0 * (u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) + u[0] * v[1] + u[1] * v[0] + u[0] * v[2] + u[2] * v[0] + u[1] * v[2] + u[2] * v[1]);
+    }
+    Some(FaceSection { area, perimeter, centroid, moments: [[ixx, ixy], [ixy, iyy]], polar: ixx + iyy })
+}
+
 /// Result of [`assembly_mass_properties`].
 #[derive(Clone, Debug)]
 pub struct AssemblyMass {

@@ -135,6 +135,9 @@ impl DrawingEditor {
     /// Drawing tab › Export…: the Export Drawing modal.
     pub fn open_export_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into());
+        // Through the user's export rules (Preferences › User export rules).
+        let values = crate::export_naming::values(&self.doc.read(cx).name(), &name, &name, None);
+        let name = crate::export_naming::default_name(noshape_model::export_rules::ExportElement::Drawing, ExportSettings::default().format.label(), &values, name);
         let file = cx.new(|cx| InputState::new(window, cx).default_value(name));
         let custom = cx.new(|cx| InputState::new(window, cx).placeholder("1-3, 5"));
         let st = Rc::new(RefCell::new(ExportSettings::default()));

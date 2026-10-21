@@ -20,9 +20,11 @@ pub struct ExprValue {
 
 impl ExprValue {
     /// A value from expression text (not yet evaluated).
+    /// Typed text in the comma form (Preferences › Decimal format) is
+    /// stored canonically.
     pub fn new(text: impl Into<String>) -> Self {
         ExprValue {
-            text: text.into(),
+            text: crate::delocalize(&text.into()),
             cached: None,
         }
     }
@@ -30,7 +32,7 @@ impl ExprValue {
     /// A literal value formatted in the preferred units, with the cache set.
     pub fn from_quantity(q: Quantity, prefs: &UnitPrefs) -> Self {
         ExprValue {
-            text: crate::format_quantity_exact(q, prefs),
+            text: crate::delocalize(&crate::format_quantity_exact(q, prefs)),
             cached: Some(q),
         }
     }

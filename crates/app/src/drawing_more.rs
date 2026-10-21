@@ -62,47 +62,17 @@ impl DrawingEditor {
     /// The axis under the cursor: a centerline annotation, an automatic
     /// centerline of a view, else a straight edge.
     fn axis_pick(&self) -> Option<Pick> {
-        let c = self.cursor;
-        let built = self.built.as_ref()?;
-        let tol = self.tol_mm(6.0);
-        for a in &built.resolved.annotations {
-            if let AnnotationKind::Centerline { view, a: pa, b: pb } = &a.kind
-                && let Some(pl) = self.placement(*view)
-                && views::dist_to_segment(c, pl.to_sheet(*pa), pl.to_sheet(*pb)) < tol
-            {
-                let r = |slot: u8| a.refs.iter().find(|x| x.slot == slot).map(|x| x.point.clone());
-                return Some(Pick::Line { a: PickedPoint { view: *view, p: *pa, r: r(0) }, b: PickedPoint { view: *view, p: *pb, r: r(1) } });
-            }
-        }
-        for pl in &built.placements {
-            let Some(g) = self.geoms.get(&pl.id) else { continue };
-            for ax in &g.axes {
-                if views::dist_to_segment(c, pl.to_sheet(ax[0]), pl.to_sheet(ax[1])) < tol {
-                    return Some(Pick::Line { a: PickedPoint { view: pl.id, p: ax[0], r: None }, b: PickedPoint { view: pl.id, p: ax[1], r: None } });
-                }
-            }
-        }
-        self.line_pick()
+        self.pk().axis_pick()
     }
 
     /// The hovered drawn line of a view (also silhouettes and cut edges
     /// without a model edge), as its end points.
     fn raw_line_pick(&self) -> Option<Pick> {
-        let h = self.hover?;
-        let noshape_model::drawing::build::PickTarget::Edge { view, edge } = self.built.as_ref()?.picks.get(h as usize)?.clone() else { return None };
-        let pts = &self.geoms.get(&view)?.edges.get(edge as usize)?.points;
-        let (a, b) = (*pts.first()?, *pts.last()?);
-        let l = len(sub(b, a));
-        if l < 1e-9 || pts.iter().any(|p| ((p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])).abs() / l > l * 1e-3) {
-            return None;
-        }
-        Some(Pick::Line { a: PickedPoint { view, p: a, r: None }, b: PickedPoint { view, p: b, r: None } })
+        self.pk().raw_line_pick()
     }
 
     fn circle_at(&self) -> Option<Pick> {
-        let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(self.cursor) else { return None };
-        let at = self.placement(view)?.to_view(self.cursor);
-        Some(Pick::CircleAt { view, center, radius, r, at })
+        self.pk().circle_at()
     }
 
     /// Clicks of the max/min and foreshortened dimension tools.
@@ -405,7 +375,8 @@ impl DrawingEditor {
         }
         let mut d = self.drawing.clone();
         let to = to.unwrap_or_else(|| d.add_sheet(self.sheet));
-        match d.move_views_to_sheet(self.sheet, &ids, to, Some(&self.sources)) {
+        // Live (behaviours "Views linked across sheets"): the views move alone, linked to their parents.
+        match d.move_views_to_sheet_linked(self.sheet, &ids, to) {
             Ok(moved) => {
                 let name = d.sheets[to].name.clone();
                 self.commit("Move to sheet", d, cx);
@@ -668,7 +639,7 @@ impl DrawingEditor {
 
     pub fn open_cell_format_panel(&mut self, table: u64, row: usize, col: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(table) else { return };
-        let f = t.cell_format(row, col);
+        let f = t.shown_cell_format(row, col);
         let height = self.input(&f.height.map(|h| format::format_number(h, None, 2)).unwrap_or_default(), window, cx);
         self.panel = Some(Panel::CellFormat { table, row, col, scope: 0, align: f.align, bold: f.bold, height });
         cx.notify();
@@ -821,7 +792,8 @@ impl DrawingEditor {
                 };
                 self.edit_table(table, "Format cells", cx, |t| {
                     for (r, c) in cells {
-                        t.set_cell_format(r, c, CellFormat { align, height: h, bold });
+                        let f = CellFormat { align, height: h, bold, ..t.shown_cell_format(r, c) };
+                        t.set_cell_format(r, c, f);
                     }
                     t.col_widths.clear();
                 });

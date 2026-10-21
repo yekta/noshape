@@ -224,59 +224,16 @@ impl PartStudioView {
         self.viewport.update(cx, |v, _| v.manipulators = handles);
     }
 
-    /// Overlay geometry for the active manipulator.
-    pub(super) fn manipulator_overlay(&self, cx: &App) -> Vec<Instance> {
-        let up = self.gpu.uploader();
-        let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
-        // Onshape manipulators: dark blue (`--os-color-charles-600`).
-        let color = crate::theme::rgb8(0x134e96);
-        let a = match self.current_manip(cx) {
-            Some(Manip::Arrow(a)) => a,
-            Some(Manip::Arc(h)) => {
-                let mut lines = LineData::default();
-                let n = ((h.angle.abs().to_degrees() / 4.0).ceil() as usize).clamp(2, 90);
-                let pts: Vec<[f32; 3]> = (0..=n).map(|i| f(h.point(h.angle * i as f64 / n as f64))).collect();
-                lines.push_polyline(&pts, color, 0, 2.5, LineSegment::ON_TOP);
-                // Spokes from the axis to both ends.
-                lines.push_polyline(&[f(h.origin), f(h.point(0.0))], color, 0, 1.0, LineSegment::ON_TOP | LineSegment::DASHED);
-                lines.push_polyline(&[f(h.origin), f(h.point(h.angle))], color, 0, 1.0, LineSegment::ON_TOP | LineSegment::DASHED);
-                let pts = PointData { points: vec![PointSprite { position: f(h.point(h.angle)), color, pick_id: 0, size: 11.0, style: LineSegment::ON_TOP, _pad: 0 }] };
-                return vec![
-                    Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(40),
-                    Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(41),
-                ];
-            }
-            Some(Manip::Triad(t)) => return self.triad_overlay(&t, cx),
-            None => return Vec::new(),
-        };
-        let _ = color;
-        // Live (part-studio/230, dialogs/extrude-05): a screen-sized arrow at
-        // the end of the length: a 1.5 px white shaft and a hollow triangular
-        // head, outlined light gray (blue when hovered).
-        let tip = a.base + a.dir * a.length;
-        let dir = a.dir * a.length.signum();
-        let vp = self.viewport.read(cx);
-        let right = vp.camera.right();
-        let (Some(p0), Some(p1)) = (vp.project(tip), vp.project(tip + right * 1e-3)) else { return Vec::new() };
-        let wpp = 1e-3 / (p1 - p0).length().max(1e-9);
-        // The head's width runs across the view.
-        let view_dir = (vp.camera.target - vp.camera.eye()).normalize_or_zero();
-        let side = dir.cross(view_dir).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
-        let base = tip + dir * ARROW_SHAFT_PX * wpp;
-        let apex = base + dir * ARROW_HEAD_PX * wpp;
-        let (l, r) = (base + side * ARROW_HEAD_PX * 0.45 * wpp, base - side * ARROW_HEAD_PX * 0.45 * wpp);
-        let outline = if self.ui.manip_hover { crate::theme::rgb8(0x3e6eb0) } else { crate::theme::rgb8(0xa8adb2) };
-        let white = crate::theme::rgb8(0xffffff);
-        let mut back = LineData::default();
-        let mut front = LineData::default();
-        for (data, color, width) in [(&mut back, outline, if self.ui.manip_hover { 4.0 } else { 3.0 }), (&mut front, white, 1.5)] {
-            data.push_polyline(&[f(tip), f(base)], color, 0, width, LineSegment::ON_TOP);
-            data.push_polyline(&[f(l), f(apex), f(r), f(l)], color, 0, width, LineSegment::ON_TOP);
-        }
-        vec![
-            Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
-            Instance::new(Drawable::Lines(up.upload_lines(&front))).per_primitive_color().unpickable().ignore_clip().layer(41),
-        ]
+    /// The active manipulator's glyph, built by the renderer for every
+    /// frame's camera (its head faces the viewer and keeps its screen size).
+    pub(super) fn manipulator_geometry(&self, cx: &App) -> Option<std::sync::Arc<ManipGeometry>> {
+        let manip = self.current_manip(cx)?;
+        Some(std::sync::Arc::new(ManipGeometry {
+            manip,
+            arrow_hover: self.ui.manip_hover,
+            triad_hover: self.ui.triad_drag.as_ref().map(|d| d.handle).or(self.ui.triad_hover),
+            triad_dragging: self.ui.triad_drag.is_some(),
+        }))
     }
 
     /// Axis parameter of the point on the arrow axis closest to a view ray.
@@ -424,4 +381,69 @@ fn region_anchor(positions: &[[f32; 3]], indices: &[u32]) -> Option<DVec3> {
     // Nearest sizable triangle center to the centroid.
     let min_area = total / tris.len() as f64 * 0.25;
     tris.iter().filter(|t| t.1 >= min_area).min_by(|a, b| a.0.distance_squared(centroid).total_cmp(&b.0.distance_squared(centroid))).map(|t| t.0)
+}
+
+/// A manipulator's glyph for the renderer (`noshape_render::camera_geometry`).
+pub(super) struct ManipGeometry {
+    manip: Manip,
+    arrow_hover: bool,
+    triad_hover: Option<usize>,
+    triad_dragging: bool,
+}
+
+impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
+    fn build(&self, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+        match self.manip {
+            Manip::Arrow(a) => arrow_glyph(&a, self.arrow_hover, view, up),
+            Manip::Arc(h) => arc_glyph(&h, up),
+            Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, view, up),
+        }
+    }
+}
+
+// Onshape manipulators: dark blue (`--os-color-charles-600`).
+const MANIP_COLOR: u32 = 0x134e96;
+
+fn arc_glyph(h: &ArcHandle, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+    let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
+    let color = crate::theme::rgb8(MANIP_COLOR);
+    let mut lines = LineData::default();
+    let n = ((h.angle.abs().to_degrees() / 4.0).ceil() as usize).clamp(2, 90);
+    let pts: Vec<[f32; 3]> = (0..=n).map(|i| f(h.point(h.angle * i as f64 / n as f64))).collect();
+    lines.push_polyline(&pts, color, 0, 2.5, LineSegment::ON_TOP);
+    // Spokes from the axis to both ends.
+    lines.push_polyline(&[f(h.origin), f(h.point(0.0))], color, 0, 1.0, LineSegment::ON_TOP | LineSegment::DASHED);
+    lines.push_polyline(&[f(h.origin), f(h.point(h.angle))], color, 0, 1.0, LineSegment::ON_TOP | LineSegment::DASHED);
+    let pts = PointData { points: vec![PointSprite { position: f(h.point(h.angle)), color, pick_id: 0, size: 11.0, style: LineSegment::ON_TOP, _pad: 0 }] };
+    vec![
+        Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(40),
+        Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(41),
+    ]
+}
+
+fn arrow_glyph(a: &Arrow, hover: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
+    let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
+    // Live (part-studio/230, dialogs/extrude-05): a screen-sized arrow at
+    // the end of the length: a 1.5 px white shaft and a hollow triangular
+    // head, outlined light gray (blue when hovered).
+    let tip = a.base + a.dir * a.length;
+    let dir = a.dir * a.length.signum();
+    let Some(wpp) = view.world_per_px(tip) else { return Vec::new() };
+    // The head's width runs across the view.
+    let side = dir.cross(view.direction()).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
+    let base = tip + dir * ARROW_SHAFT_PX * wpp;
+    let apex = base + dir * ARROW_HEAD_PX * wpp;
+    let (l, r) = (base + side * ARROW_HEAD_PX * 0.45 * wpp, base - side * ARROW_HEAD_PX * 0.45 * wpp);
+    let outline = if hover { crate::theme::rgb8(0x3e6eb0) } else { crate::theme::rgb8(0xa8adb2) };
+    let white = crate::theme::rgb8(0xffffff);
+    let mut back = LineData::default();
+    let mut front = LineData::default();
+    for (data, color, width) in [(&mut back, outline, if hover { 4.0 } else { 3.0 }), (&mut front, white, 1.5)] {
+        data.push_polyline(&[f(tip), f(base)], color, 0, width, LineSegment::ON_TOP);
+        data.push_polyline(&[f(l), f(apex), f(r), f(l)], color, 0, width, LineSegment::ON_TOP);
+    }
+    vec![
+        Instance::new(Drawable::Lines(up.upload_lines(&back))).per_primitive_color().unpickable().ignore_clip().layer(40),
+        Instance::new(Drawable::Lines(up.upload_lines(&front))).per_primitive_color().unpickable().ignore_clip().layer(41),
+    ]
 }

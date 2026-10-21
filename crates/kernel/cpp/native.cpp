@@ -11,7 +11,10 @@
 #include "internal.hpp"
 #include "pvz_reader.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <sstream>
 #include <functional>
 #include <fstream>
@@ -881,6 +884,409 @@ std::vector<std::string> extract_zip(const std::string& zip, const std::string& 
     o << data;
   }
   return names;
+}
+
+
+// ---- Inventor assemblies (.iam)
+//
+// The occurrences' placements live in one of the assembly's RSe segments
+// ("RSeStorage/B…": an 18-byte header, then zlib): a record per occurrence
+// ending in UTF-16 "GRx" and the record's index, its placement right before
+// that as a compact 4x4 (row-major, translation in cm, relative to the parent
+// assembly): a flag word (low 16 bits: entries equal to 1, high 16 bits:
+// entries equal to 0, both: −1), then every other entry as a double. The
+// "UFRxDoc" stream lists, in the same order, a property set per occurrence:
+// the referenced document's internal id (property 0x13, a GUID found in that
+// document's own UFRxDoc) and its name (property 0x05).
+
+namespace
+{
+
+uint32_t iam_u32(const std::string& d, size_t at)
+{
+  uint32_t v = 0;
+  std::memcpy(&v, d.data() + at, 4);
+  return v;
+}
+
+std::string iam_utf16(const std::string& ascii)
+{
+  std::string u;
+  for (char c : ascii)
+  {
+    u += c;
+    u += '\0';
+  }
+  return u;
+}
+
+// UTF-16LE (BMP) as UTF-8.
+std::string iam_utf8(const std::string& d, size_t at, size_t chars)
+{
+  std::string out;
+  for (size_t i = 0; i < chars && at + 2 * i + 1 < d.size(); ++i)
+  {
+    const unsigned c = (unsigned char)d[at + 2 * i] | ((unsigned char)d[at + 2 * i + 1] << 8);
+    if (c < 0x80)
+      out += (char)c;
+    else if (c < 0x800)
+    {
+      out += (char)(0xC0 | (c >> 6));
+      out += (char)(0x80 | (c & 0x3F));
+    }
+    else
+    {
+      out += (char)(0xE0 | (c >> 12));
+      out += (char)(0x80 | ((c >> 6) & 0x3F));
+      out += (char)(0x80 | (c & 0x3F));
+    }
+  }
+  return out;
+}
+
+// The compact placement ending at `end`; false when none fits there.
+bool iam_placement(const std::string& d, size_t end, std::array<double, 16>& m)
+{
+  for (size_t c = 0; c <= 16; ++c)
+  {
+    if (end < 8 * c + 4)
+      return false;
+    const size_t   at = end - 8 * c - 4;
+    const uint32_t fl = iam_u32(d, at);
+    if ((fl & 0x70008000u) != 0x70008000u)
+      continue;
+    const uint32_t ones = fl & 0xFFFFu, zeros = fl >> 16;
+    size_t         stored = 0;
+    for (int i = 0; i < 16; ++i)
+      if (!((ones >> i) & 1) && !((zeros >> i) & 1))
+        ++stored;
+    if (stored != c)
+      continue;
+    size_t next = at + 4;
+    for (int i = 0; i < 16; ++i)
+    {
+      const bool o = (ones >> i) & 1, z = (zeros >> i) & 1;
+      if (o && z)
+        m[(size_t)i] = -1.0;
+      else if (o)
+        m[(size_t)i] = 1.0;
+      else if (z)
+        m[(size_t)i] = 0.0;
+      else
+      {
+        std::memcpy(&m[(size_t)i], d.data() + next, 8);
+        next += 8;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+struct IamOccurrence
+{
+  std::string            name, guid;
+  std::array<double, 16> m{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+};
+
+std::string iam_ufrx(const std::string& path)
+{
+  Compound    cf(read_file(path));
+  std::string x;
+  if (!cf.stream("UFRxDoc", x))
+    fail_invalid("inventor: " + file_name_of(path) + " has no document stream");
+  return x;
+}
+
+std::vector<IamOccurrence> iam_occurrences(const std::string& path)
+{
+  Compound    cf(read_file(path));
+  std::string ufrx;
+  if (!cf.stream("UFRxDoc", ufrx))
+    fail_invalid("inventor: the assembly has no document stream");
+  // The occurrences' property sets, in record order.
+  std::vector<IamOccurrence> out;
+  static const std::string tag("\x01\x13\x01\x00\x00\x00\x13", 7), name_tag("\x05\x01\x00\x00\x00\x05", 6);
+  for (size_t i = ufrx.find(tag); i != std::string::npos && i + tag.size() + 16 <= ufrx.size(); i = ufrx.find(tag, i + 1))
+  {
+    IamOccurrence o;
+    o.guid         = ufrx.substr(i + tag.size(), 16);
+    const size_t n = ufrx.find(name_tag, i + tag.size() + 16);
+    if (n != std::string::npos && n < i + tag.size() + 16 + 200 && n + name_tag.size() + 4 <= ufrx.size())
+      o.name = iam_utf8(ufrx, n + name_tag.size() + 4, iam_u32(ufrx, n + name_tag.size()));
+    out.push_back(std::move(o));
+  }
+  // Their placements: the segment with the "GRx" records.
+  const std::string grx = iam_utf16("GRx");
+  for (const std::string& p : cf.stream_paths())
+  {
+    if (p.rfind("RSeStorage/B", 0) != 0)
+      continue;
+    std::string raw, d;
+    if (!cf.stream(p, raw) || raw.size() < 21 || (unsigned char)raw[18] != 0x78)
+      continue;
+    try
+    {
+      d = pvz::inflate_raw((const unsigned char*)raw.data() + 20, raw.size() - 20);
+    }
+    catch (const std::runtime_error&)
+    {
+      continue;
+    }
+    std::vector<size_t> marks;
+    for (size_t k = d.find(grx); k != std::string::npos; k = d.find(grx, k + 1))
+      marks.push_back(k);
+    if (marks.empty())
+      continue;
+    if (marks.size() != out.size())
+      fail_unsupported("inventor: the assembly's occurrences don't match their placements");
+    for (size_t k = 0; k < marks.size(); ++k)
+    {
+      std::array<double, 16> r;
+      if (marks[k] < 10 || !iam_placement(d, marks[k] - 10, r))
+        fail_unsupported("inventor: an occurrence placement noshape can't read");
+      // Row-major, cm → column-major, metres.
+      auto& m = out[k].m;
+      for (int row = 0; row < 3; ++row)
+        for (int col = 0; col < 3; ++col)
+          m[(size_t)(col * 4 + row)] = r[(size_t)(row * 4 + col)];
+      for (int row = 0; row < 3; ++row)
+        m[(size_t)(12 + row)] = r[(size_t)(row * 4 + 3)] * 0.01;
+    }
+    return out;
+  }
+  if (out.empty())
+    return out;
+  fail_unsupported("inventor: the assembly's placements are missing");
+}
+
+} // namespace
+
+std::vector<AsmNode> read_iam_tree(const std::string& path, const std::string& search_dir)
+{
+  namespace fs = std::filesystem;
+  // Every Inventor document under `search_dir` (relative paths) and its
+  // UFRxDoc, read once.
+  std::vector<std::pair<std::string, std::string>> docs;
+  std::error_code                                  ec;
+  for (fs::recursive_directory_iterator it(search_dir, ec), end; !ec && it != end; it.increment(ec))
+  {
+    if (!it->is_regular_file(ec))
+      continue;
+    const std::string e = it->path().extension().string();
+    if (e.size() != 4 || (e[1] != 'i' && e[1] != 'I') || (std::tolower((unsigned char)e[3]) != 't' && std::tolower((unsigned char)e[3]) != 'm'))
+      continue;
+    try
+    {
+      docs.emplace_back(fs::relative(it->path(), search_dir, ec).generic_string(), iam_ufrx(it->path().string()));
+    }
+    catch (const std::exception&)
+    {
+    }
+  }
+  auto lower = [](std::string s) {
+    for (char& c : s)
+      c = (char)std::tolower((unsigned char)c);
+    return s;
+  };
+  auto stem = [&](const std::string& rel) { return lower(fs::path(rel).stem().string()); };
+  auto ext  = [&](const std::string& rel) { return lower(fs::path(rel).extension().string()); };
+  std::vector<AsmNode>                        out;
+  std::function<void(const std::string&, int, std::vector<std::string>&, int)> walk = [&](const std::string& file, int parent, std::vector<std::string>& chain, int depth) {
+    if (depth > 32)
+      return;
+    std::map<std::string, int> numbers;
+    for (const IamOccurrence& o : iam_occurrences(file))
+    {
+      AsmNode n;
+      n.parent = parent;
+      n.name   = o.name;
+      n.number = ++numbers[o.name];
+      n.m      = o.m;
+      // The referenced document: the one whose UFRxDoc holds the id; a part
+      // over the assemblies that use it, then the name (mirrored copies share
+      // the id), never an assembly up the chain.
+      const std::string want = lower(o.name);
+      int               best = -1, best_score = -1;
+      for (size_t i = 0; i < docs.size(); ++i)
+      {
+        if (o.guid.empty() || docs[i].second.find(o.guid) == std::string::npos)
+          continue;
+        if (std::find(chain.begin(), chain.end(), docs[i].first) != chain.end())
+          continue;
+        const std::string s     = stem(docs[i].first);
+        const int         score = (ext(docs[i].first) == ".ipt" ? 4 : 0) + (s == want ? 2 : 0) + (s.rfind(want, 0) == 0 ? 1 : 0);
+        if (score > best_score)
+          best = (int)i, best_score = score;
+      }
+      if (best >= 0)
+      {
+        n.file     = docs[(size_t)best].first;
+        n.assembly = ext(n.file) == ".iam";
+      }
+      out.push_back(n);
+      if (n.assembly)
+      {
+        chain.push_back(n.file);
+        walk((fs::path(search_dir) / n.file).string(), (int)out.size() - 1, chain, depth + 1);
+        chain.pop_back();
+      }
+    }
+  };
+  std::string root = fs::relative(fs::path(path), search_dir, ec).generic_string();
+  std::vector<std::string> chain{root};
+  walk(path, -1, chain, 0);
+  return out;
+}
+
+
+// ---- Solid Edge assemblies (.asm)
+//
+// "JAsmRefAttr" lists the occurrences in order, by name "<file>:<k>" (UTF-16,
+// NUL-terminated); "Attachments" holds each one's placement: 16 doubles
+// (row-major, row-vector convention like SOLIDWORKS' swTransform, metres),
+// a 6-double box and a u32, then the name's byte length and the name, so the
+// matrix starts 180 bytes before that length (live G43: Onshape's
+// transforms). "Preview/Structure/IDS" keeps the same list for previews but
+// can be stale (G43: the module holders 5 mm off), so it is only a fallback.
+
+namespace
+{
+
+// UTF-16 names "<file>.<ext>:<k>" in `d` with the offset of their u32 length
+// (`bytes`: the length counts bytes and the terminating NUL; else characters).
+std::vector<std::pair<size_t, std::string>> se_names(const std::string& d, bool bytes)
+{
+  std::vector<std::pair<size_t, std::string>> out;
+  for (size_t k = 0; k + 8 <= d.size(); ++k)
+  {
+    const uint32_t n     = iam_u32(d, k);
+    const size_t   chars = bytes ? (n >= 2 && n % 2 == 0 ? n / 2 - 1 : 0) : n;
+    if (chars < 5 || chars > 260 || k + 4 + 2 * chars > d.size())
+      continue;
+    bool ascii = true;
+    for (size_t c = 0; c < chars && ascii; ++c)
+      ascii = d[k + 4 + 2 * c] >= 0x20 && d[k + 4 + 2 * c] < 0x7f && d[k + 5 + 2 * c] == 0;
+    if (!ascii)
+      continue;
+    const std::string s     = iam_utf8(d, k + 4, chars);
+    const size_t      colon = s.rfind(':');
+    if (colon == std::string::npos || colon < 5 || s[colon - 4] != '.' || colon + 1 >= s.size() || !std::isdigit((unsigned char)s[colon + 1]))
+      continue;
+    out.emplace_back(k, s);
+    k += 3 + 2 * chars;
+  }
+  return out;
+}
+
+// Printable UTF-16 runs "<file>.<ext>:<k>" in `d`, in order (JAsmRefAttr
+// keeps its names NUL-terminated, without a length).
+std::vector<std::string> se_runs(const std::string& d)
+{
+  std::vector<std::string> out;
+  for (size_t k = 0; k + 1 < d.size(); ++k)
+  {
+    size_t e = k;
+    while (e + 1 < d.size() && d[e] >= 0x20 && d[e] < 0x7f && d[e + 1] == 0)
+      e += 2;
+    if (e - k < 10)
+      continue;
+    const std::string s     = iam_utf8(d, k, (e - k) / 2);
+    const size_t      colon = s.rfind(':');
+    if (colon != std::string::npos && colon >= 5 && s[colon - 4] == '.' && colon + 1 < s.size() && std::isdigit((unsigned char)s[colon + 1]))
+      out.push_back(s);
+    k = e;
+  }
+  return out;
+}
+
+bool se_rigid(const std::array<double, 16>& m)
+{
+  if (std::abs(m[3]) > 1e-9 || std::abs(m[7]) > 1e-9 || std::abs(m[11]) > 1e-9 || std::abs(m[15] - 1) > 1e-9)
+    return false;
+  for (int i = 0; i < 3; ++i)
+    for (int j = 0; j < 3; ++j)
+    {
+      double dot = 0;
+      for (int k = 0; k < 3; ++k)
+        dot += m[(size_t)(4 * i + k)] * m[(size_t)(4 * j + k)];
+      if (std::abs(dot - (i == j ? 1.0 : 0.0)) > 1e-6)
+        return false;
+    }
+  return true;
+}
+
+} // namespace
+
+std::vector<AsmNode> read_se_tree(const std::string& path, const std::string& search_dir)
+{
+  namespace fs = std::filesystem;
+  std::vector<AsmNode>                              out;
+  std::function<void(const std::string&, int, int)> walk = [&](const std::string& file, int parent, int depth) {
+    if (depth > 32)
+      return;
+    Compound    cf(read_file(file));
+    std::string order, att, ids;
+    cf.stream("JAsmRefAttr", order);
+    cf.stream("Attachments", att);
+    cf.stream("Preview/Structure/IDS", ids);
+    // Placements by name: Attachments first, the preview list as fallback.
+    std::map<std::string, std::array<double, 16>> placed;
+    auto take = [&](const std::string& d, bool bytes, size_t back) {
+      for (const auto& [at, name] : se_names(d, bytes))
+      {
+        if (placed.count(name) || at < back)
+          continue;
+        std::array<double, 16> m;
+        std::memcpy(m.data(), d.data() + at - back, 128);
+        if (se_rigid(m))
+          placed[name] = m;
+      }
+    };
+    take(att, true, 180);
+    take(ids, false, 128);
+    std::vector<std::string> names;
+    for (const std::string& name : se_runs(order))
+      if (std::find(names.begin(), names.end(), name) == names.end())
+        names.push_back(name);
+    if (names.empty())
+      for (const auto& [name, m] : placed)
+        names.push_back(name);
+    if (names.empty())
+      fail_unsupported("this Solid Edge assembly has no occurrence list noshape can read");
+    for (const std::string& full : names)
+    {
+      const size_t colon = full.rfind(':');
+      AsmNode      n;
+      n.parent = parent;
+      n.file   = full.substr(0, colon);
+      n.name   = fs::path(n.file).stem().string();
+      n.number = std::max(1, std::atoi(full.c_str() + colon + 1));
+      if (placed.count(full))
+        n.m = placed[full];
+      std::string ext = fs::path(n.file).extension().string();
+      for (char& c : ext)
+        c = (char)std::tolower((unsigned char)c);
+      n.assembly = ext == ".asm";
+      out.push_back(n);
+      if (n.assembly)
+        walk((fs::path(search_dir) / n.file).string(), (int)out.size() - 1, depth + 1);
+    }
+  };
+  walk(path, -1, 0);
+  return out;
+}
+
+std::vector<AsmNode> read_native_tree(const std::string& path, const std::string& search_dir)
+{
+  std::string ext = std::filesystem::path(path).extension().string();
+  for (char& c : ext)
+    c = (char)std::tolower((unsigned char)c);
+  if (ext == ".iam")
+    return read_iam_tree(path, search_dir);
+  if (ext == ".asm")
+    return read_se_tree(path, search_dir);
+  return read_sldasm_tree(path);
 }
 
 } // namespace noshape

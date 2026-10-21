@@ -58,7 +58,14 @@ impl OpenDoc {
     /// the given values; None: the active configuration), incrementally from
     /// the cached results.
     pub fn regenerate(&mut self, tab: TabId, config: Option<&ConfigValues>) -> Result<RegenResult, OpError> {
-        let opts = self.regen_options(tab);
+        self.regenerate_with(tab, config, |_| ())
+    }
+
+    /// [`OpenDoc::regenerate`] with adjusted options (`upto` and
+    /// `editing_sketch` while a sketch is edited, as the sketch mode does).
+    pub fn regenerate_with(&mut self, tab: TabId, config: Option<&ConfigValues>, adjust: impl FnOnce(&mut RegenOptions)) -> Result<RegenResult, OpError> {
+        let mut opts = self.regen_options(tab);
+        adjust(&mut opts);
         let units = self.session.doc.settings.units;
         let values = match config {
             Some(c) => crate::config::current(studio(&self.session.doc, tab)?, c),
