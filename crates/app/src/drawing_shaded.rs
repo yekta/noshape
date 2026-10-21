@@ -1,0 +1,233 @@
+//! Drawing editor: shaded views (view menu › Show/hide › Show shaded view;
+//! live behaviours "Shaded drawing views"): the view's parts rendered
+//! offscreen along the view's line of sight (orthographic, the document
+//! thumbnail look) and drawn under its edges; PDF embeds the picture (at
+//! most 1024 px), DXF keeps the edges only. Children don't inherit it.
+//! Base, projected and auxiliary views without crops or breaks for now
+//! (sections and details need their cut / clipped bodies).
+
+use crate::drawing_view::*;
+use gpui_kit::*;
+use noshape_model::drawing::views::{self, ViewFrame};
+use noshape_model::drawing::{RenderStyle, ViewId, ViewKind};
+use noshape_render::{Drawable, ImageData, ImageHandle, Instance};
+use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+
+/// Live: the PDF picture is at most 1024 px on its long side.
+const MAX_PX: f64 = 1024.0;
+/// Picture pixels per sheet millimetre (before the cap).
+const PX_PER_MM: f64 = 8.0;
+
+/// A picture for export: lower-left corner and size on the sheet, PNG.
+pub type ShadedExport = ([f64; 2], [f64; 2], Arc<Vec<u8>>);
+
+/// One view's picture: what it was made for, its texture and PNG.
+pub struct ShadedImage {
+    key: u64,
+    pub handle: ImageHandle,
+    pub png: Arc<Vec<u8>>,
+}
+
+#[derive(Default)]
+pub struct ShadedViews {
+    pub images: HashMap<ViewId, ShadedImage>,
+    busy: HashSet<ViewId>,
+}
+
+impl DrawingEditor {
+    /// Render the pictures of the sheet's shaded views that changed (called
+    /// after each refresh).
+    pub fn sync_shaded(&mut self, cx: &mut Context<Self>) {
+        let d = self.display().clone();
+        let Some(sheet) = d.sheets.get(self.sheet) else { return };
+        let wanted: Vec<ViewId> = sheet
+            .views
+            .iter()
+            .filter(|v| v.style == RenderStyle::Shaded && v.crop.is_none() && v.breaks.is_empty() && matches!(v.kind, ViewKind::Base { .. } | ViewKind::Projected { .. } | ViewKind::Auxiliary { .. }))
+            .map(|v| v.id)
+            .collect();
+        self.shaded.images.retain(|id, _| wanted.contains(id));
+        for id in wanted {
+            let Some(g) = self.geoms.get(&id).cloned() else { continue };
+            let Some(frame) = g.frame else { continue };
+            let Some((key, part)) = views::view_source(sheet, id) else { continue };
+            let Some(src) = self.sources.get(&key).cloned() else { continue };
+            let Some(pl) = self.placement(id) else { continue };
+            let (lo, hi) = (g.min, g.max);
+            if !(hi[0] > lo[0] && hi[1] > lo[1]) {
+                continue;
+            }
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            src.hash.hash(&mut h);
+            format!("{:?}{:?}{lo:?}{hi:?}{part:?}{}", frame.dir, frame.up, pl.scale).hash(&mut h);
+            let k = h.finish();
+            if self.shaded.images.get(&id).is_some_and(|i| i.key == k) || self.shaded.busy.contains(&id) {
+                continue;
+            }
+            self.shaded.busy.insert(id);
+            let (w_mm, h_mm) = ((hi[0] - lo[0]) * pl.scale * 1000.0, (hi[1] - lo[1]) * pl.scale * 1000.0);
+            let f = (MAX_PX / (w_mm.max(h_mm) * PX_PER_MM)).min(1.0) * PX_PER_MM;
+            let (wp, hp) = (((w_mm * f).round() as u32).max(8), ((h_mm * f).round() as u32).max(8));
+            let job = Job {
+                gpu: self.gpu.clone(),
+                src,
+                part,
+                frame,
+                lo,
+                hi,
+                size: (wp, hp),
+            };
+            cx.spawn(async move |this, cx| {
+                let png = job.render().await;
+                let _ = this.update(cx, |this: &mut Self, cx| {
+                    this.shaded.busy.remove(&id);
+                    if let Some(png) = png
+                        && let Some(img) = decode(&png)
+                    {
+                        let handle = this.gpu.uploader().upload_image(&img);
+                        this.shaded.images.insert(id, ShadedImage { key: k, handle, png: Arc::new(png) });
+                        this.geometry_dirty = true;
+                        cx.notify();
+                    }
+                });
+            })
+            .detach();
+        }
+    }
+
+    /// The pictures as scene quads over their views (under the edges).
+    pub fn shaded_instances(&self) -> Vec<Instance> {
+        self.shaded
+            .images
+            .iter()
+            .filter_map(|(id, img)| {
+                let (o, x, y) = self.shaded_frame(*id)?;
+                let m = glam::Mat4::from_cols(
+                    glam::Vec4::new(x[0] as f32, x[1] as f32, 0.0, 0.0),
+                    glam::Vec4::new(y[0] as f32, y[1] as f32, 0.0, 0.0),
+                    glam::Vec4::Z,
+                    glam::Vec4::new(o[0] as f32, o[1] as f32, 0.0, 1.0),
+                );
+                Some(Instance::new(Drawable::Image(img.handle.clone())).with_transform(m).layer(-2))
+            })
+            .collect()
+    }
+
+    /// The pictures for PDF / SVG / raster export: (lower-left corner,
+    /// size, PNG) on the sheet (rotated views keep their axis-aligned box).
+    pub fn shaded_exports(&self) -> Vec<ShadedExport> {
+        self.shaded
+            .images
+            .iter()
+            .filter_map(|(id, img)| {
+                let (o, x, y) = self.shaded_frame(*id)?;
+                Some((o, [x[0] + y[0], x[1] + y[1]], img.png.clone()))
+            })
+            .collect()
+    }
+
+    /// Sheet corner and edge vectors of view `id`'s picture (its geometry box).
+    fn shaded_frame(&self, id: ViewId) -> Option<([f64; 2], [f64; 2], [f64; 2])> {
+        let g = self.geoms.get(&id)?;
+        let pl = self.placement(id)?;
+        let (lo, hi) = (g.min, g.max);
+        let o = pl.to_sheet(lo);
+        let a = pl.to_sheet([hi[0], lo[1]]);
+        let b = pl.to_sheet([lo[0], hi[1]]);
+        Some((o, [a[0] - o[0], a[1] - o[1]], [b[0] - o[0], b[1] - o[1]]))
+    }
+}
+
+/// One picture to render: the parts (or `part`) of `src` seen along
+/// `frame`, framing exactly the view box `lo`..`hi` (view coordinates), at
+/// `size` pixels.
+struct Job {
+    gpu: crate::gpu::Gpu,
+    src: views::SourceModel,
+    part: Option<noshape_model::BodyId>,
+    frame: ViewFrame,
+    lo: [f64; 2],
+    hi: [f64; 2],
+    size: (u32, u32),
+}
+
+impl Job {
+    async fn render(self) -> Option<Vec<u8>> {
+        use noshape_model::display::{BodyDisplay, BodyKind, StudioDisplay};
+        let Job {
+            gpu,
+            src,
+            part,
+            frame,
+            lo,
+            hi,
+            size: (w, h),
+        } = self;
+        let part = part.as_ref();
+        let mut display = StudioDisplay::default();
+        let (mut d0, mut d1) = (f64::MAX, f64::MIN);
+        for b in src.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid && part.is_none_or(|p| *p == b.id)) {
+            let Some(mesh) = noshape_model::regen::tessellate_shape(&b.shape, 0.5) else { continue };
+            if let Ok(bb) = b.shape.bounding_box(false) {
+                for c in [bb.min, bb.max] {
+                    d0 = d0.min(c.dot(frame.dir));
+                    d1 = d1.max(c.dot(frame.dir));
+                }
+            }
+            let color = noshape_model::regen::PART_COLORS[b.color % noshape_model::regen::PART_COLORS.len()];
+            display.bodies.push(BodyDisplay {
+                id: b.id.clone(),
+                name: b.name.clone(),
+                kind: BodyKind::Solid,
+                color,
+                hidden: false,
+                mesh: Arc::new(mesh),
+                face_refs: vec![],
+                edge_refs: vec![],
+                vertex_refs: vec![],
+                bounds: None,
+                composite: None,
+                is_mesh: false,
+                face_colors: vec![],
+            });
+        }
+        if display.bodies.is_empty() {
+            return None;
+        }
+        let opts = crate::scene_builder::SceneOptions {
+            show_planes: false,
+            show_sketches: false,
+            show_origin: false,
+            ..Default::default()
+        };
+        let built = crate::scene_builder::build(&display, &opts, &mut crate::scene_builder::GpuCache::default(), gpu.uploader());
+        let mut camera = noshape_render::Camera {
+            rotation: noshape_render::Camera::look_rotation(frame.dir, frame.up),
+            projection: noshape_render::Projection::Orthographic,
+            ..Default::default()
+        };
+        let (cx, cy) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
+        camera.target = frame.right * cx + frame.up * cy + frame.dir * ((d0 + d1) / 2.0);
+        let half = (hi[1] - lo[1]) / 2.0;
+        camera.distance = (half / (camera.fov_y * 0.5).tan()).max(1e-6);
+        let style = noshape_render::Style {
+            show_edges: false,
+            ..crate::start_thumbnail::thumbnail_style()
+        };
+        gpu.render_png(Arc::new(built.scene), camera, style, w, h).await.ok()
+    }
+}
+
+/// PNG → RGBA image for the scene.
+fn decode(png: &[u8]) -> Option<ImageData> {
+    let rgba = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?.to_rgba8();
+    let (width, height) = rgba.dimensions();
+    Some(ImageData {
+        corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
+        width,
+        height,
+        rgba: rgba.into_raw(),
+    })
+}

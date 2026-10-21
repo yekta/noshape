@@ -599,6 +599,33 @@ Preferences, Release/Publish):**
   (`noshape_units::to_fixed` missing), drawing/cad_export.rs (borrow); clippy in model std_feature.rs:23,
   drawing/cad_fit.rs:33.
 
+- **After the freeze (main 5d28447):** Variable Studio input ⋯ = live ei-900…905 (Copy table, Copy input, Move
+  up / down, Rename, Edit internal IDs… / Edit internal ID…, Visibility conditions…, Input propagation… → toast
+  "No references in the tab.", Delete). **Edit internal IDs** modal (variable_config.rs `IdsDialog`, live
+  ei-906…911): blue 20 px title + subtitle, Input ID / Row IDs tables (names grey read-only, IDs editable,
+  invalid pink + the Input ID's tooltip), duplicate → red "IDs must be unique. Cannot use duplicate ID "X"."
+  box, valid change → yellow ⚠ warning, [Break references and change IDs] [Cancel]; model
+  `VsConfiguration::change_ids` (test `internal_ids_change_with_their_cells`).
+- **For skb (assembly feature dialogs, live "Assembly feature dialogs"):** required empty query boxes pink
+  (#fbe5e5 fill + red border: Direction, Mirror plane, Parts to find match in), defaults Linear 25 mm / 2,
+  Circular 360 deg / 2 with Equal spacing on, Replicate's [Match faces in parts ▾ | features | individual
+  faces], Mirror strategy… tooltip "Select how instances are…", Change configuration… = feature dialog with
+  the studio row + inputs + Generate. skb has taken the pattern / configuration dialogs further since; I leave
+  assembly_panels.rs to skb.
+
+- **Internal IDs as live:** new list inputs are `List_<14 alnum>` with the row "Default" (was "in…" / "default",
+  a FS keyword, so it showed pink), new rows / checkbox / variable inputs take their name as ID
+  (`fs_identifier`, unique: "Big", "CB"); ID column 366 px (fills the 598 px modal). Checked in the app.
+- **qa5 A15 (colour side; skb has the root-row highlight, `ui.root_selected`):** a selected / just-inserted
+  instance's faces get `state::SELECTED | state::BODY` and its edges `SELECTED` (assembly_scene.rs
+  `edges_by_top`), so the edges are amber; **render (perf's files, surgical):** new `state::BODY = 256`
+  (scene.rs) and in shaders.wgsl `BODY_SELECTED = (0.992, 0.503, 0.034)` used instead of FACE_SELECTED for
+  BODY faces — fitted to live (242,182,72) lit (side ≈ (207,152,39) vs live (192,144,57)); a Part Studio part
+  selection uses the same flag now (scene/src/builder.rs: a selected `Reference::Body` gets SELECTED | BODY; live
+  #c09039…#f0b850). render tests 23/23. **Checked in the app (20:35 build):** selected instance top
+  (242,182,73) = live, edges (255,169,10) amber, root row not highlighted (skb); side (207,152,41) vs live
+  (192,144,57) — our shade() can't match both with one colour.
+
 ## (was) PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
 
 Not committed, in the shared tree (all mine, all complete edits; none half done):

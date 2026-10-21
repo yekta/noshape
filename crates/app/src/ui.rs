@@ -299,6 +299,9 @@ pub struct PlacedTooltip {
     width: std::rc::Rc<std::cell::Cell<Option<Pixels>>>,
     /// Hidden after a press on the element, until the pointer leaves it.
     pressed: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Onshape's `data-bs-expanded-content`: a second, italic block shown
+    /// under the title after the hover delay (and whether it shows yet).
+    expanded: Option<(SharedString, bool)>,
 }
 
 impl Render for PlacedTooltip {
@@ -308,20 +311,29 @@ impl Render for PlacedTooltip {
         let a = self.anchor;
         let h = px(26.);
         let measured = self.width.clone();
-        let content = div()
-            .font_family(cx.theme().font_family.clone())
-            .text_size(px(12.))
+        let title = div()
             .font_weight(FontWeight::MEDIUM)
-            .text_color(pal.text)
             .h(h)
             .px(px(4.))
             .flex()
             .flex_none()
             .items_center()
             .bg(pal.tooltip)
-            .shadow(shadow)
             .whitespace_nowrap()
-            .child(self.text.clone())
+            .child(self.text.clone());
+        // Live `.tooltip-expand`: the expanded fill, 4 px padding, at most
+        // 400 px wide, under the title.
+        let extra = self.expanded.as_ref().filter(|(_, shown)| *shown).map(|(text, _)| div().max_w(px(RICH_TOOLTIP_W)).p(px(4.)).line_height(px(18.)).bg(gpui_kit::rgb(0xffffff)).italic().child(text.clone()));
+        let content = div()
+            .font_family(cx.theme().font_family.clone())
+            .text_size(px(12.))
+            .text_color(pal.text)
+            .flex()
+            .flex_col()
+            .flex_none()
+            .shadow(shadow)
+            .child(title)
+            .children(extra)
             .child(canvas(move |b, window, _| {
                 if measured.get() != Some(b.size.width) {
                     measured.set(Some(b.size.width));
@@ -376,7 +388,7 @@ pub fn with_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide)
         .on_any_mouse_down(move |_, _, _| p3.set(true))
         .tooltip(move |_, cx| {
             let (text, anchor, pressed) = (text.clone(), anchor.get(), pressed.clone());
-            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed }).into()
+            cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None }).into()
         })
 }
 
@@ -396,17 +408,42 @@ pub fn with_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> S
     with_tip(row, text, TipSide::Right)
 }
 
-/// [`with_side_tooltip`] whose text is worked out when the tooltip opens,
-/// not each time the row renders (a feature row's "Extrude 1 <- Sketch 1").
-pub fn with_lazy_side_tooltip(row: Stateful<Div>, text: impl Fn(&App) -> SharedString + 'static) -> Stateful<Div> {
+/// [`with_side_tooltip`] with Onshape's expanded content: `extra` (italic)
+/// joins the title after the same delay as the toolbar's [`RichTooltip`]
+/// (a custom feature's "Feature from current workspace", live FS4).
+pub fn with_side_tooltip_expanded(row: Stateful<Div>, text: impl Into<SharedString>, extra: impl Into<SharedString>) -> Stateful<Div> {
+    let (text, extra): (SharedString, SharedString) = (text.into(), extra.into());
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
     let a2 = anchor.clone();
     row.relative()
         .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .tooltip(move |_, cx| {
-            let (text, anchor) = (text(cx), anchor.get());
-            cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default() }).into()
+            let (text, extra, anchor) = (text.clone(), extra.clone(), anchor.get());
+            cx.new(|cx| {
+                cx.spawn(async move |this: WeakEntity<PlacedTooltip>, cx| {
+                    cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+                    let _ = this.update(cx, |t, cx| {
+                        if let Some((_, shown)) = &mut t.expanded {
+                            *shown = true;
+                        }
+                        cx.notify();
+                    });
+                })
+                .detach();
+                PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: Some((extra, false)) }
+            })
+            .into()
         })
+}
+
+/// [`with_side_tooltip`] whose text and place are worked out when the
+/// tooltip opens, not each time the row renders (a feature row's "Extrude 1
+/// <- Sketch 1"): `anchor` gives the row's bounds then.
+pub fn with_lazy_side_tooltip(row: Stateful<Div>, anchor: impl Fn() -> Bounds<Pixels> + 'static, text: impl Fn(&App) -> SharedString + 'static) -> Stateful<Div> {
+    row.tooltip(move |_, cx| {
+        let (text, anchor) = (text(cx), anchor());
+        cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None }).into()
+    })
 }
 
 /// A square icon button with no fill at rest and `#eaeaea` on hover (§4.1):
@@ -589,7 +626,7 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
 /// drawing toolbar: 30 px, "Undo (ctrl+z)", live drawing-toolbar-widths).
 pub fn undo_redo_with(doc: &Entity<crate::doc_model::DocModel>, cell: f32, tips: (&'static str, &'static str), cx: &App) -> AnyElement {
     let d = doc.read(cx);
-    let (can_undo, can_redo) = (d.session.can_undo(), d.session.can_redo());
+    let (can_undo, can_redo) = (d.can_undo(), d.can_redo());
     let undo_tip: SharedString = tips.0.into();
     let redo_tip: SharedString = tips.1.into();
     let (d1, d2) = (doc.clone(), doc.clone());
@@ -1141,6 +1178,45 @@ pub fn drop_line() -> Div {
         .child(div().absolute().left_0().top_0().size(px(6.)).rounded_full().border_2().border_color(accent).bg(gpui_kit::rgb(0xcad8ed)))
 }
 
+/// The two letters of a custom feature's initials icon: the first letter
+/// of its first two words ("QA cube" → "Qc", "FS pack probe" → "Fp"), or
+/// the first two letters of a single word.
+pub fn feature_initials(name: &str) -> String {
+    let mut words = name.split_whitespace();
+    let first = words.next().unwrap_or_default();
+    let mut out: String = first.chars().take(1).flat_map(char::to_uppercase).collect();
+    match words.next().and_then(|w| w.chars().next()) {
+        Some(c) => out.extend(c.to_lowercase()),
+        None => out.extend(first.chars().skip(1).take(1).flat_map(char::to_lowercase)),
+    }
+    out
+}
+
+/// Onshape's custom-feature icon (`.tool-initials-icon`, live
+/// part-studio/1252): the initials in a 20 px box with a 1 px `#999`
+/// border, in the custom features dropdown and the feature list.
+pub fn initials_icon(name: &str) -> Div {
+    div()
+        .flex_none()
+        .size(px(20.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .border_1()
+        .border_color(gpui_kit::rgb(0x999999))
+        .rounded(px(2.))
+        .bg(gpui_kit::rgb(0xffffff))
+        .text_size(px(12.))
+        .text_color(p().text)
+        .child(feature_initials(name))
+}
+
+/// A regeneration time as Onshape shows it: "617ms", "1.02s" from 1 s on
+/// (live behaviours "qa5 big plate").
+pub fn regen_time_text(ms: f32) -> String {
+    if ms >= 1000.0 { format!("{}s", noshape_units::to_fixed(f64::from(ms) / 1000.0, 2)) } else { format!("{}ms", noshape_units::to_fixed(f64::from(ms), 0)) }
+}
+
 #[cfg(test)]
 mod tests {
     // `super::*` brings gpui's `test` attribute (via gpui_kit), which would
@@ -1152,6 +1228,15 @@ mod tests {
     }
 
     #[::core::prelude::v1::test]
+    fn custom_feature_initials_and_regen_times_read_as_onshape() {
+        assert_eq!(feature_initials("QA cube"), "Qc");
+        assert_eq!(feature_initials("FS pack probe"), "Fp");
+        assert_eq!(feature_initials("Cube"), "Cu");
+        assert_eq!(regen_time_text(617.4), "617ms");
+        assert_eq!(regen_time_text(1024.0), "1.02s");
+    }
+
+    #[::core::prelude::v1::test]
     fn panels_snap_like_onshape() {
         let area = rect(0., 0., 1000., 600.);
         // Within 10 px of the area's edges: stuck to them.
@@ -1159,8 +1244,10 @@ mod tests {
         assert_eq!(snap_panel(rect(791., 495., 200., 100.), area, &[]), point(px(800.), px(495.)));
         // Farther: left as is.
         assert_eq!(snap_panel(rect(11., 50., 200., 100.), area, &[]), point(px(11.), px(50.)));
-        // Beside another panel, overlapping it vertically.
-        assert_eq!(snap_panel(rect(306., 50., 200., 100.), area, &[rect(100., 40., 200., 300.)]), point(px(300.), px(50.)));
+        // Beside another panel, overlapping it vertically; the tops, 10 px
+        // apart, align too.
+        assert_eq!(snap_panel(rect(306., 50., 200., 100.), area, &[rect(100., 40., 200., 300.)]), point(px(300.), px(40.)));
+        assert_eq!(snap_panel(rect(306., 70., 200., 100.), area, &[rect(100., 40., 200., 300.)]), point(px(300.), px(70.)));
         // Not beside it (no vertical overlap): no snap.
         assert_eq!(snap_panel(rect(306., 400., 200., 100.), area, &[rect(100., 40., 200., 100.)]), point(px(306.), px(400.)));
         // Dragged out: kept inside.

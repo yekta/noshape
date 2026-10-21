@@ -17,3 +17,12 @@ Status: ✅ exact / expected, ✗ broken, ? live comparison pending.
 | **Rhino (.3dm)** | – | **export_failed "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT"** (Onshape exports Rhino; live G-series has .3dm imports) | ✗ **EXP1** (kern / packaging: the shipped build must include it) |
 | **OBJ** | 45214 B | **import fails: "i/o error: could not read mesh file …bracket.obj"** (our own OBJ export can't be read back) | ✗ **EXP2** (kern) |
 | STL (CLI defaults) | 47284 B | 6.7e-05 mm³: the export defaults to **metres**, the import to **mm** | ? (live: UI export dialog Units sticky "Meter", REST always metres; UI import Units defaults to the document units, so Onshape behaves the same way. Check that our UI export dialog defaults/stickiness match) |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+| Row | Ours | Status |
+|---|---|---|
+| EXP2 OBJ round trip | 72076 B, re-imports as mesh 67196.546728, 1 face | ✅ **fixed** |
+| EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS" | ✗ still |
+| other nine formats | unchanged (exact or mesh) | ✅ |

@@ -71,6 +71,21 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
             }
         }
         Reference::Origin => out.push(k::make_vertex(DVec3::ZERO).ok().into_iter().next().unwrap_or_else(Shape::null)),
+        // Default planes and plane features measure as their (unbounded)
+        // plane: a large planar face (qa5 AN1: vertex / edge + Top plane).
+        Reference::Plane(d) => {
+            let f = match d {
+                crate::reference::DatumPlane::Top => crate::display::PlaneFrame::TOP,
+                crate::reference::DatumPlane::Front => crate::display::PlaneFrame::FRONT,
+                crate::reference::DatumPlane::Right => crate::display::PlaneFrame::RIGHT,
+            };
+            out.extend(plane_face(&f));
+        }
+        Reference::FeaturePlane(_) => {
+            if let Some(p) = ctx.planes.iter().find(|p| &p.reference == r) {
+                out.extend(plane_face(&p.frame));
+            }
+        }
         Reference::SketchEntity { sketch, entity } => {
             if let Some(s) = ctx.sketch(*sketch) {
                 let id = noshape_sketch::EntityId(*entity);
@@ -101,6 +116,11 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
     }
     out.retain(|s| !s.is_null());
     out
+}
+
+/// A plane as a face for measuring: 2 km square, centred on its origin.
+fn plane_face(f: &crate::display::PlaneFrame) -> Option<Shape> {
+    k::make_plane_face(&super::eval::kernel_plane(f), -1e3, 1e3, -1e3, 1e3).ok()
 }
 
 /// Measurements for a selection (single entity properties, or pairwise
@@ -562,6 +582,20 @@ mod tests {
 
     /// The Measure tool with nothing selected (or a selection that resolves
     /// to nothing) measures nothing; it panicked on `shapes[0]`.
+    /// qa5 AN1: a vertex or an edge with a default plane measures their
+    /// distance (the plane is unbounded).
+    #[test]
+    fn vertex_and_edge_with_a_default_plane() {
+        let ctx = Context::default();
+        let top = resolve_shapes(&ctx, &Reference::Plane(crate::reference::DatumPlane::Top));
+        assert_eq!(top.len(), 1);
+        let v = k::make_vertex(DVec3::new(0.3, -0.2, 0.05)).unwrap();
+        let rows = measure_shapes(&[vec![v], top.clone()]);
+        assert!(!rows.is_empty(), "a result row");
+        let e = k::make_line(DVec3::new(0.0, 0.0, 0.02), DVec3::new(0.1, 0.0, 0.02)).unwrap();
+        assert!(!measure_shapes(&[vec![e], top]).is_empty());
+    }
+
     #[test]
     fn empty_selection_measures_nothing() {
         assert!(measure_shapes(&[]).is_empty());

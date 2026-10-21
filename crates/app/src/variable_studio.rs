@@ -335,7 +335,7 @@ impl VariableStudioView {
                 this.renaming = None;
                 if !name.is_empty() {
                     this.doc.update(cx, |d, cx| {
-                        d.edit_document(&format!("Rename tab : {name}"), cx, |doc| {
+                        d.edit_document_not_undoable(&format!("Rename tab : {name}"), cx, |doc| {
                             if let Some(t) = doc.tab_mut(tab) {
                                 t.name = name.clone();
                             }

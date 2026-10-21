@@ -700,6 +700,10 @@ pub fn tolerance_allowed(k: &ConstraintKind) -> bool {
 }
 
 /// A dimension text that is more than a plain number with an optional unit.
+/// [`SketchEditor::apply_dimension`]'s error for a value the sketch can't
+/// be solved with (Onshape's warning toast text).
+pub const SKETCH_NOT_SOLVED: &str = "Sketch could not be solved.";
+
 /// What Enter does in sketch mode ([`SketchEditor::enter_target`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EnterTarget {
@@ -1570,6 +1574,9 @@ impl SketchEditor {
                 if self.picks.len() >= need {
                     let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
                     self.picks.clear();
+                    if already_coincident(&data.sketch, c, &ids) {
+                        return EditOutcome::redraw();
+                    }
                     match make_constraint(&data.sketch, c, &ids) {
                         Some(kind) => match data.sketch.add_constraint(kind) {
                             Ok(_) => {
@@ -3471,6 +3478,8 @@ impl SketchEditor {
     /// angles, line lengths); radii, diameters and arc lengths must be positive.
     pub fn apply_dimension(&mut self, data: &mut SketchData, cid: ConstraintId, text: &str, units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> Result<(), String> {
         let Some(c) = data.sketch.constraint(cid).cloned() else { return Err("Dimension no longer exists".into()) };
+        // The shape to keep when the new value can't be solved.
+        let solved = data.sketch.clone();
         let dim = dim_unit(&c.kind);
         // Stored with the workspace unit (live: "1" reopens as "1 mm", "2*5"
         // as "(2*5) mm"; "1 in" and "#var" stay), so a later change of the
@@ -3521,7 +3530,12 @@ impl SketchEditor {
         }
         let report = data.sketch.solve();
         if !report.is_solved() {
-            return Err("The sketch could not be solved with that value".into());
+            // Live (qa5 dim conflict): the value is taken (the label reads it,
+            // the sketch turns red) but the last solved shape stays.
+            let mut kept = solved;
+            let _ = kept.set_dimension_value(cid, data.sketch.constraint(cid).and_then(|c| c.kind.value()).unwrap_or(value.abs()));
+            data.sketch = kept;
+            return Err(SKETCH_NOT_SOLVED.into());
         }
         Ok(())
     }
@@ -3616,7 +3630,7 @@ impl SketchEditor {
         // (live sketch/202).
         for k in data.external_refs.keys() {
             let e = EntityId(*k);
-            if sk.entity(e).is_none() || noshape_sketch::text::glyph_text_id(e).is_some() {
+            if sk.entity(e).is_none_or(|x| x.reference_only) || noshape_sketch::text::glyph_text_id(e).is_some() {
                 continue;
             }
             let cid = use_glyph_id(e);
@@ -3757,6 +3771,9 @@ impl SketchEditor {
     /// switch to the constraint tool.
     pub fn constraint_command(&mut self, data: &mut SketchData, c: ConstraintTool) -> bool {
         // Select-first: the constraint applies to the whole selection at once.
+        if already_coincident(&data.sketch, c, &self.selection) {
+            return false;
+        }
         if !self.selection.is_empty() && constraint_applicable(&data.sketch, c, &self.selection) {
             match apply_constraint(&mut data.sketch, c, &self.selection) {
                 Ok(n) if n > 0 => {
@@ -4784,7 +4801,31 @@ fn nearest_point(sk: &Sketch, p: DVec2, radius: f64) -> Option<EntityId> {
 
 /// Remove texts whose box was deleted, and dimension expressions, labels
 /// and glyph offsets whose constraints are gone.
+/// Drops reference-only model geometry (see `Entity::reference_only`) no
+/// constraint or dimension uses any more, with its link.
+pub fn prune_reference_only(data: &mut SketchData) {
+    let sk = &data.sketch;
+    let used: std::collections::HashSet<EntityId> = sk.constraints().flat_map(|c| c.kind.entities().to_vec()).collect();
+    let mut drop: Vec<EntityId> = Vec::new();
+    for e in sk.entities().filter(|e| e.reference_only) {
+        // A curve stays while it or one of its points is used; its points go with it.
+        if e.kind() == EntityKind::Point {
+            if !used.contains(&e.id) && sk.users_of_point(e.id).is_empty() {
+                drop.push(e.id);
+            }
+        } else if !used.contains(&e.id) && !e.point_refs().iter().any(|p| used.contains(p)) {
+            drop.push(e.id);
+        }
+    }
+    if drop.is_empty() {
+        return;
+    }
+    data.sketch.remove_entities(&drop);
+    data.external_refs.retain(|k, _| data.sketch.entity(EntityId(*k)).is_some());
+}
+
 fn prune_exprs(data: &mut SketchData) {
+    prune_reference_only(data);
     data.prune_texts();
     data.prune_images();
     let live: std::collections::HashSet<u32> = data.sketch.constraints().map(|c| c.id.0).collect();
@@ -5430,6 +5471,15 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
     }
 }
 
+/// Points already coincident (one point, or joined by coincident
+/// constraints): Onshape's Coincident adds nothing for them and shows nothing.
+pub fn already_coincident(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> bool {
+    c == ConstraintTool::Coincident && ids.len() >= 2 && ids.iter().all(|e| is_point(sk, *e)) && {
+        let joint = sk.joint_points(ids[0]);
+        ids[1..].iter().all(|e| joint.contains(e))
+    }
+}
+
 /// Apply constraint `c` to a selection: n-ary constraints chain the first
 /// entity with each other one, one-entity constraints apply to each entity.
 /// Returns the number of constraints added.
@@ -5464,7 +5514,7 @@ pub fn apply_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) ->
             }
         }
         _ => {
-            for e in &ids[1..] {
+            for e in ids[1..].iter().filter(|e| !already_coincident(sk, c, &[ids[0], **e])) {
                 kinds.extend(make_constraint(sk, c, &[ids[0], *e]));
             }
         }
@@ -5649,6 +5699,27 @@ mod tests {
         assert!(!ed.selection.is_empty(), "and keeps it");
     }
 
+    /// Live (qa5 dim conflict, SK1): a value the sketch can't be solved with
+    /// is taken (the dimension reads it) but the last solved shape stays,
+    /// with Onshape's "Sketch could not be solved.".
+    #[test]
+    fn an_unsolvable_value_keeps_the_solved_shape() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let a = d.sketch.add_point(v(0.0, 0.0));
+        let b = d.sketch.add_point(v(0.03, 0.0));
+        let line = d.sketch.add_line_between(a, b).unwrap();
+        d.sketch.add_constraint(ConstraintKind::Horizontal { a: line, b: None }).unwrap();
+        d.sketch.add_constraint(ConstraintKind::HorizontalDistance { a, b, value: 0.03 }).unwrap();
+        let len = d.sketch.add_reference(ConstraintKind::Length { curve: line, value: 0.03 }).unwrap();
+        let _ = d.sketch.set_driving(len, true);
+        let before = d.sketch.point(b).unwrap();
+        let r = ed.apply_dimension(&mut d, len, "10", &UnitPrefs::default(), &noshape_units::EmptyScope);
+        assert_eq!(r, Err(SKETCH_NOT_SOLVED.to_string()));
+        assert!((d.sketch.point(b).unwrap() - before).length() < 1e-12, "the solved shape stays");
+        assert!((d.sketch.constraint(len).unwrap().kind.value().unwrap() - 0.01).abs() < 1e-12, "the value is taken");
+        assert_eq!(d.dimension_exprs[&len.0].text, "10 mm");
+    }
+
     /// Live (lead sketch dim): Esc on the dimension box closes it and the
     /// Dimension tool stays; the next Esc ends the tool (qa4 F29: the app
     /// then gives the keys back to the sketch).
@@ -5807,6 +5878,28 @@ mod tests {
         ed.drag_handle(&d.sketch.clone(), PatternHandle::Center, v(0.0, 0.0));
         ed.follow_transform_selection(&d.sketch);
         assert!(ed.pattern_center.length() < 1e-6, "a dragged center stays put");
+    }
+
+    /// qa5 SK3: a dimension to a model edge adds no visible sketch
+    /// geometry, and its reference goes with the dimension.
+    #[test]
+    fn model_edge_references_are_hidden_and_go_with_their_dimension() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let edge = d.sketch.add_line(v(-0.05, 0.0), v(0.05, 0.0));
+        let _ = d.sketch.set_external(edge, true);
+        let _ = d.sketch.set_construction(edge, true);
+        let _ = d.sketch.set_reference_only(edge, true);
+        d.external_refs.insert(edge.0, noshape_model::reference::Reference::Plane(noshape_model::reference::DatumPlane::Top));
+        let c = d.sketch.add_circle(v(0.0, 0.02), 0.004);
+        let center = d.sketch.entity(c).unwrap().point_refs()[0];
+        let dim = d.sketch.add_constraint(ConstraintKind::Distance { a: center, b: edge, value: 0.02, mode: DistanceMode::Center }).unwrap();
+        prune_reference_only(&mut d);
+        assert!(d.sketch.entity(edge).is_some(), "kept while the dimension uses it");
+        assert!(ed.constraint_glyphs(&d).iter().all(|g| g.icon != "use"), "no use glyph");
+        assert!(ed.delete_constraint(&mut d, dim));
+        assert!(d.sketch.entity(edge).is_none(), "removed with its dimension");
+        assert!(d.external_refs.is_empty());
+        assert!(d.sketch.entity(c).is_some());
     }
 
     #[test]
@@ -6472,6 +6565,25 @@ mod tests {
         assert!(matches!(circle_mode(&sk, k.clone(), &[(c, v(8.0, 0.0))], 0.01), ConstraintKind::Distance { mode: DistanceMode::Minimum, .. }));
         assert!(matches!(circle_mode(&sk, k.clone(), &[(c, v(12.0, 0.0))], 0.01), ConstraintKind::Distance { mode: DistanceMode::Maximum, .. }));
         assert!(matches!(circle_mode(&sk, k, &[(c, v(10.0, 0.0))], 0.01), ConstraintKind::Distance { mode: DistanceMode::Center, .. }));
+    }
+
+    #[test]
+    fn coincident_on_already_coincident_points_adds_nothing() {
+        let mut sk = Sketch::new();
+        let (a, b, c) = (sk.add_point(v(0.0, 0.0)), sk.add_point(v(1.0, 0.0)), sk.add_point(v(2.0, 0.0)));
+        assert_eq!(apply_constraint(&mut sk, ConstraintTool::Coincident, &[a, b]), Ok(1));
+        assert_eq!(apply_constraint(&mut sk, ConstraintTool::Coincident, &[b, c]), Ok(1));
+        // a-c are joined through b: nothing to add (live: no glyph, no message).
+        assert!(already_coincident(&sk, ConstraintTool::Coincident, &[a, c]));
+        assert_eq!(apply_constraint(&mut sk, ConstraintTool::Coincident, &[a, c]), Ok(0));
+        let mut data = SketchData { sketch: sk, ..Default::default() };
+        let n = data.sketch.constraints().count();
+        let mut ed = SketchEditor::new(FeatureId(1), PlaneFrame::TOP);
+        ed.selection = vec![c, a];
+        assert!(!ed.constraint_command(&mut data, ConstraintTool::Coincident));
+        assert_eq!(data.sketch.constraints().count(), n);
+        assert!(ed.message.is_none());
+        assert_ne!(ed.tool, Tool::Constraint(ConstraintTool::Coincident));
     }
 
     #[test]

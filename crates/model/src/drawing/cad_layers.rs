@@ -14,6 +14,7 @@ pub enum CadLayer {
     TangentLines,
     TangentHidden,
     ViewHatches,
+    SectionJogLines,
     Centermarks,
     Centerlines,
     SectionCuttingLine,
@@ -36,17 +37,19 @@ pub enum CadLayer {
 }
 
 impl CadLayer {
-    /// The layer name. 2000+ files write "Visible" in mixed case (live
-    /// AC1032); R12 / R14 write every name in capitals (qa5-sm-flat), and
-    /// truncate them to 26 characters.
+    /// The layer name. 2000+ files write "Visible" and "Hidden" in mixed
+    /// case (live drw2-k-dxf2018); R12 / R14 write every name in capitals
+    /// (drw2-k-dxfR14, qa5-sm-flat), truncated to 26 characters.
     pub fn name(self, upper: bool) -> &'static str {
         match self {
             CadLayer::Visible if upper => "VISIBLE",
             CadLayer::Visible => "Visible",
-            CadLayer::Hidden => "HIDDEN",
+            CadLayer::Hidden if upper => "HIDDEN",
+            CadLayer::Hidden => "Hidden",
             CadLayer::TangentLines => "TANGENT_LINES",
             CadLayer::TangentHidden => "TANGENT_HIDDEN",
             CadLayer::ViewHatches => "VIEW_HATCHES",
+            CadLayer::SectionJogLines => "SECTION_JOG_LINES",
             CadLayer::Centermarks => "CENTERMARKS",
             CadLayer::Centerlines => "CENTERLINES",
             CadLayer::SectionCuttingLine => "SECTION_CUTTING_LINE",

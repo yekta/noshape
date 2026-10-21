@@ -420,7 +420,7 @@ impl Render for PerformancePanel {
                     .pl(px(15.))
                     .gap(px(5.))
                     .items_center()
-                    .child(div().text_size(px(13.33)).child(format!("Total regeneration time: {:.0}ms", tab.regen_ms)))
+                    .child(div().text_size(px(13.33)).child(format!("Total regeneration time: {}", crate::ui::regen_time_text(tab.regen_ms))))
                     .child(
                         div()
                             .id("perf-regen-times")

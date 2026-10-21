@@ -1159,3 +1159,25 @@ fn flat_spiral_planes_and_ruled_overrides() {
     assert!(has(DVec3::new(mm(110.0), 0.0, mm(25.0))), "override end rules along X");
     assert!(has(DVec3::new(0.0, 0.0, mm(35.0))), "other end rules along Z");
 }
+
+/// qa5 SK1: a sketch whose dimensions can't all be met is in error (live:
+/// its title and feature row red), keeping its last solved shape.
+#[test]
+fn an_unsolvable_sketch_is_in_error() {
+    use noshape_sketch::ConstraintKind;
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_point(DVec2::new(0.0, 0.0));
+    let b = sk.add_point(DVec2::new(0.03, 0.0));
+    let line = sk.add_line_between(a, b).unwrap();
+    sk.add_constraint(ConstraintKind::Horizontal { a: line, b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::HorizontalDistance { a, b, value: 0.03 }).unwrap();
+    let len = sk.add_reference(ConstraintKind::Length { curve: line, value: 0.03 }).unwrap();
+    sk.set_driving(len, true).unwrap();
+    // The editor keeps a value the sketch can't meet (live: label reads it).
+    sk.set_dimension_value(len, 0.02).unwrap();
+    s.sketch(Reference::Plane(noshape_model::reference::DatumPlane::Top), sk);
+    let (status, _) = s.last_status();
+    assert_eq!(status, FeatureStatus::Error);
+}
+

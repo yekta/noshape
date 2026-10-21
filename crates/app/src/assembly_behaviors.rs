@@ -136,10 +136,15 @@ pub(crate) struct FolderNameDialog {
 /// View state of the behaviours in this module.
 #[derive(Default)]
 pub(crate) struct AsmUi {
+    /// A dialog or panel covers the viewport's top left (last render):
+    /// zoom to fit centres the model in the rest (as the Part Studio).
+    pub left_open: bool,
     /// Instance list filter box and its parsed value.
     pub filter_input: Option<Entity<InputState>>,
     pub filter: ListFilter,
     pub filter_sub: Option<Subscription>,
+    /// The ≡ "Show search results as list" toggle (off: matches in their tree).
+    pub filter_flat: bool,
     /// Instance row under the cursor in the list (highlighted in the viewport).
     pub list_hover: Option<InstanceId>,
     /// Make transparent (Shift+T): instances drawn transparent.
@@ -244,6 +249,13 @@ pub(crate) struct AsmUi {
     /// Snap-insert: (source connector on the inserted instance, target), and
     /// which of the instance's explicit mate connectors is the source.
     pub place_snap: Option<(MateConnectorRef, MateConnectorRef)>,
+    /// The pointer moved over the graphics area since placing started.
+    pub place_moved: bool,
+    /// A just-inserted instance's selection: no transform manipulator on it
+    /// until the selection changes (live qa5 pass 7, A15).
+    pub inserted_selection: Vec<InstanceId>,
+    /// The root row was clicked (it highlights only then; live A15).
+    pub root_selected: bool,
     pub place_src_ix: usize,
     /// Faces, edges and vertices selected in the graphics area (live:
     /// additive clicks, each filled amber; their instances' rows selected),
@@ -662,7 +674,7 @@ impl AssemblyView {
             return;
         }
         let n = clip.instances.len();
-        let ids = self.edit(&if n == 1 { format!("Paste {}", clip.instances[0].name) } else { format!("Paste {n} items") }, cx, |a| clip.paste(a, [0.0; 3])).unwrap_or_default();
+        let ids = self.edit_insert(&if n == 1 { format!("Paste {}", clip.instances[0].name) } else { format!("Paste {n} items") }, cx, |a| clip.paste(a, [0.0; 3])).unwrap_or_default();
         self.start_placing(ids, cx);
     }
 
@@ -1011,6 +1023,11 @@ impl AssemblyView {
             m.push(icon_item("Change to version…", "legend-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
         m.push(export);
+        // Live qa5 CA2: Release… after Export… (the instances' parts).
+        if matches!(inst.source, InstanceSource::Part { .. }) {
+            let tg = targets.clone();
+            m.push(item("Release…", move |t, w, cx| t.release_instances(tg.clone(), w, cx)));
+        }
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
         m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
@@ -1109,9 +1126,42 @@ impl AssemblyView {
             let configured = inst.source.studio().and_then(|s| self.doc.read(cx).session.doc.tab(s)).is_some_and(|t| matches!(&t.content, TabContent::PartStudio(ps) if !ps.configuration.inputs.is_empty()));
             if configured && !matches!(inst.source, InstanceSource::Standard { .. }) {
                 m.push(item("Change configuration…", move |t, w, cx| t.open_config(top, w, cx)));
+                // Live qa5 CA2: both selections follow Change configuration….
+                m.push(item("Select instances with same configuration", move |t, _, cx| t.select_same_configuration(top, false, cx)));
+                m.push(item("Select instances with same part and same configuration", move |t, _, cx| t.select_same_configuration(top, true, cx)));
             }
         }
         m
+    }
+
+    /// Instance menu "Select instances with same (part and same) configuration".
+    fn select_same_configuration(&mut self, top: InstanceId, same_part: bool, cx: &mut Context<Self>) {
+        let Some(ids) = self.assembly(cx).map(|a| noshape_ops::assembly::same_configuration(a, top, same_part)) else { return };
+        self.selected = ids;
+        self.selected_mate = None;
+        self.refresh_scene(false, cx);
+        cx.notify();
+    }
+
+    /// Instance menu Release…: the Release candidate dialog with the
+    /// instances' parts (in their configurations), as the Part Studio's.
+    fn release_instances(&mut self, ids: Vec<InstanceId>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(asm) = self.assembly(cx) else { return };
+        let mut items = Vec::new();
+        for id in &ids {
+            let Some(inst) = asm.instance(*id) else { continue };
+            let InstanceSource::Part { studio, body, config } = &inst.source else { continue };
+            // The part's name: the instance name without its " <n>".
+            let name = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
+            for it in crate::release_dialog::part_items(self.doc.read(cx), *studio, std::slice::from_ref(body), &[name], config) {
+                if !items.iter().any(|x: &noshape_model::release::ReleaseItem| x.same_object(&it)) {
+                    items.push(it);
+                }
+            }
+        }
+        if !items.is_empty() {
+            crate::release_dialog::open_release_candidate(self.doc.clone(), items, window, cx);
+        }
     }
 
     /// View normal to: camera direction into the hovered planar face (and an up vector).
@@ -1641,6 +1691,11 @@ impl AssemblyView {
         }));
         m.push(MenuEntry::Sep);
         m.push(item("Export…", |t, w, cx| t.open_asm_export(None, w, cx)));
+        // Live (qa5 CA2): Release… after Export… (the assembly's release items).
+        m.push(item("Release…", |t, w, cx| {
+            let items = crate::release_dialog::tab_items(t.doc.read(cx), t.tab);
+            crate::release_dialog::open_release_candidate(t.doc.clone(), items, w, cx);
+        }));
         m.push(MenuEntry::Sep);
         m.push(item("Expand all", |t, _, cx| t.expand_all(true, cx)));
         m.push(item("Collapse all", |t, _, cx| t.expand_all(false, cx)));
@@ -1997,8 +2052,8 @@ impl AssemblyView {
         if self.inserted_count(cx) == 0 && self.placing.is_none() {
             return;
         }
-        // Inserting and placing are two undo steps: undo until the last
-        // inserted instance (or the one following the cursor) is gone.
+        // The Insert session is one pending step: take the last instance
+        // out of it; once committed, undo until that instance is gone.
         let targets: Vec<InstanceId> = match self.placing.take() {
             Some(ids) => {
                 self.placing_point = None;
@@ -2007,6 +2062,11 @@ impl AssemblyView {
             }
             None => self.assembly(cx).and_then(|a| self.ui.insert_inserted.iter().rev().find(|id| a.instance(**id).is_some()).copied()).into_iter().collect(),
         };
+        if self.doc.read(cx).has_pending() {
+            self.edit_insert("Insert", cx, |a| noshape_ops::assembly::delete_instances(a, &targets));
+            cx.notify();
+            return;
+        }
         for _ in 0..targets.len() + 2 {
             self.doc.update(cx, |d, cx| d.undo(cx));
             if self.assembly(cx).is_none_or(|a| targets.iter().all(|id| a.instance(*id).is_none())) {
@@ -2023,6 +2083,7 @@ impl AssemblyView {
             self.finish_placing(true, window, cx);
         }
         self.insert_open = false;
+        self.end_insert_step(cx);
         // Rescanned next time; the opened document and category stay.
         self.ui.insert_other_docs = None;
         self.ui.std.auto_size = false;
@@ -2052,10 +2113,11 @@ impl AssemblyView {
             .mt(px(7.))
             .flex_none()
             .pl(px(5.))
-            .pr(px(16.))
+            .pr(px(8.))
             .gap(px(12.))
             .child(
-                Button::new("asm-filter-cmds").ghost().child(crate::assets::icon("filter", 20., cx)).w(px(22.)).h(px(26.)).p_0().tooltip("Filter").os_dropdown_menu("asm-filter-cmds-dd", false, move |mut menu, _, _| {
+                // Live assembly/752: the funnel turns blue while the filter has text.
+                Button::new("asm-filter-cmds").ghost().child(crate::assets::icon(if current.is_empty() { "filter" } else { "filter-active" }, 20., cx)).w(px(22.)).h(px(26.)).p_0().tooltip("Filter").os_dropdown_menu("asm-filter-cmds-dd", false, move |mut menu, _, _| {
                     for c in FilterCommand::ALL {
                         let v = view.clone();
                         let current = current.clone();
@@ -2090,7 +2152,29 @@ impl AssemblyView {
                     .child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(13.33)).pl(px(5.))),
             )
             .child(div().flex_1())
-            .child(crate::assets::icon("instance-list-view", 20., cx))
+            .child({
+                // Live assembly/750–753: a 30 px toggle (no menu); hover #eaeaea,
+                // on `os-active`: #eaeaea pressed in under a #b6b6b6 top edge.
+                let flat = self.ui.filter_flat;
+                div()
+                    .id("asm-filter-flat")
+                    .size(px(30.))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(2.))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                    .relative()
+                    .when(flat, |d| d.bg(gpui_kit::rgb(0xeaeaea)).border_l_1().border_r_1().border_color(gpui_kit::rgb(0xe4e4e4)).child(div().absolute().top_0().left_0().right_0().h(px(1.)).bg(gpui_kit::rgb(0xb6b6b6))))
+                    .child(crate::assets::icon("instance-list-view", 20., cx))
+                    .tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Show search results as list").build(w, cx))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.ui.filter_flat = !this.ui.filter_flat;
+                        cx.notify();
+                    }))
+            })
             .into_any_element()
     }
 
@@ -2693,14 +2777,15 @@ impl AssemblyView {
     /// first empty mate field (Screw: its single field).
     pub(super) fn pick_relation_mate(&mut self, id: MateId, cx: &mut Context<Self>) {
         let Some(r) = &mut self.relation else { return };
-        if r.kind == RelationType::Screw {
+        // The Mate(s) query: a picked mate toggles; a screw takes one mate,
+        // the others two (a third pick replaces the second).
+        if r.b == Some(id) {
+            r.b = None;
+        } else if r.a == Some(id) {
+            r.a = r.b.take();
+        } else if r.a.is_none() || r.kind == RelationType::Screw {
             r.a = Some(id);
-        } else if r.a.is_none() || (r.b.is_some() && r.a != Some(id)) {
-            r.a = Some(id);
-            if r.b == Some(id) {
-                r.b = None;
-            }
-        } else if r.a != Some(id) {
+        } else {
             r.b = Some(id);
         }
         cx.notify();
@@ -3017,9 +3102,10 @@ impl AssemblyView {
         if self.insert_config_inputs(studio, cx).is_empty() {
             return None;
         }
-        let set_last = move |this: &mut Self, cx: &mut Context<Self>| {
+        let set_last = move |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
             match crate::release_dialog::last_viewed_config(studio) {
                 Some(v) => {
+                    this.set_config_panel_values(&v, window, cx);
                     this.ui.insert_config.insert(studio, v);
                 }
                 None => this.show_cfg_toast("Could not find last viewed configuration.".into(), false, cx),
@@ -3051,9 +3137,9 @@ impl AssemblyView {
                         .hover(|d| d.bg(rgb(0xeaeaea)))
                         .tooltip(crate::ui::tooltip("Set to last viewed configuration"))
                         .child(crate::assets::icon(&icon_path("configuration"), 20., cx))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             cx.stop_propagation();
-                            set_last(this, cx);
+                            set_last(this, window, cx);
                         })),
                 )
                 .child(
@@ -3073,10 +3159,16 @@ impl AssemblyView {
                             cx.stop_propagation();
                             let (v1, v2) = (view.clone(), view.clone());
                             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                                m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").icon_name("cfg-last-viewed").on_click(move |_, _, cx| v1.update(cx, |this, cx| set_last(this, cx))))
-                                    .item(crate::os_menu::OsMenuItem::new("Reset to default").icon_name("cfg-reset-default").on_click(move |_, _, cx| {
+                                m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").icon_name("cfg-last-viewed").on_click(move |_, window, cx| v1.update(cx, |this, cx| set_last(this, window, cx))))
+                                    .item(crate::os_menu::OsMenuItem::new("Reset to default").icon_name("cfg-reset-default").on_click(move |_, window, cx| {
                                         v2.update(cx, |this, cx| {
                                             this.ui.insert_config.remove(&studio);
+                                            // Change configuration (qa5 CA5): its inputs go
+                                            // back to their defaults too.
+                                            if let Some(inputs) = this.config_panel.as_ref().map(|s| s.inputs.clone()) {
+                                                let d = noshape_model::configuration::Configuration { inputs, configured: Vec::new() }.defaults();
+                                                this.set_config_panel_values(&d, window, cx);
+                                            }
                                             cx.notify();
                                         })
                                     }))
@@ -3088,6 +3180,25 @@ impl AssemblyView {
                 )
                 .into_any_element(),
         )
+    }
+
+    /// The Change configuration panel takes `values` (its fields too);
+    /// Generate turns on when they differ from the panel's.
+    fn set_config_panel_values(&mut self, values: &ConfigValues, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(s) = &mut self.config_panel else { return };
+        let mut changed = false;
+        for (k, v) in &values.0 {
+            if s.values.0.get(k) != Some(v) {
+                s.values.0.insert(k.clone(), v.clone());
+                changed = true;
+            }
+            if let Some((_, st)) = s.texts.iter().find(|(id, _)| id == k) {
+                let v = v.clone();
+                st.update(cx, |st, cx| st.set_value(v, window, cx));
+            }
+        }
+        s.generate |= changed;
+        cx.notify();
     }
 
     /// Configuration inputs of a configured Part Studio (shown when the

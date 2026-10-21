@@ -154,7 +154,7 @@ it, so re-take positions after every selection.
 
 | # | Result | Notes |
 |---|---|---|
-| F1 | ✅ fixed | Show constraints on by default |
+| F1 | ✅ fixed | Show constraints on by default (re-confirmed 10-21 16:42 on an empty HOME: ☑ Show constraints, ☑ Show errors) |
 | F3 | ✅ fixed | mm → inch with the sketch's bare "40" and "10+5" dimensions: labels 1.575 / ƒ Ø0.591, geometry unchanged |
 | F4 | ✅ fixed | "ƒ Ø15" |
 | F5 | ✅ fixed | re-opened box shows "(10+5) mm" |
@@ -187,3 +187,33 @@ New in this run:
 | F28 | **Show errors** now opens **unchecked** in the Sketch dialog (live: ☑ Show errors) — regression from the F1 change? | new sketch | psb — **not a code regression** (10-21): the defaults are Show constraints ☑, Show errors ☑ (test `sketch_options_default_as_live`). The qa4 profile has a saved `/tmp/qa4/cwhome/.config/noshape/sketch-options.json` (08:22) with `"show_errors": false`. As in Onshape (UserSettingsService), accepting a sketch whose options changed saves them. Delete that file to test a fresh profile. |
 | F29 | After an invalid value in a dimension box (abc + Enter) then Esc, Esc, sketch shortcuts (L) do nothing until a click in the graphics; the plain Esc path works | dim box, abc, Enter, Esc, Esc, L, click, click | psb — fixed (10-21): Esc on the box closes it in every state and gives the focus back to the Part Studio (sketch.rs dim box `capture_key_down`); test `esc_closes_the_dimension_box_then_the_tool` |
 
+**F28 closed (10-21 16:42, qa4): not a bug.** The re-run's profile still had my own saved sketch options (`rm -rf HOME/*` keeps dotfiles); on an empty HOME both defaults are on. Fresh-profile runs now use `FRESH=1 cwstart.sh`, which deletes the whole HOME.
+
+
+## v0.4.5 gate run: 5d28447 (target-lead build, files = 5d28447), FRESH=1 profile, 2026-10-21 17:05–17:20, qa4
+
+**Result: FAIL** (1 blocking regression path + 3 known kernel/export fails). Everything else passes.
+
+| Section | Rows | Result |
+|---|---|---|
+| 1 New document | 1.1–1.4 | ✅ (footer "(0.4.4.e4b90e209380)": the hash is the stale HEAD of /root/noshape-lead, not 5d28447; CI builds are fine) |
+| 2 Sketch | 2.1–2.21 | ✅ all (fresh defaults ☑ Show constraints / ☑ Show errors; ƒ, (10+5) mm, #w popup, invalid state, F29 Esc path, Enter does not accept) |
+| 3 Features | 3.1–3.4, 3.7–3.11, 3.13–3.15 | ✅ |
+| | 3.5 chamfer 5 mm next to fillets (F8) | ✗ kern |
+| | 3.6 shell 2.5 / 1 mm (F9) | ✗ kern |
+| | 3.12 Feature pattern of the Hole **after a Part pattern** (direction = Part 1's bottom edge, 10 mm × 2) | ✗ **new path of F12**: no extra holes, Part 1's filleted top corner turns into twisted facets and a sliver **Part 4** is split off |
+| | 3.16 Boolean union | ? (the mirrored part didn't touch Part 3 in this layout; committed without error, parts unchanged) |
+| 4 Edit / history | 4.1 Extrude 1 30 → 25 mm | ✗ **Part 1 disappears with no error** (Parts 3) while Linear pattern 2 (the Feature pattern above) is active — data loss |
+| | 4.2–4.8 | ✅ (suppressing Linear pattern 2 brings Part 1 back; reorder, undo/redo, rollback arrows, Delete key, menu Delete + undo). Note: plain clicks in the list add to the selection, so Delete removed the two selected rows (verify against live's list selection) |
+| 5 Variables … units | 5.1–5.11 | ✅ (5.5 centre of mass blank = F18, live request open; 5.11 mm → inch changes only the Hole row's text) |
+| 6 Assembly / drawing | 6.1–6.7 | ✅ (first instance at the origin; "Select a mate connector on a different instance" hint; coincident fastened faces show z-fighting lines: ? vs live) |
+| 7 Export / reopen | 7.1, 7.3 | ✅ |
+| | 7.2 STEP (F26) | ✗ kern: 4 parts → PRODUCT Part 1–4 plus **three** PRODUCT('SOLID'); header "Open CASCADE Model" |
+
+Repro for the F12 path: new doc; sketch rectangle on Top, extrude 30; fillet two top edges 3 mm; chamfer the vertical edge 2 mm;
+sketch 2 points on the top face, Hole; Linear pattern (Part) Part 1, 40 mm × 3; Linear pattern (Feature) Hole 1,
+direction = Part 1's bottom-right edge, 10 mm × 2 → sliver Part 4 + facets; then edit Extrude 1 to 25 mm → Part 1 gone.
+
+**Live answers (10-21, behaviours.md "Mass properties without material + the material notice"):**
+- **F18 closed, matches live:** without a material live also leaves Mass, Center of mass X/Y/Z and all nine inertia values **empty** (Override boxes disabled), Volume and Surface area filled, the Part chip in red text. Our panel is the same.
+- **F19 still differs (psb / ui):** live shows a **page toast** (yellow warning bubble, top centre, "⚠ One or more parts do not have a material defined." ×; bg rgb(255,248,230), border rgb(252,218,127)) **≈3.6 s after** the panel opens with a part lacking material, **auto-hides ≈4.6 s later**, and only **once per page load** (re-opening in the same session shows none; closing the panel doesn't touch it). Ours: first run showed it and it never auto-hid; on the 14:32 build and 5d28447 it never appears.

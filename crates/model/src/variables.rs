@@ -314,6 +314,23 @@ impl VsConfiguration {
         self.configured.push(VsConfigured { input: input.to_string(), variable: variable.to_string(), field, values });
     }
 
+    /// Edit internal IDs: the input `input` becomes `new_id`, its rows
+    /// renamed by `rows` (old id, new id); visibility rules, configured
+    /// cells and the shown configuration follow.
+    pub fn change_ids(&mut self, input: &str, new_id: &str, rows: &[(String, String)]) {
+        let mut cfg = self.inputs_only();
+        cfg.change_ids(input, new_id, rows);
+        self.inputs = cfg.inputs;
+        let row = |k: &String| rows.iter().find(|(a, _)| a == k).map(|(_, b)| b.clone()).unwrap_or_else(|| k.clone());
+        for c in self.configured.iter_mut().filter(|c| c.input == input) {
+            c.input = new_id.to_string();
+            c.values = std::mem::take(&mut c.values).into_iter().map(|(k, v)| (row(&k), v)).collect();
+        }
+        if let Some(v) = self.active.0.remove(input) {
+            self.active.0.insert(new_id.to_string(), row(&v));
+        }
+    }
+
     /// Unconfigure a cell.
     pub fn unconfigure(&mut self, variable: &str, field: VsField) {
         self.configured.retain(|c| !(c.variable == variable && c.field == field));
@@ -723,6 +740,24 @@ mod studio_scope_tests {
             insert_studio(&mut p.variable_studios, StudioRef { config: small, ..StudioRef::whole(ids[0]) });
         }
         assert!((element_variables(&doc, ps)["W1"].value - 0.127).abs() < 1e-9);
+    }
+
+    #[test]
+    fn internal_ids_change_with_their_cells() {
+        use crate::configuration::{ConfigInput, ConfigInputKind, ListOption};
+        let mut s = vs(&[("L1", "72 in")], false);
+        let opts = vec![ListOption { id: "Default".into(), name: "Default".into() }, ListOption { id: "Big".into(), name: "Big".into() }];
+        s.configuration.inputs.push(ConfigInput { id: "List_a".into(), name: "Configuration".into(), kind: ConfigInputKind::List { options: opts, default: "Default".into() }, visible_when: None, excluded: false });
+        s.configuration.configure("List_a", "L1", VsField::Value, "72 in");
+        s.configuration.configured[0].values.insert("Big".into(), "80 in".into());
+        s.configuration.active.0.insert("List_a".into(), "Big".into());
+        s.configuration.change_ids("List_a", "size", &[("Big".into(), "Big2".into())]);
+        let c = &s.configuration;
+        assert_eq!(c.inputs[0].id, "size");
+        assert_eq!(c.configured[0].input, "size");
+        assert_eq!(c.configured[0].values.get("Big2").map(String::as_str), Some("80 in"));
+        assert_eq!(c.active.0.get("size").map(String::as_str), Some("Big2"));
+        assert_eq!(s.configured(&c.active).variables[0].expr.text, "80 in");
     }
 
     #[test]

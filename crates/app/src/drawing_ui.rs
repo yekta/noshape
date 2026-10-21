@@ -30,9 +30,7 @@ impl DrawingEditor {
         if self.computing {
             parts.push("computing views…".into());
         }
-        if self.out_of_date {
-            parts.push("Out of date — Update (Ctrl+Q)".into());
-        }
+        // Out of date: Onshape's only cue is the bright yellow Update button.
         if let Some(b) = &self.built
             && !b.dangling.is_empty()
         {

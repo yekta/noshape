@@ -520,3 +520,51 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   `scope`/`scope_refs` (assembly owner, in progress). assembly_pattern now takes `centered`, `scope`, `scope_refs`;
   the default scope moved to shared ops::assembly::default_replicate_scope (app's replicate_scope to switch to it).
   Re-queued as chain8.sh after chain7.sh (export/OBJ fix).
+- 2026-10-21 ~17:30 (api): v-freeze reply "frozen, green" (ops/scene/cli clippy-clean, ops+cli tests green incl. e2e 13;
+  noshape-model has 2 foreign lints: custom/std_feature.rs:23, drawing/cad_fit.rs:33). Freeze lifted at 5d28447:
+  parked work re-queued as chain9.sh (log /tmp/api/chain9.log): assembly stages 1-3 (patterns incl. centered and
+  Replicate scope, BOM, interference, groups, relations, connectors, replace, rename, feature state, named positions,
+  exploded views), names/curves fix, Feature Studio ops, import tests, then UPDATE_DOCS + tests + CLI + probe.
+  Rule: re-run `UPDATE_DOCS=1 cargo test -p noshape-ops --test coverage` whenever ops change (the chains do).
+  ~17:50: stage 1 LANDED (assembly_pattern/dissolve_pattern/bom/bom_settings/interference). App pattern defaults are now
+  live's 25 mm / 360 deg / 2 -> fix_pattern_defaults.py queued (chain10.sh). App switch READY (needs the assembly
+  owner's freeze): /root/api-scratch/patch_asm_switch.py (--dry OK on 5d28447+): assembly_panels.rs 902-938
+  new_pattern_session defaults, 948-956 replicate_on_edge, 1029-1039 seed_mate, 1093-1137 accept_pattern;
+  assembly_interference.rs 105-127 interference_rows; assembly_view.rs 1334-1353 toggle_mate_suppressed,
+  1361-1387 accept_group -> noshape_ops::assembly. Relations / connectors / replace / named positions follow after
+  stages 2-3 land.
+  ~18:20: stage 2 LANDED (groups, relations, mate connectors, replace, rename, feature state; PLANNED_CEILING 64) and
+  the names/curves fix LANDED; stage 3 in its guard. qa5 API3 (coincident on an already-coincident corner gave
+  "a constraint needs two different entities"): the corner drawn on the origin IS the origin point, so the API passed
+  one entity twice. Fix queued (coinc/apply.py, chain11.sh): sketch_constrain treats `entities` as a selection set (each
+  once, as the UI); coincident on points that are one point -> success, nothing added, no edit, message "The points
+  are already coincident (they are the same point)."; other duplicates get the tool's own prompt ("Select 2
+  entities for Equal ..."). Note: coincident on two distinct already-coincident points adds a second constraint in
+  both app and API (shared apply_constraint) - left as the app does it.
+- 2026-10-21 ~19:10 (api, new agent after quota takeover): chains 9-11 had run: stage 1/2, names/curves, Feature
+  Studio ops, import tests, pattern defaults and the coincident no-op (API3) all LANDED; stage 3 had FAILED to apply
+  (stale import anchor in asm_ops3/apply.py: assembly.rs now imports MateType) -> anchor fixed, re-applied via guard.
+  e2e drawing_views_and_dimensions failed since drw2's DXF default became Release 14 (not UTF-8) -> test reads bytes.
+  API3 second half: `sketch_dimension` `value` is now optional (keeps the measured value, as the Dimension tool's
+  value box accepted unchanged); test in coincident_on_one_point_is_a_no_op.
+  Pending app switches (need owners' freezes, unchanged): patch_asm_switch.py, patch_part_rename_props.py.
+  ~19:50: stage 3 LANDED (assembly_named_position / _drivers / exploded_view / explode_step; asm_get lists
+  named_positions + exploded_views). AGENT_API.md regenerated; ops + cli tests green (e2e 20). Clippy on
+  noshape-ops currently stops in foreign crates/store/src/undo.rs:208/243 (type_complexity, someone's in-progress
+  edit); the guarded clippy before it was clean in ops.
+  NEXT: app switches (patch_asm_switch.py, patch_part_rename_props.py) and drawing slices 5-6 when the lead
+  freezes the owners' files; then live mode.
+- 2026-10-21 ~21:30 (api): App switches done (lead: no freeze, one file at a time): part_studio/menus.rs (Properties
+  save), part_studio/behaviors.rs (Rename), assembly_panels.rs + assembly_interference.rs (patch_asm_switch.py with a
+  file filter). assembly_view.rs part NOT yet applied (file was mid-edit): `python3 patch_asm_switch.py assembly_view.rs`.
+  Notes left in part-studio-behaviour.md and assembly-behaviour.md. Backups in /root/api-scratch/bak_*.rs.
+  API3 per live (no glyph, no message, no edit): scene sketch_mode `already_coincident` (uses the sketch crate's
+  `joint_points`, now pub); apply_constraint skips already-coincident pairs, constraint_command returns false without
+  a tool switch, tool-first picks do nothing. API reply keeps an informational "message". Unit test in scene.
+  Drawing slice 5 started: scene drawing_tools/commit.rs (ortho_point, extend_cut, section_jog_at, aux_edge,
+  view_refusal, silhouette/edge-pair centerlines, centerline/circle_centerline/virtual_sharp builders, view_break,
+  view_crop, view_table, default_break_gap_mm), and ops/src/ops/drawing_tools.rs: drawing_section_view,
+  _detail_view, _auxiliary_view, _break_view, _crop_view, _centerline, _virtual_sharp, _view_table (+ e2e
+  drawing_section_detail_views_and_annotations). NEXT: switch the app's tool_click (drawing_tools.rs) and
+  extra_tool_click (drawing_extra.rs) to commit.rs (asb's files, one at a time) + note in drawing-behaviour.md;
+  then notes/callouts/centermarks/datums/GD&T/surface finish/weld/hole callout/ordinate ops; then live mode.

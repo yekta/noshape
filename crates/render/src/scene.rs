@@ -381,6 +381,11 @@ pub mod state {
     /// outlined in the selection color, its faces keep their shading
     /// (Onshape, live part-studio/440).
     pub const OUTLINE: u32 = 128;
+    /// With SELECTED on faces: a whole part / instance selected, Onshape's
+    /// lighter part amber (live #f2b648 lit, #c09039 in shade) instead of a
+    /// selected face's; with OUTLINE its silhouette is #ffc04c, 3 px. On
+    /// edges (alone): the part's edges let the amber through.
+    pub const BODY: u32 = 256;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -38,3 +38,18 @@ the rest pending (REQUESTS.md "qa5 tabs"). Status: ✅ ok, ✗ differs, ? live p
 | Unpack | no dialog; the folder's tabs go to the **end of the tab list** | no dialog; tab placed where the folder was | ✗ **TABS4** |
 | Rename, then Ctrl+Z | not undoable | **Ctrl+Z reverts the rename** | ✗ **TABS5** |
 | Tab › Delete | immediate, no confirmation, no toast | immediate, no confirmation | ✅ |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| DOC6 rename spaces | "r t" → "rt" | ✗ still |
+| TABS5 rename undoable | Ctrl+Z reverts it | ✗ still |
+| DOC5 new tab position | Assembly 3 after Part Studio 1, **stays there after reopening** (the old Assembly 2 remains at the end) | ✅ **fixed** for new tabs |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+| Row | Ours | Status |
+|---|---|---|
+| DOC6 rename with spaces | "r t" kept | ✅ **fixed** |
+| TABS5 rename undoable | Ctrl+Z still reverts the rename | ✗ still |
+| TABS2 Duplicate name | "Part Studio 4 Copy 1", right after the source, not activated | ✅ **fixed** |
+| TABS1 drag | ghost "Part St…" follows, gap placeholder opens, no line, no preview card | ✅ **fixed** |
+| TABS3 folder menu | Rename · Unpack · Move to document… | ✅ **fixed** |
+| TABS4 Unpack | the folder's tab goes to the end of the tab list | ✅ **fixed** |

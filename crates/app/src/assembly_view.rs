@@ -209,6 +209,32 @@ struct SnapDrag {
     normal: DVec3,
 }
 
+/// Text colour of a Mate features row: suppressed / inactive and hidden
+/// rows grey (live qa5 asm-056: hidden mates in #999, icons dimmed),
+/// failing ones red.
+fn feature_row_color(inactive: bool, ok: bool, hidden: bool) -> Rgba {
+    let pal = p();
+    if inactive {
+        pal.text_faint
+    } else if !ok {
+        pal.error
+    } else if hidden {
+        pal.text_faint
+    } else {
+        pal.text
+    }
+}
+
+/// A relation's icon (its toolbar button's).
+fn relation_icon(kind: RelationType) -> &'static str {
+    match kind {
+        RelationType::Gear => "gear-relation",
+        RelationType::RackAndPinion => "rack-pinion",
+        RelationType::Screw => "screw-relation",
+        RelationType::Linear => "linear-relation",
+    }
+}
+
 /// A row of the Mate features list.
 struct FeatureRow {
     id: MateId,
@@ -279,7 +305,6 @@ pub struct AssemblyView {
     cache: AsmGpuCache,
     eval_seq: u64,
     eval_task: Option<Task<()>>,
-    evaluating: bool,
     catalog: Catalog,
     selected: Vec<InstanceId>,
     selected_mate: Option<MateId>,
@@ -410,9 +435,14 @@ impl AssemblyView {
         // the key (live; qa5 A11).
         let weak = cx.entity().downgrade();
         subs.push(cx.intercept_keystrokes(move |ev, window, cx| {
-            let Some(text) = bom_panel::typed_text(&ev.keystroke) else { return };
             let Some(view) = weak.upgrade() else { return };
-            if view.update(cx, |this, cx| this.bom_type_into(&text, window, cx)) {
+            let taken = if ev.keystroke.key == "delete" && ev.keystroke.modifiers.number_of_modifiers() == 0 {
+                view.update(cx, |this, cx| this.bom_clear_selected(window, cx))
+            } else {
+                let Some(text) = bom_panel::typed_text(&ev.keystroke) else { return };
+                view.update(cx, |this, cx| this.bom_type_into(&text, window, cx))
+            };
+            if taken {
                 cx.stop_propagation();
             }
         }));
@@ -462,7 +492,6 @@ impl AssemblyView {
             cache: AsmGpuCache::default(),
             eval_seq: 0,
             eval_task: None,
-            evaluating: false,
             catalog: Catalog::default(),
             selected: Vec::new(),
             selected_mate: None,
@@ -535,6 +564,18 @@ impl AssemblyView {
         }
     }
 
+    /// The instance's Part Studio has configuration inputs (live qa5 CA1:
+    /// such parts are listed with the configured part icon).
+    fn is_configured_source(&self, source: &InstanceSource, cx: &App) -> bool {
+        match source {
+            InstanceSource::Part { studio, .. } | InstanceSource::PartStudio { studio, .. } => match self.doc.read(cx).session.doc.tab(*studio).map(|t| &t.content) {
+                Some(TabContent::PartStudio(ps)) => !ps.configuration.inputs.is_empty(),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
     fn assembly<'a>(&self, cx: &'a App) -> Option<&'a Assembly> {
         match &self.doc.read(cx).session.doc.tab(self.tab)?.content {
             TabContent::Assembly(a) => Some(&**a),
@@ -597,6 +638,11 @@ impl AssemblyView {
             if !s.solve_all {
                 opts.only_mate = Some(m.id);
             }
+            // A new mate brings its connectors together (free values zero;
+            // live qa5 A4: Slider flip turns the block over onto the plate).
+            if s.editing.is_none() && !s.solve_all {
+                opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m));
+            }
             // After a snap drag the dragged instance starts at its snapped placement.
             if let Some((id, p)) = self.snap_start {
                 let mut start: HashMap<InstanceId, Placement> = asm.instances.iter().map(|i| (i.id, i.placement)).collect();
@@ -629,7 +675,6 @@ impl AssemblyView {
         let self_tab = self.tab;
         self.eval_seq += 1;
         let seq = self.eval_seq;
-        self.evaluating = true;
         self.eval_task = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(Duration::from_millis(10)).await;
             let (result, catalog) = cx
@@ -663,7 +708,6 @@ impl AssemblyView {
                 if seq != this.eval_seq {
                     return;
                 }
-                this.evaluating = false;
                 this.catalog = catalog;
                 this.apply_result(Arc::new(result), window, cx);
             });
@@ -687,9 +731,11 @@ impl AssemblyView {
         }
         self.update_pattern_preview(cx);
         self.rebuild_scene(true, cx);
-        if !self.fitted_once && self.result.bounds().is_some() {
+        if !self.fitted_once && let Some(bounds) = self.result.bounds() {
             self.fitted_once = true;
+            let inset = if self.ui.left_open || self.insert_open { 220.0 + 2.0 * 12.0 } else { 0.0 };
             self.viewport.update(cx, |vp, cx| {
+                (vp.fit_bounds, vp.fit_inset_left) = (Some(bounds), inset);
                 vp.camera.set_view(StandardView::Trimetric);
                 vp.zoom_to_fit(false, cx)
             });
@@ -1008,7 +1054,11 @@ impl AssemblyView {
         // connector (Onshape: alignSnapData with target data shows it,
         // clearTargetSnapData removes it).
         let (count, snapping, fixed_drag) = (self.selected.len(), self.snap_drag.as_ref().is_some_and(|s| s.target.is_some()), self.ui.fixed_drag.is_some());
+        // Zoom to fit: the visible instances (the scene's bounds lag a new
+        // insert: qa5 A1 cropped the first part), clear of the dialog.
+        let (fit_bounds, fit_inset) = (self.result.bounds(), if self.ui.left_open { 220.0 + 2.0 * 12.0 } else { 0.0 });
         self.viewport.update(cx, |vp, cx| {
+            (vp.fit_bounds, vp.fit_inset_left) = (fit_bounds, fit_inset);
             vp.selection_count = count;
             vp.tool_cursor = if fixed_drag {
                 Some(crate::cursor::AppCursor::NoDrop)
@@ -1042,7 +1092,7 @@ impl AssemblyView {
     /// Move manipulator frame: at the bounds center of the instances it moves, world-aligned.
     fn manipulator(&self, cx: &App) -> Option<Frame> {
         let ids = self.manip_targets(cx);
-        if ids.is_empty() {
+        if ids.is_empty() || (!self.ui.inserted_selection.is_empty() && self.selected == self.ui.inserted_selection) {
             return None;
         }
         let mut bb: Option<(DVec3, DVec3)> = None;
@@ -1083,13 +1133,37 @@ impl AssemblyView {
         })
     }
 
+    /// [`Self::edit`] for an Insert session (and a paste): its instances and
+    /// their placing are one undo step (live undoes a whole Insert session
+    /// at once), committed by [`Self::end_insert_step`] or the next edit.
+    pub(super) fn edit_insert<R>(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly) -> R) -> Option<R> {
+        let result = &self.result;
+        let tab = self.tab;
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_tab_deferred(tab, desc, cx, |c| {
+                if let TabContent::Assembly(a) = c {
+                    noshape_ops::assembly::fold_solved(a, result);
+                    Some(f(a))
+                } else {
+                    None
+                }
+            })
+            .flatten()
+        })
+    }
+
+    /// Commit the Insert session's step (see [`Self::edit_insert`]).
+    pub(super) fn end_insert_step(&mut self, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| doc.flush_pending(cx));
+    }
+
     fn insert_part(&mut self, studio: TabId, body: Option<CatalogPart>, cx: &mut Context<Self>) -> Option<InstanceId> {
         let studio_name = self.doc.read(cx).session.doc.tab(studio).map(|t| t.name.clone()).unwrap_or_default();
         let part = body.map(|(b, n, bb, _)| (b, n, bb));
         let desc = noshape_ops::assembly::insert_description(&studio_name, part.as_ref());
         // Configuration chosen in the Insert dialog (Onshape: set it before clicking the item).
         let config = self.ui.insert_config.get(&studio).cloned().unwrap_or_default();
-        self.edit(&desc, cx, |a| noshape_ops::assembly::insert_part(a, studio, &studio_name, part, config))
+        self.edit_insert(&desc, cx, |a| noshape_ops::assembly::insert_part(a, studio, &studio_name, part, config))
     }
 
     /// Start placing freshly inserted instances: they follow the cursor until a click.
@@ -1104,6 +1178,10 @@ impl AssemblyView {
         // (origins aligned) and doesn't follow the cursor (live, help); it
         // is selected (amber, its row too; live qa5 1.4).
         if self.assembly(cx).is_some_and(|a| noshape_ops::assembly::inserted_into_empty(a, &ids)) {
+            if !self.insert_open {
+                self.end_insert_step(cx);
+            }
+            self.ui.inserted_selection = ids.clone();
             self.selected = ids;
             self.selected_mate = None;
             self.refresh_scene(false, cx);
@@ -1115,6 +1193,7 @@ impl AssemblyView {
         self.selected = ids.clone();
         self.placing = Some(ids);
         self.placing_point = None;
+        self.ui.place_moved = false;
         self.ui.place_snap = None;
         self.ui.place_src_ix = 0;
         // Live Onshape shows no hint while the instance follows the cursor.
@@ -1143,7 +1222,7 @@ impl AssemblyView {
         if self.pick_replacement(InstanceSource::Sketch { studio, sketch, config }, name.clone(), cx) {
             return;
         }
-        let id = self.edit(&format!("Insert : {name}"), cx, |a| {
+        let id = self.edit_insert(&format!("Insert : {name}"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);
             a.instances.push(Instance::new(id, n, InstanceSource::Sketch { studio, sketch, config: ConfigValues::default() }, Placement::default()));
@@ -1176,7 +1255,7 @@ impl AssemblyView {
             return;
         }
         let config = self.ui.insert_config.get(&tab).cloned().unwrap_or_default();
-        let id = self.edit(&format!("Insert : {name}"), cx, |a| {
+        let id = self.edit_insert(&format!("Insert : {name}"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);
             a.instances.push(Instance { id, name: n, source: InstanceSource::Assembly { assembly: tab, config: config.clone() }, placement: Placement::default(), fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
@@ -1220,6 +1299,11 @@ impl AssemblyView {
     /// Move the instances being placed so their bounds' bottom center sits at the cursor point.
     fn update_placing(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(ids) = self.placing.clone() else { return false };
+        // Until the cursor moves over the graphics area the instance stays
+        // where it was inserted (live qa5 A18: ✓ right away keeps it there).
+        if !self.ui.place_moved {
+            return false;
+        }
         // Snap mode: an inserted instance with explicit mate connectors snaps
         // onto mate connectors of the others (Onshape "Insert and drag to snap").
         if ids.len() == 1 && (self.snap.is_some() || self.std_placing(ids[0], cx)) && self.update_insert_snap(ids[0], cx) {
@@ -1265,14 +1349,18 @@ impl AssemblyView {
                         a.mates.push(Mate::new(id, n, MateType::Fastened, src, dst));
                     });
                 }
+                // The drop joins the insert's undo step (live: one step).
                 None => {
-                    self.edit(&format!("Place : {name}"), cx, |_| {});
+                    self.edit_insert(&format!("Place : {name}"), cx, |_| {});
                 }
             }
             self.selected.retain(|s| !ids.contains(s));
         } else {
             self.selected.retain(|s| !ids.contains(s));
             self.schedule_eval(window, cx);
+        }
+        if !self.insert_open {
+            self.end_insert_step(cx);
         }
         self.refresh_scene(false, cx);
         cx.notify();
@@ -1541,19 +1629,16 @@ impl AssemblyView {
     // ------------------------------------------------------------ relations
 
     fn open_relation(&mut self, kind: RelationType, existing: Option<Relation>, window: &mut Window, cx: &mut Context<Self>) {
-        let text = existing.as_ref().map(|r| r.ratio.text.clone()).unwrap_or_else(|| match kind {
-            RelationType::Gear | RelationType::Linear => "1".into(),
-            RelationType::RackAndPinion => "10 mm".into(),
-            RelationType::Screw => "1 mm".into(),
-        });
+        let kind = existing.as_ref().map(|r| r.relation_type).unwrap_or(kind);
+        let text = existing.as_ref().map(|r| r.ratio.text.clone()).unwrap_or_else(|| noshape_ops::assembly::relation_default_ratio(kind).into());
         let ratio = cx.new(|cx| InputState::new(window, cx).default_value(text));
         // A new relation starts empty (a selected mate is the preselection);
         // mates are then picked in the list or the graphics area.
         let pre = self.selected_mate.filter(|id| self.assembly(cx).and_then(|a| a.mate(*id)).is_some_and(|m| m.mate_type.dof() > 0));
         self.relation = Some(RelationSession {
-            kind: existing.as_ref().map(|r| r.relation_type).unwrap_or(kind),
+            kind,
             a: existing.as_ref().map(|r| r.mates[0]).or(pre),
-            b: existing.as_ref().map(|r| r.mates[1]),
+            b: existing.as_ref().filter(|r| r.relation_type != RelationType::Screw).map(|r| r.mates[1]),
             ratio,
             reverse: existing.as_ref().is_some_and(|r| r.reverse),
             editing: existing.map(|r| r.id),
@@ -1561,52 +1646,40 @@ impl AssemblyView {
         cx.notify();
     }
 
-    fn accept_relation(&mut self, cx: &mut Context<Self>) {
-        let Some(r) = self.relation.take() else { return };
-        let screw = r.kind == RelationType::Screw;
-        let (Some(a), Some(b)) = (r.a, if screw { r.a } else { r.b }) else {
-            self.message = Some((false, "Select two mates for the relation.".into()));
-            cx.notify();
-            return;
-        };
-        if a == b && !screw {
-            self.message = Some((false, "A relation needs two different mates.".into()));
-            cx.notify();
+    /// The relation dialog's type select: the value row takes the new
+    /// type's default unless it was edited (live: one dialog, four types).
+    fn set_relation_kind(&mut self, kind: RelationType, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(r) = &mut self.relation else { return };
+        if r.kind == kind {
             return;
         }
+        let old_default = noshape_ops::assembly::relation_default_ratio(r.kind);
+        if r.ratio.read(cx).value().trim() == old_default {
+            let text = noshape_ops::assembly::relation_default_ratio(kind);
+            r.ratio.update(cx, |s, cx| s.set_value(text, window, cx));
+        }
+        r.kind = kind;
+        if kind == RelationType::Screw {
+            r.b = None;
+        }
+        cx.notify();
+    }
+
+    fn relation_valid(&self, cx: &App) -> bool {
+        let Some(r) = &self.relation else { return false };
+        self.assembly(cx).is_some_and(|a| noshape_ops::assembly::check_relation(a, r.kind, r.a, r.b).is_ok())
+    }
+
+    fn accept_relation(&mut self, cx: &mut Context<Self>) {
+        let Some(r) = &self.relation else { return };
+        let Some(mates) = self.assembly(cx).and_then(|a| noshape_ops::assembly::check_relation(a, r.kind, r.a, r.b).ok()) else { return };
+        let Some(r) = self.relation.take() else { return };
         let ratio = ExprValue::new(r.ratio.read(cx).value().to_string());
         let (kind, reverse, editing) = (r.kind, r.reverse, r.editing);
-        if let Some(asm) = self.assembly(cx)
-            && let (Some(ma), Some(mb)) = (asm.mate(a), asm.mate(if kind == RelationType::Screw { a } else { b }))
-            && let Err(e) = noshape_model::assembly::eval::relation_values(kind, ma.mate_type, mb.mate_type)
-        {
-            self.message = Some((true, e));
-            self.relation = Some(r);
-            cx.notify();
-            return;
-        }
         // The coupling is measured from the mates' current values.
-        let base = self.assembly(cx).and_then(|asm| self.result.relation_base(asm, kind, [a, b]));
-        let base_name = match kind {
-            RelationType::Gear => "Gear",
-            RelationType::RackAndPinion => "Rack and pinion",
-            RelationType::Screw => "Screw",
-            RelationType::Linear => "Linear",
-        };
-        self.edit(&format!("Insert : {base_name} relation"), cx, |asm| {
-            if let Some(id) = editing
-                && let Some(x) = asm.relations.iter_mut().find(|x| x.id == id)
-            {
-                x.relation_type = kind;
-                x.mates = [a, b];
-                x.ratio = ratio;
-                x.reverse = reverse;
-                x.base = base;
-                return;
-            }
-            let id = MateId(asm.next_id());
-            let name = asm.next_feature_name(base_name);
-            asm.relations.push(Relation { id, name, relation_type: kind, mates: [a, b], ratio, reverse, suppressed: false, base });
+        let base = self.assembly(cx).and_then(|asm| self.result.relation_base(asm, kind, mates));
+        self.edit(&noshape_ops::assembly::relation_description(kind), cx, |asm| {
+            noshape_ops::assembly::commit_relation(asm, editing, kind, mates, ratio, reverse, base);
         });
     }
 
@@ -2113,6 +2186,7 @@ impl AssemblyView {
                 // Shift (hold) locks mate inference to the entity under the cursor.
                 self.infer_locked = modifiers.shift;
                 if self.placing.is_some() {
+                    self.ui.place_moved = true;
                     if self.update_placing(cx) {
                         self.rebuild_scene(true, cx);
                     }
@@ -2588,6 +2662,7 @@ impl AssemblyView {
     /// clicks on faces, edges and vertices select them (additive), their
     /// instances' rows too; an empty click clears.
     fn click_select(&mut self, target: Option<AsmPickTarget>, position: DVec2, additive: bool, cx: &mut Context<Self>) {
+        self.ui.root_selected = false;
         let now = std::time::Instant::now();
         let double = self.ui.last_click.is_some_and(|(t, p)| now.duration_since(t) < std::time::Duration::from_millis(500) && (p - position).length() < 4.0);
         self.ui.last_click = Some((now, position));
@@ -2596,6 +2671,9 @@ impl AssemblyView {
         } else {
             match target {
                 Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.select_entity(t, !additive),
+                // Mass properties shows the selection as its chips; an empty
+                // click keeps a dialog's chips (live qa5 pass 7).
+                None if self.ui.mass.is_some() => {}
                 None if !additive => self.clear_selection(),
                 target => self.select_target(target, additive, cx),
             }
@@ -2740,7 +2818,6 @@ impl AssemblyView {
     // ------------------------------------------------------------ render: toolbar
 
     fn render_toolbar(&mut self, viewport_w: f32, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
         let sep = crate::ui::tool_separator;
         // Tool search's "Highlight tool in toolbar": `#fcda7f`, border `#fab601`.
         let found = self.search_found_icon();
@@ -2842,8 +2919,8 @@ impl AssemblyView {
                     }
                 })))
             })
-            .child(div().flex_1())
-            .when(self.evaluating, |d| d.child(div().pr(px(8.)).text_xs().text_color(pal.text_faint).child("solving…")));
+            // Live (qa5 pass 7, A16): no "Solving…" text while the assembly solves.
+            .child(div().flex_1());
         // Right-click: Customize toolbar… / Hide "Search tools" (live 331z).
         let menu = self.toolbar_menu(cx.entity());
         let bar = div().id("asm-toolbar").child(bar).os_context_menu(menu);
@@ -2960,6 +3037,7 @@ impl AssemblyView {
             // parts the composite icon (live 326).
             NodeKind::Part if inst.is_some_and(|i| matches!(i.source, InstanceSource::Sketch { .. })) => "sketch",
             NodeKind::Part if inst.is_some_and(|i| self.is_composite_source(&i.source, cx)) => "composite-part",
+            NodeKind::Part if inst.is_some_and(|i| self.is_configured_source(&i.source, cx)) => "part-configured",
             NodeKind::Part => "part",
             NodeKind::PartStudio => "part-studio",
             NodeKind::Assembly if node.is_some_and(|n| n.rigid) => "sub-assembly-rigid",
@@ -3078,6 +3156,7 @@ impl AssemblyView {
                 }
             }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
+                this.ui.root_selected = false;
                 if this.ui.interference.is_some() {
                     this.toggle_interference_instance(p3[0], cx);
                     return;
@@ -3148,15 +3227,12 @@ impl AssemblyView {
         let FeatureRow { id, icon, name, ok, inactive, message, has_limits, hidden, tooltip, implicit } = f;
         let selected = self.selected_mate == Some(id);
         let accent = pal.accent;
-        let color = if inactive {
-            pal.text_faint
-        } else if !ok {
-            pal.error
-        } else {
-            pal.text
-        };
+        let dim = hidden == Some(true);
+        let color = feature_row_color(inactive, ok, dim);
         let expanded = self.ui.expanded_mates.contains(&id);
-        let can_expand = !implicit.is_empty();
+        // Live assembly/752: search results as a list have no chevron column.
+        let flat = self.ui.filter_flat && !self.ui.filter.is_empty();
+        let can_expand = !implicit.is_empty() && !flat;
         let tip = match (&message, tooltip) {
             (Some(m), Some(t)) => Some(format!("{name} has error: {m}\n{t}")),
             (Some(m), None) => Some(format!("{name} has error: {m}")),
@@ -3173,7 +3249,7 @@ impl AssemblyView {
             .text_color(color)
             .when(selected, |d| d.bg(pal.accent_soft))
             .when(!selected, |d| d.hover(|d| d.bg(pal.row_hover)))
-            .child(div().id(SharedString::from(format!("mexp-{}", id.0))).w(px(12.)).when(can_expand, |d| {
+            .child(div().id(SharedString::from(format!("mexp-{}", id.0))).w(px(if flat { 0. } else { 12. })).when(can_expand, |d| {
                 d.child(crate::ui::glyph(if expanded { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if !this.ui.expanded_mates.remove(&id) {
                         this.ui.expanded_mates.insert(id);
@@ -3182,7 +3258,7 @@ impl AssemblyView {
                     cx.notify();
                 }))
             }))
-            .child(crate::assets::icon(&icon, 14., cx))
+            .child(div().flex_none().when(dim, |d| d.opacity(0.5)).child(crate::assets::icon(&icon, 14., cx)))
             .child(match self.rename_field(behaviors::RenameRow::Feature(id)) {
                 Some(field) => field,
                 None => div().flex_1().truncate().when(inactive, |d| d.line_through()).child(name.clone()).into_any_element(),
@@ -3287,7 +3363,9 @@ impl AssemblyView {
     fn assembly_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
-        let all_selected = self.assembly(cx).is_some_and(|a| !a.instances.is_empty() && a.instances.iter().all(|i| self.selected.contains(&i.id)));
+        // Live (A15): the root row highlights when it was clicked, not
+        // whenever every instance happens to be selected.
+        let all_selected = self.ui.root_selected && self.assembly(cx).is_some_and(|a| !a.instances.is_empty() && a.instances.iter().all(|i| self.selected.contains(&i.id)));
         let grounded = self.assembly(cx).is_some_and(|a| !a.fixed_instances().is_empty());
         let view = cx.entity();
         h_flex()
@@ -3311,6 +3389,7 @@ impl AssemblyView {
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.selected = this.assembly(cx).map(|a| a.instances.iter().filter(|i| a.generated_by(i.id).is_none()).map(|i| i.id).collect()).unwrap_or_default();
                 this.selected_mate = None;
+                this.ui.root_selected = true;
                 this.refresh_scene(false, cx);
                 cx.notify();
             }))
@@ -3362,15 +3441,36 @@ impl AssemblyView {
         lines.join("\n")
     }
 
+    /// A mate's row in Mate features (None when the filter hides it).
+    fn mate_list_row(&self, m: &Mate, result: &AssemblyResult, labeler: &ConnectorLabeler, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let st = result.mates.iter().find(|s| s.id == m.id);
+        let ok = st.is_none_or(|s| s.ok);
+        let inactive = m.suppressed || st.is_some_and(|s| s.inactive);
+        let hidden = m.hidden || !self.show_mates;
+        if !self.feature_passes(noshape_model::assembly::ops::RowKind::Mate, &m.name, !ok, inactive, hidden, !m.limits.is_empty()) {
+            return None;
+        }
+        let implicit: Vec<(String, MateConnectorRef)> = m.connectors().filter(|c| c.connector.is_none() && !c.is_origin()).map(|c| (labeler(c), c.clone())).collect();
+        Some(self.feature_row(
+            FeatureRow { id: m.id, icon: mate_icon(m.mate_type), name: m.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: !m.limits.is_empty(), hidden: Some(hidden), tooltip: Some(self.mate_tooltip(m)), implicit },
+            cx,
+        ))
+    }
+
     fn render_list(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(asm) = self.assembly(cx).cloned() else { return div().into_any_element() };
         let result = self.result.clone();
         let filtering = !self.ui.filter.is_empty();
+        // Live assembly/753: with ≡ off (the default) the matches stay in
+        // their tree, under the top row, and a "…" row stands for the rest.
+        let tree = filtering && !self.ui.filter_flat;
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut selected_row: Option<usize> = None;
-        if !filtering {
+        if !filtering || tree {
             rows.push(self.assembly_row(cx));
+        }
+        if !filtering {
             rows.push(self.origin_row(cx));
         }
         let mut shown_folders: HashSet<MateId> = HashSet::new();
@@ -3438,6 +3538,37 @@ impl AssemblyView {
                         rows.push(self.instance_row(result.node(&[inst.id]), Some(inst), vec![inst.id], 1, cx));
                     }
                 }
+                // Live (qa5 asm-056): "Replicate 1 ▸ Part 3 <2>, ▸ Mate features (1)",
+                // that folder collapsed at first.
+                let mates: Vec<&Mate> = asm.pattern_mates(p).collect();
+                if !mates.is_empty() && !filtering {
+                    let key = vec![InstanceId(p.id.0), MATE_FEATURES_COLLAPSED];
+                    let open = self.expanded.contains(&key);
+                    let pid = p.id;
+                    rows.push(
+                        crate::ui::tree_row(SharedString::from(format!("pat-mates-{}", p.id.0)), false)
+                            .pl(px(5. + 22.))
+                            .cursor_pointer()
+                            .child(crate::ui::caret(open))
+                            .child(format!("Mate features ({})", mates.len()))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                let key = vec![InstanceId(pid.0), MATE_FEATURES_COLLAPSED];
+                                if !this.expanded.remove(&key) {
+                                    this.expanded.insert(key);
+                                }
+                                cx.notify();
+                            }))
+                            .into_any_element(),
+                    );
+                    if open {
+                        let labeler = self.labeler(cx);
+                        for m in mates {
+                            if let Some(row) = self.mate_list_row(m, &result, &labeler, cx) {
+                                rows.push(div().pl(px(17. + 22.)).child(row).into_any_element());
+                            }
+                        }
+                    }
+                }
             }
         }
         if asm.instances.is_empty() {
@@ -3462,19 +3593,14 @@ impl AssemblyView {
             mate_ids.push(c.id);
         }
         for m in &asm.mates {
-            let st = result.mates.iter().find(|s| s.id == m.id);
-            let ok = st.is_none_or(|s| s.ok);
-            let inactive = m.suppressed || st.is_some_and(|s| s.inactive);
-            let hidden = m.hidden || !self.show_mates;
-            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Mate, &m.name, !ok, inactive, hidden, !m.limits.is_empty()) {
+            // Live (qa5 asm-056): a pattern's mates are listed under its row.
+            if !filtering && asm.mate_generated_by(m.id).is_some() {
                 continue;
             }
-            let implicit: Vec<(String, MateConnectorRef)> = m.connectors().filter(|c| c.connector.is_none() && !c.is_origin()).map(|c| (labeler(c), c.clone())).collect();
-            mate_rows.push(self.feature_row(
-                FeatureRow { id: m.id, icon: mate_icon(m.mate_type), name: m.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: !m.limits.is_empty(), hidden: Some(hidden), tooltip: Some(self.mate_tooltip(m)), implicit },
-                cx,
-            ));
-            mate_ids.push(m.id);
+            if let Some(row) = self.mate_list_row(m, &result, &labeler, cx) {
+                mate_rows.push(row);
+                mate_ids.push(m.id);
+            }
         }
         for r in &asm.relations {
             let st = result.relations.iter().find(|s| s.id == r.id);
@@ -3482,14 +3608,22 @@ impl AssemblyView {
             if !self.feature_passes(noshape_model::assembly::ops::RowKind::Relation, &r.name, !ok, r.suppressed, false, false) {
                 continue;
             }
-            let icon = icon_path(match r.relation_type {
-                RelationType::Gear => "gear-relation",
-                RelationType::RackAndPinion => "rack-pinion",
-                RelationType::Screw => "screw-relation",
-                RelationType::Linear => "linear-relation",
-            });
+            let icon = icon_path(relation_icon(r.relation_type));
             mate_rows.push(self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive: r.suppressed, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx));
             mate_ids.push(r.id);
+        }
+        // Live: a new relation's row ("Gear 1", selected, bold) is in the
+        // list while its dialog is open.
+        let new_relation = self.relation.as_ref().filter(|r| r.editing.is_none()).map(|r| (r.kind, self.relation_name(cx)));
+        if let Some((kind, name)) = new_relation.clone() {
+            mate_rows.push(
+                crate::ui::tree_row("rel-new", true)
+                    .child(div().w(px(12.)))
+                    .child(crate::assets::icon(&icon_path(relation_icon(kind)), 14., cx))
+                    .child(div().flex_1().truncate().font_weight(FontWeight::BOLD).child(name))
+                    .into_any_element(),
+            );
+            mate_ids.push(MateId(u64::MAX));
         }
         for g in &asm.groups {
             if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, false, g.suppressed, false, false) {
@@ -3503,8 +3637,8 @@ impl AssemblyView {
         // with its new-folder button, then one tree that ends with the
         // collapsible "Mate features (N)" folder holding the mates.
         let mates_open = !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]);
-        let mate_count = asm.mates.len() + asm.relations.len() + asm.groups.len() + asm.connectors.len();
-        if !filtering {
+        let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some());
+        if !filtering || (tree && !mate_rows.is_empty()) {
             rows.push(
                 crate::ui::tree_row("mates-folder", false)
                     .cursor_pointer()
@@ -3520,8 +3654,12 @@ impl AssemblyView {
                     .into_any_element(),
             );
         }
-        if mates_open || filtering {
-            rows.extend(mate_rows.into_iter().map(|r| div().pl(px(if filtering { 0. } else { 17. })).child(r).into_any_element()));
+        if mates_open || (filtering && !tree) {
+            rows.extend(mate_rows.into_iter().map(|r| div().pl(px(if filtering && !tree { 0. } else { 17. })).child(r).into_any_element()));
+        }
+        if tree {
+            // The "…" (live: text at x 28 of the list), past the rows shown.
+            rows.push(h_flex().h(px(crate::ui::ROW_H)).flex_none().pl(px(28.)).text_size(px(crate::ui::ROW_TEXT)).text_color(pal.text).child("…").into_any_element());
         }
         v_flex().id("instance-list").size_full().overflow_y_scroll().track_scroll(&self.ui.list_scroll).children(rows).into_any_element()
     }
@@ -3536,6 +3674,10 @@ impl AssemblyView {
         // A configured assembly: the Configurations box above the list (live 191).
         let mut head: Vec<AnyElement> = self.render_asm_config_box(cx).into_iter().collect();
         head.push(self.render_list_filter(cx));
+        // Live assembly/752–753: no "Instances (N)" row while filtering.
+        if !self.ui.filter.is_empty() {
+            return head;
+        }
         head.push(
             // Live assembly/10: like the Part Studio's "Features (n)" row.
             h_flex()
@@ -4198,73 +4340,99 @@ impl AssemblyView {
                     .into_any_element()
     }
 
+    /// The relation feature dialog (live behaviours.md "Assembly relation
+    /// dialogs"): "<Type> 1" ✓ ✕, an unlabelled type select, the Mate(s)
+    /// query, Relation ratio / Distance per revolution, ☐ Reverse direction.
     fn render_relation_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(r) = &self.relation else { return div().into_any_element() };
-        let mates: Vec<(MateId, String, MateType)> = self.assembly(cx).map(|a| a.mates.iter().map(|m| (m.id, m.name.clone(), m.mate_type)).collect()).unwrap_or_default();
-        let name_of = |id: Option<MateId>| id.and_then(|id| mates.iter().find(|m| m.0 == id).map(|m| m.1.clone())).unwrap_or_else(|| "Select mate".into());
-        let view = cx.entity();
-        let picker = |slot: usize, current: Option<MateId>| {
-            let mates = mates.clone();
-            let view = view.clone();
-            Button::new(SharedString::from(format!("rel-pick-{slot}"))).label(name_of(current)).outline().small().dropdown_caret(true).os_dropdown_menu(SharedString::from(format!("rel-pick-{slot}-dd")), true, move |mut menu, _, _| {
-                for (id, name, t) in &mates {
-                    let v = view.clone();
-                    let id = *id;
-                    menu = menu.item(crate::os_menu::OsMenuItem::new(name.clone()).icon(Icon::empty().path(mate_icon(*t))).on_click(move |_, _, cx| {
-                        v.update(cx, |this, cx| {
-                            if let Some(r) = &mut this.relation {
-                                if slot == 0 {
-                                    r.a = Some(id);
-                                } else {
-                                    r.b = Some(id);
-                                }
-                            }
-                            cx.notify();
-                        })
-                    }));
-                }
-                menu
+        let kind = r.kind;
+        let name = self.relation_name(cx);
+        let valid = self.relation_valid(cx);
+        const KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::RackAndPinion, RelationType::Screw, RelationType::Linear];
+        let current = KINDS.iter().position(|k| *k == kind).unwrap_or(0);
+        let view = cx.entity().downgrade();
+        let select = crate::os_ui::select_field("rel-type", KINDS.iter().map(|k| noshape_ops::assembly::relation_name(*k).to_string()).collect(), current, move |i, window, cx| {
+            if let (Some(k), Some(v)) = (KINDS.get(i).copied(), view.upgrade()) {
+                v.update(cx, |this, cx| this.set_relation_kind(k, window, cx));
+            }
+        });
+        let rows: Vec<AnyElement> = [r.a, r.b]
+            .into_iter()
+            .enumerate()
+            .filter_map(|(slot, id)| {
+                let m = self.assembly(cx)?.mate(id?)?;
+                Some(crate::os_ui::query_row(SharedString::from(format!("rel-mate-{slot}")), noshape_ops::assembly::relation_mate_label(kind, slot, m.mate_type, &m.name)).into_any_element())
             })
-        };
-        let kinds = [(RelationType::Gear, "Gear"), (RelationType::RackAndPinion, "Rack & pinion"), (RelationType::Screw, "Screw"), (RelationType::Linear, "Linear")];
-        let mut seg = h_flex().gap_1().flex_wrap();
-        for (k, label) in kinds {
-            seg = seg.child(Button::new(SharedString::from(format!("rel-k-{label}"))).label(label).ghost().xsmall().selected(r.kind == k).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                if let Some(r) = &mut this.relation {
-                    r.kind = k;
-                }
-                cx.notify();
-            })));
-        }
-        let (la, lb, lr) = match r.kind {
-            RelationType::Gear => ("Driver (revolute)", "Driven (revolute)", "Ratio"),
-            RelationType::RackAndPinion => ("Pinion (revolute)", "Rack (slider)", "Pitch radius"),
-            RelationType::Screw => ("Screw (cylindrical)", "Same mate", "Lead per radian"),
-            RelationType::Linear => ("Driver (slider)", "Driven (slider)", "Ratio"),
-        };
+            .collect();
+        let value = crate::os_ui::param_row(noshape_ops::assembly::relation_value_label(kind), crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).text_right(), 25.));
         let body = v_flex()
-            .p_3()
-            .gap_2()
-            .child(seg)
-            .child(div().text_xs().text_color(pal.text_muted).child(la))
-            .child(picker(0, r.a))
-            .child(div().text_xs().text_color(pal.text_muted).child(lb))
-            .child(picker(1, r.b))
-            .child(div().text_xs().text_color(pal.text_muted).child(lr))
-            .child(Input::new(&r.ratio).text_size(px(13.33)).xsmall())
-            .child(Checkbox::new("rel-rev").label("Reverse direction").checked(r.reverse).on_click(cx.listener(|this, v: &bool, _, cx| {
+            .pb(px(2.))
+            .child(div().px(px(3.)).pt(px(5.)).child(select))
+            // The Mate(s) field is active while the dialog is open.
+            .child(div().px(px(3.)).pt(px(5.)).child(crate::os_ui::query_box("rel-mates", "Mate(s)", true, rows)))
+            .child(div().h(px(5.)))
+            .child(value)
+            .child(crate::os_ui::checkbox("rel-rev", "Reverse direction", r.reverse).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(r) = &mut this.relation {
-                    r.reverse = *v;
+                    r.reverse = !r.reverse;
                 }
                 cx.notify();
             })))
-            .child(h_flex().justify_end().gap_2().child(Button::new("rel-ok").label("OK").primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_relation(cx)))));
-        Self::panel_frame("Relation", body, cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.relation = None;
-            cx.notify();
-        }), "rel-close")
-        .into_any_element()
+            .child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")));
+        v_flex()
+            .id("relation-dialog")
+            .w(px(220.))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .bg(pal.panel)
+                    .border_b_1()
+                    .border_color(pal.border)
+                    .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if valid { pal.text } else { pal.text_invalid }).truncate().child(name))
+                    .child(
+                        div()
+                            .id("rel-ok")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(if valid { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
+                            .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
+                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_relation(cx))),
+                    )
+                    .child(
+                        div()
+                            .id("rel-cancel")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.panel_hover))
+                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.relation = None;
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(body)
+            .into_any_element()
+    }
+
+    /// The open relation dialog's feature name ("Gear 1"; an edited one keeps its own).
+    fn relation_name(&self, cx: &App) -> String {
+        let Some(r) = &self.relation else { return String::new() };
+        let Some(a) = self.assembly(cx) else { return String::new() };
+        match r.editing.and_then(|id| a.relations.iter().find(|x| x.id == id)) {
+            Some(x) => x.name.clone(),
+            None => a.next_feature_name(noshape_ops::assembly::relation_name(r.kind)),
+        }
     }
 
     /// One table view per Variable Studio shown in this Assembly.
@@ -4479,6 +4647,11 @@ impl AssemblyView {
         if let Some(el) = self.render_isolate_panel(cx) {
             left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-isolate")));
             any_left = true;
+        }
+        if self.ui.left_open != any_left {
+            self.ui.left_open = any_left;
+            let inset = if any_left { 220.0 + 2.0 * 12.0 } else { 0.0 };
+            self.viewport.update(cx, |vp, _| vp.fit_inset_left = inset);
         }
         if any_left {
             out.push(left.into_any_element());
@@ -5125,5 +5298,21 @@ impl Render for AssemblyView {
                 // So is the customize toolbar's Tools panel, over the list
                 // and graphics.
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::feature_row_color;
+    use crate::theme::p;
+
+    /// qa5 A3: new mates are hidden, and hidden rows are listed in grey.
+    #[test]
+    fn hidden_mate_rows_are_grey() {
+        let pal = p();
+        assert_eq!(feature_row_color(false, true, true), pal.text_faint);
+        assert_eq!(feature_row_color(false, true, false), pal.text);
+        assert_eq!(feature_row_color(false, false, true), pal.error);
+        assert_eq!(pal.text_faint, gpui_kit::rgb(0x999999));
     }
 }

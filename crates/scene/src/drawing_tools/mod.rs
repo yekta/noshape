@@ -4,8 +4,10 @@
 //! vector helpers. Slice 2: picking ([`SheetPick`]). Slice 3: the smart
 //! dimension, grips and drags, and the pending annotation / view previews.
 //! Slice 4: the dialogs' options as plain values ([`ViewOptions`] etc.).
+//! Slice 5: what the tools commit (`commit.rs`).
 
 pub mod geom;
+mod commit;
 mod jog;
 mod opts;
 mod overlay;
@@ -15,6 +17,7 @@ mod smart;
 mod sketch;
 mod types;
 
+pub use commit::*;
 pub use overlay::{Overlay, SnapMark};
 pub use jog::{CentermarkArms, seg_dist};
 pub use opts::*;

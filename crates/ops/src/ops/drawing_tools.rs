@@ -1,0 +1,523 @@
+//! Drawing views and annotations beyond Insert / Projected view and the
+//! dimensions: Section, Detail, Auxiliary, Break and Crop views,
+//! centerlines, virtual sharps and view tables. Each runs the drawing
+//! editor's own tool code (`noshape_scene::drawing_tools`) on the clicks
+//! given (sheet mm) and commits with the editor's edit text.
+
+use super::doc_field;
+use super::drawing::{commit, drawing_field, drawing_tab, point, point_value, reply, sheet_field, sheet_index};
+use crate::drawing::{self as dr, SheetModel};
+use crate::error::OpError;
+use crate::registry::{Args, Op, OpOutput, opt, req};
+use crate::{Ctx, OpenDoc, refs};
+use noshape_model::drawing::{BreakStyle, Drawing, ViewId, ViewKind};
+use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ViewOptions};
+use serde_json::{Value, json};
+
+fn view_id(name: &'static str, what: &'static str) -> crate::registry::Field {
+    req(name, json!({ "type": "integer" }), what)
+}
+
+fn points(min: u64, max: u64) -> Value {
+    json!({ "type": "array", "items": point(), "minItems": min, "maxItems": max })
+}
+
+pub fn ops() -> Vec<Op> {
+    let common = || vec![doc_field(), drawing_field(), sheet_field()];
+    let with = |mut v: Vec<crate::registry::Field>, more: Vec<crate::registry::Field>| {
+        v.extend(more);
+        v
+    };
+    vec![
+        Op {
+            group: "drawing",
+            verb: "section_view",
+            summary: "Section view of a view (full, partial, jogged by snap points)",
+            description: "The Section view tool: the cutting line goes through `point` (sheet mm; a vertex or circle center there is snapped) across the whole parent view, `direction` vertical (the dialog's default), horizontal or angular (`angle`, default 45 deg). With `partial` the line runs from `point` to `end` (snapped to horizontal / vertical within 8 deg, as the second click) and only cuts along its length. `jogs`: snap points of the view the line jogs through. The view goes to `position`, projected perpendicular to the line. One edit (\"Section view\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("parent", "View to section (drawing_get)."),
+                    req("point", point(), "A point of the cutting line (sheet mm)."),
+                    opt("direction", json!({ "type": "string", "enum": ["vertical", "horizontal", "angular"], "default": "vertical" }), "Cutting line direction (full sections)."),
+                    opt("angle", json!({ "type": "number", "default": 45 }), "Angular: the line's angle in degrees."),
+                    opt("opposite", json!({ "type": "boolean", "default": false }), "Angular: Opposite direction."),
+                    opt("partial", json!({ "type": "boolean", "default": false }), "Partial section: the line from `point` to `end` only."),
+                    opt("end", point(), "Partial: the line's other end (sheet mm)."),
+                    opt("jogs", points(0, 16), "Full sections: snap points the line jogs through, in order."),
+                    req("position", point(), "Where the section view goes (sheet mm)."),
+                    opt("label", json!({ "type": "string" }), "Section id (default the sheet's next letter)."),
+                    opt("cut_only", json!({ "type": "boolean", "default": false }), "Show cut geometry only."),
+                    opt("flip", json!({ "type": "boolean", "default": false }), "Flip the view direction."),
+                    opt("depth", json!({ "type": "number", "exclusiveMinimum": 0 }), "Section depth (model mm)."),
+                    opt("depth_to", point(), "Section depth up to this vertex / circle center (sheet mm)."),
+                    opt("exclude", json!({ "type": "array", "items": { "type": "string" } }), "Parts excluded from the cut (`body:…`)."),
+                    opt("cut_from_section", json!({ "type": "boolean", "default": true }), "Sectioning a section view: cut from the section."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: section_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "detail_view",
+            summary: "Detail view of a circular region of a view",
+            description: "The Detail view tool: the circle centered at `center` (sheet mm; a vertex or circle center there is snapped) with `radius` (sheet mm) on the parent view, shown at `scale` (default twice the parent's) at `position`. One edit (\"Detail view\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("parent", "View to detail."),
+                    req("center", point(), "Detail circle center (sheet mm)."),
+                    req("radius", json!({ "type": "number", "exclusiveMinimum": 0 }), "Detail circle radius (sheet mm)."),
+                    req("position", point(), "Where the detail view goes (sheet mm)."),
+                    opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "View scale (default 2 x the parent's)."),
+                    opt("label", json!({ "type": "string" }), "Detail id (default the sheet's next letter)."),
+                    opt("style", json!({ "type": "string", "enum": ["in_line", "connected", "leader"] }), "Label style (default Drawing properties')."),
+                    opt("show_profile", json!({ "type": "boolean" }), "Show the detail profile (default Drawing properties')."),
+                    opt("clip_border", json!({ "type": "boolean" }), "Clip the border (default Drawing properties')."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: detail_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "auxiliary_view",
+            summary: "Auxiliary view looking normal to a straight edge",
+            description: "The Auxiliary view tool (Normal): `edge` is a click on a straight model edge of the parent view (sheet mm); the view looks along it and goes to `position` (at least 15 mm from the parent, perpendicular to the edge). One edit (\"Auxiliary view\").",
+            fields: with(
+                common(),
+                vec![
+                    req("edge", point(), "A point on a straight edge of a view (sheet mm)."),
+                    req("position", point(), "Where the view goes (sheet mm)."),
+                    opt("label", json!({ "type": "string" }), "Auxiliary id (default the sheet's next letter)."),
+                    opt("reverse", json!({ "type": "boolean", "default": false }), "Reverse the direction."),
+                    opt("show_reference", json!({ "type": "boolean", "default": true }), "Show the view reference indicator."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: auxiliary_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "break_view",
+            summary: "Break a view (remove a band between two points)",
+            description: "The Break view tool: removes the band between `from` and `to` (sheet mm) across the view: `vertical` break lines cut along x, horizontal ones along y. One edit (\"Break view\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "View to break."),
+                    req("from", point(), "First break line (sheet mm)."),
+                    req("to", point(), "Second break line (sheet mm)."),
+                    opt("orientation", json!({ "type": "string", "enum": ["vertical", "horizontal"], "default": "vertical" }), "Break line orientation."),
+                    opt("style", json!({ "type": "string", "enum": ["zigzag", "straight", "curve", "small_zigzag"], "default": "zigzag" }), "Break line style."),
+                    opt("gap", json!({ "type": "number", "exclusiveMinimum": 0 }), "Gap (sheet mm; default 6 mm, 0.25 in in inch drawings)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: break_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "crop_view",
+            summary: "Crop a view to a rectangle or circle",
+            description: "The Crop view tool: a rectangle with corners `from` and `to`, or a circle centered at `from` through `to` (sheet mm; `from` snaps to a vertex there). One edit (\"Crop view\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "View to crop."),
+                    opt("shape", json!({ "type": "string", "enum": ["rectangle", "circle"], "default": "rectangle" }), "Crop shape."),
+                    req("from", point(), "Rectangle corner / circle center (sheet mm)."),
+                    req("to", point(), "Opposite corner / a point on the circle (sheet mm)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: crop_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "centerline",
+            summary: "Centerlines: 2 point, edge to edge, 3 point / 2 point circle",
+            description: "The centerline tools, on clicks `picks` (sheet mm): two_point (two snap points of one view), edge_to_edge (one cylinder silhouette edge gives its axis; or two edges give their middle line), circle_3_point (three snap points) and circle_2_point (center, then a point on the circle). Associative to the model points snapped. One edit with the tool's name.",
+            fields: with(
+                common(),
+                vec![
+                    req("kind", json!({ "type": "string", "enum": ["two_point", "edge_to_edge", "circle_3_point", "circle_2_point"] }), "Centerline tool."),
+                    req("picks", points(1, 3), "The clicks (sheet mm)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: centerline,
+        },
+        Op {
+            group: "drawing",
+            verb: "virtual_sharp",
+            summary: "Virtual sharp where two straight edges would meet",
+            description: "The Virtual sharp tool: clicks on two straight edges of one view (sheet mm). Associative: dimensions can attach to it. One edit (\"Virtual sharp\").",
+            fields: with(common(), vec![req("picks", points(2, 2), "A point on each edge (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: virtual_sharp,
+        },
+        Op {
+            group: "drawing",
+            verb: "view_table",
+            summary: "Place a BOM, cut list or hole table of a view",
+            description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its top-left corner at `position` (sheet mm). A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.",
+            fields: with(
+                common(),
+                vec![
+                    req("kind", json!({ "type": "string", "enum": ["bom", "cut_list", "hole"] }), "Table tool."),
+                    view_id("view", "The view the table lists."),
+                    opt("origin", point(), "Hole table: the origin vertex (sheet mm)."),
+                    req("position", point(), "Where the table goes (sheet mm)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: view_table,
+        },
+    ]
+}
+
+// ------------------------------------------------------------ helpers
+
+struct Target {
+    tab: noshape_model::document::TabId,
+    sheet: usize,
+    d: Drawing,
+    m: SheetModel,
+}
+
+fn target(od: &mut OpenDoc, a: &Args) -> Result<Target, OpError> {
+    let tab = drawing_tab(od, a)?;
+    let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
+    let sheet = sheet_index(&d, a)?;
+    let m = SheetModel::build(&od.session, tab, d.clone(), sheet, &[]);
+    Ok(Target { tab, sheet, d, m })
+}
+
+fn pt_arg(a: &Args, name: &str) -> Result<[f64; 2], OpError> {
+    point_value(a.get(name).ok_or_else(|| OpError::param(name, "required"))?, name)
+}
+
+fn view_arg(t: &Target, a: &Args, name: &str) -> Result<ViewId, OpError> {
+    let id = ViewId(a.opt_u64(name)?.ok_or_else(|| OpError::param(name, "a view id (drawing_get)"))?);
+    t.d.sheets[t.sheet].view(id).map(|_| id).ok_or_else(|| OpError::param(name, "no such view on the sheet"))
+}
+
+fn refused(t: &Target, tool: &str, view: ViewId, param: &str) -> Result<(), OpError> {
+    match t.m.pick(&Tool::Select, &[], [0.0; 2]).view_refusal(tool, view) {
+        Some(why) => Err(OpError::param(param, why)),
+        None => Ok(()),
+    }
+}
+
+fn enum_arg<T: Copy>(a: &Args, name: &str, options: &[(&str, T)], default: T) -> Result<T, OpError> {
+    match a.opt_str(name)? {
+        None => Ok(default),
+        Some(s) => options.iter().find(|o| o.0 == s).map(|o| o.1).ok_or_else(|| OpError::param(name, &format!("one of {}", options.iter().map(|o| o.0).collect::<Vec<_>>().join(", ")))),
+    }
+}
+
+/// Commit, then reply with the sheet and the new item's id under `key`.
+fn done(od: &mut OpenDoc, t: Target, description: &str, key: &str, id: u64) -> Result<OpOutput, OpError> {
+    commit(od, t.tab, t.sheet, t.d, description)?;
+    let mut out = reply(od, t.tab, t.sheet, false)?;
+    out[key] = json!(id);
+    Ok(out.into())
+}
+
+/// The snap point (vertex, circle center...) of view `view` at `p`.
+fn snap_in(t: &Target, tool: &Tool, view: ViewId, p: [f64; 2]) -> Option<PickedPoint> {
+    t.m.pick(tool, &[], p).snap_at(p).filter(|s| s.view == view)
+}
+
+// ------------------------------------------------------------ views
+
+fn section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let parent = view_arg(&t, a, "parent")?;
+    let partial = a.bool_or("partial", false)?;
+    let dir = enum_arg(a, "direction", &[("vertical", 0u8), ("horizontal", 1), ("angular", 2)], 0)?;
+    if dir == 2 && !partial {
+        refused(&t, "angular_section", parent, "parent")?;
+    }
+    let p = pt_arg(a, "point")?;
+    let tool0 = Tool::Section { parent: None, p0: None, line: None, partial, jogs: vec![] };
+    let pk = t.m.pick(&tool0, &[], p);
+    let pl = pk.placement(parent).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
+    let p0 = snap_in(&t, &tool0, parent, p).map(|s| s.p).unwrap_or(pl.to_view(p));
+    let line = if partial {
+        // The second click: snapped to horizontal / vertical, then to a snap point.
+        let end = pt_arg(a, "end").map_err(|_| OpError::param("end", "a partial section needs the line's other end"))?;
+        let s0 = pl.to_sheet(p0);
+        let b = dt::ortho_point(s0, end);
+        if dt::geom::len(dt::geom::sub(b, s0)) < 2.0 {
+            return Err(OpError::param("end", "the line must be at least 2 mm long"));
+        }
+        (p0, snap_in(&t, &tool0, parent, end).map(|s| s.p).unwrap_or(pl.to_view(b)))
+    } else {
+        // Section view dialog › Vertical / Horizontal / Angular: one click places the whole line.
+        let axis = match dir {
+            0 => [0.0, 1.0],
+            1 => [1.0, 0.0],
+            _ => {
+                let ang = a.opt_f64("angle")?.unwrap_or(45.0).to_radians() * if a.bool_or("opposite", false)? { -1.0 } else { 1.0 };
+                [ang.cos(), ang.sin()]
+            }
+        };
+        pk.extend_cut(parent, pl.to_sheet(p0), axis).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?
+    };
+    let mut jogs: Vec<[f64; 2]> = Vec::new();
+    if let Some(list) = a.opt_array("jogs")? {
+        for (i, j) in list.iter().enumerate() {
+            let param = format!("jogs[{i}]");
+            let c = point_value(j, &param)?;
+            let tool = Tool::Section { parent: Some(parent), p0: Some(p0), line: Some(line), partial, jogs: jogs.clone() };
+            let q = t.m.pick(&tool, &[], c).section_jog_at(parent, c).filter(|_| !partial).ok_or_else(|| OpError::param(&param, "not a snap point of the view off the cutting line"))?;
+            jogs.push(q);
+        }
+    }
+    let mut section = SectionOpts { cut_only: a.bool_or("cut_only", false)?, flip: a.bool_or("flip", false)?, cut_from: a.bool_or("cut_from_section", true)?, ..Default::default() };
+    if let Some(depth) = a.opt_f64("depth")? {
+        section.depth_on = true;
+        section.depth_value = Some(depth / 1000.0);
+    }
+    if let Some(to) = a.get("depth_to") {
+        let c = point_value(to, "depth_to")?;
+        let r = snap_in(&t, &tool0, parent, c).and_then(|s| s.r).ok_or_else(|| OpError::param("depth_to", "Select a vertex or circle center for the section depth"))?;
+        section.depth_on = true;
+        section.up_to = true;
+        section.depth_ref = Some(r);
+    }
+    if let Some(list) = a.opt_array("exclude")? {
+        for (i, b) in list.iter().enumerate() {
+            match b.as_str().and_then(refs::parse_str) {
+                Some(noshape_model::reference::Reference::Body(b)) => section.exclude.push(b),
+                _ => return Err(OpError::param(&format!("exclude[{i}]"), "a part id (`body:…`)")),
+            }
+        }
+    }
+    // A partial section has no dialog.
+    let opts = ViewOptions { section: (!partial).then_some(section), ..Default::default() };
+    let tool = Tool::Section { parent: Some(parent), p0: Some(p0), line: Some(line), partial, jogs };
+    let position = pt_arg(a, "position")?;
+    let mut v = t.m.pick(&tool, &[], position).pending_view(&opts).ok_or_else(|| OpError::param("position", "the section view can't be placed there"))?;
+    if let (ViewKind::Section { label, .. }, Some(l)) = (&mut v.kind, a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty())) {
+        *label = l.to_string();
+    }
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Section view", "view", id.0)
+}
+
+fn detail_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let parent = view_arg(&t, a, "parent")?;
+    let c = pt_arg(a, "center")?;
+    let tool0 = Tool::Detail { parent: None, center: None, radius: None };
+    let pl = t.m.pick(&tool0, &[], c).placement(parent).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
+    let center = snap_in(&t, &tool0, parent, c).map(|s| s.p).unwrap_or(pl.to_view(c));
+    let r = a.opt_f64("radius")?.unwrap_or(0.0) / (pl.scale * 1000.0);
+    if r <= 1e-6 {
+        return Err(OpError::param("radius", "must be greater than zero"));
+    }
+    let props = &t.d.props.view_tab;
+    let style = enum_arg(a, "style", &[("in_line", 0u8), ("connected", 1), ("leader", 2)], props.detail_style)?;
+    let detail = DetailOpts {
+        scale: a.opt_f64("scale")?,
+        profile: None,
+        style,
+        show_profile: a.bool_or("show_profile", props.detail_show_profile)?,
+        clip_border: a.bool_or("clip_border", props.detail_clip_border)?,
+        label: a.opt_str("label")?.unwrap_or("").trim().to_string(),
+    };
+    let opts = ViewOptions { detail: Some(detail), ..Default::default() };
+    let tool = Tool::Detail { parent: Some(parent), center: Some(center), radius: Some(r) };
+    let position = pt_arg(a, "position")?;
+    let v = t.m.pick(&tool, &[], position).pending_view(&opts).ok_or_else(|| OpError::param("position", "the detail view can't be placed there"))?;
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Detail view", "view", id.0)
+}
+
+fn auxiliary_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let e = pt_arg(a, "edge")?;
+    let tool0 = Tool::Auxiliary { parent: None };
+    let (view, dir, anchor) = t.m.pick(&tool0, &[], e).aux_edge().ok_or_else(|| OpError::param("edge", "Select a straight edge of a view"))?;
+    refused(&t, "auxiliary", view, "edge")?;
+    let letter = match a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty()) {
+        Some(l) => l.to_string(),
+        None => t.d.sheets[t.sheet].next_label(),
+    };
+    let aux = AuxOpts { reverse: a.bool_or("reverse", false)?, show_ref: a.bool_or("show_reference", true)?, anchor: Some(anchor), letter };
+    let opts = ViewOptions { aux: Some(aux), ..Default::default() };
+    let tool = Tool::Auxiliary { parent: Some((view, dir)) };
+    let position = pt_arg(a, "position")?;
+    let v = t.m.pick(&tool, &[], position).pending_view(&opts).ok_or_else(|| OpError::param("position", "an auxiliary view goes at least 15 mm from its parent, perpendicular to the edge"))?;
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Auxiliary view", "view", id.0)
+}
+
+fn break_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let view = view_arg(&t, a, "view")?;
+    refused(&t, "break", view, "view")?;
+    let vertical = enum_arg(a, "orientation", &[("vertical", true), ("horizontal", false)], true)?;
+    let style = enum_arg(a, "style", &[("zigzag", BreakStyle::ZigZag), ("straight", BreakStyle::Straight), ("curve", BreakStyle::Curve), ("small_zigzag", BreakStyle::SmallZigZag)], BreakStyle::ZigZag)?;
+    let gap = a.opt_f64("gap")?.unwrap_or(dt::default_break_gap_mm(t.d.units_mm));
+    let pl = t.m.pick(&Tool::Select, &[], [0.0; 2]).placement(view).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
+    let b = dt::view_break(&pl, vertical, pt_arg(a, "from")?, pt_arg(a, "to")?, style, gap).ok_or_else(|| OpError::param("to", "the break band is empty"))?;
+    let sheet = t.sheet;
+    if let Some(v) = t.d.sheets[sheet].views.iter_mut().find(|v| v.id == view) {
+        v.breaks.push(b);
+    }
+    done(od, t, "Break view", "view", view.0)
+}
+
+fn crop_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let view = view_arg(&t, a, "view")?;
+    refused(&t, "crop", view, "view")?;
+    let circle = enum_arg(a, "shape", &[("rectangle", false), ("circle", true)], false)?;
+    let f = pt_arg(a, "from")?;
+    let tool0 = Tool::Crop { parent: Some(view), first: None, circle };
+    let pk = t.m.pick(&tool0, &[], f);
+    let f = pk.snap_at(f).and_then(|s| pk.pick_sheet(&s)).unwrap_or(f);
+    let pl = pk.placement(view).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
+    let crop = dt::view_crop(&pl, circle, f, pt_arg(a, "to")?).ok_or_else(|| OpError::param("to", "the crop shape is empty"))?;
+    let sheet = t.sheet;
+    if let Some(v) = t.d.sheets[sheet].views.iter_mut().find(|v| v.id == view) {
+        v.crop = Some(crop);
+    }
+    done(od, t, "Crop view", "view", view.0)
+}
+
+// ------------------------------------------------------------ annotations
+
+fn clicks(a: &Args) -> Result<Vec<[f64; 2]>, OpError> {
+    a.array("picks")?.iter().enumerate().map(|(i, p)| point_value(p, &format!("picks[{i}]"))).collect()
+}
+
+/// A straight edge under click `i`: its ends and (for virtual sharps) its
+/// model edge.
+fn edge_at(t: &Target, tool: &Tool, c: [f64; 2], i: usize) -> Result<(PickedPoint, PickedPoint, Option<dt::EdgeRef>), OpError> {
+    let pk = t.m.pick(tool, &[], c);
+    match (pk.line_pick(), pk.hovered_edge()) {
+        (Some(Pick::Line { a, b }), Some((_, me))) => Ok((a, b, Some((me.body.clone(), (*me.name).clone())))),
+        _ => Err(OpError::param(&format!("picks[{i}]"), "Select a straight edge")),
+    }
+}
+
+fn centerline(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let kind = a.str("kind")?.to_string();
+    let cs = clicks(a)?;
+    let c = *cs.last().expect("minItems 1");
+    let id = t.d.sheets[t.sheet].next_annotation_id();
+    let snap = |t: &Target, tool: &Tool, i: usize, first: Option<&PickedPoint>| -> Result<PickedPoint, OpError> {
+        t.m.pick(tool, &[], cs[i]).snap_at(cs[i]).filter(|p| first.is_none_or(|f| f.view == p.view)).ok_or_else(|| OpError::param(&format!("picks[{i}]"), "not a vertex, circle center or midpoint (of the first pick's view)"))
+    };
+    let (ann, name) = match kind.as_str() {
+        "two_point" => {
+            if cs.len() != 2 {
+                return Err(OpError::param("picks", "two points"));
+            }
+            let p = snap(&t, &Tool::Centerline { first: None }, 0, None)?;
+            let q = snap(&t, &Tool::Centerline { first: Some(p.clone()) }, 1, Some(&p))?;
+            (dt::centerline(id, &p, &q, c), "Centerline")
+        }
+        "edge_to_edge" => {
+            let tool = Tool::EdgeCenterline { first: None };
+            let (a1, b1, _) = edge_at(&t, &tool, cs[0], 0)?;
+            let (p, q) = match cs.get(1) {
+                None => t.m.pick(&tool, &[], cs[0]).silhouette_centerline(&a1, &b1).ok_or_else(|| OpError::param("picks", "one edge must be a cylinder or cone silhouette; else pick two edges"))?,
+                Some(c2) => {
+                    let tool = Tool::EdgeCenterline { first: Some((a1.clone(), b1.clone())) };
+                    let (a2, b2, _) = edge_at(&t, &tool, *c2, 1)?;
+                    if a2.view != a1.view {
+                        return Err(OpError::param("picks[1]", "Select an edge in the same view"));
+                    }
+                    dt::edge_pair_centerline(a1.p, b1.p, a2.p, b2.p)
+                }
+            };
+            (dt::edge_centerline(id, a1.view, p, q, c), "Edge to edge centerline")
+        }
+        "circle_3_point" | "circle_2_point" => {
+            let three = kind == "circle_3_point";
+            let need = if three { 3 } else { 2 };
+            if cs.len() != need {
+                return Err(OpError::param("picks", &format!("{need} points")));
+            }
+            let mut pts: Vec<PickedPoint> = Vec::new();
+            for i in 0..need {
+                let tool = Tool::CircleCenterline { three, points: pts.clone() };
+                let p = snap(&t, &tool, i, pts.first())?;
+                pts.push(p);
+            }
+            let ann = dt::circle_centerline(id, &pts, c).ok_or_else(|| OpError::param("picks", "the points make no circle"))?;
+            (ann, if three { "3 point circle centerline" } else { "2 point circle centerline" })
+        }
+        _ => return Err(OpError::param("kind", "two_point, edge_to_edge, circle_3_point or circle_2_point")),
+    };
+    let sheet = t.sheet;
+    t.d.sheets[sheet].annotations.push(ann);
+    done(od, t, name, "annotation", id)
+}
+
+fn virtual_sharp(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let cs = clicks(a)?;
+    if cs.len() != 2 {
+        return Err(OpError::param("picks", "a point on each of two edges"));
+    }
+    let first = edge_at(&t, &Tool::VirtualSharp { first: None }, cs[0], 0)?;
+    let second = edge_at(&t, &Tool::VirtualSharp { first: Some(first.clone()) }, cs[1], 1)?;
+    if first.0.view != second.0.view {
+        return Err(OpError::param("picks[1]", "Select an edge in the same view"));
+    }
+    let id = t.d.sheets[t.sheet].next_annotation_id();
+    let ann = dt::virtual_sharp(id, first.0.view, (&first.0, &first.1, &first.2), (&second.0, &second.1, &second.2), cs[1]).map_err(|why| OpError::param("picks", why))?;
+    let sheet = t.sheet;
+    t.d.sheets[sheet].annotations.push(ann);
+    done(od, t, "Virtual sharp", "annotation", id)
+}
+
+fn view_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let kind = enum_arg(a, "kind", &[("bom", TableTool::Bom), ("cut_list", TableTool::CutList), ("hole", TableTool::Hole)], TableTool::Bom)?;
+    let view = view_arg(&t, a, "view")?;
+    let origin = match (kind, a.get("origin")) {
+        (TableTool::Hole, Some(o)) => {
+            let c = point_value(o, "origin")?;
+            Some(snap_in(&t, &Tool::Table { kind, view: Some(view), origin: None }, view, c).ok_or_else(|| OpError::param("origin", "not a vertex or circle center of the view"))?)
+        }
+        (TableTool::Hole, None) => return Err(OpError::param("origin", "a hole table needs its origin (a vertex of the view)")),
+        _ => None,
+    };
+    let id = t.d.sheets[t.sheet].next_table_id();
+    let (table, name) = dt::view_table(id, kind, view, origin, pt_arg(a, "position")?);
+    let sheet = t.sheet;
+    t.d.sheets[sheet].tables.push(table);
+    done(od, t, name, "table", id)
+}

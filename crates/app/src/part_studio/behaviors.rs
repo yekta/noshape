@@ -150,6 +150,8 @@ pub struct UiState {
     /// Section view dialog, and the parts excluded (false) or the only ones
     /// included (true) in the cut.
     pub section_dialog: Option<super::section::SectionDialog>,
+    /// The section offset box being typed into (section.rs).
+    pub section_offset_edit: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     pub section_parts: Option<(bool, Vec<BodyId>)>,
     /// Open Appearance editor, and faces of a hovered appearance row.
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
@@ -176,6 +178,8 @@ pub struct UiState {
     pub force_regen: bool,
     /// Regeneration times panel.
     pub show_regen_times: bool,
+    /// Its sort: column (0 #, 1 Feature name, 2 Time) and descending.
+    pub regen_sort: (u8, bool),
     /// Parts list: collapsed sections, height, part properties shown.
     pub collapsed_sections: HashSet<&'static str>,
     /// The parts list's share of the list panel's height once the separator
@@ -246,6 +250,9 @@ pub struct UiState {
     pub consumed_lines: Option<ConsumedLines>,
     /// "Show dimensions" of a sketch.
     pub shown_dims: Option<super::shown_dims::ShownDims>,
+    /// The sketch draws something with GPUI that follows the camera (set
+    /// by `render_sketch_labels`: the dimension box, glyphs, counts...).
+    pub sketch_follows_camera: bool,
     /// Entity of the hovered dialog selection row.
     pub query_hover: Option<Reference>,
     /// The pointer is over the manipulator arrow (drawn outlined).
@@ -364,6 +371,7 @@ impl UiState {
             var_tables: Default::default(),
             section: Vec::new(),
             section_dialog: None,
+            section_offset_edit: None,
             section_parts: None,
             appearance_edit: None,
             appearance_hover: Vec::new(),
@@ -378,6 +386,8 @@ impl UiState {
             regen_paused: None,
             force_regen: false,
             show_regen_times: false,
+            // Live (part-studio/1158): slowest first.
+            regen_sort: (2, true),
             // Live part-studio/470: "Composite parts (N)" starts collapsed.
             collapsed_sections: HashSet::from(["composites"]),
             parts_height: None,
@@ -415,6 +425,7 @@ impl UiState {
             list_menu: None,
             consumed_lines: None,
             shown_dims: None,
+            sketch_follows_camera: false,
             query_hover: None,
             manip_hover: false,
             sized_for_wpp: 0.0,
@@ -984,9 +995,7 @@ impl PartStudioView {
                 if !text.is_empty() {
                     let b = b2.clone();
                     this.doc.update(cx, |doc, cx| {
-                        doc.edit_studio(this.tab, &format!("Rename : {text}"), cx, |ps| {
-                            ps.part_properties.entry(b.clone()).or_default().name = Some(text.clone());
-                        });
+                        doc.edit_studio(this.tab, &noshape_ops::studio::rename_part_description(&text), cx, |ps| noshape_ops::studio::rename_part(ps, &b, &text));
                     });
                 }
                 cx.notify();
@@ -1333,62 +1342,136 @@ impl PartStudioView {
             );
         }
         if self.ui.show_regen_times {
-            let studio = self.studio(cx).cloned().unwrap_or_default();
-            let total: f32 = self.display.features.iter().map(|f| f.time_ms).sum();
-            let rows: Vec<AnyElement> = studio
-                .features
-                .iter()
-                .map(|f| {
-                    let t = self.display.feature_state(f.id).map(|s| s.time_ms).unwrap_or(0.0);
-                    let id = f.id;
-                    h_flex()
-                        .id(SharedString::from(format!("rt-{id}")))
-                        .gap_2()
-                        .px_1()
-                        .rounded_sm()
-                        .hover(|d| d.bg(pal.panel_hover))
-                        .child(div().flex_1().truncate().text_xs().text_color(pal.text).child(f.name.clone()))
-                        .child(div().text_xs().text_color(if t > 500.0 { pal.warning } else { pal.text_muted }).child(format!("{t:.1} ms")))
-                        .on_hover(cx.listener(move |this, h: &bool, _, cx| {
-                            // Hovering a row highlights the feature's geometry.
-                            this.ui.list_hover = h.then_some(id);
-                            this.refresh_scene(false, cx);
-                        }))
-                        .into_any_element()
-                })
-                .collect();
-            out.push(
-                v_flex()
-                    .id("regen-times")
-                    .occlude()
-                    .absolute()
-                    .top_3()
-                    .left(px(340.))
-                    .w(px(260.))
-                    .max_h(px(420.))
-                    .overflow_y_scroll()
-                    .p_2()
-                    .gap_0p5()
-                    .rounded_md()
-                    .bg(pal.panel_raised)
-                    .border_1()
-                    .border_color(pal.border_strong)
-                    .shadow_lg()
-                    .child(
-                        h_flex()
-                            .justify_between()
-                            .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Regeneration times"))
-                            .child(div().id("rt-close").px_1().cursor_pointer().text_color(pal.text_faint).child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                this.ui.show_regen_times = false;
-                                cx.notify();
-                            }))),
-                    )
-                    .child(div().text_xs().text_color(pal.text_muted).child(format!("Total regeneration time: {total:.1} ms")))
-                    .children(rows)
-                    .into_any_element(),
-            );
+            out.push(self.render_regen_times(cx));
         }
         out
+    }
+
+    /// Onshape's "Regeneration times" dialog (`regen-info-dialog`, live
+    /// part-studio/1158, behaviours "qa5 bracket"; qa5 REG1): 350 px on the
+    /// feature list's edge, a table # | Feature name | Time sorted slowest
+    /// first, a blue bar under each time (its share of the total), and the
+    /// footer "Total regen time: 92ms".
+    fn render_regen_times(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let studio = self.studio(cx).cloned().unwrap_or_default();
+        let total: f32 = self.display.features.iter().map(|f| f.time_ms).sum();
+        let (col, desc) = self.ui.regen_sort;
+        let mut rows: Vec<(usize, &noshape_model::partstudio::Feature, f32, bool)> = studio
+            .features
+            .iter()
+            .enumerate()
+            .map(|(i, f)| {
+                let st = self.display.feature_state(f.id);
+                let failed = st.is_some_and(|s| s.status == FeatureStatus::Error);
+                (i + 1, f, st.map_or(0.0, |s| s.time_ms), failed)
+            })
+            .collect();
+        rows.sort_by(|a, b| {
+            let o = match col {
+                0 => a.0.cmp(&b.0),
+                1 => a.1.name.cmp(&b.1.name),
+                _ => a.2.total_cmp(&b.2).then_with(|| b.0.cmp(&a.0)),
+            };
+            if desc { o.reverse() } else { o }
+        });
+        let line = gpui_kit::rgb(0xaaaaaa);
+        const COLS: [f32; 3] = [49., 199., 99.];
+        let head = |i: u8, label: &'static str, cx: &mut Context<Self>| {
+            let icon = (col == i).then_some(if desc { "sort-desc" } else { "sort-asc" });
+            h_flex()
+                .id(SharedString::from(format!("rt-th-{i}")))
+                .w(px(COLS[i as usize] + 1.))
+                .h_full()
+                .border_r_1()
+                .border_color(line)
+                .cursor_pointer()
+                .child(div().flex_1().px(px(6.)).text_size(px(12.)).font_weight(FontWeight::BOLD).child(label))
+                .child(div().size(px(30.)).flex().items_center().justify_center().children(icon.map(|i| crate::ui::glyph(i, 20., pal.text))))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    let (c, d) = this.ui.regen_sort;
+                    // Time starts slowest first; # and the name ascending.
+                    this.ui.regen_sort = if c == i { (i, !d) } else { (i, i == 2) };
+                    cx.notify();
+                }))
+        };
+        let body: Vec<AnyElement> = rows
+            .into_iter()
+            .enumerate()
+            .map(|(k, (n, f, t, failed))| {
+                let id = f.id;
+                let cell = |w: f32| div().w(px(w + 1.)).h_full().flex().items_center().px(px(6.)).border_r_1().border_color(line);
+                let bar = if total > 0.0 { t / total * COLS[2] } else { 0.0 };
+                h_flex()
+                    .id(SharedString::from(format!("rt-{id}")))
+                    .h(px(25.6))
+                    .text_size(px(12.))
+                    .when(k % 2 == 0, |d| d.bg(gpui_kit::rgb(0xfafafa)))
+                    .child(cell(COLS[0]).child(n.to_string()))
+                    .child(
+                        cell(COLS[1])
+                            .pl(px(5.))
+                            .gap(px(10.))
+                            .when(failed, |d| d.text_color(pal.text_invalid))
+                            .child(div().flex_none().opacity(0.8).child(crate::assets::icon(&feature_icon(&f.type_id), 16., cx)))
+                            .child(div().flex_1().min_w_0().truncate().child(f.name.clone())),
+                    )
+                    .child(cell(COLS[2]).relative().child(crate::ui::regen_time_text(t)).child(div().absolute().left_0().bottom_0().h(px(5.)).w(px(bar)).bg(pal.accent)))
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        // Hovering a row highlights the feature's geometry.
+                        this.ui.list_hover = h.then_some(id);
+                        this.refresh_scene(false, cx);
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }];
+        v_flex()
+            .id("regen-times")
+            .occlude()
+            .absolute()
+            .top(px(3.))
+            .left(px(-1.))
+            .w(px(351.))
+            .bg(gpui_kit::rgb(0xffffff))
+            .border_l_1()
+            .border_color(gpui_kit::rgb(0xc3c3c3))
+            .shadow(shadow)
+            .text_color(pal.text)
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .border_b_1()
+                    .border_color(gpui_kit::rgb(0xd7d7d7))
+                    .child(div().flex_1().pl(px(7.)).text_size(px(14.)).child("Regeneration times"))
+                    .child(
+                        div()
+                            .id("rt-close")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .opacity(0.5)
+                            .child(crate::ui::glyph("close", 16., gpui_kit::rgb(0x000000)))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.show_regen_times = false;
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(h_flex().h(px(35.)).bg(gpui_kit::rgb(0xf5f5f5)).border_b_1().border_color(line).child(head(0, "#", cx)).child(head(1, "Feature name", cx)).child(head(2, "Time", cx)))
+            .child(div().id("rt-rows").max_h(px(640.)).overflow_y_scroll().children(body))
+            .child(
+                h_flex()
+                    .h(px(31.))
+                    .px(px(6.))
+                    .bg(gpui_kit::rgb(0xeeeeee))
+                    .text_size(px(11.))
+                    .child("Total regen time: ")
+                    .child(div().font_weight(FontWeight::BOLD).child(crate::ui::regen_time_text(total))),
+            )
+            .into_any_element()
     }
 
     // ------------------------------------------------------------ select ▸
@@ -1918,15 +2001,14 @@ impl PartStudioView {
         let transparent = self.isolation_transparent();
         let look = iso_look(iso.opacity);
         let mut d = (*self.display).clone();
-        // Live (qa5 KB3): isolating also takes the default planes and the
-        // origin out of the view (Make transparent leaves them).
+        // Live (behaviours "Isolate", qa5 KB3): isolating also takes every
+        // plane (default ones and Plane 1 alike) out of the view; the origin
+        // stays (ui/pn-900: drawn where part-studio/1030 has it). Make
+        // transparent leaves the planes.
         if iso.mode == IsolateMode::Isolate {
             for p in &mut d.planes {
-                if matches!(p.reference, Reference::Plane(_)) {
-                    p.hidden = true;
-                }
+                p.hidden = true;
             }
-            d.show_origin = false;
         }
         for b in &mut d.bodies {
             if transparent.contains(&b.id) {
@@ -2347,7 +2429,7 @@ impl PartStudioView {
         let results = match &self.measure_cache {
             Some((s, r)) if *s == sel => r.clone(),
             _ => {
-                let r = noshape_model::regen::measure::measure(&ctx, &sel);
+                let r = super::menus::studio_measure(&ctx, &sel);
                 self.measure_cache = Some((sel, r.clone()));
                 r
             }
@@ -2902,9 +2984,11 @@ impl PartStudioView {
             if op != want && (matches!(op.as_str(), "NEW" | "ADD") || ty == "thicken") {
                 changes.push(("operationType", ParamValue::Enum(want.into())));
             }
-            if !hosts.is_empty() && !scope_user && dialog.read(cx).feature.params.query("booleanScope").is_empty() {
-                changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
-            }
+        }
+        // The merge scope starts as the profiles' part, also when the user
+        // picked the operation (live, qa5 EXT1: Remove fills "Part 1").
+        if !hosts.is_empty() && !scope_user && dialog.read(cx).feature.params.query("booleanScope").is_empty() {
+            changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
         }
         if ty == "extrude" && !flip_user && !hosts.is_empty() {
             let into = matches!(op.as_str(), "REMOVE" | "INTERSECT");

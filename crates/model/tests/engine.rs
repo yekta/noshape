@@ -862,3 +862,177 @@ fn pending_pattern_clip_at_1000_is_one_part() {
     let solids = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count();
     assert_eq!(solids, 1, "every rib fuses into the block");
 }
+
+/// Live "Pattern face merging" ("fins 1000") as a feature clipboard payload:
+/// a 100 × 2000 × 40 mm block, a 1 mm fin flush with its front face, 40 mm
+/// high on top, and a Feature linear pattern of it (Reapply features, 2 mm,
+/// 2 instances; type 1000 in the dialog as live did).
+/// `cargo test -p noshape-model --test engine write_fins_clip -- --ignored`.
+#[test]
+#[ignore]
+fn write_fins_clip() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 2.0, "40 mm");
+    let fs = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.0, 0.0, 0.1, 0.001));
+    let r = t.regions(fs)[0].clone();
+    let fin = t.extrude(r, "40 mm", "ADD");
+    t.set(fin, "startOffset", b(true));
+    t.set(fin, "startOffsetBound", en("BLIND"));
+    t.set(fin, "startOffsetDistance", e("40 mm"));
+    t.add(
+        "linearPattern",
+        &[
+            ("patternType", en("FEATURE")),
+            ("instanceFunction", q(vec![Reference::Feature(fin)])),
+            ("directionOne", q(vec![Reference::Plane(DatumPlane::Front)])),
+            ("oppositeDirection", b(true)),
+            ("distance", e("2 mm")),
+            ("instanceCount", e("2")),
+            ("operationType", en("ADD")),
+            ("fullFeaturePattern", b(true)),
+        ],
+    );
+    t.ok();
+    let v = serde_json::json!({ "noshape_features": t.ps.features });
+    std::fs::write(std::env::temp_dir().join("noshape-fins-clip.json"), v.to_string()).unwrap();
+}
+
+/// qa5 ADV10: a Feature linear pattern with a second direction makes the
+/// full grid (3 × 3 holes), not only the first row.
+#[test]
+fn feature_pattern_second_direction_makes_the_grid() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.1, "20 mm");
+    let pl = t.top_plane("20 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p1 = sk.add_point(DVec2::new(0.02, 0.02));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let h = t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p1.0 }])), ("unitsSystem", en("METRIC")), ("styleV2", en("SIMPLE")), ("endStyleV2", en("BLIND")), ("holeDiameterV3", e("6 mm")), ("holeDepthV3", e("10 mm"))]);
+    let one = 0.1 * 0.1 * 0.02 - total_volume(&t.ok().context);
+    t.add(
+        "linearPattern",
+        &[
+            ("patternType", en("FEATURE")),
+            ("instanceFunction", q(vec![Reference::Feature(h)])),
+            ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])),
+            ("distance", e("20 mm")),
+            ("instanceCount", e("3")),
+            ("hasSecondDir", b(true)),
+            ("directionTwo", q(vec![Reference::Plane(DatumPlane::Front)])),
+            ("oppositeDirectionTwo", b(true)),
+            ("distanceTwo", e("20 mm")),
+            ("instanceCountTwo", e("3")),
+        ],
+    );
+    let removed = 0.1 * 0.1 * 0.02 - total_volume(&t.ok().context);
+    assert!(near(removed, 9.0 * one, 1e-6), "removed {removed}, 9 holes {}", 9.0 * one);
+}
+
+/// qa4 F12, the path after a Part pattern (v0.4.5 release blocker): block,
+/// two top-edge fillets, a chamfer on the vertical edge between them, a Hole
+/// at two sketch points on the top face, a Part pattern of Part 1 (40 mm × 3)
+/// and then a Feature pattern of the Hole along Part 1's bottom edge
+/// (10 mm × 2). Live copies the holes on Part 1 only, and an Extrude 1 edit
+/// keeps every part. Ours split off a sliver part, then lost Part 1 silently.
+#[test]
+fn feature_pattern_of_a_hole_after_a_part_pattern_keeps_the_parts() {
+    for (w, along_x) in [(0.1, false), (0.1, true), (0.03, true), (0.03, false)] {
+        f12_case(w, along_x);
+    }
+}
+
+fn f12_case(w: f64, along_x: bool) {
+    let d = 0.05;
+    let mut t = T::new();
+    let (_, block) = t.block(0.0, 0.0, w, d, "30 mm");
+    let r = t.ok();
+    let part = r.context.bodies[0].clone();
+    t.add("fillet", &[("entities", q(vec![f12_edge(&part, DVec3::new(w / 2.0, 0.0, 0.03)), f12_edge(&part, DVec3::new(w, d / 2.0, 0.03))])), ("radius", e("3 mm"))]);
+    let r = t.ok();
+    let part = r.context.bodies[0].clone();
+    t.add("chamfer", &[("entities", q(vec![f12_edge(&part, DVec3::new(w, 0.0, 0.015))])), ("width", e("2 mm"))]);
+    let r = t.ok();
+    let part = r.context.bodies[0].clone();
+    let top = part
+        .shape
+        .faces()
+        .iter()
+        .enumerate()
+        .find(|(_, f)| (f.centroid().unwrap().z - 0.03).abs() < 1e-6)
+        .map(|(i, _)| Reference::Face((*part.faces[i]).clone()))
+        .expect("top face");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p1 = sk.add_point(DVec2::new(w * 0.25, d * 0.5));
+    let p2 = sk.add_point(DVec2::new(w * 0.5, d * 0.3));
+    let s = t.sketch(top, sk);
+    let locs = q(vec![Reference::SketchEntity { sketch: s, entity: p1.0 }, Reference::SketchEntity { sketch: s, entity: p2.0 }]);
+    let pre = total_volume(&r.context);
+    let hole = t.add("hole", &[("locations", locs), ("scope", q(vec![Reference::Body(part.id.clone())]))]);
+    let r = t.ok();
+    let part = r.context.bodies[0].clone();
+    let holes = pre - total_volume(&r.context);
+    assert!(holes > 0.0, "the Hole cuts");
+    let dir = if along_x { DVec3::new(w / 2.0, 0.0, 0.0) } else { DVec3::new(w, d / 2.0, 0.0) };
+    t.add(
+        "linearPattern",
+        &[("patternType", en("PART")), ("entities", q(vec![Reference::Body(part.id.clone())])), ("directionOne", q(vec![f12_edge(&part, DVec3::new(w / 2.0, 0.0, 0.0))])), ("distance", e("40 mm")), ("instanceCount", e("3"))],
+    );
+    let r = t.ok();
+    assert_eq!(r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count(), 3, "Part pattern: three parts");
+    let part = r.context.bodies.iter().find(|b| b.id == part.id).expect("Part 1").clone();
+    let before = total_volume(&r.context);
+    let de = f12_edge(&part, dir);
+    t.add(
+        "linearPattern",
+        &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(hole)])), ("directionOne", q(vec![de])), ("distance", e("10 mm")), ("instanceCount", e("2"))],
+    );
+    let check = |t: &mut T, before: f64, what: &str| {
+        let r = t.regen();
+        let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).collect();
+        let names: Vec<_> = solids.iter().map(|b| (b.name.clone(), b.shape.volume().unwrap_or(0.0))).collect();
+        // Never a silent loss: a pattern OCCT can't cut reports it and leaves
+        // the parts as they were (the cut into the fillet, along Y: live cuts
+        // it; ours fails for now, see the handoff).
+        if let Some(st) = r.display.features.last().filter(|s| matches!(s.status, FeatureStatus::Error)) {
+            assert_eq!(solids.len(), 3, "{what} (w {w}, x {along_x}): a failed pattern keeps the parts: {:?} {names:?}", st.message);
+            let failed = total_volume(&r.context);
+            let last = t.ps.features.len() - 1;
+            t.ps.features[last].suppressed = true;
+            let without = total_volume(&t.regen().context);
+            t.ps.features[last].suppressed = false;
+            assert!(near(failed, without, 1e-9), "{what} (w {w}, x {along_x}): and leaves them unchanged: {failed} vs {without}");
+            return;
+        }
+        for (i, s) in r.display.features.iter().enumerate() {
+            assert!(matches!(s.status, FeatureStatus::Ok), "{what} (w {w}, x {along_x}): feature {i} ({}) {:?}: {:?}", t.ps.features[i].type_id, s.status, s.message);
+        }
+        assert_eq!(solids.len(), 3, "{what} (w {w}, x {along_x}): still three parts: {names:?}");
+        assert!(solids.iter().any(|b| b.id == part.id), "{what}: Part 1 kept: {names:?}");
+        let removed = before - total_volume(&r.context);
+        assert!(removed > 0.5 * holes && removed < 1.05 * holes, "{what} (w {w}, x {along_x}): the copies cut two more holes from Part 1: {removed} vs {holes}; {names:?}");
+    };
+    check(&mut t, before, "Feature pattern");
+    t.set(block, "depth", e("25 mm"));
+    // Volumes after the edit: the same pattern on a 25 mm block.
+    let before25 = before - w * d * 0.005 * 3.0;
+    check(&mut t, before25, "Extrude 1 → 25 mm");
+}
+
+/// Like `edge_near`, skipping degenerate edges (the hole's cone tip).
+fn f12_edge(b: &Body, p: DVec3) -> Reference {
+    let v = noshape_kernel::make_vertex(p).unwrap();
+    let (i, _) = b
+        .shape
+        .edges()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, e)| {
+            let d = noshape_kernel::distance(&v, e).ok()?.distance;
+            let info = e.edge_info().ok()?;
+            let m = e.point_at((info.first_param + info.last_param) * 0.5).ok()?;
+            Some((i, d * 1e3 + m.distance(p)))
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .unwrap();
+    Reference::Edge((*b.edges[i]).clone())
+}

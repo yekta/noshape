@@ -205,7 +205,7 @@ impl AssemblyView {
         }
         let flip = self.ui.std.flip;
         let base = spec.part_name();
-        let ids = self.edit(&format!("Insert : {base}"), cx, |a| {
+        let ids = self.edit_insert(&format!("Insert : {base}"), cx, |a| {
             let mut ids = Vec::new();
             for _ in 0..holes.len().max(1) {
                 let id = InstanceId(a.next_id());

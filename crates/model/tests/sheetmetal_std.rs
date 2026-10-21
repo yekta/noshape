@@ -118,6 +118,20 @@ fn flanges_on_adjacent_edges_match_live() {
     assert!((volume_mm3(&r) - 8511.4987).abs() < 1e-3 && faces == 24, "{} mm³, {} faces", volume_mm3(&r), faces);
 }
 
+/// qa5 3.2: a default Hem on G34's top edge at x = 60 (live: 9378.1835 mm³,
+/// 33 faces: 27 plane, 6 cylinder).
+#[test]
+#[ignore = "in progress (fs): std hem on G34 gives 8311.2 mm³ / 25 faces"]
+fn hem_on_g34_matches_live() {
+    let mut s = g34();
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(60.0, 20.0, 2.0));
+    s.add("sheetMetalHem", |p| p.set("edges", ParamValue::Query(vec![edge])));
+    let r = s.ok();
+    let faces = r.context.bodies[part(&r)].shape.faces().len();
+    assert!((volume_mm3(&r) - 9378.1835).abs() < 1e-3 && faces == 33, "{} mm³, {} faces: {:#?}", volume_mm3(&r), faces, face_report(&r));
+}
+
 /// The part's face through `p` (mm).
 fn face_at(r: &RegenResult, p: DVec3) -> Reference {
     let b = &r.context.bodies[part(r)];
@@ -158,4 +172,83 @@ fn tab_merges_into_the_top_face() {
     let r = s.ok();
     // The tab adds 20 × 10 × 2 mm to the part.
     assert!((volume_mm3(&r) - (8511.4987 + 400.0)).abs() < 1e-3, "{} mm³", volume_mm3(&r));
+}
+
+/// The flat pattern of G34 (std-built, live's placement: the plate stays at
+/// x 0..60, y 0..40; bend lines on the bends' centres, up).
+#[test]
+fn flat_pattern_keeps_the_model_placement() {
+    let r = g34().ok();
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    let (lo, hi) = flat.bounds();
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-7;
+    // Live dom/qa5-sm-flat.dxf (the same flanges): cut lines out to -18.5553
+    // (20 mm flange: 16 flat + the 4.5553 bend allowance), bend lines UP at
+    // -0.2777 (the allowance's centre).
+    assert!(near(lo.x * 1e3, -18.5553093477) && near(lo.y * 1e3, -18.5553093477) && near(hi.x * 1e3, 60.0) && near(hi.y * 1e3, 40.0), "{lo:?} {hi:?}");
+    assert_eq!(flat.loops.len(), 1);
+    let mut lines: Vec<String> = flat.bend_lines.iter().map(|l| format!("{:.4} {:.4} {:.4} {:.4} {}", l.a.x * 1e3, l.a.y * 1e3, l.b.x * 1e3, l.b.y * 1e3, l.up)).collect();
+    lines.sort();
+    assert_eq!(lines, ["-0.2777 2.0000 -0.2777 40.0000 true", "60.0000 -0.2777 2.0000 -0.2777 true"]);
+}
+
+/// qa5 SM14: the flat's DXF as live writes it (samples/qa5-sm-flat.dxf):
+/// Release 14, Onshape's whole layer table, the outline on
+/// SHEETMETAL_CUT_LINES and the bend centre lines on SHEETMETAL_BEND_LINES_UP.
+#[test]
+fn flat_dxf_is_written_as_live() {
+    let r = g34().ok();
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    let dxf = noshape_model::sheetmetal::flat_dxf::flat_dxf(&flat, &Default::default()).unwrap();
+    let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap();
+    assert_eq!(doc.version, acadrust::DxfVersion::AC1014);
+    assert_eq!(doc.layers.iter().count(), 48);
+    let mut layers: Vec<String> = doc.entities().map(|e| format!("{} {}", e.as_entity().entity_type(), e.common().layer)).collect();
+    layers.sort();
+    layers.dedup_by(|a, b| a == b);
+    assert_eq!(layers, ["LINE SHEETMETAL_BEND_LINES_UP", "LINE SHEETMETAL_CUT_LINES"]);
+}
+
+/// The part's vertex at `p` (mm).
+fn vertex_at(r: &RegenResult, p: DVec3) -> Reference {
+    let b = &r.context.bodies[part(r)];
+    let i = b.shape.vertices().iter().position(|v| v.vertex_point().is_ok_and(|q| q.distance(p * 1e-3) < 1e-9)).unwrap_or_else(|| panic!("no vertex at {p:?}"));
+    Reference::Vertex((*b.vertices[i]).clone())
+}
+
+/// qa5 SM3 / live G34a: a Closed corner at the inner bend corner (2, 2, 2)
+/// (8535.0418 mm³, 23 faces: the bends run into the corner and end in
+/// ruled faces 0.02 mm apart across the diagonal).
+#[test]
+#[ignore = "in progress (fs): closed corner gives 8541.25 / 39 faces"]
+fn closed_corner_matches_live() {
+    let mut s = g34();
+    let r = s.ok();
+    let v = vertex_at(&r, DVec3::new(2.0, 2.0, 2.0));
+    s.add("sheetMetalCorner", |p| {
+        p.set("corner", ParamValue::Query(vec![v]));
+        p.set("cornerStyle", en("CLOSED"));
+    });
+    let r = s.ok();
+    let faces = r.context.bodies[part(&r)].shape.faces().len();
+    assert!((volume_mm3(&r) - 8535.0418).abs() < 1e-3 && faces == 23, "{} mm³, {} faces: {:#?}", volume_mm3(&r), faces, face_report(&r));
+}
+
+/// The part's faces: type, area (mm²) and a point on each (mm), for failures.
+fn face_report(r: &RegenResult) -> Vec<String> {
+    r.context.bodies[part(r)]
+        .shape
+        .faces()
+        .iter()
+        .map(|f| {
+            let kind = match f.face_surface() {
+                Ok(noshape_kernel::Surface::Plane(_)) => "PLANE",
+                Ok(noshape_kernel::Surface::Cylinder { .. }) => "CYLINDER",
+                _ => "OTHER",
+            };
+            let [u0, u1, v0, v1] = f.uv_bounds().unwrap_or_default();
+            let p = f.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).unwrap_or_default() * 1e3;
+            format!("{kind} {:.7} at ({:.3}, {:.3}, {:.3})", f.area().unwrap_or(0.0) * 1e6, p.x, p.y, p.z)
+        })
+        .collect()
 }

@@ -931,6 +931,16 @@ impl Assembly {
     pub fn mate_generated_by(&self, id: MateId) -> Option<&InstancePattern> {
         self.patterns.iter().find(|p| p.generated.iter().any(|g| g.mate == Some(id)))
     }
+    /// Mates a pattern generated: listed under its row in "Mate features (N)"
+    /// (live qa5 asm-056), not in the top-level Mate features.
+    pub fn pattern_mates<'a>(&'a self, p: &'a InstancePattern) -> impl Iterator<Item = &'a Mate> + 'a {
+        self.mates.iter().filter(move |m| p.generated.iter().any(|g| g.mate == Some(m.id)))
+    }
+    /// The top-level "Mate features (N)" count: connectors, mates (not those
+    /// a pattern generated), relations and groups.
+    pub fn listed_mate_count(&self) -> usize {
+        self.connectors.len() + self.mates.iter().filter(|m| self.mate_generated_by(m.id).is_none()).count() + self.relations.len() + self.groups.len()
+    }
     /// Fresh id for instances, mates, relations, groups, connectors and patterns
     /// (unique within the assembly; never 0, which is the origin).
     pub fn next_id(&self) -> u64 {

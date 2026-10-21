@@ -107,8 +107,13 @@ impl Model<'_> {
 pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, cursor: DVec2, r: &Reference, pierce: bool, construction: bool) -> Option<EntityId> {
     let frame = model.frame;
     let want_point = pierce || matches!(r, Reference::Vertex(_));
-    if let Some((id, _)) = data.external_refs.iter().find(|(id, v)| *v == r && data.sketch.entity(EntityId(**id)).is_some_and(|e| (e.kind() == EntityKind::Point) == want_point)) {
-        return Some(EntityId(*id));
+    if let Some(id) = data.external_refs.iter().find(|(id, v)| *v == r && data.sketch.entity(EntityId(**id)).is_some_and(|e| (e.kind() == EntityKind::Point) == want_point)).map(|(id, _)| EntityId(*id)) {
+        // Use on geometry a dimension already refers to makes it sketch geometry.
+        if !construction && data.sketch.entity(id).is_some_and(|e| e.reference_only) {
+            let _ = data.sketch.set_reference_only(id, false);
+            let _ = data.sketch.set_construction(id, false);
+        }
+        return Some(id);
     }
     let shape = resolve_shapes(model.context, r).into_iter().next();
     enum Made {
@@ -137,6 +142,11 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
     match made {
         Made::Point(p) => {
             let id = data.sketch.use_external_point(p);
+            // A dimension / constraint to model geometry adds no sketch
+            // geometry (live, qa5 SK3): the reference is solved, not shown.
+            if construction {
+                let _ = data.sketch.set_reference_only(id, true);
+            }
             data.external_refs.insert(id.0, r.clone());
             first = Some(id);
         }
@@ -144,6 +154,7 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
             for id in sk_feat::add_section_curves(&mut data.sketch, &curves) {
                 if construction {
                     let _ = data.sketch.set_construction(id, true);
+                    let _ = data.sketch.set_reference_only(id, true);
                 }
                 data.external_refs.insert(id.0, r.clone());
                 first.get_or_insert(id);

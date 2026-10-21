@@ -335,9 +335,16 @@ fn external_thread_is_cosmetic() {
     let res = t.ok();
     let v0 = total_volume(&res.context);
     let edge = edge_near(&res.context.bodies[0], DVec3::new(0.004, 0.0, 0.02));
+    let faces0 = res.context.bodies[0].shape.faces().len();
     t.add("externalThread", &[("entities", q(vec![edge]))]);
     let res = t.ok();
     assert!(near(total_volume(&res.context), v0, 1e-9));
+    // Live (ADV7): "Split face" (on by default) splits the cylinder where the
+    // 10 mm thread ends: 3 → 4 faces, one boundary circle at z = 10 mm.
+    let b = &res.context.bodies[0];
+    assert_eq!(b.shape.faces().len(), faces0 + 1);
+    let split = noshape_kernel::make_vertex(DVec3::new(0.004, 0.0, 0.01)).unwrap();
+    assert!(b.shape.edges().iter().any(|e| noshape_kernel::distance(&split, e).is_ok_and(|d| d.distance < 1e-9)), "no edge at z = 10 mm");
 }
 
 // ------------------------------------------------------------------ detail extras

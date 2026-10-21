@@ -43,8 +43,10 @@ const FEATURES: &[(&str, &str)] = &[
     ("Face blend", "faceBlend"),
     ("Fill", "fill"),
     ("Fillet", "fillet"),
+    ("Finish flex PCB model", "pcbEnd"),
     ("Finish sheet metal model", "sheetMetalEnd"),
     ("Flange", "sheetMetalFlange"),
+    ("Flex PCB model", "pcbStart"),
     ("Form", "sheetMetalFormed"),
     ("Frame", "frame"),
     ("Frame trim", "frameTrim"),
@@ -239,11 +241,11 @@ mod tests {
     #[test]
     fn every_part_studio_and_sketch_action_runs_something() {
         // Part Studio: a feature type for each action without a GPUI action
-        // (flex PCB and custom features have none in noshape yet).
+        // (custom features have none in noshape yet).
         for e in shortcuts::entries(Tab::PartStudio).filter(|e| e.action.is_none()) {
             let known = FEATURES.iter().find(|(n, _)| *n == e.name).map(|(_, id)| *id);
             match e.name {
-                "Add custom features" | "Finish flex PCB model" | "Flex PCB model" => assert!(known.is_none()),
+                "Add custom features" => assert!(known.is_none()),
                 _ => assert!(known.is_some_and(|id| noshape_model::features::get(id).is_some()), "{}", e.name),
             }
         }

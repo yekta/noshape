@@ -1,7 +1,7 @@
 //! GPU side of the screen overlays ([`crate::overlay`]): an MSAA UNORM layer
 //! the size of the overlay's bounds, composited over the frame.
 
-use crate::overlay::{Mask, OverlayDraw, OverlayVertex, TextShading};
+use crate::overlay::{Mask, OverlayDraw, OverlayVertex, QuadInstance, TextShading};
 use bytemuck::{Pod, Zeroable};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -76,6 +76,8 @@ pub(crate) struct OverlayGpu {
     mask_layout: wgpu::BindGroupLayout,
     layer_layout: wgpu::BindGroupLayout,
     fill: wgpu::RenderPipeline,
+    quad: wgpu::RenderPipeline,
+    shadow: wgpu::RenderPipeline,
     mask: wgpu::RenderPipeline,
     composite: wgpu::RenderPipeline,
     sampler: wgpu::Sampler,
@@ -86,6 +88,7 @@ pub(crate) struct OverlayGpu {
     vertices: Growable,
     indices: Growable,
     mask_vertices: Growable,
+    quads: Growable,
     /// Uploaded masks by their pixels' address, with the frame they were last used.
     masks: HashMap<usize, (Arc<Vec<u8>>, wgpu::BindGroup, u64)>,
     frame: u64,
@@ -138,6 +141,10 @@ impl OverlayGpu {
         let mask_attrs = wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2, 2 => Float32x4];
         let mask_buffers = [wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<MaskVertex>() as u64, step_mode: wgpu::VertexStepMode::Vertex, attributes: &mask_attrs }];
         let fill = pipeline("overlay-fill", &fill_layout, "vs_fill", "fs_fill", &fill_buffers, wgpu::PrimitiveTopology::TriangleList, LAYER_SAMPLES);
+        let quad_attrs = wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4];
+        let quad_buffers = [wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<QuadInstance>() as u64, step_mode: wgpu::VertexStepMode::Instance, attributes: &quad_attrs }];
+        let quad = pipeline("overlay-quad", &fill_layout, "vs_quad", "fs_quad", &quad_buffers, wgpu::PrimitiveTopology::TriangleStrip, LAYER_SAMPLES);
+        let shadow = pipeline("overlay-shadow", &fill_layout, "vs_shadow", "fs_shadow", &quad_buffers, wgpu::PrimitiveTopology::TriangleStrip, LAYER_SAMPLES);
         let mask = pipeline("overlay-mask", &mask_pipeline_layout, "vs_mask", "fs_mask", &mask_buffers, wgpu::PrimitiveTopology::TriangleStrip, LAYER_SAMPLES);
         let composite = pipeline("overlay-composite", &composite_layout, "vs_composite", "fs_composite", &[], wgpu::PrimitiveTopology::TriangleStrip, 1);
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor { label: Some("overlay-mask"), mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, ..Default::default() });
@@ -151,6 +158,8 @@ impl OverlayGpu {
             mask_layout,
             layer_layout,
             fill,
+            quad,
+            shadow,
             mask,
             composite,
             sampler,
@@ -161,6 +170,7 @@ impl OverlayGpu {
             vertices: Growable::new(wgpu::BufferUsages::VERTEX),
             indices: Growable::new(wgpu::BufferUsages::INDEX),
             mask_vertices: Growable::new(wgpu::BufferUsages::VERTEX),
+            quads: Growable::new(wgpu::BufferUsages::VERTEX),
             masks: HashMap::new(),
             frame: 0,
         }
@@ -257,11 +267,14 @@ impl OverlayGpu {
             .iter()
             .flat_map(|(m, at, color)| {
                 let (x, y) = (at[0] as f32, at[1] as f32);
-                let (mw, mh) = (m.width as f32, m.height as f32);
+                let [mw, mh] = m.drawn_size().map(|v| v as f32);
                 [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]].map(|[u, v]| MaskVertex { position: [x + u * mw, y + v * mh], uv: [u, v], color: *color })
             })
             .collect();
         let mask_vertices = (!quads.is_empty()).then(|| self.mask_vertices.write(device, queue, bytemuck::cast_slice(&quads)).clone());
+        // Shadows, then quads, in one instance buffer.
+        let boxes: Vec<QuadInstance> = draw.shadows.iter().chain(&draw.quads).copied().collect();
+        let box_buffer = (!boxes.is_empty()).then(|| self.quads.write(device, queue, bytemuck::cast_slice(&boxes)).clone());
         let l = layer.as_ref().expect("layer");
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -273,6 +286,18 @@ impl OverlayGpu {
                 multiview_mask: None,
             });
             pass.set_bind_group(0, &self.layer_bind, &[]);
+            if let Some(b) = &box_buffer {
+                let n_shadows = draw.shadows.len() as u32;
+                pass.set_vertex_buffer(0, b.slice(..));
+                if n_shadows > 0 {
+                    pass.set_pipeline(&self.shadow);
+                    pass.draw(0..4, 0..n_shadows);
+                }
+                if !draw.quads.is_empty() {
+                    pass.set_pipeline(&self.quad);
+                    pass.draw(0..4, n_shadows..n_shadows + draw.quads.len() as u32);
+                }
+            }
             if let (Some(v), Some(i)) = (&vertices, &indices) {
                 pass.set_pipeline(&self.fill);
                 pass.set_vertex_buffer(0, v.slice(..));

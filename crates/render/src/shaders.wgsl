@@ -47,6 +47,7 @@ fn load_inst(slot: u32) {
 
 const HOVER: u32 = 1u;
 const SELECTED: u32 = 2u;
+const BODY: u32 = 256u;
 const HIDDEN: u32 = 4u;
 const ACCENT: u32 = 8u;
 const ERROR: u32 = 16u;
@@ -113,6 +114,10 @@ fn highlight_stroke(base: vec3<f32>, st: u32) -> vec3<f32> {
 // so the top face under a default plane reads `#e4b049` like live
 // (selection/04); alone it is about `#e9a100`.
 const FACE_SELECTED: vec3<f32> = vec3<f32>(0.87, 0.385, 0.0);
+// A whole selected part / instance (state BODY): live (242,182,72) lit,
+// outlined (state OUTLINE) in (255,192,76), 2 px (live ins-902).
+const BODY_SELECTED: vec3<f32> = vec3<f32>(0.992, 0.503, 0.034);
+const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
 
 // ---------------------------------------------------------------- background
 
@@ -284,11 +289,13 @@ fn fs_compare_dn(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0)
     return vec4(n, compare_depth(i.world));
 }
 
-// Both versions drawn together, mixed over the "under" version.
+// Both versions drawn together, mixed over the "under" version
+// (Onshape's compareBlend: the over color with alpha uBlend), in gamma
+// space: the target is the frame's unorm view.
 @fragment
 fn fs_compare_mix(i: BgOut) -> @location(0) vec4<f32> {
     let c = textureLoad(compare_over, vec2<i32>(floor(i.pos.xy)), 0);
-    return vec4(c.rgb, g.compare2.z);
+    return vec4(linear_to_srgb(c.rgb), g.compare2.z);
 }
 
 fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
@@ -309,7 +316,8 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
         if ((st & SELECTED) != 0u) { c = mix(c, FACE_SELECTED, 0.5); }
     } else if (!unlit) {
         if ((st & SELECTED) != 0u && (st & ERROR) == 0u) {
-            c = mix(FACE_SELECTED * 0.97, shade(i.world, i.normal, front, FACE_SELECTED), 0.45);
+            let sel = select(FACE_SELECTED, BODY_SELECTED, (st & BODY) != 0u);
+            c = mix(sel * 0.97, shade(i.world, i.normal, front, sel), 0.45);
         } else if ((inst.params.y & 16u) != 0u) {
             c = shade_preview(i.normal, front, c);
         } else {
@@ -360,6 +368,7 @@ fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
     // Hovered, not selected: the light-orange hover color (live G35, a
     // hovered mesh part).
     if ((st & HOVER) != 0u && (st & SELECTED) == 0u) { return vec4(g.hover.rgb, 1.0); }
+    if ((st & BODY) != 0u) { return vec4(BODY_OUTLINE, 1.0); }
     return vec4(g.select.rgb, 1.0);
 }
 
@@ -611,6 +620,9 @@ fn vs_line(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
     var alpha: f32;
     if (inst.params.x != 0u) { base = srgb_to_linear(l.color.rgb); alpha = l.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
     if ((st & DIM) != 0u) { alpha = alpha * 0.3; }
+    // A selected part's edges let its amber through (live ins-902: the
+    // top/front edge peaks at 0.73 of the faces, ours at 0.53 when opaque).
+    if ((st & (BODY | HOVER | SELECTED)) == BODY) { alpha = alpha * 0.68; }
     o.color = vec4(highlight_stroke(base, st), alpha);
     o.pick = pick;
     o.along = t * len;

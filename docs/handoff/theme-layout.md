@@ -1104,3 +1104,124 @@ Replace instance / Interference detection. What live's `panelLayoutManager` (bun
   - Chrome's native scrollbar (kit `PopupMenu::native_scrollbar`; shown once laid out at the cap, via
     `request_animation_frame`);
   - Onshape's row pitch: `tool_list`, 32 px rows 1 px apart, no padding, 2 + 33n + 1 px tall.
+
+## ui handoff, 21 Oct 19:20 UTC (agent ui moving to another account): state and next steps
+
+**Tree state:** everything below is in the working tree (not committed; the lead integrates). No debug code is left: the temporary `UI-TRACE` eprintlns in `part_studio/view_tools.rs` / `mod.rs` were removed. The last full `cargo build -p noshape` (18:57, with traces) had no warnings. A clippy run over `noshape noshape-ops noshape-model noshape-units --all-targets -D warnings` was started at 19:05; see "Checks" at the end for its result.
+
+### qa5 findings owned by ui
+
+| id | state | where / notes |
+|---|---|---|
+| **DOC6** rename drops spaces | **not a bug, not changed.** Spaces type fine in every rename path (double-click, menu Rename, active or inactive tab; /tmp/ui/doc6*.png). qa5's `/root/qa5-scratch/s.sh` runs `eval "xdotool $c"` for each `;`-split step, so an unquoted `type Part Studio 1` types "PartStudio1". Tell qa5 to quote. | — |
+| **TABS1** drag | **done, verified in app.** The tab leaves the bar, a 198 px gap shows the drop place (no line), a 100 px `#eaeaea` ghost (shadow 0 5 10 .2) moves along the bar only; no hover card during a drag; dropping in the gap moves it; reorder not undoable. | `workspace.rs`: `TabGap`, `start_tab_drag`, `drop_tab`, `move_tab` (replaces move_before), strip `on_drag_move`/`on_drop`, ghost in `render_tab_bar`; `TabDrag` renders nothing; `tab_thumbs.rs` card hidden while `cx.has_active_drag()`. Not done: live "dropping past the last tab does nothing" (ours drops in the last gap). |
+| **TABS2** Duplicate | **done, verified** ("Part Studio 1 Copy 1", first free N, after the source, not activated). | `ops/src/docedit.rs duplicate_tab`; AGENT_API.md line 341 + op description. |
+| **TABS3** folder menu | **done** (Rename · Unpack · ── · Move to document… in the tab bar and tab manager). Not checked in the app. | `workspace.rs folder_tab` (now returns `Stateful<Div>`), `tab_manager.rs` (removed unused `new_folder_in`). |
+| **TABS4** Unpack to the end | **done** + model test line. | `model/src/document.rs unpack_folder` + test `folders_nest_unpack_and_keep_old_documents_loading`. |
+| **TABS5** rename not undoable | **done** (tab bar, Variable Studio tab rename (ui2's file, one word), tab manager folder rename, agent API `tab_rename`). | `edit_document_not_undoable`. Not checked in the app. |
+| **C5** toast | **done, verified** (centred on the window at y 85, over the right panel). | `part_studio/mod.rs render_viewport_overlay(window, cx)`: `deferred(anchored().position_mode(Window))`, priority 1. Assembly / drawing toasts not changed (check whether qa5 sees them too). |
+| **KB1** Shift+N on a part | already in the tree (psb: `start_part_rename` from `RenameSelected`). Not re-tested by ui. | `part_studio/mod.rs` RenameSelected. |
+| **KB2** Esc on tool panels | **half done.** Esc with focus in graphics → `close_tool_panel` (Named views, Mass properties, Measure; Appearance stays). **Bug left:** Esc with the focus in the Named views "New view name" input only clears the text and blurs; the panel stays open. Trace showed: no Cancel reaches the Part Studio, `close_named_views` isn't called, the input emits Change("") then Blur, although the InputState has `.revert_on_escape(false)` and the only `revert_escape` callers are state.rs:2323 and feature_dialog.rs:2777. **Next:** find who clears + blurs (put an eprintln in gpui-base `state.rs escape()` / `clean()` / `replace_text`, and check the key bindings for "escape" that match inside this panel); the goal is: one Esc closes the panel, typed text discarded (live). | `part_studio/view_tools.rs close_tool_panel / close_named_views`, the panel's `.on_action(Escape)`, `mod.rs` Cancel chain. |
+| **KB3** planes in Isolate | **done, verified** (all planes and their names hidden, origin hidden; Make transparent leaves them). | `behaviors.rs` isolate display; `mod.rs render_viewport_underlay` skips plane names while isolating. |
+| **ADV4** hole rows | **done, verified** (icons, full values). Icons redrawn after live's crops (dialogs/adv4-*): `hole-cbore-*`, `hole-csink-*`, new `hole-tap-clearance`; tap drill row uses `hole-diameter`; `hole-tap-diameter.svg` deleted. **Found:** Inch countersink defaults read 10 mm / 90 deg, live 0.531 in / 82 deg (and cBore 0.4375 in / 0.25 in): the drilled ANSI table values aren't applied to cBore/cSink params; that's psb's hole model (`hole_tables apply_table_to_params`), report to psb. Run `cargo test -p noshape --test no_onshape_assets` for the new SVGs. | `feature_dialog.rs param_icon`, `assets/icons/hole-*.svg`. |
+| **ADV8** "20 tpi" | **done** (external-thread pitch options without the series; tapped holes keep "(UNC)"). Not checked in the app. | `model/src/features/hole_tables.rs thread_level`. |
+| **REG1** Regeneration times | **done, verified** (screenshot /tmp/ui/r1c.png): live's 350 px table, sorted by Time ▼, bars, footer; "617ms"/"1.02s" format also in the Performance panel. | `behaviors.rs render_regen_times`, `ui.rs regen_time_text`, `doc_panels.rs`. Not done: the dialog doesn't list a feature being edited (Shell 1 while its dialog is open); live unknown. |
+| **FS2** ⚠ tooltip in the Feature Studio gutter | **not started** (fs owns the editor; coordinate). | — |
+| **FS4** custom feature initials | **done for the dropdown and feature-list rows**: `ui::initials_icon` / `feature_initials` ("QA cube" → "Qc"), no "Custom features" heading, side tooltip with the name. **Not done:** the delayed italic second line "Feature from current workspace" in that tooltip (live `data-bs-expanded-content`, like `RichTooltip`'s expansion but to the side). Not checked in the app (the demo doc has no custom feature in a Part Studio; use "Custom features" tab). | `part_studio/mod.rs custom_tools`, feature row icon. NB: qa4 had a perf experiment editing these feature-row lines (`exp & 64` etc.); check it's gone. |
+| **FS5** "Result: Regeneration complete" | **not started** (notices panel text after a broken commit; fs's area). | — |
+| **RD1** | done by psb (`menus.rs studio_measure`). | — |
+
+### Other work in the tree from this session
+- SM15 `noshape_units::to_fixed` (JS toFixed rounding, exported from lib.rs) + 33 display sites; units tests pass.
+- ADV5 helix "Handedness" label (`model/src/features/curve.rs` SHOW_LABEL).
+- Tooltip press gate (vendor gpui-pre `TooltipPressGate`, a press hides the tooltip until the pointer leaves).
+- `os_ui::param_row` 194 px; panel snapping; toolbar collapse (see sections above).
+
+### Parked patches (not in the tree)
+- `/root/ui-scratch/numberinput-wip.patch`: shared `NumberField` / `NumberInput` / `step_keys` in `quantity_field.rs` and their use in analysis tools (Zebra, Reflection, Connection), draft angle, assembly zebra/reflection. Never compiled. Re-apply on a quiet tree, `cargo check`, then test (live table: behaviours.md "Input behaviour outside feature dialogs").
+- `/root/ui-scratch/tooltip-test.patch`: unit test `a_press_hides_the_tooltip_until_the_pointer_leaves` for ui.rs (now with `::gpui_kit::TooltipPressGate`). It failed to resolve in the app's test target with `gpui_kit::`; apply, then `cargo clippy -p noshape --all-targets` to see whether the absolute path works.
+
+### Next steps, in order
+1. KB2 input Esc bug (above).
+2. Check TABS3/TABS5/ADV8/FS4 in the app; run `no_onshape_assets` and the app unit tests (`custom_feature_initials_and_regen_times_read_as_onshape`, `panels_snap_like_onshape`).
+3. FS4 tooltip second line; then FS2/FS5 with fs.
+4. DOC5 (a tab made with + later shown at the end): not reproduced statically; `place_after` and saving look right. Reproduce: + after a middle tab, then BOM edit / undo / tab switch / reopen.
+5. Parked NumberInput patch; TAB1 with psb ("Parts (0)" after a tab switch).
+
+### How to build and test (ui)
+`/root/ui-scratch/tools/retry2.sh` (build into /root/target-shared, copy to /tmp/ui/noshape, retry on others' errors), `start.sh --demo` (display :101, `APP_TIMEOUT`), `x.sh name [xdotool…]` screenshots to /tmp/ui. Kill the app by PID only.
+
+### Checks (19:20)
+- `cargo clippy -p noshape -p noshape-ops -p noshape-model -p noshape-units --all-targets -- -D warnings`: **clean** (19:08, after the traces were removed; includes the app's test target with the new ui tests).
+- `cargo test -p noshape-units`: pass (56 + 1 doctest).
+- Not yet run: `cargo test -p noshape-model --lib folders_nest` (unpack-to-end assertion; a 15 min attempt timed out while compiling at 19:23), the app unit tests, `no_onshape_assets`, ops tests touching tab rename/duplicate.
+
+## ui takeover, 21 Oct 19:30– (new account): state
+
+Model test `folders_nest` (Unpack moves tabs to the end): **passes** (2 tests).
+
+Done in the tree (not yet verified in the app unless noted):
+- **TABS5** (root cause: undo is blob-level and the tab name lives in the tab blob, so undoing *any* earlier edit of
+  the tab restored the old name; reopened documents also replayed renames as undoable):
+  - `ops/src/session.rs`: `commit` / `commit_all` classify an edit that touches only the tab bar (tabs added or
+    removed, names, `tab_order` / `folders` / `parents`) as not undoable (`tab_bar_only`; a content edit is
+    recognised from the unchanged name without parsing the tab). Undo/redo pass every restored blob through
+    `keep_tab_bar`: tabs keep their current names, deleted tabs stay deleted, the tab bar keeps its order and folders.
+    The no-active-tab path now uses the scoped undo too.
+  - `store/src/undo.rs`: `undo_in_keeping` / `redo_in_keeping`; `NOT_UNDOABLE_PREFIXES` lists every tab operation
+    (for `from_history` after a reopen); tab edits ("<tab> :: …") never match.
+  - Test `session::tests::tab_operations_are_not_undoable`; `create_commit_undo_reopen` now undoes a description edit.
+  - Open for the lead: live clears every undo stack on page reload; we rebuild it from history (the CLI needs that).
+- **CA3: not a bug.** Every live `ns-dialog` is `rgba(255,255,255,.95)` (woolsthorpe.css `--os-feature-dialog-background`
+  = `--os-background-transparent-primary` = rgba95), on hover too; live cf-052 shows the feature-list toggle through
+  the Change configuration dialog's lower body (/tmp/ui/ca3-live-crop.png). Ours blends to (250,248,242) over the
+  gold part = CSS .95 within 2 levels. Not changed.
+- **CA4**: Change configuration (`assembly_panels.rs`): values commit with the workspace unit on blur / Enter / Tab / ✓
+  (`quantity_text::commit_text`; "25" → "25 mm"), Generate turns on when a value changes; the dialog has the
+  `FeatureDialog` key context (Tab / Shift+Tab walk its fields, past the end → navbar like feature dialogs; Enter ✓,
+  Esc ✕). `workspace.rs forward_chrome_key`: a key no binding took while a navbar / tab bar control has focus is
+  replayed on the active tab's editor (so f works after Tab left a dialog); Tab/Enter/Space/Esc and typing stay.
+  Live request filed (REQUESTS.md "ui (10-21 20:00)") to confirm shortcuts with focus on Share.
+- **D16**: closed Sheets panel's chips are drawn on the canvas *under* the dialogs (`drawing_view.rs` `sheet_chips`),
+  the `covered` hide-list in `drawing_extra.rs render_sheet_tabs` is gone (top 4 inside the canvas border = same y).
+- **FS4**: custom features dropdown entries: `ui::with_side_tooltip_expanded` (title, then after 1.5 s the italic
+  "Feature from current workspace" block, live `.tooltip-expand`: white, 4 px padding, ≤400 px). Open: whether
+  live re-centres the expanded side tooltip vertically (ours grows down).
+- **FS5**: notices "Result:" line always "Regeneration complete" (live, also with a failing feature).
+- **FS2**: Onshape's gutter quirk (bundle `makeGutterAnnotations` reduces `Object.values` by index): the k-th
+  on-screen line with notices puts its marker on **row k** (error at 13:1 → line 1; live captures agree). Vendor
+  `gpui-base input/base/element.rs layout_gutter_markers` + `GutterMarkerRenderer(index, worst, notes)`;
+  `feature_studio::gutter_marker` gives the marker Ace's tooltip (`ace_tooltip`, shared with the squiggle tooltip).
+  "Function f with n argument(s) not found" squiggles span the whole call (`squiggle_end`, test).
+- **KB3 leftover**: live grey rows (pn-900: Top/Front/Right and sketches #999) are the *hidden* look, the same
+  without Isolate (pn-908); ours greys hidden default geometry already. Others-ghosting code exists
+  (`display_for_scene_inner`); needs an in-app check of what qa5 saw.
+- Scripts: `/root/ui-scratch/tools/{build,start}.sh` kill the app by PID (`/tmp/ui/app.pid`), `stop.sh`. No pkill.
+
+Next: build, then check in the app TABS5, CA4 (25 → 25 mm, Tab, f), D16, FS2/FS4, KB3, F19 toast; run
+`cargo test -p noshape-ops session`, `-p noshape-store`, app tests `feature_studio`, clippy.
+
+### From fs (21 Oct ~20:15): qa5 FS2 / FS4 / FS5 are UI-only
+No model-side hook is needed. The compiler already emits live's text ("Function fCuboidX with 3 argument(s) not
+found", featurescript/src/compile.rs) and `squiggle_end` underlines the whole call. Left for ui: the gutter/underline
+tooltip (FS2; live shows the ⚠ on line 1 for this warning, ours on the call's line, so check live), the custom-feature
+toolbar entries' two-letter initials icon plus the italic "Feature from current workspace" tooltip line (FS4). FS5's
+"Result: Regeneration complete" is already done (`PartStudioView::regen_result`).
+Also from fs: the flat DXF writer for the flat view's "Export DXF/DWG of Flat pattern…" dialog is
+`noshape_model::sheetmetal::flat_dxf::{flat_dxf, flat_dwg}(flat, &FlatExport { insunits, version, bend_centerlines })`
+(live samples/qa5-sm-flat.dxf format). The part menus no longer have "Export flat pattern…" (SM13).
+- (20:30) Store clippy fix: `undo.rs` `KeepBlob<'a>` type alias (lead: type_complexity); `cargo clippy -p
+  noshape-store --all-targets -D warnings` clean.
+- (20:30) Empty-space clicks keep dialog chips (lead, live): Part Studio keeps the selection while Mass properties
+  or the pinned Measure panel is open (`mod.rs` viewport click); assembly `click_select` while Mass properties is
+  open. Notes left in part-studio-behaviour.md and assembly-behaviour.md.
+- KB3: Isolate now keeps the **origin** (live pn-900 draws it where 1030 has it, (1082,562)) and greys the plane rows
+  (`isolating_planes` in the default-geometry rows); planes hidden as before.
+- (21:20) **Crash fixed**: the first `forward_chrome_key` replayed the key inside `cx.defer_in` (Workspace still
+  being updated) → panic "cannot update Workspace while it is already being updated" on any shortcut typed with
+  the navbar focused (e.g. f after Tab left Change configuration). Now `window.defer` with the editor's focus
+  handle taken first (`active_focus`). Any binary built from the tree between ~20:15 and ~21:20 has the crash.
+- Verified in the app (21:15 binary): TABS5 (/tmp/ui/tabs5-cd.png: Ctrl+Z restores Fillet 1, keeps the new tab
+  name, Undo then disabled), FS4 (/tmp/ui/fs4c-c.png), KB3 rows grey (/tmp/ui/kb3a.png), CA4 "25" → "25 mm",
+  Generate on, Tab → navbar logo (/tmp/ui/ca78.png). Test doc: /tmp/ui/cfg2.noshape (CLI: config variable d +
+  Part 1 inserted).

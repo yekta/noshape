@@ -10,6 +10,7 @@
 //! VsConfiguration`.
 
 use super::*;
+use gpui_kit::component::WindowExt as _;
 use noshape_model::configuration::{ConfigInput, ConfigInputKind, ListOption, VariableKind};
 use noshape_model::variables::{VsConfiguration, VsField};
 
@@ -35,6 +36,25 @@ fn new_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let n = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     format!("in{:x}", n & 0xffff_ffff_ffff)
+}
+
+/// A new list input's internal ID, as Onshape's "List_8iFesnytxapQpg".
+fn list_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    const ALNUM: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let mut n = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0) ^ 0x9e37_79b9_7f4a_7c15;
+    let mut out = String::from("List_");
+    for _ in 0..14 {
+        out.push(ALNUM[(n % 62) as usize] as char);
+        n = (n / 62) ^ (n << 7);
+    }
+    out
+}
+
+/// A row's or a named input's internal ID: its name as a FeatureScript
+/// identifier, unique among `taken` (live: row "Big" → ID "Big").
+fn name_id(name: &str, taken: &[String]) -> String {
+    noshape_model::configuration::fs_identifier(name, taken)
 }
 
 /// The dotted outline over a configured cell.
@@ -140,11 +160,12 @@ impl VariableStudioView {
         }
         self.cfg_edit("Add configuration input", cx, |c| {
             let n = c.inputs.len() + 1;
-            let id = new_id();
+            // Live ei-906: "List_…", the first row "Default".
+            let id = list_id();
             c.inputs.push(ConfigInput {
                 id,
                 name: if n == 1 { "Configuration".into() } else { format!("List {n}") },
-                kind: ConfigInputKind::List { options: vec![ListOption { id: "default".into(), name: "Default".into() }], default: "default".into() },
+                kind: ConfigInputKind::List { options: vec![ListOption { id: "Default".into(), name: "Default".into() }], default: "Default".into() },
                 visible_when: None,
                 excluded: false,
             });
@@ -300,12 +321,17 @@ impl VariableStudioView {
             })));
             let (i3, k3) = (input.clone(), key.clone());
             m = m.item(act("Duplicate row", Box::new(move |c| {
-                let oid = new_id();
+                let mut oid = String::new();
                 if let Some(ConfigInputKind::List { options, .. }) = c.inputs.iter_mut().find(|x| x.id == i3).map(|x| &mut x.kind)
                     && let Some(at) = options.iter().position(|o| o.id == k3)
                 {
                     let name = format!("{} copy", options[at].name);
+                    let taken: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
+                    oid = name_id(&name, &taken);
                     options.insert(at + 1, ListOption { id: oid.clone(), name });
+                }
+                if oid.is_empty() {
+                    return;
                 }
                 for x in c.configured.iter_mut().filter(|x| x.input == i3) {
                     let v = x.values.get(&k3).cloned().unwrap_or_default();
@@ -369,6 +395,10 @@ impl VariableStudioView {
         let name_cell = self.cfg_text(format!("in-{iid}"), input.name.clone(), (16., FontWeight::MEDIUM, pal.text.into()), rename, cx);
         let view = cx.entity();
         let (i1, i2) = (iid.clone(), iid.clone());
+        let at = cfg.inputs.iter().position(|i| i.id == iid).unwrap_or(0);
+        let count = cfg.inputs.len();
+        let list = matches!(input.kind, ConfigInputKind::List { .. });
+        let has_ids = matches!(input.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. });
         let header = h_flex()
             .h(px(35.))
             .flex_none()
@@ -410,13 +440,15 @@ impl VariableStudioView {
                     .child(crate::assets::icon("more", 20., cx))
                     .on_click(move |e: &ClickEvent, window, cx| {
                         let (v, id) = (view.clone(), i2.clone());
-                        // Live vs-908: Copy table, Copy input, Rename, Visibility
-                        // conditions…, Delete.
+                        // Live ei-900…905: Copy table, Copy input, Move up / down,
+                        // Rename, Edit internal IDs…, Visibility conditions…, Input
+                        // propagation…, Delete.
                         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                             use crate::os_menu::OsMenuItem;
-                            let (v1, v2, v3, v4, v5) = (v.clone(), v.clone(), v.clone(), v.clone(), v.clone());
-                            let (id1, id2, id3, id4, id5) = (id.clone(), id.clone(), id.clone(), id.clone(), id.clone());
-                            m.item(OsMenuItem::new("Copy table").on_click(move |_, _, cx| {
+                            let (v1, v2, v3, v4, v5, v6, v7) = (v.clone(), v.clone(), v.clone(), v.clone(), v.clone(), v.clone(), v.clone());
+                            let (id1, id2, id3, id4, id5, id6) = (id.clone(), id.clone(), id.clone(), id.clone(), id.clone(), id.clone());
+                            let moves = [("Move up", at > 0, true), ("Move down", at + 1 < count, false)];
+                            let mut m = m.item(OsMenuItem::new("Copy table").on_click(move |_, _, cx| {
                                 let text = v1.read(cx).config_table_text(&id1, cx);
                                 cx.write_to_clipboard(ClipboardItem::new_string(text));
                             }))
@@ -424,8 +456,27 @@ impl VariableStudioView {
                                 if let Some(i) = v2.read(cx).studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == id2).cloned()) {
                                     crate::config_visibility::copy_inputs(vec![i]);
                                 }
-                            }))
-                            .item(OsMenuItem::new("Rename").on_click(move |_, window, cx| {
+                            }));
+                            for (label, show, up) in moves {
+                                if !show {
+                                    continue;
+                                }
+                                let (v, id) = (v.clone(), id.clone());
+                                m = m.item(OsMenuItem::new(label).on_click(move |_, _, cx| {
+                                    let id = id.clone();
+                                    v.update(cx, |t, cx| {
+                                        t.cfg_edit(label, cx, move |c| {
+                                            let n = c.inputs.len();
+                                            if let Some(at) = c.inputs.iter().position(|i| i.id == id)
+                                                && let Some(to) = if up { at.checked_sub(1) } else { (at + 1 < n).then_some(at + 1) }
+                                            {
+                                                c.inputs.swap(at, to);
+                                            }
+                                        })
+                                    })
+                                }));
+                            }
+                            let m = m.item(OsMenuItem::new("Rename").on_click(move |_, window, cx| {
                                 v3.update(cx, |t, cx| {
                                     let name = t.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == id3).map(|i| i.name.clone())).unwrap_or_default();
                                     let id = id3.clone();
@@ -436,8 +487,14 @@ impl VariableStudioView {
                                     });
                                     t.start_cfg_text(format!("in-{id3}"), name, commit, window, cx);
                                 })
+                            }));
+                            let m = if has_ids { m.item(OsMenuItem::new(if list { "Edit internal IDs…" } else { "Edit internal ID…" }).on_click(move |_, window, cx| v6.update(cx, |t, cx| t.open_internal_ids(&id6, window, cx)))) } else { m };
+                            m.item(OsMenuItem::new("Visibility conditions…").on_click(move |_, window, cx| v4.update(cx, |t, cx| t.open_visibility(Some(id4.clone()), window, cx))))
+                            // Live ei-910: a Variable Studio has nothing that references
+                            // inputs: a toast, no dialog.
+                            .item(OsMenuItem::new("Input propagation…").on_click(move |_, _, cx| {
+                                v7.update(cx, |t, cx| t.doc.update(cx, |_, cx| cx.emit(DocEvent::Info("No references in the tab.".into()))))
                             }))
-                            .item(OsMenuItem::new("Visibility conditions…").on_click(move |_, window, cx| v4.update(cx, |t, cx| t.open_visibility(Some(id4.clone()), window, cx))))
                             .separator()
                             .item(OsMenuItem::new("Delete").on_click(move |_, _, cx| {
                                 v5.update(cx, |t, cx| {
@@ -569,7 +626,11 @@ impl VariableStudioView {
                     if name.is_empty() {
                         return;
                     }
-                    let oid = new_id();
+                    let taken: Vec<String> = match c.inputs.iter().find(|i| i.id == id).map(|i| &i.kind) {
+                        Some(ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect(),
+                        _ => Vec::new(),
+                    };
+                    let oid = name_id(&name, &taken);
                     // New rows start from the default row's values.
                     let default = match c.inputs.iter().find(|i| i.id == id).map(|i| &i.kind) {
                         Some(ConfigInputKind::List { default, .. }) => default.clone(),
@@ -896,7 +957,10 @@ impl VariableStudioView {
         };
         self.cfg_dialog = None;
         self.cfg_edit("Add configuration input", cx, move |c| {
-            c.inputs.push(ConfigInput { id: new_id(), name, kind, visible_when: None, excluded: false });
+            // Live ei-911: a checkbox "CB" has the ID "CB".
+            let taken: Vec<String> = c.inputs.iter().map(|i| i.id.clone()).collect();
+            let id = name_id(&name, &taken);
+            c.inputs.push(ConfigInput { id, name, kind, visible_when: None, excluded: false });
         });
         cx.notify();
     }
@@ -1091,5 +1155,154 @@ impl VariableStudioView {
                 .child(col)
                 .into_any_element(),
         )
+    }
+}
+
+/// An internal ID's problem: empty, not a FeatureScript identifier, or a
+/// reserved keyword.
+fn id_error(id: &str) -> Option<&'static str> {
+    if id.is_empty() {
+        return Some("ID cannot be empty");
+    }
+    let mut chars = id.chars();
+    let first_ok = chars.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_');
+    if !first_ok || !chars.all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Some("ID must be a valid FeatureScript identifier");
+    }
+    noshape_model::configuration::FS_KEYWORDS.contains(&id).then_some("ID cannot be a reserved FeatureScript keyword")
+}
+
+/// Input ⋯ › Edit internal IDs… (live ei-906…911): a 600 px modal, "Edit
+/// internal IDs" (blue, 20 px), Input ID and Row IDs tables (names
+/// read-only grey, IDs editable), invalid IDs pink, duplicates in a red box,
+/// a valid change in a yellow warning; [Break references and change IDs]
+/// (enabled by a valid change) [Cancel].
+struct IdsDialog {
+    view: WeakEntity<VariableStudioView>,
+    studio_name: String,
+    input_name: String,
+    input_id: String,
+    default_display: String,
+    others: Vec<String>,
+    id: Entity<InputState>,
+    rows: Vec<(String, String, Entity<InputState>)>,
+}
+
+impl VariableStudioView {
+    fn open_internal_ids(&mut self, input: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(cfg) = self.studio(cx).map(|s| s.configuration.clone()) else { return };
+        let Some(inp) = cfg.inputs.iter().find(|i| i.id == input).cloned() else { return };
+        let default_display = match &inp.kind {
+            ConfigInputKind::List { options, default } => options.iter().find(|o| &o.id == default).map(|o| o.name.clone()).unwrap_or_default(),
+            ConfigInputKind::Checkbox { default } => default.to_string(),
+            _ => String::new(),
+        };
+        let no_space = |s: &str, _: &mut App| !s.contains(char::is_whitespace);
+        let id = cx.new(|cx| InputState::new(window, cx).validate(no_space).default_value(inp.id.clone()));
+        let rows = match &inp.kind {
+            ConfigInputKind::List { options, .. } => options.iter().map(|o| (o.id.clone(), o.name.clone(), cx.new(|cx| InputState::new(window, cx).validate(no_space).default_value(o.id.clone())))).collect(),
+            _ => Vec::new(),
+        };
+        let studio_name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        id.update(cx, |s, cx| s.focus(window, cx));
+        let others = cfg.inputs.iter().filter(|i| i.id != input).map(|i| i.id.clone()).collect();
+        let view = cx.entity().downgrade();
+        let dialog = cx.new(|_| IdsDialog { view, studio_name, input_name: inp.name.clone(), input_id: inp.id.clone(), default_display, others, id, rows });
+        window.open_dialog(cx, move |d, _, _| d.w(px(598.)).margin_top(px(80.)).close_button(false).p_0().gap_0().rounded(px(4.)).child(dialog.clone()));
+    }
+}
+
+impl IdsDialog {
+    fn renames(&self, cx: &App) -> Vec<(String, String)> {
+        self.rows.iter().map(|(old, _, st)| (old.clone(), st.read(cx).value().to_string())).filter(|(a, b)| a != b).collect()
+    }
+
+    /// The first duplicate ID.
+    fn duplicate(&self, cx: &App) -> Option<String> {
+        let id = self.id.read(cx).value().to_string();
+        if id != self.input_id && self.others.contains(&id) {
+            return Some(id);
+        }
+        let mut seen = HashSet::new();
+        self.rows.iter().map(|(_, _, st)| st.read(cx).value().to_string()).find(|v| !seen.insert(v.clone()))
+    }
+}
+
+impl Render for IdsDialog {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        let grid = rgb(0xaaaaaa);
+        let multiple = !self.rows.is_empty();
+        let new_id = self.id.read(cx).value().to_string();
+        let renames = self.renames(cx);
+        let (id_change, row_change) = (new_id != self.input_id, !renames.is_empty());
+        let errors = id_error(&new_id).is_some() || self.rows.iter().any(|(_, _, st)| id_error(&st.read(cx).value()).is_some());
+        let duplicate = self.duplicate(cx);
+        let can_confirm = duplicate.is_none() && (id_change || row_change) && !errors;
+        let cell = |w: f32| h_flex().w(px(w)).h(px(34.)).flex_none().px(px(4.)).border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text);
+        let head = |w: f32, t: &str| cell(w).bg(rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD).child(t.to_string());
+        // Invalid: pink (the Input ID's cell also says why on hover).
+        let id_cell = |st: &Entity<InputState>, tip: bool, cx: &App| {
+            let err = id_error(&st.read(cx).value());
+            cell(366.)
+                .when(err.is_some(), |d| d.bg(rgb(0xf9ebec)))
+                .child(div().id(SharedString::from(format!("vid-{}", st.entity_id()))).flex_1().when_some(err.filter(|_| tip), |d, e| d.tooltip(crate::ui::tooltip(e))).child(Input::new(st).appearance(false).text_size(px(13.33))))
+        };
+        let table = |title: &str, name_head: &str, rows: Vec<(String, AnyElement)>| {
+            let mut t = v_flex().border_l_1().border_t_1().border_color(grid).child(h_flex().child(head(200., name_head)).child(head(366., "Internal ID")));
+            for (name, editor) in rows {
+                t = t.child(h_flex().child(cell(200.).bg(rgb(0xf5f5f5)).text_color(pal.text_muted).child(name)).child(editor));
+            }
+            v_flex().gap(px(4.)).when(multiple, |d| d.child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(rgb(0x1651b0)).child(title.to_string()))).child(t)
+        };
+        let id_rows = vec![(self.input_name.clone(), id_cell(&self.id, true, cx).into_any_element())];
+        let option_rows: Vec<(String, AnyElement)> = self.rows.iter().map(|(_, name, st)| (name.clone(), id_cell(st, false, cx).into_any_element())).collect();
+        let title = if multiple { "Edit internal IDs" } else { "Edit internal ID" };
+        let info = if multiple { format!("This dialog will change the internal identifiers of the input {}.", self.input_name) } else { format!("This dialog will change the internal identifier of the input {}.", self.input_name) };
+        let warning_text = if can_confirm && row_change {
+            Some(format!("This change will break all references to {} in any assemblies, drawings, and other tabs which use a row of {} whose ID has changed.", self.studio_name, self.input_name))
+        } else if can_confirm && id_change {
+            Some(format!("After this change, all assemblies, drawings, and other tabs which reference {0} will revert {0}'s {1} to the default value \"{2}\".", self.studio_name, self.input_name, self.default_display))
+        } else {
+            None
+        };
+        let warning = warning_text.map(|text| h_flex().gap(px(12.)).px(px(16.)).py(px(14.)).rounded(px(4.)).bg(pal.warn_fill).border_1().border_color(pal.warn_outline).text_size(px(13.)).text_color(pal.text).child(crate::assets::icon("warning", 24., cx)).child(div().flex_1().min_w_0().child(text)));
+        // Live ei-907: duplicates in a red box.
+        let dup_box = duplicate.map(|d| div().px(px(16.)).py(px(12.)).rounded(px(4.)).bg(rgb(0xf8d7da)).border_1().border_color(rgb(0xf5c2c7)).text_size(px(13.)).text_color(rgb(0x842029)).child(format!("IDs must be unique. Cannot use duplicate ID \"{d}\".")));
+        let (view, input_id) = (self.view.clone(), self.input_id.clone());
+        v_flex()
+            .w_full()
+            .child(
+                v_flex()
+                    .px(px(16.))
+                    .pt(px(16.))
+                    .pb(px(12.))
+                    .gap(px(8.))
+                    .child(div().text_size(px(20.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x1651b0)).child(title))
+                    .child(div().text_size(px(14.)).text_color(pal.text).child(info)),
+            )
+            .child(div().h(px(1.)).bg(rgb(crate::os_ui::MODAL_DIVIDER)))
+            .child(v_flex().p(px(16.)).gap(px(12.)).child(table("Input ID", "Name", id_rows)).when(multiple, |d| d.child(table("Row IDs", "Row name", option_rows))))
+            .child(
+                v_flex()
+                    .px(px(16.))
+                    .py(px(12.))
+                    .gap(px(8.))
+                    .border_t_1()
+                    .border_color(rgb(crate::os_ui::MODAL_DIVIDER))
+                    .children(dup_box)
+                    .children(warning)
+                    .child(
+                        h_flex()
+                            .justify_end()
+                            .gap(px(8.))
+                            .child(gpui_kit::component::Disableable::disabled(crate::os_ui::primary_button("vid-ok", if multiple { "Break references and change IDs" } else { "Break references and change ID" }), !can_confirm).on_click(move |_, window, cx| {
+                                let (old, new_id, renames) = (input_id.clone(), new_id.clone(), renames.clone());
+                                let _ = view.update(cx, |t, cx| t.cfg_edit("Edit internal IDs", cx, move |c| c.change_ids(&old, &new_id, &renames)));
+                                window.close_dialog(cx);
+                            }))
+                            .child(crate::os_ui::cancel_button("vid-cancel", "Cancel", cx).on_click(|_, window, cx| window.close_dialog(cx))),
+                    ),
+            )
     }
 }

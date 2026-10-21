@@ -16,7 +16,12 @@ No code edits, no builds. Writes only under docs/parity/, docs/handoff/qa5.md an
 
 ## Binary used
 - Pass 1: target-shared 11:50; pass 2: 13:03 (+ CLI 13:33, which panicked on every call: clap duplicate `part`).
-- Pass 3/4 (14:35–16:20): /tmp/qa5/noshape-1448 (target-shared 14:48), /tmp/qa5/noshape-cli-1436 (target-engine 14:36). origin/main still 67c472c.
+- Pass 3/4 (14:35–16:20): /tmp/qa5/noshape-1448 (target-shared 14:48), /tmp/qa5/noshape-cli-1436 (target-engine 14:36).
+- Pass 5 (17:05–17:20): integration **5d28447** via /tmp/qa5/noshape-1659 = copy of /root/target-lead/debug/noshape (16:59; target-shared was still 14:48).
+- Pass 6 (17:22–17:33, predecessor, 17:11 target-shared = d5745c9; stopped mid-pass, not written to checklists): ADV8, C5, A12, D5 fixed; rest unchanged.
+- Pass 7 (18:56–19:50, new qa5 thread): app /tmp/qa5/noshape-1851 (target-shared 18:51, tree d5745c9 + uncommitted), CLI /tmp/qa5/noshape-cli-1809 (target-engine 18:09).
+  Every checklist has a "Re-run pass 7" section; raw notes in /root/qa5-scratch/pass7.md. CLI scripts: pass3/impmatrix7.py (→ impmatrix7.log), roundtrip.py, sf2.py;
+  doc copies for CLI checks in /tmp/qa5/cli (adv, surf, sm). CLI rollback: `feature_rollback {"after": "<feature id>"}`.
 - Re-run rule: when a new Integrate commit lands (`git -C /root/noshape log -1 origin/main`) or a newer target-shared binary appears,
   copy it and re-run every ✗ row; each checklist has dated "Re-run pass N" / "Update from live's answer" sections.
 
@@ -40,10 +45,15 @@ No code edits, no builds. Writes only under docs/parity/, docs/handoff/qa5.md an
 | 15 | FeatureScript custom feature | workflow-featurescript.md | done; live "qa5 featurescript" pending |
 | 16 | import formats matrix | workflow-import-matrix.md | done (CLI, all samples); live "qa5 zip import" pending |
 | 17 | sheet-metal drawing with flat view | workflow-drawing-sheet-metal.md | done |
+| 18 | export → re-import round trips | workflow-export-roundtrip.md | done (EXP1 Rhino, EXP2 OBJ) |
+| 19 | workspace units | workflow-units.md | done; live "qa5 units" pending |
+| 20 | configured part in an assembly (Change configuration, configured insert, BOM, Variable Studio) | workflow-configured-assembly.md | done pass 7 (CA1–CA4, A18 new) |
+| 21 | drawing of a configured assembly + BOM table after a configuration change | workflow-configured-assembly-drawing.md | done pass 8 (CA5, CA6 new; 19:24 build) |
 
 ## Open live requests (REQUESTS.md, "qa5 (10-21 pass 3/4 …)")
 - Answered: qa5 bracket, qa5 dim conflict, Hole row name (folded in).
-- Pending: qa5 undo across tabs, qa5 tabs, qa5 big plate, qa5 featurescript, qa5 zip import, qa5 sketch refs.
+- Answered and folded: undo across tabs, tabs, big plate, featurescript, zip import, sketch refs, relation dialogs.
+- Pending: qa5 units, qa5 pass 7 (solving label, BOM undo, empty SCALE, flat filter / shaded item, configured BOM merge + Reset to default, out-of-date hint).
 
 ## Findings sent (latest first)
 - Pass 4: REG1, PERF2, ADV9 confirmed, ADV12, SK1 (live answers); FS1–FS3, RD1 (stale volume readout), SK2, SK3, IM1, IM2, DSM1–DSM3, SM13 partly fixed.
@@ -51,9 +61,13 @@ No code edits, no builds. Writes only under docs/parity/, docs/handoff/qa5.md an
 - Pass 1/2: SM1–SM17, A1–A11, D1–D13, I1–I6, SF1–SF8, C1–C8, ADV1–ADV6, AN1–AN4, DOC1–DOC4, KB1–KB4.
 
 ## Next steps
-- Integration was running at 16:20: when origin/main moves, copy the new binaries and re-run every ✗ row (all 17 checklists).
+- Pass 7 fixed: RD1, ADV3, AN1–AN3, KB1, DOC6, TABS1–TABS4, C1, A3, A5, A11, A13, A14, A1 (fit), D14, D15, DSM1, EXP2; SK1/KB3/D8/DSM3 mostly.
+  Still open: ADV1, ADV2, ADV7, ADV12, TAB1, TABS5, A4, SM1, hem, SM3, SM12, SM13, DSM2, SF2, SF5 (now moves all edges), SF6, I1, IM1–IM3, EXP1.
+  New: A15 (selected-instance look), A18 (repeat insert position), CA1–CA4 (workflow 20), A16 ("solving…" label, live ?), D16 (Sheet1 chip over Insert view title). Live request "qa5 pass 7" filed (4 checks).
+- Pass 5 results are in each checklist's "Re-run on integration 5d28447" section. Fixed in 5d28447: ADV4, SK2, DOC5 (new tabs), TAB1 partly, KB3 partly.
+- Next: target-shared was rebuilt at 17:11 and origin/main is now d5745c9: copy it and re-run all ✗ rows; when target-engine is rebuilt from 5d28447 (or newer), re-run with them (D14 and the CLI rows still open).
 - Fold live's pending answers into the "?" rows.
-- Possible next workflows: assembly with configured parts + drawing BOM update; export round trips (STEP/Parasolid/PDF) checked by re-import;
+- Possible next workflows: export round trips (STEP/Parasolid/PDF) checked by re-import;
   Variable Studio driven bracket; Preferences (units, decimals) effect on every readout.
 
 ## Gotchas

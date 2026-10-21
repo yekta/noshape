@@ -237,7 +237,8 @@ impl Document {
         self.children(Some(folder)).into_iter().flat_map(|c| if self.is_folder(c) { self.tabs_in(c) } else { vec![c] }).collect()
     }
 
-    /// Unpack folder: its contents move to its parent; the folder goes.
+    /// Unpack folder: its contents move to its parent and to the end of the
+    /// tab list (live qa5 TABS4); the folder goes.
     pub fn unpack_folder(&mut self, id: TabId) {
         let parent = self.parent_of(id);
         for c in self.children(Some(id)) {
@@ -245,6 +246,8 @@ impl Document {
             if let Some(p) = parent {
                 self.settings.parents.push((c, p));
             }
+            self.settings.tab_order.retain(|t| *t != c);
+            self.settings.tab_order.push(c);
         }
         self.settings.folders.retain(|f| f.id != id);
         self.settings.parents.retain(|(t, _)| *t != id);
@@ -378,6 +381,8 @@ mod folder_tests {
         d.unpack_folder(a);
         assert_eq!(d.parent_of(b), None);
         assert_eq!(d.parent_of(ps), None);
+        // Its contents go to the end of the tab list.
+        assert_eq!(d.settings.tab_order[d.settings.tab_order.len() - 2..], [ps, b]);
         assert!(d.folder(a).is_none());
         // Depth limit: 10 levels below the root.
         let mut at = None;

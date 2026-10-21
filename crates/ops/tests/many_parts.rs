@@ -134,3 +134,55 @@ fn write_parts_1000_fixture() {
     let tab = noshape_ops::doc::find_tab(od.doc(), "Part Studio 1").unwrap();
     assert_eq!(od.regenerate(tab, None).unwrap().display.bodies.len(), 1000);
 }
+
+/// GPU cost of the 1000-part fixture (perf.yml `fixture` parts-1000):
+/// 20 orbit frames at the CI runners' 1194×794, the app's style; mean and
+/// worst frame. Run once per diagnostic (`NOSHAPE_PERF_SKIP=lines|meshes|
+/// instancing`, `NOSHAPE_PERF_MSAA=1`, `NOSHAPE_TEST_AO=0`) to see what the
+/// frame spends.
+#[test]
+#[ignore]
+fn thousand_pins_frame_time() {
+    let dir = std::env::temp_dir().join(format!("noshape-pins-bench-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("x.noshape");
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let seed = pin(&mut ctx, "Part Studio 1");
+    call(
+        &mut ctx,
+        "feature_add",
+        json!({ "tab": "Part Studio 1", "type": "linearPattern", "params": {
+            "patternType": "PART", "entities": [format!("body:{seed}.0")],
+            "directionOne": ["plane:right"], "distance": "6 mm", "instanceCount": "40",
+            "directionTwo": ["plane:front"], "distanceTwo": "6 mm", "instanceCountTwo": "25", "hasSecondDir": true,
+            "operationType": "NEW" } }),
+    );
+    let od = ctx.doc(path.to_str()).unwrap();
+    let tab = noshape_ops::doc::find_tab(od.doc(), "Part Studio 1").unwrap();
+    let r = od.regenerate(tab, None).unwrap();
+    let off = ctx.offscreen().unwrap();
+    let up = off.renderer.uploader();
+    let built = builder::build(&r.display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, ..Default::default() }, &mut off.cache, &up);
+    let mut style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    if std::env::var("NOSHAPE_TEST_AO").is_ok_and(|v| v == "0") {
+        style.ambient_occlusion = 0.0;
+    }
+    let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).expect("bounds");
+    let (w, h) = (1194u32, 794u32);
+    let mut cam = noshape_scene::png::fit_camera(lo, hi, w as f64 / h as f64, Some(noshape_render::StandardView::Isometric));
+    let tris: usize = r.display.bodies.iter().map(|b| b.mesh.indices.len() / 3).sum();
+    let mut times = Vec::new();
+    for i in 0..21 {
+        let t = std::time::Instant::now();
+        off.renderer.render(RenderParams { scene: &built.scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
+        if i > 0 {
+            times.push(t.elapsed().as_secs_f64() * 1000.0);
+        }
+        cam.rotation = glam::DQuat::from_rotation_z(0.05) * cam.rotation;
+    }
+    let mean = times.iter().sum::<f64>() / times.len() as f64;
+    let worst = times.iter().cloned().fold(0.0, f64::max);
+    eprintln!("1000 pins, {} instances, {tris} triangles, {w}x{h}: frame mean {mean:.1} ms, worst {worst:.1} ms (skip {:?}, msaa {:?}, ao {})", built.scene.instances.len(), std::env::var("NOSHAPE_PERF_SKIP").ok(), std::env::var("NOSHAPE_PERF_MSAA").ok(), style.ambient_occlusion);
+    let _ = std::fs::remove_dir_all(&dir);
+}

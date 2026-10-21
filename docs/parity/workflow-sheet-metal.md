@@ -127,3 +127,18 @@ New findings: **SM14** flat DXF format/layers/text differ (fs/kern); **SM15** 1.
 | 3.2 | Hem default (rollback after Hem 1) | 9254.2367, 30 faces (live 9378.1835, 33) | ✗ |
 | 5.6 | Corner → Closed | "Closed corners are not supported yet" | ✗ SM3 |
 | 1.2 | Sheet metal ▾ | 13 items, no Flex PCB pair | ✗ SM12 |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| SM1 flange (UI roll-back + Mass properties) | 8383.122 | ✗ still |
+| SM3 Closed corner | "Closed corners are not supported yet" | ✗ still |
+| SM12 Sheet metal ▾ | 13 items | ✗ still |
+| SM13 part menu | "Export flat pattern (DXF)…" still there | ✗ still |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+| Row | Ours | Status |
+|---|---|---|
+| SM1 flange (CLI rollback after Flange 1) | 8383.1217, 20 faces | ✗ still (live 8511.4987) |
+| 3.2 hem (CLI rollback after Hem 1) | 9254.2367, 30 faces | ✗ still (live 9378.1835, 33) |
+| SM3 Closed corner | "Corner 1 did not regenerate properly: Closed corners are not supported yet" | ✗ still |
+| SM12 Sheet metal ▾ | 13 items, no Flex PCB pair | ✗ still |
+| SM13 part menu | "Export flat pattern (DXF)…" still there | ✗ still |

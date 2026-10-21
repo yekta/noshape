@@ -532,3 +532,104 @@ on white, on grey; CreateIconIndirect on white, on grey), `cursors.txt`, one `<n
 smoke.log/stdout.log one level up. **52/52 ok:** every hot spot reads back the same as the file through both LoadImage and
 CreateIconIndirect; max drawing diff 0–1 level (confirmation, count-1..6/5+, crosshair, crosshair-box, move,
 remove-selection, snap-mate, zoom-in).
+
+## Round 8 (2026-10-21 ~15:00-, icons2 on Stablecog; full per-icon log: /root/icons2-scratch/work/reports/icons2-r8.md)
+- Copy-in #3 (before the freeze): 44 redraws that sat in redraw/ but had never been copied (r7 log claimed otherwise).
+- Copy-in #4 (after "freeze lifted", main 5d28447): 49 files via tools/copyin-r8.sh --apply (guard, repo == before-r8 snapshot,
+  backups in scratch r8/*.before.svg). Includes NEW auto-variable-reference.svg (lead/ui2: assembly Variable table header
+  "Automatically referenced Variable Studio", live dom assembly-panel-variable-table:9, 20 px; variable-table art + script x +
+  green check with a mask-knockout halo, no white). Standalone guard test 2 passed.
+  Biggest gains: sync-view 6.29->1.62 (redesign), fit-spline 6.08->2.53 (3 nodes), hem 5.82->2.55, flange 3.53->0.98, treelist
+  3.71->1.06, weld-symbol 5.89->2.50, hide/eye-off ->2.54, eye/show ->1.90 (eye had the mask-stroke bug), variable family
+  (variable, -studio, -table, create-, insert-) ->2.9-3.6 with Onshape's script x, move-boundary 7.30->3.24,
+  section-view-3d/menu-section-view = section-plane art 2.61, add-appearance 3.65, add-mate-connector 2.21, sheet-metal 2.54,
+  note-order-up/down 1.38/1.88, composite-curve 2.21, list-free 2.71, fs-monitor 2.23, cube card file-geometry 1x/2x
+  7.42/5.97 -> 6.03/3.09 (ftscore; 1x limited: Onshape's 2:1 diagonals are crisp stair steps at 1x).
+  stack-furthest has white fills (washer face, nut hole): only drawn in colour via assets::icon (assembly_standard stacks).
+- cursor.rs: Windows count label "4" shifted 1 px right instead of 3 (live: Onshape's Windows "4" ink starts 2 CSS px left of
+  the other digits; mac "4" matches). Windows CI sheet (run 39608471542) vs live icons2-win*: every cursor aligned at offset 0;
+  mean grey diff 2.6-3.9 (counts, remove-selection), 6-6.5 (confirmation, snap-mate: same ink extents, live AA/shadow softer).
+  Tool: scratch tools/wincmp.py.
+- TOOL FIX (scratch rlib.py): sprites with non-square viewBox (14 refs: add-appearance, compare, sync-view, chevrons, carets,
+  illustrations) were rendered stretched and top-aligned; now centred via a square viewBox like the browser. compare is fine
+  (1.30); add-appearance/sync-view were refit.
+- New scratch tools: sd.py NAME [size] [svg] (signed diff, best guide at 20 px; '+' = Onshape has ink we lack), ov.py
+  (continuous colour overlay), natsd.py (png refs at native size), livecmp.py (svg vs a live screenshot at 1x), scan.py
+  (contact sheets; SCAN_S/SCAN_C env), q.sh / try.sh (quick per-icon loop), copyin-r8.sh.
+- In-app check without touching the tree: bind-mount a merged icon dir over assets/icons in a private mount namespace
+  (/tmp/icons2/cap.sh TAG BIN DIR; kill only your own binary copy). context/r8-1..4: toolbars + instance list render right.
+- State of the < 3 sweep: ~95 icons in the r6 set are still >= 3. The rest are at a local optimum: the residual is
+  anti-aliasing / hairline differences, and sub-pixel nudges made every one I tried worse (hole, analysis-tools,
+  isoparametric, surface-body, stack-closest, config-show, mate-connector, composite-part beyond .8). Gains came only from
+  structural mismatches (wrong node shapes, missing elements, mask bugs, 1 px hairlines). PNG-ref icons are judged natively
+  (natsd.py): 16 were >= 3, mostly dithered live crops with a floor.
+- Next: keep scanning for structural mismatches (scan.py sheets), then the compact Configurations block in the app.
+
+## Round 9 (2026-10-21 ~20:30-, icons2 on Unbind; predecessor thread b7f0af4f)
+- Verified at takeover: copy-in #4 (49 files) and batch b2 (13 files, 17:13: drawing-styles, appearance, intersection-curve,
+  hole-table, realign-mate-dialog, jog, drawing-props, auxiliary/broken/section/projected-view-linked (hollow bracket
+  arrowhead), offset-surface, driven-dimension; copies in scratch r8-batches/b2) are in the tree; every changed icon file
+  matches a scratch copy (redraw/, r8/, r8-batches/). cursor.rs Windows "4" fix ((1,-5) instead of (3,-5)) is in.
+- **Hatch swatches clobbered and restored:** at 17:54 someone ran drawing-behaviour's ignored generator
+  (`cargo test -p noshape-model hatch_icons -- --ignored`, model/drawing/hatch_pat.rs:316), which rewrites all 54
+  `hatch-<g>-<i>.svg` from the .pat line families. hatch_pat.rs itself was unchanged, so this was a stray run. The
+  generated art scored mean 32.8 vs icons2's hand redraws 8.6 (none better) -> restored the 54 files from HEAD.
+  For the lead: ask drawing-behaviour to point that generator at a scratch dir (or drop it) so it can't overwrite the
+  redrawn swatches again.
+- auto-variable-reference refined: table row-gap cells are opaque white and the top cells opaque #999 (Onshape paints
+  them; visible on the Variable Studio header's #eaeaea), x stem widened at its lower right, balls/arm/check nudged.
+  Sprite score 4.32 -> 3.52; vs the live 1x crop (refs/icons2/auto-variable-reference-1x.png, on #eaeaea) 10.1 -> 7.9
+  (Onshape's own sprite: 4.8; the live capture is quantised to ~6 grey levels). White is fine: only drawn via
+  assets::icon (variable_studio.rs:853). New tools: tools/live1x.py NAME SVG [LIVE] [REF] (diff vs a 20x20 live crop on
+  its own background), tools/try2.sh (try.sh + live diff).
+- Gotcha: live crops of header icons sit on grey (#eaeaea), so transparent "white" faces in our art read darker than
+  Onshape's painted white there. Check the background before trusting a live diff.
+
+## Round 9b (2026-10-21 ~19:45-, icons2 on Stablecog; predecessor thread 084c1884)
+- Copy-ins (backups scratch r8/<name>.before.svg; copies r8-batches/b3..b5; guard test 2 passed after each):
+  * b3: body-draft 4.69->1.31, hole 5.47->3.66, end-cap 4.95->2.55, mutual-trim 6.99->3.49, hole-table 4.22->2.86
+    (hole-table: arrow halo only along the sides (apex touches the 7.5 line), tapered filled tail, mitred box corner,
+    1-unit lower-left polyline).
+  * b4: transform 4.10->2.61 (bottom curve now runs into the arrowhead like the top one, box path closed + 1.4 corner,
+    hexagon 9.25-17.75 / stroke .85), reset-default 4.58->1.28 (arrow base x 6, bigger x centred 10,11),
+    sheet-metal-end 4.81->2.79 (redrawn: 45deg mitred 2.5 check, 3.2 wide grey diagonal band, bend wedge),
+    sheet-metal-loft 4.50->2.54 (bottom = two straight segments with a rounded middle, outline 1.08), part-mesh 4.40->2.63.
+  * b5: split 4.39->2.94, frame-trim 4.18->1.85 (badge centre 5,15 r5 halo r6; x arms clipped flat to a 2.5-7.5 square),
+    cut-list 2.73->1.82 (chamfers H14.8 L18.5 5.2: on pixel centres), modify-fillet 4.09->3.92.
+- cursor.rs: Windows count "4" is now a hand-drawn open-top 4 (Onshape's Windows glyph: stem starts below the diagonal
+  with a slanted cut), Windows only; mac keeps the font glyph. Verified through the app's own dump path
+  (`DISPLAY=:115 NOSHAPE_SMOKE=1 NOSHAPE_CURSOR_DUMP=dir ns --demo-drawing`; needs --demo-drawing, and
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent avoids a 120 s portal stall): 52 files. Before the glyph change, vs
+  live icons2-win*: counts 3.5-3.9, the 4 4.17 (label region 3.54 vs 2.4 for other digits); prototype of the new 4
+  (tools/four.py, same SVG as cursor.rs): label 1.43 / whole 2.91. Re-dumped with a 20:35 build that contains it: count-4 vs live 2.91 / 2.85 (1x/2x, was 4.17 / 4.36), now the best
+  of the counts, offset (0,0) (tools/curcmp.py /tmp/icons2/curdump).
+  cargo check -p noshape clean after the edit (one warning in model/sheetmetal/flat_dxf.rs:132, not mine).
+- **Finding: the app rasterises icons at 2x and box-downsamples** (GPUI's svg scale factor): an in-app toolbar crop
+  matches ds2(resvg 40 px) at 1.0-1.2 mean diff, a direct 20 px resvg render at 6-8. Chrome (live) sits between the two
+  (Onshape sprite vs live: 1x 3.55 mean, ds2 3.59), so no GPUI change is needed, but **d40 predicts the in-app look best**;
+  1.01-stroke hairline tricks matter less in the app than at resvg 1x.
+- New scratch tools: applive.py NAME SVG LIVE (ours through the app path vs a 20x20 live crop; floor = Onshape's sprite,
+  same path), tbslots.py APPSHOT LIVESHOT (every toolbar slot app vs live at the same position; app and live toolbar
+  positions coincide), inapp.py, appshot.sh start|shot|stop (one app, killed only by its saved pid), curcmp.py, four.py.
+  Live toolbar crops: refs/icons2/<name>-tb-1x.png (from live/part-studio/00-new-doc-initial.png, y 48).
+- Hatch swatches: unchanged since round 9's restore (asb's generator output left alone).
+- b6: import 4.17->2.92 (DXF page: smaller arrowhead 5..13 apex 9,10, tapered tail, dog-ear = rounded outline, wider X),
+  dwt-template 4.06->1.90 (same page/arrow as import + W/T letters), dwg-insert 3.08->2.36 (same art as import, same ref),
+  curvature 3.41->1.91 (pointier arch). b7: create-partstudio-incontext 2.82->1.80 (smaller bottom chamfers).
+- Toolbar sweep app vs live (tbslots.py, same positions): Part Studio, sketch and assembly toolbars. After the copy-ins (in-app
+  crops vs live): split 6.44->4.26, frame-trim 8.67->6.18, cut-list 3.85->1.85, curvature 7.16->5.24, import 8.13->7.92,
+  modify-fillet 9.04->8.63, create-partstudio-incontext 4.66->2.63 (applive). Everything else in the three toolbars is
+  within ~1.5 of its floor. Left as is (tried, no gain): hole (ring size), gear-relation / rack-pinion (8-tooth params from
+  tools/gear.py, hand-picked sets all worse), parallel (live prefers the 1.15 blue line: pixel phase through the 2x path),
+  snap-mode (live crop is speckled, floor 7.4), boundary-surface, drawing-suggested-views (66 px tile, see r7).
+- Gotcha: a sprite-score gain can be a live loss for thin lines (parallel): check applive.py too when a live crop exists.
+
+## EXACT STATE (2026-10-21 ~21:05, icons2 on Stablecog)
+- No app or cargo of mine running. /tmp/icons2/ns-icons2 = 20:35 shared-target build (has the cursor change).
+- Tree: my files compile (cargo check -p noshape clean at 20:20). At 21:00 the shared tree failed in another agent's WIP
+  (model/custom/host/sheetmetal.rs:713 `fi` not found), not mine. Guard test (standalone rustc) 2 passed after every copy-in.
+- Files touched this round: crates/app/src/cursor.rs (Windows "4"), icons of batches b3-b7 (list above; backups in
+  scratch r8/*.before.svg, copies r8-batches/b3..b7). r8w/ is empty.
+- Next: drawing toolbar icons all match live by eye (checked in toolbar order vs live/drawing/08); remaining sprite >= 3
+  icons are at a local optimum or by design (see lists above). Further gains: other live screens with stable positions
+  (feature list, context menus via tools/menusweep.py) using applive.py; d40 is the best predictor of the in-app look.

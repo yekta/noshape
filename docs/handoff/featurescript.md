@@ -598,3 +598,98 @@ Live spec: behaviours.md "(8) Sheet metal table and flat view" (sm-090…105) an
 - Attributes now follow renamed entities (`CtxState::remap_attributes`, snapshots per attribute):
   definition vertices lost their association attributes when a flange renamed them, so Corner at
   a vertex failed (SHEET_METAL_RIP_NO_CORNER).
+
+## HANDOVER (21 Oct ~19:00 UTC, fs moves to another account) — exact state
+Main at d5745c9 had part of this; uncommitted on top (all compiling; clippy and tests were being re-run at
+handover, see the last line): host/mod.rs, host/query.rs, host/sheetmetal.rs, regen/context.rs,
+sheetmetal/flat.rs, tests/custom_features.rs, tests/sheetmetal_std.rs.
+
+### What works now (verified against live numbers)
+- std sheet metal through the FS host matches live exactly for: sm1–sm4 (CONVERT tray), sm7 (closed hem),
+  sm8 (tab), sm5/5b/5c/5d (partial flange bend reliefs OBROUND/RECTANGLE/TEAR), sm6/6c/6e/6f/6g (corner reliefs
+  SIMPLE/RECTANGLE/SIZED_ROUND-too-small/RECTANGLE/SIZED_RECTANGLE), G34 (qa5 SM1: 8511.4987 mm³, 24 faces).
+  All asserted in tests/custom_features.rs `std_sheet_metal_matches_onshape` (tests/fs/sm_harness.fs).
+- Built-in features through std (`custom/std_feature.rs`, opt-in): tests/sheetmetal_std.rs — G34 flanges exact,
+  and `flat_pattern_keeps_the_model_placement`: the std-built flat (live placement, bend lines at -0.2777 UP,
+  bounds -18.5553..60 × -18.5553..40) = live dom/qa5-sm-flat.dxf for those flanges. Tab-on-top-face test is
+  `#[ignore]` (not yet run green).
+- std reference probe: tests `std_features_match_onshape` asserts 19 live lines (dom/fs-stdref.txt).
+
+### Fixes made this round (all in host/, mine)
+- Transient ids: a cached id of an edge/vertex is re-checked when its body changed (`body_versions`,
+  `transient_versions` in CtxState::transient): names get reused after an op, the stale id pointed at another
+  edge (sm5's partial flange went onto the plate's right edge).
+- Attributes follow renamed edges/vertices of sheet bodies (`attr_snapshots`, `remap_attributes(changed)` after
+  each op, only for bodies the op changed; recomputed in FsContext::new). Definition vertices keep their
+  association attributes (Corner at a vertex works).
+- `@evCornerType` (sheetmetal.rs): NOT_A_CORNER / BEND_END / CLOSED_CORNER (≥2 bends + rip) / OPEN_CORNER;
+  returns transient id *strings* (std wraps them with qTransient).
+- qSplitBy for opSplitEdges (`CtxState::split_edges`), relief slots after a moved (INNER-aligned) bend edge
+  (`relief_tools` follows the short connector to the plate edge line).
+- Bridge for the app: `update_sheet_metal_geometry` now also stores `ctx.sheet_metal[part]` (SheetMetalData:
+  walls by definition face, bends with geometry + `ref_inner` = up as in the flat, rips) and
+  `ctx.sheet_metal_flats[part]` (FlatPattern from `flat_of`: walls' definition-plane faces + bend strips placed by
+  `unfold`, bend centre lines); `sheetmetal::flat_pattern_for` returns the std flat first
+  (`flat::flat_from_pieces`). Names renamed marker→feature after the op.
+
+### Not done / next steps, in order
+1. Verified at handover (19:10 UTC): `cargo clippy --locked -p noshape-model -p noshape-featurescript
+   --all-targets -- -D warnings` exit 0; custom_features 24 passed / 1 ignored (bench), sheetmetal_std 2 passed /
+   1 ignored (tab). The bridge (sheet_data, ctx.sheet_metal_flats) runs for every std-built part already (also from
+   custom features), but the built-in route is still off by default.
+2. Switch the std route on by default (std_feature.rs `STD_SHEET_METAL`), then fix what breaks: native-only tests
+   in tests/sheetmetal_frames.rs and tests/features_c.rs read native SheetMetalData details; rewrite them against
+   live numbers or set_std_sheet_metal(false) in that binary as an interim. Check the app (fab panel, DXF export,
+   drawing flat view: model/src/drawing/views.rs uses flat_pattern_for) on :108. This closes qa5 SM1/SM2/SM3 in
+   the app (lead's re-run still shows 8383.122 because the route is off).
+3. CLOSED corner (sm6h, G34a): runs now but 8541.2499 mm³ / 39 faces vs live 8535.0418 / 23 (G34a) — the
+   wrapped closed cut (`WrappedCut::Closed`, loft of 33 sections) leaves slivers (0.0283, 3e-4, 2e-4 mm² faces);
+   build the bend end as one ruled face (two sections suffice where a(w) is linear), and check the plate corner
+   chamfer prism. Live geometry: behaviours.md "G34" (a).
+4. ROUND corner relief (sm6b/6d) ~1e-4 relative off (bend faces +0.0004 mm², front flange +0.0014): check the
+   wrap mapping (per-fiber vs neutral) and loft accuracy.
+5. SM14 DXF: write AC1014 with live's 49-layer table (samples/qa5-sm-flat.dxf: LINEs on SHEETMETAL_CUT_LINES,
+   bend centre lines on SHEETMETAL_BEND_LINES_UP/DOWN (CENTER linetype), no TEXT); the flat to write is
+   `flat_pattern_for` (std flat). SM16: Tab dialog auto-fill = std's `sheetMetalTabEditingLogic` (run std editing
+   logic for std-backed built-ins like custom features do). SM12: pcbStart/pcbEnd via std + toolbar (ui).
+   SM13: remove "Export flat pattern (DXF)…" from the part menu (psb/ui; live has only the flat view menu).
+   SM7: per-vertex bend relief attributes (like `corner_overrides`).
+6. Eval speed: no local release builds (team rule); profile in debug with perf on `bench_std_regen`
+   (tests/custom_features.rs, ignored) or ask the lead for a CI perf job. Earlier flat profile: std
+   lex/parse/compile dominates but is once per process; interpreter SipHash on Arc<str> maps is the next target.
+7. App: Profile (Monitor ▾ › Profile) never checked on screen; ADV7/ADV6 (threads) are psb's with me.
+
+### Scratch
+/root/fs-scratch: live-areas.txt (live face areas per case), stdref-live.txt, freeze-1505-all.patch,
+backup-featurescript-*.md.
+
+## From asb (21 Oct night): drawing bend notes direction (qa5 DSM2 = your SM5)
+- The drawing flat view's bend notes take UP/DOWN from `FlatPattern.bend_lines[].up` (model/sheetmetal/flat.rs:300,
+  `b.is_up() != data.flip_direction_up`). qa5's sheet-metal drawing shows "DOWN 90°" where live shows "UP 90.0°", the
+  same inversion as SM5. The angle format ("90.0°") is fixed on my side; the direction is in the flat pattern data:
+  please check `up` against live when you fix SM5 (the std-route flat `flat_from_pieces` included). The drawing reads
+  it as is.
+
+## Session 21 Oct ~19:30 UTC (new fs, after handover) — state
+- Disk was 100% full at takeover; deleted stale (>60 min) test executables in /root/target-engine/debug/deps (20 GB).
+- **std route ON by default** (`custom/std_feature.rs`: `NOSHAPE_STD_SHEET_METAL=0` / `set_std_sheet_metal(false)` turns it off).
+- **Bridge fixes (host/sheetmetal.rs):**
+  - rolled bends (definition faces with a BEND joint: a Hem's arc, std `annotateHemSheets`) are strips: `rolled_strip`,
+    `Definition.rolled`, table bend kind Hem, unfolded across (`place_from`), flat strip + bend line;
+  - walls joined only by rips are separate parts (live G34d): the fused solid is split into connected solids, each its own
+    body (reusing `Definition.previous`, now all earlier parts), own `SheetMetalData` (walls re-indexed, rips to another part:
+    `b = usize::MAX`, `other` = that wall's reference face) and own flat (`unfold` places one root per part).
+- **sheetmetal_frames.rs** expectations moved to live: extruded L/U walls lose R (sm3: material outside the turn), flange
+  up = UP (G34 DXF), Finish needs "Sheet metal parts" (std).
+- **ADV7**: External thread "Split face" imprints the circle at the thread length (hole.rs `split_thread_face`); test in
+  features_a `external_thread_is_cosmetic` (3 → 4 faces, edge at z = 10).
+- **SM13**: "Export flat pattern (DXF/SVG)…" removed from both part context menus (menus.rs, mod.rs); live has it only in
+  the flat view's menu ("Export DXF/DWG of Flat pattern…", ui's panel).
+- **SM12**: `pcbStart` / `pcbEnd` feature types (features/sheetmetal.rs, schemas from pcbStart.fs / pcbEnd.fs) run by std,
+  in the Sheet metal ▾ list after Finish sheet metal model, icons pcb-start.svg / pcb-end.svg (own drawing), tool texts,
+  shortcuts list.
+- **SM14**: `sheetmetal::flat_dxf` (`FlatExport { insunits, version, bend_centerlines }`, `flat_dxf`, `flat_dwg`): AC1014,
+  live's 48-entry layer table with on/off/frozen and line types, LINEs on SHEETMETAL_CUT_LINES / SHEETMETAL_BEND_LINES_UP|DOWN.
+  The app's export_flat("dxf") uses it. ui: the "Export as DXF/DWG" dialog for the flat view should call `flat_dxf`/`flat_dwg`.
+  Curved outline pieces are still written as LINE segments (live probably ARCs; no live sample with arcs yet).
+- New tests: sheetmetal_std `hem_on_g34_matches_live` (9378.1835 / 33), `flat_dxf_is_written_as_live`.

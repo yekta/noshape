@@ -828,20 +828,7 @@ impl Sketch {
     /// Resolves a region id after edits: exact match first, otherwise the
     /// region whose boundary shares the most oriented entities.
     pub fn find_region(&self, id: &RegionId) -> Option<Region> {
-        let regions = self.regions();
-        if let Some(r) = regions.iter().find(|r| &r.id == id) {
-            return Some(r.clone());
-        }
-        let mut best: Option<(f64, usize)> = None;
-        for (i, r) in regions.iter().enumerate() {
-            let common = r.id.boundary.iter().filter(|s| id.boundary.contains(s)).count() as f64;
-            let union = (r.id.boundary.len() + id.boundary.len()) as f64 - common;
-            let score = if union > 0.0 { common / union } else { 0.0 };
-            if score > 0.0 && best.is_none_or(|b| score > b.0) {
-                best = Some((score, i));
-            }
-        }
-        best.map(|b| regions[b.1].clone())
+        find_region_in(&self.regions(), id)
     }
 
     /// The smallest region containing point `p` (region picking).
@@ -914,4 +901,22 @@ impl Sketch {
         }
         out
     }
+}
+
+/// [`Sketch::find_region`] over regions already computed (a sketch's
+/// regions are costly to build; callers resolving many ids keep them).
+pub fn find_region_in(regions: &[Region], id: &RegionId) -> Option<Region> {
+    if let Some(r) = regions.iter().find(|r| &r.id == id) {
+        return Some(r.clone());
+    }
+    let mut best: Option<(f64, usize)> = None;
+    for (i, r) in regions.iter().enumerate() {
+        let common = r.id.boundary.iter().filter(|s| id.boundary.contains(s)).count() as f64;
+        let union = (r.id.boundary.len() + id.boundary.len()) as f64 - common;
+        let score = if union > 0.0 { common / union } else { 0.0 };
+        if score > 0.0 && best.is_none_or(|b| score > b.0) {
+            best = Some((score, i));
+        }
+    }
+    best.map(|b| regions[b.1].clone())
 }

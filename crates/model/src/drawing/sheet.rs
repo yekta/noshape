@@ -136,6 +136,10 @@ pub struct SheetGeometry {
     pub cad: Vec<super::cad_layers::CadSpan>,
     /// Hatched sections, written as HATCH entities by the DXF / DWG export.
     pub hatches: Vec<super::cad_layers::HatchRegion>,
+    /// Element groups the DXF / DWG export writes as one object
+    /// (dimensions), and their elements (`cad_objects`).
+    pub cad_objects: Vec<super::cad_objects::CadObject>,
+    pub cad_members: Vec<super::cad_objects::CadMember>,
 }
 
 /// Chamfer dimension settings (Drawing properties › Dimensions › Chamfer).
@@ -1726,6 +1730,7 @@ impl SheetGeometry {
             let Some(c) = c else { continue };
             self.colors.push(ColorSpan { lines: l0..l1, texts: t0..t1, fills: f0..f1, rgb: c });
         }
+        self.add_cad_objects(&starts, end, env);
         // Callouts grouped with a dimension: at the upper right of its text.
         let (tn, ln) = (self.texts.len(), self.lines.len());
         let corner = |g: &Self, id: u64| {

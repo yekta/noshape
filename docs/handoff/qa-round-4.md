@@ -746,3 +746,79 @@ new F28 (Show errors defaults off), F29 (shortcuts dead after invalid dim value 
 Binary: /root/qa4-scratch/bin/noshape-cw2 (app run under `timeout 1800` by cwstart.sh). Perf leftover: release
 row-rebuild frames 5.75 ms on a 60-feature list (gpui per-element cost of ~14 rows); options for the lead: reuse
 row views at shifted positions (gpui-pre change) or slimmer feature rows (psb/ui row code).
+
+## STATE FOR THE NEXT qa4 (10-21 ~19:10, moving from the Ngyekta to the Motile account)
+
+**Read first:** this file's R7–R10 and this section, docs/parity/core-workflow.md (checklist + all runs), ARCHITECTURE.md
+"Performance rules". Scripts: /root/qa4-scratch (cwstart.sh, s.sh, measure3/4/5/6.sh, ft2.sh, frames.py, pixcmp.sh,
+rowexp.sh, keycpu.sh, prof2.sh). Test binaries live in /root/qa4-scratch/bin (symlinked from /tmp/qa4, which is RAM).
+Big test doc: /tmp/qa4/big/big.noshape (60 features; regenerate with noshape-cli batch /tmp/qa4/big/batch.jsonl if /tmp
+was wiped; the CLI is /root/target-engine/debug/noshape-cli). Rules learned today: no local release builds (CI only);
+fresh-profile runs with `FRESH=1 cwstart.sh` (deletes the whole HOME; `rm HOME/*` kept .config prefs → false F28);
+`pkill -f` only with anchored patterns (`^/tmp/qa4/noshape`), never a pattern from your own command line.
+
+**Uncommitted from qa4 in the tree right now:** docs only (this file, docs/parity/core-workflow.md additions). All code
+work (Assembly front layer, gpui-pre nested cached views, feature-list placeholders) is in main at 5d28447. The temporary
+row-cost experiment was removed at 19:05 (reference patch /root/qa4-scratch/row-exp2.patch, includes others' edits).
+
+**1. v0.4.5 release gate on 5d28447: FAIL** (sent to the lead 17:20; details in core-workflow.md):
+- ✗ F12 new path (psb): Feature pattern of a Hole after a Part pattern → sliver part + facets; editing Extrude 1 then
+  silently deletes Part 1. Repro in core-workflow.md.
+- ✗ F8 chamfer / F9 shell / F26 STEP "SOLID" products + OCC header (kern).
+- F27 footer OK in form; the hash in lead integration binaries is the stale /root/noshape-lead HEAD (told the lead).
+- F18 closed (live: also empty without material). F19 differs (live toast spec now in core-workflow.md; psb/ui).
+- F28 closed (my stale profile). F29 fixed. Everything else passes.
+**Next:** re-run the failed steps (3.5, 3.6, 3.12/4.1, 7.2, F19) when psb/kern report fixes, and the **whole checklist on
+every new integration binary** (copy /root/target-lead/debug/noshape after the lead's integrate; check its files equal
+the commit with `cd /root/noshape-lead && git diff --stat <commit> -- . ':!.github'`).
+
+**2. Slimmer feature rows (lead's decision; target < 4 ms in release on the 60-feature filter; look must stay
+pixel-identical, coordinate with ui (look) and psb (behaviour) via the lead — message_agent only reaches agents you
+started).** Findings so far (dev build, frames that rebuild rows, median UI CPU; caret-only frames ≈3.25):
+- normal 8.1 ms; without the rollback-drop marker, the tooltip-anchor canvas, the eye, the drag/drop listeners (all
+  four) 6.75 ms → those four parts are only ~1.4 ms. Individual parts are within noise (~0.3–0.9 each).
+- floor sweep done (19:05, /root/qa4-scratch/m-rowexp2.txt; binary /root/qa4-scratch/bin/noshape-exp built from
+  row-exp2.patch): normal ≈7.1, four parts off ≈7.1 (noise), **bare row** (also no icon, name, context menu) **≈4.9**
+  vs caret floor 3.25. So even bare rows leave ~1.6 ms dev (~1.3 release) → ≈4.3 ms release with the 3.0 floor:
+  **per-row slimming alone cannot reach < 4 ms**; the icon + name (which the look needs) are most of the slimmable
+  cost (~2.2 ms dev for ~14 rows). Reported to the lead in the move message.
+- Release ≈ 0.82 × dev for these frames (5.75 release vs 7.0 dev on the same tree), floor ≈ 3.0 ms release in the big doc.
+  So < 4 ms needs the row delta ≤ ~1 ms release (~1.2 ms dev): slimming the four parts alone can't reach it.
+**Next steps:** (a) wait for the lead's decision on the numbers above; options to put to them: fewer real rows (no overscan; overscan is
+2 rows now) + the cheap removals below, and/or cutting the per-frame floor (head: filter_features runs ~5×/frame,
+render_contexts_section walks every feature's params via referenced_contexts each frame: cache by studio revision).
+(b) Cheap, look-identical removals worth doing anyway: drop-marker child only while a drag is active
+(`cx.has_active_drag()`; a drag start refreshes the window), and replace the per-row tooltip-anchor canvas with one
+`on_children_prepainted` on the list (ui::with_lazy_side_tooltip is only used by feature rows). Verify with screenshots
+(rows normal / hover / selected / rolled back / suppressed / error / editing / rollback drag-over line) against the
+current build, pixel-identical, and re-measure with measure4.sh. Release numbers must come from CI (perf.yml has no
+typing bench yet: proposal to the lead pending: per-frame UI-CPU log in gpui-pre `Window::draw` under NOSHAPE_PERF=1 +
+a typing run in perf.yml).
+
+**3. Other open items:** perf leftovers (rows in release 5.75 ms on 60 features); proposal on CI typing bench; R6
+input-behaviour audit of ~220 sites (/root/qa4-scratch/input-inventory.md) is still to be redone against live's
+"Input behaviour" now that ui landed the shared field behaviour (most F-items above confirm it), one batched list to the
+lead.
+
+### R11 (10-21 ~19:30–, Motile account): feature-list row floor (lead's decision)
+Lead: do the cheap look-identical removals + cut the per-frame floor; keep the 2-row overscan; no gpui row-view reuse.
+Done in the tree (uncommitted, qa4):
+- `ListCache` in part_studio/mod.rs (`list_cache: RefCell<ListCache>`): `filtered(cx)` = filter_features once per
+  (query, display Weak ptr, document state); `referenced_contexts(cx)` (the walk over every feature's params) once per
+  document state. Both dropped on any `DocEvent` (top of the doc subscription). Users: list head, rows, the filter
+  box's Change handler (`filter_rows_changed`, `filter_rows` is now `Option<Rc<HashSet>>`), render_contexts_section,
+  shown_context_referenced.
+- Rollback drop marker built only while `cx.has_active_drag()` (a drag start refreshes the window: every row re-renders).
+- No per-row tooltip-anchor canvas: `ui::with_lazy_side_tooltip(row, anchor, text)`; a feature row's anchor asks the
+  list's ScrollHandle (`bounds_for_item(child ix) + offset()`, inset by the indent and the 5 px right margin for rows
+  in folders) when the tooltip opens. The row gets its `slot` (child index, indent) from render_feature_list.
+  (`on_children_prepainted` doesn't work on the list: with `track_scroll` gpui fills the handle's bounds instead.)
+- Found: the hollow blue drop circle (live part-studio/30) **never showed** (before too): gpui gives an element with
+  only `group_drag_over` styles no hitbox, so the style is never applied. NOSHAPE PATCH qa4 in gpui-pre div.rs
+  `should_insert_hitbox` (+ `group_drag_over_styles`).
+- Pixel check /root/qa4-scratch/rowcmp.sh (list, tooltip, selected, context menu, rollback drag-over, folder +
+  indented-row tooltip, big doc tooltip, scrolled tooltip): before vs after **0 differing pixels in all 8**.
+- Release reference from CI: the CI Linux artifact (ci.yml `cargo build --release`, with debug info, so the uprobe
+  scripts work on it) of d5745c9, /root/qa4-scratch/ci/d5745c9/noshape (`gh run download 39641518601 -n noshape-Linux-X64`).
+  measure4.sh on big.noshape: CI release 5.5–5.75 / 2.75 ms (rows / caret frames) vs dev "before" (19:32 tree) 8.0 / 3.25.
+- Scripts: no pkill any more (new rule): qkill.sh REGEX kills by PID (pgrep + kill).

@@ -40,3 +40,5 @@ behaviours.md "Frame rate"), so fps numbers below are for the perf owner, not a 
 | Extrude 1 10 → 12 | **1677416.68726529**, 806; total 1.03 s | 1677416.687, 806; **150 s** | ✅ geometry / ✗ PERF1 |
 | Regen time format | "617ms", and "**1.02s**" (2 decimals) at ≥ 1 s, in the Performance panel and the dialog footer | "438.4 ms" style (one decimal + space) | ✗ REG1 (format) |
 | Orbit (software rendering on both) | bracket 25.4 fps, big plate 1.3–1.5 fps (SwiftShader); WebGL context lost twice → "Onshape's WebGL rendering context has been lost. Refresh the browser…" | big plate: frame unchanged 0.75 s after mouse-up | – (not comparable) |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)

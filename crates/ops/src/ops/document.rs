@@ -121,7 +121,7 @@ pub fn ops() -> Vec<Op> {
             group: "tab",
             verb: "duplicate",
             summary: "Duplicate a tab",
-            description: "Tab › Duplicate: \"<name> (copy)\" right after it.",
+            description: "Tab › Duplicate: \"<name> Copy 1\" right after it.",
             fields: vec![doc_field(), req("tab", s(), "Tab name or id.")],
             mutates: true,
             destructive: false,
@@ -257,7 +257,8 @@ fn tab_rename(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if name.is_empty() {
         return Err(OpError::param("name", "must not be empty"));
     }
-    od.session.edit_document(&docedit::rename_tab_description(&name), |d| docedit::rename_tab(d, tab, &name))?;
+    // Onshape: a tab rename isn't undoable (qa5 TABS5).
+    od.session.edit_document_not_undoable(&docedit::rename_tab_description(&name), |d| docedit::rename_tab(d, tab, &name))?;
     Ok(json!({ "tab": tab.to_string(), "name": name }).into())
 }
 

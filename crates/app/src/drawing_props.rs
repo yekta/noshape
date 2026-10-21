@@ -163,6 +163,8 @@ impl DrawingEditor {
         show.push(MenuEntry::item(if shaded { "Hide shaded view" } else { "Show shaded view" }, move |t, _, cx| t.edit_view("Shaded view", id, cx, |v| v.style = if shaded { RenderStyle::HiddenLinesRemoved } else { RenderStyle::Shaded })));
         let threads = !v.hide_threads;
         show.push(MenuEntry::item(if threads { "Hide threads" } else { "Show threads" }, move |t, _, cx| t.edit_view("Threads", id, cx, |v| v.hide_threads = threads)));
+        let faulty = v.show_faulty;
+        show.push(MenuEntry::item(if faulty { "Hide faulty parts" } else { "Show faulty parts" }, move |t, _, cx| t.edit_view("Faulty parts", id, cx, |v| v.show_faulty = !faulty)));
         // Part views (not sketch views): the source's sketches and their points.
         if v.sketch.is_none() && !self.view_sketch_list(id).is_empty() {
             show.push(MenuEntry::item("Show/hide sketches...", move |t, _, cx| t.open_view_sketches(id, cx)));
@@ -190,7 +192,10 @@ impl DrawingEditor {
                 show.push(MenuEntry::item("Show/hide parts...", move |t, _, cx| t.open_hide_parts(id, cx)));
             }
             let com = v.show_com;
-            show.push(MenuEntry::item(if com { "Hide center of mass" } else { "Show center of mass" }, move |t, _, cx| t.edit_view("Center of mass", id, cx, |v| v.show_com = !com)));
+            // Flat patterns have no center of mass (live drawing/176).
+            if !v.flat {
+                show.push(MenuEntry::item(if com { "Hide center of mass" } else { "Show center of mass" }, move |t, _, cx| t.edit_view("Center of mass", id, cx, |v| v.show_com = !com)));
+            }
         }
         out.push(MenuEntry::Submenu("Show/hide".into(), show));
         // View orientation ▸ (base views; the current one is checked).

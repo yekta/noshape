@@ -1448,9 +1448,12 @@ impl<M: InputModeKind> TextElement<M> {
         icon_layout
     }
 
-    /// NOSHAPE PATCH: one marker per visible line that has diagnostics (the
-    /// most severe one's), 2 px into the gutter and centred on the line's
-    /// first row, built by the app's `GutterMarkerRenderer`.
+    /// NOSHAPE PATCH: Onshape's Feature Studio gutter (`makeGutterAnnotations`):
+    /// the visible lines with diagnostics, in line order, are numbered 0, 1, …
+    /// and the k-th one's marker (its most severe diagnostic's, its messages
+    /// as the tooltip) is drawn on the document's row k, not on its own line
+    /// (live: an error at 13:1 marks line 1; a warning and an error mark lines
+    /// 1 and 2). Built by the app's `GutterMarkerRenderer`.
     fn layout_gutter_markers(
         &self,
         origin_x: Pixels,
@@ -1460,6 +1463,7 @@ impl<M: InputModeKind> TextElement<M> {
         cx: &mut App,
     ) -> Vec<gpui::AnyElement> {
         use crate::input::DiagnosticSeverity as S;
+        type Notes = Vec<(S, gpui::SharedString)>;
         const MARKER: Pixels = px(16.);
         let Some(render) = cx.try_global::<crate::input::GutterMarkerRenderer>().map(|r| r.0.clone()) else {
             return Vec::new();
@@ -1470,27 +1474,29 @@ impl<M: InputModeKind> TextElement<M> {
             S::Info => 1,
             S::Hint => 0,
         };
-        let (rows, gutter_left): (Vec<(Pixels, S)>, Pixels) = {
+        let (rows, gutter_left): (Vec<(Pixels, S, Notes)>, Pixels) = {
             let state = self.state.read(cx);
             // The gutter starts the editor's left padding before the text bounds.
             let gutter_left = origin_x - state.editor_paddings.left;
             let Some(diagnostics) = state.mode.diagnostics().filter(|d| !d.is_empty()) else {
                 return Vec::new();
             };
-            // A diagnostic marks the line it starts on.
-            let mut worst = std::collections::HashMap::<usize, S>::new();
+            // A diagnostic belongs to the line it starts on; only lines on
+            // screen count (Onshape's `getAceLineIfOnScreen`).
+            let mut by_line = std::collections::BTreeMap::<usize, Notes>::new();
             for entry in diagnostics.iter() {
                 let line = state.text.offset_to_point(entry.range.start).row;
-                let slot = worst.entry(line).or_insert(entry.severity);
-                if rank(entry.severity) > rank(*slot) {
-                    *slot = entry.severity;
+                if last_layout.visible_buffer_lines.contains(&line) {
+                    by_line.entry(line).or_default().push((entry.severity, entry.message.clone()));
                 }
             }
+            let notes: Vec<Notes> = by_line.into_values().collect();
             let mut rows = Vec::new();
             let mut offset_y = last_layout.visible_top;
             for (line, buffer_line) in last_layout.lines.iter().zip(last_layout.visible_buffer_lines.iter()) {
-                if let Some(&severity) = worst.get(buffer_line) {
-                    rows.push((offset_y, severity));
+                if let Some(n) = notes.get(*buffer_line) {
+                    let worst = n.iter().map(|(s, _)| *s).max_by_key(|s| rank(*s)).unwrap_or(S::Info);
+                    rows.push((offset_y, worst, n.clone()));
                 }
                 offset_y += line.wrapped_lines.len() * last_layout.line_height;
             }
@@ -1498,8 +1504,9 @@ impl<M: InputModeKind> TextElement<M> {
         };
         let line_height = last_layout.line_height;
         rows.into_iter()
-            .map(|(offset_y, severity)| {
-                let mut marker = gpui::div().size(MARKER).flex().items_center().justify_center().child(render(severity, cx)).into_any_element();
+            .enumerate()
+            .map(|(k, (offset_y, severity, notes))| {
+                let mut marker = gpui::div().size(MARKER).flex().items_center().justify_center().child(render(k, severity, &notes, cx)).into_any_element();
                 let origin = point(gutter_left + px(2.), bounds.origin.y + offset_y + (line_height - MARKER).half());
                 marker.prepaint_as_root(origin, size(MARKER, MARKER).into(), window, cx);
                 marker

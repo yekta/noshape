@@ -1173,6 +1173,15 @@ pub fn limit_keys(t: MateType) -> &'static [&'static str] {
     }
 }
 
+/// A new mate's preview holds: every free value at zero, so the moving
+/// instance lands with its mate connector on the other one (Onshape brings
+/// the connectors together; qa5 A4: a flipped Slider turns the block over
+/// onto the plate instead of sliding it below). For
+/// [`SolveOptions::hold_values`].
+pub fn new_mate_holds(m: &super::Mate) -> Vec<(MateId, usize, f64)> {
+    mate_dofs(m.mate_type).iter().map(|(ix, _)| (m.id, *ix, 0.0)).collect()
+}
+
 /// Degrees of freedom of a mate type that can be driven (Animate, named
 /// positions): (free value index, Onshape `MateDOFType` label).
 pub fn mate_dofs(t: MateType) -> &'static [(usize, &'static str)] {

@@ -1020,3 +1020,72 @@ fn chamfer_distance_one_face_matches_onshape() {
     assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
     assert!((v - 7164.336354145117).abs() < 1e-6, "(i) {v}");
 }
+
+/// Live G46 (qa4 F8/F9): a 50 × 30 × 30 block, R3 fillets on the two top
+/// edges meeting at (50, 0, 30), a chamfer on the vertical edge between them,
+/// then Shell with the top removed; and the same with the chamfer first.
+/// Onshape's mass properties are approximate where fillets meet (G49: its
+/// own variance ±2.9 mm³; the exact mitred fillet is 44848.0752 against its
+/// 44848.2156), so volumes there are checked to 0.3 mm³; the chamfer's blend
+/// patch (G49) is checked against Onshape's faces in the kernel probe.
+#[test]
+#[ignore = "qa4 F8/F9 in progress (kern): chamfer 2 mm patch, shell cases"]
+fn chamfer_and_shell_on_filleted_box_match_onshape() {
+    fn face_count(t: &mut T) -> usize {
+        t.regen().context.bodies[0].shape.count(noshape_kernel::ShapeType::Face)
+    }
+    let mut bad = Vec::new();
+    let mut check = |t: &mut T, id: FeatureId, want: Result<(f64, usize), &str>, tol: f64, what: &str| {
+        let (st, msg, v) = status(t, id);
+        let n = face_count(t);
+        let ok = match want {
+            Ok((w, faces)) => st == FeatureStatus::Ok && (v - w).abs() <= tol && n == faces,
+            Err(m) => st == FeatureStatus::Error && msg.as_deref() == Some(m),
+        };
+        if !ok {
+            bad.push(format!("{what}: got {st:?} {msg:?} {v:.6} mm³ {n} faces, want {want:?}"));
+        }
+    };
+    let top_front = |i: &noshape_kernel::EdgeInfo| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9;
+    let top_right = |i: &noshape_kernel::EdgeInfo| (i.start.x - 0.05).abs() < 1e-9 && (i.end.x - 0.05).abs() < 1e-9 && (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9;
+    let corner = |i: &noshape_kernel::EdgeInfo| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && vertical(i) && (i.start.x - 0.05).abs() < 1e-9 && i.start.y.abs() < 1e-9;
+    let top_face = |t: &mut T| t.faces_where(|c| c.z > 29.999);
+    // Fillet, then chamfer, then shell.
+    let mut base = T::new();
+    base.block(50.0, 30.0, 30.0);
+    let edges = base.edges_where(|i| top_front(i) || top_right(i));
+    assert_eq!(edges.len(), 2);
+    let f = base.fillet(edges, "3 mm");
+    check(&mut base, f, Ok((44848.215635, 8)), 0.15, "fillet R3");
+    let c_edge = base.edges_where(corner);
+    assert_eq!(c_edge.len(), 1);
+    let mut t = base.fork();
+    let c = t.chamfer(c_edge.clone(), "5 mm");
+    check(&mut t, c, Err("Distance of chamfer on face too large."), 0.0, "chamfer 5 after fillet");
+    let mut t = base.fork();
+    let c = t.chamfer(c_edge.clone(), "2 mm");
+    check(&mut t, c, Ok((44789.850213, 10)), 0.3, "chamfer 2 after fillet");
+    for (th, want) in [("2.5 mm", Ok((13946.594771, 21))), ("1 mm", Ok((6052.696796, 21)))] {
+        let mut u = t.fork();
+        let top = top_face(&mut u);
+        let s = u.shell(top, th);
+        check(&mut u, s, want, 0.3, &format!("shell {th} after fillet + chamfer 2"));
+    }
+    // Chamfer 5 first, then the fillet, then shell.
+    let mut t = T::new();
+    t.block(50.0, 30.0, 30.0);
+    let c_edge = t.edges_where(corner);
+    let c = t.chamfer(c_edge, "5 mm");
+    check(&mut t, c, Ok((44625.0, 7)), 1e-3, "chamfer 5 first");
+    let edges = t.edges_where(|i| top_front(i) || top_right(i));
+    assert_eq!(edges.len(), 2);
+    let f = t.fillet(edges, "3 mm");
+    check(&mut t, f, Ok((44487.208465, 9)), 0.01, "fillet R3 after chamfer");
+    for (th, want) in [("2.5 mm", Err("Could not shell part with selections.")), ("1 mm", Ok((5990.519587, 20)))] {
+        let mut u = t.fork();
+        let top = top_face(&mut u);
+        let s = u.shell(top, th);
+        check(&mut u, s, want, 0.02, &format!("shell {th} after chamfer + fillet"));
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}

@@ -4,7 +4,7 @@
 //! keyboard hint at the bottom. ↑/↓ (or Tab) move the selection, Enter
 //! opens it, Esc closes the panel. With no search and no type filter the
 //! tab folders show (help: Document tabs › Searching and grouping tabs):
-//! folder menu Rename, Add selected to a folder, New folder, Unpack folder;
+//! folder menu Rename, Unpack, Move to document… (as the tab bar);
 //! Ctrl+click selects several tabs for Add selection to folder, Move to
 //! document… or Delete.
 
@@ -217,21 +217,6 @@ impl TabManager {
         }
     }
 
-    /// Folder › New folder: a folder inside it.
-    fn new_folder_in(&mut self, folder: TabId, window: &mut Window, cx: &mut Context<Self>) {
-        let mut made = None;
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_document("Create folder", cx, |d| {
-                let name = d.next_folder_name();
-                made = Some(d.add_folder(&name, Some(folder)));
-            });
-        });
-        self.collapsed.remove(&folder);
-        if let Some(f) = made {
-            self.start_rename(f, window, cx);
-        }
-    }
-
     fn unpack(&mut self, folder: TabId, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| doc.edit_document("Unpack folder", cx, |d| d.unpack_folder(folder)));
         cx.notify();
@@ -245,7 +230,7 @@ impl TabManager {
                 let name = st.read(cx).value().trim().to_string();
                 this.renaming = None;
                 if !name.is_empty() {
-                    this.doc.update(cx, |doc, cx| doc.edit_document(&format!("Rename tab : {name}"), cx, |d| d.rename_folder(folder, &name)));
+                    this.doc.update(cx, |doc, cx| doc.edit_document_not_undoable(&format!("Rename tab : {name}"), cx, |d| d.rename_folder(folder, &name)));
                 }
                 cx.notify();
             }
@@ -299,16 +284,15 @@ impl TabManager {
             }))
             .os_context_menu(move |menu, _, _| {
                 use crate::os_menu::OsMenuItem as I;
-                let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+                // Live (behaviours "Folders"): the tab bar's three items.
+                let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
                 menu.item(I::new("Rename").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.start_rename(id, w, cx))))
-                    .item(I::new("Add selected to a folder").on_click(move |_, w, cx| {
-                        v2.update(cx, |t, cx| {
-                            let ids = t.targets(id);
-                            t.add_to_new_folder(ids, w, cx)
-                        })
+                    .item(I::new("Unpack").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.unpack(id, cx))))
+                    .separator()
+                    .item(I::new("Move to document…").on_click(move |_, w, cx| {
+                        let doc = v3.read(cx).doc.clone();
+                        crate::doc_dialogs::move_to_document(doc, vec![id], w, cx)
                     }))
-                    .item(I::new("New folder").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.new_folder_in(id, w, cx))))
-                    .item(I::new("Unpack folder").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.unpack(id, cx))))
             })
             .into_any_element()
     }

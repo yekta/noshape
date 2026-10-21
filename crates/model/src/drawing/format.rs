@@ -118,6 +118,13 @@ fn finish(drawing: &Drawing, s: String, fixed: bool, tolerance: bool) -> String 
     if p.decimal_comma { s.replace('.', ",") } else { s }
 }
 
+/// An angle in degrees: Onshape's leading / trailing zero settings are for
+/// lengths only, so a set precision keeps its digits ("90.0°", DSM2).
+fn angle_number(drawing: &Drawing, deg: f64, precision: Option<u8>) -> String {
+    let s = format_number(deg, precision, 2);
+    if drawing.props.decimal_comma { s.replace('.', ",") } else { s }
+}
+
 /// A number with the dimension's precision, else the drawing's.
 fn number(drawing: &Drawing, v: f64, precision: Option<u8>, drawing_precision: Option<u8>, digits: usize, tolerance: bool) -> String {
     let p = precision.or(drawing_precision);
@@ -187,7 +194,8 @@ pub fn dim_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool, sym
     let p = &drawing.props;
     let num_with = |v: f64, tol: bool| -> String {
         if angular {
-            format!("{}°", number(drawing, v.to_degrees(), f.precision, if tol { p.angular_tolerance_precision } else { p.angular_precision }, 2, tol))
+            // Unset: Onshape's template defaults (0.1°, tolerances 0°).
+            format!("{}°", angle_number(drawing, v.to_degrees(), f.precision.or(if tol { p.angular_tolerance_precision.or(Some(0)) } else { p.angular_precision.or(Some(1)) })))
         } else {
             let u = length_units(drawing, f);
             unit_number(drawing, v, u, f.precision, if tol { p.tolerance_precision.or(p.precision) } else { p.precision }, tol)
@@ -576,9 +584,10 @@ mod tests {
         assert_eq!(format_len(&d, &f, 0.0254 * 0.5), ".5");
         d.props.decimal_comma = true;
         assert_eq!(format_len(&d, &f, 0.0254 * 1.25), "1,25");
-        // Angles use the angular precision.
+        // Angles use the angular precision; the zero settings are for
+        // lengths only (Onshape: "Length trailing zeros").
         d.props.angular_precision = Some(1);
-        assert_eq!(dim_text(&d, &f, std::f64::consts::FRAC_PI_4, true, "").main, "45°");
+        assert_eq!(dim_text(&d, &f, std::f64::consts::FRAC_PI_4, true, "").main, "45,0°");
         d.props.trailing_zeros = true;
         assert_eq!(dim_text(&d, &f, std::f64::consts::FRAC_PI_4, true, "").main, "45,0°");
     }
@@ -617,7 +626,8 @@ mod tests {
         assert_eq!(dim_text(&d, &f, 0.012, false, "Ø").main, "Ø12 H7/g6");
         let f = DimFormat { units: Some(DimUnits::Inch), show_units: true, ..Default::default() };
         assert_eq!(dim_text(&d, &f, 0.0254, false, "").main, "1 in");
-        assert_eq!(dim_text(&d, &DimFormat::default(), std::f64::consts::FRAC_PI_4, true, "").main, "45°");
+        // Unset angular precision: Onshape's 0.1°.
+        assert_eq!(dim_text(&d, &DimFormat::default(), std::f64::consts::FRAC_PI_4, true, "").main, "45.0°");
         assert!(dim_text(&d, &DimFormat { tolerance: Tolerance::Basic, ..Default::default() }, 0.01, false, "").boxed);
     }
 

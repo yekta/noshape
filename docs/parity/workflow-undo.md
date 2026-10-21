@@ -26,3 +26,5 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 | 9 | Undo tooltip | always "Undo (cmd+z/ctrl+z)" / "Redo (ctrl+y/shift+cmd+z)" | "Undo (cmd+z/ctrl+z)" | ✅ |
 | – | Stacks after a reload | cleared | not checked | ? |
 | – | Tab ops (rename, reorder, delete, duplicate) | not undoable | not checked | ? |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)

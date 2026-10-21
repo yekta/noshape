@@ -2399,6 +2399,27 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &
     g
 }
 
+/// The part seen at `p` (view coordinates) in a view with `frame`: the
+/// front-most body the line of sight through `p` meets (callouts clicked on
+/// a face or a silhouette, which have no model edge; qa5 D8).
+pub fn body_under(src: &SourceModel, frame: &ViewFrame, p: [f64; 2]) -> Option<BodyId> {
+    let at = frame.right * p[0] + frame.up * p[1];
+    let reach = src.context.bodies.iter().filter_map(|b| b.shape.bounding_box(false).ok()).map(|b| b.diagonal()).fold(0.0, f64::max) * 4.0 + 1.0;
+    let plane = Plane { origin: at, x_dir: frame.dir, normal: frame.right };
+    let ray = noshape_kernel::make_edge_2d(&plane, &Segment2d::Line { a: DVec2::new(-reach, 0.0), b: DVec2::new(reach, 0.0) }).ok()?;
+    let tol = reach * 1e-7;
+    src.context
+        .bodies
+        .iter()
+        .filter(|b| b.kind == BodyKind::Solid)
+        .filter_map(|b| {
+            let d = noshape_kernel::distance(&ray, &b.shape).ok()?;
+            (d.distance <= tol).then(|| (d.point_a.dot(frame.dir), b.id.clone()))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, id)| id)
+}
+
 /// Crop a parent view's geometry to a circle.
 fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: f64, poly: Option<&[[f64; 2]]>) -> ViewGeometry {
     let mut g = ViewGeometry { id, frame: parent.frame, origin: center, exact: parent.exact, error: parent.error.clone(), clip: Some((center, radius)), aligned: parent.aligned, ..Default::default() };

@@ -807,3 +807,31 @@ drw2's cad_export.rs). Check first: `cargo test -p noshape-model --lib drawing::
   drawing_insert.rs. Not yet done: Other documents tab content, the two document buttons, Import… footer, flat-pattern
   thumbnails (use the part's picture).
 - **D12** left to drw2 (they're in cad_export.rs); note left in drawing-verify.md.
+
+## asb 10-21 night (after the freeze): qa5 status
+- Integrated in 5d28447: D1–D4, D7, D9, D11 confirmed by qa5. D2 picker re-applied after the freeze (`drawing_chooser.rs`).
+- In the tree since (model drawing tests 115 green; app clippy waiting on others' model WIP):
+  - **D3 root cause**: serde_json was built without `float_roundtrip` (only sketch's dev-dependency had it), so a
+    document reloaded from the store (open, undo) had slightly different floats → new hashes → "Out of date".
+    Workspace Cargo.toml now enables it (no Cargo.lock change). Test `source_hashes_survive_a_store_round_trip`.
+  - **UNDO2**: `studio_changed` recomputes `out_of_date` over all unpinned sources (an undo back clears it).
+  - **D8 (pass 3)**: existing callouts without a ref / part find the part of the view edge at their anchor at render
+    time (`Env::part_at`, Env got `views`). Test `old_callout_on_an_edge_finds_its_part`.
+  - **D14**: `Sheet.scale_shown` (set by commit when the sheet has views, carried over by `reload`), SCALE shows the
+    sheet scale after its views are undone. Test `sheet_scale_stays_after_its_views_are_gone`.
+  - **D15**: DXF defaults ☑ z-height to zero, Units "Use drawing units" + live list. Test in drawing_export.rs.
+  - **DSM1**: chooser flat-pattern pictures are the flattened plate (`ThumbOf::Flat`: flat_pattern_for → extrude by
+    thickness → tessellate).
+  - **DSM2**: new drawings get Onshape's template precisions (`templates::template_precisions`: inch 0.123 / 0.1° /
+    fit 0.1234, no leading / trailing kept; mm 0.12 / 0.1° / fit 0.123, leading / no trailing); angles keep their
+    digits (zero settings are length-only) → "UP 90.0°". Tests `template_precisions_keep_the_angle_decimal`, format.rs.
+  - **DSM3**: Show/hide gets "Show faulty parts" (`DrawingView.show_faulty`, no effect yet: no faulty-part concept);
+    flat views have no center of mass.
+- Still open: D10 (re-check with qa5), D12 (drw2), D2 leftovers (Other documents, document buttons, Import…),
+  D6 (verify vs live).
+- **App checks (21 Oct late, build after d5745c9):** D2 picker (toolbar Insert view → empty Insert view panel + flyout,
+  filters, Part Studio 1 ▾ → Part 1 picture, choosing it opens the Insert view panel with the view on the cursor);
+  D8 (Callout clicked on a plain assembly edge → "1" with a dot leader); D5 (Auxiliary view, Esc, d → Dimension);
+  D7 (GTol: typed "0.1" lands in Tolerance at once, ✓ green); DSM3 Show/hide order with "Show faulty parts". Fixed
+  after: sheet tabs hide under the chooser; an empty filter result shows no "No Part Studios" message.
+  `cargo clippy --locked -p noshape --all-targets -- -D warnings` clean; model drawing tests 115 green.

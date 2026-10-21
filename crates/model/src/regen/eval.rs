@@ -590,7 +590,9 @@ impl<'a> EvalCtx<'a> {
     pub fn resolve_region(&self, sketch: FeatureId, key: &[u32]) -> Option<(Arc<SketchResult>, noshape_sketch::regions::Region)> {
         let s = self.ctx.sketch(sketch)?.clone();
         let id = decode_region_key(key)?;
-        let r = s.sketch.find_region(&id)?;
+        // The sketch's own regions: rebuilding them per reference made an
+        // extrude of 400 circles take minutes.
+        let r = noshape_sketch::regions::find_region_in(&s.regions, &id)?;
         Some((s, r))
     }
 
@@ -783,11 +785,33 @@ impl<'a> EvalCtx<'a> {
             let perf = super::display::perf_enabled();
             let t0 = std::time::Instant::now();
             // A newer edit stops the kernel boolean too (pending state).
-            let run = || k::boolean(op, std::slice::from_ref(&target.shape), &near_shapes, opts);
-            let res = match &self.cancel {
-                Some(c) => c.scope(run),
-                None => run(),
-            }?;
+            let run = |o: &k::BooleanOptions| {
+                let run = || k::boolean(op, std::slice::from_ref(&target.shape), &near_shapes, o);
+                match &self.cancel {
+                    Some(c) => c.scope(run),
+                    None => run(),
+                }
+            };
+            let mut res = run(opts)?;
+            // OCCT sometimes returns an empty cut, with no error, for a valid
+            // one (a hole running into a fillet, qa4 F12): never let a part
+            // vanish that way. Retry with a small fuzzy tolerance; if it still
+            // comes back empty, the feature fails instead.
+            if op == k::BooleanOp::Cut && target.kind == BodyKind::Solid && res.shape.count(ShapeType::Solid) == 0 && !tools_engulf(&target.shape, &near_shapes) {
+                let size = target.shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0);
+                let mut fixed = false;
+                for f in [1e-8, 1e-7, 1e-6] {
+                    let r = run(&k::BooleanOptions { fuzzy: size * f, ..*opts })?;
+                    if r.shape.count(ShapeType::Solid) > 0 {
+                        res = r;
+                        fixed = true;
+                        break;
+                    }
+                }
+                if !fixed {
+                    return Err(FeatureError::new(format!("Removing material failed on {}", target.name)));
+                }
+            }
             let t_bool = t0.elapsed();
             let mut args: Vec<ShapeNames> = vec![target.shape_names()];
             args.extend(near.iter().map(|&i| tools[i].names.clone()));
@@ -1077,4 +1101,12 @@ pub fn sweep_names(ev: &EvalCtx, profile: &Profile, res: &k::OpResult, start_cap
     }
     let empty = ShapeNames::default();
     ev.name_result(&[&empty], &res.history, &res.shape, &roles, None)
+}
+
+/// Whether the tools can account for a cut that leaves nothing of `target`
+/// (together at least its volume).
+fn tools_engulf(target: &Shape, tools: &[Shape]) -> bool {
+    let Ok(v) = target.volume() else { return true };
+    let t: f64 = tools.iter().filter_map(|t| t.volume().ok()).map(f64::abs).sum();
+    t >= v.abs() * (1.0 - 1e-6)
 }

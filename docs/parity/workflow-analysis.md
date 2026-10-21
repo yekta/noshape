@@ -46,3 +46,15 @@ Status: ✅ matches live/expected, ✗ differs (finding #), ? live data missing.
 | 2 | edge + Top row | readout still empty | ✗ AN1 |
 | 10 | Shift+X prompt | still "Select a plane, planar face, cylinder, or mate connector." | ✗ AN2 |
 | 13 | Click the "0 mm" offset box | **the click passes through to the plane under it: Right is deselected, the section disappears and the box goes away**; Enter (after typing) closed the dialog and no section stayed | ✗ AN3 (worse) |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| AN1 face/edge + Top readout | empty | ✗ still |
+| AN2 Shift+X prompt | no "cone," | ✗ still |
+| AN3 offset box | click passes to Plane 1, typed value ignored, Tab adds "Section plane 2 (Plane 1)" | ✗ still |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+| Row | Ours | Status |
+|---|---|---|
+| AN1 face + Top, edge + Top | "Parallel dist: 10.000 mm" for both | ✅ **fixed** |
+| AN2 Shift+X prompt | "Select a plane, planar face, cylinder, cone, or mate connector." | ✅ **fixed** |
+| AN3 offset box | click takes focus, typed 5 + Enter moves the section 5 mm, dialog stays open | ✅ **fixed** |

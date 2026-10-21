@@ -55,6 +55,9 @@ pub enum MenuIcon {
     Named(SharedString),
     /// A kit icon (single color).
     Kit(Box<Icon>),
+    /// A color swatch: 17 px, radius 2 (live menus/rmb-ps-featurelist-sketch:
+    /// "Edit sketch appearance…" shows the sketch's color).
+    Swatch(Hsla),
 }
 
 /// One row of an [`OsMenu`].
@@ -82,6 +85,14 @@ impl OsMenuItem {
     pub fn icon(mut self, icon: impl Into<Icon>) -> Self {
         if let Self::Item { icon: i, .. } | Self::Submenu { icon: i, .. } = &mut self {
             *i = Some(MenuIcon::Kit(Box::new(icon.into())));
+        }
+        self
+    }
+
+    /// A color swatch at the left instead of an icon.
+    pub fn swatch(mut self, color: Hsla) -> Self {
+        if let Self::Item { icon: i, .. } | Self::Submenu { icon: i, .. } = &mut self {
+            *i = Some(MenuIcon::Swatch(color));
         }
         self
     }
@@ -449,6 +460,7 @@ impl Render for OsMenu {
                     icon.as_ref().map(|i| match i {
                         MenuIcon::Named(n) => crate::assets::icon(n, icon_sz, cx).into_any_element(),
                         MenuIcon::Kit(k) => div().size(px(icon_sz)).flex().items_center().justify_center().child((**k).clone().with_size(px(12.)).text_color(pal.text)).into_any_element(),
+                        MenuIcon::Swatch(c) => div().size(px(icon_sz)).flex().items_center().justify_center().child(div().flex_none().size(px(17.)).rounded(px(2.)).bg(*c)).into_any_element(),
                     })
                 };
                 // "Label\tbeta": the label and a blue badge (live drawing/447:

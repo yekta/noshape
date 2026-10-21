@@ -11,7 +11,7 @@
 pub mod context;
 pub mod derived;
 mod display;
-pub use display::tessellate_shape;
+pub use display::{PART_COLORS, tessellate_shape};
 pub mod eval;
 pub mod features;
 pub mod implicit;
@@ -274,6 +274,15 @@ impl Regenerator {
                                     && let Some(s) = ev.ctx.sketch(f.id)
                                 {
                                     state.underdefined = s.report.dof.is_some_and(|d| d > 0);
+                                    // Live (qa5 SK1): a sketch that can't be solved is in
+                                    // error (red title and feature row), its geometry kept.
+                                    if !matches!(s.report.status, noshape_sketch::SolveStatus::Solved) {
+                                        state.status = FeatureStatus::Error;
+                                        state.message = Some(match &s.report.status {
+                                            noshape_sketch::SolveStatus::Failed { .. } => "Sketch could not be solved.".to_string(),
+                                            _ => state.message.clone().unwrap_or_else(|| "Sketch has conflicting constraints".into()),
+                                        });
+                                    }
                                 }
                                 state.computed = std::mem::take(&mut ev.computed);
                                 if uses_context {

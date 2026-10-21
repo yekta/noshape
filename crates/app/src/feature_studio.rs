@@ -297,12 +297,91 @@ pub struct Notice {
     pub info: bool,
 }
 
+/// Ace's notice tooltip (live document/fs-gutter-tooltip): `#f5f5f5`, 1 px
+/// `#dadada`, a row per notice with its icon and the message in the code font.
+fn ace_tooltip(notes: &[(gpui_kit::base::input::DiagnosticSeverity, SharedString)], cx: &App) -> Div {
+    use gpui_kit::base::input::DiagnosticSeverity as S;
+    let rows = notes.iter().map(|(severity, message)| {
+        h_flex()
+            .h(px(23.))
+            .gap(px(7.))
+            .child(crate::assets::icon(crate::fs_notices::notice_icon(*severity == S::Error, matches!(severity, S::Info | S::Hint)), 14., cx))
+            .child(message.clone())
+    });
+    v_flex()
+        .pl(px(18.))
+        .pr(px(6.))
+        .bg(rgb(0xf5f5f5))
+        .border_1()
+        .border_color(rgb(0xdadada))
+        .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.15), offset: point(px(1.), px(1.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }])
+        .text_size(px(13.))
+        .font_family(cx.theme().mono_font_family.clone())
+        .text_color(rgb(0x333333))
+        .whitespace_nowrap()
+        .children(rows)
+}
+
+/// The tooltip of a gutter marker: [`ace_tooltip`] beside the pointer.
+struct GutterTooltip {
+    at: Point<Pixels>,
+    notes: Vec<(gpui_kit::base::input::DiagnosticSeverity, SharedString)>,
+}
+
+impl Render for GutterTooltip {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        anchored().position(self.at + point(px(6.), px(14.))).snap_to_window_with_margin(px(4.)).child(ace_tooltip(&self.notes, cx))
+    }
+}
+
+/// Ace's gutter marker (live document/fs-gutter-*): the notice icon, 13 px,
+/// with the messages it stands for as Ace's tooltip.
+pub fn gutter_marker(index: usize, severity: gpui_kit::base::input::DiagnosticSeverity, notes: &[(gpui_kit::base::input::DiagnosticSeverity, SharedString)], cx: &App) -> AnyElement {
+    use gpui_kit::base::input::DiagnosticSeverity as S;
+    let notes = notes.to_vec();
+    div()
+        .id(("fs-gutter-marker", index))
+        .child(crate::assets::icon(crate::fs_notices::notice_icon(severity == S::Error, matches!(severity, S::Info | S::Hint)), 13., cx))
+        .tooltip(move |window, cx| {
+            let (at, notes) = (window.mouse_position(), notes.clone());
+            cx.new(|_| GutterTooltip { at, notes }).into()
+        })
+        .into_any_element()
+}
+
 /// Characters Ace's squiggle covers from a notice's 0-based column: the
 /// identifier or number starting there (live fs-squiggles-zoom8x: `f`, `x`,
 /// `undefinedThing`), else one character.
 fn squiggle_len(line: &str, column: usize) -> usize {
     let word = line.chars().skip(column).take_while(|c| c.is_alphanumeric() || *c == '_').count();
     word.max(1)
+}
+
+/// Where a notice's squiggle ends: past the token ([`squiggle_len`]), or for
+/// "Function f with n argument(s) not found" past the whole call, its
+/// arguments and closing parenthesis included, across lines (live qa5 FS2:
+/// the wavy underline spans `fCuboidX(...)`).
+fn squiggle_end(lines: &[&str], at: Position, message: &str) -> Position {
+    let line = lines.get(at.line as usize).copied().unwrap_or("");
+    let token = Position { line: at.line, character: at.character + squiggle_len(line, at.character as usize) as u32 };
+    if !(message.starts_with("Function ") && message.ends_with("argument(s) not found")) {
+        return token;
+    }
+    let (mut depth, mut row, mut col) = (0usize, token.line as usize, token.character as usize);
+    while let Some(text) = lines.get(row) {
+        for (i, c) in text.chars().enumerate().skip(col) {
+            match c {
+                '(' => depth += 1,
+                ')' if depth > 1 => depth -= 1,
+                ')' if depth == 1 => return Position { line: row as u32, character: i as u32 + 1 },
+                c if depth == 0 && !c.is_whitespace() => return token,
+                _ => {}
+            }
+        }
+        row += 1;
+        col = 0;
+    }
+    token
 }
 
 /// **Compile hook** (agent fs plugs the FeatureScript parser / checker in
@@ -594,28 +673,11 @@ impl FeatureStudioView {
             .into_any_element()
     }
 
-    /// Ace's tooltip over a squiggle (live document/fs-gutter-tooltip): `#f5f5f5`,
-    /// 1 px `#dadada`, the notice icon, the message in the code font.
+    /// Ace's tooltip over a squiggle (live document/fs-gutter-tooltip): see [`ace_tooltip`].
     fn render_diagnostic_tooltip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        use gpui_kit::base::input::DiagnosticSeverity;
         let at = self.hover_at?;
         let entry = self.editor.read(cx).hovered_diagnostic()?;
-        let (error, info) = (entry.severity == DiagnosticSeverity::Error, matches!(entry.severity, DiagnosticSeverity::Info | DiagnosticSeverity::Hint));
-        let tip = h_flex()
-            .h(px(23.))
-            .pl(px(18.))
-            .pr(px(6.))
-            .gap(px(7.))
-            .bg(rgb(0xf5f5f5))
-            .border_1()
-            .border_color(rgb(0xdadada))
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.15), offset: point(px(1.), px(1.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }])
-            .text_size(px(13.))
-            .font_family(cx.theme().mono_font_family.clone())
-            .text_color(rgb(0x333333))
-            .whitespace_nowrap()
-            .child(crate::assets::icon(crate::fs_notices::notice_icon(error, info), 14., cx))
-            .child(entry.message.clone());
+        let tip = ace_tooltip(&[(entry.severity, entry.message.clone())], cx);
         Some(deferred(anchored().position(at + point(px(6.), px(14.))).snap_to_window_with_margin(px(4.)).child(tip)).with_priority(2).into_any_element())
     }
 
@@ -728,8 +790,7 @@ impl FeatureStudioView {
                         set.reset(&text);
                         for n in notices.iter().filter(|n| n.line > 0) {
                             let at = Position { line: (n.line - 1) as u32, character: n.column.saturating_sub(1) as u32 };
-                            let len = squiggle_len(lines.get(n.line - 1).copied().unwrap_or(""), at.character as usize);
-                            let end = Position { line: at.line, character: at.character + len as u32 };
+                            let end = squiggle_end(&lines, at, &n.message);
                             set.push(Diagnostic::new(at..end, n.message.clone()).with_severity(if n.error {
                                 DiagnosticSeverity::Error
                             } else if n.info {
@@ -1824,6 +1885,15 @@ mod tests {
     }
 
     #[::core::prelude::v1::test]
+    fn a_missing_function_squiggle_covers_the_call() {
+        use gpui_kit::component::input::Position;
+        let src = ["    fCuboidX(context, id + \"cuboid1\", {", "            \"corner1\" : vector(0, 0, 0) * meter", "    });"];
+        let at = Position { line: 0, character: 4 };
+        assert_eq!(super::squiggle_end(&src, at, "Function fCuboidX with 3 argument(s) not found"), Position { line: 2, character: 6 });
+        assert_eq!(super::squiggle_end(&src, at, "Variable fCuboidX not found"), Position { line: 0, character: 12 });
+    }
+
+    #[test]
     fn squiggles_cover_the_token() {
         let line = "function f() { x = 1; } y = undefinedThing + 1;";
         assert_eq!(super::squiggle_len(line, 9), 1);

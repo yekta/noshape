@@ -28,12 +28,15 @@ pub struct InsertOpts {
     pub named: Option<(String, [[f64; 3]; 2])>,
     /// Insert a sketch of the source (a sketch view).
     pub sketch: Option<noshape_model::FeatureId>,
+    /// Another document's Part Studio / assembly (Other documents): the
+    /// view is pinned to that document's version (its reference key).
+    pub pinned: Option<PinnedVersion>,
 }
 
 /// The Insert view panel's starting values (as the app's `InsertViewState`).
 impl Default for InsertOpts {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, flat: false, sketch_appearances: false, model_annotations: true, asm_position: AsmPosition::Default, display_state: None, named: None, sketch: None }
+        Self { scale: None, simplification: Simplification::Auto, flat: false, sketch_appearances: false, model_annotations: true, asm_position: AsmPosition::Default, display_state: None, named: None, sketch: None, pinned: None }
     }
 }
 
@@ -102,7 +105,8 @@ impl SheetPick<'_> {
             let mut v = DrawingView { id, kind, position, scale: None, label: None, ..Default::default() };
             match parent {
                 Some(p) => {
-                    v.style = p.style;
+                    // Live: child views don't inherit shading.
+                    v.style = if p.style == RenderStyle::Shaded { RenderStyle::HiddenLinesRemoved } else { p.style };
                     v.show_tangent_edges = p.show_tangent_edges;
                     v.tangent_phantom = p.tangent_phantom;
                     v.show_centerlines = p.show_centerlines;
@@ -129,7 +133,7 @@ impl SheetPick<'_> {
                 v.display_state = o.insert.display_state.clone();
                 // All views of a part use the same version: a pinned
                 // reference pins the new view too.
-                v.pinned = self.drawing.sheets.iter().flat_map(|s| &s.views).find(|o| matches!(&o.kind, ViewKind::Base { source: s2, part: p2, .. } if s2 == source && p2 == part) && o.pinned.is_some()).and_then(|o| o.pinned.clone());
+                v.pinned = o.insert.pinned.clone().or_else(|| self.drawing.sheets.iter().flat_map(|s| &s.views).find(|o| matches!(&o.kind, ViewKind::Base { source: s2, part: p2, .. } if s2 == source && p2 == part) && o.pinned.is_some()).and_then(|o| o.pinned.clone()));
                 // View orientation › a named view: its camera.
                 if let Some((name, frame)) = &o.insert.named {
                     v.custom_frame = Some(*frame);

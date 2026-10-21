@@ -472,9 +472,11 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
     let mut inputs = face_shapes.clone();
     inputs.extend(caps.iter().cloned());
     let sewn = k::sew(&inputs, 1e-6, true).map_err(kerr("These faces can't be patterned (they don't bound a closed volume)"))?;
-    let solid = match sewn.shape.solids().into_iter().next() {
-        Some(s) if sewn.shape.count(ShapeType::Solid) == 1 => s,
-        _ => return err("These faces can't be patterned (they don't bound a closed volume)"),
+    // Separate closed pieces (a Hole at several points) make one tool.
+    let solid = match sewn.shape.count(ShapeType::Solid) {
+        0 => return err("These faces can't be patterned (they don't bound a closed volume)"),
+        1 => sewn.shape.solids().into_iter().next().ok_or_else(|| fe("These faces can't be patterned (they don't bound a closed volume)"))?,
+        _ => Shape::compound(&sewn.shape.solids()),
     };
     // Names: selected faces keep their names, caps are new.
     let mut names: Vec<Option<Name>> = vec![None; solid.count(ShapeType::Face)];
@@ -568,14 +570,10 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
         }
         return Ok(());
     }
-    let mut targets = ev.auto_scope(&tools);
-    if let Some(bi) = index_of_body(ev, seed)
-        && !targets.contains(&bi)
-    {
-        targets.push(bi);
-    }
-    targets.sort_unstable();
-    ev.boolean_into_with(&targets, tools, k::BooleanOp::Cut, &EvalCtx::many_tools_options())
+    // Onshape's face pattern only changes the body the faces are on: the
+    // copies of a hole on Part 1 never cut a part overlapping it (qa4 F12).
+    let Some(bi) = index_of_body(ev, seed) else { return Ok(()) };
+    ev.boolean_into_with(&[bi], tools, k::BooleanOp::Cut, &EvalCtx::many_tools_options())
 }
 
 /// Whether two boxes meet (within `tol`).

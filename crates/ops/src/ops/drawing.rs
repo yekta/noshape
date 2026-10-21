@@ -39,15 +39,15 @@ const DIMENSIONS: [(&str, DimTool, &str); 9] = [
     ("arc_length", DimTool::ArcLength, "one arc"),
 ];
 
-fn point() -> Value {
+pub(super) fn point() -> Value {
     json!({ "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 })
 }
 
-fn drawing_field() -> crate::registry::Field {
+pub(super) fn drawing_field() -> crate::registry::Field {
     req("drawing", s(), "Drawing tab, by name (\"Part 1 Drawing 1\") or id.")
 }
 
-fn sheet_field() -> crate::registry::Field {
+pub(super) fn sheet_field() -> crate::registry::Field {
     opt("sheet", json!({ "type": ["integer", "string"] }), "Sheet: number (1 = first) or name (\"Sheet1\"). Default: the sheet the drawing shows.")
 }
 
@@ -164,17 +164,17 @@ pub fn ops() -> Vec<Op> {
 
 // ------------------------------------------------------------ helpers
 
-fn point_value(v: &Value, param: &str) -> Result<[f64; 2], OpError> {
+pub(super) fn point_value(v: &Value, param: &str) -> Result<[f64; 2], OpError> {
     let a = v.as_array().filter(|a| a.len() == 2).ok_or_else(|| OpError::param(param, "a point is [x, y] in sheet mm"))?;
     let n = |i: usize| a[i].as_f64().ok_or_else(|| OpError::param(param, "numbers (sheet mm)"));
     Ok([n(0)?, n(1)?])
 }
 
-fn drawing_tab(od: &OpenDoc, a: &Args) -> Result<TabId, OpError> {
+pub(super) fn drawing_tab(od: &OpenDoc, a: &Args) -> Result<TabId, OpError> {
     doc::tab_of_kind(od.doc(), Some(a.str("drawing")?), "Drawing", |c| matches!(c, TabContent::Drawing(_))).map_err(|e| e.with_param("drawing"))
 }
 
-fn sheet_index(d: &Drawing, a: &Args) -> Result<usize, OpError> {
+pub(super) fn sheet_index(d: &Drawing, a: &Args) -> Result<usize, OpError> {
     match a.get("sheet") {
         None => Ok(d.active_sheet.min(d.sheets.len().saturating_sub(1))),
         Some(Value::Number(n)) => n.as_u64().filter(|n| (1..=d.sheets.len() as u64).contains(n)).map(|n| n as usize - 1).ok_or_else(|| OpError::param("sheet", &format!("sheet numbers are 1 to {}", d.sheets.len()))),
@@ -187,7 +187,7 @@ fn source_tab(od: &OpenDoc, a: &Args, name: &str) -> Result<TabId, OpError> {
     doc::tab_of_kind(od.doc(), Some(a.str(name)?), "Part Studio or Assembly", |c| matches!(c, TabContent::PartStudio(_) | TabContent::Assembly(_))).map_err(|e| e.with_param(name))
 }
 
-fn part_arg(a: &Args) -> Result<Option<noshape_model::BodyId>, OpError> {
+pub(super) fn part_arg(a: &Args) -> Result<Option<noshape_model::BodyId>, OpError> {
     match a.opt_str("part")? {
         None => Ok(None),
         Some(p) => match refs::parse_str(p) {
@@ -198,7 +198,7 @@ fn part_arg(a: &Args) -> Result<Option<noshape_model::BodyId>, OpError> {
 }
 
 /// Commit an edited drawing as the editor does ("<tab> :: <description>").
-fn commit(od: &mut OpenDoc, tab: TabId, sheet: usize, mut d: Drawing, description: &str) -> Result<(), OpError> {
+pub(super) fn commit(od: &mut OpenDoc, tab: TabId, sheet: usize, mut d: Drawing, description: &str) -> Result<(), OpError> {
     dr::finish_edit(&mut d, sheet);
     od.session.edit_tab(tab, description, |c| {
         if let TabContent::Drawing(x) = c {
@@ -283,11 +283,26 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if edges
                 && let (Some(pl), Some(g)) = (pl, m.geoms.get(&v.id))
             {
+                // Other drawn curves (circles seen at an angle, splines):
+                // their drawn points, at most 24 per edge.
+                let curve = |mi: usize| -> Option<Value> {
+                    let pts: Vec<[f64; 2]> = g.edges.iter().filter(|d| d.model == Some(mi as u32)).flat_map(|d| d.points.iter().copied()).collect();
+                    if pts.len() < 2 {
+                        return None;
+                    }
+                    let step = pts.len().div_ceil(24).max(1);
+                    let mut sampled: Vec<Value> = pts.iter().step_by(step).map(|p| pt(pl.to_sheet(*p))).collect();
+                    if !(pts.len() - 1).is_multiple_of(step) {
+                        sampled.push(pt(pl.to_sheet(pts[pts.len() - 1])));
+                    }
+                    Some(json!({ "type": "curve", "points": sampled }))
+                };
                 let list: Vec<Value> = g
                     .model_edges
                     .iter()
-                    .filter(|e| !e.seam)
-                    .filter_map(|e| match e.geom {
+                    .enumerate()
+                    .filter(|(_, e)| !e.seam)
+                    .filter_map(|(mi, e)| match e.geom {
                         EdgeGeom::Line { a, b } => Some(json!({ "type": "line", "a": pt(pl.to_sheet(a)), "b": pt(pl.to_sheet(b)) })),
                         EdgeGeom::Circle { center, radius, face_on: true, .. } => {
                             // Closed: no end vertices, or one seam vertex at both ends.
@@ -302,7 +317,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                             }
                             Some(c)
                         }
-                        _ => None,
+                        _ => curve(mi),
                     })
                     .collect();
                 j["edges"] = json!(list);
@@ -332,7 +347,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
     json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables })
 }
 
-fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {
+pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {
     let d = dr::drawing_of(od.doc(), tab).cloned().ok_or_else(|| OpError::not_found("the drawing tab is gone"))?;
     let m = SheetModel::build(&od.session, tab, d.clone(), sheet, &[]);
     let mut v = sheet_json(&m, edges);
@@ -483,7 +498,13 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
     let f = a.str("format")?;
     let format = DrawingFormat::ALL.into_iter().filter(|x| !x.raster() && !x.csv()).find(|x| x.label().eq_ignore_ascii_case(f)).ok_or_else(|| OpError::param("format", "PDF, DWG, DXF, DWT or SVG"))?;
-    let mut s = ExportSettings { format, ..Default::default() };
+    // DXF / DWG start at live's Version (Release 14 / 2000).
+    let version = match format {
+        DrawingFormat::Dxf => noshape_model::drawing::cad_export::DEFAULT_DXF,
+        DrawingFormat::Dwg => noshape_model::drawing::cad_export::DEFAULT_DWG,
+        _ => 0,
+    };
+    let mut s = ExportSettings { format, version, ..Default::default() };
     match a.opt_str("sheets")? {
         None | Some("all") => {}
         Some("current") => s.sheets = 1,

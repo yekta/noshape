@@ -115,7 +115,7 @@ impl Sketch {
 
     /// Points that coincide with `p`: itself plus points joined to it by
     /// coincident constraints (transitively).
-    fn joint_points(&self, p: EntityId) -> Vec<EntityId> {
+    pub fn joint_points(&self, p: EntityId) -> Vec<EntityId> {
         let mut pts = vec![p];
         let mut k = 0;
         while k < pts.len() {

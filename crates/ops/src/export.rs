@@ -246,7 +246,9 @@ fn deflection(s: &ExportSettings, parts: &[(String, k::Shape, [f32; 4])]) -> f64
 fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::Shape, [f32; 4])]) -> anyhow::Result<()> {
     match s.format {
         PartFormat::Step => {
-            let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, c)| k::ExportShape { shape: sh.clone(), name: Some(n.clone()), color: Some([c[0].powf(1.0 / 2.2), c[1].powf(1.0 / 2.2), c[2].powf(1.0 / 2.2)]) }).collect();
+            // Onshape writes the part colour's 8-bit sRGB values.
+            let srgb = |v: f32| crate::appearance::lin_to_srgb(v) as f32 / 255.0;
+            let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, c)| k::ExportShape { shape: sh.clone(), name: Some(n.clone()), color: Some([srgb(c[0]), srgb(c[1]), srgb(c[2])]) }).collect();
             let schema = if s.latest { k::StepSchema::Ap242 } else { [k::StepSchema::Ap242, k::StepSchema::Ap214, k::StepSchema::Ap203].get(s.version).copied().unwrap_or(k::StepSchema::Ap242) };
             let file_unit = if s.custom_units {
                 match UNITS[s.units].0 {

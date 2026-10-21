@@ -371,7 +371,7 @@ impl DrawingEditor {
         use noshape_scene::drawing_tools::{AuxOpts, DetailOpts, InsertOpts, SectionOpts, ViewOptions};
         let i = &self.insert;
         ViewOptions {
-            insert: InsertOpts { scale: i.scale, simplification: i.simplification, flat: i.flat, sketch_appearances: i.sketch_appearances, model_annotations: i.model_annotations, asm_position: i.asm_position, display_state: i.display_state.clone(), named: i.named.clone(), sketch: i.sketch },
+            insert: InsertOpts { scale: i.scale, simplification: i.simplification, flat: i.flat, sketch_appearances: i.sketch_appearances, model_annotations: i.model_annotations, asm_position: i.asm_position, display_state: i.display_state.clone(), named: i.named.clone(), sketch: i.sketch, pinned: i.pinned.clone() },
             aux: self.aux_dlg.as_ref().map(|d| AuxOpts { reverse: d.reverse, show_ref: d.show_ref, anchor: d.anchor, letter: self.aux_letter.clone() }),
             section: self.section_dlg.as_ref().map(|d| SectionOpts { cut_only: d.cut_only, flip: d.flip, depth_on: d.depth.is_some(), depth_value: d.depth_value, up_to: d.up_to, depth_ref: d.depth_ref.clone(), exclude: d.exclude.clone(), cut_from: d.cut_from }),
             detail: self.detail_dlg.as_ref().map(|d| DetailOpts { scale: d.scale, profile: d.profile.clone(), style: d.style, show_profile: d.show_profile, clip_border: d.clip_border, label: self.detail_label.clone() }),
@@ -926,9 +926,18 @@ impl DrawingEditor {
                     self.edit_sheet("Callout", cx, |s| s.annotations.push(Annotation { id, kind, position: c, ..Default::default() }));
                 }
             }
-            Tool::Balloon { anchor: Some(_) } => {
+            Tool::Balloon { anchor: Some(anchor) } => {
                 self.refresh_callout_values(cx);
-                if let Some(a) = self.pending_annotation() {
+                if let Some(mut a) = self.pending_annotation() {
+                    // Clicked on a face or a silhouette (no edge, no snap
+                    // point): the part on the line of sight (qa5 D8).
+                    if let AnnotationKind::Balloon { callout, .. } = &mut a.kind
+                        && callout.part.is_none()
+                        && anchor.r.is_none()
+                    {
+                        callout.part = self.pk().part_under(anchor.view, anchor.p);
+                        callout.on_face |= callout.part.is_some() && views::view_source(self.current_sheet(), anchor.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
+                    }
                     self.edit_sheet("Callout", cx, |s| s.annotations.push(a));
                     self.tool = Tool::Balloon { anchor: None };
                 }

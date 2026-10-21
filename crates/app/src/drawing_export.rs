@@ -106,7 +106,8 @@ const PDF_TEXT: [&str; 2] = ["Normal", "Selectable"];
 const DXF_TEXT: [&str; 3] = ["Export as text", "Explode into polylines (notes)", "Explode all into polylines"];
 const COLOR: [&str; 3] = ["Color", "Black and white", "Grayscale"];
 /// DXF Units: the drawing's, or another (INSUNITS code).
-const UNITS: [(&str, u8); 6] = [("Drawing units", 0), ("Millimeters", 4), ("Centimeters", 5), ("Meters", 6), ("Inches", 1), ("Feet", 2)];
+/// Live dialog-export-drawing-all-formats (DWG / DXF Units).
+const UNITS: [(&str, u8); 7] = [("Use drawing units", 0), ("Centimeter", 5), ("Foot", 2), ("Inch", 1), ("Meter", 6), ("Millimeter", 4), ("Yard", 10)];
 const OPTIONS: [&str; 3] = ["Download", "Download and store…", "Store file in a new tab"];
 
 /// The modal's settings.
@@ -133,7 +134,7 @@ pub struct ExportSettings {
 
 impl Default for ExportSettings {
     fn default() -> Self {
-        Self { format: DrawingFormat::Pdf, version: default_version(DrawingFormat::Pdf), sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: false, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false }
+        Self { format: DrawingFormat::Pdf, version: default_version(DrawingFormat::Pdf), sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: true, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false }
     }
 }
 
@@ -360,6 +361,8 @@ impl DrawingEditor {
             DrawingFormat::Dwg | DrawingFormat::Dxf => CAD_VERSIONS.get(s.version).map(|v| v.1),
             _ => None,
         };
+        // Shaded views (live: PDF embeds their picture, DXF keeps the edges).
+        let (shaded, shaded_sheet) = (self.shaded_exports(), self.sheet);
         let sources = self.sources.clone();
         let cache = self.cache.clone();
         let info = self.info.clone();
@@ -398,8 +401,13 @@ impl DrawingEditor {
                             color_mode: if f == DrawingFormat::Pdf || f.raster() { s.color as u8 } else { 0 },
                         };
                         let mut geo = export::prepare(&built.geometry, &opts);
-                        // PDF embeds decoded image pixels.
-                        if f == DrawingFormat::Pdf {
+                        if i == shaded_sheet && (f == DrawingFormat::Pdf || f == DrawingFormat::Svg || f.raster()) {
+                            for (pos, size, png) in &shaded {
+                                geo.images.insert(0, noshape_model::drawing::sheet::GeomImage { pos: *pos, size: *size, data_base64: noshape_model::sketch_feature::base64_encode(png).into(), rgb: None });
+                            }
+                        }
+                        // PDF and DWG / DXF (OLE2FRAME) embed decoded image pixels.
+                        if f == DrawingFormat::Pdf || f.cad() {
                             for im in &mut geo.images {
                                 im.rgb = crate::drawing_images::decode_rgb(&im.data_base64);
                             }
@@ -410,9 +418,10 @@ impl DrawingEditor {
                         DrawingFormat::Pdf => vec![(String::new(), export::to_pdf_pages_version(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), PDF_VERSIONS[s.version]))],
                         DrawingFormat::Dxf => match cad_version {
                             Some(v) => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dxf_version(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
-                            None => pages.iter().map(|(n, g)| (n.clone(), export::to_dxf_units(g, insunits).into_bytes())).collect(),
+                            // Release 11-12: the view geometry only (live).
+                            None => pages.iter().map(|(n, g)| (n.clone(), noshape_model::drawing::cad_export::to_dxf_r12(g, insunits).into_bytes())).collect(),
                         },
-                        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg(g, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+                        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg_file(g, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
                         // With the sheet formats, so Select a DWT gets them back exactly.
                         DrawingFormat::Dwt => {
                             let templates: Vec<noshape_model::drawing::dwt::SheetTemplate> = sheets.iter().filter_map(|i| drawing.sheets.get(*i)).map(noshape_model::drawing::dwt::SheetTemplate::of).collect();
@@ -479,7 +488,7 @@ fn rasterize(svg: &[u8], f: DrawingFormat, cx: &App) -> Result<Vec<u8>, String> 
 
 #[cfg(test)]
 mod tests {
-    use super::{CAD_VERSIONS, DWT_VERSIONS, DrawingFormat, PDF_VERSIONS, default_version, parse_sheet_range};
+    use super::{CAD_VERSIONS, DWT_VERSIONS, DrawingFormat, ExportSettings, PDF_VERSIONS, UNITS, default_version, parse_sheet_range};
 
     #[test]
     fn default_versions_are_onshapes() {
@@ -488,6 +497,9 @@ mod tests {
         assert_eq!(CAD_VERSIONS[default_version(DrawingFormat::Dwg)].0, "2000");
         assert_eq!(CAD_VERSIONS[default_version(DrawingFormat::Dxf)].0, "Release 14");
         assert_eq!(DWT_VERSIONS[default_version(DrawingFormat::Dwt)].0, "2013");
+        // qa5 D15: z-height to zero on, "Use drawing units".
+        assert!(ExportSettings::default().z_zero);
+        assert_eq!(UNITS[ExportSettings::default().units].0, "Use drawing units");
     }
 
     #[test]

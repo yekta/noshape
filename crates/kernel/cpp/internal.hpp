@@ -245,6 +245,18 @@ TopoDS_Shape mesh_shape(const std::vector<gp_Pnt>& nodes, const std::vector<std:
 // no text header: what JT embeds), and its faces in XT order (node ids).
 std::string parasolid_binary_body(const TopoDS_Shape& prepared, std::vector<TopoDS_Face>& faces);
 
+// A blend of some of a slab's edges for blend_in_slabs (`edges`: indices into
+// the edges given to it; `image` maps the part's sub-shapes into the slab):
+// the result and its history from the slab; false if it fails.
+using SlabBlend = std::function<bool(const TopoDS_Shape& slab, const std::vector<int>& edges,
+                                     const std::function<TopoDS_Shape(const TopoDS_Shape&)>& image,
+                                     TopoDS_Shape& out, occ::handle<BRepTools_History>& hist)>;
+// Blends of many edges far apart, slab by slab in parallel (boolean.cpp);
+// `reach` bounds how far a blend changes the part from its edge. False when
+// it doesn't apply or a slab fails.
+bool blend_in_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Edge>& edges, double reach, const SlabBlend& blend,
+                    TopoDS_Shape& out, occ::handle<BRepTools_History>& hist);
+
 // Convenience: build OpOut from args + output + optional history.
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,
                   const BRepTools_History* h);

@@ -72,3 +72,9 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | – | Switch to the holeblock tab | "Parts (0)" until a click (TAB1) | ✗ TAB1 |
 | – | `noshape-cli … | head` | CLI **panics** "failed printing to stdout: Broken pipe" | ✗ **API1** (minor) |
 | – | `tab_create kind="Part Studio"` (the kind document_info prints) | "unknown tab kind" (needs "partstudio"; the message doesn't list the valid kinds) | ✗ **API2** (minor) |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| I1 / IM2 | not re-run (no new CLI); UI import not repeated | – |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+| I1 g25-b SAT / X_T / STEP | 7585.978524 / 7583.000869 / 7582.713024 (live 7582.912205) | ✗ still |

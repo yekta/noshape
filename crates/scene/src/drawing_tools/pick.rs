@@ -69,7 +69,7 @@ impl<'a> SheetPick<'a> {
                 _ => None,
             },
             // Dimension-like tools only care about view edges.
-            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
                 Some(PickTarget::Edge { .. }) => Some(h),
                 _ => None,
             },
@@ -253,6 +253,14 @@ impl<'a> SheetPick<'a> {
             })
             .min_by(|a, b| a.0.total_cmp(&b.0))
             .map(|(_, b)| b)
+    }
+
+    /// The part under `p` (view coordinates): the front-most body on the
+    /// line of sight (faces and silhouettes).
+    pub fn part_under(&self, view: ViewId, p: [f64; 2]) -> Option<noshape_model::BodyId> {
+        let frame = self.geoms.get(&view)?.frame?;
+        let (key, _) = views::view_source(&self.drawing.sheets[self.sheet], view)?;
+        views::body_under(self.sources.get(&key)?, &frame, p)
     }
 
     pub fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {

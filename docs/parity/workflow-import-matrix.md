@@ -41,3 +41,8 @@ Findings: **IM1** (kern/fs) PVZ part names; **IM2** (kern) Parasolid imports of 
 | g26-revolved-spline.x_t | **1726.09834614350** | 1726.080764 (sat 1726.080718) | ✗ **IM2** (−0.018) |
 | pvz-shapes.pvz | Part Studio "**pvz-shapes parts**" + Assembly "**RootAssembly**" + BOM tab; parts **Cylinder 9407.778, Torus 1770.239, Cone 1569.177** (that order) + "Composite parts (1)" | one tab "pvz-shapes", Part 1 1569.18 (Cone), Part 2 1770.24 (Torus), Part 3 9407.78 (Cylinder) + "Composite part 1" (Surface) | ✗ IM1 (names, order, tab name, no RootAssembly/BOM) |
 | Import dialog options by type | STEP/x_t: appearances, material density, Y up, composite, join; SAT: no density; PVZ: no density, no join | UI dialog not re-checked this pass | ? |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+All 106 imports (impmatrix7.log) are identical to the 14:36 CLI run: I1 (g25-b SAT 7585.978524 / STEP 7582.713024 / X_T 7583.000869), IM1 (PVZ part names, no RootAssembly/BOM), IM2 (ktane 19377.868698 etc.), IM3 (zip: "Root assembly file not found") ✗ still.

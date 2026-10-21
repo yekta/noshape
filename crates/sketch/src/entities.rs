@@ -84,6 +84,11 @@ pub struct Entity {
     /// External (projected via "Use"/"Convert") geometry is fixed: the
     /// solver never moves it.
     pub external: bool,
+    /// Model geometry a dimension or constraint refers to: solved with the
+    /// sketch but not shown, picked or listed (Onshape creates no sketch
+    /// geometry for a dimension to a model edge; qa5 SK3).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reference_only: bool,
 }
 
 impl Entity {

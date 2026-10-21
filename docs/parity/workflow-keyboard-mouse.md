@@ -106,3 +106,23 @@ d / n (workflow 3) ✅; p Projected view ✅; Shift+D, Shift+R, Ctrl+M, Shift+H 
 | Shift+N on a part row | nothing (feature rows rename inline ✅) | ✗ KB1 |
 | Shift+I | Isolate dialog; planes stay fully visible | ✗ KB3 |
 | Right-drag 100 px left from Front (Shift+1) | ends ≈ 85° (view cube almost Right) vs live ≈ 55° | ✗ KB4 |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| KB1 Shift+N part row | nothing | ✗ still |
+| KB3 Isolate | default plane outlines fade (labels stay), Plane 1 stays opaque | ✗ still (partly fixed) |
+| KB4 right-drag 100 px | ≈85° | ✗ still |
+
+## KB4 settled (perf, 2026-10-21 17:57, same canvas size; /root/perf-scratch/kb4.sh, NOSHAPE_PERF `nav: rotate drag` log)
+Onshape (webgl `onDrag`): 2π·3 / canvas diagonal per px. Ours in a 1919×1079 window (live's): graphics area **1673×973 =
+live's canvas**; right-drag 100 px in 10 moves, held still, released: **55.80°** (live ≈55°). Same drag released while
+moving (< 50 ms, inertia ×0.77/frame): 61.35°. Our document window opens at 1440×900 → 1194×794 → **75.32°** held,
+≈83° with a quick xdotool release, which is qa5's ≈85°. So the rate is Onshape's; the difference was the window size
+(plus release inertia). ✅ KB4 (no change). Remaining: Onshape turns inertia off while the interactive frame rate is
+below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+| Row | Ours | Status |
+|---|---|---|
+| KB1 Shift+N on a part row | inline rename with the name selected | ✅ **fixed** |
+| KB3 Isolate | planes now hidden (live hides them too, ui/pn-900); **other parts stay fully opaque** (live: translucent); **Default geometry rows not greyed** (live grey) | ✗ still (partly) |
+| KB4 orbit rate | settled by perf 17:57 (rate = Onshape's per canvas diagonal) | ✅ |

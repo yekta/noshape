@@ -6,8 +6,10 @@ mod assembly;
 mod configuration;
 mod document;
 mod drawing;
+mod drawing_tools;
 mod export;
 mod feature;
+mod featurestudio;
 mod history;
 mod import;
 mod meta;
@@ -36,6 +38,7 @@ pub fn all() -> Vec<Op> {
     v.extend(configuration::ops());
     v.extend(assembly::ops());
     v.extend(drawing::ops());
+    v.extend(drawing_tools::ops());
     v.extend(parts::ops());
     v.extend(appearance::ops());
     v.extend(query::ops());
@@ -43,6 +46,7 @@ pub fn all() -> Vec<Op> {
     v.extend(render::ops());
     v.extend(export::ops());
     v.extend(import::ops());
+    v.extend(featurestudio::ops());
     v.extend(history::ops());
     v
 }

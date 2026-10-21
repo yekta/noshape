@@ -207,6 +207,11 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
         if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
             match noshape_model::native_assembly::read_assembly_zip(path) {
                 Ok(a) => assemblies.push(a),
+                // Onshape keeps the zip as a file tab and reports it.
+                Err(e) if e == noshape_model::native_assembly::STEP_IN_ZIP => {
+                    let msg = format!("{} was not translated. {e}", crate::workspace::import_names(path).1);
+                    doc.update(cx, |_, cx| cx.emit(DocEvent::Error(msg)));
+                }
                 Err(e) => doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Import failed: {}: {e:#}", path.display())))),
             }
             continue;
@@ -221,11 +226,15 @@ fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<Ta
             Err(e) => doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("Import failed: {}: {e:#}", path.display())))),
         }
     }
-    if read.is_empty() && assemblies.is_empty() {
+    // A file Onshape couldn't translate still gets its file tab.
+    if read.is_empty() && assemblies.is_empty() && !keep_files {
         return None;
     }
     let mut first = None;
-    let label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
+    let mut label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
+    if label.is_empty() {
+        label = paths.iter().map(|p| crate::workspace::import_names(p).1).collect::<Vec<_>>().join(", ");
+    }
     let mut errors: Vec<String> = Vec::new();
     let files: Vec<noshape_model::file_tab::FileTab> = if keep_files {
         paths.iter().filter_map(|p| Some(noshape_model::file_tab::FileTab::new(&crate::workspace::import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect()

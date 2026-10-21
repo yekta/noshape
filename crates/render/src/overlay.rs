@@ -46,14 +46,55 @@ pub struct Overlay {
 /// shapes and text masks (rasterized by GPUI once, at those offsets) are
 /// given relative to the rounded corner and only the corner moves with the
 /// camera.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Label {
     pub anchor: DVec3,
     pub offset: [f32; 2],
     /// Filled rectangles (x0, y0, x1, y1), device px from the corner.
     pub rects: Vec<([f32; 4], Rgba)>,
-    /// Text masks: top-left in device px from the corner, color.
+    /// GPUI box shadows and quads (rounded, bordered), device px from the
+    /// corner, drawn before the rectangles.
+    pub shadows: Vec<Shadow>,
+    pub quads: Vec<Quad>,
+    /// Text and icon masks: top-left in device px from the corner, color.
     pub masks: Vec<(Mask, [i32; 2], Rgba)>,
+    /// What the pointer finds over the label's quads and rectangles
+    /// ([`Overlay::label_at`]); `None`: not hit tested.
+    pub hit: Option<u64>,
+}
+
+/// A GPUI quad: a div's background and solid border, as GPUI's `fs_quad`
+/// draws it (signed distance antialiasing). Device px.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Quad {
+    /// (x0, y0, x1, y1).
+    pub bounds: [f32; 4],
+    pub corner_radius: f32,
+    pub background: Rgba,
+    pub border_width: f32,
+    pub border_color: Rgba,
+}
+
+/// A GPUI drop shadow (`BoxShadow`) as `fs_shadow` draws it: `bounds` is
+/// the element's bounds moved by the shadow's offset. Device px.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Shadow {
+    pub bounds: [f32; 4],
+    pub corner_radius: f32,
+    pub blur_radius: f32,
+    pub color: Rgba,
+}
+
+/// A quad or shadow for the GPU: frame device px, straight (not
+/// premultiplied) color; `params` = (corner radius, border width or blur
+/// radius, 0, 0).
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct QuadInstance {
+    pub bounds: [f32; 4],
+    pub color: [f32; 4],
+    pub border_color: [f32; 4],
+    pub params: [f32; 4],
 }
 
 /// Contours in world space, filled even-odd in one color (one GPUI path).
@@ -63,7 +104,8 @@ pub struct WorldFill {
     pub color: Rgba,
 }
 
-/// An alpha mask (text rasterized by the UI toolkit), 1 byte per pixel.
+/// An alpha mask (text or an icon rasterized by the UI toolkit), 1 byte
+/// per pixel.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Mask {
     pub width: u32,
@@ -72,6 +114,18 @@ pub struct Mask {
     /// Device pixels from the glyph's integer origin to the mask's top-left
     /// corner (see [`AxisLabel`]).
     pub offset: [i32; 2],
+    /// Texels per device pixel: 1 for text; 2 for icons, which GPUI
+    /// rasterizes at `SMOOTH_SVG_SCALE_FACTOR` and samples down onto
+    /// `ceil(size / 2)` pixels.
+    pub density: u32,
+}
+
+impl Mask {
+    /// The device pixels it covers.
+    pub fn drawn_size(&self) -> [u32; 2] {
+        let d = self.density.max(1);
+        [self.width.div_ceil(d), self.height.div_ceil(d)]
+    }
 }
 
 /// GPUI's horizontal sub-pixel glyph variants (`SUBPIXEL_VARIANTS_X`).
@@ -148,6 +202,9 @@ pub struct OverlayDraw {
     pub indices: Vec<u32>,
     /// Masks drawn after the triangles: (mask, top-left in device pixels, color).
     pub masks: Vec<(Mask, [i32; 2], Rgba)>,
+    /// Shadows and quads, drawn first (shadows, then quads).
+    pub shadows: Vec<QuadInstance>,
+    pub quads: Vec<QuadInstance>,
     /// Device-pixel bounds of everything drawn: (x0, y0, x1, y1).
     pub bounds: Option<[f32; 4]>,
 }
@@ -243,7 +300,47 @@ impl OverlayDraw {
     }
 }
 
+/// A model point in logical px of a frame (`view_proj`, `logical` size),
+/// or `None` behind the camera.
+fn project_px(view_proj: &DMat4, logical: DVec2, p: DVec3) -> Option<DVec2> {
+    let clip = *view_proj * DVec4::new(p.x, p.y, p.z, 1.0);
+    if clip.w <= 0.0 {
+        return None;
+    }
+    let ndc = clip.truncate() / clip.w;
+    Some(DVec2::new((ndc.x + 1.0) * 0.5 * logical.x, (1.0 - ndc.y) * 0.5 * logical.y))
+}
+
+/// A label's rounded corner in frame device px (GPUI's layout), or `None`
+/// behind the camera. In f32, as the owner computes the div's left and
+/// top; GPUI rounds the div's position in the window, the frame's corner
+/// is at the window origin (logical px) rounded the same way.
+fn label_corner(label: &Label, window_origin: [f32; 2], project: &impl Fn(DVec3) -> Option<DVec2>, dpr: f32) -> Option<[f32; 2]> {
+    let at = project(label.anchor)?;
+    let o = window_origin;
+    let round = |frame: f32, local: f32, off: f32| round_half_toward_zero((frame + local + off) * dpr) - round_half_toward_zero(frame * dpr);
+    Some([round(o[0], at.x as f32, label.offset[0]), round(o[1], at.y as f32, label.offset[1])])
+}
+
+/// The topmost hit-tested label of `labels` under `point` (logical px in
+/// the frame) with the frame's camera: where [`Overlay::build`] draws it,
+/// over its quads and rectangles (GPUI's hitbox is the div's bounds).
+pub fn label_at(labels: &[Label], window_origin: [f32; 2], view_proj: &DMat4, logical: DVec2, dpr: f32, point: DVec2) -> Option<u64> {
+    let project = |p: DVec3| project_px(view_proj, logical, p);
+    let (px, py) = (point.x as f32 * dpr, point.y as f32 * dpr);
+    labels.iter().rev().filter(|l| l.hit.is_some()).find_map(|label| {
+        let corner = label_corner(label, window_origin, &project, dpr)?;
+        let inside = label.quads.iter().map(|q| q.bounds).chain(label.rects.iter().map(|r| r.0)).any(|b| px >= corner[0] + b[0] && px < corner[0] + b[2] && py >= corner[1] + b[1] && py < corner[1] + b[3]);
+        inside.then_some(label.hit).flatten()
+    })
+}
+
 impl Overlay {
+    /// [`label_at`] over this overlay's labels.
+    pub fn label_at(&self, view_proj: &DMat4, logical: DVec2, dpr: f32, point: DVec2) -> Option<u64> {
+        label_at(&self.labels, self.window_origin, view_proj, logical, dpr, point)
+    }
+
     /// Whether there is nothing to draw.
     pub fn is_empty(&self) -> bool {
         self.world_fills.is_empty() && self.labels.is_empty() && self.view_cube.is_none()
@@ -253,14 +350,7 @@ impl Overlay {
     /// view-projection, `logical` the viewport size in logical pixels.
     pub fn build(&self, camera: &Camera, view_proj: &DMat4, logical: DVec2, dpr: f32) -> OverlayDraw {
         let mut out = OverlayDraw::default();
-        let project = |p: DVec3| -> Option<DVec2> {
-            let clip = *view_proj * DVec4::new(p.x, p.y, p.z, 1.0);
-            if clip.w <= 0.0 {
-                return None;
-            }
-            let ndc = clip.truncate() / clip.w;
-            Some(DVec2::new((ndc.x + 1.0) * 0.5 * logical.x, (1.0 - ndc.y) * 0.5 * logical.y))
-        };
+        let project = |p: DVec3| project_px(view_proj, logical, p);
         for fill in &self.world_fills {
             // A contour with a point behind the camera is dropped (like
             // the Part Studio's `in_plane_text`).
@@ -268,20 +358,29 @@ impl Overlay {
             out.fill(&polys, fill.color, dpr);
         }
         for label in &self.labels {
-            let Some(at) = project(label.anchor) else { continue };
-            // In f32, as the owner computes the div's left and top; GPUI
-            // rounds the div's position in the window, the frame's corner
-            // is at the window origin rounded the same way.
-            let o = self.window_origin;
-            let round = |frame: f32, local: f32, off: f32| round_half_toward_zero((frame + local + off) * dpr) - round_half_toward_zero(frame * dpr);
-            let corner = [round(o[0], at.x as f32, label.offset[0]), round(o[1], at.y as f32, label.offset[1])];
+            let Some(corner) = label_corner(label, self.window_origin, &project, dpr) else { continue };
+            let at = |b: [f32; 4]| [corner[0] + b[0], corner[1] + b[1], corner[0] + b[2], corner[1] + b[3]];
+            for sh in &label.shadows {
+                let b = at(sh.bounds);
+                let m = 3.0 * sh.blur_radius;
+                out.grow(b[0] - m, b[1] - m);
+                out.grow(b[2] + m, b[3] + m);
+                out.shadows.push(QuadInstance { bounds: b, color: sh.color, border_color: [0.0; 4], params: [sh.corner_radius, sh.blur_radius, 0.0, 0.0] });
+            }
+            for q in &label.quads {
+                let b = at(q.bounds);
+                out.grow(b[0], b[1]);
+                out.grow(b[2], b[3]);
+                out.quads.push(QuadInstance { bounds: b, color: q.background, border_color: q.border_color, params: [q.corner_radius, q.border_width, 0.0, 0.0] });
+            }
             for (r, color) in &label.rects {
                 out.rect([corner[0] + r[0], corner[1] + r[1], corner[0] + r[2], corner[1] + r[3]], *color);
             }
             for (mask, at, color) in &label.masks {
                 let top_left = [corner[0] as i32 + at[0], corner[1] as i32 + at[1]];
+                let [w, h] = mask.drawn_size();
                 out.grow(top_left[0] as f32, top_left[1] as f32);
-                out.grow((top_left[0] + mask.width as i32) as f32, (top_left[1] + mask.height as i32) as f32);
+                out.grow((top_left[0] + w as i32) as f32, (top_left[1] + h as i32) as f32);
                 out.masks.push((mask.clone(), top_left, *color));
             }
         }

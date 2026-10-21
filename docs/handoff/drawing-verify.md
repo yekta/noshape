@@ -228,8 +228,25 @@ Done (stage 1–3, model): `drawing/cad_layers.rs` (CadLayer kinds, names, line 
 aux / detail circle, annotations by kind `annotation_cad_layers`, tables, hole origin, sketch, images) and kept
 by `export::prepare`; cad_export.rs: live layer table / line types / text styles, MTEXT, curves via
 `drawing/cad_fit.rs` (`fit_curve`: circle / arc / ellipse within 1e-4 mm); R12 writer: same layers in capitals.
-Next: HATCH entities (section_segments loops + ANSI31), DIMENSION + *D blocks with Onshape dimstyles, GD&T etc.
-as INSERT *U blocks, ACAD_TABLE, one DXF with layouts per sheet, then compare with live request drw2 10-21 k.
+Done (stage 4, 21 Oct, against live drw2-k-dxf2018 / R14 / R12, request k): layer names "Visible" / "Hidden"
+in 2000+, capitals (+ DEFPOINTS) in R12–R14; live layer table order (`cad_export::LAYER_ORDER`); Defpoints only
+with dimensions; SECTION_JOG_LINES (broken-out profile, SPLINE). `drawing/cad_objects.rs`: `CadObject`s (set in
+`SheetGeometry::add_cad_objects` after the annotations, `add_cad_table`, `add_cad_spline`; members kept by
+`export::prepare`): DIMENSION (linear / radius / diameter / 3-point angular / ordinate, *D block with the drawn
+lines, SOLIDs, `\A1;` MTEXT in Onshape-Standard-Dimension, Defpoints POINTs; dimstyles Onshape-Standard$0/$2/$3/
+$4, Onshape-OrdinateStyle; DSTYLE xdata DIMLFAC = 1 / view scale), TOLERANCE for GD&T frames
+(Onshape-Standard-GTolerance, fields split by %%v), hole callout texts as INSERT of a *U block, tables as
+ACAD_TABLE over a *T block (2004+; INSERT before), images as OLE2FRAME "Paintbrush Picture" (BMP in
+\x01Ole10Native). POLYLINE instead of LWPOLYLINE (view edges 70 = 128). Drawing symbols in MTEXT as
+`{\fDrawing Symbols Sans|c0;…}` (no more stroked text). Note leaders on ANNOTATION_TEXT. Release 11-12:
+`cad_export::to_dxf_r12` / `r12_geometry` (view edges + sketch only, CIRCLE / ARC / LINE / POLYLINE, line types
+used + DASHED). Export dialog / ops: `CAD_VERSIONS`, `DEFAULT_DXF` (R14), `DEFAULT_DWG` (2000), `to_dxf_file` /
+`to_dwg_file`. Tests: cad_export::tests::*, drawing::tests::cad_export_dimensions_layers_and_r12_like_onshape.
+Still open: (1) all sheets in ONE file (model space side by side + a layout with VIEWPORT per sheet; the offset
+rule is unknown → request drw2 10-21 l); (2) per-kind text styles (Onshape-Standard-Fields / -NoteStyle with
+`{\pxql;…}` / -View-Label / -Hole-Tag / table row styles; one MTEXT per multi-line view label); (3) the
+remaining dimension types (chamfer, arc length, ordinate groups) and the _DotMediumOnshape leader-dot INSERTs;
+(4) the full live STYLE / DIMSTYLE tables.
 
 ## asb → drw2 (10-21, qa5 findings)
 - D12 (DXF entities / layer names): I see you're in model/drawing/cad_export.rs, so D12 is yours. I'm taking D11

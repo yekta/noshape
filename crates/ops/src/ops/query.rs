@@ -99,13 +99,17 @@ fn dir(d: DVec3) -> Value {
     json!([r6(d.x), r6(d.y), r6(d.z)])
 }
 
-fn find_part<'a>(bodies: &'a [std::sync::Arc<Body>], key: &str) -> Result<&'a Body, OpError> {
-    let r = refs::parse_str(key);
+/// A part by id or by the name the parts list shows (a renamed part's
+/// name included).
+fn find_part<'a>(r: &'a noshape_model::regen::RegenResult, key: &str) -> Result<&'a Body, OpError> {
+    let id = refs::parse_str(key);
+    let shown = |b: &Body| r.display.bodies.iter().find(|d| d.id == b.id).map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone());
+    let bodies = &r.context.bodies;
     bodies
         .iter()
-        .find(|b| matches!(&r, Some(Reference::Body(id)) if *id == b.id) || b.name == key || b.name.eq_ignore_ascii_case(key))
+        .find(|b| matches!(&id, Some(Reference::Body(i)) if *i == b.id) || shown(b) == key || shown(b).eq_ignore_ascii_case(key))
         .map(|b| &**b)
-        .ok_or_else(|| OpError::not_found(format!("no part `{key}`; parts: {}", bodies.iter().map(|b| format!("{} ({})", b.name, refs::body_id(&b.id))).collect::<Vec<_>>().join(", "))).with_param("part"))
+        .ok_or_else(|| OpError::not_found(format!("no part `{key}`; parts: {}", bodies.iter().map(|b| format!("{} ({})", shown(b), refs::body_id(&b.id))).collect::<Vec<_>>().join(", "))).with_param("part"))
 }
 
 fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -264,7 +268,7 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => None,
     };
     let bodies: Vec<&Body> = match a.opt_str("part")? {
-        Some(p) => vec![find_part(&r.context.bodies, p)?],
+        Some(p) => vec![find_part(&r, p)?],
         None => r.context.bodies.iter().map(|b| &**b).collect(),
     };
     let normal = match a.opt_array("normal")? {
@@ -402,7 +406,7 @@ fn mass(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let r = od.regenerate(tab, None)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
     let bodies: Vec<BodyId> = match a.opt_array("parts")? {
-        Some(list) => list.iter().enumerate().map(|(i, v)| v.as_str().ok_or_else(|| OpError::param(&format!("parts[{i}]"), "part id or name")).and_then(|s| find_part(&r.context.bodies, s).map(|b| b.id.clone()).map_err(|e| e.with_param(format!("parts[{i}]"))))).collect::<Result<_, _>>()?,
+        Some(list) => list.iter().enumerate().map(|(i, v)| v.as_str().ok_or_else(|| OpError::param(&format!("parts[{i}]"), "part id or name")).and_then(|s| find_part(&r, s).map(|b| b.id.clone()).map_err(|e| e.with_param(format!("parts[{i}]"))))).collect::<Result<_, _>>()?,
         None => Vec::new(),
     };
     let reference = match a.opt_str("reference")? {

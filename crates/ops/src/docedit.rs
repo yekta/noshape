@@ -75,10 +75,12 @@ pub fn duplicate_tab_description(name: &str) -> String {
     format!("Duplicate tab : {name}")
 }
 
-/// Tab › Duplicate: "<name> (copy)" right after the original.
+/// Tab › Duplicate: "<name> Copy 1" (the first free number; live qa5
+/// TABS2) right after the original.
 pub fn duplicate_tab(d: &mut Document, tab: TabId) -> Option<TabId> {
     let t = d.tab(tab)?.clone();
-    let id = d.add_tab(&format!("{} (copy)", t.name), t.content);
+    let name = (1..).map(|n| format!("{} Copy {n}", t.name)).find(|n| !d.tabs.iter().any(|t| t.name == *n)).expect("a free number");
+    let id = d.add_tab(&name, t.content);
     place_after(d, id, Some(tab));
     Some(id)
 }

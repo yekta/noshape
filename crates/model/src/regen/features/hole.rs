@@ -440,7 +440,9 @@ fn up_to_depth(ev: &EvalCtx, r: &Reference, s: DVec3, dir: DVec3) -> FResult<f64
 
 // ------------------------------------------------------------------ external thread
 
-/// Cosmetic external thread: validates the inputs, no geometry change.
+/// Cosmetic external thread: validates the inputs; with "Split face" (Blind,
+/// no undercut) the cylindrical face is split where the thread ends, as live
+/// (behaviours.md "External thread": 3 → 4 faces, area unchanged).
 pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities");
     if refs.is_empty() {
@@ -451,28 +453,32 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
         return err("The selected edges no longer exist");
     }
     let mut radius: Option<f64> = None;
+    // Per edge: body, circle centre and axis, and the thread's cylindrical face.
+    let mut threads: Vec<(BodyId, DVec3, DVec3, f64, usize)> = Vec::new();
     for (bi, ei) in edges {
         let e = ev.edge_shape(bi, ei)?;
-        match e.edge_curve()? {
-            k::Curve::Circle { radius: r, .. } => {
+        let (center, axis) = match e.edge_curve()? {
+            k::Curve::Circle { radius: r, center, axis, .. } => {
                 if let Some(r0) = radius
                     && (r0 - r).abs() > 1e-7
                 {
                     return err("All thread edges must have the same diameter");
                 }
                 radius = Some(r);
+                (center, axis.normalize())
             }
             _ => return err("Thread edges must be circular"),
-        }
+        };
         if !ev.ctx.bodies[bi].shape.edge_faces().ok().and_then(|ef| ef.get(ei).map(|f| f.len() == 2)).unwrap_or(false) {
             return err("Thread edges must be edges of a solid");
         }
-        let cyl = ev.ctx.bodies[bi].shape.ancestors(ShapeType::Edge, ei, ShapeType::Face).unwrap_or_default().into_iter().any(|fi| {
+        let cyl = ev.ctx.bodies[bi].shape.ancestors(ShapeType::Edge, ei, ShapeType::Face).unwrap_or_default().into_iter().find(|&fi| {
             ev.ctx.bodies[bi].shape.sub_shape(ShapeType::Face, fi).ok().and_then(|f| f.face_surface().ok()).is_some_and(|s| matches!(s, k::Surface::Cylinder { .. }))
         });
-        if !cyl {
+        let Some(cyl) = cyl else {
             return err("Thread edges must bound a cylindrical face");
-        }
+        };
+        threads.push((ev.ctx.bodies[bi].id.clone(), center, axis, radius.unwrap_or_default(), cyl));
     }
     let path = ht::complete_path(ht::TABLE_EXTERNAL_THREAD, ev.params.lookup("branchOfStandard"));
     if ht::table_values(ht::TABLE_EXTERNAL_THREAD, &path).is_none() {
@@ -481,5 +487,42 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("depthType", "Blind") && ev.length("threadDepth")? <= 0.0 {
         return err("Thread length must be positive");
     }
+    if ev.is("depthType", "Blind") && !ev.bool("addUndercut") && ev.bool("splitFace") {
+        let depth = ev.length("threadDepth")?;
+        for (id, center, axis, r, fi) in threads {
+            split_thread_face(ev, &id, center, axis, r, fi, depth)?;
+        }
+    }
+    Ok(())
+}
+
+/// Split the cylindrical face `fi` of body `id` by the circle `depth` from
+/// the thread's start edge (centre `center`, axis `axis`), measured into the
+/// face. A thread that reaches the face's far end leaves it whole.
+fn split_thread_face(ev: &mut EvalCtx, id: &BodyId, center: DVec3, axis: DVec3, r: f64, fi: usize, depth: f64) -> FResult<()> {
+    let Some(bi) = index_of_body(ev, id) else { return Ok(()) };
+    let body = ev.ctx.bodies[bi].clone();
+    let face = body.shape.sub_shape(ShapeType::Face, fi).map_err(kerr("Thread failed"))?;
+    // The face's extent along the axis from the start edge (signed).
+    let ts: Vec<f64> = face.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(|p| (p - center).dot(axis)).collect();
+    let far = ts.iter().copied().fold(0.0_f64, |a, t| if t.abs() > a.abs() { t } else { a });
+    if far.abs() <= depth + 1e-9 {
+        return Ok(());
+    }
+    let circle = k::make_circle(center + axis * depth.copysign(far), axis, r).map_err(kerr("Thread failed"))?;
+    let res = k::imprint(&body.shape, &[circle]).map_err(kerr("Thread failed"))?;
+    let res_solid = if body.kind == BodyKind::Solid { res.shape.solids().into_iter().next().unwrap_or(res.shape.clone()) } else { res.shape.clone() };
+    if res_solid.count(ShapeType::Face) <= body.shape.count(ShapeType::Face) {
+        return Ok(());
+    }
+    let empty = crate::naming::ShapeNames::default();
+    let names = ev.name_result(&[&body.shape_names(), &empty], &res.history, &res.shape, &BTreeMap::new(), None);
+    let names = res_solid
+        .faces()
+        .iter()
+        .map(|f| res.shape.index_of(f, ShapeType::Face).and_then(|i| names.get(i).cloned()).unwrap_or_else(|| std::sync::Arc::new(crate::reference::TopoName::face(ev.feature, Role::New(0)))))
+        .collect();
+    let names = dedup_names(ev, names);
+    ev.replace_body(bi, res_solid, names);
     Ok(())
 }

@@ -1160,7 +1160,6 @@ fn section_cap_hatch_follows_onshape() {
 /// base-only geometry shows fully up to blend 0.5 and fades out to 1,
 /// target-only geometry fades in to 0.5.
 #[test]
-#[ignore = "base-only at 0.75 is 7 off in blue (tolerance 6); compare mode isn't wired in the app yet; perf to fix"]
 fn compare_blend_follows_onshape() {
     let mut r = match Renderer::new() {
         Ok(r) => r,
@@ -1220,4 +1219,68 @@ fn compare_blend_follows_onshape() {
     assert!(near(shots[2].1, t1, 3.0) && near(shots[3].1, t1, 3.0), "target-only not full from 0.5: {:?} {:?}", shots[2].1, shots[3].1);
     let half: Vec<f32> = (0..3).map(|i| 0.5 * (t1[i] + shots[0].1[i])).collect();
     assert!(near(shots[1].1, [half[0], half[1], half[2]], 6.0), "target-only at 0.25: {:?}, want {half:?}", shots[1].1);
+}
+
+/// Label quads and shadows are drawn like GPUI draws a div with
+/// `.rounded(4).border_1().shadow_xs()` (overlay.wgsl `fs_quad` /
+/// `fs_shadow`): solid background inside, the full border color on the
+/// straight border, the rounded corner left out, a faint shadow below;
+/// and the pointer finds the label where it is drawn (`label_at`).
+#[test]
+fn label_quads_and_shadows_follow_gpui() {
+    use noshape_render::overlay::{Label, Overlay, Quad, Shadow};
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let scene = std::sync::Arc::new(Scene::default());
+    let cam = Camera::default();
+    let (w, h) = (400u32, 300u32);
+    let req = || FrameRequest { scene: scene.clone(), camera: cam, width: w, height: h, device_pixel_ratio: 1.0, style: Style::default(), invalidate_pick: false };
+    let frame = |r: &mut Renderer, seq: u64| {
+        r.submit_frame(8, seq, req()).unwrap();
+        loop {
+            r.wait_oldest();
+            if let Some(Completed::Frame { result, .. }) = r.collect().into_iter().next() {
+                return result.unwrap();
+            }
+        }
+    };
+    let plain = frame(&mut r, 1);
+    let (bg, border) = ([0xd9 as f32 / 255.0, 0xa5 as f32 / 255.0, 0x66 as f32 / 255.0, 1.0], [1.0, 0xc2 as f32 / 255.0, 0x0e as f32 / 255.0, 1.0]);
+    let label = Label {
+        anchor: cam.target,
+        offset: [-40.0, -11.0],
+        quads: vec![Quad { bounds: [0.0, 0.0, 80.0, 22.0], corner_radius: 4.0, background: bg, border_width: 1.0, border_color: border }],
+        shadows: vec![Shadow { bounds: [0.0, 1.0, 80.0, 23.0], corner_radius: 4.0, blur_radius: 2.0, color: [0.0, 0.0, 0.0, 0.05] }],
+        hit: Some(7),
+        ..Default::default()
+    };
+    let overlay = Overlay { labels: vec![label], ..Default::default() };
+    r.set_overlay(8, Some(std::sync::Arc::new(overlay.clone())));
+    let with = frame(&mut r, 2);
+    let px = |f: &Frame, x: u32, y: u32| -> [i32; 3] {
+        let o = ((y * w + x) * 4) as usize;
+        [f.bgra[o + 2] as i32, f.bgra[o + 1] as i32, f.bgra[o] as i32]
+    };
+    let (x0, y0) = (w / 2 - 40, h / 2 - 11);
+    let near = |a: [i32; 3], b: [i32; 3]| a.iter().zip(&b).all(|(p, q)| (p - q).abs() <= 1);
+    assert!(near(px(&with, x0 + 40, y0 + 11), [0xd9, 0xa5, 0x66]), "inside {:?}", px(&with, x0 + 40, y0 + 11));
+    assert!(near(px(&with, x0 + 40, y0), [0xff, 0xc2, 0x0e]), "top border {:?}", px(&with, x0 + 40, y0));
+    assert!(near(px(&with, x0, y0 + 11), [0xff, 0xc2, 0x0e]), "left border {:?}", px(&with, x0, y0 + 11));
+    // The corner pixel is outside the 4 px rounding: (almost) the frame.
+    let (c, p) = (px(&with, x0, y0), px(&plain, x0, y0));
+    assert!(c.iter().zip(&p).all(|(a, b)| (a - b).abs() <= 12), "corner {c:?} vs frame {p:?}");
+    // The shadow darkens the row under the box a little, nothing far away.
+    let (s, p) = (px(&with, x0 + 40, y0 + 22), px(&plain, x0 + 40, y0 + 22));
+    assert!(s.iter().zip(&p).all(|(a, b)| b - a >= 1 && b - a <= 12), "shadow {s:?} vs frame {p:?}");
+    assert_eq!(px(&with, x0 + 40, y0 + 40), px(&plain, x0 + 40, y0 + 40));
+    // Hit testing with the frame's camera.
+    let view_proj = cam.projection_matrix(w as f64 / h as f64, 1.0) * cam.view_matrix();
+    let logical = glam::DVec2::new(w as f64, h as f64);
+    assert_eq!(overlay.label_at(&view_proj, logical, 1.0, glam::DVec2::new(w as f64 / 2.0, h as f64 / 2.0)), Some(7));
+    assert_eq!(overlay.label_at(&view_proj, logical, 1.0, glam::DVec2::new(w as f64 / 2.0 + 41.0, h as f64 / 2.0)), None);
 }

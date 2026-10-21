@@ -32,6 +32,7 @@ pub mod mesh;
 pub mod ops;
 pub mod props;
 pub mod shape;
+mod step_out;
 pub mod surfacing;
 pub mod transform;
 

@@ -85,6 +85,8 @@ const REQUIRED: &[&str] = &[
     "sheetMetalCornerBreak",
     "sheetMetalJoint",
     "sheetMetalEnd",
+    "pcbStart",
+    "pcbEnd",
     // frames
     "frame",
     "frameTrim",

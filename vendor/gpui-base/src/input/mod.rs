@@ -59,11 +59,15 @@ pub struct CodeGutterMetrics {
 
 impl gpui::Global for CodeGutterMetrics {}
 
-/// NOSHAPE PATCH: the gutter marker of a line's most severe diagnostic (Ace's
-/// error / warning icon, 2 px into the gutter cell, centred on the line).
+/// NOSHAPE PATCH: a gutter marker (Ace's error / warning icon, 2 px into the
+/// gutter cell, centred on the line), given its index, the most severe
+/// severity and every (severity, message) it stands for, for its tooltip.
 /// Code editors draw none unless the app sets this global.
 #[derive(Clone)]
-pub struct GutterMarkerRenderer(pub std::rc::Rc<dyn Fn(DiagnosticSeverity, &gpui::App) -> gpui::AnyElement>);
+pub struct GutterMarkerRenderer(pub std::rc::Rc<GutterMarkerFn>);
+
+/// NOSHAPE PATCH: see [`GutterMarkerRenderer`].
+pub type GutterMarkerFn = dyn Fn(usize, DiagnosticSeverity, &[(DiagnosticSeverity, gpui::SharedString)], &gpui::App) -> gpui::AnyElement;
 
 impl gpui::Global for GutterMarkerRenderer {}
 

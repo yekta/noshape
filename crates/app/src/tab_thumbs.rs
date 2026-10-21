@@ -148,7 +148,8 @@ impl Render for TabCard {
             .child(div().absolute().top(px(CARD_H - 2.)).left(px(CARD_W * 0.5 - 9.)).child(crate::assets::icon("tab-card-notch", 16., cx)));
         let a = self.anchor;
         let at = point(a.center().x - px(CARD_W * 0.5), a.top() - px(10. + CARD_H));
-        div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(card)))
+        // Not while a tab is dragged (live qa5 TABS1).
+        div().when(!crate::os_menu::is_open(cx) && !cx.has_active_drag(), |d| d.child(anchored().position(at).snap_to_window().child(card)))
     }
 }
 

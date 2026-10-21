@@ -381,6 +381,9 @@ pub struct DrawingView {
     /// Show/Hide threads (cosmetic threads of tapped holes; shown by default).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hide_threads: bool,
+    /// Show/hide › Show faulty parts (parts whose features failed).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub show_faulty: bool,
     /// Adjust linestyle: edges drawn in their own style.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub edge_styles: Vec<EdgeStyle>,
@@ -612,6 +615,7 @@ impl Default for DrawingView {
             hide_bend_lines: false,
             hide_bend_notes: false,
             hide_threads: false,
+            show_faulty: false,
             edge_styles: Vec::new(),
             hidden_edges: Vec::new(),
             sketch_appearances: false,
@@ -2056,6 +2060,11 @@ pub struct Sheet {
     /// (None: Custom / a built-in template).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dwt: Option<String>,
+    /// The sheet has had a view: its scale shows in the title block from then
+    /// on, even when the views are undone or deleted (qa5 D14; "----" only
+    /// before the first view, live 820).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub scale_shown: bool,
 }
 
 /// Where zone labelling starts (Custom template › Start zones): numbers
@@ -2294,7 +2303,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None, scale_shown: false }
     }
 }
 
@@ -3379,6 +3388,7 @@ pub mod create;
 pub mod cad_export;
 pub mod cad_fit;
 pub mod cad_layers;
+pub mod cad_objects;
 pub mod sheet_sketch;
 pub mod hatch_pat;
 pub mod imported;

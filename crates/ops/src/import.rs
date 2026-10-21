@@ -151,8 +151,9 @@ pub struct ImportInputs {
 }
 
 impl ImportInputs {
+    /// Nothing to add: no translation and no file tab.
     pub fn is_empty(&self) -> bool {
-        self.read.is_empty() && self.assemblies.is_empty()
+        self.read.is_empty() && self.assemblies.is_empty() && self.files.is_empty()
     }
 }
 
@@ -167,6 +168,8 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
         if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
             match noshape_model::native_assembly::read_assembly_zip(path) {
                 Ok(a) => assemblies.push(a),
+                // Onshape keeps the zip as a file tab and reports it.
+                Err(e) if e == noshape_model::native_assembly::STEP_IN_ZIP => errors.push(format!("{} was not translated. {e}", import_names(path).1)),
                 Err(e) => errors.push(format!("Import failed: {}: {e:#}", path.display())),
             }
             continue;
@@ -181,7 +184,10 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
             Err(e) => errors.push(format!("Import failed: {}: {e:#}", path.display())),
         }
     }
-    let label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
+    let mut label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
+    if label.is_empty() {
+        label = paths.iter().map(|p| import_names(p).1).collect::<Vec<_>>().join(", ");
+    }
     let files = if keep_files { paths.iter().filter_map(|p| Some(FileTab::new(&import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect() } else { Vec::new() };
     (ImportInputs { read, assemblies, files, label }, errors)
 }

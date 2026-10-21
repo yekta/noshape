@@ -18,7 +18,11 @@ fn asm_field() -> crate::registry::Field {
     opt("tab", s(), "Assembly tab, by name or id. Default: the first Assembly.")
 }
 
-const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name, \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin. Optional \"flip\": true flips that connector's primary axis.";
+mod features;
+mod more;
+mod positions;
+
+const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name, \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis.";
 
 pub fn ops() -> Vec<Op> {
     let connector = json!({ "type": "object" });
@@ -134,14 +138,19 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "assembly",
             verb: "delete",
-            summary: "Delete instances or mates",
+            summary: "Delete instances, mates or other assembly features",
             description: "",
-            fields: vec![doc_field(), asm_field(), opt("instances", strings(), "Instance ids or names."), opt("mates", strings(), "Mate ids or names.")],
+            fields: vec![doc_field(), asm_field(), opt("instances", strings(), "Instance ids or names."), opt("mates", strings(), "Mate, relation, group, mate connector or pattern ids or names (a pattern takes its instances with it).")],
             mutates: true,
             destructive: true,
             run: delete,
         },
     ]
+    .into_iter()
+    .chain(more::ops())
+    .chain(features::ops())
+    .chain(positions::ops())
+    .collect()
 }
 
 fn mate_type_id(t: MateType) -> String {
@@ -203,6 +212,7 @@ fn find_mate(a: &Assembly, key: &str) -> Result<MateId, OpError> {
         .find(|m| Some(m.id) == by_id || m.name == k)
         .map(|m| m.id)
         .or_else(|| a.relations.iter().find(|r| Some(r.id) == by_id || r.name == k).map(|r| r.id))
+        .or_else(|| more::find_feature(a, k))
         .ok_or_else(|| OpError::not_found(format!("no mate `{key}`")).with_param("mates"))
 }
 
@@ -247,7 +257,8 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
             json!({ "id": format!("mate:{}", m.id.0), "name": m.name, "type": mate_type_id(m.mate_type), "a": format!("inst:{}", m.a.instance.0), "b": format!("inst:{}", m.b.instance.0), "ok": st.map(|s| s.ok), "message": st.and_then(|s| s.message.clone()), "suppressed": m.suppressed })
         })
         .collect();
-    Ok(json!({ "units": units_json(&units), "instances": instances, "mates": mates, "dof": r.solved.dof, "converged": r.solved.converged }))
+    let (named_positions, exploded_views) = positions::json(a);
+    Ok(json!({ "units": units_json(&units), "instances": instances, "mates": mates, "patterns": more::patterns_json(a), "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
 }
 
 fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -415,6 +426,10 @@ fn parse_connector(a: &Assembly, od: &OpenDoc, tab: TabId, v: &Value, field: &st
     let o = v.as_object().ok_or_else(|| OpError::param(field, CONNECTOR_DOC))?;
     let mut c = if o.get("origin").and_then(Value::as_bool) == Some(true) {
         MateConnectorRef::origin()
+    } else if let Some(k) = o.get("connector").and_then(Value::as_str) {
+        // An assembly mate connector (assembly_mate_connector).
+        let mc = a.connectors.iter().find(|c| c.name == k || format!("mc:{}", c.id.0) == k || c.id.0.to_string() == k).ok_or_else(|| OpError::not_found(format!("no assembly mate connector `{k}`")).with_param(format!("{field}.connector")))?;
+        MateConnectorRef::assembly_connector(mc.id, mc.owner())
     } else {
         let inst = find_instance(a, o.get("instance").and_then(Value::as_str).ok_or_else(|| OpError::param(&format!("{field}.instance"), "instance id or name"))?, &format!("{field}.instance"))?;
         let reference = match (o.get("reference"), o.get("entity")) {

@@ -105,7 +105,17 @@ impl PartStudioView {
         // The newest closure (it captures the current ids).
         self.panel_commits.insert(key.clone(), commit.clone());
         if let Some((st, last)) = self.panel_inputs.get(&key).cloned() {
-            if st.read(cx).focus_handle(cx).is_focused(window) {
+            let focused = st.read(cx).focus_handle(cx).is_focused(window);
+            if focused && last != value && st.read(cx).value() == last.as_str() {
+                // Just committed and rewritten (live: "25" + Enter shows
+                // "25 mm" at once, still selected).
+                self.panel_focused = Some(key.clone());
+                st.update(cx, |s, cx| {
+                    s.set_value(value.clone(), window, cx);
+                    s.select_all(window, cx);
+                });
+                self.panel_inputs.insert(key.clone(), (st.clone(), value));
+            } else if focused {
                 self.panel_focused = Some(key.clone());
             } else if last != value {
                 // The model value changed underneath (undo, other edits).

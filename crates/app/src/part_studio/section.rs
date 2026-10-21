@@ -62,7 +62,7 @@ pub struct SectionDialog {
 }
 
 /// The section view dialog's prompt (live part-studio/70).
-const SELECT_SECTION_PLANE: &str = "Select a plane, planar face, cylinder, or mate connector.";
+const SELECT_SECTION_PLANE: &str = "Select a plane, planar face, cylinder, cone, or mate connector.";
 
 impl PartStudioView {
     /// Plane frame of a plane, planar face, sketch entity or mate connector.
@@ -161,6 +161,7 @@ impl PartStudioView {
     /// ✓ keeps the section, ✕ restores the state before the dialog.
     pub(super) fn close_section_dialog(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(d) = self.ui.section_dialog.take() else { return };
+        self.ui.section_offset_edit = None;
         if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
             self.message = None;
         }
@@ -450,6 +451,10 @@ impl PartStudioView {
     /// follows the camera without a window redraw); [`Self::render_section_value`]
     /// is the GPUI element it reproduces.
     pub(super) fn section_value_label(&self, window: &Window, cx: &App) -> Option<noshape_render::overlay::Label> {
+        // While it is typed into, the box is a GPUI field (section_value_field).
+        if self.ui.section_offset_edit.is_some() {
+            return None;
+        }
         let a = self.section_arrow()?;
         let d = self.ui.section_dialog.as_ref()?;
         let pl = self.ui.section.get(d.active)?;
@@ -484,6 +489,72 @@ impl PartStudioView {
                 .child(text)
                 .into_any_element(),
         )
+    }
+
+    /// The offset box as a field (qa5 AN3; live: the arrow's value box takes
+    /// a typed offset): over the drawn box a click target that opens it; then
+    /// an input there. Enter or leaving it moves the plane; the click never
+    /// reaches the graphics (it would pick the plane under it).
+    pub(super) fn section_value_field(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let a = self.section_arrow()?;
+        let d = self.ui.section_dialog.as_ref()?;
+        let pl = self.ui.section.get(d.active)?;
+        let s = self.viewport.read(cx).project(a.base + a.dir * a.length)?;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let text = noshape_units::format_quantity(noshape_units::Quantity::new(pl.offset, noshape_units::Dim::LENGTH), &units);
+        let at = div().absolute().left(px(s.x as f32 + 12.)).top(px(s.y as f32 - 10.)).occlude();
+        if let Some((input, _)) = &self.ui.section_offset_edit {
+            let field = gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(12.));
+            return Some(at.id("section-offset-field").w(px(90.)).px(px(4.)).border_1().border_color(p().accent).bg(gpui_kit::rgb(0xffffff)).child(gpui_kit::base::input::input_frame(div().child(field))).into_any_element());
+        }
+        // The drawn box: 12 px text, 4 px padding.
+        let w = text.chars().count() as f32 * 7.0 + 10.0;
+        Some(
+            at.id("section-offset-hit")
+                .w(px(w))
+                .h(px(18.))
+                .cursor(CursorStyle::IBeam)
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    this.open_section_offset_edit(text.clone(), window, cx);
+                }))
+                .into_any_element(),
+        )
+    }
+
+    fn open_section_offset_edit(&mut self, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::{InputEvent, InputState};
+        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let sub = cx.subscribe_in(&input, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                let typed = st.read(cx).value().to_string();
+                this.commit_section_offset(&typed, window, cx);
+            }
+        });
+        input.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.ui.section_offset_edit = Some((input, sub));
+        cx.notify();
+    }
+
+    /// A typed offset (a bare number in the workspace unit) moves the active
+    /// plane; text that doesn't evaluate leaves it.
+    fn commit_section_offset(&mut self, typed: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.ui.section_offset_edit = None;
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let vars = self.scope_variables(None, cx);
+        let text = noshape_model::quantity_text::commit_text(typed, noshape_units::Dim::LENGTH, &units, &vars);
+        if let Ok(q) = noshape_units::evaluate_as(&text, noshape_units::Dim::LENGTH, &units, &vars)
+            && let Some(active) = self.ui.section_dialog.as_ref().map(|d| d.active)
+            && let Some(pl) = self.ui.section.get_mut(active)
+        {
+            pl.offset = q.value;
+            self.apply_section(window, cx);
+        }
+        window.focus(&self.focus, cx);
+        cx.notify();
     }
 
     fn add_view_section_plane(&mut self, window: &mut Window, cx: &mut Context<Self>) {

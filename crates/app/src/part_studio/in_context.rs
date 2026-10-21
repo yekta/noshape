@@ -892,7 +892,7 @@ impl PartStudioView {
         // that context greyed, without ⋯ (live 504).
         let editing = self.edit.is_some();
         let pending = self.ui.in_context.as_ref().and_then(|c| c.ctx.context).filter(|id| self.edit.as_ref().is_some_and(|e| noshape_model::in_context::params_use_context(&e.dialog.read(cx).feature.params, Some(*id))));
-        let mut referenced = noshape_model::in_context::referenced_contexts(&studio.features);
+        let mut referenced = (*self.referenced_contexts(cx)).clone();
         referenced.extend(pending);
         let contexts: Vec<(u32, String, String)> = studio.contexts.iter().filter(|c| referenced.contains(&c.id)).map(|c| (c.id, c.name.clone(), self.assembly_name(c.assembly, cx))).collect();
         if contexts.is_empty() {
@@ -1041,7 +1041,7 @@ impl PartStudioView {
         let id = self.ui.in_context.as_ref()?.ctx.context?;
         let studio = self.studio(cx)?;
         let c = studio.contexts.iter().find(|c| c.id == id)?;
-        let mut referenced = noshape_model::in_context::referenced_contexts(&studio.features).contains(&id);
+        let mut referenced = self.referenced_contexts(cx).contains(&id);
         if let Some(e) = &self.edit {
             referenced |= noshape_model::in_context::params_use_context(&e.dialog.read(cx).feature.params, Some(id));
         }

@@ -1525,7 +1525,11 @@ impl FeatureDialog {
                 let pid = s.id.to_string();
                 let mut el = div().id(SharedString::from(format!("cfg-{pid}"))).child(r);
                 if is_configured {
-                    el = el.border_2().border_dashed().border_color(gpui_kit::rgb(0xfab601)).tooltip(crate::ui::tooltip("Configured"));
+                    // Live: no "Configured" tag on a checkbox row.
+                    el = el.border_2().border_dashed().border_color(gpui_kit::rgb(0xfab601));
+                    if !matches!(s.kind, ParamKind::Bool { .. }) {
+                        el = el.tooltip(crate::ui::tooltip("Configured"));
+                    }
                 }
                 if configurable {
                     // Capture phase: the control under the click (a checkbox,
@@ -2900,7 +2904,9 @@ fn param_icon(feature: &str, param: &str) -> Option<&'static str> {
         ("hole", "cBoreDepthV3") => Some("hole-cbore-depth"),
         ("hole", "cSinkDiameterV3") => Some("hole-csink-diameter"),
         ("hole", "cSinkAngleV3") => Some("hole-csink-angle"),
-        ("hole", "tapDrillDiameterV3") => Some("hole-tap-diameter"),
+        // Live (ADV4): the tap drill row shows the plain diameter icon.
+        ("hole", "tapDrillDiameterV3") => Some("hole-diameter"),
+        ("hole", "tapClearance") => Some("hole-tap-clearance"),
         ("hole", "tappedDepthV3") => Some("hole-tapped-depth"),
         // Live (part-studio/102, dom/dialog-copy-here.txt): Translate by
         // XYZ rows start with an axis icon instead of a label.
@@ -3110,7 +3116,7 @@ impl Render for FeatureDialog {
                     }
                 }));
                 if self.configured.contains(key) {
-                    el = el.border_2().border_dashed().border_color(gpui_kit::rgb(0xfab601)).tooltip(crate::ui::tooltip("Configured"));
+                    el = el.border_2().border_dashed().border_color(gpui_kit::rgb(0xfab601));
                 }
                 d.child(el)
             }))

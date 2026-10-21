@@ -129,6 +129,15 @@ pub struct CtxState {
     pub dependencies: HashMap<FsId, Vec<Reference>>,
     /// Bodies each `opSplitPart` left and its tool plane (`qSplitBy`).
     pub splits: HashMap<FsId, SplitRecord>,
+    /// Where each attributed face, edge or vertex was (Parasolid attributes
+    /// follow the topology; our references follow names, which an operation
+    /// can change: [`CtxState::remap_attributes`]).
+    pub attr_snapshots: HashMap<Reference, (BodyId, query::Snapshot)>,
+    /// Bumped each time an operation changes a body (cached transient ids
+    /// of its edges and vertices are checked again: names get reused).
+    body_versions: HashMap<BodyId, u64>,
+    /// The body version each transient id was last checked at.
+    transient_versions: HashMap<Arc<str>, u64>,
     /// The edges each `opSplitEdges` split (`qSplitBy` finds their pieces).
     pub split_edges: HashMap<FsId, Vec<(BodyId, noshape_kernel::Shape)>>,
 }
@@ -164,7 +173,7 @@ impl FsContext {
         let hidden: HashSet<BodyId> = hidden_bodies.iter().map(|b| b.id.clone()).collect();
         ctx.bodies.extend(hidden_bodies);
         let attributes = std::mem::take(&mut ctx.fs_attributes);
-        Arc::new(FsContext {
+        let cx = Arc::new(FsContext {
             serial: next_serial(),
             state: Mutex::new(CtxState {
                 ctx,
@@ -193,8 +202,29 @@ impl FsContext {
                 dependencies: HashMap::new(),
                 splits: HashMap::new(),
                 split_edges: HashMap::new(),
+                attr_snapshots: HashMap::new(),
+                body_versions: HashMap::new(),
+                transient_versions: HashMap::new(),
             }),
-        })
+        });
+        // Where the attributed entities are now (for renames by this feature).
+        {
+            let mut st = cx.state.lock();
+            let snaps: HashMap<Reference, (BodyId, query::Snapshot)> = {
+                let q = query::QueryCx::new(&st);
+                let mut out = HashMap::new();
+                for (r, _) in &st.attributes {
+                    if !out.contains_key(r)
+                        && let Some(s) = q.attribute_snapshot(r)
+                    {
+                        out.insert(r.clone(), s);
+                    }
+                }
+                out
+            };
+            st.attr_snapshots = snaps;
+        }
+        cx
     }
 
     /// The regeneration context after the feature: hidden bodies and
@@ -219,12 +249,79 @@ impl CtxState {
     /// Transient id string of an entity (stable within this evaluation).
     /// Attach an attribute to `r`.
     pub fn push_attribute(&mut self, r: Reference, v: Value) {
+        if !self.attr_snapshots.contains_key(&r)
+            && let Some(s) = query::QueryCx::new(self).attribute_snapshot(&r)
+        {
+            self.attr_snapshots.insert(r.clone(), s);
+        }
         self.attributes.push((r, v));
     }
 
+    /// Attributes whose entity an operation renamed follow it (a sheet
+    /// metal definition's vertices are renamed when a flange adds faces
+    /// beside them; live keeps their association attributes).
+    pub fn remap_attributes(&mut self, changed: &HashSet<BodyId>) {
+        let moves: Vec<(Reference, Reference, (BodyId, query::Snapshot))> = {
+            let q = query::QueryCx::new(self);
+            let mut out = Vec::new();
+            for (r, (body, snap)) in &self.attr_snapshots {
+                if !changed.contains(body) {
+                    continue;
+                }
+                if let Some(e) = query::relocated(&q, r, snap)
+                    && let Some(s) = q.attribute_snapshot(&q.to_ref(&e))
+                {
+                    out.push((r.clone(), q.to_ref(&e), s));
+                }
+            }
+            out
+        };
+        if moves.is_empty() {
+            return;
+        }
+        // All at once: one entity's new name may be another's old one.
+        let map: HashMap<Reference, Reference> = moves.iter().map(|(o, n, _)| (o.clone(), n.clone())).collect();
+        for (r, _) in self.attributes.iter_mut() {
+            if let Some(n) = map.get(r) {
+                *r = n.clone();
+            }
+        }
+        for (old, _, _) in &moves {
+            self.attr_snapshots.remove(old);
+        }
+        for (_, new, snap) in moves {
+            self.attr_snapshots.insert(new, snap);
+        }
+    }
+
     pub fn transient(&mut self, r: &Reference) -> Arc<str> {
-        if let Some(s) = self.transient_of.get(r) {
-            return s.clone();
+        if let Some(s) = self.transient_of.get(r).cloned() {
+            if !matches!(r, Reference::Edge(_) | Reference::Vertex(_)) {
+                return s;
+            }
+            // An edge's or vertex's name may now stand for another entity
+            // (ordinals shift when a body changes): keep the id only if the
+            // entity is still where the id saw it.
+            let (version, now) = {
+                let q = query::QueryCx::new(self);
+                let e = q.from_ref(r).into_iter().next();
+                let version = e.as_ref().and_then(|e| q.owner(e)).and_then(|o| if let query::Ent::Body(b) = o { self.body_versions.get(&self.ctx.bodies[b].id).copied() } else { None }).unwrap_or(0);
+                let unchanged = self.transient_versions.get(&s) == Some(&version);
+                (version, if unchanged { None } else { Some(e.and_then(|e| q.snapshot(&e))) })
+            };
+            match now {
+                None => return s,
+                Some(snap) => {
+                    let same = match (snap, self.snapshots.get(&s)) {
+                        (Some(a), Some(b)) => a.etype == b.etype && a.points.len() == b.points.len() && a.points.iter().zip(&b.points).all(|(p, q)| p.distance(*q) < 1e-9),
+                        _ => true,
+                    };
+                    if same {
+                        self.transient_versions.insert(s.clone(), version);
+                        return s;
+                    }
+                }
+            }
         }
         // Onshape-style three letter ids: JAA, JAB, ...
         let mut n = self.transient_ids.len();
@@ -250,6 +347,11 @@ impl CtxState {
         }
         self.transient_ids.insert(id.clone(), r.clone());
         self.transient_of.insert(r.clone(), id.clone());
+        let version = {
+            let q = query::QueryCx::new(self);
+            q.from_ref(r).first().and_then(|e| q.owner(e)).and_then(|o| if let query::Ent::Body(b) = o { self.body_versions.get(&self.ctx.bodies[b].id).copied() } else { None }).unwrap_or(0)
+        };
+        self.transient_versions.insert(id.clone(), version);
         id
     }
 
@@ -487,7 +589,15 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
             for b in created {
                 st.body_ops.insert(b, id.to_vec());
             }
+            // Bodies the operation changed (their attributes may need to follow renames).
+            let changed: HashSet<BodyId> = ctx.bodies.iter().filter(|b| snapshot.bodies.iter().any(|o| o.id == b.id && !Arc::ptr_eq(o, b))).map(|b| b.id.clone()).collect();
             st.ctx = ctx;
+            for b in &changed {
+                *st.body_versions.entry(b.clone()).or_default() += 1;
+            }
+            if !changed.is_empty() {
+                st.remap_attributes(&changed);
+            }
             for w in warnings {
                 let s = status::status_map("WARNING", "CUSTOM_ERROR", Some(&w));
                 st.status.insert(id.to_vec(), s);

@@ -785,6 +785,12 @@ fn condition_definition(decls: &[ParamDecl], v: &ParamValues) -> Value {
     Value::map(m)
 }
 
+/// Dialog specs of a precondition's parameters (as a custom feature's).
+pub(super) fn param_specs(params: &[ParamDecl]) -> Vec<ParamSpec> {
+    let shared = Arc::new(params.to_vec());
+    params.iter().map(|p| param_spec(p, shared.clone())).collect()
+}
+
 fn param_spec(d: &ParamDecl, siblings: Arc<Vec<ParamDecl>>) -> ParamSpec {
     let id = intern(&d.id);
     let label = intern(&d.label);

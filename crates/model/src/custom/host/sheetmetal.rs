@@ -29,7 +29,11 @@ use noshape_kernel::Shape;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-pub const NATIVES: &[(&str, NativeFn)] = &[("updateSheetMetalGeometry", update_sheet_metal_geometry), ("evSheetMetalFlatTransformation", ev_sheet_metal_flat_transformation)];
+pub const NATIVES: &[(&str, NativeFn)] = &[
+    ("updateSheetMetalGeometry", update_sheet_metal_geometry),
+    ("evSheetMetalFlatTransformation", ev_sheet_metal_flat_transformation),
+    ("evCornerType", ev_corner_type),
+];
 
 const TOL: f64 = 1e-7;
 
@@ -60,8 +64,13 @@ struct Definition {
     back: f64,
     /// Bend radius by definition edge index.
     bends: BTreeMap<usize, f64>,
+    /// Rolled bends (a Hem's arc: a curved definition face with a BEND
+    /// joint): inner radius by definition face index.
+    rolled: BTreeMap<usize, f64>,
     /// Rip edges (definition edge indices) and the gap walls keep from them.
     rips: Vec<usize>,
+    /// Rip styles other than EDGE (BUTT / BUTT2) by rip edge.
+    rip_styles: BTreeMap<usize, String>,
     clearance: f64,
     /// Bend relief at the ends of a partial bend: style, depth scale (× bend
     /// radius) and width scale (× thickness), from the model attribute.
@@ -70,25 +79,45 @@ struct Definition {
     /// Corner features' settings by definition vertex (else `corner`).
     corners: BTreeMap<usize, CornerRelief>,
     k_factor: f64,
-    /// The part built from it before (rebuilt in place).
-    previous: Option<BodyId>,
+    /// Active (not finished by Finish sheet metal model), default bend radius.
+    active: bool,
+    default_radius: f64,
+    /// The parts built from it before (rebuilt in place).
+    previous: Vec<BodyId>,
 }
 
-/// A definition body's bends (edge index → radius) and rips (edge indices).
-fn joints(st: &CtxState, q: &QueryCx, b: usize) -> (BTreeMap<usize, f64>, Vec<usize>) {
+/// A definition body's bends (edge index → radius), rips (edge indices),
+/// rolled bends (face index → radius) and butt rip styles (edge → style).
+type Joints = (BTreeMap<usize, f64>, Vec<usize>, BTreeMap<usize, f64>, BTreeMap<usize, String>);
+
+fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
     let mut bends = BTreeMap::new();
     let mut rips = Vec::new();
+    let mut styles = BTreeMap::new();
+    let mut rolled = BTreeMap::new();
+    for f in 0..st.ctx.bodies[b].faces.len() {
+        if let Some(j) = sm_attribute(st, &q.to_ref(&Ent::Face(b, f)), "JOINT")
+            && j.get("jointType").get("value").as_str().as_deref() == Some("BEND")
+        {
+            rolled.insert(f, length_field(&j, "radius"));
+        }
+    }
     for e in 0..st.ctx.bodies[b].edges.len() {
         let Some(j) = sm_attribute(st, &q.to_ref(&Ent::Edge(b, e)), "JOINT") else { continue };
         match j.get("jointType").get("value").as_str().as_deref() {
             Some("BEND") => {
                 bends.insert(e, length_field(&j, "radius"));
             }
-            Some("RIP") => rips.push(e),
+            Some("RIP") => {
+                rips.push(e);
+                if let Some(style) = enum_field(&j, "jointStyle").filter(|s| s != "EDGE") {
+                    styles.insert(e, style);
+                }
+            }
             _ => {}
         }
     }
-    (bends, rips)
+    (bends, rips, rolled, styles)
 }
 
 /// An enum field of an SM attribute (stored bare: `defaultBendReliefStyle : OBROUND`).
@@ -355,9 +384,23 @@ fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f6
             let e = l.side[j];
             let free = !def.bends.contains_key(&e) && !def.rips.contains(&e);
             let along = (l.pts[(j + 1) % m] - l.pts[j]).normalize();
-            if !free || along.cross(dir).length() > 1e-9 {
+            if !free {
                 continue;
             }
+            // The free edge the bend runs on along: next to it, or past a
+            // short connector when the bend edge was moved in (INNER flange
+            // alignment; live sm5: the slot starts on the plate's edge line).
+            let v = if along.cross(dir).length() <= 1e-9 {
+                v
+            } else {
+                let (next, base) = if j == (k + m - 1) % m { ((j + m - 1) % m, l.pts[j]) } else { ((j + 1) % m, l.pts[(j + 1) % m]) };
+                let e2 = l.side[next];
+                let along2 = (l.pts[(next + 1) % m] - l.pts[next]).normalize();
+                if def.bends.contains_key(&e2) || def.rips.contains(&e2) || along2.cross(dir).length() > 1e-9 {
+                    continue;
+                }
+                base
+            };
             let straight = def.relief.depth * radius;
             let depth = if def.relief.style == "RECTANGLE" { straight + w * 0.5 } else { straight };
             // Through the whole thickness and a little more.
@@ -530,8 +573,104 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
     Ok((clips, extends, cuts, wraps))
 }
 
+/// A built sheet metal part and what its flat pattern is made of.
+struct Built {
+    part: Shape,
+    pieces: Vec<Piece>,
+    topo: Topo,
+    /// Each wall's face on its definition plane (reliefs cut), by definition face.
+    wall_flats: Vec<(usize, Shape)>,
+    strips: Vec<Strip>,
+}
+
+/// A bend's developed strip: the tangent lines on its two walls (from the
+/// bend's start to its end), unfolded with each wall.
+#[derive(Clone)]
+struct Strip {
+    edge: usize,
+    wall_a: usize,
+    wall_b: usize,
+    a: [DVec3; 2],
+    b: [DVec3; 2],
+    angle: f64,
+    radius: f64,
+    /// Wall a's definition normal, and the direction into wall b from the bend.
+    normal_a: DVec3,
+    toward_b: DVec3,
+    /// The bend's axis (a point and the direction it turns wall b about),
+    /// the direction into wall a, from the axis to wall a's tangent line,
+    /// and its extent along the axis from `origin`.
+    origin: DVec3,
+    axis: DVec3,
+    dir_a: DVec3,
+    radial_a: DVec3,
+    extent: (f64, f64),
+    /// A rolled bend's definition face (else the bend is at `edge`).
+    rolled: Option<usize>,
+}
+
+/// A rolled bend (definition face `fi`, a cylinder with a BEND joint such as
+/// a Hem's arc) as a strip from the wall on one straight edge to the wall on
+/// the other: wall a is the lower-numbered one. A rolled Hem's arc ends free
+/// (wall b `usize::MAX`).
+fn rolled_strip(topo: &Topo, fi: usize, radius: f64) -> Option<Strip> {
+    let face = &topo.faces[fi];
+    let Ok(k::Surface::Cylinder { origin, axis, .. }) = face.face_surface() else { return None };
+    let axis = axis.normalize();
+    let mut sides = Vec::new();
+    for e in 0..topo.edges.len() {
+        let fs = &topo.edge_faces[e];
+        let (s, t) = topo.edge_ends[e];
+        if !fs.contains(&(fi as u32)) || s.distance(t) < TOL || (t - s).normalize().cross(axis).length() > 1e-7 {
+            continue;
+        }
+        let w = fs.iter().map(|f| *f as usize).find(|f| *f != fi).unwrap_or(usize::MAX);
+        let (s, t) = if (t - s).dot(axis) < 0.0 { (t, s) } else { (s, t) };
+        if sides.iter().all(|x: &(usize, usize, DVec3, DVec3)| x.1 != w) {
+            sides.push((e, w, s, t));
+        }
+    }
+    sides.sort_by_key(|x| x.1);
+    if sides.first().is_none_or(|x| x.1 == usize::MAX) {
+        return None;
+    }
+    let [(ea, wa, sa, ta), (_, wb, sb, tb)] = sides[..] else { return None };
+    let [u0, u1, ..] = face.uv_bounds().ok()?;
+    let angle = (u1 - u0).abs();
+    let foot = |p: DVec3| origin + axis * (p - origin).dot(axis);
+    let o = foot(sa);
+    let (ra, rb) = ((sa - o).normalize(), (sb - foot(sb)).normalize());
+    let turn = |v: DVec3, ang: f64| glam::DMat3::from_axis_angle(axis, ang) * v;
+    let sign = if turn(ra, angle).distance(rb) <= turn(ra, -angle).distance(rb) { 1.0 } else { -1.0 };
+    let (pa, na) = face_normal(&topo.faces[wa]).ok()?;
+    let mut a1 = na.cross(axis).normalize();
+    if (pa - sa).dot(a1) < 0.0 {
+        a1 = -a1;
+    }
+    let len = sa.distance(ta);
+    let (s0, s1) = (0.0_f64, len * sign);
+    Some(Strip {
+        edge: ea,
+        wall_a: wa,
+        wall_b: wb,
+        a: [sa, ta],
+        b: [sb, tb],
+        angle,
+        radius,
+        normal_a: na,
+        // The side the strip curls to (wall b's side of wall a).
+        toward_b: -ra,
+        origin: o,
+        axis: axis * sign,
+        dir_a: a1,
+        radial_a: ra,
+        extent: (s0.min(s1), s0.max(s1)),
+        rolled: Some(fi),
+    })
+}
+
 /// The part solid of one definition sheet and the pieces its faces come from.
-fn build_part(def: &Definition, shape: &Shape) -> FResult<(Shape, Vec<Piece>, Topo)> {
+fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     let topo = Topo::of(shape)?;
     let (front, back) = (def.front, def.back);
     if front + back <= TOL {
@@ -539,6 +678,8 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<(Shape, Vec<Piece>, To
     }
     let mut solids = Vec::new();
     let mut pieces = Vec::new();
+    let mut wall_flats = Vec::new();
+    let mut strips = Vec::new();
     // Bend pull-backs first (they trim the walls).
     let mut setbacks: BTreeMap<usize, f64> = BTreeMap::new();
     let mut bends = Vec::new();
@@ -562,14 +703,14 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<(Shape, Vec<Piece>, To
     // dom/fs-smprobe3-7.txt): thickened as they are, the walls meeting
     // them tangentially.
     let mut outlines = Vec::new();
-    for face in &topo.faces {
+    for (fi, face) in topo.faces.iter().enumerate() {
         if face.face_plane().map_err(|e| fe(e.to_string()))?.is_none() {
             outlines.push(None);
             continue;
         }
         let l = wall_loop(face, &topo)?;
         let (_, n) = face_normal(face)?;
-        let offset: Vec<f64> = l.side.iter().map(|e| setbacks.get(e).copied().unwrap_or(if def.rips.contains(e) { def.clearance } else { 0.0 })).collect();
+        let offset: Vec<f64> = l.side.iter().map(|e| setbacks.get(e).copied().unwrap_or_else(|| if def.rips.contains(e) { rip_offset(def, &topo, *e, fi) } else { 0.0 })).collect();
         let sides = pulled_sides(&l, n, &offset);
         outlines.push(Some((l, n, sides)));
     }
@@ -638,6 +779,29 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<(Shape, Vec<Piece>, To
             b.axis_point + along + perp * ang.cos() + b.dir.cross(perp) * ang.sin()
         };
         let sign = if rotate(b.angle).distance(p2) <= rotate(-b.angle).distance(p2) { 1.0 } else { -1.0 };
+        let radial = {
+            let r = b.start + a1 * b.setback - b.axis_point;
+            (r - b.dir * r.dot(b.dir)).normalize_or_zero()
+        };
+        // Along the axis (`dir * sign`) from the axis point at the edge's start.
+        let (s0, s1) = (t0 * sign, t1 * sign);
+        strips.push(Strip {
+            edge: e,
+            wall_a: fa,
+            wall_b: fb,
+            a: [p1, p1 + b.dir * len],
+            b: [p2, p2 + b.dir * len],
+            angle: b.angle,
+            radius: def.bends.get(&e).copied().unwrap_or(0.0),
+            normal_a: n1,
+            toward_b: a2,
+            origin: b.axis_point,
+            axis: b.dir * sign,
+            dir_a: a1,
+            radial_a: radial,
+            extent: (s0.min(s1), s0.max(s1)),
+            rolled: None,
+        });
         let mut bend = k::revolve(&face, b.axis_point, b.dir * sign, b.angle).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
         let (v0, v1) = (topo.nearest_vertex(b.start), topo.nearest_vertex(b.start + b.dir * b.len));
         // Round corner reliefs: the flat circle wrapped onto the bend (angle
@@ -688,6 +852,9 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<(Shape, Vec<Piece>, To
     for (fi, outline) in outlines.iter().enumerate() {
         let Some((l, n, pulled)) = outline else {
             rolled_bend(&topo, fi, front, back, &mut solids, &mut pieces)?;
+            if let Some(st) = def.rolled.get(&fi).and_then(|r| rolled_strip(&topo, fi, *r)) {
+                strips.push(st);
+            }
             continue;
         };
         let n = *n;
@@ -697,8 +864,13 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<(Shape, Vec<Piece>, To
         let mut slab = k::extrude(&base, n * (front + back)).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape;
         let mut reliefs = relief_tools(def, &topo, l, n, front + back)?;
         reliefs.extend(cuts.remove(&fi).unwrap_or_default());
+        // The wall in the flat: its outline on the definition plane, reliefs cut.
+        let mut flat = k::make_face_from_wire(&k::make_polyline(&outline_points(pulled), true).map_err(|e| fe(e.to_string()))?, true).map_err(|e| fe(e.to_string()))?;
         if !reliefs.is_empty() {
             let tools: Vec<Shape> = reliefs.iter().map(|r| r.0.clone()).collect();
+            if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&flat), &tools, &k::BooleanOptions::default()) {
+                flat = r.shape;
+            }
             slab = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slab), &tools, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal bend relief failed: {e}")))?.shape;
             // The slot's faces come from the bend's end vertex.
             for (tool, v) in &reliefs {
@@ -727,6 +899,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<(Shape, Vec<Piece>, To
             };
             pieces.push(Piece { face: f, from });
         }
+        wall_flats.push((fi, flat));
         solids.push(slab);
     }
     let fused = if solids.len() == 1 {
@@ -734,7 +907,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<(Shape, Vec<Piece>, To
     } else {
         k::fuse_all(&solids, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape
     };
-    Ok((fused, pieces, topo))
+    Ok(Built { part: fused, pieces, topo, wall_flats, strips })
 }
 
 /// A rolled bend: definition face `fi` thickened (`front` along its normal).
@@ -834,11 +1007,11 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if !changed_owners.is_empty() && !changed_owners.contains(&body.id) {
                 continue;
             }
-            let (bends, rips) = joints(&st, &q, b);
+            let (bends, rips, rolled, rip_styles) = joints(&st, &q, b);
             // The part made from it before: the solid carrying its association.
             let own = associations(&st, &body_ref);
-            let previous = st.ctx.bodies.iter().enumerate().find(|(pb, p)| p.kind == BodyKind::Solid && !own.is_empty() && associations(&st, &q.to_ref(&Ent::Body(*pb))).iter().any(|x| own.contains(x))).map(|(_, p)| p.id.clone());
-            defs.push(Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rips, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), previous });
+            let previous: Vec<BodyId> = st.ctx.bodies.iter().enumerate().filter(|(pb, p)| p.kind == BodyKind::Solid && !own.is_empty() && associations(&st, &q.to_ref(&Ent::Body(*pb))).iter().any(|x| own.contains(x))).map(|(_, p)| p.id.clone()).collect();
+            defs.push(Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -852,35 +1025,90 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let op: FsId = id.iter().cloned().chain(std::iter::once(Arc::<str>::from("smGeometry"))).collect();
     let built = run_op(i, &cx, &op, "SHEET_METAL_REBUILD_ERROR", |ev| {
         let mut out = Vec::new();
+        let mut fresh = 0u32;
         for (n, def) in defs.iter().enumerate() {
             let Some(bi) = ev.ctx.bodies.iter().position(|b| b.id == def.body) else { continue };
             let shape = ev.ctx.bodies[bi].shape.clone();
-            let (part, pieces, topo) = build_part(def, &shape)?;
-            let sources = part_sources(&part, &pieces, &topo);
+            let Built { part, pieces, topo, wall_flats, strips } = build_part(def, &shape)?;
             // The definition body's own topology order (references are by index).
             let def_topo = (ev.ctx.bodies[bi].faces.len(), ev.ctx.bodies[bi].edges.len());
             if def_topo != (topo.faces.len(), topo.edges.len()) {
                 return Err(fe("The sheet metal definition changed while rebuilding"));
             }
-            let id = match &def.previous {
-                Some(old) => {
-                    ev.ctx.bodies.retain(|b| &b.id != old);
-                    old.clone()
+            ev.ctx.bodies.retain(|b| !def.previous.contains(&b.id));
+            // Walls joined only by rips are separate parts (live G34d), first
+            // the one holding the lowest definition face.
+            let solids = part.solids();
+            let solids = if solids.len() > 1 { solids } else { vec![part] };
+            let mut parts: Vec<PartOf> = solids
+                .into_iter()
+                .map(|solid| {
+                    let sources = part_sources(&solid, &pieces, &topo);
+                    let mut members: Vec<usize> = sources.0.iter().filter_map(|d| if let Def::Face(f) = d { Some(*f) } else { None }).collect();
+                    members.sort_unstable();
+                    members.dedup();
+                    PartOf { solid, names: Vec::new(), sources, members }
+                })
+                .collect();
+            parts.sort_by_key(|p| p.members.first().copied().unwrap_or(usize::MAX));
+            let mut others = BTreeMap::new();
+            for p in &mut parts {
+                p.names = super::ops::fresh_names(ev, &p.solid);
+                let part_faces = p.solid.faces();
+                for &fi in &p.members {
+                    if let Some(n) = wall_faces(&topo, fi, &part_faces, &p.named(Def::Face(fi))).0.first() {
+                        others.insert(fi, n.clone());
+                    }
                 }
-                None => BodyId { feature: ev.feature, index: n as u32 },
-            };
-            let names = super::ops::fresh_names(ev, &part);
-            push_body(ev, id.clone(), BodyKind::Solid, part, names);
-            out.push((id, sources));
+            }
+            for (k, p) in parts.into_iter().enumerate() {
+                let walls: Vec<(usize, Shape)> = wall_flats.iter().filter(|w| p.members.contains(&w.0)).cloned().collect();
+                let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();
+                let flat = flat_of(def, &topo, &walls, &own);
+                let data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others);
+                let id = def.previous.get(k).cloned().unwrap_or_else(|| {
+                    fresh += 1;
+                    BodyId { feature: ev.feature, index: fresh - 1 }
+                });
+                push_body(ev, id.clone(), BodyKind::Solid, p.solid, p.names);
+                out.push((n, id, p.sources, flat, data));
+            }
         }
         Ok(out)
     })?;
     // Associations and hiding.
     let mut st = cx.state.lock();
     let (marker, feature) = (super::marker_of(&op), st.feature);
-    for ((part_id, (faces, edges, vertices)), (body_ref, dfaces, dedges, dverts)) in built.into_iter().zip(def_refs) {
+    for (n, part_id, (faces, edges, vertices), flat, data) in built {
+        let Some((body_ref, dfaces, dedges, dverts)) = def_refs.get(n) else { continue };
         // New parts were renamed to the feature after the operation.
         let part_id = super::wrap_body_id(&part_id, marker, feature);
+        // Its face names as the operation's bodies were renamed after it.
+        let mut data = data;
+        let wrap = |v: &mut Vec<crate::naming::Name>| v.iter_mut().for_each(|n| *n = super::wrap_name(n, marker, feature));
+        for w in &mut data.walls {
+            wrap(&mut w.faces);
+            wrap(&mut w.back);
+        }
+        for b in &mut data.bends {
+            wrap(&mut b.inner_faces);
+            wrap(&mut b.outer_faces);
+        }
+        for r in &mut data.rips {
+            wrap(&mut r.faces);
+            if let Some(o) = &mut r.other {
+                *o = super::wrap_name(o, marker, feature);
+            }
+        }
+        st.ctx.sheet_metal.insert(part_id.clone(), Arc::new(data));
+        match flat {
+            Some(f) => {
+                st.ctx.sheet_metal_flats.insert(part_id.clone(), Arc::new(f));
+            }
+            None => {
+                st.ctx.sheet_metal_flats.remove(&part_id);
+            }
+        }
         let Some(pb) = st.ctx.bodies.iter().position(|b| b.id == part_id) else { continue };
         let part = st.ctx.bodies[pb].clone();
         let def_ref = |d: &Def| match *d {
@@ -897,7 +1125,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 st.push_attribute(to.clone(), Value::map_from([("attribute", attr)]));
             }
         }
-        if let Reference::Body(def_body) = &body_ref {
+        if let Reference::Body(def_body) = body_ref {
             st.hidden.insert(def_body.clone());
         }
     }
@@ -915,6 +1143,184 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// back by the developed length BA = θ (r + K T) along its neighbour's
 /// direction (sm2's flange: y' = 1.0155 mm - z); a bend face gets half of it
 /// (sm2: translation (0, 0.921957, -1.828427) mm).
+/// The part as the app's sheet metal data (table, panel; its flat pattern is
+/// the std-built one): walls by definition face (the faces seen in the flat
+/// first), bends in strip order with up as in the flat, rips.
+/// `others`: the reference-side face of every wall, for rips to a wall in
+/// another part.
+fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, flat: Option<&crate::sheetmetal::FlatPattern>, others: &BTreeMap<usize, crate::naming::Name>) -> crate::sheetmetal::SheetMetalData {
+    use crate::sheetmetal::{Bend as SmBend, BendKind, BendReliefStyle, Rip, SheetMetalData, Wall};
+    let thickness = def.front + def.back;
+    let mut data = SheetMetalData::new(def.body.feature, thickness, def.default_radius, def.k_factor);
+    data.active = def.active;
+    data.minimal_clearance = def.clearance;
+    data.bend_relief = BendReliefStyle::from_id(&def.relief.style);
+    data.bend_relief_depth_scale = def.relief.depth;
+    data.bend_relief_width_scale = def.relief.width;
+    data.corner_relief = def.corner.style.clone();
+    let part_faces = part.solid.faces();
+    let named = |d: Def| part.named(d);
+    // Walls by definition face of this part (a rolled bend's faces are the bend's).
+    let index = |fi: usize| part.members.iter().position(|m| *m == fi);
+    for &fi in &part.members {
+        let (seen, back) = if def.rolled.contains_key(&fi) { (Vec::new(), Vec::new()) } else { wall_faces(topo, fi, &part_faces, &named(Def::Face(fi))) };
+        data.walls.push(Wall { feature: def.body.feature, faces: seen, back });
+    }
+    for (k, st) in strips.iter().enumerate() {
+        let (mut inner, mut outer) = (Vec::new(), Vec::new());
+        for (i, name) in named(st.rolled.map_or(Def::Edge(st.edge), Def::Face)) {
+            match part_faces.get(i).and_then(|f| f.face_surface().ok()) {
+                Some(k::Surface::Cylinder { radius, .. }) if radius < st.radius + thickness * 0.5 => inner.push(name),
+                Some(k::Surface::Cylinder { .. }) => outer.push(name),
+                _ => {}
+            }
+        }
+        let up = flat.and_then(|f| f.bend_lines.get(k)).is_some_and(|l| l.up);
+        data.bends.push(SmBend {
+            feature: def.body.feature,
+            kind: if st.rolled.is_some() { BendKind::Hem } else { BendKind::Bend },
+            parent: index(st.wall_a).unwrap_or(0),
+            child: index(st.wall_b),
+            origin: st.origin,
+            axis: st.axis,
+            angle: st.angle,
+            radius: st.radius,
+            k_factor: def.k_factor,
+            dir_a: st.dir_a,
+            radial_a: st.radial_a,
+            s0: st.extent.0,
+            s1: st.extent.1,
+            ref_inner: up,
+            inner_faces: inner,
+            outer_faces: outer,
+            flat: false,
+        });
+    }
+    for &e in &def.rips {
+        let fs: Vec<usize> = topo.edge_faces.get(e).map(|v| v.iter().map(|x| *x as usize).collect()).unwrap_or_default();
+        // Wall a in this part; wall b here or (`usize::MAX`) in another part.
+        let Some(a) = fs.iter().copied().find(|f| index(*f).is_some()) else { continue };
+        let b = fs.iter().copied().find(|f| *f != a);
+        let b_here = b.and_then(index);
+        data.rips.push(Rip {
+            feature: def.body.feature,
+            a: index(a).unwrap_or(0),
+            b: b_here.unwrap_or(usize::MAX),
+            style: def.rip_styles.get(&e).cloned().unwrap_or_else(|| "EDGE".into()),
+            gap: def.clearance,
+            other: if b_here.is_none() { b.and_then(|b| others.get(&b).cloned()) } else { None },
+            faces: named(Def::Edge(e)).into_iter().map(|x| x.1).collect(),
+        });
+    }
+    data
+}
+
+/// How far wall `f` stops short of rip `e` (negative: runs past it). Edge
+/// joint: both walls the minimal gap (live G34d). Butt joint (live G34b,
+/// G34d with the Joint feature): the wall running through (Direction 1: the
+/// first in definition order, Direction 2 the other) covers the other's
+/// thickness; the other stops the gap short of it.
+fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
+    let Some(style) = def.rip_styles.get(&e) else { return def.clearance };
+    let walls = &topo.edge_faces[e];
+    let Some(other) = walls.iter().map(|x| *x as usize).find(|x| *x != f) else { return def.clearance };
+    let first = f.min(other);
+    let through = if style == "BUTT2" { first != f } else { first == f };
+    let (s, t) = topo.edge_ends[e];
+    let dir = (t - s).normalize_or_zero();
+    // A wall's in-plane direction from its inside toward the rip.
+    let toward = |w: usize| -> Option<DVec3> {
+        let (p, n) = face_normal(&topo.faces[w]).ok()?;
+        let u = n.cross(dir).normalize_or_zero();
+        Some(if (p - s).dot(u) > 0.0 { -u } else { u })
+    };
+    // Where a wall's material lies along `u`, from its definition plane.
+    let span = |w: usize, u: DVec3| -> Option<(f64, f64)> {
+        let n = face_normal(&topo.faces[w]).ok()?.1;
+        let (a, b) = (-def.back * n.dot(u), def.front * n.dot(u));
+        Some((a.min(b), a.max(b)))
+    };
+    let (Some(uf), Some(uo)) = (toward(f), toward(other)) else { return def.clearance };
+    if through {
+        span(other, uf).map_or(0.0, |(_, hi)| -hi.max(0.0))
+    } else {
+        span(other, uo).map_or(def.clearance, |(lo, _)| def.clearance - lo.min(0.0))
+    }
+}
+
+/// One part built from a definition sheet: its solid, face names, what each
+/// face comes from, and its definition faces (walls and rolled bends).
+struct PartOf {
+    solid: Shape,
+    names: Vec<crate::naming::Name>,
+    sources: (Vec<Def>, Vec<Def>, Vec<Def>),
+    members: Vec<usize>,
+}
+
+impl PartOf {
+    /// This part's faces made from definition entity `d` (index, name).
+    fn named(&self, d: Def) -> Vec<(usize, crate::naming::Name)> {
+        self.sources.0.iter().enumerate().filter(|(_, x)| **x == d).filter_map(|(i, _)| Some((i, self.names.get(i)?.clone()))).collect()
+    }
+}
+
+/// A wall's faces: those seen from the reference side (opposite the
+/// definition normal) and the back ones.
+fn wall_faces(topo: &Topo, fi: usize, part_faces: &[Shape], named: &[(usize, crate::naming::Name)]) -> (Vec<crate::naming::Name>, Vec<crate::naming::Name>) {
+    let n = face_normal(&topo.faces[fi]).map(|x| x.1).unwrap_or(DVec3::Z);
+    let (mut seen, mut back) = (Vec::new(), Vec::new());
+    for (i, name) in named {
+        let fnormal = part_faces.get(*i).and_then(|f| face_normal(f).ok()).map(|x| x.1).unwrap_or(n);
+        if fnormal.dot(n) < 0.0 { seen.push(name.clone()) } else { back.push(name.clone()) }
+    }
+    (seen, back)
+}
+
+/// The flat pattern of a built part (live's placement: the first wall's
+/// definition plane at z = 0, seen from +z; dom/qa5-sm-flat.dxf): walls and
+/// bend strips unfolded, bend lines on the strips' centres, up when the bend
+/// rises toward the viewer.
+fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip]) -> Option<crate::sheetmetal::FlatPattern> {
+    let unfolded = unfold(def, def.k_factor, topo).ok()?;
+    let mut pieces = Vec::new();
+    for (fi, face) in wall_flats {
+        let m = unfolded.walls.get(fi)?;
+        pieces.push(k::transform(face, &k::Transform::Matrix(*m), true).ok()?.shape);
+    }
+    let thickness = def.front + def.back;
+    let mut lines = Vec::new();
+    for (n, s) in strips.iter().enumerate() {
+        let Some(ma) = unfolded.walls.get(&s.wall_a) else { continue };
+        let a = s.a.map(|p| ma.transform_point3(p));
+        let b = match unfolded.walls.get(&s.wall_b) {
+            Some(mb) => s.b.map(|p| mb.transform_point3(p)),
+            // A free rolled end: the developed length on from wall a.
+            None if s.rolled.is_some() => s.a.map(|p| ma.transform_point3(p - s.dir_a * s.angle * (s.radius + def.k_factor * thickness))),
+            None => continue,
+        };
+        if let Ok(face) = k::make_polyline(&[a[0], a[1], b[1], b[0]], true).and_then(|w| k::make_face_from_wire(&w, true)) {
+            pieces.push(face);
+        }
+        // Wall b rises toward the viewer (+z) when it lies on the side wall a's
+        // flat normal points away from.
+        let flat_normal = ma.transform_vector3(s.normal_a);
+        let up = (s.toward_b.dot(s.normal_a) < 0.0) == (flat_normal.z < 0.0);
+        let mid = |i: usize| glam::DVec2::new((a[i].x + b[i].x) * 0.5, (a[i].y + b[i].y) * 0.5);
+        lines.push(crate::sheetmetal::FlatBendLine {
+            a: mid(0),
+            b: mid(1),
+            up,
+            angle: s.angle,
+            radius: s.radius,
+            k_factor: def.k_factor,
+            allowance: s.angle * (s.radius + def.k_factor * thickness),
+            bend: n,
+        });
+    }
+    let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    crate::sheetmetal::flat::flat_from_pieces(frame, &pieces, lines, thickness).ok()
+}
+
 struct Unfolded {
     walls: BTreeMap<usize, glam::DMat4>,
     bends: BTreeMap<usize, glam::DMat4>,
@@ -925,14 +1331,27 @@ fn rotation_about(point: DVec3, axis: DVec3, angle: f64) -> glam::DMat4 {
 }
 
 fn unfold(def: &Definition, k_factor: f64, topo: &Topo) -> FResult<Unfolded> {
-    let thickness = def.front + def.back;
     let mut walls = BTreeMap::new();
     let mut bends = BTreeMap::new();
     if topo.faces.is_empty() {
         return Ok(Unfolded { walls, bends });
     }
-    // The first wall: its definition normal to -z, its plane to z = 0.
-    let (p0, n0) = face_normal(&topo.faces[0])?;
+    // Each part's first wall (walls only joined by rips are separate parts):
+    // its definition normal to -z, its plane to z = 0.
+    for root in 0..topo.faces.len() {
+        if walls.contains_key(&root) || def.rolled.contains_key(&root) || !matches!(topo.faces[root].face_plane(), Ok(Some(_))) {
+            continue;
+        }
+        place_from(def, k_factor, topo, root, &mut walls, &mut bends)?;
+    }
+    Ok(Unfolded { walls, bends })
+}
+
+/// Place wall `root` (normal to -z, plane z = 0) and every wall reached from
+/// it across bends.
+fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: &mut BTreeMap<usize, glam::DMat4>, bends: &mut BTreeMap<usize, glam::DMat4>) -> FResult<()> {
+    let thickness = def.front + def.back;
+    let (p0, n0) = face_normal(&topo.faces[root])?;
     let target = DVec3::NEG_Z;
     let rot = if n0.dot(target) > 1.0 - 1e-12 {
         glam::DMat4::IDENTITY
@@ -942,8 +1361,8 @@ fn unfold(def: &Definition, k_factor: f64, topo: &Topo) -> FResult<Unfolded> {
         glam::DMat4::from_axis_angle(n0.cross(target).normalize(), n0.dot(target).clamp(-1.0, 1.0).acos())
     };
     let z = rot.transform_point3(p0).z;
-    walls.insert(0, glam::DMat4::from_translation(DVec3::new(0.0, 0.0, -z)) * rot);
-    let mut queue = vec![0usize];
+    walls.insert(root, glam::DMat4::from_translation(DVec3::new(0.0, 0.0, -z)) * rot);
+    let mut queue = vec![root];
     while let Some(w1) = queue.pop() {
         let base = walls[&w1];
         for (&e, &radius) in &def.bends {
@@ -970,8 +1389,28 @@ fn unfold(def: &Definition, k_factor: f64, topo: &Topo) -> FResult<Unfolded> {
                 queue.push(w2);
             }
         }
+        // Across rolled bends: wall b turned about the arc's axis onto wall
+        // a's tangent line, then moved out by the developed length.
+        for (&fi, &radius) in &def.rolled {
+            let Some(st) = rolled_strip(topo, fi, radius) else { continue };
+            let (w2, line1, line2) = if st.wall_a == w1 { (st.wall_b, st.a, st.b) } else if st.wall_b == w1 { (st.wall_a, st.b, st.a) } else { continue };
+            if w2 == usize::MAX || walls.contains_key(&w2) {
+                continue;
+            }
+            let axis = st.axis.normalize();
+            let into = |f: usize, at: DVec3| -> FResult<DVec3> {
+                let (p, n) = face_normal(&topo.faces[f])?;
+                let a = n.cross(axis).normalize();
+                Ok(if (p - at).dot(a) < 0.0 { -a } else { a })
+            };
+            let (a1, a2) = (into(w1, line1[0])?, into(w2, line2[0])?);
+            let developed = st.angle * (radius + k_factor * thickness);
+            let sign = if glam::DMat4::from_axis_angle(axis, st.angle).transform_vector3(a2).dot(-a1) > 0.0 { 1.0 } else { -1.0 };
+            walls.insert(w2, base * glam::DMat4::from_translation(-a1 * developed) * rotation_about(st.origin, axis, sign * st.angle));
+            queue.push(w2);
+        }
     }
-    Ok(Unfolded { walls, bends })
+    Ok(())
 }
 
 fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -993,9 +1432,9 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
         });
         def_entity.map(|(e, b, model)| {
             let body = &st.ctx.bodies[b];
-            let (bends, rips) = joints(&st, &q, b);
+            let (bends, rips, rolled, rip_styles) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rips, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), previous: None };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };
@@ -1011,4 +1450,43 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
     let row = |r: usize| Value::array((0..3).map(|c| Value::num(m.col(c)[r])).collect());
     let t = m.col(3);
     Ok(Value::map_from([("linear", Value::array(vec![row(0), row(1), row(2)])), ("translation", Value::array(vec![Value::num(t.x), Value::num(t.y), Value::num(t.z)]))]))
+}
+
+/// `@evCornerType` (std evaluate.fs; Corner feature): what meets at a sheet
+/// metal definition vertex, with the definition vertices lying there (a
+/// corner's walls end in coincident vertices). No bend: NOT_A_CORNER; one
+/// bend alone: BEND_END; bends and a rip between their walls: CLOSED_CORNER
+/// (live G34a, a Closed corner on two flanges); otherwise OPEN_CORNER.
+fn ev_corner_type(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let def = def_arg(i, &a, 1)?;
+    let (kind, refs) = super::query::with_ents(i, &cx, def.get("vertex"), |i, q, ents| {
+        let [Ent::Vertex(b, v)] = ents.as_slice() else { return Err(super::raise_error(i, "BAD_GEOMETRY", None)) };
+        let shape = &q.st.ctx.bodies[*b].shape;
+        let at = shape.sub_shape(k::ShapeType::Vertex, *v).and_then(|x| x.vertex_point()).unwrap_or_default();
+        let verts: Vec<usize> = shape.vertices().iter().enumerate().filter(|(_, x)| x.vertex_point().is_ok_and(|p| p.distance(at) < TOL)).map(|(n, _)| n).collect();
+        let ve = shape.vertex_edges().unwrap_or_default();
+        let edges: std::collections::BTreeSet<u32> = verts.iter().flat_map(|n| ve.get(*n).cloned().unwrap_or_default()).collect();
+        let (mut bends, mut rips) = (0, 0);
+        for e in edges {
+            let Some(j) = sm_attribute(q.st, &q.to_ref(&Ent::Edge(*b, e as usize)), "JOINT") else { continue };
+            match j.get("jointType").get("value").as_str().as_deref() {
+                Some("BEND") => bends += 1,
+                Some("RIP") => rips += 1,
+                _ => {}
+            }
+        }
+        let kind = match (bends, rips) {
+            (0, _) => "NOT_A_CORNER",
+            (1, 0) => "BEND_END",
+            (2.., 1..) => "CLOSED_CORNER",
+            _ => "OPEN_CORNER",
+        };
+        Ok((kind, verts.iter().map(|n| q.to_ref(&Ent::Vertex(*b, *n))).collect::<Vec<Reference>>()))
+    })?;
+    // Transient ids (std's wrapper makes them queries).
+    let mut st = cx.state.lock();
+    let ids: Vec<Value> = refs.iter().map(|r| Value::str(st.transient(r))).collect();
+    let corner = super::std_enum("smcornertype.gen.fs", "SMCornerType", kind).unwrap_or_else(|| Value::str(kind));
+    Ok(Value::map_from([("cornerType", corner), ("primaryVertex", ids.first().cloned().unwrap_or_default()), ("allVertices", Value::array(ids))]))
 }

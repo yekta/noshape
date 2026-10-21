@@ -433,45 +433,12 @@ impl DrawingEditor {
     }
 
     /// Onshape's sheet tabs at the top-left of the drawing area ("Sheet1",
-    /// the active one on a `#c7c7c7` chip) and the 33x34 tab at the left
-    /// edge that opens the Sheets panel.
-    fn render_sheet_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    /// the active one on a `#c7c7c7` chip) while the Sheets panel is closed.
+    /// The canvas draws them under its tool dialogs, which cover them.
+    pub(crate) fn render_sheet_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let mut tabs = h_flex().absolute().top(px(5.)).left(px(4.)).gap(px(2.));
-        // A dialog panel at the top left (Insert view, View properties)
-        // covers the sheet tabs, as in Onshape.
-        let covered = matches!(self.tool, Tool::InsertView { .. })
-            || self.view_props.is_some()
-            || self.sheet_props.is_some()
-            || self.section_dlg.is_some()
-            || self.centermark_dlg.is_some()
-            || self.painter.is_some()
-            || self.inspection.is_some()
-            || self.hatch_dlg.is_some()
-            || self.break_dlg.is_some()
-            || self.aux_dlg.is_some()
-            || self.detail_dlg.is_some()
-            || self.crop_dlg.is_some()
-            || self.gdt_dlg.is_some()
-            || self.callout_dlg.is_some()
-            || self.stack_dlg.is_some()
-            || self.weld_dlg.is_some()
-            || self.table_dlg.is_some()
-            || self.revision_dlg.is_some()
-            || self.custom_tables.dlg.is_some()
-            || self.move_sheet.is_some()
-            || self.table_props.is_some()
-            || self.table_tool.is_some()
-            || self.linestyle.is_some()
-            || self.hide_edges.is_some()
-            || self.section_edit.is_some()
-            || self.replicate_dlg.is_some()
-            || self.datum_dlg.is_some()
-            || self.palette.is_some()
-            || self.view_sketches.is_some()
-            || self.hide_parts.is_some()
-            || self.panel.is_some();
-        for (i, s) in self.drawing.sheets.iter().enumerate().filter(|_| !covered) {
+        let mut tabs = h_flex().absolute().top(px(4.)).left(px(4.)).gap(px(2.));
+        for (i, s) in self.drawing.sheets.iter().enumerate() {
             let active = i == self.sheet;
             tabs = tabs.child(
                 div()

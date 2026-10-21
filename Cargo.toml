@@ -28,7 +28,8 @@ wgpu = "29"
 glam = { version = "0.34", features = ["serde", "bytemuck"] }
 bytemuck = { version = "1", features = ["derive"] }
 serde = { version = "1", features = ["derive", "rc"] }
-serde_json = "1"
+# float_roundtrip: documents reload (open, undo) with the exact same floats.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 thiserror = "2"
 anyhow = "1"
 parking_lot = "0.12"

@@ -17,6 +17,7 @@ use crate::reference::{FeatureId, TopoName};
 use glam::{DMat4, DVec3};
 
 pub mod flat;
+pub mod flat_dxf;
 pub use flat::{FlatBendLine, FlatForm, FlatPattern, flat_pattern, flat_pattern_for};
 
 /// Bend relief shape (model default or Bend relief override).

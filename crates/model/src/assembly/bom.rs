@@ -281,6 +281,25 @@ fn part_props<'a>(doc: &'a Document, studio: TabId, body: &BodyId) -> Option<&'a
     }
 }
 
+/// `config` without the entries a Part Studio's defaults give anyway (or
+/// that aren't its inputs): instances in the same configuration share one
+/// BOM row however their values were stored (qa5 CA6).
+fn canonical_config(doc: &Document, studio: TabId, config: &ConfigValues) -> ConfigValues {
+    let Some(TabContent::PartStudio(ps)) = doc.tab(studio).map(|t| &t.content) else { return config.clone() };
+    let defaults = ps.configuration.defaults();
+    // "10 mm" typed into a variable input equals a "10mm" default.
+    let same = |a: &str, b: &str| {
+        a.trim() == b.trim()
+            || match (noshape_units::evaluate(a, &noshape_units::EmptyScope), noshape_units::evaluate(b, &noshape_units::EmptyScope)) {
+                (Ok(x), Ok(y)) => x.dim == y.dim && (x.value - y.value).abs() <= 1e-12 * x.value.abs().max(y.value.abs()).max(1.0),
+                _ => false,
+            }
+    };
+    // Inputs excluded from properties count as their default in the BOM.
+    let excluded = |k: &str| ps.configuration.inputs.iter().any(|i| i.id == k && i.excluded);
+    ConfigValues(config.0.iter().filter(|(k, v)| !excluded(k) && defaults.0.get(*k).is_some_and(|d| !same(d, v))).map(|(k, v)| (k.clone(), v.clone())).collect())
+}
+
 fn assembly_of(doc: &Document, tab: TabId) -> Option<&Assembly> {
     match doc.tab(tab).map(|t| &t.content) {
         Some(TabContent::Assembly(a)) => Some(a),
@@ -321,13 +340,13 @@ fn walk(doc: &Document, asm: &Assembly, prefix: &InstancePath, result: &Assembly
                 if mirrored {
                     name = format!("{name} (mirrored)");
                 }
-                out.push(Use { source: BomSource::Part { studio: *studio, body: body.clone(), config: config.clone(), mirrored }, name, path, excluded, children: Vec::new(), behavior: BomBehavior::default() });
+                out.push(Use { source: BomSource::Part { studio: *studio, body: body.clone(), config: canonical_config(doc, *studio, config), mirrored }, name, path, excluded, children: Vec::new(), behavior: BomBehavior::default() });
             }
             InstanceSource::PartStudio { studio, config } => {
                 // Every solid / surface part of the rigid Part Studio instance.
                 for o in result.occurrences.iter().filter(|o| o.path == path) {
                     let excluded = suppressed || part_props(doc, *studio, &o.body).is_some_and(|p| p.meta.exclude_from_bom);
-                    out.push(Use { source: BomSource::Part { studio: *studio, body: o.body.clone(), config: config.clone(), mirrored: false }, name: o.body_name.clone(), path: path.clone(), excluded, children: Vec::new(), behavior: BomBehavior::default() });
+                    out.push(Use { source: BomSource::Part { studio: *studio, body: o.body.clone(), config: canonical_config(doc, *studio, config), mirrored: false }, name: o.body_name.clone(), path: path.clone(), excluded, children: Vec::new(), behavior: BomBehavior::default() });
                 }
             }
             InstanceSource::External { key, body: None, config } if result.node(&path).is_some_and(|n| n.linked.is_some()) => {
@@ -731,3 +750,28 @@ pub fn table_text(doc: &Document, result: &AssemblyResult, lines: &[BomLine], se
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::configuration::{ConfigInput, ConfigInputKind, VariableKind};
+    use crate::document::DocumentSettings;
+    use crate::partstudio::PartStudio;
+
+    /// qa5 CA6: two instances back in the default configuration share one
+    /// BOM row, whatever their stored values look like.
+    #[test]
+    fn instances_in_the_same_configuration_share_a_row() {
+        let mut ps = PartStudio::default();
+        let input = |id: &str, kind| ConfigInput { id: id.into(), name: id.into(), kind, visible_when: None, excluded: false };
+        ps.configuration.inputs.push(input("d", ConfigInputKind::Variable { kind: VariableKind::Length, default: noshape_units::ExprValue::new("10 mm"), min: None, max: None }));
+        let mut doc = Document { settings: DocumentSettings::default(), tabs: Vec::new() };
+        let tab = doc.add_tab("Part Studio 1", TabContent::PartStudio(ps));
+        let cfg = |v: &str| ConfigValues([("d".to_string(), v.to_string())].into_iter().collect());
+        assert_eq!(canonical_config(&doc, tab, &cfg("10 mm")), ConfigValues::default());
+        assert_eq!(canonical_config(&doc, tab, &cfg("10mm")), ConfigValues::default());
+        assert_eq!(canonical_config(&doc, tab, &ConfigValues::default()), ConfigValues::default());
+        assert_eq!(canonical_config(&doc, tab, &cfg("25 mm")), cfg("25 mm"));
+    }
+}
+

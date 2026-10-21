@@ -799,6 +799,37 @@ pub fn sketch_edge_shape(sk: &crate::regen::context::SketchResult, id: u32) -> O
 }
 
 /// Whether an entity still lies on all of a snapshot's points.
+impl QueryCx<'_> {
+    /// Where an attributed edge or vertex of a sheet (a sheet metal
+    /// definition) is, with its body: [`CtxState::remap_attributes`].
+    pub fn attribute_snapshot(&self, r: &Reference) -> Option<(BodyId, Snapshot)> {
+        if !matches!(r, Reference::Edge(_) | Reference::Vertex(_)) {
+            return None;
+        }
+        let e = self.from_ref(r).into_iter().next()?;
+        let Some(Ent::Body(b)) = self.owner(&e) else { return None };
+        let body = &self.st.ctx.bodies[b];
+        if body.kind != BodyKind::Surface {
+            return None;
+        }
+        Some((body.id.clone(), self.snapshot(&e)?))
+    }
+}
+
+/// Where an attributed entity is now, if an operation renamed it (its name
+/// gone, or now naming another entity): the one entity of its kind lying
+/// where it was. `None`: it is where it was, or nothing (or several) is.
+pub fn relocated(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<Ent> {
+    let found = q.from_ref(r);
+    if !found.is_empty() && found.iter().all(|e| snap_matches(q, snap, e)) {
+        return None;
+    }
+    match q.tracked(snap, false).as_slice() {
+        [e] => Some(e.clone()),
+        _ => None,
+    }
+}
+
 fn snap_matches(q: &QueryCx, snap: &Snapshot, e: &Ent) -> bool {
     entity_type_of(e) == snap.etype
         && q.shape(e).is_some_and(|s| snap.points.iter().all(|p| k::make_vertex(*p).ok().and_then(|v| k::distance(&v, &s).ok()).is_some_and(|d| d.distance < 1e-7)))

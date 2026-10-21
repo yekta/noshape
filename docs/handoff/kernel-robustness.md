@@ -7,6 +7,47 @@ ground truth (kern)", built through Onshape's REST API with exact numbers; scrip
 requests in `live/REQUESTS.md`, lines starting `kern`). Build dir `/root/target-kern`, display `:106`. Scratch C++
 experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`make <name>`; `common.hpp`).
 
+## kern (new account) 2026-10-21 19:00 → — state
+- Pending-pattern-2 test (`pattern_fins::narrow_rib_feature_pattern_without_reapply_matches_onshape`) was already
+  appended; it passes (2.1 s).
+- **PERF1 root cause #1 fixed:** the 400-hole Extrude spent 115 of its 117 s in `find_region` rebuilding all sketch
+  regions per referenced region (O(n²) arrangement). `eval.rs::resolve_region` now looks the id up in the sketch's
+  stored `SketchResult::regions` (`noshape_sketch::regions::find_region_in`, new; `Sketch::find_region` uses it).
+  Test `model/tests/big_plate.rs` (predecessor's, live "qa5 big plate": 400 holes / chamfer 400 edges / depth edit,
+  each < 2 s). Before: holes 122.8 s (kernel cut 1.3 s), chamfer 5.5 s, depth edit 122.4 s.
+- **Release blockers (lead 19:00) F8/F9/F26:**
+  - Test `kernel_robustness::chamfer_and_shell_on_filleted_box_match_onshape` (live G46 numbers). Onshape's mass
+    properties are approximate where fillets meet (G49 reports variance ±2.9 mm³; exact mitred fillet 44848.0752 vs
+    its 44848.2156), so those volumes are checked to 0.3 mm³.
+  - F8 chamfer 5: `op_chamfer`'s catch reports "chamfer distance too large" (→ "Distance of chamfer on face too
+    large.") when the edge ends on a fillet cylinder of smaller radius.
+  - F8 fillet after chamfer: `features.cpp::fillet_past_end_faces` (fallback when OCCT fails): fillet the part with
+    the end faces removed (Defeaturing), then Common with the part. Probe: 44487.2158, 9/21/14 vs Onshape 44487.2085,
+    9/21/14 (`/root/kern-scratch/g46/g46.cpp`).
+  - F8 chamfer 2 after fillets (live G49 decoded): Onshape's blend patch (face JJC, a (1,3) B-spline) is ruled
+    between the two fillet cylinders' sections by the vertical planes through the chamfer's top corners and the
+    point where the fillets meet, rulings at equal cylinder angle; Onshape approximates the arcs by a fixed cubic
+    (normalized poles (1,0), (1.0010623,0.2621644), (0.8924865,0.5217270), …) and trims by intersection.
+    `features.cpp::chamfer_into_fillet_corners` builds the exact surface (rational) as part − tool (sewn tool:
+    chamfer plane, section planes, patch). Probe `/root/kern-scratch/g46/patch.cpp`: 10 faces, valid, 44790.0752
+    (2 mm) / 44833.5752 (1 mm); Onshape's x_t read by us 44789.9729 / 44833.5301; its mass props 44789.8502 /
+    44833.4378. Face areas match to ≤0.007 mm².
+  - F9 shell after those: verified only through the model test (OCCT's plain join shell returns the input).
+  - F26 STEP: `kernel/src/step_out.rs`: OCCT writes each part (location baked, no assembly, no p-curves, metres),
+    the file is rebuilt in Onshape's layout (G47/G48): one product per part (last first), names on product / shape
+    rep / solid / context, colours in 1/255, AP214/AP203 context strings + PMI-validation properties, inch units,
+    **entity numbering = ST-Developer's: types ordered by reverse first creation, creation order emulated (product
+    data, units, context, SR placement, solid top-down with its style, faces surface-first, edges curve-then-vertices,
+    ABSR, SRR), from #10**, line wrapping (refs/strings/enums pre-checked at col 72, enums indented, strings broken at
+    col 70). G47's 3 cubes: same entity numbers as Onshape for the product layer. Header identity says NOSHAPE
+    (not ST-DEVELOPER / ONSHAPE BY PTC INC; no ST-Developer comment): lead to decide. Tests
+    `kernel/tests/export.rs::{step_layout_like_onshape, step_layout_variants_like_onshape}` (pass).
+    `ops/src/export.rs`: STEP colours are the part colour's exact sRGB (was a 2.2 gamma).
+- **PERF1 chamfer/fillet of many edges:** `boolean.cpp::blend_in_slabs` (declared in internal.hpp): ≥ 48 edges →
+  split the part by planes in gaps between the edges' reach (2 × size), blend each slab in parallel, join on the
+  shared cut faces, unify. Probe `/root/kern-scratch/plate/slabs.cpp`: 400 rims 4.3 s → ~1.1 s with glue + USD
+  (join + merge_planar should be cheaper). Used first by checked `op_fillet` / `op_chamfer`.
+
 ## For the lead (2026-10-21 13:20): integration blockers fixed
 - `cargo clippy -p noshape-model -p noshape-kernel --all-targets -- -D warnings`: clean (13:07).
 - `cargo test -p noshape-kernel --test features`: 20/20 (13:18), incl. `booleans_multi_and_unify` (the merged

@@ -116,3 +116,27 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data pending.
 | # | Row | Live | Ours | Verdict |
 |---|---|---|---|---|
 | – | Relation tools | **four toolbar buttons** (Gear / Rack and pinion / Screw / Linear relation); **one feature dialog** (220 px, "<Type> 1" ✓ ✕): unlabelled type select (Gear, Rack and pinion, Screw, Linear), **Mate(s)** query (chips like "⟳ - z - Revolute 1"), one value row (Relation ratio 1 / Distance per revolution 25 mm), ☐ Reverse direction; row "Gear 1" etc. at the end of Mate features | one button opening a custom "Relation" panel with tabs, "Select mate" dropdowns, "Lead per radian 1 mm", blue OK | ✗ **A13 confirmed** (skb) |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| A1 first insert | amber + selected ✅, fit crops plate | ✗ still (partly) |
+| A3 hidden mate rows | #333333 | ✗ still |
+| A4 slider flip | no effect | ✗ still |
+| A5 MC hover dots | dots on other parts | ✗ still |
+| A11 BOM typing | first char lost ("QA1" → "A1") | ✗ still |
+| A12 Replicate mate placement | "Cylindrical 2" top level | ✗ still |
+| A13 relations | custom Relation panel | ✗ still |
+| A14 Replicate red hints | still shown | ✗ still |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+Pass 6 (17:11) had found A12 fixed (mate nests under "Replicate 1 ▸ Mate features (1)").
+| Row | Ours | Status |
+|---|---|---|
+| A1 first insert fit | as tight as live (ins-902: live's block also runs under the right strip) | ✅ fit |
+| A15 (new) pending first instance look | face (229,163,54) with **black edges** vs live (242,182,72) with amber edges (255,192,76); **a transform triad at the instance** (live none); root row "Assembly 5" highlighted with the instance row (live only the instance row) | ✗ **A15** (skb / ui2) |
+| A3 hidden mate rows | light grey | ✅ **fixed** |
+| A13 relations | four toolbar buttons; Gear → "Gear 1" dialog: type select, Mate(s), Relation ratio 1, ☐ Reverse direction | ✅ **fixed** |
+| A11 typing into a BOM cell | "QA1" kept | ✅ **fixed** (Ctrl+Z doesn't revert the BOM edit; live ?) |
+| A14 Replicate red hints | none | ✅ **fixed** |
+| A16 (new) | "solving…" label at the top right for as long as the Replicate dialog is open (nothing selected); gone on cancel | ? A16 (live request filed) |
+| A4 Slider flip | block still inside the plate (Front view) | ✗ still |
+| A5 mate connector hover | dots only on the hovered face, small triad + ring | ✅ **fixed** |

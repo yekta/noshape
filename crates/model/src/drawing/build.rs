@@ -667,7 +667,10 @@ fn annotation_cad_layers(k: &AnnotationKind) -> (CadLayer, CadLayer) {
         A::Centermark { .. } => (CadLayer::Centermarks, CadLayer::Centermarks),
         A::Centerline { .. } | A::CircleCenterline { .. } => (CadLayer::Centerlines, CadLayer::Centerlines),
         A::VirtualSharp { .. } => (CadLayer::VirtualSharps, CadLayer::VirtualSharps),
-        A::Note { .. } | A::Balloon { .. } | A::HoleCallout { .. } | A::RevisionCallout { .. } => (CadLayer::AnnotationLines, CadLayer::AnnotationText),
+        // Live drw2-k-dxf2018: a note's leader goes with its text; hole
+        // callout, GD&T, datum, surface finish and weld leaders and symbol
+        // lines on ANNOTATION_LINES.
+        A::Balloon { .. } | A::HoleCallout { .. } | A::RevisionCallout { .. } | A::Gdt { .. } | A::Datum { .. } | A::SurfaceFinish { .. } | A::Weld { .. } => (CadLayer::AnnotationLines, CadLayer::AnnotationText),
         _ => (CadLayer::AnnotationText, CadLayer::AnnotationText),
     }
 }
@@ -732,7 +735,7 @@ fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources
         "sheet.name" => sheet.name.clone(),
         "sheet.number" => (si + 1).to_string(),
         "sheet.count" => drawing.sheets.len().to_string(),
-        "sheet.scale" => if sheet.views.is_empty() { String::new() } else { format_scale(sheet.scale) },
+        "sheet.scale" => if sheet.views.is_empty() && !sheet.scale_shown { String::new() } else { format_scale(sheet.scale) },
         "sheet.size" => sheet.size.label().to_string(),
         "date" => format::today(),
         "units" => if drawing.units_mm { "mm".into() } else { "in".into() },
@@ -864,6 +867,7 @@ struct Env<'a> {
     drawing: &'a Drawing,
     sheet: &'a Sheet,
     placements: &'a [ViewPlacement],
+    views: &'a HashMap<ViewId, Arc<ViewGeometry>>,
     sources: &'a Sources,
     fields: &'a dyn Fn(&str) -> Option<String>,
     revisions: &'a [tables::RevisionRow],
@@ -919,8 +923,10 @@ impl AnnotationEnv for Env<'_> {
         hole_callout_marked(self.drawing, self.sheet, self.sources, a).unwrap_or_else(|| vec!["⌀?".into()])
     }
     fn balloon_text(&self, a: &Annotation, text: &str) -> String {
-        let part = if let AnnotationKind::Balloon { callout, .. } = &a.kind { callout.part.clone() } else { None };
-        let body = a.refs.iter().find(|r| r.slot == 0).map(|r| r.point.body().clone()).or(part);
+        let (part, anchor) = if let AnnotationKind::Balloon { callout, view, anchor, .. } = &a.kind { (callout.part.clone(), Some((*view, *anchor))) } else { (None, None) };
+        // Callouts made before the part was stored (qa5 D8): the part of the
+        // view edge at the anchor.
+        let body = a.refs.iter().find(|r| r.slot == 0).map(|r| r.point.body().clone()).or(part).or_else(|| anchor.and_then(|(v, p)| self.part_at(v, p)));
         self.callout_text(a, body.as_ref(), text)
     }
     fn stacked_text(&self, a: &Annotation, st: &super::StackedCallout) -> String {
@@ -929,6 +935,23 @@ impl AnnotationEnv for Env<'_> {
 }
 
 impl Env<'_> {
+    /// The part of view `view`'s edge nearest to `p` (view coordinates),
+    /// within 2 mm on the sheet.
+    fn part_at(&self, view: ViewId, p: [f64; 2]) -> Option<crate::reference::BodyId> {
+        let g = self.views.get(&view)?;
+        let pl = self.placements.iter().find(|pl| pl.id == view)?;
+        let s = pl.to_sheet(p);
+        g.edges
+            .iter()
+            .filter_map(|e| {
+                let me = g.model_edges.get(e.model? as usize)?;
+                let d = e.points.windows(2).map(|w| views::dist_to_segment(s, pl.to_sheet(w[0]), pl.to_sheet(w[1]))).fold(f64::INFINITY, f64::min);
+                (d < 2.0).then(|| (d, me.body.clone()))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, b)| b)
+    }
+
     /// A callout's text: its own (empty: the BOM item number), with the
     /// properties of its part `body` (`{part.*}`) and that part's BOM row
     /// (`{bom.*}`) filled in; "----" when there is none.
@@ -1129,6 +1152,30 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
             }
             g.cad_since(cad_mark, CadLayer::ViewHatches);
+            // Broken-out profiles (live: a SPLINE on SECTION_JOG_LINES over
+            // the cut's edge; a polygon profile as a polyline).
+            for b in &v.broken_out {
+                let outline = views::broken_out_outline(b);
+                if outline.len() < 3 {
+                    continue;
+                }
+                let mut closed = outline.clone();
+                closed.push(outline[0]);
+                let cad_mark = g.mark();
+                let pieces = map_polyline(&pl, &closed);
+                let whole = pieces.len() == 1;
+                for mut piece in pieces {
+                    if whole {
+                        piece.pop();
+                    }
+                    g.lines.push(Polyline2 { points: piece, style: LineStyle::Visible, closed: whole, pick: 0 });
+                }
+                if b.spline && pl.breaks().is_empty() && g.lines.len() == cad_mark.0 + 1 {
+                    let poles: Vec<[f64; 2]> = super::cad_objects::catmull_rom_poles(&b.profile).into_iter().map(|p| pl.to_sheet(p)).collect();
+                    g.add_cad_spline(cad_mark.0, poles);
+                }
+                g.cad_since(cad_mark, CadLayer::SectionJogLines);
+            }
             // Detail boundary ("Show detail view profile"; none with "Clip
             // border to geometry").
             // Detail profile lines: Phantom / Dashed / Solid.
@@ -1505,7 +1552,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let (ml, mt, mg) = (g.lines.len(), g.texts.len(), g.grips.len());
     // Note fields are matched only against annotation texts.
     let used_notes = std::cell::RefCell::new(Vec::<String>::new());
-    let env = Env { drawing, sheet, placements: &placements, sources, fields: &fields, revisions: &info.revisions, used: &used_notes };
+    let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used_notes };
     g.add_annotations(&resolved, &env);
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for a in &resolved.annotations {
@@ -1514,9 +1561,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             remap.insert(super::sheet::inspection_pick(a.id), picks.id(PickTarget::Inspection(a.id)));
         }
     }
-    // Export layers by annotation kind (live: dimensions and symbols on
-    // ANNOTATION_TEXT, leaders on ANNOTATION_LINES, centermarks /
-    // centerlines on their own layers).
+    // Export layers by annotation kind (`annotation_cad_layers`).
     let kinds: HashMap<u32, (CadLayer, CadLayer)> = resolved.annotations.iter().map(|a| ((a.id & 0xFFFF_FFFF) as u32, annotation_cad_layers(&a.kind))).collect();
     let line_kinds: Vec<Option<CadLayer>> = g.lines[ml..].iter().map(|l| kinds.get(&l.pick).map(|k| k.0)).collect();
     let text_kinds: Vec<Option<CadLayer>> = g.texts[mt..].iter().map(|t| kinds.get(&t.pick).map(|k| k.1)).collect();
@@ -1587,6 +1632,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let (l0, t0, f0) = (g.lines.len(), g.texts.len(), g.fills.len());
         tables::render(&mut g, t, &data, &layout, pick);
         g.cad_since((l0, t0, f0), CadLayer::Tables);
+        g.add_cad_table((l0, t0, f0), &layout, &data);
         // Moved to a format layer: its color, locked with the format.
         if !t.layer.is_drawing() {
             let span = LayerSpan { lines: l0..g.lines.len(), texts: t0..g.texts.len(), fills: f0..g.fills.len(), layer: t.layer };

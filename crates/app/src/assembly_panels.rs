@@ -181,6 +181,9 @@ pub(crate) struct ConfigSession {
     pub texts: Vec<(String, Entity<InputState>)>,
     /// Generate is enabled once an input changed (live: greyed at first).
     pub generate: bool,
+    /// The dialog (Tab leaves it past its last control).
+    pub focus: FocusHandle,
+    pub _subs: Vec<Subscription>,
 }
 
 /// The Replace instance dialog (live assembly/833–836): the instances to
@@ -829,7 +832,6 @@ impl AssemblyView {
         };
         let selected = self.selected_mate == Some(id);
         let suppressed = pat.suppressed;
-        let n = pat.generated.len();
         let row = h_flex()
             .id(SharedString::from(format!("pat-{}", id.0)))
             .h(px(24.))
@@ -857,7 +859,6 @@ impl AssemblyView {
             )
             .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
             .child(div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(pat.name.clone()))
-            .child(div().text_xs().text_color(pal.text_faint).child(format!("{n}")))
             .when_some(error, |d, e| d.child(div().id(SharedString::from(format!("pat-err-{}", id.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(id) } else { None };
@@ -902,10 +903,7 @@ impl AssemblyView {
     fn new_pattern_session(&self, kind: PatternDialogKind, window: &mut Window, cx: &mut Context<Self>) -> PatternSession {
         // Live ("qa5 assembly" 6): Distance 25 mm, Angle 360 deg, Instance
         // count 2.
-        let (d, n) = match kind {
-            PatternDialogKind::Circular => ("360 deg", "2"),
-            _ => ("25 mm", "2"),
-        };
+        let (d, n) = noshape_ops::assembly::pattern_defaults(kind == PatternDialogKind::Circular);
         let mk = |t: &str, window: &mut Window, cx: &mut Context<Self>| {
             let t = t.to_string();
             cx.new(|cx| InputState::new(window, cx).default_value(t))
@@ -946,13 +944,10 @@ impl AssemblyView {
 
     /// Whether the seed mate's target entity is an edge (edge scopes).
     fn replicate_on_edge(&self, s: &PatternSession, cx: &App) -> bool {
-        let Some(m) = s.mate.and_then(|id| self.assembly(cx).and_then(|a| a.mate(id).cloned())) else { return false };
-        let target = if s.seeds.first() == Some(&m.a.instance) { &m.b } else { &m.a };
-        let entity = match &target.reference {
-            Reference::Implicit { on, .. } => &**on,
-            r => r,
-        };
-        matches!(entity, Reference::Edge(_))
+        match (self.assembly(cx), s.seeds.first(), s.mate) {
+            (Some(a), Some(seed), Some(m)) => noshape_ops::assembly::default_replicate_scope(a, *seed, m) == noshape_model::assembly::ReplicateScope::EdgesOnPlane,
+            _ => false,
+        }
     }
 
     pub(super) fn open_pattern(&mut self, kind: PatternDialogKind, window: &mut Window, cx: &mut Context<Self>) {
@@ -1027,15 +1022,7 @@ impl AssemblyView {
 
     /// The seed's mate to match: its only mate, or the selected one.
     fn seed_mate(&self, seeds: &[InstanceId], cx: &App) -> Option<MateId> {
-        let asm = self.assembly(cx)?;
-        let seed = *seeds.first()?;
-        let mates: Vec<&Mate> = asm.mates.iter().filter(|m| m.uses_instance(seed) && asm.mate_generated_by(m.id).is_none()).collect();
-        if let Some(sel) = self.selected_mate
-            && mates.iter().any(|m| m.id == sel)
-        {
-            return Some(sel);
-        }
-        (mates.len() == 1).then(|| mates[0].id)
+        noshape_ops::assembly::seed_mate(self.assembly(cx)?, *seeds.first()?, self.selected_mate)
     }
 
     pub(super) fn pattern_from_session(&self, s: &PatternSession, cx: &App) -> Result<InstancePattern, String> {
@@ -1117,17 +1104,8 @@ impl AssemblyView {
         let editing = s.editing.is_some();
         self.pattern = None;
         let id = pat.id;
-        let desc = format!("{} : {}", if editing { "Edit" } else { "Insert" }, pat.name);
-        let created = self.edit(&desc, cx, move |a| {
-            match a.patterns.iter().position(|p| p.id == id) {
-                Some(i) => a.patterns[i] = pat,
-                None => a.patterns.push(pat),
-            }
-            match targets {
-                Some(t) => a.sync_matched_pattern(id, t),
-                None => a.sync_pattern(id),
-            }
-        });
+        let desc = noshape_ops::assembly::pattern_description(&pat.name, editing);
+        let created = self.edit(&desc, cx, move |a| noshape_ops::assembly::commit_pattern(a, pat, targets));
         if let Some(c) = created {
             self.message = Some((false, format!("{} instance(s) created.", c.len())));
         }
@@ -1355,9 +1333,8 @@ impl AssemblyView {
                         cx.notify();
                     }))));
                 }
-                if let Some(Err(e)) = &s.preview {
-                    body = body.child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_invalid).child(e.clone()));
-                }
+                // Live (qa5 pass 3, A14): no hint text in the dialog; an
+                // incomplete pattern only greys the ✓ and reddens the fields.
             }
         }
         // The help ? at the bottom right.
@@ -2004,15 +1981,74 @@ impl AssemblyView {
                 texts.push((inp.id.clone(), cx.new(|cx| InputState::new(window, cx).default_value(cur))));
             }
         }
-        self.config_panel = Some(ConfigSession { instance: top, inputs, values, texts, generate: false });
+        // Live: a value is committed with the workspace unit ("25" → "25 mm")
+        // when the field loses focus or on Enter, and makes Generate active.
+        let mut subs = Vec::new();
+        for (id, st) in &texts {
+            let id = id.clone();
+            subs.push(cx.subscribe_in(st, window, move |this: &mut Self, _, ev: &InputEvent, window, cx| match ev {
+                InputEvent::Change => {
+                    if let Some(s) = &mut this.config_panel {
+                        s.generate = true;
+                    }
+                    cx.notify();
+                }
+                InputEvent::Blur | InputEvent::PressEnter { .. } => this.commit_config_text(&id, window, cx),
+                InputEvent::Focus => {}
+            }));
+        }
+        self.config_panel = Some(ConfigSession { instance: top, inputs, values, texts, generate: false, focus: cx.focus_handle(), _subs: subs });
         cx.notify();
+    }
+
+    /// Tab / Shift+Tab in the Change configuration dialog (as in feature
+    /// dialogs, live psb 10-19 h): the next control in paint order; past
+    /// either end the focus leaves the dialog.
+    fn config_tab(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(focus) = self.config_panel.as_ref().map(|s| s.focus.clone()) else { return };
+        if forward {
+            window.focus_next(cx);
+        } else {
+            window.focus_prev(cx);
+        }
+        if !focus.contains_focused(window, cx) {
+            if forward {
+                window.dispatch_action(Box::new(crate::actions::FocusNavbar), cx);
+            } else {
+                window.focus(&self.focus, cx);
+            }
+        }
+    }
+
+    /// The text a variable input commits: a length or angle takes the
+    /// workspace unit, numbers and text stay as typed.
+    fn config_commit_text(&self, id: &str, text: &str, cx: &App) -> String {
+        use noshape_model::configuration::VariableKind;
+        let Some(s) = &self.config_panel else { return text.to_string() };
+        let dim = match s.inputs.iter().find(|i| i.id == id).map(|i| &i.kind) {
+            Some(ConfigInputKind::Variable { kind: VariableKind::Length, .. }) => Dim::LENGTH,
+            Some(ConfigInputKind::Variable { kind: VariableKind::Angle, .. }) => Dim::ANGLE,
+            Some(ConfigInputKind::Variable { kind: VariableKind::Integer | VariableKind::Real, .. }) => Dim::UNITLESS,
+            _ => return text.to_string(),
+        };
+        noshape_model::quantity_text::commit_text(text, dim, &self.units(cx), &EmptyScope)
+    }
+
+    fn commit_config_text(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(st) = self.config_panel.as_ref().and_then(|s| s.texts.iter().find(|(k, _)| k == id)).map(|(_, st)| st.clone()) else { return };
+        let text = st.read(cx).value().to_string();
+        let next = self.config_commit_text(id, &text, cx);
+        if next != text {
+            st.update(cx, |st, cx| st.set_value(next, window, cx));
+        }
     }
 
     fn apply_config(&mut self, cx: &mut Context<Self>) {
         let Some(s) = self.config_panel.take() else { return };
         let mut values = s.values.clone();
         for (id, st) in &s.texts {
-            values.0.insert(id.clone(), st.read(cx).value().to_string());
+            let text = st.read(cx).value().to_string();
+            values.0.insert(id.clone(), self.config_commit_text(id, &text, cx));
         }
         let name = self.assembly(cx).and_then(|a| a.instance(s.instance).map(|i| i.name.clone())).unwrap_or_default();
         let id = s.instance;
@@ -2030,6 +2066,8 @@ impl AssemblyView {
         let pal = p();
         let Some(s) = &self.config_panel else { return div().into_any_element() };
         let inputs = s.inputs.clone();
+        // Read before `insert_config_button` borrows the view mutably.
+        let focus = s.focus.clone();
         let name = self.assembly(cx).and_then(|a| a.instance(s.instance).map(|i| i.name.clone())).unwrap_or_default();
         let mut body = v_flex().pt(px(3.)).pb(px(4.));
         // Visibility conditions: hidden inputs and options don't show.
@@ -2156,6 +2194,18 @@ impl AssemblyView {
         }
         v_flex()
             .id("config-dialog")
+            // Feature-dialog keys: Tab walks the fields (committing them) and
+            // leaves the dialog for the navbar past the last one; Enter ✓, Esc ✕.
+            .key_context("FeatureDialog")
+            .track_focus(&focus)
+            .on_action(cx.listener(|this, _: &crate::actions::DialogTab, window, cx| this.config_tab(true, window, cx)))
+            .on_action(cx.listener(|this, _: &crate::actions::DialogTabPrev, window, cx| this.config_tab(false, window, cx)))
+            .on_action(cx.listener(|this, _: &crate::actions::Accept, _, cx| this.apply_config(cx)))
+            .on_action(cx.listener(|this, _: &crate::actions::Cancel, window, cx| {
+                this.config_panel = None;
+                window.focus(&this.focus, cx);
+                cx.notify();
+            }))
             .w(px(300.))
             .h(px(587.))
             .bg(pal.dialog_bg)
@@ -3888,7 +3938,7 @@ impl AssemblyView {
                     return;
                 }
                 let items: Vec<(Option<BodyId>, String)> = if rigid { vec![(None, studio_name.clone())] } else { parts.into_iter().filter(|(b, _)| only.as_ref().is_none_or(|o| o == b)).map(|(b, n)| (Some(b), n)).collect() };
-                let ids = this.edit(&format!("Insert : {studio_name} (other document)"), cx, |a| {
+                let ids = this.edit_insert(&format!("Insert : {studio_name} (other document)"), cx, |a| {
                     let mut ids = Vec::new();
                     for (k, (body, name)) in items.into_iter().enumerate() {
                         let id = InstanceId(a.next_id());
@@ -3914,7 +3964,7 @@ impl AssemblyView {
         if self.pick_replacement(InstanceSource::External { key: key.clone(), body: None, config: ConfigValues::default() }, name.clone(), cx) {
             return;
         }
-        let id = self.edit(&format!("Insert : {name} (other document)"), cx, |a| {
+        let id = self.edit_insert(&format!("Insert : {name} (other document)"), cx, |a| {
             let id = InstanceId(a.next_id());
             let n = a.next_instance_name(&name);
             a.instances.push(Instance::new(id, n, InstanceSource::External { key: key.clone(), body: None, config: ConfigValues::default() }, Placement::default()));

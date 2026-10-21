@@ -234,7 +234,12 @@ fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
         match r {
             Reference::Face(_) => {
                 for (bi, fi) in ev.resolve_faces(std::slice::from_ref(r)) {
-                    surf_tools.push(ev.face_shape(bi, fi)?);
+                    let face = ev.face_shape(bi, fi)?;
+                    // FeatureScript opSplitFace "extendToCompletion": planar tools split as whole planes.
+                    match face.face_plane() {
+                        Ok(Some(pl)) if ev.bool("extendToCompletion") => surf_tools.push(big_plane_face(ev, &pl)?),
+                        _ => surf_tools.push(face),
+                    }
                 }
             }
             Reference::Body(id) => {

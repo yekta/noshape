@@ -145,6 +145,9 @@ fn polygon_area(p: &[DVec2]) -> f64 {
 
 /// Flat pattern of the sheet metal body with id `id` in a context.
 pub fn flat_pattern_for(ctx: &Context, id: &BodyId) -> Result<FlatPattern, String> {
+    if let Some(f) = ctx.sheet_metal_flats.get(id) {
+        return Ok((**f).clone());
+    }
     let body = ctx.body(id).ok_or_else(|| "The part no longer exists".to_string())?;
     let data = ctx.sheet_metal.get(id).ok_or_else(|| format!("{} is not a sheet metal part", body.name))?;
     flat_pattern(body, data)
@@ -383,6 +386,39 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
     }
     loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
     Ok(FlatPattern { frame, loops, bend_lines: lines, forms, shape, thickness: t, warnings })
+}
+
+/// A flat pattern from planar pieces already laid flat in `frame` (walls and
+/// developed bend strips, built from the std sheet metal definition: its
+/// placement is live's, the model's own coordinates; see
+/// custom/host/sheetmetal.rs `flat_of`).
+pub fn flat_from_pieces(frame: k::Plane, pieces: &[Shape], bend_lines: Vec<FlatBendLine>, thickness: f64) -> Result<FlatPattern, String> {
+    if pieces.is_empty() {
+        return Err("Nothing to flatten".into());
+    }
+    let mut warnings = Vec::new();
+    let shape = match union_planar(pieces) {
+        Ok(s) => Some(s),
+        Err(e) => {
+            warnings.push(format!("The flat outline could not be merged ({e}); showing the pieces"));
+            None
+        }
+    };
+    let faces_src: Vec<Shape> = match &shape {
+        Some(s) => s.faces(),
+        None => pieces.to_vec(),
+    };
+    let mut loops: Vec<Vec<DVec2>> = Vec::new();
+    for f in &faces_src {
+        for w in f.wires() {
+            let l = wire_loop(&w, &frame);
+            if l.len() >= 3 {
+                loops.push(l);
+            }
+        }
+    }
+    loops.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
+    Ok(FlatPattern { frame, loops, bend_lines, forms: Vec::new(), shape, thickness, warnings })
 }
 
 fn extent(l: &[DVec2]) -> f64 {

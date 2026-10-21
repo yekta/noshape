@@ -56,6 +56,10 @@ impl AsmPickMap {
     pub fn ids_for(&self, path: &InstancePath, r: &Reference) -> &[u32] {
         self.by_ref.get(&(path.clone(), r.clone())).map(|v| v.as_slice()).unwrap_or(&[])
     }
+    /// Pick ids of an instance's edges.
+    pub fn edges_of(&self, top: noshape_model::assembly::InstanceId) -> Vec<u32> {
+        self.by_ref.iter().filter(|((p, r), _)| p.first() == Some(&top) && matches!(r, Reference::Edge(_))).flat_map(|(_, v)| v.iter().copied()).collect()
+    }
     /// Pick ids of the edges bounding a face (edge names hold their faces').
     pub fn boundary_ids(&self, path: &InstancePath, face: &Reference) -> Vec<u32> {
         let Reference::Face(n) = face else { return Vec::new() };
@@ -394,9 +398,15 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             scene.add_flag(id, state::ACCENT);
         }
     }
+    // A selected (or just inserted) instance: Onshape's whole-part amber,
+    // lighter than a selected face, outlined in light amber; its edges go
+    // dark amber (live ins-902, qa5 A15).
     for top in &h.selected_tops {
         for &id in built.picks.faces_of(*top) {
-            scene.add_flag(id, state::SELECTED);
+            scene.add_flag(id, state::SELECTED | state::BODY | state::OUTLINE);
+        }
+        for id in built.picks.edges_of(*top) {
+            scene.add_flag(id, state::BODY);
         }
     }
     let mut pts = PointData::default();
@@ -430,9 +440,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         pts.points.push(PointSprite { position: d.as_vec3().into(), color: DARK, pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 });
     }
     for d in &h.light_dots {
-        // Live (qa5/asm-041): white with a soft grey rim.
-        pts.points.push(PointSprite { position: d.as_vec3().into(), color: [0x9f, 0x9f, 0x9f, 255], pick_id: 0, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
-        pts.points.push(PointSprite { position: d.as_vec3().into(), color: [0xfd, 0xfd, 0xfd, 255], pick_id: 0, size: 5.0, style: LineSegment::ON_TOP, _pad: 0 });
+        // Live (qa5/asm-041): white with a soft grey rim, hidden behind
+        // other parts (depth tested; qa5 A5: points of the hovered face
+        // under a shaft / bracket showed on those parts).
+        pts.points.push(PointSprite { position: d.as_vec3().into(), color: [0x9f, 0x9f, 0x9f, 255], pick_id: 0, size: 7.0, style: 0, _pad: 0 });
+        pts.points.push(PointSprite { position: d.as_vec3().into(), color: [0xfd, 0xfd, 0xfd, 255], pick_id: 0, size: 5.0, style: 0, _pad: 0 });
     }
     let mut lines = LineData::default();
     if let Some((f, r)) = &h.inference_glyph {

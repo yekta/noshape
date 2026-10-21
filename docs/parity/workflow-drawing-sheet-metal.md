@@ -13,3 +13,12 @@ Live: behaviours.md "Flat pattern view" (asb, ~line 1365). Status: ✅ matches l
 | 6 | View right-click › Show/hide ▸ | Show hidden lines · Hide bend lines · Hide bend notes · Show shaded view · Hide threads · **Show faulty parts** · Show/hide sketches… · Show/hide edges… · Hide auto centermarks | no "Show faulty parts"; extra "Show center of mass" | ✗ **DSM3** |
 | 7 | Hide bend notes | notes hidden | notes hidden; Ctrl+Z restores | ✅ |
 | 8 | View right-click (whole menu) | (assembly/part view menus in behaviours.md drawing section) | Show/hide ▸, View orientation ▸, Tangent edges ▸, Adjust linestyle…, Insert custom table of Part Studio 1…, View properties…, Order ▸, Align views ▸, Rotate view ▸, Switch to Part Studio 1, Move to sheet…, Copy, Paste as table, Select for replication [beta] ▸, Replicate annotations [beta], Clear selection, Zoom to fit, Delete | ? |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+| Row | Ours | Status |
+|---|---|---|
+| DSM1 picker thumbnail | flat thumbnail ✅; with the Flat patterns filter on, the folded "Part 1" is listed too (live lists the flat pattern rows) | ✅ **fixed** / ? minor |
+| DSM2 bend notes | "DOWN 90° R2", "DOWN 180° R0.01" | ✗ still (live "UP 90.0° …") |
+| DSM3 Show/hide ▸ | Show faulty parts ✅, no Show center of mass ✅; but **"Hide shaded view"** on an unshaded flat view (live "Show shaded view") | ✗ still (mostly fixed) |

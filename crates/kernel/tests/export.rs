@@ -638,3 +638,122 @@ fn native_part_appearances() {
         }
     }
 }
+
+/// Live G47 (qa4 F26): a Part Studio's STEP has one independent product per
+/// part (last part first), no assembly, no "SOLID" product, Onshape's header,
+/// metres, and each part's name on its product, shape representation, solid
+/// and context; entities grouped by type from #10.
+#[test]
+fn step_layout_like_onshape() {
+    let cube = make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap();
+    // Parts 2 and 3 share Part 1's geometry, moved (as a Part pattern makes them).
+    let parts: Vec<ExportShape> = [(0.0, [0.6157, 0.8118, 0.9294]), (0.02, [0.6471, 0.6471, 0.6471]), (0.04, [0.2314, 0.3804, 0.7059])]
+        .iter()
+        .enumerate()
+        .map(|(i, (x, c))| ExportShape { shape: if *x == 0.0 { cube.clone() } else { cube.translated(DVec3::new(*x, 0.0, 0.0)).unwrap() }, name: Some(format!("Part {}", i + 1)), color: Some(*c) })
+        .collect();
+    let dir = std::env::temp_dir().join(format!("noshape-g47-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("g47 3parts.step");
+    write_step_with(&path, &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None }).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let count = |s: &str| text.matches(s).count();
+    assert!(text.starts_with("ISO-10303-21;\nHEADER;\n"));
+    assert!(text.contains("FILE_DESCRIPTION(\n/* description */ ('STEP AP242 Edition 2',"), "{text}");
+    assert!(text.contains("/* name */ 'g47 3parts',"));
+    assert!(text.contains("FILE_SCHEMA (('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }'));"));
+    assert!(!text.contains("Open CASCADE"));
+    assert!(text.contains("\nDATA;\n#10=SHAPE_REPRESENTATION_RELATIONSHIP('','',"), "{}", &text[..2000.min(text.len())]);
+    assert_eq!(count("=PRODUCT("), 3);
+    assert_eq!(count("'SOLID'"), 0, "no SOLID product");
+    assert_eq!(count("NEXT_ASSEMBLY_USAGE_OCCURRENCE") + count("CONTEXT_DEPENDENT_SHAPE_REPRESENTATION") + count("ITEM_DEFINED_TRANSFORMATION"), 0);
+    assert_eq!(count("PCURVE"), 0);
+    for i in 1..=3 {
+        let n = format!("Part {i}");
+        assert!(text.contains(&format!("=PRODUCT('{n}','{n}','{n}',(#")), "{n}");
+        assert!(text.contains(&format!("=SHAPE_REPRESENTATION('{n}',(#")), "{n}");
+        assert!(text.contains(&format!("=MANIFOLD_SOLID_BREP('{n}',#")), "{n}");
+        assert!(text.contains(&format!("REPRESENTATION_CONTEXT('{n}','TOP_LEVEL_ASSEMBLY_PART')")), "{n}");
+    }
+    // Last part first.
+    assert!(text.find("PRODUCT('Part 3'").unwrap() < text.find("PRODUCT('Part 1'").unwrap());
+    assert_eq!(count("SI_UNIT($,.METRE.)"), 3);
+    assert_eq!(count("UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-8),"), 3);
+    assert!(text.contains("COLOUR_RGB('',0.231372549019608,0.380392156862745,0.705882352941177);"), "colours in 1/255 steps");
+    assert_eq!(count("=ADVANCED_FACE("), 18);
+    assert_eq!(count("=EDGE_CURVE("), 36);
+    assert_eq!(count("=VERTEX_POINT("), 24);
+    // Grouped by type: the order of first appearance follows Onshape's.
+    let firsts: Vec<usize> = ["=SHAPE_REPRESENTATION_RELATIONSHIP(", "=ADVANCED_BREP_SHAPE_REPRESENTATION(", "=ORIENTED_EDGE(", "=EDGE_CURVE(", "=VERTEX_POINT(", "=LINE(", "=VECTOR(", "=EDGE_LOOP(", "=PLANE(", "=ADVANCED_FACE(", "=CLOSED_SHELL(", "=STYLED_ITEM(", "=COLOUR_RGB(", "=MANIFOLD_SOLID_BREP(", "=SHAPE_DEFINITION_REPRESENTATION(", "=SHAPE_REPRESENTATION(", "=AXIS2_PLACEMENT_3D(", "=DIRECTION(", "=CARTESIAN_POINT(", "=MECHANICAL_DESIGN", "=PRODUCT_DEFINITION_SHAPE(", "=PRODUCT(", "=APPLICATION_CONTEXT("]
+        .iter()
+        .map(|t| text.find(t).unwrap_or_else(|| panic!("{t}")))
+        .collect();
+    assert!(firsts.windows(2).all(|w| w[0] < w[1]), "type order");
+    let back = read_step(&path, LengthUnit::Meter).unwrap();
+    assert_eq!(back.len(), 3);
+    let names: Vec<_> = back.iter().map(|b| b.name.clone().unwrap_or_default()).collect();
+    assert_eq!(names, ["Part 3", "Part 2", "Part 1"]);
+    for b in &back {
+        assert!((volume_properties(&b.shape).unwrap().mass - 1e-6).abs() < 1e-15);
+    }
+    let xs: Vec<f64> = back.iter().map(|b| b.shape.bounding_box(false).unwrap().min.x).collect();
+    assert!((xs[0] - 0.04).abs() < 1e-6 && (xs[1] - 0.02).abs() < 1e-6 && xs[2].abs() < 1e-6, "{xs:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Live G48: a part with a void (BREP_WITH_VOIDS) written after a plain cube:
+/// the types only it brings are numbered first (Onshape numbers the type it
+/// created last first); AP214 / AP203 / inch variants.
+#[test]
+fn step_layout_variants_like_onshape() {
+    let cube = make_box_corners(DVec3::new(0.06, 0.0, 0.0), DVec3::new(0.07, 0.01, 0.01)).unwrap();
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(0.04, 0.03, 0.02)).unwrap();
+    let void = make_sphere(&Plane::from_normal(DVec3::new(0.02, 0.015, 0.01), DVec3::Z), 0.003, std::f64::consts::TAU).unwrap();
+    let holed = cut(&block, &void).unwrap().shape;
+    let dir = std::env::temp_dir().join(format!("noshape-g48-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let parts = [ExportShape { shape: holed.clone(), name: Some("Part 1".into()), color: None }, ExportShape { shape: cube.clone(), name: Some("Part 2".into()), color: None }];
+    let path = dir.join("g48 two.step");
+    write_step_with(&path, &parts, LengthUnit::Meter, &StepOptions::default()).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let at = |t: &str| text.find(t).unwrap_or_else(|| panic!("{t}"));
+    assert!(text.contains("=BREP_WITH_VOIDS('Part 1',#"));
+    assert!(text.contains("=MANIFOLD_SOLID_BREP('Part 2',#"));
+    // Here the sphere only bounds the void, so its type is created after the
+    // void's shell (in G48 it came first, from a hemisphere on the outside).
+    assert!(at("=SPHERICAL_SURFACE(") < at("=ORIENTED_CLOSED_SHELL("));
+    assert!(at("=ORIENTED_CLOSED_SHELL(") < at("=BREP_WITH_VOIDS("));
+    assert!(at("=BREP_WITH_VOIDS(") < at("=SHAPE_REPRESENTATION_RELATIONSHIP("));
+    assert!(at("=SHAPE_REPRESENTATION_RELATIONSHIP(") < at("=MANIFOLD_SOLID_BREP("));
+    let back = read_step(&path, LengthUnit::Meter).unwrap();
+    let v: f64 = back.iter().map(|b| volume_properties(&b.shape).unwrap().mass).sum();
+    let want = volume_properties(&holed).unwrap().mass + 1e-6;
+    assert!((v - want).abs() < 1e-12, "{v} vs {want}");
+
+    let one = [ExportShape { shape: cube.clone(), name: Some("Part 1".into()), color: Some([0.6157, 0.8118, 0.9294]) }];
+    let p214 = dir.join("a214.step");
+    write_step_with(&p214, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap214, file_unit: None }).unwrap();
+    let t = std::fs::read_to_string(&p214).unwrap();
+    assert!(t.contains("/* description */ ('STEP AP214',\n'CAx-IF Rec.Pracs.---User Defined Attributes---1.5---2016-08-15'),"));
+    assert!(t.contains("FILE_SCHEMA (('AUTOMOTIVE_DESIGN {1 0 10303 214 3 1 1}'));"));
+    assert!(t.contains("\nDATA;\n#10=PROPERTY_DEFINITION_REPRESENTATION(#14,#12);\n"), "{}", &t[..1500]);
+    assert!(t.contains("=VALUE_REPRESENTATION_ITEM('number of annotations',COUNT_MEASURE(0.));"));
+    assert!(t.contains("=APPLICATION_CONTEXT(\n'core data for automotive mechanical design processes');"));
+    let p203 = dir.join("a203.step");
+    write_step_with(&p203, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap203, file_unit: None }).unwrap();
+    let t = std::fs::read_to_string(&p203).unwrap();
+    assert!(t.contains("/* description */ ('STEP AP203'),"));
+    assert!(t.contains("FILE_SCHEMA (('CONFIG_CONTROL_DESIGN'));"));
+    assert!(t.contains("=DESIGN_CONTEXT('',#") && t.contains("=MECHANICAL_CONTEXT('',#"));
+    assert!(t.contains("=APPLICATION_CONTEXT(\n'configuration controlled 3D designs of mechanical parts and assemblie\ns');"));
+    let pin = dir.join("inch.step");
+    write_step_with(&pin, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: Some(LengthUnit::Inch) }).unwrap();
+    let t = std::fs::read_to_string(&pin).unwrap();
+    assert!(t.contains("CONVERSION_BASED_UNIT('INCH',#"));
+    assert!(t.contains("=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(3.93700787401575E-7),"), "{t}");
+    assert!(t.contains("SI_UNIT(.MILLI.,.METRE.)"));
+    for b in read_step(&pin, LengthUnit::Meter).unwrap() {
+        assert!((volume_properties(&b.shape).unwrap().mass - 1e-6).abs() < 1e-14);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

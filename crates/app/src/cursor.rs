@@ -115,7 +115,7 @@ fn art(cursor: AppCursor, windows: bool) -> Option<Art> {
     let arrow = if windows { WIN_ARROW } else { MAC_ARROW };
     let hot = if windows { (1., 2.) } else { (3., 3.) };
     // Onshape's Windows files are 38 px; their art beside the arrow sits 1 px
-    // right and down of the mac one (the count label 3 right, 5 up).
+    // right and down of the mac one (the count label 3 right, 5 up; its hand-drawn "4" 1 right).
     let side = |mac: f32| -> (f32, (i32, i32)) { if windows { (38., (1, 1)) } else { (mac, (0, 0)) } };
     let place = |side: f32, shift: (i32, i32), body: String| wrap(side, arrow, &format!(r##"<g transform="translate({} {})">{body}</g>"##, shift.0, shift.1), windows);
     // A label in black with a white outline at the arrow's lower right.
@@ -125,9 +125,17 @@ fn art(cursor: AppCursor, windows: bool) -> Option<Art> {
     };
     Some(match cursor {
         AppCursor::Count(n) => {
-            let body = if n >= 6 { format!(r##"{}<path d="M22.4 19.75h6.8v1h-6.8zM25.3 16.85h1v6.8h-1z" fill="#000" stroke="#fff" stroke-width="2.4" paint-order="stroke"/>"##, label("5")) } else { label(&n.to_string()) };
+            let body = if n >= 6 {
+                format!(r##"{}<path d="M22.4 19.75h6.8v1h-6.8zM25.3 16.85h1v6.8h-1z" fill="#000" stroke="#fff" stroke-width="2.4" paint-order="stroke"/>"##, label("5"))
+            } else if n == 4 && windows {
+                // Onshape's Windows "4" is open at the top: the stem starts
+                // below the diagonal with a slanted cut.
+                r##"<path d="M18.45 15H20.3L16.85 20.8H21.75V22.05H15V20.8ZM19 19.1L20.7 18.4V24.5H19Z" fill="#000" stroke="#fff" stroke-width="2.4" stroke-linejoin="miter" paint-order="stroke"/>"##.into()
+            } else {
+                label(&n.to_string())
+            };
             let (side, _) = side(32.);
-            Art { svg: place(side, if windows { (3, -5) } else { (0, 0) }, body), side, hot }
+            Art { svg: place(side, if windows { (if n == 4 { 1 } else { 3 }, -5) } else { (0, 0) }, body), side, hot }
         }
         // A 15 px plus: 1 px black lines on 3 px white, white 1 px caps at
         // the ends (hot 7.5,7.5). The drawing tools' crosshair is the same.

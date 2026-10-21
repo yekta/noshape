@@ -219,7 +219,7 @@ pub struct DrawingEditor {
     backdrops: ColoredHandles,
     paper: Option<(MeshHandle, MeshHandle, [f64; 2])>,
     overlay_handles: Option<(LinesHandle, PointsHandle)>,
-    geometry_dirty: bool,
+    pub(crate) geometry_dirty: bool,
     frame_dirty: bool,
     seq: u64,
     last_presented: u64,
@@ -264,6 +264,8 @@ pub struct DrawingEditor {
     /// Detail view dialog (see `drawing_detail`) and its label text.
     pub detail_dlg: Option<crate::drawing_detail::DetailDlg>,
     pub crop_dlg: Option<crate::drawing_crop::CropDlg>,
+    pub chooser: crate::drawing_chooser::ChooserState,
+    pub shaded: crate::drawing_shaded::ShadedViews,
     /// Revision table dialog (drawing_revision.rs).
     pub revision_dlg: Option<crate::drawing_revision::RevisionDlg>,
     /// Show/hide sketches dialog (drawing_view_sketches.rs).
@@ -472,6 +474,8 @@ impl DrawingEditor {
             break_dlg: None,
             detail_dlg: None,
             crop_dlg: None,
+            chooser: Default::default(),
+            shaded: Default::default(),
             revision_dlg: None,
             view_sketches: None,
             hide_parts: None,
@@ -563,7 +567,12 @@ impl DrawingEditor {
     fn reload(&mut self, cx: &mut Context<Self>) {
         self.update_info(cx);
         if let Some(TabContent::Drawing(d)) = self.doc.read(cx).session.doc.tab(self.tab).map(|t| &t.content) {
+            // Undoing a sheet's views keeps its scale shown (live; qa5 D14).
+            let shown: Vec<u32> = self.drawing.sheets.iter().filter(|s| s.scale_shown || !s.views.is_empty()).map(|s| s.uid).collect();
             self.drawing = d.clone();
+            for s in &mut self.drawing.sheets {
+                s.scale_shown |= shown.contains(&s.uid);
+            }
         }
         if self.drawing.sheets.is_empty() {
             self.drawing.sheets.push(Sheet::default());
@@ -596,6 +605,10 @@ impl DrawingEditor {
     pub fn commit(&mut self, description: &str, mut new: Drawing, cx: &mut Context<Self>) {
         // The sheet on screen goes with the change (undo returns to it).
         new.active_sheet = self.sheet;
+        // A sheet that has had a view keeps showing its scale (qa5 D14).
+        for s in &mut new.sheets {
+            s.scale_shown |= !s.views.is_empty();
+        }
         // Older drawings: DRAWN becomes the user who first edits them.
         if new.drawn_by.is_none() && !self.info.user_name.is_empty() {
             new.drawn_by = Some(self.info.user_name.clone());
@@ -642,17 +655,22 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ sources
 
-    /// A tab of the document changed: sources built from it (or assemblies,
-    /// which depend on every studio) are out of date.
+    /// A tab of the document changed: the drawing is out of date while any
+    /// source differs from what its views were made of (an undo back to it
+    /// clears it again).
     fn studio_changed(&mut self, tab: TabId, cx: &mut Context<Self>) {
         let doc = self.doc.read(cx);
-        let stale = self.sources.iter().any(|(k, src)| {
-            // Pinned references never go out of date.
-            let depends = k.version.is_none() && (k.tab == tab || src.assembly);
-            depends && views::source_hash(&doc.session.doc, k) != Some(src.hash)
-        });
-        if stale && !self.out_of_date {
-            self.out_of_date = true;
+        // Only sources built from this tab (or assemblies, which depend on
+        // every studio) can have changed.
+        if !self.out_of_date && !self.sources.iter().any(|(k, src)| k.tab == tab || src.assembly) {
+            return;
+        }
+        // Pinned references never go out of date.
+        let stale = self.sources.iter().any(|(k, src)| k.version.is_none() && views::source_hash(&doc.session.doc, k) != Some(src.hash));
+        // Undoing the change makes the sources current again: no Update
+        // needed (qa5 UNDO2; exact float round trips make the hashes match).
+        if stale != self.out_of_date {
+            self.out_of_date = stale;
             cx.notify();
         }
     }
@@ -662,7 +680,11 @@ impl DrawingEditor {
         if let Some(d) = self.version_docs.get(id) {
             return Some(d.clone());
         }
-        let d = self.doc.read(cx).session.document_at_version(id).ok().flatten()?;
+        // Another document's version (Insert view › Other documents).
+        let d = match crate::derived::ExternalRef::parse(id) {
+            Some(r) => (*crate::derived::external_snapshot(&r.path, r.microversion).ok()?).clone(),
+            None => self.doc.read(cx).session.document_at_version(id).ok().flatten()?,
+        };
         self.version_docs.insert(id.to_string(), d.clone());
         Some(d)
     }
@@ -671,7 +693,7 @@ impl DrawingEditor {
     pub fn ensure_sources(&mut self, all: bool, cx: &mut Context<Self>) {
         let mut wanted = views::referenced_sources(self.display());
         if let Tool::InsertView { source, .. } = &self.tool {
-            let k = SourceKey::studio(*source);
+            let k = SourceKey { version: self.insert.pinned.as_ref().map(|p| p.id.clone()), ..SourceKey::studio(*source) };
             // The preview of an assembly uses the panel's Explode/Position and Display state.
             let (explode, position) = match self.insert.asm_position {
                 AsmPosition::Explode(e) => (Some(e), None),
@@ -817,6 +839,7 @@ impl DrawingEditor {
         }
         self.built = Some(Arc::new(built));
         self.geometry_dirty = true;
+        self.sync_shaded(cx);
         self.update_hover(cx);
         cx.notify();
     }
@@ -994,6 +1017,7 @@ impl DrawingEditor {
         }
         // Inserted images and backdrops, under the sheet geometry.
         scene.instances.extend(self.image_instances());
+        scene.instances.extend(self.shaded_instances());
         for (m, color) in &self.backdrops {
             scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(*color).unlit().unpickable().layer(-1));
         }
@@ -1260,6 +1284,7 @@ impl Render for DrawingEditor {
         self.sync_aux_dlg(window, cx);
         self.sync_detail_dlg(window, cx);
         self.sync_crop_dlg();
+        self.sync_chooser(window, cx);
         self.sync_revision_dlg(window, cx);
         self.sync_weld_dlg(window, cx);
         self.sync_callout_dlg(window, cx);
@@ -1308,7 +1333,10 @@ impl Render for DrawingEditor {
             self.inplace_cell = cell;
             self.refresh(cx);
         }
-        let sheet_bar = self.render_sheet_bar(cx);
+        // The closed panel's sheet chips are drawn on the canvas under the
+        // dialogs, which cover them (qa5 D16; live).
+        let sheet_bar = self.sheets_open.then(|| self.render_sheet_bar(cx));
+        let sheet_chips = (!self.sheets_open).then(|| self.render_sheet_tabs(cx));
         // The panel (the Note ✓ ✕ panel above a note typed in place, …) as a
         // cached layer: a keystroke or caret blink in the note re-renders
         // the editor, not the panel. It reads the note's text and caret, so
@@ -1350,6 +1378,7 @@ impl Render for DrawingEditor {
             )
             .children(image.map(|img| gpui_kit::img(img).absolute().top_0().left_0().size_full()))
             .child(self.sheets_toggle(0., cx))
+            .children(sheet_chips)
             .child(status)
             .children(self.render_note_inplace(cx))
             .children(self.render_sketch_dim_box(cx))
@@ -1459,10 +1488,9 @@ impl Render for DrawingEditor {
             .child(slices.toolbar.clone().cached(StyleRefinement::default().w_full().h(px(crate::ui::TOOLBAR_H)).flex_none()))
             .child({
                 // The open Sheets panel pushes the canvas (live drawing/30);
-                // the closed one's sheet tabs float over it.
+                // the closed one's sheet chips are on the canvas.
                 let canvas_el = canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border);
-                let row = gpui_kit::component::h_flex().flex_1().min_h_0().relative();
-                if self.sheets_open { row.child(sheet_bar).child(canvas_el) } else { row.child(canvas_el).child(sheet_bar) }
+                gpui_kit::component::h_flex().flex_1().min_h_0().relative().children(sheet_bar).child(canvas_el)
             })
     }
 }

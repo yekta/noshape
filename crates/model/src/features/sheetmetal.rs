@@ -22,6 +22,8 @@ pub fn register(out: &mut Vec<FeatureType>) {
     out.push(corner_break());
     out.push(modify_joint());
     out.push(sheet_metal_end());
+    out.push(pcb_start());
+    out.push(pcb_end());
     out.push(rip());
     out.push(unfold());
     out.push(refold());
@@ -155,6 +157,49 @@ fn sm_extrude_direction(second: bool) -> Vec<ParamSpec> {
 }
 
 pub fn sheet_metal_start() -> FeatureType {
+    let mut p = start_selections();
+    p.extend(model_parameters(always));
+    p.push(hidden(ParamSpec::text("parameterLibraryPurposeId", "Parameter library purpose", "")));
+    FeatureType::new("sheetMetalStart", "Sheet metal model", Category::SheetMetal, p)
+        .icon("sheetMetalModel")
+        .describe("Create an active sheet metal model by converting, extruding or thickening")
+}
+
+/// pcbStart.fs: the Sheet metal model selections, then smGeneralParameters
+/// (ungrouped) and the K factor (PCB_K_FACTOR_BOUNDS: 0..1, default 0).
+pub fn pcb_start() -> FeatureType {
+    let rem = Hints::REMEMBER_PREVIOUS_VALUE;
+    let mut p = start_selections();
+    p.extend([
+        ParamSpec::num("thickness", "Thickness", SM_THICKNESS).hints(rem),
+        ParamSpec::flip("oppositeDirection", "Opposite direction"),
+        ParamSpec::num("radius", "Bend radius", SM_BEND_RADIUS).hints(rem),
+        ParamSpec::bool("flipDirectionUp", "Flip direction up", false).hints(rem),
+        ParamSpec::num("kFactor", "Default bend K Factor", NumSpec::real(0.0, 0.0, 1.0)).hints(rem),
+    ]);
+    FeatureType::new("pcbStart", "Flex PCB model", Category::SheetMetal, p)
+        .icon("pcbStart")
+        .describe("Create an active flex PCB model by converting, extruding or thickening")
+}
+
+/// pcbEnd.fs: unfold, then finish the flex PCB model.
+pub fn pcb_end() -> FeatureType {
+    let ty = |v: &ParamValues, t: &str| v.is("unfoldType", t);
+    let p = vec![
+        hidden(ParamSpec::query("initEntities", "Entities", QueryFilter::ANY_FACE | QueryFilter::EDGE)),
+        ParamSpec::enum_("unfoldType", "Unfold type", &[("UNFOLD_ALL", "Unfold all"), ("UNFOLD_SELECTED", "Unfold selected"), ("UNFOLD_NONE", "Unfold none")]),
+        ParamSpec::query("entitiesToUnfold", "Bend or non-planar faces to unfold", QueryFilter::ANY_FACE).visible(move |v| ty(v, "UNFOLD_SELECTED")),
+        ParamSpec::query1("holdEntity", "Wall face or bounding edge to hold", QueryFilter::ANY_FACE | QueryFilter::EDGE).visible(move |v| !ty(v, "UNFOLD_NONE")),
+        ParamSpec::query1("pcbPart", "PCB part to finish", QueryFilter::SOLID_BODY),
+    ];
+    FeatureType::new("pcbEnd", "Finish flex PCB model", Category::SheetMetal, p)
+        .icon("pcbEnd")
+        .describe("Unfold and finish flex PCB models")
+}
+
+/// sheetMetalStart.fs / pcbStart.fs: initial entities, Process and the
+/// "Selections" group.
+fn start_selections() -> Vec<ParamSpec> {
     let pr = |v: &ParamValues, t: &str| v.is("process", t);
     let extrude = move |v: &ParamValues| pr(v, "EXTRUDE");
     let conv_or_thick = move |v: &ParamValues| pr(v, "CONVERT") || pr(v, "THICKEN");
@@ -187,11 +232,7 @@ pub fn sheet_metal_start() -> FeatureType {
         ParamSpec::bool("keepInputParts", "Keep input parts", false).visible(move |v| pr(v, "CONVERT")),
     ]);
     p.extend(group("selectionsGroup", "Selections", true, sel));
-    p.extend(model_parameters(always));
-    p.push(hidden(ParamSpec::text("parameterLibraryPurposeId", "Parameter library purpose", "")));
-    FeatureType::new("sheetMetalStart", "Sheet metal model", Category::SheetMetal, p)
-        .icon("sheetMetalModel")
-        .describe("Create an active sheet metal model by converting, extruding or thickening")
+    p
 }
 
 /// "Use model bend radius" + "Bend radius".
@@ -433,7 +474,18 @@ pub fn modify_joint() -> FeatureType {
         ParamSpec::enum_("jointType", "Joint type", &[("BEND", "Bend"), ("RIP", "Rip"), ("TANGENT", "Tangent")]),
     ];
     p.extend(bend_radius_override(bend, "radius"));
-    p.extend(k_factor_override(bend));
+    // sheetMetalJoint.fs: Use model K Factor, else Bend calculation and its value.
+    let own = move |v: &ParamValues| bend(v) && !v.bool("useDefaultKFactor");
+    let calc = move |v: &ParamValues, t: &str| own(v) && v.is("bendCalculationType", t);
+    p.extend([
+        ParamSpec::bool("useDefaultKFactor", "Use model K Factor", true).visible(bend),
+        ParamSpec::enum_("bendCalculationType", "Bend calculation", &[("K_FACTOR", "K Factor"), ("BEND_ALLOWANCE", "Bend allowance"), ("BEND_DEDUCTION", "Bend deduction")])
+            .hints(Hints::SHOW_LABEL)
+            .visible(own),
+        ParamSpec::num("kFactor", "K Factor", NumSpec::real(0.45, -1.5, 1.0)).visible(move |v| calc(v, "K_FACTOR")),
+        ParamSpec::length("bendAllowance", "Bend allowance", 25.0, 1.0).visible(move |v| calc(v, "BEND_ALLOWANCE")),
+        ParamSpec::length("bendDeduction", "Bend deduction", 25.0, 1.0).visible(move |v| calc(v, "BEND_DEDUCTION")),
+    ]);
     p.push(hidden(ParamSpec::bool("hasStyle", "Has style", true)));
     p.push(ParamSpec::enum_("jointStyle", "Joint style", JOINT_STYLE).visible(|v| v.is("jointType", "RIP") && v.bool("hasStyle")));
     FeatureType::new("sheetMetalJoint", "Modify joint", Category::SheetMetal, p).icon("modifyJoint").describe("Change the type or style of a sheet metal joint")

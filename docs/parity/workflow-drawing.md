@@ -51,7 +51,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 4.1 | Tab › Export…, PDF | File name + **"View export rules" link**, Format, Version 1.5, Overridden dimensions, Text, Color, Options, ☐ Hide inspection items | same, without the "View export rules" link | ✗ D9 (minor) |
 | 4.2 | PDF content | as on screen | letter landscape, 1 page; **iso view exported shaded** (on screen: hidden-line); **Detail B circle border lost / content not clipped** | ✗ D10 |
 | 4.3 | DXF options | **Version default Release 14** (+ "Model space only" line), **Sheets ▾ All/Current/Custom** | Version default **2018**, no Sheets ▾ | ✗ D11 |
-| 4.4 | DXF content | CIRCLE/ARC/ELLIPSE, HATCH, MTEXT, DIMENSION, ACAD_TABLE, INSERT; layers Visible, TANGENT_LINES, VIEW_HATCHES, CENTERMARKS, ANNOTATION_TEXT, ANNOTATION_LINES, SECTION_CUTTING_LINE, TABLES, BORDER_*, TITLE_BLOCK | only LINE / LWPOLYLINE / SOLID / TEXT (circles, hatches, dimensions, tables exploded); layers VISIBLE, TANGENT, CENTER, ANNOTATION, SECTION, PHANTOM, BORDER_*, TITLE_BLOCK | ✗ D12 |
+| 4.4 | DXF content | CIRCLE/ARC/ELLIPSE, HATCH, MTEXT, DIMENSION, ACAD_TABLE, INSERT; layers Visible, TANGENT_LINES, VIEW_HATCHES, CENTERMARKS, ANNOTATION_TEXT, ANNOTATION_LINES, SECTION_CUTTING_LINE, TABLES, BORDER_*, TITLE_BLOCK | drw2 10-21 (vs live drw2-k-dxf2018 / R14 / R12): CIRCLE / ARC / ELLIPSE / SPLINE / POLYLINE, HATCH, MTEXT, DIMENSION over *D blocks, TOLERANCE, hole callouts as INSERT *U, ACAD_TABLE (INSERT before 2004), OLE2FRAME; live layer names, case and order, Defpoints with dimensions; Release 11-12 view geometry only. Open: all sheets in one file with layouts (request drw2 10-21 l), per-kind text styles | 🔧 D12 |
 
 ## Findings (2026-10-21 run)
 
@@ -84,3 +84,17 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 4.3 | DXF options | Release 14 + "Model space only", Sheets ▾ "All sheets" ✅; **Units "Drawing units"** (live "Use drawing units"), **☐ Set z-height to zero…** (live ☑ by default, behaviours.md D12 answer) | ✅ D11 fixed / ✗ **D15** |
 | – | Tab menus (assembly / drawing tab) | no "Open in new browser tab" (browser-only, ok), no "Show code" | ? |
 | 2.1, 4.2, 4.4 | D5, D10, D13 | not re-run this pass | – |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| D8 balloons | "----" | ✗ still |
+| D15 DXF defaults | z-height ☐, "Drawing units" | ✗ still |
+| D14 | not re-run (tab switch missed) | – |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+Pass 6 (17:11) had found D5 fixed (d starts Dimension after Esc).
+| Row | Ours | Status |
+|---|---|---|
+| D8 balloons | the old front-view balloon now shows **3**; a new balloon on a cylinder in the isometric view still shows "----" | ✗ still (partly) |
+| D15 DXF defaults | ☑ Set z-height to zero…, Units "Use drawing units" | ✅ **fixed** |
+| D14 SCALE after undo | "----" on the empty sheet, "1:1" with a view, "----" after Ctrl+Z (consistent) | ✅ **fixed** (live value on an empty sheet ?) |
+| D16 (new) | the "Sheet1" chip draws over the Insert view dialog's title ("Sheet1 ew") | ✗ **D16** (asb / ui) |

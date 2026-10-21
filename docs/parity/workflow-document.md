@@ -44,3 +44,6 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data missing.
 | 17 | IGES global section | still "Open CASCADE IGES processor 8.0", "Filename.iges", author "root" | ✗ DOC1 |
 | – | Parasolid header | still `APPL=noshape`, `SCH_1200000_12006` | ✗ I5 |
 | – | Tab created with + after the active tab | shown at the end of the tab bar later and after reopening (Assembly 2 in qa5 assembly) | ✗ DOC5 (live request "qa5 tabs" (e)) |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| DOC5 | new tabs keep their position after reopening | ✅ fixed |

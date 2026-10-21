@@ -93,3 +93,13 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 2.4 | "25" Enter | "25 mm" | ✅ C8 fixed |
 | 3.1 | New List inputs (doc already has "List 2") | next one "Configuration" ✅, the one after **"List 4"** (live "List input 1") | ✗ C1 (partly fixed) |
 | 3.5 | Configure mode, click Draft (unconfigured checkbox) | stays unchecked, column "Extrude 1 / Draft" added, toast | ✅ C2 fixed |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| C1 third List name | "List 4" | ✗ still |
+| C5 bubble | clipped under the right panel | ✗ still |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+Pass 6 (17:11) had found C5 fixed (bubble at the window's top centre, unclipped, auto-dismisses); not re-checked.
+| Row | Ours | Status |
+|---|---|---|
+| C1 List input names | "Configuration", then "List input 1" | ✅ **fixed** |

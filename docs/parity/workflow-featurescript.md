@@ -27,3 +27,5 @@ open points requested ("qa5 featurescript"). Status: ✅ matches live/expected, 
 | 7 | Part Studio row | red, "Qc" icon outlined red, header error icon, Parts (0); tooltip "**QA cube 1 did not regenerate properly: Error regenerating.**" | red; tooltip "Error regenerating." | ✗ ADV3 |
 | 8 | Notices panel | same messages/stack; last line "**Result: Regeneration complete**" | "Result: Regeneration failed: Error regenerating." | ✗ **FS5** (minor) |
 | 9 | Volume after the part disappears | Onshape has **no bottom-right volume readout**; the Mass properties panel empties within 2 s | our status bar shows "Volume: 15625.000 mm³" and keeps it | ✗ **RD1** (readout doesn't exist in Onshape + goes stale) |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)

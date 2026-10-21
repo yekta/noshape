@@ -42,6 +42,9 @@ pub struct Workspace {
     /// The navbar logo (Onshape's documents link) as a Tab stop: where Tab
     /// past a feature dialog's last control lands (live psb 10-19 h).
     logo_focus: FocusHandle,
+    /// The navbar and the tab bar: keys pressed while their buttons have
+    /// the focus still work as shortcuts (`forward_chrome_key`).
+    chrome_focus: [FocusHandle; 2],
     history: Option<Entity<HistoryPanel>>,
     /// The Release drafts panel (left rail).
     release_drafts: Option<Entity<crate::release_dialog::ReleaseDraftsPanel>>,
@@ -64,6 +67,8 @@ pub struct Workspace {
     doc_panel: Option<(DocPanel, Vec<Subscription>)>,
     /// Tab being renamed (tab › Rename, double-click).
     renaming_tab: Option<(TabId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    /// A tab being dragged along the bar (live qa5 TABS1).
+    tab_gap: Option<TabGap>,
     /// ☰ › Workspace units… panel.
     units_panel: Option<(Entity<crate::doc_dialogs::WorkspaceUnits>, Subscription)>,
     /// The tab-bar folder being shown (None: all tabs at the root).
@@ -111,7 +116,7 @@ impl Workspace {
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
-        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
@@ -276,16 +281,49 @@ impl Workspace {
         }
     }
 
+    /// A key no binding took while a navbar or tab bar control has the focus
+    /// (after Tab left a dialog, or a click on a tab): Onshape's shortcuts
+    /// are document-wide, so it goes to the active tab's editor. Tab, Enter,
+    /// Space and Esc stay with the focused control; typing in a field too.
+    fn forward_chrome_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.chrome_focus.iter().any(|f| f.contains_focused(window, cx)) || window.context_stack().iter().any(|c| c.contains("Input")) {
+            return;
+        }
+        let k = &ev.keystroke;
+        if matches!(k.key.as_str(), "tab" | "enter" | "space" | "escape" | "shift" | "control" | "alt" | "platform" | "function") {
+            return;
+        }
+        let Some(editor) = self.active_focus(cx) else { return };
+        cx.stop_propagation();
+        let (keystroke, chrome) = (k.clone(), window.focused(cx));
+        // Replayed once this dispatch is over and no entity is being updated
+        // (the workspace sees the replayed key too).
+        window.defer(cx, move |window, cx| {
+            window.focus(&editor, cx);
+            window.dispatch_keystroke(keystroke, cx);
+            // The control keeps the focus unless the shortcut moved it (live).
+            if let Some(chrome) = chrome.filter(|_| editor.is_focused(window)) {
+                window.focus(&chrome, cx);
+            }
+        });
+    }
+
+    /// The active tab's editor's focus handle.
+    fn active_focus(&self, cx: &App) -> Option<FocusHandle> {
+        Some(match self.active.and_then(|t| self.views.get(&t))? {
+            TabView::PartStudio(v) => v.read(cx).focus_handle(cx),
+            TabView::Drawing(v) => v.read(cx).focus.clone(),
+            TabView::Assembly(v) => v.read(cx).focus_handle(cx),
+            TabView::FeatureStudio(v) => v.read(cx).editor_focus(cx),
+            _ => return None,
+        })
+    }
+
     /// Give keyboard focus to the active tab's editor.
     fn focus_active(&self, window: &mut Window, cx: &mut Context<Self>) {
-        let fh = match self.active.and_then(|t| self.views.get(&t)) {
-            Some(TabView::PartStudio(v)) => v.read(cx).focus_handle(cx),
-            Some(TabView::Drawing(v)) => v.read(cx).focus.clone(),
-            Some(TabView::Assembly(v)) => v.read(cx).focus_handle(cx),
-            Some(TabView::FeatureStudio(v)) => v.read(cx).editor_focus(cx),
-            _ => return,
-        };
-        window.focus(&fh, cx);
+        if let Some(fh) = self.active_focus(cx) {
+            window.focus(&fh, cx);
+        }
     }
 
     pub(crate) fn add_tab(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
@@ -371,8 +409,9 @@ impl Workspace {
                 let name = st.read(cx).value().trim().to_string();
                 this.renaming_tab = None;
                 if !name.is_empty() {
+                    // Live (qa5 TABS5): Ctrl+Z doesn't undo a tab rename.
                     this.doc.update(cx, |d, cx| {
-                        d.edit_document(&format!("Rename tab : {name}"), cx, |doc| {
+                        d.edit_document_not_undoable(&format!("Rename tab : {name}"), cx, |doc| {
                             if let Some(t) = doc.tab_mut(tab) {
                                 t.name = name.clone();
                             } else {
@@ -893,7 +932,31 @@ impl Workspace {
             self.tab_scroll.scroll_to_item(lead + ix);
             self.reveal_active_tab = false;
         }
-        let mut strip = h_flex().id("tab-strip").flex_1().min_w_0().h_full().items_start().pl(px(5.)).gap(px(3.)).overflow_x_scroll().track_scroll(&self.tab_scroll);
+        // Live (qa5 TABS1): while a tab is dragged it leaves the bar, the
+        // others close up and a gap the tab's width shows where it will
+        // drop (no line); the ghost moves along the bar only.
+        if !cx.has_active_drag() {
+            self.tab_gap = None;
+        }
+        let gap = self.tab_gap.as_ref().map(|g| (g.dragged, g.before));
+        let placeholder = || div().flex_none().w(px(198.)).h(px(27.));
+        let mut strip = h_flex()
+            .id("tab-strip")
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .items_start()
+            .pl(px(5.))
+            .gap(px(3.))
+            .overflow_x_scroll()
+            .track_scroll(&self.tab_scroll)
+            .on_drag_move::<TabDrag>(cx.listener(|this, e: &DragMoveEvent<TabDrag>, _, cx| {
+                if let Some(g) = &mut this.tab_gap {
+                    g.x = e.event.position.x;
+                    cx.notify();
+                }
+            }))
+            .on_drop(cx.listener(|this, _: &TabDrag, _, cx| this.drop_tab(cx)));
         if let Some(name) = open_name {
             let folder = open.unwrap_or(TabId(0));
             // "All tabs" (home): back to every tab; dropping here moves to the root.
@@ -933,9 +996,30 @@ impl Workspace {
             }
             strip = strip.child(self.folder_tab(folder, name, true, cx));
         }
+        let order: Vec<TabId> = items.iter().map(|(id, ..)| *id).filter(|id| gap.is_none_or(|(d, _)| d != *id)).collect();
         for (id, name, kind) in items {
+            if gap.is_some_and(|(d, _)| d == id) {
+                continue;
+            }
+            if gap.is_some_and(|(_, b)| b == Some(Some(id))) {
+                strip = strip.child(placeholder());
+            }
+            // The gap goes before this tab (pointer on its left half) or
+            // after it.
+            let next = order.iter().position(|t| *t == id).and_then(|i| order.get(i + 1)).copied();
+            let gap_here = cx.listener(move |this, e: &DragMoveEvent<TabDrag>, _, cx| {
+                if !e.bounds.contains(&e.event.position) {
+                    return;
+                }
+                let Some(g) = &mut this.tab_gap else { return };
+                let before = if kind.is_none() { None } else if e.event.position.x < e.bounds.center().x { Some(Some(id)) } else { Some(next) };
+                if g.before != before {
+                    g.before = before;
+                    cx.notify();
+                }
+            });
             let Some(kind) = kind else {
-                strip = strip.child(self.folder_tab(id, name, false, cx));
+                strip = strip.child(self.folder_tab(id, name, false, cx).on_drag_move(gap_here));
                 continue;
             };
             let active = self.active == Some(id);
@@ -985,10 +1069,10 @@ impl Workspace {
                             cx.new(|cx| crate::tab_thumbs::TabCard::new(thumbs, id, anchor, cx)).into()
                         })
                     })
-                    // Drag to reorder; drop a tab on a folder to file it.
-                    .on_drag(TabDrag { id, name: tab_name.clone(), icon: Some(tab_icon(kind)) }, |d, _, _, cx| cx.new(|_| d.clone()))
-                    .drag_over::<TabDrag>(|st, _, _, _| st.border_l_2().border_color(gpui_kit::rgb(0x1651b0)))
-                    .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_before(drag.id, id, cx)))
+                    // Drag to reorder (the strip drops it in the gap); drop a
+                    // tab on a folder to file it.
+                    .on_drag(TabDrag { id, name: tab_name.clone(), icon: Some(tab_icon(kind)) }, start_tab_drag(cx.entity().downgrade()))
+                    .on_drag_move(gap_here)
                     .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                         if compare_off {
                             return;
@@ -1124,6 +1208,31 @@ impl Workspace {
                     }),
             );
         }
+        if gap.is_some_and(|(_, b)| b == Some(None)) {
+            strip = strip.child(placeholder());
+        }
+        // Live: a 100 px ghost (#eaeaea, shadow 0 5px 10px .2, the label
+        // truncated) under the pointer, along the bar (it starts at x 0).
+        let ghost = self.tab_gap.as_ref().map(|g| {
+            h_flex()
+                .absolute()
+                .top_0()
+                .left(g.x - g.grab.min(px(90.)))
+                .w(px(100.))
+                .h(px(27.))
+                .px(px(10.))
+                .gap(px(3.))
+                .rounded_b(px(5.))
+                .bg(gpui_kit::rgb(0xeaeaea))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_size(px(14.))
+                .text_color(pal.text)
+                .child(div().flex_none().child(match g.icon {
+                    Some(i) => crate::assets::icon(i, 20., cx),
+                    None => os::glyph(os::GLYPH_FOLDER, 20., pal.text).into_any_element(),
+                }))
+                .child(div().min_w_0().truncate().child(g.name.clone()))
+        });
         let arrows = self.render_tab_scroll_buttons(cx);
         // The strip's overflow is known only after layout, and the bar is a
         // cached slice: when it differs from what this render assumed (tabs
@@ -1142,7 +1251,7 @@ impl Workspace {
         .size(px(1.));
         // Full width: inside the cached slice nothing stretches the row, and
         // the strip must overflow (and scroll) within the window.
-        (tab_list.into_any_element(), h_flex().w_full().min_w_0().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).child(strip).children(arrows).child(watch).into_any_element())
+        (tab_list.into_any_element(), h_flex().relative().w_full().min_w_0().h(px(crate::ui::TAB_BAR_H)).flex_none().bg(pal.tab_bar).child(add).child(strip).children(arrows).child(watch).children(ghost).into_any_element())
     }
 
     /// Live (behaviours "Document tab bar scroll buttons"): ‹ › at the right
@@ -1463,7 +1572,8 @@ impl Render for Workspace {
                     this.open_create_drawing(req, window, cx);
                 }
             }))
-            .child(title)
+            .on_key_down(cx.listener(Self::forward_chrome_key))
+            .child(div().w_full().flex_none().track_focus(&self.chrome_focus[0]).child(title))
             .child(
                 h_flex()
                     .flex_1()
@@ -1502,7 +1612,7 @@ impl Render for Workspace {
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
                                 .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(crate::ui::left_panel_w())).child(p.clone()))),
                         )
-                        .child(tabs)
+                        .child(div().w_full().flex_none().track_focus(&self.chrome_focus[1]).child(tabs))
                         // Live document/75: the notices panel sits under the tab bar,
                         // right of the left rail (the rail runs the full height).
                         .children(self.fs_notices.as_ref().map(|(p, _)| p.clone())),
@@ -1643,27 +1753,36 @@ impl Workspace {
     }
 
     /// Drop on a tab: in front of it, in its folder.
-    fn move_before(&mut self, id: TabId, before: TabId, cx: &mut Context<Self>) {
-        if id == before {
+    /// Put tab `id` before `before` (None: the end of the open folder's
+    /// tabs). Live: a reorder isn't undoable.
+    fn move_tab(&mut self, id: TabId, before: Option<TabId>, cx: &mut Context<Self>) {
+        if Some(id) == before {
             return;
         }
+        let parent = before.map_or(self.open_folder, |b| self.doc.read(cx).session.doc.parent_of(b));
         self.doc.update(cx, |doc, cx| {
-            doc.edit_document("Reorder tabs", cx, |d| {
-                let parent = d.parent_of(before);
+            doc.edit_document_not_undoable("Reorder tabs", cx, |d| {
                 if d.set_parent(id, parent) {
-                    d.move_in_order(id, Some(before));
+                    d.move_in_order(id, before);
                 }
             });
         });
         cx.notify();
     }
 
+    /// A tab dropped on the bar: into the gap, if one is open (live:
+    /// dropping past the last tab does nothing).
+    fn drop_tab(&mut self, cx: &mut Context<Self>) {
+        if let Some(TabGap { dragged, before: Some(before), .. }) = self.tab_gap.take() {
+            self.move_tab(dragged, before, cx);
+        }
+        cx.notify();
+    }
+
     /// A folder on the tab bar: click opens it, double-click renames;
-    /// right-click: Rename, Move to parent folder, Unpack folder, Move to
-    /// document (help: Document tabs › Organizing tabs with folders).
-    fn folder_tab(&self, id: TabId, name: String, current: bool, cx: &mut Context<Self>) -> AnyElement {
+    /// right-click: Rename, Unpack, Move to document… (live qa5 TABS3).
+    fn folder_tab(&self, id: TabId, name: String, current: bool, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
-        let has_parent = self.doc.read(cx).session.doc.parent_of(id).is_some();
         let view = cx.entity();
         tab_chip(SharedString::from(format!("folder-{id}")), current)
             .min_w(px(60.))
@@ -1674,7 +1793,7 @@ impl Workspace {
                 Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
                 None => div().truncate().when(current, |d| d.font_weight(FontWeight::SEMIBOLD)).child(name.clone()).into_any_element(),
             })
-            .when(!current, |d| d.on_drag(TabDrag { id, name: name.clone(), icon: None }, |d, _, _, cx| cx.new(|_| d.clone())))
+            .when(!current, |d| d.on_drag(TabDrag { id, name: name.clone(), icon: None }, start_tab_drag(cx.entity().downgrade())))
             .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
             .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_into(drag.id, Some(id), cx)))
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
@@ -1687,15 +1806,9 @@ impl Workspace {
             }))
             .os_context_menu(move |menu, _, _| {
                 use crate::os_menu::OsMenuItem as I;
-                let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+                let (v1, v3, v4) = (view.clone(), view.clone(), view.clone());
                 menu.item(I::new("Rename").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.start_tab_rename(id, w, cx))))
-                    .item(I::new("Move to parent folder").disabled(!has_parent).on_click(move |_, _, cx| {
-                        v2.update(cx, |t, cx| {
-                            let up = t.doc.read(cx).session.doc.ancestors(id).get(1).copied();
-                            t.move_into(id, up, cx)
-                        })
-                    }))
-                    .item(I::new("Unpack folder").on_click(move |_, _, cx| {
+                    .item(I::new("Unpack").on_click(move |_, _, cx| {
                         v3.update(cx, |t, cx| {
                             if t.open_folder == Some(id) {
                                 t.open_folder = t.doc.read(cx).session.doc.parent_of(id);
@@ -1710,7 +1823,6 @@ impl Workspace {
                         crate::doc_dialogs::move_to_document(doc, vec![id], w, cx)
                     }))
             })
-            .into_any_element()
     }
 
     /// Open (or focus) the Search Feature Studios pane.
@@ -1757,6 +1869,14 @@ pub fn request_export(tab: TabId, parts: Vec<noshape_model::BodyId>, window: &mu
             *REQUESTED_EXPORT.lock() = Some((tab, parts));
             window.dispatch_action(Box::new(ExportRequestedItem), cx);
         }
+    }
+}
+
+/// The workspace's + › Import… (e.g. the drawing Insert view picker's
+/// "Import..." row).
+pub fn request_import(window: &mut Window, cx: &mut App) {
+    if let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<Workspace>().ok()) {
+        ws.update(cx, |w, cx| w.import(window, cx));
     }
 }
 
@@ -1902,23 +2022,37 @@ struct TabDrag {
 }
 
 impl Render for TabDrag {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let pal = p();
-        h_flex()
-            .h(px(27.))
-            .px(px(10.))
-            .gap(px(3.))
-            .rounded_b(px(5.))
-            .bg(pal.panel)
-            .opacity(0.9)
-            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }])
-            .text_size(px(14.))
-            .text_color(pal.text)
-            .child(match self.icon {
-                Some(i) => crate::assets::icon(i, 20., cx),
-                None => os::glyph(os::GLYPH_FOLDER, 20., pal.text).into_any_element(),
-            })
-            .child(self.name.clone())
+    /// Nothing under the pointer: the bar draws the ghost, along the bar
+    /// only (`Workspace::render_tab_bar`).
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// A tab drag along the bar: the dragged tab, where its gap is (None: no
+/// gap, Some(None): at the end), the pointer x and where the tab was
+/// grabbed, and the ghost's icon and label.
+struct TabGap {
+    dragged: TabId,
+    before: Option<Option<TabId>>,
+    x: Pixels,
+    grab: Pixels,
+    icon: Option<&'static str>,
+    name: String,
+}
+
+/// The drag start of a tab or folder chip: records the drag on the
+/// workspace (the gap starts where the tab was).
+fn start_tab_drag(ws: WeakEntity<Workspace>) -> impl Fn(&TabDrag, Point<Pixels>, &mut Window, &mut App) -> Entity<TabDrag> {
+    move |d, offset, window, cx| {
+        let x = window.mouse_position().x;
+        let _ = ws.update(cx, |w, cx| {
+            let order = w.doc.read(cx).session.doc.children(w.open_folder);
+            let next = order.iter().position(|t| *t == d.id).and_then(|i| order.get(i + 1)).copied();
+            w.tab_gap = Some(TabGap { dragged: d.id, before: Some(next), x, grab: offset.x, icon: d.icon, name: d.name.clone() });
+            cx.notify();
+        });
+        cx.new(|_| d.clone())
     }
 }
 

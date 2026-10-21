@@ -61,3 +61,6 @@ UI findings while building:
 - View cube arrows: 15° per click (ours ≈15° ✅).
 - Extrude after closing a one-region sketch: region **not** preselected, ✓ disabled (ours same ✅).
 - Remove + Through all: Merge scope **auto-filled "Part 1"** (ours empty ✗ **EXT1**, minor), default direction into the material (ours ✅).
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| RD1 volume readout | stays 64475.752 after Extrude 1 8 → 10 (real 70994.690) | ✗ still |

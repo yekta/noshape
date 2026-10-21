@@ -748,7 +748,7 @@ fn slider_flip_primary_turns_the_part_over() {
             part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
             part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.07, 0.03, -0.02), false),
         ],
-        mates: vec![mate(10, MateType::Slider, conn(2, bottom, Inference::Centroid), conn(1, top, Inference::Centroid))],
+        mates: vec![mate(10, MateType::Slider, conn(2, bottom, Inference::Centroid), conn(1, top.clone(), Inference::Centroid))],
         ..Default::default()
     };
     let up = |asm: &Assembly, ev: &mut AssemblyEvaluator| {
@@ -761,6 +761,20 @@ fn slider_flip_primary_turns_the_part_over() {
     asm.mates[0].flip_primary = true;
     let z = up(&asm, &mut ev);
     assert!(z.z < -0.999, "turned over after the flip: {z:?}");
+    // qa5 A4: top face onto top face (the Z axes agree, the block sits in
+    // the base); the flip turns it over, onto the base.
+    asm.mates[0] = mate(10, MateType::Slider, conn(2, top.clone(), Inference::Centroid), conn(1, top, Inference::Centroid));
+    asm.mates[0].flip_primary = true;
+    assert!(up(&asm, &mut ev).z > 0.999, "Z axes agree: upright, in the base");
+    asm.mates[0].flip_primary = false;
+    let z = up(&asm, &mut ev);
+    assert!(z.z < -0.999, "turned over onto the base after the flip: {z:?}");
+    // The new mate's preview holds its free value at zero: the connectors
+    // meet, so the turned-over block sits on the base (not below it).
+    let opts = SolveOptions { hold_values: eval::new_mate_holds(&asm.mates[0]), ..Default::default() };
+    let res = ev.evaluate(&f.doc, &asm, &opts, None);
+    let (fa, fb) = (res.mates[0].frame_a.unwrap(), res.mates[0].frame_b.unwrap());
+    assert!((fa.origin - fb.origin).length() < 1e-6, "connectors meet: {:?} {:?}", fa.origin, fb.origin);
 }
 
 #[test]
@@ -1072,6 +1086,9 @@ fn replicate_on_matching_holes() {
     let created = asm.sync_matched_pattern(MateId(80), targets);
     assert_eq!(created.len(), 1);
     assert_eq!(asm.mates.len(), 2);
+    // qa5 A12: the copy's mate is listed under "Replicate 1", not at the top.
+    assert_eq!(asm.pattern_mates(&asm.patterns[0]).count(), 1);
+    assert_eq!(asm.listed_mate_count(), 1);
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
     let o = DVec3::from(res.solved.placement(created[0]).unwrap().translation);

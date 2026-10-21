@@ -48,11 +48,14 @@ pub struct InsertViewState {
     /// new views (prefilled from the assembly's last applied ones).
     pub asm_position: AsmPosition,
     pub display_state: Option<String>,
+    /// Other documents: the chosen document version (the source's reference
+    /// key as the pinned id; [`DrawingEditor::version_doc`] loads it).
+    pub pinned: Option<PinnedVersion>,
 }
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
     }
 }
 
@@ -164,8 +167,18 @@ impl DrawingEditor {
         self.doc.read(cx).session.doc.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| SourceKey::studio(t.id)).collect()
     }
 
+    /// Other documents: a Part Studio or assembly of another document's
+    /// version (`key`: its `ExternalRef` key, `label`: "<document> <version>").
+    pub(crate) fn choose_external(&mut self, key: String, tab: TabId, label: String, cx: &mut Context<Self>) {
+        self.choose_source(tab, None, cx);
+        self.insert.pinned = Some(PinnedVersion { id: key, name: label });
+        self.ensure_sources(false, cx);
+        self.update_preview(cx);
+    }
+
     pub(crate) fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
         self.insert.chooser = None;
+        self.insert.pinned = None;
         if let (Some(old), Some(old_part)) = (self.insert.replace, self.insert.replace_part.take()) {
             // Sheets panel reference › Replace: on every sheet (help H:sheets).
             self.insert.replace = None;
@@ -239,6 +252,10 @@ impl DrawingEditor {
 
     /// Source label of the panel: "<Part Studio> <part>" (or the assembly).
     fn insert_source_label(&self, source: TabId, part: Option<&noshape_model::BodyId>, cx: &App) -> String {
+        // Another document's tab: its name from the regenerated source.
+        if let Some(p) = &self.insert.pinned {
+            return self.sources.get(&SourceKey { version: Some(p.id.clone()), ..SourceKey::studio(source) }).map(|s| s.name.clone()).unwrap_or_default();
+        }
         let tab_name = self.doc.read(cx).session.doc.tab(source).map(|t| t.name.clone()).unwrap_or_default();
         let part_name = part.and_then(|b| self.sources.get(&SourceKey::studio(source)).and_then(|s| s.context.bodies.iter().find(|x| &x.id == b).map(|x| x.name.clone())));
         match part_name {
@@ -277,7 +294,7 @@ impl DrawingEditor {
         // Source dropdown: the whole Part Studio or one of its parts.
         let mut src_items: Vec<(String, bool, Act)> = Vec::new();
         let is_asm = matches!(self.doc.read(cx).session.doc.tab(source).map(|t| &t.content), Some(TabContent::Assembly(_)));
-        if !is_asm {
+        if !is_asm && self.insert.pinned.is_none() {
             let tab_name = self.doc.read(cx).session.doc.tab(source).map(|t| t.name.clone()).unwrap_or_default();
             src_items.push((format!("{tab_name} (all parts)"), part.is_none(), std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| t.choose_source(source, None, cx))));
             if let Some(src) = self.sources.get(&SourceKey::studio(source)) {
@@ -413,136 +430,6 @@ impl DrawingEditor {
                         cx.notify();
                     }))),
                 ))
-                .into_any_element(),
-        )
-    }
-
-    /// "Select a part or assembly": Part Studios (whole studio or one part)
-    /// and assemblies of the document.
-    pub fn render_insert_chooser(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let tab = self.insert.chooser?;
-        let pal = p();
-        // (tab, name, is assembly) of the insertable tabs, in tab order.
-        let tabs: Vec<(TabId, String, bool)> = self
-            .doc
-            .read(cx)
-            .session
-            .doc
-            .ordered_tabs()
-            .into_iter()
-            .filter_map(|t| match &t.content {
-                TabContent::PartStudio(_) => Some((t.id, t.name.clone(), false)),
-                TabContent::Assembly(_) => Some((t.id, t.name.clone(), true)),
-                _ => None,
-            })
-            .collect();
-        let dtab = |id: &'static str, label: &'static str, on: bool, value: u8, cx: &mut Context<Self>| {
-            div()
-                .id(id)
-                .flex_1()
-                .h(px(32.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_size(px(12.))
-                .cursor_pointer()
-                .text_color(if on { pal.accent } else { pal.text })
-                .when(on, |d| d.font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
-                .child(label)
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    this.insert.chooser = Some(value);
-                    cx.notify();
-                }))
-        };
-        let row = |id: SharedString, indent: f32, icon: &'static str, name: String, cx: &App| {
-            h_flex()
-                .id(id)
-                .h(px(32.))
-                .pl(px(8. + indent))
-                .gap(px(8.))
-                .cursor_pointer()
-                .hover(|d| d.bg(pal.row_hover))
-                .child(crate::assets::icon(&crate::assets::icon_path(icon), 18., cx))
-                .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).child(name))
-        };
-        let mut list = v_flex().id("dr-chooser-list").flex_1().min_h_0().overflow_y_scroll();
-        let mut any = false;
-        for (id, name, asm) in tabs {
-            match (asm, tab) {
-                (false, 0) => {
-                    any = true;
-                    list = list.child(row(SharedString::from(format!("dr-ch-ps-{id}")), 0., "part-studio", name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.choose_source(id, None, cx))));
-                    if let Some(src) = self.sources.get(&SourceKey::studio(id)) {
-                        for b in views::view_bodies(&src.context, None) {
-                            // Sheet metal parts: "Flat pattern of <part>" above the part.
-                            if src.context.sheet_metal.contains_key(&b.id) {
-                                let bid = b.id.clone();
-                                list = list.child(row(SharedString::from(format!("dr-ch-f-{id}-{}", b.id)), 20., "sheet-metal", format!("Flat pattern of {}", b.name), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                    this.choose_source(id, Some(bid.clone()), cx);
-                                    this.insert.flat = true;
-                                    this.set_insert_orientation(ViewOrientation::Top, cx);
-                                })));
-                            }
-                            let bid = b.id.clone();
-                            list = list.child(row(SharedString::from(format!("dr-ch-p-{id}-{}", b.id)), 20., "part", b.name.clone(), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.choose_source(id, Some(bid.clone()), cx))));
-                        }
-                        // Sketches give sketch views.
-                        for s in &src.context.sketches {
-                            let f = s.feature;
-                            list = list.child(row(SharedString::from(format!("dr-ch-s-{id}-{}", f.0)), 20., "sketch", s.name.clone(), cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                this.choose_source(id, None, cx);
-                                this.insert_sketch(Some(f), cx);
-                            })));
-                        }
-                    }
-                }
-                (true, 1) => {
-                    any = true;
-                    list = list.child(row(SharedString::from(format!("dr-ch-asm-{id}")), 0., "assembly", name, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.choose_source(id, None, cx))));
-                }
-                _ => {}
-            }
-        }
-        if !any {
-            list = list.child(div().p_2().text_size(px(12.)).text_color(pal.text_muted).child(if tab == 0 { "No Part Studios in this document." } else { "No assemblies in this document." }));
-        }
-        let doc_name = self.doc.read(cx).name();
-        Some(
-            div()
-                .id("dr-chooser-backdrop")
-                .absolute()
-                .inset_0()
-                .flex()
-                .items_center()
-                .justify_center()
-                .bg(pal.modal_backdrop)
-                .occlude()
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(
-                    v_flex()
-                        .w(px(420.))
-                        .h(px(460.))
-                        .bg(pal.modal_bg)
-                        .rounded(px(4.))
-                        .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.25), offset: point(px(0.), px(6.)), blur_radius: px(18.), spread_radius: px(0.), inset: false }])
-                        .text_color(pal.text)
-                        .child(
-                            h_flex()
-                                .h(px(40.))
-                                .px(px(10.))
-                                .border_b_1()
-                                .border_color(pal.border)
-                                .child(div().flex_1().text_size(px(16.)).child("Select a part or assembly"))
-                                .child(Button::new("dr-chooser-close").ghost().child(crate::ui::glyph("close", 14., pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    this.insert.chooser = None;
-                                    cx.notify();
-                                }))),
-                        )
-                        .child(h_flex().h(px(30.)).px(px(10.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(doc_name))
-                        .child(h_flex().border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).child(dtab("dr-ch-ps", "Part Studios", tab == 0, 0, cx)).child(dtab("dr-ch-asm", "Assemblies", tab == 1, 1, cx)))
-                        .child(list),
-                )
                 .into_any_element(),
         )
     }

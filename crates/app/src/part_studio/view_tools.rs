@@ -552,11 +552,38 @@ impl PartStudioView {
 // ------------------------------------------------------------ named views
 
 impl PartStudioView {
+    /// Esc on a tool panel (live qa5 KB2): Named views, Mass and section
+    /// properties and Measure close on the first Esc; the Appearance panel
+    /// (a rail panel) stays. False when none is open.
+    pub(super) fn close_tool_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if self.named_views.is_some() {
+            self.close_named_views(window, cx);
+        } else if self.show_mass {
+            self.set_show_mass(false, cx);
+        } else if self.ui.measure_pinned {
+            self.ui.measure_pinned = false;
+        } else {
+            return false;
+        }
+        cx.notify();
+        true
+    }
+
+    /// Close the Named views panel (Esc, live qa5 KB2); the typed name goes.
+    fn close_named_views(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.named_views.take().is_some() {
+            window.focus(&self.focus, cx);
+            cx.notify();
+        }
+    }
+
     pub(super) fn toggle_named_views(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.named_views.take().is_some() {
             window.focus(&self.focus, cx);
         } else {
-            let st = cx.new(|cx| InputState::new(window, cx));
+            // Live (qa5 KB2): Esc in "New view name" closes the panel at
+            // once, with no revert step (the panel's Escape below).
+            let st = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false));
             let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
                 if matches!(ev, InputEvent::Change) {
                     cx.notify();
@@ -673,6 +700,7 @@ impl PartStudioView {
             v_flex()
                 .id("named-views")
                 .occlude()
+                .on_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| this.close_named_views(window, cx)))
                 .child(crate::ui::panel_probe("ps-named-views"))
                 .absolute()
                 .top(px(3.))

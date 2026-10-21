@@ -122,6 +122,8 @@ pub(super) struct SketchUi {
     use_preview_for: Option<Reference>,
     /// Open dimension context menu: constraint and viewport position.
     dim_menu: Option<(noshape_sketch::ConstraintId, f32, f32)>,
+    /// The dimension whose label (in the frame) the pointer is over.
+    label_hover: Option<noshape_sketch::ConstraintId>,
     /// Pattern instance-count label being typed into (`3x`).
     count_edit: Option<(crate::sketch_mode::PatternHandle, Entity<InputState>, Subscription)>,
 }
@@ -274,6 +276,10 @@ impl PartStudioView {
         if self.sketch.take().is_some() {
             self.dim_input = None;
             self.opts.editing_sketch = None;
+            // Live: "Sketch could not be solved." goes when the sketch closes.
+            if self.message.as_ref().is_some_and(|(_, m)| m == crate::sketch_mode::SKETCH_NOT_SOLVED) {
+                self.message = None;
+            }
             self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
         }
     }
@@ -502,12 +508,66 @@ impl PartStudioView {
         }
         match ev {
             ViewportEvent::CameraChanged => {
-                // Arrowheads and glyph offsets are sized in pixels.
+                // Arrowheads, glyph offsets and the name are sized in pixels.
+                // Otherwise nothing to redo: what GPUI draws at projected
+                // points re-renders with the viewport (`sketch_follows_camera`),
+                // the rest is in the frame.
                 if wpp_changed {
                     self.refresh_scene(false, cx);
+                    cx.notify();
                 }
-                cx.notify();
                 false
+            }
+            // A dimension label in the frame (`sketch_dimension_overlay`):
+            // what its GPUI element did on hover and press.
+            ViewportEvent::LabelHover(id) => {
+                let new = id.and_then(dim_label_of);
+                let prev = self.ui_mut().and_then(|u| std::mem::replace(&mut u.label_hover, new));
+                if let Some(ed) = &mut self.sketch {
+                    let hover = match new {
+                        Some(c) => Some(c),
+                        None if prev.is_some() && ed.hover_constraint == prev => None,
+                        None => ed.hover_constraint,
+                    };
+                    if hover != ed.hover_constraint {
+                        ed.hover_constraint = hover;
+                        if hover.is_some() {
+                            self.hover = None;
+                        }
+                        self.refresh_scene(false, cx);
+                        cx.notify();
+                    }
+                }
+                new.is_some()
+            }
+            ViewportEvent::LabelDown { id, button, click_count, modifiers } => {
+                let Some(cid) = dim_label_of(*id) else { return false };
+                let Some(data) = self.sketch_data(cx) else { return true };
+                let Some(d) = self.placed_dimension_labels(&data, cx).into_iter().find(|d| d.cid == cid) else { return true };
+                match button {
+                    // Context menu: edit / driving-driven / delete.
+                    MouseButton::Right => {
+                        if let Some(ui) = self.ui_mut() {
+                            ui.dim_menu = Some((cid, d.at.0 + 6.0, d.at.1 + 10.0));
+                        }
+                        cx.notify();
+                    }
+                    // The press goes on to the editor too, which turns it
+                    // into a label drag / selection.
+                    MouseButton::Left => {
+                        let additive = modifiers.shift || modifiers.control;
+                        if *click_count >= 2 && d.driving {
+                            if let Some(ed) = &mut self.sketch {
+                                ed.pressed_label = Some((cid, additive, false));
+                            }
+                            self.open_dim_edit(cid, window, cx);
+                        } else if let Some(ed) = &mut self.sketch {
+                            ed.pressed_label = Some((cid, additive, true));
+                        }
+                    }
+                    _ => {}
+                }
+                true
             }
             ViewportEvent::Hover(id) => {
                 // While a glyph/label is hovered, the geometry under it isn't.
@@ -1065,6 +1125,22 @@ impl PartStudioView {
             Some(Ok(())) => {
                 self.dim_input = None;
                 self.regen_sync(window, cx);
+                // Solvable again: the warning goes (live).
+                if self.message.as_ref().is_some_and(|(_, m)| m == crate::sketch_mode::SKETCH_NOT_SOLVED) {
+                    self.message = None;
+                }
+                window.focus(&self.focus, cx);
+            }
+            Some(Err(e)) if e == crate::sketch_mode::SKETCH_NOT_SOLVED => {
+                // Live (qa5 dim conflict, SK1): the value is taken and the box
+                // closes; the sketch shows red and Onshape's yellow "Sketch
+                // could not be solved." stays until it solves or closes.
+                if let Some(ed) = &mut self.sketch {
+                    ed.dim_edit = None;
+                }
+                self.dim_input = None;
+                self.regen_sync(window, cx);
+                self.message = Some((FeatureStatus::Warning, e));
                 window.focus(&self.focus, cx);
             }
             Some(Err(e)) => {
@@ -2284,6 +2360,101 @@ impl PartStudioView {
 
     /// Dimension labels, constraint glyphs, inference icons, value entry and
     /// tool options (viewport overlay elements).
+    /// The sketch's dimension labels where they show (viewport px), with
+    /// their text; configured dimensions show the active configuration's
+    /// value. The one being edited is included (its box goes there).
+    fn placed_dimension_labels(&self, data: &SketchData, cx: &App) -> Vec<PlacedDimension> {
+        let Some(ed) = self.sketch.as_ref() else { return Vec::new() };
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let vp = self.viewport.read(cx);
+        let configured: std::collections::HashSet<u32> = data.sketch.constraints().filter(|c| c.is_dimension() && self.dimension_configuration(c.id, cx).is_some()).map(|c| c.id.0).collect();
+        let regenerated = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)).map(|s| s.sketch.clone());
+        let beside = ed.labels_beside_line(data);
+        let mut out = Vec::new();
+        for (cid, pos, mut text, driving) in ed.dimension_labels(data, &units) {
+            let anchor = ed.frame.to_world(pos);
+            let Some(s) = vp.project(anchor) else { continue };
+            // Steep dimension lines: the text sits right of the line (live sketch/17).
+            let shift = if beside.contains(&cid) { crate::sketch_mode::label_width_px(&text) as f32 * 0.5 + 8.0 } else { 0.0 };
+            let (x, y) = (s.x as f32 + shift, s.y as f32);
+            let is_configured = configured.contains(&cid.0);
+            if is_configured
+                && let Some(c) = regenerated.as_ref().and_then(|s| s.constraint(cid))
+                && let Some(v) = c.kind.value()
+            {
+                text = crate::sketch_mode::dim_value_text_tol(&c.kind, v, &units, data.dimension_tolerances.get(&cid.0));
+            }
+            out.push(PlacedDimension { cid, at: (x, y), anchor, shift, text, driving, configured: is_configured });
+        }
+        out
+    }
+
+    /// The sketch frame's name ("Sketch 1", light blue, top-left inside) as
+    /// glyph contours in the sketch plane, for the frame. Onshape
+    /// `updateText`: a 20 px label (`PLANE_TEXT_HEIGHT_PX`, 2 px padding)
+    /// 5 px inside the top-left corner (`PLANE_TEXT_MARGIN`), shrunk to fit
+    /// a small frame; pixel sizes from the zoom (`world_per_px`), so only a
+    /// zoom changes them.
+    pub(super) fn sketch_name_contours(&self, cx: &App) -> Vec<Vec<DVec3>> {
+        let Some(ed) = self.sketch.as_ref() else { return Vec::new() };
+        let (lo, hi) = ed.sketch_box();
+        let name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_default();
+        let wpp = ed.world_per_px;
+        let width = super::plane_text(&name).width;
+        let (text_w, text_h) = ((width * 16.5 + 4.0) * wpp, 24.0 * wpp);
+        let (avail_w, avail_h) = (hi.x - lo.x - 10.0 * wpp, hi.y - lo.y - 10.0 * wpp);
+        let scale = if text_w > avail_w || text_h > avail_h { (avail_w / text_w).min(avail_h / text_h) } else { 1.0 };
+        let mut out = Vec::new();
+        if scale > 0.0 {
+            // `in_plane_text` puts the ascender 0.25 asc right of and 0.3
+            // asc below the point it is given.
+            let (asc, inset) = (16.5 * wpp * scale, (5.0 + 2.0 * scale) * wpp);
+            let top_left = DVec2::new(lo.x + inset - 0.25 * asc, hi.y - inset + 0.3 * asc);
+            super::in_plane_contours(&name, ed.frame.to_world(top_left), ed.frame.x, ed.frame.y, asc, &mut out);
+        }
+        out
+    }
+
+    /// The dimension labels at rest as labels in the viewport's frame (they
+    /// follow the camera without a window redraw; hover and presses come
+    /// back as `ViewportEvent::LabelHover` / `LabelDown`): what
+    /// `render_sketch_labels` would lay out, painted the same way.
+    pub(super) fn sketch_dimension_overlay(&self, window: &Window, cx: &App) -> Vec<noshape_render::overlay::Label> {
+        if !crate::overlay_labels::frame_sketch_labels() {
+            return Vec::new();
+        }
+        let (Some(ed), Some(data)) = (self.sketch.as_ref(), self.sketch_data(cx)) else { return Vec::new() };
+        let editing = self.dim_input.as_ref().map(|(c, _, _)| *c);
+        let mut out = Vec::new();
+        for PlacedDimension { cid, anchor, shift, text, driving, configured, .. } in self.placed_dimension_labels(&data, cx) {
+            if editing == Some(cid) {
+                continue;
+            }
+            let est_w = crate::sketch_mode::label_width_px(&text) as f32 + 8.0;
+            let (bg, fg) = dimension_label_colors(ed, cid, driving);
+            let (marker, rest) = dim_label_marker(&text);
+            let mut leaves = Vec::new();
+            if let Some((t, color)) = marker {
+                leaves.push(crate::overlay_labels::Leaf { text: t, italic: true, color: rgb(color).into(), margin_right: 4.0 });
+            }
+            leaves.push(crate::overlay_labels::Leaf { text: rest, italic: false, color: fg.into(), margin_right: 0.0 });
+            let b = crate::overlay_labels::RowBox {
+                leaves,
+                text_size: 16.0,
+                height: 22.0,
+                pad_x: 4.0,
+                radius: 4.0,
+                background: bg.map(Into::into),
+                border: configured.then(|| rgb(0xffc20e).into()),
+                offset: [shift - est_w * 0.5, -11.0],
+            };
+            if let Some(l) = crate::overlay_labels::row_box(window, cx, &b, anchor, dim_label_hit(cid)) {
+                out.push(l);
+            }
+        }
+        out
+    }
+
     pub(super) fn render_sketch_labels(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         if self.sketch.is_none() {
@@ -2410,7 +2581,10 @@ impl PartStudioView {
 
         // ---- one-line measurement of the selection, left of the evaluation
         // tools at the bottom right (live: `Length: 1.003 in`, monospace value)
-        if let Some((label, value)) = ed.selection_readout(&data, &units) {
+        // (the one element so far that doesn't follow the camera)
+        let readout = ed.selection_readout(&data, &units);
+        let fixed = usize::from(readout.is_some());
+        if let Some((label, value)) = readout {
             out.push(
                 h_flex()
                     .absolute()
@@ -2428,47 +2602,12 @@ impl PartStudioView {
             );
         }
 
-        // ---- the sketch frame's name ("Sketch 1", light blue, top-left inside)
-        {
-            let (lo, hi) = ed.sketch_box();
-            let name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_default();
-            // Onshape `updateText`: drawn in the sketch plane, a 20 px label
-            // (`PLANE_TEXT_HEIGHT_PX`, 2 px padding) 5 px inside the top-left
-            // corner (`PLANE_TEXT_MARGIN`), shrunk to fit a small frame.
-            let mut polys = Vec::new();
-            let wpp = ed.world_per_px;
-            let width = super::plane_text(&name).width;
-            let (text_w, text_h) = ((width * 16.5 + 4.0) * wpp, 24.0 * wpp);
-            let (avail_w, avail_h) = (hi.x - lo.x - 10.0 * wpp, hi.y - lo.y - 10.0 * wpp);
-            let scale = if text_w > avail_w || text_h > avail_h { (avail_w / text_w).min(avail_h / text_h) } else { 1.0 };
-            if scale > 0.0 {
-                // `in_plane_text` puts the ascender 0.25 asc right of and
-                // 0.3 asc below the point it is given.
-                let (asc, inset) = (16.5 * wpp * scale, (5.0 + 2.0 * scale) * wpp);
-                let top_left = DVec2::new(lo.x + inset - 0.25 * asc, hi.y - inset + 0.3 * asc);
-                super::in_plane_text(vp, &name, frame.to_world(top_left), frame.x, frame.y, asc, &mut polys);
-            }
-            if !polys.is_empty() {
-                out.push(super::paint_paths(polys, rgb(crate::sketch_mode::SKETCH_BOX_COLOR).into()));
-            }
-        }
+        // ---- the sketch frame's name: in the frame (`sketch_name_contours`)
 
-        // ---- dimension labels
-        let configured: std::collections::HashSet<u32> = data.sketch.constraints().filter(|c| c.is_dimension() && self.dimension_configuration(c.id, cx).is_some()).map(|c| c.id.0).collect();
-        let regenerated = self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)).map(|s| s.sketch.clone());
-        let beside = ed.labels_beside_line(&data);
-        for (cid, pos, mut text, driving) in ed.dimension_labels(&data, &units) {
-            let Some((x, y)) = project(pos) else { continue };
-            // Steep dimension lines: the text sits right of the line (live sketch/17).
-            let x = if beside.contains(&cid) { x + crate::sketch_mode::label_width_px(&text) as f32 * 0.5 + 8.0 } else { x };
-            let is_configured = configured.contains(&cid.0);
-            // Configured dimensions show the active configuration's value.
-            if is_configured
-                && let Some(c) = regenerated.as_ref().and_then(|s| s.constraint(cid))
-                && let Some(v) = c.kind.value()
-            {
-                text = crate::sketch_mode::dim_value_text_tol(&c.kind, v, &units, data.dimension_tolerances.get(&cid.0));
-            }
+        // ---- dimension labels (at rest drawn in the viewport's frame,
+        // `sketch_dimension_overlay`, unless NOSHAPE_GPUI_LABELS)
+        let gpui_labels = !crate::overlay_labels::frame_sketch_labels();
+        for PlacedDimension { cid, at: (x, y), text, driving, configured: is_configured, .. } in self.placed_dimension_labels(&data, cx) {
             if let Some((ec, st)) = &editing
                 && *ec == cid
             {
@@ -2503,15 +2642,17 @@ impl PartStudioView {
                             let st = st.clone();
                             move |this, e: &KeyDownEvent, window, cx| {
                                 let k = &e.keystroke;
-                                // Esc closes the box (live: a reopened dimension
-                                // keeps its value, a new one stays with its
-                                // measured value) and the sketch gets the keys
-                                // back (qa4 F29: after an invalid value the
-                                // field's own Esc kept them).
+                                // Live (qa5 dim conflict): Esc in the box reverts
+                                // it to the committed value and blurs it; the box
+                                // stays, and the next Esc (the sketch's) closes
+                                // it. The sketch gets the keys back (qa4 F29).
                                 if k.key == "escape" && !k.modifiers.modified() {
                                     cx.stop_propagation();
                                     this.ui.dim_invalid = false;
-                                    this.sketch_cancel(cx);
+                                    let units = this.doc.read(cx).session.doc.settings.units;
+                                    if let Some(text) = this.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units)) {
+                                        st.update(cx, |s, cx| s.set_value(text, window, cx));
+                                    }
                                     window.focus(&this.focus, cx);
                                     cx.notify();
                                     return;
@@ -2663,22 +2804,11 @@ impl PartStudioView {
                 }
                 continue;
             }
-            let selected = ed.selected_constraints.contains(&cid);
-            let hovered = ed.hover_constraint == Some(cid);
-            let conflict = ed.show_errors && ed.conflicting.contains(&cid);
-            // Onshape: 16 px black value with no box at rest (the dimension
-            // line is broken around it); hover / selected get a rounded
-            // `#d9bfa0` / `#d9a566` box; driven values are `#666`.
+            if !gpui_labels {
+                continue;
+            }
             let est_w = crate::sketch_mode::label_width_px(&text) as f32 + 8.0;
-            let (bg, fg) = if selected {
-                (Some(rgb(0xd9a566)), rgb(0x000000))
-            } else if hovered {
-                (Some(rgb(0xd9bfa0)), rgb(0x000000))
-            } else if conflict {
-                (None, rgb(crate::theme::viewport::SKETCH_OVER))
-            } else {
-                (None, if driving { rgb(0x000000) } else { rgb(crate::theme::viewport::DIM_DRIVEN) })
-            };
+            let (bg, fg) = dimension_label_colors(ed, cid, driving);
             out.push(
                 div()
                     .id(SharedString::from(format!("dim-{}", cid.0)))
@@ -3027,6 +3157,10 @@ impl PartStudioView {
             );
         }
 
+        // Anything pushed so far but the readout sits at a projected point:
+        // then camera moves re-render the window.
+        let follows = out.len() > fixed;
+
         // ---- tool options box: a small floating panel at the top of the
         // viewport, right of the feature dialog (clear of the view toggles).
         if !rows.is_empty() && !ed.text_dialog_open() {
@@ -3092,6 +3226,9 @@ impl PartStudioView {
         }
         if let Some(menu) = self.render_dim_menu(cx) {
             out.push(menu);
+        }
+        if std::mem::replace(&mut self.ui.sketch_follows_camera, follows) != follows {
+            cx.notify();
         }
         let ed = self.sketch.as_ref().expect("sketch");
         if let Some(m) = ed.message.clone() {
@@ -3769,14 +3906,61 @@ impl Render for DimBoxGhost {
 /// A dimension label's text with its expression marker drawn as Onshape
 /// does (live sketch/992): a variable's grey italic "ƒx", an expression's
 /// italic "ƒ", left of the number.
-fn dim_label_parts(text: String) -> Vec<AnyElement> {
-    let marker = |t: &'static str, color: u32| div().italic().mr(px(4.)).text_color(rgb(color)).child(t).into_any_element();
-    if let Some(rest) = text.strip_prefix(crate::sketch_mode::VARIABLE_MARK) {
-        vec![marker("ƒx", 0x9a9a9a), rest.to_string().into_any_element()]
-    } else if let Some(rest) = text.strip_prefix(crate::sketch_mode::EXPRESSION_MARK) {
-        vec![marker("ƒ", 0x555555), rest.to_string().into_any_element()]
+/// A dimension label where it shows: viewport px (`at`), and as a model
+/// point plus a px shift right (`anchor`, `shift`).
+struct PlacedDimension {
+    cid: noshape_sketch::ConstraintId,
+    at: (f32, f32),
+    anchor: DVec3,
+    shift: f32,
+    text: String,
+    driving: bool,
+    configured: bool,
+}
+
+/// Onshape: 16 px black value with no box at rest (the dimension line is
+/// broken around it); hover / selected get a rounded `#d9bfa0` / `#d9a566`
+/// box; driven values are `#666`; conflicts red.
+fn dimension_label_colors(ed: &SketchEditor, cid: noshape_sketch::ConstraintId, driving: bool) -> (Option<Rgba>, Rgba) {
+    if ed.selected_constraints.contains(&cid) {
+        (Some(rgb(0xd9a566)), rgb(0x000000))
+    } else if ed.hover_constraint == Some(cid) {
+        (Some(rgb(0xd9bfa0)), rgb(0x000000))
+    } else if ed.show_errors && ed.conflicting.contains(&cid) {
+        (None, rgb(crate::theme::viewport::SKETCH_OVER))
     } else {
-        vec![text.into_any_element()]
+        (None, if driving { rgb(0x000000) } else { rgb(crate::theme::viewport::DIM_DRIVEN) })
+    }
+}
+
+/// Overlay label ids of the sketch's dimension labels (`Label::hit`).
+const DIM_LABEL_HIT: u64 = 1 << 40;
+
+fn dim_label_hit(cid: noshape_sketch::ConstraintId) -> u64 {
+    DIM_LABEL_HIT | cid.0 as u64
+}
+
+/// The dimension a label id is for.
+fn dim_label_of(hit: u64) -> Option<noshape_sketch::ConstraintId> {
+    (hit & !0xffff_ffff == DIM_LABEL_HIT).then_some(noshape_sketch::ConstraintId(hit as u32))
+}
+
+/// A label's ƒx (variable) / ƒ (expression) marker with its color, and the
+/// value after it.
+fn dim_label_marker(text: &str) -> (Option<(&'static str, u32)>, &str) {
+    if let Some(rest) = text.strip_prefix(crate::sketch_mode::VARIABLE_MARK) {
+        (Some(("ƒx", 0x9a9a9a)), rest)
+    } else if let Some(rest) = text.strip_prefix(crate::sketch_mode::EXPRESSION_MARK) {
+        (Some(("ƒ", 0x555555)), rest)
+    } else {
+        (None, text)
+    }
+}
+
+fn dim_label_parts(text: String) -> Vec<AnyElement> {
+    match dim_label_marker(&text) {
+        (Some((t, color)), rest) => vec![div().italic().mr(px(4.)).text_color(rgb(color)).child(t).into_any_element(), rest.to_string().into_any_element()],
+        (None, _) => vec![text.into_any_element()],
     }
 }
 

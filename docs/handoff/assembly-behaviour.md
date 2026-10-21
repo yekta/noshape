@@ -763,3 +763,84 @@ Live reference: behaviours.md "qa5 assembly" (dialogs, placements) and the Repli
   there went with it — re-add `.linear_direction()` if patterns come back to the API.
 * Queued: ASME B18.6.4 tapping screws (10 components; Head type Slot/Type I/IA/VI, Tip type A…T need per-size option
   values in the catalogue; tables in dims/ASME_B18.6.4_*), askew head bolt (dims/ASME_B18.2.1_askew_head_bolt).
+
+### qa5 pass 3 (after the freeze, 21 Oct evening) — on top of 5d28447
+* A12: a pattern's generated mates are listed under its row as a collapsed "Mate features (N)"
+  folder (`Assembly::pattern_mates`); the top-level "Mate features (N)" counts
+  `Assembly::listed_mate_count` (live qa5/asm-056). The pattern row's instance count is gone (live has
+  none). Test: assertions in `replicate_on_matching_holes`.
+* A3: hidden mate rows `#999` with icons at 0.5 (`feature_row_color`, test
+  `hidden_mate_rows_are_grey` in assembly_view.rs).
+* A14: the pattern dialogs' red hint line is removed (an incomplete pattern only greys ✓ / reddens the title).
+* UNDO1: `DocModel::edit_tab_deferred` / `flush_pending` (doc_model.rs, `PendingEdit`, test
+  `deferred_edits_are_one_undo_step`): an Insert session (inserts, paste, the drop) is one undo
+  step, committed when the Insert dialog closes, by the next edit, undo/redo, or on drop of the
+  model. `AssemblyView::edit_insert` / `end_insert_step`. Undo button: `DocModel::can_undo/can_redo`.
+  The Insert dialog's "undo last insert" removes the instance from the pending step.
+* A11: BOM type-to-edit put the caret after the typed key (`set_selected_range`, the input's
+  select-on-focus selected the "P" and the next key replaced it); `revert_on_escape(false)` so Esc
+  drops the edit; Delete clears the selected cell (`bom_clear_selected`).
+* A1: zoom to fit uses `AssemblyResult::bounds()` (the scene's bounds lagged the first insert) and
+  `fit_inset_left` 244 px while a left dialog is open (`AsmUi::left_open`, set at render).
+* A13: the relation dialog is a feature dialog as live (behaviours.md "Assembly relation dialogs"):
+  "<Type> 1" ✓ ✕, type select (Gear, Rack and pinion, Screw, Linear), Mate(s) query with chips
+  "⟳ - z - Revolute 1" (`noshape_ops::assembly::relation_mate_label`), "Relation ratio 1" /
+  "Distance per revolution 25 mm" (`relation_default_ratio`, `relation_value_label`), ☐ Reverse
+  direction, ?; the new row ("Gear 1", bold, selected) is in the list while open. Picks toggle
+  (screw: one mate). Test `relation_dialog_matches_live` (ops). Not done: the chips' × (shared
+  `os_ui::query_row` has none), the DOF manipulators in the graphics.
+* A4: extra model case (top face onto top face, the qa5 setup) in `slider_flip_primary_turns_the_part_over`.
+* SK3 (mine: sketch leftovers): a dimension / constraint to model geometry makes a reference-only
+  entity (`noshape_sketch::Entity::reference_only`, `Sketch::set_reference_only`,
+  set in `noshape_ops::sketch_use::external_entity` when `construction`): solved, not drawn
+  (`regen/display.rs`), no use glyph, pruned with its last constraint (`prune_reference_only` in
+  `prune_exprs`). Use on such geometry makes it normal used geometry. Test
+  `model_edge_references_are_hidden_and_go_with_their_dimension` (scene).
+* ✓/✕ tooltips: none left in assembly dialogs (the mate HUD keeps "Commit current mate and start a
+  new mate" / "Cancel": live mate-hud.txt).
+
+### qa5 pass 7 (lead, 21 Oct night)
+* A4 (root cause found in the GUI): the flip did turn the block over, but the Slider's free Z
+  value stayed where the solve from the stored placement left it (the block landed under the
+  plate). A new mate's preview now holds every free value at zero
+  (`eval::new_mate_holds` → `SolveOptions::hold_values` in `effective()`), so the connectors meet
+  as in Onshape. Test: end of `slider_flip_primary_turns_the_part_over`.
+* A18: `ops::assembly::insert_part` puts a repeat of the same part at n × bbox/8 (live: 5, 2.5,
+  1.25 for a 40×20×10 block), another part at the origin; the instance only follows the cursor
+  once the pointer moves over the graphics (`AsmUi::place_moved`), so ✓ right away keeps it there.
+* A15 (my part; ui2 does the face/edge colours in assembly_scene): no manipulator triad on a
+  just-inserted instance (`AsmUi::inserted_selection`), root row highlighted only after a click
+  on it (`AsmUi::root_selected`).
+* CA1: configured Part Studio parts use `icons/part-configured.svg` (own drawing: part + blue
+  grid; icons2 may redraw it). CA2: "Select instances with same configuration", "… with same part
+  and same configuration" (`ops::assembly::same_configuration`, test) after Change
+  configuration…; "Release…" after Export… in the list menu (`release_instances`).
+* SK1 leftover: regen marks a sketch whose solve isn't `Solved` as Error (regen/mod.rs), so the
+  dialog title and the feature row turn red. Test `an_unsolvable_sketch_is_in_error` (features_c).
+* A16 waits for live. "Accept (Enter)" tooltips: no such string exists in the tree (grep).
+* CA5: the configuration button's ▾ › Reset to default / Set to last viewed also set an open
+  Change configuration panel's inputs (`set_config_panel_values`, Generate enabled on a change).
+* CA6: BOM part rows key on `bom::canonical_config` (entries equal to the Part Studio's defaults,
+  numerically for variable inputs, and excluded inputs dropped), so instances in the same
+  configuration share a row (assembly panel and drawing table). Test
+  `instances_in_the_same_configuration_share_a_row` (bom.rs). Live confirmation pending.
+* CA2: root-row menu Release… after Export… (`release_dialog::tab_items`).
+* Live confirmed (qa5 pass 7): CA5 and CA6 as built. A16: the toolbar "solving…" label is removed
+  (live never shows one). BOM cell edits are committed not undoable
+  (`DocModel::edit_document_not_undoable` in `set_bom_cell`), as live's Ctrl+Z leaves them.
+* Fixed the integration blocker assembly_panels.rs E0502 (`ConfigSession::focus` read before
+  `insert_config_button`).
+
+### Note from ui (21 Oct ~20:30)
+`assembly_view.rs click_select`: an empty click no longer clears the selection while Mass properties is open
+(its "Parts to measure" chips are the selection; live: empty clicks keep dialog chips). Also Change configuration
+(`assembly_panels.rs`) now commits values with the unit and has feature-dialog keys (qa5 CA4).
+
+## Moved to the shared ops (api, 2026-10-21 21:20; lead's call, no freeze)
+`assembly_panels.rs`: the pattern dialog's defaults (`pattern_defaults`: 25 mm / 360 deg / 2), Replicate's default
+scope (`replicate_on_edge` -> `default_replicate_scope`), the seed mate (`seed_mate`) and the pattern commit
+(`pattern_description` + `commit_pattern`); `assembly_interference.rs`: `interference_rows`. They now call
+`noshape_ops::assembly::*`, the same code moved verbatim, so the CLI/MCP patterns, Replicate and interference
+behave exactly as the dialogs. Behaviour unchanged. Change these rules in `crates/ops/src/assembly.rs`.
+Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_suppressed`) and the Group commit
+(`commit_group`, `GROUP_TOO_FEW`), script /root/api-scratch/patch_asm_switch.py assembly_view.rs.

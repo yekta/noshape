@@ -78,6 +78,8 @@ pub fn description(id: &str) -> Option<&'static str> {
         "sheetMetalBendRelief" => "Change one sheet metal bend relief's type and scale.",
         "sheetMetalCornerBreak" => "Break sheet metal corners with a fillet or chamfer at a corner edge or vertex.",
         "sheetMetalEnd" => "Finish the sheet metal models so later features edit them as ordinary parts.",
+        "pcbStart" => "Create a flex PCB model by converting parts, extruding sketch curves or thickening faces.",
+        "pcbEnd" => "Unfold a flex PCB model and finish it so later features edit it as an ordinary part.",
         _ => return None,
     })
 }

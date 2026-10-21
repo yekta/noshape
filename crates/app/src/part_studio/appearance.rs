@@ -142,6 +142,15 @@ pub fn face_colors(body: &noshape_model::display::BodyDisplay, appearances: &[Fa
 }
 
 impl PartStudioView {
+    /// The swatch of a sketch's "Edit sketch appearance…" menu item: its
+    /// appearance color, else #999 (live menus/rmb-ps-featurelist-sketch).
+    pub(super) fn sketch_swatch(&self, id: FeatureId, cx: &App) -> Hsla {
+        let target = AppearanceTarget::Feature(id);
+        let color = self.studio(cx).and_then(|s| s.appearances.iter().find(|a| a.target == target).map(|a| a.color));
+        let hex = color.map_or(0x999999, |c| [0, 1, 2].iter().fold(0u32, |v, &i| (v << 8) | u32::from(lin_to_srgb(c[i]))));
+        rgb(hex).into()
+    }
+
     /// Per-vertex colors for the scene: an active analysis map, otherwise
     /// face/feature appearances. Cached per display and inputs.
     pub(super) fn vertex_colors(&mut self, cx: &App) -> Option<VertexColors> {

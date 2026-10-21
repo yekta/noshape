@@ -57,8 +57,8 @@ impl PartStudioView {
         let creator = target_ref.as_ref().and_then(|r| self.creating_feature(r));
         let studio = self.studio(cx);
         let creator_name = creator.and_then(|id| studio.and_then(|s| s.feature(id)).map(|f| f.name.clone()));
+        let sketch_swatch = creator.map(|id| self.sketch_swatch(id, cx));
         let source_sketch = creator.and_then(|id| studio.and_then(|s| s.feature(id).and_then(|f| noshape_model::interaction::source_sketch(&s.features, f)).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone())))));
-        let sheet_metal = body.as_ref().is_some_and(|b| self.context.as_ref().is_some_and(|c| c.sheet_metal.contains_key(b)));
         let has_selection = !self.selection.is_empty() || !self.selected_features.is_empty();
         let isolate = self.ui.isolate.as_ref().map(|i| i.mode);
         let section = !self.ui.section.is_empty();
@@ -255,7 +255,7 @@ impl PartStudioView {
                             .separator()
                             .item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))))
                             .separator()
-                            .item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Feature(id, None), w, cx))));
+                            .item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Feature(id, None), w, cx))).swatch(sketch_swatch.unwrap_or_else(|| rgb(0x999999).into())));
                     }
                 }
                 // Part faces, edges and vertices.
@@ -340,12 +340,6 @@ impl PartStudioView {
                         if k == PickKind::Face && planar && faces.len() <= 1 {
                             let rf = r.clone();
                             m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_face(rf.clone(), w, cx))));
-                        }
-                        if sheet_metal {
-                            let (b5, b6) = (b.clone(), b.clone());
-                            m = m
-                                .item(item("Export flat pattern (DXF)…", Box::new(move |this, w, cx| this.export_flat(b5.clone(), "dxf", w, cx))))
-                                .item(item("Export flat pattern (SVG)…", Box::new(move |this, w, cx| this.export_flat(b6.clone(), "svg", w, cx))));
                         }
                         m = m.item(item("Export…", Box::new(move |this, w, cx| this.open_export_dialog(vec![b8.clone()], w, cx))));
                     }
@@ -553,38 +547,16 @@ impl PartStudioView {
             configured,
             move |v, _, cx| {
                 let body = body.clone();
-                let has = |f: &str| kept.contains(&f);
+                let values = noshape_ops::studio::PartPropertyValues {
+                    name: v.name.clone(),
+                    description: v.description.clone(),
+                    part_number: v.part_number.clone(),
+                    revision: v.revision.clone(),
+                    meta: v.meta.clone(),
+                    mass_override: v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass),
+                };
                 doc.update(cx, |d, cx| {
-                    d.edit_studio(tab, &format!("Properties : {}", v.name), cx, |ps| {
-                        let p = ps.part_properties.entry(body).or_default();
-                        let old = p.meta.clone();
-                        if !has("Name") {
-                            p.name = Some(v.name.clone());
-                        }
-                        if !has("Description") {
-                            p.description = Some(v.description.clone()).filter(|s| !s.is_empty());
-                        }
-                        if !has("Part number") {
-                            p.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
-                        }
-                        if !has("Revision") {
-                            p.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
-                        }
-                        p.meta = v.meta.clone();
-                        for (f, new, was) in [
-                            ("Vendor", &mut p.meta.vendor, old.vendor),
-                            ("Project", &mut p.meta.project, old.project),
-                            ("Product line", &mut p.meta.product_line, old.product_line),
-                            ("Title 1", &mut p.meta.title1, old.title1),
-                            ("Title 2", &mut p.meta.title2, old.title2),
-                            ("Title 3", &mut p.meta.title3, old.title3),
-                        ] {
-                            if has(f) {
-                                *new = was;
-                            }
-                        }
-                        p.mass_override = v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass);
-                    });
+                    d.edit_studio(tab, &noshape_ops::studio::properties_description(&v.name), cx, |ps| noshape_ops::studio::set_part_properties(ps, &body, &values, &kept));
                 });
                 view.update(cx, |this, cx| this.refresh_scene(true, cx));
             },
@@ -604,8 +576,8 @@ impl PartStudioView {
 
     pub(super) fn export_flat(&mut self, body: BodyId, ext: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(ctx) = self.context.clone() else { return };
-        let geometry = match noshape_model::sheetmetal::flat_pattern_for(&ctx, &body) {
-            Ok(f) => f.to_sheet_geometry(),
+        let flat = match noshape_model::sheetmetal::flat_pattern_for(&ctx, &body) {
+            Ok(f) => f,
             Err(e) => {
                 self.message = Some((noshape_model::display::FeatureStatus::Error, e));
                 cx.notify();
@@ -615,8 +587,13 @@ impl PartStudioView {
         let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_else(|| "flat".into());
         let view = cx.entity();
         crate::files::request_save_path("Export flat pattern", format!("{name} flat.{ext}"), ext, window, cx, move |path, cx| {
-            let bytes = if ext == "dxf" { noshape_model::drawing::export::to_dxf(&geometry).into_bytes() } else { noshape_model::drawing::export::to_svg(&geometry).into_bytes() };
-            let msg = match std::fs::write(&path, bytes) {
+            // DXF as live's "Export DXF/DWG of Flat pattern" writes it (SM14).
+            let bytes = if ext == "dxf" {
+                noshape_model::sheetmetal::flat_dxf::flat_dxf(&flat, &Default::default())
+            } else {
+                Ok(noshape_model::drawing::export::to_svg(&flat.to_sheet_geometry()).into_bytes())
+            };
+            let msg = match bytes.and_then(|b| std::fs::write(&path, b).map_err(|e| e.to_string())) {
                 Ok(()) => (noshape_model::display::FeatureStatus::Info, format!("Exported {}", path.display())),
                 Err(e) => (noshape_model::display::FeatureStatus::Error, format!("Export failed: {e}")),
             };
@@ -708,7 +685,7 @@ impl PartStudioView {
         let results = match &self.measure_cache {
             Some((s, r)) if *s == sel => r.clone(),
             _ => {
-                let r = measure::measure(&ctx, &sel);
+                let r = studio_measure(&ctx, &sel);
                 self.measure_cache = Some((sel, r.clone()));
                 r
             }
@@ -906,7 +883,7 @@ impl PartStudioView {
             let results = match &self.measure_cache {
                 Some((s, r)) if *s == sel => r.clone(),
                 _ => {
-                    let r = measure::measure(&ctx, &sel);
+                    let r = studio_measure(&ctx, &sel);
                     self.measure_cache = Some((sel, r.clone()));
                     r
                 }
@@ -1340,4 +1317,10 @@ impl PartStudioView {
         }
         cx.notify();
     }
+}
+
+/// The Part Studio's measurements of a selection: no part volume (live, qa5
+/// RD1: the volume only shows in Mass properties; the readout's went stale).
+pub(super) fn studio_measure(ctx: &noshape_model::regen::context::Context, sel: &[noshape_model::reference::Reference]) -> Vec<(String, measure::Measurement)> {
+    measure::measure(ctx, sel).into_iter().filter(|(_, m)| !matches!(m, measure::Measurement::Volume(_))).collect()
 }

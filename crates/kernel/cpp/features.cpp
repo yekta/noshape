@@ -1,6 +1,13 @@
 // Feature operations: prism, revolve, sweep, loft, thicken, shell, fillet,
 // chamfer, draft, defeaturing, offsets, sewing, filling, rib.
 #include "internal.hpp"
+#include <optional>
+#include <gp_Cylinder.hxx>
+#include <gp_Lin.hxx>
+#include <NCollection_Array2.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepClass_FaceClassifier.hxx>
 #include <Precision.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
@@ -9,6 +16,7 @@
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Defeaturing.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
 #include <BRepBndLib.hxx>
@@ -1631,6 +1639,153 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
   return sc.finish(r, h);
 }
 
+// Images of `x` through `h` (null: unchanged), or nothing when removed.
+void add_images(const HHist& h, const TopoDS_Shape& x, const TopoDS_Shape& from, const HHist& r)
+{
+  if (h.IsNull())
+  {
+    r->AddModified(from, x);
+    return;
+  }
+  const ShapeList g = h->Generated(x);
+  for (ShapeList::Iterator it(g); it.More(); it.Next())
+    r->AddGenerated(from, it.Value());
+  if (h->IsRemoved(x))
+    return;
+  const ShapeList& m = h->Modified(x);
+  if (m.IsEmpty())
+    r->AddModified(from, x);
+  for (ShapeList::Iterator it(m); it.More(); it.Next())
+    r->AddModified(from, it.Value());
+}
+
+// A fillet whose edges end against a face they don't bound (live G46: a
+// fillet after a chamfer ends on the chamfer face) where OCCT can't run the
+// fillet out: built on the part without those faces (removed, their
+// neighbours extended back), then trimmed back to the part. That is the
+// solid Parasolid makes (G46: 44487.2158 mm³, 9/21/14 faces/edges/vertices
+// against Onshape's 44487.2085, 9/21/14). Null when it doesn't apply.
+std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
+                                                                   const std::vector<double>& rs)
+{
+  ShapeAncMap e2f, v2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  TopExp::MapShapesAndAncestors(input, TopAbs_VERTEX, TopAbs_FACE, v2f);
+  ShapeIMap ends;
+  for (const TopoDS_Edge& e : es)
+  {
+    const ShapeList* own = e2f.Seek(e);
+    for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+    {
+      const ShapeList* at = v2f.Seek(v.Current());
+      if (at == nullptr)
+        continue;
+      for (ShapeList::Iterator it(*at); it.More(); it.Next())
+      {
+        bool mine = false;
+        if (own != nullptr)
+          for (ShapeList::Iterator o(*own); o.More(); o.Next())
+            mine = mine || o.Value().IsSame(it.Value());
+        BRepAdaptor_Surface a(TopoDS::Face(it.Value()), false);
+        if (!mine && a.GetType() == GeomAbs_Plane)
+          ends.Add(it.Value());
+      }
+    }
+  }
+  if (ends.IsEmpty())
+    return std::nullopt;
+  for (int i = 1; i <= ends.Extent(); ++i)
+    for (const TopoDS_Edge& e : es)
+      for (TopExp_Explorer x(ends(i), TopAbs_EDGE); x.More(); x.Next())
+        if (x.Current().IsSame(e))
+          return std::nullopt;
+  try
+  {
+    BRepAlgoAPI_Defeaturing df;
+    df.SetShape(input);
+    ShapeList faces;
+    for (int i = 1; i <= ends.Extent(); ++i)
+      faces.Append(ends(i));
+    df.AddFacesToRemove(faces);
+    df.SetToFillHistory(true);
+    df.Build();
+    if (!df.IsDone() || df.HasErrors())
+      return std::nullopt;
+    const TopoDS_Shape full = df.Shape();
+    HHist              h1   = history_of({input}, df);
+    BRepFilletAPI_MakeFillet mk(full);
+    for (size_t i = 0; i < es.size(); ++i)
+    {
+      const ShapeList im = images_of(h1, es[i]);
+      if (im.Extent() != 1)
+        return std::nullopt;
+      mk.Add(rs[i], TopoDS::Edge(im.First()));
+    }
+    mk.Build();
+    if (!mk.IsDone())
+      return std::nullopt;
+    HHist        h2      = history_of({full}, mk);
+    TopoDS_Shape rounded = mk.Shape();
+    HHist        corners;
+    rounded = exact_vertex_blends(rounded, corners);
+    if (!corners.IsNull())
+      h2 = compose(full, h2, corners);
+    BRepAlgoAPI_Common cm(rounded, input);
+    cm.SetToFillHistory(true);
+    cm.Build();
+    if (!cm.IsDone() || cm.HasErrors())
+      return std::nullopt;
+    TopoDS_Shape out = cm.Shape();
+    int solids = 0;
+    for (TopExp_Explorer x(out, TopAbs_SOLID); x.More(); x.Next())
+      ++solids;
+    if (!valid_shape(out) || solids != 1)
+      return std::nullopt;
+    HHist h3 = history_of({rounded, input}, cm);
+    // Every input shape's images: through the rounded part, and as an
+    // argument of the trim itself; removed only when both lose it.
+    HHist through = compose(input, compose(input, h1, h2), h3);
+    HHist r       = new BRepTools_History();
+    for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap in;
+      TopExp::MapShapes(input, k, in);
+      for (int i = 1; i <= in.Extent(); ++i)
+      {
+        const TopoDS_Shape& x = in(i);
+        HHist               one = new BRepTools_History();
+        add_images(through, x, x, one);
+        add_images(h3, x, x, one);
+        const ShapeList m = one->Modified(x);
+        const ShapeList g = one->Generated(x);
+        ShapeIMap       seen;
+        bool            any = false;
+        for (ShapeList::Iterator it(m); it.More(); it.Next())
+        {
+          if (seen.Contains(it.Value()))
+            continue;
+          seen.Add(it.Value());
+          any = true;
+          if (!it.Value().IsSame(x))
+            r->AddModified(x, it.Value());
+        }
+        for (ShapeList::Iterator it(g); it.More(); it.Next())
+        {
+          r->AddGenerated(x, it.Value());
+          any = true;
+        }
+        if (!any)
+          r->Remove(x);
+      }
+    }
+    return std::make_pair(out, r);
+  }
+  catch (const Standard_Failure&)
+  {
+    return std::nullopt;
+  }
+}
+
 } // namespace
 
 OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
@@ -1653,7 +1808,32 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
     rs.push_back(r);
     rmax = std::max(rmax, r);
   }
-  return scaled_blend(s.shape, checked, rmax, "fillet", [&](const Scaled& sc) -> BlendBuild {
+  if (checked)
+  {
+    const SlabBlend blend = [&](const TopoDS_Shape& slab, const std::vector<int>& idx,
+                                const std::function<TopoDS_Shape(const TopoDS_Shape&)>& image, TopoDS_Shape& r, HHist& rh) {
+      BRepFilletAPI_MakeFillet mk(slab);
+      for (int i : idx)
+        mk.Add(rs[(size_t)i], TopoDS::Edge(image(es[(size_t)i])));
+      mk.Build();
+      if (!mk.IsDone())
+        return false;
+      r  = mk.Shape();
+      rh = history_of({slab}, mk);
+      HHist corners;
+      r = exact_vertex_blends(r, corners);
+      if (!corners.IsNull())
+        rh = compose(slab, rh, corners);
+      return valid_shape(r);
+    };
+    TopoDS_Shape out;
+    HHist        h;
+    if (blend_in_slabs(s.shape, es, 2 * rmax, blend, out, h))
+      return make_result({s.shape}, out, h.get());
+  }
+  try
+  {
+    return scaled_blend(s.shape, checked, rmax, "fillet", [&](const Scaled& sc) -> BlendBuild {
     return [&sc, &es, &rs](double scale, TopoDS_Shape& out, HHist& h) {
       BRepFilletAPI_MakeFillet mk(sc.shape);
       for (size_t i = 0; i < es.size(); ++i)
@@ -1671,6 +1851,16 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
       return true;
     };
   });
+  }
+  catch (const std::runtime_error&)
+  {
+    if (!checked)
+      throw;
+    auto past = fillet_past_end_faces(s.shape, es, rs);
+    if (!past)
+      throw;
+    return make_result({s.shape}, past->first, past->second.get());
+  }
 }
 
 OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<const double> params,
@@ -1708,6 +1898,327 @@ OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<cons
     };
   });
 }
+
+namespace {
+
+// A rational quadratic arc: poles and weights.
+struct Arc3
+{
+  gp_Pnt p[3];
+  double w[3];
+};
+
+// The section of a fillet cylinder by the plane through A and P (both on it)
+// that contains `t`, from A to P: an ellipse arc, exact as a rational
+// quadratic (the circle arc's poles moved along the axis onto the plane).
+std::optional<Arc3> fillet_section(const gp_Cylinder& cyl, const gp_Pnt& A, const gp_Pnt& P, const gp_Dir& t)
+{
+  const gp_Ax1 ax = cyl.Axis();
+  const double R  = cyl.Radius();
+  const gp_Vec at(ax.Direction());
+  auto         on_axis = [&](const gp_Pnt& x) { return ax.Location().Translated(at * gp_Vec(ax.Location(), x).Dot(at)); };
+  const gp_Pnt OA = on_axis(A);
+  gp_Vec       ea(OA, A), eb(on_axis(P), P);
+  if (std::abs(ea.Magnitude() - R) > 1e-6 * R || std::abs(eb.Magnitude() - R) > 1e-6 * R)
+    return std::nullopt;
+  ea.Normalize();
+  eb.Normalize();
+  const double th = ea.Angle(eb);
+  if (th < 1e-3 || th > M_PI - 1e-3)
+    return std::nullopt;
+  const gp_Vec ep = (eb - ea * eb.Dot(ea)).Normalized();
+  gp_Vec       n  = gp_Vec(A, P).Crossed(gp_Vec(t));
+  if (n.Magnitude() < 1e-12 * R)
+    return std::nullopt;
+  n.Normalize();
+  const double nt = n.Dot(at);
+  if (std::abs(nt) < 1e-9)
+    return std::nullopt;
+  const double ab[3][2] = {{1, 0}, {1, std::tan(th / 2)}, {std::cos(th), std::sin(th)}};
+  Arc3         r;
+  for (int i = 0; i < 3; ++i)
+  {
+    const gp_Pnt q = OA.Translated(ea * (R * ab[i][0]) + ep * (R * ab[i][1]));
+    r.p[i]         = q.Translated(at * (n.Dot(gp_Vec(q, A)) / nt));
+    r.w[i]         = i == 1 ? std::cos(th / 2) : 1.0;
+  }
+  if (r.p[2].Distance(P) > 1e-6 * R)
+    return std::nullopt;
+  return r;
+}
+
+occ::handle<Geom_BSplineCurve> arc_curve(const Arc3& a)
+{
+  NCollection_Array1<gp_Pnt> p(1, 3);
+  NCollection_Array1<double> w(1, 3), k(1, 2);
+  NCollection_Array1<int>    m(1, 2);
+  for (int i = 0; i < 3; ++i)
+  {
+    p(i + 1) = a.p[i];
+    w(i + 1) = a.w[i];
+  }
+  k(1) = 0;
+  k(2) = 1;
+  m(1) = m(2) = 3;
+  return new Geom_BSplineCurve(p, w, k, m, 2);
+}
+
+TopoDS_Face polygon_face(const std::vector<gp_Pnt>& pts)
+{
+  BRepBuilderAPI_MakePolygon mp;
+  for (const gp_Pnt& p : pts)
+    mp.Add(p);
+  mp.Close();
+  return BRepBuilderAPI_MakeFace(mp.Wire(), true).Face();
+}
+
+// Outward normal of a planar face.
+gp_Dir face_normal(const TopoDS_Face& f)
+{
+  BRepAdaptor_Surface a(f, false);
+  gp_Dir              n = a.Plane().Axis().Direction();
+  return f.Orientation() == TopAbs_REVERSED ? n.Reversed() : n;
+}
+
+// Equal-distance chamfers of straight edges between two planes that end, at
+// one vertex, where two fillets on those planes meet (live G46 / G49: a box
+// with R3 fillets on two top edges, the vertical edge between them
+// chamfered). Parasolid runs the chamfer face up to the fillets' tangent
+// lines and closes the corner with a blend patch: ruled between the
+// fillets' sections by the planes through the chamfer's top corners and the
+// point where the fillets meet (on the top face), along the chamfered edge's
+// direction; rulings join equal angles on the two fillets. Built here as the
+// part minus a tool bounded by the chamfer plane, those section planes and
+// the patch. Onshape's patch is a cubic approximation of that surface
+// (faces, edges and areas match to 0.007 mm²; volume 44790.075 against
+// 44789.973 read from Onshape's own Parasolid file). Null when it doesn't apply.
+std::optional<std::pair<TopoDS_Shape, HHist>> chamfer_into_fillet_corners(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es, double d)
+{
+  ShapeAncMap e2f, v2f, v2e;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  TopExp::MapShapesAndAncestors(input, TopAbs_VERTEX, TopAbs_FACE, v2f);
+  TopExp::MapShapesAndAncestors(input, TopAbs_VERTEX, TopAbs_EDGE, v2e);
+  auto faces_of = [](const ShapeAncMap& m, const TopoDS_Shape& x) {
+    std::vector<TopoDS_Face> out;
+    if (const ShapeList* l = m.Seek(x))
+      for (ShapeList::Iterator it(*l); it.More(); it.Next())
+      {
+        bool seen = false;
+        for (const TopoDS_Face& f : out)
+          seen = seen || f.IsSame(it.Value());
+        if (!seen)
+          out.push_back(TopoDS::Face(it.Value()));
+      }
+    return out;
+  };
+  auto is_plane = [](const TopoDS_Face& f) { return BRepAdaptor_Surface(f, false).GetType() == GeomAbs_Plane; };
+  // The edge at `v` between faces a and b, if any.
+  auto edge_between = [&](const TopoDS_Shape& v, const TopoDS_Face& a, const TopoDS_Face& b) -> TopoDS_Edge {
+    if (const ShapeList* l = v2e.Seek(v))
+      for (ShapeList::Iterator it(*l); it.More(); it.Next())
+      {
+        const auto fs = faces_of(e2f, it.Value());
+        bool       ha = false, hb = false;
+        for (const TopoDS_Face& f : fs)
+        {
+          ha = ha || f.IsSame(a);
+          hb = hb || f.IsSame(b);
+        }
+        if (ha && hb && fs.size() == 2)
+          return TopoDS::Edge(it.Value());
+      }
+    return TopoDS_Edge();
+  };
+  ShapeList                tools;
+  std::vector<TopoDS_Face> chamfer_faces, patches;
+  for (const TopoDS_Edge& e : es)
+  {
+    BRepAdaptor_Curve c(e);
+    if (c.GetType() != GeomAbs_Line)
+      return std::nullopt;
+    const auto ef = faces_of(e2f, e);
+    if (ef.size() != 2 || !is_plane(ef[0]) || !is_plane(ef[1]))
+      return std::nullopt;
+    TopoDS_Vertex va, vb;
+    TopExp::Vertices(e, va, vb);
+    // Which end is the fillets' corner: faces F1, F2 and two cylinders.
+    struct Corner
+    {
+      TopoDS_Vertex v;
+      gp_Cylinder   cyl[2];
+      gp_Pnt        P;
+    };
+    std::optional<Corner> corner;
+    TopoDS_Vertex         base;
+    for (const TopoDS_Vertex& v : {va, vb})
+    {
+      const auto vf = faces_of(v2f, v);
+      std::vector<TopoDS_Face> others;
+      for (const TopoDS_Face& f : vf)
+        if (!f.IsSame(ef[0]) && !f.IsSame(ef[1]))
+          others.push_back(f);
+      if (others.size() == 1 && is_plane(others[0]))
+      {
+        if (!base.IsNull())
+          return std::nullopt;
+        base = v;
+        continue;
+      }
+      if (others.size() != 2 || corner)
+        return std::nullopt;
+      Corner k;
+      k.v = v;
+      for (int i = 0; i < 2; ++i)
+      {
+        // The cylinder next to F_i along an edge through v.
+        int found = -1;
+        for (int j = 0; j < 2; ++j)
+        {
+          BRepAdaptor_Surface a(others[(size_t)j], false);
+          if (a.GetType() == GeomAbs_Cylinder && !edge_between(v, ef[(size_t)i], others[(size_t)j]).IsNull())
+          {
+            found      = j;
+            k.cyl[i]   = a.Cylinder();
+          }
+        }
+        if (found < 0)
+          return std::nullopt;
+      }
+      const TopoDS_Edge m = edge_between(v, others[0], others[1]);
+      if (m.IsNull())
+        return std::nullopt;
+      TopoDS_Vertex m0, m1;
+      TopExp::Vertices(m, m0, m1);
+      k.P    = BRep_Tool::Pnt(m0.IsSame(v) ? m1 : m0);
+      corner = k;
+    }
+    if (!corner || base.IsNull())
+      return std::nullopt;
+    const gp_Pnt V0 = BRep_Tool::Pnt(base), V1 = BRep_Tool::Pnt(corner->v);
+    const double L  = V0.Distance(V1);
+    if (L < 1e-9)
+      return std::nullopt;
+    const gp_Dir t(gp_Vec(V0, V1));
+    // In-face directions away from the edge.
+    gp_Vec w[2];
+    for (int i = 0; i < 2; ++i)
+    {
+      w[i] = gp_Vec(t).Crossed(gp_Vec(face_normal(ef[(size_t)i])));
+      const gp_Pnt mid = V0.Translated(gp_Vec(t) * (L / 2) + w[i] * (d * 1e-3));
+      BRepClass_FaceClassifier fc(ef[(size_t)i], mid, Precision::Confusion());
+      if (fc.State() != TopAbs_IN)
+        w[i].Reverse();
+    }
+    const gp_Pnt A[2] = {V1.Translated(w[0] * d), V1.Translated(w[1] * d)};
+    // The chamfer's top corners on the fillets' tangent lines.
+    for (int i = 0; i < 2; ++i)
+      if (std::abs(gp_Lin(corner->cyl[i].Axis()).Distance(A[i]) - corner->cyl[i].Radius()) > 1e-6 * corner->cyl[i].Radius())
+        return std::nullopt;
+    std::optional<Arc3> sec[2];
+    for (int i = 0; i < 2; ++i)
+      if (!(sec[i] = fillet_section(corner->cyl[i], A[i], corner->P, t)))
+        return std::nullopt;
+    const double R  = std::max(corner->cyl[0].Radius(), corner->cyl[1].Radius());
+    const double mg = 2 * (d + R);
+    auto         h  = [&](const gp_Pnt& x) { return gp_Vec(V0, x).Dot(gp_Vec(t)); };
+    auto         at = [&](const gp_Pnt& x, double z) { return x.Translated(gp_Vec(t) * (z - h(x))); };
+    const double lo = -mg, hi = h(corner->P) + mg;
+    gp_Vec       along(A[0], A[1]);
+    along.Normalize();
+    const gp_Pnt Q1 = A[0].Translated(along * -mg), Q2 = A[1].Translated(along * mg);
+    const gp_Pnt K  = V0.Translated((w[0] + w[1]).Normalized() * -mg);
+    const gp_Pnt P  = corner->P;
+    std::vector<TopoDS_Shape> faces;
+    const TopoDS_Face cf = polygon_face({at(Q1, lo), at(Q2, lo), at(Q2, hi), at(A[1], hi), A[1], A[0], at(A[0], hi), at(Q1, hi)});
+    faces.push_back(cf);
+    faces.push_back(polygon_face({at(Q1, lo), at(K, lo), at(K, hi), at(Q1, hi)}));
+    faces.push_back(polygon_face({at(K, lo), at(Q2, lo), at(Q2, hi), at(K, hi)}));
+    faces.push_back(polygon_face({at(Q1, lo), at(Q2, lo), at(K, lo)}));
+    faces.push_back(polygon_face({at(Q1, hi), at(K, hi), at(Q2, hi), at(A[1], hi), at(P, hi), at(A[0], hi)}));
+    occ::handle<Geom_BSplineCurve> cv[2];
+    for (int i = 0; i < 2; ++i)
+    {
+      cv[i] = arc_curve(*sec[i]);
+      BRepBuilderAPI_MakeWire mw;
+      mw.Add(BRepBuilderAPI_MakeEdge(cv[i]).Edge());
+      mw.Add(BRepBuilderAPI_MakeEdge(P, at(P, hi)).Edge());
+      mw.Add(BRepBuilderAPI_MakeEdge(at(P, hi), at(A[i], hi)).Edge());
+      mw.Add(BRepBuilderAPI_MakeEdge(at(A[i], hi), A[i]).Edge());
+      if (!mw.IsDone())
+        return std::nullopt;
+      BRepBuilderAPI_MakeFace mf(mw.Wire(), true);
+      if (!mf.IsDone())
+        return std::nullopt;
+      faces.push_back(mf.Face());
+    }
+    // The patch: rows the two sections (u), quadratic along them (v).
+    NCollection_Array2<gp_Pnt> sp(1, 2, 1, 3);
+    NCollection_Array2<double> sw(1, 2, 1, 3);
+    for (int i = 0; i < 2; ++i)
+      for (int j = 0; j < 3; ++j)
+      {
+        sp(i + 1, j + 1) = sec[i]->p[j];
+        sw(i + 1, j + 1) = sec[i]->w[j];
+      }
+    NCollection_Array1<double> uk(1, 2), vk(1, 2);
+    NCollection_Array1<int>    um(1, 2), vm(1, 2);
+    uk(1) = vk(1) = 0;
+    uk(2) = vk(2) = 1;
+    um(1) = um(2) = 2;
+    vm(1) = vm(2) = 3;
+    occ::handle<Geom_BSplineSurface> S  = new Geom_BSplineSurface(sp, sw, uk, vk, um, vm, 1, 2);
+    const TopoDS_Face                pf = BRepBuilderAPI_MakeFace(S, 0, 1, 0, 1, Precision::Confusion()).Face();
+    faces.push_back(pf);
+    BRepBuilderAPI_Sewing sew(10 * Precision::Confusion());
+    for (const TopoDS_Shape& f : faces)
+      sew.Add(f);
+    sew.Perform();
+    TopoDS_Shell shell;
+    int          shells = 0;
+    for (TopExp_Explorer x(sew.SewedShape(), TopAbs_SHELL); x.More(); x.Next(), ++shells)
+      shell = TopoDS::Shell(x.Current());
+    if (shells != 1 || !BRep_Tool::IsClosed(shell))
+      return std::nullopt;
+    ShapeFix_Solid fx(BRepBuilderAPI_MakeSolid(shell).Solid());
+    fx.Perform();
+    const TopoDS_Shape T = fx.Solid();
+    if (!valid_shape(T))
+      return std::nullopt;
+    tools.Append(T);
+    // The tool's chamfer and patch faces (sewing may replace them).
+    chamfer_faces.push_back(TopoDS::Face(sew.Modified(cf)));
+    patches.push_back(TopoDS::Face(sew.Modified(pf)));
+  }
+  BRepAlgoAPI_Cut cut;
+  ShapeList       args;
+  args.Append(input);
+  cut.SetArguments(args);
+  cut.SetTools(tools);
+  cut.SetToFillHistory(true);
+  cut.Build();
+  if (!cut.IsDone() || cut.HasErrors())
+    return std::nullopt;
+  const TopoDS_Shape out = cut.Shape();
+  int                solids = 0;
+  for (TopExp_Explorer x(out, TopAbs_SOLID); x.More(); x.Next())
+    ++solids;
+  if (solids != 1 || !valid_shape(out))
+    return std::nullopt;
+  std::vector<TopoDS_Shape> all{input};
+  for (ShapeList::Iterator it(tools); it.More(); it.Next())
+    all.push_back(it.Value());
+  HHist hc = history_of(all, cut);
+  // The chamfer and patch faces are generated by their edge.
+  HHist g = new BRepTools_History();
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    g->AddGenerated(es[i], chamfer_faces[i]);
+    g->AddGenerated(es[i], patches[i]);
+  }
+  return std::make_pair(out, compose(input, g, hc));
+}
+
+} // namespace
 
 OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& faces,
                  uint8_t mode, double d1, double d2, bool checked)
@@ -1769,6 +2280,39 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
       return true;
     };
   };
+  if (checked)
+  {
+    const SlabBlend blend = [&](const TopoDS_Shape& slab, const std::vector<int>& idx,
+                                const std::function<TopoDS_Shape(const TopoDS_Shape&)>& image, TopoDS_Shape& r, HHist& rh) {
+      BRepFilletAPI_MakeChamfer mk(slab);
+      for (int i : idx)
+      {
+        const TopoDS_Edge e = TopoDS::Edge(image(es[(size_t)i]));
+        if (mode == 0)
+          mk.Add(d1, e);
+        else
+        {
+          const TopoDS_Shape f = image(fs[(size_t)i]);
+          if (f.IsNull())
+            return false;
+          if (mode == 1)
+            mk.Add(d1, d2, e, TopoDS::Face(f));
+          else
+            mk.AddDA(d1, d2, e, TopoDS::Face(f));
+        }
+      }
+      mk.Build();
+      if (!mk.IsDone())
+        return false;
+      r  = mk.Shape();
+      rh = history_of({slab}, mk);
+      return valid_shape(r);
+    };
+    TopoDS_Shape out;
+    HHist        h;
+    if (blend_in_slabs(s.shape, es, 2 * size, blend, out, h))
+      return make_result({s.shape}, out, h.get());
+  }
   try
   {
     return scaled_blend(s.shape, checked, size, "chamfer", make);
@@ -1777,11 +2321,23 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
   {
     // Onshape reports a chamfer wider than a face it runs over (or than the
     // radius of an arc it follows) separately.
+    // Also a chamfer wider than a fillet its edge ends on (live G46: 5 mm on
+    // the edge between two R3 fillets).
+    ShapeAncMap v2f;
+    TopExp::MapShapesAndAncestors(s.shape, TopAbs_VERTEX, TopAbs_FACE, v2f);
     for (const TopoDS_Edge& e : es)
     {
       BRepAdaptor_Curve c(e);
       if (c.GetType() == GeomAbs_Circle && c.Circle().Radius() < size * (1 - 1e-9))
         fail_op("chamfer distance too large");
+      for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+        if (const ShapeList* at = v2f.Seek(v.Current()))
+          for (ShapeList::Iterator it(*at); it.More(); it.Next())
+          {
+            BRepAdaptor_Surface a(TopoDS::Face(it.Value()), false);
+            if (a.GetType() == GeomAbs_Cylinder && a.Cylinder().Radius() < size * (1 - 1e-9))
+              fail_op("chamfer distance too large");
+          }
       const ShapeList* l = anc.Seek(e);
       if (l == nullptr)
         continue;
@@ -1795,6 +2351,9 @@ OpOut op_chamfer(const OcShape& s, const OcShapeList& edges, const OcShapeList& 
           fail_op("chamfer distance too large");
       }
     }
+    if (checked && mode == 0)
+      if (auto corner = chamfer_into_fillet_corners(s.shape, es, d1))
+        return make_result({s.shape}, corner->first, corner->second.get());
     throw;
   }
 }

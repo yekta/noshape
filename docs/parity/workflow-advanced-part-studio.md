@@ -106,3 +106,30 @@ rebuilt exactly to live's spec in /tmp/qa5/home/Documents/noshape/qa5-livecheck.
 |---|---|---|---|---|
 | 3.6c | Hole row name | the callout's **first line only** ("1/4-20 ↧ 12 mm"); tooltip "<callout> [Hole]"; Rename opens with "#featureName" selected; empty name restores the callout | row "1/4-20 ↧ 12 mm \| ⌵Ø 12…" (both lines) | ✗ **ADV12** (rename behaviour to check) |
 | – | Dim set to an unsolvable value, Enter | box **closes**; value accepted (R2) but geometry stays; sketch, title and row red; **warning toast "⚠ Sketch could not be solved."** (yellow rgb(255,248,230), top centre), not auto-dismissed, **gone when the sketch closes**; Esc #1 reverts + blurs, Esc #2 closes; box ✕ cancels (stays R6) | box **stays open**, Esc ignored, ✕ keeps R2; **red error toast "The sketch could not be solved with that value"**, still shown after the sketch closed | ✗ **SK1** |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| Row | Ours | Status |
+|---|---|---|
+| ADV1 Plane 1 row → Sketch plane | nothing | ✗ still |
+| ADV2 loft | 5927.755 | ✗ still |
+| ADV3 / SK1 dim conflict | box stays open, red "The sketch could not be solved with that value" | ✗ still |
+| ADV4 countersink rows | icon rows, values fit, no overlap | ✅ **fixed** |
+| ADV7 thread split face | whole cylinder highlights as one face | ✗ still |
+| ADV8 "20 tpi (UNC)" | unchanged | ✗ still |
+| ADV12 hole row name | both callout lines | ✗ still |
+| TAB1 tab switch Parts (0) | PS2 still "Parts (0)" on open (holeblock in qa5 import OK) | ✗ still (partly) |
+| SK2 F in a sketch | fits the far rectangle (tight margin) | ✅ **fixed** (no "Sketch N" outline yet) |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-checked here.
+| Row | Ours | Status |
+|---|---|---|
+| ADV1 Plane 1 row → Sketch plane | field stays empty | ✗ still |
+| ADV2 loft | 5927.754632 (CLI) | ✗ still (live 5927.728) |
+| ADV3 error tooltip prefix | "Helix 1 did not regenerate properly: Select a cone or cylinder." | ✅ **fixed** |
+| SK1 dim set to an unsolvable value | Enter closes the box, value R2 kept, geometry red, **yellow "⚠ Sketch could not be solved."** toast, gone when the sketch closes ✅; **dialog title "Sketch 2" and the feature row text stay black** (live red) | ✗ still (mostly fixed) |
+| SK2 | the "Sketch 2" plane outline now shows while editing | ✅ |
+| ADV7 thread splits face | still one cylindrical face, 565.487 mm² (whole 30 mm) (CLI) | ✗ still |
+| ADV12 hole row name | both callout lines; tooltip "Hole 1 <- Sketch 2" | ✗ still |
+| TAB1 tab switch | Part Studio 2 and 3 open with "Parts (0)" and 4 right-strip icons until a body is clicked | ✗ still |
+| RD1 stale Volume readout | **readout gone**: nothing at the bottom right with a part selected (live has none) | ✅ **fixed** |

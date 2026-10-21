@@ -49,8 +49,9 @@ impl AssemblyView {
             return;
         }
         let line = line.clone();
+        // Live (qa5 pass 7): BOM cell edits are not undone by Ctrl+Z.
         self.doc.update(cx, |d, cx| {
-            d.edit_document(&format!("Edit {}", col.label()), cx, |doc| {
+            d.edit_document_not_undoable(&format!("Edit {}", col.label()), cx, |doc| {
                 bom::set_cell(doc, &line, col, &value);
             })
         });
@@ -64,12 +65,18 @@ impl AssemblyView {
     /// Edit a cell starting from `text`, selected (double-click) or with the
     /// caret after it (typing into the selected cell).
     fn edit_bom_cell_with(&mut self, row: usize, col: BomColumn, text: String, select: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let input = cx.new(|cx| InputState::new(window, cx));
+        // Esc drops the edit (the view's Cancel), not back to the typed key.
+        let input = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false));
         input.update(cx, |s, cx| {
+            let n = text.len();
             s.set_value(text, window, cx);
             s.focus(window, cx);
             if select {
                 s.select_all(window, cx);
+            } else {
+                // qa5 A11: the caret after the typed key (a select-on-focus
+                // made the next key replace it: "PN-002" gave "N-002").
+                s.set_selected_range(n..n, cx);
             }
         });
         let sub = cx.subscribe_in(&input, window, move |this: &mut Self, _, ev: &InputEvent, window, cx| match ev {
@@ -96,6 +103,20 @@ impl AssemblyView {
             return false;
         }
         self.edit_bom_cell_with(row, col, text.to_string(), false, window, cx);
+        true
+    }
+
+    /// Delete on the selected cell clears it (spreadsheet style; qa5 A11).
+    pub(super) fn bom_clear_selected(&mut self, window: &Window, cx: &mut Context<Self>) -> bool {
+        if self.panel != Some(SidePanel::Bom) || self.ui.bom_edit.is_some() || !self.focus.is_focused(window) {
+            return false;
+        }
+        let Some((row, col)) = self.ui.bom_selected else { return false };
+        let Some(line) = self.bom_lines(cx).get(row).cloned() else { return false };
+        if !bom::editable(&line, col) || col.edit() != CellEdit::Text {
+            return false;
+        }
+        self.set_bom_cell(&line, col, String::new(), cx);
         true
     }
 

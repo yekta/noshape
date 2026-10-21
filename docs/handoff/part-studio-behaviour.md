@@ -1261,3 +1261,58 @@ Implemented from live's "Pending state" (behaviours.md):
       ~7 s unloaded.
   - **Open:** that result shows **Parts (911)**: most ribs didn't fuse into the block (see the ignored test
     `engine.rs::pending_pattern_clip_at_1000_is_one_part`; pasting over Part 1 may be the cause).
+
+### Pass 16 (21 Oct evening, new psb after a quota handover at ~18:55)
+- **On main (5d28447):** sketch dimension units stored with the unit; no tooltip on dialog ✓/✕; "ƒx"/"ƒ" on driven
+  dimensions; qa4 F3/F5/F6/F7/F10/F11/F14/F15/F19/F20/F21/F23/F29; pending state for big patterns (cancellable boolean);
+  qa5 I2, C2, C8, SF5.
+- **Left by the previous psb after its 16:40 report (in the tree, not yet integrated or tried in the app):**
+  - AN1: `measure::resolve_shapes` handles datum and feature planes (large planar faces).
+  - ADV3: the feature-row error/warning tooltip starts "<Feature> did not regenerate properly:" (mod.rs row tip).
+  - KB1: Shift+N (RenameSelected) on a selected part starts the part rename.
+  - DOC3: Derived (paste part) gets its reference sources, so its Part Studio field is no longer blank.
+  - ADV10: test `engine.rs::feature_pattern_second_direction_makes_the_grid` (passes; the model already did both
+    directions).
+  - C1: ops/config.rs "Configuration" vs "List input N" naming.
+  - RD1: `menus.rs::studio_measure` drops `Measurement::Volume` from both Part Studio readouts (the agent API keeps
+    it); the measure cache is cleared on a new display (no stale readouts).
+  - SK1: `sketch_mode::SKETCH_NOT_SOLVED`; an unsolvable dimension value is taken, the last solved shape stays, the
+    yellow "Sketch could not be solved." message stays until it solves or the sketch closes (`leave_sketch`).
+    Scene test `an_unsolvable_value_keeps_the_solved_shape`. Esc #1 revert / Esc #2 close: check in the app.
+  - EXT1: Merge scope auto-fills also when the user picks Remove by hand (`auto_operation` in behaviors.rs).
+  - Tests at 18:00: engine 19 ok, model measure 8 ok, scene 57 ok, ops config ok; clippy blocked by other agents' files.
+- **Not yet verified in the app:** configure mode (F20/F21), dimension-box Esc fix, Create-variable popup placement,
+  the missing-material toast timing, qa5 fixes (I2, C2, C8, SF5) and everything in the list above.
+- **Queue:** RD1/SK1 app check → ADV9 (Feature mirror of the gusset without Reapply; kern's face_pattern_fails) →
+  ADV1, ADV12 (live: only the callout's first line? two captures disagree, read hole.fs), TAB1 ("Parts (0)"), KB3,
+  C3, C4, C6, SF1, SF4, I3, other ADV/AN/DOC/KB items → qa5 pass 3 → sketch dimension right-click menu as live.
+
+### Note from ui (21 Oct ~20:30): empty-space clicks keep dialog chips (lead, live qa5 pass 7)
+Live: a click on empty graphics removes no chips from an open dialog. `part_studio/mod.rs` (viewport click, the
+`None` arm) no longer clears the selection while Mass properties (`show_mass`) or the pinned Measure panel
+(`ui.measure_pinned`) is open, since both show the selection as their field. Same in `assembly_view.rs
+click_select` while the assembly Mass properties (`ui.mass`) is open. If you add another panel whose field is the
+selection, add it to that condition.
+
+## Moved to the shared ops (api, 2026-10-21 20:45; lead's call, no freeze)
+Parts list › **Rename** (`behaviors.rs`) and part **Properties › Save** (`menus.rs`, the `open_part_properties_configured`
+callback) now call `noshape_ops::studio::{rename_part, rename_part_description, set_part_properties,
+properties_description, PartPropertyValues}`. The code is the same as before, moved so the CLI/MCP rename and
+set properties exactly as the UI does (same history text "Rename : X" / "Properties : X", same configured-field
+rule). Behaviour unchanged. If you change these rules, edit `crates/ops/src/studio.rs` (the app and the API both use it).
+- **F12 (v0.4.5 release blocker, lead 19:00), in progress:**
+  - Test `engine.rs::feature_pattern_of_a_hole_after_a_part_pattern_keeps_the_parts` (`f12_case`, `f12_edge`):
+    block 100×50×30, two top-edge fillets 3 mm, chamfer 2 mm, Hole at 2 sketch points on the top face (scope Part 1),
+    Part pattern 40 mm × 3, then a Feature pattern of the Hole 10 mm × 2 along the bottom X or Y edge, then Extrude
+    1 → 25 mm. It reproduces: along Y, Part 1 vanished with no error.
+  - Causes found:
+    1. `faces_tool` took only one closed solid, so a Hole at 2+ points failed the face pattern ("don't bound a closed
+       volume") and fell back to Reapply. It now makes a compound tool of the pieces.
+    2. `apply_tools` cut every part the copies touched (`auto_scope`). Onshape's face pattern only changes the faces'
+       body, so it cuts the seed body only.
+    3. Data loss: OCCT returns an **empty cut with no error** for a moved hole running into the 3 mm fillet, and
+       `boolean_into_with` then dropped the part. It now retries (fuzzy) and otherwise fails the feature
+       ("Removing material failed on Part 1"), never deleting the part (`tools_engulf`).
+  - Still open: make that cut succeed (live does). Probe: ignored test `f12_kernel_probe` on BREPs dumped to
+    /root/psb-scratch/f12 (temporary debug prints DBGE/DBGF/DBGH in eval.rs, pattern.rs, hole.rs: **remove before
+    reporting**).

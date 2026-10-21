@@ -2,14 +2,36 @@
 
 use crate::{BranchId, Document, MicroversionId, Result, StoreError};
 
-/// Edits that Ctrl+Z can't revert (Onshape: deleting a tab; it comes back
-/// only by restoring from the Versions and history panel). They are not
-/// recorded; earlier edits of other tabs stay undoable.
-pub const NOT_UNDOABLE_PREFIXES: &[&str] = &["Delete tab"];
+/// Edits that Ctrl+Z can't revert: Onshape's tab operations (live qa5
+/// 10-21: rename, reorder, delete, duplicate; new tabs and folders start
+/// with an empty stack). A deleted tab comes back only by restoring from the
+/// Versions and history panel. They are not recorded; earlier edits stay
+/// undoable.
+pub const NOT_UNDOABLE_PREFIXES: &[&str] = &[
+    "Delete tab",
+    "Rename tab",
+    "Reorder tabs",
+    "Duplicate tab",
+    "Insert tab",
+    "Paste tab",
+    "Create folder",
+    "Move to folder",
+    "Unpack folder",
+    "Add selection to folder",
+    "Move tab to document",
+    "Create Drawing of",
+    "Import ",
+    "Store ",
+];
+
+/// What [`UndoStack::undo_in_keeping`] / [`UndoStack::redo_in_keeping`] write
+/// back for a blob: given its name and the value undo/redo would restore.
+pub type KeepBlob<'a> = dyn Fn(&str, Option<Vec<u8>>) -> Option<Vec<u8>> + 'a;
 
 /// Whether a change description is one of [`NOT_UNDOABLE_PREFIXES`].
 pub fn is_not_undoable(description: &str) -> bool {
-    NOT_UNDOABLE_PREFIXES.iter().any(|p| description.starts_with(p))
+    // Edits of a tab read "<tab name> :: <edit>" (a tab may be called "Import 1").
+    !description.contains(" :: ") && NOT_UNDOABLE_PREFIXES.iter().any(|p| description.starts_with(p))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -185,6 +207,13 @@ impl UndoStack {
     /// (names a newer edit changed again are kept), as a new microversion
     /// "Undo <description>". Edits of other tabs are left as they are.
     pub fn undo_in(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool) -> Result<Option<MicroversionId>> {
+        self.undo_in_keeping(doc, in_scope, &|_, v| v)
+    }
+
+    /// [`Self::undo_in`], with each restored blob passed through `keep`
+    /// (name, restored value) first, so parts of the current state an edit
+    /// can't take back (tab names, the tab bar) stay as they are.
+    pub fn undo_in_keeping(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool, keep: &KeepBlob<'_>) -> Result<Option<MicroversionId>> {
         self.check_fresh(doc)?;
         let mut found = None;
         for i in (0..self.undo.len()).rev() {
@@ -203,7 +232,7 @@ impl UndoStack {
         e.changed = Some(names.clone());
         let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
         for n in names.into_iter().filter(|n| !newer.contains(n)) {
-            let v = doc.read(e.before, &n)?;
+            let v = keep(&n, doc.read(e.before, &n)?);
             changes.push((n, v));
         }
         let mv = doc.commit(self.branch, &changes, &format!("Undo {}", e.description))?;
@@ -215,6 +244,11 @@ impl UndoStack {
     /// Re-applies the newest undone edit `in_scope` (names it changed set
     /// back to what the edit produced).
     pub fn redo_in(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool) -> Result<Option<MicroversionId>> {
+        self.redo_in_keeping(doc, in_scope, &|_, v| v)
+    }
+
+    /// [`Self::redo_in`] with `keep` as in [`Self::undo_in_keeping`].
+    pub fn redo_in_keeping(&mut self, doc: &mut Document, in_scope: &dyn Fn(&[String]) -> bool, keep: &KeepBlob<'_>) -> Result<Option<MicroversionId>> {
         self.check_fresh(doc)?;
         let mut found = None;
         for i in (0..self.redo.len()).rev() {
@@ -228,7 +262,7 @@ impl UndoStack {
         let e = self.redo.remove(i);
         let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
         for n in names {
-            let v = doc.read(e.after, &n)?;
+            let v = keep(&n, doc.read(e.after, &n)?);
             changes.push((n, v));
         }
         let mv = doc.commit(self.branch, &changes, &format!("Redo {}", e.description))?;

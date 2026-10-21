@@ -10,6 +10,7 @@
 #include <Message_ProgressIndicator.hxx>
 #include <Message_ProgressScope.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
@@ -1080,6 +1081,323 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
 
 } // namespace
 
+// Planes between groups of boxes for slab-wise work: along the axis where
+// the boxes leave the most gaps, about `per_slab` boxes a slab (at most 32
+// slabs), halfway across the gaps nearest to equal counts. False when the
+// boxes leave no gap.
+static bool slab_planes(const std::vector<Bnd_Box>& boxes, const Bnd_Box& whole, int per_slab, int& axis, std::vector<double>& at, ShapeList& planes)
+{
+  const int n = (int)boxes.size();
+  auto      lo = [&](int i, int ax) {
+    double x[6];
+    boxes[(size_t)i].Get(x[0], x[1], x[2], x[3], x[4], x[5]);
+    return x[ax];
+  };
+  auto hi = [&](int i, int ax) {
+    double x[6];
+    boxes[(size_t)i].Get(x[0], x[1], x[2], x[3], x[4], x[5]);
+    return x[3 + ax];
+  };
+  int              best_axis = -1;
+  std::vector<int> best_order, best_cuts;
+  for (int ax = 0; ax < 3; ++ax)
+  {
+    std::vector<int> order((size_t)n);
+    for (int i = 0; i < n; ++i)
+      order[(size_t)i] = i;
+    std::sort(order.begin(), order.end(), [&](int p, int q) { return lo(p, ax) < lo(q, ax); });
+    std::vector<int> cuts;
+    double           r = hi(order[0], ax);
+    for (int k = 1; k < n; ++k)
+    {
+      if (lo(order[(size_t)k], ax) > r)
+        cuts.push_back(k);
+      r = std::max(r, hi(order[(size_t)k], ax));
+    }
+    if (cuts.size() > best_cuts.size())
+      best_axis = ax, best_order = order, best_cuts = cuts;
+  }
+  if (best_axis < 0 || best_cuts.empty())
+    return false;
+  const int        slabs = std::min(32, std::max(2, (n + per_slab - 1) / per_slab));
+  std::vector<int> chosen;
+  for (int s = 1; s < slabs; ++s)
+  {
+    const int want = s * n / slabs;
+    auto      it   = std::lower_bound(best_cuts.begin(), best_cuts.end(), want);
+    if (it == best_cuts.end())
+      it = std::prev(it);
+    if (it != best_cuts.begin() && std::abs(*std::prev(it) - want) < std::abs(*it - want))
+      it = std::prev(it);
+    if (chosen.empty() || *it > chosen.back())
+      chosen.push_back(*it);
+  }
+  axis = best_axis;
+  gp_Dir       dir(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
+  const double size = std::sqrt(whole.SquareExtent()) * 2 + 1;
+  for (int c : chosen)
+  {
+    double r = -1e300;
+    for (int k = 0; k < c; ++k)
+      r = std::max(r, hi(best_order[(size_t)k], axis));
+    const double x = 0.5 * (r + lo(best_order[(size_t)c], axis));
+    at.push_back(x);
+    gp_Pnt o(0, 0, 0);
+    o.SetCoord(axis + 1, x);
+    planes.Append(BRepBuilderAPI_MakeFace(gp_Pln(o, dir), -size, size, -size, size).Face());
+  }
+  return true;
+}
+
+// Fillets / chamfers of many edges far apart (400 hole rims of a plate) in
+// slabs: the part cut by planes in the gaps between the edges' reach, each
+// slab blended on its own (in parallel), the slabs joined on their shared
+// cut faces and the cuts merged away. One OCCT blend of all the edges costs
+// ~11 ms an edge on the plate (4.3 s for 400, Onshape 0.4 s): every edge's
+// blend works against the whole of the long faces. False when it doesn't
+// apply (few edges, no gaps, a slab failing); the caller then blends whole.
+bool blend_in_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Edge>& edges, double reach, const SlabBlend& blend,
+                    TopoDS_Shape& out, occ::handle<BRepTools_History>& hist)
+{
+  const int n = (int)edges.size();
+  if (n < 48)
+    return false;
+  std::vector<Bnd_Box> boxes((size_t)n);
+  for (int i = 0; i < n; ++i)
+  {
+    BRepBndLib::Add(edges[(size_t)i], boxes[(size_t)i], false);
+    if (boxes[(size_t)i].IsVoid())
+      return false;
+    boxes[(size_t)i].Enlarge(reach);
+  }
+  Bnd_Box tb;
+  BRepBndLib::Add(target, tb, false);
+  if (tb.IsVoid())
+    return false;
+  int                 ax = 0;
+  std::vector<double> at;
+  ShapeList           planes;
+  if (!slab_planes(boxes, tb, 24, ax, at, planes))
+    return false;
+  const std::atomic<bool>* flag = t_cancel;
+  BRepAlgoAPI_Splitter     sp;
+  ShapeList                one;
+  one.Append(target);
+  sp.SetArguments(one);
+  sp.SetTools(planes);
+  sp.SetRunParallel(true);
+  sp.SetNonDestructive(true);
+  sp.Build();
+  if (sp.HasErrors() || !sp.IsDone() || cancelled(flag))
+    return false;
+  HHist                     h1 = new BRepTools_History(one, sp);
+  std::vector<TopoDS_Shape> pieces;
+  for (TopExp_Explorer e(sp.Shape(), TopAbs_SOLID); e.More(); e.Next())
+    pieces.push_back(e.Current());
+  std::vector<ShapeIMap> piece_shapes(pieces.size());
+  for (size_t k = 0; k < pieces.size(); ++k)
+    for (TopAbs_ShapeEnum t : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+      TopExp::MapShapes(pieces[k], t, piece_shapes[k]);
+  // The image of a sub-shape of the part in piece k (null if none there).
+  auto image_in = [&](size_t k, const TopoDS_Shape& x) {
+    const ShapeList& m = h1->Modified(x);
+    if (m.IsEmpty())
+      return piece_shapes[k].Contains(x) ? x : TopoDS_Shape();
+    for (ShapeList::Iterator it(m); it.More(); it.Next())
+      if (piece_shapes[k].Contains(it.Value()))
+        return it.Value();
+    return TopoDS_Shape();
+  };
+  // Each edge to the piece holding it (whole: no plane crosses its reach).
+  std::vector<std::vector<int>> mine(pieces.size());
+  for (int i = 0; i < n; ++i)
+  {
+    if (h1->Modified(edges[(size_t)i]).Extent() > 1)
+      return false;
+    int owner = -1;
+    for (size_t k = 0; k < pieces.size() && owner < 0; ++k)
+      if (!image_in(k, edges[(size_t)i]).IsNull())
+        owner = (int)k;
+    if (owner < 0)
+      return false;
+    mine[(size_t)owner].push_back(i);
+  }
+  std::vector<TopoDS_Shape> res(pieces.size());
+  std::vector<HHist>        hs(pieces.size());
+  std::vector<char>         failed(pieces.size(), 0);
+  OSD_Parallel::For(0, (int)pieces.size(), [&](int k) {
+    if (cancelled(flag))
+    {
+      failed[(size_t)k] = 1;
+      return;
+    }
+    if (mine[(size_t)k].empty())
+    {
+      res[(size_t)k] = pieces[(size_t)k];
+      hs[(size_t)k]  = new BRepTools_History();
+      return;
+    }
+    try
+    {
+      const auto image = [&](const TopoDS_Shape& x) { return image_in((size_t)k, x); };
+      if (!blend(pieces[(size_t)k], mine[(size_t)k], image, res[(size_t)k], hs[(size_t)k]))
+        failed[(size_t)k] = 1;
+    }
+    catch (...)
+    {
+      failed[(size_t)k] = 1;
+    }
+  });
+  for (char f : failed)
+    if (f)
+      return false;
+  std::vector<TopoDS_Shape> shared;
+  const TopoDS_Shape        joined = join_on_shared_faces(res, shared);
+  if (joined.IsNull())
+    return false;
+  std::vector<Stage> level2;
+  for (size_t k = 0; k < pieces.size(); ++k)
+    level2.push_back(stage_of({pieces[k]}, hs[k]));
+  HHist h3 = new BRepTools_History();
+  for (const TopoDS_Shape& f : shared)
+    h3->Remove(f);
+  std::vector<std::vector<Stage>> stages;
+  stages.push_back({stage_of({target}, h1)});
+  stages.push_back(std::move(level2));
+  stages.push_back({stage_of(shared, h3)});
+  HHist h = compose({target}, stages);
+  const TopoDS_Shape r = unify(joined, h);
+  if (!BRepCheck_Analyzer(r).IsValid())
+    return false;
+  out  = r;
+  hist = h;
+  return true;
+}
+
+// A cut by many tools apart from each other (400 holes through a plate) in
+// slabs: the target cut by planes in the gaps between the tools, each slab
+// cut by its own tools in parallel, the slabs joined on their shared cut
+// faces and unified. One cut of all the tools is superlinear: the target's
+// long faces collect every tool's intersections (400 holes: 0.9 s, in 16
+// slabs ~0.3 s). False when it doesn't apply.
+static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, const BoolOpts& opts, TopoDS_Shape& out, HHist& hist)
+{
+  const int n = (int)t.size();
+  if (n < 64)
+    return false;
+  Bnd_Box tb;
+  BRepBndLib::Add(target, tb, false);
+  if (tb.IsVoid())
+    return false;
+  const double         gap = 1e-6 * std::sqrt(tb.SquareExtent());
+  std::vector<Bnd_Box> boxes((size_t)n);
+  for (int i = 0; i < n; ++i)
+  {
+    BRepBndLib::Add(t[(size_t)i], boxes[(size_t)i], false);
+    if (boxes[(size_t)i].IsVoid())
+      return false;
+    boxes[(size_t)i].Enlarge(gap);
+  }
+  int                 ax = 0;
+  std::vector<double> at;
+  ShapeList           planes;
+  if (!slab_planes(boxes, tb, 25, ax, at, planes))
+    return false;
+  const std::atomic<bool>* flag = t_cancel;
+  BRepAlgoAPI_Splitter     sp;
+  ShapeList                one;
+  one.Append(target);
+  sp.SetArguments(one);
+  sp.SetTools(planes);
+  sp.SetRunParallel(true);
+  sp.SetNonDestructive(true);
+  sp.Build();
+  if (sp.HasErrors() || !sp.IsDone() || cancelled(flag))
+    return false;
+  HHist      h1      = new BRepTools_History(one, sp);
+  const int  nslab   = (int)at.size() + 1;
+  auto       slab_of = [&](double x) { return (int)(std::upper_bound(at.begin(), at.end(), x) - at.begin()); };
+  auto       mid     = [&](const Bnd_Box& b) {
+    double x[6];
+    b.Get(x[0], x[1], x[2], x[3], x[4], x[5]);
+    return 0.5 * (x[ax] + x[3 + ax]);
+  };
+  std::vector<std::vector<TopoDS_Shape>> pieces((size_t)nslab), tools((size_t)nslab);
+  for (TopExp_Explorer e(sp.Shape(), TopAbs_SOLID); e.More(); e.Next())
+  {
+    Bnd_Box b;
+    BRepBndLib::Add(e.Current(), b, false);
+    pieces[(size_t)slab_of(mid(b))].push_back(e.Current());
+  }
+  for (int i = 0; i < n; ++i)
+    tools[(size_t)slab_of(mid(boxes[(size_t)i]))].push_back(t[(size_t)i]);
+  std::vector<TopoDS_Shape> res((size_t)nslab);
+  std::vector<HHist>        hs((size_t)nslab);
+  std::vector<char>         failed((size_t)nslab, 0);
+  OSD_Parallel::For(0, nslab, [&](int k) {
+    const auto& p = pieces[(size_t)k];
+    const auto& q = tools[(size_t)k];
+    if (cancelled(flag))
+    {
+      failed[(size_t)k] = 1;
+      return;
+    }
+    if (p.empty())
+      return;
+    if (q.empty())
+    {
+      res[(size_t)k] = compound_of(p);
+      hs[(size_t)k]  = new BRepTools_History();
+      return;
+    }
+    BRepAlgoAPI_Cut c;
+    c.SetArguments(to_list(p));
+    c.SetTools(to_list(q));
+    c.SetUseOBB(opts.obb);
+    c.SetRunParallel(false);
+    c.SetNonDestructive(true);
+    c.SetToFillHistory(true);
+    c.Build();
+    if (c.HasErrors() || !c.IsDone())
+    {
+      failed[(size_t)k] = 1;
+      return;
+    }
+    res[(size_t)k] = c.Shape();
+    hs[(size_t)k]  = new BRepTools_History(to_list(concat(p, q)), c);
+  });
+  for (char f : failed)
+    if (f)
+      return false;
+  std::vector<Stage>        level2;
+  std::vector<TopoDS_Shape> parts;
+  for (int k = 0; k < nslab; ++k)
+  {
+    if (res[(size_t)k].IsNull())
+      continue;
+    level2.push_back(stage_of(concat(pieces[(size_t)k], tools[(size_t)k]), hs[(size_t)k]));
+    parts.push_back(res[(size_t)k]);
+  }
+  std::vector<TopoDS_Shape> shared;
+  const TopoDS_Shape        joined = parts.size() < 2 ? TopoDS_Shape() : join_on_shared_faces(parts, shared);
+  if (joined.IsNull())
+    return false;
+  HHist h3 = new BRepTools_History();
+  for (const TopoDS_Shape& f : shared)
+    h3->Remove(f);
+  std::vector<std::vector<Stage>> stages;
+  stages.push_back({stage_of({target}, h1)});
+  stages.push_back(std::move(level2));
+  stages.push_back({stage_of(shared, h3)});
+  HHist h = compose(concat({target}, t), stages);
+  const TopoDS_Shape r = unify(joined, h);
+  if (!BRepCheck_Analyzer(r).IsValid())
+    return false;
+  out  = r;
+  hist = h;
+  return true;
+}
+
 // The result's facets back as mesh faces; `hist` becomes the history from
 // the original (unfaceted) inputs.
 static TopoDS_Shape remesh_facets(const TopoDS_Shape& res, MeshFacets& facets, HHist& hist)
@@ -1137,6 +1455,16 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     TopoDS_Shape out;
     HHist        h;
     const bool   done = fuse_slabs(a[0], t, opts, out, h);
+    fail_if_cancelled();
+    if (done)
+      return make_result(concat(args.items, tools.items), out, h.get());
+  }
+  // Many tools apart from each other cut out of one solid (holes): in slabs.
+  if (op == 1 && opts.unify && a.size() == 1 && facets.source.empty())
+  {
+    TopoDS_Shape out;
+    HHist        h;
+    const bool   done = cut_slabs(a[0], t, opts, out, h);
     fail_if_cancelled();
     if (done)
       return make_result(concat(args.items, tools.items), out, h.get());

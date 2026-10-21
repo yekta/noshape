@@ -97,6 +97,9 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     let mut lk: Vec<Option<CadLayer>> = (0..g.lines.len()).map(|i| cad_of(&g.cad, 0, i)).collect();
     let mut fk: Vec<Option<CadLayer>> = (0..g.fills.len()).map(|i| cad_of(&g.cad, 2, i)).collect();
     let mut tk: Vec<Option<CadLayer>> = Vec::new();
+    // CAD objects (dimensions) per element, kept the same way.
+    let (mut lo, text_obj, mut fo) = g.cad_members_of();
+    let mut to: Vec<Option<usize>> = Vec::new();
     out.fonts.clear();
     if o.underline_overrides {
         for &i in &g.overridden {
@@ -106,6 +109,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             lc.push(tone(g.text_color(i)));
             ll.push(g.text_sheet_layer(i));
             lk.push(cad_of(&g.cad, 1, i));
+            lo.push(text_obj[i]);
         }
     }
     let texts = std::mem::take(&mut out.texts);
@@ -113,11 +117,13 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         let c = tone(g.text_color(i));
         let layer = g.text_sheet_layer(i);
         let kind = cad_of(&g.cad, 1, i);
+        let obj = text_obj[i];
         if !(o.explode_all || o.explode.contains(&i)) {
             out.texts.push(t);
             tc.push(c);
             tl.push(layer);
             tk.push(kind);
+            to.push(obj);
             tf.push(g.text_font(i).cloned());
             continue;
         }
@@ -128,6 +134,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
                 fc.push(c);
                 fl.push(layer);
                 fk.push(kind);
+                fo.push(obj);
             }
         } else {
             for points in font::text_strokes(&t).into_iter().filter(|s| s.len() >= 2) {
@@ -135,6 +142,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
                 lc.push(c);
                 ll.push(layer);
                 lk.push(kind);
+                lo.push(obj);
             }
         }
     }
@@ -160,6 +168,10 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         filter(&mut lk, &keep_l);
         filter(&mut fk, &keep_f);
         filter(&mut tk, &keep_t);
+        lo.resize(keep_l.len(), None);
+        filter(&mut lo, &keep_l);
+        filter(&mut fo, &keep_f);
+        filter(&mut to, &keep_t);
         let mut k = keep_t.iter();
         tf.retain(|_| *k.next().unwrap_or(&true));
         // Hatch regions' line ranges after the removed lines.
@@ -184,6 +196,8 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     out.layers = ll.iter().enumerate().filter_map(|(i, l)| one(i, l, 0)).chain(tl.iter().enumerate().filter_map(|(i, l)| one(i, l, 1))).chain(fl.iter().enumerate().filter_map(|(i, l)| one(i, l, 2))).collect();
     let span = |i: usize, l: &Option<CadLayer>, k: u8| l.map(|layer| super::cad_layers::CadSpan { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, layer });
     out.cad = lk.iter().enumerate().filter_map(|(i, l)| span(i, l, 0)).chain(tk.iter().enumerate().filter_map(|(i, l)| span(i, l, 1))).chain(fk.iter().enumerate().filter_map(|(i, l)| span(i, l, 2))).collect();
+    let member = |i: usize, o: &Option<usize>, k: u8| o.map(|obj| super::cad_objects::CadMember { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, obj });
+    out.cad_members = lo.iter().enumerate().filter_map(|(i, o)| member(i, o, 0)).chain(to.iter().enumerate().filter_map(|(i, o)| member(i, o, 1))).chain(fo.iter().enumerate().filter_map(|(i, o)| member(i, o, 2))).collect();
     out.fonts = tf.into_iter().enumerate().filter_map(|(i, f)| f.map(|font| FontSpan { texts: i..i + 1, font })).collect();
     out
 }
@@ -216,7 +230,7 @@ fn hex(c: Option<[u8; 3]>) -> String {
 
 /// The nearest AutoCAD color index (DXF R12 has no true color): 7 is
 /// black / white.
-fn aci(c: Option<[u8; 3]>) -> u8 {
+pub(crate) fn aci(c: Option<[u8; 3]>) -> u8 {
     let Some(c) = c else { return 7 };
     const TABLE: [(u8, [u8; 3]); 9] = [(1, [255, 0, 0]), (2, [255, 255, 0]), (3, [0, 255, 0]), (4, [0, 255, 255]), (5, [0, 0, 255]), (6, [255, 0, 255]), (7, [0, 0, 0]), (8, [128, 128, 128]), (9, [192, 192, 192])];
     let d = |a: [u8; 3]| (0..3).map(|i| (a[i] as i32 - c[i] as i32).pow(2)).sum::<i32>();

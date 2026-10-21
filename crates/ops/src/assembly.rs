@@ -2,11 +2,15 @@
 //! commit first folds in the latest solved placements ([`fold_solved`]), as
 //! the view does, so instances stay where the mates put them.
 
+use noshape_model::assembly::analysis::InstanceInterference;
 use noshape_model::assembly::eval::AssemblyResult;
-use noshape_model::assembly::{Assembly, Instance, InstanceId, InstanceSource, Mate, MateId, Placement, SubassemblyLock};
+use noshape_model::assembly::config::{self as acfg, ConfigTarget};
+use noshape_model::assembly::{AsmMateConnector, Assembly, Group, Instance, InstanceId, InstancePattern, InstanceSource, Mate, MateId, MateType, NamedPosition, Placement, Relation, RelationType, SubassemblyLock};
 use noshape_model::configuration::ConfigValues;
 use noshape_model::document::TabId;
+use noshape_model::params::ParamValue;
 use noshape_model::reference::BodyId;
+use noshape_units::ExprValue;
 
 /// Copy the solver's placements (and flexible subassemblies' nested
 /// positions) into the instances before an edit is committed.
@@ -42,15 +46,37 @@ pub fn insert_description(studio_name: &str, part: Option<&CatalogPart>) -> Stri
 /// don't overlap.
 pub fn insert_part(a: &mut Assembly, studio: TabId, studio_name: &str, part: Option<CatalogPart>, config: ConfigValues) -> InstanceId {
     let id = InstanceId(a.next_id());
-    let (source, base, width) = match part {
-        Some((b, n, bb)) => (InstanceSource::Part { studio, body: b, config }, n, bb.map(|(lo, hi)| hi.x - lo.x).unwrap_or(0.02)),
-        None => (InstanceSource::PartStudio { studio, config }, studio_name.to_string(), 0.05),
+    let (source, base, size) = match part {
+        Some((b, n, bb)) => (InstanceSource::Part { studio, body: b, config }, n, bb.map(|(lo, hi)| hi - lo)),
+        None => (InstanceSource::PartStudio { studio, config }, studio_name.to_string(), None),
     };
-    let same = a.instances.iter().filter(|i| i.source == source).count();
-    let placement = Placement { translation: [same as f64 * (width + 0.01), 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0] };
+    // Live (qa5 pass 7, A18): the same part again starts at +1/8 of its
+    // bounding box per earlier instance (a 40 x 20 x 10 block: 5, 2.5,
+    // 1.25 mm); a different part at the origin.
+    let same = a.instances.iter().filter(|i| i.source == source).count() as f64;
+    let step = size.map(|d| d / 8.0).unwrap_or(glam::DVec3::new(0.05 / 8.0, 0.0, 0.0));
+    let placement = Placement { translation: (step * same).into(), rotation: [0.0, 0.0, 0.0, 1.0] };
     let name = a.next_instance_name(&base);
     a.instances.push(Instance { id, name, source, placement, fixed: false, hidden: false, suppressed: false, lock: SubassemblyLock::Flexible, nested: Vec::new(), best_tessellation: false, reference_designator: None, unsuppressed_if: None });
     id
+}
+
+/// Instance menu "Select instances with same configuration" (`same_part`
+/// false: any part of the same Part Studio in the same configuration) and
+/// "… with same part and same configuration" (live qa5 CA2).
+pub fn same_configuration(a: &Assembly, id: InstanceId, same_part: bool) -> Vec<InstanceId> {
+    let Some(inst) = a.instance(id) else { return Vec::new() };
+    let key = |s: &InstanceSource| match s {
+        InstanceSource::Part { studio, body, config } => Some((*studio, Some(body.clone()), config.clone())),
+        InstanceSource::PartStudio { studio, config } => Some((*studio, None, config.clone())),
+        _ => None,
+    };
+    let Some((studio, body, config)) = key(&inst.source) else { return vec![id] };
+    a.instances
+        .iter()
+        .filter(|i| key(&i.source).is_some_and(|(s, b, c)| s == studio && c == config && (!same_part || b == body)))
+        .map(|i| i.id)
+        .collect()
 }
 
 /// Whether freshly inserted `ids` are all the assembly has (they went into an
@@ -170,9 +196,15 @@ pub fn delete_instances(a: &mut Assembly, ids: &[InstanceId]) {
     a.prune_configured();
 }
 
-/// "Delete : Fastened 1" (a mate, relation or group).
+/// "Delete : Fastened 1" (a mate, relation, group, mate connector or pattern).
 pub fn delete_mate_description(a: &Assembly, id: MateId) -> String {
-    let name = a.mate(id).map(|m| m.name.clone()).or_else(|| a.relations.iter().find(|r| r.id == id).map(|r| r.name.clone())).or_else(|| a.groups.iter().find(|g| g.id == id).map(|g| g.name.clone()));
+    let name = a
+        .mate(id)
+        .map(|m| m.name.clone())
+        .or_else(|| a.relations.iter().find(|r| r.id == id).map(|r| r.name.clone()))
+        .or_else(|| a.groups.iter().find(|g| g.id == id).map(|g| g.name.clone()))
+        .or_else(|| a.connectors.iter().find(|c| c.id == id).map(|c| c.name.clone()))
+        .or_else(|| a.pattern(id).map(|p| p.name.clone()));
     format!("Delete : {}", name.unwrap_or_default())
 }
 
@@ -187,6 +219,329 @@ pub fn delete_mate(a: &mut Assembly, id: MateId) {
 pub fn default_flip_primary(result: &AssemblyResult, a: &noshape_model::assembly::MateConnectorRef, b: &noshape_model::assembly::MateConnectorRef, units: &noshape_units::UnitPrefs) -> Option<bool> {
     let (fa, fb) = (result.connector_world(a, units)?, result.connector_world(b, units)?);
     Some(fa.z().dot(fb.z()) > 0.0)
+}
+
+/// Targets of a part pattern / replicate: (code, target connector, initial placement).
+pub type PatternTargets = Vec<(u32, noshape_model::assembly::MateConnectorRef, Option<Placement>)>;
+
+/// "Insert : Linear pattern 1" / "Edit : Linear pattern 1".
+pub fn pattern_description(name: &str, editing: bool) -> String {
+    format!("{} : {name}", if editing { "Edit" } else { "Insert" })
+}
+
+/// The pattern dialog's default distance (angle) and instance count (live
+/// "qa5 assembly" 6: Distance 25 mm, Angle 360 deg, Instance count 2).
+pub fn pattern_defaults(circular: bool) -> (&'static str, &'static str) {
+    if circular { ("360 deg", "2") } else { ("25 mm", "2") }
+}
+
+/// The mate a part pattern / replicate follows: the selected mate when it
+/// uses the seed, else the seed's only own (not generated) mate.
+pub fn seed_mate(a: &Assembly, seed: InstanceId, selected: Option<MateId>) -> Option<MateId> {
+    let mates: Vec<&Mate> = a.mates.iter().filter(|m| m.uses_instance(seed) && a.mate_generated_by(m.id).is_none()).collect();
+    if let Some(sel) = selected
+        && mates.iter().any(|m| m.id == sel)
+    {
+        return Some(sel);
+    }
+    (mates.len() == 1).then(|| mates[0].id)
+}
+
+/// Replicate's default match scope (help: Replicate 6): the first edge
+/// option when the seed mate's target is an edge, else the first face one.
+pub fn default_replicate_scope(a: &Assembly, seed: InstanceId, mate: MateId) -> noshape_model::assembly::ReplicateScope {
+    use noshape_model::assembly::ReplicateScope;
+    use noshape_model::reference::Reference;
+    let Some(m) = a.mate(mate) else { return ReplicateScope::FacesInParts };
+    let target = if m.a.instance == seed { &m.b } else { &m.a };
+    let entity = match &target.reference {
+        Reference::Implicit { on, .. } => &**on,
+        r => r,
+    };
+    if matches!(entity, Reference::Edge(_)) { ReplicateScope::EdgesOnPlane } else { ReplicateScope::FacesInParts }
+}
+
+/// Accept the pattern dialog: the pattern replaces its old version (or is
+/// appended), then its instances are generated, on `targets` for a part
+/// pattern / replicate. Returns the instances created.
+pub fn commit_pattern(a: &mut Assembly, pat: InstancePattern, targets: Option<PatternTargets>) -> Vec<InstanceId> {
+    let id = pat.id;
+    match a.patterns.iter().position(|p| p.id == id) {
+        Some(i) => a.patterns[i] = pat,
+        None => a.patterns.push(pat),
+    }
+    match targets {
+        Some(t) => a.sync_matched_pattern(id, t),
+        None => a.sync_pattern(id),
+    }
+}
+
+/// The Interference detection dialog's rows: (row index, "A and B", the
+/// overlap's size "w x h x d"); with Show top level only, one row per pair
+/// of top-level instances, named by them.
+pub fn interference_rows(result: &AssemblyResult, rows: &[InstanceInterference], top_only: bool, units: &noshape_units::UnitPrefs) -> Vec<(usize, String, String)> {
+    let len = |x: f64| noshape_units::format_quantity(noshape_units::Quantity::new(x, noshape_units::Dim::LENGTH), units);
+    let name = |p: &[InstanceId]| -> String {
+        let p = if top_only { &p[..1] } else { p };
+        result.node(p).map(|n| n.name.clone()).unwrap_or_default()
+    };
+    let mut out = Vec::new();
+    let mut seen: Vec<(InstanceId, InstanceId)> = Vec::new();
+    for (k, r) in rows.iter().enumerate() {
+        if top_only {
+            let pair = (r.a[0].min(r.b[0]), r.a[0].max(r.b[0]));
+            if r.a[0] == r.b[0] || seen.contains(&pair) {
+                continue;
+            }
+            seen.push(pair);
+        }
+        let (lo, hi) = r.overlap.bounds;
+        let size = hi - lo;
+        out.push((k, format!("{} and {}", name(&r.a), name(&r.b)), format!("{} x {} x {}", len(size.x), len(size.y), len(size.z))));
+    }
+    out
+}
+
+/// "Insert : Group" / "Edit : Group".
+pub fn group_description(editing: bool) -> &'static str {
+    if editing { "Edit : Group" } else { "Insert : Group" }
+}
+
+/// The Group dialog's check.
+pub const GROUP_TOO_FEW: &str = "Select at least two instances to group.";
+
+/// Accept the Group dialog: a new group ("Group 1"...) or the edited
+/// group's instances. Returns the group's id.
+pub fn commit_group(a: &mut Assembly, editing: Option<MateId>, ids: Vec<InstanceId>) -> MateId {
+    if let Some(gid) = editing {
+        if let Some(g) = a.groups.iter_mut().find(|g| g.id == gid) {
+            g.instances = ids;
+        }
+        return gid;
+    }
+    let id = MateId(a.next_id());
+    let name = a.next_feature_name("Group");
+    a.groups.push(Group { id, name, instances: ids, suppressed: false });
+    id
+}
+
+/// A relation's base name ("Gear" -> "Gear 1", "Insert : Gear relation").
+pub fn relation_name(kind: RelationType) -> &'static str {
+    match kind {
+        RelationType::Gear => "Gear",
+        RelationType::RackAndPinion => "Rack and pinion",
+        RelationType::Screw => "Screw",
+        RelationType::Linear => "Linear",
+    }
+}
+
+/// The relation dialog's default ratio (gear / linear) or distance per
+/// revolution (rack and pinion, screw); live (behaviours.md "Assembly
+/// relation dialogs"): "Relation ratio 1", "Distance per revolution 25 mm".
+pub fn relation_default_ratio(kind: RelationType) -> &'static str {
+    match kind {
+        RelationType::Gear | RelationType::Linear => "1",
+        RelationType::RackAndPinion | RelationType::Screw => "25 mm",
+    }
+}
+
+/// The relation dialog's value row label.
+pub fn relation_value_label(kind: RelationType) -> &'static str {
+    match kind {
+        RelationType::Gear | RelationType::Linear => "Relation ratio",
+        RelationType::RackAndPinion | RelationType::Screw => "Distance per revolution",
+    }
+}
+
+/// A mate's entry in the relation dialog's Mate(s) field: the coupled
+/// degree of freedom ("⟳ - z - Revolute 1": rotation about z, "↹ - z -
+/// Slider 1": translation along z); a screw's one cylindrical mate is just
+/// its name (it uses both). `slot`: 0 the first mate, 1 the second.
+pub fn relation_mate_label(kind: RelationType, slot: usize, mate_type: MateType, name: &str) -> String {
+    let rotational = match kind {
+        RelationType::Gear => true,
+        RelationType::RackAndPinion => slot == 0,
+        RelationType::Linear => false,
+        RelationType::Screw => return name.to_string(),
+    };
+    let axis = match (rotational, mate_type) {
+        (true, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel) => "z",
+        (false, MateType::Slider | MateType::Cylindrical | MateType::Parallel) => "z",
+        (false, MateType::PinSlot | MateType::Planar) => "x",
+        _ => return name.to_string(),
+    };
+    format!("{} - {axis} - {name}", if rotational { "⟳" } else { "↹" })
+}
+
+/// "Insert : Gear relation" (also when editing, as the dialog does).
+pub fn relation_description(kind: RelationType) -> String {
+    format!("Insert : {} relation", relation_name(kind))
+}
+
+/// The relation dialog's checks: two different mates (a screw uses one),
+/// of types the relation couples. `Err((is_error, message))`.
+pub fn check_relation(a: &Assembly, kind: RelationType, first: Option<MateId>, second: Option<MateId>) -> Result<[MateId; 2], (bool, String)> {
+    let screw = kind == RelationType::Screw;
+    let (Some(x), Some(y)) = (first, if screw { first } else { second }) else { return Err((false, "Select two mates for the relation.".into())) };
+    if x == y && !screw {
+        return Err((false, "A relation needs two different mates.".into()));
+    }
+    if let (Some(ma), Some(mb)) = (a.mate(x), a.mate(y))
+        && let Err(e) = noshape_model::assembly::eval::relation_values(kind, ma.mate_type, mb.mate_type)
+    {
+        return Err((true, e));
+    }
+    Ok([x, y])
+}
+
+/// Accept the relation dialog. `base`: the mates' current values
+/// (`AssemblyResult::relation_base`), the coupling's reference.
+pub fn commit_relation(a: &mut Assembly, editing: Option<MateId>, kind: RelationType, mates: [MateId; 2], ratio: ExprValue, reverse: bool, base: Option<[f64; 2]>) -> MateId {
+    if let Some(id) = editing
+        && let Some(x) = a.relations.iter_mut().find(|x| x.id == id)
+    {
+        x.relation_type = kind;
+        x.mates = mates;
+        x.ratio = ratio;
+        x.reverse = reverse;
+        x.base = base;
+        return id;
+    }
+    let id = MateId(a.next_id());
+    let name = a.next_feature_name(relation_name(kind));
+    a.relations.push(Relation { id, name, relation_type: kind, mates, ratio, reverse, suppressed: false, base });
+    id
+}
+
+/// Accept the Mate connector dialog: mates using the connector follow its
+/// owner; the connector replaces its old version or is appended.
+pub fn commit_connector(a: &mut Assembly, c: AsmMateConnector) {
+    for m in &mut a.mates {
+        for r in std::iter::once(&mut m.a).chain(std::iter::once(&mut m.b)).chain(m.extra.iter_mut()) {
+            if r.connector == Some(c.id) {
+                r.instance = c.on.instance;
+            }
+        }
+    }
+    match a.connectors.iter().position(|x| x.id == c.id) {
+        Some(i) => a.connectors[i] = c,
+        None => a.connectors.push(c),
+    }
+}
+
+/// Suppress / Unsuppress of a mate, relation or group ("Suppress mate"):
+/// a configured mate's value changes in configuration `values`.
+pub fn toggle_mate_suppressed(a: &mut Assembly, id: MateId, values: &ConfigValues) {
+    let now = a.configured(values).mate(id).map(|m| m.suppressed);
+    if let Some(now) = now
+        && a.set_configured_value(ConfigTarget::Mate(id), acfg::param::UNSUPPRESSED, values, ParamValue::Bool(now))
+    {
+        return;
+    }
+    if let Some(m) = a.mates.iter_mut().find(|m| m.id == id) {
+        m.suppressed = !m.suppressed;
+    }
+    if let Some(r) = a.relations.iter_mut().find(|r| r.id == id) {
+        r.suppressed = !r.suppressed;
+    }
+    if let Some(g) = a.groups.iter_mut().find(|g| g.id == id) {
+        g.suppressed = !g.suppressed;
+    }
+}
+
+/// "Replace instance : Part 2".
+pub fn replace_description(base: &str) -> String {
+    format!("Replace instance : {base}")
+}
+
+/// Replace instance `id` (with `all`, every instance of the same source)
+/// by `source`, then re-point mates whose geometry names don't exist on the
+/// replacement to geometrically matching faces / edges of `new` (the
+/// replacement's Part Studio, and its part). Returns (replaced, remapped
+/// mate references).
+pub fn replace_instance(a: &mut Assembly, id: InstanceId, source: InstanceSource, base: &str, all: bool, old: &AssemblyResult, new: Option<(&noshape_model::regen::context::Context, Option<&BodyId>)>) -> (usize, usize) {
+    let ids = a.replace_instance(id, source, base, all);
+    let n = new.map(|(c, body)| noshape_model::assembly::analysis::remap_replaced(a, &ids, old, c, body)).unwrap_or(0);
+    (ids.len(), n)
+}
+
+/// The message after Replace instance.
+pub fn replace_message(count: usize, remapped: usize) -> String {
+    if remapped > 0 { format!("Replaced {count} instance(s); {remapped} mate reference(s) matched to the nearest geometry of the same type.") } else { format!("Replaced {count} instance(s); mates are kept where the new geometry has the same names.") }
+}
+
+/// The degrees of freedom of a mate that a named position can drive, in
+/// the Driving mate selector's order (0 = rotation about Z, 1..3 =
+/// translation along X / Y / Z).
+pub fn driven_dofs(t: noshape_model::assembly::MateType) -> &'static [u8] {
+    use noshape_model::assembly::MateType;
+    match t {
+        MateType::Revolute => &[0],
+        MateType::Slider => &[3],
+        MateType::Cylindrical => &[3, 0],
+        MateType::PinSlot => &[1, 0],
+        MateType::Planar => &[1, 2, 0],
+        MateType::Parallel => &[1, 2, 3, 0],
+        _ => &[],
+    }
+}
+
+/// Add named position's default name: "Named position N".
+pub fn next_named_position_name(a: &Assembly) -> String {
+    let mut k = a.named_positions.len() + 1;
+    while a.named_positions.iter().any(|p| p.name == format!("Named position {k}")) {
+        k += 1;
+    }
+    format!("Named position {k}")
+}
+
+/// A named position holding the current state (placements and the driving
+/// mates' values).
+pub fn capture_named_position(a: &Assembly, result: &AssemblyResult, name: String) -> NamedPosition {
+    NamedPosition { name, placements: result.solved.placements.clone(), mate_values: result.named_position_values(a) }
+}
+
+/// Apply a position: its driving values are imposed (the other mates stay
+/// as they are); without driving mates its stored placements are solved.
+pub fn apply_named_position(a: &Assembly, result: &AssemblyResult, np: &NamedPosition) -> noshape_model::assembly::eval::Solved {
+    let hold: Vec<(MateId, usize, f64)> = a.position_drivers.iter().filter_map(|(m, ix)| np.mate_values.iter().find(|(x, _)| x == m).map(|(_, v)| (*m, *ix as usize, v[*ix as usize]))).collect();
+    if hold.is_empty() {
+        return result.prepared.solve_named_position(np);
+    }
+    let mut start: std::collections::HashMap<InstanceId, Placement> = result.solved.placements.iter().cloned().collect();
+    for (id, p) in &np.placements {
+        start.insert(*id, *p);
+    }
+    result.prepared.solve(&noshape_model::assembly::eval::SolveOptions { start: Some(start), hold_values: hold, ..Default::default() })
+}
+
+/// Duplicate named position's name: "<name> (1)", "<name> (2)"...
+pub fn duplicate_position_name(a: &Assembly, name: &str) -> String {
+    let mut k = 1;
+    while a.named_positions.iter().any(|p| p.name == format!("{name} ({k})")) {
+        k += 1;
+    }
+    format!("{name} ({k})")
+}
+
+/// Set a driving value of position `row` (a mate's value index `ix`);
+/// `current`: the mate's values now, for a mate the position hasn't stored.
+pub fn set_position_value(a: &mut Assembly, row: usize, mate: MateId, ix: usize, value: f64, current: [f64; 4]) {
+    if let Some(np) = a.named_positions.get_mut(row) {
+        match np.mate_values.iter_mut().find(|(m, _)| *m == mate) {
+            Some((_, v)) => v[ix] = value,
+            None => {
+                let mut v = current;
+                v[ix] = value;
+                np.mate_values.push((mate, v));
+            }
+        }
+    }
+}
+
+/// Add exploded view's name: "Explode N".
+pub fn next_exploded_view_name(a: &Assembly) -> String {
+    format!("Explode {}", a.exploded_views.len() + 1)
 }
 
 #[cfg(test)]
@@ -237,11 +592,13 @@ mod tests {
         let first = insert_part(&mut a, studio, "Part Studio 1", Some(part(0, 0.04)), ConfigValues::default());
         assert!(inserted_into_empty(&a, &[first]));
         assert_eq!(a.instance(first).unwrap().placement, Placement::default());
-        // The same part again starts at a slight offset (it then follows the
-        // cursor in the graphics area).
+        // The same part again starts at +1/8 of its bounding box (live qa5
+        // pass 7: 5, 2.5, 1.25 for a 40 x 20 x 10 block); it then follows
+        // the cursor once that enters the graphics area.
         let second = insert_part(&mut a, studio, "Part Studio 1", Some(part(0, 0.04)), ConfigValues::default());
         assert!(!inserted_into_empty(&a, &[second]));
-        assert_eq!(a.instance(second).unwrap().placement.translation, [0.05, 0.0, 0.0]);
+        let t = DVec3::from(a.instance(second).unwrap().placement.translation);
+        assert!((t - DVec3::new(0.005, 0.00125, 0.00125)).length() < 1e-12, "{t:?}");
         // Another part starts with its origin on the assembly origin.
         let other = insert_part(&mut a, studio, "Part Studio 1", Some(part(1, 0.02)), ConfigValues::default());
         assert!(!inserted_into_empty(&a, &[other]));
@@ -251,5 +608,34 @@ mod tests {
         let ids = vec![insert_part(&mut b, studio, "Part Studio 1", Some(part(0, 0.04)), ConfigValues::default()), insert_part(&mut b, studio, "Part Studio 1", Some(part(1, 0.02)), ConfigValues::default())];
         assert!(inserted_into_empty(&b, &ids));
         assert!(ids.iter().all(|id| b.instance(*id).unwrap().placement == Placement::default()));
+    }
+
+    /// qa5 A13: the relation dialog's defaults and Mate(s) entries as live.
+    #[test]
+    fn relation_dialog_matches_live() {
+        assert_eq!(relation_default_ratio(RelationType::Gear), "1");
+        assert_eq!(relation_default_ratio(RelationType::Screw), "25 mm");
+        assert_eq!(relation_value_label(RelationType::RackAndPinion), "Distance per revolution");
+        assert_eq!(relation_value_label(RelationType::Linear), "Relation ratio");
+        assert_eq!(relation_mate_label(RelationType::Gear, 1, MateType::Cylindrical, "Cylindrical 1"), "⟳ - z - Cylindrical 1");
+        assert_eq!(relation_mate_label(RelationType::RackAndPinion, 1, MateType::Slider, "Slider 1"), "↹ - z - Slider 1");
+        assert_eq!(relation_mate_label(RelationType::Linear, 1, MateType::Cylindrical, "Cylindrical 1"), "↹ - z - Cylindrical 1");
+        assert_eq!(relation_mate_label(RelationType::Screw, 0, MateType::Cylindrical, "Cylindrical 1"), "Cylindrical 1");
+    }
+
+    /// qa5 CA2: the instance menu's "Select instances with same (part and
+    /// same) configuration".
+    #[test]
+    fn select_instances_with_same_configuration() {
+        let mut a = Assembly::default();
+        let studio = TabId(7);
+        let big = ConfigValues([("size".to_string(), "Big".to_string())].into_iter().collect());
+        let p0 = insert_part(&mut a, studio, "Part Studio 1", Some(part(0, 0.04)), big.clone());
+        let p0b = insert_part(&mut a, studio, "Part Studio 1", Some(part(0, 0.04)), big.clone());
+        let p1 = insert_part(&mut a, studio, "Part Studio 1", Some(part(1, 0.02)), big.clone());
+        let small = insert_part(&mut a, studio, "Part Studio 1", Some(part(0, 0.04)), ConfigValues::default());
+        assert_eq!(same_configuration(&a, p0, false), vec![p0, p0b, p1]);
+        assert_eq!(same_configuration(&a, p0, true), vec![p0, p0b]);
+        assert_eq!(same_configuration(&a, small, true), vec![small]);
     }
 }

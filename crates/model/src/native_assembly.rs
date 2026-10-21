@@ -41,6 +41,9 @@ pub struct PartFile {
 pub const NO_GEOMETRY: &str = "Imported file contains no translatable geometry";
 /// Onshape's message when the zip has no assembly named like it, or folders.
 pub const NO_ROOT: &str = "Root assembly file not found. Ensure zip file name matches root assembly name and the archive does not have folders";
+/// A zip of STEP files: Onshape uploads it but doesn't translate it (live
+/// qa5 pass 7: a BLOB tab, notification "<zip> was not translated. …").
+pub const STEP_IN_ZIP: &str = "Translation is not supported for STEP (.stp) files.";
 
 /// A native assembly as Onshape imports it (live G38): a flat zip named like
 /// its root assembly, with the part files the assembly references by name.
@@ -104,11 +107,11 @@ pub fn read_assembly_zip(path: &std::path::Path) -> Result<AssemblyZip, String> 
         // whatever the zip's name (live G42).
         let assemblies: Vec<&String> = names.iter().filter(|n| NativeSystem::of(n).is_some()).collect();
         let iams: Vec<&&String> = assemblies.iter().filter(|n| NativeSystem::of(n) == Some(NativeSystem::Inventor)).collect();
-        let root = *assemblies
-            .iter()
-            .find(|n| split(n).0.eq_ignore_ascii_case(&stem))
-            .or(if iams.len() == 1 { iams.first().copied() } else { None })
-            .ok_or(NO_ROOT)?;
+        let found = assemblies.iter().find(|n| split(n).0.eq_ignore_ascii_case(&stem)).or(if iams.len() == 1 { iams.first().copied() } else { None });
+        let Some(root) = found.copied() else {
+            let step = |n: &String| matches!(split(n).1.as_str(), "step" | "stp");
+            return Err(if names.iter().any(step) { STEP_IN_ZIP } else { NO_ROOT }.to_string());
+        };
         let system = NativeSystem::of(root).ok_or(NO_ROOT)?;
         let components = k::read_native_assembly(&dir.join(root)).map_err(|e| e.to_string())?;
         let mut files = Vec::new();

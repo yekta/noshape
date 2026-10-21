@@ -4,7 +4,7 @@
 //! through `noshape-store`.
 
 use anyhow::{Context as _, Result};
-use noshape_model::document::{Document, META_BLOB, TabId};
+use noshape_model::document::{Document, DocumentSettings, META_BLOB, Tab, TabId};
 use noshape_store::{BranchId, Document as Store, MicroversionId, UndoStack, VersionId};
 use std::path::{Path, PathBuf};
 
@@ -14,6 +14,57 @@ pub const READ_ONLY_MESSAGE: &str = "This is a read-only view of history. Return
 /// What edits on a protected workspace report (Onshape "Workspace
 /// protections": changes are made on a branch and merged in).
 pub const PROTECTED_MESSAGE: &str = "This workspace is protected. Make changes in another workspace and merge them into this one.";
+
+/// Document settings that make up the tab bar (order, folders, nesting).
+const TAB_BAR_FIELDS: [&str; 3] = ["tab_order", "folders", "parents"];
+
+/// The name in a tab blob (the rest is skipped, not built).
+fn tab_name(blob: &[u8]) -> Option<String> {
+    #[derive(serde::Deserialize)]
+    struct Named {
+        name: String,
+    }
+    serde_json::from_slice::<Named>(blob).ok().map(|n| n.name)
+}
+
+/// A blob's JSON without `fields` (None when it isn't a JSON object).
+fn without_fields(blob: &[u8], fields: &[&str]) -> Option<serde_json::Value> {
+    let mut v: serde_json::Value = serde_json::from_slice(blob).ok()?;
+    let map = v.as_object_mut()?;
+    for f in fields {
+        map.remove(*f);
+    }
+    Some(v)
+}
+
+/// What undo/redo writes back for blob `name` (`restored`), given the
+/// current document: tab operations can't be undone, so tabs keep their
+/// current names, deleted tabs stay deleted and the tab bar keeps its
+/// order and folders.
+fn keep_tab_bar(doc: &Document, name: &str, restored: Option<Vec<u8>>) -> Option<Vec<u8>> {
+    let bytes = restored?;
+    if name == META_BLOB {
+        let Ok(mut settings) = serde_json::from_slice::<DocumentSettings>(&bytes) else { return Some(bytes) };
+        let now = &doc.settings;
+        if settings.tab_order == now.tab_order && settings.folders == now.folders && settings.parents == now.parents {
+            return Some(bytes);
+        }
+        settings.tab_order = now.tab_order.clone();
+        settings.folders = now.folders.clone();
+        settings.parents = now.parents.clone();
+        return Some(serde_json::to_vec(&settings).unwrap_or(bytes));
+    }
+    if !name.starts_with("tab/") {
+        return Some(bytes);
+    }
+    let now = doc.tabs.iter().find(|t| Document::blob_name(t.id) == name)?;
+    let Ok(mut tab) = serde_json::from_slice::<Tab>(&bytes) else { return Some(bytes) };
+    if tab.name == now.name {
+        return Some(bytes);
+    }
+    tab.name = now.name.clone();
+    Some(serde_json::to_vec(&tab).unwrap_or(bytes))
+}
 
 /// Store meta key of a protected workspace (`workspace_protected:<branch>`).
 pub const PROTECTED_KEY: &str = "workspace_protected:";
@@ -184,6 +235,9 @@ impl Session {
         if settings {
             changes.push((META_BLOB.to_string(), Some(self.doc.settings_blob())));
         }
+        if self.tab_bar_only(&changes)? {
+            return Ok(self.undo.commit_not_undoable(&mut self.store, &changes, description)?);
+        }
         Ok(self.undo.commit(&mut self.store, &changes, description)?)
     }
 
@@ -208,19 +262,52 @@ impl Session {
         Ok(changes)
     }
 
-    /// Commit the whole document (used after structural changes).
+    /// Commit the whole document (used after structural changes). An edit
+    /// of the tab bar only (tabs added or removed, renamed, reordered,
+    /// foldered) is not undoable, as in Onshape.
     pub fn commit_all(&mut self, description: &str) -> Result<MicroversionId> {
         self.ensure_unprotected()?;
-        let head = self.head()?;
-        let existing: Vec<String> = self.store.names(head)?;
-        let blobs = self.doc.to_blobs();
-        let mut changes: Vec<(String, Option<Vec<u8>>)> = blobs.into_iter().map(|(k, v)| (k, Some(v))).collect();
-        for name in existing {
-            if !changes.iter().any(|(k, _)| *k == name) {
-                changes.push((name, None));
-            }
+        let changes = self.all_changes()?;
+        if self.tab_bar_only(&changes)? {
+            return Ok(self.undo.commit_not_undoable(&mut self.store, &changes, description)?);
         }
         Ok(self.undo.commit(&mut self.store, &changes, description)?)
+    }
+
+    /// Whether `changes` (against the head) touch nothing but the tab bar:
+    /// tabs created or deleted, tab names, and the tab order and folders.
+    fn tab_bar_only(&self, changes: &[(String, Option<Vec<u8>>)]) -> Result<bool> {
+        let head = self.head()?;
+        let mut any = false;
+        for (name, new) in changes {
+            let old = self.store.read(head, name)?;
+            if old == *new {
+                continue;
+            }
+            any = true;
+            let (Some(old), Some(new)) = (old, new) else {
+                if name.starts_with("tab/") {
+                    continue;
+                }
+                return Ok(false);
+            };
+            let fields: &[&str] = if name == META_BLOB {
+                &TAB_BAR_FIELDS
+            } else if name.starts_with("tab/") {
+                // A content edit (the common case) keeps the name: no need
+                // to compare the whole tab.
+                if tab_name(&old) == tab_name(new) {
+                    return Ok(false);
+                }
+                &["name"]
+            } else {
+                return Ok(false);
+            };
+            if without_fields(&old, fields) != without_fields(new, fields) {
+                return Ok(false);
+            }
+        }
+        Ok(any)
     }
 
     fn reload(&mut self, mv: MicroversionId) -> Result<()> {
@@ -250,9 +337,11 @@ impl Session {
 
     pub fn undo(&mut self) -> Result<bool> {
         self.ensure_unprotected()?;
+        let doc = &self.doc;
+        let keep = |name: &str, v: Option<Vec<u8>>| keep_tab_bar(doc, name, v);
         let mv = match self.tab_scope() {
-            Some(scope) => self.undo.undo_in(&mut self.store, &scope)?,
-            None => self.undo.undo(&mut self.store)?,
+            Some(scope) => self.undo.undo_in_keeping(&mut self.store, &scope, &keep)?,
+            None => self.undo.undo_in_keeping(&mut self.store, &|_| true, &keep)?,
         };
         match mv {
             Some(mv) => {
@@ -265,9 +354,11 @@ impl Session {
 
     pub fn redo(&mut self) -> Result<bool> {
         self.ensure_unprotected()?;
+        let doc = &self.doc;
+        let keep = |name: &str, v: Option<Vec<u8>>| keep_tab_bar(doc, name, v);
         let mv = match self.tab_scope() {
-            Some(scope) => self.undo.redo_in(&mut self.store, &scope)?,
-            None => self.undo.redo(&mut self.store)?,
+            Some(scope) => self.undo.redo_in_keeping(&mut self.store, &scope, &keep)?,
+            None => self.undo.redo_in_keeping(&mut self.store, &|_| true, &keep)?,
         };
         match mv {
             Some(mv) => {
@@ -403,16 +494,68 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         let mut s = Session::create(&path, Document::new()).unwrap();
         let tab = s.doc.tabs[0].id;
-        s.doc.tab_mut(tab).unwrap().name = "Renamed".into();
-        s.commit(&[tab], false, "Rename tab").unwrap();
+        s.doc.settings.description = "Edited".into();
+        s.commit(&[], true, "Edit description").unwrap();
         assert!(s.can_undo());
         s.undo().unwrap();
-        assert_eq!(s.doc.tab(tab).unwrap().name, "Part Studio 1");
+        assert_eq!(s.doc.settings.description, "");
         s.redo().unwrap();
-        assert_eq!(s.doc.tab(tab).unwrap().name, "Renamed");
+        assert_eq!(s.doc.settings.description, "Edited");
+        s.doc.tab_mut(tab).unwrap().name = "Renamed".into();
+        s.commit(&[tab], false, "Rename tab").unwrap();
         drop(s);
         let s2 = Session::open(&path).unwrap();
         assert_eq!(s2.doc.tab(tab).unwrap().name, "Renamed");
+        assert_eq!(s2.doc.settings.description, "Edited");
+    }
+
+    /// qa5 TABS5 (live: tab rename, reorder, delete and duplicate are not
+    /// undoable): Ctrl+Z after a rename does nothing, and undoing an edit
+    /// made before it keeps the new name and the tab order.
+    #[test]
+    fn tab_operations_are_not_undoable() {
+        use noshape_model::document::TabContent;
+        let dir = std::env::temp_dir().join(format!("noshape-session-tabs-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("t.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut s = Session::create(&path, Document::new()).unwrap();
+        let tab = s.doc.tabs[0].id;
+        s.active_tab = Some(tab);
+        // A rename alone: nothing to undo.
+        s.edit_document("Rename tab : A", |d| d.tab_mut(tab).unwrap().name = "A".into()).unwrap();
+        assert!(!s.can_undo());
+        // A content edit, then a rename, a new tab and a reorder.
+        s.edit_tab(tab, "Insert feature", |c| {
+            if let TabContent::PartStudio(ps) = c {
+                ps.features.clear();
+            }
+        })
+        .unwrap();
+        s.doc.settings.description = "x".into();
+        s.commit(&[tab], true, "Edit").unwrap();
+        assert!(s.can_undo());
+        s.edit_document("Rename tab : B", |d| d.tab_mut(tab).unwrap().name = "B".into()).unwrap();
+        let other = s.edit_document("Insert tab : Part Studio 2", |d| d.add_tab("Part Studio 2", TabContent::PartStudio(Default::default()))).unwrap();
+        let order = vec![other, tab];
+        s.edit_document("Reorder tabs", |d| d.settings.tab_order = order.clone()).unwrap();
+        s.undo().unwrap();
+        assert_eq!(s.doc.settings.description, "");
+        assert_eq!(s.doc.tab(tab).unwrap().name, "B");
+        assert!(s.doc.tab(other).is_some());
+        assert_eq!(s.doc.settings.tab_order, order);
+        assert!(!s.can_undo());
+        s.redo().unwrap();
+        assert_eq!(s.doc.settings.description, "x");
+        assert_eq!(s.doc.tab(tab).unwrap().name, "B");
+        // The rebuilt stack of a reopened document skips them too.
+        drop(s);
+        let mut s2 = Session::open(&path).unwrap();
+        s2.active_tab = Some(tab);
+        s2.undo().unwrap();
+        assert_eq!(s2.doc.tab(tab).unwrap().name, "B");
+        assert_eq!(s2.doc.settings.description, "");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -33,10 +33,16 @@ pub fn add_input(ps: &mut PartStudio, label: &str) -> String {
             default: "Default".into(),
         },
     };
-    // Live: a List is "Configuration" while no input has that name (also
-    // after a configuration variable, qa5 C1).
-    let free = !ps.configuration.inputs.iter().any(|i| i.name == "Configuration");
-    let name = if label == "List" && free { "Configuration".to_string() } else { format!("{label} {n}") };
+    // Live (qa5 configurations (1)): the first List is "Configuration", the
+    // next ones "List input 1", "List input 2"…
+    let names: Vec<&str> = ps.configuration.inputs.iter().map(|i| i.name.as_str()).collect();
+    let name = if label != "List" {
+        format!("{label} {n}")
+    } else if !names.contains(&"Configuration") {
+        "Configuration".to_string()
+    } else {
+        (1..).map(|k| format!("List input {k}")).find(|c| !names.contains(&c.as_str())).unwrap_or_default()
+    };
     // FeatureScript ids from the names (Edit FeatureScript IDs… shows them).
     let id = fs_identifier(&name, &taken);
     ps.configuration.inputs.push(ConfigInput { id: id.clone(), name, kind, visible_when: None, excluded: false });
@@ -239,7 +245,8 @@ pub fn current(ps: &PartStudio, chosen: &noshape_model::configuration::ConfigVal
 mod tests {
     use super::*;
 
-    /// qa5 C1: the first List is "Configuration", also after a variable input.
+    /// qa5 C1: the first List is "Configuration" (also after a variable
+    /// input), then "List input 1", "List input 2".
     #[test]
     fn a_new_list_is_named_configuration() {
         let mut ps = PartStudio::new();
@@ -247,6 +254,8 @@ mod tests {
         let id = add_input(&mut ps, "List");
         assert_eq!(ps.configuration.inputs.iter().find(|i| i.id == id).unwrap().name, "Configuration");
         let id2 = add_input(&mut ps, "List");
-        assert_eq!(ps.configuration.inputs.iter().find(|i| i.id == id2).unwrap().name, "List 3");
+        assert_eq!(ps.configuration.inputs.iter().find(|i| i.id == id2).unwrap().name, "List input 1");
+        let id3 = add_input(&mut ps, "List");
+        assert_eq!(ps.configuration.inputs.iter().find(|i| i.id == id3).unwrap().name, "List input 2");
     }
 }

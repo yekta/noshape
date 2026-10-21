@@ -340,7 +340,13 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
   for (size_t i = 0; i < shapes.items.size(); ++i)
   {
     require_non_null(shapes.items[i], "exported shape");
-    const TopoDS_Shape s = yard ? BRepBuilderAPI_Transform(shapes.items[i], third, true).Shape() : shapes.items[i];
+    TopoDS_Shape s = shapes.items[i];
+    // A located part (a pattern instance sharing its seed's geometry) would
+    // become an assembly instance of a "SOLID" product: bake the location.
+    if (!s.Location().IsIdentity())
+      s = BRepBuilderAPI_Transform(s.Located(TopLoc_Location()), s.Location().Transformation(), true).Shape();
+    if (yard)
+      s = BRepBuilderAPI_Transform(s, third, true).Shape();
     TDF_Label l = st->AddShape(s, false);
     if (i < names.size() && !names[i].empty())
     {
@@ -359,6 +365,9 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
   // Shapes are in millimetres here (see io.rs); the file unit and schema are the user's.
   DESTEP_Parameters params;
   params.InitFromStatic();
+  // One product per part (Onshape writes no assembly) and no p-curves.
+  params.WriteAssembly       = DESTEP_Parameters::WriteMode_Assembly_Off;
+  params.WriteSurfaceCurMode = false;
   switch (schema)
   {
     case 1:

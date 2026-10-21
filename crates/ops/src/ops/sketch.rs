@@ -128,13 +128,13 @@ pub fn ops() -> Vec<Op> {
             group: "sketch",
             verb: "dimension",
             summary: "Add a driving dimension (value or expression) to sketch entities",
-            description: Box::leak(format!("The Dimension tool: placed as a reference, made driving unless that over-constrains the sketch, then set to `value` (\"20 mm\", \"#width\", \"45 deg\"; a bare number uses workspace units). Kinds: {DIMENSION_KINDS}").into_boxed_str()),
+            description: Box::leak(format!("The Dimension tool: placed as a reference, made driving unless that over-constrains the sketch, then set to `value` when given (\"20 mm\", \"#width\", \"45 deg\"; a bare number uses workspace units). Kinds: {DIMENSION_KINDS}").into_boxed_str()),
             fields: vec![
                 doc_field(),
                 tab_field(),
                 req("sketch", s(), "Sketch feature id or name."),
                 req("entities", json!({ "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 2 }), "One or two sketch entity ids (`entity:…`) or `origin`."),
-                req("value", json!({ "type": ["string", "number"] }), "Value or expression."),
+                opt("value", json!({ "type": ["string", "number"] }), "Value or expression. Without it the dimension keeps the measured value, as when the Dimension tool's value box is accepted unchanged."),
                 opt("kind", json!({ "type": "string", "enum": ["auto", "distance", "horizontal_distance", "vertical_distance", "length", "radius", "diameter", "angle", "arc_angle", "centerline"] }), "Dimension kind (default auto)."),
                 opt("mode", json!({ "type": "string", "enum": ["center", "minimum", "maximum"] }), "Distance to a circle/arc measured to its center (default), nearest or farthest point."),
                 opt("label", point.clone(), "Label position in sketch coordinates (also picks the auto kind: above/below two points gives a horizontal distance, beside them a vertical one)."),
@@ -511,7 +511,26 @@ fn constrain(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let name = a.str("constraint")?;
     let c = CONSTRAINTS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param("constraint", "unknown constraint"))?;
     let pierce = c == ConstraintTool::Pierce;
-    let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, true, pierce).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+    let given = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, true, pierce).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+    // The entities are a selection, as in the UI: each once.
+    let mut ids: Vec<EntityId> = Vec::new();
+    for e in &given {
+        if !ids.contains(e) {
+            ids.push(*e);
+        }
+    }
+    // Points that are one point already (a corner drawn on the origin, the
+    // endpoint two curves share) are coincident: nothing to add.
+    let one_point = c == ConstraintTool::Coincident && given.len() >= 2 && ids.len() == 1 && t.data.sketch.point(ids[0]).is_some();
+    if one_point || sm::already_coincident(&t.data.sketch, c, &ids) {
+        let (id, tab) = (t.id, t.tab);
+        let mut v = sketch_state(od, tab, id, Some(&[]))?;
+        v.as_object_mut().expect("object").remove("created");
+        v["added"] = json!([]);
+        // Onshape shows nothing here; the reply says why nothing changed.
+        v["message"] = json!(if one_point { "The points are already coincident (they are the same point)." } else { "The points are already coincident." });
+        return Ok(v.into());
+    }
     let before: Vec<ConstraintId> = t.data.sketch.constraints().map(|c| c.id).collect();
     let mut ed = editor(&t);
     ed.selection = ids;
@@ -618,10 +637,10 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => None,
     };
     let kind = dimension_kind(a.opt_str("kind")?.unwrap_or("auto"), &ids, mode, &t.data, label)?;
-    let text = value_text(a.get("value").expect("required"))?;
+    let text = a.get("value").map(value_text).transpose()?;
     let cid = sm::add_dimension(&mut t.data, kind, label, None).ok_or_else(|| OpError::invalid("the dimension doesn't apply to these entities").with_param("entities"))?;
     let driving = t.data.sketch.constraint(cid).is_some_and(|c| c.driving);
-    if driving {
+    if driving && let Some(text) = text {
         let mut ed = editor(&t);
         ed.apply_dimension(&mut t.data, cid, &text, &units, &vars).map_err(|m| OpError::invalid(m).with_param("value"))?;
     }

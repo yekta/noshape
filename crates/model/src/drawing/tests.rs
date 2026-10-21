@@ -1320,7 +1320,7 @@ fn flat_pattern_view_shows_bend_lines_and_notes() {
     let built = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;
     let g1 = built(&drawing);
     let note = g1.texts.iter().find(|t| t.text.starts_with("UP ") || t.text.starts_with("DOWN ")).expect("a bend note");
-    assert!(note.text.contains("90°") && note.text.contains("R3"), "{}", note.text);
+    assert!(note.text.contains("90.0°") && note.text.contains("R3"), "{}", note.text);
     let centerlines = |g: &sheet::SheetGeometry| g.lines.iter().filter(|l| l.style == sheet::LineStyle::Centerline).count();
     // Show/Hide bend lines and bend notes.
     drawing.sheets[0].views[0].hide_bend_lines = true;
@@ -2013,4 +2013,129 @@ fn exact_export_clips_detail_views_to_their_circle() {
             }
         }
     }
+}
+
+#[test]
+fn sheet_scale_stays_after_its_views_are_gone() {
+    // qa5 D14: "----" only before the first view; once a sheet has had one,
+    // its scale stays (undoing or deleting the views).
+    let (doc, _) = demo();
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].annotations.push(Annotation { id: 1, kind: AnnotationKind::note("S[{sheet.scale}]", 3.5), position: [30.0, 40.0], ..Default::default() });
+    let cache = ViewCache::new();
+    let note = |d: &Drawing| texts(&render_sheet(d, 0, &regenerate_sources(&doc, d), &cache, false).unwrap()).into_iter().find(|t| t.starts_with("S[")).unwrap();
+    assert_eq!(note(&drawing), "S[----]");
+    drawing.sheets[0].scale_shown = true;
+    assert_eq!(note(&drawing), "S[1:1]");
+}
+
+#[test]
+fn old_callout_on_an_edge_finds_its_part() {
+    // qa5 D8 (pass 3): callouts made before the part was stored, on an edge
+    // with no reference, still show their part's BOM item.
+    let (doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Front, [120.0, 150.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    let e = g.edges.iter().find(|e| e.model.is_some() && e.points.len() >= 2).expect("an edge");
+    let body = &g.model_edges[e.model.unwrap() as usize].body;
+    let at = [(e.points[0][0] + e.points[1][0]) / 2.0, (e.points[0][1] + e.points[1][1]) / 2.0];
+    let src = &sources[&views::SourceKey::studio(asm)];
+    let item = src.bom.iter().find(|r| r.bodies.contains(body)).expect("bom row").item;
+    drawing.sheets[0].annotations.push(Annotation { id: 1, kind: AnnotationKind::balloon(ViewId(1), at, ""), position: [200.0, 220.0], ..Default::default() });
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
+    let t: Vec<&str> = built.geometry.texts.iter().filter(|t| t.pick == pick).map(|t| t.text.as_str()).collect();
+    assert_eq!(t, vec![item.to_string().as_str()]);
+}
+
+/// Live D12 (samples/drw2-k-dxf2018 / R14 / R12): dimensions are DIMENSION
+/// entities over *D blocks, layer names in Onshape's case per version, and
+/// Release 11-12 holds the view geometry only.
+#[test]
+fn cad_export_dimensions_layers_and_r12_like_onshape() {
+    use super::cad_export::{to_dxf_r12, to_dxf_version};
+    use acadrust::{DxfVersion, EntityType};
+    let (doc, drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, true).unwrap();
+    let g = export::prepare(&built.geometry, &export::ExportOptions { strokes: true, ..Default::default() });
+    let dims = drawing.sheets[0].annotations.iter().filter(|a| matches!(a.kind, AnnotationKind::LinearDimension { .. } | AnnotationKind::RadialDimension { .. } | AnnotationKind::AngularDimension { .. } | AnnotationKind::OrdinateDimension { .. })).count();
+    assert!(dims > 0);
+    assert_eq!(g.cad_objects.iter().filter(|o| matches!(o, super::cad_objects::CadObject::Dimension(_))).count(), dims);
+    let read = |b: Vec<u8>| acadrust::DxfReader::from_reader(std::io::Cursor::new(b)).unwrap().read().unwrap();
+    let d = read(to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap());
+    let dimensions: Vec<_> = d.entities().filter_map(|e| if let EntityType::Dimension(x) = e { Some(x.base().clone()) } else { None }).collect();
+    assert_eq!(dimensions.len(), dims);
+    for b in &dimensions {
+        assert!(b.block_name.starts_with("*D") && b.style_name.starts_with("Onshape-"), "{} {}", b.block_name, b.style_name);
+        assert_eq!(b.common.layer, "ANNOTATION_TEXT");
+        let inner: Vec<&str> = d.entities_in_block(&b.block_name).map(|e| e.as_entity().entity_type()).collect();
+        assert!(inner.contains(&"MTEXT") && inner.contains(&"POINT"), "{inner:?}");
+    }
+    let names: Vec<String> = d.layers.iter().map(|l| l.name.clone()).collect();
+    assert!(names.contains(&"Defpoints".to_string()) && names.contains(&"Visible".to_string()), "{names:?}");
+    assert!(!names.contains(&"VISIBLE".to_string()) && !names.contains(&"HIDDEN".to_string()));
+    // R14: the same entities, layer names in capitals.
+    let d14 = read(to_dxf_version(&g, 4, DxfVersion::AC1014).unwrap());
+    let names: Vec<String> = d14.layers.iter().map(|l| l.name.clone()).collect();
+    assert!(names.contains(&"DEFPOINTS".to_string()) && names.contains(&"VISIBLE".to_string()), "{names:?}");
+    assert_eq!(d14.entities().filter(|e| matches!(e, EntityType::Dimension(_))).count(), dims);
+    // R12: geometry only.
+    let r12 = to_dxf_r12(&g, 4);
+    assert!(r12.contains("AC1009") && r12.contains("\nDEFPOINTS\n") && r12.contains("\nVISIBLE\n"));
+    for absent in ["\nMTEXT\n", "\nTEXT\n", "\nDIMENSION\n", "\nSOLID\n", "\nHATCH\n", "\nTITLE_BLOCK\n", "\nBORDER_FRAME\n", "\nANNOTATION_TEXT\n"] {
+        assert!(!r12.contains(absent), "{absent:?} in R12");
+    }
+    assert!(r12.contains("\nCIRCLE\n"), "the holes as circles");
+}
+
+#[test]
+fn template_precisions_keep_the_angle_decimal() {
+    // qa5 DSM2: Onshape's templates give 0.1° angles ("UP 90.0°"); the
+    // length zero settings don't trim angles.
+    for imperial in [true, false] {
+        let mut d = Drawing::default();
+        super::templates::template_precisions(&mut d.props, imperial);
+        let t = format::dim_text(&d, &DimFormat::default(), std::f64::consts::FRAC_PI_2, true, "").main;
+        assert_eq!(t, "90.0°", "imperial {imperial}");
+    }
+}
+
+#[test]
+fn source_hashes_survive_a_store_round_trip() {
+    // qa5 D3: undo restores tabs from the store; a source's hash must not
+    // change when nothing did (else "Out of date" shows spuriously).
+    let (doc, _) = demo();
+    let json = serde_json::to_string(&doc.tabs).unwrap();
+    let mut back = doc.clone();
+    back.tabs = serde_json::from_str(&json).unwrap();
+    for t in &doc.tabs {
+        if matches!(t.content, TabContent::PartStudio(_) | TabContent::Assembly(_)) {
+            let k = views::SourceKey::studio(t.id);
+            assert_eq!(views::source_hash(&doc, &k), views::source_hash(&back, &k), "tab {}", t.name);
+        }
+    }
+}
+
+#[test]
+fn body_under_finds_the_part_on_the_line_of_sight() {
+    // qa5 D8: a callout clicked on a face (no edge) finds its part.
+    let (doc, _) = demo();
+    let ps = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap().id;
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Front, [100.0, 100.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let src = &sources[&views::SourceKey::studio(ps)];
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &ViewCache::new(), false);
+    let frame = g.frame.expect("frame");
+    let b = src.context.bodies.iter().find(|b| b.kind == crate::display::BodyKind::Solid).unwrap();
+    let bb = b.shape.bounding_box(false).unwrap();
+    let mid = frame.project((bb.min + bb.max) * 0.5);
+    assert_eq!(views::body_under(src, &frame, mid), Some(b.id.clone()));
+    assert_eq!(views::body_under(src, &frame, [mid[0] + 10.0, mid[1]]), None);
 }

@@ -103,27 +103,7 @@ impl AssemblyView {
     /// Interferences rows: (label, tooltip "w x h x d"), one per pair of
     /// top-level instances with Show top level only.
     fn interference_rows(&self, d: &InterferenceDialog, cx: &App) -> Vec<(usize, String, String)> {
-        let units = self.units(cx);
-        let len = |x: f64| noshape_units::format_quantity(noshape_units::Quantity::new(x, noshape_units::Dim::LENGTH), &units);
-        let name = |p: &[InstanceId]| -> String {
-            let p = if d.top_only { &p[..1] } else { p };
-            self.result.node(p).map(|n| n.name.clone()).unwrap_or_default()
-        };
-        let mut out: Vec<(usize, String, String)> = Vec::new();
-        let mut seen: Vec<(InstanceId, InstanceId)> = Vec::new();
-        for (k, r) in d.rows.iter().enumerate() {
-            if d.top_only {
-                let pair = (r.a[0].min(r.b[0]), r.a[0].max(r.b[0]));
-                if r.a[0] == r.b[0] || seen.contains(&pair) {
-                    continue;
-                }
-                seen.push(pair);
-            }
-            let (lo, hi) = r.overlap.bounds;
-            let size = hi - lo;
-            out.push((k, format!("{} and {}", name(&r.a), name(&r.b)), format!("{} x {} x {}", len(size.x), len(size.y), len(size.z))));
-        }
-        out
+        noshape_ops::assembly::interference_rows(&self.result, &d.rows, d.top_only, &self.units(cx))
     }
 
     /// The 220 px dialog (live dom/dialog-interference-assembly-*.txt).

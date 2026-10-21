@@ -45,6 +45,7 @@ mod drawing_hatch;
 mod drawing_images;
 mod drawing_break;
 mod drawing_aux;
+mod drawing_chooser;
 mod drawing_crop;
 mod drawing_detail;
 mod drawing_revision;
@@ -80,6 +81,7 @@ mod file_tab_view;
 mod drawing_props;
 mod drawing_scene;
 mod drawing_section;
+mod drawing_shaded;
 mod drawing_sheetprops;
 mod drawing_tools;
 mod drawing_ui;
@@ -213,11 +215,8 @@ fn apply_theme(cx: &mut App) {
     // #fcc81a (the kit's theme status colors are a stub without tree-sitter).
     cx.set_global(gpui_kit::base::input::DiagnosticColors { error: gpui_kit::rgb(0xdf5528).into(), warning: gpui_kit::rgb(0xfcc81a).into(), info: gpui_kit::rgb(0x3d8fd1).into(), hint: gpui_kit::rgb(0x3d8fd1).into() });
     // Ace's gutter markers (live document/fs-gutter-*): the notice icons, 13 px
-    // in the 16 px cell 2 px into the gutter.
-    cx.set_global(gpui_kit::base::input::GutterMarkerRenderer(std::rc::Rc::new(|severity, cx| {
-        use gpui_kit::base::input::DiagnosticSeverity as S;
-        assets::icon(fs_notices::notice_icon(severity == S::Error, matches!(severity, S::Info | S::Hint)), 13., cx)
-    })));
+    // in the 16 px cell 2 px into the gutter, with Ace's tooltip.
+    cx.set_global(gpui_kit::base::input::GutterMarkerRenderer(std::rc::Rc::new(feature_studio::gutter_marker)));
     cx.set_global(gpui_kit::base::input::CodeGutterMetrics { min_digits: 1, number_inset: px(15.), right_margin: px(0.), fold_width: px(14.), text_gap: px(4.), active_background: Some(gpui_kit::rgb(0xdcdcdc).into()) });
     Theme::update(cx, |t| {
         t.font_family = UI_FONT.into();

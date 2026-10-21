@@ -129,20 +129,12 @@ pub struct StepOptions {
 pub fn write_step_with(path: &Path, shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> Result<()> {
     let f = unit.mm_per_unit();
     let mut v = Vec::with_capacity(shapes.len());
-    let mut names = Vec::new();
-    let mut colors = Vec::new();
-    let mut has = Vec::new();
     for s in shapes {
         v.push(scaled(&s.shape, f)?);
-        names.push(s.name.clone().unwrap_or_default());
-        let c = s.color.unwrap_or([0.0; 3]);
-        colors.extend_from_slice(&c);
-        has.push(s.color.is_some());
     }
-    let l = vec_to_list(&v);
     let schema = match opts.schema {
-        StepSchema::Default => 0,
-        StepSchema::Ap242 => 1,
+        // Onshape's default.
+        StepSchema::Default | StepSchema::Ap242 => 1,
         StepSchema::Ap214 => 2,
         StepSchema::Ap203 => 3,
     };
@@ -157,7 +149,33 @@ pub fn write_step_with(path: &Path, shapes: &[ExportShape], unit: LengthUnit, op
         // Not an OCCT unit: written in feet, then turned into yards (io.cpp).
         Some(LengthUnit::Yard) => 100,
     };
-    ck(ffi::write_step(&l, &names, &colors, &has, path_str(path)?, schema, file_unit))
+    // Onshape's layout (live G47): OCCT writes each part's geometry in metres
+    // (Onshape's unit without custom units), the file is rebuilt from those.
+    let file_unit = if file_unit == 0 { 6 } else { file_unit };
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let mut parts = Vec::with_capacity(v.len());
+    for (i, sh) in v.iter().enumerate() {
+        let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let tmp = std::env::temp_dir().join(format!("noshape-step-{}-{n}.step", std::process::id()));
+        let written = ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit));
+        let text = written.and_then(|_| std::fs::read_to_string(&tmp).map_err(|e| KernelError::Io(e.to_string())));
+        let _ = std::fs::remove_file(&tmp);
+        let name = shapes[i].name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| format!("Part {}", i + 1));
+        parts.push(crate::step_out::Part { name, color: shapes[i].color, occt: text? });
+    }
+    let file_name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let text = crate::step_out::write(
+        &parts,
+        &file_name,
+        &crate::step_out::timestamp(now),
+        match opts.schema {
+            StepSchema::Ap214 => crate::step_out::Schema::Ap214,
+            StepSchema::Ap203 => crate::step_out::Schema::Ap203,
+            _ => crate::step_out::Schema::Ap242,
+        },
+    )?;
+    std::fs::write(path, text).map_err(|e| KernelError::Io(format!("could not write STEP file {}: {e}", path.display())))
 }
 
 /// Convenience: write plain shapes to STEP.

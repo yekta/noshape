@@ -239,3 +239,40 @@ fn fin_pattern_x1000_matches_onshape_and_is_fast() {
     eprintln!("fins ×1000: pattern {pattern:.2} s, whole regeneration with display {total:.2} s");
     assert!(total < 13.0, "{total:.2} s");
 }
+
+/// Live "Pending state" ("pending pattern 2"): block 520 × 60 × 10 mm, a rib
+/// 0.2 × 40 mm extruded 15 mm Add, a default Feature pattern along the block
+/// (0.5 mm): Onshape patterns it without error. Both ways to make the rib:
+/// from the Top plane through the block, and standing on its top face.
+/// Live G45 (narrow rib, 5 × 5 mm): 11 + 4 × 5 faces, i.e. 6 + 5N.
+#[test]
+fn narrow_rib_feature_pattern_without_reapply_matches_onshape() {
+    for on_top in [false, true] {
+        let n = 200usize;
+        let mut s = Studio { ps: PartStudio::new(), units: UnitPrefs::default() };
+        let block = s.region(rect(0.0, 0.0, 0.52, 0.06));
+        s.add("extrude", &[("entities", q(vec![block])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let rib = s.region(rect(0.005, 0.01, 0.0052, 0.05));
+        let mut p = vec![("entities", q(vec![rib])), ("operationType", en("ADD")), ("depth", e("15 mm"))];
+        if on_top {
+            p.extend([("startOffset", ParamValue::Bool(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e("10 mm"))]);
+        }
+        let rib = s.add("extrude", &p);
+        s.add(
+            "linearPattern",
+            &[
+                ("patternType", en("FEATURE")),
+                ("instanceFunction", q(vec![Reference::Feature(rib)])),
+                ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])),
+                ("distance", e("0.5 mm")),
+                ("instanceCount", e(&n.to_string())),
+                ("operationType", en("ADD")),
+            ],
+        );
+        let r = s.regen();
+        assert!(matches!(status(&r).0, FeatureStatus::Ok), "on top {on_top}: {:?}", status(&r));
+        let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).collect();
+        assert_eq!(solids.len(), 1, "on top {on_top}");
+        assert_eq!(solids[0].shape.count(noshape_kernel::ShapeType::Face), 6 + 5 * n, "on top {on_top}");
+    }
+}

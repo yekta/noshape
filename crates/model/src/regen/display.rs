@@ -93,6 +93,102 @@ fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts
     }
 }
 
+/// A body's tessellation quality: its part property and the view-wide
+/// quality (Shift+R) scale the chord tolerance.
+fn body_quality(studio: &PartStudio, b: &super::context::Body, opts: &RegenOptions) -> f64 {
+    studio.part_properties.get(&b.id).and_then(|p| p.tessellation).map(|q| q.factor()).unwrap_or(1.0) * (opts.relative_deflection / RegenOptions::default().relative_deflection)
+}
+
+/// The mesh cache key of a body's world mesh (finer meshes are cached
+/// separately).
+fn world_key(shape: &noshape_kernel::Shape, quality: f64) -> u64 {
+    if (quality - 1.0).abs() < 1e-9 { shape.hash_code() } else { shape.hash_code() ^ quality.to_bits().wrapping_mul(0x9E37_79B9_7F4A_7C15) }
+}
+
+/// The mesh cache key of pattern partners' shared (unlocated) mesh.
+fn local_key(partner: u64, quality: f64) -> u64 {
+    partner.rotate_left(17) ^ quality.to_bits().wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0x5348_4152_4544_0001
+}
+
+/// Meshes the bodies the cache misses before the display is built, in
+/// parallel: BRepMesh only parallelizes within a shape (a threaded screw is
+/// one big face), so each body gets its own thread. BRepMesh stores the
+/// triangulation on the shape's faces and edges, so bodies sharing any
+/// face or edge (a split part's cut face) are meshed one after another.
+/// Pattern partners are meshed once, unlocated; composites (made of other
+/// bodies' shapes) are left to the display loop. Returns the shared
+/// meshes made here.
+fn mesh_in_parallel(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, partners: &HashMap<u64, usize>, meshes: &mut HashMap<u64, (u64, bool, Arc<MeshBuffers>)>) -> std::collections::HashSet<u64> {
+    use rayon::prelude::*;
+    struct Job {
+        key: u64,
+        nfaces: u64,
+        shape: noshape_kernel::Shape,
+        name: String,
+        quality: f64,
+    }
+    let mut jobs: Vec<Job> = Vec::new();
+    let mut queued = std::collections::HashSet::new();
+    let fresh = |m: &HashMap<u64, (u64, bool, Arc<MeshBuffers>)>, key: u64, nfaces: u64| m.get(&key).is_some_and(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes));
+    for b in ctx.bodies.iter().filter(|b| b.composite.is_none()) {
+        let quality = body_quality(studio, b, opts);
+        let nfaces = b.faces.len() as u64;
+        let partner = b.shape.partner_hash();
+        let (key, shape) = if partner != 0 && partners.get(&partner).is_some_and(|&n| n > 1) {
+            (local_key(partner, quality), b.shape.unlocated().unwrap_or_else(|_| b.shape.clone()))
+        } else {
+            (world_key(&b.shape, quality), b.shape.clone())
+        };
+        if !fresh(meshes, key, nfaces) && queued.insert(key) {
+            jobs.push(Job { key, nfaces, shape, name: b.name.clone(), quality });
+        }
+    }
+    if jobs.len() < 2 {
+        return Default::default();
+    }
+    // Groups of jobs sharing a face or edge TShape (union-find).
+    let mut parent: Vec<usize> = (0..jobs.len()).collect();
+    fn root(parent: &mut [usize], mut i: usize) -> usize {
+        while parent[i] != i {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        i
+    }
+    let mut owner: HashMap<u64, usize> = HashMap::new();
+    for (i, j) in jobs.iter().enumerate() {
+        for sub in j.shape.faces().into_iter().chain(j.shape.edges()) {
+            match owner.entry(sub.partner_hash()) {
+                std::collections::hash_map::Entry::Vacant(e) => {
+                    e.insert(i);
+                }
+                std::collections::hash_map::Entry::Occupied(e) => {
+                    let (a, b) = (root(&mut parent, *e.get()), root(&mut parent, i));
+                    parent[a] = b;
+                }
+            }
+        }
+    }
+    let mut groups: HashMap<usize, Vec<Job>> = HashMap::new();
+    for (i, j) in jobs.into_iter().enumerate() {
+        groups.entry(root(&mut parent, i)).or_default().push(j);
+    }
+    let made: Vec<(u64, u64, Arc<MeshBuffers>)> = groups
+        .into_values()
+        .collect::<Vec<_>>()
+        .into_par_iter()
+        .flat_map_iter(|group| {
+            group.into_iter().filter(|_| !opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted)).map(|j| (j.key, j.nfaces, tessellate_body(&j.shape, &j.name, j.quality, opts))).collect::<Vec<_>>()
+        })
+        .collect();
+    let mut keys = std::collections::HashSet::new();
+    for (key, nfaces, m) in made {
+        keys.insert(key);
+        meshes.insert(key, (nfaces, opts.preview_meshes, m));
+    }
+    keys
+}
+
 /// Build the display; returns whether any body only has a preview mesh.
 pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &mut HashMap<u64, (u64, bool, Arc<MeshBuffers>)>) -> (StudioDisplay, bool) {
     let mut needs_refine = false;
@@ -104,6 +200,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
     for b in &ctx.bodies {
         *partners.entry(b.shape.partner_hash()).or_default() += 1;
     }
+    let meshed_here = mesh_in_parallel(ctx, studio, opts, &partners, meshes);
     for b in &ctx.bodies {
         // A newer edit made this run stale (meshes made so far stay cached).
         if opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted) {
@@ -111,8 +208,8 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         }
         // Part tessellation quality and the view-wide quality (Shift+R)
         // scale the chord tolerance; finer meshes are cached separately.
-        let quality = studio.part_properties.get(&b.id).and_then(|p| p.tessellation).map(|q| q.factor()).unwrap_or(1.0) * (opts.relative_deflection / RegenOptions::default().relative_deflection);
-        let key = if (quality - 1.0).abs() < 1e-9 { b.shape.hash_code() } else { b.shape.hash_code() ^ quality.to_bits().wrapping_mul(0x9E37_79B9_7F4A_7C15) };
+        let quality = body_quality(studio, b, opts);
+        let key = world_key(&b.shape, quality);
         let nfaces = b.faces.len() as u64;
         used.insert(key);
         // An open composite's members are drawn themselves.
@@ -122,9 +219,11 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         let partner = b.shape.partner_hash();
         let mut fresh_partner_mesh = false;
         let partner_mesh = (partner != 0 && !open_composite && partners.get(&partner).is_some_and(|&n| n > 1)).then(|| {
-            let local_key = partner.rotate_left(17) ^ quality.to_bits().wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0x5348_4152_4544_0001;
+            let local_key = local_key(partner, quality);
             used.insert(local_key);
             if let Some((_, _, m)) = meshes.get(&local_key).filter(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes)) {
+                // Made just now (in parallel): the copies' world meshes follow.
+                fresh_partner_mesh = meshed_here.contains(&local_key);
                 return m.clone();
             }
             let m = match b.shape.unlocated() {
@@ -270,6 +369,11 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
         }
     }
     for e in s.sketch.entities() {
+        // References of dimensions / constraints to model geometry are not
+        // drawn (live: no sketch geometry; qa5 SK3).
+        if e.reference_only {
+            continue;
+        }
         // Text glyph outlines are derived geometry: no points, regular color.
         let glyph = noshape_sketch::text::glyph_text_id(e.id).is_some();
         if e.kind() == EntityKind::Point {

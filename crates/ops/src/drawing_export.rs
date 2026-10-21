@@ -167,8 +167,8 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
             sh.tables.clear();
         }
     }
-    // DWG / DXF versions (DXF's last entry is our R12 writer); DWT is 2013.
-    let versions = noshape_model::drawing::cad_export::VERSIONS;
+    // DWG / DXF versions (Export Drawing's list); DWT is 2013.
+    let versions = noshape_model::drawing::cad_export::CAD_VERSIONS;
     let cad_version = match f {
         DrawingFormat::Dwt => Some(acadrust_2013()),
         DrawingFormat::Dwg | DrawingFormat::Dxf => versions.get(s.version).map(|v| v.1),
@@ -203,8 +203,8 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
             color_mode: if f == DrawingFormat::Pdf || f.raster() { s.color as u8 } else { 0 },
         };
         let mut geo = export::prepare(&built.geometry, &opts);
-        // PDF embeds decoded image pixels.
-        if f == DrawingFormat::Pdf {
+        // PDF and DWG / DXF (OLE2FRAME) embed decoded image pixels.
+        if f == DrawingFormat::Pdf || f.cad() {
             for im in &mut geo.images {
                 im.rgb = noshape_scene::png::decode_rgb(&im.data_base64);
             }
@@ -214,10 +214,10 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
     let files: Vec<(String, Vec<u8>)> = match f {
         DrawingFormat::Pdf => vec![(String::new(), export::to_pdf_pages_version(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), PDF_VERSIONS[s.version]))],
         DrawingFormat::Dxf => match cad_version {
-            Some(v) => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dxf_version(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+            Some(v) => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dxf_file(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
             None => pages.iter().map(|(n, g)| (n.clone(), export::to_dxf_units(g, insunits).into_bytes())).collect(),
         },
-        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg(g, insunits, cad_version.unwrap_or(versions[0].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg_file(g, insunits, cad_version.unwrap_or(versions[noshape_model::drawing::cad_export::DEFAULT_DWG].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
         // With the sheet formats, so Select a DWT gets them back exactly.
         DrawingFormat::Dwt => {
             let templates: Vec<noshape_model::drawing::dwt::SheetTemplate> = sheets.iter().filter_map(|i| drawing.sheets.get(*i)).map(noshape_model::drawing::dwt::SheetTemplate::of).collect();

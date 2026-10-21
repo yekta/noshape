@@ -64,3 +64,14 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | 13 | Extrude two adjacent regions 10 mm | 8000, **10 faces** (live 6) | ✗ SF2 |
 | 21 | Move boundary on the planar boundary surface (qa5 surfaces doc) | still Error | ✗ SF5 |
 | 9 | Tool search "fill" / Sheet metal ▾ | still no Finish flex PCB model | ✗ SM12 |
+
+## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+| SF2 two adjacent regions | seam kept (top face split in two) | ✗ still |
+
+## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
+| Row | Ours | Status |
+|---|---|---|
+| SF2 adjacent regions | 8000, 10 faces (CLI); seam visible in the app | ✗ still |
+| SF5 Move boundary one Fill edge 10 mm (CLI) | OK but **all four edges move**: 2400 mm², bbox −10..50 × 30..70 (expected 1000) | ✗ still (changed) |
+| SF5 boundary-surface case, 25 mm | error now "Unable to move selected entities." (raw kernel text gone) | ✅ text |
+| SF6 bspline edge 10 mm (CLI) | OK, area −514.304543 | ✗ still |

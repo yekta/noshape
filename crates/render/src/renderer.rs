@@ -1685,7 +1685,7 @@ impl Renderer {
             image_soft: make_in(image_layout, P { label: "image-soft", vs: "vs_image", fs: "fs_image_soft", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }),
             image_blend: make_in(image_layout, P { label: "image-blend", vs: "vs_image", fs: "fs_image_blend", buffers: &image_buffers, format: COLOR_FORMAT, blend: premul, depth: Some((false, ge)), bias: none, samples: msaa }),
             compare_dn: make(P { label: "compare-dn", vs: "vs_mesh", fs: "fs_compare_dn", buffers: &mesh_buffers, format: COMPARE_DN_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }),
-            compare_mix: make(P { label: "compare-mix", vs: "vs_background", fs: "fs_compare_mix", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: None, bias: none, samples: 1 }),
+            compare_mix: make(P { label: "compare-mix", vs: "vs_background", fs: "fs_compare_mix", buffers: &[], format: PRESENT_FORMAT, blend: alpha, depth: None, bias: none, samples: 1 }),
             msaa,
         };
         self.pipelines = Some(pipelines);
@@ -2140,9 +2140,13 @@ impl Renderer {
                 let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength, timestamp_writes: None };
                 ao.encode(device, queue, &mut encoder, &c.over.depth_sample, &c.over.resolve_view, frame);
             }
+            // Onshape blends the mix onto a WebGL canvas, which is not sRGB:
+            // the stored (gamma) values are mixed, so this pass draws
+            // through the frame's unorm view.
+            let frame = present_texture.as_ref().map_or(&tex.resolve_unorm, |t| &t.view);
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("compare-mix"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: color_view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: frame, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,

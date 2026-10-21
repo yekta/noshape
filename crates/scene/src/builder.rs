@@ -722,8 +722,11 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     for r in accent {
         mark(r, state::ACCENT, &mut scene);
     }
+    // A whole selected part: Onshape's lighter part amber (live #c09039 …
+    // #f0b850, part-studio/09), not a selected face's.
     for r in selection {
-        mark(r, state::SELECTED, &mut scene);
+        let flag = if matches!(r, Reference::Body(_)) { state::SELECTED | state::BODY } else { state::SELECTED };
+        mark(r, flag, &mut scene);
     }
     if let Some(h) = hover {
         mark(h, state::HOVER, &mut scene);

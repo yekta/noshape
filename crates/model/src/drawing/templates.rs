@@ -127,7 +127,26 @@ pub fn set_title_style(drawing: &mut Drawing, sheet: usize, style: TitleBlockSty
 /// template's properties (its units and standard; everything else at the
 /// defaults), remembering the template file.
 pub fn template_props(t: &DrawingTemplate, file: &str) -> DrawingProps {
-    DrawingProps { units: Some(t.dim_units()), decimal_comma: t.decimal_comma, template: Some(file.to_string()), ..DrawingProps::default() }
+    let mut p = DrawingProps { units: Some(t.dim_units()), decimal_comma: t.decimal_comma, template: Some(file.to_string()), ..DrawingProps::default() };
+    template_precisions(&mut p, t.dim_units().imperial());
+    p
+}
+
+/// Onshape's templates' Units and precision (live dom/drawing-properties-
+/// dimensions-{ansi,iso}): inch 0.123 / 0.123 / 0.1° / 0° / fit 0.1234 with
+/// no leading zeros and trailing zeros kept; mm 0.12 / 0.12 / 0.1° / 0° /
+/// fit 0.123 with leading zeros and no trailing zeros.
+pub fn template_precisions(p: &mut DrawingProps, imperial: bool) {
+    let (len, fit) = if imperial { (3, 4) } else { (2, 3) };
+    p.precision = Some(len);
+    p.tolerance_precision = Some(len);
+    p.angular_precision = Some(1);
+    p.angular_tolerance_precision = Some(0);
+    p.fit_tolerance_precision = Some(fit);
+    p.leading_zeros = !imperial;
+    p.trailing_zeros = imperial;
+    p.tolerance_leading_zeros = !imperial;
+    p.tolerance_trailing_zeros = imperial;
 }
 
 pub fn apply_template(drawing: &mut Drawing, sheet: usize, t: &DrawingTemplate) {

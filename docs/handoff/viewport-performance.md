@@ -389,3 +389,62 @@ changes. I write the renderer part first (my files) and show crops before touchi
   Test `compare_blend_follows_onshape`. App: the Part Studio must build the target version's scene (regenerate the
   target document's studio) tagged TARGET, its own tagged BASE, and pass `compare_mode::blend()`; edges stay
   normal (Onshape tints only nodes `isTintedByCompare`); planes/origin/sketches hidden; picking: base only.
+- **2026-10-21 17:50 (perf, third account; took over at 14:50)** State:
+  - Done: clippy fixes for the freeze (compare_graphics `Owner<V>`, needless `&up`, view_cube `+=`); **compare blend in
+    gamma space** (Onshape's `fs-compareBlend`: over color with alpha uBlend = f<.5 ? 2f : 2(1−f), blended on a WebGL
+    canvas that is not sRGB; ours drew into the sRGB view, i.e. mixed linear values: +7 in blue). The mix pass now draws
+    through the frame's unorm view (`resolve_unorm` / present `view`, like the overlay) and the shader writes
+    `linear_to_srgb(over)`. `compare_blend_follows_onshape` un-ignored, passes; offscreen 22/22.
+  - Item 5 (Windows Cursors): run 39608471542 on perf-ci, 52/52 ok; results in docs/handoff/icons2.md (no channel to
+    icons2 from this account), artifact /root/perf-scratch/dl/cursors-39608471542/.
+  - KB4: bundle checked again (`onDrag`: 2π·ROTATION_CYCLES_PER_SCREEN 3 / |canvas width,height attrs|; inertia
+    ROTATION_INERTIA .77 only if released < 50 ms after the last move AND the interactive frame rate is not below
+    `REDUCTION_THRESHOLD_MS`). Ours: same formula; our document window opens at 1440×900 → 1194×794 graphics area →
+    75.3°/100 px without inertia. qa5's 85° ≈ that + inertia from a fast xdotool release; live's 55.8° = its 1673×973
+    canvas with no inertia: either released ≥ 50 ms after the last move, or below Onshape's 20 fps
+    `DETAIL_REDUCTION_THRESHOLD_FPS` (inertia off); unverified until live answers the request. Measuring: viewport
+    logs `nav: rotate drag N px, released still|moving|with inertia: D° (°/px); graphics area WxH (diagonal, formula)`
+    under NOSHAPE_PERF (viewport.rs `rotate_log`). Live request filed (REQUESTS.md, exact protocol). TODO: Onshape's
+    "no inertia below 20 fps interactive" (detailManager `isInteractiveFramerateBelowThreshold`).
+  - Item 6: main has instancing + `NOSHAPE_PERF_SKIP=instancing` + perf.yml `fixture` input (no baseline unless default;
+    variants on macOS and Linux). Fixture from `many_parts.rs::write_parts_1000_fixture` (ignored,
+    NOSHAPE_FIXTURE_OUT) → tests/perf/parts-1000.noshape on a perf branch, then
+    `gh workflow run perf.yml --ref <branch> -f ref=<branch> -f jobs=bench -f fixture=tests/perf/parts-1000.noshape
+    -f variants='noinst:NOSHAPE_PERF_SKIP=instancing'`.
+  - PERF1/PERF2 (lead 17:30, with kern): probe `crates/ops/tests/big_plate_perf.rs` (ignored, --nocapture): qa5's
+    400-hole plate through the agent API; prints call times, a from-scratch regen split into features vs display, and
+    the plate's tessellation alone. Display tessellation is serial over bodies (display.rs `build`), BRepMesh parallel
+    per face only; RegenOptions relative_deflection 8e-4 of the diagonal, angular 0.35 rad (Onshape's tolerances TBD).
+  - Next: items 2 (overlays) and 3 (compare app wiring: compare_graphics.rs is wired into part_studio/mod.rs
+    `refresh_scene` and `render`; needs an app check in compare mode + crops vs live).
+- **2026-10-21 19:40 (perf) Results + item 2 in progress.**
+  - **Item 6 measured** (run 39646897129, perf-inst = 5d28447 + tests/perf/parts-1000.noshape; 1000 pins as a Part
+    pattern, 184k triangles, 3007 instances): instancing works (`r.draw_calls` 9 vs 2007 with
+    `NOSHAPE_PERF_SKIP=instancing`), but orbit fps is the same either way: macOS 14 runner texture orbit 15.5 fps
+    (p95 74 ms; noinst 15.7), UI CPU 0.57 ms; lavapipe 2.3 fps, GPU 379 ms/frame (noinst 371). So this studio is GPU
+    bound, not draw-call bound, and slower than the 670k-triangle NIST fixture (macOS 27.8 fps, lavapipe GPU 455 ms):
+    the per-pixel/per-instance cost (edges and vertex points of 1000 parts, MSAA, AO) dominates. Local diagnosis:
+    `many_parts.rs::thousand_pins_frame_time` (ignored; run per variant NOSHAPE_PERF_SKIP=lines|meshes|instancing,
+    NOSHAPE_PERF_MSAA=1, NOSHAPE_TEST_AO=0). Fixture is on branch perf-inst only (not in the tree).
+  - **PERF1/PERF2**: `big_plate_perf.rs` (in main): the 400-hole Remove's *feature evaluation* is 142.8 s (kern's
+    boolean; live 491 ms); the plate's tessellation is 230 ms (59k triangles). 400 single sketch_draw calls took
+    50 s (api: per-call re-solve). Display meshing is now **parallel over bodies** (display.rs `mesh_in_parallel`:
+    rayon, one job per cache-missing body or pattern-partner group, bodies sharing a face/edge TShape meshed in
+    one group because BRepMesh writes triangulations onto them; composites left to the serial loop). Test
+    `shared_meshes.rs::parallel_meshing_keeps_every_body_whole` (6 cylinders + a split box whose halves share the
+    cut face, 8 rounds). Onshape's display tolerances requested from live (REQUESTS.md).
+  - **Rotation inertia off below 20 fps** like Onshape (navigation.rs `FrameTimer`: drawLoopDetails + frameDetails,
+    5-sample averages, timing every 10th interactive frame with a forced redraw; interactive = 500 ms after a
+    camera change). Test `frame_timer_follows_onshape`.
+  - **Item 2 (overlays), first slice in the tree, NOT yet built/verified in the app:** renderer: `overlay::Quad`
+    (GPUI `fs_quad` port: rounded, solid border, SDF AA), `overlay::Shadow` (GPUI `fs_shadow`), `Mask::density`
+    (icons: GPUI's 2× SVG tile drawn on ceil(size/2) px), `Label::hit` + `overlay::label_at` (hit test with the
+    frame camera, same corner rounding as the drawing); test `label_quads_and_shadows_follow_gpui`. App:
+    `overlay_labels::row_box` (dimension-label div replica: h 22, px 4, items_center, rounded 4, ƒx/ƒ italic
+    marker leaf), viewport `label_at` + `ViewportEvent::LabelHover/LabelDown`, sketch.rs
+    `placed_dimension_labels` (shared by GPUI and frame paths) / `sketch_dimension_overlay` / `sketch_name_contours`
+    (name as a WorldFill in the sketch plane), `ui.sketch_follows_camera` (only when GPUI still draws something at
+    projected points: dimension box, glyphs, counts, inference, on-the-fly boxes); the CameraChanged notify now
+    only on zoom (wpp). TODO: build, pixel crops vs `NOSHAPE_GPUI_LABELS=1` at 1x/2x (hover, selected,
+    configured, ƒx), then constraint glyphs (icons via resvg 0.46 like GPUI's `render_alpha_mask`, shadow_xs =
+    offset (0,1) blur 2 black 5%), pattern counts, datums.

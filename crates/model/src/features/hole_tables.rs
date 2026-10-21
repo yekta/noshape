@@ -579,7 +579,9 @@ fn thread_level(path: &[String]) -> Option<LevelInfo> {
             let s = find_size(std, size)?;
             Some(LevelInfo {
                 name: std.pitch_level,
-                options: s.threads.iter().map(|th| (thread_id(std, th), thread_label(std, th))).collect(),
+                // std externalThread tables list the bare pitch ("20 tpi",
+                // live qa5 ADV8); tapped holes add the series.
+                options: s.threads.iter().map(|th| (thread_id(std, th), thread_id(std, th))).collect(),
                 default: thread_id(std, &s.threads[0]),
             })
         }

@@ -61,6 +61,12 @@ fn least_squares(rows: &[Vec<f64>], y: &[f64]) -> Option<Vec<f64>> {
     solve(a, b)
 }
 
+/// An angle in [0, 2π), with round-off just below 0 (or 2π) giving 0.
+fn wrap(a: f64) -> f64 {
+    let w = a.rem_euclid(TAU);
+    if TAU - w < 1e-12 { 0.0 } else { w }
+}
+
 /// The signed angle steps along the points about `c`, if they all turn the
 /// same way (a single arc, less than a full turn plus a step).
 fn sweep(points: &[[f64; 2]], c: [f64; 2], param: impl Fn([f64; 2]) -> f64) -> Option<(f64, f64)> {
@@ -122,7 +128,7 @@ pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve
                 }
                 let (a0, total) = sweep(&q, c, |d| d[1].atan2(d[0]))?;
                 let (start, end) = if total > 0.0 { (a0, a0 + total) } else { (a0 + total, a0) };
-                return Some(FitCurve::Arc { center, radius: r, start: start.rem_euclid(TAU), end: end.rem_euclid(TAU) });
+                return Some(FitCurve::Arc { center, radius: r, start: wrap(start), end: wrap(end) });
             }
         }
     }
@@ -176,7 +182,7 @@ pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve
         l[1].atan2(l[0])
     })?;
     let (start, end) = if total > 0.0 { (t0, t0 + total) } else { (t0 + total, t0) };
-    Some(FitCurve::Ellipse { center, major, ratio, start: start.rem_euclid(TAU), end: end.rem_euclid(TAU) })
+    Some(FitCurve::Ellipse { center, major, ratio, start: wrap(start), end: wrap(end) })
 }
 
 #[cfg(test)]
@@ -204,6 +210,8 @@ mod tests {
             FitCurve::Arc { radius, start, end, .. } => assert!((radius - 3.0).abs() < 1e-9 && start.abs() < 1e-9 && (end - std::f64::consts::FRAC_PI_2).abs() < 1e-9),
             other => panic!("{other:?}"),
         }
+        // Round-off just below 0 (Windows' atan2) is 0, not 2π.
+        assert!(wrap(-1e-16) == 0.0 && wrap(TAU) == 0.0 && (wrap(-0.5) - (TAU - 0.5)).abs() < 1e-15);
         // A tilted ellipse (an isometric circle).
         match fit_curve(&ring([1.0, 2.0], 6.0, 3.5, 0.5, 0.0, TAU, 64), true, 1e-6).unwrap() {
             FitCurve::Ellipse { major, ratio, .. } => {

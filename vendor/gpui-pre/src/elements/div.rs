@@ -2427,6 +2427,10 @@ impl Interactivity {
             || self.drag_listener.is_some()
             || !self.drop_listeners.is_empty()
             || !self.drag_over_styles.is_empty()
+            // NOSHAPE PATCH qa4: a group drag-over style is only applied to
+            // an element with a hitbox (upstream left it out here, so such a
+            // style never showed: the feature list's rollback drop marker).
+            || !self.group_drag_over_styles.is_empty()
             || self.tooltip_builder.is_some()
             || window.is_inspector_picking(cx)
     }

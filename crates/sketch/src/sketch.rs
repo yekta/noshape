@@ -194,7 +194,7 @@ impl Sketch {
 
     /// Adds an entity with validated references.
     pub fn add_entity(&mut self, geometry: Geometry, construction: bool, external: bool) -> Result<EntityId> {
-        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external };
+        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -229,7 +229,7 @@ impl Sketch {
         if id.0 < self.next_entity || self.entities.contains_key(&id) {
             return Err(SketchError::InvalidGeometry(format!("entity id {id} is already allocated")));
         }
-        let probe = Entity { id, geometry, construction, external };
+        let probe = Entity { id, geometry, construction, external, reference_only: false };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -261,7 +261,7 @@ impl Sketch {
         keep.sort_by_key(|e| (self.kind(*e) != Some(EntityKind::Point), e.0));
         for id in &keep {
             if let Some(e) = self.entity(*id) {
-                out.entities.insert(*id, Entity { external: false, ..e.clone() });
+                out.entities.insert(*id, Entity { external: false, reference_only: false, ..e.clone() });
             }
         }
         out.next_entity = keep.iter().map(|e| e.0 + 1).max().unwrap_or(0);
@@ -291,7 +291,7 @@ impl Sketch {
         }
         for e in other.entities.values().filter(|e| e.kind() != EntityKind::Point) {
             let mut g = e.geometry.clone();
-            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false };
+            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false };
             for p in e.point_refs() {
                 if let Some(n) = map.get(&p) {
                     probe.replace_point(p, *n);
@@ -426,6 +426,19 @@ impl Sketch {
     pub fn set_construction(&mut self, id: EntityId, construction: bool) -> Result<()> {
         let e = self.entities.get_mut(&id).ok_or(SketchError::UnknownEntity(id))?;
         e.construction = construction;
+        self.touch();
+        Ok(())
+    }
+
+    /// Marks an entity and its defining points as reference-only (see
+    /// [`Entity::reference_only`]).
+    pub fn set_reference_only(&mut self, id: EntityId, on: bool) -> Result<()> {
+        let refs = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.point_refs();
+        for r in refs.iter().copied().chain(std::iter::once(id)) {
+            if let Some(e) = self.entities.get_mut(&r) {
+                e.reference_only = on;
+            }
+        }
         self.touch();
         Ok(())
     }

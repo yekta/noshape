@@ -39,6 +39,13 @@ pub enum ViewportEvent {
     /// Pointer moved (viewport-local logical pixels), for tool previews.
     PointerMove { position: DVec2, modifiers: Modifiers },
     CameraChanged,
+    /// The pointer entered or left a hit-tested overlay label
+    /// ([`Viewport::set_overlay_labels`], `Label::hit`).
+    LabelHover(Option<u64>),
+    /// A button went down on an overlay label. A right press stops there (no
+    /// rotate or context menu); a left press also goes on to the tool, as a
+    /// GPUI element that doesn't stop propagation.
+    LabelDown { id: u64, button: MouseButton, click_count: usize, modifiers: Modifiers },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -116,6 +123,8 @@ pub struct Viewport {
     plane_labels: Vec<noshape_render::overlay::WorldFill>,
     /// Boxes with text at model points, drawn in the frame.
     overlay_labels: Vec<noshape_render::overlay::Label>,
+    /// The hit-tested overlay label under the pointer.
+    hover_label: Option<u64>,
     axis_masks: Option<(f32, [noshape_render::overlay::AxisLabel; 3])>,
     overlay_sent: Option<Arc<noshape_render::overlay::Overlay>>,
     /// Camera-dependent geometry handed to the renderer (see
@@ -138,8 +147,14 @@ pub struct Viewport {
     hover_query_again: bool,
     /// The pointer is over the viewport (hover is cleared when it leaves).
     pointer_inside: bool,
-    /// Submitted but not yet presented frames (seq, submit time), oldest first.
-    in_flight: VecDeque<(u64, Instant)>,
+    /// Submitted but not yet presented frames (seq, submit time,
+    /// interactive), oldest first.
+    in_flight: VecDeque<(u64, Instant, bool)>,
+    /// Frames count as interactive until then (a camera change, Onshape's
+    /// `setUserIsAdjustingCamera`), and their timing (no rotation inertia
+    /// below 20 fps).
+    interactive_until: Option<Instant>,
+    frame_timer: nav::FrameTimer,
     /// A deferred submit is scheduled for the end of the current update.
     submit_scheduled: bool,
     /// A timer re-checks a dirty frame that could not be submitted because
@@ -221,6 +236,9 @@ pub struct Viewport {
     rotation_speed: RotationSpeed,
     last_rotation: Option<Instant>,
     inertia: Option<(Inertia, Instant)>,
+    /// `NOSHAPE_PERF`: the camera rotation when a rotate drag started and
+    /// the pointer distance dragged (logged as degrees per px, KB4).
+    rotate_log: Option<(glam::DQuat, f64)>,
     /// Running keyboard / view cube rotation steps (they add up while a key
     /// is held) and the time they were last advanced.
     step_rotations: Vec<StepRotation>,
@@ -346,6 +364,7 @@ impl Viewport {
             cube_origin: None,
             plane_labels: Vec::new(),
             overlay_labels: Vec::new(),
+            hover_label: None,
             axis_masks: None,
             overlay_sent: None,
             camera_geometry: Vec::new(),
@@ -358,6 +377,8 @@ impl Viewport {
             hover_query_again: false,
             pointer_inside: false,
             in_flight: VecDeque::new(),
+            interactive_until: None,
+            frame_timer: nav::FrameTimer::default(),
             submit_scheduled: false,
             retry_scheduled: false,
             last_submitted_view: None,
@@ -401,6 +422,7 @@ impl Viewport {
             rotation_speed: RotationSpeed::default(),
             last_rotation: None,
             inertia: None,
+            rotate_log: None,
             step_rotations: Vec::new(),
             step_clock: None,
             manipulators: Vec::new(),
@@ -461,6 +483,25 @@ impl Viewport {
         self.camera.project(p, self.size(), self.scene_radius())
     }
 
+    /// The hit-tested overlay label under `p` (viewport-local logical px),
+    /// with the current camera: where the frame draws it.
+    pub fn label_at(&self, p: DVec2) -> Option<u64> {
+        if !self.overlay_labels.iter().any(|l| l.hit.is_some()) {
+            return None;
+        }
+        let size = self.size();
+        let view_proj = self.camera.projection_matrix(size.x / size.y.max(1.0), self.scene_radius()) * self.camera.view_matrix();
+        let o = self.bounds.origin;
+        noshape_render::overlay::label_at(&self.overlay_labels, [f32::from(o.x), f32::from(o.y)], &view_proj, size, self.scale, p)
+    }
+
+    fn set_hover_label(&mut self, id: Option<u64>, cx: &mut Context<Self>) {
+        if self.hover_label != id {
+            self.hover_label = id;
+            cx.emit(ViewportEvent::LabelHover(id));
+        }
+    }
+
     fn scene_radius(&self) -> f64 {
         self.scene_bounds
             .map(|(lo, hi)| (hi - lo).length() as f64 * 0.5 + ((lo + hi) * 0.5).as_dvec3().distance(self.camera.target))
@@ -508,7 +549,7 @@ impl Viewport {
             return;
         }
         // A frame that never comes back must not block the viewport forever.
-        while self.in_flight.front().is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(3)) {
+        while self.in_flight.front().is_some_and(|(_, t, _)| t.elapsed() > Duration::from_secs(3)) {
             self.in_flight.pop_front();
         }
         if self.in_flight.len() < self.gpu.frames_in_flight() {
@@ -766,6 +807,13 @@ impl Viewport {
         // size change invalidates it, also when the caller only asked for a
         // redraw (e.g. keyboard zoom).
         let view = (self.camera, w, h);
+        let now = Instant::now();
+        if self.last_submitted_view.is_some_and(|v| v.0 != self.camera) {
+            self.interactive_until = Some(now + nav::INTERACTIVE_WINDOW);
+        }
+        let interactive = self.interactive_until.is_some_and(|t| now < t);
+        // Timing two consecutive frames: draw the next one at once.
+        let force_next = interactive && self.frame_timer.draw_start(now);
         let pick = std::mem::take(&mut self.pick_dirty) | (self.last_submitted_view != Some(view));
         self.last_submitted_view = Some(view);
         if pick {
@@ -774,7 +822,7 @@ impl Viewport {
             self.schedule_hover_refresh(cx);
         }
         self.seq += 1;
-        self.in_flight.push_back((self.seq, Instant::now()));
+        self.in_flight.push_back((self.seq, now, interactive));
         self.gpu.submit(RenderJob {
             target: self.target_id,
             scene: self.scene.clone(),
@@ -786,7 +834,7 @@ impl Viewport {
             pick,
             seq: self.seq,
         });
-        self.dirty = false;
+        self.dirty = force_next;
     }
 
     /// After the pick buffer was invalidated (geometry or camera changed),
@@ -824,10 +872,13 @@ impl Viewport {
 
     fn present(&mut self, seq: u64, result: Result<(Frame, FrameImage), String>, window: &mut Window, cx: &mut Context<Self>) {
         // Frames up to `seq` are done (older ones may have been coalesced away).
-        while self.in_flight.front().is_some_and(|(s, _)| *s <= seq) {
-            let (s, t) = self.in_flight.pop_front().expect("front");
+        while self.in_flight.front().is_some_and(|(s, _, _)| *s <= seq) {
+            let (s, t, interactive) = self.in_flight.pop_front().expect("front");
             if s == seq {
                 noshape_render::perf::record("v.submit_to_present", t.elapsed());
+                if interactive {
+                    self.frame_timer.draw_end(t.elapsed());
+                }
             }
         }
         if seq < self.last_presented {
@@ -997,7 +1048,7 @@ impl Viewport {
             for k in 0..SUBPIXEL_VARIANTS_X {
                 let at = point(px(k as f32 / (SUBPIXEL_VARIANTS_X as f32 * scale)) - glyph_x, px(0.));
                 let m = window.rasterize_text_line(name.into(), font.clone(), px(12.), px(16.), color, at)?;
-                masks.push(Mask { width: m.size.width.0 as u32, height: m.size.height.0 as u32, alpha: Arc::new(m.alpha), offset: [m.origin.x.0, m.origin.y.0 - base_y as i32] });
+                masks.push(Mask { width: m.size.width.0 as u32, height: m.size.height.0 as u32, alpha: Arc::new(m.alpha), offset: [m.origin.x.0, m.origin.y.0 - base_y as i32], density: 1 });
             }
             let c = Rgba::from(color);
             Some(noshape_render::overlay::AxisLabel {
@@ -1185,6 +1236,7 @@ impl Viewport {
         if mode == Mode::Rotate {
             self.last_rotation = Some(Instant::now());
             self.rotation_speed = RotationSpeed::default();
+            self.rotate_log = noshape_render::perf::enabled().then_some((self.camera.rotation, 0.0));
         }
     }
 
@@ -1200,10 +1252,10 @@ impl Viewport {
     /// End a navigation drag: a rotation still moving at release keeps
     /// turning (inertia).
     fn end_nav(&mut self, cx: &mut Context<Self>) {
-        if self.nav_mode == Mode::Rotate
-            && self.last_rotation.is_some_and(|t| t.elapsed() < nav::INERTIA_RELEASE_WINDOW)
-            && let Some(pivot) = self.orbit_pivot
-        {
+        // Onshape's performStopRotationAnimation: none below 20 fps.
+        let inertia = self.nav_mode == Mode::Rotate && self.last_rotation.is_some_and(|t| t.elapsed() < nav::INERTIA_RELEASE_WINDOW) && !self.frame_timer.below_threshold();
+        self.log_rotate(if inertia { "released moving (inertia follows)" } else { "released still" }, !inertia);
+        if inertia && let Some(pivot) = self.orbit_pivot {
             self.inertia = Some((Inertia { speed: self.rotation_speed.0, factor: 1.0, pivot }, Instant::now()));
         } else {
             self.orbit_pivot = None;
@@ -1217,6 +1269,17 @@ impl Viewport {
         cx.notify();
     }
 
+    /// `NOSHAPE_PERF`: a rotate drag's turn so far (`done`: forget it).
+    fn log_rotate(&mut self, what: &str, done: bool) {
+        let Some((start, px)) = self.rotate_log else { return };
+        if done {
+            self.rotate_log = None;
+        }
+        let deg = self.camera.rotation.angle_between(start).to_degrees();
+        let size = self.size();
+        log::info!(target: "perf", "nav: rotate drag {px:.0} px, {what}: {deg:.2}° ({:.4}°/px); graphics area {:.0}x{:.0} (diagonal {:.0}, formula {:.4}°/px)", deg / px.max(1e-9), size.x, size.y, size.length(), nav::rotation_per_px(size, false).to_degrees());
+    }
+
     /// Apply one drag step of the current navigation mode.
     fn nav_drag(&mut self, delta: DVec2, cx: &mut Context<Self>) {
         let size = self.size();
@@ -1225,6 +1288,9 @@ impl Viewport {
             Mode::None => return,
             Mode::Rotate => {
                 nav::drag_rotate(&mut self.camera, delta, size, pivot, false);
+                if let Some(l) = &mut self.rotate_log {
+                    l.1 += delta.length();
+                }
                 self.rotation_speed.push(delta);
                 self.last_rotation = Some(Instant::now());
             }
@@ -1269,6 +1335,13 @@ impl Viewport {
         }
         self.press_pos = p;
         self.last_pos = p;
+        if let Some(id) = self.label_at(p) {
+            cx.emit(ViewportEvent::LabelDown { id, button: e.button, click_count: e.click_count, modifiers: e.modifiers });
+            if e.button != MouseButton::Left {
+                self.drag = Drag::None;
+                return;
+            }
+        }
         match e.button {
             MouseButton::Left if self.tool_captures_left || self.manipulator_at(p) => {
                 self.drag = Drag::Tool;
@@ -1295,6 +1368,7 @@ impl Viewport {
         if !*hovered {
             self.hover_query_again = false;
             self.set_hover(None, cx);
+            self.set_hover_label(None, cx);
         }
     }
 
@@ -1366,6 +1440,8 @@ impl Viewport {
                 cx.emit(ViewportEvent::ToolDrag { position: p });
             }
             Drag::None | Drag::Pending(_) => {
+                let label = if self.pointer_inside { self.label_at(p) } else { None };
+                self.set_hover_label(label, cx);
                 match self.pick_at(p) {
                     Some(id) => self.set_hover(id, cx),
                     None => self.request_hover(),
@@ -1770,6 +1846,7 @@ impl Render for Viewport {
                 }
                 None => {
                     self.orbit_pivot = None;
+                    self.log_rotate("with inertia", true);
                     cx.emit(ViewportEvent::CameraChanged);
                 }
             }

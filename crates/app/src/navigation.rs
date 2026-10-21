@@ -14,7 +14,7 @@ use gpui_kit::ScrollDelta;
 use noshape_render::{Camera, Projection};
 use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 // ------------------------------------------------------------ constants
 
@@ -353,6 +353,90 @@ impl Inertia {
         self.factor *= ROTATION_INERTIA.powf(elapsed.as_secs_f64() * 60.0);
         let d = self.speed * self.factor;
         (d.x.abs() > 1.0 || d.y.abs() > 1.0).then_some(d)
+    }
+}
+
+/// How long after a camera change frames count as interactive
+/// (`setUserIsInteractingWithTimeout`).
+pub const INTERACTIVE_WINDOW: Duration = Duration::from_millis(500);
+/// Below this interactive frame rate Onshape reduces detail and drops the
+/// post-rotation inertia (`DETAIL_REDUCTION_THRESHOLD_FPS`).
+pub const DETAIL_REDUCTION_THRESHOLD_FPS: f64 = 20.0;
+/// Interactive frames between two frame-interval timings (`timingFrequency`).
+const TIMING_FREQUENCY: u32 = 10;
+/// Timings averaged (`addTiming` keeps the last 5).
+const TIMINGS_KEPT: usize = 5;
+
+/// The last [`TIMINGS_KEPT`] timings and their mean (`averageTime`).
+#[derive(Clone, Debug, Default)]
+struct Timings(std::collections::VecDeque<f64>);
+
+impl Timings {
+    fn add(&mut self, ms: f64) {
+        self.0.push_back(ms);
+        if self.0.len() > TIMINGS_KEPT {
+            self.0.pop_front();
+        }
+    }
+
+    fn average(&self) -> Option<f64> {
+        (!self.0.is_empty()).then(|| self.0.iter().sum::<f64>() / self.0.len() as f64)
+    }
+}
+
+/// Onshape's frame timer for interactive frames (`FrameTimer`, frame type
+/// INTERACTIVE): every frame's draw time (`drawLoopDetails`), and every
+/// [`TIMING_FREQUENCY`] frames the slower of two consecutive frame
+/// intervals, measured with forced draws (`frameDetails`); each averaged
+/// over the last [`TIMINGS_KEPT`].
+#[derive(Clone, Debug, Default)]
+pub struct FrameTimer {
+    draw: Timings,
+    frame: Timings,
+    since_timing: u32,
+    /// A frame-interval timing in progress: its last draw start and the
+    /// intervals so far.
+    timing: Option<(Instant, Vec<f64>)>,
+}
+
+impl FrameTimer {
+    /// An interactive frame starts drawing (`onDrawStart`). True while a
+    /// frame-interval timing runs: the caller draws the next frame at once
+    /// (`forceRequestDraw`).
+    pub fn draw_start(&mut self, at: Instant) -> bool {
+        match &mut self.timing {
+            Some((start, intervals)) => {
+                intervals.push((at - *start).as_secs_f64() * 1000.0);
+                if intervals.len() < 2 {
+                    *start = at;
+                    return true;
+                }
+                let slower = intervals[0].max(intervals[1]);
+                self.frame.add(slower);
+                self.since_timing = 0;
+                self.timing = None;
+                false
+            }
+            None => {
+                self.since_timing += 1;
+                if self.since_timing >= TIMING_FREQUENCY {
+                    self.timing = Some((at, Vec::new()));
+                    return true;
+                }
+                false
+            }
+        }
+    }
+
+    /// An interactive frame took `draw` from its start (`onDrawEnd`).
+    pub fn draw_end(&mut self, draw: Duration) {
+        self.draw.add(draw.as_secs_f64() * 1000.0);
+    }
+
+    /// `isInteractiveFramerateBelowThreshold`.
+    pub fn below_threshold(&self) -> bool {
+        let limit = 1000.0 / DETAIL_REDUCTION_THRESHOLD_FPS;
+        self.draw.average().is_some_and(|a| a > limit) || self.frame.average().is_some_and(|a| a > limit)
     }
 }
 
@@ -1012,6 +1096,42 @@ mod tests {
         drag_rotate(&mut c, DVec2::new(37.0, -12.0), vp, pivot, false);
         let after = c.project(pivot, vp, 1.0).unwrap();
         assert!((before - after).length() < 1e-6);
+    }
+
+    #[test]
+    fn frame_timer_follows_onshape() {
+        let t0 = Instant::now();
+        let ms = |n: u64| t0 + Duration::from_millis(n);
+        // 60 fps, 5 ms draws: not below 20 fps.
+        let mut fast = FrameTimer::default();
+        for i in 0..40 {
+            fast.draw_start(ms(i * 16));
+            fast.draw_end(Duration::from_millis(5));
+        }
+        assert!(!fast.below_threshold());
+        // Draws over 50 ms on average (the last five): below.
+        let mut slow_draw = FrameTimer::default();
+        for d in [10, 60, 60, 60, 60, 60] {
+            slow_draw.draw_end(Duration::from_millis(d));
+        }
+        assert!(slow_draw.below_threshold());
+        // Quick draws but frames 70 ms apart: the interval timing (every
+        // tenth frame, the slower of the next two intervals) is below.
+        let mut slow_frames = FrameTimer::default();
+        let mut forced = 0;
+        for i in 0..12 {
+            forced += slow_frames.draw_start(ms(i * 70)) as u32;
+            slow_frames.draw_end(Duration::from_millis(5));
+        }
+        assert!(slow_frames.below_threshold());
+        // Frame 10 starts the timing, frame 11 is the forced second draw.
+        assert_eq!(forced, 2);
+        // No timing before the tenth frame.
+        let mut early = FrameTimer::default();
+        for i in 0..9 {
+            early.draw_start(ms(i * 70));
+        }
+        assert!(!early.below_threshold());
     }
 
     #[test]

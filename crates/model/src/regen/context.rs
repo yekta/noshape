@@ -265,6 +265,9 @@ pub struct Context {
     // --- batch SM: sheet metal models and frame members ---
     /// Sheet metal models by body (see `crate::sheetmetal`).
     pub sheet_metal: BTreeMap<BodyId, Arc<crate::sheetmetal::SheetMetalData>>,
+    /// Flat patterns of sheet metal parts built by the standard library
+    /// (custom/host/sheetmetal.rs), in live's placement.
+    pub sheet_metal_flats: BTreeMap<BodyId, Arc<crate::sheetmetal::FlatPattern>>,
     /// Frame members (frame segments, gussets, end caps) by body, for cut lists.
     pub frame_members: BTreeMap<BodyId, Arc<super::features::frames::FrameMember>>,
     /// Form tools tagged by Tag features (purpose Form), for sheet metal Form.

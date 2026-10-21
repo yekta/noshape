@@ -1010,6 +1010,7 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("faceTools", ParamValue::Query(tools));
     p.set("projectionType", ParamValue::Enum("NORMAL_TO_TARGET".into()));
     p.set("keepToolSurfaces", ParamValue::Bool(def_bool(&def, "keepToolSurfaces", false)));
+    p.set("extendToCompletion", ParamValue::Bool(def_bool(&def, "extendToCompletion", false)));
     run_op_with(i, &cx, &id, "CANNOT_SPLIT_FACE", &p, crate::regen::features::split::split_part)?;
     Ok(Value::Undefined)
 }
