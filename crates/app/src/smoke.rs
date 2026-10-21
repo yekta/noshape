@@ -197,6 +197,13 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let _ = cx.update(|window, cx| crate::cursor::set(window, Some(cursor), cx));
             wait(cx, 60).await;
         }
+        // Every cursor image as a .cur file for the Windows check in perf.yml.
+        if let Some(dir) = std::env::var_os("NOSHAPE_CURSOR_DUMP") {
+            match cx.update(|_, cx| crate::cursor::dump(std::path::Path::new(&dir), &app_cursors(), cx)) {
+                Ok(Ok(n)) => step(&format!("cursor files: {n}")),
+                _ => fail("cursor files"),
+            }
+        }
         let _ = cx.update(|window, cx| {
             crate::cursor::set(window, None, cx);
             cx.set_platform_cursor_style(CursorStyle::Arrow);

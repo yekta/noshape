@@ -119,6 +119,8 @@ jobs:
           New-ItemProperty -Path $key -Name DumpFolder -Value $out -PropertyType ExpandString -Force | Out-Null
           New-ItemProperty -Path $key -Name DumpType -Value 1 -PropertyType DWord -Force | Out-Null
           $env:NOSHAPE_SMOKE = '1'
+          # Every cursor image as a .cur file, for the next step.
+          $env:NOSHAPE_CURSOR_DUMP = "$out\cursor-files"
           $log = "$out\smoke.log"
           $p = Start-Process -FilePath $env:BIN -ArgumentList '--demo-drawing' -RedirectStandardError $log -RedirectStandardOutput "$out\stdout.log" -PassThru
           if (-not $p.WaitForExit(480000)) {
@@ -134,6 +136,14 @@ jobs:
           Get-ChildItem $out
           if ($p.ExitCode -ne 0) { "::error::noshape exited with status $($p.ExitCode) (smoke test)"; exit 1 }
           if (-not (Select-String -Path $log -Pattern '^SMOKE done' -Quiet)) { '::error::noshape exited without finishing the smoke test'; exit 1 }
+
+      # The cursors as Windows itself loads and draws them (LoadImage and
+      # CreateIconIndirect, hot spots read back, drawn with DrawIconEx):
+      # cursors/cursors-sheet.png and cursors.txt in the smoke artifact.
+      - name: Cursors (Windows)
+        if: runner.os == 'Windows' && !cancelled()
+        shell: pwsh
+        run: .github/perf/cursors.ps1 -CurDir "$env:RUNNER_TEMP\smoke\cursor-files" -OutDir "$env:RUNNER_TEMP\smoke\cursors"
 
       - uses: actions/upload-artifact@v7
         if: always()
