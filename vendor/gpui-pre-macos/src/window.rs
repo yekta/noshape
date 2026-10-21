@@ -2206,13 +2206,9 @@ impl PlatformWindow for MacWindow {
                                 if is_resizable {
                                     // Unlike `zoom:`, AppKit's private Fill action honors the system's
                                     // "Tiled windows have margins" setting.
-                                    let responds_to_zoom_fill: BOOL =
-                                        msg_send![window, respondsToSelector: sel!(_zoomFill:)];
-                                    if responds_to_zoom_fill == YES {
-                                        let _: () = msg_send![window, _zoomFill: nil];
-                                    } else {
-                                        window.zoom_(nil);
-                                    }
+                                    // NOSHAPE PATCH: public `zoom:` only; private AppKit
+                                    // selectors can raise on newer macOS (see image_cursor).
+                                    window.zoom_(nil);
                                 }
                             }
                             _ => {
@@ -2528,6 +2524,39 @@ fn add_mouse_tracking_area(native_view: &Objc2NSView) {
     native_view.addTrackingArea(&tracking_area);
 }
 
+// NOSHAPE PATCH: cursors built from bundled PNGs (48x48 px = 24x24 pt @2x,
+// hotspot at the centre), created once on the main thread and kept for the
+// process lifetime.
+static MOVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static RESIZE_NWSE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static RESIZE_NESW: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+unsafe fn image_cursor(slot: &std::sync::atomic::AtomicUsize, png: &'static [u8]) -> id {
+    use std::sync::atomic::Ordering;
+    let cached = slot.load(Ordering::Relaxed);
+    if cached != 0 {
+        return cached as id;
+    }
+    // SAFETY: called from `reset_cursor_rects` on the main thread; every object
+    // created here is retained for the life of the process.
+    unsafe {
+        let data: id = msg_send![class!(NSData), dataWithBytes: png.as_ptr() length: png.len()];
+        let image: id = msg_send![class!(NSImage), alloc];
+        let image: id = msg_send![image, initWithData: data];
+        if image == nil {
+            return msg_send![class!(NSCursor), arrowCursor];
+        }
+        let _: () = msg_send![image, setSize: NSSize::new(24.0, 24.0)];
+        let cursor: id = msg_send![class!(NSCursor), alloc];
+        let cursor: id = msg_send![cursor, initWithImage: image hotSpot: NSPoint::new(12.0, 12.0)];
+        if cursor == nil {
+            return msg_send![class!(NSCursor), arrowCursor];
+        }
+        slot.store(cursor as usize, Ordering::Relaxed);
+        cursor
+    }
+}
+
 extern "C" fn reset_cursor_rects(this: &Object, _: Sel) {
     // SAFETY: AppKit invokes cursor-rect updates on the main thread for GPUIView instances,
     // whose WINDOW_STATE_IVAR is initialized when the view is created. The cursor registered
@@ -2556,12 +2585,10 @@ extern "C" fn reset_cursor_rects(this: &Object, _: Sel) {
 
             // Undocumented, private class methods:
             // https://stackoverflow.com/questions/27242353/cocoa-predefined-resize-mouse-cursor
-            CursorStyle::ResizeUpLeftDownRight => {
-                msg_send![class!(NSCursor), _windowResizeNorthWestSouthEastCursor]
-            }
-            CursorStyle::ResizeUpRightDownLeft => {
-                msg_send![class!(NSCursor), _windowResizeNorthEastSouthWestCursor]
-            }
+            // NOSHAPE PATCH: no private AppKit cursor selectors (macOS 27 made
+            // `+[NSCursor _moveCursor]` raise, which aborted the app). Our own images.
+            CursorStyle::ResizeUpLeftDownRight => image_cursor(&RESIZE_NWSE, include_bytes!("cursors/resize-nwse.png")),
+            CursorStyle::ResizeUpRightDownLeft => image_cursor(&RESIZE_NESW, include_bytes!("cursors/resize-nesw.png")),
 
             CursorStyle::IBeamCursorForVerticalLayout => {
                 msg_send![class!(NSCursor), IBeamCursorForVerticalLayout]
@@ -2572,16 +2599,10 @@ extern "C" fn reset_cursor_rects(this: &Object, _: Sel) {
             CursorStyle::DragLink => msg_send![class!(NSCursor), dragLinkCursor],
             CursorStyle::DragCopy => msg_send![class!(NSCursor), dragCopyCursor],
             CursorStyle::ContextualMenu => msg_send![class!(NSCursor), contextualMenuCursor],
-            // NOSHAPE PATCH: Chrome's `move` / `wait` on macOS: AppKit's private
-            // move and busy cursors when present, else the open hand / arrow.
-            CursorStyle::Move => {
-                let responds: BOOL = msg_send![class!(NSCursor), respondsToSelector: sel!(_moveCursor)];
-                if responds == YES { msg_send![class!(NSCursor), _moveCursor] } else { msg_send![class!(NSCursor), openHandCursor] }
-            }
-            CursorStyle::Wait => {
-                let responds: BOOL = msg_send![class!(NSCursor), respondsToSelector: sel!(busyButClickableCursor)];
-                if responds == YES { msg_send![class!(NSCursor), busyButClickableCursor] } else { msg_send![class!(NSCursor), arrowCursor] }
-            }
+            // NOSHAPE PATCH: Chrome's `move` from our own image; `wait` stays the
+            // public arrow (no private selectors, see above).
+            CursorStyle::Move => image_cursor(&MOVE, include_bytes!("cursors/move.png")),
+            CursorStyle::Wait => msg_send![class!(NSCursor), arrowCursor],
         };
 
         let bounds = NSView::bounds(this as *const Object as id);
