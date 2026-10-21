@@ -179,8 +179,15 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button: MouseButton::Right, position: at, modifiers, click_count: 1, first_mouse: false }), cx);
                 window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: MouseButton::Right, position: at, modifiers, click_count: 1 }), cx);
             });
-            wait(cx, 1000).await;
-            let open = cx.update(|_, cx| crate::os_menu::is_open(cx)).unwrap_or(false);
+            // The viewport's menu opens when its GPU pick is back.
+            let mut open = false;
+            for _ in 0..24 {
+                wait(cx, 250).await;
+                open = cx.update(|_, cx| crate::os_menu::is_open(cx)).unwrap_or(false);
+                if open {
+                    break;
+                }
+            }
             step(if open { "menu open" } else { "no menu here" });
             let _ = cx.update(|window, cx| window.dispatch_action(Box::new(crate::os_menu::MenuDismiss), cx));
             wait(cx, 500).await;
