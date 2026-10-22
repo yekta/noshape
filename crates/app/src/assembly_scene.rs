@@ -382,7 +382,13 @@ pub fn overlay_pick(built: &AsmBuilt, id: u32) -> Option<OverlayPick> {
     })
 }
 
-const AXIS_COLORS: [[u8; 4]; 3] = [theme::rgb8(theme::viewport::AXIS_X), theme::rgb8(theme::viewport::AXIS_Y), theme::rgb8(theme::viewport::AXIS_Z)];
+fn axis_colors() -> [[u8; 4]; 3] {
+    [
+        theme::rgb8(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X)),
+        theme::rgb8(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y)),
+        theme::rgb8(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)),
+    ]
+}
 /// Hovered manipulator handles (Onshape UI_HIGHLIGHT_COLOR).
 const HANDLE_HL: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
 /// Dark points and lines on the white viewport.
@@ -392,7 +398,7 @@ fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32,
     let o: [f32; 3] = f.origin.as_vec3().into();
     for (k, axis) in [f.x(), f.y(), f.z()].into_iter().enumerate() {
         let tip: [f32; 3] = (f.origin + axis * size).as_vec3().into();
-        let c = if highlight { HANDLE_HL } else { AXIS_COLORS[k] };
+        let c = if highlight { HANDLE_HL } else { axis_colors()[k] };
         lines.segments.push(LineSegment { a: o, b: tip, color: c, pick_id: pick, width, style: LineSegment::ON_TOP });
     }
 }
@@ -525,7 +531,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     }
     if let Some((p, size)) = h.cursor_mark {
         for axis in [DVec3::X, DVec3::Y, DVec3::Z] {
-            lines.segments.push(LineSegment { a: (p - axis * size).as_vec3().into(), b: (p + axis * size).as_vec3().into(), color: theme::rgb8(theme::viewport::PLANE_TEXT), pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+            lines.segments.push(LineSegment { a: (p - axis * size).as_vec3().into(), b: (p + axis * size).as_vec3().into(), color: theme::rgb8(theme::pick(theme::viewport::PLANE_TEXT, theme::viewport_dark::PLANE_TEXT)), pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
         }
     }
     if !lines.segments.is_empty() {

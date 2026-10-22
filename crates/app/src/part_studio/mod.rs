@@ -3827,7 +3827,8 @@ impl PartStudioView {
                 in_plane_contours(&pl.name, top_left, f.x, f.y, asc, &mut contours);
             }
         }
-        let c = Rgba::from(Hsla::from(pal.accent));
+        // Light: the accent blue; dark: white (`--os-construction-plane-text-color`).
+        let c = if noshape_scene::palette::is_dark() { gpui_kit::rgb_static(crate::theme::viewport_dark::PLANE_TEXT) } else { Rgba::from(Hsla::from(pal.accent)) };
         let mut fills = if contours.is_empty() { Vec::new() } else { vec![noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] }] };
         // Inspection datums: black, the selected one in the selection
         // color.

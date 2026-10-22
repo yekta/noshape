@@ -466,9 +466,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             loop_pts.push(corners[0]);
             border.push_polyline(&loop_pts, [0, 0, 0, 0], id, 2.0, 0);
             // Onshape: CONSTRUCTION_PLANE_AMBIENT_COLOR at CONSTRUCTION_PLANE_OPACITY, outline at 35%.
-            let fill = theme::lin(theme::viewport::PLANE_FILL);
-            let outline = theme::lin(theme::viewport::PLANE_OUTLINE);
-            let outline_alpha = theme::viewport::PLANE_OUTLINE_ALPHA * if opts.faint_planes { FAINT_PLANE_ALPHA } else { 1.0 };
+            let fill = theme::lin(theme::pick(theme::viewport::PLANE_FILL, theme::viewport_dark::PLANE_FILL));
+            let outline = theme::lin(theme::pick(theme::viewport::PLANE_OUTLINE, theme::viewport_dark::PLANE_OUTLINE));
+            let outline_alpha = theme::pick(theme::viewport::PLANE_OUTLINE_ALPHA, theme::viewport_dark::PLANE_OUTLINE_ALPHA) * if opts.faint_planes { FAINT_PLANE_ALPHA } else { 1.0 };
             if !opts.faint_planes {
                 scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], 0.2]).ignore_clip().unlit().layer(5));
             }
@@ -483,7 +483,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         // While sketching it stays over the edge-on planes crossing it (live
         // sketch/06 shows the whole ring and dot).
         let style = 4 | if opts.editing_sketch.is_some() { LineSegment::ON_TOP } else { 0 };
-        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::viewport::ORIGIN), pick_id: id, size: 12.0, style, _pad: 0 }] };
+        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)), pick_id: id, size: 12.0, style, _pad: 0 }] };
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().ignore_clip().layer(6));
     }
 
@@ -528,7 +528,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
             }
             for d in &sk.dimensions {
-                let color: [u8; 4] = theme::rgb8(if d.driven { theme::viewport::DIM_DRIVEN } else { theme::viewport::SKETCH_FULL });
+                let color: [u8; 4] = theme::rgb8(if d.driven { theme::pick(theme::viewport::DIM_DRIVEN, theme::viewport_dark::DIM_DRIVEN) } else { theme::pick(theme::viewport::SKETCH_FULL, theme::viewport_dark::SKETCH_FULL) });
                 for seg in &d.lines {
                     lines.segments.push(LineSegment { a: seg[0], b: seg[1], color, pick_id: 0, width: 1.0, style: LineSegment::ON_TOP });
                 }
@@ -591,7 +591,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // (`#9aa5af`; live sketch/17: rgb(221,226,230) over the plane's
                 // rgb(245,248,250), which our linear blending reaches at 0.34).
                 let fill = if editing {
-                    let c = theme::lin(theme::viewport::SKETCH_REGION);
+                    let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], 0.34])
                 } else {
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
@@ -608,7 +608,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         let y = mc.z.cross(mc.x);
         let mut l = LineData::default();
         let len = 0.008f64;
-        for (axis, color) in [(mc.x, theme::rgb8(theme::viewport::AXIS_X)), (y, theme::rgb8(theme::viewport::AXIS_Y)), (mc.z, theme::rgb8(theme::viewport::AXIS_Z))] {
+        for (axis, color) in [(mc.x, theme::rgb8(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X))), (y, theme::rgb8(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y))), (mc.z, theme::rgb8(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)))] {
             let tip: [f32; 3] = (mc.origin + axis * len).as_vec3().into();
             l.segments.push(LineSegment { a: o, b: tip, color, pick_id: id, width: 2.0, style: LineSegment::ON_TOP });
         }
