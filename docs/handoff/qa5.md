@@ -49,6 +49,7 @@ App under test = copy of /root/target-lead/debug/noshape (the merge queue builds
   OFF1, FIL1, PAT1, SLOT1, POLY1, STB1. Live request "qa5 (10-22 pass 14, workflow 26 …)" pending. Gotcha: s.sh `type two words` drops the space (xdotool gets 2 args).
 - Pass 15 (10-22): CLI /tmp/qa5/noshape-cli-0521 (target-engine 05:21): IM5 FIXED; IM4, NAME3, IM1, IM2, I1, SF2, SF5, SF6, SM1, hem, SM3, ADV2, EXP1 unchanged. Log pass3/impmatrix14.log. Main still aa75fdf.
 - Pass 16 (10-22): workflow 27 sheet-metal joints/loft (workflow-sheet-metal-joints.md): loft New ✅ exact, SML1 new (loft Add unsupported), Make joint dialog ✅, SM4 still; Tab/Rip/Bend/Jog dialogs asked from live. Setup pass16/mksmloft.py.
+- Pass 17 (10-22): workflow 28 exploded views + named positions (workflow-exploded-named-positions.md), doc /tmp/qa5/d28/x.noshape: EXV1–EXV4, NP1 (minor); menus, dialogs, Apply toast ✅.
 - Re-run rule: when main moves (`git -C /root/noshape log -1 main`; the merge queue lands commits every few minutes) or a newer target-shared binary appears,
   copy it and re-run every ✗ row; each checklist has dated "Re-run pass N" / "Update from live's answer" sections.
 
@@ -77,6 +78,7 @@ App under test = copy of /root/target-lead/debug/noshape (the merge queue builds
 | 20 | configured part in an assembly (Change configuration, configured insert, BOM, Variable Studio) | workflow-configured-assembly.md | done pass 7 (CA1–CA4, A18 new) |
 | 21 | drawing of a configured assembly + BOM table after a configuration change | workflow-configured-assembly-drawing.md | done pass 8 (CA5, CA6 new; 19:24 build) |
 | 22 | Variable Studios driving a Part Studio (order, clashes, own variables) | workflow-variable-studios.md | done pass 8; live "qa5 pass 8" folded 10-22 (VS1 withdrawn, VS2 confirmed ✗, VS4 new) |
+| 28 | exploded views + named positions | workflow-exploded-named-positions.md | done pass 17 (EXV1–4, NP1) |
 | 27 | sheet-metal joints, loft, Tab/Rip/Bend/Jog | workflow-sheet-metal-joints.md | done pass 16 (SML1); live request pending |
 | 26 | sketch tools in depth (Trim, Offset, fillet/chamfer, Slot, patterns, Mirror, Spline, Polygon, S toolbar) | workflow-sketch-tools.md | done pass 14 (9 ✗); live request pending |
 | 25 | multi-part booleans (union/subtract/intersect, Keep tools, names, Split, Transform copy, Delete part, merge scope) | workflow-booleans.md | pass 13: 9/10 fixed; BOOL1b, BOOL4b, INT2 open |
