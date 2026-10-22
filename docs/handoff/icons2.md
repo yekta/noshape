@@ -833,3 +833,7 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
 - For skb: our fillet default is R20 where the newer live capture (1933) shows R5 on a ~30 mm rectangle (older
   behaviours line 212 says R20: likely geometry-dependent); live highlights the clicked corner point orange; live's
   rectangle shows corner constraint glyphs ours lacks. A new polygon starts with the last side count used.
+- 10-22 ~15:xx: merged main (c209b8e), scene tests 61 ok, clippy -p noshape-scene -p noshape --all-targets --no-deps
+  clean, guard 2 passed / 0 of 735; checked in app (context/r17-*, r18-slot): polygon spinner (edge after the clicked
+  vertex, outward normal, rotated digit), slot Ø20 + join dots = live 1952, chamfer preview arrow. Marked ready/icons2.
+  For skb (noted in sketch-behaviour.md): polygon circle radius, chamfer preview dims colour, picked slot line orange.
