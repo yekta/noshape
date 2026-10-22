@@ -290,6 +290,20 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(l) = &v.label {
                 j["label"] = json!(l);
             }
+            // Crop, breaks and broken-out sections (view tools).
+            if let Some(c) = &v.crop {
+                j["crop"] = json!(match c {
+                    noshape_model::drawing::Crop::Circle { .. } => "circle",
+                    noshape_model::drawing::Crop::Polygon(_) => "polygon",
+                    noshape_model::drawing::Crop::Spline(_) => "spline",
+                });
+            }
+            if !v.breaks.is_empty() {
+                j["breaks"] = json!(v.breaks.len());
+            }
+            if !v.broken_out.is_empty() {
+                j["broken_out"] = v.broken_out.iter().map(|b| if b.depth_ref.is_some() { json!({ "up_to_point": true }) } else { json!({ "depth_mm": r3(b.depth * 1000.0) }) }).collect();
+            }
             let pl = m.built.as_ref().and_then(|b| b.placement(v.id)).copied();
             if let Some(pl) = pl {
                 j["bounds"] = json!({ "min": pt(pl.min), "max": pt(pl.max) });
@@ -354,11 +368,61 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(v) = a.kind.view() {
                 j["view"] = json!(v.0);
             }
+            if let Some(n) = a.inspection {
+                j["inspection"] = json!(n);
+            }
             j
         })
         .collect();
-    let tables: Vec<Value> = sheet.tables.iter().map(|t| json!({ "id": t.id, "kind": variant_name(&t.kind), "position": pt(t.position) })).collect();
-    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables })
+    // Tables with their text as drawn (property fields expanded).
+    let si = m.sheet;
+    let fields = |k: &str| noshape_model::drawing::build::field_value(&m.drawing, si, &m.info, &m.sources, k);
+    let placeholder = if m.drawing.props.hide_placeholder { "" } else { "----" };
+    let expand = |s: &str| noshape_model::drawing::format::expand_fields_with(s, &fields, placeholder);
+    let tables: Vec<Value> = sheet
+        .tables
+        .iter()
+        .map(|t| {
+            let view = t.view();
+            let geo = view.and_then(|v| m.geoms.get(&v)).map(|g| g.as_ref());
+            let source = view.and_then(|v| noshape_model::drawing::views::view_source(sheet, v)).and_then(|(k, _)| m.sources.get(&k));
+            let origin = match &t.kind {
+                noshape_model::drawing::TableKind::Hole { origin, origin_ref, .. } => match (origin_ref, geo, source) {
+                    (Some(r), Some(g), Some(src)) => noshape_model::drawing::views::resolve_in_view(&src.context, g, r).map(|(p, _)| p).or(Some(*origin)),
+                    _ => Some(*origin),
+                },
+                _ => None,
+            };
+            let data = noshape_model::drawing::tables::table_data_with(&m.drawing, t, geo, source, origin, &m.info, &expand);
+            let mut j = json!({ "id": t.id, "kind": variant_name(&t.kind), "position": pt(t.position), "rows": data.rows });
+            if let Some(h) = data.header {
+                j["header"] = json!(h);
+            }
+            if let Some(ti) = data.title {
+                j["title"] = json!(ti);
+            }
+            j
+        })
+        .collect();
+    let hatches: Vec<Value> = sheet
+        .sketch
+        .hatches
+        .iter()
+        .map(|h| {
+            let standard = ["ansi", "iso", "general"].get(h.standard).copied().unwrap_or("ansi");
+            let mut j = json!({ "id": h.id, "standard": standard, "pattern": noshape_model::drawing::hatch_pat::pattern(h.standard, h.pattern).map(|p| p.name), "scale": h.scale });
+            if let Some(v) = h.view {
+                j["view"] = json!(v.0);
+            }
+            if let Some(c) = h.color {
+                j["color"] = json!(c);
+            }
+            j
+        })
+        .collect();
+    let images: Vec<Value> = sheet.images.iter().map(|i| json!({ "id": i.id, "name": i.name, "position": pt(i.pos), "size": pt(i.size) })).collect();
+    let sketch_entities = sheet.sketch.sketch.entities().count();
+    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities })
 }
 
 pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {
