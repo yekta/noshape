@@ -15,20 +15,59 @@ use std::sync::Arc;
 
 // ------------------------------------------------------------------ delete face
 
-/// Fillet faces adjacent to the selection (non-planar faces created as blends).
+/// Fillet faces next to the selection, recognised from the geometry (live
+/// L11: also on imported parts): a cylinder, torus, sphere or B-spline
+/// (rolling-ball) face that is tangent to a deleted face along their edge and
+/// to another face along another edge. Fillets tangent to fillets found this
+/// way follow (a fillet chain). Faces our Fillet feature made count too.
 fn adjacent_fillets(body: &Body, faces: &BTreeSet<usize>) -> Vec<usize> {
-    let mut out = Vec::new();
-    for &f in faces {
-        for a in body.shape.adjacent_faces(f).unwrap_or_default() {
-            if faces.contains(&a) || out.contains(&a) {
-                continue;
-            }
-            let is_blend = matches!(body.faces[a].root(), TopoName::Face { role: Role::Blend(_), .. });
-            let curved = body.shape.sub_shape(ShapeType::Face, a).ok().and_then(|s| s.face_surface().ok()).is_some_and(|s| !matches!(s, k::Surface::Plane(_)));
-            if is_blend && curved {
-                out.push(a);
+    let all = body.shape.faces();
+    let Ok(ef) = body.shape.edge_faces() else { return Vec::new() };
+    let edges = body.shape.edges();
+    let blend_like = |f: usize| {
+        let named = matches!(body.faces[f].root(), TopoName::Face { role: Role::Blend(_), .. });
+        let shape = all[f].face_surface().ok();
+        named || matches!(shape, Some(k::Surface::Cylinder { .. } | k::Surface::Torus { .. } | k::Surface::Sphere { .. } | k::Surface::BSpline { .. }))
+    };
+    // Whether faces a and b meet tangentially along edge e.
+    let tangent = |e: usize, a: usize, b: usize| -> bool {
+        let Some(m) = edges.get(e).and_then(|x| x.edge_info().ok().and_then(|i| x.point_at((i.first_param + i.last_param) * 0.5).ok())) else { return false };
+        match (face_normal_near(&all[a], m), face_normal_near(&all[b], m)) {
+            (Some((_, na)), Some((_, nb))) => na.normalize().dot(nb.normalize()) > 1.0 - 1e-6,
+            _ => false,
+        }
+    };
+    // (neighbour, edge) pairs of a face.
+    let neighbours = |f: usize| -> Vec<(usize, usize)> {
+        ef.iter()
+            .enumerate()
+            .filter_map(|(e, fs)| match fs[..] {
+                [a, b] if a as usize == f && b as usize != f => Some((b as usize, e)),
+                [a, b] if b as usize == f && a as usize != f => Some((a as usize, e)),
+                _ => None,
+            })
+            .collect()
+    };
+    let mut seeds: BTreeSet<usize> = faces.clone();
+    let mut out: Vec<usize> = Vec::new();
+    loop {
+        let mut found = Vec::new();
+        for &s in &seeds {
+            for (f, e) in neighbours(s) {
+                if seeds.contains(&f) || out.contains(&f) || found.contains(&f) || !blend_like(f) || !tangent(e, s, f) {
+                    continue;
+                }
+                // Tangent to something else too (a fillet joins two faces).
+                if neighbours(f).into_iter().any(|(g, e2)| g != s && e2 != e && tangent(e2, f, g)) {
+                    found.push(f);
+                }
             }
         }
+        if found.is_empty() {
+            break;
+        }
+        out.extend(found.iter().copied());
+        seeds.extend(found);
     }
     out
 }
@@ -50,12 +89,20 @@ pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let mut set: BTreeSet<usize> = faces.into_iter().collect();
+        let fillets = adjacent_fillets(&body, &set);
         if ev.bool("includeFillet") {
-            set.extend(adjacent_fillets(&body, &set));
+            set.extend(fillets);
+        } else if heal == "HEAL" && !fillets.is_empty() {
+            // Live L11: a fillet left around the deleted faces can't be
+            // healed (Parasolid); OCCT would stretch it to close the gap.
+            return err(DELETE_FAILED);
         }
         let all = body.shape.faces();
+        // Live: deleting every face removes the part, with no message.
         if set.len() >= all.len() {
-            return err("Cannot delete all faces of a part or surface.");
+            let id = body.id.clone();
+            ev.ctx.bodies.retain(|b| b.id != id);
+            continue;
         }
         match heal.as_str() {
             "HEAL" => {
@@ -215,8 +262,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         None
     };
     let rotation = if ty == "ROTATE" {
-        let Some(r) = ev.query("axis").first() else { return err("Select a rotation axis") };
-        let (o, a) = ev.resolve_axis(r).ok_or_else(|| fe("The axis could not be resolved"))?;
+        // Live L5: "Cannot determine rotation axis." on Axis.
+        let no_axis = || crate::regen::eval::err_at(&["axis"], "Cannot determine rotation axis.");
+        let Some(r) = ev.query("axis").first() else { return no_axis() };
+        let Some((o, a)) = ev.resolve_axis(r) else { return no_axis() };
         Some((o, a.normalize(), ev.angle("angle")? * sign))
     } else {
         None
@@ -467,19 +516,37 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["replaceFaces"], "Select faces to replace.");
     }
-    let Some(tr) = ev.query("templateFace").first().cloned() else { return err("Select the face or plane to replace with") };
+    // Live L9: an empty or unresolvable Faces to replace with.
+    let unresolved = || crate::regen::eval::err_at(&["templateFace"], "Cannot resolve entities.");
+    let Some(tr) = ev.query("templateFace").first().cloned() else { return unresolved() };
     let extent = ev.model_extent();
     let mut template = match &tr {
         Reference::Face(_) => {
-            let Some(&(tb, tf)) = ev.resolve_faces(std::slice::from_ref(&tr)).first() else { return err("The template face no longer exists") };
+            let Some(&(tb, tf)) = ev.resolve_faces(std::slice::from_ref(&tr)).first() else { return unresolved() };
             ev.face_shape(tb, tf)?
         }
         _ => {
-            let Some(p) = ev.resolve_plane(&tr) else { return err("Select a face or plane to replace with") };
+            let Some(p) = ev.resolve_plane(&tr) else { return unresolved() };
             k::make_plane_face(&crate::regen::eval::kernel_plane(&p), -extent, extent, -extent, extent)?
         }
     };
-    let off = ev.length("offset")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
+    // Flip alignment reverses the template's sense (live L7/L8): the
+    // replaced faces must then face the same way as the template, else it
+    // fails; the offset goes along the template's (flipped) normal.
+    let sense = if ev.params.get("oppositeSense").is_some() && ev.bool("oppositeSense") { -1.0 } else { 1.0 };
+    let template_normal = |p: DVec3| -> Option<DVec3> { template.project_point(p).ok().and_then(|q| template.normal_at_point(q.point).ok()) };
+    for (bi, faces) in &groups {
+        for &f in faces {
+            let face = ev.ctx.bodies[*bi].shape.sub_shape(ShapeType::Face, f)?;
+            let c = face.centroid()?;
+            if let (Ok(n), Some(t)) = (face.normal_at_point(c), template_normal(c))
+                && n.dot(t * sense) < 0.0
+            {
+                return err(REPLACE_FAILED);
+            }
+        }
+    }
+    let off = ev.length("offset")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 } * sense;
     if off.abs() > 1e-12 {
         template = match template.face_plane()? {
             Some(pl) => template.translated(pl.unit_normal() * off)?,

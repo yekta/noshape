@@ -28,6 +28,9 @@ fn interactive_style(style: noshape_render::Style, d: &nav::DetailSettings) -> n
     s.detail.edge_silhouettes &= d.edge_silhouettes;
     s.detail.backface_silhouettes &= d.backface_silhouettes;
     s.detail.section_edges &= d.section_edges;
+    // Interactive settings box bodies under 10 px (full detail: 2 px).
+    s.detail.low_level_body_proportion = d.low_level_body_proportion as f32;
+    s.detail.extent_culling_px = noshape_render::scene::INTERACTIVE_EXTENT_CULLING_PX;
     s
 }
 

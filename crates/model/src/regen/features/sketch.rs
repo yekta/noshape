@@ -121,8 +121,17 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     if lost > 0 {
         ev.warnings.push(format!("{lost} intersection curve(s) could not be updated"));
     }
-    // Expression-driven dimensions.
+    // Expression-driven dimensions. The ones whose value changes are kept:
+    // a single changed dimension solves like an edit in the sketch (only its
+    // geometry moves, live SK5), not as a fresh solve of everything.
     let mut problems = Vec::new();
+    let mut changed: Vec<ConstraintId> = Vec::new();
+    let mut set_value = |sk: &mut noshape_sketch::Sketch, id: ConstraintId, v: f64| {
+        if sk.constraint(id).and_then(|c| c.kind.value()).is_some_and(|old| (old - v).abs() > 1e-12 * old.abs().max(1.0)) {
+            changed.push(id);
+        }
+        let _ = sk.set_dimension_value(id, v);
+    };
     for (cid, expr) in &data.dimension_exprs {
         let id = ConstraintId(*cid);
         let Some(c) = sk.constraint(id) else { continue };
@@ -137,9 +146,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         // Ellipse axes are typed as diameters but stored as radii.
         let scale = c.kind.display_scale();
         match ev.eval_text(&expr.text, dim) {
-            Ok(q) => {
-                let _ = sk.set_dimension_value(id, q.value / scale);
-            }
+            Ok(q) => set_value(&mut sk, id, q.value / scale),
             Err(e) => problems.push(e.message),
         }
     }
@@ -157,9 +164,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         // Ellipse axes are typed as diameters but stored as radii.
         let scale = c.kind.display_scale();
         match ev.eval_text(&expr.text, dim) {
-            Ok(q) => {
-                let _ = sk.set_dimension_value(id, q.value / scale);
-            }
+            Ok(q) => set_value(&mut sk, id, q.value / scale),
             Err(e) => problems.push(e.message),
         }
     }
@@ -181,7 +186,15 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
-    let report = sk.solve();
+    changed.sort();
+    changed.dedup();
+    let report = match changed.as_slice() {
+        [one] => {
+            let opts = sk.dimension_edit_options(*one);
+            sk.solve_with(&opts)
+        }
+        _ => sk.solve(),
+    };
     // Text glyph outlines follow their (solved) text boxes.
     data.add_text_outlines(&mut sk);
     let regions = sk.regions();
