@@ -22,8 +22,187 @@ use glam::DVec2;
 /// Font families available for sketch text.
 pub const FONTS: [&str; 3] = ["Liberation Sans", "Liberation Serif", "Liberation Mono"];
 
-/// Default font family.
+/// Default font family of the app's own glyph outlines (labels, cursors);
+/// sketch text uses [`SKETCH_DEFAULT_FONT`]. The Liberation families stay
+/// loadable for documents that used them.
 pub const DEFAULT_FONT: &str = "Liberation Sans";
+
+/// One family of the Text tool's font list (live dom/sketch-text-fonts: 32
+/// Google fonts in this order; `bold` / `italic`: whether the B / I buttons
+/// show for it).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SketchFont {
+    pub name: &'static str,
+    pub bold: bool,
+    pub italic: bool,
+}
+
+/// The Text tool's fonts (SIL OFL 1.1 / Apache 2.0, see `fonts/sketch/`).
+pub const SKETCH_FONTS: [SketchFont; 32] = [
+    SketchFont { name: "Allerta", bold: false, italic: false },
+    SketchFont { name: "Allerta Stencil", bold: false, italic: false },
+    SketchFont { name: "Arimo", bold: true, italic: true },
+    SketchFont { name: "Balthazar", bold: false, italic: false },
+    SketchFont { name: "Baumans", bold: false, italic: false },
+    SketchFont { name: "Bebas Neue", bold: false, italic: false },
+    SketchFont { name: "Comic Neue", bold: true, italic: true },
+    SketchFont { name: "Courier Prime", bold: true, italic: true },
+    SketchFont { name: "Didact Gothic", bold: false, italic: false },
+    SketchFont { name: "Droid Sans Mono", bold: false, italic: false },
+    SketchFont { name: "Inconsolata", bold: true, italic: false },
+    SketchFont { name: "Inter", bold: true, italic: false },
+    SketchFont { name: "Michroma", bold: false, italic: false },
+    SketchFont { name: "MPLUSRounded1c", bold: true, italic: false },
+    SketchFont { name: "Noto Sans", bold: true, italic: true },
+    SketchFont { name: "Noto Sans Chinese Simplified", bold: true, italic: false },
+    SketchFont { name: "Noto Sans Chinese Traditional", bold: true, italic: false },
+    SketchFont { name: "Noto Sans Japanese", bold: true, italic: false },
+    SketchFont { name: "Noto Sans Korean", bold: true, italic: false },
+    SketchFont { name: "Noto Serif", bold: true, italic: true },
+    SketchFont { name: "Open Sans", bold: true, italic: true },
+    SketchFont { name: "Orbitron", bold: true, italic: false },
+    SketchFont { name: "Oswald", bold: true, italic: false },
+    SketchFont { name: "Poppins", bold: true, italic: true },
+    SketchFont { name: "PTSans", bold: true, italic: true },
+    SketchFont { name: "Rajdhani", bold: true, italic: false },
+    SketchFont { name: "Roboto", bold: true, italic: true },
+    SketchFont { name: "Roboto Slab", bold: true, italic: false },
+    SketchFont { name: "Ropa Sans", bold: false, italic: true },
+    SketchFont { name: "Sofia Sans", bold: true, italic: true },
+    SketchFont { name: "Source Sans Pro", bold: true, italic: true },
+    SketchFont { name: "Tinos", bold: true, italic: true },
+];
+
+/// The Text tool's default font (live).
+pub const SKETCH_DEFAULT_FONT: &str = "Open Sans";
+
+/// The Text tool's font files, zstd-compressed (unpacked on first use).
+static SKETCH_FILES: [&[u8]; 55] = [
+    include_bytes!("../fonts/sketch/Allerta-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/AllertaStencil-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/Arimo-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Arimo-Italic-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Balthazar-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/Baumans-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/BebasNeue-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/ComicNeue-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/ComicNeue-Bold.ttf.zst"),
+    include_bytes!("../fonts/sketch/ComicNeue-Italic.ttf.zst"),
+    include_bytes!("../fonts/sketch/ComicNeue-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/sketch/CourierPrime-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/CourierPrime-Bold.ttf.zst"),
+    include_bytes!("../fonts/sketch/CourierPrime-Italic.ttf.zst"),
+    include_bytes!("../fonts/sketch/CourierPrime-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/sketch/DidactGothic-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/DroidSansMono.ttf.zst"),
+    include_bytes!("../fonts/sketch/Inconsolata-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Inter-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Michroma-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/MPLUSRounded1c-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/MPLUSRounded1c-Bold.ttf.zst"),
+    include_bytes!("../fonts/sketch/NotoSansSC-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/NotoSansTC-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/NotoSansJP-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/NotoSansKR-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/NotoSerif-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/NotoSerif-Italic-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/OpenSans-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/OpenSans-Italic-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Orbitron-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Oswald-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Poppins-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/Poppins-Bold.ttf.zst"),
+    include_bytes!("../fonts/sketch/Poppins-Italic.ttf.zst"),
+    include_bytes!("../fonts/sketch/Poppins-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/sketch/PT_Sans-Web-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/PT_Sans-Web-Bold.ttf.zst"),
+    include_bytes!("../fonts/sketch/PT_Sans-Web-Italic.ttf.zst"),
+    include_bytes!("../fonts/sketch/PT_Sans-Web-BoldItalic.ttf.zst"),
+    include_bytes!("../fonts/sketch/Rajdhani-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/Rajdhani-Bold.ttf.zst"),
+    include_bytes!("../fonts/sketch/Roboto-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Roboto-Italic-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/RobotoSlab-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/RopaSans-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/RopaSans-Italic.ttf.zst"),
+    include_bytes!("../fonts/sketch/SofiaSans-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/SofiaSans-Italic-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/SourceSans3-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/SourceSans3-Italic-VF.ttf.zst"),
+    include_bytes!("../fonts/sketch/Tinos-Regular.ttf.zst"),
+    include_bytes!("../fonts/sketch/Tinos-Bold.ttf.zst"),
+    include_bytes!("../fonts/sketch/Tinos-Italic.ttf.zst"),
+    include_bytes!("../fonts/sketch/Tinos-BoldItalic.ttf.zst"),
+];
+
+static SKETCH_UNPACKED: [std::sync::OnceLock<&'static [u8]>; 55] = [const { std::sync::OnceLock::new() }; 55];
+
+fn sketch_file(i: usize) -> &'static [u8] {
+    SKETCH_UNPACKED[i].get_or_init(|| Box::leak(zstd::decode_all(SKETCH_FILES[i]).unwrap_or_default().into_boxed_slice()))
+}
+
+/// A face of a Text tool font: its file and, for a variable font, the weight.
+enum SketchFace {
+    File(usize, Option<f32>),
+    /// The bundled static Noto Sans.
+    Noto,
+}
+
+/// The face of `font` (a [`SKETCH_FONTS`] name) in a style it has; a style it
+/// lacks falls back to the closest one it has.
+fn sketch_face(font: &str, bold: bool, italic: bool) -> Option<SketchFace> {
+    let some = |f: Option<(usize, Option<f32>)>| f.map(|(i, w)| SketchFace::File(i, w));
+    let faces: [Option<SketchFace>; 4] = match font {
+        "Allerta" => [some(Some((0, None))), some(None), some(None), some(None)],
+        "Allerta Stencil" => [some(Some((1, None))), some(None), some(None), some(None)],
+        "Arimo" => [some(Some((2, None))), some(Some((2, Some(700.0)))), some(Some((3, None))), some(Some((3, Some(700.0))))],
+        "Balthazar" => [some(Some((4, None))), some(None), some(None), some(None)],
+        "Baumans" => [some(Some((5, None))), some(None), some(None), some(None)],
+        "Bebas Neue" => [some(Some((6, None))), some(None), some(None), some(None)],
+        "Comic Neue" => [some(Some((7, None))), some(Some((8, None))), some(Some((9, None))), some(Some((10, None)))],
+        "Courier Prime" => [some(Some((11, None))), some(Some((12, None))), some(Some((13, None))), some(Some((14, None)))],
+        "Didact Gothic" => [some(Some((15, None))), some(None), some(None), some(None)],
+        "Droid Sans Mono" => [some(Some((16, None))), some(None), some(None), some(None)],
+        "Inconsolata" => [some(Some((17, None))), some(Some((17, Some(700.0)))), some(None), some(None)],
+        "Inter" => [some(Some((18, None))), some(Some((18, Some(700.0)))), some(None), some(None)],
+        "Michroma" => [some(Some((19, None))), some(None), some(None), some(None)],
+        "MPLUSRounded1c" => [some(Some((20, None))), some(Some((21, None))), some(None), some(None)],
+        "Noto Sans" => [Some(SketchFace::Noto), Some(SketchFace::Noto), Some(SketchFace::Noto), Some(SketchFace::Noto)],
+        "Noto Sans Chinese Simplified" => [some(Some((22, None))), some(Some((22, Some(700.0)))), some(None), some(None)],
+        "Noto Sans Chinese Traditional" => [some(Some((23, None))), some(Some((23, Some(700.0)))), some(None), some(None)],
+        "Noto Sans Japanese" => [some(Some((24, None))), some(Some((24, Some(700.0)))), some(None), some(None)],
+        "Noto Sans Korean" => [some(Some((25, None))), some(Some((25, Some(700.0)))), some(None), some(None)],
+        "Noto Serif" => [some(Some((26, None))), some(Some((26, Some(700.0)))), some(Some((27, None))), some(Some((27, Some(700.0))))],
+        "Open Sans" => [some(Some((28, None))), some(Some((28, Some(700.0)))), some(Some((29, None))), some(Some((29, Some(700.0))))],
+        "Orbitron" => [some(Some((30, None))), some(Some((30, Some(700.0)))), some(None), some(None)],
+        "Oswald" => [some(Some((31, None))), some(Some((31, Some(700.0)))), some(None), some(None)],
+        "Poppins" => [some(Some((32, None))), some(Some((33, None))), some(Some((34, None))), some(Some((35, None)))],
+        "PTSans" => [some(Some((36, None))), some(Some((37, None))), some(Some((38, None))), some(Some((39, None)))],
+        "Rajdhani" => [some(Some((40, None))), some(Some((41, None))), some(None), some(None)],
+        "Roboto" => [some(Some((42, None))), some(Some((42, Some(700.0)))), some(Some((43, None))), some(Some((43, Some(700.0))))],
+        "Roboto Slab" => [some(Some((44, None))), some(Some((44, Some(700.0)))), some(None), some(None)],
+        "Ropa Sans" => [some(Some((45, None))), some(None), some(Some((46, None))), some(None)],
+        "Sofia Sans" => [some(Some((47, None))), some(Some((47, Some(700.0)))), some(Some((48, None))), some(Some((48, Some(700.0))))],
+        "Source Sans Pro" => [some(Some((49, None))), some(Some((49, Some(700.0)))), some(Some((50, None))), some(Some((50, Some(700.0))))],
+        "Tinos" => [some(Some((51, None))), some(Some((52, None))), some(Some((53, None))), some(Some((54, None)))],
+        _ => return None,
+    };
+    let [r, b, i, bi] = faces;
+    match (bold, italic) {
+        (true, true) => bi.or(b).or(i).or(r),
+        (true, false) => b.or(r),
+        (false, true) => i.or(r),
+        (false, false) => r,
+    }
+}
+
+/// The Text tool family of an Onshape font file name ("OpenSans-BoldItalic.ttf",
+/// "RobotoSlab-Regular.ttf"), compared without spaces and case.
+pub fn sketch_font_of_file(name: &str) -> Option<&'static str> {
+    let stem = name.split(['-', '.']).next().unwrap_or(name).to_ascii_lowercase().replace([' ', '_'], "");
+    SKETCH_FONTS.iter().map(|f| f.name).find(|n| n.to_ascii_lowercase().replace(' ', "") == stem)
+}
+
 
 /// Maximum number of characters in a text box (Onshape limit).
 pub const MAX_CHARS: usize = 250;
@@ -221,7 +400,16 @@ impl ttf_parser::OutlineBuilder for Outline {
 
 /// Lays out `text` (newlines start new lines) in box units.
 pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayout {
-    let Ok(face) = ttf_parser::Face::parse(font_data(font, bold, italic), 0) else { return TextLayout::default() };
+    let (data, wght) = match sketch_face(font, bold, italic) {
+        Some(SketchFace::File(i, w)) => (sketch_file(i), w),
+        Some(SketchFace::Noto) => (font_data("Noto Sans", bold, italic), None),
+        None => (font_data(font, bold, italic), None),
+    };
+    let Ok(mut face) = ttf_parser::Face::parse(data, 0) else { return TextLayout::default() };
+    // A variable font's weight (Bold = 700; otherwise its default instance).
+    if let Some(w) = wght {
+        face.set_variation(ttf_parser::Tag::from_bytes(b"wght"), w);
+    }
     let asc = (face.ascender() as f64).max(1.0);
     let scale = 1.0 / asc;
     let line_h = (face.ascender() as f64 - face.descender() as f64 + face.line_gap() as f64) * scale;

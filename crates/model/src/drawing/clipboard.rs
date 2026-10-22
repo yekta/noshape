@@ -94,7 +94,7 @@ impl Drawing {
     /// annotations and tables).
     pub fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
-        let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0, continuation: None, drawn_by: self.drawn_by.clone() };
+        let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0, continuation: None, drawn_by: self.drawn_by.clone(), sources_at: None };
         tmp.move_views_to_sheet(0, ids, 1, sources)?;
         Ok(ViewClipboard { noshape_drawing_views: 1, sheet: tmp.sheets.swap_remove(1), anchor: None })
     }

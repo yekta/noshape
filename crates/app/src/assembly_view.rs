@@ -34,7 +34,7 @@ use noshape_model::assembly::analysis;
 use noshape_model::assembly::eval::{AssemblyEvaluator, AssemblyResult, InferencePoint, InstanceNode, NodeKind, SolveOptions, frame_to_placement, inference_candidates, placement_to_frame};
 use noshape_model::assembly::solver::Frame;
 use noshape_model::assembly::{
-    AsmMateConnector, Assembly, ExplodeStep, ExplodedView, Group, Instance, InstanceId, InstancePattern, InstanceSource, Mate, MateConnectorRef, MateId, MateType, NamedPosition, PatternKind, Placement,
+    AsmMateConnector, Assembly, ExplodeStep, ExplodedView, Instance, InstanceId, InstancePattern, InstanceSource, Mate, MateConnectorRef, MateId, MateType, NamedPosition, PatternKind, Placement,
     Relation, RelationType, SubassemblyLock,
 };
 use noshape_model::configuration::ConfigValues;
@@ -157,8 +157,6 @@ mod config_panel;
 #[path = "assembly_toolbar.rs"]
 mod toolbar;
 pub(crate) use toolbar::{AsmToolbarPrefs, shortcut_catalog};
-use noshape_model::assembly::config::{self as acfg, ConfigTarget};
-use noshape_model::params::ParamValue;
 pub(crate) use standard_content::*;
 
 struct DragState {
@@ -223,6 +221,12 @@ fn feature_row_color(inactive: bool, ok: bool, hidden: bool) -> Rgba {
     } else {
         pal.text
     }
+}
+
+/// Live's "related-highlight" list row (live 305): #ecf0f4 with a
+/// #90cef1 line under it.
+fn related_row<E: Styled>(d: E) -> E {
+    d.bg(gpui_kit::rgb(0xecf0f4)).border_b_1().border_color(gpui_kit::rgb(0x90cef1))
 }
 
 /// A relation's icon (its toolbar button's).
@@ -428,6 +432,8 @@ impl AssemblyView {
     }
 
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // Read before `doc` moves into the view (derived parts' sources, DER8).
+        let studio_cache = doc.read(cx).studio_cache.clone();
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let mut subs = Vec::new();
         subs.push(cx.subscribe_in(&viewport, window, Self::on_viewport_event));
@@ -483,7 +489,9 @@ impl AssemblyView {
             cube_origin: None,
             slices: None,
             evaluator: Arc::new(Mutex::new({
-                let mut ev = AssemblyEvaluator::new();
+                // Derived parts and custom features read their sources as in
+                // the Part Studio (qa5 DER8).
+                let mut ev = crate::derived::assembly_evaluator(studio_cache.clone());
                 ev.set_external(Arc::new(AppExternal));
                 ev
             })),
@@ -691,7 +699,10 @@ impl AssemblyView {
                                 let parts = r
                                     .as_ref()
                                     .map(|r| {
-                                        r.display.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface)).map(|b| (b.id.clone(), b.name.clone(), b.bounds, b.kind == BodyKind::Surface)).collect()
+                                        // The exact box (live qa5 A18: a repeat insert lands at
+                                        // exactly bbox/8; the display box has OCCT's gap).
+                                        let exact = |b: &noshape_model::display::BodyDisplay| r.context.bodies.iter().find(|c| c.id == b.id).and_then(|c| c.shape.bounding_box(true).ok()).map(|bb| (bb.min, bb.max)).or(b.bounds);
+                                        r.display.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface)).map(|b| (b.id.clone(), b.name.clone(), exact(b), b.kind == BodyKind::Surface)).collect()
                                     })
                                     .unwrap_or_default();
                                 let sketches = r.as_ref().map(|r| r.context.sketches.iter().filter(|s| s.sketch.entities().any(|e| !e.construction)).map(|s| (s.feature, s.name.clone())).collect()).unwrap_or_default();
@@ -802,6 +813,17 @@ impl AssemblyView {
         self.result.bounds().map(|(a, b)| (b - a).length() * 0.06).unwrap_or(0.01).clamp(0.002, 1.0)
     }
 
+    /// Instance rows drawn "related-highlight" (live 305 / 578): the
+    /// selected mate's instances, the instance of a connector being edited
+    /// from a mate dialog (qa5 MT7, MT4).
+    fn related_instances(&self, cx: &App) -> Vec<InstanceId> {
+        let mut out = self.selected_mate.map(|id| self.mate_instances(id, cx)).unwrap_or_default();
+        if let Some(c) = self.mc.as_ref().filter(|m| m.for_mate.is_some()).and_then(|m| m.on.as_ref()) {
+            out.push(c.instance);
+        }
+        out
+    }
+
     fn mate_instances(&self, id: MateId, cx: &App) -> Vec<InstanceId> {
         let Some(a) = self.assembly(cx) else { return vec![] };
         if let Some(m) = a.mate(id) {
@@ -866,9 +888,28 @@ impl AssemblyView {
                 behaviors::ValueShape::Line(line) => h.value_lines.push(line),
             }
         }
-        // Mate highlight (list hover / selection): instances accent + both connector triads.
+        // Mate highlight: a selected mate shows only its mated faces /
+        // edges amber (live 305, qa5 MT7); a hovered row its instances.
+        // Both show the connector triads.
+        let selected_mate = self.selected_mate.and_then(|id| self.assembly(cx).and_then(|a| a.mate(id).cloned()));
+        if let Some(m) = &selected_mate {
+            for c in m.connectors() {
+                let entity = match &c.reference {
+                    Reference::Implicit { on, .. } if matches!(**on, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) => Some((**on).clone()),
+                    r @ (Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_)) => Some(r.clone()),
+                    _ => None,
+                };
+                if let Some(e) = entity {
+                    let mut path = vec![c.instance];
+                    path.extend(c.path.iter().copied());
+                    h.selected_entities.push((path, e));
+                }
+            }
+        }
         for mid in [self.selected_mate, self.list_hover_mate].into_iter().flatten() {
-            h.accent_tops.extend(self.mate_instances(mid, cx));
+            if selected_mate.as_ref().is_none_or(|m| m.id != mid) {
+                h.accent_tops.extend(self.mate_instances(mid, cx));
+            }
             if let Some(ms) = self.result.mates.iter().find(|m| m.id == mid) {
                 mate_glyph(&mut h, ms, true, 1.0);
             }
@@ -942,10 +983,7 @@ impl AssemblyView {
                 {
                     let i = overlay_connectors.len();
                     let hl = hovered_overlay == Some(OverlayPick::Connector(i)) || editing_mc == Some(c.id) || self.selected_mate == Some(c.id);
-                    // The connector dialog's preview slider fades the edited one
-                    // (as Onshape's feature preview slider, resting at 0.7).
-                    let opacity = self.mc.as_ref().filter(|m| m.id == c.id).map_or(1.0, |m| (m.preview / panels::PREVIEW_REST).min(1.0));
-                    h.connectors.push((f, size * 0.9, hl, opacity));
+                    h.connectors.push((f, size * 0.9, hl, 1.0));
                     overlay_connectors.push(c.id);
                 }
             }
@@ -1421,23 +1459,7 @@ impl AssemblyView {
 
     fn toggle_mate_suppressed(&mut self, id: MateId, cx: &mut Context<Self>) {
         let values = self.ui.config_values.clone();
-        self.edit("Suppress mate", cx, |a| {
-            let now = a.configured(&values).mate(id).map(|m| m.suppressed);
-            if let Some(now) = now
-                && a.set_configured_value(ConfigTarget::Mate(id), acfg::param::UNSUPPRESSED, &values, ParamValue::Bool(now))
-            {
-                return;
-            }
-            if let Some(m) = a.mates.iter_mut().find(|m| m.id == id) {
-                m.suppressed = !m.suppressed;
-            }
-            if let Some(r) = a.relations.iter_mut().find(|r| r.id == id) {
-                r.suppressed = !r.suppressed;
-            }
-            if let Some(g) = a.groups.iter_mut().find(|g| g.id == id) {
-                g.suppressed = !g.suppressed;
-            }
-        });
+        self.edit("Suppress mate", cx, |a| noshape_ops::assembly::toggle_mate_suppressed(a, id, &values));
     }
 
     /// Group tool: opens the Group dialog with the selection as preselection.
@@ -1449,27 +1471,12 @@ impl AssemblyView {
     fn accept_group(&mut self, cx: &mut Context<Self>) {
         let Some((editing, ids)) = self.ui.group.take() else { return };
         if ids.len() < 2 {
-            self.message = Some((false, "Select at least two instances to group.".into()));
+            self.message = Some((false, noshape_ops::assembly::GROUP_TOO_FEW.into()));
             self.ui.group = Some((editing, ids));
             cx.notify();
             return;
         }
-        match editing {
-            Some(gid) => {
-                self.edit("Edit : Group", cx, |a| {
-                    if let Some(g) = a.groups.iter_mut().find(|g| g.id == gid) {
-                        g.instances = ids;
-                    }
-                });
-            }
-            None => {
-                self.edit("Insert : Group", cx, |a| {
-                    let id = MateId(a.next_id());
-                    let name = a.next_feature_name("Group");
-                    a.groups.push(Group { id, name, instances: ids, suppressed: false });
-                });
-            }
-        }
+        self.edit(noshape_ops::assembly::group_description(editing.is_some()), cx, |a| noshape_ops::assembly::commit_group(a, editing, ids));
         self.update_capture(cx);
         cx.notify();
     }
@@ -3064,6 +3071,7 @@ impl AssemblyView {
             .text_size(px(crate::ui::ROW_TEXT))
             .text_color(color)
             .when(selected, |d| d.bg(pal.accent_soft))
+            .when(!selected && is_top && self.related_instances(cx).contains(&top), related_row)
             .when(!selected, |d| d.hover(|d| d.bg(pal.row_hover)))
             .child(
                 div()
@@ -3234,7 +3242,8 @@ impl AssemblyView {
         let flat = self.ui.filter_flat && !self.ui.filter.is_empty();
         let can_expand = !implicit.is_empty() && !flat;
         let tip = match (&message, tooltip) {
-            (Some(m), Some(t)) => Some(format!("{name} has error: {m}\n{t}")),
+            // Mates: the tooltip already starts "<name> has error: …".
+            (Some(_), Some(t)) => Some(t),
             (Some(m), None) => Some(format!("{name} has error: {m}")),
             (None, t) => t,
         };
@@ -3367,6 +3376,12 @@ impl AssemblyView {
         // whenever every instance happens to be selected.
         let all_selected = self.ui.root_selected && self.assembly(cx).is_some_and(|a| !a.instances.is_empty() && a.instances.iter().all(|i| self.selected.contains(&i.id)));
         let grounded = self.assembly(cx).is_some_and(|a| !a.fixed_instances().is_empty());
+        // Live (qa5 A19): the root row carries an error badge while a feature
+        // (or the pattern being defined) is in error.
+        let has_error = self.result.mates.iter().any(|m| !m.ok)
+            || !self.result.pattern_errors.is_empty()
+            || self.result.relations.iter().any(|r| !r.ok)
+            || self.pattern.as_ref().is_some_and(|s| s.editing.is_none() && self.pattern_from_session(s, cx).is_err());
         let view = cx.entity();
         h_flex()
             .id("asm-top-row")
@@ -3384,6 +3399,7 @@ impl AssemblyView {
                 Some(field) => field,
                 None => div().min_w_0().truncate().child(name).into_any_element(),
             })
+            .when(has_error, |d| d.child(div().id("asm-error").flex_none().size(px(6.)).rounded_full().bg(pal.error)))
             // Grounded: something in the assembly is fixed (Onshape's arrow onto ground).
             .when(grounded, |d| d.child(div().id("asm-grounded").flex_none().child(crate::assets::icon(&icon_path("list-grounded"), 20., cx)).tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Assembly is grounded").build(w, cx))))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -3571,6 +3587,7 @@ impl AssemblyView {
                 }
             }
         }
+        rows.extend(self.pending_pattern_row(cx));
         if asm.instances.is_empty() {
             rows.push(div().px_3().py_2().text_xs().text_color(pal.text_faint).child("Insert parts and assemblies (I) to start.").into_any_element());
         }
@@ -3641,6 +3658,7 @@ impl AssemblyView {
         if !filtering || (tree && !mate_rows.is_empty()) {
             rows.push(
                 crate::ui::tree_row("mates-folder", false)
+                    .when(self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)), related_row)
                     .cursor_pointer()
                     .child(crate::ui::caret(mates_open))
                     .child(format!("Mate features ({mate_count})"))
@@ -3654,8 +3672,19 @@ impl AssemblyView {
                     .into_any_element(),
             );
         }
-        if mates_open || (filtering && !tree) {
-            rows.extend(mate_rows.into_iter().map(|r| div().pl(px(if filtering && !tree { 0. } else { 17. })).child(r).into_any_element()));
+        if filtering && !tree {
+            rows.extend(mate_rows);
+        } else if mates_open && !mate_rows.is_empty() {
+            // Live assembly/751, 753: the folder's rows hang off a 1 px #d7d7d7
+            // line under its caret (x 9) that ends in an 8 px tick.
+            rows.push(
+                v_flex()
+                    .relative()
+                    .children(mate_rows.into_iter().map(|r| div().pl(px(17.)).child(r)))
+                    .child(div().absolute().left(px(9.)).top_0().bottom_0().w(px(1.)).bg(gpui_kit::rgb(0xd7d7d7)))
+                    .child(div().absolute().left(px(5.)).bottom_0().w(px(8.)).h(px(1.)).bg(gpui_kit::rgb(0xd7d7d7)))
+                    .into_any_element(),
+            );
         }
         if tree {
             // The "…" (live: text at x 28 of the list), past the rows shown.
@@ -4365,7 +4394,7 @@ impl AssemblyView {
                 Some(crate::os_ui::query_row(SharedString::from(format!("rel-mate-{slot}")), noshape_ops::assembly::relation_mate_label(kind, slot, m.mate_type, &m.name)).into_any_element())
             })
             .collect();
-        let value = crate::os_ui::param_row(noshape_ops::assembly::relation_value_label(kind), crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).text_right(), 25.));
+        let value = crate::os_ui::param_row(noshape_ops::assembly::relation_value_label(kind), crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.));
         let body = v_flex()
             .pb(px(2.))
             .child(div().px(px(3.)).pt(px(5.)).child(select))
@@ -4402,7 +4431,7 @@ impl AssemblyView {
                             .justify_center()
                             .bg(if valid { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
-                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                            .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_relation(cx))),
                     )
                     .child(
@@ -4548,6 +4577,14 @@ impl AssemblyView {
         // (live 578: the Mate connector dialog at x 467, beside the mate's).
         let mc_beside = self.mate.is_some() && self.mc.as_ref().is_some_and(|m| m.for_mate.is_some());
         if let Some((dialog, hud)) = self.mate.as_ref().map(|s| (s.dialog.clone(), s.hud)) {
+            // Live (qa5 MT4): the chip whose connector the panel edits is bold.
+            let editing = self.mc.as_ref().and_then(|m| m.for_mate);
+            if dialog.read(cx).editing_field != editing {
+                dialog.update(cx, |d, cx| {
+                    d.editing_field = editing;
+                    cx.notify();
+                });
+            }
             if mc_beside {
                 let mc = self.render_mc_panel(cx);
                 left = left.child(h_flex().items_start().gap(px(1.)).child(dialog.clone()).child(mc));

@@ -10,9 +10,25 @@ use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, refs};
-use noshape_model::drawing::{BreakStyle, Drawing, ViewId, ViewKind};
-use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ViewOptions};
+use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Drawing, ViewId, ViewKind};
+use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
+
+/// The Callout dialog's border shapes.
+const BORDERS: [(&str, CalloutBorder); 12] = [
+    ("none", CalloutBorder::None),
+    ("circle", CalloutBorder::Circle),
+    ("diamond", CalloutBorder::Diamond),
+    ("double_circle", CalloutBorder::DoubleCircle),
+    ("flag", CalloutBorder::Flag),
+    ("hexagon", CalloutBorder::Hexagon),
+    ("octagon", CalloutBorder::Octagon),
+    ("rectangle", CalloutBorder::Rectangle),
+    ("split_circle", CalloutBorder::SplitCircle),
+    ("square_circle", CalloutBorder::SquareCircle),
+    ("triangle", CalloutBorder::Triangle),
+    ("underline", CalloutBorder::Underline),
+];
 
 fn view_id(name: &'static str, what: &'static str) -> crate::registry::Field {
     req(name, json!({ "type": "integer" }), what)
@@ -164,6 +180,63 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: virtual_sharp,
+        },
+        Op {
+            group: "drawing",
+            verb: "hole_callout",
+            summary: "Hole / thread callout on a hole seen as a circle",
+            description: "The Hole/thread callout tool: `hole` is a click on the hole's circle (sheet mm); the callout text (diameter, depth, thread from the Hole feature) goes to `position`. One edit (\"Hole callout\").",
+            fields: with(common(), vec![req("hole", point(), "A point on the hole's circle (sheet mm)."), req("position", point(), "Where the callout text goes (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: hole_callout,
+        },
+        Op {
+            group: "drawing",
+            verb: "callout",
+            summary: "Callout (balloon) with or without a leader",
+            description: "The Callout tool and its dialog: with `anchor` (a click on an edge or point, sheet mm) the leader starts there (in an assembly view an empty `text` shows the part's BOM item number); without it the callout sits alone at `position`. One edit (\"Callout\").",
+            fields: with(
+                common(),
+                vec![
+                    opt("anchor", point(), "Where the leader starts (sheet mm). Omit for a callout without a leader."),
+                    req("position", point(), "Where the callout goes (sheet mm)."),
+                    opt("text", json!({ "type": "string" }), "Centre text (empty: the BOM item number in assembly views)."),
+                    opt("above", json!({ "type": "string" }), "Text above."),
+                    opt("below", json!({ "type": "string" }), "Text below."),
+                    opt("left", json!({ "type": "string" }), "Text left."),
+                    opt("right", json!({ "type": "string" }), "Text right."),
+                    opt("border", json!({ "type": "string", "enum": BORDERS.iter().map(|b| b.0).collect::<Vec<_>>(), "default": "circle" }), "Border shape."),
+                    opt("chars", json!({ "type": "integer", "minimum": 0, "maximum": 20 }), "Border size in characters (0: tight fit)."),
+                    opt("height", json!({ "type": "number", "exclusiveMinimum": 0 }), "Text height (mm)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: callout,
+        },
+        Op {
+            group: "drawing",
+            verb: "ordinate",
+            summary: "Ordinate dimensions from a datum point",
+            description: "The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, sheet mm), `side` a click that sets the measured direction (beside the origin: horizontal values; above or below: vertical), then each of `points` adds an ordinate to the group. One edit per click, as with the mouse (\"Ordinate dimension\", then \"Add to ordinate group\").",
+            fields: with(
+                common(),
+                vec![req("origin", point(), "The datum point (sheet mm)."), req("side", point(), "Where the values line up (sheet mm)."), opt("points", points(0, 64), "Points to dimension (vertices, circle centers; sheet mm).")],
+            ),
+            mutates: true,
+            destructive: false,
+            run: ordinate,
+        },
+        Op {
+            group: "drawing",
+            verb: "datum",
+            summary: "Datum feature symbol",
+            description: "The Datum tool: the triangle on the geometry at `anchor` (a vertex or edge point, sheet mm), the label box at `position` (at least 3 mm away). The label is the next free letter (A, B, …; I, O, Q, S, X, Z skipped) unless given. One edit (\"Datum\").",
+            fields: with(common(), vec![req("anchor", point(), "Where the triangle attaches (sheet mm)."), req("position", point(), "Where the label box goes (sheet mm)."), opt("label", json!({ "type": "string" }), "Datum letter.")]),
+            mutates: true,
+            destructive: false,
+            run: datum,
         },
         Op {
             group: "drawing",
@@ -520,4 +593,97 @@ fn view_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sheet = t.sheet;
     t.d.sheets[sheet].tables.push(table);
     done(od, t, name, "table", id)
+}
+
+// ------------------------------------------------------------ callouts, ordinates, datums
+
+fn hole_callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let h = pt_arg(a, "hole")?;
+    let Some(Pick::Circle { view, center, radius, r }) = t.m.pick(&Tool::HoleCallout { circle: None }, &[], h).circle_pick(h) else {
+        return Err(OpError::param("hole", "not on a hole's circle"));
+    };
+    let tool = Tool::HoleCallout { circle: Some((view, center, radius, r)) };
+    let ann = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("position", "the callout can't be placed there"))?;
+    let (id, sheet) = (ann.id, t.sheet);
+    t.d.sheets[sheet].annotations.push(ann);
+    done(od, t, "Hole callout", "annotation", id)
+}
+
+fn callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let text = |k: &str| -> Result<String, OpError> { Ok(a.opt_str(k)?.unwrap_or("").to_string()) };
+    let mut style = CalloutStyle { above: text("above")?, below: text("below")?, left: text("left")?, right: text("right")?, border: enum_arg(a, "border", &BORDERS, CalloutBorder::Circle)?, ..Default::default() };
+    if let Some(n) = a.opt_u64("chars")? {
+        style.chars = n.min(20) as u8;
+    }
+    style.height = a.opt_f64("height")?;
+    let position = pt_arg(a, "position")?;
+    let centre = text("text")?;
+    let ann = match a.get("anchor") {
+        // Empty space: a callout without a leader, right there.
+        None => dt::free_callout(t.d.sheets[t.sheet].next_annotation_id(), position, centre, style),
+        Some(p) => {
+            let c = point_value(p, "anchor")?;
+            let anchor = t.m.pick(&Tool::Balloon { anchor: None }, &[], c).any_point(c).ok_or_else(|| OpError::param("anchor", "not on a view's geometry"))?;
+            let tool = Tool::Balloon { anchor: Some(anchor.clone()) };
+            let pk = t.m.pick(&tool, &[], position);
+            let mut ann = pk.pending_annotation(&ToolValues { callout: Some((centre, style)), ..Default::default() }).ok_or_else(|| OpError::param("position", "the callout can't be placed there"))?;
+            pk.finish_callout(&mut ann, &anchor);
+            ann
+        }
+    };
+    let (id, sheet) = (ann.id, t.sheet);
+    t.d.sheets[sheet].annotations.push(ann);
+    done(od, t, "Callout", "annotation", id)
+}
+
+fn ordinate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let o = pt_arg(a, "origin")?;
+    let origin = t.m.pick(&Tool::Ordinate { origin: None, horizontal: None, group: None }, &[], o).any_point(o).ok_or_else(|| OpError::param("origin", "not a point of a view"))?;
+    let tool = Tool::Ordinate { origin: Some(origin.clone()), horizontal: None, group: None };
+    let group = t.m.pick(&tool, &[], pt_arg(a, "side")?).pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("side", "at least 3 mm from the origin"))?;
+    let AnnotationKind::OrdinateGroup { horizontal, .. } = group.kind else { return Err(OpError::new("internal", "not an ordinate group")) };
+    let (gid, mut sheet, tab) = (group.id, t.sheet, t.tab);
+    let mut t = t;
+    t.d.sheets[sheet].annotations.push(group);
+    commit(od, tab, sheet, t.d, "Ordinate dimension")?;
+    // Each further click adds a point to the group (one edit each).
+    for (i, p) in a.opt_array("points")?.cloned().unwrap_or_default().iter().enumerate() {
+        let param = format!("points[{i}]");
+        let c = point_value(p, &param)?;
+        let t2 = target(od, a)?;
+        sheet = t2.sheet;
+        let tool = Tool::Ordinate { origin: Some(origin.clone()), horizontal: Some(horizontal), group: Some(gid) };
+        let g = t2.m.pick(&tool, &[], c).pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param(&param, "not a new point of the origin's view (a vertex or circle center)"))?;
+        let mut d = t2.d;
+        if let Some(x) = d.sheets[sheet].annotations.iter_mut().find(|x| x.id == gid) {
+            *x = g;
+        }
+        commit(od, tab, sheet, d, "Add to ordinate group")?;
+    }
+    let mut out = reply(od, tab, sheet, false)?;
+    out["annotation"] = json!(gid);
+    Ok(out.into())
+}
+
+fn datum(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let c = pt_arg(a, "anchor")?;
+    let pk = t.m.pick(&Tool::Datum { anchor: None }, &[], c);
+    let anchor = pk.snap_at(c).and_then(|s| pk.pick_sheet(&s)).unwrap_or(c);
+    let label = match a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty()) {
+        Some(l) => l.to_string(),
+        None => pk.next_datum_label(),
+    };
+    let tool = Tool::Datum { anchor: Some(anchor) };
+    let ann = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_annotation(&ToolValues { datum_label: Some(label), ..Default::default() }).ok_or_else(|| OpError::param("position", "at least 3 mm from the anchor"))?;
+    let (id, sheet) = (ann.id, t.sheet);
+    t.d.sheets[sheet].annotations.push(ann);
+    done(od, t, "Datum", "annotation", id)
 }

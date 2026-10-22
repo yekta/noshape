@@ -92,7 +92,9 @@ pub struct Size {
     /// Nominal (bolt) diameter in the component's unit.
     pub d: f64,
     /// The script's dimensions in the component's unit, keyed by the
-    /// standard's symbols (dk, k, s, t, m, d1, d2, h…).
+    /// standard's symbols (dk, k, s, t, m, d1, d2, h…). A key
+    /// "<name>@<param>=<option>" applies (as <name>) only with that option
+    /// chosen, e.g. "sd@Head type=Type I" for a Type I recess.
     pub dims: BTreeMap<String, f64>,
     /// Live's Length list for this size (bare numbers in the component's
     /// unit, live's order).
@@ -179,10 +181,25 @@ const FILES: [&str; 6] = [
 ];
 
 /// Every component, in file order.
+/// Tests only: NOSHAPE_STD_DATA=<dir> reads the data files from there (to
+/// try a regenerated catalogue before it replaces the built-in one).
+#[cfg(test)]
+fn data_files() -> Vec<String> {
+    const NAMES: [&str; 6] = ["ansi-inch", "din", "iso", "nas", "pem", "sae"];
+    match std::env::var("NOSHAPE_STD_DATA") {
+        Ok(dir) => NAMES.iter().map(|n| std::fs::read_to_string(format!("{dir}/{n}.json")).expect("NOSHAPE_STD_DATA file")).collect(),
+        Err(_) => FILES.iter().map(|t| t.to_string()).collect(),
+    }
+}
+#[cfg(not(test))]
+fn data_files() -> Vec<String> {
+    FILES.iter().map(|t| t.to_string()).collect()
+}
+
 pub static CATALOGUE: LazyLock<Vec<Component>> = LazyLock::new(|| {
     let mut out = Vec::new();
-    for text in FILES {
-        let files: Vec<File> = serde_json::from_str(text).expect("standard content catalogue");
+    for text in data_files() {
+        let files: Vec<File> = serde_json::from_str(&text).expect("standard content catalogue");
         for f in files {
             for mut c in f.components {
                 c.standard = f.standard.clone();

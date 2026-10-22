@@ -8,7 +8,7 @@ use super::PartStudioView;
 use crate::theme::p;
 use glam::{DVec2, DVec3};
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
@@ -49,7 +49,7 @@ pub struct FlattenState {
     pub result: Option<Arc<Flattened>>,
     /// Uploaded drawables for the current result and options.
     pub drawn: Vec<Instance>,
-    inputs: Vec<(Entity<InputState>, Subscription)>,
+    inputs: Vec<(Entity<QuantityInput>, Subscription)>,
 }
 
 impl PartStudioView {
@@ -57,25 +57,29 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let unit = units.length.symbol();
         type Setter = fn(&mut FlattenState, f64);
-        let defaults: [(String, Setter); 4] = [
-            ("10".into(), |s, v| s.checker_scale = v),
-            ("1".into(), |s, v| s.distortion_scale = v),
-            (format!("0 {unit}"), |s, v| s.offset = v),
-            ("0 deg".into(), |s, v| s.angle_deg = v),
+        // Onshape's number fields (quantity_field): the scales are plain
+        // positive numbers, the offset a length, the angle an angle; values
+        // arrive in SI (metres, radians).
+        let scale = QuantitySpec::quantity(noshape_units::Dim::UNITLESS).range(Some(1e-9), None);
+        let defaults: [(String, QuantitySpec, Setter); 4] = [
+            ("10".into(), scale.clone().label("Checkerboard scale"), |s, v| s.checker_scale = v),
+            ("1".into(), scale.label("Distortion scale"), |s, v| s.distortion_scale = v),
+            (format!("0 {unit}"), QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Offset"), |s, v| s.offset = v),
+            ("0 deg".into(), QuantitySpec::quantity(noshape_units::Dim::ANGLE).label("Angle"), |s, v| s.angle_deg = v.to_degrees()),
         ];
-        let factor = units.length.meters();
         let mut inputs = Vec::new();
-        for (k, (text, set)) in defaults.into_iter().enumerate() {
-            let st = cx.new(|cx| InputState::new(window, cx).default_value(text));
-            let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
-                if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+        for (text, spec, set) in defaults {
+            let vars = self.display.variables.clone();
+            let st = cx.new(|cx| {
+                let mut q = QuantityInput::new(text, spec, units, window, cx);
+                q.set_variables(vars, cx);
+                q
+            });
+            let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &QuantityEvent, cx| {
+                if !matches!(ev, QuantityEvent::Committed(_)) {
                     return;
                 }
-                let text = st.read(cx).value().to_string();
-                let num = text.trim().trim_end_matches(|c: char| c.is_alphabetic()).trim().parse::<f64>();
-                let Ok(v) = num else { return this.flash_info("Enter a number".into(), cx) };
-                // Offset is a length in the document's unit.
-                let v = if k == 2 { v * factor } else { v };
+                let Some(v) = st.read(cx).value() else { return };
                 if let Some(s) = &mut this.ui.flatten {
                     set(s, v);
                 }
@@ -382,7 +386,7 @@ impl PartStudioView {
                                 .opacity(0.)
                                 .group_hover("flrow", |d| d.opacity(1.))
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Close).with_size(px(11.)).text_color(pal.text_muted))
+                                .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     if let Some(s) = &mut this.ui.flatten {
@@ -448,10 +452,8 @@ impl PartStudioView {
                 this.redraw_flatten(cx);
             }))
         };
-        let number = |label: &'static str, st: &Entity<InputState>| {
-            h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child(label)).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(st).text_size(px(13.33)).appearance(false).xsmall().text_right())))
-        };
-        let inputs: Vec<Entity<InputState>> = s.inputs.iter().map(|(st, _)| st.clone()).collect();
+        let number = |label: &'static str, st: &Entity<QuantityInput>| h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child(label)).child(div().flex_1().child(st.clone()));
+        let inputs: Vec<Entity<QuantityInput>> = s.inputs.iter().map(|(st, _)| st.clone()).collect();
         let (faces, rips) = (s.faces.clone(), s.rips.clone());
         let origin: Vec<Reference> = s.origin.iter().cloned().collect();
         let position: Vec<Reference> = s.position.iter().cloned().collect();

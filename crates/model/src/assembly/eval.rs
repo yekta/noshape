@@ -922,7 +922,14 @@ pub struct AssemblyEvaluator {
     /// Inserted sketches as wire bodies, by (studio, sketch, configuration),
     /// with the studio regeneration they were built from.
     sketch_bodies: HashMap<SketchKey, SketchBodyEntry>,
+    /// Regeneration options for Part Studios with Derived or custom
+    /// features (their sources: the app's / agent API's providers).
+    studio_options: Option<StudioOptions>,
 }
+
+/// Builds the regeneration options (derived parts' sources, custom
+/// features) for a document's Part Studios.
+pub type StudioOptions = Arc<dyn Fn(&Document) -> RegenOptions + Send + Sync>;
 
 /// Body id of an inserted sketch's wire body (one per sketch feature).
 pub fn sketch_body_id(sketch: FeatureId) -> BodyId {
@@ -1632,10 +1639,30 @@ impl AssemblyEvaluator {
         };
         let cfg = effective_config(doc, tab, config);
         let key = (tab, serde_json::to_string(&cfg).unwrap_or_default());
-        let hash = hash_of(&(ps, &doc.settings.units));
+        let mut hash = hash_of(&(ps, &doc.settings.units));
+        // Derived parts and custom features need their sources (qa5 DER8:
+        // a Part Studio of derived parts listed nothing in Insert); the
+        // sources' versions are part of the cache key.
+        let needs_sources = ps.features.iter().any(|f| f.type_id == "importDerived" || crate::custom::is_custom(&f.type_id));
+        let opts = match self.studio_options.as_ref().filter(|_| needs_sources) {
+            Some(make) => make(doc),
+            None => RegenOptions::default(),
+        };
+        if let Some(p) = &opts.derived {
+            for f in ps.features.iter().filter(|f| f.type_id == "importDerived") {
+                hash = hash.rotate_left(5) ^ p.version(f.params.text("partStudio").trim());
+            }
+        }
+        if opts.custom_features.is_some() {
+            for t in &doc.tabs {
+                if matches!(t.content, TabContent::FeatureStudio(_)) {
+                    hash = hash.rotate_left(5) ^ hash_of(&serde_json::to_string(&t.content).unwrap_or_default());
+                }
+            }
+        }
         let entry = self.studios.entry(key).or_insert_with(|| StudioCacheEntry { hash: hash ^ 1, regen: Regenerator::new(), result: Arc::new(RegenResult::default()) });
         if entry.hash != hash {
-            let r = entry.regen.regenerate(ps, &cfg, &doc.settings.units, &RegenOptions::default());
+            let r = entry.regen.regenerate(ps, &cfg, &doc.settings.units, &opts);
             entry.result = Arc::new(r);
             entry.hash = hash;
         }
@@ -1645,6 +1672,13 @@ impl AssemblyEvaluator {
     /// Regenerate a standard content part (cached per spec).
     pub fn standard_part(&mut self, spec: &super::standard::StandardSpec) -> Result<Arc<RegenResult>, String> {
         self.standard.entry(spec.clone()).or_insert_with(|| super::standard::regenerate(spec).map(Arc::new)).clone()
+    }
+
+    /// Set how Part Studios with Derived or custom features find their
+    /// sources (without it they regenerate without them).
+    pub fn set_studio_options(&mut self, make: StudioOptions) {
+        self.studio_options = Some(make);
+        self.studios.clear();
     }
 
     /// Set the resolver for parts inserted from other documents.
@@ -2229,7 +2263,7 @@ impl AssemblyEvaluator {
             let mut full = vec![c.instance];
             full.extend(c.path.iter().copied());
             let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
-            let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate connector could not be resolved (missing geometry)")?;
+            let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
             Ok(match leaf.flex {
                 Some((child, rest)) => (Owner::Nested(c.instance, child), matrix_frame(&rest).mul(&f)),
                 None => (Owner::Top(c.instance), matrix_frame(&leaf.inner).mul(&f)),
@@ -2392,7 +2426,7 @@ impl AssemblyEvaluator {
                 full.extend(c.path.iter().copied());
                 let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
                 let rest = leaf.flex.map(|f| f.1).unwrap_or(DMat4::IDENTITY);
-                let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate connector could not be resolved (missing geometry)")?;
+                let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
                 let (b, off) = *prepared.nested_body_of.get(&(*sid, c.instance)).ok_or("Instance no longer exists")?;
                 Ok((b, off.mul(&matrix_frame(&rest)).mul(&f)))
             };

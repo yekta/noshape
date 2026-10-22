@@ -1,16 +1,19 @@
 //! Drawing editor: shaded views (view menu › Show/hide › Show shaded view;
 //! live behaviours "Shaded drawing views"): the view's parts rendered
 //! offscreen along the view's line of sight (orthographic, the document
-//! thumbnail look) and drawn under its edges; PDF embeds the picture (at
-//! most 1024 px), DXF keeps the edges only. Children don't inherit it.
-//! Base, projected and auxiliary views without crops or breaks for now
-//! (sections and details need their cut / clipped bodies).
+//! thumbnail look) instead of its edges, which show only while the view is
+//! hovered (plain) or selected (selection colour); the background stays
+//! transparent. A flat pattern view shows its flat plate, with the bend
+//! lines and notes on top. PDF embeds the picture (at most 1024 px), DXF
+//! keeps the edges only. Children don't inherit it. Base, projected and
+//! auxiliary views without crops or breaks for now (sections and details
+//! need their cut / clipped bodies).
 
 use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_model::drawing::views::{self, ViewFrame};
 use noshape_model::drawing::{RenderStyle, ViewId, ViewKind};
-use noshape_render::{Drawable, ImageData, ImageHandle, Instance};
+use noshape_render::{Drawable, ImageData, ImageHandle, Instance, LinesHandle};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -20,8 +23,9 @@ const MAX_PX: f64 = 1024.0;
 /// Picture pixels per sheet millimetre (before the cap).
 const PX_PER_MM: f64 = 8.0;
 
-/// A picture for export: lower-left corner and size on the sheet, PNG.
-pub type ShadedExport = ([f64; 2], [f64; 2], Arc<Vec<u8>>);
+/// A picture for export: its view, lower-left corner and size on the
+/// sheet, PNG (with alpha).
+pub type ShadedExport = (ViewId, [f64; 2], [f64; 2], Arc<Vec<u8>>);
 
 /// One view's picture: what it was made for, its texture and PNG.
 pub struct ShadedImage {
@@ -34,6 +38,9 @@ pub struct ShadedImage {
 pub struct ShadedViews {
     pub images: HashMap<ViewId, ShadedImage>,
     busy: HashSet<ViewId>,
+    /// The edges of the views with a picture: with their pick ids (picking,
+    /// and drawn while selected) and without (drawn while hovered).
+    pub edges: Vec<(ViewId, LinesHandle, LinesHandle)>,
 }
 
 impl DrawingEditor {
@@ -55,13 +62,14 @@ impl DrawingEditor {
             let Some((key, part)) = views::view_source(sheet, id) else { continue };
             let Some(src) = self.sources.get(&key).cloned() else { continue };
             let Some(pl) = self.placement(id) else { continue };
+            let flat = sheet.view(id).is_some_and(|v| v.flat);
             let (lo, hi) = (g.min, g.max);
             if !(hi[0] > lo[0] && hi[1] > lo[1]) {
                 continue;
             }
             let mut h = std::collections::hash_map::DefaultHasher::new();
             src.hash.hash(&mut h);
-            format!("{:?}{:?}{lo:?}{hi:?}{part:?}{}", frame.dir, frame.up, pl.scale).hash(&mut h);
+            format!("{:?}{:?}{lo:?}{hi:?}{part:?}{}{flat}", frame.dir, frame.up, pl.scale).hash(&mut h);
             let k = h.finish();
             if self.shaded.images.get(&id).is_some_and(|i| i.key == k) || self.shaded.busy.contains(&id) {
                 continue;
@@ -74,6 +82,7 @@ impl DrawingEditor {
                 gpu: self.gpu.clone(),
                 src,
                 part,
+                flat,
                 frame,
                 lo,
                 hi,
@@ -83,9 +92,7 @@ impl DrawingEditor {
                 let png = job.render().await;
                 let _ = this.update(cx, |this: &mut Self, cx| {
                     this.shaded.busy.remove(&id);
-                    if let Some(png) = png
-                        && let Some(img) = decode(&png)
-                    {
+                    if let Some((img, png)) = png.as_deref().and_then(decode) {
                         let handle = this.gpu.uploader().upload_image(&img);
                         this.shaded.images.insert(id, ShadedImage { key: k, handle, png: Arc::new(png) });
                         this.geometry_dirty = true;
@@ -97,7 +104,10 @@ impl DrawingEditor {
         }
     }
 
-    /// The pictures as scene quads over their views (under the edges).
+    /// The pictures as scene quads over their views, behind the sheet's ink
+    /// (z −0.5: images are drawn after the text meshes and depth-tested, so
+    /// the bend notes and other texts over a picture stay visible; the
+    /// paper is at −1).
     pub fn shaded_instances(&self) -> Vec<Instance> {
         self.shaded
             .images
@@ -108,11 +118,27 @@ impl DrawingEditor {
                     glam::Vec4::new(x[0] as f32, x[1] as f32, 0.0, 0.0),
                     glam::Vec4::new(y[0] as f32, y[1] as f32, 0.0, 0.0),
                     glam::Vec4::Z,
-                    glam::Vec4::new(o[0] as f32, o[1] as f32, 0.0, 1.0),
+                    glam::Vec4::new(o[0] as f32, o[1] as f32, -0.5, 1.0),
                 );
                 Some(Instance::new(Drawable::Image(img.handle.clone())).with_transform(m).layer(-2))
             })
             .collect()
+    }
+
+    /// A shaded view's edges: pickable but hidden; plain ink while the view
+    /// is hovered, the selection colour while it is selected.
+    pub fn shaded_edge_instances(&self) -> Vec<Instance> {
+        let hovered = self.hover.and_then(|h| self.sel_of_pick(h));
+        let mut out = Vec::new();
+        for (id, picked, plain) in &self.shaded.edges {
+            out.push(Instance::new(Drawable::Lines(picked.clone())).per_primitive_color().pick_only());
+            if self.selection.contains(&Sel::View(*id)) {
+                out.push(Instance::new(Drawable::Lines(picked.clone())).per_primitive_color());
+            } else if hovered == Some(Sel::View(*id)) {
+                out.push(Instance::new(Drawable::Lines(plain.clone())).per_primitive_color().unpickable());
+            }
+        }
+        out
     }
 
     /// The pictures for PDF / SVG / raster export: (lower-left corner,
@@ -123,7 +149,7 @@ impl DrawingEditor {
             .iter()
             .filter_map(|(id, img)| {
                 let (o, x, y) = self.shaded_frame(*id)?;
-                Some((o, [x[0] + y[0], x[1] + y[1]], img.png.clone()))
+                Some((*id, o, [x[0] + y[0], x[1] + y[1]], img.png.clone()))
             })
             .collect()
     }
@@ -142,11 +168,13 @@ impl DrawingEditor {
 
 /// One picture to render: the parts (or `part`) of `src` seen along
 /// `frame`, framing exactly the view box `lo`..`hi` (view coordinates), at
-/// `size` pixels.
+/// `size` pixels. `flat`: the part's flat pattern, seen from its reference
+/// side (the flat view's coordinates are the flat's plane coordinates).
 struct Job {
     gpu: crate::gpu::Gpu,
     src: views::SourceModel,
     part: Option<noshape_model::BodyId>,
+    flat: bool,
     frame: ViewFrame,
     lo: [f64; 2],
     hi: [f64; 2],
@@ -160,17 +188,29 @@ impl Job {
             gpu,
             src,
             part,
-            frame,
+            flat,
+            mut frame,
             lo,
             hi,
             size: (w, h),
         } = self;
         let part = part.as_ref();
+        // The flat plate (the flat region made solid), placed in its plane.
+        let mut origin = glam::DVec3::ZERO;
+        let mut plate = None;
+        if flat {
+            let fp = noshape_model::sheetmetal::flat::flat_pattern_for(&src.context, part?).ok()?;
+            let solid = noshape_kernel::extrude(fp.shape.as_ref()?, fp.frame.normal * -fp.thickness).ok()?;
+            frame = ViewFrame::new(-fp.frame.unit_normal(), fp.frame.unit_y());
+            origin = fp.frame.origin;
+            plate = Some(solid.shape);
+        }
         let mut display = StudioDisplay::default();
         let (mut d0, mut d1) = (f64::MAX, f64::MIN);
-        for b in src.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid && part.is_none_or(|p| *p == b.id)) {
-            let Some(mesh) = noshape_model::regen::tessellate_shape(&b.shape, 0.5) else { continue };
-            if let Ok(bb) = b.shape.bounding_box(false) {
+        for b in src.context.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface) && part.is_none_or(|p| *p == b.id) && (part.is_some() || b.kind == BodyKind::Solid)) {
+            let shape = plate.as_ref().unwrap_or(&b.shape);
+            let Some(mesh) = noshape_model::regen::tessellate_shape(shape, 0.5) else { continue };
+            if let Ok(bb) = shape.bounding_box(false) {
                 for c in [bb.min, bb.max] {
                     d0 = d0.min(c.dot(frame.dir));
                     d1 = d1.max(c.dot(frame.dir));
@@ -180,7 +220,7 @@ impl Job {
             display.bodies.push(BodyDisplay {
                 id: b.id.clone(),
                 name: b.name.clone(),
-                kind: BodyKind::Solid,
+                kind: b.kind,
                 color,
                 hidden: false,
                 mesh: Arc::new(mesh),
@@ -209,7 +249,7 @@ impl Job {
             ..Default::default()
         };
         let (cx, cy) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
-        camera.target = frame.right * cx + frame.up * cy + frame.dir * ((d0 + d1) / 2.0);
+        camera.target = origin + frame.right * cx + frame.up * cy + frame.dir * ((d0 + d1) / 2.0 - origin.dot(frame.dir));
         let half = (hi[1] - lo[1]) / 2.0;
         camera.distance = (half / (camera.fov_y * 0.5).tan()).max(1e-6);
         let style = noshape_render::Style {
@@ -220,14 +260,25 @@ impl Job {
     }
 }
 
-/// PNG → RGBA image for the scene.
-fn decode(png: &[u8]) -> Option<ImageData> {
-    let rgba = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?.to_rgba8();
+/// PNG → RGBA image for the scene, and the PNG again with the white
+/// background transparent (live: the picture covers only the part).
+fn decode(png: &[u8]) -> Option<(ImageData, Vec<u8>)> {
+    let mut rgba = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?.to_rgba8();
+    for px in rgba.as_chunks_mut::<4>().0 {
+        if px[0] >= 250 && px[1] >= 250 && px[2] >= 250 {
+            *px = [0; 4];
+        }
+    }
+    let mut out = std::io::Cursor::new(Vec::new());
+    rgba.write_to(&mut out, image::ImageFormat::Png).ok()?;
     let (width, height) = rgba.dimensions();
-    Some(ImageData {
-        corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
-        width,
-        height,
-        rgba: rgba.into_raw(),
-    })
+    Some((
+        ImageData {
+            corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
+            width,
+            height,
+            rgba: rgba.into_raw(),
+        },
+        out.into_inner(),
+    ))
 }

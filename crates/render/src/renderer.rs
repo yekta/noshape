@@ -107,6 +107,9 @@ pub(crate) struct GpuLines {
     buffer: wgpu::Buffer,
     count: u32,
     pub(crate) bounds: Option<(Vec3, Vec3)>,
+    /// [`SilhouetteSegment`]s (drawn where they are silhouettes, never
+    /// picked), not [`LineSegment`]s.
+    silhouette: bool,
 }
 pub(crate) struct GpuPoints {
     buffer: wgpu::Buffer,
@@ -180,7 +183,8 @@ struct InstUniform {
     normal_m: [[f32; 4]; 4],
     color: [f32; 4],
     params: [u32; 4],
-    /// x = line width scale.
+    /// x = line width scale; y = ghost amount (params.y bit 7) when there is
+    /// no reflection.
     extra: [f32; 4],
 }
 
@@ -550,6 +554,10 @@ struct DrawLists {
     /// Color pass only: opaque meshes drawn after the transparent ones.
     over_transparent: Vec<usize>,
     lines: Vec<usize>,
+    /// Color pass only: silhouette candidates (`GpuLines::silhouette`) and
+    /// backface silhouette meshes (`Instance::back_silhouette`).
+    silhouettes: Vec<usize>,
+    back_silhouettes: Vec<usize>,
     points: Vec<usize>,
     /// Color pass only: `hidden_only` lines and points.
     lines_hidden: Vec<usize>,
@@ -566,6 +574,17 @@ struct DrawLists {
 }
 
 impl DrawLists {
+    /// Leave out what the style's [`Detail`] turns off (their slots stay
+    /// assigned, unused).
+    fn apply_detail(&mut self, detail: &Detail) {
+        if !detail.edge_silhouettes {
+            self.silhouettes.clear();
+        }
+        if !detail.backface_silhouettes {
+            self.back_silhouettes.clear();
+        }
+    }
+
     /// Partition the scene's visible instances by pass, sorted by layer.
     fn build(&mut self, scene: &Scene, view_proj: &Mat4, width: u32, height: u32, dpr: f32, pick: bool) {
         self.opaque.clear();
@@ -576,6 +595,8 @@ impl DrawLists {
         self.reflective.clear();
         self.over_transparent.clear();
         self.lines.clear();
+        self.silhouettes.clear();
+        self.back_silhouettes.clear();
         self.points.clear();
         self.lines_hidden.clear();
         self.points_hidden.clear();
@@ -628,6 +649,11 @@ impl DrawLists {
                 continue;
             }
             match &inst.drawable {
+                Drawable::Mesh(_) if inst.back_silhouette => {
+                    if !pick {
+                        self.back_silhouettes.push(i);
+                    }
+                }
                 Drawable::Mesh(_) if pick && inst.pick_only => self.pick_priority.push(i),
                 Drawable::Mesh(_) if !pick && inst.reflection.is_some() && inst.color[3] >= 0.999 => self.reflective.push(i),
                 Drawable::Mesh(_) if !pick && inst.over_transparent && inst.color[3] >= 0.999 => self.over_transparent.push(i),
@@ -635,6 +661,11 @@ impl DrawLists {
                 Drawable::Mesh(_) => self.transparent.push(i),
                 Drawable::Image(_) if inst.color[3] >= 0.999 => self.images.push(i),
                 Drawable::Image(_) => self.images_faded.push(i),
+                Drawable::Lines(l) if l.0.silhouette => {
+                    if !pick && !inst.hidden_only {
+                        self.silhouettes.push(i);
+                    }
+                }
                 Drawable::Lines(_) if inst.hidden_only => self.lines_hidden.push(i),
                 Drawable::Points(_) if inst.hidden_only => self.points_hidden.push(i),
                 Drawable::Lines(_) => self.lines.push(i),
@@ -645,6 +676,8 @@ impl DrawLists {
             let o = perf_overrides();
             if o.skip_lines {
                 self.lines.clear();
+                self.silhouettes.clear();
+                self.back_silhouettes.clear();
             }
             if o.skip_meshes {
                 self.opaque.clear();
@@ -653,8 +686,8 @@ impl DrawLists {
             }
         }
         let inst = &scene.instances;
-        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, lines, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
-        let all = [opaque, transparent, pick_priority, reflective, over_transparent, images, images_faded, lines, points, lines_hidden, points_hidden];
+        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
+        let all = [opaque, transparent, pick_priority, reflective, over_transparent, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
         slots.clear();
         slot_of.clear();
         slot_of.resize(inst.len(), u32::MAX);
@@ -817,6 +850,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.lines, &pipelines.line_pick);
         draw(pass, &lists.points, &pipelines.point_pick);
     } else {
+        draw(pass, &lists.back_silhouettes, &pipelines.mesh_backsil);
         draw(pass, &lists.opaque, &pipelines.mesh_opaque);
         if outline {
             draw(pass, &lists.opaque, &pipelines.mesh_outline);
@@ -844,6 +878,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.lines_hidden, &pipelines.line_hidden);
         draw(pass, &lists.points_hidden, &pipelines.point_hidden);
         draw(pass, &lists.lines, &pipelines.line);
+        draw(pass, &lists.silhouettes, &pipelines.silhouette);
         draw(pass, &lists.points, &pipelines.point);
         // Outlined see-through parts, last (their depth would hide what
         // is behind them).
@@ -1085,6 +1120,8 @@ struct Pipelines {
     /// Lines and points of `hidden_only` instances: drawn where something is
     /// in front of them (depth test Less, no depth write).
     line_hidden: wgpu::RenderPipeline,
+    silhouette: wgpu::RenderPipeline,
+    mesh_backsil: wgpu::RenderPipeline,
     point_hidden: wgpu::RenderPipeline,
     mesh_pick: wgpu::RenderPipeline,
     mesh_pick_transparent: wgpu::RenderPipeline,
@@ -1549,6 +1586,9 @@ impl Renderer {
     pub fn upload_lines(&self, lines: &LineData) -> LinesHandle {
         self.uploader().upload_lines(lines)
     }
+    pub fn upload_silhouettes(&self, data: &SilhouetteData) -> LinesHandle {
+        self.uploader().upload_silhouettes(data)
+    }
     pub fn upload_points(&self, points: &PointData) -> PointsHandle {
         self.uploader().upload_points(points)
     }
@@ -1571,6 +1611,11 @@ impl Renderer {
             array_stride: std::mem::size_of::<MeshVertex>() as u64,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Uint32, 3 => Unorm8x4],
+        }];
+        let silhouette_buffers = [wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<SilhouetteSegment>() as u64,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x3, 3 => Float32x3, 4 => Uint32, 5 => Float32],
         }];
         let line_buffers = [wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<LineSegment>() as u64,
@@ -1672,6 +1717,8 @@ impl Renderer {
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
             mesh_transparent: make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }),
             line: make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
+            mesh_backsil: make(P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }),
+            silhouette: make(P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: &silhouette_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
             line_hidden: make(P { label: "line-hidden", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
             point: make(P { label: "point", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: msaa }),
             point_hidden: make(P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: POINT_DEPTH_BIAS, samples: msaa }),
@@ -1791,10 +1838,10 @@ impl Renderer {
                 model: inst.transform.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5), inst.pickable as u32, inst.pick_base],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32, inst.pick_base],
                 extra: match &inst.reflection {
                     Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, r.lock as u32 as f32],
-                    None => [inst.line_scale, 0.0, 0.0, 0.0],
+                    None => [inst.line_scale, inst.ghost, 0.0, 0.0],
                 },
             };
             let off = i * INST_STRIDE as usize;
@@ -1941,6 +1988,7 @@ impl Renderer {
             None => 0,
         };
         lists.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, false);
+        lists.apply_detail(&req.style.detail);
         let bind_inst = self.prepare_slots(SLOTS_COLOR, &lists.slots);
         // ...then both versions together, and each version's opaque faces
         // for its depth and normal.
@@ -1948,6 +1996,7 @@ impl Renderer {
             let mut over = std::mem::take(&mut self.lists_over);
             over.skip_compare = 0;
             over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, false);
+            over.apply_detail(&req.style.detail);
             let bind_over = self.prepare_slots(SLOTS_COMPARE_OVER, &over.slots);
             let faces = [crate::scene::compare::BASE, crate::scene::compare::TARGET]
                 .map(|v| req.scene.instances.iter().enumerate().filter(|(_, i)| i.compare == v && !i.pick_only && i.color[3] >= 1.0 && matches!(i.drawable, Drawable::Mesh(_))).map(|(k, _)| k as u32).collect::<Vec<u32>>());
@@ -2059,7 +2108,7 @@ impl Renderer {
                     pass.set_bind_group(3, &*compare_none, &[]);
                     draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, &bind_inst, DrawMode { mask: true, ..Default::default() });
                 }
-                section_caps.encode_edges(&mut encoder, &caps);
+                section_caps.encode_edges(&mut encoder, &caps, req.style.detail.section_edges);
                 Some(caps)
             }
             None => None,
@@ -2862,7 +2911,16 @@ impl Uploader {
             },
             usage: wgpu::BufferUsages::VERTEX,
         });
-        LinesHandle(Arc::new(GpuLines { buffer, count: lines.segments.len() as u32, bounds: lines.bounds() }))
+        LinesHandle(Arc::new(GpuLines { buffer, count: lines.segments.len() as u32, bounds: lines.bounds(), silhouette: false }))
+    }
+
+    pub fn upload_silhouettes(&self, data: &SilhouetteData) -> LinesHandle {
+        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("silhouettes"),
+            contents: if data.segments.is_empty() { &[0u8; std::mem::size_of::<SilhouetteSegment>()] } else { bytemuck::cast_slice(&data.segments) },
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        LinesHandle(Arc::new(GpuLines { buffer, count: data.segments.len() as u32, bounds: data.bounds(), silhouette: true }))
     }
 
     pub fn upload_points(&self, points: &PointData) -> PointsHandle {

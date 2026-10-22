@@ -50,7 +50,7 @@ fn big_plate_timing() {
     eprintln!("400 circles: {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
     let regions: Vec<Value> = last["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
     eprintln!("regions: {}", regions.len());
-    let r = timed(&mut ctx, "Extrude 2 (Remove, Through all)", "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": regions, "operationType": "REMOVE", "endBound": "THROUGH_ALL" } }));
+    let r = timed(&mut ctx, "Extrude 2 (Remove, Through all)", "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": regions, "operationType": "REMOVE", "defaultScope": true, "endBound": "THROUGH_ALL" } }));
     assert_eq!(r["feature_status"]["status"], "Ok", "{r}");
 
     // From scratch: feature evaluation vs display.

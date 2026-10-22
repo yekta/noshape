@@ -455,14 +455,12 @@ pub fn replace_description(base: &str) -> String {
 }
 
 /// Replace instance `id` (with `all`, every instance of the same source)
-/// by `source`, then re-point mates whose geometry names don't exist on the
-/// replacement to geometrically matching faces / edges of `new` (the
-/// replacement's Part Studio, and its part). Returns (replaced, remapped
-/// mate references).
-pub fn replace_instance(a: &mut Assembly, id: InstanceId, source: InstanceSource, base: &str, all: bool, old: &AssemblyResult, new: Option<(&noshape_model::regen::context::Context, Option<&BodyId>)>) -> (usize, usize) {
-    let ids = a.replace_instance(id, source, base, all);
-    let n = new.map(|(c, body)| noshape_model::assembly::analysis::remap_replaced(a, &ids, old, c, body)).unwrap_or(0);
-    (ids.len(), n)
+/// by `source`. Mates keep their references: where the replacement lacks
+/// the same geometry names they fail, as live ("Mate cannot resolve mate
+/// connectors.", qa5 MT9). Returns (replaced, 0); `old` / `new` are kept for
+/// the agent API's signature.
+pub fn replace_instance(a: &mut Assembly, id: InstanceId, source: InstanceSource, base: &str, all: bool, _old: &AssemblyResult, _new: Option<(&noshape_model::regen::context::Context, Option<&BodyId>)>) -> (usize, usize) {
+    (a.replace_instance(id, source, base, all).len(), 0)
 }
 
 /// The message after Replace instance.

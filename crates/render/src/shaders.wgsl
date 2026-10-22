@@ -45,6 +45,8 @@ fn load_inst(slot: u32) {
     inst = insts[slots[slot]];
 }
 
+// The part edges' width in logical px (scene builder `push_polyline` 1.25).
+const EDGE_WIDTH: f32 = 1.25;
 const HOVER: u32 = 1u;
 const SELECTED: u32 = 2u;
 const BODY: u32 = 256u;
@@ -326,6 +328,8 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
     }
     // Back faces revealed by a section cut are tinted so cut solids read well.
     if (!front && g.flags.x != 0u) { c = mix(c, g.accent.rgb * 0.5, 0.5); }
+    // params.y bit 7: Isolate ghost, mixed toward white in sRGB (extra.y).
+    if ((inst.params.y & 128u) != 0u) { c = srgb_to_linear(mix(linear_to_srgb(c), vec3(1.0), inst.extra.y)); }
     var a = inst.color.a;
     if ((st & DIM) != 0u) { a = a * 0.25; }
     return vec4(c, a);
@@ -335,6 +339,52 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
 fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     return mesh_color(i, front);
+}
+
+// Onshape's image-based silhouettes (`vs-backfacesil-faces`): back faces
+// pushed out along their normals by half an edge width on screen (less
+// where they face straight away), in the edge color; the part's front
+// faces hide them except a thin band along its outline.
+struct BackSilOut {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) clamped_ndv: f32,
+    @location(1) world: vec3<f32>,
+    @location(2) @interpolate(flat) pick: u32,
+    @location(3) @interpolate(flat) slot: u32,
+};
+
+@vertex
+fn vs_backsil(v: MeshIn, @builtin(instance_index) slot: u32) -> BackSilOut {
+    load_inst(slot);
+    let w = (inst.model * vec4(v.pos, 1.0)).xyz;
+    let n = normalize((inst.normal_m * vec4(v.normal, 0.0)).xyz);
+    let persp = g.camera_pos.w > 0.5;
+    let ndv = dot(n, select(-g.camera_fwd.xyz, normalize(g.camera_pos.xyz - w), persp));
+    // A small step along the normal (any length in orthographic).
+    let step = select(1e-3, 1e-3 * length(g.camera_pos.xyz - w), persp);
+    let p = g.view_proj * vec4(w, 1.0);
+    let q = g.view_proj * vec4(w + n * step, 1.0);
+    let half_vp = g.viewport.xy * 0.5;
+    let screen = length((q.xy / q.w - p.xy / p.w) * half_vp);
+    // The part's edge width (EDGE_WIDTH × the line width preference).
+    let width = EDGE_WIDTH * inst.extra.x;
+    let scale = 0.5 * g.viewport.z * width / (screen + 1e-6) * (1.0 - abs(ndv));
+    var o: BackSilOut;
+    o.pos = mix(p, q, scale);
+    o.clamped_ndv = min(ndv, 0.0);
+    o.world = w;
+    o.pick = global_pick(v.pick);
+    o.slot = slot;
+    return o;
+}
+
+@fragment
+fn fs_backsil(i: BackSilOut) -> @location(0) vec4<f32> {
+    if (i.clamped_ndv == 0.0) { discard; }
+    load_inst(i.slot);
+    let st = state_of(i.pick);
+    if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return vec4(inst.color.rgb, 1.0);
 }
 
 // Part outline (state OUTLINE): the faces turned away from the viewer,
@@ -347,7 +397,9 @@ fn vs_outline(v: MeshIn, @builtin(instance_index) slot: u32) -> MeshOut {
     let n = (g.view_proj * vec4(o.normal, 0.0)).xy;
     let len = length(n);
     if (len > 1e-6) {
-        let width = 3.0 * g.viewport.z;
+        // A whole selected part (BODY): live ins-902's band is 3 px at the
+        // bottom, 2 px at the side; the boundary edge eats about one.
+        let width = select(3.0, 4.0, (state_of(o.pick) & BODY) != 0u) * g.viewport.z;
         o.pos = vec4(o.pos.xy + n / len * width * 2.0 / g.viewport.xy * o.pos.w, o.pos.zw);
     }
     return o;
@@ -573,8 +625,47 @@ fn in_front_of_faces(c: vec4<f32>, units: f32) -> vec4<f32> {
 fn vs_line(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
     // Six vertices (two triangles) per segment and slot: corners (t, side).
     let slot = index / 6u;
-    let vi = index % 6u;
     load_inst(slot);
+    return line_vertex(index, l, 0xffffffffu);
+}
+
+// A tessellation edge inside a curved face with the normals of its two
+// facets (Onshape's edge-based silhouettes, `vs-draw-silhouettes`): drawn
+// like an edge where one facet faces the viewer and the other doesn't.
+struct SilhouetteIn {
+    @location(0) a: vec3<f32>,
+    @location(1) b: vec3<f32>,
+    @location(2) n1: vec3<f32>,
+    @location(3) n2: vec3<f32>,
+    @location(4) pick: u32,
+    @location(5) width: f32,
+};
+
+@vertex
+fn vs_silhouette(@builtin(vertex_index) index: u32, s: SilhouetteIn) -> LineOut {
+    let slot = index / 6u;
+    load_inst(slot);
+    let n1 = (inst.normal_m * vec4(s.n1, 0.0)).xyz;
+    let n2 = (inst.normal_m * vec4(s.n2, 0.0)).xyz;
+    // Toward the viewer: the eye ray (perspective) or the view direction.
+    let at = (inst.model * vec4(s.a, 1.0)).xyz;
+    let view = select(-g.camera_fwd.xyz, g.camera_pos.xyz - at, g.camera_pos.w > 0.5);
+    var l: LineIn;
+    l.a = s.a;
+    l.b = s.b;
+    l.color = vec4(0.0);
+    l.pick = s.pick;
+    l.width = s.width;
+    l.style = 0u;
+    // A face's hover and selection show on its boundary edges, not here.
+    var o = line_vertex(index, l, ~(HOVER | SELECTED));
+    if (dot(n1, view) * dot(n2, view) >= 0.0) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
+    return o;
+}
+
+fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
+    let slot = index / 6u;
+    let vi = index % 6u;
     var ts = array<f32, 6>(0.0, 0.0, 1.0, 0.0, 1.0, 1.0);
     var ss = array<f32, 6>(-1.0, 1.0, 1.0, -1.0, 1.0, -1.0);
     let t = ts[vi];
@@ -596,7 +687,7 @@ fn vs_line(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
     let nrm = vec2(-d.y, d.x);
 
     let pick = global_pick(l.pick);
-    let st = state_of(pick);
+    let st = state_of(pick) & state_mask;
     var width = l.width * inst.extra.x + g.viewport.w;
     if ((st & (HOVER | SELECTED)) != 0u) { width = width * 1.8 + 1.0; }
     let half = max(width * g.viewport.z * 0.5, 0.5);

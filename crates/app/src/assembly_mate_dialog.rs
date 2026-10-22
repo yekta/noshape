@@ -5,11 +5,10 @@
 use crate::assets::icon_path;
 use crate::os_ui as os;
 use crate::theme::p;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_menu::OsMenuItem;
 use crate::os_ui::OsDropdownExt as _;
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::assembly::eval::{limit_keys, offset_axes};
@@ -79,6 +78,9 @@ pub struct MateDialog {
     /// Connector field receiving viewport picks (0 = a, 1 = b, 2 = c, 3 = d).
     pub active: Option<usize>,
     pub flip_primary: bool,
+    /// The connector field the Mate connector panel is editing (its chip is
+    /// bold, live 578).
+    pub editing_field: Option<usize>,
     pub reorient: u8,
     pub suppressed: bool,
     /// Tangent mates: contact may move onto tangent-connected faces.
@@ -103,6 +105,8 @@ pub struct MateDialog {
     pub status: Option<String>,
     focus: FocusHandle,
     _subs: Vec<Subscription>,
+    /// The mate type select (Onshape's os-select, live assembly/36).
+    type_select: Entity<crate::os_select::OsSelect>,
 }
 
 impl EventEmitter<MateDialogEvent> for MateDialog {}
@@ -112,6 +116,9 @@ impl Focusable for MateDialog {
         self.focus.clone()
     }
 }
+
+/// What an unset limit field reads (live).
+const NO_LIMIT: [&str; 3] = ["No minimum", "No maximum", "No maximum angle"];
 
 fn text_of(e: &Option<ExprValue>) -> String {
     e.as_ref().map(|e| e.text.clone()).unwrap_or_default()
@@ -145,9 +152,11 @@ impl MateDialog {
     }
 
     pub fn new(mate: Mate, is_new: bool, labeler: ConnectorLabeler, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mk = |text: String, ph: &str, window: &mut Window, cx: &mut Context<Self>| {
-            let ph = ph.to_string();
-            cx.new(|cx| InputState::new(window, cx).placeholder(ph).default_value(text))
+        // Live (qa5 MT5, dom/qa5-asm-036): "0 mm", "No minimum" are the
+        // fields' values in regular text (their placeholder is empty).
+        let mk = |text: String, default: &str, window: &mut Window, cx: &mut Context<Self>| {
+            let text = if text.trim().is_empty() { default.to_string() } else { text };
+            cx.new(|cx| InputState::new(window, cx).default_value(text))
         };
         let offsets = [
             mk(text_of(&mate.offset_x), "0 mm", window, cx),
@@ -172,6 +181,13 @@ impl MateDialog {
                 _ => {}
             }));
         }
+        let type_select = cx.new(|_| crate::os_select::OsSelect::new("mate-type"));
+        subs.push(cx.subscribe_in(&type_select, window, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, _, cx| {
+            let crate::os_select::OsSelectEvent::Picked(id) = ev;
+            if let Some(mt) = MATE_TYPE_ORDER.iter().copied().find(|mt| mt.name() == id.as_ref()) {
+                this.set_type(mt, cx);
+            }
+        }));
         let use_offset = [&mate.offset_x, &mate.offset_y, &mate.offset_z, &mate.rotation].iter().any(|e| e.as_ref().is_some_and(|e| !e.text.trim().is_empty()));
         let use_limits = !mate.limits.is_empty();
         let (a, b) = if is_new { (None, None) } else { (Some(mate.a.clone()), Some(mate.b.clone())) };
@@ -187,6 +203,7 @@ impl MateDialog {
             d,
             active,
             flip_primary: mate.flip_primary,
+            editing_field: None,
             reorient: mate.reorient_secondary,
             suppressed: mate.suppressed,
             tangent_propagation: mate.tangent_propagation,
@@ -203,6 +220,7 @@ impl MateDialog {
             status: None,
             focus: cx.focus_handle(),
             _subs: subs,
+            type_select,
         }
     }
 
@@ -300,7 +318,8 @@ impl MateDialog {
 
     fn expr(state: &Entity<InputState>, cx: &App) -> Option<ExprValue> {
         let t = state.read(cx).value().to_string();
-        (!t.trim().is_empty()).then(|| ExprValue::new(t))
+        let unset = t.trim().is_empty() || NO_LIMIT.contains(&t.trim());
+        (!unset).then(|| ExprValue::new(t))
     }
 
     /// The mate as currently defined (None until both connectors are set).
@@ -388,15 +407,19 @@ impl MateDialog {
             let Some(c) = self.slot(field) else { continue };
             let text: SharedString = (self.labeler)(c).into();
             let text_del = text.clone();
+            // Live (qa5 MT3): "Mate connector of Part 1 <3> (Click to edit)".
+            let edit_tip = format!("{text} (Click to edit)");
+            let bold = self.editing_field == Some(field);
             rows.push(
                 os::query_row(SharedString::from(format!("mc-field-{field}")), text)
+                    .when(bold, |d| d.font_weight(FontWeight::BOLD))
                     .hover(|d| d.bg(pal.row_hover))
                     // The connector glyph opens the connector for editing.
                     .when(self.mate_type != MateType::Tangent, |d| {
                         d.child(
                             div()
                                 .id(SharedString::from(format!("mc-edit-{field}")))
-                                .tooltip(crate::ui::tooltip("Edit mate connector"))
+                                .tooltip(crate::ui::tooltip(edit_tip))
                                 // Live: `mate-connector-qlv-item`, 15 px.
                                 .child(crate::assets::icon("mate-connector-qlv-item", 15., cx))
                                 .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
@@ -468,40 +491,11 @@ impl Render for MateDialog {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let t = self.mate_type;
-        let view = cx.entity();
-        // Mate type: Onshape's underlined dropdown field ("Fastened ▾").
-        let type_field = Button::new("mate-type")
-            .custom(
-                gpui_kit::component::button::ButtonCustomVariant::new(cx)
-                    .color(gpui_kit::transparent_white())
-                    .foreground(pal.text.into())
-                    .hover(gpui_kit::transparent_white())
-                    .active(gpui_kit::transparent_white())
-                    .shadow(false),
-            )
-            // Live (dom/assembly-revolute-dialog-both.txt): the 194 px first
-            // column, 26 px, 14 px text 6 px in, a 8 px caret 6 px from the end.
-            .w(px(194.))
-            .h(px(26.))
-            .pl(px(6.))
-            .pr(px(6.))
-            .rounded(px(0.))
-            .border_b_1()
-            .border_color(pal.border)
-            .child(h_flex().w_full().child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(t.name())).child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb(0x333333))))
-            .os_dropdown_menu("mate-type-dd", true, move |mut menu, _, _| {
-                // Onshape's order in the type select (live behaviours: Slider,
-                // Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened,
-                // Parallel); Tangent and Width are separate tools.
-                let order = [MateType::Slider, MateType::Cylindrical, MateType::Revolute, MateType::PinSlot, MateType::Planar, MateType::Ball, MateType::Fastened, MateType::Parallel];
-                let types: Vec<MateType> = if order.contains(&t) { order.to_vec() } else { vec![t] };
-                for mt in types {
-                    let v = view.clone();
-                    menu = menu.item(OsMenuItem::new(mt.name()).icon_name(mate_icon_name(mt)).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_type(mt, cx))));
-                }
-                menu
-            })
-            .w(px(194.));
+        // Mate type: Onshape's select (live assembly/36): open, the list
+        // hangs under the emptied field, plain rows, the current type blue.
+        let types: Vec<MateType> = if MATE_TYPE_ORDER.contains(&t) { MATE_TYPE_ORDER.to_vec() } else { vec![t] };
+        self.type_select.update(cx, |sel, _| sel.set_items(types.iter().map(|mt| (SharedString::from(mt.name()), SharedString::from(mt.name()))).collect(), t.name()));
+        let type_field = div().w(px(194.)).child(self.type_select.clone());
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;
         let lkeys = limit_keys(t);
@@ -516,7 +510,7 @@ impl Render for MateDialog {
                     .w(px(194.))
                     .h(px(29.))
                     .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
-                    .child(gpui_kit::base::input::input_frame(div().w(px(168.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.))))
+                    .child(gpui_kit::base::input::input_frame(div().w(px(168.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))))
             };
             if ox {
                 offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_X, axis_row("xyz-along-x", &self.offsets[0], cx), cx));
@@ -561,36 +555,36 @@ impl Render for MateDialog {
                     .w(px(194.))
                     .h(px(26.))
                     .child(div().w(px(86.)).h_full().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Rotation angle"))
-                    .child(gpui_kit::base::input::input_frame(div().w(px(108.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(&self.offsets[3]).appearance(false).text_size(px(13.33)).text_right(), 25.))));
+                    .child(gpui_kit::base::input::input_frame(div().w(px(108.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(&self.offsets[3]).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))));
                 offset_rows = offset_rows.child(div().py(px(1.5)).child(select)).child(self.cfg_param(noshape_model::assembly::config::param::ROTATION, angle, cx));
             }
         }
         let mut limit_rows = v_flex();
         if self.use_limits {
-            // Onshape: per limit an axis letter + min / max glyph and a
-            // right-aligned field ("No minimum" / "No maximum").
+            // Onshape (dom/dialog-mate-revolute-limits): per limit one 26 px
+            // icon (axis letter + min / max glyph in the axis colour: X red,
+            // Y green, Z blue), the right-aligned field ("No minimum" /
+            // "No maximum") right after it.
             let limit_field = |key: &'static str, max: bool, st: &Entity<InputState>, cx: &App| {
-                let angle = key == "rz" || key == "cone";
-                let letter = match key {
-                    "x" => "X",
-                    "y" => "Y",
-                    _ => "Z",
-                };
-                let icon = match (angle, max) {
-                    (true, false) => "limit-angle-min",
-                    (true, true) => "limit-angle-max",
-                    (false, false) => "limit-dist-min",
-                    (false, true) => "limit-dist-max",
+                let icon = match (key, max) {
+                    ("cone", _) => "mate-limit-cone",
+                    ("rz", false) => "mate-limit-z-rot-min",
+                    ("rz", true) => "mate-limit-z-rot-max",
+                    ("x", false) => "mate-limit-x-lin-min",
+                    ("x", true) => "mate-limit-x-lin-max",
+                    ("y", false) => "mate-limit-y-lin-min",
+                    ("y", true) => "mate-limit-y-lin-max",
+                    (_, false) => "mate-limit-z-lin-min",
+                    (_, true) => "mate-limit-z-lin-max",
                 };
                 h_flex()
                     .id(SharedString::from(format!("mate-limit-{key}-{max}")))
-                    .h(px(28.))
-                    .pl(px(3.))
-                    .gap(px(1.))
+                    // Live: a 194 x 29 row, the field ends 26 px before the dialog's edge.
+                    .w(px(194.))
+                    .h(px(29.))
                     .tooltip(crate::ui::tooltip(format!("{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key))))
-                    .child(div().text_size(px(14.)).text_color(gpui_kit::rgb(0x999999)).child(letter))
-                    .child(crate::assets::icon(&icon_path(icon), 18., cx))
-                    .child(gpui_kit::base::input::input_frame(div().flex_1().ml(px(6.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.))))
+                    .child(crate::assets::icon(&icon_path(icon), 26., cx))
+                    .child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))))
             };
             for key in lkeys {
                 let (lo, hi) = &self.limits[key];
@@ -611,7 +605,10 @@ impl Render for MateDialog {
         // Live (dom/dialog-mate-fastened-empty / -filled): the flip is a
         // boolean icon parameter shown by its icon, never pressed:
         // flip-direction while Onshape's flip flag is off, -opposite when on.
-        let (flip_icon, reorient_icon) = (crate::assets::icon(flip_icon_name(self.flip_primary), 20., cx), crate::assets::icon("realign-mate-dialog", 20., cx));
+        // Live (qa5 MT1): until both connectors are picked the icon points
+        // up-right, whatever the flag.
+        let flip_shown = self.flip_primary || self.a.is_none() || self.b.is_none();
+        let (flip_icon, reorient_icon) = (crate::assets::icon(flip_icon_name(flip_shown), 20., cx), crate::assets::icon("realign-mate-dialog", 20., cx));
         let small_tool = |id: &'static str, icon: AnyElement, tip: &'static str, on: bool| {
             div()
                 .id(id)
@@ -659,7 +656,7 @@ impl Render for MateDialog {
                             .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
                             .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
-                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                            .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Accept))),
                     ))
                     .child(
@@ -791,6 +788,11 @@ impl Render for MateDialog {
             )
     }
 }
+
+/// Onshape's order in the mate type select (live behaviours: Slider,
+/// Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel);
+/// Tangent and Width are separate tools.
+const MATE_TYPE_ORDER: [MateType; 8] = [MateType::Slider, MateType::Cylindrical, MateType::Revolute, MateType::PinSlot, MateType::Planar, MateType::Ball, MateType::Fastened, MateType::Parallel];
 
 /// The Flip primary axis icon for a mate's alignment (`flip_primary`: the
 /// connectors' Z axes agree, which is Onshape's flip flag off).

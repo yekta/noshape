@@ -42,6 +42,9 @@ pub struct Workspace {
     /// The navbar logo (Onshape's documents link) as a Tab stop: where Tab
     /// past a feature dialog's last control lands (live psb 10-19 h).
     logo_focus: FocusHandle,
+    /// The top bar's `{ }` button: where Tab goes after a dialog's last
+    /// control, or from the page (live: Share, in the same spot).
+    notices_focus: FocusHandle,
     /// The navbar and the tab bar: keys pressed while their buttons have
     /// the focus still work as shortcuts (`forward_chrome_key`).
     chrome_focus: [FocusHandle; 2],
@@ -116,7 +119,7 @@ impl Workspace {
         let _ = doc.read(cx).custom_features();
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
-        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         this.sync_tabs(window, cx);
         // Focus the active tab view so its shortcuts work immediately.
@@ -1536,7 +1539,7 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &ToggleVersionGraph, window, cx| this.toggle_history(window, cx)))
             .on_action(cx.listener(|this, _: &ToggleReleaseDrafts, _, cx| this.toggle_release_drafts(cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
-            .on_action(cx.listener(|this, _: &crate::actions::FocusNavbar, window, cx| window.focus(&this.logo_focus, cx)))
+            .on_action(cx.listener(|this, _: &crate::actions::FocusNavbar, window, cx| window.focus(&this.notices_focus, cx)))
             // Tool search from anywhere in the window (e.g. after clicking the tab bar).
             .on_action(cx.listener(|this, _: &SearchTools, window, cx| {
                 if let Some(s) = this.active_studio() {
@@ -1677,6 +1680,14 @@ impl Workspace {
         Some(
             h_flex()
                 .id("fs-notices-btn")
+                .track_focus(&self.notices_focus)
+                .focus(|s| s.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }]))
+                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                    if matches!(ev.keystroke.key.as_str(), "enter" | "space") {
+                        cx.stop_propagation();
+                        this.toggle_fs_notices(window, cx);
+                    }
+                }))
                 .h(px(32.))
                 .px(px(6.))
                 .rounded(px(3.))

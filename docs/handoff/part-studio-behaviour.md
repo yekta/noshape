@@ -1316,3 +1316,73 @@ rule). Behaviour unchanged. If you change these rules, edit `crates/ops/src/stud
   - Still open: make that cut succeed (live does). Probe: ignored test `f12_kernel_probe` on BREPs dumped to
     /root/psb-scratch/f12 (temporary debug prints DBGE/DBGF/DBGH in eval.rs, pattern.rs, hole.rs: **remove before
     reporting**).
+- **F12 done on our side** (qa4 gate on 5bd50b2 passes F12 and F19). The kernel half (OCCT's empty cut where a
+  cylinder runs into the 3 mm fillet; live cuts it) went to kern via docs/handoff/kernel-robustness.md, with the BREPs in
+  /root/psb-scratch/f12 and the probe in /root/psb-scratch/f12/probe.rs. Once kern fixes it, tighten the F12 test.
+
+### Pass 16, continued (10-22)
+- **BOOL1 + BOOL3 (data loss / wrong geometry):** `EvalCtx::fuse_targets` (eval.rs) runs one union of all the target
+  parts plus the tools. Each piece keeps the id, name and colour of the first target it holds, merged targets go, parts
+  apart keep their identity and list place, and new pieces follow the first kept part. `boolean_into_with` uses it for
+  any Fuse with 2+ targets (Extrude/Revolve/... Add, patterns), and the Boolean union calls it directly. The old union
+  removed tools by index after the fuse had shifted the indices, which deleted Part 2.
+  Tests: `engine.rs::union_of_parts_apart_keeps_every_part`, `add_into_several_parts_is_one_union` (qa5's numbers:
+  14785.398163 mm³, 14000 + pin).
+- **BOOL4:** `FeatureState.touched` holds the parts an Add/Remove/Intersect tool touched with an empty merge scope.
+  `apply_display` fills a new dialog's Merge scope with them unless the user set it or ticked Merge with all.
+- **VS2:** `interaction::check_order` no longer refuses moving a Variable below the feature using it (geometric
+  references still block). A missing `#var` evaluates to Onshape's "Variable not found, is suppressed, or has not
+  been set." (`eval_num_in`). VS1 needs nothing: our two-stage Enter is live's.
+- **F30:** Enter in an integer field (Instance count) commits and accepts the dialog (`apply_on_enter`); quantities
+  keep the two-stage Enter.
+- **F33:** the feature-drag drop line goes below the hovered row when dragging down (`FeatureDrag.index`), where
+  `interaction::reordered` puts it.
+- **ADV12:** kept both callout parts in the row (live part-studio/1035 shows "Ø 6.35 mm ↧ 12 mm | ⌴…", hole.fs joins them
+  with " | "). The tooltip is now "<callout> [Hole]". Live request "psb 10-21 p" asks for a committed counterbore row.
+- **Next:** in-app checks (TAB1 repro: Parts (0) until you leave the tab and come back, also with derived parts; F32;
+  BOOL4 in the dialog; F33 line) → DER4/6/7/9/10 (+ live "qa5 derived" answers) → BOOL2 when live answers.
+
+### For ui (10-22): TAB1, ADV12, F32 moved to you; what psb found
+- **TAB1:** not reproduced in the app yet, and no code changed. The parts list (`render_parts_list`) and the right strip
+  are cached slices (`PsSlices`, cached_slice.rs) that read `self.display` directly. Live hints: it clears when you
+  leave the tab and come back, and it also happens for studios holding a derived part. So the slices seem to miss the
+  first regen's `apply_display` → `cx.notify()` (views are made lazily on activation, `workspace.rs::ensure_view`; the
+  first regen runs in `PartStudioView::new`). Suspect the Slice observer and the first draw (or the progressive-mesh
+  `refine` path, which doesn't call `end_pending` on the first result).
+- **ADV12:** in the tree, the row tooltip reads "<callout> [Hole]" (mod.rs, `templated`). The row name keeps both
+  callout parts: live part-studio/1035 shows "Ø 6.35 mm ↧ 12 mm | ⌴…" for a counterbore while editing, and hole.fs
+  `generateFeatureNameTemplate` joins the parts with " | ". qa5's "first line only" capture was a Simple hole, which
+  has no second part. Live request "psb 10-21 p" (committed counterbore row) is open in REQUESTS.md.
+- **F32:** not started.
+
+### Note from ui (22 Oct ~03:30): DER5 taken over by ui (lead), model side included
+`import_derived` now copies the source's sketches when the whole studio is derived (they keep their source ids,
+follow the first location, `Context::derived_sketches` / `StudioDisplay::derived_sketches` record which Derived
+brought them). The feature list shows a ▸ on such Derived rows and the sketches under them (`ListItem::
+DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
+
+### Pass 16, booleans and derived (10-22, after live's "qa5 booleans" / "qa5 derived")
+- **BOOL4 (correction of the earlier note):** live's empty scope is right; Onshape's booleanStepEditLogic
+  (booleanHeuristics.fs) is now ours: `boolean_edit_logic` (behaviors.rs, run from `apply_display`) uses
+  `FeatureState.touched` (set in `apply_operation` for ≤ 8 solid tools): exactly one touched part → Add + scope [it];
+  else New + empty scope; a user-picked Add keeps the empty scope. **An empty solid merge scope without Merge with
+  all is now Onshape's error** "No merge scope selected." (`apply_operation`, faulty `booleanScope`: pink field, red
+  title). A failing Add shows its tool in the red tool preview (`schedule_tool_preview`). Old documents:
+  `PartStudio.scope_rule` (`ScopeRule`, 0 = legacy) → `upgrade_saved_params` ticks Merge with all where an
+  Add/Remove/Intersect had an empty scope (the same result as the old auto scope). Tests ticked Merge with all where
+  they relied on the auto scope. **Lead approved this migration (10-22):** older documents keep their geometry, new
+  features follow Onshape's scope rule. Don't remove `ScopeRule` / the upgrade.
+- **BOOL1 info bubble:** a union that merges nothing reports Info "Boolean resulted in no geometry change. The parts
+  either do not intersect or are totally contained.".
+- **NAME1/NAME2:** `Context::renumber_default_names` after every feature ("Part N", "Surface N", "Curve N" by list
+  order; other names untouched). The union keeps the first-picked part (pick order from the query).
+- **INT1/BOOL2:** Boolean Intersect makes a new part (new id and colour, appended); ☑ Keep tools keeps the tools.
+- **SPLIT1:** split pieces are new parts in the source's colour at the end of the list (features_a test updated).
+- **COPY1:** a Transform copy keeps its source's colour (Part pattern copies still take the next colours).
+- **Derived:** DER4 labels/missing (derived faces keep source names: labeler `owner`, the dialog's `missing` counts
+  the source studios' features); DER6 (the duplicate-source error only after accepting); DER9 (panel names and the
+  derived part take the source's rename: `DerivedProvider::part_name`); DER10 (contents hidden while a configuration
+  change waits for Generate, `config_changed`); a whole-studio Derived with no parts stays OK; a deleted source →
+  "Error regenerating." and the field reads "Missing Part Studio"; row menu "Switch to <source>". DER7 (ghost) not done.
+- **Verified in the app (qa5 merge.noshape):** Add over three parts starts on New; picking Add leaves the scope empty
+  → pink scope, red title and row; Merge with all → Parts (1) "Part 1"; F33 line and landing.

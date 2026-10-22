@@ -133,3 +133,13 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | ADV12 hole row name | both callout lines; tooltip "Hole 1 <- Sketch 2" | ✗ still |
 | TAB1 tab switch | Part Studio 2 and 3 open with "Parts (0)" and 4 right-strip icons until a body is clicked | ✗ still |
 | RD1 stale Volume readout | **readout gone**: nothing at the bottom right with a part selected (live has none) | ✅ **fixed** |
+
+## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
+| Row | Ours | Status |
+|---|---|---|
+| ADV1 Plane 1 row → Sketch plane | fills "Plane 1" | ✅ **fixed** |
+| ADV2 loft (Mass properties) | 5927.755 mm³ | ✗ still (live 5927.728) |
+| ADV7 thread splits face | hover shows two cylinder faces, split ~10 mm up | ✅ **fixed** |
+| SK1 unsolvable dimension | dialog title and row now red, ✓ disabled | ✅ **fixed** |
+| ADV12 hole row | tooltip "1/4-20 ↧ 12 mm \| ⌵Ø 12.878 mm X 82° [Hole]" ✅; row still shows both callout lines | ✗ still (partly) |
+| TAB1 | Part Studio 2 still opens with "Parts (0)" (Part Studio 3 listed its parts) | ✗ still |

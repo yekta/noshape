@@ -10,6 +10,7 @@ use noshape_model::drawing::views;
 use noshape_model::drawing::*;
 
 pub(crate) use noshape_scene::drawing_tools::geom::*;
+use noshape_scene::drawing_tools as dt;
 
 impl DrawingEditor {
     // ------------------------------------------------------------ tools
@@ -331,11 +332,7 @@ impl DrawingEditor {
     /// A snap point of view `pid` under `c` off the current cutting line: a
     /// jog for the Section view tool.
     fn section_jog_at(&self, pid: ViewId, c: [f64; 2]) -> Option<[f64; 2]> {
-        let Tool::Section { line: Some((a, b)), jogs, .. } = &self.tool else { return None };
-        let q = self.snap_at(c).filter(|s| s.view == pid)?.p;
-        let line = noshape_scene::drawing_tools::jogged_line(*a, *b, jogs);
-        let off = line.windows(2).all(|w| views::dist_to_segment(q, w[0], w[1]) > 1e-6);
-        off.then_some(q)
+        self.pk().section_jog_at(pid, c)
     }
 
     pub fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {
@@ -576,15 +573,7 @@ impl DrawingEditor {
 
     /// Snap a second point to horizontal/vertical from `a` when close.
     pub fn ortho_point(&self, a: [f64; 2], c: [f64; 2]) -> [f64; 2] {
-        let d = sub(c, a);
-        let ang = d[1].atan2(d[0]).to_degrees().rem_euclid(180.0);
-        if ang < 8.0 || ang > 172.0 {
-            [c[0], a[1]]
-        } else if (ang - 90.0).abs() < 8.0 {
-            [a[0], c[1]]
-        } else {
-            c
-        }
+        noshape_scene::drawing_tools::ortho_point(a, c)
     }
 
     // ------------------------------------------------------------ clicks
@@ -592,12 +581,7 @@ impl DrawingEditor {
     /// A cutting line through sheet point `a` along sheet direction `e`,
     /// extended across view `pid` (view coordinates).
     pub fn extend_cut(&self, pid: ViewId, a: [f64; 2], e: [f64; 2]) -> Option<([f64; 2], [f64; 2])> {
-        let pl = self.placement(pid)?;
-        let corners = [pl.min, [pl.max[0], pl.min[1]], pl.max, [pl.min[0], pl.max[1]]];
-        let ts: Vec<f64> = corners.iter().map(|k| dot(sub(*k, a), e)).collect();
-        let t0 = ts.iter().cloned().fold(f64::MAX, f64::min) - 6.0;
-        let t1 = ts.iter().cloned().fold(f64::MIN, f64::max) + 6.0;
-        Some((pl.to_view([a[0] + e[0] * t0, a[1] + e[1] * t0]), pl.to_view([a[0] + e[0] * t1, a[1] + e[1] * t1])))
+        self.pk().extend_cut(pid, a, e)
     }
 
     fn tool_click(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -797,51 +781,23 @@ impl DrawingEditor {
                     return;
                 };
                 match first {
-                    None => {
-                        // A cylinder / cone silhouette: its axis (the view's axis line parallel to it).
-                        let dir = norm(sub(b.p, a.p));
-                        let axis = self.geoms.get(&a.view).and_then(|g| {
-                            g.axes
-                                .iter()
-                                .filter(|ax| (dot(norm(sub(ax[1], ax[0])), dir)).abs() > 1.0 - 1e-6)
-                                .min_by(|x, y| {
-                                    let d = |ax: &[[f64; 2]; 2]| {
-                                        let n = [-dir[1], dir[0]];
-                                        dot(sub(ax[0], a.p), n).abs()
-                                    };
-                                    d(x).total_cmp(&d(y))
-                                })
-                                .copied()
-                        });
-                        let edge_len = len(sub(b.p, a.p));
-                        match axis.filter(|ax| {
-                            let n = [-dir[1], dir[0]];
-                            dot(sub(ax[0], a.p), n).abs() < edge_len.max(1e-6) * 2.0
-                        }) {
-                            Some(ax) => {
-                                // Span the silhouette edge along the axis.
-                                let o = ax[0];
-                                let t0 = dot(sub(a.p, o), dir);
-                                let t1 = dot(sub(b.p, o), dir);
-                                let (p, q) = ([o[0] + dir[0] * t0, o[1] + dir[1] * t0], [o[0] + dir[0] * t1, o[1] + dir[1] * t1]);
-                                let id = self.current_sheet().next_annotation_id();
-                                self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view: a.view, a: p, b: q }, position: c, ..Default::default() }));
-                            }
-                            None => self.tool = Tool::EdgeCenterline { first: Some((a, b)) },
+                    None => match self.pk().silhouette_centerline(&a, &b) {
+                        // A cylinder / cone silhouette: its axis, spanning the edge.
+                        Some((p, q)) => {
+                            let id = self.current_sheet().next_annotation_id();
+                            self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(dt::edge_centerline(id, a.view, p, q, c)));
                         }
-                    }
+                        None => self.tool = Tool::EdgeCenterline { first: Some((a, b)) },
+                    },
                     Some((a1, b1)) => {
                         if a.view != a1.view {
                             self.status = Some("Select an edge in the same view".into());
                             return;
                         }
                         // The middle line of the two edges (ends paired along the first edge).
-                        let dir = norm(sub(b1.p, a1.p));
-                        let (a2, b2) = if dot(sub(b.p, a.p), dir) >= 0.0 { (a.p, b.p) } else { (b.p, a.p) };
-                        let mid = |p: [f64; 2], q: [f64; 2]| [(p[0] + q[0]) * 0.5, (p[1] + q[1]) * 0.5];
-                        let (p, q) = (mid(a1.p, a2), mid(b1.p, b2));
+                        let (p, q) = dt::edge_pair_centerline(a1.p, b1.p, a.p, b.p);
                         let id = self.current_sheet().next_annotation_id();
-                        self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view: a.view, a: p, b: q }, position: c, ..Default::default() }));
+                        self.edit_sheet("Edge to edge centerline", cx, |s| s.annotations.push(dt::edge_centerline(id, a.view, p, q, c)));
                         self.tool = Tool::EdgeCenterline { first: None };
                     }
                 }
@@ -852,13 +808,10 @@ impl DrawingEditor {
                 }
                 let need = if three { 3 } else { 2 };
                 if points.len() >= need {
-                    let view = points[0].view;
-                    let refs: Vec<AnnotationRef> = points.iter().enumerate().filter_map(|(k, p)| p.r.clone().map(|point| AnnotationRef { slot: k as u8, point })).collect();
-                    let pts: Vec<[f64; 2]> = points.iter().map(|p| p.p).collect();
-                    if AnnotationKind::circle_centerline(&pts).is_some() {
-                        let id = self.current_sheet().next_annotation_id();
+                    let id = self.current_sheet().next_annotation_id();
+                    if let Some(a) = dt::circle_centerline(id, &points, c) {
                         let name = if three { "3 point circle centerline" } else { "2 point circle centerline" };
-                        self.edit_sheet(name, cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::CircleCenterline { view, points: pts }, position: c, refs, ..Default::default() }));
+                        self.edit_sheet(name, cx, |s| s.annotations.push(a));
                     }
                     points.clear();
                 }
@@ -874,18 +827,17 @@ impl DrawingEditor {
                 match first {
                     None => self.tool = Tool::VirtualSharp { first: Some((a, b, edge)) },
                     Some((a1, b1, e1)) if a1.view == view => {
-                        if AnnotationKind::line_intersection(a1.p, b1.p, a.p, b.p).is_none() {
-                            self.status = Some("The edges are parallel".into());
-                            return;
-                        }
-                        let mut refs: Vec<AnnotationRef> = [(0u8, &a1.r), (1, &b1.r), (2, &a.r), (3, &b.r)].into_iter().filter_map(|(slot, r)| r.clone().map(|point| AnnotationRef { slot, point })).collect();
-                        // Slot 4: the intersection itself, for associative dimensions to it.
-                        if let (Some((body, name)), Some((body2, name2))) = (e1, edge) {
-                            refs.push(AnnotationRef { slot: 4, point: PointRef::Intersection { body, name, body2, name2 } });
-                        }
                         let id = self.current_sheet().next_annotation_id();
-                        self.edit_sheet("Virtual sharp", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::VirtualSharp { view, a1: a1.p, b1: b1.p, a2: a.p, b2: b.p }, position: c, refs, ..Default::default() }));
-                        self.tool = Tool::VirtualSharp { first: None };
+                        match dt::virtual_sharp(id, view, (&a1, &b1, &e1), (&a, &b, &edge), c) {
+                            Ok(ann) => {
+                                self.edit_sheet("Virtual sharp", cx, |s| s.annotations.push(ann));
+                                self.tool = Tool::VirtualSharp { first: None };
+                            }
+                            Err(why) => {
+                                self.status = Some(why.into());
+                                return;
+                            }
+                        }
                     }
                     Some(_) => self.status = Some("Select an edge in the same view".into()),
                 }
@@ -906,8 +858,7 @@ impl DrawingEditor {
             Tool::Centerline { first: Some(a) } => {
                 if let Some(b) = self.snap_at(c).filter(|b| b.view == a.view) {
                     let id = self.current_sheet().next_annotation_id();
-                    let refs: Vec<AnnotationRef> = [(0u8, a.r.clone()), (1u8, b.r.clone())].into_iter().filter_map(|(slot, r)| r.map(|point| AnnotationRef { slot, point })).collect();
-                    self.edit_sheet("Centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view: a.view, a: a.p, b: b.p }, position: c, refs, ..Default::default() }));
+                    self.edit_sheet("Centerline", cx, |s| s.annotations.push(dt::centerline(id, &a, &b, c)));
                     self.tool = Tool::Centerline { first: None };
                 }
             }
@@ -918,26 +869,15 @@ impl DrawingEditor {
                     // Empty space: a callout without a leader, right there.
                     self.refresh_callout_values(cx);
                     let (text, style) = self.callout_values_now().unwrap_or_default();
-                    let mut kind = AnnotationKind::balloon(ViewId(0), c, text);
-                    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
-                        *callout = noshape_model::drawing::CalloutStyle { free: true, ..style };
-                    }
                     let id = self.current_sheet().next_annotation_id();
-                    self.edit_sheet("Callout", cx, |s| s.annotations.push(Annotation { id, kind, position: c, ..Default::default() }));
+                    self.edit_sheet("Callout", cx, |s| s.annotations.push(dt::free_callout(id, c, text, style)));
                 }
             }
             Tool::Balloon { anchor: Some(anchor) } => {
                 self.refresh_callout_values(cx);
                 if let Some(mut a) = self.pending_annotation() {
-                    // Clicked on a face or a silhouette (no edge, no snap
-                    // point): the part on the line of sight (qa5 D8).
-                    if let AnnotationKind::Balloon { callout, .. } = &mut a.kind
-                        && callout.part.is_none()
-                        && anchor.r.is_none()
-                    {
-                        callout.part = self.pk().part_under(anchor.view, anchor.p);
-                        callout.on_face |= callout.part.is_some() && views::view_source(self.current_sheet(), anchor.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
-                    }
+                    // Clicked on a face or a silhouette: the part on the line of sight (qa5 D8).
+                    self.pk().finish_callout(&mut a, &anchor);
                     self.edit_sheet("Callout", cx, |s| s.annotations.push(a));
                     self.tool = Tool::Balloon { anchor: None };
                 }

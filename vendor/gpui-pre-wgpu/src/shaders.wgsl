@@ -1040,6 +1040,13 @@ fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
         let element_distance = quad_sdf(input.position.xy, shadow.element_bounds,
                                         shadow.element_corner_radii);
         alpha *= saturate(0.5 - element_distance);
+    } else {
+        // NOSHAPE PATCH: a drop shadow is drawn only outside the element, as
+        // CSS box-shadow: under a see-through element (Onshape's 95 % white
+        // dialogs) it must not show (it darkened them to 252).
+        let element_distance = quad_sdf(input.position.xy, shadow.element_bounds,
+                                        shadow.element_corner_radii);
+        alpha *= saturate(0.5 + element_distance);
     }
 
     return blend_color(input.color, alpha);

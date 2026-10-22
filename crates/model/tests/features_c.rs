@@ -549,6 +549,7 @@ fn wrap_surface_solid_split_and_unwrap() {
     s.add("wrap", move |p| {
         p.set("resultType", en("SOLID"));
         p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
         p.set("source", q(region));
         p.set("destination", q(target));
         p.set("thickness", expr("2 mm"));
@@ -787,6 +788,7 @@ fn write_clips() {
     s.add("wrap", move |p| {
         p.set("resultType", en("SOLID"));
         p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
         p.set("source", q(region));
         p.set("destination", q(target));
         p.set("thickness", expr("2 mm"));
@@ -976,6 +978,7 @@ fn move_face_rotate_up_to_translate_and_create() {
     s.add("extrude", move |p| {
         p.set("entities", q(hr));
         p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
         p.set("endBound", en("THROUGH_ALL"));
         p.set("oppositeDirection", ParamValue::Bool(true));
     });

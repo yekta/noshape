@@ -2326,6 +2326,11 @@ pub struct Drawing {
     /// that created it, kept with the drawing (qa5 D13).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drawn_by: Option<String>,
+    /// The document state (microversion id) its views were last made
+    /// from: they keep that geometry until Update, also after the document
+    /// is reopened (live "qa5 pass 7" (6); qa5 D17). None: the current one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sources_at: Option<String>,
 }
 
 fn is_zero_usize(n: &usize) -> bool {
@@ -2334,7 +2339,7 @@ fn is_zero_usize(n: &usize) -> bool {
 
 impl Default for Drawing {
     fn default() -> Self {
-        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default(), active_sheet: 0, continuation: None, drawn_by: None }
+        Self { sheets: vec![Sheet::default()], projection: Projection::ThirdAngle, units_mm: true, props: DrawingProps::default(), active_sheet: 0, continuation: None, drawn_by: None, sources_at: None }
     }
 }
 
@@ -2398,6 +2403,10 @@ pub struct DrawingProps {
     pub inspection_text_height: f64,
     #[serde(default = "inspection_border")]
     pub inspection_border_size: f64,
+    /// Inspection › Border size in characters (live select "2 Characters";
+    /// 0: Tight Fit): the bubble is at least that wide.
+    #[serde(default = "inspection_chars")]
+    pub inspection_border_chars: u8,
     /// Inspection › Border color (None = black) and Solid fill.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inspection_color: Option<[u8; 3]>,
@@ -2595,6 +2604,12 @@ pub struct ViewTabProps {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub centerline_color: Option<[u8; 3]>,
     pub centermark_extension: f64,
+    /// Construction geometry › Centermarks › Mark size and Gap size (mm; 0,
+    /// live's default: automatic) and Extended lines (live ☑). Shown and
+    /// kept; their look is still to be captured (asb request 10-22 b).
+    pub centermark_mark_size: f64,
+    pub centermark_gap_size: f64,
+    pub centermark_extended: bool,
     /// Flat pattern views: up / down bend line styles (0 Solid, 1 Dashed,
     /// 2 Center) and colors, and the bend tangent edges' color.
     pub bend_up_line: u8,
@@ -2628,6 +2643,9 @@ impl Default for ViewTabProps {
             centermark_color: None,
             centerline_color: None,
             centermark_extension: 1.0,
+            centermark_mark_size: 0.0,
+            centermark_gap_size: 0.0,
+            centermark_extended: true,
             bend_up_line: 2,
             bend_down_line: 2,
             bend_up_color: None,
@@ -2635,6 +2653,10 @@ impl Default for ViewTabProps {
             bend_tangent_color: None,
         }
     }
+}
+
+fn inspection_chars() -> u8 {
+    2
 }
 
 fn datum_size() -> f64 {
@@ -3102,7 +3124,7 @@ fn is_zero(x: &f64) -> bool {
 
 impl Default for DrawingProps {
     fn default() -> Self {
-        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, fit_tolerance_precision: None, dual: DualDims::default(), template: None, locked: false, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2, inspection_color: None, inspection_solid_fill: false,
+        Self { units: None, decimal_comma: false, precision: None, tolerance_precision: None, angular_precision: None, angular_tolerance_precision: None, leading_zeros: true, trailing_zeros: true, tolerance_leading_zeros: true, tolerance_trailing_zeros: true, fit_tolerance_precision: None, dual: DualDims::default(), template: None, locked: false, inspection_shape: InspectionShape::Circle, hide_inspection: false, inspection_exclude_callouts: false, inspection_row_parsing: false, inspection_text_height: 2.5, inspection_border_size: 1.2, inspection_border_chars: 2, inspection_color: None, inspection_solid_fill: false,
             view_defaults: ViewDefaults::default(),
             dim_text_height: 3.5,
             dim_arrow: 3.0,

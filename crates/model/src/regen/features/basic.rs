@@ -15,16 +15,21 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
             if tools_idx.len() < 2 {
                 return err("Select at least two parts to union");
             }
-            let first = tools_idx[0];
-            let rest: Vec<NamedShape> = tools_idx[1..].iter().map(|&i| {
-                let b = &ev.ctx.bodies[i];
-                NamedShape { shape: b.shape.clone(), names: b.shape_names() }
-            }).collect();
-            ev.boolean_into(&[first], rest, k::BooleanOp::Fuse)?;
-            // Remove consumed tools (indices shift; remove by id).
-            let ids: Vec<_> = tools_idx[1..].iter().map(|&i| ev.ctx.bodies.get(i).map(|b| b.id.clone())).collect();
-            let keep_first = ev.ctx.bodies.get(first).map(|b| b.id.clone());
-            ev.ctx.bodies.retain(|b| Some(&b.id) == keep_first.as_ref() || !ids.iter().flatten().any(|id| *id == b.id));
+            // One union of all the parts: those that touch become one part
+            // (the first one's), parts apart keep theirs (qa5 BOOL1: the old
+            // tool-by-tool removal by index deleted an unpicked part).
+            // The first-picked part keeps its name, id and colour (live NAME2:
+            // Pin, then Part 1 → "Pin").
+            let refs = ev.query("tools").to_vec();
+            let mut picked = tools_idx.clone();
+            picked.sort_by_key(|&i| refs.iter().position(|r| ev.resolve_bodies(std::slice::from_ref(r)).contains(&i)).unwrap_or(usize::MAX));
+            let before = ev.ctx.bodies.len();
+            ev.fuse_targets(&picked, Vec::new(), &k::BooleanOptions::default())?;
+            // Live (qa5 BOOL1): parts apart stay as they were, with a blue
+            // note while editing.
+            if ev.ctx.bodies.len() == before {
+                ev.infos.push("Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.".into());
+            }
             Ok(())
         }
         "SUBTRACTION" | "INTERSECTION" => {
@@ -39,11 +44,25 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
             }).collect();
             if op == "INTERSECTION" && targets.is_empty() {
                 // Intersect all tools with each other: keep the common volume in the first.
+                // Live ("qa5 booleans"): the common volume is a new part (new
+                // id and colour); the tools go.
                 let first = tools_idx[0];
                 let others = tools[1..].to_vec();
+                // ☑ Keep tools keeps every tool (live BOOL2).
+                let kept: Vec<(usize, std::sync::Arc<crate::regen::context::Body>)> = if ev.bool("keepTools") { tools_idx.iter().map(|&i| (i, ev.ctx.bodies[i].clone())).collect() } else { Vec::new() };
                 ev.boolean_into(&[first], others, k::BooleanOp::Common)?;
-                let keep = ev.ctx.bodies[first].id.clone();
-                ev.ctx.bodies.retain(|b| b.id == keep || !tool_ids.contains(&b.id));
+                let first_id = tool_ids[0].clone();
+                let made: Vec<NamedShape> = ev.ctx.bodies.iter().filter(|b| b.id == first_id || (b.id.feature == ev.feature && !tool_ids.contains(&b.id))).map(|b| NamedShape { shape: b.shape.clone(), names: b.shape_names() }).collect();
+                let kind = ev.ctx.bodies.iter().find(|b| b.id == first_id).map(|b| b.kind).unwrap_or(crate::display::BodyKind::Solid);
+                let feature = ev.feature;
+                ev.ctx.bodies.retain(|b| !tool_ids.contains(&b.id) && b.id.feature != feature);
+                for (i, b) in kept {
+                    let at = i.min(ev.ctx.bodies.len());
+                    ev.ctx.bodies.insert(at, b);
+                }
+                for (i, m) in made.into_iter().enumerate() {
+                    ev.add_new_bodies(m, kind, i as u32)?;
+                }
                 return Ok(());
             }
             let bop = if op == "SUBTRACTION" { k::BooleanOp::Cut } else { k::BooleanOp::Common };

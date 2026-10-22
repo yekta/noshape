@@ -19,6 +19,18 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// `style` with what Onshape's interactive detail settings leave out.
+fn interactive_style(style: noshape_render::Style, d: &nav::DetailSettings) -> noshape_render::Style {
+    let mut s = style;
+    if !d.ssao {
+        s.ambient_occlusion = 0.0;
+    }
+    s.detail.edge_silhouettes &= d.edge_silhouettes;
+    s.detail.backface_silhouettes &= d.backface_silhouettes;
+    s.detail.section_edges &= d.section_edges;
+    s
+}
+
 /// Point under the cursor for a ray (origin, direction), if any.
 pub type OrbitPivotFn = Arc<dyn Fn(DVec3, DVec3) -> Option<DVec3> + Send + Sync>;
 
@@ -155,6 +167,12 @@ pub struct Viewport {
     /// below 20 fps).
     interactive_until: Option<Instant>,
     frame_timer: nav::FrameTimer,
+    /// Onshape's interactive detail reduction, and whether the last frame
+    /// drew less than full detail (a full one follows when interaction
+    /// stops).
+    detail: nav::DetailManager,
+    reduced_frame: bool,
+    full_detail_pending: bool,
     /// A deferred submit is scheduled for the end of the current update.
     submit_scheduled: bool,
     /// A timer re-checks a dirty frame that could not be submitted because
@@ -379,6 +397,9 @@ impl Viewport {
             in_flight: VecDeque::new(),
             interactive_until: None,
             frame_timer: nav::FrameTimer::default(),
+            detail: nav::DetailManager::default(),
+            reduced_frame: false,
+            full_detail_pending: false,
             submit_scheduled: false,
             retry_scheduled: false,
             last_submitted_view: None,
@@ -812,6 +833,17 @@ impl Viewport {
             self.interactive_until = Some(now + nav::INTERACTIVE_WINDOW);
         }
         let interactive = self.interactive_until.is_some_and(|t| now < t);
+        // Interactive frames draw what the detail manager leaves in.
+        let style = if interactive {
+            self.detail.update(&mut self.frame_timer);
+            interactive_style(self.style, &self.detail.interactive)
+        } else {
+            self.style
+        };
+        self.reduced_frame = style != self.style;
+        if self.reduced_frame {
+            self.schedule_full_detail(cx);
+        }
         // Timing two consecutive frames: draw the next one at once.
         let force_next = interactive && self.frame_timer.draw_start(now);
         let pick = std::mem::take(&mut self.pick_dirty) | (self.last_submitted_view != Some(view));
@@ -830,11 +862,42 @@ impl Viewport {
             width: w,
             height: h,
             device_pixel_ratio: scale,
-            style: self.style,
+            style,
             pick,
             seq: self.seq,
         });
         self.dirty = force_next;
+    }
+
+    /// After a frame with reduced detail, draw a full one once the
+    /// interaction is over (Onshape's FULL frames).
+    fn schedule_full_detail(&mut self, cx: &mut Context<Self>) {
+        if std::mem::replace(&mut self.full_detail_pending, true) {
+            return;
+        }
+        cx.spawn(async move |this, cx| {
+            loop {
+                let wait = this
+                    .update(cx, |this: &mut Viewport, cx| {
+                        let left = this.interactive_until.map_or(Duration::ZERO, |t| t.saturating_duration_since(Instant::now()));
+                        if left > Duration::ZERO {
+                            return Some(left + Duration::from_millis(1));
+                        }
+                        this.full_detail_pending = false;
+                        if this.reduced_frame {
+                            this.request_redraw(cx);
+                        }
+                        None
+                    })
+                    .ok()
+                    .flatten();
+                match wait {
+                    Some(w) => cx.background_executor().timer(w).await,
+                    None => break,
+                }
+            }
+        })
+        .detach();
     }
 
     /// After the pick buffer was invalidated (geometry or camera changed),

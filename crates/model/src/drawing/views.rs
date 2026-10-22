@@ -336,13 +336,26 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
         occ_body.push((i, id));
         ctx.bodies.push(Arc::new(nb));
     }
-    let mut bom = Vec::new();
+    // Rows merge like the assembly's BOM: the same part in the same
+    // configuration (values compared as numbers) is one row (qa5 D18).
+    let canon = |studio, config: &ConfigValues| crate::assembly::bom::canonical_config(doc, studio, config);
+    let mut rows: Vec<crate::assembly::analysis::BomRow> = Vec::new();
     for row in crate::assembly::analysis::bom(result) {
+        let config = canon(row.studio, &row.config);
+        if let Some(r) = rows.iter_mut().find(|r| r.studio == row.studio && r.body == row.body && r.config == config && r.mirrored == row.mirrored && r.external == row.external) {
+            r.quantity += row.quantity;
+            r.instances.extend(row.instances);
+        } else {
+            rows.push(crate::assembly::analysis::BomRow { item: rows.len() + 1, config, ..row });
+        }
+    }
+    let mut bom = Vec::new();
+    for row in &rows {
         let bodies: Vec<BodyId> = occ_body
             .iter()
             .filter(|(i, _)| {
                 let o = &result.occurrences[*i];
-                o.studio == row.studio && o.body == row.body && o.config == row.config
+                o.studio == row.studio && o.body == row.body && o.mirrored == row.mirrored && o.external == row.external && canon(o.studio, &o.config) == row.config
             })
             .map(|(_, id)| id.clone())
             .collect();
@@ -357,7 +370,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
         });
     }
     // Part names in BOM rows come from the Part Studio (not instance names).
-    for (row, r) in bom.iter_mut().zip(crate::assembly::analysis::bom(result)) {
+    for (row, r) in bom.iter_mut().zip(&rows) {
         if let Some(ps) = studio_of(doc, r.studio)
             && let Some(n) = ps.part_properties.get(&r.body).and_then(|p| p.name.clone())
         {
@@ -715,9 +728,15 @@ pub fn view_scale(sheet: &Sheet, id: ViewId) -> f64 {
     if sheet.scale > 0.0 { sheet.scale } else { 1.0 }
 }
 
-/// The solid bodies a view shows.
+/// The bodies a view shows.
 pub fn view_bodies<'a>(ctx: &'a Context, part: Option<&BodyId>) -> Vec<&'a Arc<Body>> {
-    ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid && part.is_none_or(|p| &b.id == p)).collect()
+    match part {
+        // One part, whatever its kind (Insert view's Surfaces / Curves filters).
+        Some(p) => ctx.bodies.iter().filter(|b| &b.id == p && b.kind != BodyKind::Point).collect(),
+        // The whole Part Studio: its solids (an open composite part would
+        // draw its members twice).
+        None => ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid && !b.composite.as_ref().is_some_and(|c| !c.closed)).collect(),
+    }
 }
 
 /// View coordinates of the center of a source's bodies (the point a base or
@@ -2401,13 +2420,15 @@ fn broken_out_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, view: &
 
 /// The part seen at `p` (view coordinates) in a view with `frame`: the
 /// front-most body the line of sight through `p` meets (callouts clicked on
-/// a face or a silhouette, which have no model edge; qa5 D8).
-pub fn body_under(src: &SourceModel, frame: &ViewFrame, p: [f64; 2]) -> Option<BodyId> {
+/// a face or a silhouette, which have no model edge; qa5 D8). `tol`: how
+/// far (view units) the line of sight may pass a body, as a click on a
+/// silhouette lands beside the surface.
+pub fn body_under(src: &SourceModel, frame: &ViewFrame, p: [f64; 2], tol: f64) -> Option<BodyId> {
     let at = frame.right * p[0] + frame.up * p[1];
     let reach = src.context.bodies.iter().filter_map(|b| b.shape.bounding_box(false).ok()).map(|b| b.diagonal()).fold(0.0, f64::max) * 4.0 + 1.0;
     let plane = Plane { origin: at, x_dir: frame.dir, normal: frame.right };
     let ray = noshape_kernel::make_edge_2d(&plane, &Segment2d::Line { a: DVec2::new(-reach, 0.0), b: DVec2::new(reach, 0.0) }).ok()?;
-    let tol = reach * 1e-7;
+    let tol = tol.max(reach * 1e-7);
     src.context
         .bodies
         .iter()

@@ -672,7 +672,11 @@ backup-featurescript-*.md.
 
 ## Session 21 Oct ~19:30 UTC (new fs, after handover) — state
 - Disk was 100% full at takeover; deleted stale (>60 min) test executables in /root/target-engine/debug/deps (20 GB).
-- **std route ON by default** (`custom/std_feature.rs`: `NOSHAPE_STD_SHEET_METAL=0` / `set_std_sheet_metal(false)` turns it off).
+- **std route OFF by default** (lead, freeze 21 Oct): `NOSHAPE_STD_SHEET_METAL=1` / `set_std_sheet_metal(true)` turns it on;
+  only pcbStart / pcbEnd always run by std (no native). Switch the default on only when every existing test passes with it
+  on (sheetmetal_frames, features_c, drawing tests, custom_features). My std-route version of sheetmetal_frames.rs (live
+  expectations: L/U walls lose R, flange up = UP, Finish needs parts + std message, hem bbox 2e-7, all face names stable,
+  notices in `ok()` failures) is /root/fs-scratch/sheetmetal_frames.std-route.rs: put those changes in when switching.
 - **Bridge fixes (host/sheetmetal.rs):**
   - rolled bends (definition faces with a BEND joint: a Hem's arc, std `annotateHemSheets`) are strips: `rolled_strip`,
     `Definition.rolled`, table bend kind Hem, unfolded across (`place_from`), flat strip + bend line;
@@ -693,3 +697,16 @@ backup-featurescript-*.md.
   The app's export_flat("dxf") uses it. ui: the "Export as DXF/DWG" dialog for the flat view should call `flat_dxf`/`flat_dwg`.
   Curved outline pieces are still written as LINE segments (live probably ARCs; no live sample with arcs yet).
 - New tests: sheetmetal_std `hem_on_g34_matches_live` (9378.1835 / 33), `flat_dxf_is_written_as_live`.
+
+### After the freeze (21 Oct ~22:30), std route still to fix (in order)
+1. Hem on G34 (sheetmetal_std `hem_on_g34_matches_live`, ignored): 8311.2 mm³ / 25 faces vs live 9378.1835 / 33.
+2. sheetMetalBend: opSplitFace CANNOT_SPLIT_FACE (extendToCompletion added in split.rs; still failing).
+3. Corner break: `@sheetMetalApplyInFlat` native missing.
+4. Rolled hem with a free end (rolled_strip wall b = usize::MAX; untested).
+5. Part names stable across rebuilds (Flange after Finish finds its edge): the DefNames attempt (part faces named from
+   definition entities) is in /root/fs-scratch/sheetmetal.rs.defnames; it changed sm2's flange areas (a 38 mm² face became
+   80), so it was backed out. Find out why (std's flange relief tracking by name?) before retrying.
+6. Closed corner (`closed_corner_matches_live`, ignored): 8541.25 / 39 vs live 8535.04 / 23. Plan: bend end as one helicoid
+   face (sweep the cut profile along a helix = screw motion, or ruled loft between inner/outer helices).
+7. SM16: run std editing logic (none executed today; studio.rs only parses "Editing Logic Function").
+Not mine but seen: drawing::tests::flat_pattern_view_shows_bend_lines_and_notes fails on "DOWN 90.0° R3" (format.rs angle).

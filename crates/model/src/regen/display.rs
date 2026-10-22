@@ -10,17 +10,18 @@ use noshape_sketch::{ConstraintState, EntityKind};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Default part colors (linear RGBA): Onshape's eight-color rotation
-/// ("Customizing appearances" help page), in order.
+/// Default part colors (linear RGBA): Onshape's eight-color rotation, in
+/// order (live: the Appearances swatches of ten new parts, dom/default-part-
+/// colors.txt, and live's STEP export colours; it repeats from Part 9).
 pub const PART_COLORS: [[f32; 4]; 8] = [
-    [0.337, 0.624, 0.846, 1.0], // light blue #9dcfed (live: the Appearances swatch of a new part)
-    [0.323, 0.323, 0.323, 1.0], // gray #9a9a9a
-    [0.076, 0.159, 0.474, 1.0], // dark blue #4e6fb7
-    [0.831, 0.831, 0.831, 1.0], // white #ebebeb
-    [0.578, 0.791, 0.913, 1.0], // pale blue #c8e6f5
-    [0.982, 0.332, 0.021, 1.0], // orange #fd9c28
-    [0.188, 0.188, 0.188, 1.0], // dark gray #787878
-    [0.831, 0.440, 0.007, 1.0], // yellow #ebb115
+    [0.337, 0.624, 0.847, 1.0],  // light blue #9dcfed
+    [0.376, 0.376, 0.376, 1.0],  // gray #a5a5a5
+    [0.044, 0.120, 0.456, 1.0],  // dark blue #3b61b4
+    [0.823, 0.823, 0.823, 1.0],  // white #eaeaea
+    [0.552, 0.761, 0.896, 1.0],  // pale blue #c4e2f3
+    [0.939, 0.242, 0.0003, 1.0], // orange #f88701
+    [0.212, 0.212, 0.212, 1.0],  // dark gray #7f7f7f
+    [0.956, 0.468, 0.0003, 1.0], // yellow #fab601
 ];
 
 /// `NOSHAPE_PERF` set: log meshing timings at info level.
@@ -303,6 +304,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         d.sketches.push(sd);
     }
     log::debug!("display: sketches {:?}", t_sk.elapsed());
+    d.derived_sketches = ctx.derived_sketches.clone();
     for p in &ctx.planes {
         let hidden = match &p.reference {
             Reference::FeaturePlane(f) => studio.feature(*f).is_some_and(|f| f.hidden),

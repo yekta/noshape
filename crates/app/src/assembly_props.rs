@@ -446,16 +446,19 @@ impl AssemblyView {
         let tip = if primary { names.join(", ") } else { format!("{}. Instance is not primary instance of context.", names.join(", ")) };
         let stale: Vec<String> = list.iter().filter(|c| c.4 && c.3).map(|c| c.2.clone()).collect();
         let _ = first;
-        Some(
-            h_flex()
-                .flex_none()
-                .gap(px(2.))
-                .child(div().id(SharedString::from(format!("ctx-icon-{}", top.0))).tooltip(crate::ui::tooltip(tip)).child(crate::part_studio::context_arrow_icon(false, !primary)))
-                .when(!stale.is_empty(), |d| {
-                    d.child(div().id(SharedString::from(format!("ctx-dot-{}", top.0))).size(px(6.)).rounded_full().bg(rgb(0x769fcc)).tooltip(crate::ui::tooltip(format!("Update available for {}", stale.join(", ")))))
-                })
-                .into_any_element(),
-        )
+        // Out of date: one icon (a short ⇦ and the blue dot, live
+        // ns-icon-incontext-import-out-of-date) with one tooltip (qa5 DER11).
+        if !stale.is_empty() {
+            return Some(
+                div()
+                    .id(SharedString::from(format!("ctx-icon-{}", top.0)))
+                    .flex_none()
+                    .tooltip(crate::ui::tooltip(format!("Update available for {}", stale.join(", "))))
+                    .child(crate::assets::icon("incontext-arrow-out-of-date", 20., cx))
+                    .into_any_element(),
+            );
+        }
+        Some(div().id(SharedString::from(format!("ctx-icon-{}", top.0))).flex_none().tooltip(crate::ui::tooltip(tip)).child(crate::part_studio::context_arrow_icon(false, !primary)).into_any_element())
     }
 
     /// Instance › Set as primary instance ▸ <context>: the context is

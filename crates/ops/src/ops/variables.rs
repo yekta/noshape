@@ -1,10 +1,14 @@
-//! Part Studio variables (the Variable table panel; Variable features).
+//! Variables: a Part Studio's (the Variable table panel; Variable
+//! features) or a Variable Studio's table (`crate::variable_studio`, the
+//! same edits as the app's table).
 
-use super::{doc_field, edit_studio, regen_report, s, studio_target, tab_field};
+use super::{doc_field, edit_studio, regen_report, s};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
+use crate::variable_studio as vs;
 use crate::{Ctx, OpenDoc, doc};
-use noshape_model::document::TabId;
+use noshape_model::document::{TabContent, TabId};
+use noshape_model::variables::{VarKind, VariableStudio};
 use noshape_model::partstudio::PartStudio;
 use noshape_model::reference::FeatureId;
 use noshape_model::variable_table::{self as vt, NameError};
@@ -12,15 +16,123 @@ use serde_json::{Value, json};
 
 const KINDS: [&str; 4] = ["LENGTH", "ANGLE", "NUMBER", "ANY"];
 
+fn var_tab() -> crate::registry::Field {
+    opt("tab", json!({ "type": "string" }), "Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio.")
+}
+
+/// Where the variables are: a Part Studio's Variable features, or a
+/// Variable Studio's table.
+#[derive(Clone, Copy)]
+enum Table {
+    Studio(TabId),
+    Vs(TabId),
+}
+
+fn table<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, Table), OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    if let Some(k) = a.opt_str("tab")? {
+        let id = doc::find_tab(od.doc(), k).map_err(|e| e.with_param("tab"))?;
+        if matches!(od.doc().tab(id).map(|t| &t.content), Some(TabContent::VariableStudio(_))) {
+            return Ok((od, Table::Vs(id)));
+        }
+    }
+    let tab = doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Part Studio or Variable Studio", doc::is_part_studio)?;
+    Ok((od, Table::Studio(tab)))
+}
+
+fn kind_of(k: &str) -> Result<VarKind, OpError> {
+    match k {
+        "LENGTH" => Ok(VarKind::Length),
+        "ANGLE" => Ok(VarKind::Angle),
+        "NUMBER" => Ok(VarKind::Number),
+        "ANY" => Ok(VarKind::Any),
+        _ => Err(OpError::param("kind", "LENGTH, ANGLE, NUMBER or ANY")),
+    }
+}
+
+fn vs_studio(od: &OpenDoc, tab: TabId) -> Result<&VariableStudio, OpError> {
+    match od.doc().tab(tab).map(|t| &t.content) {
+        Some(TabContent::VariableStudio(v)) => Ok(v),
+        _ => Err(OpError::param("tab", "not a Variable Studio")),
+    }
+}
+
+/// One edit of the Variable Studio's table (the app's `VariableStudioView::edit`).
+fn vs_edit(od: &mut OpenDoc, tab: TabId, desc: &str, f: impl FnOnce(&mut VariableStudio)) -> Result<(), OpError> {
+    od.session.edit_tab(tab, desc, |c| {
+        if let TabContent::VariableStudio(v) = c {
+            f(v);
+        }
+    })?;
+    Ok(())
+}
+
+fn vs_find(s: &VariableStudio, key: &str) -> Result<usize, OpError> {
+    let k = key.trim().trim_start_matches('#');
+    s.variables.iter().position(|v| v.name == k).ok_or_else(|| OpError::not_found(format!("no variable `{key}`; variables: {}", s.variables.iter().map(|v| format!("#{}", v.name)).collect::<Vec<_>>().join(", "))).with_param("variable"))
+}
+
+/// A new name for the table: an identifier no other row uses.
+fn vs_name(s: &VariableStudio, name: &str, except: Option<usize>) -> Result<String, OpError> {
+    let n = name.trim().trim_start_matches('#');
+    if !vt::is_identifier(n) {
+        return Err(name_error(NameError::Invalid, n));
+    }
+    if s.variables.iter().enumerate().any(|(i, v)| v.name == n && Some(i) != except) {
+        return Err(name_error(NameError::Duplicate, n));
+    }
+    Ok(n.to_string())
+}
+
+fn vs_list(od: &OpenDoc, tab: TabId) -> Result<Value, OpError> {
+    let units = od.doc().settings.units;
+    let s = vs_studio(od, tab)?;
+    let eval = noshape_model::variables::studio_evaluation(od.doc(), tab);
+    let rows: Vec<Value> = s
+        .variables
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let mut j = json!({ "name": format!("#{}", v.name), "index": i, "type": v.kind.map(vs::kind_label).unwrap_or("Any"), "expression": v.expr.text, "description": v.description });
+            match eval.results.get(i) {
+                Some(Ok(q)) => j["value"] = json!(noshape_units::format_quantity_exact(*q, &units)),
+                Some(Err(e)) => j["error"] = json!(e.to_string()),
+                None => {}
+            }
+            j
+        })
+        .collect();
+    Ok(json!({ "variable_studio": od.doc().tab(tab).map(|t| t.name.clone()), "variables": rows }))
+}
+
+/// Set the given fields of row `i`, one table edit each, in the order the
+/// cells are typed: type, value, description.
+fn vs_set_fields(od: &mut OpenDoc, tab: TabId, i: usize, a: &Args) -> Result<(), OpError> {
+    let units = od.doc().settings.units;
+    if let Some(k) = a.opt_str("kind")? {
+        let k = kind_of(k)?;
+        vs_edit(od, tab, "Change variable type", |s| vs::set_kind(s, i, k))?;
+    }
+    if let Some(v) = a.get("value") {
+        let v = value_text(v)?;
+        vs_edit(od, tab, "Edit variable", |s| vs::set_value(s, i, &v, &units))?;
+    }
+    if let Some(d) = a.opt_str("description")? {
+        let d = d.to_string();
+        vs_edit(od, tab, "Edit variable description", |s| vs::set_description(s, i, &d))?;
+    }
+    Ok(())
+}
+
 pub fn ops() -> Vec<Op> {
     let kind = json!({ "type": "string", "enum": KINDS });
     vec![
         Op {
             group: "variable",
             verb: "list",
-            summary: "The Part Studio's variables with their values",
-            description: "Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables).",
-            fields: vec![doc_field(), tab_field()],
+            summary: "The variables of a Part Studio or a Variable Studio, with their values",
+            description: "Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).",
+            fields: vec![doc_field(), var_tab()],
             mutates: false,
             destructive: false,
             run: list,
@@ -28,11 +140,11 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "variable",
             verb: "create",
-            summary: "Create a Part Studio variable (#name)",
-            description: "The Variable table's add row: a Variable feature at the rollback bar. Use it in any expression as #name.",
+            summary: "Create a variable (#name) in a Part Studio or a Variable Studio",
+            description: "Part Studio: the Variable table's add row, a Variable feature at the rollback bar. Variable Studio: the table's last row (\"Add variable\", a Length variable), then its type, value and description cells, one edit each, as typed in the table. Use it in any expression as #name.",
             fields: vec![
                 doc_field(),
-                tab_field(),
+                var_tab(),
                 req("name", s(), "Identifier: a letter or underscore, then letters, digits or underscores."),
                 req("value", json!({ "type": ["string", "number"] }), "Expression (\"20 mm\", \"#a * 2\"); a bare number takes the workspace unit."),
                 opt("kind", kind.clone(), "LENGTH (default), ANGLE, NUMBER or ANY."),
@@ -46,10 +158,10 @@ pub fn ops() -> Vec<Op> {
             group: "variable",
             verb: "set",
             summary: "Change a variable's value, kind, name or description",
-            description: "Renaming updates every expression that uses the variable, as the panel does.",
+            description: "Part Studio: renaming updates every expression that uses the variable, as the panel does. Variable Studio: each given field is one edit of its table cell (\"Change variable type\", \"Edit variable\", \"Edit variable description\", \"Rename variable\").",
             fields: vec![
                 doc_field(),
-                tab_field(),
+                var_tab(),
                 req("variable", s(), "Variable name (with or without #) or its feature id."),
                 opt("value", json!({ "type": ["string", "number"] }), "New expression."),
                 opt("kind", kind, "New kind."),
@@ -65,7 +177,7 @@ pub fn ops() -> Vec<Op> {
             verb: "delete",
             summary: "Delete a variable",
             description: "Expressions that use it fail to regenerate, as in Onshape.",
-            fields: vec![doc_field(), tab_field(), req("variable", s(), "Variable name or feature id.")],
+            fields: vec![doc_field(), var_tab(), req("variable", s(), "Variable name or feature id.")],
             mutates: true,
             destructive: true,
             run: delete,
@@ -73,9 +185,9 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "variable",
             verb: "move",
-            summary: "Move a variable up or down in the Variable table",
+            summary: "Move a variable up or down in the Variable table or a Variable Studio",
             description: "",
-            fields: vec![doc_field(), tab_field(), req("variable", s(), "Variable name or feature id."), req("by", json!({ "type": "integer" }), "-1: up, 1: down.")],
+            fields: vec![doc_field(), var_tab(), req("variable", s(), "Variable name or feature id."), req("by", json!({ "type": "integer" }), "-1: up, 1: down.")],
             mutates: true,
             destructive: false,
             run: move_row,
@@ -151,12 +263,28 @@ fn list_value(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
 }
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let (od, tab) = studio_target(ctx, a)?;
-    Ok(list_value(od, tab)?.into())
+    match table(ctx, a)? {
+        (od, Table::Studio(tab)) => Ok(list_value(od, tab)?.into()),
+        (od, Table::Vs(tab)) => Ok(vs_list(od, tab)?.into()),
+    }
 }
 
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let (od, tab) = studio_target(ctx, a)?;
+    let (od, tab) = match table(ctx, a)? {
+        (od, Table::Vs(tab)) => {
+            let name = vs_name(vs_studio(od, tab)?, a.str("name")?, None)?;
+            if let Some(k) = a.opt_str("kind")? {
+                kind_of(k)?;
+            }
+            value_text(a.get("value").expect("required"))?;
+            let units = od.doc().settings.units;
+            vs_edit(od, tab, "Add variable", |s| vs::add_variable(s, &name, &units))?;
+            let i = vs_studio(od, tab)?.variables.len() - 1;
+            vs_set_fields(od, tab, i, a)?;
+            return Ok(vs_list(od, tab)?.into());
+        }
+        (od, Table::Studio(tab)) => (od, tab),
+    };
     let units = od.doc().settings.units;
     let name = a.str("name")?.to_string();
     let kind = a.opt_str("kind")?.unwrap_or("LENGTH").to_string();
@@ -170,7 +298,24 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn set(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let (od, tab) = studio_target(ctx, a)?;
+    let (od, tab) = match table(ctx, a)? {
+        (od, Table::Vs(tab)) => {
+            let i = vs_find(vs_studio(od, tab)?, a.str("variable")?)?;
+            let new_name = match a.opt_str("name")? {
+                Some(n) => Some(vs_name(vs_studio(od, tab)?, n, Some(i))?),
+                None => None,
+            };
+            if let Some(k) = a.opt_str("kind")? {
+                kind_of(k)?;
+            }
+            vs_set_fields(od, tab, i, a)?;
+            if let Some(n) = new_name {
+                vs_edit(od, tab, "Rename variable", |s| vs::rename_variable(s, i, &n))?;
+            }
+            return Ok(vs_list(od, tab)?.into());
+        }
+        (od, Table::Studio(tab)) => (od, tab),
+    };
     let units = od.doc().settings.units;
     let id = find(doc::studio(od.doc(), tab)?, a.str("variable")?)?;
     let mut all = Vec::new();
@@ -206,7 +351,14 @@ fn set(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let (od, tab) = studio_target(ctx, a)?;
+    let (od, tab) = match table(ctx, a)? {
+        (od, Table::Vs(tab)) => {
+            let i = vs_find(vs_studio(od, tab)?, a.str("variable")?)?;
+            vs_edit(od, tab, "Delete variable", |s| vs::delete_variable(s, i))?;
+            return Ok(vs_list(od, tab)?.into());
+        }
+        (od, Table::Studio(tab)) => (od, tab),
+    };
     let id = find(doc::studio(od.doc(), tab)?, a.str("variable")?)?;
     let (_, repaired) = edit_table(od, tab, "Delete variable", |ps| {
         ps.remove(id);
@@ -216,7 +368,15 @@ fn delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn move_row(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let (od, tab) = studio_target(ctx, a)?;
+    let (od, tab) = match table(ctx, a)? {
+        (od, Table::Vs(tab)) => {
+            let i = vs_find(vs_studio(od, tab)?, a.str("variable")?)?;
+            let down = a.get("by").and_then(Value::as_i64).ok_or_else(|| OpError::param("by", "-1 or 1"))? > 0;
+            vs_edit(od, tab, vs::move_description(down), |s| vs::move_variable(s, i, down))?;
+            return Ok(vs_list(od, tab)?.into());
+        }
+        (od, Table::Studio(tab)) => (od, tab),
+    };
     let id = find(doc::studio(od.doc(), tab)?, a.str("variable")?)?;
     let by = a.get("by").and_then(Value::as_i64).ok_or_else(|| OpError::param("by", "-1 or 1"))?.clamp(-1, 1) as i32;
     let (_, repaired) = edit_table(od, tab, "Move variable", |ps| {

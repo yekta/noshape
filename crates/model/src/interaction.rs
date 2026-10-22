@@ -138,15 +138,19 @@ pub fn reordered(features: &[Feature], moving: &[FeatureId], to: usize) -> Optio
     (rest != ids).then_some(rest)
 }
 
-/// Check that a new order keeps every feature after the features it
-/// depends on. Returns the user-facing error of the first violation
-/// (Onshape refuses such a reorder).
+/// Check that a new order keeps every feature after the features whose
+/// geometry it references. Returns the user-facing error of the first
+/// violation. A `#variable` doesn't hold a reorder back (live qa5 pass 8:
+/// the move goes through with no message, and the feature then fails with
+/// "Variable not found, is suppressed, or has not been set.").
 pub fn check_order(features: &[Feature], order: &[FeatureId]) -> Result<(), String> {
     let pos = |id: FeatureId| order.iter().position(|i| *i == id);
     let name = |id: FeatureId| features.iter().find(|f| f.id == id).map(|f| f.name.clone()).unwrap_or_default();
     for (i, f) in features.iter().enumerate() {
         let Some(p) = pos(f.id) else { continue };
-        for dep in feature_dependencies(features, i) {
+        let mut ints = HashSet::new();
+        f.params.0.values().for_each(|v| param_refs(v, &mut ints));
+        for dep in features[..i].iter().filter(|u| ints.contains(&u.id.0)).map(|u| u.id) {
             if pos(dep).is_some_and(|d| d > p) {
                 return Err(format!("Cannot reorder: {} depends on {}.", f.name, name(dep)));
             }
@@ -707,6 +711,9 @@ mod tests {
         // Several features move together and keep their relative order.
         let order = reordered(&ps.features, &[FeatureId(1004), FeatureId(1003)], 4).unwrap();
         assert_eq!(&order[2..], &[FeatureId(1005), FeatureId(1003), FeatureId(1004)]);
+        assert!(check_order(&ps.features, &order).is_ok());
+        // A Variable moves below the feature using it (live qa5 pass 8).
+        let order = reordered(&ps.features, &[FeatureId(1002)], 4).unwrap();
         assert!(check_order(&ps.features, &order).is_ok());
         // Dropping onto itself is a no-op.
         assert!(reordered(&ps.features, &[FeatureId(1003)], 2).is_none());

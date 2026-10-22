@@ -822,3 +822,71 @@ Done in the tree (uncommitted, qa4):
   scripts work on it) of d5745c9, /root/qa4-scratch/ci/d5745c9/noshape (`gh run download 39641518601 -n noshape-Linux-X64`).
   measure4.sh on big.noshape: CI release 5.5–5.75 / 2.75 ms (rows / caret frames) vs dev "before" (19:32 tree) 8.0 / 3.25.
 - Scripts: no pkill any more (new rule): qkill.sh REGEX kills by PID (pgrep + kill).
+- **Clean A/B (10-22, one binary, temporary NOSHAPE_QA4_OLDROWS toggle, removed from the tree right after the build;
+  binary /root/qa4-scratch/bin/noshape-ab, results m-r11ab.txt):** frames that rebuild rows, dev, median UI CPU:
+  old 7.25 / 7.0 / 6.5 / 8.25, new 6.75 / 7.0 / 7.75 / 6.5 (≈7.1 → 6.9, inside the noise); caret frames 3.0–3.5 both.
+  Call counts: filter_features 76 → 18 per 10 keys, referenced_contexts 0.29 → 0.02 ms/frame. CI ratio (d5745c9 CI release
+  vs dev on these frames ≈ 0.70) → release ≈ 5.0 → 4.85 ms: **the < 4 ms target is still not met**; what's left is the
+  per-row build/layout/paint of the ~14 visible rows (icon + name), which the lead ruled must stay (no overscan cut, no
+  gpui row-view reuse). Drop circle checked in the app: now drawn at the drop line's left end, as live part-studio/30.
+- **v0.4.5 gate re-run on 5bd50b2: FAIL (F8, F9 kern)**; F12, F19, F26 pass; new F30–F34 (core-workflow.md, end).
+
+## STATE FOR THE NEXT qa4 (10-22 00:20)
+- Code: nothing of qa4 uncommitted (row caches, drop marker, tooltip anchor, gpui group_drag_over hitbox are in 5bd50b2).
+  The A/B toggle is gone from the tree. Docs: this file + core-workflow.md (gate re-run 5bd50b2) uncommitted.
+- Next: re-run 3.5 / 3.6 when kern reports F8/F9, then the whole checklist on the next integration binary
+  (/root/target-lead/debug/noshape; check `cd /root/noshape-lead && git diff --name-only <commit> -- . ':!.github'` is empty).
+  Then R6 input audit items 6–8 (VS cell Esc / type-to-edit, drawing Rename sheet Esc) and the rest of the inventory.
+- Binaries: /root/qa4-scratch/bin/noshape-5bd50b2 (gate), noshape-ab (row A/B). Scripts: rowcmp.sh (row pixel check),
+  count.sh (filter/contexts call counts), blinkprof.sh, qkill.sh (no pkill).
+
+### Rows target CLOSED (lead, 10-22)
+Final numbers on the 60-feature list (frames that rebuild rows / caret-only frames, UI-thread CPU median):
+dev 6.9 / 3.25 ms; CI release estimate ≈ 4.85 / 2.75 ms (CI release of d5745c9 measured 5.5–5.75 / 2.75 before the row
+caches; release ≈ 0.70 × dev on row frames). Lead: 4.85 ms is well inside a 120 Hz frame (8.3 ms) and what remains is the
+icon + name the look needs; no gpui row-view reuse, no overscan change. Don't reopen without a new lead decision.
+
+### R12 (10-22 00:30–): input audit re-run on 5bd50b2 (against live "Input behaviour" + "Input behaviour outside feature dialogs")
+**Pass now:** all R6 items 1–9 (Extrude depth click/Enter/(10+5) mm/Esc; feature rename Esc; Variable Studio value cell:
+1st click focuses the cell, type-to-edit opens with the typed key, Esc reverts, click-away doesn't commit; drawing
+Rename sheet Esc cancels; Part Properties opens with Name focused and Enter keeps the dialog and the edit). Esc reverts
+in the other renames too: default geometry (Top), element tab, folder. Document details: no field focused on open (no
+live capture); Enter saves and closes (no data loss).
+**Deviation (one root cause, ~60 sites):** only feature-dialog numbers and the sketch dimension box use the Onshape field
+behaviour (`quantity_field.rs` helpers wired by hand in feature_dialog.rs / sketch.rs). Every other Part Studio / assembly
+numeric field (live: the same `os-param-number` control everywhere) lacks: "(1+1) deg" expression display, the invalid
+state + hover ("Enter a valid expression." / counts "Enter an integer."), ↑/↓ (Shift ×10, Ctrl ×0.1) and focused-wheel
+stepping, Enter re-selecting the value, and the blue focused underline (ours stays grey). Checked in the app: Draft
+analysis › Minimum draft angle ("1+1" stays, "abc" not invalid, ↑ no step) and Zebra stripes › Stripe count ("1 in" not
+invalid, ↑ no step); first click (select all) and Esc (revert + blur) are right on both. Site list (file:line): Part
+Studio draft_tool.rs:33, analysis_tools.rs:241/260/286, thickness.rs:317, flatten_tool.rs:69, sketch.rs:1248/1270/1399/
+1856/2072/2154, feature_dialog.rs:623 (tolerances), appearance.rs:212, material_panel.rs:149, config_panel.rs:127;
+Assembly assembly_reflection.rs:31, assembly_mass.rs:74/480, assembly_view.rs:1606, assembly_panels.rs:279/943/1460/3003,
+assembly_mate_dialog.rs:150, assembly_behaviors.rs:2478/2515/3460/3693, assembly_positions.rs:220, assembly_config.rs:238;
+prefs graphics_prefs_dialog.rs:174, numbering_prefs.rs:64. Proposed fix (ui): one reusable quantity-input wrapper
+(commit_text + step_text + invalid_field + wheel + revert_escape) and switch these sites to it.
+**Drawings are different on purpose:** live's drawing fields are Wt widgets (caret at click, Esc does nothing in panels,
+spinboxes step ±0.05 with a pale-orange "Must be a number" invalid state, sheet width appends the unit and Esc closes the
+dialog). Our drawing fields opt out of select-all/Esc-revert, which matches that family; per-widget check still to do.
+**Drawing panel fields checked (10-22, Drawing properties › Annotations, ANSI A inch sheet) vs live's Wt widgets:**
+first click puts the caret at the click and Esc does nothing (both as live), but: Notes **Text height** is a plain field
+"0.1378 in" (live: a dropdown, default **0.1200**, 4 decimals): "0.15" stays "0.15" (live "0.1500"), "3 mm" stays as typed
+(live "3.0000": the unit is ignored), "abc" stays (live silently reverts). **Stack gap size** (live spinbox 0.0500): "0.06"
+stays (live "0.0600"), "1 mm" not marked invalid (live pale orange rgba(221,82,40,0.1), hover "Must be a number"), ↑ doesn't
+step (live +0.05). Owner: drawing (asb). Sheet properties width not re-checked.
+
+### R13 (10-22 01:00–): `QuantityInput` wrapper + migration (lead: qa4 builds it; ui note in theme-layout.md)
+- Wrapper: `quantity_field.rs` `QuantityInput` / `QuantitySpec` / `QuantityEvent::{Changed, Committed(CommitVia), Enter,
+  Escape}` (see the theme-layout.md note). Feature dialogs and the sketch dimension box keep their own wiring (not a pure
+  refactor: autofill, Create variable popup, per-path baselines).
+- Migrated + built: draft_tool.rs (Minimum draft angle), analysis_tools.rs (Zebra count, Reflection rotation, Connection
+  G1/G2/G3), thickness.rs (colour-bar bound, click-to-edit: caret on focus, Enter closes, Tab keeps, Esc closes),
+  flatten_tool.rs (checker / distortion scale, offset, angle).
+- Checked in the app (binary noshape-qty, 03:00) against live "Input behaviour outside feature dialogs": Draft angle all
+  8 steps as live (select all + blue underline; 5 → "5 deg" selected; "(1+1) deg", unfocused "2 deg"; abc pink + "Enter a
+  valid expression."; ↑ 6 deg, Shift+↑ 16 deg; Esc reverts + blurs). Zebra count: "20" kept selected; "1 in" / "1+1" pink,
+  hover "Enter an integer."; ↑ 21. 
+- Next (after the gate): Part Studio sketch fields (sketch.rs 1248/1270/1399/1856/2072/2154), feature_dialog.rs:623
+  tolerances, appearance / material; then assembly (needs an assembly variable scope passed from AssemblyView for #vars;
+  mate limit fields store "No minimum" as text: handle before migrating); prefs. Removed unused builder/setters to keep
+  zero warnings; re-add `text()` / `set_text` / `set_units` when a site needs them.

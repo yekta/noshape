@@ -7,6 +7,7 @@
 use super::PartStudioView;
 use crate::actions::*;
 use crate::assets::icon_path;
+use crate::os_menu::OsContextMenuExt as _;
 use crate::sketch_mode::{ConstraintTool, EditOutcome, ExternalSnap, SketchEditor, Tool};
 use crate::theme::{p, with_alpha};
 use crate::viewport::{Viewport, ViewportEvent};
@@ -1016,6 +1017,11 @@ impl PartStudioView {
                     s.focus(window, cx);
                     s.select_all(window, cx);
                 });
+                // Live (qa5 F32): a Create variable popup left open with an
+                // earlier box doesn't come back with this one.
+                if let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) {
+                    dialog.update(cx, |d, cx| d.close_external_create_variable(DIM_BOX_FIELD, cx));
+                }
                 self.dim_input = Some((cid, state, sub));
                 self.ui.dim_box_offset = Point::default();
                 self.ui.dim_invalid = false;
@@ -1473,25 +1479,33 @@ impl PartStudioView {
         let pal = p();
         let view = cx.entity();
         let cur = font.to_string();
-        let mut row = h_flex().gap_1().flex_wrap().child(
-            Button::new("sk-text-font")
-                .label(SharedString::from(cur.clone()))
-                .ghost()
-                .xsmall()
-                .dropdown_caret(true)
-                .dropdown_menu(move |mut menu, _, _| {
-                    for f in noshape_sketch::text::FONTS {
-                        let v = view.clone();
-                        menu = menu.item(PopupMenuItem::new(f).checked(f == cur).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_text_style(TextStyle::Font(f), cx))));
+        // Live (dom/dialog-sketch-text): a 218 x 26 select, then the buttons.
+        // Live (dom/sketch-text-fonts): 32 fonts, Open Sans by default.
+        use noshape_sketch::text::{SKETCH_DEFAULT_FONT, SKETCH_FONTS};
+        let at = SKETCH_FONTS.iter().position(|f| f.name == cur).or_else(|| SKETCH_FONTS.iter().position(|f| f.name == SKETCH_DEFAULT_FONT)).unwrap_or(0);
+        // B / I show only for fonts that have the style (live: hidden, not greyed).
+        let (has_bold, has_italic) = SKETCH_FONTS.get(at).map_or((true, true), |f| (f.bold, f.italic));
+        let mut row = h_flex().gap_1().child(
+            div().w(px(218.)).flex_none().child(
+                crate::os_ui::select_field("sk-text-font", SKETCH_FONTS.iter().map(|f| f.name.to_string()).collect(), at, move |i, _, cx| {
+                    if let Some(f) = SKETCH_FONTS.get(i) {
+                        view.update(cx, |this, cx| this.set_text_style(TextStyle::Font(f.name), cx));
                     }
-                    menu
-                }),
-        );
+                })
+                // Live: a flat select (white, a #d7d7d7 line under it, 26 px).
+                .h(px(26.))
+                .rounded(px(0.))
+                .border_0()
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0xd7d7d7))
+                .pl(px(6.)),
+            ),
+        ).child(div().w(px(24.)));
         row = row
             // Live (dom dialog-sketch-text): a 25 px bold "B" and italic "I" in
             // #1651b0 (33 / 30 x 30 buttons), then the two flip icons (20 px).
-            .child(Button::new("sk-text-bold").child(div().text_size(px(25.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x1651b0)).child("B")).ghost().w(px(33.)).h(px(30.)).selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Bold, cx))))
-            .child(Button::new("sk-text-italic").child(div().text_size(px(25.)).italic().text_color(gpui_kit::rgb(0x1651b0)).child("I")).ghost().w(px(30.)).h(px(30.)).selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Italic, cx))));
+            .when(has_bold, |r| r.child(Button::new("sk-text-bold").child(div().text_size(px(25.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x1651b0)).child("B")).ghost().w(px(33.)).h(px(30.)).selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Bold, cx)))))
+            .when(has_italic, |r| r.child(Button::new("sk-text-italic").child(div().text_size(px(25.)).italic().text_color(gpui_kit::rgb(0x1651b0)).child("I")).ghost().w(px(30.)).h(px(30.)).selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Italic, cx)))));
         if let Some((fh, fv)) = flips {
             row = row
                 .child(Button::new("sk-text-fliph").child(crate::ui::glyph("sketch-flip-horizontal", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fh).tooltip("Flip horizontal").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipHorizontal, cx))))
@@ -1925,29 +1939,107 @@ impl PartStudioView {
         let is_expr = ed.text_expression;
         let error = ed.message.clone();
         let pal = p();
-        Some(v_flex().id("sk-text-dialog").absolute().left(px(342.)).top(px(12.)).w(px(404.)).occlude().bg(pal.panel).border_1().border_color(pal.border).shadow_lg()
-            .child(h_flex().justify_between().p_2().border_b_1().border_color(pal.border)
-                .child(div().text_sm().child("Text"))
-                .child(h_flex()
-                    .child(Button::new("sk-text-confirm").label("✓").primary().small().on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_sketch_text(window, cx))))
-                    .child(Button::new("sk-text-cancel").label("×").ghost().small().on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                        this.sketch_cancel(cx);
-                        window.focus(&this.focus, cx);
-                    })))))
-            .child(v_flex().p_3().gap_2().child(style)
-                .child(div().p_2().min_h(px(50.)).bg(pal.panel_hover).text_sm().child(preview))
-                .child(Input::new(&input).text_size(px(18.67)))
-                .child(h_flex().justify_between()
-                    .child(div().text_xs().text_color(if count > 250 { rgb(0xaa252d) } else { pal.text_muted }).child(format!("{count}/250 characters")))
-                    // Convert to expression / Convert to text (Onshape: text field context menu).
-                    .child(Button::new("sk-text-expr").label(if is_expr { "Convert to text" } else { "Convert to expression" }).ghost().xsmall()
-                        .tooltip("Expressions: \"text\" ~ #variable ~ roundToPrecision(#len / in, 3)")
-                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            if let Some(ed) = &mut this.sketch { ed.text_expression = !ed.text_expression; }
-                            cx.notify();
-                        }))))
-                .when_some(error, |this, error| this.child(div().text_xs().text_color(rgb(0xaa252d)).child(error))))
-            .into_any_element())
+        let view = cx.entity();
+        // Live (dom/dialog-sketch-text, sketch/132): the standard feature
+        // dialog in the sketch dialog's place: a 29 px header "Text" with the
+        // green ✓ and ✕, the font / B / I / flips row, a grey preview box, the
+        // edit box (1 px #1651b0, 18.67 px), "n/250 characters" and the ?.
+        // Convert to expression / text is on the edit box's context menu.
+        Some(
+            v_flex()
+                .id("sk-text-dialog")
+                .absolute()
+                .top(px(3.))
+                .left(px(0.))
+                .w(px(404.))
+                .occlude()
+                .bg(gpui_kit::rgba(0xfffffff2))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(gpui_kit::rgb(0x333333))
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .bg(gpui_kit::white())
+                        .border_b_1()
+                        .border_color(gpui_kit::rgb(0xd7d7d7))
+                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Text"))
+                        .child(
+                            div()
+                                .id("sk-text-confirm")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .bg(pal.accept)
+                                .cursor(CursorStyle::Arrow)
+                                .child(crate::assets::icon("dialog-ok", 24., cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_sketch_text(window, cx))),
+                        )
+                        .child(
+                            div()
+                                .id("sk-text-cancel")
+                                .size(px(28.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor(CursorStyle::Arrow)
+                                .child(crate::assets::icon("dialog-cancel", 24., cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                    this.sketch_cancel(cx);
+                                    window.focus(&this.focus, cx);
+                                })),
+                        ),
+                )
+                .child(
+                    v_flex()
+                        .p(px(3.))
+                        .child(div().h(px(42.)).pt(px(6.)).child(style))
+                        .child(
+                            div()
+                                .h(px(47.))
+                                .p(px(2.))
+                                .bg(gpui_kit::rgb(0xeeeeee))
+                                .border_1()
+                                .border_color(gpui_kit::rgba(0x7676764d))
+                                .text_size(px(18.))
+                                .text_color(gpui_kit::rgb(0x545454))
+                                .overflow_hidden()
+                                .child(preview),
+                        )
+                        .child(div().h(px(7.)))
+                        .child(
+                            div()
+                                .id("sk-text-edit")
+                                .h(px(93.))
+                                .border_1()
+                                .border_color(gpui_kit::rgb(0x1651b0))
+                                .bg(gpui_kit::white())
+                                .child(Input::new(&input).appearance(false).text_size(px(18.67)).px(px(2.)))
+                                .os_context_menu(move |menu, _, _| {
+                                    let v = view.clone();
+                                    menu.item(crate::os_menu::OsMenuItem::new(if is_expr { "Convert to text" } else { "Convert to expression" }).on_click(move |_, _, cx| {
+                                        v.update(cx, |this, cx| {
+                                            if let Some(ed) = &mut this.sketch {
+                                                ed.text_expression = !ed.text_expression;
+                                            }
+                                            cx.notify();
+                                        })
+                                    }))
+                                }),
+                        )
+                        .child(
+                            h_flex()
+                                .h(px(23.))
+                                .pl(px(4.))
+                                .pr(px(4.))
+                                .text_size(px(12.))
+                                .child(div().flex_1().text_color(if count > 250 { gpui_kit::rgb(0xaa252d) } else { gpui_kit::rgb(0x333333) }).child(format!("{count}/250 characters")))
+                                .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
+                        )
+                        .when_some(error, |this, error| this.child(div().px(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xaa252d)).child(error))),
+                )
+                .into_any_element(),
+        )
     }
 
     // ------------------------------------------------------------ insert DXF / image

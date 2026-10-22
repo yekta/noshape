@@ -2,11 +2,14 @@
 //! drawing/170–173, behaviours "Flat pattern view"): a 300 px flyout right
 //! of the Insert view panel. Current document | Other documents; the
 //! document name and its branch; Part Studios | Assemblies; "Search parts
-//! or sketches"; the filters Part Studios | Parts | Sketches | Flat patterns
-//! (one at a time, Parts first); then ▸ studio rows that expand to pictures
-//! of their parts ("Flat pattern of Part 1" above "Part 1"), sketches or
-//! flat patterns. The pictures are rendered offscreen in the background
-//! (the document-thumbnail look), cached per studio content hash.
+//! or sketches"; the filter toggles Part Studios | Parts | Composite parts
+//! | Sketches | Surfaces | Curves | Flat patterns (independent, Parts on;
+//! live "qa5 pass 7" (4)); then ▸ studio rows that expand to pictures of
+//! what the filters show ("Flat pattern of Part 1" above "Part 1"). The
+//! pictures are rendered offscreen in the background (the
+//! document-thumbnail look), cached per document and studio content hash.
+//! Other documents: the library's documents, an opened one listed like
+//! this document at one of its versions.
 
 use crate::drawing_view::*;
 use crate::theme::p;
@@ -21,8 +24,23 @@ use noshape_model::drawing::ViewOrientation;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// The filters (tooltip, icon), live order.
-const FILTERS: [(&str, &str); 4] = [("Part Studios", "part-studio"), ("Parts", "part"), ("Sketches", "sketch"), ("Flat patterns", "flat-pattern")];
+/// The filter toggles (tooltip, icon), live order.
+const FILTERS: [(&str, &str); 7] = [
+    ("Part Studios", "part-studio"),
+    ("Parts", "part"),
+    ("Composite parts", "composite-part"),
+    ("Sketches", "sketch"),
+    ("Surfaces", "surface-body"),
+    ("Curves", "wire-body"),
+    ("Flat patterns", "flat-pattern"),
+];
+const F_STUDIOS: u8 = 1;
+const F_PARTS: u8 = 1 << 1;
+const F_COMPOSITES: u8 = 1 << 2;
+const F_SKETCHES: u8 = 1 << 3;
+const F_SURFACES: u8 = 1 << 4;
+const F_CURVES: u8 = 1 << 5;
+const F_FLAT: u8 = 1 << 6;
 
 /// What a picture shows: a part (or the whole studio) or a sketch.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -39,14 +57,16 @@ type ChildRow = (String, ThumbOf, Option<BodyId>, bool, Option<noshape_model::Fe
 /// The chooser's state besides its tab (`InsertViewState::chooser`).
 #[derive(Default)]
 pub struct ChooserState {
-    /// The filter (index into [`FILTERS`]; default Parts).
-    pub filter: Option<usize>,
+    /// The filter toggles that are on (bit `i`: [`FILTERS`]`[i]`; None:
+    /// Parts only).
+    pub filter: Option<u8>,
     /// Expanded studios.
     pub open: Vec<TabId>,
     pub search: Option<Entity<InputState>>,
-    /// Pictures per (studio, what), the hash they were made for, busy.
-    pub thumbs: HashMap<(TabId, ThumbOf), Arc<RenderImage>>,
-    pub made_for: HashMap<TabId, u64>,
+    /// Pictures per (document, studio, what), the hash they were made for,
+    /// busy. Document 0 is this one, else [`OtherDoc::tag`].
+    pub thumbs: HashMap<(u64, TabId, ThumbOf), Arc<RenderImage>>,
+    pub made_for: HashMap<(u64, TabId), u64>,
     pub busy: bool,
     /// Other documents tab; its "Search or paste URL" box, category, the
     /// scanned documents, a search and the opened document.
@@ -54,12 +74,20 @@ pub struct ChooserState {
     pub url: Option<Entity<InputState>>,
     pub other_cat: Option<usize>,
     pub other_docs: Option<Vec<crate::start_library::DocEntry>>,
+    /// Each scanned document's latest version ("V1", else "Start"), its
+    /// row's second line.
+    pub other_versions: HashMap<std::path::PathBuf, String>,
     pub other_query: Option<String>,
     pub other_doc: Option<OtherDoc>,
     /// Current document › Version graph: the list shown, and the version
     /// chosen (new views are pinned to it).
     pub graph: bool,
     pub version: Option<noshape_model::drawing::PinnedVersion>,
+    /// The opened other document's Version graph (its versions listed).
+    pub other_graph: bool,
+    /// The opened other document as a model while its Create version
+    /// dialog is open (the document is reread when a version is made).
+    pub other_model: Option<(Entity<crate::doc_model::DocModel>, Subscription)>,
 }
 
 /// Other documents categories (live, as the assembly Insert dialog).
@@ -119,8 +147,17 @@ impl OtherDoc {
             .unwrap_or_default();
     }
 
+    /// The pictures' document tag: this file at the shown version.
+    pub fn tag(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        self.path.hash(&mut h);
+        self.versions.get(self.version).map(|v| v.microversion.to_string()).hash(&mut h);
+        h.finish() | 1
+    }
+
     /// Its reference key for tab `tab` at the shown version, and the label.
-    fn key(&self, tab: TabId) -> Option<(String, String)> {
+    pub(crate) fn key(&self, tab: TabId) -> Option<(String, String)> {
         let v = self.versions.get(self.version)?;
         Some((crate::derived::ExternalRef { path: self.path.clone(), microversion: v.microversion, tab: tab.to_string() }.key(), format!("{} {}", self.name, v.label)))
     }
@@ -145,8 +182,8 @@ impl DrawingEditor {
         }
     }
 
-    fn chooser_filter(&self) -> usize {
-        self.chooser.filter.unwrap_or(1)
+    fn chooser_filter(&self) -> u8 {
+        self.chooser.filter.unwrap_or(F_PARTS)
     }
 
     /// Render the pictures of studios that changed since the last time.
@@ -154,13 +191,22 @@ impl DrawingEditor {
         if self.chooser.busy {
             return;
         }
-        let doc = self.doc.read(cx).session.doc.clone();
+        // This document, or the version of the other one opened.
+        let other = self.chooser.other_doc.clone().filter(|_| self.chooser.other);
+        let (tag, doc) = match &other {
+            Some(d) => {
+                let Some(key) = d.tabs.first().and_then(|t| d.key(t.0)) else { return };
+                let Some(doc) = self.version_doc(&key.0, cx) else { return };
+                (d.tag(), doc)
+            }
+            None => (0, self.doc.read(cx).session.doc.clone()),
+        };
         let todo: Vec<(TabId, u64)> = doc
             .ordered_tabs()
             .into_iter()
             .filter(|t| matches!(t.content, TabContent::PartStudio(_)))
             .filter_map(|t| views::source_hash(&doc, &SourceKey::studio(t.id)).map(|h| (t.id, h)))
-            .filter(|(t, h)| self.chooser.made_for.get(t) != Some(h))
+            .filter(|(t, h)| self.chooser.made_for.get(&(tag, *t)) != Some(h))
             .collect();
         if todo.is_empty() {
             return;
@@ -245,10 +291,10 @@ impl DrawingEditor {
                 let (todo, out) = made;
                 this.chooser.busy = false;
                 for (tab, h) in todo {
-                    this.chooser.thumbs.retain(|(t, _), _| *t != tab);
-                    this.chooser.made_for.insert(tab, h);
+                    this.chooser.thumbs.retain(|(d, t, _), _| (*d, *t) != (tag, tab));
+                    this.chooser.made_for.insert((tag, tab), h);
                 }
-                this.chooser.thumbs.extend(out);
+                this.chooser.thumbs.extend(out.into_iter().map(|((t, w), img)| ((tag, t, w), img)));
                 cx.notify();
             });
         })
@@ -256,6 +302,46 @@ impl DrawingEditor {
     }
 
     /// A source of this document (at the Version graph's version, if chosen).
+    /// A row of the tree: of this document, or of the opened other one.
+    fn pick_tree(&mut self, id: TabId, part: Option<BodyId>, cx: &mut Context<Self>) {
+        match self.chooser.other_doc.clone().filter(|_| self.chooser.other) {
+            Some(d) => {
+                if let Some((key, label)) = d.key(id) {
+                    self.choose_external(key, id, part, label, cx);
+                }
+            }
+            None => self.pick_current(id, part, cx),
+        }
+    }
+
+    /// Create version… in the opened other document (and its blue box
+    /// link): the Create version dialog for that document.
+    fn create_version_in_other(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(path) = self.chooser.other_doc.as_ref().map(|d| d.path.clone()) else { return };
+        let session = match noshape_ops::session::Session::open(&path) {
+            Ok(s) => s,
+            Err(e) => {
+                self.status = Some(format!("Could not open the document: {e:#}").into());
+                cx.notify();
+                return;
+            }
+        };
+        let model = cx.new(|_| crate::doc_model::DocModel::new(session));
+        let sub = cx.subscribe(&model, move |this: &mut Self, _, ev: &crate::doc_model::DocEvent, cx| {
+            if matches!(ev, crate::doc_model::DocEvent::Reloaded) {
+                // The new version is listed (and shown) at once.
+                if let Ok(d) = OtherDoc::open(&path) {
+                    this.chooser.other_doc = Some(d);
+                }
+                this.chooser.other_model = None;
+                this.ensure_sources(false, cx);
+                cx.notify();
+            }
+        });
+        self.chooser.other_model = Some((model.clone(), sub));
+        crate::history_panel::open_create_version_in(model, window, cx);
+    }
+
     fn pick_current(&mut self, id: TabId, part: Option<BodyId>, cx: &mut Context<Self>) {
         let version = self.chooser.version.clone();
         self.choose_source(id, part, cx);
@@ -273,13 +359,35 @@ impl DrawingEditor {
         }
         self.chooser.other_docs = Some(Vec::new());
         cx.spawn(async move |this, cx| {
-            let docs = cx.background_spawn(async { crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs }).await;
+            let (docs, versions) = cx
+                .background_spawn(async {
+                    let docs = crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs;
+                    let versions: HashMap<std::path::PathBuf, String> = docs
+                        .iter()
+                        .filter(|d| !d.broken && !d.trashed)
+                        .filter_map(|d| {
+                            let graph = noshape_store::Document::open_read_only(&d.path).ok()?.graph().ok()?;
+                            Some((d.path.clone(), graph.versions.last().map(|v| v.name.clone()).unwrap_or_else(|| "Start".into())))
+                        })
+                        .collect();
+                    (docs, versions)
+                })
+                .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 this.chooser.other_docs = Some(docs);
+                this.chooser.other_versions = versions;
                 cx.notify();
             });
         })
         .detach();
+    }
+
+    /// Open a document in Other documents (its latest version listed).
+    fn open_other(&mut self, path: &std::path::Path, cx: &mut Context<Self>) {
+        self.chooser.other_doc = OtherDoc::open(path).ok();
+        self.chooser.other_graph = false;
+        self.ensure_sources(false, cx);
+        cx.notify();
     }
 
     /// "Search or paste URL" › Enter / 🔍: a document path opens it; other
@@ -288,7 +396,7 @@ impl DrawingEditor {
         let text = self.chooser.url.as_ref().map(|s| s.read(cx).value().trim().to_string()).unwrap_or_default();
         let path = std::path::PathBuf::from(text.trim_start_matches("file://"));
         if path.extension().is_some_and(|e| e == crate::start_library::EXT) && path.exists() {
-            self.chooser.other_doc = OtherDoc::open(&path).ok();
+            self.open_other(&path, cx);
         } else {
             self.ensure_other_docs(cx);
             self.chooser.other_query = (!text.is_empty()).then_some(text);
@@ -297,42 +405,100 @@ impl DrawingEditor {
     }
 
     /// The Other documents tab (live as the assembly Insert dialog's).
-    fn render_other_documents(&mut self, tab: u8, cx: &mut Context<Self>) -> AnyElement {
+    /// An opened other document's header (live drawing/1346): 🏠 back to
+    /// the document filters, ‹ back to the list it came from, its name and
+    /// the version listed, the Create version… / Version graph buttons.
+    fn render_other_header(&mut self, d: &OtherDoc, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let label = d.versions.get(d.version).map(|v| v.label.clone()).unwrap_or_default();
+        let back_tip: &'static str = match (self.chooser.other_query.is_some(), self.chooser.other_cat) {
+            (false, Some(c)) => OTHER_SOURCES.get(c).map(|s| s.0).unwrap_or("Back"),
+            _ => "Search results",
+        };
+        let nav = |id: &'static str, icon: &'static str, tip: &'static str| div().id(id).size(px(22.)).flex().items_center().justify_center().rounded(px(2.)).cursor_pointer().hover(|d| d.bg(pal.row_hover)).child(crate::ui::glyph(icon, 14., pal.text)).tooltip(crate::ui::tooltip(tip));
+        h_flex()
+            .px(px(6.))
+            .py(px(4.))
+            .gap(px(4.))
+            .child(nav("dr-ch-other-home", "home", "Go to document filters").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.chooser.other_doc = None;
+                this.chooser.other_cat = None;
+                this.chooser.other_query = None;
+                this.chooser.other_graph = false;
+                cx.notify();
+            })))
+            .child(nav("dr-ch-other-back", "ui-chevron-left", back_tip).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.chooser.other_doc = None;
+                this.chooser.other_graph = false;
+                cx.notify();
+            })))
+            .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(d.name.clone())).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(label)))
+            .child(chooser_square("dr-ch-other-version", "version", "Create version…", false, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.create_version_in_other(window, cx))))
+            .child(chooser_square("dr-ch-other-graph", "version-graph", "Version graph", self.chooser.other_graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.chooser.other_graph = !this.chooser.other_graph;
+                cx.notify();
+            })))
+            .into_any_element()
+    }
+
+    /// The opened document's blue box: its changes since the last version
+    /// and the link to version them (live `select-item-warning`).
+    fn render_other_changes(&mut self, d: &OtherDoc, cx: &mut Context<Self>) -> Option<AnyElement> {
+        (d.changes > 0).then(|| {
+            let ink = gpui_kit::rgb(0x094174);
+            v_flex()
+                .mx(px(4.))
+                .my(px(4.))
+                .p(px(4.))
+                .rounded(px(5.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xb2ddf6))
+                .bg(gpui_kit::rgb(0xdef1fb))
+                .text_size(px(14.))
+                .text_color(ink)
+                .child(format!("{} change{} since the last version.", d.changes, if d.changes == 1 { "" } else { "s" }))
+                .child(div().id("dr-ch-other-mkversion").underline().cursor_pointer().child(format!("Create a version in {}.", d.name)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.create_version_in_other(window, cx))))
+                .into_any_element()
+        })
+    }
+
+    /// The opened document's Version graph: its versions (newest first,
+    /// then Start); picking one lists that version.
+    fn render_other_versions(&mut self, d: &OtherDoc, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let mut col = v_flex().id("dr-ch-other-versions").flex_1().min_h_0().overflow_y_scroll();
+        for (i, v) in d.versions.iter().enumerate() {
+            col = col.child(
+                h_flex()
+                    .id(SharedString::from(format!("dr-ch-ov-{i}")))
+                    .h(px(28.))
+                    .px(px(10.))
+                    .gap(px(6.))
+                    .cursor_pointer()
+                    .text_size(px(13.33))
+                    .when(i == d.version, |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
+                    .hover(|d| d.bg(pal.row_hover))
+                    .child(crate::assets::icon("version", 14., cx))
+                    .child(v.label.clone())
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some(o) = this.chooser.other_doc.as_mut() {
+                            o.version = i;
+                            o.load_tabs();
+                        }
+                        this.chooser.other_graph = false;
+                        this.ensure_sources(false, cx);
+                        cx.notify();
+                    })),
+            );
+        }
+        col.into_any_element()
+    }
+
+    fn render_other_documents(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let blue = gpui_kit::rgb(0x1651b0);
         let row = |id: SharedString| h_flex().id(id).h(px(32.)).pl(px(16.)).pr(px(6.)).gap(px(6.)).cursor_pointer().text_size(px(14.)).hover(|d| d.bg(pal.row_hover));
         let mut col = v_flex().flex_1().min_h_0();
-        // An opened document: its name and version, the changes since the
-        // last version, then its Part Studios | Assemblies.
-        if let Some(d) = self.chooser.other_doc.clone() {
-            let label = d.versions.get(d.version).map(|v| v.label.clone()).unwrap_or_default();
-            col = col.child(
-                h_flex()
-                    .px(px(6.))
-                    .py(px(4.))
-                    .gap(px(6.))
-                    .child(div().id("dr-ch-other-back").cursor_pointer().child(crate::ui::glyph("ui-chevron-left", 14., pal.text)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.chooser.other_doc = None;
-                        cx.notify();
-                    })))
-                    .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(d.name.clone())).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(label))),
-            );
-            if d.changes > 0 {
-                col = col.child(div().mx(px(4.)).mb(px(4.)).p(px(4.)).rounded(px(5.)).border_1().border_color(gpui_kit::rgb(0xb2ddf6)).bg(gpui_kit::rgb(0xdef1fb)).text_size(px(14.)).text_color(gpui_kit::rgb(0x094174)).child(format!("{} change{} since the last version.", d.changes, if d.changes == 1 { "" } else { "s" })));
-            }
-            for (i, (t, name, asm)) in d.tabs.iter().cloned().enumerate() {
-                if asm != (tab == 1) {
-                    continue;
-                }
-                let d2 = d.clone();
-                col = col.child(row(SharedString::from(format!("dr-ch-ext-{i}"))).child(crate::assets::icon(if asm { "assembly" } else { "part-studio" }, 18., cx)).child(div().truncate().child(name)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    if let Some((key, label)) = d2.key(t) {
-                        this.choose_external(key, t, label, cx);
-                    }
-                })));
-            }
-            return col.into_any_element();
-        }
         let has_text = self.chooser.url.as_ref().is_some_and(|s| !s.read(cx).value().trim().is_empty());
         col = col.child(
             h_flex()
@@ -384,10 +550,15 @@ impl DrawingEditor {
         let mut list = v_flex().id("dr-ch-other-list").flex_1().min_h_0().overflow_y_scroll();
         for (i, d) in docs.into_iter().enumerate() {
             let path = d.path.clone();
-            list = list.child(row(SharedString::from(format!("dr-ch-doc-{i}"))).child(crate::assets::icon("document", 18., cx)).child(div().truncate().child(d.name)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                this.chooser.other_doc = OtherDoc::open(&path).ok();
-                cx.notify();
-            })));
+            // Live: the name, then its latest version (or Start).
+            let version = self.chooser.other_versions.get(&d.path).cloned().unwrap_or_default();
+            list = list.child(
+                row(SharedString::from(format!("dr-ch-doc-{i}")))
+                    .h(px(40.))
+                    .child(crate::assets::icon("document", 18., cx))
+                    .child(v_flex().min_w_0().child(div().truncate().child(d.name)).child(h_flex().gap(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("version", 11., cx)).child(version)))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.open_other(&path, cx))),
+            );
         }
         col.child(list).into_any_element()
     }
@@ -442,17 +613,29 @@ impl DrawingEditor {
         let matches = |name: &str| query.is_empty() || name.to_lowercase().contains(&query);
         let doc = self.doc.read(cx);
         let doc_name = doc.name().to_string();
-        let tabs: Vec<(TabId, String, bool)> = doc
-            .session
-            .doc
-            .ordered_tabs()
-            .into_iter()
-            .filter_map(|t| match &t.content {
-                TabContent::PartStudio(_) => Some((t.id, t.name.clone(), false)),
-                TabContent::Assembly(_) => Some((t.id, t.name.clone(), true)),
-                _ => None,
-            })
-            .collect();
+        // The tree lists this document, or the other document opened in
+        // Other documents (at its version; no pictures).
+        let other_doc = self.chooser.other_doc.clone().filter(|_| self.chooser.other);
+        let tabs: Vec<(TabId, String, bool)> = match &other_doc {
+            Some(d) => d.tabs.clone(),
+            None => doc
+                .session
+                .doc
+                .ordered_tabs()
+                .into_iter()
+                .filter_map(|t| match &t.content {
+                    TabContent::PartStudio(_) => Some((t.id, t.name.clone(), false)),
+                    TabContent::Assembly(_) => Some((t.id, t.name.clone(), true)),
+                    _ => None,
+                })
+                .collect(),
+        };
+        let key_of = |id: TabId| match &other_doc {
+            Some(d) => SourceKey { version: d.key(id).map(|k| k.0), ..SourceKey::studio(id) },
+            None => SourceKey::studio(id),
+        };
+        let tag = other_doc.as_ref().map_or(0, |d| d.tag());
+        let pic_of = |id: TabId, what: ThumbOf| self.chooser.thumbs.get(&(tag, id, what)).cloned();
         // Live: blue underlined tabs, 12 px.
         let tab_btn = |id: &'static str, label: &'static str, on: bool| {
             div()
@@ -481,41 +664,49 @@ impl DrawingEditor {
                     continue;
                 }
                 any = true;
-                list = list.child(row_base(SharedString::from(format!("dr-ch-asm-{id}")), 20.).child(div().truncate().child(name)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_current(id, None, cx))));
+                list = list.child(row_base(SharedString::from(format!("dr-ch-asm-{id}")), 20.).child(div().truncate().child(name)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
                 continue;
             }
-            // Part Studios filter: the studio rows themselves.
-            if filter == 0 {
-                if !matches(&name) {
+            // Part Studios on and nothing else: the studio rows themselves.
+            if filter & !F_STUDIOS == 0 {
+                if filter == 0 || !matches(&name) {
                     continue;
                 }
                 any = true;
-                let pic = self.chooser.thumbs.get(&(id, ThumbOf::Part(None))).cloned();
-                list = list.child(row_base(SharedString::from(format!("dr-ch-ps-{id}")), 20.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(name)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_current(id, None, cx))));
+                let pic = pic_of(id, ThumbOf::Part(None));
+                list = list.child(row_base(SharedString::from(format!("dr-ch-ps-{id}")), 20.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(name)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
                 continue;
             }
-            // Children per filter: parts, sketches, or flat patterns (with
-            // their parts).
+            // The studio's rows the filters show, in body order: its flat
+            // patterns above their parts, then its sketches (live
+            // drawing/1394–1396).
             let mut children: Vec<ChildRow> = Vec::new();
-            if let Some(src) = self.sources.get(&SourceKey::studio(id)) {
-                match filter {
-                    2 => children.extend(src.context.sketches.iter().map(|s| (s.name.clone(), ThumbOf::Sketch(s.feature), None, false, Some(s.feature)))),
-                    _ => {
-                        for b in views::view_bodies(&src.context, None) {
-                            let sm = src.context.sheet_metal.contains_key(&b.id);
-                            if filter == 3 && !sm {
-                                continue;
-                            }
-                            if sm && filter == 3 {
-                                children.push((format!("Flat pattern of {}", b.name), ThumbOf::Flat(b.id.clone()), Some(b.id.clone()), true, None));
-                            }
-                            children.push((b.name.clone(), ThumbOf::Part(Some(b.id.clone())), Some(b.id.clone()), false, None));
-                        }
+            if filter & F_STUDIOS != 0 {
+                children.push((name.clone(), ThumbOf::Part(None), None, false, None));
+            }
+            if let Some(src) = self.sources.get(&key_of(id)) {
+                for b in src.context.bodies.iter() {
+                    let listed = match (b.kind, &b.composite) {
+                        (_, Some(_)) => filter & F_COMPOSITES != 0,
+                        (noshape_model::display::BodyKind::Solid, None) => filter & F_PARTS != 0,
+                        (noshape_model::display::BodyKind::Surface, None) => filter & F_SURFACES != 0,
+                        (noshape_model::display::BodyKind::Wire, None) => filter & F_CURVES != 0,
+                        _ => false,
+                    };
+                    if filter & F_FLAT != 0 && src.context.sheet_metal.contains_key(&b.id) {
+                        children.push((format!("Flat pattern of {}", b.name), ThumbOf::Flat(b.id.clone()), Some(b.id.clone()), true, None));
                     }
+                    if listed {
+                        children.push((b.name.clone(), ThumbOf::Part(Some(b.id.clone())), Some(b.id.clone()), false, None));
+                    }
+                }
+                if filter & F_SKETCHES != 0 {
+                    children.extend(src.context.sketches.iter().map(|s| (s.name.clone(), ThumbOf::Sketch(s.feature), None, false, Some(s.feature))));
                 }
             }
             let shown: Vec<_> = children.into_iter().filter(|c| matches(&c.0) || matches(&name)).collect();
-            if shown.is_empty() && (filter == 3 || !query.is_empty()) {
+            // Only studios with something to show are listed.
+            if shown.is_empty() {
                 continue;
             }
             any = true;
@@ -537,9 +728,9 @@ impl DrawingEditor {
                 continue;
             }
             for (i, (label, what, part, flat, sketch)) in shown.into_iter().enumerate() {
-                let pic = self.chooser.thumbs.get(&(id, what)).cloned();
+                let pic = pic_of(id, what);
                 list = list.child(row_base(SharedString::from(format!("dr-ch-c-{id}-{i}")), 36.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(label)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    this.pick_current(id, part.clone(), cx);
+                    this.pick_tree(id, part.clone(), cx);
                     if flat {
                         this.insert.flat = true;
                         this.set_insert_orientation(ViewOrientation::Top, cx);
@@ -554,24 +745,51 @@ impl DrawingEditor {
         if !any && !has_tabs {
             list = list.child(div().p_2().text_size(px(12.)).text_color(pal.text_muted).child(if tab == 0 { "No Part Studios in this document." } else { "No assemblies in this document." }));
         }
-        let mut filters = h_flex().h(px(34.)).px(px(6.)).gap(px(6.));
+        // Only the kinds the document has (live: Part Studios and Parts always).
+        let mut present = F_STUDIOS | F_PARTS;
+        for k in self.chooser_sources(cx) {
+            let Some(src) = self.sources.get(&k) else { continue };
+            for b in &src.context.bodies {
+                present |= match (b.kind, &b.composite) {
+                    (_, Some(_)) => F_COMPOSITES,
+                    (noshape_model::display::BodyKind::Surface, None) => F_SURFACES,
+                    (noshape_model::display::BodyKind::Wire, None) => F_CURVES,
+                    _ => 0,
+                };
+            }
+            if !src.context.sketches.is_empty() {
+                present |= F_SKETCHES;
+            }
+            if !src.context.sheet_metal.is_empty() {
+                present |= F_FLAT;
+            }
+        }
+        // Live (drawing/1394, dom/d2-picker-current): 30 px `os-button os-clear`
+        // toggles 35 px apart; on = `os-active` (#eaeaea pressed in under a
+        // #b6b6b6 top edge, as the assembly list's ≡).
+        let mut filters = h_flex().h(px(34.)).pl(px(7.)).pr(px(6.)).gap(px(5.));
         for (i, (tip, icon)) in FILTERS.iter().enumerate() {
-            let on = i == filter;
+            if present & (1 << i) == 0 {
+                continue;
+            }
+            let on = filter & (1 << i) != 0;
             filters = filters.child(
                 div()
                     .id(SharedString::from(format!("dr-ch-filter-{i}")))
-                    .size(px(28.))
+                    .size(px(30.))
+                    .flex_none()
+                    .relative()
                     .flex()
                     .items_center()
                     .justify_center()
                     .rounded(px(2.))
                     .cursor_pointer()
-                    .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
-                    .when(!on, |d| d.hover(|d| d.bg(gpui_kit::rgb(0xe6ebef))))
+                    .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                    .when(on, |d| d.bg(gpui_kit::rgb(0xeaeaea)).border_l_1().border_r_1().border_color(gpui_kit::rgb(0xe4e4e4)).child(div().absolute().top_0().left_0().right_0().h(px(1.)).bg(gpui_kit::rgb(0xb6b6b6))))
                     .child(crate::assets::icon(icon, 20., cx))
                     .tooltip(crate::ui::tooltip(*tip))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        this.chooser.filter = Some(i);
+                        this.chooser.filter = Some(this.chooser_filter() ^ (1 << i));
                         cx.notify();
                     })),
             );
@@ -619,28 +837,49 @@ impl DrawingEditor {
                 this.insert.chooser = Some(1);
                 cx.notify();
             })));
+        // Live 170: "⤒ Import..." under the list (both document tabs).
+        let import_row = |cx: &App| {
+            h_flex()
+                .id("dr-ch-import")
+                .h(px(24.))
+                .px(px(6.))
+                .gap(px(6.))
+                .border_t_1()
+                .border_color(gpui_kit::rgb(0xeeeeee))
+                .cursor_pointer()
+                .text_size(px(13.33))
+                .hover(|d| d.bg(pal.row_hover))
+                .child(crate::assets::icon("import", 14., cx))
+                .child("Import...")
+                .on_click(|_, window, cx| crate::workspace::request_import(window, cx))
+        };
         let panel = if self.chooser.other {
-            let opened = self.chooser.other_doc.is_some();
-            let other = self.render_other_documents(tab, cx);
-            panel.when(opened, |d| d.child(sub_tabs)).child(other)
+            match other_doc {
+                // An opened document: its header, Part Studios | Assemblies,
+                // search, filters, the changes box, then its tree.
+                Some(d) => {
+                    let panel = panel.child(self.render_other_header(&d, cx));
+                    if self.chooser.other_graph {
+                        panel.child(self.render_other_versions(&d, cx)).child(import_row(cx))
+                    } else {
+                        let changes = self.render_other_changes(&d, cx);
+                        panel
+                            .child(sub_tabs)
+                            .children(self.chooser.search.as_ref().map(|s| div().px(px(6.)).pt(px(6.)).child(Input::new(s).small())))
+                            .when(tab == 0, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
+                            .children(changes)
+                            .child(list)
+                            .child(import_row(cx))
+                    }
+                }
+                None => {
+                    let other = self.render_other_documents(cx);
+                    panel.child(other).child(import_row(cx))
+                }
+            }
         } else {
             // Live 170: the document, its workspace or chosen version, and
             // the Create version… / Version graph buttons.
-            let square = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &App| {
-                div()
-                    .id(id)
-                    .size(px(30.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(px(3.))
-                    .border_1()
-                    .border_color(gpui_kit::rgb(0xdddddd))
-                    .cursor_pointer()
-                    .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
-                    .child(crate::assets::icon(icon, 20., cx))
-                    .tooltip(crate::ui::tooltip(tip))
-            };
             let place = self.chooser.version.as_ref().map(|v| v.name.clone()).unwrap_or_else(|| "Main".into());
             let doc = self.doc.clone();
             let header = h_flex()
@@ -648,8 +887,8 @@ impl DrawingEditor {
                 .py(px(4.))
                 .gap(px(4.))
                 .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(doc_name)).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(place)))
-                .child(square("dr-ch-version", "version", "Create version…", false, cx).on_click(move |_, window, cx| crate::history_panel::open_create_version_in(doc.clone(), window, cx)))
-                .child(square("dr-ch-graph", "version-graph", "Version graph", self.chooser.graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                .child(chooser_square("dr-ch-version", "version", "Create version…", false, cx).on_click(move |_, window, cx| crate::history_panel::open_create_version_in(doc.clone(), window, cx)))
+                .child(chooser_square("dr-ch-graph", "version-graph", "Version graph", self.chooser.graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.chooser.graph = !this.chooser.graph;
                     cx.notify();
                 })));
@@ -688,22 +927,7 @@ impl DrawingEditor {
                     .children(self.chooser.search.as_ref().map(|s| div().px(px(6.)).pt(px(6.)).child(Input::new(s).small())))
                     .when(tab == 0, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
                     .child(list)
-                    // Live 170: "⤒ Import..." under the list.
-                    .child(
-                        h_flex()
-                            .id("dr-ch-import")
-                            .h(px(24.))
-                            .px(px(6.))
-                            .gap(px(6.))
-                            .border_t_1()
-                            .border_color(gpui_kit::rgb(0xeeeeee))
-                            .cursor_pointer()
-                            .text_size(px(13.33))
-                            .hover(|d| d.bg(pal.row_hover))
-                            .child(crate::assets::icon("import", 14., cx))
-                            .child("Import...")
-                            .on_click(|_, window, cx| crate::workspace::request_import(window, cx)),
-                    )
+                    .child(import_row(cx))
             }
         };
         // Beside the Insert view panel (the empty one until a source is chosen).
@@ -724,6 +948,23 @@ impl DrawingEditor {
                 .into_any_element(),
         )
     }
+}
+
+/// The document header's 30 px buttons (Create version…, Version graph).
+fn chooser_square(id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &App) -> Stateful<Div> {
+    div()
+        .id(id)
+        .size(px(30.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(3.))
+        .border_1()
+        .border_color(gpui_kit::rgb(0xdddddd))
+        .cursor_pointer()
+        .when(on, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
+        .child(crate::assets::icon(icon, 20., cx))
+        .tooltip(crate::ui::tooltip(tip))
 }
 
 /// A row picture (Onshape: about 56 × 32 px), blank until rendered.

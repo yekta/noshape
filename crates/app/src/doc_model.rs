@@ -63,7 +63,10 @@ impl PendingEdit {
 impl EventEmitter<DocEvent> for DocModel {}
 
 impl DocModel {
-    pub fn new(session: Session) -> Self {
+    /// The app's model of an opened document: every tab starts with empty
+    /// undo/redo stacks (Onshape's page load; the history stays).
+    pub fn new(mut session: Session) -> Self {
+        session.forget_undo();
         Self { session, studio_cache: Default::default(), pending: PendingEdit::default() }
     }
 
@@ -232,6 +235,26 @@ impl Drop for DocModel {
 mod tests {
     use super::{PendingEdit, Session};
     use noshape_model::Document;
+
+    /// Live: a reopened document has nothing to undo, though its history
+    /// (and the CLI's undo) keeps the edits.
+    #[test]
+    fn a_reopened_document_starts_with_nothing_to_undo() {
+        let dir = std::env::temp_dir().join(format!("noshape-reopen-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("r.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut s = Session::create(&path, Document::new()).unwrap();
+        s.doc.settings.description = "Edited".into();
+        s.commit(&[], true, "Edit description").unwrap();
+        drop(s);
+        let cli = Session::open(&path).unwrap();
+        assert!(cli.can_undo());
+        let app = super::DocModel::new(Session::open(&path).unwrap());
+        assert!(!app.can_undo() && !app.can_redo());
+        assert_eq!(app.session.doc.settings.description, "Edited");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// qa5 UNDO1: an Insert session's edits (insert, drop) are one undo step.
     #[test]

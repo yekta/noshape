@@ -8,7 +8,7 @@
 use crate::fs_reference::{RefSource, RefSourceKind};
 use crate::theme::p;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::configuration::{ConfigInputKind, ConfigValues, Configuration};
@@ -85,6 +85,9 @@ pub struct SelectItemPanel {
     search: Entity<InputState>,
     /// Part Studios whose parts are listed.
     expanded: HashSet<String>,
+    /// The picked Part Studio shown alone, expanded, with a ‹ back to the
+    /// list (live part-studio/407, 418: also when the field is reopened).
+    focused: Option<String>,
     /// The version graph replaces the list.
     graph: bool,
     current: Option<VersionedDoc>,
@@ -185,6 +188,8 @@ impl SelectItemPanel {
                 _ => {}
             }),
         ];
+        let picked = source_of(split_value(&value).0);
+        let focused = (matches!(mode, PanelMode::Reference(ReferenceKind::PartStudio)) && !picked.is_empty()).then_some(picked);
         let current = doc_path.as_deref().and_then(document_versions).map(|(name, versions)| VersionedDoc { path: doc_path.clone().unwrap_or_default(), name, versions, version: None, changes: 0, sources: None });
         SelectItemPanel {
             mode,
@@ -197,7 +202,8 @@ impl SelectItemPanel {
             value,
             other_documents: false,
             search,
-            expanded: HashSet::new(),
+            expanded: focused.iter().cloned().collect(),
+            focused,
             graph: false,
             current,
             url,
@@ -322,6 +328,13 @@ impl SelectItemPanel {
     }
 
     fn pick(&mut self, value: String, cx: &mut Context<Self>) {
+        if matches!(self.mode, PanelMode::Reference(ReferenceKind::PartStudio)) {
+            let studio = source_of(split_value(&value).0);
+            self.focused = (!studio.is_empty()).then(|| {
+                self.expanded.insert(studio.clone());
+                studio
+            });
+        }
         self.value = value.clone();
         cx.emit(SelectItemEvent::Picked(value));
         cx.notify();
@@ -354,7 +367,7 @@ impl SelectItemPanel {
                 .tooltip(crate::ui::tooltip(name))
         };
         let mut out = Vec::new();
-        let accepted: Vec<RefSource> = list.iter().filter(|s| self.accepts(s)).cloned().collect();
+        let accepted: Vec<RefSource> = list.iter().filter(|s| self.accepts(s) && (self.other_documents || self.focused.as_ref().is_none_or(|f| *f == s.tab))).cloned().collect();
         for s in &accepted {
             let parts = match &s.what {
                 RefSourceKind::PartStudio(parts) if expandable => Some(parts.clone()),
@@ -441,7 +454,10 @@ impl SelectItemPanel {
                 let tab = s.tab.clone();
                 out.push(self.config_editor(&tab, &cfg, window, cx));
             }
-            if open {
+            // Live 409 (qa5 DER10): a changed configuration empties the
+            // contents until Generate lists them again.
+            let pending = s.configuration.as_ref().is_some_and(|c| self.config_changed(&s.tab, c).0);
+            if open && !pending {
                 for (body, name) in part_hits {
                     let value = crate::fs_reference::part_value(&s.tab, &body);
                     let on = current == value;
@@ -460,14 +476,20 @@ impl SelectItemPanel {
     /// A configured Part Studio's inputs under its row (live fs-refcfg-panel:
     /// 40 px indent, Size ▾, ☐ Hole, Len, Txt) and Generate, pale until a
     /// value changes; Generate applies the configuration to the field.
-    fn config_editor(&mut self, key: &str, cfg: &Configuration, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
+    /// Whether `key`'s configuration inputs were changed since the last
+    /// Generate, and the values being edited.
+    fn config_changed(&self, key: &str, cfg: &Configuration) -> (bool, ConfigValues) {
         let (base, applied) = split_value(&self.value);
         let applied = if source_of(base) == key { applied } else { ConfigValues::default() };
         let mut effective = cfg.defaults();
         effective.0.extend(applied.0.clone());
         let editing = self.cfg_edit.get(key).cloned().unwrap_or_else(|| effective.clone());
-        let changed = editing != effective;
+        (editing != effective, editing)
+    }
+
+    fn config_editor(&mut self, key: &str, cfg: &Configuration, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let (changed, editing) = self.config_changed(key, cfg);
         // Live 741: labels only as wide as their text, the editor fills the rest.
         let label = |t: String| div().pt(px(7.)).px(px(5.)).flex_none().text_size(px(12.)).line_height(px(16.)).text_color(gpui_kit::rgb(0x666666)).child(t);
         let mut col = v_flex().pl(px(40.)).pr(px(26.));
@@ -595,6 +617,13 @@ impl SelectItemPanel {
             .gap(px(6.))
             .border_t_1()
             .border_color(gpui_kit::rgb(0xeeeeee))
+            // A picked studio shown alone: ‹ goes back to the whole list.
+            .when(!other && self.focused.is_some(), |d| {
+                d.pl(px(2.)).child(nav("sel-focus-back", "ui-chevron-left", "Back".into()).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.focused = None;
+                    cx.notify();
+                })))
+            })
             .when(other, |d| {
                 d.child(nav("sel-home", "home", "Go to document filters".into()).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.other = None;
@@ -1046,7 +1075,9 @@ impl Render for SelectItemPanel {
                                 .justify_center()
                                 .opacity(0.5)
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Close).with_size(px(14.)))
+                                // Live (403): Bootstrap's btn-close, an 11 px black
+                                // cross at half opacity.
+                                .child(crate::assets::icon("panel-close", 20., cx))
                                 .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(SelectItemEvent::Close))),
                         ),
             )

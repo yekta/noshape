@@ -47,7 +47,8 @@ impl Studio {
     fn ok(&mut self) -> RegenResult {
         let r = Regenerator::new().regenerate(&self.ps, &ConfigValues::default(), &self.units, &RegenOptions::default());
         for (f, s) in self.ps.features.iter().zip(&r.display.features) {
-            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
+            // With std's FeatureScript notices (the failing call's stack).
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning), "{} ({}) failed: {:?} {:?}", f.name, f.type_id, s.message, noshape_model::custom::run::output_of(f.id).map(|o| o.notices));
         }
         r
     }
@@ -129,7 +130,8 @@ fn hem_on_g34_matches_live() {
     s.add("sheetMetalHem", |p| p.set("edges", ParamValue::Query(vec![edge])));
     let r = s.ok();
     let faces = r.context.bodies[part(&r)].shape.faces().len();
-    assert!((volume_mm3(&r) - 9378.1835).abs() < 1e-3 && faces == 33, "{} mm³, {} faces: {:#?}", volume_mm3(&r), faces, face_report(&r));
+    let bodies: Vec<String> = r.context.bodies.iter().chain(r.context.fs_hidden_bodies.iter()).map(|b| format!("{:?} {:?} {} faces {:.4} mm³", b.kind, b.shape.bounding_box(true).map(|x| (x.min * 1e3, x.max * 1e3)), b.shape.faces().len(), b.shape.volume().unwrap_or(0.0) * 1e9)).collect();
+    assert!((volume_mm3(&r) - 9378.1835).abs() < 1e-3 && faces == 33, "{} mm³, {} faces: {:#?} bodies {bodies:#?} hem {:?} {:?}", volume_mm3(&r), faces, face_report(&r), r.display.features.last().map(|f| (f.status, f.message.clone())), s.ps.features.last().and_then(|f| noshape_model::custom::run::output_of(f.id)).map(|o| o.notices));
 }
 
 /// The part's face through `p` (mm).
@@ -251,4 +253,37 @@ fn face_report(r: &RegenResult) -> Vec<String> {
             format!("{kind} {:.7} at ({:.3}, {:.3}, {:.3})", f.area().unwrap_or(0.0) * 1e6, p.x, p.y, p.z)
         })
         .collect()
+}
+
+/// Bend (sheetMetalBend) of the 60 × 40 plate along a sketch line across
+/// it at x = 30, 90°: two walls and a bend, flat as long as the plate.
+#[test]
+#[ignore = "in progress (fs): std Bend fails at opSplitFace"]
+fn bend_keeps_flat_length() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("3 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let (a, b) = (sk.add_point(glam::DVec2::new(mm(30.0), mm(-10.0))), sk.add_point(glam::DVec2::new(mm(30.0), mm(50.0))));
+    let line = sk.add_line_between(a, b).unwrap().0;
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
+    s.add("sheetMetalBend", move |p| {
+        p.set("bendReference", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line }]));
+        p.set("face", ParamValue::Query(vec![top]));
+        p.set("bendAngle", expr("90 deg"));
+    });
+    let r = s.ok();
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    let size = flat.size() * 1e3;
+    assert!((size.x.max(size.y) - 60.0).abs() < 1e-6 && (size.x.min(size.y) - 40.0).abs() < 1e-6, "{size:?}");
 }

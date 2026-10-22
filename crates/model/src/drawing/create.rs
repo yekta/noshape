@@ -85,6 +85,7 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     d.props.formats_locked = true;
     apply_template(&mut d, 0, template);
     super::templates::template_precisions(&mut d.props, template.dim_units().imperial());
+    super::templates::template_sizes(&mut d.props, template.dim_units().imperial());
     let (Some(src), true) = (source, suggested) else { return d };
     if src.sketch.is_some() {
         let (lo, hi) = bounds.unwrap_or((DVec3::splat(-0.05), DVec3::splat(0.05)));

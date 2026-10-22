@@ -203,6 +203,52 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// the fuse leaves loose faces, which the same-domain unify does not join
 /// (std Tab: the tab and its wall become one 850 mm² face, live
 /// dom/fs-smprobe3-8.txt).
+/// A sheet union whose pieces only touch along (part of) an edge, as std's
+/// sheet metal merges are (a hem's arc on a plate edge, tangent): Parasolid
+/// stitches them there (std passes the edge `matches`). Sew the union's
+/// pieces (sewing cuts partly shared edges); one connected sheet replaces
+/// them, its faces keeping their names.
+fn stitch_sheet_pieces(ev: &mut EvalCtx, first: &BodyId) -> FResult<()> {
+    let pieces: Vec<usize> = (0..ev.ctx.bodies.len()).filter(|&i| {
+        let b = &ev.ctx.bodies[i];
+        b.kind == BodyKind::Surface && (&b.id == first || (b.id.feature == ev.feature && b.id.index >= 10_000))
+    }).collect();
+    if pieces.len() < 2 || !pieces.iter().any(|&i| &ev.ctx.bodies[i].id == first) {
+        return Ok(());
+    }
+    let mut faces = Vec::new();
+    let mut names = Vec::new();
+    for &i in &pieces {
+        let b = &ev.ctx.bodies[i];
+        faces.extend(b.shape.faces());
+        names.extend(b.faces.iter().cloned());
+    }
+    let Ok(sewn) = k::sew(&faces, 1e-7, false) else { return Ok(()) };
+    if sewn.shape.shells().len() != 1 || sewn.shape.count(ShapeType::Face) != faces.len() {
+        return Ok(());
+    }
+    let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
+    let keys: Vec<_> = faces.iter().map(key).collect();
+    let Some(sewn_names) = sewn
+        .shape
+        .faces()
+        .iter()
+        .map(|f| {
+            let kf = key(f)?;
+            let i = keys.iter().position(|k| k.is_some_and(|k| k.0.distance(kf.0) < 1e-9 && (k.1 - kf.1).abs() < 1e-9))?;
+            names.get(i).cloned()
+        })
+        .collect::<Option<Vec<Name>>>()
+    else {
+        return Ok(());
+    };
+    let keep = pieces.iter().copied().find(|&i| &ev.ctx.bodies[i].id == first).unwrap_or(pieces[0]);
+    ev.replace_body(keep, sewn.shape, sewn_names);
+    let drop: Vec<BodyId> = pieces.iter().filter(|&&i| i != keep).map(|&i| ev.ctx.bodies[i].id.clone()).collect();
+    ev.ctx.bodies.retain(|b| !drop.contains(&b.id));
+    Ok(())
+}
+
 fn merge_sheet_faces(ev: &mut EvalCtx, bi: usize) -> FResult<()> {
     let body = ev.ctx.bodies[bi].clone();
     if body.kind != BodyKind::Surface {
@@ -351,6 +397,7 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 ev.ctx.bodies.retain(|b| !remove.contains(&b.id));
                 let first = index(ev, &all[0]).unwrap_or(first);
                 ev.boolean_into(&[first], others, k::BooleanOp::Fuse)?;
+                stitch_sheet_pieces(ev, &all[0])?;
                 if let Some(bi) = index(ev, &all[0]) {
                     merge_sheet_faces(ev, bi)?;
                 }
@@ -533,12 +580,13 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if transforms.len() > 2500 {
         return Err(raise_error(i, "PATTERN_INPUT_TOO_MANY_INSTANCES", None));
     }
-    run_op(i, &cx, &id, "PATTERN_BODY_FAILED", |ev| {
+    let made = run_op(i, &cx, &id, "PATTERN_BODY_FAILED", |ev| {
         let bodies = ev.resolve_bodies(&refs);
         if bodies.is_empty() {
             return err("Could not pattern selected parts.");
         }
         let mut n = 0u32;
+        let mut made: Vec<(String, BodyId)> = Vec::new();
         for bi in bodies {
             let body = ev.ctx.bodies[bi].clone();
             for (k_, m) in transforms.iter().enumerate() {
@@ -546,11 +594,18 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let inst = instance_number(names.get(k_).map(|s| s.as_str()).unwrap_or(""), k_);
                 let faces = copy_names(ev, &body.faces, &res, inst);
                 push_body(ev, BodyId { feature: ev.feature, index: n }, body.kind, res.shape, faces);
+                made.push((names.get(k_).cloned().unwrap_or_default(), BodyId { feature: ev.feature, index: n }));
                 n += 1;
             }
         }
-        Ok(())
+        Ok(made)
     })?;
+    // Instance bodies as renamed after the operation.
+    let mut st = cx.state.lock();
+    let (marker, feature) = (super::marker_of(&id), st.feature);
+    for (name, b) in made {
+        st.pattern_instances.entry((id.clone(), name)).or_default().push(super::wrap_body_id(&b, marker, feature));
+    }
     Ok(Value::Undefined)
 }
 
@@ -1011,8 +1066,63 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("projectionType", ParamValue::Enum("NORMAL_TO_TARGET".into()));
     p.set("keepToolSurfaces", ParamValue::Bool(def_bool(&def, "keepToolSurfaces", false)));
     p.set("extendToCompletion", ParamValue::Bool(def_bool(&def, "extendToCompletion", false)));
-    run_op_with(i, &cx, &id, "CANNOT_SPLIT_FACE", &p, crate::regen::features::split::split_part)?;
-    Ok(Value::Undefined)
+    if super::trace_ops() {
+        eprintln!("[fs op] splitFace targets {:?} tools {:?}", p.query("faceTargets"), p.query("faceTools"));
+    }
+    let new_edges = run_op_with(i, &cx, &id, "CANNOT_SPLIT_FACE", &p, |ev| {
+        // The target bodies' edges before the split.
+        let owners: Vec<BodyId> = ev.resolve_faces(ev.query("faceTargets")).into_iter().map(|(b, _)| ev.ctx.bodies[b].id.clone()).collect();
+        let before: Vec<(BodyId, Shape)> = ev.ctx.bodies.iter().filter(|b| owners.contains(&b.id)).map(|b| (b.id.clone(), Shape::compound(&b.shape.edges()))).collect();
+        let targets: Vec<Shape> = ev.resolve_faces(ev.query("faceTargets")).into_iter().filter_map(|(b, f)| ev.face_shape(b, f).ok()).collect();
+        let n_targets = targets.len();
+        let targets = Shape::compound(&targets);
+        crate::regen::features::split::split_part(ev)?;
+        // The pieces of the target faces (their snapshot points: uv middle, on the face).
+        let mut pieces = Vec::new();
+        for (bid, _) in &before {
+            let Some(b) = ev.ctx.bodies.iter().find(|b| &b.id == bid) else { continue };
+            for f in b.shape.faces() {
+                let Ok([u0, u1, v0, v1]) = f.uv_bounds() else { continue };
+                let Some(p) = f.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).ok().and_then(|p| f.project_point(p).ok()).map(|p| p.point) else { continue };
+                if k::make_vertex(p).ok().and_then(|v| k::distance(&v, &targets).ok()).is_some_and(|d| d.distance < 1e-7) {
+                    pieces.push(p);
+                }
+            }
+        }
+        // Nothing split: no pieces.
+        if pieces.len() <= n_targets {
+            pieces.clear();
+        }
+        // splittingEdges: the edges the split made (midpoints on no old edge).
+        let mut made = Vec::new();
+        let mut mids = Vec::new();
+        for (bid, old) in &before {
+            let Some(b) = ev.ctx.bodies.iter().find(|b| &b.id == bid) else { continue };
+            for (e, edge) in b.shape.edges().iter().enumerate() {
+                let Ok(info) = edge.edge_info() else { continue };
+                let mid = edge.point_at((info.first_param + info.last_param) * 0.5).ok().and_then(|p| k::make_vertex(p).ok());
+                if let Some(v) = mid.filter(|v| k::distance(v, old).is_ok_and(|d| d.distance > 1e-7)) {
+                    made.push(Reference::Edge((*b.edges[e]).clone()));
+                    mids.extend(v.vertex_point().ok());
+                }
+            }
+        }
+        // Which planar tool cut which of them.
+        let mut tools = Vec::new();
+        for (bi, fi) in ev.resolve_faces(ev.query("faceTools")) {
+            let Ok(Some(pl)) = ev.face_shape(bi, fi).and_then(|f| f.face_plane().map_err(|e| crate::regen::eval::FeatureError::new(e.to_string()))) else { continue };
+            let n = pl.unit_normal();
+            let on: Vec<DVec3> = mids.iter().copied().filter(|m| (*m - pl.origin).dot(n).abs() < 1e-7).collect();
+            tools.push((pl.origin, n, on));
+        }
+        Ok((made, tools, pieces))
+    })?;
+    let (new_edges, tools, pieces) = new_edges;
+    let mut st = cx.state.lock();
+    st.split_tools.extend(tools);
+    st.split_face_pieces.insert(id.clone(), pieces);
+    drop(st);
+    Ok(Value::map_from([("splittingEdges", super::query::transient_queries(&cx, &new_edges))]))
 }
 
 /// opSplitEdges: split edges at parameters (one array per edge, 0..1, by

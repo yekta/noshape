@@ -74,7 +74,8 @@ pub fn move_table(doc: &Entity<DocModel>, element: TabId, studio: TabId, down: b
 /// Dialog state kept across re-renders.
 #[derive(Default)]
 struct DialogState {
-    expanded: HashSet<(Option<std::path::PathBuf>, TabId)>,
+    /// Studios folded with their caret (live: they open expanded).
+    collapsed: HashSet<(Option<std::path::PathBuf>, TabId)>,
     other: bool,
     /// Other documents: the chosen document and version (microversion).
     document: Option<std::path::PathBuf>,
@@ -84,6 +85,10 @@ struct DialogState {
     /// in it (help config-insert-vs-01).
     config_open: HashSet<(Option<std::path::PathBuf>, TabId)>,
     config_values: std::collections::HashMap<(Option<std::path::PathBuf>, TabId), noshape_model::configuration::ConfigValues>,
+    /// The version graph is open; this document at a version (microversion,
+    /// label) instead of Main.
+    graph: bool,
+    own_version: Option<(String, String)>,
 }
 
 /// .noshape documents besides `current`: recently opened, the documents
@@ -137,10 +142,13 @@ struct Rows<'a> {
     state: &'a Rc<RefCell<DialogState>>,
     /// This document (where the target is).
     current: &'a noshape_model::Document,
+    /// "Search Variable Studios" (lowercase): studios whose name or a
+    /// variable matches.
+    query: &'a str,
 }
 
 fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars::ExternalStudio>, cx: &App, rows: &mut Vec<AnyElement>) {
-    let Rows { doc, target, state, current } = *ctx;
+    let Rows { doc, target, state, current, query } = *ctx;
     let pal = p();
     let own = match target {
         InsertTarget::Studio(t) if external.is_none() => Some(t),
@@ -151,9 +159,10 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
         .into_iter()
         .filter(|t| Some(t.id) != own)
         .filter_map(|t| match &t.content {
-            TabContent::VariableStudio(v) => Some((t.id, t.name.clone(), v.variables.iter().map(|x| x.name.clone()).filter(|n| !n.is_empty()).collect(), v.configuration.clone())),
+            TabContent::VariableStudio(v) => Some((t.id, t.name.clone(), v.variables.iter().map(|x| x.name.clone()).filter(|n| !n.is_empty()).collect::<Vec<_>>(), v.configuration.clone())),
             _ => None,
         })
+        .filter(|(_, name, vars, _)| query.is_empty() || name.to_lowercase().contains(query) || vars.iter().any(|v| v.to_lowercase().contains(query)))
         .collect();
     if studios.is_empty() {
         let msg = if external.is_some() { "This version has no Variable Studios." } else { "There are no other Variable Studios in this document." };
@@ -165,23 +174,43 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
         let cur = current_ref(current, target, id, &external);
         let whole = cur.as_ref().is_some_and(|r| r.variables.is_none());
         let key = (path.clone(), id);
-        let open = state.borrow().expanded.contains(&key);
+        let open = !state.borrow().collapsed.contains(&key);
         let cfg_key = key.clone();
         let (doc1, st, ext1) = (doc.clone(), state.clone(), external.clone());
         rows.push(
             h_flex()
                 .id(SharedString::from(format!("ivs-{}-{id}", path.as_ref().map(|p| p.display().to_string()).unwrap_or_default())))
-                .h(px(32.))
-                .px(px(6.))
-                .gap(px(4.))
-                .text_size(px(14.))
+                // Live (dom/dialog-insert-variable-studio): 40 px rows; the
+                // expander at x 4, the 50x30 studio icon at x 30, the name
+                // (13.33 px, weight 300) at x 96.
+                .h(px(40.))
+                .flex_none()
+                .pl(px(4.))
+                .pr(px(4.))
+                .text_size(px(13.33))
+                .font_weight(FontWeight::LIGHT)
+                .text_color(pal.text)
                 .cursor_pointer()
-                .when(whole, |d| d.bg(pal.accent_soft))
-                .hover(|d| d.bg(rgb(0xdef1fb)))
+                .relative()
+                .group(SharedString::from(format!("ivs-row-{id}")))
+                .tooltip(crate::ui::tooltip(name.clone()))
+                // Live 159: the picked studio light blue from x 18 (not under
+                // the expander), no check mark.
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(18.))
+                        .top_0()
+                        .bottom_0()
+                        .right_0()
+                        .when(whole, |d| d.bg(pal.accent_soft))
+                        .when(!whole, |d| d.group_hover(SharedString::from(format!("ivs-row-{id}")), |d| d.bg(rgb(0xdef1fb)))),
+                )
                 .child(
                     div()
                         .id(SharedString::from(format!("ivs-caret-{id}")))
-                        .size(px(16.))
+                        .w(px(10.))
+                        .h(px(22.))
                         .flex()
                         .items_center()
                         .justify_center()
@@ -189,15 +218,14 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();
                             let mut s = st.borrow_mut();
-                            if !s.expanded.remove(&key) {
-                                s.expanded.insert(key.clone());
+                            if !s.collapsed.remove(&key) {
+                                s.collapsed.insert(key.clone());
                             }
                             window.refresh();
                         }),
                 )
-                .child(crate::assets::icon("variable-studio", 20., cx))
-                .child(div().flex_1().truncate().child(name))
-                .when(whole, |d| d.child(crate::ui::glyph("check", 14., pal.accent)))
+                .child(div().ml(px(16.)).w(px(50.)).h(px(30.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon("variable-studio", 30., cx)))
+                .child(div().ml(px(16.)).flex_1().min_w_0().truncate().child(name))
                 // A configured studio: [▦ ▾] opens its configuration box.
                 .when(!cfg.is_empty(), |d| {
                     let (st, key) = (state.clone(), cfg_key.clone());
@@ -262,15 +290,32 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                 rows.push(
                     h_flex()
                         .id(SharedString::from(format!("ivs-{id}-{n}")))
-                        .h(px(28.))
-                        .pl(px(48.))
-                        .pr(px(6.))
-                        .text_size(px(13.))
+                        // Live: 40 px, the 20 px variable icon at x 80, the name at x 114.
+                        .h(px(40.))
+                        .flex_none()
+                        .pl(px(80.))
+                        .pr(px(4.))
+                        .text_size(px(13.33))
+                        .font_weight(FontWeight::LIGHT)
+                        .text_color(pal.text)
                         .cursor_pointer()
-                        .when(picked, |d| d.bg(pal.accent_soft))
-                        .hover(|d| d.bg(rgb(0xdef1fb)))
-                        .child(div().flex_1().truncate().child(format!("#{n}")))
-                        .when(picked, |d| d.child(crate::ui::glyph("check", 14., pal.accent)))
+                        .relative()
+                        .group(SharedString::from(format!("ivs-var-{id}-{n}")))
+                        // Live: the item (and its highlight) starts at x 40.
+                        .child(
+                            div()
+                                .absolute()
+                                .left(px(40.))
+                                .top_0()
+                                .bottom_0()
+                                .right_0()
+                                .when(picked, |d| d.bg(pal.accent_soft))
+                                .when(!picked, |d| d.group_hover(SharedString::from(format!("ivs-var-{id}-{n}")), |d| d.bg(rgb(0xdef1fb)))),
+                        )
+                        // Live (part-studio/158, dom/dialog-insert-variable-studio):
+                        // "(x) width", the 20 px variable icon 14 px before the name.
+                        .child(div().flex_none().mr(px(14.)).child(crate::assets::icon("variable", 20., cx)))
+                        .child(div().flex_1().truncate().child(n.clone()))
                         .on_click(move |_, window, cx| {
                             // Toggle one variable; a whole-table reference
                             // becomes the list of the others.
@@ -401,26 +446,44 @@ pub fn open(doc: Entity<DocModel>, target: InsertTarget, window: &mut Window, cx
 
 fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, window: &mut Window, cx: &mut App) {
     let state: Rc<RefCell<DialogState>> = Rc::new(RefCell::new(state));
+    // ✕ (or Esc) puts the target's references back as they were.
+    let before = snapshot(&doc.read(cx).session.doc, target);
+    let search = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).select_on_focus(false).placeholder("Search Variable Studios"));
+    window
+        .subscribe(&search, cx, |_, ev: &gpui_kit::component::input::InputEvent, window, _| {
+            if let gpui_kit::component::input::InputEvent::Change = ev {
+                window.refresh();
+            }
+        })
+        .detach();
+    let (doc_c, before_c) = (doc.clone(), before.clone());
+    // Live (part-studio/158, document/47, dom/dialog-insert-variable-studio):
+    // the same 300 px feature-style dialog at the top left, from a Part
+    // Studio, an Assembly or a Variable Studio; not modal.
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
-        let (current, path) = {
-            let s = &doc.read(cx).session;
-            (s.doc.clone(), s.path.clone())
+        let (current, path, doc_name, branch) = {
+            let d = doc.read(cx);
+            let s = &d.session;
+            (s.doc.clone(), s.path.clone(), d.name(), s.store.branch(s.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()))
         };
         let other = state.borrow().other;
+        let graph = state.borrow().graph && !other;
+        let query = search.read(cx).value().trim().to_lowercase();
+        let changed = before.is_some() && snapshot(&current, target) != before;
         let tab = |id: &'static str, label: &'static str, on: bool, st: Rc<RefCell<DialogState>>| {
             div()
                 .id(id)
-                .flex_1()
+                .w(px(150.))
                 .h(px(32.))
                 .relative()
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_size(px(14.))
+                .text_size(px(12.))
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
-                .when(!on, |d| d.text_color(pal.text).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.border)))
+                .when(on, |d| d.text_color(rgb(0x1651b0)).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(rgb(0x1651b0))))
+                .when(!on, |d| d.text_color(pal.text))
                 .child(label)
                 .on_click(move |_, window, _| {
                     st.borrow_mut().other = id == "ivs-other";
@@ -428,8 +491,21 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                 })
         };
         let mut rows: Vec<AnyElement> = Vec::new();
-        if !other {
-            studio_rows(&Rows { doc: &doc, target, state: &state, current: &current }, &current, None, cx, &mut rows);
+        if graph {
+            version_rows(&state, &path, &mut rows);
+        } else if !other {
+            // This document, at Main or at a version picked in the graph.
+            let at = state.borrow().own_version.clone();
+            match at {
+                None => studio_rows(&Rows { doc: &doc, target, state: &state, current: &current, query: &query }, &current, None, cx, &mut rows),
+                Some((mv, label)) => {
+                    let ext = vars::ExternalStudio { path: path.clone(), microversion: mv, version: label };
+                    match vars::external_document(&ext) {
+                        Some(src) => studio_rows(&Rows { doc: &doc, target, state: &state, current: &current, query: &query }, &src, Some(ext), cx, &mut rows),
+                        None => rows.push(os::info_box("This version could not be read.").m(px(10.)).into_any_element()),
+                    }
+                }
+            }
         } else {
             let chosen = state.borrow().document.clone();
             match chosen {
@@ -533,32 +609,242 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                         rows.push(vrow.into_any_element());
                         let ext = vars::ExternalStudio { path: d.clone(), microversion: chosen_mv.clone(), version: label };
                         match vars::external_document(&ext) {
-                            Some(src) => studio_rows(&Rows { doc: &doc, target, state: &state, current: &current }, &src, Some(ext), cx, &mut rows),
+                            Some(src) => studio_rows(&Rows { doc: &doc, target, state: &state, current: &current, query: &query }, &src, Some(ext), cx, &mut rows),
                             None => rows.push(os::info_box("This version could not be read.").m(px(10.)).into_any_element()),
                         }
                     }
                 }
             }
         }
-        let st = state.clone();
-        os::modal(dialog, "Insert Variable Studio", 460.)
+        let square = |id: &'static str, icon: &'static str, tip: &'static str, on: bool| {
+            div()
+                .id(id)
+                .size(px(30.))
+                .flex()
+                .flex_none()
+                .items_center()
+                .justify_center()
+                .rounded(px(3.))
+                .border_1()
+                .border_color(rgb(0xaaaaaa))
+                .cursor_pointer()
+                .when(on, |d| d.bg(rgb(0xeaeaea)))
+                .hover(|d| d.bg(pal.panel_hover))
+                .tooltip(crate::ui::tooltip(tip))
+                .child(crate::assets::icon(icon, 20., cx))
+        };
+        let own_label = state.borrow().own_version.as_ref().map(|(_, l)| l.clone()).unwrap_or(branch);
+        let (st_g, doc_v) = (state.clone(), doc.clone());
+        let document_row = h_flex()
+            .h(px(40.))
+            .flex_none()
+            .pl(px(6.))
+            .pr(px(5.))
+            .gap(px(6.))
+            .border_b_1()
+            .border_color(rgb(0xeeeeee))
             .child(
                 v_flex()
-                    .child(h_flex().px(px(10.)).child(tab("ivs-current", "Current document", !other, st.clone())).child(tab("ivs-other", "Other documents", other, st)))
-                    .child(v_flex().id("ivs-rows").max_h(px(420.)).min_h(px(160.)).overflow_y_scroll().py(px(6.)).children(rows)),
+                    .flex_1()
+                    .min_w_0()
+                    .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(doc_name))
+                    .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(15.6)).text_color(pal.text).child(crate::ui::glyph("branch", 10., pal.text)).child(own_label)),
             )
-            .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("close", "Close", cx))))
+            .child(square("ivs-create-version", "version", "Create version…", false).on_click(move |_, window, cx| crate::history_panel::open_create_version_in(doc_v.clone(), window, cx)))
+            .child(square("ivs-version-graph", "version-graph", "Version graph", graph).on_click(move |_, window, _| {
+                let mut s = st_g.borrow_mut();
+                s.graph = !s.graph;
+                window.refresh();
+            }));
+        let (doc_ok, doc_x, before_x, st_ok) = (doc.clone(), doc.clone(), before.clone(), state.clone());
+        let header = h_flex()
+            .h(px(28.))
+            .flex_none()
+            .bg(gpui_kit::white())
+            .border_b_1()
+            .border_color(rgb(0xd7d7d7))
+            .child(
+                // Red until a studio is picked (live: "… did not regenerate properly").
+                div()
+                    .id("ivs-title")
+                    .flex_1()
+                    .pl(px(6.))
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(if changed { pal.text } else { rgb(0xaa252d) })
+                    .when(!changed, |d| d.tooltip(crate::ui::tooltip("Insert Variable Studio did not regenerate properly: Error regenerating.")))
+                    .child("Insert Variable Studio"),
+            )
+            .child(
+                div()
+                    .id("ivs-ok")
+                    .size(px(28.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .bg(if changed { pal.accept } else { rgb(0xcce9cc) })
+                    .child(crate::assets::icon("dialog-ok", 24., cx))
+                    .on_click(move |_, window, cx| {
+                        let _ = (&doc_ok, &st_ok);
+                        if changed {
+                            window.close_dialog(cx);
+                        }
+                    }),
+            )
+            .child(
+                div()
+                    .id("ivs-cancel")
+                    .size(px(28.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(crate::assets::icon("dialog-cancel", 24., cx))
+                    .on_click(move |_, window, cx| {
+                        if let Some(b) = before_x.clone() {
+                            restore(&doc_x, target, b, cx);
+                        }
+                        window.close_dialog(cx);
+                    }),
+            );
+        // Live: a 42 px search container (6 px above and below the box).
+        let search_row = div().flex_none().py(px(6.)).px(px(6.)).child(
+            h_flex()
+                .h(px(30.))
+                .rounded(px(3.))
+                .border_1()
+                .border_color(rgb(0xaaaaaa))
+                .bg(gpui_kit::white())
+                .child(gpui_kit::component::input::Input::new(&search).appearance(false).text_size(px(13.33)).pl(px(5.))),
+        );
+        let (doc_e, before_e) = (doc_c.clone(), before_c.clone());
+        dialog
+            .w(px(300.))
+            .margin_left(px(246.))
+            .margin_top(px(79.))
+            .overlay(false)
+            .close_button(false)
+            .p_0()
+            .gap_0()
+            .rounded(px(0.))
+            .border_0()
+            .bg(gpui_kit::rgba(0xfffffff2))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .on_cancel(move |_, _, cx| {
+                if let Some(b) = before_e.clone() {
+                    restore(&doc_e, target, b, cx);
+                }
+                true
+            })
+            .child(
+                v_flex()
+                    .h(px(581.))
+                    .child(header)
+                    .child(h_flex().flex_none().border_b_1().border_color(rgb(0xeeeeee)).child(tab("ivs-current", "Current document", !other, state.clone())).child(tab("ivs-other", "Other documents", other, state.clone())))
+                    .when(!other, |d| d.child(document_row).child(search_row))
+                    .child(v_flex().id("ivs-rows").flex_1().min_h_0().overflow_y_scroll().pt(px(1.)).children(rows))
+                    // Live: a 22 px footer under a #eaeaea rule with the ? at the right.
+                    .child(
+                        h_flex().h(px(22.)).flex_none().border_t_1().border_color(rgb(0xeaeaea)).justify_end().pr(px(4.)).child(
+                            // Live: opens help "Variable Studios" (same from every tab).
+                            div().id("ivs-help").cursor_pointer().child(crate::assets::icon("help-faint", 14., cx)).on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/VariableStudio/variable_studio.htm?cshid=variable_studios")),
+                        ),
+                    ),
+            )
     });
 }
 
+/// The target's references (what ✕ puts back).
+#[derive(Clone, PartialEq)]
+enum RefsSnapshot {
+    Studio(Vec<StudioRef>),
+    Element(vars::VariableStudioRefs),
+}
+
+fn snapshot(doc: &noshape_model::Document, target: InsertTarget) -> Option<RefsSnapshot> {
+    match target {
+        InsertTarget::Studio(t) => match &doc.tab(t)?.content {
+            TabContent::VariableStudio(v) => Some(RefsSnapshot::Studio(v.inserted.clone())),
+            _ => None,
+        },
+        InsertTarget::Element(e) => match &doc.tab(e)?.content {
+            TabContent::PartStudio(ps) => Some(RefsSnapshot::Element(ps.variable_studios.clone())),
+            TabContent::Assembly(a) => Some(RefsSnapshot::Element(a.variable_studios.clone())),
+            _ => None,
+        },
+    }
+}
+
+/// Cancel: the target's references as they were when the dialog opened.
+fn restore(doc: &Entity<DocModel>, target: InsertTarget, snap: RefsSnapshot, cx: &mut App) {
+    if snapshot(&doc.read(cx).session.doc, target).as_ref() == Some(&snap) {
+        return;
+    }
+    let tab = match target {
+        InsertTarget::Studio(t) | InsertTarget::Element(t) => t,
+    };
+    doc.update(cx, |d, cx| {
+        d.edit_tab(tab, "Remove reference", cx, |c| match (c, &snap) {
+            (TabContent::VariableStudio(v), RefsSnapshot::Studio(r)) => v.inserted = r.clone(),
+            (TabContent::PartStudio(ps), RefsSnapshot::Element(r)) => ps.variable_studios = r.clone(),
+            (TabContent::Assembly(a), RefsSnapshot::Element(r)) => a.variable_studios = r.clone(),
+            _ => {}
+        });
+    });
+}
+
+/// The version graph of this document: Main, then its versions; picking
+/// one lists that version's Variable Studios.
+fn version_rows(state: &Rc<RefCell<DialogState>>, path: &std::path::Path, rows: &mut Vec<AnyElement>) {
+    let pal = p();
+    let versions: Vec<crate::derived::VersionChoice> = crate::derived::external_doc_info(path).map(|i| i.versions.into_iter().filter(|v| v.label != "Current state").collect()).unwrap_or_default();
+    let chosen = state.borrow().own_version.as_ref().map(|(mv, _)| mv.clone());
+    let row = |id: SharedString, label: String, on: bool, pick: Option<(String, String)>| {
+        let st = state.clone();
+        h_flex()
+            .id(id)
+            .h(px(36.))
+            .flex_none()
+            .pl(px(12.))
+            .text_size(px(14.))
+            .text_color(pal.text)
+            .cursor_pointer()
+            .when(on, |d| d.bg(rgb(0xb2ddf6)))
+            .hover(|d| d.bg(rgb(0xdef1fb)))
+            .child(label)
+            .on_click(move |_, window, _| {
+                let mut s = st.borrow_mut();
+                s.own_version = pick.clone();
+                s.graph = false;
+                window.refresh();
+            })
+            .into_any_element()
+    };
+    rows.push(row("ivs-v-main".into(), "Main".into(), chosen.is_none(), None));
+    for v in versions {
+        let mv = v.microversion.to_string();
+        rows.push(row(SharedString::from(format!("ivs-v-{mv}")), v.label.clone(), chosen.as_deref() == Some(mv.as_str()), Some((mv, v.label))));
+    }
+}
+
 /// "+" Create Variable Studio from a Part Studio's / Assembly's Variable
-/// table: a new studio tab right after `element` (checked "Insert into
-/// all…", so its table shows here at once, ready for input).
+/// table: a new studio tab right after `element`, its table shown here at
+/// once, ready for input (the first studio is inserted into all; a later
+/// one, unticked, is referenced by `element`).
 pub fn create_studio(doc: &Entity<DocModel>, element: TabId, cx: &mut App) {
     doc.update(cx, |d, cx| {
         d.edit_document("Insert tab : Variable Studio", cx, |doc| {
             let name = doc.next_tab_name("Variable Studio");
-            let id = doc.add_tab(&name, TabContent::VariableStudio(vars::VariableStudio::default()));
+            let studio = vars::new_studio(doc);
+            let all = studio.insert_into_all;
+            let id = doc.add_tab(&name, TabContent::VariableStudio(studio));
+            if !all {
+                let r = StudioRef { studio: id, variables: None, external: None, config: Default::default() };
+                match doc.tab_mut(element).map(|t| &mut t.content) {
+                    Some(TabContent::PartStudio(ps)) => vars::insert_studio(&mut ps.variable_studios, r),
+                    Some(TabContent::Assembly(a)) => vars::insert_studio(&mut a.variable_studios, r),
+                    _ => {}
+                }
+            }
             let order = &mut doc.settings.tab_order;
             order.retain(|t| *t != id);
             let at = order.iter().position(|t| *t == element).map(|i| i + 1).unwrap_or(order.len());

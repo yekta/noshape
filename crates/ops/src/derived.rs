@@ -19,6 +19,25 @@ use std::sync::Arc;
 /// Regenerators per source tab, shared by every view of a document.
 pub type StudioCache = Arc<Mutex<HashMap<String, Regenerator>>>;
 
+/// Regeneration options for an assembly evaluator's Part Studios: derived
+/// parts read the document's other Part Studios, custom features its Feature
+/// Studios (qa5 DER8: without them a Part Studio of derived parts is empty).
+pub fn studio_options(cache: StudioCache) -> noshape_model::assembly::eval::StudioOptions {
+    Arc::new(move |d: &Document| noshape_model::regen::RegenOptions {
+        derived: Some(DocStudios::new(d.clone(), cache.clone())),
+        custom_features: Some(noshape_model::custom::DocumentScripts::from_document(d)),
+        ..Default::default()
+    })
+}
+
+/// An assembly evaluator whose Part Studios find their derived and custom
+/// feature sources.
+pub fn assembly_evaluator(cache: StudioCache) -> noshape_model::assembly::eval::AssemblyEvaluator {
+    let mut ev = noshape_model::assembly::eval::AssemblyEvaluator::new();
+    ev.set_studio_options(studio_options(cache));
+    ev
+}
+
 pub struct DocStudios {
     doc: Arc<Document>,
     cache: Arc<Mutex<HashMap<String, Regenerator>>>,
@@ -259,6 +278,10 @@ impl DerivedProvider for DocStudios {
             };
         }
         self.studio(tab).and_then(find)
+    }
+
+    fn part_name(&self, tab: &str, part: &noshape_model::reference::BodyId) -> Option<String> {
+        self.studio(tab)?.part_properties.get(part)?.name.clone()
     }
 
     fn configuration(&self, tab: &str) -> Option<noshape_model::configuration::Configuration> {

@@ -40,7 +40,7 @@ impl SheetModel {
         let doc = &session.doc;
         let versions = |id: &str| session.document_at_version(id).ok().flatten();
         let mut sources = views::regenerate_sources_with(doc, &drawing, &versions);
-        let mut assemblies = noshape_model::assembly::eval::AssemblyEvaluator::new();
+        let mut assemblies = crate::derived::assembly_evaluator(Default::default());
         let missing: Vec<&SourceKey> = extra.iter().filter(|k| !sources.contains_key(*k)).collect();
         for k in missing {
             if let Some(src) = views::regenerate_source(doc, k, &mut noshape_model::regen::Regenerator::new(), &mut assemblies) {

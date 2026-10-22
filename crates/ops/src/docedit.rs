@@ -39,6 +39,11 @@ pub fn insert_tab_description(base: &str) -> String {
 /// "+" › new tab: the next default name ("Part Studio 2"), placed after
 /// `after` (the active tab) and in its folder.
 pub fn insert_tab(d: &mut Document, base: &str, content: TabContent, after: Option<TabId>) -> TabId {
+    // Only the first Variable Studio is inserted into all elements.
+    let content = match content {
+        TabContent::VariableStudio(vs) => TabContent::VariableStudio(noshape_model::variables::VariableStudio { insert_into_all: noshape_model::variables::new_studio(d).insert_into_all, ..vs }),
+        other => other,
+    };
     let name = d.next_tab_name(base);
     let id = d.add_tab(&name, content);
     place_after(d, id, after);

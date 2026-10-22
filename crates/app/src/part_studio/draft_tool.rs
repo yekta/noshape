@@ -9,8 +9,8 @@ use super::analysis::{Analysis, DRAFT_SIDE1, DRAFT_SIDE2, DRAFT_STEEP, DRAFT_UND
 use crate::theme::p;
 use glam::DVec3;
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::reference::Reference;
@@ -24,30 +24,31 @@ pub struct DraftState {
     pub angle_deg: f64,
     pub parts: Vec<Reference>,
     pub undercut: bool,
-    angle_input: Entity<InputState>,
+    angle_input: Entity<QuantityInput>,
     _sub: Subscription,
 }
 
 impl PartStudioView {
     pub(super) fn open_draft(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| InputState::new(window, cx).default_value("3 deg"));
-        let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
-            if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+        // Onshape's number field (quantity_field): "5" → "5 deg", "1+1" →
+        // "(1+1) deg", ↑ / ↓ steps; a value that doesn't evaluate or leaves
+        // 0–90 deg turns the field invalid (live).
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let spec = QuantitySpec::quantity(noshape_units::Dim::ANGLE).range(Some(0.), Some(90f64.to_radians())).label("Minimum draft angle").text_px(12.);
+        let st = cx.new(|cx| {
+            let mut q = QuantityInput::new("3 deg", spec, units, window, cx);
+            q.set_variables(self.display.variables.clone(), cx);
+            q
+        });
+        let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &QuantityEvent, cx| {
+            if !matches!(ev, QuantityEvent::Committed(_)) {
                 return;
             }
-            let text = st.read(cx).value().to_string();
-            match text.trim().trim_end_matches("deg").trim().parse::<f64>() {
-                Ok(v) if (0.0..90.0).contains(&v) => {
-                    if let Some(d) = &mut this.ui.draft {
-                        d.angle_deg = v;
-                    }
-                    let shown = format!("{v} deg");
-                    if text != shown {
-                        st.update(cx, |s, cx| s.set_value(shown, window, cx));
-                    }
-                    this.sync_draft(cx);
+            if let Some(v) = st.read(cx).value() {
+                if let Some(d) = &mut this.ui.draft {
+                    d.angle_deg = v.to_degrees();
                 }
-                _ => this.flash_info("Enter an angle from 0 to 90 degrees".into(), cx),
+                this.sync_draft(cx);
             }
         });
         // A preselected plane, face or edge is the mold split direction;
@@ -202,7 +203,7 @@ impl PartStudioView {
                                 .opacity(0.)
                                 .group_hover("drrow", |d| d.opacity(1.))
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Close).with_size(px(11.)).text_color(pal.text_muted))
+                                .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     if let Some(d) = &mut this.ui.draft {
@@ -261,7 +262,7 @@ impl PartStudioView {
                                 })),
                         ),
                 )
-                .child(h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child("Minimum draft angle")).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&d.angle_input).appearance(false).xsmall().text_right()))))
+                .child(h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child("Minimum draft angle")).child(div().flex_1().child(d.angle_input.clone())))
                 .child(field(1, "Entities to check", d.parts.clone(), cx))
                 .child(Checkbox::new("dr-undercut").label("Show undercut regions").checked(d.undercut).on_click(cx.listener(|this, v: &bool, _, cx| {
                     if let Some(d) = &mut this.ui.draft {

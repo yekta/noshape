@@ -260,7 +260,11 @@ impl<'a> SheetPick<'a> {
     pub fn part_under(&self, view: ViewId, p: [f64; 2]) -> Option<noshape_model::BodyId> {
         let frame = self.geoms.get(&view)?.frame?;
         let (key, _) = views::view_source(&self.drawing.sheets[self.sheet], view)?;
-        views::body_under(self.sources.get(&key)?, &frame, p)
+        // The pick tolerance in view units.
+        let pl = self.placement(view)?;
+        let (a, b) = (pl.to_sheet([0.0, 0.0]), pl.to_sheet([1.0, 0.0]));
+        let per_unit = len(sub(b, a)).max(1e-12);
+        views::body_under(self.sources.get(&key)?, &frame, p, self.tol_mm(6.0) / per_unit)
     }
 
     pub fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {

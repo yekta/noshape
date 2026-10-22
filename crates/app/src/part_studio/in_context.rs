@@ -822,7 +822,7 @@ impl PartStudioView {
         let doc = self.doc.read(cx).session.doc.clone();
         let Some(old) = self.studio(cx).and_then(|s| s.contexts.iter().find(|c| c.id == id).cloned()) else { return };
         let Some(noshape_model::TabContent::Assembly(asm)) = doc.tab(old.assembly).map(|t| &t.content) else { return };
-        let mut ev = noshape_model::assembly::eval::AssemblyEvaluator::new();
+        let mut ev = crate::derived::assembly_evaluator(self.doc.read(cx).studio_cache.clone());
         let result = ev.evaluate(&doc, asm, &noshape_model::assembly::eval::SolveOptions::default(), None);
         let primary: Vec<InstanceId> = old.primary.iter().map(|i| InstanceId(*i)).collect();
         let names = |p: &noshape_model::assembly::eval::InstancePath| asm.instance(p[0]).map(|i| i.name.clone()).unwrap_or_default();

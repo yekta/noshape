@@ -1225,3 +1225,115 @@ Also from fs: the flat DXF writer for the flat view's "Export DXF/DWG of Flat pa
   name, Undo then disabled), FS4 (/tmp/ui/fs4c-c.png), KB3 rows grey (/tmp/ui/kb3a.png), CA4 "25" → "25 mm",
   Generate on, Tab → navbar logo (/tmp/ui/ca78.png). Test doc: /tmp/ui/cfg2.noshape (CLI: config variable d +
   Part 1 inserted).
+
+### After the freeze (21 Oct ~22:40–)
+- **Shortcuts test** `customized_keys_replace_the_defaults`: vendor GPUI's `KeybindingKeystroke` Display capitalizes
+  letters ("L"); the test's `summary` now uses `unparse()` (the bindings themselves were right).
+- **Undo starts empty on reopen** (lead decision, live): `Session::forget_undo()` called from `DocModel::new`; the CLI's
+  `Session::open` keeps the history-based stack. Test `doc_model::tests::a_reopened_document_starts_with_nothing_to_undo`.
+- **CA3 closed** with a pixel table in docs/parity/workflow-configured-assembly.md ("CA3 closed"; crop
+  /root/ui-scratch/shots/ca3-side.png): the toggle icon under the dialog is 245 live / 244 ours.
+- **CA4 Tab**: Generate (while enabled; live `.os-button:focus` 1 px --os-focus ring, Enter/Space generate) and the ?
+  help link are tab stops, so Tab goes d → Generate → ? before leaving (live DOM order). Live capture still requested.
+- **KB3 corrected** (live ui/iso-900 → iso-901, the doc "ui iso"): Isolate does NOT hide the planes or grey their rows
+  (pn-900's grey rows were planes the user had hidden). Planes become faint outlines (alpha × 0.04, no fill, no label:
+  `SceneOptions::faint_planes`), the origin stays, and below 10 % the other parts are solid ghosts washed toward white
+  by 0.78 in sRGB after shading (`SceneOptions::ghost_bodies`, render `Instance::ghost` = params.y bit 7 + extra.y,
+  shader `mesh_color`; edges lightened on the CPU). The grey-rows change is reverted.
+- **Menus wrap** (icons2 via lead): plain context menus `max_w(250)` (live `.context-menu-list` max-width 250),
+  rows `min_h 22 + py 2`, 18 px lines; long labels wrap (live 40 px row); submenus open at their painted row top
+  (`OsMenu::row_tops`). Not yet checked in the app.
+- **F31** (qa4): kit `popup_menu.rs` tool lists: no padding on the scroll container (it counted as 2 px of
+  overflow); zero-height inset rows instead, `scroll_to_item(ix + 1)`. Not yet checked in the app.
+- **MT5**: mate dialog Offset / Limits and the mate connector's Move fields: "0 mm", "No minimum" are values, not
+  placeholders (`NO_LIMIT` parsed back as unset). **MT1**: flip icon up-right until both connectors are picked.
+  **MT2**: mate type is an `OsSelect` (live assembly/36) with `MATE_TYPE_ORDER`.
+- **DER1**: Locations `NO_MATE_CONNECTOR_BUTTON`, Placement `SHOW_LABEL` (model importing.rs); empty Part Studio
+  reference field pink/red with the error tooltip (`fs_reference.rs`); checkbox rows `pr 12` (live label 174 px);
+  5 px under the Derived source field. **DER2**: `version-graph.svg` redrawn as live's branch sprite (all Version
+  graph buttons), panel ✕ = new `panel-close.svg` (11 px black at .5). **DER3**: `SelectItemPanel::focused`: a picked
+  studio is shown alone, expanded, with ‹ "Back" in the header; reopening keeps it. (Live 407's "Part 1"
+  highlight + chip were the hover and its tooltip.) **DER5**: pending: needs derived sketches in the display first
+  (live: ▸ only when sketches were derived; children = the sketches).
+- Hole mc-select 0.5 px: our row is items_start and the icon is centred (+3), as live; to measure in the app.
+- **Dialog backgrounds (icons2 252 vs live 255)**: not the alpha. GPUI drew drop shadows under the whole element;
+  CSS box-shadow is only outside the border box. Under a 95 % white dialog the 0.2 shadow showed (0.95·255 +
+  0.05·204 ≈ 252). Fixed for every shadow in all three GPUI shaders (wgsl / Metal / HLSL `fs_shadow`: drop shadows ×
+  "outside the element" coverage, using the primitive's `element_bounds`). Live CSS: `.ns-dialog`,
+  `.ns-dialog-frame`, `.osx-panel-dialog`, the in-context mini toolbar = rgba(255,255,255,.95); Bootstrap modals,
+  context menus, dropdowns = opaque. Ours: `dialog_bg` (.95) / `modal_bg` (opaque) follow that split.
+- **OsSelect** lists: rows `flex_none` (they shrank to fit 200 px instead of scrolling); Chrome scrollbar
+  (`gpui_kit::component::menu::native_scrollbar` + `NativeThumbDrag` / `native_scrollbar_drag`, exported from the kit)
+  on a frame around the scrolling column, shown once the list overflows.
+- **Fonts**: live's UI font is Flama everywhere (B/I of the Text dialog too, `.bold-label` inherits it; ag-grid
+  tables too). Open Sans is the primary font only for `.fs-doc-body` (FeatureScript documentation popup), which we
+  don't have yet; bundle Open Sans (OFL, downloaded to /root/ui-scratch/fonts-dl/OpenSans.zip) with that popup.
+- **DEL1**: chip labels fall back to the bodies of the model before the edited feature (`preview_before`); the
+  dialog's labeler is refreshed when that arrives (`FeatureDialog::set_labeler`).
+- **CA4**: Generate has a white background (its focus ring is a shadow).
+- **Verified in the app (22 Oct ~01:30 build)**: KB3 ghosts (234/216 vs live 234/220) + faint planes + origin
+  (/tmp/ui/kb3d.png); F31 Fillet ▾ and the pattern-type select without scrollbars; menus 250 px with wrapped rows
+  (/tmp/ui/mw1-c.png); CA4 Tab d → Generate → ? → out (/tmp/ui/ct123.png); MT1 up-right, MT2 os-select with 7½ rows +
+  Chrome scrollbar (/tmp/ui/mt3-c.png), MT5 "0 mm" black (/tmp/ui/mt5-c.png); DER1/DER2/DER3 (/tmp/ui/der1-c.png,
+  der2-c.png, der3-c.png); DEL1 chip "Part 3" (/tmp/ui/del1-c.png); dialog body 255 over white after the shader fix.
+- Hole mc-select: ink centroid ours (449.46, 181.78) vs live hole-01 (449.56, 181.76): no 0.5 px offset in this build.
+- Test docs: /tmp/ui/kb3.noshape (3 parts), cfg2.noshape (configured part in an assembly), der.noshape (+Part Studio
+  2), del.noshape (Delete part 1 of Part 3).
+
+## Note from qa4 (10-22): `QuantityInput`, the reusable Onshape number field
+`crates/app/src/quantity_field.rs` now has **`QuantityInput`** (an entity; render it with `.child(entity.clone())` inside
+a `div().flex_1()` or a fixed width) built on the same helpers the feature dialogs use (`commit_text`, `step_text`,
+`INVALID_TIP`). It gives every numeric field live's `os-param-number` behaviour: first click selects all (or
+`QuantitySpec::caret_on_focus()` for click-to-edit labels), Esc reverts + blurs (kit), Enter/Tab/click-away commit with the
+unit appended ("5" → "5 deg", "1+1" → "(1+1) deg"), Enter re-selects, unfocused it shows the evaluated value (hover
+"Label: value"), invalid values are pink with a red underline and "Enter a valid expression." / "Enter an integer.",
+↑/↓ (Shift ×10, Ctrl ×0.1) and the focused wheel step, 1 px #d7d7d7 underline, blue on hover, 2 px blue focused.
+Spec: `QuantitySpec::quantity(Dim::LENGTH | ANGLE | UNITLESS)` or `QuantitySpec::count()`, then `.range(min, max)` (SI),
+`.label(..)`, `.no_expressions()`, `.text_px(..)`. Events: `QuantityEvent::Committed(CommitVia::Enter | Blur | Step)` (read
+`value()`: SI metres / radians, None when invalid), `Enter` (nothing new to apply, or any Enter in a count), `Escape`,
+`Changed`. Use it for any new numeric field outside feature dialogs; qa4 is migrating the existing ones (handoff R12/R13).
+- **MENU1**: parts-list menu: "Hide other parts" / "Hide all parts" after Hide when the studio has several parts.
+- **DEL2**: parts-list "Delete…" and the graphics "Delete Part N…" open the Delete part dialog with the parts
+  preselected (`start_feature("deleteBodies")`); the Delete key still deletes at once (live key behaviour unknown).
+- **Param inputs 3 px** (icons2: mate limits ~10 px too much right padding): live `.os-param-number` padding is
+  `6px 3px 2px`; the kit Input's default inset was larger. `.px(px(3.))` on every
+  `appearance(false)…text_right()` parameter input (mate dialog, assembly_view / _reflection / _mass / _behaviors /
+  _panels: 13 sites). `os_ui::input_h` is unchanged (bordered inputs use it too).
+- Verified (22 Oct ~02:30 build, no warnings): MENU1 (/tmp/ui/m1-c.png), DEL2 dialog with Part 2 prefilled
+  (/tmp/ui/d2-c.png), mate Offset values end 4 px from the underline (was 11).
+- Next: DER5 (needs psb's derived sketches in the display), FS2/FS4 tooltip placement in the app, the live capture
+  request for Change configuration's Tab order.
+- Live request filed: "ui (10-22 a)" Delete key on a selected part (list / graphics / face): dialog or immediate.
+- **FS2 verified in the app** (/tmp/ui/fs1-c.png, fs1-z.png, fs2-c.png; doc /tmp/ui/fs.noshape): ⚠ on line 1 for a
+  12:9 notice, squiggle over the whole multi-line `fCuboidX(...)` call, gutter tooltip in Ace's look.
+- **FS4**: custom features dropdown at least 178 px (live 1252), the entry fills the row so the side tooltip starts
+  just outside the menu (/tmp/ui/fs5a-c.png); the delayed second line as before. (Where live puts the expanded box
+  is still unknown; ours grows downward.)
+- **From psb (lead, 22 Oct)**:
+  - **TAB1**: repro /tmp/ui/der2.noshape (Part Studio 2 = Derived of Part Studio 1; reopen, switch): the part was
+    drawn but the list said "Parts (0)" and the strip had 4 icons: the cached workspace kept this view's old paint
+    though `apply_display` notified. `apply_display` now refreshes the window once when the set of parts changes
+    (ids or names), not on every regen. Verified (/tmp/ui/t3a.png: Parts (1), 5 strip icons).
+  - **ADV12**: rows of Holes named by their callout show the first part only (`row_label`); title / tooltip keep
+    both (live behaviours "Hole feature-list row name"). The new-hole placeholder row too. Not checked in the app.
+  - **F32**: `FeatureDialog::close_external_create_variable(DIM_BOX_FIELD)` when a new dimension box is created
+    (`sync_dim_edit`), so a Create variable popup from an earlier box doesn't come back. Not checked in the app.
+- **ADV12 / F32 verified in the app** (22 Oct ~03:20): /tmp/ui/adv12.noshape (Counterbore hole set in the dialog;
+  the CLI `style` param isn't what the dialog reads): row "Ø 6.35 mm ↧ 12 mm", tooltip "… | ⌴Ø 10 mm ↧ 5 mm [Hole]"
+  (/tmp/ui/a12f-c.png, a12g-c.png). /tmp/ui/f32.noshape (dimension 40 on Sketch 1): "#wabc" Enter → popup; Esc Esc,
+  click away, double-click again → box "40 mm", no popup (/tmp/ui/f32b-c.png, f32c-c.png).
+- **DER5 done end to end** (lead; psb told in its handoff): model `import_derived` copies the source sketches for a
+  whole-studio derive (source ids kept; moved with the first location; `derived_sketches` in Context and
+  StudioDisplay; `SketchResult` is Clone). App: ▸ caret before the Derived row's icon, `ui.derived_open`,
+  `ListItem::DerivedSketch` rows (sketch icon + name, click selects the sketch). Positions within 1 px of live 1582
+  (/tmp/ui/d5c-c.png). Repro doc /tmp/ui/der2.noshape. Several locations: sketches follow the first one only (live
+  unknown).
+- **Delete key (live answer "ui 10-22 a")**: parts selected → the Delete part dialog prefilled; faces / edges
+  selected → their creating features deleted at once (undoable). `on_delete`; `delete_selected_parts` removed;
+  `creating_feature` is `pub(super)`.
+- **Tab order (live answer "ui 10-22 b")**: our stand-in for Share is the top bar's `{ }` notices button
+  (`Workspace::notices_focus`, tab stop, Enter/Space toggles, focus ring); `FocusNavbar` goes there (feature dialogs
+  and Change configuration leave to it). Change configuration: Configuration / list selects are tab stops
+  (`os_ui::select_field_focusable`: Space/Enter/↓ open), then d, ?, then the navbar; Generate is no tab stop. Tab
+  on the assembly page itself (`Assembly && !Input`) → `FocusNavbar` (live: the dialog opens with the focus on the
+  page body, the first Tab goes to Share).

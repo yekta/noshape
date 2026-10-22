@@ -183,6 +183,8 @@ fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> any
     let (handle, ws) = crate::os_menu::open_window(options, cx, move |window, cx| {
         window.set_window_title(&format!("{} — noshape", session.name()));
         let doc = cx.new(|_| doc_model::DocModel::new(session));
+        // The CLI and MCP server edit this document here while it is open.
+        crate::live_server::serve(&doc, cx);
         let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
         let fh = ws.read(cx).focus_handle(cx);
         // The workspace focuses its active tab view (so Part Studio shortcuts

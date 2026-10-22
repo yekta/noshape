@@ -30,4 +30,9 @@ pub trait DerivedProvider: Send + Sync + std::fmt::Debug {
     fn feature_type(&self, _tab: &str, _feature: crate::reference::FeatureId) -> Option<String> {
         None
     }
+    /// A source part's name when it was renamed there (live "qa5 derived":
+    /// the rename carries over to the derived part).
+    fn part_name(&self, _tab: &str, _part: &crate::reference::BodyId) -> Option<String> {
+        None
+    }
 }

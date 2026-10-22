@@ -21,6 +21,7 @@ pub mod docedit;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod live;
 pub mod material_data;
 pub mod ops;
 pub mod reference;
@@ -30,6 +31,7 @@ pub mod session;
 pub mod sketch_use;
 pub mod studio;
 pub mod values;
+pub mod variable_studio;
 
 pub use doc::{Ctx, OpenDoc};
 pub use error::OpError;

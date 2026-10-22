@@ -199,6 +199,7 @@ impl Body {
 }
 
 /// A solved sketch.
+#[derive(Clone)]
 pub struct SketchResult {
     pub feature: FeatureId,
     pub name: String,
@@ -252,6 +253,9 @@ pub struct PointEntity {
 pub struct Context {
     pub bodies: Vec<Arc<Body>>,
     pub sketches: Vec<Arc<SketchResult>>,
+    /// Sketches a Derived feature brought in from its source: (the Derived
+    /// feature, the source sketch's feature id, which the copy keeps).
+    pub derived_sketches: Vec<(FeatureId, FeatureId)>,
     pub planes: Vec<PlaneEntity>,
     pub connectors: Vec<Connector>,
     pub points: Vec<PointEntity>,
@@ -337,6 +341,31 @@ impl Context {
 
     pub fn sketch(&self, f: FeatureId) -> Option<&Arc<SketchResult>> {
         self.sketches.iter().find(|s| s.feature == f)
+    }
+
+    /// Onshape numbers default names by list order ("Part 1", "Part 2", …):
+    /// when a part goes, the ones after it move up (live "qa5 booleans": the
+    /// old Part 3 becomes "Part 2"). Other names (renamed, derived, imported)
+    /// are left alone; new parts continue the numbering.
+    pub fn renumber_default_names(&mut self) {
+        let mut n = [0usize; 3];
+        for b in self.bodies.iter_mut() {
+            let (prefix, k) = match b.kind {
+                BodyKind::Solid => ("Part ", 0),
+                BodyKind::Surface => ("Surface ", 1),
+                BodyKind::Wire | BodyKind::Point => ("Curve ", 2),
+            };
+            let default = b.composite.is_none() && b.name.strip_prefix(prefix).is_some_and(|r| !r.is_empty() && r.bytes().all(|c| c.is_ascii_digit()));
+            if !default {
+                continue;
+            }
+            n[k] += 1;
+            let want = format!("{prefix}{}", n[k]);
+            if b.name != want {
+                *b = Arc::new(b.renamed(want));
+            }
+        }
+        (self.next_part, self.next_surface, self.next_curve) = (n[0], n[1], n[2]);
     }
 
     pub fn alloc_part_name(&mut self, kind: BodyKind) -> String {

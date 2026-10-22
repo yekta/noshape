@@ -435,3 +435,14 @@ New since then (all with T:sm/T:ux tests; GUI evidence in /tmp/skb/):
   false when an existing label is clicked); `commit_dimension` (both the apply and the untouched-Enter paths) and
   `SketchEditor::cancel` clear the selection only for created ones. Test `a_new_dimension_leaves_nothing_selected`;
   GUI dm4. Row 14.42.
+
+## ui2 10-22: took the sketch Text tool look (lead)
+- ui2 owns the Text tool dialog's look now (`part_studio/sketch.rs` `render_text_dialog`, surgical):
+  standard feature-dialog header (green ✓ / red ✕) in the UI font in the sketch dialog's place, as live
+  (dom/dialog-sketch-text, sketch/132).
+- Fonts (lead 10-22): `noshape_sketch::text::SKETCH_FONTS` = live's 32 fonts in live's order, default
+  `SKETCH_DEFAULT_FONT` = Open Sans (new texts; scene `sketch_mode.rs`), files in `crates/sketch/fonts/sketch/`
+  (zstd, 34 MB; README there). B / I buttons only for fonts with the style (`SketchFont.bold/italic`), hidden
+  otherwise. `DEFAULT_FONT` (Liberation Sans) stays for the app's own glyphs and older documents. FS host
+  `font_of` maps Onshape font file names to these families (`sketch_font_of_file`). Test
+  `every_sketch_font_lays_out_in_its_styles`.

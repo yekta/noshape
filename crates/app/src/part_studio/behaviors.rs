@@ -64,6 +64,8 @@ pub struct UiState {
     /// are outlined in magenta (live assembly/506).
     pub(super) context_arrow_hover: Option<noshape_model::FeatureId>,
     pub isolate: Option<Isolation>,
+    /// Derived rows whose derived sketches are listed under them (▸ open).
+    pub derived_open: std::collections::HashSet<FeatureId>,
     /// Cameras before discrete view changes (Previous view).
     pub cam_history: Vec<Camera>,
     /// Last pointer position over the viewport (viewport-local).
@@ -329,6 +331,7 @@ impl UiState {
             context_rename: None,
             context_arrow_hover: None,
             isolate: None,
+            derived_open: Default::default(),
             cam_history: Vec::new(),
             pointer: None,
             select_other: None,
@@ -1234,7 +1237,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                                .child(crate::assets::icon("dialog-ok", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_dynamic_suppression(window, cx))),
                         )
                         .child(
@@ -1246,7 +1249,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
+                                .child(crate::assets::icon("dialog-cancel", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.dyn_suppression = None;
                                     cx.notify();
@@ -1812,6 +1815,11 @@ impl PartStudioView {
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.before_context = Some(context);
                 this.ui.preview_before = Some(Arc::new(display));
+                // Chips of parts the feature consumes get their names now.
+                if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone()) {
+                    let labeler = this.labeler(cx);
+                    dialog.update(cx, |d, cx| d.set_labeler(labeler, cx));
+                }
                 let d = this.display.clone();
                 this.apply_display(d, window, cx);
             });
@@ -1821,9 +1829,12 @@ impl PartStudioView {
     /// Remove / Intersect previews: regenerate the open feature as New to get
     /// its tool body (shown see-through by `display_for_scene`).
     pub(super) fn schedule_tool_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Also a failing Add: its tool shows red (live qa5 BOOL4: "No merge
+        // scope selected." with the title and the preview red).
         let tool_op = self.edit.as_ref().is_some_and(|e| {
             let f = &e.dialog.read(cx).feature;
-            matches!(f.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft") && matches!(f.params.enum_("operationType"), "REMOVE" | "INTERSECT")
+            let failing = self.display.feature_state(f.id).is_some_and(|s| s.status == FeatureStatus::Error);
+            matches!(f.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft") && (matches!(f.params.enum_("operationType"), "REMOVE" | "INTERSECT") || (f.params.enum_("operationType") == "ADD" && failing))
         });
         if !tool_op {
             self.ui.preview_tool = None;
@@ -2001,23 +2012,12 @@ impl PartStudioView {
         let transparent = self.isolation_transparent();
         let look = iso_look(iso.opacity);
         let mut d = (*self.display).clone();
-        // Live (behaviours "Isolate", qa5 KB3): isolating also takes every
-        // plane (default ones and Plane 1 alike) out of the view; the origin
-        // stays (ui/pn-900: drawn where part-studio/1030 has it). Make
-        // transparent leaves the planes.
-        if iso.mode == IsolateMode::Isolate {
-            for p in &mut d.planes {
-                p.hidden = true;
-            }
-        }
+        // Isolate fades the planes to faint outlines and the ghosts are washed
+        // out after shading (`scene_options`); the origin stays (live iso-901).
         for b in &mut d.bodies {
             if transparent.contains(&b.id) {
                 match look {
-                    IsoLook::Ghost => {
-                        for c in &mut b.color[..3] {
-                            *c += (1.0 - *c) * 0.7;
-                        }
-                    }
+                    IsoLook::Ghost => {}
                     IsoLook::SeeThrough(a) => b.color[3] = b.color[3].min(a),
                     IsoLook::Hidden => b.hidden = true,
                 }
@@ -2712,27 +2712,6 @@ impl PartStudioView {
         });
     }
 
-    /// Delete key with parts selected and no features: a Delete part
-    /// feature (Onshape deletes parts parametrically).
-    pub(super) fn delete_selected_parts(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let parts: Vec<Reference> = self.selection.iter().filter(|r| matches!(r, Reference::Body(_))).cloned().collect();
-        if parts.is_empty() {
-            return false;
-        }
-        let units = self.doc.read(cx).session.doc.settings.units;
-        let Some(studio) = self.studio(cx) else { return false };
-        let Some(mut f) = studio.new_feature("deleteBodies", &units) else { return false };
-        f.params.set("entities", ParamValue::Query(parts));
-        self.selection.clear();
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, &format!("Insert feature : {}", f.name), cx, |ps| {
-                ps.insert_at_rollback(f);
-            });
-        });
-        let _ = window;
-        true
-    }
-
     /// "Show dependencies": parents above the arrow, children below.
     pub(super) fn render_dependencies(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if let Some(r) = self.ui.plane_dependencies.clone() {
@@ -2974,7 +2953,10 @@ impl PartStudioView {
             profiles.iter().find_map(host_of).into_iter().collect()
         };
         let mut changes: Vec<(&'static str, ParamValue)> = Vec::new();
-        if !op_user {
+        // Extrude, revolve and sweep take their operation and merge scope
+        // from the tool's collisions once the preview has them
+        // (`boolean_edit_logic`); Thicken follows thickenEditLogic here.
+        if !op_user && ty == "thicken" {
             // thickenEditLogic: Remove when the wall points into the part.
             let want = match (hosts.is_empty(), ty.as_str()) {
                 (true, _) => "NEW",
@@ -2987,7 +2969,7 @@ impl PartStudioView {
         }
         // The merge scope starts as the profiles' part, also when the user
         // picked the operation (live, qa5 EXT1: Remove fills "Part 1").
-        if !hosts.is_empty() && !scope_user && dialog.read(cx).feature.params.query("booleanScope").is_empty() {
+        if ty == "thicken" && !hosts.is_empty() && !scope_user && dialog.read(cx).feature.params.query("booleanScope").is_empty() {
             changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
         }
         if ty == "extrude" && !flip_user && !hosts.is_empty() {
@@ -2995,6 +2977,63 @@ impl PartStudioView {
             if flipped != into {
                 changes.push(("oppositeDirection", ParamValue::Bool(into)));
             }
+        }
+        if changes.is_empty() {
+            return;
+        }
+        dialog.update(cx, |d, cx| {
+            for (k, v) in changes {
+                d.set_value_auto(k, v, cx);
+            }
+        });
+    }
+}
+
+impl PartStudioView {
+    /// Onshape's booleanStepEditLogic (booleanHeuristics.fs) for a new
+    /// Extrude / Revolve / Sweep / Loft, from the parts its tool touches in
+    /// the preview (`FeatureState::touched`): one part → Add into it; none
+    /// or several → New with an empty scope. Nothing once the user set the
+    /// scope or "Merge with all"; a user-picked operation keeps it and only
+    /// an empty scope is filled (live: an Add over three parts starts with
+    /// an empty scope and fails "No merge scope selected.", qa5 BOOL4; a
+    /// Remove over Part 1 gets "Part 1", part-studio/234).
+    pub(super) fn boolean_edit_logic(&mut self, cx: &mut Context<Self>) {
+        let Some(e) = &self.edit else { return };
+        if !e.is_new {
+            return;
+        }
+        let dialog = e.dialog.clone();
+        let (ty, id) = {
+            let d = dialog.read(cx);
+            (d.feature.type_id.clone(), d.feature.id)
+        };
+        if !matches!(ty.as_str(), "extrude" | "revolve" | "sweep" | "loft") {
+            return;
+        }
+        let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
+        let (op, scope, op_user) = {
+            let d = dialog.read(cx);
+            if d.user_set.contains("booleanScope") || d.user_set.contains("defaultScope") || d.feature.params.enum_("bodyType") == "SURFACE" {
+                return;
+            }
+            (d.feature.params.enum_("operationType").to_string(), d.feature.params.query("booleanScope").to_vec(), d.user_set.contains("operationType"))
+        };
+        if op_user && op == "NEW" {
+            return;
+        }
+        let can_scope = !op_user || scope.is_empty();
+        let (want_op, want_scope): (&str, Vec<Reference>) = match touched.as_slice() {
+            [one] => ("ADD", vec![Reference::Body(one.clone())]),
+            _ => ("NEW", Vec::new()),
+        };
+        let mut changes: Vec<(&'static str, ParamValue)> = Vec::new();
+        // Remove / Intersect picked by the flip logic stay (canSetBooleanFlip).
+        if !op_user && op != want_op && !matches!(op.as_str(), "REMOVE" | "INTERSECT") {
+            changes.push(("operationType", ParamValue::Enum(want_op.into())));
+        }
+        if can_scope && scope != want_scope && !(op_user && want_scope.is_empty()) {
+            changes.push(("booleanScope", ParamValue::Query(want_scope)));
         }
         if changes.is_empty() {
             return;

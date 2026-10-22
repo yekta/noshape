@@ -907,7 +907,7 @@ impl AnnotationEnv for Env<'_> {
     }
     fn inspection_style(&self) -> Option<super::sheet::InspectionStyle> {
         let p = &self.drawing.props;
-        (!p.hide_inspection).then(|| super::sheet::InspectionStyle { shape: p.inspection_shape, text_height: p.inspection_text_height, border: p.inspection_border_size, color: p.inspection_color, solid: p.inspection_solid_fill, font: p.inspection_font.clone() })
+        (!p.hide_inspection).then(|| super::sheet::InspectionStyle { shape: p.inspection_shape, text_height: p.inspection_text_height, border: p.inspection_border_size, chars: p.inspection_border_chars, color: p.inspection_color, solid: p.inspection_solid_fill, font: p.inspection_font.clone() })
     }
     fn weld_ansi(&self) -> bool {
         self.drawing.weld_ansi()
@@ -1064,6 +1064,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // Projected edges: visible ones, then tangent and hidden ones (each
             // a run, so Drawing properties › Views colors them with one span).
             let vt = &drawing.props.view_tab;
+            let edges0 = g.lines.len();
             for pass in 0..3 {
                 let mark = g.mark();
                 for (i, e) in geo.edges.iter().enumerate() {
@@ -1121,6 +1122,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     _ => {}
                 }
             }
+            g.view_edges.push((v.id, edges0..g.lines.len()));
             // Section hatching: computed on the unbroken view, then cropped and
             // broken in view coordinates.
             let cad_mark = g.mark();

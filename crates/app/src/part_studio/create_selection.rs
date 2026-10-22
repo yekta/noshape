@@ -353,10 +353,10 @@ impl PartStudioView {
                     .child(
                         div()
                             .id(SharedString::from(format!("cs-seed-x-{i}")))
-                            .text_color(pal.text_muted)
-                            .hover(|d| d.text_color(pal.error))
+                            .group("cs-seed-x")
                             .cursor_pointer()
-                            .child(Icon::new(IconName::Close).with_size(px(12.)))
+                            // Live: Onshape's selection-list × (7 px, #666), red on hover.
+                            .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("cs-seed-x", |s| s.text_color(pal.error)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 cx.stop_propagation();
                                 if let Some(cs) = &mut this.ui.create_selection {

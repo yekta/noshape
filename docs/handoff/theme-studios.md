@@ -390,10 +390,14 @@ Preferences, Release/Publish):**
 - Release dialog: no live reference possible (Free plan shows only the premium upsell; behaviours.md
   "Release management is not available").
 - **For the lead / other agents:**
+  - Compare "Unknown of Extrude 1" (live cp-921): needs a regen API saying which of a feature's references
+    don't resolve in the context before it (per side); compare_features could then take a per-side
+    `unresolved(feature, &Reference) -> bool`. `FeatureState::faulty` is too coarse (also set for other
+    failures). Regen owners' call.
   - Version Properties tree: tab rows are read-only and do not expand to parts; live edits tab / part
     metadata there (needs model support for tab metadata at a version).
-  - Version row menu lacks "View in repair"; workspace row menu lacks "Workspace protection…"
-    ("Open in new browser tab" / "Copy link" are web-only). Behaviour owners to decide.
+  - (done) Version row "View in repair" and workspace row "Workspace protection…" are in the menus
+    (history_panel.rs); "Open in new browser tab" / "Copy link" stay out (web-only).
   - Feature Studio "Co-complete" toggle (AI completion): cloud or not — your call.
   - Preferences: live has an "Environment profile settings" section (profile select, Create / Delete
     profile, "Match pixel density…") that we lack; full-page capture requested (REQUESTS ui2 22:10).
@@ -617,14 +621,50 @@ Preferences, Release/Publish):**
   a FS keyword, so it showed pink), new rows / checkbox / variable inputs take their name as ID
   (`fs_identifier`, unique: "Big", "CB"); ID column 366 px (fills the 598 px modal). Checked in the app.
 - **qa5 A15 (colour side; skb has the root-row highlight, `ui.root_selected`):** a selected / just-inserted
-  instance's faces get `state::SELECTED | state::BODY` and its edges `SELECTED` (assembly_scene.rs
-  `edges_by_top`), so the edges are amber; **render (perf's files, surgical):** new `state::BODY = 256`
-  (scene.rs) and in shaders.wgsl `BODY_SELECTED = (0.992, 0.503, 0.034)` used instead of FACE_SELECTED for
-  BODY faces — fitted to live (242,182,72) lit (side ≈ (207,152,39) vs live (192,144,57)); a Part Studio part
-  selection uses the same flag now (scene/src/builder.rs: a selected `Reference::Body` gets SELECTED | BODY; live
-  #c09039…#f0b850). render tests 23/23. **Checked in the app (20:35 build):** selected instance top
-  (242,182,73) = live, edges (255,169,10) amber, root row not highlighted (skb); side (207,152,41) vs live
-  (192,144,57) — our shade() can't match both with one colour.
+  instance's faces get `state::SELECTED | BODY | OUTLINE` and its edges `BODY` alone (assembly_scene.rs
+  `edges_of`). **Render (perf's files, surgical):** `state::BODY = 256` (scene.rs); shaders.wgsl
+  `BODY_SELECTED = (0.992, 0.503, 0.034)` for BODY faces, `BODY_OUTLINE` (255,192,76) silhouette 4 px wide
+  (others 3), BODY-only lines at alpha × 0.68. A Part Studio part selection uses SELECTED | BODY too
+  (scene/src/builder.rs). render tests 23/23. **Checked in the app vs live ins-902:** top (242,182,73) = (242,182,72);
+  edges (150,110,27)/(172,126,32) vs (158,120,47)/(182,138,55); silhouette 3 px bottom/top, ~2 px side = live;
+  side face (207,152,41) vs (192,144,57) (one shade() can't fit both). Left: one dark boundary-edge pixel
+  inside the silhouette band (live has none; our outline is drawn from pushed-out back faces, which can't cover
+  the front edge); only the instance row highlights.
+
+- **Assembly ≡ "Show search results as list"** (skb's assembly_behaviors.rs / assembly_view.rs, surgical; live
+  assembly/750–753): `AsmUi.filter_flat` (default off), a 30 px toggle 8 px from the panel edge with no menu,
+  hover #eaeaea, on = #eaeaea with a #b6b6b6 top edge. While the filter has text the funnel is `filter-active`
+  and the "Instances (N)" row goes. Off = the tree: top row, matching instances, "Mate features (N)" with the
+  matching mates, then a "…" row (x 28); on = the flat list, mate rows without the chevron column. Checked in the app.
+- **Mate features guide line** (live 751/753): the folder's rows hang off a 1 px #d7d7d7 line at list x 9
+  ending in an 8 px tick (x 5–12), as the Part Studio's Default geometry.
+- **Tab manager footer:** ? (no tooltip) opens help "Document Tabs"
+  (…/document_tabs.htm?cshid=elementtabs); ⧉ "Toggle preview" no longer fades when the preview is off (live 62).
+- **qa5 VS3 (live psb/t-807):** every variable table draws alike: the Part Studio's own table
+  (part_studio/config_panel.rs, surgical) now uses `variable_studio::type_cell` (type 7 px in, black 12 px
+  ▾, select list under the cell; the Variable Studio rows use it too) and its value at 14 px.
+- **Insert into all (live, lead 10-21):** only a workspace's first Variable Studio comes up ticked; later
+  ones unticked (model `variables::new_studio`, used by ops `docedit::insert_tab` and the Variable
+  table's Create Variable Studio, which then references a later studio from its element so the table
+  still shows there). Test `only_the_first_studio_is_inserted_into_all`.
+- **qa4 F34, default part colours** (model regen/display.rs `PART_COLORS`, surgical): live's rotation, exactly
+  (dom/default-part-colors.txt, live STEP colours): #9dcfed, #a5a5a5, #3b61b4, #eaeaea, #c4e2f3, #f88701,
+  #7f7f7f, #fab601 as linear RGB (was #9a9a9a, #4e6fb7, #ebebeb, #c8e6f5, #fd9c28, #787878, #ebb115 for 2–8).
+  The Appearance palette's top row and the drawing note colours already had these.
+- **Insert Variable Studio = live's 300 px feature-style dialog** (variable_insert.rs; live part-studio/158–159,
+  document/47, dom/dialog-insert-variable-studio): at (246, 79), 300×581, not modal, from a Part Studio,
+  Assembly or Variable Studio alike. 28 px header, title red (tooltip "… did not regenerate properly") until a pick
+  changes the references, ✓ (pale until then) closes, ✕ / Esc put the references back. Tabs 150 px / 12 px,
+  document row (name 14.67/500, "⑂ Main" or the picked version, Create version…, Version graph = this
+  document's versions to insert from), "Search Variable Studios" (filters studios by name or variable), 40 px
+  rows (expander x 4, 50×30 icon cell at x 30 with a 30 px icon, name 13.33 px / 300 at x 96; variables:
+  icon x 80, name x 114), studios open expanded, the pick light blue from x 18 / x 40, no check marks;
+  22 px footer with ?. **Vendor (surgical):** gpui-component Dialog `margin_left`, and `overlay(false)` no longer
+  occludes the window (only this dialog uses it). Open: the footer ? URL (REQUESTS ui2 10-22 01:40); live
+  also shows a ‹ before the document name once a studio is picked (not done; what it does is not captured).
+- **Import to Onshape modal (live document/77):** body 6 px taller, footer 10 px under the buttons (was 13), so
+  the rule and buttons sit where live's do; position already matched (760, 25).
+- drawing_view.rs `DrawingEditor::geometry_dirty` is `pub(crate)` (asb's drawing_shaded.rs sets it).
 
 ## (was) PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state
 
@@ -1258,3 +1298,9 @@ with that tooltip. psb didn't edit your file because you have uncommitted work i
 - Name and description cells use the kit's revert; qa4 R6 item 6 is checked in the app.
 - Views that bind Esc to their own action can call `InputState::revert_escape(window, cx)` first; it returns
   false when nothing was edited.
+
+## Moved to the shared ops (api, 2026-10-22 03:30)
+`variable_studio.rs`'s table edits (Add variable row, Name, Value, Description and Type cells, row menu Move up /
+down and Delete) now call `noshape_ops::variable_studio::*` (crates/ops/src/variable_studio.rs): the same code,
+moved, so the CLI/MCP `variable_*` ops on a Variable Studio make exactly the table's edits (same history text).
+Behaviour unchanged. Change these rules there. Backup: /root/api-scratch/vs/bak_variable_studio.rs.

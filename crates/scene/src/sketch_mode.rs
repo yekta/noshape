@@ -857,7 +857,7 @@ impl SketchEditor {
             conic_rho: 0.5,
             text_string: "Default text".into(),
             text_height: 0.01,
-            text_font: noshape_sketch::text::DEFAULT_FONT.into(),
+            text_font: noshape_sketch::text::SKETCH_DEFAULT_FONT.into(),
             text_bold: false,
             text_italic: false,
             text_flip_horizontal: false,

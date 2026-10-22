@@ -8,7 +8,7 @@
 //!
 //! GPUI lays that out with the box's corner rounded to device pixels (half
 //! toward zero), the border and padding inside it, and the text leaf's
-//! measured width rounded up to device pixels; its height is the line
+//! measured width rounded up to whole logical px, then to device px; its height is the line
 //! height (the inherited `phi()` × font size, the root sets only the font
 //! family). The quad is the background with the border painted over its
 //! edges, the text is `paint_line` from the leaf's corner: rasterized here
@@ -27,12 +27,11 @@ pub fn gpui_labels() -> bool {
     *ON.get_or_init(|| std::env::var_os("NOSHAPE_GPUI_LABELS").is_some())
 }
 
-/// `NOSHAPE_FRAME_SKETCH_LABELS`: draw the sketch's dimension labels at
-/// rest in the 3D frame (`row_box`) instead of as GPUI elements; off until
-/// the pixel crops against GPUI are approved.
+/// Whether the sketch's dimension labels at rest are drawn in the 3D frame
+/// (`row_box`; crops vs GPUI ≤ 1 level at 1x/2x, rest, hover, selected),
+/// unless NOSHAPE_GPUI_LABELS asks for GPUI elements.
 pub fn frame_sketch_labels() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| !gpui_labels() && std::env::var_os("NOSHAPE_FRAME_SKETCH_LABELS").is_some())
+    !gpui_labels()
 }
 
 /// What a value box shows (logical px and GPUI colors).
@@ -53,6 +52,17 @@ fn rgba(c: Hsla) -> ORgba {
     [c.r, c.g, c.b, c.a]
 }
 
+/// A text leaf's laid-out width in device px: GPUI's text element
+/// measures `line.width.ceil()` (logical px) and taffy rounds that to
+/// device pixels (`round_to_device_pixel`).
+fn leaf_width(logical: f32, scale: f32) -> f32 {
+    round_half_toward_zero(logical.ceil() * scale)
+}
+
+fn round_half_toward_zero(v: f32) -> f32 {
+    (v.abs() - 0.5).ceil().copysign(v)
+}
+
 /// `b` anchored at `anchor`, for `window`'s scale factor; `None` if its
 /// text can't be rasterized (emoji, LCD text).
 pub fn value_box(window: &Window, cx: &App, b: &ValueBox, anchor: glam::DVec3) -> Option<Label> {
@@ -67,7 +77,7 @@ pub fn value_box(window: &Window, cx: &App, b: &ValueBox, anchor: glam::DVec3) -
     // Device px: the border, the text leaf's corner, the box's size.
     let edge = border * scale;
     let text_x = ((border + b.pad_x) * scale).round();
-    let text_w = (f32::from(line.width) * scale).ceil();
+    let text_w = leaf_width(f32::from(line.width), scale);
     let text_h = (f32::from(line_height) * scale).round();
     // Border and padding on both sides of the leaf.
     let (w, h) = (2.0 * text_x + text_w, edge * 2.0 + text_h);
@@ -133,7 +143,7 @@ pub fn row_box(window: &Window, cx: &App, b: &RowBox, anchor: glam::DVec3, hit: 
         let font = Font { family: cx.theme().font_family.clone(), style: if leaf.italic { FontStyle::Italic } else { FontStyle::Normal }, ..Default::default() };
         let run = TextRun { len: leaf.text.len(), font: font.clone(), color: leaf.color, background_color: None, underline: None, strikethrough: None };
         let line = window.text_system().shape_line(SharedString::from(leaf.text.to_string()), size, &[run], None);
-        let w = (f32::from(line.width) * scale).ceil();
+        let w = leaf_width(f32::from(line.width), scale);
         // Centered in the row (items_center), from the rounded corner.
         let top = edge + round_half_down((inner_h - f32::from(line_height) * scale) * 0.5);
         let origin = point(px(x / scale), px(top / scale));

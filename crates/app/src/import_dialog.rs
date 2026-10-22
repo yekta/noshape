@@ -76,28 +76,14 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
         let pal = p();
         let c = choice.get();
         let tile = |id: &'static str, selected: bool, title: &'static str, note: Option<&'static str>, both: bool, combine: bool, choice: Rc<Cell<Choice>>| {
-            // Our drawing of Onshape's tile pictures: a file, an arrow, then
-            // the Part Studio (and Assembly) tab icons in a box.
-            let picture = v_flex()
-                .h(px(149.))
-                .pt(px(10.))
-                .items_center()
-                .gap(px(5.))
-                // Live document/77: a blank 48x58 page with a folded corner, a ↓ arrow,
-                // then pale tab icons.
-                .child(crate::assets::icon("import-doc", 58., cx))
-                .child(crate::assets::icon("import-arrow", 18., cx))
-                .child(
-                    h_flex()
-                        .gap(px(4.))
-                        .p(px(4.))
-                        .border_1()
-                        .border_color(rgb(0xcccccc))
-                        .rounded(px(3.))
-                        .bg(rgb(0xffffff))
-                        .child(div().opacity(0.45).child(crate::assets::icon("part-studio", 36., cx)))
-                        .when(both, |d| d.child(div().opacity(0.45).child(crate::assets::icon("assembly", 36., cx)))),
-                );
+            // Live (dom/dialog-import-*.txt): each tile shows one 150 px
+            // picture (a file, an arrow, the Part Studio and Assembly tab
+            // icons in a box), centred under the 2 px border; our own drawing.
+            let picture = h_flex()
+                .h(px(150.))
+                .flex_none()
+                .justify_center()
+                .child(crate::assets::icon(if both { "import-tile-single" } else { "import-tile-combine" }, 150., cx));
             v_flex()
                 .id(id)
                 .w(px(180.))
@@ -160,8 +146,10 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
         os::modal(dialog, "Import to Onshape", 400.)
             .child(
                 // Live document/77: the tiles 12 px under the header.
+                // Live: the footer rule 27 px under the last checkbox row's text.
                 os::modal_body()
                     .pt(px(4.))
+                    .pb(px(16.))
                     .gap(px(8.))
                     .when(!native && !stl, |d| d.child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone()))))
                     // Live document/77: the checkbox rows are 34 px apart.
@@ -184,7 +172,8 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                         )
                     }),
             )
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Import"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            // Live document/77: 13 px over the buttons, 10 under them.
+            .footer(os::modal_footer().pb(px(10.)).child(os::modal_ok(os::primary_button("ok", "Import"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
                 let (doc, paths, c, opened) = (doc.clone(), paths.clone(), ch.get(), opened.clone());
                 window.defer(cx, move |window, cx| {

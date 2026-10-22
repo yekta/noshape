@@ -8,9 +8,9 @@
 use super::PartStudioView;
 use crate::theme::p;
 use glam::DVec3;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::analysis::{Comb, Continuity};
@@ -139,7 +139,7 @@ pub struct AnalysisTool {
     slider: Entity<SliderState>,
     _slider_sub: Subscription,
     /// Connection: the G1, G2 and G3 tolerance fields; Zebra: stripe count.
-    tolerance_inputs: Vec<Entity<InputState>>,
+    tolerance_inputs: Vec<Entity<QuantityInput>>,
     _input_subs: Vec<Subscription>,
     /// Interference detection: its top in the viewport, fixed when it opens
     /// (live: a resize keeps the top and the right offset).
@@ -237,71 +237,65 @@ impl PartStudioView {
         }
         let second_active = kind == ToolKind::Deviation && !selection.is_empty() && selection2.is_empty();
         let (mut tolerance_inputs, mut input_subs) = (Vec::new(), Vec::new());
+        // Onshape's number fields (quantity_field): units appended, invalid
+        // values marked in the field, ↑ / ↓ steps (live).
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let vars = self.display.variables.clone();
+        let qty = |text: String, spec: QuantitySpec, window: &mut Window, cx: &mut Context<Self>| {
+            let vars = vars.clone();
+            cx.new(|cx| {
+                let mut q = QuantityInput::new(text, spec, units, window, cx);
+                q.set_variables(vars, cx);
+                q
+            })
+        };
         if kind == ToolKind::Zebra {
-            let st = cx.new(|cx| InputState::new(window, cx).default_value(options.zebra.stripes.to_string()));
-            input_subs.push(cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
-                if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+            // Live: a count of 1–100, no expressions ("1 in", "1+1" invalid,
+            // hover "Enter an integer.").
+            let st = qty(options.zebra.stripes.to_string(), QuantitySpec::count().no_expressions().range(Some(1.), Some(100.)).label("Stripe count"), window, cx);
+            input_subs.push(cx.subscribe(&st, |this: &mut Self, st, ev: &QuantityEvent, cx| {
+                if !matches!(ev, QuantityEvent::Committed(_)) {
                     return;
                 }
-                let text = st.read(cx).value().to_string();
-                match text.trim().parse::<u32>() {
-                    Ok(n) if (1..=100).contains(&n) => {
-                        if let Some(t) = &mut this.ui.analysis_tool {
-                            t.options.zebra.stripes = n;
-                        }
-                        this.rebuild_scene(cx);
+                if let Some(n) = st.read(cx).value() {
+                    if let Some(t) = &mut this.ui.analysis_tool {
+                        t.options.zebra.stripes = n.round() as u32;
                     }
-                    _ => this.flash_info("Enter a whole number from 1 to 100".into(), cx),
+                    this.rebuild_scene(cx);
                 }
             }));
             tolerance_inputs.push(st);
         }
         if kind == ToolKind::Reflection {
-            let st = cx.new(|cx| InputState::new(window, cx).default_value(format!("{} deg", options.reflection.rotation_deg)));
-            input_subs.push(cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
-                if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+            let st = qty(format!("{} deg", options.reflection.rotation_deg), QuantitySpec::quantity(noshape_units::Dim::ANGLE).label("Rotation angle"), window, cx);
+            input_subs.push(cx.subscribe(&st, |this: &mut Self, st, ev: &QuantityEvent, cx| {
+                if !matches!(ev, QuantityEvent::Committed(_)) {
                     return;
                 }
-                let text = st.read(cx).value().to_string();
-                match text.trim().trim_end_matches("deg").trim().parse::<f64>() {
-                    Ok(v) => {
-                        if let Some(t) = &mut this.ui.analysis_tool {
-                            t.options.reflection.rotation_deg = v;
-                        }
-                        // Shown with its unit, like Onshape's fields.
-                        let shown = format!("{v} deg");
-                        if text != shown {
-                            st.update(cx, |s, cx| s.set_value(shown, window, cx));
-                        }
-                        this.rebuild_scene(cx);
+                if let Some(v) = st.read(cx).value() {
+                    if let Some(t) = &mut this.ui.analysis_tool {
+                        t.options.reflection.rotation_deg = v.to_degrees();
                     }
-                    Err(_) => this.flash_info("Enter an angle".into(), cx),
+                    this.rebuild_scene(cx);
                 }
             }));
             tolerance_inputs.push(st);
         }
         if kind == ToolKind::Connection {
             let t = options.tolerances;
-            for (i, v) in [format!("{} deg", t.g1_deg), t.g2.to_string(), t.g3.to_string()].into_iter().enumerate() {
-                let st = cx.new(|cx| InputState::new(window, cx).default_value(v));
-                input_subs.push(cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
-                    if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+            let g1 = QuantitySpec::quantity(noshape_units::Dim::ANGLE).range(Some(1e-9), None).text_px(12.);
+            let g = QuantitySpec::quantity(noshape_units::Dim::UNITLESS).range(Some(1e-12), None).text_px(12.);
+            for (i, (v, spec)) in [(format!("{} deg", t.g1_deg), g1), (t.g2.to_string(), g.clone()), (t.g3.to_string(), g)].into_iter().enumerate() {
+                let st = qty(v, spec, window, cx);
+                input_subs.push(cx.subscribe(&st, move |this: &mut Self, st, ev: &QuantityEvent, cx| {
+                    if !matches!(ev, QuantityEvent::Committed(_)) {
                         return;
                     }
-                    let text = st.read(cx).value().to_string();
+                    let Some(v) = st.read(cx).value() else { return };
                     let Some(t) = &mut this.ui.analysis_tool else { return };
-                    match text.trim().trim_end_matches("deg").trim().parse::<f64>() {
-                        Ok(v) if v > 0.0 => {
-                            let tol = &mut t.options.tolerances;
-                            *[&mut tol.g1_deg, &mut tol.g2, &mut tol.g3][i] = v;
-                            let shown = if i == 0 { format!("{v} deg") } else { v.to_string() };
-                            if text != shown {
-                                st.update(cx, |s, cx| s.set_value(shown, window, cx));
-                            }
-                            this.recompute_analysis_tool(cx);
-                        }
-                        _ => this.flash_info("Enter a positive value".into(), cx),
-                    }
+                    let tol = &mut t.options.tolerances;
+                    *[&mut tol.g1_deg, &mut tol.g2, &mut tol.g3][i] = if i == 0 { v.to_degrees() } else { v };
+                    this.recompute_analysis_tool(cx);
                 }));
                 tolerance_inputs.push(st);
             }
@@ -947,7 +941,7 @@ impl PartStudioView {
                         .child(div().w(px(32.)).h(px(24.)).flex().items_center().justify_center().child(crate::assets::icon(icons[i], 24., cx)))
                         .child(div().w(px(if i == 0 { 100. } else { 22. })).text_color(if i == 0 { pal.text } else { pal.text_muted }).child(names[i]));
                     if let Some(st) = i.checked_sub(2).and_then(|k| t.tolerance_inputs.get(k)) {
-                        row = row.child(div().flex_1().child(Input::new(st).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)));
+                        row = row.child(div().flex_1().child(st.clone()));
                     }
                     body = body.child(row);
                 }
@@ -969,7 +963,7 @@ impl PartStudioView {
                             .gap_2()
                             .text_size(px(12.))
                             .child(div().text_color(pal.text_muted).child("Stripe count"))
-                            .child(div().flex_1().child(Input::new(st).text_size(px(13.33)).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7))),
+                            .child(div().flex_1().child(st.clone())),
                     );
                 }
                 body = body
@@ -1008,7 +1002,7 @@ impl PartStudioView {
                             .gap_2()
                             .text_size(px(12.))
                             .child(div().text_color(pal.text_muted).child("Rotation angle"))
-                            .child(div().flex_1().child(Input::new(st).text_size(px(13.33)).appearance(false).xsmall().text_right()).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
+                            .child(div().flex_1().child(st.clone()))
                             .child(
                                 div()
                                     .id("at-rot-opp")
@@ -1093,7 +1087,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .bg(gpui_kit::rgb(0x2b9d3a))
-                                .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                                .child(crate::assets::icon("dialog-ok", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.accept_view_tool(cx);
                                 })),
@@ -1108,7 +1102,7 @@ impl PartStudioView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
+                            .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.close_analysis_tool(cx);
                             })),

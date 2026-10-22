@@ -47,3 +47,6 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data missing.
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 | DOC5 | new tabs keep their position after reopening | ✅ fixed |
+
+## Re-run pass 9 (10-22 00:05, /tmp/qa5/noshape-2330 = target-shared 23:30)
+- DOC3 ✅ fixed: part right-click › Copy Block, Ctrl+V in another Part Studio opens "Derived 2" with the Part Studio field filled ("qa5 src") (workflow-derived.md row 17, shot d52). Ctrl+C after a plain parts-list click copied nothing (d50); whether live copies on Ctrl+C there is not checked.

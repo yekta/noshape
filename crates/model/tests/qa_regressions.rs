@@ -296,7 +296,7 @@ fn reference_to_split_pieces_survives_when_the_split_goes_away() {
         let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
         let rr = t.regen();
         let keys: Vec<_> = rr.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
-        t.add("extrude", &[("entities", q(keys)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE"))])
+        t.add("extrude", &[("entities", q(keys)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))])
     }
     let mut t = T::new();
     t.block();

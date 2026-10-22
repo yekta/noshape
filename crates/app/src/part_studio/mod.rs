@@ -650,7 +650,15 @@ impl PartStudioView {
     fn apply_display(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) {
         let _t = noshape_render::perf::scope("ps.apply_display");
         let geometry_changed = !Arc::ptr_eq(&self.display, &display);
+        // A different set of parts (a derived studio's parts arriving after
+        // its source regenerated, qa5 TAB1): redraw the whole window once.
+        // The cached workspace kept painting the old parts list and strip
+        // ("Parts (0)") although this view was notified.
+        let parts_changed = self.display.bodies.len() != display.bodies.len() || self.display.bodies.iter().zip(&display.bodies).any(|(a, b)| a.id != b.id || a.name != b.name);
         self.display = display;
+        if parts_changed {
+            window.refresh();
+        }
         // Measurements follow the new geometry (qa5 RD1: a stale readout).
         if geometry_changed {
             self.measure_cache = None;
@@ -695,6 +703,10 @@ impl PartStudioView {
                 FeatureStatus::Error | FeatureStatus::Warning | FeatureStatus::Info => Some((s.status, s.message.clone().unwrap_or_else(|| "Feature failed".into()))),
                 _ => None,
             });
+            // Live (qa5 DER6): a second Derived of the same source and
+            // configuration only fails once accepted; its dialog stays black
+            // with ✓ enabled.
+            let st = st.filter(|(_, m)| !m.starts_with("Creating multiple Derived features from the same source"));
             let faulty = self.display.feature_state(id).map(|s| s.faulty.clone()).unwrap_or_default();
             // Live (sketch/00-sketch-dialog-empty.png): a sketch without a
             // plane asks for one in a blue bubble over the graphics.
@@ -710,6 +722,9 @@ impl PartStudioView {
                 d.set_faulty(faulty, cx);
             });
         }
+        // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
+        // from what the previewed tool touches.
+        self.boolean_edit_logic(cx);
         self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);
         if !self.fitted_once {
@@ -727,7 +742,6 @@ impl PartStudioView {
                 });
             }
         }
-        let _ = window;
         cx.notify();
     }
 
@@ -739,6 +753,14 @@ impl PartStudioView {
         o.replaced_meshes = self.thickness_meshes(cx);
         o.preview_bodies = self.preview_body_ids();
         o.display_only = self.ui.transform_ghost.clone();
+        // Isolate (live ui/iso-901): the planes fade to faint outlines; below
+        // 10 % the other parts are solid washed-out ghosts.
+        if let Some(iso) = &self.ui.isolate {
+            o.faint_planes = iso.mode == behaviors::IsolateMode::Isolate;
+            if matches!(behaviors::iso_look(iso.opacity), behaviors::IsoLook::Ghost) {
+                o.ghost_bodies = self.isolation_transparent().into_iter().collect();
+            }
+        }
         // Interference detection: the parts see-through around the red overlaps.
         if self.ui.analysis_tool.as_ref().is_some_and(|t| t.kind == analysis_tools::ToolKind::Interference && t.result.as_ref().is_some_and(|r| !r.interferences.is_empty())) {
             o.transparent_bodies = true;
@@ -889,12 +911,30 @@ impl PartStudioView {
 
     fn labeler(&self, cx: &App) -> RefLabeler {
         let names: Vec<(FeatureId, String)> = self.studio(cx).map(|s| s.features.iter().map(|f| (f.id, f.name.clone())).collect()).unwrap_or_default();
-        let bodies: Vec<(noshape_model::BodyId, String)> = self.display.bodies.iter().map(|b| (b.id.clone(), b.name.clone())).collect();
+        // A part the edited feature consumes (Delete part) is named as it was
+        // before the feature (live part-studio/577, qa5 DEL1: "Part 1").
+        let before = self.ui.preview_before.as_ref().map(|d| d.bodies.as_slice()).unwrap_or_default();
+        let bodies: Vec<(noshape_model::BodyId, String)> = self.display.bodies.iter().chain(before).map(|b| (b.id.clone(), b.name.clone())).collect();
         let entity_kinds = sketch_entity_kinds(self.studio(cx), &self.display);
         let renamed: Vec<(Reference, String)> = self.studio(cx).map(|s| s.default_names.clone()).unwrap_or_default();
         // Assembly context geometry reads "Face of Context 1" (live 504).
         let contexts: Vec<(u32, String)> = self.studio(cx).map(|s| s.contexts.iter().map(|c| (c.id, c.name.clone())).collect()).unwrap_or_default();
+        // Derived parts keep their source's face names (so references follow
+        // the source); their faces and edges read "… of Derived 1" (live,
+        // qa5 DER4).
+        let derived_ids: Vec<FeatureId> = self.studio(cx).map(|s| s.features.iter().filter(|f| f.type_id == "importDerived").map(|f| f.id).collect()).unwrap_or_default();
+        let derived: Vec<(FeatureId, Vec<Reference>)> = self
+            .display
+            .bodies
+            .iter()
+            .filter(|b| derived_ids.contains(&b.id.feature))
+            .map(|b| (b.id.feature, b.face_refs.iter().chain(&b.edge_refs).cloned().collect()))
+            .collect();
         Arc::new(move |r: &Reference| {
+            let owner = |id: Option<FeatureId>| match id {
+                Some(i) if names.iter().any(|(x, _)| *x == i) || noshape_model::in_context::context_of(i).is_some() => Some(i),
+                _ => derived.iter().find(|(_, refs)| refs.contains(r)).map(|(f, _)| *f).or(id),
+            };
             let fname = |id: FeatureId| match noshape_model::in_context::context_of(id) {
                 Some(c) => contexts.iter().find(|(i, _)| *i == c).map(|(_, n)| n.clone()).unwrap_or_else(|| "context".into()),
                 None => names.iter().find(|(i, _)| *i == id).map(|(_, n)| n.clone()).unwrap_or_else(|| "deleted feature".into()),
@@ -907,8 +947,8 @@ impl PartStudioView {
                 Reference::Plane(DatumPlane::Top) => "Top plane".into(),
                 Reference::Plane(DatumPlane::Front) => "Front plane".into(),
                 Reference::Plane(DatumPlane::Right) => "Right plane".into(),
-                Reference::Face(n) => format!("Face of {}", n.creator().map(fname).unwrap_or_else(|| "part".into())),
-                Reference::Edge(n) => format!("Edge of {}", edge_creator(n).map(fname).unwrap_or_else(|| "part".into())),
+                Reference::Face(n) => format!("Face of {}", owner(n.creator()).map(fname).unwrap_or_else(|| "part".into())),
+                Reference::Edge(n) => format!("Edge of {}", owner(edge_creator(n)).map(fname).unwrap_or_else(|| "part".into())),
                 Reference::Vertex(_) => "Vertex".into(),
                 Reference::Body(b) => bodies.iter().find(|(i, _)| i == b).map(|(_, n)| n.clone()).unwrap_or_else(|| "Part".into()),
                 Reference::SketchEntity { sketch, entity } => format!("{} {}", fname(*sketch), entity_kinds.get(&(*sketch, *entity)).copied().unwrap_or("entity")),
@@ -1298,7 +1338,19 @@ impl PartStudioView {
         let provider = self.doc.read(cx).derived_provider();
         let doc = self.doc.read(cx).session.doc.clone();
         let name = self.doc.read(cx).name();
-        let sources = crate::fs_reference::sources(&doc, &self.tab.to_string(), |id| provider.context(id).map(|c| crate::fs_reference::parts_and_sketches(&c)).unwrap_or_default());
+        // Parts as the source names them now (qa5 DER9: a part renamed
+        // "Block" there reads "Block" here too).
+        let renamed = |id: &str, mut v: Vec<(noshape_model::BodyId, String)>| {
+            if let Some(noshape_model::document::TabContent::PartStudio(ps)) = doc.tabs.iter().find(|t| t.id.to_string() == id).map(|t| &t.content) {
+                for (b, n) in v.iter_mut() {
+                    if let Some(name) = ps.part_properties.get(b).and_then(|p| p.name.clone()) {
+                        *n = name;
+                    }
+                }
+            }
+            v
+        };
+        let sources = crate::fs_reference::sources(&doc, &self.tab.to_string(), |id| provider.context(id).map(|c| renamed(id, crate::fs_reference::parts_and_sketches(&c))).unwrap_or_default());
         let studios: Vec<TabId> = doc.tabs.iter().filter(|t| t.id != self.tab && matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| t.id).collect();
         let wants_pictures = dialog.read(cx).ty.id == "importDerived" || dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { kind: noshape_model::params::ReferenceKind::PartStudio }));
         let (path, except, gpu_for_dialog) = (self.doc.read(cx).session.path.clone(), self.tab.to_string(), self.gpu.clone());
@@ -1413,7 +1465,18 @@ impl PartStudioView {
         let vars = self.scope_variables(Some(index), cx);
         let later = self.studio(cx).is_some_and(|s| !is_new && index + 1 < s.features.len());
         // Missing references: their creating feature is gone or suppressed.
-        let live: std::collections::HashSet<FeatureId> = self.studio(cx).map(|s| s.features.iter().filter(|f| !f.suppressed).map(|f| f.id).collect()).unwrap_or_default();
+        let mut live: std::collections::HashSet<FeatureId> = self.studio(cx).map(|s| s.features.iter().filter(|f| !f.suppressed).map(|f| f.id).collect()).unwrap_or_default();
+        // Derived parts keep their source studio's names: those features
+        // count as present (qa5 DER4: a fillet on a derived edge).
+        if let Some(s) = self.studio(cx) {
+            let doc = &self.doc.read(cx).session.doc;
+            for f in s.features.iter().filter(|f| f.type_id == "importDerived" && !f.suppressed) {
+                let key = f.params.text("partStudio").trim().to_string();
+                if let Some(noshape_model::document::TabContent::PartStudio(src)) = doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| &t.content) {
+                    live.extend(src.features.iter().filter(|g| !g.suppressed).map(|g| g.id));
+                }
+            }
+        }
         let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = Arc::new(move |r: &Reference| match r {
             Reference::Edge(n) | Reference::Vertex(n) => edge_creator(n).is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
             // Assembly context geometry is never missing (snapshot).
@@ -1586,12 +1649,30 @@ impl PartStudioView {
             return;
         }
         let ids = std::mem::take(&mut self.selected_features);
-        if ids.is_empty() {
-            // Selected parts are deleted with a Delete part feature.
-            self.delete_selected_parts(window, cx);
+        if !ids.is_empty() {
+            self.delete_features(ids, cx);
             return;
         }
-        self.delete_features(ids, cx);
+        // Live (behaviours "Delete key", ui 10-22 a): selected parts open the
+        // Delete part dialog with them prefilled; selected faces or edges
+        // delete the features that made them, at once (Ctrl+Z restores).
+        if self.selection.iter().any(|r| matches!(r, Reference::Body(_))) {
+            self.selection.retain(|r| matches!(r, Reference::Body(_)));
+            self.start_feature("deleteBodies", window, cx);
+            return;
+        }
+        let mut creators: Vec<FeatureId> = Vec::new();
+        for r in self.selection.iter().filter(|r| matches!(r, Reference::Face(_) | Reference::Edge(_))) {
+            if let Some(f) = self.creating_feature(r).filter(|f| !creators.contains(f)) {
+                creators.push(f);
+            }
+        }
+        if !creators.is_empty() {
+            self.selection.clear();
+            self.delete_features(creators, cx);
+            self.refresh_scene(false, cx);
+            cx.notify();
+        }
     }
 
     fn on_clear_selection(&mut self, _: &ClearSelection, _: &mut Window, cx: &mut Context<Self>) {
@@ -2077,12 +2158,14 @@ impl PartStudioView {
                     // the name as a side tooltip that expands with "Feature
                     // from current workspace".
                     .dropdown_menu(move |mut menu, _, _| {
+                        // Live (part-studio/1252): 178 px at least.
+                        menu = menu.min_w(px(178.));
                         for t in &custom {
                             let v = view.clone();
                             let (id, name): (&'static str, &'static str) = (t.id, t.name);
                             menu = menu.item(
                                 PopupMenuItem::element(move |_, _| {
-                                    crate::ui::with_side_tooltip_expanded(h_flex().id(SharedString::from(format!("cf-{id}"))).w_full().gap(px(6.)).child(crate::ui::initials_icon(name)).child(name), name, "Feature from current workspace")
+                                    crate::ui::with_side_tooltip_expanded(h_flex().id(SharedString::from(format!("cf-{id}"))).flex_1().gap(px(6.)).child(crate::ui::initials_icon(name)).child(name), name, "Feature from current workspace")
                                 })
                                 .on_click(move |_, window, cx| {
                                     v.update(cx, |this, cx| this.start_feature(id, window, cx));
@@ -2112,7 +2195,6 @@ impl PartStudioView {
         };
         let filtered = self.filtered(cx);
         let hidden_defaults = studio.hidden_defaults.clone();
-        let isolating_planes = self.ui.isolate.as_ref().is_some_and(|i| i.mode == behaviors::IsolateMode::Isolate);
         let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
         let editing_new_at = self.edit.as_ref().filter(|e| e.is_new).map(|e| e.index);
         // The Folder name popup sits beside the first selected feature, or
@@ -2157,6 +2239,13 @@ impl PartStudioView {
                 continue;
             }
             items.push(ListItem::Feature(12.0 * chain.len() as f32, f.id));
+            // Live (qa5 derived, part-studio/1582): an open Derived row lists
+            // the sketches it brought in.
+            if self.ui.derived_open.contains(&f.id) {
+                for (_, sk) in self.display.derived_sketches.iter().filter(|(d, _)| *d == f.id) {
+                    items.push(ListItem::DerivedSketch(12.0 * chain.len() as f32, *sk));
+                }
+            }
             if prompt_anchor == Some(Some(f.id)) {
                 items.push(ListItem::Prompt);
             }
@@ -2216,10 +2305,6 @@ impl PartStudioView {
             }
             let selected = self.selection.contains(&r);
             let hidden = hidden_defaults.contains(&r);
-            // Live (ui/pn-900 vs part-studio/1030): Isolate takes the planes
-            // out of the view, and their rows read as hidden ones (the origin
-            // stays).
-            let greyed = hidden || (isolating_planes && matches!(r, Reference::Plane(_)));
             let r2 = r.clone();
             let r3 = r.clone();
             let icon = if label == "Origin" { "origin" } else { "plane" };
@@ -2236,8 +2321,8 @@ impl PartStudioView {
                     .pr(px(11.))
                     .group("dg-row")
                     // Onshape: hidden default geometry is listed in gray.
-                    .when(greyed, |d| d.text_color(pal.text_faint))
-                    .child(crate::ui::tree_icon(icon, greyed, cx))
+                    .when(hidden, |d| d.text_color(pal.text_faint))
+                    .child(crate::ui::tree_icon(icon, hidden, cx))
                     .child(match renaming {
                         Some(st) => div().flex_1().child(gpui_kit::component::input::Input::new(&st).xsmall()).into_any_element(),
                         None => div().flex_1().truncate().child(name).into_any_element(),
@@ -2396,7 +2481,7 @@ impl PartStudioView {
                 ListItem::Prompt => 60.,
                 _ => row_h,
             };
-            let off_view = matches!(item, ListItem::Ellipsis | ListItem::Folder(..) | ListItem::Feature(..)) && shown.is_some_and(|(top, bottom)| y + h < top || y > bottom);
+            let off_view = matches!(item, ListItem::Ellipsis | ListItem::Folder(..) | ListItem::Feature(..) | ListItem::DerivedSketch(..)) && shown.is_some_and(|(top, bottom)| y + h < top || y > bottom);
             y += h;
             if off_view {
                 skipped += 1;
@@ -2414,6 +2499,7 @@ impl PartStudioView {
                 ListItem::Ellipsis => ellipsis(),
                 ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, cx)),
                 ListItem::Feature(x, id) => indent(x, self.render_feature_row_view(id, slot, cx)),
+                ListItem::DerivedSketch(x, id) => indent(x, self.render_derived_sketch_row(id, cx)),
                 ListItem::Prompt => self.render_folder_prompt(cx),
             });
         }
@@ -2722,6 +2808,7 @@ impl PartStudioView {
         let r_hover = r.clone();
         let view = cx.entity();
         let part_name = b.name.clone();
+        let several_parts = self.display.bodies.len() > 1;
         // Release…: the part's number and whether it has released revisions.
         let part_number = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty());
         let has_revisions = part_number.as_ref().is_some_and(|pn| !crate::release_dialog::release_log(self.doc.read(cx)).revisions(pn).is_empty());
@@ -2877,7 +2964,23 @@ impl PartStudioView {
                     .item(item(if hidden { "Show" } else { "Hide" }, Box::new(move |this, _, cx| {
                         let t: Vec<Reference> = targets(this, &b5).into_iter().map(Reference::Body).collect();
                         this.set_visibility(&t, !hidden, cx);
-                    })).icon_name(if hidden { "eye" } else { "eye-off" }))
+                    })).icon_name(if hidden { "eye" } else { "eye-off" }));
+                // Live (qa5 MENU1, part-studio/1624): with several parts,
+                // Hide other parts and Hide all parts follow.
+                if several_parts {
+                    let keep = b.clone();
+                    m = m
+                        .item(item("Hide other parts", Box::new(move |this, _, cx| {
+                            let keep = targets(this, &keep);
+                            let others: Vec<Reference> = this.display.bodies.iter().filter(|d| !keep.contains(&d.id)).map(|d| Reference::Body(d.id.clone())).collect();
+                            this.set_visibility(&others, true, cx);
+                        })))
+                        .item(item("Hide all parts", Box::new(|this, _, cx| {
+                            let all: Vec<Reference> = this.display.bodies.iter().map(|d| Reference::Body(d.id.clone())).collect();
+                            this.set_visibility(&all, true, cx);
+                        })));
+                }
+                m = m
                     .item(item("Isolate…", Box::new(move |this, w, cx| {
                         this.selection = targets(this, &b7).into_iter().map(Reference::Body).collect();
                         this.hover = None;
@@ -2895,8 +2998,10 @@ impl PartStudioView {
                         this.zoom_to_selection(cx);
                     })));
                 m.separator().item(item("Delete…", Box::new(move |this, w, cx| {
+                    // Live (qa5 DEL2, part-studio/1627): the "Delete part 1"
+                    // dialog with the parts prefilled; ✓ commits.
                     this.selection = targets(this, &b11).into_iter().map(Reference::Body).collect();
-                    this.delete_selected_parts(w, cx);
+                    this.start_feature("deleteBodies", w, cx);
                 })).icon_name("menu-delete"))
             })
             .into_any_element()
@@ -2971,6 +3076,27 @@ impl PartStudioView {
             .child(div().m(px(6.)).border_1().border_color(pal.accent).child(gpui_kit::component::input::Input::new(st).small().appearance(false).text_size(px(13.33)).text_color(gpui_kit::rgb(0x000000)).pl(px(6.))));
         // A zero-height box under the anchor row; the popup rises beside it.
         div().relative().w_full().h_0().child(div().absolute().left_full().top(px(-26.)).size_0().child(deferred(anchored().snap_to_window().child(popup)).with_priority(5))).into_any_element()
+    }
+
+    /// A sketch listed under its Derived row (live part-studio/1582): the
+    /// sketch icon and name, 12 px in; a click selects the sketch.
+    fn render_derived_sketch_row(&self, id: FeatureId, cx: &mut Context<Self>) -> AnyElement {
+        let Some(sk) = self.display.sketches.iter().find(|s| s.feature == id) else { return div().h(px(crate::ui::ROW_H)).into_any_element() };
+        let r = Reference::Sketch(id);
+        let selected = self.selection.contains(&r);
+        crate::ui::tree_row(SharedString::from(format!("dsk-{id}")), selected)
+            // Live 1582: the sketch icon at x 66, the name at 86.
+            .pl(px(23.))
+            .mr(px(5.))
+            .pr(px(11.))
+            .child(div().flex_none().child(crate::ui::tree_icon(&feature_icon("sketch"), sk.hidden, cx)))
+            .child(div().flex_1().truncate().child(sk.name.clone()))
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                this.selection = vec![r.clone()];
+                this.refresh_scene(false, cx);
+                cx.notify();
+            }))
+            .into_any_element()
     }
 
     fn render_folder_row(&self, fd: &noshape_model::partstudio::Folder, cx: &mut Context<Self>) -> AnyElement {
@@ -3196,9 +3322,6 @@ impl PartStudioView {
                 if let Some(m) = &msg {
                     return m.clone().into();
                 }
-                if let Some(t) = &templated {
-                    return t.clone().into();
-                }
                 let parents: Vec<String> = view
                     .upgrade()
                     .and_then(|v| {
@@ -3207,7 +3330,13 @@ impl PartStudioView {
                         Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect())
                     })
                     .unwrap_or_default();
-                if parents.is_empty() { name.clone().into() } else { format!("{feature_name} <- {}", parents.join(", ")).into() }
+                // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2".
+                let head = templated.clone().unwrap_or_else(|| feature_name.clone());
+                match (parents.is_empty(), &templated) {
+                    (true, Some(t)) => t.clone().into(),
+                    (true, None) => name.clone().into(),
+                    (false, _) => format!("{head} <- {}", parents.join(", ")).into(),
+                }
             }
         };
         let manually_suppressed = f.suppressed;
@@ -3251,6 +3380,27 @@ impl PartStudioView {
             .when(rolled_back || suppressed, |d| d.italic())
             .when(related && !selected && !editing, |d| d.bg(gpui_kit::rgb(0xecf0f4)))
             .when(editing, |d| d.font_weight(FontWeight::SEMIBOLD))
+            // Live (qa5 derived, 1580–1582): a Derived feature that brought
+            // sketches has a ▸ before its icon; it lists them.
+            .when(self.display.derived_sketches.iter().any(|(d, _)| *d == f.id), |d| {
+                let open = self.ui.derived_open.contains(&f.id);
+                let fid = f.id;
+                d.child(
+                    div()
+                        .id(SharedString::from(format!("feat-exp-{fid}")))
+                        .flex_none()
+                        // Live 1582: caret ink at x 44, icon at 66.
+                        .w(px(17.))
+                        .child(crate::ui::caret(open))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            if !this.ui.derived_open.remove(&fid) {
+                                this.ui.derived_open.insert(fid);
+                            }
+                            cx.notify();
+                        })),
+                )
+            })
             .child(
                 div()
                     .relative()
@@ -3269,6 +3419,9 @@ impl PartStudioView {
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
                 Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.))).into_any_element(),
+                // Live (psb 10-21 p): a Hole's row shows its whole callout,
+                // both parts ("Ø 6.6 mm ↧ 10 mm | ⌴Ø 11 mm ↧ 6.5 mm"), cut by
+                // the ellipsis at the list's width.
                 None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(name.clone()).into_any_element(),
             })
             // In-context arrow (features referencing an Assembly context).
@@ -3344,8 +3497,11 @@ impl PartStudioView {
             }))
             .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
             .on_drop(cx.listener(move |this, _: &RollbackDrag, _, cx| this.set_rollback(Some(i), cx)))
-            .on_drag(FeatureDrag { id, name: f.name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
-            .drag_over::<FeatureDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
+            .on_drag(FeatureDrag { id, index: i, name: f.name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
+            // The drop line shows where the feature lands
+            // (`interaction::reordered`): above the row when moving up, below
+            // it when moving down (qa4 F33).
+            .drag_over::<FeatureDrag>(move |s, d, _, _| if d.index < i { s.border_b_2().border_color(p().accent) } else { s.border_t_2().border_color(p().accent) })
             .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.drop_features(d.id, i, cx)));
         let anchor = {
             let (scroll, (ix, indent)) = (self.ui.list_scroll.clone(), slot);
@@ -3363,6 +3519,14 @@ impl PartStudioView {
         let is_last = i + 1 >= self.row_ctx.n_features;
         let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone()))));
         let feature_name = f.name.clone();
+        // A Derived feature's source studio ("Switch to qa5 src", live "qa5
+        // derived" (6)).
+        let derived_source: Option<(TabId, String)> = (f.type_id == "importDerived")
+            .then(|| {
+                let key = f.params.text("partStudio").trim().to_string();
+                self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| (t.id, t.name.clone()))
+            })
+            .flatten();
         row.os_context_menu(move |menu, window, cx| {
             view.update(cx, |this, cx| {
                 if this.ui.list_menu != Some(id) {
@@ -3487,7 +3651,11 @@ impl PartStudioView {
                     cx.notify();
                 })));
             }
-            m = dynamic(m, window, cx).separator().item(item("Zoom to selection", Box::new(move |this, _, cx| {
+            m = dynamic(m, window, cx);
+            if let Some((tab, name)) = derived_source.clone() {
+                m = m.separator().item(item(&format!("Switch to {name}"), Box::new(move |_, _, cx| cx.emit(PartStudioEvent::ActivateTab(tab)))).icon_name("part-studio"));
+            }
+            m = m.separator().item(item("Zoom to selection", Box::new(move |this, _, cx| {
                 if !this.selected_features.contains(&id) {
                     this.selected_features = vec![id];
                 }
@@ -3571,6 +3739,11 @@ impl PartStudioView {
     /// cached.
     fn render_dialog_layer(&self) -> Option<AnyElement> {
         let e = self.edit.as_ref()?;
+        // Live (dom/dialog-sketch-text): the Text dialog takes the sketch
+        // dialog's place while open.
+        if self.sketch.as_ref().is_some_and(|s| s.text_dialog_open()) {
+            return None;
+        }
         // Moved dialogs keep their place (Onshape lets you drag them).
         let d = div().absolute().child(e.dialog.clone());
         // Onshape: at the viewport's left edge, 3 px under the toolbar.
@@ -3729,6 +3902,8 @@ impl Render for RollbackDragPill {
 #[derive(Clone)]
 struct FeatureDrag {
     id: FeatureId,
+    /// The dragged row's place in the list.
+    index: usize,
     name: SharedString,
 }
 
@@ -3883,6 +4058,8 @@ enum ListItem {
     Folder(f32, noshape_model::partstudio::Folder),
     /// Indent, feature.
     Feature(f32, FeatureId),
+    /// Indent, a sketch a Derived feature brought in (its source id).
+    DerivedSketch(f32, FeatureId),
     Prompt,
 }
 

@@ -98,3 +98,8 @@ Pass 6 (17:11) had found D5 fixed (d starts Dimension after Esc).
 | D15 DXF defaults | ☑ Set z-height to zero…, Units "Use drawing units" | ✅ **fixed** |
 | D14 SCALE after undo | "----" on the empty sheet, "1:1" with a view, "----" after Ctrl+Z (consistent) | ✅ **fixed** (live value on an empty sheet ?) |
 | D16 (new) | the "Sheet1" chip draws over the Insert view dialog's title ("Sheet1 ew") | ✗ **D16** (asb / ui) |
+
+## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
+Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 ✅ confirmed.
+| D8 balloon on an isometric-view cylinder | "----" | ✗ still |
+| D16 Sheet1 chip over Insert view title | gone | ✅ **fixed** |

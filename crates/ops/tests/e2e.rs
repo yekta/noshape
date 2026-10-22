@@ -1037,3 +1037,118 @@ fn drawing_section_detail_views_and_annotations() {
     let e = try_call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "hole", "view": top_id, "position": [20, 200] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("origin"), "{e:?}");
 }
+
+#[test]
+fn sketch_draw_many_shapes_in_one_edit() {
+    let mut ctx = Ctx::new();
+    // Separate calls and one `shapes` call give the same sketch (inference too:
+    // the line starts on the rectangle's corner).
+    let shapes = json!([
+        { "tool": "corner_rectangle", "points": [[0, 0], [30, 20]] },
+        { "tool": "line", "points": [[30, 20], [50, 40]] },
+        { "tool": "circle", "points": [[10, 10], [13, 10]], "construction": true },
+    ]);
+    let a = new_sketch(&mut ctx, "many.noshape", "plane:top");
+    for sh in shapes.as_array().unwrap() {
+        let mut args = sh.clone();
+        args["sketch"] = json!(a);
+        call(&mut ctx, "sketch_draw", args);
+    }
+    let b = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
+    let n0 = call(&mut ctx, "history_list", json!({}))["history"].as_array().unwrap().len();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": b, "shapes": shapes }));
+    assert_eq!(call(&mut ctx, "history_list", json!({}))["history"].as_array().unwrap().len(), n0 + 1, "one edit");
+    let (ga, gb) = (call(&mut ctx, "sketch_get", json!({ "sketch": a })), call(&mut ctx, "sketch_get", json!({ "sketch": b })));
+    let kinds = |g: &Value, k: &str| {
+        let mut v: Vec<String> = g[k].as_array().unwrap().iter().map(|e| format!("{}{}", e["type"], e["construction"])).collect();
+        v.sort();
+        v
+    };
+    assert_eq!(kinds(&ga, "entities"), kinds(&gb, "entities"));
+    assert_eq!(kinds(&ga, "constraints"), kinds(&gb, "constraints"));
+    // 400 circles at once (perf: one at a time took 50 s).
+    let c = call(&mut ctx, "sketch_create", json!({ "plane": "plane:right" }))["sketch"].as_str().unwrap().to_string();
+    let grid: Vec<Value> = (0..400).map(|i| json!({ "tool": "circle", "points": [[(i % 20) as f64 * 10.0, (i / 20) as f64 * 10.0], [(i % 20) as f64 * 10.0 + 3.0, (i / 20) as f64 * 10.0]] })).collect();
+    let t0 = std::time::Instant::now();
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": c, "shapes": grid }));
+    assert_eq!(r["created"].as_array().unwrap().iter().filter(|e| e["type"] == "circle").count(), 400, "{}", t0.elapsed().as_secs_f64());
+    // An error names the shape.
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": c, "shapes": [{ "tool": "circle", "points": [[0, 0], [1, 0]] }, { "tool": "nope", "points": [[0, 0]] }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("shapes[1].tool"), "{e:?}");
+}
+
+#[test]
+fn variable_studio_table() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("vs.noshape").to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "vs all" }));
+    let n0 = call(&mut ctx, "history_list", json!({}))["history"].as_array().unwrap().len();
+    // Add: the table's last row, then its cells (one edit each).
+    let r = call(&mut ctx, "variable_create", json!({ "tab": "vs all", "name": "width", "value": 40, "description": "Plate width" }));
+    let w = r["variables"][0].clone();
+    assert_eq!((w["name"].as_str(), w["type"].as_str(), w["expression"].as_str(), w["description"].as_str()), (Some("#width"), Some("Length"), Some("40 mm"), Some("Plate width")), "{r}");
+    let hist = call(&mut ctx, "history_list", json!({}))["history"].as_array().unwrap().clone();
+    assert_eq!(hist.len(), n0 + 3, "Add variable, Edit variable, Edit variable description");
+    call(&mut ctx, "variable_create", json!({ "tab": "vs all", "name": "half", "value": "#width / 2" }));
+    call(&mut ctx, "variable_create", json!({ "tab": "vs all", "name": "count", "kind": "NUMBER", "value": 3 }));
+    let l = call(&mut ctx, "variable_list", json!({ "tab": "vs all" }));
+    let rows = l["variables"].as_array().unwrap();
+    assert_eq!(rows.len(), 3, "{l}");
+    assert!(rows[1]["value"].as_str().unwrap().starts_with("20"), "{l}");
+    assert_eq!((rows[2]["type"].as_str(), rows[2]["expression"].as_str()), (Some("Number"), Some("3")), "{l}");
+    // Edit, rename (expressions keep their text, as the table), reorder, delete.
+    call(&mut ctx, "variable_set", json!({ "tab": "vs all", "variable": "#width", "value": "60 mm", "kind": "LENGTH" }));
+    let l = call(&mut ctx, "variable_list", json!({ "tab": "vs all" }));
+    assert!(l["variables"][1]["value"].as_str().unwrap().starts_with("30"), "{l}");
+    call(&mut ctx, "variable_set", json!({ "tab": "vs all", "variable": "count", "name": "n" }));
+    let r = call(&mut ctx, "variable_move", json!({ "tab": "vs all", "variable": "n", "by": -1 }));
+    assert_eq!(r["variables"][1]["name"], "#n", "{r}");
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Move variable up"));
+    let r = call(&mut ctx, "variable_delete", json!({ "tab": "vs all", "variable": "n" }));
+    assert_eq!(r["variables"].as_array().unwrap().len(), 2, "{r}");
+    // Errors name the parameter.
+    let e = try_call(&mut ctx, "variable_create", json!({ "tab": "vs all", "name": "2x", "value": 1 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"), "{e:?}");
+    let e = try_call(&mut ctx, "variable_create", json!({ "tab": "vs all", "name": "half", "value": 1 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"), "{e:?}");
+    let e = try_call(&mut ctx, "variable_set", json!({ "tab": "vs all", "variable": "nope", "value": 1 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("variable"), "{e:?}");
+}
+
+#[test]
+fn drawing_callouts_ordinates_and_datums() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_annot.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let (top, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone())))).unwrap();
+    let (cx, cy, r) = (num(&circle["center"][0]), num(&circle["center"][1]), num(&circle["radius"]));
+    let lines: Vec<Value> = top["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).cloned().collect();
+    let p = |e: &Value, k: &str| [num(&e[k][0]), num(&e[k][1])];
+    let quarter = |e: &Value| [num(&e["a"][0]) * 0.75 + num(&e["b"][0]) * 0.25, num(&e["a"][1]) * 0.75 + num(&e["b"][1]) * 0.25];
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let kind_of = |ctx: &mut Ctx, id: u64| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|a| a["id"] == id).map(|a| a["kind"].as_str().unwrap_or("").to_string()).unwrap_or_default();
+
+    let h = call(&mut ctx, "drawing_hole_callout", json!({ "drawing": tab, "hole": [cx + r, cy], "position": [cx + r + 20.0, cy + 20.0] }));
+    assert!(last(&mut ctx).ends_with(":: Hole callout"));
+    assert_eq!(kind_of(&mut ctx, h["annotation"].as_u64().unwrap()), "HoleCallout");
+    let e = try_call(&mut ctx, "drawing_hole_callout", json!({ "drawing": tab, "hole": [5, 5], "position": [20, 20] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("hole"), "{e:?}");
+
+    let c = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": quarter(&lines[0]), "position": [40, 250], "text": "7", "border": "hexagon" }));
+    assert_eq!(kind_of(&mut ctx, c["annotation"].as_u64().unwrap()), "Balloon");
+    assert!(last(&mut ctx).ends_with(":: Callout"));
+    call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "position": [60, 250], "text": "free" }));
+    assert!(last(&mut ctx).ends_with(":: Callout"));
+
+    // Ordinates from the edge's left end, values along x.
+    let (a0, b0) = (p(&lines[0], "a"), p(&lines[0], "b"));
+    let o = call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "origin": a0, "side": [a0[0], a0[1] - 15.0], "points": [b0, p(&lines[1], "b")] }));
+    assert_eq!(kind_of(&mut ctx, o["annotation"].as_u64().unwrap()), "OrdinateGroup");
+    assert!(last(&mut ctx).ends_with(":: Add to ordinate group"));
+
+    let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
+    assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
+    assert!(last(&mut ctx).ends_with(":: Datum"));
+}

@@ -50,9 +50,6 @@ pub(crate) enum RenameTarget {
     ExplodeStep(usize, usize),
 }
 
-/// Where a feature dialog's preview slider rests (as the Part Studio's: from
-/// there to the right end the feature shows fully, to the left it fades).
-pub(super) const PREVIEW_REST: f32 = 0.7;
 
 pub(crate) struct McSession {
     pub id: MateId,
@@ -82,10 +79,6 @@ pub(crate) struct McSession {
     pub implicit: bool,
     /// Move checked (the X/Y/Z translation and rotation apply).
     pub moving: bool,
-    /// Preview slider (0 before the connector, 1 after; rests at
-    /// [`PREVIEW_REST`]) and its track bounds.
-    pub preview: f32,
-    preview_track: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
     /// Origin type and Rotation axis selects.
     origin_sel: Entity<crate::os_select::OsSelect>,
     axis_sel: Entity<crate::os_select::OsSelect>,
@@ -184,6 +177,10 @@ pub(crate) struct ConfigSession {
     /// The dialog (Tab leaves it past its last control).
     pub focus: FocusHandle,
     pub _subs: Vec<Subscription>,
+    /// Tab stops (live: Configuration, List input 1, d, ?, then the navbar;
+    /// Generate isn't one): the list selects by input id, the ? help link.
+    pub select_focus: HashMap<String, FocusHandle>,
+    pub help_focus: FocusHandle,
 }
 
 /// The Replace instance dialog (live assembly/833–836): the instances to
@@ -269,10 +266,12 @@ impl AssemblyView {
             Some(c) => [text(&c.translation[0]), text(&c.translation[1]), text(&c.translation[2]), text(&c.rotation)],
             None => Default::default(),
         };
-        let phs = ["0 mm", "0 mm", "0 mm", "0 deg"];
+        // Live (qa5 MT5): "0 mm" / "0 deg" are the Move fields' values in
+        // regular text, not placeholders.
+        let zeros = ["0 mm", "0 mm", "0 mm", "0 deg"];
         let inputs: [Entity<InputState>; 4] = std::array::from_fn(|i| {
-            let (t, ph) = (init[i].clone(), phs[i]);
-            cx.new(|cx| InputState::new(window, cx).placeholder(ph).default_value(t))
+            let t = if init[i].trim().is_empty() { zeros[i].to_string() } else { init[i].clone() };
+            cx.new(|cx| InputState::new(window, cx).default_value(t))
         });
         let mut subs = Vec::new();
         for st in &inputs {
@@ -330,8 +329,6 @@ impl AssemblyView {
             extra: existing.as_ref().map(|c| [c.between.clone(), c.primary_axis.clone(), c.secondary_axis.clone()]).unwrap_or_default(),
             implicit: false,
             moving,
-            preview: PREVIEW_REST,
-            preview_track: Default::default(),
             origin_sel,
             axis_sel,
             _subs: subs,
@@ -504,7 +501,7 @@ impl AssemblyView {
                 cx.notify();
             }))
         };
-        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.));
+        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.));
         let icon_tool = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -537,9 +534,18 @@ impl AssemblyView {
             .children(realign_fields.into_iter().flatten())
             .child(check("mcd-move", "Move", moving, |m, v| m.moving = v))
             .when(moving, |d| {
-                d.child(value_row("X translation", &s.inputs[0]))
-                    .child(value_row("Y translation", &s.inputs[1]))
-                    .child(value_row("Z translation", &s.inputs[2]))
+                // Live (qa5/asm-043, MT8): X↘ Y↗ Z↑ axis icons, as the
+                // mate dialog's offsets.
+                let axis_row = |icon: &'static str, st: &Entity<InputState>, cx: &App| {
+                    h_flex()
+                        .w(px(194.))
+                        .h(px(29.))
+                        .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
+                        .child(gpui_kit::base::input::input_frame(div().w(px(168.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))))
+                };
+                d.child(axis_row("xyz-along-x", &s.inputs[0], cx))
+                    .child(axis_row("xyz-along-y", &s.inputs[1], cx))
+                    .child(axis_row("xyz-along-z", &s.inputs[2], cx))
                     .child(div().id("mcd-rot-axis-tt").w(px(194.)).h(px(28.)).tooltip(crate::ui::tooltip("Rotation axis")).child(s.axis_sel.clone()))
                     .child(value_row("Rotation angle", &s.inputs[3]))
             })
@@ -561,11 +567,10 @@ impl AssemblyView {
                         cx.notify();
                     })))
                     .child(div().flex_1())
-                    // Live: the standalone dialog's `?` sits on the preview
-                    // slider row (dom/dialog-mate-connector.txt).
-                    .when(implicit, |d| d.child(div().mr(px(4.)).child(super::props::help_dot()))),
-            )
-            .when(!implicit, |d| d.child(self.render_mc_preview_slider(cx)));
+                    // Live (qa5/asm-043, MT8): no preview slider; the `?` on
+                    // the flip row.
+                    .child(div().mr(px(4.)).child(super::props::help_dot())),
+            );
         let title = if implicit { "Mate connector".to_string() } else { s.name.clone() };
         let ok = s.on.is_some();
         let header = h_flex()
@@ -628,64 +633,6 @@ impl AssemblyView {
             .into_any_element()
     }
 
-    /// The connector dialog's preview slider (a feature dialog's: 112 px,
-    /// 2 px `#777` track, 11 px white handle ringed `#888`) and `?`.
-    fn render_mc_preview_slider(&self, cx: &mut Context<Self>) -> AnyElement {
-        const W: f32 = 112.;
-        const HANDLE: f32 = 11.;
-        let Some(s) = &self.mc else { return div().into_any_element() };
-        let (value, track) = (s.preview, s.preview_track.clone());
-        let probe = track.clone();
-        let set = move |this: &mut Self, x: Pixels, cx: &mut Context<Self>| {
-            let b = track.get();
-            let v = (f32::from(x - b.left()) / f32::from(b.size.width).max(1.)).clamp(0., 1.);
-            if let Some(m) = this.mc.as_mut().filter(|m| (m.preview - v).abs() > f32::EPSILON) {
-                m.preview = v;
-                this.refresh_scene(false, cx);
-                cx.notify();
-            }
-        };
-        let set2 = set.clone();
-        h_flex()
-            .h(px(22.))
-            .pl(px(7.))
-            .pr(px(4.))
-            .child(
-                div()
-                    .id("mcd-preview")
-                    .relative()
-                    .w(px(W))
-                    .h(px(HANDLE + 2.))
-                    .flex_none()
-                    .cursor_pointer()
-                    .child(div().absolute().left_0().right_0().top(px((HANDLE + 2.) * 0.5 - 1.)).h(px(2.)).bg(rgb(0x777777)))
-                    .child(
-                        div()
-                            .absolute()
-                            .top(px(1.))
-                            .left(px(value * W - HANDLE * 0.5))
-                            .size(px(HANDLE))
-                            .rounded_full()
-                            .bg(rgb(0xffffff))
-                            .border_1()
-                            .border_color(rgb(0x888888))
-                            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(1.5), spread_radius: px(0.), inset: false }]),
-                    )
-                    .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| {
-                        cx.stop_propagation();
-                        set(this, e.position.x, cx);
-                    }))
-                    .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
-                        if e.pressed_button == Some(MouseButton::Left) && !cx.has_active_drag() {
-                            set2(this, e.position.x, cx);
-                        }
-                    })),
-            )
-            .child(div().flex_1())
-            .child(super::props::help_dot())
-            .into_any_element()
-    }
 
     // ------------------------------------------------------------ list rows
 
@@ -817,6 +764,36 @@ impl AssemblyView {
             fill_menu(menu, entries, view.clone(), window, cx)
         })
         .into_any_element()
+    }
+
+    /// A new pattern whose dialog can't make it yet (live qa5 A19: an empty
+    /// Replicate is listed red, "Replicate 1", with an error badge).
+    pub(super) fn pending_pattern_row(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let s = self.pattern.as_ref().filter(|s| s.editing.is_none())?;
+        let Err(e) = self.pattern_from_session(s, cx) else { return None };
+        let pal = p();
+        let icon = match s.kind {
+            PatternDialogKind::Linear | PatternDialogKind::PartPattern => "linear-pattern",
+            PatternDialogKind::Circular => "circular-pattern",
+            PatternDialogKind::Mirror => "mirror",
+            PatternDialogKind::Replicate => "replicate",
+        };
+        Some(
+            h_flex()
+                .id("pat-pending")
+                .h(px(24.))
+                .pl(px(6.))
+                .pr_1()
+                .gap_1p5()
+                .text_sm()
+                .text_color(pal.error)
+                .bg(pal.accent_soft)
+                .child(div().w(px(12.)))
+                .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
+                .child(div().flex_1().truncate().child(s.name.clone()))
+                .child(div().id("pat-pending-err").size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx)))
+                .into_any_element(),
+        )
     }
 
     pub(super) fn pattern_row(&self, pat: &InstancePattern, error: Option<String>, cx: &mut Context<Self>) -> AnyElement {
@@ -1190,7 +1167,7 @@ impl AssemblyView {
                     cx.notify();
                 }))
         };
-        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.));
+        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.));
         let mut body = v_flex().pb(px(2.)).child(div().px(px(3.)).pt(px(5.)).child(instances));
         let (opposite, equal, centered, second) = (s.opposite, s.equal, s.centered, s.second);
         match kind {
@@ -1324,7 +1301,8 @@ impl AssemblyView {
                         })
                         .collect();
                     let active = s.active == Some(2);
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box("rep-parts", "Parts to find match in", active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    // Live (qa5 A19): empty, the field is red (label and border).
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box("rep-parts", "Parts to find match in", active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid).border_color(pal.error)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }
@@ -1369,7 +1347,7 @@ impl AssemblyView {
                             .justify_center()
                             .bg(if valid { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
-                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                            .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if valid {
                                     this.accept_pattern(cx);
@@ -1981,6 +1959,7 @@ impl AssemblyView {
                 texts.push((inp.id.clone(), cx.new(|cx| InputState::new(window, cx).default_value(cur))));
             }
         }
+        let select_focus: HashMap<String, FocusHandle> = inputs.iter().filter(|i| matches!(i.kind, ConfigInputKind::List { .. })).map(|i| (i.id.clone(), cx.focus_handle().tab_stop(true))).collect();
         // Live: a value is committed with the workspace unit ("25" → "25 mm")
         // when the field loses focus or on Enter, and makes Generate active.
         let mut subs = Vec::new();
@@ -1997,7 +1976,7 @@ impl AssemblyView {
                 InputEvent::Focus => {}
             }));
         }
-        self.config_panel = Some(ConfigSession { instance: top, inputs, values, texts, generate: false, focus: cx.focus_handle(), _subs: subs });
+        self.config_panel = Some(ConfigSession { instance: top, inputs, values, texts, generate: false, focus: cx.focus_handle(), _subs: subs, select_focus, help_focus: cx.focus_handle().tab_stop(true) });
         cx.notify();
     }
 
@@ -2068,6 +2047,8 @@ impl AssemblyView {
         let inputs = s.inputs.clone();
         // Read before `insert_config_button` borrows the view mutably.
         let focus = s.focus.clone();
+        let help_focus = s.help_focus.clone();
+        let select_focus = s.select_focus.clone();
         let name = self.assembly(cx).and_then(|a| a.instance(s.instance).map(|i| i.name.clone())).unwrap_or_default();
         let mut body = v_flex().pt(px(3.)).pb(px(4.));
         // Visibility conditions: hidden inputs and options don't show.
@@ -2084,7 +2065,8 @@ impl AssemblyView {
                     let opts: Vec<_> = options.iter().filter(|o| vis.options.contains(&o.id)).cloned().collect();
                     let at = opts.iter().position(|o| o.id == cur).unwrap_or(0);
                     let (v, ids) = (view.clone(), opts.iter().map(|o| o.id.clone()).collect::<Vec<_>>());
-                    let select = os::select_field(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, move |i, _, cx| {
+                    let focus = select_focus.get(&inp.id).cloned().unwrap_or_else(|| cx.focus_handle());
+                    let select = os::select_field_focusable(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, &focus, move |i, _, cx| {
                         let (id, oid) = (id.clone(), ids.get(i).cloned().unwrap_or_default());
                         v.update(cx, |this, cx| {
                             if let Some(s) = &mut this.config_panel {
@@ -2108,7 +2090,7 @@ impl AssemblyView {
                 }
                 ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. } => {
                     if let Some((_, st)) = s.texts.iter().find(|(k, _)| *k == inp.id) {
-                        body = body.child(os::param_row(inp.name.clone(), crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.)));
+                        body = body.child(os::param_row(inp.name.clone(), crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)));
                     }
                 }
             }
@@ -2164,6 +2146,8 @@ impl AssemblyView {
             div().pl(px(48.)).py(px(4.)).child(
                 div()
                     .id("cfg-generate")
+                    // Live: a white button.
+                    .bg(gpui_kit::rgb(0xffffff))
                     .w(px(80.))
                     .h(px(28.))
                     .flex()
@@ -2229,7 +2213,7 @@ impl AssemblyView {
                             .bg(pal.accept)
                             .hover(|d| d.bg(gpui_kit::rgb(0x74ce3a)))
                             .cursor_pointer()
-                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                            .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_config(cx))),
                     )
                     .child(
@@ -2249,7 +2233,7 @@ impl AssemblyView {
                     ),
             )
             .child(list)
-            .child(h_flex().h(px(26.)).flex_none().justify_end().px(px(6.)).bg(pal.panel).border_t_1().border_color(pal.border).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")))
+            .child(h_flex().h(px(26.)).flex_none().justify_end().px(px(6.)).bg(pal.panel).border_t_1().border_color(pal.border).child(div().id("cfg-help").track_focus(&help_focus).focus(|s| s.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }])).size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")))
             .into_any_element()
     }
 
@@ -3178,7 +3162,7 @@ impl AssemblyView {
             body = body.child(div().mx(px(3.)).my(px(4.)).child(crate::os_ui::query_box("se-direction", if rotation { "Axis" } else { "Direction" }, active == 1, dir_rows).on_click(Self::step_edit_activate(1, cx))));
         }
         body = body
-            .child(crate::os_ui::param_row(if rotation { "Rotation angle" } else { "Distance" }, gpui_kit::base::input::input_frame(div().w(px(110.)).child(crate::os_ui::input_h(Input::new(&value).appearance(false).text_size(px(13.33)).text_right(), 25.)))))
+            .child(crate::os_ui::param_row(if rotation { "Rotation angle" } else { "Distance" }, gpui_kit::base::input::input_frame(div().w(px(110.)).child(crate::os_ui::input_h(Input::new(&value).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)))))
             .child(crate::os_ui::checkbox("se-lines", "Explode lines", lines).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(s) = &mut this.step_edit {
                     s.lines = !s.lines;
@@ -3238,36 +3222,14 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ replace with geometric matching
 
-    /// Replace instances, then re-point mates whose geometry names do not
-    /// exist on the replacement to geometrically matching faces / edges.
-    pub(super) fn replace_with_matching(&mut self, id: InstanceId, all: bool, source: InstanceSource, base: String, old: Arc<AssemblyResult>, cx: &mut Context<Self>) {
-        let evaluator = self.evaluator.clone();
-        let doc = self.doc.read(cx).session.doc.clone();
-        let (studio, body, config) = match &source {
-            InstanceSource::Part { studio, body, config } => (Some(*studio), Some(body.clone()), config.clone()),
-            InstanceSource::PartStudio { studio, config } => (Some(*studio), None, config.clone()),
-            _ => (None, None, ConfigValues::default()),
-        };
-        cx.spawn(async move |this, cx| {
-            let ctx = match studio {
-                Some(t) => cx.background_spawn(async move { evaluator.lock().studio(&doc, t, &config).map(|r| r.context.clone()) }).await,
-                None => None,
-            };
-            let _ = this.update(cx, |this: &mut Self, cx| {
-                let r = this.edit(&format!("Replace instance : {base}"), cx, |a| {
-                    let ids = a.replace_instance(id, source, &base, all);
-                    let n = ctx.as_ref().map(|c| analysis::remap_replaced(a, &ids, &old, c, body.as_ref())).unwrap_or(0);
-                    (ids.len(), n)
-                });
-                let (count, remapped) = r.unwrap_or((0, 0));
-                this.message = Some((
-                    false,
-                    if remapped > 0 { format!("Replaced {count} instance(s); {remapped} mate reference(s) matched to the nearest geometry of the same type.") } else { format!("Replaced {count} instance(s); mates are kept where the new geometry has the same names.") },
-                ));
-                cx.notify();
-            });
-        })
-        .detach();
+    /// Replace instances. Mates keep their references: on a replacement
+    /// without the same geometry names they fail ("Mate cannot resolve mate
+    /// connectors.", live qa5 MT9), they are not re-pointed elsewhere.
+    pub(super) fn replace_with_matching(&mut self, id: InstanceId, all: bool, source: InstanceSource, base: String, _old: Arc<AssemblyResult>, cx: &mut Context<Self>) {
+        self.edit(&format!("Replace instance : {base}"), cx, |a| {
+            a.replace_instance(id, source, &base, all);
+        });
+        cx.notify();
     }
 }
 

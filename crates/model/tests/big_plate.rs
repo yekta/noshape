@@ -103,7 +103,7 @@ fn plate_with_400_holes_regenerates_like_onshape() {
     let (r, _) = s.regen();
     let holes: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s2).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s2, key: g.key.clone() }).collect();
     assert_eq!(holes.len(), 400);
-    s.add("extrude", &[("entities", q(holes)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE"))]);
+    s.add("extrude", &[("entities", q(holes)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
     let (r, t_holes) = s.regen();
     let v = |r: &RegenResult| part(r).shape.volume().unwrap() * 1e9;
     let faces = |r: &RegenResult| part(r).shape.count(noshape_kernel::ShapeType::Face);

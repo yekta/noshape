@@ -2136,6 +2136,53 @@ fn body_under_finds_the_part_on_the_line_of_sight() {
     let b = src.context.bodies.iter().find(|b| b.kind == crate::display::BodyKind::Solid).unwrap();
     let bb = b.shape.bounding_box(false).unwrap();
     let mid = frame.project((bb.min + bb.max) * 0.5);
-    assert_eq!(views::body_under(src, &frame, mid), Some(b.id.clone()));
-    assert_eq!(views::body_under(src, &frame, [mid[0] + 10.0, mid[1]]), None);
+    assert_eq!(views::body_under(src, &frame, mid, 0.0), Some(b.id.clone()));
+    assert_eq!(views::body_under(src, &frame, [mid[0] + 10.0, mid[1]], 0.0), None);
+    // Just beside the silhouette, within the pick tolerance.
+    let right = frame.project(bb.min).into_iter().zip(frame.project(bb.max)).map(|(a, b)| a.max(b)).next().unwrap();
+    assert_eq!(views::body_under(src, &frame, [right + 2e-4, mid[1]], 0.0), None);
+    assert_eq!(views::body_under(src, &frame, [right + 2e-4, mid[1]], 5e-4), Some(b.id.clone()));
+}
+
+/// qa5 D18: the drawing BOM merges rows like the assembly BOM: instances
+/// of a part in the same configuration (values compared as numbers, a
+/// value equal to the default counts as the default) share one row.
+#[test]
+fn drawing_bom_merges_instances_in_the_same_configuration() {
+    use crate::assembly::InstanceSource;
+    use crate::configuration::{ConfigInput, ConfigInputKind, VariableKind};
+    let (mut doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    let studio = studio_tab(&doc);
+    if let TabContent::PartStudio(ps) = &mut doc.tabs.iter_mut().find(|t| t.id == studio).unwrap().content {
+        ps.configuration.inputs.push(ConfigInput {
+            id: "d".into(),
+            name: "d".into(),
+            kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: noshape_units::ExprValue::new("10mm"), min: None, max: None },
+            visible_when: None,
+            excluded: false,
+        });
+    }
+    let before = |doc: &crate::Document| {
+        let mut drawing = Drawing::default();
+        drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Isometric, [150.0, 160.0]));
+        let sources = regenerate_sources(doc, &drawing);
+        sources[&SourceKey::studio(asm)].bom.iter().map(|r| (r.name.clone(), r.quantity)).collect::<Vec<_>>()
+    };
+    let rows = before(&doc);
+    let Some(TabContent::Assembly(a)) = doc.tabs.iter_mut().find(|t| t.id == asm).map(|t| &mut t.content) else { panic!() };
+    let i = a.instances.iter().position(|i| matches!(&i.source, InstanceSource::Part { studio: s, .. } if *s == studio)).expect("a part instance");
+    let next = a.instances.iter().map(|i| i.id.0).max().unwrap() + 1;
+    for (k, value) in ["10 mm", "0.01 m"].into_iter().enumerate() {
+        let mut copy = a.instances[i].clone();
+        copy.id = crate::assembly::InstanceId(next + k as u64);
+        if let InstanceSource::Part { config, .. } = &mut copy.source {
+            config.0.insert("d".into(), value.into());
+        }
+        a.instances.push(copy);
+    }
+    let after = before(&doc);
+    assert_eq!(after.len(), rows.len(), "{rows:?} -> {after:?}");
+    let grew: Vec<_> = rows.iter().zip(&after).filter(|(a, b)| b.1 == a.1 + 2).collect();
+    assert_eq!(grew.len(), 1, "{rows:?} -> {after:?}");
 }

@@ -46,3 +46,20 @@ Findings: **IM1** (kern/fs) PVZ part names; **IM2** (kern) Parasolid imports of 
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 All 106 imports (impmatrix7.log) are identical to the 14:36 CLI run: I1 (g25-b SAT 7585.978524 / STEP 7582.713024 / X_T 7583.000869), IM1 (PVZ part names, no RootAssembly/BOM), IM2 (ktane 19377.868698 etc.), IM3 (zip: "Root assembly file not found") ✗ still.
+
+## Re-run pass 12 (2026-10-22 ~01:35, CLI /tmp/qa5/noshape-cli-0107 = target-engine 01:07; main still 5bd50b2)
+All 106 earlier samples re-imported (/root/qa5-scratch/pass3/impmatrix12.py → impmatrix12.log/json); 104 rows identical to pass 7.
+| Row | Ours | Status |
+|---|---|---|
+| IM3 zips (g39-rule-unique-parts.zip, g47-3parts-unique.zip) | import returns errors ["g39-rule-unique-parts.zip was not translated. Translation is not supported for STEP (.stp) files."] (= live's notification text) and creates a **File tab** named after the zip, no parts | ✅ **fixed** (UI toast "…uploaded but failed to translate. Open document ×" not checked) |
+| IM1 PVZ (part names, RootAssembly + BOM tabs) | unchanged | ✗ still |
+| IM2 Parasolid volumes (ktane, Bell Crank, McMaster, fluxpad, g26) | unchanged | ✗ still |
+| I1 g25-b SAT/STEP/X_T | unchanged | ✗ still |
+| New g48-ap203 / ap214 / inch .step (g47 3 cubes) | 3 × 1000, 6 faces each, listed Part 3, 2, 1 | ✅ volumes (order as g47, ?) |
+| New g48-types.step (live 22595.3688587902, 15 faces) | 22595.371166, 15 | ✗ IM2-type (+0.0023) |
+| New g48-two.step (live Part 1 22595.3688587902 + Part 2 1000) | 22595.371166 + 1000 | ✗ IM2-type (+0.0023) |
+| New g48-surface.step | "Surface 1", 1 face | ✅ |
+| New g49-chamfer2.x_t (live 44789.85021254086) | 44789.972897, 10 faces | ✗ IM2 (+0.123) |
+| New g49-chamfer1.x_t (live 44833.437797237995) | 44833.53007, 10 faces | ✗ IM2 (+0.092) |
+| New g50-reorder-shell1.x_t (live 5990.51958739, 20 faces) | 5990.523086, 20 | ✗ IM2-type (+0.0035) |
+| New **g50-g46-shell1.x_t** (live 6052.69679568 mm³, 21 faces, area 12258.75 mm², part ~50×30×30 mm) | 21 faces but **volume 3720.632966, area 11691.098, bounding box 0..37350.68 × 0..23719.42 × 0..334.71 mm** (a face/edge is evaluated metres away: the 2 "OTHER" blend patches?) | ✗ **IM4** (kern, severe: corrupt import) |

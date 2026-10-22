@@ -140,6 +140,9 @@ pub struct SheetGeometry {
     /// (dimensions), and their elements (`cad_objects`).
     pub cad_objects: Vec<super::cad_objects::CadObject>,
     pub cad_members: Vec<super::cad_objects::CadMember>,
+    /// The projected edges of each view (its range of `lines`): a shaded
+    /// view shows its picture instead, except while hovered or selected.
+    pub view_edges: Vec<(super::ViewId, std::ops::Range<usize>)>,
 }
 
 /// Chamfer dimension settings (Drawing properties › Dimensions › Chamfer).
@@ -879,6 +882,8 @@ impl SheetGeometry {
         let m = self.mark();
         let text = n.to_string();
         let w = (text.chars().count() as f64 * h * 0.7).max(h);
+        // Border size: at least that many characters wide (as callouts).
+        let w = if style.chars == 0 { w } else { w.max(style.chars as f64 * h * 0.6) };
         let (rx, ry) = (w * 0.5 + border, h * 0.5 + border);
         let c = [at[0] - rx - 0.8, at[1]];
         let ring = |rx: f64, ry: f64| -> Vec<[f64; 2]> { (0..32).map(|i| {
@@ -2325,7 +2330,7 @@ pub trait AnnotationEnv {
     }
     /// Inspection item bubbles' look, None while hidden.
     fn inspection_style(&self) -> Option<InspectionStyle> {
-        Some(InspectionStyle { shape: super::InspectionShape::Circle, text_height: 2.5, border: 1.2, color: None, solid: false, font: None })
+        Some(InspectionStyle { shape: super::InspectionShape::Circle, text_height: 2.5, border: 1.2, chars: 2, color: None, solid: false, font: None })
     }
     /// Weld symbols follow ANSI (else ISO).
     fn weld_ansi(&self) -> bool {
@@ -2408,6 +2413,8 @@ pub struct InspectionStyle {
     pub shape: super::InspectionShape,
     pub text_height: f64,
     pub border: f64,
+    /// Border size in characters (0: Tight Fit).
+    pub chars: u8,
     pub color: Option<[u8; 3]>,
     pub solid: bool,
     pub font: Option<TextFont>,

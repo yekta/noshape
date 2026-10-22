@@ -111,6 +111,8 @@ pub struct EvalCtx<'a> {
     /// Read-only parameter values the feature computed (see
     /// [`crate::display::FeatureState::computed`]).
     pub computed: Vec<(String, crate::display::ComputedValue)>,
+    /// See [`crate::display::FeatureState::touched`].
+    pub touched: Vec<BodyId>,
     /// Sketch being edited (for display of constraint states).
     pub editing_sketch: Option<FeatureId>,
     /// Other Part Studios of the document (for Derived).
@@ -211,7 +213,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None, cancel: None }
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), touched: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None, cancel: None }
     }
 
     /// The run was aborted (a newer edit made it stale): stop and return
@@ -272,7 +274,12 @@ impl<'a> EvalCtx<'a> {
         let scope_outer = ContextScope(self.outer_vars);
         let scope = LayeredScope { inner: &scope_inner, outer: &scope_outer };
         let expr = e.parse().map_err(|x| FeatureError::new(format!("{}: {x}", e.text)))?;
-        let q = noshape_units::evaluate_expr_as(&expr, kind.dim(), self.units, &scope).map_err(|x| FeatureError::new(format!("{}: {x}", e.text)))?;
+        let q = noshape_units::evaluate_expr_as(&expr, kind.dim(), self.units, &scope).map_err(|x| match x {
+            // Onshape's message (live qa5 pass 8: a Variable moved below the
+            // feature using it).
+            noshape_units::EvalError::UndefinedVariable(_) => FeatureError::new("Variable not found, is suppressed, or has not been set."),
+            x => FeatureError::new(format!("{}: {x}", e.text)),
+        })?;
         Ok(q.value)
     }
 
@@ -677,6 +684,12 @@ impl<'a> EvalCtx<'a> {
         if tools.is_empty() {
             return err("Nothing was created");
         }
+        // The parts the tool touches, for the dialog's boolean heuristics
+        // (booleanHeuristics.fs `autoSelectionForBooleanStep`).
+        if kind == BodyKind::Solid && tools.len() <= 8 {
+            let t = self.auto_scope(&tools);
+            self.touched = t.iter().map(|&i| self.ctx.bodies[i].id.clone()).collect();
+        }
         match op {
             "NEW" => {
                 // Tools that touch are merged into one part (like Onshape).
@@ -687,13 +700,17 @@ impl<'a> EvalCtx<'a> {
                 Ok(())
             }
             "ADD" | "REMOVE" | "INTERSECT" => {
+                // Onshape (booleanStepScopePredicate): the merge scope is
+                // required unless "Merge with all" is on (live qa5 BOOL4:
+                // "No merge scope selected.").
                 let targets = match scope {
                     Some(s) if !s.is_empty() => s,
+                    _ if kind == BodyKind::Solid => return err_at(&["booleanScope"], "No merge scope selected."),
                     _ => self.auto_scope(&tools),
                 };
                 if targets.is_empty() {
                     if op == "ADD" {
-                        // Nothing to merge with: behave like New (Onshape's auto heuristic).
+                        // Surfaces with nothing to merge with: new surfaces.
                         for (i, t) in tools.into_iter().enumerate() {
                             self.add_new_bodies(t, kind, i as u32)?;
                         }
@@ -765,6 +782,12 @@ impl<'a> EvalCtx<'a> {
 
     /// [`Self::boolean_into`] with explicit boolean options.
     pub fn boolean_into_with(&mut self, targets: &[usize], tools: Vec<NamedShape>, op: k::BooleanOp, opts: &k::BooleanOptions) -> FResult<()> {
+        // Onshape adds into several parts as one union: the tool and every
+        // part in the merge scope become one part (qa5 BOOL3), not a copy of
+        // the tool fused into each part.
+        if op == k::BooleanOp::Fuse && targets.len() > 1 {
+            return self.fuse_targets(targets, tools, opts);
+        }
         let tool_shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
         let mut new_bodies: Vec<(usize, Vec<Body>)> = Vec::new();
         for &ti in targets {
@@ -862,6 +885,79 @@ impl<'a> EvalCtx<'a> {
         Ok(())
     }
 
+    /// One union of the bodies `targets` and `tools`. Each resulting piece
+    /// keeps the id, name and colour of the first target (in `targets`
+    /// order) whose faces it holds; a target merged into an earlier one's
+    /// piece goes, and a piece holding no target is a new part. Disjoint
+    /// targets stay separate parts with their own identity (live: a Boolean
+    /// union of parts apart leaves both, qa5 BOOL1).
+    pub fn fuse_targets(&mut self, targets: &[usize], tools: Vec<NamedShape>, opts: &k::BooleanOptions) -> FResult<()> {
+        let mut targets: Vec<usize> = targets.to_vec();
+        targets.dedup();
+        let bodies: Vec<Arc<Body>> = targets.iter().map(|&ti| self.ctx.bodies[ti].clone()).collect();
+        let mut shapes: Vec<Shape> = bodies.iter().map(|b| b.shape.clone()).collect();
+        shapes.extend(tools.iter().map(|t| t.shape.clone()));
+        if shapes.len() < 2 {
+            return Ok(());
+        }
+        let run = || k::boolean(k::BooleanOp::Fuse, &shapes[..1], &shapes[1..], opts);
+        let res = match &self.cancel {
+            Some(c) => c.scope(run),
+            None => run(),
+        }?;
+        let mut args: Vec<ShapeNames> = bodies.iter().map(|b| b.shape_names()).collect();
+        args.extend(tools.iter().map(|t| t.names.clone()));
+        let arg_refs: Vec<&ShapeNames> = args.iter().collect();
+        let face_names = self.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
+        let unified = k::unify_same_domain(&res.shape)?;
+        let (shape, face_names) = if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
+            let before = names_for(&res.shape, face_names);
+            let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
+            (unified.shape, names)
+        } else {
+            (res.shape, face_names)
+        };
+        let pieces = split_solids(&shape, &face_names);
+        // Which target each piece holds first (by its faces' original names).
+        let roots: Vec<std::collections::HashSet<&TopoName>> = bodies.iter().map(|b| b.faces.iter().map(|n| n.root()).collect()).collect();
+        let mut owned: Vec<(usize, NamedShape)> = Vec::new();
+        let mut free: Vec<NamedShape> = Vec::new();
+        for p in pieces.into_iter().filter(|p| p.shape.count(ShapeType::Face) > 0) {
+            let owner = (0..bodies.len()).find(|&t| !owned.iter().any(|(o, _)| *o == t) && p.names.faces.iter().any(|n| roots[t].contains(n.root())));
+            match owner {
+                Some(t) => owned.push((t, p)),
+                None => free.push(p),
+            }
+        }
+        // Each kept part stays in its place in the list; merged ones go; new
+        // pieces follow the first kept part.
+        let mut replaced: BTreeMap<usize, Arc<Body>> = BTreeMap::new();
+        for (t, p) in owned {
+            let b = &bodies[t];
+            replaced.insert(targets[t], Arc::new(Body::new(b.id.clone(), b.name.clone(), b.kind, p.shape, p.names.faces, b.color, self.feature)));
+        }
+        let (kind, color) = (bodies[0].kind, bodies[0].color);
+        let mut extra: Vec<Arc<Body>> = Vec::new();
+        for (j, p) in free.into_iter().enumerate() {
+            let name = self.ctx.alloc_part_name(kind);
+            extra.push(Arc::new(Body::new(BodyId { feature: self.feature, index: 30_000 + j as u32 }, name, kind, p.shape, p.names.faces, color, self.feature)));
+        }
+        let first_kept = replaced.keys().next().copied();
+        let old = std::mem::take(&mut self.ctx.bodies);
+        for (i, b) in old.into_iter().enumerate() {
+            if let Some(nb) = replaced.remove(&i) {
+                self.ctx.bodies.push(nb);
+                if Some(i) == first_kept {
+                    self.ctx.bodies.append(&mut extra);
+                }
+            } else if !targets.contains(&i) {
+                self.ctx.bodies.push(b);
+            }
+        }
+        self.ctx.bodies.append(&mut extra);
+        Ok(())
+    }
+
     /// Replace a body's shape after a local operation (fillet, shell...).
     pub fn replace_body(&mut self, bi: usize, shape: Shape, faces: Vec<Name>) {
         let old = self.ctx.bodies[bi].clone();
@@ -912,8 +1008,16 @@ pub fn split_solids(shape: &Shape, face_names: &[Name]) -> Vec<NamedShape> {
     let parts: Vec<Shape> = if !solids.is_empty() {
         solids
     } else if shape.shape_type() == ShapeType::Compound {
-        let shells = shape.shells();
-        if shells.is_empty() { vec![shape.clone()] } else { shells }
+        let mut shells = shape.shells();
+        if shells.is_empty() {
+            vec![shape.clone()]
+        } else {
+            // Faces in no shell (a sheet that touched nothing) are pieces too.
+            let shelled: Vec<Shape> = shells.iter().flat_map(|s| s.faces()).collect();
+            let loose: Vec<Shape> = shape.faces().into_iter().filter(|f| !shelled.iter().any(|g| g.is_same(f))).collect();
+            shells.extend(loose);
+            shells
+        }
     } else {
         vec![shape.clone()]
     };

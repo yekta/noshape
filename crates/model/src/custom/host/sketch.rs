@@ -284,11 +284,16 @@ fn sk_arc(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 }
 
 /// Font family and style for an Onshape font file name
-/// ("OpenSans-BoldItalic.ttf"): serif / mono families map to Liberation
-/// Serif / Mono, everything else to Liberation Sans.
+/// ("OpenSans-BoldItalic.ttf"): a Text tool font when it is one, else serif /
+/// mono families map to Liberation Serif / Mono, everything else to
+/// Liberation Sans.
 fn font_of(name: &str) -> (&'static str, bool, bool) {
     let n = name.to_ascii_lowercase();
-    let family = if ["serif", "slab", "tinos", "times", "georgia"].iter().any(|s| n.contains(s)) && !n.contains("sans") {
+    // A Text tool font by its file name ("OpenSans-Bold.ttf"), else the
+    // closest Liberation family.
+    let family = if let Some(f) = noshape_sketch::text::sketch_font_of_file(name) {
+        f
+    } else if ["serif", "slab", "tinos", "times", "georgia"].iter().any(|s| n.contains(s)) && !n.contains("sans") {
         "Liberation Serif"
     } else if ["mono", "cousine", "courier", "code"].iter().any(|s| n.contains(s)) {
         "Liberation Mono"

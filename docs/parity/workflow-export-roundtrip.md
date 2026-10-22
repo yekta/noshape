@@ -26,3 +26,8 @@ Status: ✅ exact / expected, ✗ broken, ? live comparison pending.
 | EXP2 OBJ round trip | 72076 B, re-imports as mesh 67196.546728, 1 face | ✅ **fixed** |
 | EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS" | ✗ still |
 | other nine formats | unchanged (exact or mesh) | ✅ |
+
+## Re-run pass 12 (2026-10-22 ~01:35, CLI /tmp/qa5/noshape-cli-0107 = target-engine 01:07; main still 5bd50b2)
+| Row | Ours | Status |
+|---|---|---|
+| EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT (scripts/build-opennurbs.sh)" | ✗ still (the engine build has no openNURBS) |

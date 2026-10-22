@@ -568,3 +568,38 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   drawing_section_detail_views_and_annotations). NEXT: switch the app's tool_click (drawing_tools.rs) and
   extra_tool_click (drawing_extra.rs) to commit.rs (asb's files, one at a time) + note in drawing-behaviour.md;
   then notes/callouts/centermarks/datums/GD&T/surface finish/weld/hole callout/ordinate ops; then live mode.
+- 2026-10-22 ~02:05 (api): after "freeze lifted" (main 5bd50b2):
+  * assembly_view.rs switch done (Suppress mate, Group commit; unused acfg/ConfigTarget/ParamValue/Group imports
+    removed). All planned app switches are now in: menus.rs, behaviors.rs, assembly_panels.rs,
+    assembly_interference.rs, assembly_view.rs, drawing_tools.rs, drawing_extra.rs (drw5/apply_*.py).
+    Notes in part-studio-behaviour.md, assembly-behaviour.md, drawing-behaviour.md.
+  * sketch_draw `shapes`: many shapes in one edit (perf: 400 circles one call at a time took 50 s); each shape is
+    drawn by a fresh editor exactly as its own call; e2e sketch_draw_many_shapes_in_one_edit (same entities and
+    constraints as separate calls; 400 circles).
+  * Variable Studio variables (qa5 wf22): variable_list/create/set/delete/move take a Variable Studio `tab`; shared
+    edits in crates/ops/src/variable_studio.rs (the app's table cells, same history text). e2e variable_studio_table.
+    App switch of crates/app/src/variable_studio.rs (ui2's) to ops::variable_studio still to do.
+  * LIVE MODE: crates/ops/src/live.rs (discovery file <temp>/noshape-live/<fnv(path)>.json {port, token, pid}; TCP
+    127.0.0.1; one JSON line each way; registry::run forwards via live::forward unless ctx.serving; Ctx gains
+    live/serving/set_live/unset_live/adopt/get_mut). App: crates/app/src/live_server.rs (serve(doc) from
+    files.rs open_session_window; runs each call on the window's session by swapping it with a placeholder session
+    adopted in a serving Ctx; emits Reloaded + HistoryChanged after mutating ops). Test crates/ops/tests/live.rs.
+    Docs: AGENT_API.md "Live mode". NEXT: in-app check (open a doc in the app, CLI edit, screenshot, Ctrl+Z undoes).
+  * Fresh CLI for qa5: /root/target-engine/debug/noshape-cli (01:07) and /root/api-scratch/bin/noshape-cli.
+  * ~03:20 IN-APP VERIFIED (Xvfb :114, build 02:21): live mode (CLI sketch + extrude appear in the open window;
+    Ctrl+Z in the app undoes the CLI's extrude; CLI history_list via the app shows the undo); part Properties › Save
+    ("Part Studio 1 :: Properties : Base plate"); drawing Virtual sharp (hover + commit, "Drawing 1 :: Virtual
+    sharp"); assembly Suppress mate ("Assembly 1 :: Suppress mate"). Screens in /root/api-scratch/livedemo/.
+    FOUND (psb, not mine): parts list Rename panics in debug builds ("hover style already set",
+    part_studio/mod.rs render_part_row: tree_row() sets hover when !selected, then .when(renaming, .hover(..)));
+    fix: tree_row(id, selected || renaming) and drop the second .hover. Reported to the lead.
+    live.rs: serve() removes stale discovery files / spare sessions of apps that are gone (killed apps run no
+    destructors); spare session path = live::spare_path() (<pid>-<token>.noshape).
+  * ~03:30 variable_studio.rs (ui2) switched to ops::variable_studio (apply: /root/api-scratch/vs/apply.py);
+    unused VariableDef/ExprValue imports removed; app clippy: nothing from it (one foreign lint:
+    drawing_drawprops.rs:165). Note in theme-studios.md.
+    NEXT: drawing slice 6 tools (note, callout, centermark, datum, GD&T, surface finish, weld, hole callout,
+    ordinate) as API ops on the shared pending_annotation builders; aux view In line / Axis modes.
+  * ~03:55 VS switch IN-APP VERIFIED (build 03:39, Xvfb :114, /root/api-scratch/vsdemo/v*.png): Add variable (name row ->
+    Length 0 mm), Value "40" -> "40 mm", Description, second Add, Rename, Type -> Number (value turns red), row
+    menu Move up / Move down / Delete, Ctrl+Z restores the row; history texts as before (read through live mode).

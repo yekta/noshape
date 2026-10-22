@@ -171,8 +171,11 @@ impl SectionCaps {
 
     /// The outline passes, after the mask pass: edges into A, blur x into
     /// B, blur y back into A (which the caps read).
-    pub fn encode_edges(&self, encoder: &mut wgpu::CommandEncoder, t: &CapTextures) {
-        for (pipeline, group, target) in [(&self.edges, &t.edges_from_mask, &t.edge_a), (&self.blur, &t.blur_x, &t.edge_b), (&self.blur, &t.blur_y, &t.edge_a)] {
+    /// The outline passes; without `enabled` (interactive detail
+    /// reduction) the outline texture is only cleared.
+    pub fn encode_edges(&self, encoder: &mut wgpu::CommandEncoder, t: &CapTextures, enabled: bool) {
+        let passes = [(&self.edges, &t.edges_from_mask, &t.edge_a), (&self.blur, &t.blur_x, &t.edge_b), (&self.blur, &t.blur_y, &t.edge_a)];
+        for (pipeline, group, target) in passes.into_iter().take(if enabled { 3 } else { 1 }) {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("section-cap-edges"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -186,9 +189,11 @@ impl SectionCaps {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, group, &[]);
-            pass.draw(0..3, 0..1);
+            if enabled {
+                pass.set_pipeline(pipeline);
+                pass.set_bind_group(0, group, &[]);
+                pass.draw(0..3, 0..1);
+            }
         }
     }
 }

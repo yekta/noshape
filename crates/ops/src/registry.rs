@@ -185,5 +185,9 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
             return Err(OpError::param(f.name, &format!("required: {}", f.description)));
         }
     }
+    // Live mode: the document is open in the app; the call runs there.
+    if let Some(r) = crate::live::forward(ctx, op, args) {
+        return r;
+    }
     (op.run)(ctx, &Args { op, value: args })
 }

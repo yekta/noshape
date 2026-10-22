@@ -1141,7 +1141,9 @@ mod tests {
         bindings
             .iter()
             .map(|b| {
-                let keys = b.keystrokes().iter().map(|k| k.to_string()).collect::<Vec<_>>().join(" ");
+                // The parse form ("l", "shift-8"): `to_string` is the display
+                // form, which capitalizes letters ("L").
+                let keys = b.keystrokes().iter().map(|k| k.unparse()).collect::<Vec<_>>().join(" ");
                 let ctx = b.predicate().map(|p| format!("{p:?}")).unwrap_or_default();
                 (keys, b.action().name().to_string(), ctx)
             })

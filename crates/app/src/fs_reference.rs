@@ -139,10 +139,26 @@ impl FeatureDialog {
         let pal = p();
         let (icon, placeholder) = texts(kind);
         let open = self.ref_picker.as_ref().is_some_and(|r| r.path == path);
-        let chosen = value_name(&self.ref_sources, value);
+        // A Part Studio that is gone reads "Missing Part Studio" (live "qa5
+        // derived" (7), with the feature's error as its tooltip).
+        let gone = kind == ReferenceKind::PartStudio && !value.trim().is_empty() && !value.starts_with("ext:") && value_name(&self.ref_sources, value).is_none();
+        let chosen = value_name(&self.ref_sources, value).or_else(|| gone.then(|| "Missing Part Studio".to_string()));
         let empty = chosen.is_none();
         // Live 611: "Table: fsrefs.csv".
-        let tip = chosen.as_ref().map(|c| format!("{label}: {c}"));
+        let mut tip = chosen.as_ref().map(|c| format!("{label}: {c}"));
+        // Live (part-studio/400, qa5 DER1): an empty Part Studio field the
+        // error is about is pink with a red border and text.
+        let error = if open || (!empty && !gone) {
+            None
+        } else {
+            self.field_error(path).or_else(|| match &self.status {
+                Some((noshape_model::display::FeatureStatus::Error, msg)) if kind == ReferenceKind::PartStudio => Some(msg.clone()),
+                _ => None,
+            })
+        };
+        if let Some(e) = &error {
+            tip = Some(e.clone());
+        }
         let path_s = path.to_string();
         v_flex()
             .mx(px(1.))
@@ -156,7 +172,8 @@ impl FeatureDialog {
                     .gap(px(4.))
                     .rounded(px(2.))
                     .border_1()
-                    .border_color(gpui_kit::rgb(if open { BLUE } else { 0xd7d7d7 }))
+                    .border_color(if error.is_some() { pal.error } else { gpui_kit::rgb(if open { BLUE } else { 0xd7d7d7 }) })
+                    .when(error.is_some(), |d| d.bg(gpui_kit::rgb(0xf9ebec)))
                     .cursor_pointer()
                     .when_some(tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
                     .child(div().when(empty, |d| d.opacity(0.6)).child(crate::assets::icon(icon, 20., cx)))
@@ -167,7 +184,7 @@ impl FeatureDialog {
                             .truncate()
                             .text_size(px(14.))
                             .line_height(px(21.))
-                            .text_color(pal.text)
+                            .text_color(if error.is_some() { pal.text_invalid } else { pal.text })
                             .when(empty, |d| d.opacity(0.6))
                             .when(open, |d| d.font_weight(FontWeight::MEDIUM))
                             .child(chosen.unwrap_or_else(|| placeholder.to_string())),

@@ -209,7 +209,7 @@ impl Regenerator {
             }
             live.push(f.id);
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new() });
                 continue;
             }
             if let Some(e) = self.entries.get(&f.id)
@@ -220,7 +220,7 @@ impl Regenerator {
                 continue;
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -285,9 +285,11 @@ impl Regenerator {
                                     }
                                 }
                                 state.computed = std::mem::take(&mut ev.computed);
+                                state.touched = std::mem::take(&mut ev.touched);
                                 if uses_context {
                                     ev.ctx.bodies.retain(|b| !crate::in_context::is_context_feature(b.id.feature));
                                 }
+                                ev.ctx.renumber_default_names();
                                 ctx = Arc::new(ev.ctx);
                             }
                             Ok(Err(e)) => {

@@ -10,7 +10,7 @@
 use super::PartStudioView;
 use crate::theme::{p, with_alpha};
 use glam::DVec3;
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::display::PlaneFrame;
@@ -296,7 +296,7 @@ impl PartStudioView {
                         .opacity(0.)
                         .group_hover("srow", |d| d.opacity(1.))
                         .cursor_pointer()
-                        .child(Icon::new(IconName::Close).with_size(px(11.)).text_color(pal.text_muted))
+                        .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)))
                         .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
                             cx.stop_propagation();
                             on_x(this, w, cx)
@@ -399,7 +399,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff)))
+                                .child(crate::assets::icon("dialog-ok", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.close_section_dialog(true, w, cx))),
                         )
                         .child(
@@ -411,7 +411,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .child(Icon::new(IconName::Close).with_size(px(16.)).text_color(pal.cancel))
+                                .child(crate::assets::icon("dialog-cancel", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.close_section_dialog(false, w, cx))),
                         ),
                 )

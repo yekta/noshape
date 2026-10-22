@@ -9,7 +9,7 @@
 use super::PartStudioView;
 use crate::theme::p;
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use crate::quantity_field::{CommitVia, QuantityEvent, QuantityInput, QuantitySpec};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
@@ -105,7 +105,7 @@ pub struct BarUi {
     /// The pointer is over the color map (Onshape: the sketch crosshair).
     pub map_hover: bool,
     /// The bound being typed (0 / 1) and its field.
-    editing: Option<(usize, Entity<InputState>, Subscription)>,
+    editing: Option<(usize, Entity<QuantityInput>, Subscription)>,
 }
 
 pub struct ThicknessState {
@@ -314,19 +314,27 @@ impl PartStudioView {
 
     fn edit_bound(&mut self, bar: Bar, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some((lo, hi)) = self.bar_bounds(bar, cx) else { return };
-        let st = cx.new(|cx| InputState::new(window, cx).default_value(fmt_value([lo, hi][i])));
-        st.update(cx, |s, cx| s.focus(window, cx));
-        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
-            if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
-                return;
-            }
-            let v = st.read(cx).value().trim().parse::<f64>().ok();
-            this.set_bar(bar, cx, |b| {
-                b.editing = None;
-                if let Some(v) = v {
+        // Live ("Curvature color map › upper bound"): the label turns into a
+        // number field with the caret at the end; Enter applies a valid value
+        // and closes it, an invalid one ("1 in", "abc") stays pink and open;
+        // Tab applies it and the field stays; Esc closes it unchanged.
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let spec = QuantitySpec::quantity(noshape_units::Dim::UNITLESS).caret_on_focus().text_px(12.);
+        let st = cx.new(|cx| QuantityInput::new(fmt_value([lo, hi][i]), spec, units, window, cx));
+        st.update(cx, |q, cx| q.state().update(cx, |s, cx| s.focus(window, cx)));
+        let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &QuantityEvent, cx| match ev {
+            QuantityEvent::Committed(via) => {
+                let Some(v) = st.read(cx).value() else { return };
+                let close = *via == CommitVia::Enter;
+                this.set_bar(bar, cx, |b| {
                     b.bounds[i] = Some(v);
-                }
-            });
+                    if close {
+                        b.editing = None;
+                    }
+                });
+            }
+            QuantityEvent::Escape => this.set_bar(bar, cx, |b| b.editing = None),
+            _ => {}
         });
         if let Some(b) = self.bar_ui_mut(bar) {
             b.editing = Some((i, st, sub));
@@ -480,7 +488,7 @@ impl PartStudioView {
         // Tick labels: the bounds (blue, editable) and four between.
         let label = |i: usize, value: f64, cx: &mut Context<Self>| -> AnyElement {
             if let Some((_, st)) = editing.as_ref().filter(|(e, _)| *e == i) {
-                return div().w(px(70.)).child(Input::new(st).xsmall()).into_any_element();
+                return div().w(px(70.)).child(st.clone()).into_any_element();
             }
             h_flex()
                 .gap_1()

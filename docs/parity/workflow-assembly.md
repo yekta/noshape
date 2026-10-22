@@ -140,3 +140,14 @@ Pass 6 (17:11) had found A12 fixed (mate nests under "Replicate 1 ▸ Mate featu
 | A16 (new) | "solving…" label at the top right for as long as the Replicate dialog is open (nothing selected); gone on cancel | ? A16 (live request filed) |
 | A4 Slider flip | block still inside the plate (Front view) | ✗ still |
 | A5 mate connector hover | dots only on the hovered face, small triad + ring | ✅ **fixed** |
+
+## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
+Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an empty Replicate; BOM edits are not on the undo stack.
+| Row | Ours | Status |
+|---|---|---|
+| A15 selected instance | (242,182,73) top, amber edges, only the instance row highlighted | ✅ **fixed** |
+| A16 "solving…" label | gone | ✅ **fixed** |
+| A19 (new) empty Replicate | title red ✅; **no pending red "Replicate N" row with error badge in the list, no badge on the root row, no red border on "Parts to find match in"** (live has all three) | ✗ **A19** (skb) |
+| A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) |
+| A4 Slider flip | block still inside the plate | ✗ still |
+| A18 repeat insert, ✓ without entering graphics | (5.000025, 2.500025, 1.250025) | ✅ **fixed** (live exact 5 / 2.5 / 1.25) |

@@ -160,6 +160,29 @@ pub fn view_crop(pl: &ViewPlacement, circle: bool, f: [f64; 2], c: [f64; 2]) -> 
     }
 }
 
+/// A callout placed in empty space: no leader, its text at `c`.
+pub fn free_callout(id: u64, c: [f64; 2], text: String, style: CalloutStyle) -> Annotation {
+    let mut kind = AnnotationKind::balloon(ViewId(0), c, text);
+    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+        *callout = CalloutStyle { free: true, ..style };
+    }
+    Annotation { id, kind, position: c, ..Default::default() }
+}
+
+impl SheetPick<'_> {
+    /// A callout with a leader clicked on a face or a silhouette (no edge,
+    /// no snap point): the part on the line of sight (qa5 D8).
+    pub fn finish_callout(&self, a: &mut Annotation, anchor: &PickedPoint) {
+        if let AnnotationKind::Balloon { callout, .. } = &mut a.kind
+            && callout.part.is_none()
+            && anchor.r.is_none()
+        {
+            callout.part = self.part_under(anchor.view, anchor.p);
+            callout.on_face |= callout.part.is_some() && views::view_source(self.current_sheet(), anchor.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
+        }
+    }
+}
+
 /// The Break view dialog's default gap: 6 mm, or 0.25 in in inch drawings.
 pub fn default_break_gap_mm(units_mm: bool) -> f64 {
     if units_mm { 6.0 } else { 0.25 * 25.4 }

@@ -272,7 +272,8 @@ impl PartStudioView {
                             .border_color(gpui_kit::rgb(0xd7d7d7))
                             .text_size(px(13.33))
                             .child(div().flex_1().truncate().child(libraries.get(library).cloned().unwrap_or_default()))
-                            .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+                            // Live (assign-material-01): a native select's 8 x 6 #777 arrow.
+                            .child(crate::ui::glyph("ui-select-caret", 8., gpui_kit::rgb(0x777777)))
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 if let Some(m) = &mut this.ui.material_panel {
@@ -293,7 +294,8 @@ impl PartStudioView {
                             .border_1()
                             .border_color(gpui_kit::rgb(0xaaaaaa))
                             .cursor_pointer()
-                            .child(crate::assets::icon("plus", 20., cx))
+                            // Live (dom/dialog-assign-material): svg-icon-add-button, a 12 px "+" (2 px, #333).
+                            .child(crate::assets::icon("add-button", 20., cx))
                             .tooltip(crate::ui::tooltip("Add material library…"))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_add_material_library(window, cx))),
                     ),
@@ -356,7 +358,8 @@ impl PartStudioView {
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .cursor_pointer()
                         .child(div().flex_1().truncate().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).child(picked.as_ref().map(|e| e.name.clone()).unwrap_or_else(|| "- None -".into())))
-                        .child(crate::ui::glyph("ui-caret-down", 10., pal.text))
+                        // Live (assign-material-01): Onshape's 8 x 4 select caret, as in os_select.
+                        .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let rows = this.material_rows(cx);
                             if let Some(m) = &mut this.ui.material_panel {
@@ -464,7 +467,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(if can_apply { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
                                 .when(can_apply, |d| d.cursor_pointer())
-                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_material(cx))),
                         )
                         .child(
@@ -476,7 +479,8 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
+                                // Live (dom/dialog-assign-material): ✓ and ✗ are 24 px sprites, as in feature dialogs.
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.material_panel = None;
                                     cx.notify();

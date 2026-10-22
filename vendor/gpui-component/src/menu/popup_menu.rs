@@ -944,7 +944,8 @@ impl PopupMenu {
     fn set_selected_index(&mut self, ix: usize, cx: &mut Context<Self>) {
         if self.selected_index != Some(ix) {
             self.selected_index = Some(ix);
-            self.scroll_handle.scroll_to_item(ix);
+            // A tool list's first child is its top inset row.
+            self.scroll_handle.scroll_to_item(ix + self.tool_list as usize);
             cx.notify();
         }
     }
@@ -1537,7 +1538,10 @@ impl Render for PopupMenu {
                     .id("items")
                     .p_1()
                     .gap_y_0p5()
-                    .when(self.tool_list, |this| this.p(px(1.)).gap_y(px(1.)))
+                    // (A tool list's 1 px insets are zero-height rows 1 px
+                    // gap away: padding on the scroll container counted as
+                    // 2 px of overflow and a two-row list scrolled, qa4 F31.)
+                    .when(self.tool_list, |this| this.p_0().gap_y(px(1.)))
                     .min_w(rems(8.))
                     .when_some(self.min_width, |this, min_width| this.min_w(min_width))
                     .max_w(max_width)
@@ -1548,14 +1552,16 @@ impl Render for PopupMenu {
                     })
                     // The native scrollbar takes its width from the list.
                     .when(native, |this| this.pr(px(if self.tool_list { 1. } else { 4. } + NATIVE_SCROLLBAR_W)))
-                    .children(
-                        self.menu_items
+                    .map(|this| {
+                        let rows = self
+                            .menu_items
                             .iter()
                             .enumerate()
                             // Ignore last separator
                             .filter(|(ix, item)| !(*ix + 1 == items_count && item.is_separator()))
-                            .map(|(ix, item)| self.render_item(ix, item, options, window, cx)),
-                    )
+                            .map(|(ix, item)| self.render_item(ix, item, options, window, cx));
+                        if self.tool_list { this.child(div().flex_none()).children(rows).child(div().flex_none()) } else { this.children(rows) }
+                    })
                     .on_prepaint(move |bounds, window, cx| {
                         let changed = view.update(cx, |r, _| {
                             r.bounds = bounds;
@@ -1579,15 +1585,7 @@ impl Render for PopupMenu {
             })
             .when(native, |this| this.child(native_scrollbar(&self.scroll_handle, cx)))
             .on_drag_move(cx.listener(|this, e: &gpui::DragMoveEvent<NativeThumbDrag>, window, cx| {
-                let (y0, off0) = NATIVE_THUMB_PRESS.with(|c| c.get());
-                let handle = &this.scroll_handle;
-                let (view_h, max) = (handle.bounds().size.height, handle.max_offset().y);
-                let track = (view_h - px(2. * NATIVE_SCROLLBAR_W + 6.)).max(px(1.));
-                let thumb = native_thumb_len(track, view_h, max);
-                let travel = (track - thumb).max(px(1.));
-                let dy = e.event.position.y - y0;
-                let y = (off0 - dy * (max / travel)).clamp(-max, px(0.));
-                handle.set_offset(gpui::point(handle.offset().x, y));
+                native_scrollbar_drag(&this.scroll_handle, e.event.position.y);
                 window.refresh();
                 cx.notify();
             }))
@@ -1607,8 +1605,25 @@ thread_local! {
     static NATIVE_THUMB_PRESS: std::cell::Cell<(Pixels, Pixels)> = const { std::cell::Cell::new((Pixels::ZERO, Pixels::ZERO)) };
 }
 
+/// NOSHAPE PATCH: the drag of a [`native_scrollbar`] thumb; a list using one
+/// handles `DragMoveEvent<NativeThumbDrag>` with [`native_scrollbar_drag`].
 #[derive(Clone)]
-struct NativeThumbDrag;
+pub struct NativeThumbDrag;
+
+/// NOSHAPE PATCH: scrolls `handle` for a thumb dragged to `y` (window).
+pub fn native_scrollbar_drag(handle: &ScrollHandle, y: Pixels) {
+    let (y0, off0) = NATIVE_THUMB_PRESS.with(|c| c.get());
+    let (view_h, max) = (handle.bounds().size.height, handle.max_offset().y);
+    let track = (view_h - px(2. * NATIVE_SCROLLBAR_W + 6.)).max(px(1.));
+    let thumb = native_thumb_len(track, view_h, max);
+    let travel = (track - thumb).max(px(1.));
+    let dy = y - y0;
+    let y = (off0 - dy * (max / travel)).clamp(-max, px(0.));
+    handle.set_offset(gpui::point(handle.offset().x, y));
+}
+
+/// NOSHAPE PATCH: Chrome's scrollbar width ([`native_scrollbar`]).
+pub const NATIVE_SCROLLBAR_WIDTH: f32 = NATIVE_SCROLLBAR_W;
 
 impl Render for NativeThumbDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
@@ -1621,7 +1636,9 @@ fn native_thumb_len(track: Pixels, view_h: Pixels, max: Pixels) -> Pixels {
     (track * (view_h / content)).max(px(18.)).min(track)
 }
 
-fn native_scrollbar(handle: &ScrollHandle, _cx: &App) -> impl IntoElement {
+/// NOSHAPE PATCH: Chrome's native vertical scrollbar over the right edge of
+/// a list scrolled by `handle` (also used by noshape's selects).
+pub fn native_scrollbar(handle: &ScrollHandle, _cx: &App) -> impl IntoElement {
     let grey = gpui::rgb(0x8b8b8b);
     let (view_h, max, off) = (handle.bounds().size.height, handle.max_offset().y, -handle.offset().y);
     let track = (view_h - px(2. * NATIVE_SCROLLBAR_W + 6.)).max(px(1.));

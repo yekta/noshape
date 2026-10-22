@@ -19,8 +19,31 @@ use noshape_model::drawing::format::default_digits;
 use noshape_model::drawing::sheet::AnnType;
 use noshape_model::drawing::*;
 
-/// A number field and its subscription.
-pub type NumberField = (Entity<InputState>, Subscription);
+/// What a panel field is (live dom/drawing-wt-widgets): a Wt dropdown
+/// (text heights, arrowheads, datum size, inspection text) or spinbox
+/// (gaps, stack gap, center of mass, table padding, centermark sizes)
+/// (`drawing_wt`), or text (label prefixes).
+#[derive(Clone, Copy, PartialEq)]
+pub enum FieldKind {
+    Dropdown,
+    /// ↑ / ↓ step in an inch and in a mm drawing, decimals shown (live
+    /// dom/drawing-wt-widgets: gaps 4, table padding 3).
+    Spin { step_in: f64, step_mm: f64, decimals: usize },
+    Text,
+}
+
+/// A panel field: its input, kind, the value it shows (mm), whether a
+/// spinbox holds no number, and its subscription.
+pub struct NumberField {
+    pub state: Entity<InputState>,
+    pub kind: FieldKind,
+    pub value: std::rc::Rc<std::cell::Cell<f64>>,
+    pub invalid: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Applies a value (mm) / a text to the drawing's properties.
+    pub set: Option<fn(&mut DrawingProps, f64)>,
+    pub set_text: Option<fn(&mut DrawingProps, String)>,
+    _sub: Subscription,
+}
 
 /// Drawing properties panel: open, the selected tab and the Inspection
 /// tab's number fields (text height, border size).
@@ -30,6 +53,8 @@ pub struct DrawingPropsUi {
     pub tab: usize,
     /// The open tab's number fields: (tab, fields).
     pub inspection_inputs: Option<(usize, Vec<NumberField>)>,
+    /// The field that had the focus at the last render.
+    pub focused: Option<usize>,
 }
 
 /// Onshape's tabs (tooltip, icon).
@@ -96,18 +121,58 @@ const TYPE_IDS: [[&str; 4]; 9] = [
 /// Hole/thread callouts › Indicator choices (the count's sign: "4X").
 const HOLE_INDICATORS: [&str; 3] = ["X", "x", "-"];
 
-/// A typed length in mm: "0.12 in", "3 mm", or a bare number in the
-/// drawing's units (`inch`). None unless positive.
-fn length_mm(text: &str, inch: bool) -> Option<f64> {
-    let t = text.trim();
-    let (num, k) = if let Some(n) = t.strip_suffix("in") {
-        (n, 25.4)
-    } else if let Some(n) = t.strip_suffix("mm") {
-        (n, 1.0)
-    } else {
-        (t, if inch { 25.4 } else { 1.0 })
-    };
-    num.trim().parse::<f64>().ok().map(|v| v * k).filter(|v| *v > 0.0)
+
+/// What committing a number field needs.
+#[derive(Clone)]
+struct FieldCommit {
+    st: Entity<InputState>,
+    kind: FieldKind,
+    val: std::rc::Rc<std::cell::Cell<f64>>,
+    inv: std::rc::Rc<std::cell::Cell<bool>>,
+    set: fn(&mut DrawingProps, f64),
+}
+
+/// Commit a number field's text (Enter, or leaving it): a dropdown takes
+/// its leading number in the drawing's units or reverts; a spinbox a plain
+/// number or stays invalid.
+fn commit_number(this: &mut DrawingEditor, f: &FieldCommit, inch: bool, window: &mut Window, cx: &mut Context<DrawingEditor>) {
+    use crate::drawing_wt::{leading_number, show, spin_number};
+    let FieldCommit { st, kind, val, inv, set } = f.clone();
+    let k = if inch { 25.4 } else { 1.0 };
+    let text = st.read(cx).value().to_string();
+    match kind {
+        FieldKind::Dropdown => {
+            if let Some(d) = leading_number(&text).filter(|d| *d > 0.0) {
+                val.set(d * k);
+                this.set_drawing_prop(&move |p| set(p, d * k), cx);
+            }
+            let shown = show(val.get() / k);
+            st.update(cx, |s, cx| s.set_value(shown, window, cx));
+        }
+        FieldKind::Spin { decimals, .. } => match spin_number(&text).filter(|d| *d >= 0.0) {
+            Some(d) => {
+                val.set(d * k);
+                inv.set(false);
+                this.set_drawing_prop(&move |p| set(p, d * k), cx);
+                st.update(cx, |s, cx| s.set_value(crate::drawing_wt::show_dec(d, decimals), window, cx));
+            }
+            None => {
+                inv.set(true);
+                cx.notify();
+            }
+        },
+        FieldKind::Text => {}
+    }
+}
+
+/// A border size in characters as the selects show it ("Tight Fit",
+/// "1 Character", "2 Characters"…).
+fn border_chars_label(n: u8) -> String {
+    match n {
+        0 => "Tight Fit".into(),
+        1 => "1 Character".into(),
+        n => format!("{n} Characters"),
+    }
 }
 
 /// Sets annotation type `I`'s text height.
@@ -132,80 +197,192 @@ impl DrawingEditor {
             return;
         }
         if self.drawing_props.inspection_inputs.as_ref().is_some_and(|i| i.0 == tab) {
+            self.track_field_focus(window, cx);
             return;
         }
         let p = &self.drawing.props;
         // Lengths in the drawing's units ("0.1200 in", "3 mm"); typing a unit
         // overrides them.
         let inch = !self.drawing.units_mm;
-        let field = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| {
-            let shown = if inch { format!("{:.4} in", v / 25.4) } else { format!("{} mm", noshape_model::drawing::format::format_number(v, None, 2)) };
+        let k = if inch { 25.4 } else { 1.0 };
+        let make = move |v: f64, kind: FieldKind, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| {
+            let shown = match kind {
+                FieldKind::Spin { decimals, .. } => crate::drawing_wt::show_dec(v / k, decimals),
+                _ => crate::drawing_wt::show(v / k),
+            };
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(shown));
-            let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
-                if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur)
-                    && let Some(v) = length_mm(&st.read(cx).value(), inch)
-                {
-                    this.set_drawing_prop(&move |p| set(p, v), cx);
+            let (value, invalid) = (std::rc::Rc::new(std::cell::Cell::new(v)), std::rc::Rc::new(std::cell::Cell::new(false)));
+            let (val, inv) = (value.clone(), invalid.clone());
+            // Enter commits (leaving the field too: `track_field_focus`); a
+            // spinbox shows whether it holds a number while typing.
+            let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+                InputEvent::PressEnter { .. } => commit_number(this, &FieldCommit { st: st.clone(), kind, val: val.clone(), inv: inv.clone(), set }, inch, window, cx),
+                InputEvent::Change if matches!(kind, FieldKind::Spin { .. }) => {
+                    let bad = crate::drawing_wt::spin_number(&st.read(cx).value()).filter(|d| *d >= 0.0).is_none();
+                    if inv.replace(bad) != bad {
+                        cx.notify();
+                    }
                 }
+                _ => {}
             });
-            (st, sub)
+            NumberField { state: st, kind, value, invalid, set: Some(set), set_text: None, _sub: sub }
         };
+        let dropdown = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Dropdown, set, window, cx);
+        // Steps: live 0.05 in; mm Stack gap 0.05, Text gap 0.1.
+        let spin = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.1, decimals: 4 }, set, window, cx);
+        let spin_fine = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.05, decimals: 4 }, set, window, cx);
+        let spin3 = move |v: f64, set: fn(&mut DrawingProps, f64), window: &mut Window, cx: &mut Context<Self>| make(v, FieldKind::Spin { step_in: 0.05, step_mm: 0.1, decimals: 3 }, set, window, cx);
         // Text fields (label prefixes): applied on Enter / blur.
         let text_field = |v: String, set: fn(&mut DrawingProps, String), window: &mut Window, cx: &mut Context<Self>| {
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(v));
             let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
-                if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                if matches!(ev, InputEvent::PressEnter { .. }) {
                     let v = st.read(cx).value().to_string();
                     this.set_drawing_prop(&move |p| set(p, v.clone()), cx);
                 }
             });
-            (st, sub)
+            let none = std::rc::Rc::new(std::cell::Cell::new(0.0));
+            NumberField { state: st, kind: FieldKind::Text, value: none, invalid: std::rc::Rc::new(std::cell::Cell::new(false)), set: None, set_text: Some(set), _sub: sub }
         };
         let vt = p.view_tab.clone();
         let fields = match tab {
             3 => vec![
-                field(vt.hatch_spacing, |p, v| p.view_tab.hatch_spacing = v, window, cx),
                 text_field(vt.section_prefix, |p, v| p.view_tab.section_prefix = v, window, cx),
                 text_field(vt.detail_prefix, |p, v| p.view_tab.detail_prefix = v, window, cx),
                 text_field(vt.aux_prefix, |p, v| p.view_tab.aux_prefix = v, window, cx),
                 text_field(vt.aux_suffix, |p, v| p.view_tab.aux_suffix = v, window, cx),
             ],
-            4 => vec![field(vt.centermark_extension, |p, v| p.view_tab.centermark_extension = v, window, cx)],
+            4 => vec![spin(vt.centermark_mark_size, |p, v| p.view_tab.centermark_mark_size = v, window, cx), spin(vt.centermark_gap_size, |p, v| p.view_tab.centermark_gap_size = v, window, cx)],
             1 => {
                 let (h, a, tg, gg, ex) = (p.dim_text_height, p.dim_arrow, p.dim_text_gap, p.dim_geometry_gap, p.dim_extension);
+                // Live raw dump: Text height / Arrowhead are Wt dropdowns, the
+                // gaps spinboxes.
                 vec![
-                    field(h, |p, v| p.dim_text_height = v, window, cx),
-                    field(a, |p, v| p.dim_arrow = v, window, cx),
-                    field(tg, |p, v| p.dim_text_gap = v, window, cx),
-                    field(gg, |p, v| p.dim_geometry_gap = v, window, cx),
-                    field(ex, |p, v| p.dim_extension = v, window, cx),
+                    dropdown(h, |p, v| p.dim_text_height = v, window, cx),
+                    dropdown(a, |p, v| p.dim_arrow = v, window, cx),
+                    spin(tg, |p, v| p.dim_text_gap = v, window, cx),
+                    spin(gg, |p, v| p.dim_geometry_gap = v, window, cx),
+                    spin(ex, |p, v| p.dim_extension = v, window, cx),
                 ]
             }
             2 => {
                 let (h, a) = (p.ann_text_height, p.ann_arrow);
-                let mut f = vec![field(h, |p, v| p.ann_text_height = v, window, cx), field(a, |p, v| p.ann_arrow = v, window, cx)];
+                let mut f = vec![dropdown(h, |p, v| p.ann_text_height = v, window, cx), dropdown(a, |p, v| p.ann_arrow = v, window, cx)];
                 // Per type text heights (shown: the type's, else All annotations'),
                 // then Datum size, the center of mass diameter, the stack gap.
                 let setters: [fn(&mut DrawingProps, f64); 9] = [set_type_height::<0>, set_type_height::<1>, set_type_height::<2>, set_type_height::<3>, set_type_height::<4>, set_type_height::<5>, set_type_height::<6>, set_type_height::<7>, set_type_height::<8>];
                 for (t, set) in AnnType::ALL.iter().zip(setters) {
-                    f.push(field(p.ann_type(*t).height.unwrap_or(h), set, window, cx));
+                    f.push(dropdown(p.ann_type(*t).height.unwrap_or(h), set, window, cx));
                 }
                 let (ds, cd, gap) = (p.datum_size, p.com_diameter, p.callout_stack_gap);
-                f.push(field(ds, |p, v| p.datum_size = v, window, cx));
-                f.push(field(cd, |p, v| p.com_diameter = v, window, cx));
-                f.push(field(gap, |p, v| p.callout_stack_gap = v, window, cx));
+                f.push(dropdown(ds, |p, v| p.datum_size = v, window, cx));
+                f.push(spin(cd, |p, v| p.com_diameter = v, window, cx));
+                f.push(spin_fine(gap, |p, v| p.callout_stack_gap = v, window, cx));
                 f
             }
             6 => {
                 let (h, v) = (p.table_h_padding, p.table_v_padding);
-                vec![field(h, |p, v| p.table_h_padding = v, window, cx), field(v, |p, v| p.table_v_padding = v, window, cx)]
+                vec![spin3(h, |p, v| p.table_h_padding = v, window, cx), spin3(v, |p, v| p.table_v_padding = v, window, cx)]
             }
             _ => {
-                let (h, b) = (p.inspection_text_height, p.inspection_border_size);
-                vec![field(h, |p, v| p.inspection_text_height = v, window, cx), field(b, |p, v| p.inspection_border_size = v, window, cx)]
+                vec![dropdown(p.inspection_text_height, |p, v| p.inspection_text_height = v, window, cx)]
             }
         };
         self.drawing_props.inspection_inputs = Some((tab, fields));
+    }
+
+    /// Field `i` of the open tab as live draws it: Wt dropdowns 141 px with
+    /// a ▾ list (the current value), spinboxes 169 px with spin arrows (↑ /
+    /// ↓ step, pale orange "Must be a number" when invalid), the unit as a
+    /// label beside; texts 160 px.
+    fn wt_field(&self, i: usize, ed: &Entity<Self>) -> AnyElement {
+        use crate::drawing_wt::{INVALID_BG, INVALID_TIP, show, show_dec, spin_step};
+        let Some(f) = self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) else { return div().into_any_element() };
+        // Show `v` (display units) in the field and apply it.
+        let apply = {
+            let (ed, st, val, set, inv) = (ed.clone(), f.state.clone(), f.value.clone(), f.set, f.invalid.clone());
+            let k = if self.drawing.units_mm { 1.0 } else { 25.4 };
+            let decimals = match f.kind {
+                FieldKind::Spin { decimals, .. } => decimals,
+                _ => 4,
+            };
+            std::rc::Rc::new(move |v: f64, window: &mut Window, cx: &mut App| {
+                st.update(cx, |s, cx| s.set_value(show_dec(v, decimals), window, cx));
+                val.set(v * k);
+                inv.set(false);
+                if let Some(set) = set {
+                    ed.update(cx, |this, cx| this.set_drawing_prop(&move |p| set(p, v * k), cx));
+                }
+            })
+        };
+        let input = Input::new(&f.state).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.));
+        let unit = div().w(px(24.)).flex_none().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).opacity(0.65).flex().justify_center().child(if self.drawing.units_mm { "mm" } else { "in" });
+        let k = if self.drawing.units_mm { 1.0 } else { 25.4 };
+        match f.kind {
+            FieldKind::Dropdown => {
+                // ▾: the preset heights (as the Styles panel's list).
+                let val = f.value.clone();
+                // Live: the ▾ sits inside the field's right padding (20 px).
+                let caret = div().id(SharedString::from(format!("dp-wt-dd-{i}"))).w(px(18.)).h(px(24.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("ui-dropdown-arrow", 10., gpui_kit::rgb(0x555555)));
+                let caret = caret.os_dropdown_menu(SharedString::from(format!("dp-wt-ddm-{i}")), false, move |menu, _, _| {
+                    // Live: the list holds only the current value.
+                    let v = val.get() / k;
+                    let apply = apply.clone();
+                    menu.item(crate::os_menu::OsMenuItem::new(show(v)).checked(true).on_click(move |_, window, cx| apply(v, window, cx)))
+                });
+                h_flex().gap(px(6.)).child(div().w(px(141.)).relative().child(input).child(caret.absolute().right(px(1.)).top(px(0.)))).child(unit).into_any_element()
+            }
+            FieldKind::Spin { step_in, step_mm, .. } => {
+                let step_by = if self.drawing.units_mm { step_mm } else { step_in };
+                let invalid = f.invalid.get();
+                let step = {
+                    let (st, val) = (f.state.clone(), f.value.clone());
+                    std::rc::Rc::new(move |up: bool, window: &mut Window, cx: &mut App| apply(spin_step(&st.read(cx).value(), val.get() / k, up, step_by), window, cx))
+                };
+                let arrow = |id: String, up: bool| {
+                    let step = step.clone();
+                    div().id(SharedString::from(id)).h(px(12.)).w(px(16.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph(if up { "ui-caret-up" } else { "ui-caret-down" }, 8., gpui_kit::rgb(0x555555))).on_click(move |_, window, cx| step(up, window, cx))
+                };
+                let (step_up, step_dn) = (step.clone(), step.clone());
+                let boxed = div()
+                    .id(SharedString::from(format!("dp-wt-spin-{i}")))
+                    .w(px(169.))
+                    .relative()
+                    .when(invalid, |d| d.bg(gpui_kit::rgba(INVALID_BG)).tooltip(crate::ui::tooltip(INVALID_TIP)))
+                    .capture_action(move |_: &gpui_kit::component::input::MoveUp, window, cx| {
+                        step_up(true, window, cx);
+                        cx.stop_propagation();
+                    })
+                    .capture_action(move |_: &gpui_kit::component::input::MoveDown, window, cx| {
+                        step_dn(false, window, cx);
+                        cx.stop_propagation();
+                    })
+                    .child(input)
+                    .child(v_flex().absolute().right(px(2.)).top(px(1.)).child(arrow(format!("dp-wt-up-{i}"), true)).child(arrow(format!("dp-wt-dn-{i}"), false)));
+                h_flex().gap(px(6.)).child(boxed).child(unit).into_any_element()
+            }
+            FieldKind::Text => div().w(px(160.)).child(input).into_any_element(),
+        }
+    }
+
+    /// A field that lost the focus (Tab, a click elsewhere) commits like
+    /// Enter (live: "Tab commits, away commits"). Checked at each render:
+    /// these panel inputs get no blur event.
+    fn track_field_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((_, fields)) = &self.drawing_props.inspection_inputs else { return };
+        let now = fields.iter().position(|f| f.state.read(cx).focus_handle(cx).is_focused(window));
+        let before = std::mem::replace(&mut self.drawing_props.focused, now);
+        let Some(i) = before.filter(|i| Some(*i) != now) else { return };
+        let Some(f) = fields.get(i) else { return };
+        let (st, kind, val, inv, set, set_text) = (f.state.clone(), f.kind, f.value.clone(), f.invalid.clone(), f.set, f.set_text);
+        match (set, set_text) {
+            (Some(set), _) => commit_number(self, &FieldCommit { st, kind, val, inv, set }, !self.drawing.units_mm, window, cx),
+            (None, Some(set)) => {
+                let v = st.read(cx).value().to_string();
+                self.set_drawing_prop(&move |p| set(p, v.clone()), cx);
+            }
+            _ => {}
+        }
     }
 
     fn set_drawing_prop(&mut self, f: &dyn Fn(&mut DrawingProps), cx: &mut Context<Self>) {
@@ -374,10 +551,7 @@ impl DrawingEditor {
                 .child(check("dp-ttz", "Length tolerance trailing zeros", props.tolerance_trailing_zeros, |p, v| p.tolerance_trailing_zeros = v, cx));
         } else if self.drawing_props.tab == 1 {
             // Dimensions › All dimensions, Gaps and extensions.
-            let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
-                None => div().into_any_element(),
-            };
+            let field = |i: usize| self.wt_field(i, &ed);
             let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL
                 .iter()
                 .map(|&t| (t.name().to_string(), t == props.dim_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.dim_arrow_type = t) as Act))
@@ -442,10 +616,7 @@ impl DrawingEditor {
         } else if self.drawing_props.tab == 2 {
             // Annotations, in Onshape's groups: All annotations (Arrowhead),
             // then each type's font, text height and color with its extras.
-            let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
-                None => div().into_any_element(),
-            };
+            let field = |i: usize| self.wt_field(i, &ed);
             let arrow_items: Vec<(String, bool, Act)> = noshape_model::drawing::sheet::ArrowType::ALL
                 .iter()
                 .map(|&t| (t.name().to_string(), t == props.ann_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.ann_arrow_type = t) as Act))
@@ -572,10 +743,7 @@ impl DrawingEditor {
                 .child(check("dp-vscale", "Scale label", vd.scale_label, |p, v| p.view_defaults.scale_label = v, cx));
             // Per view type.
             let vt = props.view_tab.clone();
-            let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
-                None => div().into_any_element(),
-            };
+            let field = |i: usize| self.wt_field(i, &ed);
             let detail_lines: Vec<(String, bool, Act)> = ["Phantom", "Dashed", "Solid"].iter().enumerate().map(|(i, n)| (n.to_string(), vt.detail_line == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.detail_line = i as u8) as Act)).collect();
             let detail_styles: Vec<(String, bool, Act)> = ["In line", "Connected", "Leader"].iter().enumerate().map(|(i, n)| (n.to_string(), vt.detail_style == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.detail_style = i as u8) as Act)).collect();
             let aux_styles: Vec<(String, bool, Act)> = vec![
@@ -588,11 +756,10 @@ impl DrawingEditor {
                 .child(section("Tangent edges"))
                 .child(row("Color", swatch("dp-tcolor", vt.tangent_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.tangent_color = c))))
                 .child(section("Section views"))
-                .child(row("Hatch spacing", field(0)))
-                .child(row("Label prefix", field(1)))
+                .child(row("Label prefix", field(0)))
                 .child(section("Detail views"))
                 .child(row("Profile lines", select("dp-dline", ["Phantom", "Dashed", "Solid"][vt.detail_line.min(2) as usize].into(), detail_lines)))
-                .child(row("Label prefix", field(2)))
+                .child(row("Label prefix", field(1)))
                 .child(row("Style", select("dp-dstyle", ["In line", "Connected", "Leader"][vt.detail_style.min(2) as usize].into(), detail_styles)))
                 .child(check("dp-dprofile", "Show detail view profile", vt.detail_show_profile, |p, v| p.view_tab.detail_show_profile = v, cx))
                 .child(check("dp-dclip", "Clip border to geometry", vt.detail_clip_border, |p, v| p.view_tab.detail_clip_border = v, cx))
@@ -600,9 +767,9 @@ impl DrawingEditor {
                 .child(check("dp-aind", "Show view reference indicator", vt.aux_indicator, |p, v| p.view_tab.aux_indicator = v, cx))
                 .child(row("View reference format", div().into_any_element()))
                 .child(self.aux_format_tiles(vt.aux_arrow_format, cx))
-                .child(row("View label prefix", field(3)))
+                .child(row("View label prefix", field(2)))
                 .child(row("View label style", select("dp-alabel", if vt.aux_double_label { "A-A".into() } else { "A".into() }, aux_styles)))
-                .child(row("View label suffix", field(4)));
+                .child(row("View label suffix", field(3)));
             // Flat pattern views: up / down bend lines (style + color), bend tangent edges.
             const BEND_LINES: [&str; 3] = ["Solid", "Dashed", "Center"];
             let bend = |id: &'static str, cur: u8, set: fn(&mut DrawingProps, u8)| {
@@ -618,15 +785,21 @@ impl DrawingEditor {
                 .child(row("Bend tangent edges", swatch("dp-btanc", vt.bend_tangent_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.bend_tangent_color = c))));
         } else if self.drawing_props.tab == 4 {
             let vt = props.view_tab.clone();
-            let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
-                None => div().into_any_element(),
+            let field = |i: usize| self.wt_field(i, &ed);
+            let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+                    let v = *v;
+                    this.set_drawing_prop(&move |p| f(p, v), cx);
+                })))
             };
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Construction geometry"))
+                // Live order: Mark size, Gap size, Color, Extended lines.
                 .child(section("Centermarks"))
-                .child(row("Color", swatch("dp-cmcolor", vt.centermark_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centermark_color = c))))
                 .child(row("Mark size", field(0)))
+                .child(row("Gap size", field(1)))
+                .child(row("Color", swatch("dp-cmcolor", vt.centermark_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centermark_color = c))))
+                .child(check("dp-cmext", "Extended lines", vt.centermark_extended, |p, v| p.view_tab.centermark_extended = v, cx))
                 .child(section("Centerlines"))
                 .child(row("Color", swatch("dp-clcolor", vt.centerline_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.view_tab.centerline_color = c))));
         } else if self.drawing_props.tab == 5 {
@@ -645,10 +818,7 @@ impl DrawingEditor {
                 .child(section("Title block"))
                 .child(row("Color", color_select("dp-ftitle", props.title_block_color, |p, c| p.title_block_color = c)));
         } else if self.drawing_props.tab == 6 {
-            let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
-                None => div().into_any_element(),
-            };
+            let field = |i: usize| self.wt_field(i, &ed);
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Tables"))
                 .child(section("All tables"))
@@ -666,25 +836,23 @@ impl DrawingEditor {
                 ("Row".into(), props.inspection_row_parsing, std::rc::Rc::new(|p: &mut DrawingProps| p.inspection_row_parsing = true) as Act),
             ];
             let shape_items: Vec<(String, bool, Act)> = InspectionShape::ALL.iter().map(|&s| (s.name().to_string(), s == props.inspection_shape, std::rc::Rc::new(move |p: &mut DrawingProps| p.inspection_shape = s) as Act)).collect();
-            let field = |i: usize| match self.drawing_props.inspection_inputs.as_ref().and_then(|(_, f)| f.get(i)) {
-                Some(f) => div().w(px(160.)).child(Input::new(&f.0).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.))).into_any_element(),
-                None => div().into_any_element(),
-            };
+            let border_items: Vec<(String, bool, Act)> = (0..=5u8).map(|n| (border_chars_label(n), n == props.inspection_border_chars, std::rc::Rc::new(move |p: &mut DrawingProps| p.inspection_border_chars = n) as Act)).collect();
+            let field = |i: usize| self.wt_field(i, &ed);
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Inspection"))
+                // Live: one "Inspection items" group, then "Automatic inspection items".
+                .child(section("Inspection items"))
                 .child(row("Item parsing", select("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items)))
-                .child(section("Text"))
                 .child(row("Font", font_row(FontOf::Inspection, props.inspection_font.clone(), cx)))
-                .child(row("Text height", field(0)))
-                .child(section("Border"))
+                .child(row("Text", field(0)))
                 .child(row("Border shape", select("dp-ishape", props.inspection_shape.name().into(), shape_items)))
-                .child(row("Border size", field(1)))
+                .child(row("Border size", select("dp-isize", border_chars_label(props.inspection_border_chars), border_items)))
                 .child(row(
                     "Border color",
                     swatch("dp-icolor", props.inspection_color, std::rc::Rc::new(|p: &mut DrawingProps, c| p.inspection_color = c)),
                 ))
                 .child(check("dp-isolid", "Solid fill", props.inspection_solid_fill, |p, v| p.inspection_solid_fill = v, cx))
-                .child(section("Automatic"))
+                .child(section("Automatic inspection items"))
                 .child(check("dp-iexcl", "Exclude callouts", props.inspection_exclude_callouts, |p, v| p.inspection_exclude_callouts = v, cx));
         } else {
             body = body
@@ -827,19 +995,5 @@ impl DrawingEditor {
             .child(tile("dp-aformat-line", "Line style", "aux-format-line", !arrow, cx))
             .child(tile("dp-aformat-arrow", "Arrow style", "aux-format-arrow", arrow, cx))
             .into_any_element()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::length_mm;
-
-    #[test]
-    fn lengths_in_drawing_units() {
-        assert_eq!(length_mm("0.12 in", false), Some(0.12 * 25.4));
-        assert_eq!(length_mm("3 mm", true), Some(3.0));
-        assert_eq!(length_mm("0.5", true), Some(0.5 * 25.4));
-        assert_eq!(length_mm("2", false), Some(2.0));
-        assert_eq!(length_mm("-1", false), None);
     }
 }

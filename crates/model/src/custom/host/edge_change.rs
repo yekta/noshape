@@ -3,8 +3,10 @@
 //! extent with it (Hem alignment OUTER, live dom/fs-smprobe3-7.txt). An
 //! option's `offset` moves its edge's line in the face plane, outwards
 //! when positive; the neighbouring sides keep their lines, so their ends
-//! follow, in every face of the sheet sharing a moved corner. Faces keep
-//! their names (and their edges, named from them, theirs).
+//! follow. Only the faces with a moved edge change: a wall meeting the
+//! moved corner keeps its outline (live qa5 Hem on G34: the front flange
+//! still runs to x = 60, 9378.1835 mm³). Faces keep their names (and their
+//! edges, named from them, theirs).
 //! `transformList` and `replaceFace` options are not supported yet.
 
 use super::query::evaluate_refs;
@@ -36,6 +38,9 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
         let mut by_body: BTreeMap<usize, BTreeMap<usize, f64>> = BTreeMap::new();
         for (edges, offset) in &options {
+            if super::trace_ops() {
+                eprintln!("[fs op] edgeChange {:?} -> {:?} offset {offset}", edges, ev.resolve_edges(edges));
+            }
             for (b, e) in ev.resolve_edges(edges) {
                 by_body.entry(b).or_default().insert(e, *offset);
             }
@@ -102,9 +107,10 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, f64>) -> FResult<(Shape
         let (pts, sides) = face_loop(f, &moved)?;
         loops.push((normal(f)?, pts, sides));
     }
-    // New corners where a moved side meets its neighbours.
-    let mut corners: Vec<(DVec3, DVec3)> = Vec::new();
+    // New corners where a moved side meets its neighbours, per face.
+    let mut corners: Vec<Vec<(DVec3, DVec3)>> = Vec::new();
     for (n, pts, sides) in &loops {
+        let mut own = Vec::new();
         let m = pts.len();
         let area: DVec3 = (0..m).map(|k| pts[k].cross(pts[(k + 1) % m])).sum();
         let ccw = area.dot(*n) > 0.0;
@@ -125,11 +131,12 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, f64>) -> FResult<(Shape
                 continue;
             }
             let t = (p1 - p0).cross(d1).dot(c) / c.length_squared();
-            corners.push((pts[k], p0 + d0 * t));
+            own.push((pts[k], p0 + d0 * t));
         }
+        corners.push(own);
     }
     let mut built = Vec::new();
-    for ((n, pts, _), f) in loops.iter().zip(&faces) {
+    for (((n, pts, _), f), corners) in loops.iter().zip(&faces).zip(&corners) {
         let new: Vec<DVec3> = pts.iter().map(|p| corners.iter().find(|(o, _)| o.distance(*p) < TOL).map_or(*p, |x| x.1)).collect();
         if new.iter().zip(pts).all(|(a, b)| a.distance(*b) < TOL) {
             built.push(f.clone());

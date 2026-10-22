@@ -810,11 +810,11 @@ impl DrawingEditor {
     /// Help crop_view: crops can't be made from detail, break or flat
     /// pattern views (says so in the status line).
     pub fn crop_refused(&mut self, v: ViewId) -> bool {
-        let refused = self.current_sheet().view(v).is_some_and(|dv| matches!(dv.kind, ViewKind::Detail { .. }) || !dv.breaks.is_empty() || dv.flat);
-        if refused {
-            self.status = Some("Crop views can't be created from detail, break or flat pattern views".into());
+        let why = self.pk().view_refusal("crop", v);
+        if let Some(why) = why {
+            self.status = Some(why.into());
         }
-        refused
+        why.is_some()
     }
 
     pub fn next_datum_label(&self) -> String {
@@ -963,13 +963,7 @@ impl DrawingEditor {
             }
             Tool::Crop { parent: Some(v), first: Some(f), circle } => {
                 let Some(pl) = self.placement(v) else { return true };
-                let crop = if circle {
-                    let r = len(sub(c, f)) / (pl.scale * 1000.0);
-                    (r > 1e-7).then(|| Crop::Circle { center: pl.to_view(f), radius: r })
-                } else {
-                    let corners = [f, [c[0], f[1]], c, [f[0], c[1]]];
-                    (len(sub(c, f)) > 1.0).then(|| Crop::Polygon(corners.iter().map(|k| pl.to_view(*k)).collect()))
-                };
+                let crop = noshape_scene::drawing_tools::view_crop(&pl, circle, f, c);
                 // The Crop view dialog's ✓ applies it.
                 match crop {
                     Some(crop) => self.crop_done(v, crop, cx),
@@ -978,14 +972,9 @@ impl DrawingEditor {
             }
             Tool::Break { parent, first: None, vertical } => {
                 let v = parent.or_else(|| self.view_at(c));
-                // Onshape: no breaks on detail views.
-                if v.and_then(|v| self.current_sheet().view(v)).is_some_and(|dv| matches!(dv.kind, ViewKind::Detail { .. })) {
-                    self.status = Some("Break views can't be created from detail views".into());
-                    return true;
-                }
-                // Help drawing_section_view: no breaks on views with angular cut lines.
-                if v.is_some_and(|v| self.current_sheet().has_angular_cut(v)) {
-                    self.status = Some("Break views can't be created on views with angular section lines".into());
+                // Onshape: no breaks on detail views, nor on views with angular cut lines.
+                if let Some(why) = v.and_then(|v| self.pk().view_refusal("break", v)) {
+                    self.status = Some(why.into());
                     return true;
                 }
                 if v.is_some() {
@@ -994,12 +983,9 @@ impl DrawingEditor {
             }
             Tool::Break { parent: Some(v), first: Some(f), vertical } => {
                 let Some(pl) = self.placement(v) else { return true };
-                let (a, b) = (pl.to_view(f), pl.to_view(c));
-                let k = if vertical { 0 } else { 1 };
-                let (lo, hi) = (a[k].min(b[k]), a[k].max(b[k]));
-                if hi - lo > 1e-6 {
-                    let (style, gap_mm) = self.break_dlg.as_ref().map(|d| (d.style, d.gap)).unwrap_or((BreakStyle::ZigZag, 6.0));
-                    self.edit_view("Break view", v, cx, |dv| dv.breaks.push(ViewBreak { vertical, a: lo, b: hi, gap_mm, style }));
+                let (style, gap_mm) = self.break_dlg.as_ref().map(|d| (d.style, d.gap)).unwrap_or((BreakStyle::ZigZag, 6.0));
+                if let Some(b) = noshape_scene::drawing_tools::view_break(&pl, vertical, f, c, style, gap_mm) {
+                    self.edit_view("Break view", v, cx, |dv| dv.breaks.push(b));
                 }
                 self.tool = Tool::Select;
             }
@@ -1041,20 +1027,8 @@ impl DrawingEditor {
             }
             Tool::Table { kind, view: Some(v), origin } => {
                 let id = self.current_sheet().next_table_id();
-                let tk = match kind {
-                    TableTool::Bom => TableKind::Bom { view: v, structured: false, bottom_to_top: false, overrides: Vec::new() },
-                    TableTool::CutList => TableKind::CutList { view: v, bottom_to_top: false },
-                    _ => {
-                        let o = origin.clone();
-                        TableKind::Hole { view: v, origin: o.as_ref().map(|o| o.p).unwrap_or([0.0; 2]), origin_ref: o.and_then(|o| o.r), precision: None, flip_x: false, flip_y: false }
-                    }
-                };
-                let name = match kind {
-                    TableTool::Bom => "BOM table",
-                    TableTool::CutList => "Cut list table",
-                    _ => "Hole table",
-                };
-                self.edit_sheet(name, cx, |s| s.tables.push(Table::new(id, tk, c)));
+                let (table, name) = noshape_scene::drawing_tools::view_table(id, kind, v, origin, c);
+                self.edit_sheet(name, cx, |s| s.tables.push(table));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Table(id)];
             }

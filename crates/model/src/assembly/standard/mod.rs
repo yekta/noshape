@@ -408,8 +408,18 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
     if !s.dims.contains_key("d") && matches!(c.shape, Shape::Screw | Shape::Nut | Shape::Pin) {
         f.params.set("d", mm(s.d * u));
     }
-    for (k, v) in &s.dims {
+    // Plain dimensions, then those of the chosen options ("sd@Head
+    // type=Type I": the recess of a Type I head), which take precedence.
+    for (k, v) in s.dims.iter().filter(|(k, _)| !k.contains('@')) {
         f.params.set(k, mm(v * u));
+    }
+    for (k, v) in &s.dims {
+        if let Some((name, cond)) = k.split_once('@')
+            && let Some((param, option)) = cond.split_once('=')
+            && spec.param(param) == option
+        {
+            f.params.set(name, mm(v * u));
+        }
     }
     for (k, v) in &s.counts {
         f.params.set(k, ParamValue::Expr(ExprValue::new(format!("{v}"))));

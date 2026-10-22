@@ -4466,6 +4466,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.21",
  "ttf-parser",
+ "zstd",
 ]
 
 [[package]]

@@ -175,18 +175,13 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         if !both {
             pieces.retain(|p| if front { p.0 > 0.0 } else { p.0 < 0.0 });
         }
-        let mut bodies: Vec<Body> = Vec::new();
-        for (j, (_, _, p)) in pieces.into_iter().enumerate() {
-            let (bid, name) = if j == 0 {
-                (target.id.clone(), target.name.clone())
-            } else {
-                (BodyId { feature: ev.feature, index: (tord * 64 + j) as u32 }, ev.ctx.alloc_part_name(target.kind))
-            };
-            bodies.push(Body::new(bid, name, target.kind, p.shape, p.names.faces, target.color, ev.feature));
-        }
+        // Live ("qa5 booleans"): every piece is a new part (new id) in the
+        // source's colour, at the end of the parts list.
         ev.ctx.bodies.remove(ti);
-        for (k2, b) in bodies.into_iter().enumerate() {
-            ev.ctx.bodies.insert(ti + k2, Arc::new(b));
+        for (j, (_, _, p)) in pieces.into_iter().enumerate() {
+            let bid = BodyId { feature: ev.feature, index: (tord * 64 + j) as u32 };
+            let name = ev.ctx.alloc_part_name(target.kind);
+            ev.ctx.bodies.push(Arc::new(Body::new(bid, name, target.kind, p.shape, p.names.faces, target.color, ev.feature)));
         }
     }
     if !changed {

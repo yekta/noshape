@@ -844,3 +844,31 @@ scope (`replicate_on_edge` -> `default_replicate_scope`), the seed mate (`seed_m
 behave exactly as the dialogs. Behaviour unchanged. Change these rules in `crates/ops/src/assembly.rs`.
 Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_suppressed`) and the Group commit
 (`commit_group`, `GROUP_TOO_FEW`), script /root/api-scratch/patch_asm_switch.py assembly_view.rs.
+
+### 22 Oct (after the freeze): DER8, MT*, A18/A19, sketch Text, catalogue
+* DER8: `AssemblyEvaluator::set_studio_options` (model) + `noshape_ops::derived::assembly_evaluator(cache)` /
+  `studio_options`: Part Studios with Derived (importDerived) or custom features regenerate with the document's
+  sources (their versions in the cache key). Used by the assembly view, assembly drawings (drawing_view, ops
+  drawing), version properties, in-context. Test `derived_parts_are_insertable`. (Build fix: read
+  `studio_cache` before `doc` moves into the view.)
+* DER11: out-of-date context = one icon `icons/incontext-arrow-out-of-date.svg` (own drawing, measured on live
+  519 zoom), one tooltip "Update available for <context>".
+* MT9: Replace instance keeps mate references (no nearest-geometry remap; `analysis::remap_replaced` kept but
+  unused by the app/agent API) → unrelated parts fail with live's "Mate cannot resolve mate connectors."
+* MT6: `Mate::new` Fastened → rotation_axis 0 (Rotate about X). Test.
+* MT3/MT4: chip tooltip "<label> (Click to edit)"; the chip the connector panel edits is bold
+  (`MateDialog::editing_field`, synced at render); related-highlight rows (#ecf0f4 + #90cef1 line, live 305):
+  `related_instances` (selected mate's instances, edited connector's instance) and the Mate features row.
+* MT7 (part): a selected mate highlights only its mated entities (amber, `selected_entities`), triad letters
+  X/Y/Z (`render_triad_letters`). Open: the dashed circle's radius rule and the 0° look (live request 10-22 00:40).
+* MT8: connector Move rows = X↘ Y↗ Z↑ icon rows; preview slider removed (qa5/asm-043), ? on the flip row.
+* A18: Insert catalogue bounds are the exact (optimal) boxes. A19: pending red "<Pattern> N" row + badge
+  (`pending_pattern_row`), root-row error badge, red "Parts to find match in" border.
+* Sketch Text dialog (sketch leftovers): live's feature-dialog layout in the sketch dialog's place
+  (dom/dialog-sketch-text); Convert to expression on the edit box's context menu. Open: fonts (live default
+  Open Sans; we embed Liberation only) — font list requested from live, shipping fonts needs the lead.
+* Catalogue: generator now writes 195 components but the regenerated data FAILED the standard-content tests →
+  tree data restored to HEAD; `NOSHAPE_STD_DATA=<dir>` (tests only) runs the tests on a scratch catalogue.
+  Conditional dims `"<dim>@<param>=<option>"` (standard/mod.rs). Tapping screws staged in scratch
+  (gen/tapping.py, tap/fasteners.fs POINT_BT); blocked on tips C–T, Type III/VI recesses, indent heads (live
+  requests filed). Plan: /root/skb-scratch/PLAN-catalogue.md.

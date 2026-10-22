@@ -14,7 +14,10 @@
 #include <BRepLib.hxx>
 #include <TopExp.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
+#include <BRepAdaptor_Curve.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <Bnd_Box.hxx>
+#include <BRepBndLib.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
@@ -772,7 +775,9 @@ struct Builder
         s = blend_surface(n);
         break;
       case 60:
-        s = new Geom_OffsetSurface(surface(n.ptr("surface")), n.real("offset"));
+        // Parasolid offsets bases OCCT calls not C1 (a blend patch with a
+        // double knot): no continuity check.
+        s = new Geom_OffsetSurface(surface(n.ptr("surface")), n.real("offset"), true);
         break;
       case 67:
         s = new Geom_SurfaceOfLinearExtrusion(curve(n.ptr("section")), D(n.vec("sweep")));
@@ -1118,13 +1123,20 @@ struct Builder
         return false;
       return t.Magnitude() > 0 && on_both(a1, a2, p1, p2, x, t.Normalized(), out);
     };
+    // A chart point lies on the curve to the chart's accuracy: a refined
+    // point much farther away came from a wrong projection (onto an offset of
+    // a blend patch: a curve 23 km long, qa5 IM4) and the chart point stays.
+    double spacing = 0;
+    for (size_t i = 0; i + 1 < cp.size(); ++i)
+      spacing = std::max(spacing, cp[i].Distance(cp[i + 1]));
+    const double near = std::max(100 * r.at_index(n.ptr("chart")).real("chordal_error"), 1e-2 * spacing);
     std::vector<gp_Pnt> exact;
     for (size_t i = 0; i < cp.size(); ++i)
     {
       const gp_Vec t = gp_Vec(cp[i == 0 ? 0 : i - 1], cp[i + 1 < cp.size() ? i + 1 : i]);
       gp_Pnt       q;
       const bool   fixed = (i == 0 && fixed_first) || (i + 1 == cp.size() && fixed_last);
-      exact.push_back(!fixed && refine(cp[i], t, q) && q.Distance(cp[i]) < 10 * cp[0].Distance(cp.back()) ? q : cp[i]);
+      exact.push_back(!fixed && refine(cp[i], t, q) && q.Distance(cp[i]) < near ? q : cp[i]);
     }
     if (extend > 0 && exact.size() >= 2 && exact.front().Distance(exact.back()) > 1e-7)
     {
@@ -1686,7 +1698,47 @@ struct Builder
     TopoDS_Shape out = part;
     if (nsolids == 1 && part.NbChildren() == 1)
       out = last;
-    return heal_import(out, tol);
+    out = heal_import(out, tol);
+    check_rebuilt(out);
+    return out;
+  }
+
+  // A body with a rebuilt (B-spline) edge running far outside the box of its
+  // vertices and exact analytic edges fails instead of importing as garbage
+  // (qa5 IM4: an edge on the offset of a degenerate blend patch, 23 km long).
+  static void check_rebuilt(const TopoDS_Shape& body)
+  {
+    Bnd_Box ref;
+    for (TopExp_Explorer v(body, TopAbs_VERTEX); v.More(); v.Next())
+      ref.Add(BRep_Tool::Pnt(TopoDS::Vertex(v.Current())));
+    std::vector<TopoDS_Shape> rebuilt;
+    for (TopExp_Explorer e(body, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge& E = TopoDS::Edge(e.Current());
+      if (BRep_Tool::Degenerated(E))
+        continue;
+      const GeomAbs_CurveType t = BRepAdaptor_Curve(E).GetType();
+      if (t == GeomAbs_Line || t == GeomAbs_Circle || t == GeomAbs_Ellipse)
+        BRepBndLib::Add(E, ref, false);
+      else
+        rebuilt.push_back(E);
+    }
+    if (ref.IsVoid() || rebuilt.empty())
+      return;
+    ref.Enlarge(10 * std::sqrt(ref.SquareExtent()) + 1e-6);
+    double a0, b0, c0, a1, b1, c1;
+    ref.Get(a0, b0, c0, a1, b1, c1);
+    for (const TopoDS_Shape& E : rebuilt)
+    {
+      Bnd_Box eb;
+      BRepBndLib::Add(E, eb, false);
+      if (eb.IsVoid())
+        continue;
+      double x0, y0, z0, x1, y1, z1;
+      eb.Get(x0, y0, z0, x1, y1, z1);
+      if (x0 < a0 || y0 < b0 || z0 < c0 || x1 > a1 || y1 > b1 || z1 > c1)
+        fail_invalid("parasolid: a curve of the file could not be rebuilt");
+    }
   }
 
   // ---- names and colours (SDL/TYSA_NAME, SDL/TYSA_COLOUR attributes)

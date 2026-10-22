@@ -12,8 +12,7 @@ use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::TabContent;
 use noshape_model::document::TabId;
-use noshape_model::variables::{VarKind, VariableDef, VariableStudio, VsField};
-use noshape_units::ExprValue;
+use noshape_model::variables::{VarKind, VariableStudio, VsField};
 use std::collections::{HashMap, HashSet};
 
 #[path = "variable_config.rs"]
@@ -303,25 +302,56 @@ fn cell_div() -> Div {
     div().w(px(COL_W)).h(px(ROW_H)).flex_none().flex().items_center().border_r_1().border_b_1().border_color(rgb(RULE))
 }
 
+/// A variable table's "Variable type" cell: the type 7 px in, a black ▾ at
+/// the right and Onshape's select list under the cell. Every variable table
+/// draws it alike, a Variable Studio's or a Part Studio's own (live psb/t-807).
+pub(crate) fn type_cell(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Div {
+    let pal = p();
+    let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+    let probe = bounds.clone();
+    let on_select = std::rc::Rc::new(on_select);
+    let label = options.get(current).cloned().unwrap_or_default();
+    cell_div()
+        .relative()
+        // The cell's painted bounds place the select list under it.
+        .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+        .child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text)))
+        .child(
+            // A plain cell (a kit Button centres its label): text 7 px in, as live.
+            div()
+                .id(id)
+                .size_full()
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .pl(px(7.))
+                .pt(px(2.))
+                .child(div().text_size(px(14.)).text_color(pal.text).child(label))
+                .on_click(move |_, window, cx| {
+                    let (options, on_select, b) = (options.clone(), on_select.clone(), bounds.get());
+                    // Onshape's select list (live, document/16).
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                        m = m.select_list(COL_W);
+                        for (k, o) in options.iter().enumerate() {
+                            let f = on_select.clone();
+                            m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(k == current).on_click(move |_, window, cx| f(k, window, cx)));
+                        }
+                        m
+                    });
+                    crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
+                }),
+        )
+}
+
 impl VariableStudioView {
     fn move_variable(&mut self, i: usize, down: bool, cx: &mut Context<Self>) {
         self.inputs.clear();
-        self.edit(if down { "Move variable down" } else { "Move variable up" }, cx, |s| {
-            let j = if down { i + 1 } else { i.wrapping_sub(1) };
-            if i < s.variables.len() && j < s.variables.len() {
-                s.variables.swap(i, j);
-            }
-        })
+        self.edit(noshape_ops::variable_studio::move_description(down), cx, |s| noshape_ops::variable_studio::move_variable(s, i, down))
     }
 
     fn delete_variable(&mut self, i: usize, cx: &mut Context<Self>) {
         self.inputs.clear();
-        self.edit("Delete variable", cx, |s| {
-            if i < s.variables.len() {
-                let v = s.variables.remove(i);
-                s.configuration.configured.retain(|c| c.variable != v.name);
-            }
-        })
+        self.edit("Delete variable", cx, |s| noshape_ops::variable_studio::delete_variable(s, i))
     }
 
     /// The more menu's Rename: edit the studio's name in its title row.
@@ -548,35 +578,15 @@ impl Render for VariableStudioView {
                 continue;
             }
             let name = self.cell(format!("n{i}"), v.name.clone(), window, cx, move |this, val, cx| {
-                this.edit("Rename variable", cx, |s| {
-                    if let Some(v) = s.variables.get_mut(i) {
-                        let (old, new) = (v.name.clone(), val.trim().trim_start_matches('#').to_string());
-                        v.name = new.clone();
-                        s.rename_configured(&old, &new);
-                    }
-                })
+                this.edit("Rename variable", cx, |s| noshape_ops::variable_studio::rename_variable(s, i, &val))
             });
             // Live (qa4 10-20): a bare number gets the workspace unit of a Length
             // / Angle variable ("5" → "5 mm"), as in the Part Studio table.
             let cell_units = units;
             // Shown in the user's decimal separator (stored canonically).
             let expr = self.cell(format!("e{i}"), noshape_units::localize(&v.expr.text), window, cx, move |this, val, cx| {
-                this.edit("Edit variable", cx, |s| {
-                    let Some(v) = s.variables.get(i) else { return };
-                    let kind = match v.kind {
-                        Some(VarKind::Length) => "LENGTH",
-                        Some(VarKind::Angle) => "ANGLE",
-                        _ => "",
-                    };
-                    let text = ExprValue::new(noshape_model::variable_table::with_workspace_unit(kind, &val, &cell_units)).text;
-                    // A configured value: the shown configuration's row.
-                    let name = v.name.clone();
-                    if let Some(slot) = s.configured_text_mut(&name, VsField::Value) {
-                        *slot = text;
-                    } else if let Some(v) = s.variables.get_mut(i) {
-                        v.expr = ExprValue::new(text);
-                    }
-                })
+                // A configured value: the shown configuration's row.
+                this.edit("Edit variable", cx, |s| noshape_ops::variable_studio::set_value(s, i, &val, &cell_units))
             });
             // Convert to expression (live 652–656, as the Part Studio table): the
             // literal shows without its quotes; a failing expression is empty
@@ -587,14 +597,7 @@ impl Render for VariableStudioView {
             let desc_tip = if desc_error { Some("Error regenerating.".to_string()) } else { v.description_expr.then(|| v.description.clone()).filter(|d| !d.is_empty()) };
             let (desc_text, desc_is_expr) = (v.description.clone(), v.description_expr);
             let desc = self.cell(format!("d{i}"), desc_shown, window, cx, move |this, val, cx| {
-                this.edit("Edit variable description", cx, |s| {
-                    let Some(name) = s.variables.get(i).map(|v| v.name.clone()) else { return };
-                    if let Some(slot) = s.configured_text_mut(&name, VsField::Description) {
-                        *slot = val;
-                    } else if let Some(v) = s.variables.get_mut(i) {
-                        v.set_description(&val);
-                    }
-                })
+                this.edit("Edit variable description", cx, |s| noshape_ops::variable_studio::set_description(s, i, &val))
             });
             // Onshape (behaviours.md, Variable Studio): a plain value shows as
             // typed; an expression (`#width * 2`) shows its result ("4 in")
@@ -684,7 +687,6 @@ impl Render for VariableStudioView {
                 }
             };
             let kind = v.kind.unwrap_or(VarKind::Any);
-            let cell_bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
             let kinds = view.clone();
             let menu_view = view.clone();
             rows.push(
@@ -711,55 +713,21 @@ impl Render for VariableStudioView {
                                     .child(cell_input(&name))
                                     .when(overwritten.contains(&v.name), |d| d.child(div().id(("vs-over", i)).absolute().right(px(8.)).top(px(12.)).tooltip(crate::ui::tooltip("Overwritten in another variable table.")).child(crate::ui::glyph("info", 10., rgb(0x666666))))),
                             ))
-                            .child(
-                                cell_div()
-                                    .relative()
-                                    .child({
-                                        // The cell's painted bounds place the select list under it.
-                                        let b = cell_bounds.clone();
-                                        canvas(move |bounds, _, _| b.set(bounds), |_, _, _, _| {}).absolute().top_0().left_0().size_full()
+                            .child({
+                                // Onshape's types (behaviours.md, Variable Studio).
+                                const KINDS: [VarKind; 5] = [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport];
+                                let current = KINDS.iter().position(|k| *k == kind).unwrap_or(0);
+                                type_cell(("vs-kind", i), KINDS.iter().map(|k| kind_label(*k).to_string()).collect(), current, move |k, window, cx| {
+                                    let k = KINDS[k];
+                                    kinds.update(cx, |this, cx| {
+                                        this.edit("Change variable type", cx, |s| noshape_ops::variable_studio::set_kind(s, i, k));
+                                        // From import: its settings are in the Variable dialog.
+                                        if k == VarKind::FromImport {
+                                            crate::variable_import::open(this.doc.clone(), this.tab, i, window, cx);
+                                        }
                                     })
-                                    .child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text)))
-                                    .child(
-                                    // A plain cell (a kit Button centres its label): text 7 px in, as live.
-                                    div()
-                                        .id(("vs-kind", i))
-                                        .size_full()
-                                        .flex()
-                                        .items_center()
-                                        .cursor_pointer()
-                                        .pl(px(7.))
-                                        .pt(px(2.))
-                                        .child(div().text_size(px(14.)).text_color(pal.text).child(kind_label(kind)))
-                                        .on_click(move |_, window, cx| {
-                                            let kinds = kinds.clone();
-                                            let b = cell_bounds.get();
-                                            // Onshape's select list (live, document/16).
-                                            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                                                m = m.select_list(COL_W);
-                                                // Onshape's types (behaviours.md, Variable Studio).
-                                                for k in [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport] {
-                                                    let v = kinds.clone();
-                                                    m = m.item(crate::os_menu::OsMenuItem::new(kind_label(k)).checked(k == kind).on_click(move |_, window, cx| {
-                                                        v.update(cx, |this, cx| {
-                                                            this.edit("Change variable type", cx, |s| {
-                                                                if let Some(var) = s.variables.get_mut(i) {
-                                                                    var.kind = Some(k);
-                                                                }
-                                                            });
-                                                            // From import: its settings are in the Variable dialog.
-                                                            if k == VarKind::FromImport {
-                                                                crate::variable_import::open(this.doc.clone(), this.tab, i, window, cx);
-                                                            }
-                                                        })
-                                                    }));
-                                                }
-                                                m
-                                            });
-                                            crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
-                                        }),
-                                ),
-                            ),
+                                })
+                            }),
                     )
                     // Value: the row menu plus Configure… (help config-rmb-configure-01),
                     // a configured value dotted orange.
@@ -807,14 +775,14 @@ impl Render for VariableStudioView {
         }
         // The last row: an italic "Name" cell; typing a name adds a Length
         // variable set to 0 in the document's length unit.
-        let unit = units.length.symbol();
+        let add_units = units;
         let new_name = self.cell("new".into(), String::new(), window, cx, move |this, val, cx| {
             let name = val.trim().trim_start_matches('#').to_string();
             if name.is_empty() {
                 return;
             }
             this.inputs.remove("new");
-            this.edit("Add variable", cx, |s| s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), description_expr: false, import: None }));
+            this.edit("Add variable", cx, |s| noshape_ops::variable_studio::add_variable(s, &name, &add_units));
         });
         if std::mem::take(&mut self.focus_add_row) {
             // After this frame, once the new row's input is laid out.

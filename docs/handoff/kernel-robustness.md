@@ -43,6 +43,38 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
     (not ST-DEVELOPER / ONSHAPE BY PTC INC; no ST-Developer comment): lead to decide. Tests
     `kernel/tests/export.rs::{step_layout_like_onshape, step_layout_variants_like_onshape}` (pass).
     `ops/src/export.rs`: STEP colours are the part colour's exact sRGB (was a 2.2 gamma).
+- **F8/F9 status (10-22 after freeze):**
+  - `chamfer_into_fillet_corners` now runs *before* OCCT (OCCT's retries "succeeded" with an 11-face solid). It
+    accepts the fillets' mitre edge in the selection: it starts tangent to the chamfered edge, so tangent
+    propagation selects it. Onshape's patch *is* the chamfer running on along that mitre. The patch is named from
+    the mitre edge when it's selected. A chamfer ≥ the fillet radius returns "doesn't apply" → OCCT fails → "too large".
+  - Test `kernel_robustness::chamfer_and_shell_on_filleted_box_match_onshape` (qa4's F8/F9 cases, passing):
+    fillet; chamfer 5 = Onshape's error (live G46: Onshape fails too); chamfer 2 = 10 faces; shell 2.5 after it
+    13946.59 / 21 faces; fillet after chamfer 5.
+  - Open, `shell_details_match_onshape` (#[ignore]) + `shell_thickness_sweep` (ignored, prints):
+    (a) shell 1 mm after chamfer 2: 6053.88 vs Onshape 6052.70: inner patch 3.891 vs 4.189 mm², inner fillet 1
+    145.682 vs 145.437; (b) chamfer-then-fillet shell: Onshape's rim corner is one flat triangle at z=30 (the inner
+    chamfer extended up to the open top), ours two sloped "extrusion" faces from BRepOffset (shell.cpp by_offset);
+    ours fails at 1.10–1.25 mm and works ≥ 2.06 mm, Onshape works ≤ 2.05 and fails ≥ 2.06 (rule unknown; 7/(2+√2)
+    = 2.0503 fits: rim-triangle leg t√2−1 = 2(3−t)). Live G50 data: dom/kern-g50-*-bodydetails.json,
+    samples/g50-*.x_t (our reader: reorder file OK 5990.5231; the g46 one reads with broken offset faces).
+  - `xt_read.cpp`: offset surfaces built without OCCT's C1 check (Parasolid offsets a C1-knotted blend patch).
+  - Kernel test helpers: `export::report_xt` (NOSHAPE_XT, prints faces), `export::write_g47_step` (NOSHAPE_STEP_OUT).
+- **Shell by regions (10-22):** `shell.cpp::by_regions` runs first for inward shells of convex solids (no concave
+  edge per BRepOffset_Analyse) bounded by planes and convex cylinders, removed faces planar: cavity = bounding box
+  − each plane's offset half-space − each fillet's sector beyond r−t (axial extent ± 2t). Probe
+  `/root/kern-scratch/g46/cavity.cpp`: chamfer-then-fillet shell = Onshape's 20/50/32 at 1, 1.5, 2, 2.05 mm,
+  volumes within 0.007 (= Onshape's bias; 1 mm = its x_t 5990.5231). Onshape fails ≥ 2.06 mm: rule unknown,
+  live **G51** asked (thresholds for other chamfer/radius pairs).
+- **IM4 (qa5 pass 12):** g50-g46-shell1.x_t imported as garbage (offset of Onshape's degenerate blend patch: edges
+  through the apex row, where the offset normal is undefined, wander 23 km). Now: intersection refinement keeps
+  chart points unless the refined point is near (100 × chordal_error or 1 % of chart spacing), and
+  `check_rebuilt` fails a body whose edges leave its vertices' box (enlarged by its diagonal) with "parasolid: a
+  curve of the file could not be rebuilt". Proper import open: rebuild such offsets as a fitted B-spline using
+  the limit normals at the degenerate row (the offset apex becomes a curve).
+- **Onshape mass properties carry error bars**: REST volume = [value, min, max]; g49 2 mm 44789.850 in
+  [44786.647, 44793.054]. The "IM2-kind" +0.12/+0.09 (g49), +0.0023 (g48), +0.0035 (g50-reorder) are inside them;
+  our numbers are the exact integrals (g50-reorder equals an independent exact construction).
 - **PERF1 chamfer/fillet of many edges:** `boolean.cpp::blend_in_slabs` (declared in internal.hpp): ≥ 48 edges →
   split the part by planes in gaps between the edges' reach (2 × size), blend each slab in parallel, join on the
   shared cut faces, unify. Probe `/root/kern-scratch/plate/slabs.cpp`: 400 rims 4.3 s → ~1.1 s with glue + USD
@@ -856,3 +888,15 @@ The fallback mesh used deflection `size * 2e-5`, which is ≤ `Precision::Confus
 (miniature screws, small standard content): BRepMesh threw "BRepMesh_IncrementalMesh::initParameters : invalid parameter
 value", so their volume / mass properties failed. Now `std::max(size * 2e-5, 10.0 * Precision::Confusion())`
 (`#include <Precision.hxx>` added). GCC 13 syntax-checked. Caught by assembly::tests::standard_content_parts_regenerate_with_mate_connectors.
+
+### psb → kern (10-22, qa4 F12 release blocker, kernel half)
+OCCT returns an **empty result with no error** for a valid cut: a vertical cylinder (Ø6.35 hole, axis x=50 y=5 mm)
+cut from a 100×50×30 block whose front top edge has a 3 mm fillet (another top edge filleted, the vertical corner
+chamfered 2 mm). The cut fails whenever the cylinder reaches into the fillet (z > 27 mm): plain `make_cylinder` too,
+rotated/shifted tools, a B-spline tool, fuzzy up to 0.1 mm, `Shape::fixed`, split (loses the outer piece). Common and
+tool − target work. Live (Parasolid) cuts it.
+- Shapes: /root/psb-scratch/f12/target.brep, tool0.brep (cuts fine), tool1.brep (fails). Probe test (paste into
+  crates/model/tests/engine.rs, `--ignored --nocapture`): /root/psb-scratch/f12/probe.rs.
+- Model side is done (psb): `boolean_into_with` no longer drops a part on an empty Cut (fuzzy retry, then the feature
+  fails "Removing material failed on Part 1"). Test `engine.rs::feature_pattern_of_a_hole_after_a_part_pattern_keeps_the_parts`
+  accepts that failure for now; once the cut works, tighten it to require the cut (see its comment).

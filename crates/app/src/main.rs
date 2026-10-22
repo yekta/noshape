@@ -7,6 +7,7 @@
 
 mod actions;
 mod fs_profile;
+mod live_server;
 mod std_source;
 mod assembly_mate_dialog;
 mod assembly_scene;
@@ -82,6 +83,7 @@ mod drawing_props;
 mod drawing_scene;
 mod drawing_section;
 mod drawing_shaded;
+mod drawing_wt;
 mod drawing_sheetprops;
 mod drawing_tools;
 mod drawing_ui;

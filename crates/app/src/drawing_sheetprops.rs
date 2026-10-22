@@ -6,7 +6,7 @@
 use crate::drawing_view::*;
 use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
@@ -22,6 +22,20 @@ pub struct SheetPropsState {
     /// Size › Custom: width and height (drawing units).
     pub width: Entity<InputState>,
     pub height: Entity<InputState>,
+    /// Width / height: their last committed texts, the one focused at the
+    /// last render, the Enter subscriptions.
+    lens: [std::rc::Rc<std::cell::RefCell<String>>; 2],
+    focused: Option<usize>,
+    _subs: Vec<Subscription>,
+}
+
+/// Commit a width / height field (Enter, or leaving it): live's text.
+fn commit_len_field(st: &Entity<InputState>, last: &std::cell::RefCell<String>, inches: bool, window: &mut Window, cx: &mut App) {
+    let text = commit_sheet_len(&st.read(cx).value(), &last.borrow(), inches);
+    *last.borrow_mut() = text.clone();
+    if st.read(cx).value() != text {
+        st.update(cx, |s, cx| s.set_value(text, window, cx));
+    }
 }
 
 /// Zone counts of Size › Custom (live 825: 0–20).
@@ -53,6 +67,23 @@ fn parse_sheet_len(text: &str, inches: bool) -> Option<f64> {
     };
     // Help H:sheets: at most 1800 in x 1800 in.
     (mm > 0.0 && mm <= 1800.0 * 25.4).then_some(mm)
+}
+
+/// A width / height field's text after a commit (live `XeInput
+/// OsUnitLengthLineEdit`): a number gets the drawing's unit ("12" →
+/// "12 in", "1+1" → "1 in": the leading number), a number with its own unit
+/// stays as typed ("300 mm"), anything else reverts to `last`.
+pub(crate) fn commit_sheet_len(text: &str, last: &str, inches: bool) -> String {
+    let t = text.trim();
+    let Some(n) = crate::drawing_wt::leading_number(t) else { return last.to_string() };
+    if t.find(|c: char| c.is_ascii_alphabetic()).is_some() && parse_sheet_len(t, inches).is_some() {
+        return t.to_string();
+    }
+    let mm = if inches { n * 25.4 } else { n };
+    if parse_sheet_len(&sheet_len(mm, inches), inches).is_none() {
+        return last.to_string();
+    }
+    sheet_len(mm, inches)
 }
 
 const SCALES: [f64; 12] = [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05, 0.02, 0.01];
@@ -94,8 +125,31 @@ impl DrawingEditor {
         let width = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false).default_value(sheet_len(w, inches)));
         let height = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false).default_value(sheet_len(h, inches)));
         scale.update(cx, |st, cx| st.focus(window, cx));
-        self.sheet_props = Some(SheetPropsState { sheet, scale, width, height });
+        let lens = [&width, &height].map(|f| std::rc::Rc::new(std::cell::RefCell::new(f.read(cx).value().to_string())));
+        let commit = |field: &Entity<InputState>, last: std::rc::Rc<std::cell::RefCell<String>>, window: &mut Window, cx: &mut Context<Self>| {
+            cx.subscribe_in(field, window, move |_, st, ev: &InputEvent, window, cx| {
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    commit_len_field(st, &last, inches, window, cx);
+                }
+            })
+        };
+        let _subs = vec![commit(&width, lens[0].clone(), window, cx), commit(&height, lens[1].clone(), window, cx)];
+        self.sheet_props = Some(SheetPropsState { sheet, scale, width, height, lens, focused: None, _subs });
         cx.notify();
+    }
+
+    /// A width / height field that lost the focus commits like Enter
+    /// (checked at each render: these inputs get no blur event).
+    pub fn track_sheet_len_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let inches = !self.drawing.units_mm;
+        let Some(st) = self.sheet_props.as_mut() else { return };
+        let fields = [st.width.clone(), st.height.clone()];
+        let now = fields.iter().position(|f| f.read(cx).focus_handle(cx).is_focused(window));
+        let before = std::mem::replace(&mut st.focused, now);
+        if let Some(i) = before.filter(|i| Some(*i) != now) {
+            let last = st.lens[i].clone();
+            commit_len_field(&fields[i], &last, inches, window, cx);
+        }
     }
 
     /// ✓: apply the typed scale and close.

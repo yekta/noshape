@@ -84,7 +84,7 @@ pub fn ops() -> Vec<Op> {
             summary: "Draw sketch geometry with a sketch tool (line, rectangle, circle, arc, spline, slot, polygon, ellipse, point...)",
             description: Box::leak(
                 format!(
-                    "Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions (\"10 mm\"). One call = one edit of the sketch (\"Edit : Sketch 1\"). Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:\n{}",
+                    "Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions (\"10 mm\"). One call = one edit of the sketch (\"Edit : Sketch 1\"); `shapes` draws many shapes in that one edit. Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:\n{}",
                     DRAW_TOOLS.iter().map(|(n, _, h)| format!("- {n}: {h}")).collect::<Vec<_>>().join("\n")
                 )
                 .into_boxed_str(),
@@ -93,8 +93,9 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 tab_field(),
                 req("sketch", s(), "Sketch feature id or name."),
-                req("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool."),
-                req("points", json!({ "type": "array", "items": point }), "The clicks, in order: [[x, y], ...]."),
+                opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
+                opt("points", json!({ "type": "array", "items": point.clone() }), "The clicks, in order: [[x, y], ...] (required without `shapes`)."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
             ],
@@ -468,20 +469,49 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let mut t = target(od, tab, a)?;
-    let name = a.str("tool")?;
-    let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param("tool", "unknown drawing tool"))?;
-    let points = a.array("points")?.iter().enumerate().map(|(i, p)| point_value(p, &units).map_err(|e| e.with_param(format!("points[{i}]")))).collect::<Result<Vec<_>, _>>()?;
+    let before: Vec<EntityId> = t.data.sketch.entities().map(|e| e.id).collect();
+    match a.opt_array("shapes")? {
+        // Many shapes, each drawn as its own call would, in one edit.
+        Some(list) => {
+            if list.is_empty() {
+                return Err(OpError::param("shapes", "at least one shape"));
+            }
+            for (i, sh) in list.iter().enumerate() {
+                let p = format!("shapes[{i}].");
+                let obj = sh.as_object().ok_or_else(|| OpError::param(&format!("shapes[{i}]"), "an object { tool, points, sides?, construction? }"))?;
+                let tool = obj.get("tool").and_then(Value::as_str).ok_or_else(|| OpError::param(&format!("{p}tool"), "required"))?;
+                let points = obj.get("points").and_then(Value::as_array).ok_or_else(|| OpError::param(&format!("{p}points"), "required: [[x, y], ...]"))?;
+                let sides = obj.get("sides").map(|v| v.as_u64().ok_or_else(|| OpError::param(&format!("{p}sides"), "an integer"))).transpose()?;
+                let construction = obj.get("construction").map(|v| v.as_bool().ok_or_else(|| OpError::param(&format!("{p}construction"), "true or false"))).transpose()?.unwrap_or(false);
+                draw_shape(&mut t, &units, &p, tool, points, sides, construction)?;
+            }
+        }
+        None => {
+            let (tool, points) = (a.opt_str("tool")?.ok_or_else(|| OpError::param("tool", "required (or `shapes`)"))?, a.opt_array("points")?.ok_or_else(|| OpError::param("points", "required (or `shapes`)"))?);
+            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?)?;
+        }
+    }
+    let (id, tab) = (t.id, t.tab);
+    commit(od, t)?;
+    Ok(sketch_state(od, tab, id, Some(&before))?.into())
+}
+
+/// One drawing tool run on its clicks with a fresh editor, as one
+/// `sketch_draw` call does (`p`: the parameter prefix for errors).
+fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool) -> Result<(), OpError> {
+    let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param(&format!("{p}tool"), "unknown drawing tool"))?;
+    let points = points.iter().enumerate().map(|(i, v)| point_value(v, units).map_err(|e| e.with_param(format!("{p}points[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     if points.is_empty() {
-        return Err(OpError::param("points", "at least one click"));
+        return Err(OpError::param(&format!("{p}points"), "at least one click"));
     }
     let before: Vec<EntityId> = t.data.sketch.entities().map(|e| e.id).collect();
-    let mut ed = editor(&t);
+    let mut ed = editor(t);
     ed.set_tool(tool);
-    if let Some(n) = a.opt_u64("sides")? {
+    if let Some(n) = sides {
         ed.polygon_sides = n.clamp(3, 1000) as usize;
     }
-    for p in &points {
-        click(&mut ed, &mut t.data, *p);
+    for c in &points {
+        click(&mut ed, &mut t.data, *c);
     }
     // Commit what the tool still holds (spline, slot, polygon), then leave it.
     let _ = ed.escape_commit(&mut t.data);
@@ -492,17 +522,15 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let created: Vec<EntityId> = t.data.sketch.entities().map(|e| e.id).filter(|e| !before.contains(e)).collect();
     if created.is_empty() {
         let hint = ed.message.clone().unwrap_or_else(|| format!("the clicks didn't complete a {name} (see sketch_draw's tool list for the clicks it takes)"));
-        return Err(OpError::invalid(format!("nothing was drawn: {hint}")).with_param("points"));
+        return Err(OpError::invalid(format!("nothing was drawn: {hint}")).with_param(format!("{p}points")));
     }
-    if a.bool_or("construction", false)? {
+    if construction {
         for e in &created {
             let _ = t.data.sketch.set_construction(*e, true);
         }
         t.data.sketch.solve();
     }
-    let (id, tab) = (t.id, t.tab);
-    commit(od, t)?;
-    Ok(sketch_state(od, tab, id, Some(&before))?.into())
+    Ok(())
 }
 
 fn constrain(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -628,7 +628,7 @@ impl AssemblyView {
             .border_b_1()
             .border_color(gpui_kit::rgb(0xd7d7d7))
             .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Edit standard content"))
-            .child(div().id("std-edit-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(Icon::new(IconName::Check).with_size(px(18.)).text_color(gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx))))
+            .child(div().id("std-edit-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::assets::icon("dialog-ok", 24., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.std_update(cx))))
             .child(div().id("std-edit-close").size(px(28.)).flex().items_center().justify_center().cursor_pointer().hover(|d| d.bg(pal.panel_hover)).child(crate::assets::icon("dialog-cancel", 18., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| close(this, cx))));
         v_flex()
             .id("std-edit-panel")

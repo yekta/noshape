@@ -757,3 +757,40 @@ fn step_layout_variants_like_onshape() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Writes the G47 three-cube Part Studio as STEP to $NOSHAPE_STEP_OUT (for a
+/// line-by-line comparison with Onshape's samples/g47-3parts.step):
+/// `cargo test -p noshape-kernel --test export write_g47_step -- --ignored`.
+#[test]
+#[ignore]
+fn write_g47_step() {
+    let Some(dir) = std::env::var_os("NOSHAPE_STEP_OUT") else { return };
+    let colors = [[0.6157, 0.8118, 0.9294], [0.6471, 0.6471, 0.6471], [0.2314, 0.3804, 0.7059]];
+    let parts: Vec<ExportShape> = (0..3).map(|i| ExportShape { shape: make_box_corners(DVec3::new(0.02 * i as f64, 0.0, 0.0), DVec3::new(0.02 * i as f64 + 0.01, 0.01, 0.01)).unwrap(), name: Some(format!("Part {}", i + 1)), color: Some(colors[i]) }).collect();
+    write_step_with(&std::path::Path::new(&dir).join("g47 3parts.step"), &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None }).unwrap();
+}
+
+/// Prints the volume and faces (kind, area mm², box mm) of the parts of the
+/// Parasolid file $NOSHAPE_XT (comparing Onshape's bodies with ours):
+/// `cargo test -p noshape-kernel --test export report_xt -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn report_xt() {
+    let Some(path) = std::env::var_os("NOSHAPE_XT") else { return };
+    for p in read_parasolid_parts(std::path::Path::new(&path), LengthUnit::Meter).unwrap() {
+        eprintln!("{:?}: {:.6} mm³, {} faces", p.name, volume_properties(&p.shape).unwrap().mass * 1e9, p.shape.count(ShapeType::Face));
+        for f in p.shape.faces() {
+            let kind = f.face_surface().map(|s| format!("{s:?}").split(['(', ' ', '{']).next().unwrap_or("?").to_string()).unwrap_or_default();
+            let b = f.bounding_box(false).unwrap();
+            eprintln!("    {kind} {:.6} {:.3?}..{:.3?}", f.area().unwrap() * 1e6, (b.min * 1e3).to_array(), (b.max * 1e3).to_array());
+            if f.area().unwrap() < 0.0 || (b.max - b.min).length() > 1.0 {
+                for e in f.edges() {
+                    let i = e.edge_info().unwrap();
+                    let eb = e.bounding_box(false).unwrap();
+                    let kind = format!("{:?}", i.curve).split(['(', ' ', '{']).next().unwrap_or("?").to_string();
+                    eprintln!("        edge {kind} len {:.4} {:.3?}..{:.3?} from {:.3?} to {:.3?}", e.length().unwrap() * 1e3, (eb.min * 1e3).to_array(), (eb.max * 1e3).to_array(), (i.start * 1e3).to_array(), (i.end * 1e3).to_array());
+                }
+            }
+        }
+    }
+}

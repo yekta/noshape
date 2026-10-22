@@ -4,7 +4,8 @@
 //! (several sheets), Overridden dimensions, Text, Color, Units, Options,
 //! Export splines as polylines, Set z-height to zero…, Hide inspection
 //! items, Exclude off-sheet content. Several sheets of a single-page format
-//! download as one zip.
+//! download as one zip; DXF / DWG write them into one file, a layout per
+//! sheet (live drw2 l).
 
 use crate::drawing_view::*;
 use gpui_kit::component::WindowExt as _;
@@ -274,7 +275,7 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
-        let zip = !matches!(s.format, DrawingFormat::Pdf | DrawingFormat::Dwt) && sheets.len() > 1;
+        let zip = !matches!(s.format, DrawingFormat::Pdf | DrawingFormat::Dwt | DrawingFormat::Dxf | DrawingFormat::Dwg) && sheets.len() > 1;
         let ext = if zip { "zip" } else { s.format.ext() };
         // Store file in a new tab: no download.
         if s.options == 2 {
@@ -328,7 +329,7 @@ impl DrawingEditor {
     fn write_export_with(&mut self, s: ExportSettings, sheets: Vec<usize>, name: String, path: Option<PathBuf>, cx: &mut Context<Self>) {
         let f = s.format;
         let store = s.options >= 1;
-        let zip = !matches!(f, DrawingFormat::Pdf | DrawingFormat::Dwt) && sheets.len() > 1;
+        let zip = !matches!(f, DrawingFormat::Pdf | DrawingFormat::Dwt | DrawingFormat::Dxf | DrawingFormat::Dwg) && sheets.len() > 1;
         let file_name = format!("{name}.{}", if zip { "zip" } else { f.ext() });
         if f.csv() {
             let csv = noshape_model::drawing::inspection::rows_csv(&self.inspection_rows(f == DrawingFormat::DefinitionList));
@@ -400,9 +401,19 @@ impl DrawingEditor {
                             exclude_off_sheet: s.exclude_off_sheet,
                             color_mode: if f == DrawingFormat::Pdf || f.raster() { s.color as u8 } else { 0 },
                         };
-                        let mut geo = export::prepare(&built.geometry, &opts);
-                        if i == shaded_sheet && (f == DrawingFormat::Pdf || f == DrawingFormat::Svg || f.raster()) {
-                            for (pos, size, png) in &shaded {
+                        let pictures = i == shaded_sheet && (f == DrawingFormat::Pdf || f == DrawingFormat::Svg || f.raster());
+                        // A shaded view's picture replaces its edges.
+                        let mut g = built.geometry.clone();
+                        if pictures {
+                            for (_, r) in g.view_edges.clone().iter().filter(|(v, _)| shaded.iter().any(|x| x.0 == *v)) {
+                                for l in &mut g.lines[r.clone()] {
+                                    l.points.clear();
+                                }
+                            }
+                        }
+                        let mut geo = export::prepare(&g, &opts);
+                        if pictures {
+                            for (_, pos, size, png) in &shaded {
                                 geo.images.insert(0, noshape_model::drawing::sheet::GeomImage { pos: *pos, size: *size, data_base64: noshape_model::sketch_feature::base64_encode(png).into(), rgb: None });
                             }
                         }
@@ -412,22 +423,27 @@ impl DrawingEditor {
                                 im.rgb = crate::drawing_images::decode_rgb(&im.data_base64);
                             }
                         }
-                        pages.push((drawing.sheets[i].name.clone(), geo));
+                        // DXF / DWG lay the sheets out by their content before exclusion.
+                        let range = noshape_model::drawing::cad_export::content_x_range(&built.geometry);
+                        pages.push((drawing.sheets[i].name.clone(), geo, range));
                     }
                     let files: Vec<(String, Vec<u8>)> = match f {
                         DrawingFormat::Pdf => vec![(String::new(), export::to_pdf_pages_version(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), PDF_VERSIONS[s.version]))],
+                        // Several sheets: one file, a layout per sheet (live drw2 l).
+                        DrawingFormat::Dxf if pages.len() > 1 => vec![(String::new(), noshape_model::drawing::cad_export::to_dxf_sheets(&pages, insunits, cad_version.unwrap_or(noshape_model::drawing::cad_export::CadVersion::AC1009))?)],
+                        DrawingFormat::Dwg if pages.len() > 1 => vec![(String::new(), noshape_model::drawing::cad_export::to_dwg_sheets(&pages, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1))?)],
                         DrawingFormat::Dxf => match cad_version {
-                            Some(v) => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dxf_version(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+                            Some(v) => pages.iter().map(|(n, g, _)| noshape_model::drawing::cad_export::to_dxf_version(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
                             // Release 11-12: the view geometry only (live).
-                            None => pages.iter().map(|(n, g)| (n.clone(), noshape_model::drawing::cad_export::to_dxf_r12(g, insunits).into_bytes())).collect(),
+                            None => pages.iter().map(|(n, g, _)| (n.clone(), noshape_model::drawing::cad_export::to_dxf_r12(g, insunits).into_bytes())).collect(),
                         },
-                        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg_file(g, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+                        DrawingFormat::Dwg => pages.iter().map(|(n, g, _)| noshape_model::drawing::cad_export::to_dwg_file(g, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
                         // With the sheet formats, so Select a DWT gets them back exactly.
                         DrawingFormat::Dwt => {
                             let templates: Vec<noshape_model::drawing::dwt::SheetTemplate> = sheets.iter().filter_map(|i| drawing.sheets.get(*i)).map(noshape_model::drawing::dwt::SheetTemplate::of).collect();
                             vec![(String::new(), noshape_model::drawing::dwt::to_dwt(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &templates, insunits, cad_version.unwrap_or(DWT_VERSIONS[0].1))?)]
                         }
-                        _ => pages.iter().map(|(n, g)| (n.clone(), export::to_svg(g).into_bytes())).collect(),
+                        _ => pages.iter().map(|(n, g, _)| (n.clone(), export::to_svg(g).into_bytes())).collect(),
                     };
                     Ok(files)
                 })

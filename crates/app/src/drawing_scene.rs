@@ -91,28 +91,14 @@ fn push(lines: &mut LineData, pts: &[[f64; 2]], color: [u8; 4], pick: u32, width
 
 /// All sheet polylines as line segments, plus texts the filled font
 /// can't draw (the others: [`sheet_text`]).
-pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>) -> LineData {
+/// `skip`: line ranges drawn separately (shaded views' edges).
+pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>, skip: &[std::ops::Range<usize>]) -> LineData {
     let g = &built.geometry;
     let mut lines = LineData::default();
     lines.segments.reserve(g.lines.len() * 4);
-    for (li, l) in g.lines.iter().enumerate() {
-        if l.points.len() < 2 {
-            continue;
-        }
-        let color = if dangling_picks.contains(&l.pick) {
-            DANGLING_INK
-        } else if let Some(c) = g.line_color(li) {
-            [c[0], c[1], c[2], 255]
-        } else if matches!(l.style, LineStyle::Tangent | LineStyle::Phantom) {
-            TANGENT_INK
-        } else {
-            INK
-        };
-        // Adjust linestyle pens override the style's width and dashes.
-        let (width_mm, dashes) = g.line_pen(li);
-        let width = (width_mm * zoom * 0.45).clamp(1.0, 7.0) as f32;
-        for piece in dash(&l.points, l.closed, &dashes) {
-            push(&mut lines, &piece, color, l.pick, width);
+    for li in 0..g.lines.len() {
+        if !skip.iter().any(|r| r.contains(&li)) {
+            push_sheet_line(&mut lines, built, li, zoom, dangling_picks, true);
         }
     }
     // Drawing properties › Dimensions › Underline overridden dimensions.
@@ -133,6 +119,35 @@ pub fn sheet_lines(built: &BuiltSheet, zoom: f64, dangling_picks: &HashSet<u32>)
         }
     }
     lines
+}
+
+/// The lines `range` of the sheet (with their pick ids, or none).
+pub fn range_lines(built: &BuiltSheet, range: std::ops::Range<usize>, zoom: f64, picked: bool) -> LineData {
+    let mut lines = LineData::default();
+    for li in range {
+        push_sheet_line(&mut lines, built, li, zoom, &HashSet::new(), picked);
+    }
+    lines
+}
+
+fn push_sheet_line(lines: &mut LineData, built: &BuiltSheet, li: usize, zoom: f64, dangling_picks: &HashSet<u32>, picked: bool) {
+    let g = &built.geometry;
+    let Some(l) = g.lines.get(li).filter(|l| l.points.len() >= 2) else { return };
+    let color = if dangling_picks.contains(&l.pick) {
+        DANGLING_INK
+    } else if let Some(c) = g.line_color(li) {
+        [c[0], c[1], c[2], 255]
+    } else if matches!(l.style, LineStyle::Tangent | LineStyle::Phantom) {
+        TANGENT_INK
+    } else {
+        INK
+    };
+    // Adjust linestyle pens override the style's width and dashes.
+    let (width_mm, dashes) = g.line_pen(li);
+    let width = (width_mm * zoom * 0.45).clamp(1.0, 7.0) as f32;
+    for piece in dash(&l.points, l.closed, &dashes) {
+        push(lines, &piece, color, if picked { l.pick } else { 0 }, width);
+    }
 }
 
 /// Sheet texts as filled glyphs (Onshape's sheet text is a filled sans

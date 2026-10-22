@@ -887,7 +887,8 @@ impl AssemblyView {
         });
         let drawing = self.instance_drawing_entry(&inst, multi);
         let tg = targets.clone();
-        let export = if graphics { icon_item("Export…", "export", move |t, w, cx| t.open_asm_export(Some(tg.clone()), w, cx)) } else { item("Export…", move |t, w, cx| t.open_asm_export(Some(tg.clone()), w, cx)) };
+        // Live (menus/rmb-asm-two-instances-selected, rmb-asm-list-instance): no icon.
+        let export = item("Export…", move |t, w, cx| t.open_asm_export(Some(tg.clone()), w, cx));
         // Edit group: mate connector, replace, switch to the source.
         let mut edit: Vec<MenuEntry> = Vec::new();
         // Graphics (live rmb-asm-two-instances-selected): Edit in context,
@@ -996,11 +997,12 @@ impl AssemblyView {
             }));
             m.push(item("Select other…", |t, _, cx| t.select_other(false, cx)));
             m.push(MenuEntry::Sep);
-            m.push(icon_item("Zoom to fit", "zoom-fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
+            // Live (menus/rmb-asm-two-instances-selected): the view items have no icons.
+            m.push(item("Zoom to fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
             let tg = targets.clone();
             m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
             if let Some((forward, up)) = self.hovered_face_normal(cx) {
-                m.push(icon_item("View normal to", "normal", move |t, _, cx| t.viewport.update(cx, |vp, cx| vp.animate_to_direction(forward, up, cx))));
+                m.push(item("View normal to", move |t, _, cx| t.viewport.update(cx, |vp, cx| vp.animate_to_direction(forward, up, cx))));
             }
             m.push(MenuEntry::Sep);
             let tg = targets;
@@ -1876,8 +1878,9 @@ impl AssemblyView {
                     crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
                 }));
                 m.push(MenuEntry::Sep);
-                m.push(icon_item("Zoom to fit", "zoom-fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
-                m.push(icon_item("Isometric", "iso-view", |t, _, cx| t.view(StandardView::Isometric, cx)));
+                // Live (menus/rmb-asm-empty): no icons, as in the Part Studio.
+                m.push(item("Zoom to fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
+                m.push(item("Isometric", |t, _, cx| t.view(StandardView::Isometric, cx)));
                 if !self.selected.is_empty() || self.selected_mate.is_some() {
                     m.push(item("Clear selection", |t, _, cx| {
                         t.clear_selection();
@@ -2663,7 +2666,7 @@ impl AssemblyView {
         // Onshape's "Animate mate" dialog: the DOF chip box, right-aligned
         // fields, Playback type ▾ + reverse, Current value, ▶ ■ and ?.
         use crate::os_ui as os;
-        let field = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).text_right(), 25.)).into_any_element();
+        let field = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)).into_any_element();
         let axis_of = |ix: usize| match ix {
             0 => ("⟳", "z"),
             1 => ("↔", "x"),
@@ -2674,7 +2677,10 @@ impl AssemblyView {
             let (g, ax) = axis_of(ix);
             format!("{g} - {ax} - {}", m.name)
         };
-        let chip_row = os::query_row("anim-dof-chip", chip(dof)).child(div().id("anim-dof-x").child(Icon::new(IconName::Close).with_size(px(12.)).text_color(pal.text_muted))).into_any_element();
+        let chip_row = os::query_row("anim-dof-chip", chip(dof)).child(
+            // Live (dom/dialog-animate): a 20 x 24 "×" span (5 px left pad), 8 x 7 px ink, #666.
+            div().id("anim-dof-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 10., gpui_kit::rgb(0x666666))),
+        ).into_any_element();
         // Live dom dialog-animate: the chip box, 5 px, then 26 px rows.
         let mut body = v_flex().px(px(3.)).pt(px(3.)).pb(px(2.)).child(os::query_box("anim-dof", "Mate DOF to animate", true, vec![chip_row])).child(div().h(px(5.)));
         if dofs.len() > 1 {
@@ -3446,7 +3452,46 @@ impl AssemblyView {
     }
 
     pub(super) fn render_mate_values(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        self.render_value_text(cx)
+        let mut out = self.render_value_text(cx);
+        out.extend(self.render_triad_letters(cx));
+        out
+    }
+
+    /// The selected mate's connector triad carries X / Y / Z letters in the
+    /// axis colours just past the tips (live 305z, qa5 MT7).
+    fn render_triad_letters(&self, cx: &App) -> Vec<AnyElement> {
+        if self.mate.is_some() {
+            return vec![];
+        }
+        let Some(ms) = self.selected_mate.and_then(|id| self.result.mates.iter().find(|m| m.id == id)) else { return vec![] };
+        let Some(f) = ms.frame_b.or(ms.frame_a) else { return vec![] };
+        let vp = self.viewport.read(cx);
+        let size = self.triad_size();
+        let Some(o) = vp.project(f.origin) else { return vec![] };
+        let colors = [crate::theme::viewport::AXIS_X, crate::theme::viewport::AXIS_Y, crate::theme::viewport::AXIS_Z];
+        let mut out = Vec::new();
+        for (k, (axis, letter)) in [(f.x(), "X"), (f.y(), "Y"), (f.z(), "Z")].into_iter().enumerate() {
+            let Some(tip) = vp.project(f.origin + axis * size) else { continue };
+            // 7 px beyond the tip along the axis on screen.
+            let dir = (tip - o).normalize_or_zero();
+            let at = tip + dir * 7.0;
+            out.push(
+                div()
+                    .absolute()
+                    .left(px(at.x as f32 - 5.))
+                    .top(px(at.y as f32 - 7.))
+                    .w(px(10.))
+                    .h(px(14.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_size(px(11.))
+                    .text_color(rgb(colors[k]))
+                    .child(letter)
+                    .into_any_element(),
+            );
+        }
+        out
     }
 
     fn start_value_edit(&mut self, id: MateId, ix: usize, window: &mut Window, cx: &mut Context<Self>) {

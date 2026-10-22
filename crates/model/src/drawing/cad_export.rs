@@ -205,6 +205,150 @@ pub fn cad_document(g: &SheetGeometry, insunits: u8, version: DxfVersion) -> Res
 /// "Sheet2", "Sheet3"... (a DWT keeps sheet 2 as the continuation sheet).
 pub fn cad_document_pages(pages: &[SheetGeometry], insunits: u8, version: DxfVersion) -> Result<CadDocument, String> {
     let k = units_per_mm(insunits);
+    let mut doc = document_tables(&pages.iter().collect::<Vec<_>>(), insunits, version)?;
+    for (pi, g) in pages.iter().enumerate() {
+        let layout = (pi > 0).then(|| format!("Sheet{}", pi + 1));
+        if let Some(name) = &layout {
+            doc.add_layout(name).map_err(|e| e.to_string())?;
+        }
+        add_sheet(&mut doc, g, k, layout.as_deref(), version, 0.0)?;
+    }
+    Ok(doc)
+}
+
+/// Live: the gap between two sheets' contents in model space (5.019 in).
+pub const SHEET_GAP_MM: f64 = 5.019 * 25.4;
+
+/// The x extent (sheet mm) of a sheet's content: its frame and anything
+/// placed off the sheet (live lays the sheets of one file out by it).
+pub fn content_x_range(g: &SheetGeometry) -> [f64; 2] {
+    let mut r = [0.0f64, g.width];
+    let mut add = |x: f64| {
+        r[0] = r[0].min(x);
+        r[1] = r[1].max(x);
+    };
+    for p in g.lines.iter().flat_map(|l| l.points.iter()).chain(g.fills.iter().flat_map(|f| f.points.iter())) {
+        add(p[0]);
+    }
+    for t in &g.texts {
+        for p in super::font::text_box(t) {
+            add(p[0]);
+        }
+    }
+    for im in &g.images {
+        add(im.pos[0]);
+        add(im.pos[0] + im.size[0]);
+    }
+    r
+}
+
+/// Several sheets in ONE file as live writes it (drw2 l): every sheet in
+/// model space, left to right, each one's content (`[lo, hi]` sheet mm,
+/// measured before off-sheet content is excluded) starting
+/// [`SHEET_GAP_MM`] after the previous one's (the first at x = 0), and a
+/// layout per sheet named after it with a viewport onto its frame.
+pub fn cad_document_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8, version: DxfVersion) -> Result<CadDocument, String> {
+    let k = units_per_mm(insunits);
+    let mut doc = document_tables(&sheets.iter().map(|s| &s.1).collect::<Vec<_>>(), insunits, version)?;
+    let mut next = 0.0;
+    let mut names: Vec<String> = Vec::new();
+    for (i, (name, g, [lo, hi])) in sheets.iter().enumerate() {
+        let dx = next - lo;
+        next = hi + dx + SHEET_GAP_MM;
+        add_sheet(&mut doc, g, k, None, version, dx)?;
+        // Layout names are unique: a repeated sheet name gets " (2)"...
+        let mut layout = name.clone();
+        let mut n = 1;
+        while names.contains(&layout) {
+            n += 1;
+            layout = format!("{name} ({n})");
+        }
+        names.push(layout.clone());
+        if i == 0 {
+            rename_layout(&mut doc, "Layout1", &layout);
+        } else {
+            doc.add_layout(&layout).map_err(|e| e.to_string())?;
+        }
+        let (w, h) = (g.width * k, g.height * k);
+        let mut vp = acadrust::entities::Viewport::new();
+        vp.id = 2;
+        vp.center = Vector3::new(w / 2.0, h / 2.0, 0.0);
+        (vp.width, vp.height, vp.view_height) = (w, h, h);
+        vp.view_target = Vector3::new((dx + g.width / 2.0) * k, h / 2.0, 0.0);
+        doc.add_entity_to_layout(EntityType::Viewport(Box::new(vp)), &layout).map_err(|e| e.to_string())?;
+    }
+    Ok(doc)
+}
+
+/// Rename a layout (its object and its ACAD_LAYOUT dictionary entry).
+fn rename_layout(doc: &mut CadDocument, from: &str, to: &str) {
+    let dict = doc.header.acad_layout_dict_handle;
+    for o in doc.objects.values_mut() {
+        match o {
+            acadrust::objects::ObjectType::Layout(l) if l.name == from => l.name = to.to_string(),
+            acadrust::objects::ObjectType::Dictionary(d) if d.handle == dict => {
+                for e in d.entries.iter_mut().filter(|e| e.0 == from) {
+                    e.0 = to.to_string();
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Several sheets in one DXF file ([`cad_document_sheets`]; Release 11-12
+/// has no layouts: the sheets side by side in model space).
+pub fn to_dxf_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8, version: DxfVersion) -> Result<Vec<u8>, String> {
+    if version <= DxfVersion::AC1009 {
+        return Ok(to_dxf_r12(&r12_sheets(sheets), insunits).into_bytes());
+    }
+    let doc = cad_document_sheets(sheets, insunits, version)?;
+    DxfWriter::new(&doc).write_to_vec().map_err(|e| e.to_string())
+}
+
+/// Several sheets in one DWG file, like [`to_dxf_sheets`].
+pub fn to_dwg_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8, version: DxfVersion) -> Result<Vec<u8>, String> {
+    if version <= DxfVersion::AC1009 {
+        return to_dwg(&r12_sheets(sheets), insunits, version);
+    }
+    let doc = cad_document_sheets(sheets, insunits, version)?;
+    DwgWriter::write_to_vec(&doc).map_err(|e| e.to_string())
+}
+
+/// The sheets' Release 11-12 geometry ([`r12_geometry`]) side by side,
+/// laid out like [`cad_document_sheets`].
+fn r12_sheets(sheets: &[(String, SheetGeometry, [f64; 2])]) -> SheetGeometry {
+    let first = sheets.first().map(|s| &s.1);
+    let mut all = SheetGeometry::new(first.map_or(0.0, |g| g.width), first.map_or(0.0, |g| g.height));
+    let mut next = 0.0;
+    for (_, g, [lo, hi]) in sheets {
+        let dx = next - lo;
+        next = hi + dx + SHEET_GAP_MM;
+        let r = r12_geometry(g);
+        if all.cad_objects.is_empty() {
+            all.style = r.style.clone();
+        }
+        all.cad_objects.extend(r.cad_objects.iter().cloned());
+        for (li, l) in r.lines.iter().enumerate() {
+            let i = all.lines.len();
+            let mut l = l.clone();
+            for p in &mut l.points {
+                p[0] += dx;
+            }
+            all.lines.push(l);
+            if let Some(c) = r.line_color(li) {
+                all.colors.push(super::sheet::ColorSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, rgb: c });
+            }
+            all.cad.push(super::cad_layers::CadSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer: r.cad_line_layer(li) });
+        }
+    }
+    all
+}
+
+/// The tables (line types, text and dimension styles, layers) for the
+/// sheets `pages`.
+fn document_tables(pages: &[&SheetGeometry], insunits: u8, version: DxfVersion) -> Result<CadDocument, String> {
+    let k = units_per_mm(insunits);
     let mut doc = CadDocument::with_version(version);
     doc.header.insertion_units = insunits as i16;
     for (name, description, pattern) in LINE_TYPES {
@@ -257,13 +401,6 @@ pub fn cad_document_pages(pages: &[SheetGeometry], insunits: u8, version: DxfVer
             _ => LineWeight::Default,
         };
         let _ = doc.layers.add(layer);
-    }
-    for (pi, g) in pages.iter().enumerate() {
-        let layout = (pi > 0).then(|| format!("Sheet{}", pi + 1));
-        if let Some(name) = &layout {
-            doc.add_layout(name).map_err(|e| e.to_string())?;
-        }
-        add_sheet(&mut doc, g, k, layout.as_deref(), version)?;
     }
     Ok(doc)
 }
@@ -354,6 +491,8 @@ struct Sheet<'a> {
     g: &'a SheetGeometry,
     /// File units per sheet mm.
     k: f64,
+    /// Shift along x (sheet mm): the sheet's place in model space.
+    dx: f64,
     /// R12–R14 layer names in capitals.
     upper: bool,
     version: DxfVersion,
@@ -361,10 +500,10 @@ struct Sheet<'a> {
 
 impl Sheet<'_> {
     fn p2(&self, p: [f64; 2]) -> Vector2 {
-        Vector2::new(p[0] * self.k, p[1] * self.k)
+        Vector2::new((p[0] + self.dx) * self.k, p[1] * self.k)
     }
     fn p3(&self, p: [f64; 2]) -> Vector3 {
-        Vector3::new(p[0] * self.k, p[1] * self.k, 0.0)
+        Vector3::new((p[0] + self.dx) * self.k, p[1] * self.k, 0.0)
     }
 
     /// A POLYLINE (live writes no LWPOLYLINE; view edges with the
@@ -677,9 +816,9 @@ impl Sheet<'_> {
     }
 }
 
-fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&str>, version: DxfVersion) -> Result<(), String> {
+fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&str>, version: DxfVersion, dx: f64) -> Result<(), String> {
     let upper = version <= DxfVersion::AC1014;
-    let sh = Sheet { g, k, upper, version };
+    let sh = Sheet { g, k, dx, upper, version };
     let owner = Owner::Space(layout);
     let p2 = |p: [f64; 2]| sh.p2(p);
     // Section hatches as HATCH entities (live: ANSI31, the 45° lines at the
@@ -985,6 +1124,51 @@ mod tests {
         g.line([50.0, 85.0], [150.0, 85.0], LineStyle::Hidden);
         g.linear_dimension([50.0, 120.0], [150.0, 120.0], 10.0, DimOrientation::Horizontal, "100", 1);
         g
+    }
+
+    /// drw2 l (live drw2-l-3sheets.dxf): three sheets in one file, Sheet2
+    /// with content 5 in left of its frame: the sheets side by side in model
+    /// space, each content box 5.019 in after the previous one, a layout per
+    /// sheet named after it whose viewport looks at that sheet.
+    #[test]
+    fn several_sheets_go_in_one_file_like_live() {
+        let mut b = sample();
+        b.line([-127.0, 100.0], [-120.0, 100.0], LineStyle::Visible);
+        let sheets: Vec<(String, SheetGeometry, [f64; 2])> = [("Sheet1", sample()), ("Sheet2", b), ("Sheet3", sample())]
+            .into_iter()
+            .map(|(n, g)| {
+                let r = content_x_range(&g);
+                (n.to_string(), g, r)
+            })
+            .collect();
+        let doc = cad_document_sheets(&sheets, 1, DxfVersion::AC1032).unwrap();
+        let mut layouts: Vec<String> = doc.objects.values().filter_map(|o| if let acadrust::objects::ObjectType::Layout(l) = o { Some(l.name.clone()) } else { None }).collect();
+        layouts.sort();
+        assert_eq!(layouts, ["Model", "Sheet1", "Sheet2", "Sheet3"]);
+        let dxf = String::from_utf8(to_dxf_sheets(&sheets, 1, DxfVersion::AC1032).unwrap()).unwrap();
+        let lines: Vec<&str> = dxf.lines().map(str::trim).collect();
+        let (mut targets, mut in_vp) = (Vec::new(), false);
+        for pair in lines.chunks(2).filter(|p| p.len() == 2) {
+            if pair[0] == "100" {
+                in_vp = pair[1] == "AcDbViewport";
+            }
+            if in_vp && pair[0] == "17" {
+                targets.push(pair[1].parse::<f64>().unwrap());
+            }
+        }
+        targets.retain(|t| *t > 1.0);
+        targets.sort_by(f64::total_cmp);
+        let w = sheets[0].1.width / 25.4;
+        let left2 = w + 5.019 + 5.0;
+        let left3 = left2 + w + 5.019;
+        let want = [w / 2.0, left2 + w / 2.0, left3 + w / 2.0];
+        assert_eq!(targets.len(), 3, "{targets:?}");
+        for (t, e) in targets.iter().zip(want) {
+            assert!((t - e).abs() < 1e-6, "{targets:?} vs {want:?}");
+        }
+        // Release 11-12: no layouts, the same model space layout.
+        let r12 = String::from_utf8(to_dxf_sheets(&sheets, 1, DxfVersion::AC1009).unwrap()).unwrap();
+        assert!(r12.contains("AC1009") && !r12.contains("AcDbViewport"));
     }
 
     #[test]

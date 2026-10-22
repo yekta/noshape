@@ -12,7 +12,7 @@ use glam::DVec3;
 use noshape_model::display::{BodyKind, SharedMesh, SketchEntityState, StudioDisplay};
 use noshape_model::reference::{FeatureId, Reference};
 use noshape_render::renderer::Uploader;
-use noshape_render::{Drawable, ImageData, ImageHandle, Instance, LineData, LineSegment, LinesHandle, MeshData, MeshHandle, PointData, PointSprite, PointsHandle, Scene, state};
+use noshape_render::{Drawable, ImageData, ImageHandle, Instance, LineData, LineSegment, LinesHandle, MeshData, MeshHandle, PointData, PointSprite, PointsHandle, Scene, SilhouetteData, SilhouetteSegment, state};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -101,6 +101,8 @@ struct CachedBody {
     vertices: PointsHandle,
     /// Mesh faces' triangle sides (live G35), when the body has mesh faces.
     mesh_lines: Option<LinesHandle>,
+    /// Silhouette candidates of its curved faces ([`silhouette_edges`]).
+    silhouettes: Option<LinesHandle>,
 }
 
 /// GPU caches that survive across rebuilds.
@@ -198,6 +200,30 @@ pub struct SceneOptions {
     /// Meshes drawn instead of a part's (Thickness analysis: refined and
     /// colored per vertex, with the part's face pick ids).
     pub replaced_meshes: Option<Arc<HashMap<noshape_model::BodyId, noshape_render::MeshHandle>>>,
+    /// Isolate's other parts below 10 % transparency (live ui/iso-901): drawn
+    /// solid but washed out, faces and edges mixed toward white by
+    /// [`ISOLATE_GHOST`] in sRGB.
+    pub ghost_bodies: Vec<noshape_model::BodyId>,
+    /// Isolate's planes (live ui/iso-901): no fill, the outline at
+    /// [`FAINT_PLANE_ALPHA`] of its opacity (172 → 252 over white).
+    pub faint_planes: bool,
+}
+
+/// See [`SceneOptions::faint_planes`].
+pub const FAINT_PLANE_ALPHA: f32 = 0.04;
+
+/// How far Isolate's ghosts are mixed toward white (live iso-900 → iso-901:
+/// 160 → 234, 107 → 220, 209 → 246, i.e. 0.78 of the way, every face).
+pub const ISOLATE_GHOST: f32 = 0.78;
+
+/// A linear color mixed toward white by `k` in sRGB (see [`ISOLATE_GHOST`]).
+fn ghost_color(c: [f32; 4], k: f32) -> [f32; 4] {
+    let ch = |x: f32| {
+        let s = if x <= 0.003_130_8 { x * 12.92 } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 };
+        let s = s + (1.0 - s) * k;
+        if s <= 0.040_45 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) }
+    };
+    [ch(c[0]), ch(c[1]), ch(c[2]), c[3]]
 }
 
 /// Viewport render style (Onshape's display modes).
@@ -307,6 +333,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
             };
             let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
+            let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(ISOLATE_GHOST) } else { mesh };
             // Parts excluded from the section view are not cut.
             scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
         }
@@ -315,12 +342,24 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             (_, DisplayMode::HiddenLine) => theme::lin(theme::viewport::EDGE_UNSHADED),
             _ => theme::lin(EDGE_COLOR),
         };
+        let edge_color = if opts.ghost_bodies.contains(&b.id) { ghost_color(edge_color, ISOLATE_GHOST) } else { edge_color };
         // A mesh part's triangle sides: thin dark-grey lines at every zoom
         // (live G35, part-studio/551: #464646, 1 px), like edges hidden in
         // plain Shaded mode.
         if let Some(lines) = cached.mesh_lines.clone().filter(|_| opts.display_mode != DisplayMode::Shaded) {
             let l = Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).unpickable().line_scale(opts.graphics.line_width).layer(1);
             scene.instances.push(if opts.section_skip.contains(&b.id) { l.ignore_clip() } else { l });
+        }
+        // Onshape's backface silhouettes: the outline band of opaque solids
+        // (with edges and in hidden line).
+        if b.kind == BodyKind::Solid && color[3] >= 0.999 && matches!(opts.display_mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine) && replaced.is_none() {
+            let s = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).back_silhouette();
+            scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
+        }
+        // Silhouettes of curved faces, like the edges (not in plain Shaded).
+        if let Some(sil) = cached.silhouettes.clone().filter(|_| opts.display_mode != DisplayMode::Shaded && b.kind != BodyKind::Wire) {
+            let s = Instance::new(Drawable::Lines(sil)).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).layer(1);
+            scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
         }
         let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1);
         let edges = if opts.section_skip.contains(&b.id) { edges.ignore_clip() } else { edges };
@@ -429,8 +468,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             // Onshape: CONSTRUCTION_PLANE_AMBIENT_COLOR at CONSTRUCTION_PLANE_OPACITY, outline at 35%.
             let fill = theme::lin(theme::viewport::PLANE_FILL);
             let outline = theme::lin(theme::viewport::PLANE_OUTLINE);
-            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], 0.2]).ignore_clip().unlit().layer(5));
-            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], theme::viewport::PLANE_OUTLINE_ALPHA]).ignore_clip().layer(5));
+            let outline_alpha = theme::viewport::PLANE_OUTLINE_ALPHA * if opts.faint_planes { FAINT_PLANE_ALPHA } else { 1.0 };
+            if !opts.faint_planes {
+                scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], 0.2]).ignore_clip().unlit().layer(5));
+            }
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], outline_alpha]).ignore_clip().layer(5));
         }
     }
 
@@ -649,7 +691,44 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
         }
         up.upload_lines(&l)
     });
-    CachedBody { mesh: up.upload_mesh_parts(&m.positions, &m.normals, &pick_ids, &m.indices), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines }
+    let sil = silhouette_edges(m);
+    let silhouettes = (!sil.segments.is_empty()).then(|| up.upload_silhouettes(&sil));
+    CachedBody { mesh: up.upload_mesh_parts(&m.positions, &m.normals, &pick_ids, &m.indices), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines, silhouettes }
+}
+
+/// Onshape's edge-based silhouettes: every tessellation edge inside a face
+/// (shared by two of its triangles) whose two facets aren't coplanar, with
+/// both facet normals; the renderer draws the ones where one facet faces
+/// the viewer and the other doesn't, like the part's edges (1.25 px).
+pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteData {
+    let mut out = SilhouetteData::default();
+    let p = |i: u32| glam::Vec3::from_array(m.positions[i as usize]);
+    for (fi, &(start, count)) in m.face_ranges.iter().enumerate() {
+        let tris = m.indices[start as usize..(start + count) as usize].as_chunks::<3>().0;
+        // Each side by its (smaller, larger) vertex index: the first
+        // triangle's normal, until the second one comes.
+        let mut open: HashMap<(u32, u32), glam::Vec3> = HashMap::new();
+        for t in tris {
+            if t.iter().any(|&i| i as usize >= m.positions.len()) {
+                continue;
+            }
+            let n = (p(t[1]) - p(t[0])).cross(p(t[2]) - p(t[0])).normalize_or_zero();
+            if n == glam::Vec3::ZERO {
+                continue;
+            }
+            for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                let key = (a.min(b), a.max(b));
+                match open.remove(&key) {
+                    Some(other) if other.dot(n) < 1.0 - 1e-6 => out.segments.push(SilhouetteSegment { a: m.positions[a as usize], b: m.positions[b as usize], n1: other.into(), n2: n.into(), pick_id: fi as u32 + 1, width: 1.25 }),
+                    Some(_) => {}
+                    None => {
+                        open.insert(key, n);
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Apply hover/selection state and rebuild highlight overlays for pick-only

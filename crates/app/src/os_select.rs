@@ -75,6 +75,8 @@ pub struct OsSelect {
     /// field's width; presses inside the list don't close it).
     bounds: Rc<Cell<Bounds<Pixels>>>,
     list_bounds: Rc<Cell<Bounds<Pixels>>>,
+    /// The open list is longer than it can show (draws the scrollbar).
+    list_overflow: Rc<Cell<bool>>,
     /// Scroll of the open list (at most [`LIST_MAX_H`] tall).
     scroll: ScrollHandle,
     _subs: Vec<Subscription>,
@@ -84,7 +86,7 @@ impl EventEmitter<OsSelectEvent> for OsSelect {}
 
 impl OsSelect {
     pub fn new(id: impl Into<SharedString>) -> Self {
-        Self { id: id.into(), items: Vec::new(), current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
+        Self { id: id.into(), items: Vec::new(), current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
     }
 
     /// A shorter field (Hole's lookup rows are 22 px).
@@ -145,7 +147,7 @@ impl OsSelect {
         self._subs = vec![sub];
         self.query.clear();
         self.highlight = self.items.iter().position(|(id, _)| *id == self.current).unwrap_or(0);
-        self.scroll.scroll_to_item(self.highlight);
+        self.scroll.scroll_to_item(self.highlight + 1);
         cx.notify();
     }
 
@@ -251,6 +253,8 @@ impl OsSelect {
             div()
                 .id(row)
                 .h(px(ROW_H))
+                // Rows keep their height: a long list scrolls (live 7½ rows).
+                .flex_none()
                 .flex()
                 .items_center()
                 .pl(px(TEXT_INSET))
@@ -266,26 +270,62 @@ impl OsSelect {
                 }))
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.pick(i, window, cx)))
         });
+        // Live (assembly/36, dialogs/hole-33): a list longer than 200 px
+        // scrolls with Chrome's scrollbar on its right edge; the frame
+        // holds the scrollbar, the inner column scrolls.
+        let overflow = self.list_overflow.get();
+        let (scroll, flag) = (self.scroll.clone(), self.list_overflow.clone());
+        let bar_w = gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH;
         deferred(
             anchored().snap_to_window_with_margin(px(4.)).child(
-                v_flex()
+                div()
                     .id("os-select-list")
                     .occlude()
                     .w(width)
                     .bg(gpui_kit::rgb(0xffffff))
                     .border_1()
                     .border_color(pal.border)
-                    .pt(px(LIST_PAD_TOP))
-                    .pb(px(LIST_PAD_BOTTOM))
                     .font_family(cx.theme().font_family.clone())
                     .relative()
-                    // Live (dialogs/hole-33): long lists (tolerance type, fit
-                    // classes) scroll in a 200 px list.
-                    .max_h(px(LIST_MAX_H))
-                    .overflow_y_scroll()
-                    .track_scroll(&self.scroll)
-                    .children(rows)
-                    .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()),
+                    .child(
+                        v_flex()
+                            .id("os-select-items")
+                            .w_full()
+                            .max_h(px(LIST_MAX_H - 2.))
+                            .overflow_y_scroll()
+                            .track_scroll(&self.scroll)
+                            .when(overflow, |d| d.pr(px(bar_w)))
+                            // The insets are rows: padding on a scroll container
+                            // counts as overflow, and a 3-item list showed a
+                            // scrollbar (qa4 F31, icons2).
+                            .child(div().h(px(LIST_PAD_TOP)).flex_none())
+                            .children(rows)
+                            .child(div().h(px(LIST_PAD_BOTTOM)).flex_none()),
+                    )
+                    .when(overflow, |d| d.child(gpui_kit::component::menu::native_scrollbar(&self.scroll, cx)))
+                    .on_drag_move(cx.listener(|this, e: &DragMoveEvent<gpui_kit::component::menu::NativeThumbDrag>, window, cx| {
+                        gpui_kit::component::menu::native_scrollbar_drag(&this.scroll, e.event.position.y);
+                        window.refresh();
+                        cx.notify();
+                    }))
+                    .child(
+                        canvas(
+                            move |b, window, _| {
+                                probe.set(b);
+                                // Known once laid out: draw again with the scrollbar.
+                                let o = scroll.max_offset().y > px(0.5);
+                                if o != flag.get() {
+                                    flag.set(o);
+                                    window.request_animation_frame();
+                                }
+                            },
+                            |_, _, _, _| {},
+                        )
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full(),
+                    ),
             ),
         )
         .with_priority(3)
@@ -368,14 +408,14 @@ impl Render for OsSelect {
                 let n = this.matches().len();
                 if n > 0 {
                     this.highlight = (this.highlight.min(n - 1) + 1).min(n - 1);
-                    this.scroll.scroll_to_item(this.highlight);
+                    this.scroll.scroll_to_item(this.highlight + 1);
                     cx.notify();
                 }
             }))
             .on_action(cx.listener(|this, _: &SelectUp, _, cx| {
                 let n = this.matches().len();
                 this.highlight = this.highlight.min(n.saturating_sub(1)).saturating_sub(1);
-                this.scroll.scroll_to_item(this.highlight);
+                this.scroll.scroll_to_item(this.highlight + 1);
                 cx.notify();
             }))
             // Tab leaves the open list.

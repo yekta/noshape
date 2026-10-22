@@ -1488,9 +1488,11 @@ fn replace_instance_matches_geometry_when_names_differ() {
     let old = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(old.mates[0].ok);
     let ids = asm.replace_instance(InstanceId(2), InstanceSource::Part { studio: f.studios[1], body: body2.clone(), config: ConfigValues::default() }, "Block B", false);
-    // Without remapping the mate loses its geometry.
+    // Without remapping the mate loses its geometry; Replace instance keeps
+    // it that way (live qa5 MT9: red, with live's message).
     let broken = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(!broken.mates[0].ok);
+    assert_eq!(broken.mates[0].message.as_deref(), Some("Mate cannot resolve mate connectors."));
     let n = analysis::remap_replaced(&mut asm, &ids, &old, &r2.context, Some(&body2));
     assert_eq!(n, 1);
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
@@ -1993,7 +1995,10 @@ fn mate_rotation_offset_about_any_axis() {
         let [x, y, z, w] = res.solved.placement(InstanceId(2)).unwrap().rotation;
         DQuat::from_xyzw(x, y, z, w)
     };
-    // About Z (default): the block turns in the face plane, its Z stays up.
+    // A new Fastened mate rotates about X (live, qa5 MT6); about Z the block
+    // turns in the face plane, its Z stays up.
+    assert_eq!(m.rotation_axis, 0);
+    m.rotation_axis = 2;
     let res = ev.evaluate(&f.doc, &mk(m.clone()), &SolveOptions::default(), None);
     assert!(res.mates[0].ok);
     assert!((rot(&res) * DVec3::Z - DVec3::Z).length() < 1e-6);
@@ -2999,3 +3004,49 @@ fn propagated_inputs_set_the_instances_configuration() {
     cfg.0.insert("size".into(), "default".into());
     assert_eq!(key(&asm.configured(&cfg)).as_deref(), Some("default"));
 }
+
+/// The document's Part Studios as a Derived feature's sources (as the app's
+/// `DocStudios`, without its caching).
+#[derive(Debug)]
+struct DocSources(Document);
+
+impl crate::regen::derived::DerivedProvider for DocSources {
+    fn context(&self, tab: &str) -> Option<std::sync::Arc<crate::regen::context::Context>> {
+        let t = self.0.tabs.iter().find(|t| t.id.to_string() == tab)?;
+        let TabContent::PartStudio(ps) = &t.content else { return None };
+        Some(Regenerator::new().regenerate(ps, &ConfigValues::default(), &UnitPrefs::default(), &RegenOptions::default()).context)
+    }
+    fn version(&self, _tab: &str) -> u64 {
+        0
+    }
+}
+
+/// qa5 DER8: a Part Studio holding only derived parts lists them in Insert
+/// (and they can be inserted): its regeneration finds the source studio.
+#[test]
+fn derived_parts_are_insertable() {
+    let mut f = doc_with(vec![block_studio()]);
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut d = ps.new_feature("importDerived", &units).unwrap();
+    d.params.set("partStudio", ParamValue::Text(f.studios[0].to_string()));
+    ps.features.push(d);
+    let derived_tab = f.doc.add_tab("Part Studio 2", TabContent::PartStudio(ps));
+    // Without sources the derived feature can't make its part.
+    let mut plain = AssemblyEvaluator::new();
+    assert!(plain.studio(&f.doc, derived_tab, &ConfigValues::default()).unwrap().context.bodies.is_empty());
+    let mut ev = AssemblyEvaluator::new();
+    ev.set_studio_options(std::sync::Arc::new(|d: &Document| RegenOptions { derived: Some(std::sync::Arc::new(DocSources(d.clone()))), ..Default::default() }));
+    let r = ev.studio(&f.doc, derived_tab, &ConfigValues::default()).unwrap();
+    assert_eq!(r.context.bodies.len(), 1, "{:?}", r.display.features.iter().map(|x| (&x.status, &x.message)).collect::<Vec<_>>());
+    assert!(!r.display.bodies.is_empty(), "listed in the Insert dialog");
+}
+
+/// qa5 MT6: a new Fastened mate's Offset rotation defaults to "Rotate about X".
+#[test]
+fn fastened_offset_rotates_about_x_by_default() {
+    let c = |i: u64| MateConnectorRef::on(InstanceId(i), vec![], Reference::Origin);
+    assert_eq!(Mate::new(MateId(1), "Fastened 1".into(), MateType::Fastened, c(1), c(2)).rotation_axis, 0);
+    assert_eq!(Mate::new(MateId(2), "Revolute 1".into(), MateType::Revolute, c(1), c(2)).rotation_axis, 2);
+}
+

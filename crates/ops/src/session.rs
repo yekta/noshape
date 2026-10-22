@@ -414,6 +414,14 @@ impl Session {
         Ok(b)
     }
 
+    /// Drop every undo/redo step (the history stays). The app calls this when
+    /// it opens a document: as in Onshape, where a page load starts every
+    /// tab with empty stacks, edits made before can't be undone. A CLI session
+    /// keeps the stack `open` rebuilt from the history.
+    pub fn forget_undo(&mut self) {
+        self.undo = UndoStack::new(self.branch).with_limit(500);
+    }
+
     pub fn switch_branch(&mut self, b: BranchId) -> Result<()> {
         self.branch = b;
         self.undo = UndoStack::new(b).with_limit(500);

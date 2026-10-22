@@ -170,7 +170,7 @@ impl ItemProperties {
         cx.spawn(async move |this, cx| {
             let made = cx
                 .background_spawn(async move {
-                    let evaluator = parking_lot::Mutex::new(noshape_model::assembly::eval::AssemblyEvaluator::new());
+                    let evaluator = parking_lot::Mutex::new(crate::derived::assembly_evaluator(Default::default()));
                     let mut out = Vec::new();
                     for (tab, assembly) in todo {
                         if let Some(t) = at.tab(tab)

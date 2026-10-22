@@ -205,6 +205,7 @@ pub(crate) struct DialogProps {
     width: Pixels,
     max_width: Option<Pixels>,
     margin_top: Option<Pixels>,
+    margin_left: Option<Pixels>,
     close_button: bool,
 
     overlay: bool,
@@ -218,6 +219,7 @@ impl Default for DialogProps {
     fn default() -> Self {
         Self {
             margin_top: None,
+            margin_left: None,
             width: px(448.),
             max_width: None,
             overlay: true,
@@ -483,6 +485,12 @@ impl Dialog {
         self
     }
 
+    /// Set the left offset of the dialog, defaults to None (centred).
+    pub fn margin_left(mut self, margin_left: impl Into<Pixels>) -> Self {
+        self.props.margin_left = Some(margin_left.into());
+        self
+    }
+
     /// Sets the width of the dialog, defaults to 448px.
     ///
     /// The dialog is never wider than the viewport minus a margin on each side.
@@ -638,7 +646,7 @@ impl RenderOnce for Dialog {
             .props
             .width
             .min((view_size.width - margin * 2.).max(px(0.)));
-        let x = (view_size.width - width) / 2.;
+        let x = self.props.margin_left.map_or((view_size.width - width) / 2., |m| m.min((view_size.width - width).max(px(0.))));
         let max_height = (view_size.height - margin * 2. - layer_offset).max(px(0.));
 
         let base_size = window.text_style().font_size;
@@ -681,7 +689,9 @@ impl RenderOnce for Dialog {
                 div()
                     .id("dialog")
                     .test_support()
-                    .occlude()
+                    // Without an overlay the dialog is not modal: the window
+                    // around it stays usable (a feature-style dialog).
+                    .when(self.props.overlay, |d| d.occlude())
                     .w(view_size.width)
                     .h(view_size.height)
                     .child(

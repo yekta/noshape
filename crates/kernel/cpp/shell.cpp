@@ -40,6 +40,10 @@
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepOffset_MakeOffset.hxx>
+#include <BRepPrimAPI_MakeCylinder.hxx>
+#include <gp_Lin.hxx>
+#include <ElSLib.hxx>
+#include <BRepOffset_Analyse.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
@@ -315,6 +319,162 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   out.result = r;
   // The rim is the cut image of the removed faces: no need to search for it.
   out.history = shell_history(solid, r, {hc, hs}, {hc, hs}, sources, {});
+  return true;
+}
+
+// ------------------------------------------------------------------ regions
+
+// Path 0, inward walls of convex solids bounded by planes and convex
+// cylinders (fillets) with planar faces removed: the cavity is where every
+// kept face's offset leaves it, Parasolid's rule of offset faces extended
+// until they meet. A plane's offset is a half-space; a fillet's offset
+// bounds the angular sector its face spans (the sector beyond the offset
+// radius is removed, closed by the sector's sides where a removed face
+// is tangent: Onshape's wall strips). OCCT's offset changes the topology
+// there (live G50: a chamfer next to fillets under a removed top face makes
+// one flat rim triangle in Onshape; BRepOffset gives two sloped faces).
+bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t, double sign,
+                Built& out)
+{
+  if (sign > 0)
+    return false;
+  ShapeIMap rm;
+  for (const TopoDS_Shape& f : removed)
+  {
+    if (BRepAdaptor_Surface(TopoDS::Face(f), false).GetType() != GeomAbs_Plane)
+      return false;
+    rm.Add(f);
+  }
+  // Convex: no concave edge.
+  try
+  {
+    BRepOffset_Analyse an(solid, 0.01);
+    for (TopExp_Explorer e(solid, TopAbs_EDGE); e.More(); e.Next())
+      for (const BRepOffset_Interval& iv : an.Type(TopoDS::Edge(e.Current())))
+        if (iv.Type() != ChFiDS_Convex && iv.Type() != ChFiDS_Tangential)
+          return false;
+  }
+  catch (const Standard_Failure&)
+  {
+    return false;
+  }
+  Bnd_Box bb;
+  BRepBndLib::Add(solid, bb, false);
+  const double margin = 2 * t + 1e-3 * std::sqrt(bb.SquareExtent());
+  bb.Enlarge(margin);
+  double x0, y0, z0, x1, y1, z1;
+  bb.Get(x0, y0, z0, x1, y1, z1);
+  const double big = 4 * std::sqrt(bb.SquareExtent());
+  SourceMap    sources;
+  TopoDS_Shape cavity = BRepPrimAPI_MakeBox(gp_Pnt(x0, y0, z0), gp_Pnt(x1, y1, z1)).Shape();
+  // Cuts `tool` from the cavity; `src` gives the tool faces their source.
+  auto cut_by = [&](const TopoDS_Shape& tool, const SourceMap& src) {
+    BRepAlgoAPI_Cut c(cavity, tool);
+    if (c.HasErrors() || !c.IsDone())
+      return false;
+    const HHist h = c.History();
+    SourceMap   next;
+    auto        carry = [&](const TopoDS_Shape& f, const Source& s) {
+      const ShapeList imgs = images_of(h, f);
+      for (ShapeList::Iterator it(imgs); it.More(); it.Next())
+        if (!it.Value().IsNull())
+          next.Bind(it.Value(), s);
+    };
+    for (SourceMap::Iterator it(sources); it.More(); it.Next())
+      carry(it.Key(), it.Value());
+    for (SourceMap::Iterator it(src); it.More(); it.Next())
+      carry(it.Key(), it.Value());
+    cavity  = c.Shape();
+    sources = next;
+    return true;
+  };
+  std::vector<std::pair<TopoDS_Face, gp_Cylinder>> cylinders;
+  for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(e.Current());
+    if (rm.Contains(f))
+      continue;
+    BRepAdaptor_Surface a(f, false);
+    if (a.GetType() == GeomAbs_Cylinder)
+    {
+      cylinders.emplace_back(f, a.Cylinder());
+      continue;
+    }
+    if (a.GetType() != GeomAbs_Plane)
+      return false;
+    // Outward normal (a left-handed plane frame's surface normal is minus its
+    // axis); the offset plane t inside; everything beyond it goes.
+    gp_Dir n = a.Plane().Axis().Direction();
+    if (!a.Plane().Position().Direct())
+      n.Reverse();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    const gp_Pnt o  = a.Plane().Location().Translated(gp_Vec(n) * -t);
+    gp_Ax3       ax(o, n);
+    gp_Pnt       c0 = o.Translated(gp_Vec(ax.XDirection()) * -big + gp_Vec(ax.YDirection()) * -big);
+    TopoDS_Shape hs = BRepPrimAPI_MakeBox(gp_Ax2(c0, n, ax.XDirection()), 2 * big, 2 * big, big).Shape();
+    SourceMap    src;
+    for (TopExp_Explorer x(hs, TopAbs_FACE); x.More(); x.Next())
+    {
+      BRepAdaptor_Surface s(TopoDS::Face(x.Current()), false);
+      if (s.Plane().Axis().Direction().IsParallel(n, 1e-9) && std::abs(gp_Vec(o, s.Plane().Location()).Dot(gp_Vec(n))) < 1e-9 * big)
+        src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
+    }
+    if (!cut_by(hs, src))
+      return false;
+  }
+  for (const auto& [f, cyl] : cylinders)
+  {
+    // Convex fillet: the outward normal points away from the axis.
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    BRepAdaptor_Surface a(f, true);
+    gp_Pnt              p;
+    gp_Vec              du, dv;
+    a.D1(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    const gp_Ax3& ax  = cyl.Position();
+    const gp_Pnt  pin = ElSLib::Value(0.5 * (u0 + u1), 0.5 * (v0 + v1), cyl);
+    const gp_Vec  radial(gp_Lin(ax.Axis()).Normal(pin).Direction());
+    const double  r = cyl.Radius();
+    if (n.Dot(radial) <= 0 || u1 - u0 >= M_PI - 1e-6 || r <= t * (1 + 1e-9))
+      return false;
+    // The sector [u0, u1] beyond radius r - t, over the face's axial extent
+    // and 2t more each way: a prism of the sector polygon minus the cylinder.
+    const double L  = big;
+    auto         at = [&](double u, double rad, double v) { return ElSLib::Value(u, v, gp_Cylinder(ax, rad)); };
+    const double va = v0 - margin, vb = v1 + margin, um = 0.5 * (u0 + u1), wide = L / std::cos(0.5 * (u1 - u0));
+    std::vector<gp_Pnt> base{at(u0, 0, va), at(u0, L, va), at(um, wide, va), at(u1, L, va)};
+    BRepBuilderAPI_MakePolygon poly;
+    for (const gp_Pnt& q : base)
+      poly.Add(q);
+    poly.Close();
+    TopoDS_Shape sector = BRepPrimAPI_MakePrism(BRepBuilderAPI_MakeFace(poly.Wire(), true).Face(), gp_Vec(ax.Direction()) * (vb - va)).Shape();
+    gp_Ax2       cax(ElSLib::Value(0, va - 1, gp_Cylinder(ax, 0)), ax.Direction(), ax.XDirection());
+    TopoDS_Shape inner = BRepPrimAPI_MakeCylinder(cax, r - t, vb - va + 2).Shape();
+    BRepAlgoAPI_Cut k(sector, inner);
+    if (k.HasErrors() || !k.IsDone())
+      return false;
+    SourceMap src;
+    for (TopExp_Explorer x(k.Shape(), TopAbs_FACE); x.More(); x.Next())
+      src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
+    if (!cut_by(k.Shape(), src))
+      return false;
+  }
+  BRepAlgoAPI_Cut c(solid, cavity);
+  if (c.HasErrors() || !c.IsDone())
+    return false;
+  TopoDS_Shape r = single_solid(c.Shape());
+  if (!valid_solid(r) || solid_count(r) != 1)
+    return false;
+  const double vo = volume_of(solid), vr = volume_of(r);
+  if (!(vr > 0 && vr < vo))
+    return false;
+  const HHist hc = c.History();
+  out.result     = r;
+  out.history    = shell_history(solid, r, {hc}, {hc}, sources, {});
   return true;
 }
 
@@ -1072,7 +1232,8 @@ OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thic
   const double sign = outward ? 1.0 : -1.0;
   Built        b;
   // method: 0 = automatic, 1 = offset only, 2 = slabs only (tests).
-  const bool done = (method != 2 && by_offset(solid.shape, removed, thickness, sign, b)) ||
+  const bool done = (method == 0 && by_regions(solid.shape, removed, thickness, sign, b)) ||
+                    (method != 2 && by_offset(solid.shape, removed, thickness, sign, b)) ||
                     (method != 1 && by_slabs(solid.shape, removed, thickness, sign, b));
   if (!done)
     fail_op("shell failed");

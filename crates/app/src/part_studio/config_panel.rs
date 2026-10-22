@@ -351,11 +351,12 @@ impl PartStudioView {
                 .truncate()
                 .child(text)
         };
+        // Live psb/t-807: the ⌄ at x 6 in the table, the title at x 21.
         let header = h_flex()
             .h(px(35.))
-            .pl(px(4.))
+            .pl(px(5.))
             .pr(px(6.))
-            .gap(px(3.))
+            .gap(px(4.))
             .bg(gpui_kit::rgb(0xeaeaea))
             .border_1()
             .border_color(grid)
@@ -364,7 +365,8 @@ impl PartStudioView {
                 div()
                     .id("pvar-fold")
                     .cursor_pointer()
-                    .child(crate::ui::glyph(if self.ui.var_folded { "ui-chevron-right" } else { "ui-chevron-down" }, 14., pal.text))
+                    // The same fold glyph as the inserted tables (live psb/t-807).
+                    .child(crate::os_ui::glyph(if self.ui.var_folded { crate::os_ui::GLYPH_COLLAPSED } else { crate::os_ui::GLYPH_EXPANDED }, 10., pal.text))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.ui.var_folded = !this.ui.var_folded;
                         cx.notify();
@@ -389,7 +391,8 @@ impl PartStudioView {
         // Only the variables before the rollback bar (live 10-20 o).
         let var_rows = self.studio(cx).map(noshape_model::variable_table::active_rows).unwrap_or_default();
         let count = var_rows.len();
-        let input_cell = |st: &Entity<InputState>| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(13.33)).pl(px(4.))));
+        let input_cell_sized = move |st: &Entity<InputState>, size: f32| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(size)).pl(px(4.))));
+        let input_cell = move |st: &Entity<InputState>| input_cell_sized(st, 13.33);
         // A Name cell holding an invalid name: pink with a red border and the
         // reason as tooltip (live part-studio/554–555).
         let name_cell = |st: &Entity<InputState>, cx: &App| {
@@ -432,17 +435,15 @@ impl PartStudioView {
             const KINDS: [(&str, &str); 6] = [("LENGTH", "Length"), ("ANGLE", "Angle"), ("NUMBER", "Number"), ("ANY", "Any"), ("MEASURED", "Measured"), ("TABLE", "From import")];
             let current = KINDS.iter().position(|(k, _)| *k == r.kind).unwrap_or(0);
             let v_kind = cx.entity();
-            let kind_select = crate::os_ui::select_field(SharedString::from(format!("pvar-kind-{fid}")), KINDS.iter().map(|(_, n)| n.to_string()).collect(), current, move |i, _, cx| {
+            // Drawn as an inserted Variable Studio's (live psb/t-807, qa5 VS3).
+            let kind_select = crate::variable_studio::type_cell(SharedString::from(format!("pvar-kind-{fid}")), KINDS.iter().map(|(_, n)| n.to_string()).collect(), current, move |i, _, cx| {
                 let kind = KINDS[i].0;
                 v_kind.update(cx, |this, cx| {
                     let units = this.doc.read(cx).session.doc.settings.units;
                     this.edit_config("Edit variable", cx, |ps| noshape_model::variable_table::set_kind(ps, fid, kind, &units));
                     this.config_dirty(cx);
                 })
-            })
-            .h(px(32.))
-            .border_0()
-            .rounded(px(0.));
+            });
             let (n1, name, n2) = (r.name.clone(), r.name.clone(), r.name.clone());
             let view = cx.entity();
             // Measured / From import: the evaluated value, or "Not set", and
@@ -468,7 +469,8 @@ impl PartStudioView {
                     )
                     .into_any_element()
             } else {
-                input_cell(&value_st).into_any_element()
+                // The value at 14 px, as a Variable Studio's value cell (qa5 VS3).
+                input_cell_sized(&value_st, 14.).into_any_element()
             };
             rows.push(
                 h_flex()
@@ -489,7 +491,7 @@ impl PartStudioView {
                     .child(
                         h_flex()
                             .child(name_cell(&name_st, cx))
-                            .child(div().w(px(140.)).h(px(34.)).flex_none().border_r_1().border_b_1().border_color(grid).child(kind_select))
+                            .child(kind_select)
                             .child(value_cell)
                             .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count)),
                     )

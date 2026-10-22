@@ -66,7 +66,8 @@ impl T {
         regs.iter().map(|x| Reference::SketchRegion { sketch, key: x.key.clone() }).collect()
     }
     fn extrude(&mut self, region: Reference, depth: &str, op: &str) -> FeatureId {
-        self.add("extrude", &[("entities", q(vec![region])), ("depth", e(depth)), ("operationType", en(op))])
+        // Add / Remove merge with what they touch ("Merge with all").
+        self.add("extrude", &[("entities", q(vec![region])), ("depth", e(depth)), ("operationType", en(op)), ("defaultScope", ParamValue::Bool(op != "NEW"))])
     }
     /// Block [x0,x1]x[y0,y1]x[0,h] on the Top plane.
     fn block(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, h: &str) -> (FeatureId, FeatureId) {
@@ -192,7 +193,7 @@ fn thicken_region_and_face() {
     assert!(near(total_volume(&res.context), 0.04 * 0.02 * 0.005, 1e-6), "thicken volume {} faces {}", total_volume(&res.context), res.context.bodies[0].faces.len());
     // Thicken the top face of the new part with Add: the part grows.
     let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
-    t.add("thicken", &[("entities", q(vec![top])), ("thickness1", e("3 mm")), ("operationType", en("ADD"))]);
+    t.add("thicken", &[("entities", q(vec![top])), ("thickness1", e("3 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 1);
     assert!(near(total_volume(&res.context), 0.04 * 0.02 * 0.008, 1e-6));
@@ -428,9 +429,11 @@ fn split_part_by_plane() {
     let sp = t.add("splitPart", &[("targets", q(vec![body_ref(&BodyId { feature: x, index: 0 })])), ("tool", q(vec![Reference::FeaturePlane(pl)]))]);
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 2);
-    // Front piece (positive x side) keeps the original id.
+    // Live ("qa5 booleans"): both pieces are new parts, the front piece
+    // (positive x side) first.
     let b0 = &res.context.bodies[0];
-    assert_eq!(b0.id, BodyId { feature: x, index: 0 });
+    assert!(res.context.bodies.iter().all(|b| b.id != BodyId { feature: x, index: 0 }));
+    assert_eq!(b0.color, res.context.bodies[1].color, "both keep the source colour");
     assert!(near(b0.shape.volume().unwrap(), 0.07 * 0.04 * 0.02, 1e-6));
     assert!(near(res.context.bodies[1].shape.volume().unwrap(), 0.03 * 0.04 * 0.02, 1e-6));
     t.set(sp, "keepBothSides", b(false));
@@ -483,6 +486,7 @@ fn linear_part_pattern_new_add_and_skip() {
     t.set(lp, "skipInstances", b(false));
     t.set(lp, "distance", e("5 mm"));
     t.set(lp, "operationType", en("ADD"));
+    t.set(lp, "defaultScope", ParamValue::Bool(true));
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 1);
     assert!(near(total_volume(&res.context), 0.02 * 0.01 * 0.01, 1e-6));

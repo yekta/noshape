@@ -1254,8 +1254,13 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
     if copy {
         let copies = copy_bodies(ev, &bodies, &inst, true)?;
         pattern_connectors(ev, refs, &inst);
+        // Live ("qa5 booleans", Copy here…): a copy keeps its source's
+        // colour (a Part pattern's copies take the next colours instead).
         for (_, bj, kind, ns) in copies {
-            push_body(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces);
+            let color = ev.ctx.bodies[bodies[bj]].color;
+            let name = ev.ctx.alloc_part_name(kind);
+            let f = ev.feature;
+            ev.ctx.bodies.push(Arc::new(Body::new(BodyId { feature: f, index: bj as u32 }, name, kind, ns.shape, ns.names.faces, color, f)));
         }
         return Ok(());
     }

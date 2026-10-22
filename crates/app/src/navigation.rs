@@ -367,20 +367,25 @@ const TIMING_FREQUENCY: u32 = 10;
 /// Timings averaged (`addTiming` keeps the last 5).
 const TIMINGS_KEPT: usize = 5;
 
-/// The last [`TIMINGS_KEPT`] timings and their mean (`averageTime`).
+/// The last [`TIMINGS_KEPT`] timings, their mean (`averageTime`) and how
+/// many were added since the last reset (`timingCount`).
 #[derive(Clone, Debug, Default)]
-struct Timings(std::collections::VecDeque<f64>);
+struct Timings {
+    kept: std::collections::VecDeque<f64>,
+    count: u32,
+}
 
 impl Timings {
     fn add(&mut self, ms: f64) {
-        self.0.push_back(ms);
-        if self.0.len() > TIMINGS_KEPT {
-            self.0.pop_front();
+        self.kept.push_back(ms);
+        if self.kept.len() > TIMINGS_KEPT {
+            self.kept.pop_front();
         }
+        self.count += 1;
     }
 
     fn average(&self) -> Option<f64> {
-        (!self.0.is_empty()).then(|| self.0.iter().sum::<f64>() / self.0.len() as f64)
+        (!self.kept.is_empty()).then(|| self.kept.iter().sum::<f64>() / self.kept.len() as f64)
     }
 }
 
@@ -433,10 +438,114 @@ impl FrameTimer {
         self.draw.add(draw.as_secs_f64() * 1000.0);
     }
 
+    /// Frames slower than [`DETAIL_REDUCTION_THRESHOLD_FPS`] on average.
+    fn too_slow(average: Option<f64>) -> bool {
+        average.is_some_and(|a| a > 1000.0 / DETAIL_REDUCTION_THRESHOLD_FPS)
+    }
+
     /// `isInteractiveFramerateBelowThreshold`.
     pub fn below_threshold(&self) -> bool {
-        let limit = 1000.0 / DETAIL_REDUCTION_THRESHOLD_FPS;
-        self.draw.average().is_some_and(|a| a > limit) || self.frame.average().is_some_and(|a| a > limit)
+        Self::too_slow(self.draw.average()) || Self::too_slow(self.frame.average())
+    }
+}
+
+/// Above this interactive frame rate detail comes back
+/// (`DETAIL_ENHANCEMENT_THRESHOLD_FPS`).
+pub const DETAIL_ENHANCEMENT_THRESHOLD_FPS: f64 = 30.0;
+/// Lowest-LOD body share steps (`LOW_LEVEL_BODY_PROPORTION_STEP`,
+/// `MAX_LOW_LEVEL_BODY_PROPORTION`).
+const LOW_LEVEL_BODY_PROPORTION_STEP: f64 = 0.1;
+const MAX_LOW_LEVEL_BODY_PROPORTION: f64 = 0.9;
+
+/// Onshape's interactive detail settings (DetailManager's per-viewer
+/// settings): what interactive frames draw.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DetailSettings {
+    pub edge_silhouettes: bool,
+    pub section_edges: bool,
+    pub ssao: bool,
+    pub backface_silhouettes: bool,
+    /// The share of bodies drawn at their lowest level of detail.
+    pub low_level_body_proportion: f64,
+}
+
+impl Default for DetailSettings {
+    fn default() -> Self {
+        Self { edge_silhouettes: true, section_edges: true, ssao: true, backface_silhouettes: true, low_level_body_proportion: 0.0 }
+    }
+}
+
+impl DetailSettings {
+    /// `decreaseDetail`: edge silhouettes and section edges, then ambient
+    /// occlusion, then backface silhouettes, then more bodies at their
+    /// lowest LOD. Whether anything changed.
+    pub fn decrease(&mut self) -> bool {
+        if self.edge_silhouettes || self.section_edges {
+            self.edge_silhouettes = false;
+            self.section_edges = false;
+        } else if self.ssao {
+            self.ssao = false;
+        } else if self.backface_silhouettes {
+            self.backface_silhouettes = false;
+        } else if self.low_level_body_proportion < MAX_LOW_LEVEL_BODY_PROPORTION {
+            self.low_level_body_proportion = (self.low_level_body_proportion + LOW_LEVEL_BODY_PROPORTION_STEP).min(MAX_LOW_LEVEL_BODY_PROPORTION);
+        } else {
+            return false;
+        }
+        true
+    }
+
+    /// `increaseDetail`, the other way round (`ssao` / `silhouettes`: the
+    /// platform allows them interactively).
+    pub fn increase(&mut self, ssao: bool, silhouettes: bool) -> bool {
+        if self.low_level_body_proportion > 0.0 {
+            self.low_level_body_proportion = (self.low_level_body_proportion - LOW_LEVEL_BODY_PROPORTION_STEP).max(0.0);
+        } else if !self.backface_silhouettes && silhouettes {
+            self.backface_silhouettes = true;
+        } else if !self.ssao && ssao {
+            self.ssao = true;
+        } else if !self.edge_silhouettes && silhouettes {
+            self.edge_silhouettes = true;
+        } else if !self.section_edges {
+            self.section_edges = true;
+        } else {
+            return false;
+        }
+        true
+    }
+}
+
+/// Onshape's DetailManager for interactive frames
+/// (`updateInteractiveSettings`, run for every interactive frame): slow
+/// draws step detail down at once (and restart the draw timings); every
+/// second frame-interval timing, slow frames step it down and fast ones
+/// (over [`DETAIL_ENHANCEMENT_THRESHOLD_FPS`]) step it back up.
+#[derive(Clone, Debug, Default)]
+pub struct DetailManager {
+    pub interactive: DetailSettings,
+    last_acted: Option<u32>,
+}
+
+impl DetailManager {
+    pub fn update(&mut self, timer: &mut FrameTimer) {
+        let count = timer.frame.count;
+        let Some(last) = self.last_acted else {
+            self.last_acted = Some(count);
+            return;
+        };
+        if FrameTimer::too_slow(timer.draw.average()) {
+            self.interactive.decrease();
+            timer.draw = Timings::default();
+        } else if count.saturating_sub(last) >= 2 {
+            let frames = timer.frame.average();
+            if FrameTimer::too_slow(frames) {
+                self.interactive.decrease();
+                self.last_acted = Some(count);
+            } else if frames.is_some_and(|a| a < 1000.0 / DETAIL_ENHANCEMENT_THRESHOLD_FPS) {
+                self.interactive.increase(true, true);
+                self.last_acted = Some(count);
+            }
+        }
     }
 }
 
@@ -1132,6 +1241,61 @@ mod tests {
             early.draw_start(ms(i * 70));
         }
         assert!(!early.below_threshold());
+    }
+
+    #[test]
+    fn detail_steps_down_and_back_like_onshape() {
+        // decreaseDetail's order, then the floor.
+        let mut d = DetailSettings::default();
+        assert!(d.decrease() && !d.edge_silhouettes && !d.section_edges && d.ssao);
+        assert!(d.decrease() && !d.ssao && d.backface_silhouettes);
+        assert!(d.decrease() && !d.backface_silhouettes && d.low_level_body_proportion == 0.0);
+        for _ in 0..20 {
+            d.decrease();
+        }
+        assert!((d.low_level_body_proportion - 0.9).abs() < 1e-9 && !d.decrease());
+        // increaseDetail: LOD first, then backface silhouettes, SSAO, edge
+        // silhouettes, section edges.
+        // (0.9 less nine 0.1 steps is ~1e-17 in doubles, as in Onshape's
+        // JavaScript: one more step to 0.)
+        let mut steps = 0;
+        while d.low_level_body_proportion > 0.0 {
+            assert!(d.increase(true, true));
+            steps += 1;
+        }
+        assert!((9..=10).contains(&steps) && !d.backface_silhouettes);
+        assert!(d.increase(true, true) && d.backface_silhouettes && !d.ssao);
+        assert!(d.increase(true, true) && d.ssao && !d.edge_silhouettes);
+        assert!(d.increase(true, true) && d.edge_silhouettes && !d.section_edges);
+        assert!(d.increase(true, true) && d == DetailSettings::default() && !d.increase(true, true));
+
+        // The manager: slow draws step down at once; frame intervals act
+        // every second timing (a timing every tenth frame).
+        let t0 = Instant::now();
+        let ms = |n: u64| t0 + Duration::from_millis(n);
+        let mut m = DetailManager::default();
+        let mut timer = FrameTimer::default();
+        m.update(&mut timer);
+        timer.draw_end(Duration::from_millis(80));
+        m.update(&mut timer);
+        assert!(!m.interactive.edge_silhouettes && m.interactive.ssao, "one step down on a slow draw");
+        // 70 ms frames with quick draws: two interval timings, one more step.
+        let mut at = 0;
+        for _ in 0..24 {
+            timer.draw_start(ms(at));
+            timer.draw_end(Duration::from_millis(5));
+            m.update(&mut timer);
+            at += 70;
+        }
+        assert!(!m.interactive.ssao, "slow frames step down again");
+        // Fast frames bring detail back.
+        for _ in 0..200 {
+            timer.draw_start(ms(at));
+            timer.draw_end(Duration::from_millis(2));
+            m.update(&mut timer);
+            at += 10;
+        }
+        assert_eq!(m.interactive, DetailSettings::default());
     }
 
     #[test]

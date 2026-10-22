@@ -56,8 +56,8 @@ it, so re-take positions after every selection.
 | 3.2 | Depth: 1st click / "30" Enter / Enter | Selects all / "30 mm" re-selected, dialog stays / commits; sketch hidden | ✅ |
 | 3.3 | Shift+7 | Isometric | ✅ |
 | 3.4 | Shift+F, two edges, "3" Enter Enter | Fillet 1 | ✅ |
-| 3.5 | Chamfer (dropdown) on the edge meeting both fillets, 5 mm | ? (Parasolid) | ✗ F8 (fails; 2 mm works) |
-| 3.6 | Shell, remove top face, 2.5 / 1 mm | Shells | ✗ F9 |
+| 3.5 | Chamfer on the vertical edge meeting both 3 mm fillets: 5 mm, then 2 mm | 5 mm: **error "Distance of chamfer on face too large."** (live G46: Onshape refuses it too); 2 mm builds Onshape's 10-face shape | (F8 fixed per kern 10-22; re-run) |
+| 3.6 | Shell, remove top face, 2.5 / 1 mm | Shells (2.5 mm: 13946.59 mm³, 21 faces, kern 10-22) | (F9 fixed per kern 10-22; re-run) |
 | 3.7 | After Enter committed a value, Esc | Cancels the dialog (no pending edit) | ✅ |
 | 3.8 | Sketch points on the top face; Hole from the sketch | One chip "Vertices of Sketch 2"; one hole per point | ✗ F10 |
 | 3.9 | Hole defaults and callout | Drilled 1/4 (6.35 mm), 12 mm blind, 118 deg; "Ø6.35 ↧ 12" callout; row "Ø 6.35 mm ↧ 12 mm" | ✅ |
@@ -67,7 +67,7 @@ it, so re-take positions after every selection.
 | 3.13 | Esc while a select's search box is open | Closes the list only | ✗ F13 |
 | 3.14 | Mirror, Part type: Part 3 about Right | Part 4 | ✅ |
 | 3.15 | Shift+X while a feature dialog is open | ? | ✗ F14 (Section view opens on top of the open Mirror dialog) |
-| 3.16 | Boolean union Part 3 + Part 4 | One part | ✅ |
+| 3.16 | Boolean union Part 3 + Part 4 | Touching parts: one part. Parts that don't touch (live 10-22): **two unchanged parts, the row stays black with no error**, and while editing a blue info bubble **"Boolean resulted in no geometry change…"** (psb BOOL1) | ✅ touching; disjoint: re-run |
 
 ## 4. Edit, roll back, reorder, suppress, delete, undo (live: "Rollback bar", "Right-click menus")
 
@@ -217,3 +217,35 @@ direction = Part 1's bottom-right edge, 10 mm × 2 → sliver Part 4 + facets; t
 **Live answers (10-21, behaviours.md "Mass properties without material + the material notice"):**
 - **F18 closed, matches live:** without a material live also leaves Mass, Center of mass X/Y/Z and all nine inertia values **empty** (Override boxes disabled), Volume and Surface area filled, the Part chip in red text. Our panel is the same.
 - **F19 still differs (psb / ui):** live shows a **page toast** (yellow warning bubble, top centre, "⚠ One or more parts do not have a material defined." ×; bg rgb(255,248,230), border rgb(252,218,127)) **≈3.6 s after** the panel opens with a part lacking material, **auto-hides ≈4.6 s later**, and only **once per page load** (re-opening in the same session shows none; closing the panel doesn't touch it). Ours: first run showed it and it never auto-hid; on the 14:32 build and 5d28447 it never appears.
+
+## v0.4.5 gate re-run: 5bd50b2 (target-lead build, files = 5bd50b2), FRESH=1 profile, 2026-10-21 23:35 – 10-22 00:15, qa4
+
+**Result: FAIL** on F8 and F9 (kern). F12, F19 and F26 now pass. Four new findings (F30–F33) and one palette finding (F34), none blocking on its own.
+
+| Section | Rows | Result |
+|---|---|---|
+| 1 New document | 1.1–1.4 | ✅ (footer hash again the stale /root/noshape-lead HEAD e4b90e2) |
+| 2 Sketch | 2.1–2.20 | ✅ all (☑ Show constraints / ☑ Show errors; chain, Enter mid-chain, Esc; G/C/A; E; D value box selected; 25; 1 in → Ø25.4 tan; ƒ Ø15; (10+5) mm; Esc reverts + blurs; #w → Create variable; abc → pink, ✓ disabled, "Enter a valid expression."; R20 / 40 typed right after the placing click; Enter with no tool keeps the sketch) |
+| 3 Features | 3.1–3.4, 3.7–3.11, 3.13–3.15 | ✅ |
+| | 3.5 chamfer 5 mm next to the two 3 mm fillets (F8) | ✗ kern (red; 2 mm works) |
+| | 3.6 shell 2.5 mm, top face removed (F9) | ✗ kern (red) |
+| | 3.10 count field | ✗ **F30** (Enter kept the dialog open; see below) |
+| | 3.12 Feature pattern of Hole 1 after the Part pattern, Part 1's bottom-right edge, 10 mm × 2 (F12 path) | ✅ real holes, Parts (3), no sliver or facets |
+| | 3.16 Boolean union of the disjoint Part 3 + mirrored Part 4 | ? (no error, parts unchanged; same as last run) |
+| 4 Edit / history | 4.1 Extrude 1 → 25 mm with the Feature pattern active (F12) | ✅ rolled back while editing; Part 1 kept |
+| | 4.2, 4.4–4.8 | ✅ |
+| | 4.3 drag Fillet 1 down onto the Sketch 2 row | ✗ **F33**: the drop line is drawn above Sketch 2, but the feature lands **below** Sketch 2 (dragging up lands where the line is) |
+| 5 Variables … units | 5.1–5.11 | ✅ (5.6 F19 now as live: toast ≈3.4 s after opening, gone by ≈8 s, not shown again on reopening; 5.11 accepts the sketch first, live not captured) |
+| 6 Assembly / drawing | 6.1–6.7 | ✅ |
+| 7 Export / reopen | 7.1–7.3 | ✅ (7.2 F26: flat products Part 4…1, id = name = description, no PRODUCT('SOLID'), AP242 header, METRE, one colour per part = live G47; originating system 'NOSHAPE 0.4.4' vs live 'ONSHAPE BY PTC INC') |
+
+New findings (10-22):
+| # | Finding | Repro | Owner |
+|---|---|---|---|
+| F30 | **Instance count + Enter** in Linear pattern keeps the dialog open and re-selects the value (the next key replaced it). Live ("Input behaviour" › Enter): Instance count Enter **accepts the whole feature dialog** | Linear pattern › Instance count, click, "3", Enter | psb |
+| F31 | Fillet ▾ toolbar dropdown (Fillet, Face blend) shows a **scrollbar** and scrolls 2 px; live is a plain two-row list | click the ▾ next to Fillet | ui |
+| F32 | A **Create variable popup** left open (from "#wabc" in a dimension box) **outlives the box**: Esc closes the box, but re-opening the box shows the old popup again | dim box "#wabc" Enter, Esc Esc, click away, double-click the dimension | psb (sketch dim box) |
+| F33 | Feature drag **down**: the drop line is drawn at the hovered row's top, but `interaction::reordered` puts the feature **after** that row; line and result must agree (live capture requested in REQUESTS.md, qa4 10-21 23:59) | drag Fillet 1 onto the row two below | psb |
+| F34 | **Default part colours** (`regen/display.rs PART_COLORS`): ours #9dcfed, #9a9a9a, #4e6fb7, #ebebeb, #c8e6f5, #fd9c28, #787878, #ebb115; live (behaviours.md "Default part colour rotation", dom/default-part-colors.txt, and live's STEP colours) #9dcfed, **#a5a5a5, #3b61b4, #eaeaea, #c4e2f3, #f88701, #7f7f7f, #fab601**. (Row 3.10 was passed by eye earlier.) | Linear pattern of a part ×3 | ui2 |
+
+Routing (lead, 10-22): F30, F32, F33 → psb; F31 → ui; F34 → ui2. 3.16: live request filed (REQUESTS.md, qa4 10-22).

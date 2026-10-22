@@ -359,7 +359,7 @@ pub(crate) fn make_composite(ev: &mut EvalCtx, idx: &[usize], closed: bool, inde
     let name = format!("Composite part {}", ev.ctx.bodies.iter().filter(|b| b.name.starts_with("Composite part")).count() + 1);
     // A new part: the next colour of the rotation (live part-studio/472:
     // after Part 1 light blue and Part 2 gray, the closed composite is dark
-    // blue #4e6fb7).
+    // blue #3b61b4).
     let color = ev.ctx.alloc_color();
     let mut body = Body::new(id, name, kind, compound, faces, color, ev.feature);
     body.edges = edges;

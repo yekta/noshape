@@ -22,8 +22,10 @@ pub fn derived() -> FeatureType {
         hidden(ParamSpec::bool("newUI", "New UI", true)),
         ParamSpec::text("partStudio", "Part Studio", "").visible(new_ui),
         ParamSpec::bool("preserveActiveSheetMetal", "Preserve active sheet metal models", false).visible(new_ui),
-        ParamSpec::query("location", "Locations", QueryFilter::MATE_CONNECTOR | QueryFilter::POINT_LIKE).visible(new_ui),
-        ParamSpec::enum_("placement", "Placement", &[("AT_ORIGIN", "Base origin"), ("AT_MATE_CONNECTOR", "Base mate connector")]).visible(new_ui),
+        // Live (qa5 DER1, part-studio/400): Locations is full width (no
+        // mate connector button); Placement keeps its label.
+        ParamSpec::query("location", "Locations", QueryFilter::MATE_CONNECTOR | QueryFilter::POINT_LIKE).hints(Hints::NO_MATE_CONNECTOR_BUTTON).describe("Select or create mate connectors in this Part Studio to position derived instances").visible(new_ui),
+        ParamSpec::enum_("placement", "Placement", &[("AT_ORIGIN", "Base origin"), ("AT_MATE_CONNECTOR", "Base mate connector")]).hints(Hints::SHOW_LABEL).visible(new_ui),
         hidden(ParamSpec::num("mateConnectorIndex", "Mate connector index", NumSpec::integer(0, 0, 100_000))),
         // Name of the source Part Studio's mate connector aligned with the locations.
         ParamSpec::text("mateConnectorId", "Base mate connector", "").visible(move |v| new_ui(v) && v.is("placement", "AT_MATE_CONNECTOR")),

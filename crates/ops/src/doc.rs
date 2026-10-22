@@ -97,6 +97,10 @@ pub struct Ctx {
     current: Option<PathBuf>,
     /// Headless renderer, created on first use.
     offscreen: Option<noshape_scene::png::Offscreen>,
+    /// Documents the app has open (live mode): their port and token.
+    live: Vec<(PathBuf, (u16, String))>,
+    /// The app's own context: calls run here, never forwarded.
+    pub serving: bool,
 }
 
 fn canonical(path: &Path) -> PathBuf {
@@ -181,6 +185,41 @@ impl Ctx {
 
     pub fn current_path(&self) -> Option<&Path> {
         self.current.as_deref()
+    }
+
+    /// The app serving document `key` (canonical path), if this context
+    /// sends its calls there.
+    pub fn live_server(&self, key: &Path) -> Option<(u16, String)> {
+        self.live.iter().find(|(p, _)| p == key).map(|(_, s)| s.clone())
+    }
+
+    /// Send calls for `key` to the app (live mode); it becomes current.
+    pub fn set_live(&mut self, key: &Path, server: (u16, String)) {
+        self.live.retain(|(p, _)| p != key);
+        self.live.push((key.to_path_buf(), server));
+        self.current = Some(key.to_path_buf());
+    }
+
+    /// Stop sending calls for `key` to the app.
+    pub fn unset_live(&mut self, key: &Path) {
+        self.live.retain(|(p, _)| p != key);
+        if self.current.as_deref() == Some(key) {
+            self.current = self.docs.last().map(|(p, _)| p.clone()).or_else(|| self.live.last().map(|(p, _)| p.clone()));
+        }
+    }
+
+    /// The app's context: a document it has open (live mode), current.
+    pub fn adopt(&mut self, path: &Path, doc: OpenDoc) {
+        let key = canonical(path);
+        self.docs.retain(|(p, _)| *p != key);
+        self.docs.push((key.clone(), doc));
+        self.current = Some(key);
+    }
+
+    /// A document this context has open.
+    pub fn get_mut(&mut self, path: &Path) -> Option<&mut OpenDoc> {
+        let key = canonical(path);
+        self.docs.iter_mut().find(|(p, _)| *p == key).map(|(_, d)| d)
     }
 }
 

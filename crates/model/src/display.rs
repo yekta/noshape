@@ -319,6 +319,9 @@ pub struct FeatureState {
     /// Values the feature computed for its read-only parameters (Onshape's
     /// `setFeatureComputedParameter`, e.g. a Hole's Up to next depth).
     pub computed: Vec<(String, ComputedValue)>,
+    /// Parts an Add / Remove / Intersect tool touched while its merge scope
+    /// was empty: the dialog's default scope (live part-studio/234, qa5 BOOL4).
+    pub touched: Vec<BodyId>,
 }
 
 /// A computed parameter value: a length (meters) or text such as "Multiple".
@@ -338,6 +341,9 @@ impl FeatureState {
 pub struct StudioDisplay {
     pub bodies: Vec<BodyDisplay>,
     pub sketches: Vec<SketchDisplay>,
+    /// Sketches Derived features brought in: (the Derived feature, the
+    /// sketch's feature id); the feature list shows them under the Derived row.
+    pub derived_sketches: Vec<(FeatureId, FeatureId)>,
     pub planes: Vec<PlaneDisplay>,
     pub connectors: Vec<ConnectorDisplay>,
     pub features: Vec<FeatureState>,

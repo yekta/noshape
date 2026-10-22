@@ -85,7 +85,7 @@ impl T {
     /// Through-all cut of circles (mm).
     fn holes(&mut self, circles: &[((f64, f64), f64)]) -> FeatureId {
         let (_, regions) = self.sketch(&[], circles);
-        self.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE"))])
+        self.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))])
     }
     fn edges_where(&mut self, f: impl Fn(&noshape_kernel::EdgeInfo) -> bool) -> Vec<Reference> {
         let r = self.regen();
@@ -258,7 +258,7 @@ fn shell_matches_onshape_volumes() {
     let mut t = T::new();
     t.block(40.0, 40.0, 10.0);
     let (_, regions) = t.sketch(&[&[(20.0, 0.0), (40.0, 0.0), (40.0, 40.0), (20.0, 40.0)]], &[]);
-    t.add("extrude", &[("entities", q(regions)), ("depth", e("20 mm")), ("operationType", en("ADD"))]);
+    t.add("extrude", &[("entities", q(regions)), ("depth", e("20 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
     let bottom = t.faces_where(|c| c.z < 1e-6);
     let s = t.shell(bottom, "2 mm");
     check(&mut t, s, "2 mm", 7872.0);
@@ -303,7 +303,7 @@ fn bench_kernel_ops() {
         t.holes(&[((x, y), 3.0 + (i % 3) as f64)]);
     }
     let (_, regions) = t.sketch(&[&[(40.0, 32.0), (80.0, 32.0), (80.0, 46.0), (40.0, 46.0)]], &[]);
-    t.add("extrude", &[("entities", q(regions)), ("depth", e("20 mm")), ("operationType", en("ADD"))]);
+    t.add("extrude", &[("entities", q(regions)), ("depth", e("20 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
     let v = t.edges_where(vertical);
     let v: Vec<_> = v.into_iter().take(4).collect();
     t.fillet(v, "5 mm");
@@ -1028,64 +1028,146 @@ fn chamfer_distance_one_face_matches_onshape() {
 /// own variance ±2.9 mm³; the exact mitred fillet is 44848.0752 against its
 /// 44848.2156), so volumes there are checked to 0.3 mm³; the chamfer's blend
 /// patch (G49) is checked against Onshape's faces in the kernel probe.
-#[test]
-#[ignore = "qa4 F8/F9 in progress (kern): chamfer 2 mm patch, shell cases"]
-fn chamfer_and_shell_on_filleted_box_match_onshape() {
+struct G46 {
+    bad: Vec<String>,
+}
+
+impl G46 {
     fn face_count(t: &mut T) -> usize {
         t.regen().context.bodies[0].shape.count(noshape_kernel::ShapeType::Face)
     }
-    let mut bad = Vec::new();
-    let mut check = |t: &mut T, id: FeatureId, want: Result<(f64, usize), &str>, tol: f64, what: &str| {
+    // Each face: surface kind, area (mm²) and box (mm), for comparing with
+    // Onshape's bodydetails.
+    fn faces(t: &mut T) -> String {
+        let r = t.regen();
+        r.context.bodies[0]
+            .shape
+            .faces()
+            .iter()
+            .map(|f| {
+                let kind = f.face_surface().map(|s| format!("{s:?}").split(['(', ' ', '{']).next().unwrap_or("?").to_string()).unwrap_or_default();
+                let b = f.bounding_box(false).map(|b| format!("{:.3?}..{:.3?}", (b.min * 1e3).to_array(), (b.max * 1e3).to_array())).unwrap_or_default();
+                format!("    {kind} {:.6} {b}", f.area().unwrap_or(0.0) * 1e6)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+    fn check(&mut self, t: &mut T, id: FeatureId, want: Result<(f64, usize), &str>, tol: f64, what: &str) {
         let (st, msg, v) = status(t, id);
-        let n = face_count(t);
+        let n = Self::face_count(t);
         let ok = match want {
             Ok((w, faces)) => st == FeatureStatus::Ok && (v - w).abs() <= tol && n == faces,
             Err(m) => st == FeatureStatus::Error && msg.as_deref() == Some(m),
         };
         if !ok {
-            bad.push(format!("{what}: got {st:?} {msg:?} {v:.6} mm³ {n} faces, want {want:?}"));
+            self.bad.push(format!("{what}: got {st:?} {msg:?} {v:.6} mm³ {n} faces, want {want:?}\n{}", Self::faces(t)));
         }
-    };
-    let top_front = |i: &noshape_kernel::EdgeInfo| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9;
-    let top_right = |i: &noshape_kernel::EdgeInfo| (i.start.x - 0.05).abs() < 1e-9 && (i.end.x - 0.05).abs() < 1e-9 && (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9;
-    let corner = |i: &noshape_kernel::EdgeInfo| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && vertical(i) && (i.start.x - 0.05).abs() < 1e-9 && i.start.y.abs() < 1e-9;
-    let top_face = |t: &mut T| t.faces_where(|c| c.z > 29.999);
-    // Fillet, then chamfer, then shell.
-    let mut base = T::new();
-    base.block(50.0, 30.0, 30.0);
-    let edges = base.edges_where(|i| top_front(i) || top_right(i));
-    assert_eq!(edges.len(), 2);
-    let f = base.fillet(edges, "3 mm");
-    check(&mut base, f, Ok((44848.215635, 8)), 0.15, "fillet R3");
-    let c_edge = base.edges_where(corner);
+    }
+    fn top_front(i: &noshape_kernel::EdgeInfo) -> bool {
+        i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9
+    }
+    fn top_right(i: &noshape_kernel::EdgeInfo) -> bool {
+        (i.start.x - 0.05).abs() < 1e-9 && (i.end.x - 0.05).abs() < 1e-9 && (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9
+    }
+    fn corner(i: &noshape_kernel::EdgeInfo) -> bool {
+        matches!(i.curve, noshape_kernel::Curve::Line { .. }) && vertical(i) && (i.start.x - 0.05).abs() < 1e-9 && i.start.y.abs() < 1e-9
+    }
+    fn shell(&mut self, t: &T, th: &str, want: Result<(f64, usize), &str>, tol: f64, what: &str) {
+        let mut u = t.fork();
+        let top = u.faces_where(|c| c.z > 29.999);
+        let s = u.shell(top, th);
+        self.check(&mut u, s, want, tol, &format!("shell {th} {what}"));
+    }
+    /// The block with the fillets (and the fillet feature).
+    fn filleted(&mut self) -> T {
+        let mut t = T::new();
+        t.block(50.0, 30.0, 30.0);
+        let edges = t.edges_where(|i| Self::top_front(i) || Self::top_right(i));
+        assert_eq!(edges.len(), 2);
+        let f = t.fillet(edges, "3 mm");
+        self.check(&mut t, f, Ok((44848.215635, 8)), 0.15, "fillet R3");
+        t
+    }
+    /// The block with the 5 mm chamfer, then the fillets.
+    fn chamfer_first(&mut self) -> T {
+        let mut t = T::new();
+        t.block(50.0, 30.0, 30.0);
+        let c_edge = t.edges_where(Self::corner);
+        let c = t.chamfer(c_edge, "5 mm");
+        self.check(&mut t, c, Ok((44625.0, 7)), 1e-3, "chamfer 5 first");
+        let edges = t.edges_where(|i| Self::top_front(i) || Self::top_right(i));
+        assert_eq!(edges.len(), 2);
+        let f = t.fillet(edges, "3 mm");
+        self.check(&mut t, f, Ok((44487.208465, 9)), 0.01, "fillet R3 after chamfer");
+        t
+    }
+}
+
+/// qa4 F8 / F9 as Onshape does them (live G46).
+#[test]
+fn chamfer_and_shell_on_filleted_box_match_onshape() {
+    let mut g = G46 { bad: Vec::new() };
+    let base = g.filleted();
+    let mut probe = base.fork();
+    let c_edge = probe.edges_where(G46::corner);
     assert_eq!(c_edge.len(), 1);
+    // F8: Onshape can't chamfer 5 mm there either.
     let mut t = base.fork();
     let c = t.chamfer(c_edge.clone(), "5 mm");
-    check(&mut t, c, Err("Distance of chamfer on face too large."), 0.0, "chamfer 5 after fillet");
+    g.check(&mut t, c, Err("Distance of chamfer on face too large."), 0.0, "chamfer 5 after fillet");
     let mut t = base.fork();
     let c = t.chamfer(c_edge.clone(), "2 mm");
-    check(&mut t, c, Ok((44789.850213, 10)), 0.3, "chamfer 2 after fillet");
-    for (th, want) in [("2.5 mm", Ok((13946.594771, 21))), ("1 mm", Ok((6052.696796, 21)))] {
-        let mut u = t.fork();
-        let top = top_face(&mut u);
-        let s = u.shell(top, th);
-        check(&mut u, s, want, 0.3, &format!("shell {th} after fillet + chamfer 2"));
-    }
-    // Chamfer 5 first, then the fillet, then shell.
+    g.check(&mut t, c, Ok((44789.850213, 10)), 0.3, "chamfer 2 after fillet");
+    // F9.
+    g.shell(&t, "2.5 mm", Ok((13946.594771, 21)), 0.3, "after fillet + chamfer 2");
+    // Fillet after the chamfer (F8, reordered).
+    g.chamfer_first();
+    assert!(g.bad.is_empty(), "{}", g.bad.join("\n"));
+}
+
+/// The rest of live G46 / G50 (kern, in progress): Onshape's 1 mm shell after
+/// the 2 mm chamfer (6052.70 mm³; ours 6053.88: the patch's offset differs),
+/// the reordered model's rim triangle at 1 mm (Onshape 20 faces: one flat
+/// 0.0858 mm² triangle where we make two sloped faces) and its failure from
+/// 2.06 mm (Onshape: 2.05 works).
+#[test]
+#[ignore = "kern: shell offsets at the chamfer/fillet corner (live G50)"]
+fn shell_details_match_onshape() {
+    let mut g = G46 { bad: Vec::new() };
+    let base = g.filleted();
+    let mut t = base.fork();
+    let c_edge = t.edges_where(G46::corner);
+    t.chamfer(c_edge, "2 mm");
+    g.shell(&t, "1 mm", Ok((6052.696796, 21)), 0.3, "after fillet + chamfer 2");
+    let t = g.chamfer_first();
+    g.shell(&t, "1 mm", Ok((5990.519587, 20)), 0.02, "after chamfer + fillet");
+    g.shell(&t, "2.05 mm", Ok((11601.0764818, 20)), 0.02, "after chamfer + fillet");
+    g.shell(&t, "2.06 mm", Err("Could not shell part with selections."), 0.0, "after chamfer + fillet");
+    g.shell(&t, "2.5 mm", Err("Could not shell part with selections."), 0.0, "after chamfer + fillet");
+    assert!(g.bad.is_empty(), "{}", g.bad.join("\n"));
+}
+
+/// Live G50: Shell of the chamfer-then-fillet box works up to 2.05 mm in
+/// Onshape and fails from 2.06 mm. Prints our status and faces per
+/// thickness: `cargo test -p noshape-model --test kernel_robustness
+/// shell_thickness_sweep -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn shell_thickness_sweep() {
     let mut t = T::new();
     t.block(50.0, 30.0, 30.0);
-    let c_edge = t.edges_where(corner);
-    let c = t.chamfer(c_edge, "5 mm");
-    check(&mut t, c, Ok((44625.0, 7)), 1e-3, "chamfer 5 first");
-    let edges = t.edges_where(|i| top_front(i) || top_right(i));
-    assert_eq!(edges.len(), 2);
-    let f = t.fillet(edges, "3 mm");
-    check(&mut t, f, Ok((44487.208465, 9)), 0.01, "fillet R3 after chamfer");
-    for (th, want) in [("2.5 mm", Err("Could not shell part with selections.")), ("1 mm", Ok((5990.519587, 20)))] {
+    let corner = t.edges_where(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && vertical(i) && (i.start.x - 0.05).abs() < 1e-9 && i.start.y.abs() < 1e-9);
+    t.chamfer(corner, "5 mm");
+    let edges = t.edges_where(|i| (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9 && ((i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9) || ((i.start.x - 0.05).abs() < 1e-9 && (i.end.x - 0.05).abs() < 1e-9)));
+    t.fillet(edges, "3 mm");
+    for k in 0..=30 {
+        let th = 1.0 + 0.05 * k as f64;
         let mut u = t.fork();
-        let top = top_face(&mut u);
-        let s = u.shell(top, th);
-        check(&mut u, s, want, 0.02, &format!("shell {th} after chamfer + fillet"));
+        let top = u.faces_where(|c| c.z > 29.999);
+        let s = u.shell(top, &format!("{th} mm"));
+        let r = u.regen();
+        let st = r.display.features.iter().find(|x| x.id == s).unwrap();
+        let b = &r.context.bodies[0].shape;
+        eprintln!("{th:.2} mm: {:?} {:?} {} faces, {:.6} mm³", st.status, st.message, b.count(noshape_kernel::ShapeType::Face), volume(&r));
     }
-    assert!(bad.is_empty(), "{}", bad.join("\n"));
 }

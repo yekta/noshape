@@ -338,7 +338,7 @@ impl AssemblyView {
                         override_check("amass-override", false).into_any_element()
                     };
                     let shown: AnyElement = if overriding {
-                        gpui_kit::base::input::input_frame(div().flex_1().mr(px(5.)).h(px(24.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(&override_input).appearance(false).text_size(px(13.33)).text_right(), 23.)).into_any_element()).into_any_element()
+                        gpui_kit::base::input::input_frame(div().flex_1().mr(px(5.)).h(px(24.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(&override_input).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 23.)).into_any_element()).into_any_element()
                     } else {
                         value(with_unit(props.and_then(|p| p.mass).map(|m| number(m * mass_factor)), mass_sym.to_string())).into_any_element()
                     };
@@ -563,7 +563,7 @@ impl AssemblyView {
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_zebra(false, cx))),
                         ),
                 )
-                .child(crate::os_ui::param_row("Stripe count", crate::os_ui::input_h(Input::new(&d.stripes).appearance(false).text_size(px(13.33)).text_right(), 25.)))
+                .child(crate::os_ui::param_row("Stripe count", crate::os_ui::input_h(Input::new(&d.stripes).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)))
                 .child(check("azebra-flip", "Flip stripes", flip, |s| s.flip = !s.flip, cx))
                 .child(check("azebra-edges", "Show edges", edges, |s| s.show_edges = !s.show_edges, cx))
                 .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(super::props::help_dot()))

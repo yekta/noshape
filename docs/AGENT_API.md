@@ -135,6 +135,10 @@ drawing_dimension {"drawing": "Part 1 Drawing 1", "kind": "diameter", "picks": [
 drawing_dimension {"drawing": "Part 1 Drawing 1", "picks": [[180.0, 180.0]], "place": [180, 200]}                         -> text "80"
 drawing_insert_view    {"drawing": "…", "source": "Part Studio 1", "orientation": "isometric", "position": [330, 230]}
 drawing_projected_view {"drawing": "…", "parent": 3, "position": [330, 120]}
+drawing_section_view   {"drawing": "…", "parent": 3, "point": [205.5, 160], "position": [300, 160]}           -> Section A-A (vertical line, the dialog's default)
+drawing_detail_view    {"drawing": "…", "parent": 3, "center": [205.5, 160], "radius": 12, "position": [380, 60]}
+drawing_centerline     {"drawing": "…", "kind": "edge_to_edge", "picks": [[190, 150], [190, 170]]}
+drawing_view_table     {"drawing": "…", "kind": "bom", "view": 3, "position": [20, 280]}
 ```
 
 ### Analysis
@@ -183,6 +187,40 @@ import_files {"files": ["/tmp/bracket.step"]}      -> tabs [{"name": "bracket", 
 query_parts  {"tab": "bracket"}
 ```
 
+### Variable Studios
+
+The `variable_*` operations work on a Variable Studio when `tab` names one: `variable_create` adds the table's
+last row and then types its cells (type, value, description), `variable_set` edits cells, `variable_move` and
+`variable_delete` use the row menu. Each cell is one edit, as in the table.
+
+```text
+tab_create      {"kind": "variablestudio", "name": "Variables"}
+variable_create {"tab": "Variables", "name": "width", "value": "40 mm", "description": "Plate width"}
+variable_list   {"tab": "Variables"}      -> rows [{name: "#width", type: "Length", expression: "40 mm", value: "40 mm"}]
+```
+
+### Many sketch shapes at once
+
+`sketch_draw` with `shapes` draws a list of shapes in one sketch edit; each shape is drawn exactly as its own
+call would be (same inference and constraints), but the sketch is solved, regenerated and reported once:
+hundreds of shapes take about as long as one call.
+
+```text
+sketch_draw {"sketch": "Sketch 1", "shapes": [{"tool": "circle", "points": [[0, 0], [3, 0]]}, {"tool": "circle", "points": [[10, 0], [13, 0]]}]}
+```
+
+## Live mode (the app is open)
+
+When the noshape app has a document open, the CLI and the MCP server send their calls for that document to
+the app: edits show in the window at once and land on the window's undo stack (Ctrl+Z undoes them), and
+queries see the window's current state. Nothing to configure: open the same `.noshape` path
+(`document_open` or `doc`) and the call goes to the app; with the app closed, the same calls edit the file.
+
+The app serves each open document on a localhost TCP port and writes a discovery file
+`<temp dir>/noshape-live/<hash>.json` (port, random token, pid); closing the document removes it. Only
+`document_create` is refused for a document the app has open; `document_close` just stops sending calls to
+the app.
+
 ## For developers
 
 - Operations live in `crates/ops/src/ops/<group>.rs`; each is an `Op` (group, verb, summary, description,
@@ -197,7 +235,7 @@ query_parts  {"tab": "bracket"}
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-133 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
+137 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -207,7 +245,7 @@ query_parts  {"tab": "bracket"}
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_view_table`](#drawing_view_table)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_view_table`](#drawing_view_table)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
@@ -534,7 +572,7 @@ Inserts a Sketch feature ("Insert feature : Sketch 1") at the rollback bar. Retu
 
 Draw sketch geometry with a sketch tool (line, rectangle, circle, arc, spline, slot, polygon, ellipse, point...) (edits the document (one undoable history entry)).
 
-Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions ("10 mm"). One call = one edit of the sketch ("Edit : Sketch 1"). Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:
+Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions ("10 mm"). One call = one edit of the sketch ("Edit : Sketch 1"); `shapes` draws many shapes in that one edit. Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:
 - line: Clicks chain segments: [p0, p1, p2...] makes p0-p1, p1-p2...; repeat the first point to close the loop.
 - midpoint_line: [midpoint, end].
 - corner_rectangle: [corner, opposite corner]. Horizontal/vertical and coincident constraints, like the UI.
@@ -560,8 +598,9 @@ Runs the sketch editor's drawing tool on the clicks you give, exactly as clickin
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
-| `tool` | one of `line`, `midpoint_line`, `corner_rectangle`, `center_rectangle`, `aligned_rectangle`, `circle`, `three_point_circle`, `three_point_arc`, `tangent_arc`, `center_point_arc`, `point`, `spline`, `bezier`, `conic`, `slot`, `inscribed_polygon`, `circumscribed_polygon`, `ellipse`, `elliptical_arc` | required | Drawing tool. |
-| `points` | array of array of number or string | required | The clicks, in order: [[x, y], ...]. |
+| `tool` | one of `line`, `midpoint_line`, `corner_rectangle`, `center_rectangle`, `aligned_rectangle`, `circle`, `three_point_circle`, `three_point_arc`, `tangent_arc`, `center_point_arc`, `point`, `spline`, `bezier`, `conic`, `slot`, `inscribed_polygon`, `circumscribed_polygon`, `ellipse`, `elliptical_arc` |  | Drawing tool (required without `shapes`). |
+| `points` | array of array of number or string |  | The clicks, in order: [[x, y], ...] (required without `shapes`). |
+| `shapes` | array of object |  | Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. |
 | `construction` | boolean |  | Make the new geometry construction geometry. |
 | `sides` | integer |  | Polygon sides. |
 
@@ -912,25 +951,25 @@ Places a PNG, JPEG, GIF or BMP image in the rectangle from the first corner towa
 
 #### variable_list
 
-The Part Studio's variables with their values.
+The variables of a Part Studio or a Variable Studio, with their values.
 
-Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables).
+Part Studio: Variable features (#name) in feature order with kind, expression, evaluated value and description, plus the values of every variable visible at the end of the feature list (including Variable Studio and configuration variables). Variable Studio (`tab` names it): its table rows in order (name, type, expression, value, description).
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
 
 #### variable_create
 
-Create a Part Studio variable (#name) (edits the document (one undoable history entry)).
+Create a variable (#name) in a Part Studio or a Variable Studio (edits the document (one undoable history entry)).
 
-The Variable table's add row: a Variable feature at the rollback bar. Use it in any expression as #name.
+Part Studio: the Variable table's add row, a Variable feature at the rollback bar. Variable Studio: the table's last row ("Add variable", a Length variable), then its type, value and description cells, one edit each, as typed in the table. Use it in any expression as #name.
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `name` | string | required | Identifier: a letter or underscore, then letters, digits or underscores. |
 | `value` | string or number | required | Expression ("20 mm", "#a * 2"); a bare number takes the workspace unit. |
 | `kind` | one of `LENGTH`, `ANGLE`, `NUMBER`, `ANY` |  | LENGTH (default), ANGLE, NUMBER or ANY. |
@@ -940,12 +979,12 @@ The Variable table's add row: a Variable feature at the rollback bar. Use it in 
 
 Change a variable's value, kind, name or description (edits the document (one undoable history entry)).
 
-Renaming updates every expression that uses the variable, as the panel does.
+Part Studio: renaming updates every expression that uses the variable, as the panel does. Variable Studio: each given field is one edit of its table cell ("Change variable type", "Edit variable", "Edit variable description", "Rename variable").
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `variable` | string | required | Variable name (with or without #) or its feature id. |
 | `value` | string or number |  | New expression. |
 | `kind` | one of `LENGTH`, `ANGLE`, `NUMBER`, `ANY` |  | New kind. |
@@ -961,17 +1000,17 @@ Expressions that use it fail to regenerate, as in Onshape.
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `variable` | string | required | Variable name or feature id. |
 
 #### variable_move
 
-Move a variable up or down in the Variable table (edits the document (one undoable history entry)).
+Move a variable up or down in the Variable table or a Variable Studio (edits the document (one undoable history entry)).
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Variable Studio tab, by name or id. Default: the first Part Studio. |
 | `variable` | string | required | Variable name or feature id. |
 | `by` | integer | required | -1: up, 1: down. |
 
@@ -1693,6 +1732,72 @@ The Virtual sharp tool: clicks on two straight edges of one view (sheet mm). Ass
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `picks` | array of array of number | required | A point on each edge (sheet mm). |
+
+#### drawing_hole_callout
+
+Hole / thread callout on a hole seen as a circle (edits the document (one undoable history entry)).
+
+The Hole/thread callout tool: `hole` is a click on the hole's circle (sheet mm); the callout text (diameter, depth, thread from the Hole feature) goes to `position`. One edit ("Hole callout").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `hole` | array of number | required | A point on the hole's circle (sheet mm). |
+| `position` | array of number | required | Where the callout text goes (sheet mm). |
+
+#### drawing_callout
+
+Callout (balloon) with or without a leader (edits the document (one undoable history entry)).
+
+The Callout tool and its dialog: with `anchor` (a click on an edge or point, sheet mm) the leader starts there (in an assembly view an empty `text` shows the part's BOM item number); without it the callout sits alone at `position`. One edit ("Callout").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `anchor` | array of number |  | Where the leader starts (sheet mm). Omit for a callout without a leader. |
+| `position` | array of number | required | Where the callout goes (sheet mm). |
+| `text` | string |  | Centre text (empty: the BOM item number in assembly views). |
+| `above` | string |  | Text above. |
+| `below` | string |  | Text below. |
+| `left` | string |  | Text left. |
+| `right` | string |  | Text right. |
+| `border` | one of `none`, `circle`, `diamond`, `double_circle`, `flag`, `hexagon`, `octagon`, `rectangle`, `split_circle`, `square_circle`, `triangle`, `underline` |  | Border shape. |
+| `chars` | integer |  | Border size in characters (0: tight fit). |
+| `height` | number |  | Text height (mm). |
+
+#### drawing_ordinate
+
+Ordinate dimensions from a datum point (edits the document (one undoable history entry)).
+
+The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, sheet mm), `side` a click that sets the measured direction (beside the origin: horizontal values; above or below: vertical), then each of `points` adds an ordinate to the group. One edit per click, as with the mouse ("Ordinate dimension", then "Add to ordinate group").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `origin` | array of number | required | The datum point (sheet mm). |
+| `side` | array of number | required | Where the values line up (sheet mm). |
+| `points` | array of array of number |  | Points to dimension (vertices, circle centers; sheet mm). |
+
+#### drawing_datum
+
+Datum feature symbol (edits the document (one undoable history entry)).
+
+The Datum tool: the triangle on the geometry at `anchor` (a vertex or edge point, sheet mm), the label box at `position` (at least 3 mm away). The label is the next free letter (A, B, …; I, O, Q, S, X, Z skipped) unless given. One edit ("Datum").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `anchor` | array of number | required | Where the triangle attaches (sheet mm). |
+| `position` | array of number | required | Where the label box goes (sheet mm). |
+| `label` | string |  | Datum letter. |
 
 #### drawing_view_table
 

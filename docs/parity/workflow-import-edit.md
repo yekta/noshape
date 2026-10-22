@@ -78,3 +78,6 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 ## Re-run pass 7 (2026-10-21 18:56–19:50, app /tmp/qa5/noshape-1851 = target-shared 18:51 (tree d5745c9 + uncommitted work), CLI /tmp/qa5/noshape-cli-1809 = target-engine 18:09)
 | I1 g25-b SAT / X_T / STEP | 7585.978524 / 7583.000869 / 7582.713024 (live 7582.912205) | ✗ still |
+
+## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
+| I1 g25-b.sat via the app's + › Import… | 7585.979 mm³ | ✗ still (live 7582.912) |

@@ -126,3 +126,6 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 | KB1 Shift+N on a part row | inline rename with the name selected | ✅ **fixed** |
 | KB3 Isolate | planes now hidden (live hides them too, ui/pn-900); **other parts stay fully opaque** (live: translucent); **Default geometry rows not greyed** (live grey) | ✗ still (partly) |
 | KB4 orbit rate | settled by perf 17:57 (rate = Onshape's per canvas diagonal) | ✅ |
+
+## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
+| KB3 Isolate | Default geometry rows greyed ✅; other parts stay opaque | ✗ still (partly) |

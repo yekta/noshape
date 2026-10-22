@@ -437,7 +437,9 @@ impl Mate {
             offset_x: None,
             offset_y: None,
             rotation: None,
-            rotation_axis: 2,
+            // Live (qa5 MT6, live 585): a Fastened mate's offset rotates
+            // about X by default.
+            rotation_axis: if mate_type == MateType::Fastened { 0 } else { 2 },
             flip_primary: false,
             reorient_secondary: 0,
             limits: vec![],

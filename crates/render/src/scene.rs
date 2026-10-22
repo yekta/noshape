@@ -69,6 +69,34 @@ impl LineData {
     }
 }
 
+/// Tessellation edges inside curved faces, each with the normals of its
+/// two facets: drawn as edges where they are silhouettes for the camera
+/// (one facet toward the viewer, the other away), like Onshape's
+/// edge-based silhouettes.
+#[derive(Clone, Debug, Default)]
+pub struct SilhouetteData {
+    pub segments: Vec<SilhouetteSegment>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
+pub struct SilhouetteSegment {
+    pub a: [f32; 3],
+    pub b: [f32; 3],
+    pub n1: [f32; 3],
+    pub n2: [f32; 3],
+    /// The face's pick id (its state: hidden, dimmed, highlighted).
+    pub pick_id: u32,
+    /// Width in logical pixels (the part's edges').
+    pub width: f32,
+}
+
+impl SilhouetteData {
+    pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
+        bounds_of(self.segments.iter().flat_map(|s| [s.a, s.b]))
+    }
+}
+
 /// Screen-space round points (vertices, sketch points).
 #[derive(Clone, Debug, Default)]
 pub struct PointData {
@@ -191,9 +219,15 @@ pub struct Instance {
     /// Excluded from section-view clipping (e.g. sketch overlays, planes).
     pub ignore_clip: bool,
     /// Drawn with its flat color, without lighting (construction planes).
+    /// See [`Instance::back_silhouette`].
+    pub back_silhouette: bool,
     pub unlit: bool,
     /// Lit like Onshape's feature previews (see [`Instance::preview`]).
     pub preview: bool,
+    /// Onshape's Isolate ghost: after shading, the color is mixed toward
+    /// white by this much in sRGB, as a see-through layer over a white page
+    /// looks, while still hiding what is behind (0: off).
+    pub ghost: f32,
     /// Draw order within its pass (lower first). Overlays use larger values.
     pub layer: i32,
     /// Line width multiplier for line instances (Graphics preferences line widths).
@@ -271,7 +305,9 @@ impl Instance {
             pickable: !image,
             ignore_clip: false,
             unlit: false,
+            back_silhouette: false,
             preview: false,
+            ghost: 0.0,
             layer: 0,
             line_scale: 1.0,
             hidden_only: false,
@@ -343,11 +379,25 @@ impl Instance {
         self
     }
 
+    /// Draw this mesh as Onshape's image-based (backface) silhouettes in
+    /// the instance color, not as faces; never picked.
+    pub fn back_silhouette(mut self) -> Self {
+        self.back_silhouette = true;
+        self.pickable = false;
+        self
+    }
+
     /// Shade as a feature preview (Onshape: flat faces lit only from the
     /// viewer's lower right, so the top and front read alike and darker than
     /// the right side), instead of the part lighting.
     pub fn preview(mut self) -> Self {
         self.preview = true;
+        self
+    }
+
+    /// Draw as an Isolate ghost (see [`Instance::ghost`]).
+    pub fn ghost(mut self, amount: f32) -> Self {
+        self.ghost = amount;
         self
     }
 
@@ -408,6 +458,27 @@ pub struct Style {
     pub show_edges: bool,
     /// 1, 2, 4 or 8.
     pub msaa: u32,
+    /// What Onshape's interactive detail reduction can leave out (ambient
+    /// occlusion is `ambient_occlusion` 0).
+    pub detail: Detail,
+}
+
+/// Graphics Onshape drops while the camera moves too slowly (webgl
+/// DetailManager `decreaseDetail`); all on by default.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Detail {
+    /// Edge-based silhouettes ([`SilhouetteData`]).
+    pub edge_silhouettes: bool,
+    /// Image-based silhouettes ([`Instance::back_silhouette`]).
+    pub backface_silhouettes: bool,
+    /// The section caps' outlines.
+    pub section_edges: bool,
+}
+
+impl Default for Detail {
+    fn default() -> Self {
+        Self { edge_silhouettes: true, backface_silhouettes: true, section_edges: true }
+    }
 }
 
 impl Default for Style {
@@ -427,6 +498,7 @@ impl Default for Style {
             // Onshape's defaults: specular #999999, shininess 3%.
             specular: { let c = srgb(0x99, 0x99, 0x99); [c[0], c[1], c[2], 0.03] },
             show_edges: true,
+            detail: Detail::default(),
             msaa: 4,
         }
     }

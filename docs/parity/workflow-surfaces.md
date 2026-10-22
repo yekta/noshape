@@ -75,3 +75,14 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | SF5 Move boundary one Fill edge 10 mm (CLI) | OK but **all four edges move**: 2400 mm², bbox −10..50 × 30..70 (expected 1000) | ✗ still (changed) |
 | SF5 boundary-surface case, 25 mm | error now "Unable to move selected entities." (raw kernel text gone) | ✅ text |
 | SF6 bspline edge 10 mm (CLI) | OK, area −514.304543 | ✗ still |
+
+## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
+| SF2 | seam still visible in the app | ✗ still |
+
+## Re-run pass 12 (2026-10-22 ~01:35, CLI /tmp/qa5/noshape-cli-0107 = target-engine 01:07; main still 5bd50b2)
+| Row | Ours | Status |
+|---|---|---|
+| SF2 adjacent regions (sf2.py) | 8000, 10 faces (live 6) | ✗ still |
+| SF5 Move boundary one Fill edge 10 mm | OK, 2400 mm², bbox −10..50 × 30..70 (all four edges move; live 1000) | ✗ still |
+| SF5 boundary-surface case 25 mm | "Unable to move selected entities." | ✅ text (as pass 7) |
+| SF6 bspline edge 10 mm | OK, area −514.304543 | ✗ still |

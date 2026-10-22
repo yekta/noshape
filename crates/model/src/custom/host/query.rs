@@ -571,6 +571,15 @@ impl<'a> QueryCx<'a> {
         let mut out = self.resolve_transient(id);
         if let Some(snap) = self.st.snapshots.get(id) {
             out.extend(self.tracked(snap, true));
+            // A face used to split faces: the edges it cut.
+            if snap.etype == EType::Face && let Some(p) = snap.points.first() {
+                for (o, n, mids) in &self.st.split_tools {
+                    if (*p - *o).dot(*n).abs() < 1e-7 {
+                        let cut = |e: &Ent| self.snapshot(e).and_then(|s| s.points.get(1).copied()).is_some_and(|m| mids.iter().any(|x| x.distance(m) < 1e-7));
+                        out.extend(self.all_with(Some(EType::Edge), true).into_iter().filter(cut));
+                    }
+                }
+            }
             // A sketch vertex extruded: the straight edge it swept (std Hem
             // tracks its profile arc's end onto the arc sheet's side edge).
             if snap.sketch && snap.etype == EType::Vertex && let Some(p) = snap.points.first() {
@@ -1020,7 +1029,17 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         "SM_DEFINITION_ENTITY_FILTER" | "CORRESPONDING_IN_FLAT" | "PARTS_ATTACHED_TO" | "SM_APPLICATION_TYPE_FILTER" => Vec::new(),
         "COMPOSITE_PART_TYPE_FITLER" | "CONSUMED" | "TOLERANCE_FILTER" => sub(i, "subquery")?,
         "OP_HOLE_FACE" | "OP_HOLE_PROFILE" => filter(super::hole::op_hole_query(i, q, query, &*kind == "OP_HOLE_FACE")?),
-        "CONTAINED_IN_COMPOSITE" | "COMPOSITE_CONTAINING" | "SOURCE_MESH" | "PATTERN_INSTANCES" => Vec::new(),
+        "PATTERN_INSTANCES" => {
+            let Some(id) = id_of(query.get("featureId")) else { return Ok(Vec::new()) };
+            let names: Vec<String> = query.get("instanceNames").as_array().map(|a| a.iter().filter_map(|n| n.as_str().map(|s| s.to_string())).collect()).unwrap_or_default();
+            let bodies: Vec<BodyId> = names.into_iter().flat_map(|n| q.st.pattern_instances.get(&(id.clone(), n)).cloned().unwrap_or_default()).collect();
+            let of = |e: &Ent| match q.owner(e).unwrap_or_else(|| e.clone()) {
+                Ent::Body(b) => bodies.contains(&q.st.ctx.bodies[b].id),
+                _ => false,
+            };
+            filter(q.all(None).into_iter().filter(of).collect())
+        }
+        "CONTAINED_IN_COMPOSITE" | "COMPOSITE_CONTAINING" | "SOURCE_MESH" => Vec::new(),
         "VERTEX_ADJACENT" | "EDGE_ADJACENT" => {
             let t = entity_type.unwrap_or(EType::Face);
             let mut out = Vec::new();
@@ -1308,6 +1327,11 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
         // `qSplitBy`: the bodies a split left on one side of its tool plane
         // (the back: against the plane normal), or their faces the split cut.
         "SPLIT" => {
+            // opSplitFace: the pieces of the faces it split (either side).
+            if let Some(pieces) = q.st.split_face_pieces.get(&op) {
+                let piece = |e: &Ent| q.snapshot(e).and_then(|s| s.points.first().copied()).is_some_and(|m| pieces.iter().any(|p| p.distance(m) < 1e-7));
+                return q.all_with(Some(EType::Face), true).into_iter().filter(piece).collect();
+            }
             if let Some(originals) = q.st.split_edges.get(&op) {
                 // Split edges: the pieces lying on the edges that were split.
                 let on = |e: &Ent| {

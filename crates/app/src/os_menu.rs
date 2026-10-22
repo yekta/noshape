@@ -55,7 +55,7 @@ pub enum MenuIcon {
     Named(SharedString),
     /// A kit icon (single color).
     Kit(Box<Icon>),
-    /// A color swatch: 17 px, radius 2 (live menus/rmb-ps-featurelist-sketch:
+    /// A color swatch: 17 px, radius 3 (live menus/rmb-ps-featurelist-sketch:
     /// "Edit sketch appearance…" shows the sketch's color).
     Swatch(Hsla),
 }
@@ -141,6 +141,9 @@ pub struct OsMenu {
     hovered: Option<usize>,
     /// Painted bounds of this menu and of its open submenu (outside clicks).
     bounds: Rc<Cell<Bounds<Pixels>>>,
+    /// Submenu rows' painted tops (window coordinates): a wrapped label above
+    /// makes a row taller than the pitch.
+    row_tops: Rc<std::cell::RefCell<std::collections::HashMap<usize, Pixels>>>,
     _subs: Vec<Subscription>,
     /// The menu this one is a submenu of (Left returns to it).
     parent: Option<WeakEntity<OsMenu>>,
@@ -197,7 +200,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, camera: false, on_escape: None, ring: None }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, camera: false, on_escape: None, ring: None }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -450,6 +453,7 @@ impl Render for OsMenu {
             })
             .collect();
 
+        let row_top_painted = self.row_tops.clone();
         let rows: Vec<AnyElement> = self
             .items
             .iter()
@@ -460,7 +464,7 @@ impl Render for OsMenu {
                     icon.as_ref().map(|i| match i {
                         MenuIcon::Named(n) => crate::assets::icon(n, icon_sz, cx).into_any_element(),
                         MenuIcon::Kit(k) => div().size(px(icon_sz)).flex().items_center().justify_center().child((**k).clone().with_size(px(12.)).text_color(pal.text)).into_any_element(),
-                        MenuIcon::Swatch(c) => div().size(px(icon_sz)).flex().items_center().justify_center().child(div().flex_none().size(px(17.)).rounded(px(2.)).bg(*c)).into_any_element(),
+                        MenuIcon::Swatch(c) => div().size(px(icon_sz)).flex().items_center().justify_center().child(div().flex_none().size(px(17.)).rounded(px(3.)).bg(*c)).into_any_element(),
                     })
                 };
                 // "Label\tbeta": the label and a blue badge (live drawing/447:
@@ -474,16 +478,20 @@ impl Render for OsMenu {
                         None => label.clone().into_any_element(),
                     }
                 };
+                // Context menus (live `.context-menu-list`, at most 250 px):
+                // a long label wraps, 18 px lines in a row 2 px padded (22,
+                // 40 for two lines: "Add mate connector to instance origin…").
+                let wraps = plain_menu && !camera;
                 let row = |id: usize| {
                     h_flex()
                         .id(id)
                         .relative()
-                        .h(px(row_h))
+                        .when(wraps, |d| d.min_h(px(row_h)).py(px(2.)).line_height(px(18.)))
+                        .when(!wraps, |d| d.h(px(row_h)).whitespace_nowrap())
                         .w_full()
                         .pl(px(text_x))
                         .pr(px(if plain_menu { 10. } else { 12. }))
                         .text_size(px(text_sz))
-                        .whitespace_nowrap()
                         .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                             if *h && this.hovered != Some(ix) {
                                 this.hovered = Some(ix);
@@ -502,7 +510,7 @@ impl Render for OsMenu {
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
                             d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(crate::assets::icon("menu-check", 16., cx)))
                         })
-                        .child(label_el(label))
+                        .child(div().when(wraps, |d| d.flex_1().min_w_0()).child(label_el(label)))
                         .when(!keys.is_empty(), |d| {
                             let chip = |k: &SharedString| div().px(px(3.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0x333333)).text_size(px(12.)).text_color(pal.text).child(k.clone());
                             d.child(div().flex_1().min_w(px(16.))).child(h_flex().gap(px(2.)).children(keys.iter().map(chip)))
@@ -515,7 +523,11 @@ impl Render for OsMenu {
                         .text_color(pal.text)
                         .when(hovered, |d| d.bg(hover_bg))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
-                        .child(div().flex_1().child(label_el(label)))
+                        .child(div().flex_1().when(wraps, |d| d.min_w_0()).child(label_el(label)))
+                        .child({
+                            let tops = self.row_tops.clone();
+                            canvas(move |b, _, _| { tops.borrow_mut().insert(ix, b.top()); }, |_, _, _, _| {}).absolute().top_0().left_0().size_full()
+                        })
                         // The small ▸ at the right (live: a 5 px `#666` triangle 9 px
                         // from the border).
                         .pr(px(6.))
@@ -525,7 +537,7 @@ impl Render for OsMenu {
                             // level with the row (window coordinates from the last paint).
                             // Near the window's right edge it opens to the left (live camera menu).
                             // Live: the submenu's border lies on the parent's.
-                            let y = menu_bounds.top() + px(row_tops[ix] - 1.);
+                            let y = row_top_painted.borrow().get(&ix).copied().unwrap_or(menu_bounds.top() + px(row_tops[ix])) - px(1.);
                             let (at, anchor) = if menu_bounds.right() + px(200.) > window_w {
                                 (point(menu_bounds.left() + px(1.), y), Anchor::TopRight)
                             } else {
@@ -573,6 +585,7 @@ impl Render for OsMenu {
             }))
             .when(!plain_menu, |d| d.p(px(1.)))
             .when(plain_menu, |d| d.min_w(px(120.)))
+            .when(plain_menu && !camera, |d| d.max_w(px(250.)))
             .when(camera, |d| d.w(px(224.)))
             .bg(gpui_kit::rgb(0xffffff))
             .border_1()

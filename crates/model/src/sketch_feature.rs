@@ -119,7 +119,7 @@ pub struct SketchImage {
 pub struct SketchText {
     pub id: u32,
     pub text: String,
-    /// Font family (see [`noshape_sketch::text::FONTS`]).
+    /// Font family (see [`noshape_sketch::text::SKETCH_FONTS`]).
     pub font: String,
     pub bold: bool,
     pub italic: bool,

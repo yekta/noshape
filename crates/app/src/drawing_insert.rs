@@ -164,13 +164,19 @@ impl DrawingEditor {
         if self.insert.chooser.is_none() {
             return Vec::new();
         }
+        // Other documents: the opened document's Part Studios at its version.
+        if self.chooser.other {
+            let Some(d) = &self.chooser.other_doc else { return Vec::new() };
+            return d.tabs.iter().filter(|t| !t.2).filter_map(|t| Some(SourceKey { version: Some(d.key(t.0)?.0), ..SourceKey::studio(t.0) })).collect();
+        }
         self.doc.read(cx).session.doc.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_))).map(|t| SourceKey::studio(t.id)).collect()
     }
 
-    /// Other documents: a Part Studio or assembly of another document's
-    /// version (`key`: its `ExternalRef` key, `label`: "<document> <version>").
-    pub(crate) fn choose_external(&mut self, key: String, tab: TabId, label: String, cx: &mut Context<Self>) {
-        self.choose_source(tab, None, cx);
+    /// Other documents: a Part Studio (or one of its parts) or an assembly
+    /// of another document's version (`key`: its `ExternalRef` key, `label`:
+    /// "<document> <version>").
+    pub(crate) fn choose_external(&mut self, key: String, tab: TabId, part: Option<noshape_model::BodyId>, label: String, cx: &mut Context<Self>) {
+        self.choose_source(tab, part, cx);
         self.insert.pinned = Some(PinnedVersion { id: key, name: label });
         self.ensure_sources(false, cx);
         self.update_preview(cx);

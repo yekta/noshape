@@ -73,7 +73,7 @@ fn fins(n: usize, full: bool, reapply: bool) -> (Studio, RegenResult) {
     let fin = s.region(rect(x0, 0.0, x1, 0.001));
     let fin = s.add(
         "extrude",
-        &[("entities", q(vec![fin])), ("operationType", en("ADD")), ("startOffset", ParamValue::Bool(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e("40 mm")), ("depth", e("40 mm"))],
+        &[("entities", q(vec![fin])), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true)), ("startOffset", ParamValue::Bool(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e("40 mm")), ("depth", e("40 mm"))],
     );
     s.add(
         "linearPattern",
@@ -85,7 +85,7 @@ fn fins(n: usize, full: bool, reapply: bool) -> (Studio, RegenResult) {
             ("oppositeDirection", ParamValue::Bool(true)),
             ("distance", e("2 mm")),
             ("instanceCount", e(&n.to_string())),
-            ("operationType", en("ADD")),
+            ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true)),
             ("fullFeaturePattern", ParamValue::Bool(reapply)),
         ],
     );
@@ -229,15 +229,25 @@ fn fin_pattern_x1000_matches_onshape_and_is_fast() {
     if std::env::var_os("NOSHAPE_PERF").is_some() && log::set_logger(&PerfLog).is_ok() {
         log::set_max_level(log::LevelFilter::Info);
     }
-    let t0 = std::time::Instant::now();
-    let (_, r) = fins(1000, true, true);
-    let total = t0.elapsed().as_secs_f64();
+    let timed = |n: usize| {
+        let t0 = std::time::Instant::now();
+        let (_, r) = fins(n, true, true);
+        (t0.elapsed().as_secs_f64(), r)
+    };
+    // Speed against a baseline from the same run (the machine's load varies
+    // with every other agent's builds): ×200 before and after ×1000.
+    let (before, _) = timed(200);
+    let (total, r) = timed(1000);
+    let (after, _) = timed(200);
     assert!(matches!(status(&r).0, FeatureStatus::Ok), "{:?}", status(&r));
     let t = topology(&r);
     assert_eq!((t.faces, t.edges, t.vertices, t.front, t.dups, t.sides, t.base_top), (4004, 12006, 8004, 1, 0, (1, 1), 1000));
     let pattern = r.display.features.last().unwrap().time_ms as f64 / 1e3;
-    eprintln!("fins ×1000: pattern {pattern:.2} s, whole regeneration with display {total:.2} s");
-    assert!(total < 13.0, "{total:.2} s");
+    let base = before.max(after);
+    eprintln!("fins ×1000: pattern {pattern:.2} s, whole regeneration with display {total:.2} s; ×200 {before:.2} / {after:.2} s, ratio {:.2}", total / base);
+    // Linear is 5×; OCCT's shell orientation step adds a little (pattern_perf:
+    // 5.6-6.4); the old quadratic paths were ~25×.
+    assert!(total < 8.0 * base, "×1000 {total:.2} s against ×200 {base:.2} s");
 }
 
 /// Live "Pending state" ("pending pattern 2"): block 520 × 60 × 10 mm, a rib
@@ -253,7 +263,7 @@ fn narrow_rib_feature_pattern_without_reapply_matches_onshape() {
         let block = s.region(rect(0.0, 0.0, 0.52, 0.06));
         s.add("extrude", &[("entities", q(vec![block])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
         let rib = s.region(rect(0.005, 0.01, 0.0052, 0.05));
-        let mut p = vec![("entities", q(vec![rib])), ("operationType", en("ADD")), ("depth", e("15 mm"))];
+        let mut p = vec![("entities", q(vec![rib])), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true)), ("depth", e("15 mm"))];
         if on_top {
             p.extend([("startOffset", ParamValue::Bool(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e("10 mm"))]);
         }
@@ -266,7 +276,7 @@ fn narrow_rib_feature_pattern_without_reapply_matches_onshape() {
                 ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])),
                 ("distance", e("0.5 mm")),
                 ("instanceCount", e(&n.to_string())),
-                ("operationType", en("ADD")),
+                ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true)),
             ],
         );
         let r = s.regen();

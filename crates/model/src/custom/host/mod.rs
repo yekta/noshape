@@ -140,6 +140,14 @@ pub struct CtxState {
     transient_versions: HashMap<Arc<str>, u64>,
     /// The edges each `opSplitEdges` split (`qSplitBy` finds their pieces).
     pub split_edges: HashMap<FsId, Vec<(BodyId, noshape_kernel::Shape)>>,
+    /// The bodies each `opPattern` instance made, by (operation id, instance name) (`qPatternInstances`).
+    pub pattern_instances: HashMap<(FsId, String), Vec<BodyId>>,
+    /// `opSplitFace` planar tools: a point and normal of each tool's plane
+    /// and the midpoints of the edges it cut (tracking a tool face finds
+    /// them, std's partial dependency: sheet metal Bend's boundaries).
+    pub split_tools: Vec<(DVec3, DVec3, Vec<DVec3>)>,
+    /// The face pieces each `opSplitFace` left (their snapshot points; `qSplitBy` faces).
+    pub split_face_pieces: HashMap<FsId, Vec<DVec3>>,
 }
 
 /// The `Context` builtin.
@@ -202,6 +210,9 @@ impl FsContext {
                 dependencies: HashMap::new(),
                 splits: HashMap::new(),
                 split_edges: HashMap::new(),
+                pattern_instances: HashMap::new(),
+                split_tools: Vec::new(),
+                split_face_pieces: HashMap::new(),
                 attr_snapshots: HashMap::new(),
                 body_versions: HashMap::new(),
                 transient_versions: HashMap::new(),
@@ -559,6 +570,13 @@ pub fn context_arg(i: &mut Interp, a: &[Value]) -> R<Arc<FsContext>> {
 /// gets an [`EvalCtx`] whose feature is the operation's marker; created
 /// geometry is renamed afterwards. Failures restore the context, record the
 /// error status on `id` and raise `{ message : <error> }`.
+/// `NOSHAPE_FS_TRACE=1`: print every host operation and the bodies' face
+/// counts before and after it (debugging std features).
+pub(super) fn trace_ops() -> bool {
+    static ON: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var("NOSHAPE_FS_TRACE").is_ok_and(|v| v == "1"));
+    *ON
+}
+
 pub fn run_op<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: &str, f: impl FnOnce(&mut EvalCtx) -> Result<T, FeatureError>) -> R<T> {
     run_op_with(i, cx, id, failure, &crate::params::ParamValues::default(), f)
 }
@@ -580,6 +598,26 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
     let mut ev = EvalCtx::new(marker, &name, params, &units, ctx, &outer);
     ev.xform = st.xform;
     let r = f(&mut ev);
+    if trace_ops() {
+        // Operation trace for debugging std features (stderr).
+        let faces = |c: &crate::regen::context::Context| {
+            c.bodies
+                .iter()
+                .map(|b| {
+                    let bb = b.shape.bounding_box(true).map(|x| format!("[{:.3} {:.3} {:.3} .. {:.3} {:.3} {:.3}]", x.min.x * 1e3, x.min.y * 1e3, x.min.z * 1e3, x.max.x * 1e3, x.max.y * 1e3, x.max.z * 1e3)).unwrap_or_default();
+                    // A small sheet: each face's box too.
+                    let fb = if b.kind == crate::display::BodyKind::Surface && b.faces.len() <= 8 {
+                        b.shape.faces().iter().filter_map(|f| f.bounding_box(true).ok()).map(|x| format!(" f[{:.3} {:.3} {:.3} .. {:.3} {:.3} {:.3}]", x.min.x * 1e3, x.min.y * 1e3, x.min.z * 1e3, x.max.x * 1e3, x.max.y * 1e3, x.max.z * 1e3)).collect::<String>()
+                    } else {
+                        String::new()
+                    };
+                    format!("{:?}:{}{bb}{fb}", b.kind, b.faces.len())
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        eprintln!("[fs op] {} {failure} {} -> {} | {}", id.join("."), faces(&snapshot), if r.is_ok() { "ok" } else { "ERR" }, faces(&ev.ctx));
+    }
     let warnings = std::mem::take(&mut ev.warnings);
     let mut ctx = ev.ctx;
     match r {

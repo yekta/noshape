@@ -178,6 +178,9 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("tab", DialogTab, Some("FeatureDialog")),
         KeyBinding::new("shift-tab", DialogTabPrev, Some("FeatureDialog")),
         KeyBinding::new("shift-tab", StudioTabPrev, Some("PartStudio")),
+        // Live (ui 10-22 b): Change configuration… leaves the focus on the
+        // page, and the first Tab goes to the top bar (Share).
+        KeyBinding::new("tab", FocusNavbar, asm),
         KeyBinding::new("shift-n", RenameSelected, doc),
         KeyBinding::new("alt-c", SearchTools, doc_mod),
         KeyBinding::new("s", ShortcutToolbar, doc),

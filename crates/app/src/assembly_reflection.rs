@@ -184,7 +184,7 @@ impl AssemblyView {
             )
             .child(
                 h_flex()
-                    .child(div().child(crate::os_ui::param_row("Rotation angle", crate::os_ui::input_h(Input::new(&rotation).appearance(false).text_size(px(13.33)).text_right(), 25.))))
+                    .child(div().child(crate::os_ui::param_row("Rotation angle", crate::os_ui::input_h(Input::new(&rotation).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))))
                     .child(
                         // Live: the 26 px column right of the 194 px row (icon at 443).
                         div()

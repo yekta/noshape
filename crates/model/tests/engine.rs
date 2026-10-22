@@ -69,7 +69,8 @@ impl T {
         regs.iter().map(|x| Reference::SketchRegion { sketch, key: x.key.clone() }).collect()
     }
     fn extrude(&mut self, region: Reference, depth: &str, op: &str) -> FeatureId {
-        self.add("extrude", &[("entities", q(vec![region])), ("depth", e(depth)), ("operationType", en(op))])
+        // Add / Remove merge with what they touch ("Merge with all").
+        self.add("extrude", &[("entities", q(vec![region])), ("depth", e(depth)), ("operationType", en(op)), ("defaultScope", ParamValue::Bool(op != "NEW"))])
     }
     /// Block [x0,x1]x[y0,y1]x[0,h] on the Top plane.
     fn block(&mut self, x0: f64, y0: f64, x1: f64, y1: f64, h: &str) -> (FeatureId, FeatureId) {
@@ -651,6 +652,7 @@ fn aborted_pattern_regeneration_stops_quickly() {
     let pattern = feature_pattern(&mut t, vec![rib], "1000", true);
     t.set(pattern, "distance", e("2 mm"));
     t.set(pattern, "operationType", en("ADD"));
+    t.set(pattern, "defaultScope", ParamValue::Bool(true));
     let cancel = RegenCancel::default();
     let (latency, result) = std::thread::scope(|s| {
         let c = cancel.clone();
@@ -700,6 +702,7 @@ fn write_pending_pattern_clip() {
     let pattern = feature_pattern(&mut t, vec![rib], "10", true);
     t.set(pattern, "distance", e("0.5 mm"));
     t.set(pattern, "operationType", en("ADD"));
+    t.set(pattern, "defaultScope", ParamValue::Bool(true));
     t.ok();
     let v = serde_json::json!({ "noshape_features": t.ps.features });
     std::fs::write(std::env::temp_dir().join("noshape-pending-clip.json"), v.to_string()).unwrap();
@@ -858,6 +861,7 @@ fn pending_pattern_clip_at_1000_is_one_part() {
     let pattern = feature_pattern(&mut t, vec![rib], "1000", true);
     t.set(pattern, "distance", e("0.5 mm"));
     t.set(pattern, "operationType", en("ADD"));
+    t.set(pattern, "defaultScope", ParamValue::Bool(true));
     let r = t.ok();
     let solids = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count();
     assert_eq!(solids, 1, "every rib fuses into the block");
@@ -888,7 +892,7 @@ fn write_fins_clip() {
             ("oppositeDirection", b(true)),
             ("distance", e("2 mm")),
             ("instanceCount", e("2")),
-            ("operationType", en("ADD")),
+            ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true)),
             ("fullFeaturePattern", b(true)),
         ],
     );
@@ -1035,4 +1039,147 @@ fn f12_edge(b: &Body, p: DVec3) -> Reference {
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .unwrap();
     Reference::Edge((*b.edges[i]).clone())
+}
+
+/// qa5's "qa5 bool" studio: Part 1 block (0,0)–(40,20)×10 mm, Part 2
+/// cylinder Ø10 centred (40,10) ×20 (New, overlapping Part 1's x=40 face),
+/// Part 3 block (60,0)–(80,20)×10.
+fn qa5_bool() -> (T, [BodyId; 3]) {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let cs = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::new(0.04, 0.01), 0.005));
+    let r = t.regions(cs)[0].clone();
+    t.extrude(r, "20 mm", "NEW");
+    t.block(0.06, 0.0, 0.08, 0.02, "10 mm");
+    let r = t.ok();
+    let ids: Vec<BodyId> = r.context.bodies.iter().map(|b| b.id.clone()).collect();
+    assert_eq!(ids.len(), 3);
+    (t, [ids[0].clone(), ids[1].clone(), ids[2].clone()])
+}
+
+fn parts(r: &RegenResult) -> Vec<(BodyId, String, f64)> {
+    r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| (b.id.clone(), b.name.clone(), b.shape.volume().unwrap() * 1e9)).collect()
+}
+
+/// qa5 BOOL1: a Boolean union of two parts apart (Part 1 + Part 3) leaves
+/// both parts as they were (live) and never touches Part 2.
+#[test]
+fn union_of_parts_apart_keeps_every_part() {
+    for keep in [false, true] {
+        let (mut t, [p1, p2, p3]) = qa5_bool();
+        t.add("booleanBodies", &[("operationType", en("UNION")), ("tools", q(vec![Reference::Body(p1.clone()), Reference::Body(p3.clone())])), ("keepTools", b(keep))]);
+        let r = t.regen();
+        let st = r.display.features.last().unwrap();
+        assert!(matches!(st.status, FeatureStatus::Info), "keep {keep}: the union succeeds with a note: {:?}", st.message);
+        assert_eq!(st.message.as_deref(), Some("Boolean resulted in no geometry change. The parts either do not intersect or are totally contained."));
+        let ps = parts(&r);
+        assert_eq!(ps.len(), 3, "keep {keep}: {ps:?}");
+        let vol = |id: &BodyId| ps.iter().find(|p| p.0 == *id).map(|p| p.2).unwrap_or_else(|| panic!("keep {keep}: {id:?} gone: {ps:?}"));
+        assert!((vol(&p1) - 8000.0).abs() < 1e-6, "{ps:?}");
+        assert!((vol(&p2) - 25.0 * PI * 20.0).abs() < 1e-6, "Part 2 untouched: {ps:?}");
+        assert!((vol(&p3) - 4000.0).abs() < 1e-6, "{ps:?}");
+        assert_eq!(ps.iter().map(|p| p.1.as_str()).collect::<Vec<_>>(), ["Part 1", "Part 2", "Part 3"]);
+    }
+}
+
+/// qa5 BOOL3 (live "qa5 booleans"): an Extrude Add whose tool touches Part
+/// 1, the pin and Part 3: Merge with all makes one part of the tool and
+/// every part ("Part 1", 14785.398163 mm³); the scope Part 1 + Part 3 makes
+/// those two and the tool one part (14000) and the pin stays; an empty
+/// scope fails ("No merge scope selected.").
+#[test]
+fn add_into_several_parts_is_one_union() {
+    for case in ["empty", "all", "p1p3"] {
+        let (mut t, [p1, p2, p3]) = qa5_bool();
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.03, 0.005, 0.07, 0.015));
+        let reg = t.regions(s)[0].clone();
+        let x = t.extrude(reg, "10 mm", "ADD");
+        t.set(x, "defaultScope", b(false));
+        match case {
+            "all" => t.set(x, "defaultScope", b(true)),
+            "p1p3" => t.set(x, "booleanScope", q(vec![Reference::Body(p1.clone()), Reference::Body(p3.clone())])),
+            _ => {}
+        }
+        if case == "empty" {
+            // Live: the feature fails, "No merge scope selected.", and the
+            // parts stay as they were.
+            let r = t.regen();
+            let st = r.display.features.last().unwrap();
+            assert!(matches!(st.status, FeatureStatus::Error) && st.message.as_deref() == Some("No merge scope selected."), "{:?}", st.message);
+            assert_eq!(parts(&r).len(), 3);
+            continue;
+        }
+        let r = t.ok();
+        let ps = parts(&r);
+        if case == "p1p3" {
+            assert_eq!(ps.len(), 2, "{case}: {ps:?}");
+            let merged = ps.iter().find(|p| p.0 == p1).expect("Part 1 kept");
+            assert!((merged.2 - 14000.0).abs() < 1e-5, "{case}: {ps:?}");
+            let pin = ps.iter().find(|p| p.0 == p2).expect("the pin stays");
+            assert!((pin.2 - 25.0 * PI * 20.0).abs() < 1e-6, "{case}: {ps:?}");
+        } else {
+            assert_eq!(ps.len(), 1, "{case}: one part: {ps:?}");
+            assert_eq!(ps[0].0, p1, "{case}: it is Part 1");
+            assert!((ps[0].2 - 14785.398163).abs() < 1e-5, "{case}: {ps:?}");
+            assert!(!ps.iter().any(|p| p.0 == p2 || p.0 == p3), "{case}: merged into Part 1");
+        }
+    }
+}
+
+/// Live "qa5 booleans": Union Part 1 + Part 2 is one part of 9178.097 mm³
+/// keeping the first pick's id, name and colour, and the old Part 3 is then
+/// "Part 2"; Subtract (tools Part 2, targets Part 1) leaves Part 1 7607.301;
+/// Intersect makes a new part (new id and colour) of 392.699.
+#[test]
+fn boolean_results_and_names_as_live() {
+    let (mut t, [p1, p2, p3]) = qa5_bool();
+    let color = |r: &RegenResult, id: &BodyId| r.context.bodies.iter().find(|b| b.id == *id).map(|b| b.color);
+    let c1 = color(&t.ok(), &p1);
+    let u = t.add("booleanBodies", &[("operationType", en("UNION")), ("tools", q(vec![Reference::Body(p1.clone()), Reference::Body(p2.clone())]))]);
+    let r = t.ok();
+    let ps = parts(&r);
+    assert_eq!(ps.len(), 2, "{ps:?}");
+    assert_eq!((ps[0].0.clone(), ps[0].1.as_str()), (p1.clone(), "Part 1"));
+    assert!((ps[0].2 - 9178.097245).abs() < 1e-4, "{ps:?}");
+    assert_eq!(color(&r, &p1), c1);
+    assert_eq!((ps[1].0.clone(), ps[1].1.as_str()), (p3.clone(), "Part 2"), "the old Part 3 renumbers");
+    t.ps.features.retain(|f| f.id != u);
+
+    let s = t.add("booleanBodies", &[("operationType", en("SUBTRACTION")), ("tools", q(vec![Reference::Body(p2.clone())])), ("targets", q(vec![Reference::Body(p1.clone())]))]);
+    let ps = parts(&t.ok());
+    assert_eq!(ps.len(), 2, "{ps:?}");
+    assert!((ps.iter().find(|p| p.0 == p1).unwrap().2 - 7607.300919).abs() < 1e-4, "{ps:?}");
+    t.ps.features.retain(|f| f.id != s);
+
+    t.add("booleanBodies", &[("operationType", en("INTERSECTION")), ("tools", q(vec![Reference::Body(p1.clone()), Reference::Body(p2.clone())]))]);
+    let r = t.ok();
+    let ps = parts(&r);
+    assert_eq!(ps.len(), 2, "{ps:?}");
+    let new = ps.iter().find(|p| p.0 != p3).unwrap();
+    assert!(new.0 != p1 && new.0 != p2, "a new part: {ps:?}");
+    assert!((new.2 - 392.699082).abs() < 1e-4, "{ps:?}");
+    assert_ne!(color(&r, &new.0), c1, "with a new colour");
+}
+
+/// Live NAME2 / BOOL2 ("qa5 booleans"): a union keeps the first-picked
+/// part's id and colour (the pin picked first); Intersect with ☑ Keep tools
+/// keeps all three parts and adds the common volume as a new part, last.
+#[test]
+fn union_pick_order_and_intersect_keep_tools() {
+    let (mut t, [p1, p2, p3]) = qa5_bool();
+    let color = |r: &RegenResult, id: &BodyId| r.context.bodies.iter().find(|b| b.id == *id).map(|b| b.color);
+    let c2 = color(&t.ok(), &p2);
+    let u = t.add("booleanBodies", &[("operationType", en("UNION")), ("tools", q(vec![Reference::Body(p2.clone()), Reference::Body(p1.clone())]))]);
+    let r = t.ok();
+    let ps = parts(&r);
+    assert_eq!(ps.len(), 2, "{ps:?}");
+    assert!(ps.iter().any(|p| p.0 == p2 && (p.2 - 9178.097245).abs() < 1e-4), "the pin's id holds the union: {ps:?}");
+    assert_eq!(color(&r, &p2), c2);
+    t.ps.features.retain(|f| f.id != u);
+
+    t.add("booleanBodies", &[("operationType", en("INTERSECTION")), ("tools", q(vec![Reference::Body(p1.clone()), Reference::Body(p2.clone())])), ("keepTools", b(true))]);
+    let ps = parts(&t.ok());
+    assert_eq!(ps.len(), 4, "{ps:?}");
+    assert_eq!(ps[..3].iter().map(|p| p.0.clone()).collect::<Vec<_>>(), [p1, p2, p3], "the tools stay: {ps:?}");
+    assert!((ps[3].2 - 392.699082).abs() < 1e-4 && ps[3].1 == "Part 4", "{ps:?}");
 }

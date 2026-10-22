@@ -13,6 +13,7 @@ use super::*;
 use gpui_kit::component::WindowExt as _;
 use noshape_model::configuration::{ConfigInput, ConfigInputKind, ListOption, VariableKind};
 use noshape_model::variables::{VsConfiguration, VsField};
+use noshape_units::ExprValue;
 
 /// The panel's width (live vs-914: x 1347–1919).
 const PANEL_W: f32 = 572.;

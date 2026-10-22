@@ -401,6 +401,18 @@ fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f6
                 }
                 base
             };
+            // Another joint meeting the bend's end (the plate's edge to a Hem's
+            // arc) makes it a corner, not a partial bend: no bend relief (live
+            // qa5 Hem on G34: the front flange keeps its full end, 9378.1835 mm³).
+            let joint_here = (0..topo.edges.len()).any(|x| {
+                x != l.side[k] && topo.edge_faces[x].len() == 2 && {
+                    let (a, b) = topo.edge_ends[x];
+                    a.distance(v) < TOL || b.distance(v) < TOL
+                }
+            });
+            if joint_here {
+                continue;
+            }
             let straight = def.relief.depth * radius;
             let depth = if def.relief.style == "RECTANGLE" { straight + w * 0.5 } else { straight };
             // Through the whole thickness and a little more.

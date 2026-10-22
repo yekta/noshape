@@ -149,3 +149,22 @@ fn offset_circular_conic_stays_a_conic() {
         assert!((p.length() - 0.75).abs() < 1e-9, "offset of a quarter circle is a circle: {}", p.length());
     }
 }
+
+#[test]
+fn every_sketch_font_lays_out_in_its_styles() {
+    use noshape_sketch::text::{SKETCH_DEFAULT_FONT, SKETCH_FONTS, sketch_font_of_file};
+    assert_eq!(SKETCH_FONTS.len(), 32);
+    assert!(SKETCH_FONTS.iter().any(|f| f.name == SKETCH_DEFAULT_FONT));
+    for f in SKETCH_FONTS {
+        let text = if f.name.contains("Chinese") || f.name.contains("Japanese") || f.name.contains("Korean") { "字Ab" } else { "Ab" };
+        for (bold, italic) in [(false, false), (f.bold, false), (false, f.italic), (f.bold, f.italic)] {
+            let l = layout_text(text, f.name, bold, italic);
+            assert!(!l.contours.is_empty() && l.width > 0.0, "{} bold {bold} italic {italic}", f.name);
+        }
+    }
+    // A variable font's Bold is its 700 instance: wider strokes, wider text.
+    let (r, b) = (layout_text("Wide", "Open Sans", false, false), layout_text("Wide", "Open Sans", true, false));
+    assert!(b.width > r.width * 1.02, "{} vs {}", b.width, r.width);
+    assert_eq!(sketch_font_of_file("OpenSans-BoldItalic.ttf"), Some("Open Sans"));
+    assert_eq!(sketch_font_of_file("RobotoSlab-Regular.ttf"), Some("Roboto Slab"));
+}

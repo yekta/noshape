@@ -448,3 +448,32 @@ changes. I write the renderer part first (my files) and show crops before touchi
     only on zoom (wpp). TODO: build, pixel crops vs `NOSHAPE_GPUI_LABELS=1` at 1x/2x (hover, selected,
     configured, ƒx), then constraint glyphs (icons via resvg 0.46 like GPUI's `render_alpha_mask`, shadow_xs =
     offset (0,1) blur 2 black 5%), pattern counts, datums.
+- **2026-10-21 22:30 (perf, after the green-up freeze)**
+  - Local llvmpipe, many_parts.rs::thousand_pins_frame_time (1194x794, 1000 pins, 184k tris; machine loaded):
+    default 1149 ms; skip meshes 371; MSAA 1: 331; AO off 959; no instancing 1530 (instancing -25% here).
+    The "lines" variant printed nothing (rerun). Meshes under 4x MSAA dominate on software rasterizers.
+  - Onshape adapts interactive detail (webgl DetailManager): while the INTERACTIVE frame rate is below
+    DETAIL_REDUCTION_THRESHOLD_FPS 20 it steps down: (1) edge silhouettes + section plane edges off, (2) SSAO off,
+    (3) image-based (backface) silhouettes off, (4) lowLevelBodyProportion += LOW_LEVEL_BODY_PROPORTION_STEP .1 up to
+    MAX_LOW_LEVEL_BODY_PROPORTION .9 (that share of bodies at the lowest LOD); above DETAIL_ENHANCEMENT_THRESHOLD_FPS
+    30 it steps back up; settings persisted per [viewerUsage, workspace, element, modelUsage]. Bodies under
+    DEFAULT_EXTENT_CULLING_THRESHOLD_IN_PIXELS 2 px are culled (occurrence LOD manager; read where it applies).
+    Next perf item: implement this on top of navigation::FrameTimer (AO off first; LOD = coarser meshes).
+  - Item 2 gate: frame sketch labels only with NOSHAPE_FRAME_SKETCH_LABELS=1 (overlay_labels::frame_sketch_labels)
+    until crops vs GPUI are approved; the sketch name is in the frame unconditionally.
+- **2026-10-22 02:00 (perf) Silhouettes (Onshape draws them; we drew none) + label crops.**
+  - Edge-based silhouettes (Onshape `vs-draw-silhouettes`): scene builder `silhouette_edges` = every tessellation
+    edge inside a face shared by two non-coplanar facets, with both facet normals (`SilhouetteSegment`, uploaded
+    with the body, so pattern copies share it); renderer `GpuLines::silhouette` → its own list and pipeline
+    (`vs_silhouette`: drawn where one facet faces the viewer and the other doesn't, otherwise like an edge via the
+    shared `line_vertex`; face hover/selection masked; never in the pick pass). Image-based backface silhouettes
+    (`vs-backfacesil-faces` port: back faces pushed out by half the edge width on screen × (1 − |n·v|), edge color;
+    `Instance::back_silhouette`, `mesh_backsil`, drawn before the opaque faces) for opaque solids in Shaded with
+    edges / Hidden line. Not in plain Shaded; wires/surfaces no backface pass. Test
+    crates/scene/tests/silhouettes.rs (cylinder from Front, ortho + perspective: sides much darker than in Shaded,
+    the face unchanged). Onshape's exact line width/color for silhouettes requested from live (REQUESTS.md);
+    the shader source is at /root/perf-scratch/onshape-silhouette-shaders.txt.
+  - Frame sketch labels vs GPUI (crops2/, fixture crops2/labels.noshape via mklabels.py + noshape-cli): 1x rest and
+    hover ≤1 level (11 / 19 px); 2x: the value after the ƒx/ƒ marker 1 device px left → GPUI's text leaf width is
+    `round(ceil(width_logical) · scale)` (text.rs measure ceils in logical px, taffy rounds to device px), fixed in
+    `overlay_labels::leaf_width` (also the section/analysis value boxes). Re-crop pending a build.

@@ -31,7 +31,7 @@ impl PartStudioView {
     }
 
     /// Feature that created a referenced entity.
-    fn creating_feature(&self, r: &Reference) -> Option<FeatureId> {
+    pub(super) fn creating_feature(&self, r: &Reference) -> Option<FeatureId> {
         match r {
             Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } => Some(*sketch),
             Reference::Face(n) => n.creator(),
@@ -362,8 +362,9 @@ impl PartStudioView {
                     if let Some(b) = body.clone() {
                         let bd = b.clone();
                         m = m.separator().item(icon_item(&format!("Delete {body_name}…"), "menu-delete", Box::new(move |this, w, cx| {
+                            // Live (qa5 DEL2): the Delete part dialog, the part prefilled.
                             this.selection = vec![Reference::Body(bd.clone())];
-                            this.delete_selected_parts(w, cx);
+                            this.start_feature("deleteBodies", w, cx);
                         })));
                         if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                             m = m.item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));

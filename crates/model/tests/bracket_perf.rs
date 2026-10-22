@@ -91,9 +91,9 @@ fn bracket_regenerates_like_onshape() {
     let base = s.sketch(DatumPlane::Top, &[&[(0.0, 0.0), (80.0, 0.0), (80.0, 50.0), (0.0, 50.0)]], &[]);
     let x1 = s.add("extrude", &[("entities", q(base)), ("depth", e("8 mm"))]);
     let wall = s.sketch(DatumPlane::Top, &[&[(0.0, 0.0), (80.0, 0.0), (80.0, 8.0), (0.0, 8.0)]], &[]);
-    s.add("extrude", &[("entities", q(wall)), ("depth", e("60 mm")), ("operationType", en("ADD"))]);
+    s.add("extrude", &[("entities", q(wall)), ("depth", e("60 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
     let holes = s.sketch(DatumPlane::Top, &[], &[((20.0, 30.0), 4.0), ((60.0, 30.0), 4.0)]);
-    s.add("extrude", &[("entities", q(holes[..2].to_vec())), ("operationType", en("REMOVE")), ("endBound", en("THROUGH_ALL"))]);
+    s.add("extrude", &[("entities", q(holes[..2].to_vec())), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true)), ("endBound", en("THROUGH_ALL"))]);
     let f = s.edges_at(&[DVec3::new(0.0, 50.0, 4.0), DVec3::new(80.0, 50.0, 4.0)]);
     assert_eq!(f.len(), 2);
     s.add("fillet", &[("entities", q(f)), ("radius", e("5 mm"))]);
@@ -101,12 +101,12 @@ fn bracket_regenerates_like_onshape() {
     assert_eq!(c.len(), 1);
     s.add("chamfer", &[("entities", q(c)), ("width", e("1 mm"))]);
     let wh = s.sketch(DatumPlane::Front, &[], &[((15.0, 45.0), 3.0)]);
-    let hole = s.add("extrude", &[("entities", q(wh[..1].to_vec())), ("operationType", en("REMOVE")), ("endBound", en("THROUGH_ALL")), ("oppositeDirection", ParamValue::Bool(true))]);
+    let hole = s.add("extrude", &[("entities", q(wh[..1].to_vec())), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true)), ("endBound", en("THROUGH_ALL")), ("oppositeDirection", ParamValue::Bool(true))]);
     let dir = s.edges_at(&[DVec3::new(40.0, 50.0, 0.0)]);
     assert_eq!(dir.len(), 1);
     s.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(hole)])), ("directionOne", q(dir)), ("distance", e("25 mm")), ("instanceCount", e("3"))]);
     let g = s.sketch(DatumPlane::Right, &[&[(8.0, 8.0), (30.0, 8.0), (8.0, 40.0)]], &[]);
-    let gusset = s.add("extrude", &[("entities", q(g[..1].to_vec())), ("depth", e("5 mm")), ("operationType", en("ADD"))]);
+    let gusset = s.add("extrude", &[("entities", q(g[..1].to_vec())), ("depth", e("5 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
     let pl = s.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("offset", e("40 mm"))]);
     s.add("mirror", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(gusset)])), ("mirrorPlane", q(vec![Reference::FeaturePlane(pl)])), ("fullFeaturePattern", ParamValue::Bool(true))]);
     // The whole Part Studio from scratch, as on opening the document.

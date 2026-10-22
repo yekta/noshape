@@ -835,3 +835,121 @@ drw2's cad_export.rs). Check first: `cargo test -p noshape-model --lib drawing::
   D7 (GTol: typed "0.1" lands in Tolerance at once, ✓ green); DSM3 Show/hide order with "Show faulty parts". Fixed
   after: sheet tabs hide under the chooser; an empty filter result shows no "No Part Studios" message.
   `cargo clippy --locked -p noshape --all-targets -- -D warnings` clean; model drawing tests 115 green.
+
+## Moved to the shared drawing tools (api, 2026-10-21 23:40; drawing slice 5)
+What the drawing tools commit now lives in `crates/scene/src/drawing_tools/commit.rs`, so the agent API
+(`drawing_section_view`, `_detail_view`, `_auxiliary_view`, `_break_view`, `_crop_view`, `_centerline`,
+`_virtual_sharp`, `_view_table`) builds exactly what the clicks build. The app calls it:
+- `drawing_tools.rs`: `ortho_point`, `extend_cut`, `section_jog_at` (bodies), the Centerline, Edge to edge
+  centerline (`silhouette_centerline`, `edge_pair_centerline`, `edge_centerline`), 3/2 point circle centerline
+  (`circle_centerline`) and Virtual sharp (`virtual_sharp`, its "The edges are parallel") commits.
+- `drawing_extra.rs`: `crop_refused` and the Break refusals (`view_refusal`, same messages), `view_crop`,
+  `view_break`, `view_table` (BOM / cut list / hole table + its edit name).
+Behaviour unchanged. Fix also landed in `scene/drawing_tools/pick.rs` `hover_at`: Edge to edge centerline and
+Virtual sharp now hover view edges (before, they always said "Select a straight edge"). If you change one of
+these rules, change it in commit.rs (the app and the API both use it). Backups: /root/api-scratch/drw5/bak_*.rs.
+
+## asb 10-22 (qa5 pass 8 on 5bd50b2): DSM5, D18, D17, DSM2, DSM4, D8
+- **D18** drawing BOM = assembly BOM: `views::assembly_source` merges `analysis::bom` rows with skb's rule
+  (`assembly::bom::canonical_config`, now `pub(crate)`: values equal to the default, or equal as numbers, are the
+  default; excluded inputs don't count); a row's bodies are matched on the canonical configuration.
+  Test `drawing_bom_merges_instances_in_the_same_configuration` (two copies at "10 mm" / "0.01 m" of a "10mm"
+  default join the original's row).
+- **D17** (app, `drawing_view.rs`):
+  - (1) the end of *any* regeneration (e.g. the chooser's Part Studios) set `out_of_date = false`, so a stale
+    drawing's Update went pale while its views stayed old (reproduced: Part Studio change → yellow → open the
+    picker → pale). Now `sources_stale` is recomputed over the views' own sources only.
+  - (2) the views keep their geometry after the document is reopened: `Drawing.sources_at` (microversion the views
+    were made from) is set by every drawing commit while up to date and by Update (an "Update" step);
+    `load_old_state` regenerates the changed sources from `store.read_all(sources_at)` at open, so Update is
+    yellow and the old views stay until it. Live "qa5 pass 7" (6).
+- **DSM4** picker filters (`drawing_chooser.rs`): 7 independent toggles in live's order (Part Studios, Parts (on),
+  Composite parts, Sketches, Surfaces, Curves, Flat patterns; `filter` is a bit set). Studio rows show what the
+  toggles list, in body order (flat pattern above its part, then sketches); a studio with nothing listed is
+  hidden; Part Studios alone = the studio rows themselves. `views::view_bodies(ctx, Some(part))` takes any
+  non-point body (surfaces / curves picked here); the whole studio skips open composites (members twice).
+- **DSM5** shaded views (`drawing_shaded.rs`, `drawing_scene.rs`, model `SheetGeometry.view_edges`):
+  - a flat view's picture is the flat plate (flat face extruded by the thickness) seen from the flat's reference
+    side in its plane coordinates (= the flat view's coordinates), so it lines up with the outline;
+  - the picture's white background is transparent (also in the exported PNG);
+  - a shaded view with its picture hides its edges: they are a pick-only layer, drawn in ink while the view is
+    hovered and in the selection colour while it is selected; bend lines, notes and centermarks stay on top;
+    PDF / SVG / raster drop the edges where the picture is embedded (DXF keeps them).
+  - "the existing flat view opened shaded": no code shades a new flat view (style defaults to hidden lines
+    removed); qa5's view was shaded in the test document (most likely by pass 7's DSM3 menu check).
+- **DSM2** UP/DOWN: the notes print `FlatBendLine.up` as is (`sheetmetal/flat.rs:300`,
+  `b.is_up() != data.flip_direction_up`). fs's native-route test asserts a flange is *not* up
+  (`sheetmetal_frames.rs:271`), against live; fs's std-route rewrite ("flange up = UP",
+  /root/fs-scratch/sheetmetal_frames.std-route.rs) lands with the std-route switch. Nothing to change on the
+  drawing side (note in featurescript.md "From asb (21 Oct night)").
+- **D8** iso cylinder balloon "----": a click on a silhouette lands beside the surface and the line of sight
+  missed it (tolerance 1e-7 × size). `body_under(src, frame, p, tol)` takes the pick tolerance in view units
+  (`pick.rs part_under`). Test extended (just beside the silhouette: none at 0, found at 0.5 mm).
+- **Checked in the app (build of 10-22 ~00:30):** D17 (1) the Update tool stays yellow after the picker regenerates
+  other studios; DSM4 the demo shows Part Studios / Parts / Sketches only, Parts + Sketches lists "Part 1" then
+  "Sketch 1", Sketches alone hides studios without sketches, Part Studios alone = studio rows; shaded iso view: no
+  black edges, transparent background (the through hole shows the sheet), hover = thin ink edges, selection =
+  orange edges, the balloon on top; qa5's "qa5 sheet metal" flat view: the plate fill now matches the flat outline,
+  bend lines on top. Found there: the bend notes were still hidden by the picture (images are their own render pass,
+  drawn after the text meshes, depth-tested "nearer or equal"): the picture now sits at z −0.5 (paper −1, ink 0).
+  Re-check pending (build blocked by others' WIP, see below).
+- **D2 leftovers** (`drawing_chooser.rs`): an opened other document now has live's header (🏠 "Go to document
+  filters", ‹ back with the category as tooltip, name + ⑂ version, Create version… (opens the Create version dialog
+  on that document through a temporary `DocModel`; the picker rereads it when the version is made) and Version graph
+  (its versions; picking one lists it)), then Part Studios | Assemblies, search, the filter toggles, the blue box with
+  the underlined "Create a version in <name>." link, and the Part Studio › parts tree of that version (sources keyed
+  by the `ExternalRef`, `chooser_sources` lists them; `choose_external` takes a part). Document rows have the version
+  line (latest version or Start, read during the library scan). Import… footer in every state of both tabs.
+  Their rows have pictures too (`thumbs` keyed by document: 0 here, `OtherDoc::tag` there).
+- **Multi-sheet DXF / DWG** (drw2 l, `cad_export.rs`): several sheets → ONE file. `cad_document_sheets`: every sheet
+  in model space left to right, each content box (`content_x_range`: frame + off-sheet content, measured before
+  Exclude off-sheet content) starting `SHEET_GAP_MM` (5.019 in) after the previous one (first at x 0); a layout per
+  sheet named after it ("Layout1" renamed; repeated names get " (2)") with a viewport (id 2) onto its frame.
+  `Sheet.dx` shifts all of a sheet's points. R12 (no layouts): the sheets' R12 geometry side by side
+  (`r12_sheets`). `to_dxf_sheets` / `to_dwg_sheets`; the export dialog writes one .dxf / .dwg instead of a zip.
+  Test `several_sheets_go_in_one_file_like_live` (viewport targets at w/2, 11+5.019+5+w/2, …; layouts Model,
+  Sheet1–3). DWG multi-sheet assumed like DXF (live only checked DXF).
+- **qa4 R12 (lead 10-22): drawing Wt widgets** (`drawing_wt.rs`, live behaviours "Drawing Wt widgets"):
+  - Drawing properties text heights and arrowheads are Wt dropdowns: "0.1500" four decimals in drawing units with
+    the unit as a label beside, only the leading number counts ("3 mm" → 3.0000, "1+1" → 1.0000), no number
+    silently reverts, ▾ = the Styles panel's preset heights (live list requested). Gaps (Dimensions text / geometry
+    gap / extension, Annotations stack gap) are spinboxes: a plain number or invalid (pale orange
+    rgba(221,82,40,0.1), hover "Must be a number", not applied), ↑ / ↓ and the spin arrows ±0.05 clamped at 0,
+    applied at once. Other number rows keep the length field (with a unit); their widget is requested (asb 10-22 a).
+  - New drawings get live's template sizes (`templates::template_sizes`): inch 0.12 text, 0.18 arrows, gaps 0.09 /
+    0.0625 / 0.08, stack gap 0.05, datum 0.12, CoM 0.25 (so Notes › Text height reads 0.1200, not 0.1378); metric
+    3.5 / 2.5 / 0.62 / 0.625 / 1.25.
+  - Sheet properties › Custom width / height (`XeInput`): on blur / Enter "12" → "12 in", "300 mm" kept, "1+1" →
+    "1 in", "abc" reverts (`commit_sheet_len`; test). Select-all on focus and Esc closing the dialog were already so.
+- **Build state 10-22 ~01:00:** the app doesn't compile because of others' WIP (`assembly_view.rs:492` and
+  `drawing_view.rs:427` use `doc` after moving it into the struct — the new shared studio cache;
+  `quantity_field.rs:387` misses `Sizable`); the model test target fails in `assembly/tests.rs:3038`. My files type-check.
+  `/root/asb-scratch/bin/test_loop.sh` runs the model drawing tests when it compiles.
+- **DSM4 handed to ui2 (lead 10-22).** Already in the tree (uncommitted, `drawing_chooser.rs`): `FILTERS` = 7 toggles
+  with the `F_*` bits, `ChooserState.filter: Option<u8>` (None = Parts), studio rows built from the bits (flat pattern
+  above its part, then sketches; studios with nothing listed hidden), filters for absent kinds hidden (`present`), and
+  `views::view_bodies(ctx, Some(part))` accepting surfaces / curves. Checked in the app (demo + qa5 sheet metal:
+  Flat + Parts → "Flat pattern of Part 1", "Part 1"; Flat alone → the flat row only). asb no longer edits it.
+
+## ui2 10-22: took DSM4 (lead)
+- ui2 owns DSM4 now (picker filter toggles, `drawing_chooser.rs`, surgical). asb's 7 toggles and the
+  "only kinds the document has" rule match live (dom/d2-picker-current: `ng-if="filter.isFilterVisible"`;
+  drawing/170 shows 4 icons in a document without composites / surfaces / curves, 1394 all 7). Restyled to
+  live's `os-button os-clear`: 30 px, 35 px pitch, on = `os-active` (#eaeaea under a #b6b6b6 top edge).
+- **Drawing panel fields after live's widget answer (dom/drawing-wt-widgets.txt, lead 10-22):**
+  - dropdowns: every Text height, Arrowhead, Datum size, Inspection "Text"; the ▾ list holds only the current value.
+  - spinboxes (`FieldKind::Spin { step_in, step_mm, decimals }`): Text / Geometry gap, Extension past line,
+    Stack gap size (mm step 0.05), Center of mass diameter, table padding (3 decimals), Centermarks Mark size / Gap
+    size; inch step 0.05, mm 0.1 (live mm: Text gap 0.1, Stack gap 0.05).
+  - Inspection: one "Inspection items" group (Item parsing, Font, Text, Border shape, Border size, Border color, Solid
+    fill) + "Automatic inspection items"; Border size is a select "2 Characters" (`DrawingProps.inspection_border_chars`,
+    0 Tight Fit … 5; the bubble is at least that many characters wide).
+  - Views: no Hatch spacing row (live has none). Construction › Centermarks: Mark size, Gap size, Color, ☑ Extended
+    lines (`ViewTabProps.centermark_mark_size / _gap_size / _extended`; stored, look not yet applied: request asb 10-22 b).
+  - mm template sizes: arrowheads 2.5, gaps 0.625 / 0.625 / 1.25, stack gap 1.25, datum 3.5, CoM 6.35, inspection 2.0
+    (inch inspection 0.08 in).
+  - These panel inputs never get Focus / Blur events (GPUI's focus path doesn't end at their handle), so "Tab /
+    away commits" is done by `track_field_focus` (and `track_sheet_len_focus` for Sheet properties width / height):
+    each render compares the focused field with the last one and commits the one left.
+  - Not in our panel yet (live has them): the Dashes spinboxes (Hidden / Tangent / Exploded edges, Cosmetic threads,
+    Centerlines), line-thickness selects, table row text heights, Detail / Auxiliary arrowheads.

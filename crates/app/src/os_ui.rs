@@ -437,13 +437,52 @@ pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usi
 /// [`select_field`] with `disabled` options (greyed, not pickable: an
 /// `<option disabled>`).
 pub fn select_field_with(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, disabled, current, None, on_select)
+}
+
+/// [`select_field`] as a Tab stop (`focus`): a focused select opens with
+/// Space, Enter or ↓, as a `<select>` (live Change configuration: Tab walks
+/// Configuration, List input 1, d, ?).
+pub fn select_field_focusable(id: impl Into<ElementId>, options: Vec<String>, current: usize, focus: &FocusHandle, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, Vec::new(), current, Some(focus.clone()), on_select)
+}
+
+fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, focus: Option<FocusHandle>, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
     let pal = p();
     let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
     let on_select = Rc::new(on_select);
     let label = options.get(current).cloned().unwrap_or_default();
     let probe = bounds.clone();
+    let open = Rc::new(move |window: &mut Window, cx: &mut App| {
+        let (options, disabled, on_select, b) = (options.clone(), disabled.clone(), on_select.clone(), bounds.get());
+        let width = f32::from(b.size.width);
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+            m = m.native_select(width).focus_ring(b);
+            for (i, o) in options.iter().enumerate() {
+                let f = on_select.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).disabled(disabled.contains(&i)).on_click(move |_, window, cx| {
+                    f(i, window, cx);
+                    window.refresh();
+                }));
+            }
+            m
+        });
+        crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
+    });
+    let open_key = open.clone();
     div()
         .id(id)
+        .when_some(focus, |d, f| {
+            d.track_focus(&f)
+                // Chrome's focus ring on a focused `<select>` (2 px #3e94ff).
+                .focus(|s| s.border_color(rgb(0x3e94ff)).shadow(vec![BoxShadow { color: rgb(0x3e94ff).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.), inset: false }]))
+                .on_key_down(move |ev: &KeyDownEvent, window, cx| {
+                    if matches!(ev.keystroke.key.as_str(), "space" | "enter" | "down") {
+                        cx.stop_propagation();
+                        open_key(window, cx);
+                    }
+                })
+        })
         .relative()
         .h(px(34.))
         .w_full()
@@ -461,22 +500,7 @@ pub fn select_field_with(id: impl Into<ElementId>, options: Vec<String>, disable
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .child(div().flex_1().truncate().child(label))
         .child(glyph(GLYPH_CARET, 8., rgb(0x777777))) // live assembly/181-182: `#777`
-        .on_click(move |_, window, cx| {
-            let (options, disabled, on_select, b) = (options.clone(), disabled.clone(), on_select.clone(), bounds.get());
-            let width = f32::from(b.size.width);
-            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                m = m.native_select(width).focus_ring(b);
-                for (i, o) in options.iter().enumerate() {
-                    let f = on_select.clone();
-                    m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).disabled(disabled.contains(&i)).on_click(move |_, window, cx| {
-                        f(i, window, cx);
-                        window.refresh();
-                    }));
-                }
-                m
-            });
-            crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
-        })
+        .on_click(move |_, window, cx| open(window, cx))
 }
 
 // Feature Studio toolbar and search pane glyphs (our own drawings).

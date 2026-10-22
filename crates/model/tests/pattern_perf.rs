@@ -88,11 +88,11 @@ fn run(case: Case, n: usize) -> (f64, RegenResult) {
     let on_top = [("startOffset", b(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e("10 mm")), ("depth", e("5 mm"))];
     let rib_feature = match case {
         Case::FeatureOnTop => {
-            let mut p = vec![("entities", q(vec![rib])), ("operationType", en("ADD"))];
+            let mut p = vec![("entities", q(vec![rib])), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))];
             p.extend(on_top.iter().cloned());
             s.add("extrude", &p)
         }
-        Case::FeatureThrough => s.add("extrude", &[("entities", q(vec![rib])), ("depth", e("15 mm")), ("operationType", en("ADD"))]),
+        Case::FeatureThrough => s.add("extrude", &[("entities", q(vec![rib])), ("depth", e("15 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]),
         Case::Part => {
             let mut p = vec![("entities", q(vec![rib])), ("operationType", en("NEW"))];
             p.extend(on_top.iter().cloned());
@@ -100,7 +100,7 @@ fn run(case: Case, n: usize) -> (f64, RegenResult) {
         }
     };
     let dir = q(vec![Reference::Plane(DatumPlane::Right)]);
-    let common = [("directionOne", dir), ("distance", e("2 mm")), ("instanceCount", e(&n.to_string())), ("operationType", en("ADD"))];
+    let common = [("directionOne", dir), ("distance", e("2 mm")), ("instanceCount", e(&n.to_string())), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))];
     let mut p: Vec<(&str, ParamValue)> = match case {
         Case::Part => vec![("patternType", en("PART")), ("entities", q(vec![Reference::Body(BodyId { feature: rib_feature, index: 0 })]))],
         _ => vec![("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(rib_feature)]))],
@@ -142,9 +142,10 @@ fn check(case: Case) {
     for n in [200usize, 1000] {
         let (t, r) = run(case, n);
         // The block with every rib (n of them, 1 × 10 × 5 mm above it): one
-        // part (a Part pattern keeps its seed rib as its own part).
+        // part ("Merge with all" also takes a Part pattern's seed rib, which
+        // stands on the block).
         let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).collect();
-        assert_eq!(solids.len(), if matches!(case, Case::Part) { 2 } else { 1 }, "{case:?} ×{n}");
+        assert_eq!(solids.len(), 1, "{case:?} ×{n}");
         let v: f64 = solids.iter().map(|b| b.shape.volume().unwrap()).sum::<f64>() * 1e9;
         let want = (2 * n + 10) as f64 * 20.0 * 10.0 + n as f64 * 1.0 * 10.0 * 5.0;
         assert!((v - want).abs() < 1e-6 * want, "{case:?} ×{n}: volume {v} mm³, want {want}");
@@ -179,7 +180,7 @@ fn g45(full_width: bool, reapply: bool) -> (RegenResult, Vec<(f64, glam::DVec3)>
     s.add("extrude", &[("entities", q(vec![block])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
     let rib = if full_width { rect(0.002, 0.0, 0.003, 0.02) } else { rect(0.002, 0.005, 0.003, 0.015) };
     let rib = s.sketch_region(rib);
-    let rib = s.add("extrude", &[("entities", q(vec![rib])), ("depth", e("15 mm")), ("operationType", en("ADD"))]);
+    let rib = s.add("extrude", &[("entities", q(vec![rib])), ("depth", e("15 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
     s.add(
         "linearPattern",
         &[
@@ -188,7 +189,7 @@ fn g45(full_width: bool, reapply: bool) -> (RegenResult, Vec<(f64, glam::DVec3)>
             ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])),
             ("distance", e("5 mm")),
             ("instanceCount", e("5")),
-            ("operationType", en("ADD")),
+            ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true)),
             ("fullFeaturePattern", b(reapply)),
         ],
     );

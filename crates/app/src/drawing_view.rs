@@ -194,6 +194,9 @@ pub struct DrawingEditor {
     pub sketch_dim_edit: Option<crate::drawing_sketch_dim::SketchDimEdit>,
     pub info: SheetInfo,
     pub out_of_date: bool,
+    /// Opened after its sources changed: the document at the drawing's
+    /// `sources_at` and the sources still made from it until Update (qa5 D17).
+    old_state: Option<(noshape_model::Document, Vec<SourceKey>)>,
     pub cache: Arc<ViewCache>,
     pub geoms: HashMap<ViewId, Arc<ViewGeometry>>,
     compute_task: Option<Task<()>>,
@@ -380,6 +383,8 @@ impl Focusable for DrawingEditor {
 
 impl DrawingEditor {
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // Read before `doc` moves into the view (derived parts' sources, DER8).
+        let studio_cache = doc.read(cx).studio_cache.clone();
         let (target_id, rx) = gpu.register_target();
         let frames = cx.spawn_in(window, async move |this, cx| {
             while let Ok(res) = rx.recv().await {
@@ -421,7 +426,7 @@ impl DrawingEditor {
             sheets_by_ref: false,
             sources: Sources::new(),
             regens: HashMap::new(),
-            assemblies: Arc::new(Mutex::new(AssemblyEvaluator::new())),
+            assemblies: Arc::new(Mutex::new(crate::derived::assembly_evaluator(studio_cache))),
             regenerating: HashSet::new(),
             failed_sources: HashSet::new(),
             model_bg: None,
@@ -429,6 +434,7 @@ impl DrawingEditor {
             sketch_dim_edit: None,
             info: SheetInfo::default(),
             out_of_date: false,
+            old_state: None,
             cache: Arc::new(ViewCache::new()),
             geoms: HashMap::new(),
             compute_task: None,
@@ -536,6 +542,7 @@ impl DrawingEditor {
             status: None,
             _subs: subs,
         };
+        this.old_state = this.load_old_state(cx);
         this.ensure_sources(false, cx);
         this.refresh(cx);
         this
@@ -619,6 +626,10 @@ impl DrawingEditor {
         }
         // Views linked across sheets: their mirrors follow the real views.
         new.sync_links();
+        // Up-to-date views were made from the current document state.
+        if !self.out_of_date && self.old_state.is_none() {
+            new.sources_at = self.doc.read(cx).session.head().ok().map(|m| m.to_string());
+        }
         self.drawing = new.clone();
         self.preview = None;
         let tab = self.tab;
@@ -659,20 +670,38 @@ impl DrawingEditor {
     /// source differs from what its views were made of (an undo back to it
     /// clears it again).
     fn studio_changed(&mut self, tab: TabId, cx: &mut Context<Self>) {
-        let doc = self.doc.read(cx);
         // Only sources built from this tab (or assemblies, which depend on
         // every studio) can have changed.
         if !self.out_of_date && !self.sources.iter().any(|(k, src)| k.tab == tab || src.assembly) {
             return;
         }
-        // Pinned references never go out of date.
-        let stale = self.sources.iter().any(|(k, src)| k.version.is_none() && views::source_hash(&doc.session.doc, k) != Some(src.hash));
+        let stale = self.sources_stale(cx);
         // Undoing the change makes the sources current again: no Update
         // needed (qa5 UNDO2; exact float round trips make the hashes match).
         if stale != self.out_of_date {
             self.out_of_date = stale;
             cx.notify();
         }
+    }
+
+    /// Whether a source the views use differs from the current document
+    /// (pinned references never go out of date).
+    fn sources_stale(&self, cx: &App) -> bool {
+        let doc = &self.doc.read(cx).session.doc;
+        views::referenced_sources(&self.drawing).iter().any(|k| k.version.is_none() && self.sources.get(k).is_some_and(|src| views::source_hash(doc, k) != Some(src.hash)))
+    }
+
+    /// The document state the views were last made from, when the sources
+    /// changed since (the views keep their geometry until Update).
+    fn load_old_state(&self, cx: &App) -> Option<(noshape_model::Document, Vec<SourceKey>)> {
+        let mv: noshape_store::MicroversionId = self.drawing.sources_at.as_ref()?.parse().ok()?;
+        let session = &self.doc.read(cx).session;
+        let old = noshape_model::Document::from_blobs(&session.store.read_all(mv).ok()?).ok()?;
+        let keys: Vec<SourceKey> = views::referenced_sources(&self.drawing)
+            .into_iter()
+            .filter(|k| k.version.is_none() && old.tab(k.tab).is_some() && views::source_hash(&old, k).is_some_and(|h| views::source_hash(&session.doc, k) != Some(h)))
+            .collect();
+        (!keys.is_empty()).then_some((old, keys))
     }
 
     /// The document at a version (cached; versions don't change).
@@ -713,17 +742,28 @@ impl DrawingEditor {
                 wanted.push(k);
             }
         }
+        // Update: every view from the current document.
+        if all {
+            self.old_state = None;
+        }
         for key in wanted {
             if self.regenerating.contains(&key) || (!all && (self.sources.contains_key(&key) || self.failed_sources.contains(&key))) {
                 continue;
             }
-            // Pinned sources come from the document at their version.
-            let doc = match &key.version {
-                Some(v) => match self.version_doc(v, cx) {
+            // Pinned sources come from the document at their version; views
+            // not updated since a change, from the state they were made of.
+            let old = self.old_state.as_mut().and_then(|(d, keys)| {
+                let i = keys.iter().position(|k| *k == key)?;
+                keys.remove(i);
+                Some(d.clone())
+            });
+            let doc = match (&key.version, old) {
+                (Some(v), _) => match self.version_doc(v, cx) {
                     Some(d) => d,
                     None => continue,
                 },
-                None => self.doc.read(cx).session.doc.clone(),
+                (None, Some(d)) => d,
+                (None, None) => self.doc.read(cx).session.doc.clone(),
             };
             if doc.tab(key.tab).is_none() {
                 continue;
@@ -752,7 +792,10 @@ impl DrawingEditor {
                         }
                     }
                     if this.regenerating.is_empty() {
-                        this.out_of_date = false;
+                        // Out of date while a view's source differs from the
+                        // document (other sources, e.g. the chooser's, don't
+                        // update the views; qa5 D17).
+                        this.out_of_date = this.sources_stale(cx);
                         if this.status.as_ref().is_some_and(|s| s.starts_with("Updating")) {
                             this.status = None;
                         }
@@ -767,6 +810,12 @@ impl DrawingEditor {
     }
 
     pub fn update_drawing(&mut self, cx: &mut Context<Self>) {
+        // The views are made from the current document from now on, also
+        // when it is reopened.
+        if self.out_of_date || self.old_state.is_some() {
+            let head = self.doc.read(cx).session.head().ok().map(|m| m.to_string());
+            self.edit("Update", cx, |d| d.sources_at = head);
+        }
         self.ensure_sources(true, cx);
         self.status = Some("Updating drawing…".into());
     }
@@ -900,8 +949,12 @@ impl DrawingEditor {
                 (0.0, 0.0, w, h)
             }
         };
-        self.zoom = ((s[0] - 40.0) / w).min((s[1] - 40.0) / h).clamp(0.05, 200.0);
-        self.center = [x0 + w / 2.0, y0 + h / 2.0];
+        // Live (drawing/156, ISO A3): 40 px clear on each side, the bottom
+        // measured to the window's edge as if the canvas ran under the 30 px
+        // tab bar (sheet 1304×922 centred at y 577 in a 1919×1079 window).
+        const UNDER: f64 = 30.0;
+        self.zoom = ((s[0] - 80.0) / w).min((s[1] + UNDER - 80.0) / h).clamp(0.05, 200.0);
+        self.center = [x0 + w / 2.0, y0 + h / 2.0 + UNDER / 2.0 / self.zoom];
         self.fitted = true;
         self.frame_dirty = true;
         cx.notify();
@@ -953,7 +1006,12 @@ impl DrawingEditor {
             .filter(|(_, t)| matches!(t, PickTarget::Annotation(a) if built.dangling.contains(a)))
             .map(|(i, _)| i as u32)
             .collect();
-        self.lines = Some(up.upload_lines(&drawing_scene::sheet_lines(&built, self.zoom, &dangling)));
+        // Shaded views with their picture: the edges only show hovered or
+        // selected (live behaviours "Shaded drawing views").
+        let shaded: Vec<(ViewId, std::ops::Range<usize>)> = built.geometry.view_edges.iter().filter(|(v, r)| !r.is_empty() && self.shaded.images.contains_key(v)).cloned().collect();
+        self.shaded.edges = shaded.iter().map(|(v, r)| (*v, up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), self.zoom, true)), up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), self.zoom, false)))).collect();
+        let skip: Vec<std::ops::Range<usize>> = shaded.into_iter().map(|(_, r)| r).collect();
+        self.lines = Some(up.upload_lines(&drawing_scene::sheet_lines(&built, self.zoom, &dangling, &skip)));
         self.lines_zoom = self.zoom;
         self.fills = Some(up.upload_mesh(&drawing_scene::sheet_fills(&built)));
         let (ink, red) = drawing_scene::sheet_text(&built, &dangling);
@@ -1027,6 +1085,7 @@ impl DrawingEditor {
         if let Some(l) = &self.lines {
             scene.instances.push(Instance::new(Drawable::Lines(l.clone())).per_primitive_color());
         }
+        scene.instances.extend(self.shaded_edge_instances());
         for (m, color) in self.texts.iter().zip([[0.0, 0.0, 0.0, 1.0], crate::theme::lin(0xdc2828)]) {
             if let Some(m) = m {
                 scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(color).unlit());
@@ -1301,6 +1360,7 @@ impl Render for DrawingEditor {
         self.sync_centermark_dlg();
         self.sync_insert_inputs(window, cx);
         self.sync_drawprops_inputs(window, cx);
+        self.track_sheet_len_focus(window, cx);
         if !self.fitted && self.size_px()[0] > 10.0 {
             self.zoom_to_fit(cx);
         }

@@ -3,7 +3,7 @@
 
 use crate::configuration::Configuration;
 use crate::features::{self, FeatureType};
-use crate::params::{ParamValues, fill_defaults};
+use crate::params::{ParamValue, ParamValues, fill_defaults};
 use crate::reference::{BodyId, FeatureId, Reference};
 use noshape_units::UnitPrefs;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,23 @@ pub struct Feature {
 impl Feature {
     pub fn feature_type(&self) -> Option<&'static FeatureType> {
         features::get(&self.type_id)
+    }
+}
+
+/// Which merge-scope rule a studio was saved under (1: an empty scope is an
+/// error unless "Merge with all" is on; 0: older studios).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScopeRule(pub u8);
+
+impl Default for ScopeRule {
+    fn default() -> Self {
+        ScopeRule(1)
+    }
+}
+
+impl ScopeRule {
+    fn legacy() -> Self {
+        ScopeRule(0)
     }
 }
 
@@ -180,6 +197,10 @@ pub struct FaceAppearance {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartStudio {
     pub features: Vec<Feature>,
+    /// Saved after empty merge scopes became an error, as in Onshape (see
+    /// [`ScopeRule`]); older studios are upgraded on load.
+    #[serde(default = "ScopeRule::legacy")]
+    pub scope_rule: ScopeRule,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -263,6 +284,18 @@ impl PartStudio {
     pub fn upgrade_saved_params(&mut self) {
         for f in self.features.iter_mut().filter(|f| f.type_id == "cPlane") {
             crate::features::core::upgrade_plane_params(&mut f.params);
+        }
+        // Before Onshape's "No merge scope selected." rule an empty merge
+        // scope merged with the parts the tool touched; "Merge with all"
+        // gives those studios the same result.
+        if self.scope_rule == ScopeRule::legacy() {
+            for f in &mut self.features {
+                let adds = matches!(f.params.get("operationType"), Some(ParamValue::Enum(o)) if o == "ADD" || o == "REMOVE" || o == "INTERSECT");
+                if adds && f.params.get("defaultScope").is_some() && !f.params.bool("defaultScope") && f.params.query("booleanScope").is_empty() {
+                    f.params.set("defaultScope", ParamValue::Bool(true));
+                }
+            }
+            self.scope_rule = ScopeRule::default();
         }
     }
 

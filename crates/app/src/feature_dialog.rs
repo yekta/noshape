@@ -8,7 +8,7 @@
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
@@ -279,6 +279,12 @@ fn item_path(array: &str, i: usize, id: &str) -> String {
 }
 
 impl FeatureDialog {
+    /// Names chips anew (the model before the feature has arrived).
+    pub fn set_labeler(&mut self, labeler: RefLabeler, cx: &mut Context<Self>) {
+        self.labeler = labeler;
+        cx.notify();
+    }
+
     pub fn new(feature: Feature, units: UnitPrefs, labeler: RefLabeler, cx: &mut Context<Self>) -> Self {
         let ty = feature.feature_type().expect("registered feature type");
         let mut feature = feature;
@@ -989,7 +995,7 @@ impl FeatureDialog {
 
     /// The error a field shows: the feature's error when the regeneration
     /// names this parameter.
-    fn field_error(&self, id: &str) -> Option<String> {
+    pub(crate) fn field_error(&self, id: &str) -> Option<String> {
         let (FeatureStatus::Error, msg) = self.status.as_ref()? else { return None };
         if !self.faulty.is_empty() {
             return self.faulty.iter().any(|f| f == id).then(|| msg.clone());
@@ -1051,6 +1057,13 @@ impl FeatureDialog {
     fn apply_on_enter(&mut self, path: &str, state: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let text = state.read(cx).value().to_string();
         if self.baselines.get(path).is_none_or(|b| *b == text) {
+            return false;
+        }
+        // Live ("Input behaviour", qa4 F30): Enter in a count (Instance
+        // count) accepts the whole dialog at once; only quantities (Depth,
+        // a Variable's value: "8" → "8 mm") apply first.
+        if matches!(self.spec_for_path(path).map(|s| &s.kind), Some(ParamKind::Num(n)) if n.kind == noshape_model::params::NumKind::Integer) {
+            self.commit_number(path, state, window, cx);
             return false;
         }
         // Live: "30" → "30 mm", "10+5" → "(10+5) mm", the text re-selected.
@@ -1214,6 +1227,18 @@ impl FeatureDialog {
         self.external_field = Some((f.path.to_string(), f.state, f.kind));
         self.baselines.insert(f.path.to_string(), f.previous);
         self.open_create_variable(f.path.to_string(), f.name, window, cx);
+        cx.notify();
+    }
+
+    /// Drop the Create variable popup of outside field `path` (its box was
+    /// closed: a new box starts without it, qa5 F32).
+    pub(crate) fn close_external_create_variable(&mut self, path: &str, cx: &mut Context<Self>) {
+        if self.create_var.as_ref().is_some_and(|c| c.path == path) {
+            self.create_var = None;
+        }
+        if self.external_field.as_ref().is_some_and(|f| f.0 == path) {
+            self.external_field = None;
+        }
         cx.notify();
     }
 
@@ -1615,7 +1640,8 @@ impl FeatureDialog {
                 .border_b_1()
                 .border_color(hsla(0., 0., 0., 0.))
                 .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
-                .child(crate::assets::icon(icon, 20., cx))
+                // Live (dom dialog-*.txt): flip icons are 20 x 19 svgs, the sprite at 19 px.
+                .child(crate::assets::icon(icon, 19., cx))
                 .tooltip(crate::ui::tooltip(tip))
         };
         // Live: the flip toggle is a Tab stop (Space / Enter press it).
@@ -1737,7 +1763,8 @@ impl FeatureDialog {
                     .justify_center()
                     .cursor_pointer()
                     .hover(|d| d.bg(p().panel_hover))
-                    .child(crate::assets::icon(icon, 20., cx))
+                    // Live (dom dialog-*.txt): flip icons are 20 x 19 svgs, the sprite at 19 px.
+                    .child(crate::assets::icon(icon, 19., cx))
                     .tooltip(crate::ui::tooltip(f.label))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, &p1, cx)));
                 Self::tab_stop_element(el, &focus, Focus::Underline, move |this, _, cx| toggle(this, &p2, cx), cx).into_any_element()
@@ -1823,9 +1850,12 @@ impl FeatureDialog {
                 });
                 // Onshape: a 20 px expander column before group checkboxes; the
                 // checkbox itself is inset 4 px.
+                // Live (qa5 DER1, part-studio/400): the label clips 28 px
+                // short of the dialog's right edge (174 px of text).
                 let mut row = h_flex()
                     .w_full()
                     .ml(px(-2.))
+                    .pr(px(12.))
                     .min_h(px(27.))
                     .children(chevron)
                     .child({
@@ -2141,10 +2171,10 @@ impl FeatureDialog {
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{row}")))
                                     // Live (dialogs/extrude-13, fillet-02): the × is always shown.
-                                    .text_color(pal.text_muted)
-                                    .hover(|d| d.text_color(pal.error))
+                                    .group("field-x")
                                     .cursor_pointer()
-                                    .child(Icon::new(IconName::Close).with_size(px(12.)))
+                                    // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
+                                    .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         cx.stop_propagation();
                                         cx.emit(DialogEvent::HoverRef(None));
@@ -2247,7 +2277,17 @@ impl FeatureDialog {
                             .border_1()
                             .border_color(if flashing || error.is_some() { pal.error } else if active || cs_open { pal.accent } else { pal.border })
                             .bg(if active { pal.row_hover } else if error.is_some() { gpui_kit::rgb(0xf9ebec) } else { pal.panel })
-                            .tooltip(crate::ui::tooltip(error.unwrap_or_else(|| s.label.to_string())))
+                            // A parameter with a description shows Onshape's
+                            // expanding tooltip (live Derived › Locations: the
+                            // label, then "Select or create mate connectors…").
+                            .map(|d| match (&error, s.description.is_empty()) {
+                                (None, false) => {
+                                    let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+                                    let a2 = anchor.clone();
+                                    d.child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()).tooltip(crate::ui::rich_tooltip(s.label, s.description, anchor))
+                                }
+                                _ => d.tooltip(crate::ui::tooltip(error.clone().unwrap_or_else(|| s.label.to_string()))),
+                            })
                             .cursor_pointer()
                             .flex()
                             .flex_col()
@@ -2380,9 +2420,9 @@ impl FeatureDialog {
                                     div()
                                         .id(SharedString::from(format!("dqx-{path}-{k}")))
                                         .cursor_pointer()
-                                        .text_color(pal.text_muted)
-                                        .hover(|d| d.text_color(pal.error))
-                                        .child(Icon::new(IconName::Close).with_size(px(12.)))
+                                        .group("field-x")
+                                        // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
+                                        .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
                                         .on_click(cx.listener(remove(k))),
                                 )
                             });
@@ -2459,9 +2499,9 @@ impl FeatureDialog {
                                         div()
                                             .id(SharedString::from(format!("rm-{path}-{k}")))
                                             .cursor_pointer()
-                                            .text_color(pal.text_muted)
-                                            .hover(|d| d.text_color(pal.error))
-                                            .child(Icon::new(IconName::Close).with_size(px(12.)))
+                                            .group("field-x")
+                                            // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
+                                            .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
                                             .on_click(cx.listener(remove(k))),
                                     ),
                             )
@@ -2596,7 +2636,8 @@ impl FeatureDialog {
                 })))
                 .into_any_element()
         });
-        v_flex().w_full().child(field).children(update).into_any_element()
+        // Live (qa5 DER1): 5 px under the field, as under a selection field.
+        v_flex().w_full().pb(px(5.)).child(field).children(update).into_any_element()
     }
 
     /// The Derived source as a reference value for the panel: `tab[#part]`,
@@ -3073,7 +3114,8 @@ impl Render for FeatureDialog {
                                     .active(pal.accept.into())
                                     .shadow(false),
                             )
-                            .child(crate::assets::icon("dialog-ok", 20., cx))
+                            // Live (dom adv4-a-dialog): ✓ and ✗ are 24 px sprites centred in 28 x 24.
+                            .child(crate::assets::icon("dialog-ok", 24., cx))
                             .w(px(28.))
                             .h(px(28.))
                             .p_0()
@@ -3096,7 +3138,7 @@ impl Render for FeatureDialog {
                         Button::new("dlg-cancel")
                             .tab_stop(false)
                             .custom(dialog_icon_variant(cx, false))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .w(px(28.))
                             .h(px(28.))
                             .p_0()

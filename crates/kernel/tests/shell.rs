@@ -146,3 +146,27 @@ fn shell_history_names_every_face() {
         assert!(generated > 0, "t={t} {m:?}: no offset faces");
     }
 }
+
+/// Live G50: a 50 × 30 × 30 block, a 5 mm chamfer on the vertical edge at
+/// (50, 0), then R3 fillets on the two top edges meeting there, shelled with
+/// the top removed: Onshape's wall closes the rim corner with one flat
+/// triangle (20 faces / 50 edges / 32 vertices at 1, 1.5, 2 and 2.05 mm;
+/// 5990.51958739 mm³ at 1 mm, Onshape's x_t read back 5990.5231). In metres.
+#[test]
+fn chamfer_then_fillets_shell_like_onshape() {
+    let s = bx([0.0; 3], [0.05, 0.03, 0.03]);
+    let corner = edges_where(&s, |i| (i.start.z - i.end.z).abs() > 1e-9 && (i.start.x - 0.05).abs() < 1e-9 && i.start.y.abs() < 1e-9);
+    let s = chamfer_checked(&s, &corner, ChamferSpec::Equal(0.005), &[]).unwrap().shape;
+    let tops = edges_where(&s, |i| (i.start.z - 0.03).abs() < 1e-9 && (i.end.z - 0.03).abs() < 1e-9 && ((i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9) || ((i.start.x - 0.05).abs() < 1e-9 && (i.end.x - 0.05).abs() < 1e-9)));
+    assert_eq!(tops.len(), 2);
+    let s = fillet_checked(&s, &tops, &[0.003]).unwrap().shape;
+    assert_eq!(s.count(ShapeType::Face), 9);
+    let top = faces_where(&s, |c| c.z > 0.029999);
+    assert_eq!(top.len(), 1);
+    for (t, want) in [(0.001, 5990.51958739), (0.0015, 8746.15438317), (0.002, 11348.9952635), (0.00205, 11601.0764818)] {
+        let r = shell_solid(&s, &top, t, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+        let v = vol(&r) * 1e9;
+        assert_eq!((r.count(ShapeType::Face), r.count(ShapeType::Edge), r.count(ShapeType::Vertex)), (20, 50, 32), "{t}");
+        assert!((v - want).abs() < 0.01, "{t}: {v} vs {want}");
+    }
+}

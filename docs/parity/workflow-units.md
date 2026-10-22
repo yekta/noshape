@@ -24,3 +24,8 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 | 10 | Mass properties panel body | opaque | "Front" plane label shows through the lower right of the panel | ✗ CA3 (same translucency as Change configuration / Insert) |
 | 11 | Click on empty graphics with Mass properties open | ? (live request "qa5 pass 7" (7)) | the "Part 1" chip is removed from Parts to measure | ? |
 | – | Variables converted (#height = 0.197 in) | – | not checked (no variables in this doc) | – |
+
+## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
+Live answered "qa5 pass 7" (7): an empty-graphics click keeps dialog chips. Ours on 5bd50b2: Mass properties chip kept after clicks at (1400,850) and (800,102) → row 11 ✅.
+
+Row 10 (Mass properties panel translucency): **? pending** ui's comparison (live dialogs are rgba(255,255,255,.95), see workflow-configured-assembly.md CA3).

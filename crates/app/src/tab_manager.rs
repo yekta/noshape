@@ -601,12 +601,13 @@ impl Render for TabManager {
                     .child(key("↵"))
                     .child("to open")
                     .child(div().flex_1())
-                    // Live document/41, 46: the preview toggle and help.
-                    .child(div().id("tm-preview").cursor_pointer().mr(px(4.)).when(!self.show_preview, |d| d.opacity(0.3)).tooltip(crate::ui::tooltip("Toggle preview")).child(crate::assets::icon("tm-preview", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    // Live document/41, 46, 61–62: the preview toggle (its icon stays the same) and help.
+                    .child(div().id("tm-preview").cursor_pointer().mr(px(4.)).tooltip(crate::ui::tooltip("Toggle preview")).child(crate::assets::icon("tm-preview", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.show_preview = !this.show_preview;
                         cx.notify();
                     })))
-                    .child(crate::assets::icon("help-faint", 16., cx)),
+                    // Live document/63: `a.os-help-link`, no tooltip; opens "Document Tabs".
+                    .child(div().id("tm-help").cursor_pointer().child(crate::assets::icon("help-faint", 16., cx)).on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/Document/document_tabs.htm?cshid=elementtabs"))),
             )
     }
 }

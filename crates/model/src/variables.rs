@@ -443,6 +443,14 @@ impl Default for VariableStudio {
     }
 }
 
+/// A new Variable Studio for `doc`: "Insert into all Part Studios and
+/// Assemblies" is ticked only for the workspace's first one, later ones come
+/// up unticked, even when no other studio is auto-inserted (live, lead 10-21).
+pub fn new_studio(doc: &crate::document::Document) -> VariableStudio {
+    let first = !doc.tabs.iter().any(|t| matches!(t.content, crate::document::TabContent::VariableStudio(_)));
+    VariableStudio { insert_into_all: first, ..VariableStudio::default() }
+}
+
 /// The Variable Studio tables of a Part Studio or Assembly (its Variable
 /// table panel): studios inserted explicitly, and auto-inserted ones
 /// ("Insert into all…") whose reference was removed here.
@@ -828,6 +836,15 @@ mod studio_scope_tests {
         let vars = element_variables(&doc, ps);
         assert!(!vars.contains_key("a"));
         assert_eq!(mm(vars.get("b")), 2.0);
+    }
+
+    #[test]
+    fn only_the_first_studio_is_inserted_into_all() {
+        let mut doc = crate::document::Document::default();
+        let first = new_studio(&doc);
+        assert!(first.insert_into_all);
+        doc.add_tab("Variable Studio 1", crate::document::TabContent::VariableStudio(first));
+        assert!(!new_studio(&doc).insert_into_all);
     }
 
     #[test]

@@ -633,3 +633,143 @@ remove-selection, snap-mate, zoom-in).
 - Next: drawing toolbar icons all match live by eye (checked in toolbar order vs live/drawing/08); remaining sprite >= 3
   icons are at a local optimum or by design (see lists above). Further gains: other live screens with stable positions
   (feature list, context menus via tools/menusweep.py) using applive.py; d40 is the best predictor of the in-app look.
+## Round 10 (lead: score against 40 px; feature list, menus, dialogs vs live)
+- Feature list: icons render through the same 2x path at 34 px -> 17, at 0.8 opacity (ui::tree_icon); that model
+  matches the app's crop at 1.47. tools/d17.py NAME SVG = that metric vs the sprite. Only extrude degraded at 17 px:
+  its .3 hairlines -> .5 and a .5 chamfer edge at the front box: d17 4.72->3.69, iter 2.70->2.31, live toolbar
+  3.18->2.56, live feature row 6.56->5.67 (copied in, batch b8).
+- Context menus (in-app vs live menus/rmb-ps-featurelist-extrude / -sketch): icons present match. Fixed:
+  * part_studio/mod.rs feature-list menu: Show/Hide gets eye / eye-off, "Create Drawing of Sketch N…" gets
+    menu-create-drawing, "Edit sketch appearance…" shows a colour swatch (the sketch's appearance colour, #999 default;
+    live: 17x17 #999, radius 2) instead of add-appearance.
+  * part_studio/menus.rs viewport sketch menu: same swatch on "Edit sketch appearance…".
+  * os_menu.rs: new MenuIcon::Swatch(Hsla) + OsMenuItem::swatch(); appearance.rs: PartStudioView::sketch_swatch(id, cx).
+  Not yet verified in the app (needs a build after the freeze).
+- tools/menusweep.py now renders through the app path and parses icon_item(...) / MenuEntry::item(..).with_icon(..)
+  (conditional and format! labels). Its "ours has icon, live none" rows (Zoom to fit, View normal to, Export…, Edit…,
+  Isometric) are unverified: the parser may be pairing labels from other menus; check in the app before changing code.
+- Next: viewport/parts-list/assembly menus in the app vs live (Copy, Delete, Hide rows), then dialogs.
+- Freeze (21:25-) passed with: cargo check -p noshape clean, guard test 2 passed, clippy -p noshape --all-targets: nothing
+  from icons2's files. All of the above (menus + cursor "4") is in main 5bd50b2. perf's 52/52 Windows cursor result is
+  run 39608471542 (15:00), before the hand-drawn "4"; a perf.yml smoke run on 5bd50b2 would confirm it on real Windows.
+
+## Round 10b (2026-10-21 after "freeze lifted", main 5bd50b2)
+- Verified in app (23:27 build): feature-list Sketch menu now = live (Hide/Show eye icons, Create Drawing icon, #999 swatch
+  17x17). Swatch corner radius 2 -> 3 (live corner pixel is white; os_menu.rs).
+- Menus in app vs live, side by side (context/r10b-rmb-*.png vs live/menus/rmb-*): parts-list part, face, PS empty,
+  assembly instance row, revolute row, assembly empty -> icons match, except assembly_behaviors.rs had icons where live
+  has none: Export… (graphics instance menu), Zoom to fit + View normal to (instance menu), Zoom to fit + Isometric
+  (empty menu) -> plain items now (live rmb-asm-two-instances-selected, rmb-asm-empty).
+  For ui/lead (layout, not icons): live menus wrap long labels ("Add mate connector to instance origin…" on 2 lines,
+  menu max width); our os_menu widens instead.
+- Dialogs (Extrude, Fillet, Hole vs live/dialogs): flip, ±, caret, chevron, help, hole diameter/depth/tip-angle icons
+  match (2.5-7). Fixed in feature_dialog.rs: ✓ and ✗ drawn at 24 px (live dom adv4-a-dialog: 24 px sprites centred in
+  28x24; ink was 14x10 / 8x8, live 16x12 / 12x12); the selection-field chip × (kit IconName::Close 12 px, 6x6 #909aa0)
+  -> ui-clear glyph 9 px #666 (live 7x7 #666), red on hover via group_hover; Icon/IconName import dropped.
+- Verified (00:04 build, 10-22): cargo check clean; clippy -p noshape --all-targets: nothing from icons2's files (only
+  assembly_view.rs:37 unused `Group`, another agent's). In app vs live: ✓ 9.86 -> 4.53, ✗ 16.29 -> 3.28, chip × same
+  size/tone (10.9 -> 10.2, pixel phase), assembly empty menu without icons (= live), swatch corner = live.
+- Next: other dialogs with their own icons (plane types, sketch text, pattern dialogs), the Hole dialog's mc-select
+  button sits ~0.5 px lower than live (layout).
+
+## Round 11 (2026-10-22 ~00:30) — EXACT STATE at the move to Motile
+- Checked in app vs live: Plane (types), Linear pattern, Circular pattern, sketch Text dialogs (context/r11-*.png vs
+  live/dialogs/plane-types-01, linear-pattern-01, circular-pattern-01, live/sketch/132).
+  * Matching: disabled ✓ (2.3), flips, circular mate-connector button, text flip H/V (5.3 / 7.9), I (5.8).
+  * Fixed (feature_dialog.rs, both flip button helpers ~1618 and ~1741): flip icons drawn at 19 px instead of 20 (live dom
+    dialog-*.txt: every flip svg is 20 x 19, i.e. the sprite at 19 px). Simulated vs live: circular ↻ 13.6 -> 12.4
+    (floor 11.3), straight flips 12.8 -> 12.4 (floor ~12.6).
+  * NOT YET COMPILED: last cargo check (00:2x) failed only in other agents' files (assembly_view.rs:486 and
+    drawing_view.rs:427, moved `doc`). My change is the size literal 20. -> 19. plus a comment. First thing on resume:
+    cargo check -p noshape, then clippy, then build and look at an Extrude + Circular pattern dialog (flip ink should be
+    ~16x16 at x 444-460 like live).
+- For the lead / other owners (not icons):
+  * Sketch Text dialog layout (sketch owner): live replaces the sketch dialog in the left panel with Onshape's standard
+    header (green ✓ 28 px, red ✗) and font select "Open Sans"; ours is a floating popup with a small blue check, small ×,
+    "Liberation Sans" and an extra "Convert to expression".
+  * B / I glyph shape differences come from the UI font (DejaVu Sans on Linux here vs Onshape's web font; ui).
+  * Dialog body is white at 95% alpha (theme dialog_bg 0xfffffff2) = 252 over our viewport, live 255 (ui to confirm).
+  * Pattern dropdown menu (toolbar ▾) shows a scrollbar for 3 items; compare with live/menus/ps-dropdown-* (ui).
+- Next (icons2): verify the 19 px flips in the app; then other dialogs with own icons (mirror, sweep, loft, shell,
+  hole variants, mate dialogs in the assembly), using the same method: tools/appshot.sh start|shot|stop (one app, killed
+  by saved pid), side-by-side crops vs live/dialogs, per-icon template match ±12 px, DOM sizes from live/dom/dialog-*.txt.
+- No app running; nothing else half-done. Perf smoke run 39697628442 on 5bd50b2 (Windows cursor "4") pending, lead forwards.
+
+## Round 12 (2026-10-22, on Motile) — dialog icons, batch 1
+- 19 px flips (feature_dialog.rs) compile (cargo check 00:5x clean apart from quantity_field.rs warnings, not mine).
+- Hole dialog: the counterbore / countersink / tap row icons were never scored (not in work/map.json). Mapped in
+  scratch work/override-icons2-r11.txt and redrawn by hand (r11/, backups r11/before/):
+  hole-tapped-depth 24.71 -> 0.51, hole-tap-clearance 23.20 -> 0.51, hole-csink-angle 19.86 -> 1.21,
+  hole-cbore-diameter 17.92 -> 0.74, hole-csink-diameter 12.66 -> 1.22, hole-cbore-depth 10.48 -> 0.74.
+- Mate limits (assembly_mate_dialog.rs limit_field): live shows ONE 26 px icon per limit row with the axis letter in
+  it (#999) and the glyph in the axis colour (X red #BD3039, Y green #009400, Z blue), field right after it
+  (dom/dialog-mate-revolute-limits.txt). Ours drew a text letter + an 18 px blue glyph for every axis. New icons
+  mate-limit-{z-rot,z-lin,x-lin,y-lin}-{min,max} + mate-limit-cone (scratch r11lim/gen.py, scores 0.15-2.0,
+  cone 2.90); old limit-angle-*/limit-dist-* removed (only user; backups r11lim/removed/). Guard test 2 passed.
+- Dialog icon coverage: every svg-icon in live/dom/dialog-*.txt is mapped except import-*, no-views,
+  parametric-part-studio, version-graph-button, assign-variable-button, collapsed-error, sketch-flip-* (next).
+- Verified in app (01:2x build, context/r12-*.png): Hole Simple/Counterbore/Countersink rows show the new icons in
+  live's order; Revolute mate Limits rows = live (Z grey + blue glyph, 26 px). Then limit row sized as live
+  (194 x 29, field ends 26 px before the dialog edge) — not yet rebuilt.
+- insert-rigid ("Insert entire Part Studio as rigid", assembly Insert dialog) redrawn from sprite
+  parametric-part-studio (dom/dialog-assembly-insert.txt names it): 4.48 -> 2.14. insert-sketches = sprite:sketch (0.72).
+- variable_insert.rs (Insert Variable Studio dialog child rows): live "(x) width" -> added the 20 px `variable`
+  icon (= sprite assign-variable-button, d 2.2) 14 px before the name, dropped the "#" prefix. Not yet seen in app.
+  For the owner: live child rows are 40 px tall (pl 40 + a 70 px thumbnail column), name 13.33 px / 300; the
+  studio row's icon is ~30 px (variable-table-button). Ours: 28 px rows, 20 px icon.
+- Scratch override file is now work/override-icons2-z11.txt (sorted last so it wins over r6's png refs).
+- Mate dialog icons scored: realign 3.88 (local optimum, stroke sweep), qlv-item 1.70, play/stop/reorder 0.
+- version-graph.svg was redrawn by theme-layout (DER2) as the dialog "version-graph-button": 8.17 vs that sprite.
+- Import modal tiles (import_dialog.rs): live shows ONE 150 px picture per tile (svg-icon-import-single-doc /
+  import-flatten); ours composed import-doc 58 + import-arrow 18 + a div box with two 36 px tab icons (arrow too
+  small/low, box too small). New own drawings import-tile-single / import-tile-combine (150 viewBox; page, arrow,
+  white box, our part-studio/assembly paths at 1.75x, 50% opacity; ~1.4% mean diff vs sprite); old import-doc and
+  import-arrow removed (only user). Verified in app vs live document/77 (context/r12-imp.png): tiles identical.
+  For ui: our Import modal sits/sizes ~10 px off live (modal-body 588 wide at x 666).
+- version-graph.svg: 8.17 -> 1.64 vs version-graph-button (ring r2.5/1.1, stems 2, corner radius 3, dots r2).
+- Mate limit rows re-verified after the 194 x 29 change (context/r12-revlim2.png): field right edge = live.
+  For the owner: the field text has ~10 px more right inset than live; live also shows "Simulation connection"
+  (simulation, excluded).
+- State at ~02:00: cargo check -p noshape clean (2 warnings in quantity_field.rs, not mine); clippy --bin noshape:
+  nothing from my files; clippy --all-targets blocked by crates/ops/src/live.rs:118 (another agent's WIP).
+  Guard test 2 passed. No app running. /tmp/icons2/ns-icons2 = 01:5x build.
+- Next: Insert Variable Studio child rows in the app (needs a Variable Studio: + > Create Variable Studio), the
+  remaining mate dialog types (slider/cylindrical/planar/ball limits: X red, Y green, cone), sheet-metal dialog
+  collapsed-error chevron, drawing Create dialog (no-views / four-views-third-angle 6.64).
+- Insert Variable Studio child rows verified in app (context/r12-ivs2.png): "(x) width" = live content. Layout left
+  for the owner (see above); also, opened from a Variable Studio our Insert dialog is a centred modal with "Close",
+  live uses the same 300 px feature-style dialog as in the Part Studio (behaviours.md ~1571).
+- Dialog chevron (expander-right 14 px) vs sprite collapsed (20 px svg, pad 4): ink 7.6x12.4 vs 7.0x12; ok.
+
+## Round 13 (2026-10-22, after lead's batch-1 routing) — limits, sheet metal, dialog sweep
+- Mate limits verified in app for Planar (X red / Y green / Z rot blue), Ball (cone), Slider (= live
+  qa5/asm-036 exactly): context/r13-planar, r13-ball, r13-slider. Bundle (woolsthorpe) confirms the param -> icon map
+  (limitXMin -> XLinearLimitMin, ..., limitAxialZMin -> ZRotateLimitMin, limitEulerConeAngleMax -> ConeAngleLimit).
+- Slider flip arrow differs from qa5 capture only by alignment state (asb's flip_icon_name logic), not an icon issue.
+- Sheet metal model: red expanded chevron on "Selections" = live (context/r13-smm.png).
+- New tool tools/dlgcmp.sh SLUG "Tool": opens a tool by search in the running app, side by side with
+  live/dialogs/SLUG-01-open.png -> /tmp/icons2/v/d-SLUG.png. Swept: mirror, sweep, loft, shell, revolve, thicken,
+  rib, draft, chamfer, boolean, split, helix, plane, delete-face, move-face, offset-surface, mate-connector,
+  transform, delete-part, variable: all icons match. Non-icon: Helix has a "Handedness" label live doesn't show.
+- mc-select vs live (dialogs/revolve, refs/r13/mc-revolve-live.png): 11.44, sprite floor 8.97; a stroke/arc sweep
+  only got worse -> raster-path difference, left.
+- Assign material panel (part_studio/material_panel.rs): + was `plus` (15 px, 3 px stroke, #656565) -> `add-button`
+  (12 px, 2 px, #333 = live); ✓/✗ 20/18 -> 24 like feature dialogs (live 28x24 sprites); library select caret ->
+  ui-select-caret 8 px #777 (native select arrow, 8x6 = live); "- None -" caret -> drawing-tool-caret 12 px (8x4 =
+  live, same as os_select). Building to verify.
+- Kit icons in panels -> Onshape sprites (verified in app where noted):
+  * Header ✓/✗ (kit Check 18 / Close 16) -> dialog-ok / dialog-cancel 24 px in section.rs (verified = live
+    part-studio/71), analysis_tools.rs, behaviors.rs (dyn), assembly_view.rs, assembly_standard.rs,
+    assembly_panels.rs (x2), assembly_mate_dialog.rs. Imports trimmed (assembly_view keeps Icon/IconName: its
+    child modules assembly_panels/behaviors use them via super::*).
+  * Selection-list × (kit Close 11/12) -> ui-clear 9 px #666 in create_selection.rs (red on group hover),
+    draft_tool.rs, section.rs, flatten_tool.rs. Animate dialog chip × -> ui-clear 10 px #666 in a 20x24 span.
+  * Assign material panel: verified in app = live (context/r13-am2.png).
+- Open (not done): Section view chip × is hover-only in ours (section.rs `.opacity(0.)` + group_hover), live always
+  shows it; its add-plane icon is `plane` 16 px, live ~18x18 ink (part-studio/71). Remaining kit icons: Close in
+  release_dialog (x2), isolate_ui, reflection, view_tools, behaviors dep-close (x2), assembly_behaviors (shortcuts,
+  group x, measure x), assembly_panels mv-x, analysis hq-off; Check ticks in checkboxes (ours ≈ live glyph);
+  ChevronDown (flatten, thickness, reflection x2), Loader (thickness), TriangleAlert (start_window), Plus (display
+  states). Each needs a live reference before changing.
+- FREEZE 04:10: tree green at my last edit (cargo check -p noshape: Finished, 0 warnings), guard test 2 passed,
+  tools/guard.py 0/732. No tree edits until "freeze lifted".

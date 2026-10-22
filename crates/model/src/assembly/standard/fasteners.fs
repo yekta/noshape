@@ -515,6 +515,8 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isLength(definition.ts, LENGTH_0);
         annotation { "Name" : "Shorter than this, ts" }
         isLength(definition.lts, LENGTH_0);
+        annotation { "Name" : "Dog length of short screws" }
+        isLength(definition.zs, LENGTH_0);
     }
     {
         var def = definition;
@@ -525,9 +527,12 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
             def.ls = def.l;
             def.l = def.l + def.tu;
         }
-        // Short set screws take the shallower socket of the standard (ts).
+        // Short set screws take the shallower socket of the standard (ts)
+        // and, dog points, the shorter dog (zs; ISO 4028 short lengths).
         if (def.ts > EPS && def.l < def.lts - EPS)
             def.t = def.ts;
+        if (def.zs > EPS && def.l < def.lts - EPS)
+            def.z = def.zs;
         const head = screwHead(context, id + "head", def);
         // Countersunk heads reach down to -k; others sit on z = 0.
         const below = (def.head == HEAD_COUNTERSUNK || def.head == HEAD_RAISED_COUNTERSUNK) ? -def.k : Z;

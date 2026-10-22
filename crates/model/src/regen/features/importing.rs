@@ -48,7 +48,11 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     }
     let src = if config.is_empty() { provider.context(&tab) } else { provider.context_configured(&tab, &config) };
     let Some(src) = src else {
-        return err("The source Part Studio could not be regenerated (deleted, or a circular reference)");
+        // Live ("qa5 derived" (7)): a deleted source reads "Error regenerating.".
+        if provider.configuration(&tab).is_none() {
+            return err("Error regenerating.");
+        }
+        return err("The source Part Studio could not be regenerated (a circular reference)");
     };
     // Selected source parts (BodyIds of the source studio); empty = all parts.
     let wanted: Vec<crate::reference::BodyId> = ev
@@ -111,7 +115,8 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
             } else {
                 b.faces.iter().map(|f| std::sync::Arc::new(crate::reference::TopoName::face(ev.feature, crate::reference::Role::Copy { instance: inst as u32, of: f.clone() }))).collect()
             };
-            let name = if inst == 0 { b.name.clone() } else { format!("{} ({})", b.name, inst + 1) };
+            let base_name = provider.part_name(&tab, &b.id).unwrap_or_else(|| b.name.clone());
+            let name = if inst == 0 { base_name } else { format!("{base_name} ({})", inst + 1) };
             let body = crate::regen::context::Body::new(id, name, b.kind, shape, faces, color, ev.feature);
             ev.ctx.bodies.push(std::sync::Arc::new(body));
         }
@@ -128,8 +133,37 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
-    if n == 0 {
+    // A whole studio with no parts left (its Extrude suppressed) still
+    // brings its sketches and stays OK (live "qa5 derived"); only picked
+    // parts that are gone fail.
+    if n == 0 && !wanted.is_empty() {
         return err("The selected parts no longer exist in the source Part Studio");
+    }
+    // A whole studio brings its sketches too (live "qa5 derived" (1)/(4): the
+    // Derived row's ▸ lists them; deriving chosen parts brings none). They
+    // keep their source ids, so they can be picked and referenced here, and
+    // follow the first location.
+    if wanted.is_empty() {
+        let m = frames[0] * inv;
+        let moved = !m.abs_diff_eq(DMat4::IDENTITY, 1e-15);
+        for s in &src.sketches {
+            if ev.ctx.sketches.iter().any(|x| x.feature == s.feature) {
+                continue;
+            }
+            let s = if moved {
+                let mut c = (**s).clone();
+                let f = &mut c.frame;
+                f.origin = m.transform_point3(f.origin);
+                f.x = m.transform_vector3(f.x).normalize_or_zero();
+                f.y = m.transform_vector3(f.y).normalize_or_zero();
+                f.normal = m.transform_vector3(f.normal).normalize_or_zero();
+                std::sync::Arc::new(c)
+            } else {
+                s.clone()
+            };
+            ev.ctx.derived_sketches.push((ev.feature, s.feature));
+            ev.ctx.sketches.push(s);
+        }
     }
     Ok(())
 }
