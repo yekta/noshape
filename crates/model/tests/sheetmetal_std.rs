@@ -122,7 +122,6 @@ fn flanges_on_adjacent_edges_match_live() {
 /// qa5 3.2: a default Hem on G34's top edge at x = 60 (live: 9378.1835 mm³,
 /// 33 faces: 27 plane, 6 cylinder).
 #[test]
-#[ignore = "in progress (fs): std hem on G34 gives 8311.2 mm³ / 25 faces"]
 fn hem_on_g34_matches_live() {
     let mut s = g34();
     let r = s.ok();
@@ -286,4 +285,30 @@ fn bend_keeps_flat_length() {
     let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
     let size = flat.size() * 1e3;
     assert!((size.x.max(size.y) - 60.0).abs() < 1e-6 && (size.x.min(size.y) - 40.0).abs() < 1e-6, "{size:?}");
+}
+
+/// Corner break: a 5 mm fillet at a free corner of a 60 × 40 × 2 plate
+/// (std applies it in the flat: the definition corner becomes an arc).
+#[test]
+fn corner_break_fillets_a_free_corner() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let v = vertex_at(&r, DVec3::new(60.0, 40.0, 2.0));
+    s.add("sheetMetalCornerBreak", |p| {
+        p.set("entities", ParamValue::Query(vec![v]));
+        p.set("blendType", en("FILLET"));
+        p.set("radius", expr("5 mm"));
+    });
+    let r = s.ok();
+    let expected = 60.0 * 40.0 * 2.0 - (25.0 - std::f64::consts::PI * 25.0 / 4.0) * 2.0;
+    assert!((volume_mm3(&r) - expected).abs() < 1e-6, "{} mm³ vs {expected}", volume_mm3(&r));
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    assert!((flat.area() * 1e6 - expected / 2.0).abs() < 1e-4, "flat area {}", flat.area() * 1e6);
 }
