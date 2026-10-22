@@ -1409,4 +1409,10 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
 - **DER4 (2nd try):** labeler falls back to the Derived feature whose source studio holds the creator feature
   (`derived_sources`), so it holds while the edited fillet has consumed the edge.
 - **VS4:** looks done already (`variables::new_studio` on every path); confirm in the app.
-- **DER7:** not reproduced yet; doc /tmp/psb/d/derive.noshape (copy of qa5's d23).
+- **Checked in the app (10-22, derive doc copy /tmp/psb/d/derive.noshape):** F33 line/dot on the hovered half,
+  hover fill, blue pill; BOOL4b ✓ enabled with the empty scope, then row red "No merge scope selected."; DER4 chip
+  "Edge of Derived 1" (not red); DER13 tooltip "Select edges or faces to fillet." after suppressing the source extrude.
+- **DER7 is not a rendering bug:** the "ghost" cylinder sits under the Select Part Studio panel, whose background is
+  live's `rgba(255,255,255,0.95)` (dom/fs-refparams-picker-studio.txt `div.ns-dialog.feature-dialog-resize`); the
+  pixel is exactly 5 % of the part (247 over 98). qa5's d24 shows the same layout. Only a part outside the panel looks
+  "normal". Left as is; a live shot with a part behind the panel would close it.
