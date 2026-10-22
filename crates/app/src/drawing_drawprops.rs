@@ -315,7 +315,8 @@ impl DrawingEditor {
                 }
             })
         };
-        let input = Input::new(&f.state).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.));
+        // Invalid spinbox: the pale orange fills the field itself.
+        let input = Input::new(&f.state).text_size(px(13.33)).small().text_color(gpui_kit::rgb(0x555555)).pl(px(5.)).when(f.invalid.get(), |i| i.bg(gpui_kit::rgba(INVALID_BG)));
         let unit = div().w(px(24.)).flex_none().text_size(px(13.33)).text_color(gpui_kit::rgb(0x333333)).opacity(0.65).flex().justify_center().child(if self.drawing.units_mm { "mm" } else { "in" });
         let k = if self.drawing.units_mm { 1.0 } else { 25.4 };
         match f.kind {

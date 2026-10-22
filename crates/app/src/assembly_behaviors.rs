@@ -1266,7 +1266,7 @@ impl AssemblyView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                                .child(crate::assets::icon("dialog-ok", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_folder_name(true, window, cx))),
                         )
                         .child(
@@ -1278,7 +1278,7 @@ impl AssemblyView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
-                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_folder_name(false, window, cx))),
                         ),
                 )
@@ -2325,7 +2325,7 @@ impl AssemblyView {
                 .border_1()
                 .border_color(pal.border_strong)
                 .shadow_lg()
-                .child(h_flex().justify_between().child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Assembly keyboard shortcuts")).child(Button::new("asm-sc-close").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                .child(h_flex().justify_between().child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Assembly keyboard shortcuts")).child(Button::new("asm-sc-close").ghost().xsmall().opacity(0.86).child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.ui.show_shortcuts = false;
                     cx.notify();
                 }))))
@@ -2377,6 +2377,13 @@ impl AnimState {
 const PREVIEW_TURNS: f64 = 2.0;
 /// Ascender of the mate value text (px; Onshape dimension text is 16 px, behaviours "Entity colours").
 const VALUE_TEXT_ASC: f64 = 11.5;
+
+/// Live's mate angle label number: up to 3 decimals, trailing zeros dropped
+/// ("275.326", and "0" at 0°; qa5 MT7).
+pub(crate) fn mate_angle_label(deg: f64) -> String {
+    let t = noshape_units::to_fixed(deg, 3);
+    if t.contains('.') { t.trim_end_matches('0').trim_end_matches('.').to_string() } else { t }
+}
 /// Onshape `PREVIEW_ANGULAR_DIMENSION_RADIUS_PIXEL_SIZE`.
 const VALUE_ARC_RADIUS_PX: f64 = 80.0;
 
@@ -2923,13 +2930,32 @@ impl AssemblyView {
                 h_flex()
                     .gap_1()
                     .child(div().flex_1().child(Input::new(&st).xsmall()))
-                    .child(Button::new("ds-add").icon(IconName::Plus).xsmall().primary().tooltip("Add display state").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_display_state(window, cx)))),
+                    // Live (assembly/nv-904): a bordered 28 px box with Onshape's 12 px "+",
+                    // #aaa (disabled) until a name is typed.
+                    .child({
+                        let empty = st.read(cx).value().trim().is_empty();
+                        div()
+                            .id("ds-add")
+                            .size(px(28.))
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(3.))
+                            .border_1()
+                            .border_color(gpui_kit::rgb(0xdddddd))
+                            .when(!empty, |d| d.cursor_pointer().hover(|d| d.bg(p().panel_hover)))
+                            .child(div().opacity(if empty { 0.42 } else { 1. }).child(crate::assets::icon("add-button", 20., cx)))
+                            .tooltip(crate::ui::tooltip("Add display state"))
+                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_display_state(window, cx)))
+                    }),
             );
         }
-        Self::panel_frame("Display states", body, cx.listener(|this, _: &ClickEvent, _, cx| {
+        // Live (assembly/nv-904): the plain ns-dialog × (no ✓).
+        Self::panel_frame_with("Display states", body, cx.listener(|this, _: &ClickEvent, _, cx| {
             this.ui.display_states = false;
             cx.notify();
-        }), "ds-close")
+        }), "ds-close", true)
         .into_any_element()
     }
 }
@@ -2976,7 +3002,7 @@ impl AssemblyView {
                     .gap_1()
                     .text_sm()
                     .child(div().flex_1().truncate().child(names.get(&id).cloned().unwrap_or_default()))
-                    .child(Button::new(SharedString::from(format!("grp-x-{}", id.0))).icon(IconName::Close).ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_group_member(id, cx)))),
+                    .child(div().id(SharedString::from(format!("grp-x-{}", id.0))).cursor_pointer().child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_group_member(id, cx)))),
             );
         }
         let body = v_flex()
@@ -3341,10 +3367,15 @@ impl AssemblyView {
                     }
                 };
                 let sweep = on[0].rem_euclid(std::f64::consts::TAU);
-                let text = if preview { format!("{}°", noshape_units::to_fixed(sweep.to_degrees(), 0)) } else { format!("{}°", noshape_units::to_fixed(sweep.to_degrees(), 3)) };
+                let text = if preview { format!("{}°", noshape_units::to_fixed(sweep.to_degrees(), 0)) } else { format!("{}°", mate_angle_label(sweep.to_degrees())) };
                 let frame = noshape_model::assembly::solver::Frame { origin: a.origin, rotation: b.rotation };
                 let mid = sweep * 0.5;
-                let center = a.origin + b.rotation * DVec3::new(mid.cos() * radius, mid.sin() * radius, 0.0);
+                // Live (qa5 MT7): at 0° the label sits at the X axis's end.
+                let center = if sweep < 1e-9 {
+                    a.origin + bx * (self.triad_size() + width(&text) * 0.5 + pad)
+                } else {
+                    a.origin + b.rotation * DVec3::new(mid.cos() * radius, mid.sin() * radius, 0.0)
+                };
                 let (x, y) = readable(center, bx, by);
                 let (hw, hh) = (width(&text) * 0.5 + pad, asc * 0.65 + pad);
                 let (tx, ty) = (mid.sin().abs(), mid.cos().abs());
@@ -3698,7 +3729,7 @@ impl AssemblyView {
                         .border_b_1()
                         .border_color(pal.border)
                         .child(div().flex_1().text_sm().text_color(pal.text).child("Measure"))
-                        .child(Button::new("asm-measure-x").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx)))),
+                        .child(Button::new("asm-measure-x").ghost().xsmall().opacity(0.86).child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx)))),
                 )
                 .child(body)
                 .into_any_element(),

@@ -4,6 +4,9 @@ use crate::regen::eval::{EvalCtx, FResult, NamedShape, err};
 use noshape_kernel as k;
 use noshape_units::Dim;
 
+/// Onshape's note for a Boolean that changes nothing (live qa5 BOOL1).
+const NO_GEOMETRY_CHANGE: &str = "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.";
+
 pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
     let tools_idx = ev.resolve_bodies(ev.query("tools"));
     if tools_idx.is_empty() {
@@ -28,7 +31,7 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
             // Live (qa5 BOOL1): parts apart stay as they were, with a blue
             // note while editing.
             if ev.ctx.bodies.len() == before {
-                ev.infos.push("Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.".into());
+                ev.infos.push(NO_GEOMETRY_CHANGE.into());
             }
             Ok(())
         }
@@ -50,9 +53,18 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                 let others = tools[1..].to_vec();
                 // ☑ Keep tools keeps every tool (live BOOL2).
                 let kept: Vec<(usize, std::sync::Arc<crate::regen::context::Body>)> = if ev.bool("keepTools") { tools_idx.iter().map(|&i| (i, ev.ctx.bodies[i].clone())).collect() } else { Vec::new() };
+                let saved = ev.ctx.bodies.clone();
                 ev.boolean_into(&[first], others, k::BooleanOp::Common)?;
                 let first_id = tool_ids[0].clone();
-                let made: Vec<NamedShape> = ev.ctx.bodies.iter().filter(|b| b.id == first_id || (b.id.feature == ev.feature && !tool_ids.contains(&b.id))).map(|b| NamedShape { shape: b.shape.clone(), names: b.shape_names() }).collect();
+                // Parts that don't meet: nothing is made and nothing changes
+                // (qa5 INT2; the untouched first part isn't a result).
+                let untouched = ev.ctx.bodies.iter().any(|b| std::sync::Arc::ptr_eq(b, &saved[first]));
+                let made: Vec<NamedShape> = if untouched { Vec::new() } else { ev.ctx.bodies.iter().filter(|b| b.id == first_id || (b.id.feature == ev.feature && !tool_ids.contains(&b.id))).map(|b| NamedShape { shape: b.shape.clone(), names: b.shape_names() }).collect() };
+                if made.is_empty() {
+                    ev.ctx.bodies = saved;
+                    ev.infos.push(NO_GEOMETRY_CHANGE.into());
+                    return Ok(());
+                }
                 let kind = ev.ctx.bodies.iter().find(|b| b.id == first_id).map(|b| b.kind).unwrap_or(crate::display::BodyKind::Solid);
                 let feature = ev.feature;
                 ev.ctx.bodies.retain(|b| !tool_ids.contains(&b.id) && b.id.feature != feature);

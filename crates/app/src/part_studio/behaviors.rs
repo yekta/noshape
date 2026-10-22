@@ -11,7 +11,7 @@ use crate::scene_builder::{PickKind, PickTarget};
 use crate::theme::{p, with_alpha};
 use glam::DVec2;
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::display::{FeatureStatus, StudioDisplay};
@@ -66,6 +66,8 @@ pub struct UiState {
     pub isolate: Option<Isolation>,
     /// Derived rows whose derived sketches are listed under them (▸ open).
     pub derived_open: std::collections::HashSet<FeatureId>,
+    /// The open dialog's feature info shown as the graphics bubble.
+    pub dialog_info: Option<String>,
     /// Cameras before discrete view changes (Previous view).
     pub cam_history: Vec<Camera>,
     /// Last pointer position over the viewport (viewport-local).
@@ -219,6 +221,9 @@ pub struct UiState {
     /// Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
     pub preview_tool: Option<(Arc<StudioDisplay>, noshape_model::FeatureId)>,
+    /// A feature drag's drop slot: the hovered row and whether the cursor is
+    /// in its lower half (lands after it; live F33).
+    pub feature_drop: std::rc::Rc<std::cell::Cell<Option<(usize, bool)>>>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
     pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
@@ -332,6 +337,7 @@ impl UiState {
             context_arrow_hover: None,
             isolate: None,
             derived_open: Default::default(),
+            dialog_info: None,
             cam_history: Vec::new(),
             pointer: None,
             select_other: None,
@@ -412,6 +418,7 @@ impl UiState {
             before_context: None,
             preview_task: None,
             preview_tool: None,
+            feature_drop: Default::default(),
             preview_tool_task: None,
             measure_lines: None,
             dyn_suppression: None,
@@ -1863,7 +1870,10 @@ impl PartStudioView {
                 .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.preview_tool = Some((Arc::new(display), fid));
-                let missed = this.tool_missed();
+                // "Selected tools and targets do not intersect." is a Remove /
+                // Intersect note; a failing Add only shows its tool red (BOOL4b).
+                let removes = this.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).feature.params.enum_("operationType"), "REMOVE" | "INTERSECT"));
+                let missed = removes && this.tool_missed();
                 this.show_tool_miss(missed, cx);
                 let d = this.display.clone();
                 this.apply_display(d, window, cx);
@@ -2573,84 +2583,91 @@ impl PartStudioView {
     // ------------------------------------------------------------ S toolbar
 
     /// S: the shortcut toolbar at the cursor (feature tools; sketch tools
-    /// in a sketch). S again or Esc closes it.
+    /// in a sketch). In a sketch S re-opens it at the cursor (live
+    /// sketch/38–39); elsewhere S again closes it. Esc closes it too.
     pub(super) fn toggle_mini_toolbar(&mut self, cx: &mut Context<Self>) {
         // Its tools may have changed in Preferences › Shortcut toolbars.
         self.ui.toolbar = super::toolbar_prefs::ToolbarPrefs::load();
-        if self.sketch.is_some() {
-            let at = self.ui.pointer.unwrap_or_else(|| self.viewport.read(cx).size() * 0.5);
-            self.ui.mini_toolbar = Some(at + DVec2::new(10.0, -30.0));
-        } else if self.ui.mini_toolbar.take().is_none() {
-            let at = self.ui.pointer.unwrap_or_else(|| self.viewport.read(cx).size() * 0.5);
+        let at = self.ui.pointer.unwrap_or_else(|| self.viewport.read(cx).size() * 0.5);
+        if self.sketch.is_some() || self.ui.mini_toolbar.take().is_none() {
             self.ui.mini_toolbar = Some(at);
         }
         cx.notify();
     }
 
+    /// The S shortcut toolbar (`.os-mini-toolbar-panel`, the same panel as
+    /// the assembly's: live dom/assembly-shortcut-toolbar.json, behaviours
+    /// "S key", qa5 STB1): left = cursor x + 10, top = cursor y − 30; 30 px
+    /// tools (20 px icons, radius 3, hover `#eaeaea`) at a 34 px pitch, five
+    /// per row, rows 1 px apart, 4.5 px side padding (175 px wide); on
+    /// rgba(255,255,255,.95) with no border, square corners, a 0 5 10 shadow
+    /// and no tooltips.
     pub(super) fn render_mini_toolbar(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let at = self.ui.mini_toolbar?;
-        let pal = p();
-        let in_sketch = self.sketch.is_some();
-        let btn = |id: SharedString, icon: SharedString, tip: String| {
+        let btn = |id: SharedString, icon: SharedString, cx: &App| {
             div()
                 .id(id)
                 .size(px(30.))
                 .flex()
                 .items_center()
                 .justify_center()
-                .rounded_md()
+                .rounded(px(3.))
                 .cursor_pointer()
-                .hover(|d| d.bg(pal.panel_hover))
-                .child(svg().path(icon).size(px(18.)).text_color(pal.text))
-                .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
+                .hover(|d| d.bg(rgb(0xeaeaea)))
+                .child(crate::assets::icon(&icon, 20., cx))
         };
-        // Onshape: rows of five tools (sketch and Part Studio alike).
-        let mut row = h_flex().gap_0p5().w(px(158.)).flex_wrap();
-        if in_sketch {
+        let mut buttons: Vec<AnyElement> = Vec::new();
+        if self.sketch.is_some() {
             for tool in super::shortcut_cmds::sketch_shortcut_toolbar(&self.ui.toolbar) {
-                row = row.child(btn(SharedString::from(format!("mini-{}", tool.icon())), crate::assets::icon_path(tool.icon()), tool.label().to_string()).on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                        cx.stop_propagation();
-                        this.ui.mini_toolbar = None;
-                        window.focus(&this.focus, cx);
-                        this.activate_tool(tool, window, cx);
-                        cx.notify();
-                    }),
-                ));
+                buttons.push(
+                    btn(SharedString::from(format!("mini-{}", tool.icon())), tool.icon().into(), cx)
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                                cx.stop_propagation();
+                                this.ui.mini_toolbar = None;
+                                window.focus(&this.focus, cx);
+                                this.activate_tool(tool, window, cx);
+                                cx.notify();
+                            }),
+                        )
+                        .into_any_element(),
+                );
             }
         } else {
             for id in self.ui.toolbar.shortcut_tools() {
                 let Some(t) = noshape_model::features::get(&id) else { continue };
                 let id: &'static str = t.id;
-                let tip = match t.shortcut {
-                    Some(s) => format!("{} ({})", t.name, s.replace("shift-", "Shift+").to_uppercase()),
-                    None => t.name.to_string(),
-                };
-                row = row.child(btn(SharedString::from(format!("mini-{id}")), feature_icon(id), tip).on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                        cx.stop_propagation();
-                        this.ui.mini_toolbar = None;
-                        this.start_feature(id, window, cx);
-                    }),
-                ));
+                buttons.push(
+                    btn(SharedString::from(format!("mini-{id}")), feature_icon(id), cx)
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                                cx.stop_propagation();
+                                this.ui.mini_toolbar = None;
+                                this.start_feature(id, window, cx);
+                            }),
+                        )
+                        .into_any_element(),
+                );
             }
+        }
+        let mut rows = v_flex().gap(px(1.));
+        let mut buttons = buttons.into_iter().peekable();
+        while buttons.peek().is_some() {
+            rows = rows.child(h_flex().gap(px(4.)).children(buttons.by_ref().take(5)));
         }
         Some(
             div()
                 .id("mini-toolbar")
                 .occlude()
                 .absolute()
-                .left(px((at.x as f32 - 60.0).max(4.0)))
-                .top(px((at.y as f32 - 44.0).max(4.0)))
-                .p_1()
-                .rounded_lg()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
-                .child(row)
+                .left(px(at.x as f32 + 10.))
+                .top(px((at.y as f32 - 30.).max(0.)))
+                .px(px(4.5))
+                .bg(hsla(0., 0., 1., 0.95))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .child(rows)
                 .into_any_element(),
         )
     }
@@ -2697,10 +2714,10 @@ impl PartStudioView {
     /// Drop of dragged features onto the row at `to`: moves every selected
     /// feature when the dragged one is selected; refuses moves above a
     /// feature's dependencies (Onshape) with an error message.
-    pub(super) fn drop_features(&mut self, dragged: FeatureId, to: usize, cx: &mut Context<Self>) {
+    pub(super) fn drop_features(&mut self, dragged: FeatureId, to: usize, after: bool, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
         let moving: Vec<FeatureId> = if self.selected_features.contains(&dragged) { self.selected_features.clone() } else { vec![dragged] };
-        let Some(order) = interaction::reordered(&studio.features, &moving, to) else { return };
+        let Some(order) = interaction::reordered_at(&studio.features, &moving, to, after) else { return };
         if let Err(msg) = interaction::check_order(&studio.features, &order) {
             self.message = Some((FeatureStatus::Error, msg));
             cx.notify();
@@ -2725,6 +2742,9 @@ impl PartStudioView {
         let parents = names(interaction::feature_dependencies(&studio.features, idx));
         let children = names(interaction::feature_dependents(&studio.features, idx));
         let this_row = (id, name.clone(), studio.features[idx].type_id.clone());
+        // Under-defined sketches carry the feature list's blue badge here too (live part-studio/685).
+        let underdefined: std::collections::HashSet<FeatureId> =
+            parents.iter().chain(children.iter()).chain(std::iter::once(&this_row)).map(|r| r.0).filter(|f| self.display.feature_state(*f).is_some_and(|s| s.underdefined)).collect();
         let pal = p();
         // Onshape (live): 300 px panel at the dialog position; 26 px rows
         // (15 px feature icon, 12 px name); the parents, a ▲ separator
@@ -2737,7 +2757,16 @@ impl PartStudioView {
                 .bg(with_alpha(gpui_kit::rgb(0x000000), 0.02))
                 .cursor_pointer()
                 .hover(|d| d.bg(pal.row_hover))
-                .child(div().w(px(25.)).flex().justify_center().child(svg().path(feature_icon(&ty)).size(px(15.)).text_color(pal.text).opacity(0.8)))
+                // Live (part-studio/685): the feature list's full-colour icons (15 px ink, .8)
+                // and its under-defined badge (12 px, 8 px in from the icon's top-left).
+                .child(
+                    div().w(px(25.)).flex().justify_center().child(
+                        div()
+                            .relative()
+                            .child(div().opacity(0.8).child(crate::assets::icon(&feature_icon(&ty), crate::ui::LIST_ICON, cx)))
+                            .when(underdefined.contains(&fid), |d| d.child(div().absolute().left(px(8.)).top(px(8.)).child(crate::assets::icon("list-underdefined-overlay", 12., cx)))),
+                    ),
+                )
                 .child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(n))
                 .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                     this.ui.list_hover = h.then_some(fid);
@@ -2787,7 +2816,7 @@ impl PartStudioView {
                         .border_b_1()
                         .border_color(pal.border)
                         .child(div().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(format!("Dependencies of {name}")))
-                        .child(div().id("dep-close").px_1().cursor_pointer().child(Icon::new(IconName::Close).small().text_color(pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(div().id("dep-close").px_1().cursor_pointer().child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))).opacity(0.86).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.ui.dependencies = None;
                             this.ui.list_hover = None;
                             this.refresh_scene(false, cx);
@@ -2817,7 +2846,8 @@ impl PartStudioView {
                     .h(px(26.))
                     .bg(with_alpha(gpui_kit::rgb(0x000000), 0.02))
                     .hover(|d| d.bg(pal.row_hover))
-                    .child(div().w(px(25.)).flex().justify_center().child(svg().path(feature_icon(&ty)).size(px(15.)).text_color(pal.text).opacity(0.8)))
+                    // Live (part-studio/685): the feature list's full-colour icons (15 px ink, .8).
+                .child(div().w(px(25.)).flex().justify_center().opacity(0.8).child(crate::assets::icon(&feature_icon(&ty), crate::ui::LIST_ICON, cx)))
                     .child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(n))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         this.ui.list_hover = h.then_some(fid);
@@ -2845,7 +2875,7 @@ impl PartStudioView {
                         .border_b_1()
                         .border_color(pal.border)
                         .child(div().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(format!("Dependencies of {name}")))
-                        .child(div().id("pdep-close").px_1().cursor_pointer().child(Icon::new(IconName::Close).small().text_color(pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(div().id("pdep-close").px_1().cursor_pointer().child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))).opacity(0.86).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.ui.plane_dependencies = None;
                             this.ui.list_hover = None;
                             this.refresh_scene(false, cx);

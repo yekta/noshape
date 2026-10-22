@@ -63,3 +63,21 @@ All 106 earlier samples re-imported (/root/qa5-scratch/pass3/impmatrix12.py → 
 | New g49-chamfer1.x_t (live 44833.437797237995) | 44833.53007, 10 faces | ✗ IM2 (+0.092) |
 | New g50-reorder-shell1.x_t (live 5990.51958739, 20 faces) | 5990.523086, 20 | ✗ IM2-type (+0.0035) |
 | New **g50-g46-shell1.x_t** (live 6052.69679568 mm³, 21 faces, area 12258.75 mm², part ~50×30×30 mm) | 21 faces but **volume 3720.632966, area 11691.098, bounding box 0..37350.68 × 0..23719.42 × 0..334.71 mm** (a face/edge is evaluated metres away: the 2 "OTHER" blend patches?) | ✗ **IM4** (kern, severe: corrupt import) |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+impmatrix13 (116 samples) vs impmatrix12: 108 identical.
+| Row | Ours | Status |
+|---|---|---|
+| IM4 g50-g46-shell1.x_t | now refused: "Import failed: … invalid input: parasolid: a curve of the file could not be rebuilt" (File tab only) | ✗ still (safeguard instead of corruption; live imports it, 6052.69679568 mm³) |
+| **g38d-polycarb-curves.x_t** (live: Curve 1…Curve 8, 8 circles r 2.25) | **refused by the same safeguard** ("a curve of the file could not be rebuilt"); imported 8 wires on the 01:07 CLI | ✗ **IM5** (kern, regression) |
+| Multi-part imports (g47-3parts, g48-ap203/ap214/inch, g48-two, jt-2parts) | names now **renumbered by list position**: g48-two → Part 1 = the 1000 cube, Part 2 = the 22595 G48 body (01:07 CLI and live: Part 1 = G48, Part 2 = cube); jt-2parts Part 1 = 1000, Part 2 = 8000 | ✗ **NAME3** (psb, side effect of the NAME1 fix: imported parts must keep the file's names) |
+| IM1, IM2, I1, IM3 | unchanged (IM3 fixed) | as before |
+
+## Re-run pass 15 (2026-10-22, CLI /tmp/qa5/noshape-cli-0521 = target-engine 05:21; main still aa75fdf)
+impmatrix14 vs impmatrix13: 115 of 116 identical.
+| Row | Ours | Status |
+|---|---|---|
+| IM5 g38d-polycarb-curves.x_t | Curve 1…Curve 8 (8 wires) again | ✅ **fixed** |
+| IM4 g50-g46-shell1.x_t | still refused ("a curve of the file could not be rebuilt") | ✗ still |
+| NAME3 multi-part import names | unchanged (positional: g48-two Part 1 = cube) | ✗ still |
+| IM1, IM2, I1 | unchanged | ✗ still |

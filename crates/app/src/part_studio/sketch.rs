@@ -1852,17 +1852,20 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ offset distance box
 
-    /// Open / close the offset distance box with the editor's pending offset.
-    pub(super) fn sync_offset_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Close the offset distance box once no offset is pending. It doesn't
+    /// open with the preview (live sketch/303; Onshape's offset manipulator
+    /// has no edit view): Enter commits, clicking the distance label opens it.
+    pub(super) fn sync_offset_input(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
         let pending = self.sketch.as_ref().is_some_and(|s| s.offset_pending.is_some());
-        let open = self.ui_ref().is_some_and(|u| u.offset_input.is_some());
-        if !pending {
-            if open && let Some(ui) = self.ui_mut() {
-                ui.offset_input = None;
-            }
-            return;
+        if !pending && let Some(ui) = self.ui_mut() {
+            ui.offset_input = None;
         }
-        if open {
+    }
+
+    /// Open the offset distance box (a click on the preview's distance label).
+    fn open_offset_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let pending = self.sketch.as_ref().is_some_and(|s| s.offset_pending.is_some());
+        if !pending || self.ui_ref().is_some_and(|u| u.offset_input.is_some()) {
             return;
         }
         let units = self.doc.read(cx).session.doc.settings.units;
@@ -1933,6 +1936,9 @@ impl PartStudioView {
             if let Some(ui) = self.ui_mut() { ui.text_dialog_focused = true; }
         }
         let ed = self.sketch.as_ref()?;
+        // Live sketch/132: the preview and the edit box draw in the picked font.
+        let family = crate::sketch_fonts::ui_family(&ed.text_font, cx);
+        let (bold, italic) = (ed.text_bold, ed.text_italic);
         let count = ed.text_string.chars().count();
         let style = self.text_style_row(&ed.text_font, ed.text_bold, ed.text_italic, Some((ed.text_flip_horizontal, ed.text_flip_vertical)), cx);
         let preview = ed.text_string.clone();
@@ -2003,6 +2009,9 @@ impl PartStudioView {
                                 .border_color(gpui_kit::rgba(0x7676764d))
                                 .text_size(px(18.))
                                 .text_color(gpui_kit::rgb(0x545454))
+                                .when_some(family.clone(), |d, f| d.font_family(f))
+                                .when(bold, |d| d.font_weight(FontWeight::BOLD))
+                                .when(italic, |d| d.italic())
                                 .overflow_hidden()
                                 .child(preview),
                         )
@@ -2014,6 +2023,9 @@ impl PartStudioView {
                                 .border_1()
                                 .border_color(gpui_kit::rgb(0x1651b0))
                                 .bg(gpui_kit::white())
+                                .when_some(family, |d, f| d.font_family(f))
+                                .when(bold, |d| d.font_weight(FontWeight::BOLD))
+                                .when(italic, |d| d.italic())
                                 .child(Input::new(&input).appearance(false).text_size(px(18.67)).px(px(2.)))
                                 .os_context_menu(move |menu, _, _| {
                                     let v = view.clone();
@@ -2699,6 +2711,10 @@ impl PartStudioView {
         // ---- dimension labels (at rest drawn in the viewport's frame,
         // `sketch_dimension_overlay`, unless NOSHAPE_GPUI_LABELS)
         let gpui_labels = !crate::overlay_labels::frame_sketch_labels();
+        // The value box (and its Create variable popup) draw above the
+        // constraint glyphs (live qa5 VB1: a fillet's tangent glyphs sit
+        // under its radius box); appended after the glyphs below.
+        let mut on_top: Vec<AnyElement> = Vec::new();
         for PlacedDimension { cid, at: (x, y), text, driving, configured: is_configured, .. } in self.placed_dimension_labels(&data, cx) {
             if let Some((ec, st)) = &editing
                 && *ec == cid
@@ -2714,9 +2730,9 @@ impl PartStudioView {
                     let box_left = x - 104.0 + f32::from(off.x);
                     let room = self.viewport.read(cx).size().x as f32 - (box_left + 209.0);
                     let popup_left = if room >= 228.0 { box_left + 213.0 } else { box_left - 224.0 };
-                    out.push(div().absolute().left(px(popup_left - 107.0)).top(px(y - 17.0) + off.y).child(popup).into_any_element());
+                    on_top.push(div().absolute().left(px(popup_left - 107.0)).top(px(y - 17.0) + off.y).child(popup).into_any_element());
                 }
-                out.push(
+                on_top.push(
                     // Onshape's dimension box (live DOM): a 13 px drag strip
                     // with "◻◻◻" over a 209 x 34 white panel (1 px `#ccc`,
                     // shadow) holding the disabled ">" expander, the 100 px
@@ -3133,6 +3149,8 @@ impl PartStudioView {
             );
         }
 
+        out.append(&mut on_top);
+
         // ---- inference icon next to the cursor
         if ed.tool.draws()
             && let Some(inf) = &ed.inference
@@ -3223,15 +3241,51 @@ impl PartStudioView {
             out.push(div().absolute().left(px(x - est_w * 0.5)).top(px(y - 11.0)).h(px(22.)).px(px(4.)).flex().items_center().text_size(px(16.)).text_color(rgb(0x000000)).whitespace_nowrap().child(text).into_any_element());
         }
 
-        // ---- offset distance box at the direction arrow
-        if let Some(st) = self.ui_ref().and_then(|u| u.offset_input.as_ref().map(|(st, _)| st.clone()))
-            && let Some((_, tip)) = ed.offset_arrow(&data.sketch)
-            && let Some((x, y)) = project(tip)
+        // ---- pending fillet's radius label ("R5" up-left of its leader; live sketch/1934)
+        if let Some((at, r)) = ed.fillet_value_label(&data.sketch)
+            && let Some((x, y)) = project(at)
+        {
+            let full = noshape_units::format_quantity(Quantity::new(r, Dim::LENGTH), &units);
+            let text = format!("R{}", full.split(' ').next().unwrap_or_default());
+            let w = crate::sketch_mode::label_width_px(&text) as f32;
+            out.push(div().absolute().left(px(x - w)).top(px(y - 11.)).h(px(22.)).flex().items_center().text_size(px(16.)).text_color(rgb(0x000000)).whitespace_nowrap().child(text).into_any_element());
+        }
+
+        // ---- offset distance: its label between the curve and the copy (click
+        // to type), then the box in its place
+        let offset_box = self.ui_ref().and_then(|u| u.offset_input.as_ref().map(|(st, _)| st.clone()));
+        if offset_box.is_none()
+            && let Some((at, d)) = ed.offset_value_label(&data.sketch)
+            && let Some((x, y)) = project(at)
+        {
+            let full = noshape_units::format_quantity(Quantity::new(d, Dim::LENGTH), &units);
+            let text = full.split(' ').next().unwrap_or_default().to_string();
+            let w = crate::sketch_mode::label_width_px(&text) as f32;
+            out.push(
+                div()
+                    .id("sk-offset-label")
+                    .absolute()
+                    .left(px(x - w * 0.5))
+                    .top(px(y - 10.))
+                    .text_size(px(16.))
+                    .text_color(rgb(0x333333))
+                    .cursor_pointer()
+                    .whitespace_nowrap()
+                    .occlude()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_offset_input(window, cx)))
+                    .child(text)
+                    .into_any_element(),
+            );
+        }
+        if let Some(st) = offset_box
+            && let Some(at) = ed.offset_value_label(&data.sketch).map(|(at, _)| at).or_else(|| ed.offset_arrow(&data.sketch).map(|(start, _)| start))
+            && let Some((x, y)) = project(at)
         {
             out.push(
                 div()
                     .absolute()
-                    .left(px(x + 10.0))
+                    .left(px(x - 50.0))
                     .top(px(y - 12.0))
                     .w(px(100.))
                     .occlude()

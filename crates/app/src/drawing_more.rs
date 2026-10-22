@@ -58,54 +58,9 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ picking
 
-    /// The axis under the cursor: a centerline annotation, an automatic
-    /// centerline of a view, else a straight edge.
-    fn axis_pick(&self) -> Option<Pick> {
-        self.pk().axis_pick()
-    }
-
-    /// The hovered drawn line of a view (also silhouettes and cut edges
-    /// without a model edge), as its end points.
-    fn raw_line_pick(&self) -> Option<Pick> {
-        self.pk().raw_line_pick()
-    }
-
-    fn circle_at(&self) -> Option<Pick> {
-        self.pk().circle_at()
-    }
-
     /// Clicks of the max/min and foreshortened dimension tools.
     pub fn more_dimension_pick(&mut self, kind: DimTool, picks: &mut Vec<Pick>) {
-        match (kind, picks.len()) {
-            (DimTool::MaxMin, 0) => picks.extend(self.circle_at()),
-            (DimTool::MaxMin, 1) => {
-                let Some(Pick::CircleAt { view, center, .. }) = picks.first().cloned() else { return };
-                let second = match self.circle_at() {
-                    Some(Pick::CircleAt { view: v, center: c2, .. }) if v == view && len(sub(c2, center)) < 1e-9 => None,
-                    Some(p @ Pick::CircleAt { view: v, .. }) if v == view => Some(p),
-                    _ => self.snap_at(self.cursor).filter(|p| p.view == view).map(Pick::Point),
-                };
-                picks.extend(second);
-            }
-            (DimTool::Foreshorten, 0) => picks.extend(self.axis_pick()),
-            (DimTool::Foreshorten, 1) => {
-                let view = match &picks[0] {
-                    Pick::Line { a, .. } => a.view,
-                    _ => return,
-                };
-                // A snap point, a model edge, any drawn line (silhouettes have no
-                // model edge), else the clicked point itself.
-                let e = self
-                    .snap_at(self.cursor)
-                    .filter(|p| p.view == view)
-                    .map(Pick::Point)
-                    .or_else(|| self.line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view)))
-                    .or_else(|| self.raw_line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view)))
-                    .or_else(|| self.placement(view).filter(|pl| pl.contains(self.cursor, 2.0)).map(|pl| Pick::Point(PickedPoint { view, p: pl.to_view(self.cursor), r: None })));
-                picks.extend(e);
-            }
-            _ => {}
-        }
+        self.pk().more_dimension_pick(kind, picks)
     }
 
     // ------------------------------------------------------------ previews

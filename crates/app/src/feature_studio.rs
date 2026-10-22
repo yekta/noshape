@@ -477,6 +477,10 @@ pub struct FeatureStudioView {
     hover_at: Option<Point<Pixels>>,
     /// The toolbar as a cached view (see `render`).
     toolbar: Option<Entity<crate::cached_slice::Slice<FeatureStudioView>>>,
+    /// Onshape Labs › FeatureScript Co-complete switch for this session (live:
+    /// a new session takes the account's checkbox; the AI service itself is
+    /// cloud-only and not built, so the switch does nothing else).
+    co_complete: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -520,7 +524,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, toolbar: None, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -1126,6 +1130,51 @@ impl FeatureStudioView {
             .into_any_element()
     }
 
+    /// Onshape Labs › Co-complete (live feature-studio/1905, 1906, 1920): a
+    /// 28 × 14 switch, "Co-complete" and the flask after Search tools…;
+    /// disabled and faded while Onshape Labs is off.
+    fn render_co_complete(&self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let labs = crate::preferences_window::ListPrefs::load().labs;
+        let on = labs && self.co_complete;
+        let (title, body) = if labs {
+            ("Co-complete (Onshape Labs)", "Use AI to contextually suggest and complete code as you type. Toggling this setting will only affect this session.")
+        } else {
+            ("Co-complete (must enable Onshape Labs)", "Enable Onshape Labs in your preferences to use co-complete. Co-complete use AI to contextually suggest and complete code as you type.")
+        };
+        let switch = div()
+            .w(px(28.))
+            .h(px(14.))
+            .flex_none()
+            .rounded_full()
+            .border_1()
+            .border_color(if on { rgb(0x1651b0) } else { rgb(0x999999) })
+            .bg(if on { rgb(0x1651b0) } else { rgb(0xffffff) })
+            .flex()
+            .items_center()
+            .px(px(1.))
+            .when(on, |d| d.justify_end())
+            .child(div().size(px(10.)).rounded_full().bg(if on { rgb(0xffffff) } else { rgb(0xbbbbbb) }));
+        let row = h_flex()
+            .id("fs-co-complete")
+            .ml(px(10.))
+            .h(px(30.))
+            .gap(px(6.))
+            .flex_none()
+            .when(!labs, |d| d.opacity(0.5))
+            .when(labs, |d| d.cursor_pointer())
+            .child(switch)
+            .child(div().text_size(px(14.)).text_color(pal.text).child(crate::i18n::tr("Co-complete")))
+            .child(crate::assets::icon("onshape-labs-blue", 20., cx))
+            .when(labs, |d| {
+                d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.co_complete = !this.co_complete;
+                    cx.notify();
+                }))
+            });
+        crate::ui::with_rich_tooltip("fs-co-complete-tip", crate::i18n::tr(title), crate::i18n::tr(body), row)
+    }
+
     /// Search tools… (alt+c): the Feature Studio's commands.
     fn open_tools(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let (v1, v2, v3, v4) = (cx.entity(), cx.entity(), cx.entity(), cx.entity());
@@ -1487,6 +1536,7 @@ impl FeatureStudioView {
                     })))
                     .child(probe(&tools_anchor)),
             )
+            .child(self.render_co_complete(cx))
             .child(div().flex_1().relative().child(probe(&self.tb.spacer)));
         // Right side: Monitor ▾, Module outline ▾, back / forward, Line, Column.
         let d = &self.doc.read(cx).session.doc;

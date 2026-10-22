@@ -1,0 +1,30 @@
+# Workflow: sketch tools in depth (Trim, Offset, sketch fillet/chamfer, Slot, linear pattern, Mirror, Spline, Polygon, S toolbar)
+
+qa5, 2026-10-22 pass 14, app /tmp/qa5/noshape-0503 (main aa75fdf). Doc /tmp/qa5/d26/sk.noshape (new mm document via the CLI, Part Studio "qa5 sketch"),
+Sketch 1 on Top, N for the normal view (scale ≈ 5.5 px/mm). Shots /tmp/qa5/shots/k10–k36.
+Live: behaviours.md "Sketch mode" (~116–215: drawing tools, Esc per tool, mm defaults sketch/300–312), screenshots sketch/87–139, 300–309.
+Status: ✅ matches live, ✗ differs, ? live pending.
+
+| # | Step | Live | Ours | Status |
+|---|---|---|---|---|
+| 1 | Sketch on Top + N | normal view, sketch outline + name label | same (k10) | ✅ |
+| 2 | Corner rectangle (G) + Line (L) across it | glyphs —/\| , Esc ends | same (k11) | ✅ |
+| 3 | Trim (M), click the line's stub outside the rectangle | removed back to the nearest intersection | removed back to the rectangle edge, coincident glyph added (k12, k13); hover highlights the whole line | ✅ (hover ?) |
+| 4 | Offset (O), click the rectangle's top edge | picked line amber, light-blue copy at **5 mm**, a large **hollow grey arrow** manipulator; **no value box** (sketch/303) | light-blue copy at 5 mm ✅, but a **small orange arrow** and a **"5 mm" value box opens at once** (k14) | ✗ **OFF1** (skb) |
+| 5 | Esc in Offset | cancels | cancels (k15) | ✅ |
+| 6 | Sketch fillet (Shift+F), click a corner | preview **R20 mm** arc + "R" leader + **hollow grey arrow** manipulator (sketch/301) | R20 preview with a small **square handle**, no arrow, no R leader (k16) | ✗ **FIL1** (skb, manipulator) |
+| 7 | Enter → value box | value box with ±, ✓, ✕ | value box opens with "20 mm" ✅, but the **corner's constraint glyphs draw on top of the box**, covering ± and half the ✓ (k17, k17z) | ✗ **VB1** (ui) |
+| 8 | Type 3, Enter | fillet shrinks to R3; the two lines extend back toward the corner, rectangle otherwise unchanged (minimal-change solve) | R3 applied, but the **rectangle shrinks**: 160×120 px → ~123×73 px (left edge moved right ~37 px, bottom edge up ~50 px) (k18, k19) | ✗ **SK5** (skb, solver; live check requested) |
+| 9 | Slot, click a line | light-blue slot preview **Ø20 mm** + **"Ø20" dimension with a vertical leader** + 4 tangent points (sketch/304) | Ø20 preview (≈110 px) ✅, no dimension and no tangent points while pending (k20) | ✗ **SLOT1** (skb, minor) |
+| 10 | Click elsewhere | commits: dark blue, region filled, centre line stays solid; Ø20 above with a vertical leader; glyphs: coincident ×4 + tangent + offset glyphs (sketch/307) | commits ✅ (solid centre line, filled), but Ø20 on a **diagonal leader to the right arc**; glyphs tangent + **equal "="** pairs, no coincident/offset glyphs (k21) | ✗ SLOT1 |
+| 11 | Linear pattern on a circle | 3x along X at **25 mm**, 1x along Y; **hollow grey arrow manipulators**, square handles, "3x"/"1x" with **leaders**, spacing **dimension with extension lines** (sketch/136) | 3x / 25 mm / 1x ✅; but **dashed yellow guide lines + grey dots**, labels without leaders, bare "25" (k22) | ✗ **PAT1** (skb, preview look) |
+| 12 | Enter | pattern committed | 3 circles, 25 dimension, pattern glyph (k23) | ✅ |
+| 13 | Mirror: pick line, then a circle | line yellow-green #f2ff80; copy at once with symmetric glyph | same (k24, k25) | ✅ |
+| 14 | Spline: 3 clicks, Esc | commits through the clicked points (cursor point dropped), tool stays | same, end-tangent handles hollow (k26) | ✅ |
+| 15 | Inscribed polygon: centre, vertex | dash-dot construction circle, "Ø…" label, spinner **"◀6▶" rotated along the edge** next to the vertex (sketch/91) | hexagon + Ø14.551 ✅; construction circle **solid**, spinner **horizontal above the polygon** (k28) | ✗ **POLY1** (skb, minor) |
+| 16 | Esc | discards the uncommitted polygon | discards (k29) | ✅ |
+| 17 | S key at (1200,400) | 175×62 panel at **cursor x+10, y−30**, square corners; Line, Corner rect, Center rect, Circle, 3-pt arc / Spline, Point, Use, Trim, Dimension | same 10 tools ✅; panel 165×68 **above-left of the cursor** (x 1151–1315, y 327–395) with **rounded corners** (k30, k31) | ✗ **STB1** (ui) |
+| 18 | Sketch chamfer, click a corner | preview chamfer **5 mm** + horizontal arrow manipulator + two 5 mm dimensions (sketch/302, 116) | **no preview** after the click (k33, k34); Enter commits a 5 mm chamfer and opens the value box "5 mm" with ± ✅ (k35) | ✗ **CH1** (skb) |
+
+Findings: SK5 (solver reshapes geometry on a fillet radius edit), CH1 (no chamfer preview), VB1 (glyphs over the value box), OFF1, FIL1, PAT1, SLOT1, POLY1, STB1.
+Live request "qa5 (10-22 pass 14, workflow 26 …)" filed for row 3 hover, row 8 and the committed slot glyphs.

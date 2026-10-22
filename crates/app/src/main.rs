@@ -127,6 +127,10 @@ mod release_dialog;
 mod scene_builder;
 mod session;
 mod sketch_mode;
+mod sketch_fonts;
+mod i18n;
+mod prefs_general;
+mod prefs_export_rules;
 mod start_library;
 mod start_search;
 mod start_thumbnail;
@@ -207,6 +211,12 @@ fn apply_theme(cx: &mut App) {
     cx.set_global(gpui_kit::base::input::PlainSelectionColors { background: gpui_kit::rgb(0x3367d1).into(), foreground: white });
     // Onshape (live dom/caret-inputs.json): `input::placeholder { font-style:
     // italic; font-weight: 300 }` in `rgb(102, 102, 102)`.
+    // Preferences › Language and Theming, as saved.
+    {
+        let prefs = crate::preferences_window::ListPrefs::load();
+        crate::i18n::set_current(prefs.language.as_deref().unwrap_or(crate::i18n::DEFAULT));
+        crate::theme::set_dark(prefs.dark_mode);
+    }
     cx.set_global(gpui_kit::base::input::PlaceholderStyle { italic: true, weight: Some(FontWeight::LIGHT), color: Some(gpui_kit::rgb(0x666666).into()) });
     // Live document/70 (Ace): the Feature Studio gutter is 42 px for one-digit
     // line counts, numbers 21 px in, a 14 px fold column, the code 4 px after it,

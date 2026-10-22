@@ -69,9 +69,8 @@ pub fn helix() -> FeatureType {
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(move |v| path(v, "PITCH") && end_point(v)),
         ParamSpec::flip("roundUpPitch", "Flip rounding").visible(move |v| path(v, "PITCH") && end_point(v)),
-        // Live shows "Handedness [Clockwise ▾]" (qa5 ADV5), though std helix.fs
-        // gives no UIHint.SHOW_LABEL.
-        ParamSpec::enum_("handedness", "Handedness", &[("CW", "Clockwise"), ("CCW", "Counterclockwise")]).hints(Hints::SHOW_LABEL),
+        // No label: live (dom/dialog-helix.txt, qa5-adv-helix.html) shows a bare select, tooltip "Handedness".
+        ParamSpec::enum_("handedness", "Handedness", &[("CW", "Clockwise"), ("CCW", "Counterclockwise")]),
         ParamSpec::bool("showStartEndProfiles", "Show start and end profiles", false),
     ];
     FeatureType::new("helix", "Helix", Category::Curve, p).describe("Create a helix around a cylinder, cone, axis or circle")

@@ -245,8 +245,8 @@ pub fn content_x_range(g: &SheetGeometry) -> [f64; 2] {
 /// Several sheets in ONE file as live writes it (drw2 l): every sheet in
 /// model space, left to right, each one's content (`[lo, hi]` sheet mm,
 /// measured before off-sheet content is excluded) starting
-/// [`SHEET_GAP_MM`] after the previous one's (the first at x = 0), and a
-/// layout per sheet named after it with a viewport onto its frame.
+/// [`SHEET_GAP_MM`] after the previous one's (the first at x = 0), and
+/// (2000+) a layout per sheet named after it with a viewport onto its frame.
 pub fn cad_document_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8, version: DxfVersion) -> Result<CadDocument, String> {
     let k = units_per_mm(insunits);
     let mut doc = document_tables(&sheets.iter().map(|s| &s.1).collect::<Vec<_>>(), insunits, version)?;
@@ -256,6 +256,10 @@ pub fn cad_document_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunit
         let dx = next - lo;
         next = hi + dx + SHEET_GAP_MM;
         add_sheet(&mut doc, g, k, None, version, dx)?;
+        // Release 13 / 14: model space only (live drw2-k-dxfR14 has no layouts).
+        if version <= DxfVersion::AC1014 {
+            continue;
+        }
         // Layout names are unique: a repeated sheet name gets " (2)"...
         let mut layout = name.clone();
         let mut n = 1;
@@ -1166,7 +1170,9 @@ mod tests {
         for (t, e) in targets.iter().zip(want) {
             assert!((t - e).abs() < 1e-6, "{targets:?} vs {want:?}");
         }
-        // Release 11-12: no layouts, the same model space layout.
+        // Release 14: model space only (no layouts); Release 11-12 likewise.
+        let r14 = cad_document_sheets(&sheets, 1, DxfVersion::AC1014).unwrap();
+        assert!(!r14.objects.values().any(|o| matches!(o, acadrust::objects::ObjectType::Layout(l) if l.name.starts_with("Sheet"))));
         let r12 = String::from_utf8(to_dxf_sheets(&sheets, 1, DxfVersion::AC1009).unwrap()).unwrap();
         assert!(r12.contains("AC1009") && !r12.contains("AcDbViewport"));
     }

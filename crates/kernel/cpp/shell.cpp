@@ -322,6 +322,76 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   return true;
 }
 
+// Live G50/G51: Parasolid can't shell a box whose two fillets (radius r,
+// perpendicular, meeting at a mitre under the removed face) run into a 45°
+// chamfer, for walls from t0 up to (not including) r: there the rim triangle
+// the inner chamfer cuts off is as wide as the inner fillets (its legs,
+// c − 2r + √2 t, reach 2 (r − t)). With d the signed distance from the
+// fillets' corner on the removed face to the chamfer's plane (≤ 0: the
+// fillets meet before the chamfer), t0 = (2 − √2)(r − d/√2). Live: chamfer
+// 5 / 4 / 6 / 5 / 3 with fillet 3 / 3 / 3 / 4 / 2 fail from 2.053 / 2.344 /
+// 1.760 / 3.222 / 1.466 mm (last good 2.050 / 2.341 / 1.757 / 3.219 / 1.463);
+// chamfer 5 with fillet 2 (no mitre) never fails.
+bool in_onshape_mitre_band(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
+{
+  ShapeAncMap v2f, e2f;
+  TopExp::MapShapesAndAncestors(solid, TopAbs_VERTEX, TopAbs_FACE, v2f);
+  TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, e2f);
+  auto shares_edge = [&](const TopoDS_Shape& a, const TopoDS_Shape& b) {
+    for (TopExp_Explorer e(a, TopAbs_EDGE); e.More(); e.Next())
+      if (const ShapeList* l = e2f.Seek(e.Current()))
+        for (ShapeList::Iterator it(*l); it.More(); it.Next())
+          if (it.Value().IsSame(b))
+            return true;
+    return false;
+  };
+  for (const TopoDS_Shape& rf : removed)
+    for (TopExp_Explorer v(rf, TopAbs_VERTEX); v.More(); v.Next())
+    {
+      const ShapeList* at = v2f.Seek(v.Current());
+      if (at == nullptr)
+        continue;
+      std::vector<TopoDS_Face> cyl;
+      for (ShapeList::Iterator it(*at); it.More(); it.Next())
+        if (!it.Value().IsSame(rf) && BRepAdaptor_Surface(TopoDS::Face(it.Value()), false).GetType() == GeomAbs_Cylinder)
+        {
+          bool dup = false;
+          for (const TopoDS_Face& c : cyl)
+            dup = dup || c.IsSame(it.Value());
+          if (!dup)
+            cyl.push_back(TopoDS::Face(it.Value()));
+        }
+      if (cyl.size() != 2 || !shares_edge(cyl[0], cyl[1]))
+        continue;
+      const gp_Cylinder c1 = BRepAdaptor_Surface(cyl[0], false).Cylinder(), c2 = BRepAdaptor_Surface(cyl[1], false).Cylinder();
+      const double      r  = c1.Radius();
+      if (std::abs(c2.Radius() - r) > 1e-9 * r || std::abs(c1.Axis().Direction().Dot(c2.Axis().Direction())) > 1e-9)
+        continue;
+      // The chamfer: a plane next to both fillets, at 45° to both axes.
+      for (TopExp_Explorer f(solid, TopAbs_FACE); f.More(); f.Next())
+      {
+        const TopoDS_Face& F = TopoDS::Face(f.Current());
+        BRepAdaptor_Surface a(F, false);
+        if (F.IsSame(rf) || a.GetType() != GeomAbs_Plane || !shares_edge(F, cyl[0]) || !shares_edge(F, cyl[1]))
+          continue;
+        gp_Dir n = a.Plane().Axis().Direction();
+        if (!a.Plane().Position().Direct())
+          n.Reverse();
+        if (F.Orientation() == TopAbs_REVERSED)
+          n.Reverse();
+        if (std::abs(std::abs(n.Dot(c1.Axis().Direction())) - M_SQRT1_2) > 1e-6 || std::abs(std::abs(n.Dot(c2.Axis().Direction())) - M_SQRT1_2) > 1e-6)
+          continue;
+        const double d  = gp_Vec(a.Plane().Location(), BRep_Tool::Pnt(TopoDS::Vertex(v.Current()))).Dot(gp_Vec(n));
+        if (d > 1e-9 * r)
+          continue;
+        const double t0 = (2 - M_SQRT2) * (r - d / M_SQRT2);
+        if (t > t0 * (1 + 1e-9) && t < r * (1 - 1e-9))
+          return true;
+      }
+    }
+  return false;
+}
+
 // ------------------------------------------------------------------ regions
 
 // Path 0, inward walls of convex solids bounded by planes and convex
@@ -439,7 +509,7 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
     const gp_Pnt  pin = ElSLib::Value(0.5 * (u0 + u1), 0.5 * (v0 + v1), cyl);
     const gp_Vec  radial(gp_Lin(ax.Axis()).Normal(pin).Direction());
     const double  r = cyl.Radius();
-    if (n.Dot(radial) <= 0 || u1 - u0 >= M_PI - 1e-6 || r <= t * (1 + 1e-9))
+    if (n.Dot(radial) <= 0 || u1 - u0 >= M_PI - 1e-6)
       return false;
     // The sector [u0, u1] beyond radius r - t, over the face's axial extent
     // and 2t more each way: a prism of the sector polygon minus the cylinder.
@@ -452,15 +522,22 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
       poly.Add(q);
     poly.Close();
     TopoDS_Shape sector = BRepPrimAPI_MakePrism(BRepBuilderAPI_MakeFace(poly.Wire(), true).Face(), gp_Vec(ax.Direction()) * (vb - va)).Shape();
-    gp_Ax2       cax(ElSLib::Value(0, va - 1, gp_Cylinder(ax, 0)), ax.Direction(), ax.XDirection());
-    TopoDS_Shape inner = BRepPrimAPI_MakeCylinder(cax, r - t, vb - va + 2).Shape();
-    BRepAlgoAPI_Cut k(sector, inner);
-    if (k.HasErrors() || !k.IsDone())
-      return false;
+    // A wall at least as thick as the fillet's radius: its offset vanishes
+    // and the whole sector goes.
+    TopoDS_Shape region = sector;
+    if (r - t > 1e-9 * r)
+    {
+      gp_Ax2          cax(ElSLib::Value(0, va - 1, gp_Cylinder(ax, 0)), ax.Direction(), ax.XDirection());
+      TopoDS_Shape    inner = BRepPrimAPI_MakeCylinder(cax, r - t, vb - va + 2).Shape();
+      BRepAlgoAPI_Cut k(sector, inner);
+      if (k.HasErrors() || !k.IsDone())
+        return false;
+      region = k.Shape();
+    }
     SourceMap src;
-    for (TopExp_Explorer x(k.Shape(), TopAbs_FACE); x.More(); x.Next())
+    for (TopExp_Explorer x(region, TopAbs_FACE); x.More(); x.Next())
       src.Bind(x.Current(), Source{f, (uint8_t)REL_GENERATED});
-    if (!cut_by(k.Shape(), src))
+    if (!cut_by(region, src))
       return false;
   }
   BRepAlgoAPI_Cut c(solid, cavity);
@@ -1230,6 +1307,8 @@ OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thic
     removed.push_back(all(i));
   }
   const double sign = outward ? 1.0 : -1.0;
+  if (!outward && in_onshape_mitre_band(solid.shape, removed, thickness))
+    fail_op("shell failed (Parasolid can't build this wall: live G51)");
   Built        b;
   // method: 0 = automatic, 1 = offset only, 2 = slabs only (tests).
   const bool done = (method == 0 && by_regions(solid.shape, removed, thickness, sign, b)) ||

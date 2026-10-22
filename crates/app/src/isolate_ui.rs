@@ -5,7 +5,7 @@
 //! transparent geometry, the transparency slider); "Component controls"
 //! (the Expand select, the expand slider, ?).
 
-use gpui_kit::component::{Icon, IconName, h_flex, v_flex};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::rc::Rc;
@@ -86,8 +86,9 @@ pub(crate) fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyEle
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
-                        .opacity(0.5)
-                        .child(Icon::new(IconName::Close).size(px(14.)))
+                        // Live (ns-dialog close, as dom dialog-animate): an 11 px × at .5.
+                        .opacity(0.86)
+                        .child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333)))
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| close(this, window, cx))),
                 ),
         )

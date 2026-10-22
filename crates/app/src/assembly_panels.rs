@@ -606,7 +606,7 @@ impl AssemblyView {
                         .bg(pal.accept)
                         .when(!ok, |d| d.opacity(0.2))
                         .when(ok, |d| d.cursor_pointer())
-                        .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                        .child(crate::assets::icon("dialog-ok", 24., cx))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_mc(window, cx))),
                 )
                 .child(
@@ -618,7 +618,7 @@ impl AssemblyView {
                         .justify_center()
                         .cursor_pointer()
                         .hover(|d| d.bg(pal.panel_hover))
-                        .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
+                        .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_mc(window, cx))),
                 )
         };
@@ -1363,7 +1363,7 @@ impl AssemblyView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| close(this, cx))),
                     ),
             )
@@ -2225,7 +2225,7 @@ impl AssemblyView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.config_panel = None;
                                 cx.notify();
@@ -2398,7 +2398,7 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept)
                             .cursor_pointer()
-                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                            .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_replace(cx))),
                     )
                     .child(
@@ -2410,7 +2410,7 @@ impl AssemblyView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_replace(cx))),
                     ),
             )
@@ -3199,7 +3199,7 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept)
                             .cursor_pointer()
-                            .child(Icon::new(IconName::Check).with_size(px(18.)).text_color(rgb(0xffffff)))
+                            .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_step_edit(cx))),
                     )
                     .child(
@@ -3211,7 +3211,7 @@ impl AssemblyView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_step_edit(cx))),
                     ),
             )

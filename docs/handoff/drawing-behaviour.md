@@ -953,3 +953,24 @@ these rules, change it in commit.rs (the app and the API both use it). Backups: 
     each render compares the focused field with the last one and commits the one left.
   - Not in our panel yet (live has them): the Dashes spinboxes (Hidden / Tangent / Exploded edges, Cosmetic threads,
     Centerlines), line-thickness selects, table row text heights, Detail / Auxiliary arrowheads.
+- (api, 2026-10-22 06:30) More moved to `scene/drawing_tools/commit.rs` (same code; the API ops use it too):
+  Callout clicks (`free_callout`, `SheetPick::finish_callout`) in drawing_tools.rs; `chamfer_as_dimensions`
+  (drawing_tools.rs) and `more_dimension_pick` (drawing_more.rs; its private axis_pick / raw_line_pick / circle_at
+  wrappers removed) are now SheetPick methods; Centermark Single + Circular/Linear ✓ (`centermark`,
+  `centermark_set`, `CmCircle` / `CentermarkOpts`) in drawing_centermark.rs; Note panel ✓ for a new note
+  (`new_note`, incl. the typed height becoming the Notes default) in drawing_ui.rs. Behaviour unchanged; checked in
+  the app (callout with/without leader, centermark, max/min dimension; note after the next build).
+
+## asb 10-22 morning (freeze lifted, main aa75fdf)
+- **Centermarks** (live asb 10-22 b, behaviours.md "drawing centermarks"): build.rs auto centermarks = a continuous
+  cross ±a and, with ☑ Extended lines, four CENTER lines from a + g to r + a + g, where a = Mark size + 0.045 in and
+  g = Gap size + 0.045 in (sheet units); ☐ Extended lines = only the cross. `centermark_extension` is no longer used
+  (kept for old files). Test `auto_centermarks_follow_mark_gap_and_extended_lines` (defaults 0.045 / 0.09 → r + 0.09;
+  Mark 0.2 + Gap 0.1 → 0.245 / 0.39 → r + 0.39; unticked → 2 lines). Checked in the app (demo top view).
+- **Multi-sheet DXF / DWG Release 13 / 14:** model space only, no per-sheet layouts (the export dialog says "Model
+  space only"; live drw2-k-dxfR14 has no LAYOUT objects but the same side-by-side placement). 2000+ keep a layout per
+  sheet. Checked in the app: demo drawing + a second sheet → Export › DXF (Release 14) writes ONE "Drawing 1.dxf"
+  (no zip), both sheets, the second sheet's frame 127.483 mm (5.019 in) after the first's content.
+- **Panel fields checked in the app (mm demo):** Notes Text height "4 mm" + Tab → 4.0000, "abc" + Tab → reverts,
+  ▾ visible; Stack gap "1 mm" + Tab → stays, hover "Must be a number"; 1.25 + Enter, ↑ → 1.3000. The pale orange
+  now fills the input itself (it was hidden under the input's white).

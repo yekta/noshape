@@ -125,15 +125,23 @@ pub fn feature_dependents(features: &[Feature], index: usize) -> Vec<FeatureId> 
 /// down). `None` when nothing would change.
 pub fn reordered(features: &[Feature], moving: &[FeatureId], to: usize) -> Option<Vec<FeatureId>> {
     let ids: Vec<FeatureId> = features.iter().map(|f| f.id).collect();
+    let target_pos = to.min(ids.len().checked_sub(1)?);
+    let all_above = moving.iter().all(|m| ids.iter().position(|i| i == m).is_some_and(|p| p < target_pos));
+    reordered_at(features, moving, to, all_above)
+}
+
+/// New feature order after dropping `moving` on the row at `to`: before it,
+/// or `after` it (live F33: the half of the row the cursor is in, whichever
+/// way the drag goes). `None` when nothing would change.
+pub fn reordered_at(features: &[Feature], moving: &[FeatureId], to: usize, after: bool) -> Option<Vec<FeatureId>> {
+    let ids: Vec<FeatureId> = features.iter().map(|f| f.id).collect();
     let target = *ids.get(to.min(ids.len().checked_sub(1)?))?;
     let moving: Vec<FeatureId> = ids.iter().copied().filter(|i| moving.contains(i)).collect();
     if moving.is_empty() || moving.contains(&target) {
         return None;
     }
-    let target_pos = ids.iter().position(|i| *i == target)?;
-    let all_above = moving.iter().all(|m| ids.iter().position(|i| i == m).is_some_and(|p| p < target_pos));
     let mut rest: Vec<FeatureId> = ids.iter().copied().filter(|i| !moving.contains(i)).collect();
-    let at = rest.iter().position(|i| *i == target)? + usize::from(all_above);
+    let at = rest.iter().position(|i| *i == target)? + usize::from(after);
     rest.splice(at..at, moving);
     (rest != ids).then_some(rest)
 }
@@ -715,6 +723,11 @@ mod tests {
         // A Variable moves below the feature using it (live qa5 pass 8).
         let order = reordered(&ps.features, &[FeatureId(1002)], 4).unwrap();
         assert!(check_order(&ps.features, &order).is_ok());
+        // Live F33: the cursor's half of the hovered row decides, either way.
+        assert_eq!(reordered_at(&ps.features, &[FeatureId(1001)], 3, false).unwrap()[2], FeatureId(1001), "down, upper half: before");
+        assert_eq!(reordered_at(&ps.features, &[FeatureId(1001)], 3, true).unwrap()[3], FeatureId(1001), "down, lower half: after");
+        assert_eq!(reordered_at(&ps.features, &[FeatureId(1005)], 1, false).unwrap()[1], FeatureId(1005), "up, upper half: before");
+        assert_eq!(reordered_at(&ps.features, &[FeatureId(1005)], 1, true).unwrap()[2], FeatureId(1005), "up, lower half: after");
         // Dropping onto itself is a no-op.
         assert!(reordered(&ps.features, &[FeatureId(1003)], 2).is_none());
         let mut ps2 = ps.clone();

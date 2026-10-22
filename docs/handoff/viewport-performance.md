@@ -477,3 +477,35 @@ changes. I write the renderer part first (my files) and show crops before touchi
     hover ≤1 level (11 / 19 px); 2x: the value after the ƒx/ƒ marker 1 device px left → GPUI's text leaf width is
     `round(ceil(width_logical) · scale)` (text.rs measure ceils in logical px, taffy rounds to device px), fixed in
     `overlay_labels::leaf_width` (also the section/analysis value boxes). Re-crop pending a build.
+- **2026-10-22 05:30 (perf, after the 04:10 freeze)**
+  - Local llvmpipe, many_parts.rs::thousand_pins_frame_time (1194x794, 1000 pins, 184k tris; machine loaded):
+    default 1149 ms; skip meshes 371; MSAA 1: 331; AO off 959; no instancing 1530 (instancing -25% here).
+    The "lines" variant printed nothing (rerun). Meshes under 4x MSAA dominate on software rasterizers.
+  - Onshape adapts interactive detail (webgl DetailManager): while the INTERACTIVE frame rate is below
+    DETAIL_REDUCTION_THRESHOLD_FPS 20 it steps down: (1) edge silhouettes + section plane edges off, (2) SSAO off,
+    (3) image-based (backface) silhouettes off, (4) lowLevelBodyProportion += LOW_LEVEL_BODY_PROPORTION_STEP .1 up to
+    MAX_LOW_LEVEL_BODY_PROPORTION .9 (that share of bodies at the lowest LOD); above DETAIL_ENHANCEMENT_THRESHOLD_FPS
+    30 it steps back up; settings persisted per [viewerUsage, workspace, element, modelUsage]. Bodies under
+    DEFAULT_EXTENT_CULLING_THRESHOLD_IN_PIXELS 2 px are culled (occurrence LOD manager; read where it applies).
+    Next perf item: implement this on top of navigation::FrameTimer (AO off first; LOD = coarser meshes).
+  - Item 2 gate: frame sketch labels only with NOSHAPE_FRAME_SKETCH_LABELS=1 (overlay_labels::frame_sketch_labels)
+    until crops vs GPUI are approved; the sketch name is in the frame unconditionally.
+  
+  - Live 459 (behaviours.md): Onshape's display mesh is angle based: segments per full circle Coarse 24, Medium 48,
+    Fine 144, Very fine 600, Auto = Fine (144) at Ø20/Ø200/Ø2000; REST default 72. Plan: regen/display.rs
+    tessellate_body/tessellate_shape → angular deflection 2π/segments (Auto/Fine 0.0436 rad, Medium 0.1309, Coarse
+    0.2618, Very fine 0.01047), linear deflection out of the way (large, e.g. the body diagonal) so the angle rules;
+    preview meshes: Coarse; partstudio.rs TessQuality: segments() instead of factor(); per-part UI exists
+    ("Edit appearance…" Tessellation quality ▾, check it is wired); test: a Ø20 and Ø2000 cylinder both have 144
+    segments on their circular edges (count distinct vertices on the top circle); measure big-plate (230 ms before)
+    and 1000-pin regen + orbit after.
+  - Live silhouettes answer: outlines = edge colour/width (1 px ≈ #343434), none in Shaded, same in Hidden line, front
+    part's outline over the rear part, rear outlines hidden: matches ours (edge colour/width, depth tested).
+  - Offscreen suite SIGSEGV'd once (02:5x, machine loaded), passed on rerun: watch for flakiness (llvmpipe).
+
+## From ui2 (10-22): Preferences › Environment profile › "Match pixel density on high resolution displays"
+- Stored per profile (`ListPrefs.env_profiles[..].density`: Automatic (default) / On / Off, the selected one in
+  `env_profile`; `prefs_general::PixelDensity`). Live: picking a profile applies it immediately. Not applied to
+  the viewport yet: Off would render at 1 px per logical px on HiDPI (scale 1.0 instead of `window.scale_factor()`
+  in viewport.rs, picks mapped accordingly), On/Automatic = device pixels. Yours to wire (a cached atomic, not a
+  file read per frame) — tell ui2 and I'll expose a reader.

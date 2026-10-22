@@ -35,6 +35,17 @@ No code edits, no builds. Writes only under docs/parity/, docs/handoff/qa5.md an
 - Pass 12 (10-22 ~01:35): CLI /tmp/qa5/noshape-cli-0107 (target-engine 01:07); main still 5bd50b2, app still target-shared 00:14 (no app re-run needed yet).
   impmatrix12 (116 samples, 10 new g48–g50): IM3 FIXED; IM1, IM2, I1 still; new **IM4** g50-g46-shell1.x_t corrupt (bbox 37 m). SF2, SF5, SF6, SM1, hem, EXP1 still.
   SF5/SF6 are the existing Move boundary 1–3 in /tmp/qa5/cli/surf.noshape (copy it and run query_parts / feature_list); SM rows: feature_rollback after Flange 1 / Hem 1 on a copy of /tmp/qa5/cli/sm.noshape.
+- Pass 13 (10-22 05:15–06:40): main **aa75fdf** via /tmp/qa5/noshape-0503 (= target-lead 05:03), CLI /tmp/qa5/noshape-cli-0226 (target-engine 02:26). "Re-run pass 13" sections in every checklist touched.
+  Fixed: BOOL1 (geometry), BOOL2, BOOL3, NAME1, NAME2, INT1, SPLIT1, COPY1, DEL1, DEL2, MENU1, DER1–3, DER5–11, TAB1, MT1–6, MT8, MT9, VS2 (CLI), VS4, A19, CA4, KB3, D17, D18, DSM5; ADV12 withdrawn (live shows both callout parts).
+  Still: DER4, MT7 (label), ADV2, SF2, SF5, SF6, SM1, hem, SM3, DSM2/SM5, DSM4, I1, IM1, IM2, IM4 (now refused), EXP1.
+  New: CRASH1 (Parts list › Rename crashes: gpui "hover style already set", part_studio/mod.rs:2831), IM5 (g38d curves refused by IM4 safeguard), NAME3 (imported parts renumbered),
+  INT2 (disjoint Intersect + Keep tools makes an 8000 copy), BOOL1b (no-change message in dialog/tooltip instead of graphics bubble), BOOL4b (✓ disabled + extra bubble), DER13 (fillet error text), DER14 (Derived menu lacks Add appearance to feature…).
+  Not re-run: A4, D8 (the "qa5 assembly" doc is gone; rebuild it to re-run).
+  Crash log /root/qa5-scratch/crash-0503-rename.log. Import logs pass3/impmatrix12.log (01:07 CLI) and impmatrix13.log (02:26 CLI).
+- Pass 14 (10-22, after pass 13): same app /tmp/qa5/noshape-0503. "qa5 assembly" rebuilt as /tmp/qa5/d14/asm.noshape (pass14/mkasm2.py): A4 and D8 **fixed**.
+  Workflow 26 sketch tools: workflow-sketch-tools.md, doc /tmp/qa5/d26/sk.noshape (CLI-created mm doc). New: SK5 (solver reshapes rectangle on fillet R edit), CH1 (no chamfer preview), VB1 (glyphs over value box),
+  OFF1, FIL1, PAT1, SLOT1, POLY1, STB1. Live request "qa5 (10-22 pass 14, workflow 26 …)" pending. Gotcha: s.sh `type two words` drops the space (xdotool gets 2 args).
+- Pass 15 (10-22): CLI /tmp/qa5/noshape-cli-0521 (target-engine 05:21): IM5 FIXED; IM4, NAME3, IM1, IM2, I1, SF2, SF5, SF6, SM1, hem, SM3, ADV2, EXP1 unchanged. Log pass3/impmatrix14.log. Main still aa75fdf.
 - Re-run rule: when a new Integrate commit lands (`git -C /root/noshape log -1 origin/main`) or a newer target-shared binary appears,
   copy it and re-run every ✗ row; each checklist has dated "Re-run pass N" / "Update from live's answer" sections.
 
@@ -63,7 +74,8 @@ No code edits, no builds. Writes only under docs/parity/, docs/handoff/qa5.md an
 | 20 | configured part in an assembly (Change configuration, configured insert, BOM, Variable Studio) | workflow-configured-assembly.md | done pass 7 (CA1–CA4, A18 new) |
 | 21 | drawing of a configured assembly + BOM table after a configuration change | workflow-configured-assembly-drawing.md | done pass 8 (CA5, CA6 new; 19:24 build) |
 | 22 | Variable Studios driving a Part Studio (order, clashes, own variables) | workflow-variable-studios.md | done pass 8; live "qa5 pass 8" folded 10-22 (VS1 withdrawn, VS2 confirmed ✗, VS4 new) |
-| 25 | multi-part booleans (union/subtract/intersect, Keep tools, names, Split, Transform copy, Delete part, merge scope) | workflow-booleans.md | done pass 11 + live folded (12 ✗, psb has fixes) |
+| 26 | sketch tools in depth (Trim, Offset, fillet/chamfer, Slot, patterns, Mirror, Spline, Polygon, S toolbar) | workflow-sketch-tools.md | done pass 14 (9 ✗); live request pending |
+| 25 | multi-part booleans (union/subtract/intersect, Keep tools, names, Split, Transform copy, Delete part, merge scope) | workflow-booleans.md | pass 13: 9/10 fixed; BOOL1b, BOOL4b, INT2 open |
 | 24 | mates and mate connectors in depth (flip rule, HUD, connector panel, Offset/Limits, mate values, Animate, Mate connector tool, Replace instance) | workflow-mates.md | done pass 10 (MT1–MT9) |
 | 23 | derived parts + in-context references (Derived dialog/panel, source changes, configured derive, derive twice, Insert, Edit in context, Update context) | workflow-derived.md | done pass 9 (DER1–DER12; live "qa5 pass 9 derived" pending) |
 

@@ -30,3 +30,16 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 | 19 | Hidden mate row tooltip | "<name> (Hidden)" + parameter summary | "Revolute 1 (Hidden) / Revolute mate / Offset: off" (m38) | ✅ (summary lines ?) |
 | 20 | Replace instances… › pick an unrelated part | panel closes, plain chip "Part 1", title black, orange preview at the instance's position, mates that can't resolve turn red + red badge on the root | same (m44–m46) | ✅ |
 | 21 | ✓ | mate kept but **fails**: red row, tooltip "<mate> has error: Mate cannot resolve mate connectors. (Hidden)" | the mate turns back to normal (not red) and **re-attaches to the new part, moving it onto <1>** (the box now sits on the plate) (m47, m48) | ✗ **MT9** (skb) |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 10 doc). Shots m50–m76.
+| Row | Ours | Status |
+|---|---|---|
+| MT1 flip icon (empty dialog) | up-right, same as live 30 (cmp-flip2) | ✅ **fixed** |
+| MT2 mate-type list | plain rows, current type highlighted, overlays the field (cmp-m52) | ✅ **fixed** |
+| MT3 chip clock tooltip | "Mate connector of Part 1 <2> (Click to edit)" | ✅ **fixed** (m56) |
+| MT4 connector panel | chip bold, instance row highlighted | ✅ **fixed** (m57) |
+| MT5 / MT6 Offset values / default axis | regular black "0 mm"; Rotate about X | ✅ **fixed** (m53) |
+| MT7 selected Revolute at 0° | mated face amber, instance rows highlighted, triad letters, no circle ✅; label **"0.000°" italic, past the X axis** (live "0°" upright on the X-axis end, trailing zeros dropped) | ✗ still (label only) (m60) |
+| MT8 Mate connector tool | no preview slider; Move rows X↘ Y↗ Z↑ icons, Rotate about Z | ✅ **fixed** (m61, m62) |
+| MT9 Replace instance → unresolvable mate | stays red, tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" | ✅ **fixed** (m75, m76) |

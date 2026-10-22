@@ -275,7 +275,16 @@ impl StandardSpec {
     /// select depending on the size, the first of that size's options
     /// unless the chosen one is among them).
     pub fn param(&self, label: &str) -> &str {
-        let size_options = component(self).and_then(|c| c.size(&self.size)).and_then(|s| s.values.get(label));
+        // The size's row for the other chosen options (tapping screws: the
+        // Threads/inch list depends on the Tip type).
+        let size_options = component(self)
+            .and_then(|c| {
+                let mut rows = c.sizes.iter().filter(|s| s.name == self.size);
+                let first = rows.clone().next()?;
+                let chosen = |k: &String| self.params.get(k).cloned().or_else(|| c.params.iter().find(|p| &p.label == k).map(|p| p.default.clone()));
+                Some(rows.find(|s| s.when.iter().filter(|(k, _)| k.as_str() != label).all(|(k, v)| chosen(k).as_deref() == Some(v.as_str()))).unwrap_or(first))
+            })
+            .and_then(|s| s.values.get(label));
         if let Some(v) = self.params.get(label)
             && size_options.is_none_or(|o| o.contains(v))
         {
@@ -337,8 +346,14 @@ impl StandardSpec {
     /// Change the size, keeping the length when it is still offered.
     pub fn set_size(&mut self, size: &str) {
         self.size = size.to_string();
+        self.fix_length();
+    }
+
+    /// Keep the length when the size row (for the chosen options) still
+    /// offers it, else take the row's default length.
+    pub fn fix_length(&mut self) {
         if let Some(c) = component(self)
-            && let Some(s) = c.size(size)
+            && let Some(s) = self.size_row()
         {
             let lengths = c.lengths(s);
             if self.length.as_ref().is_none_or(|l| !lengths.contains(l)) {

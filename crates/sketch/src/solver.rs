@@ -91,11 +91,20 @@ pub struct SolveOptions {
     pub max_iterations: usize,
     /// Run the DOF / constraint state analysis.
     pub analyze: bool,
+    /// Entities (with their defining points) that should take the change:
+    /// every other free parameter is held (or, if that can't solve, weighted
+    /// heavier), so a new dimension value moves the dimensioned geometry and
+    /// leaves the rest where it is (Onshape: a fillet radius change extends
+    /// the lines, the rectangle stays; qa5 SK5). Empty: all parameters weigh
+    /// the same.
+    pub light: Vec<EntityId>,
+    /// Points of `light` entities that are held all the same.
+    pub still: Vec<EntityId>,
 }
 
 impl Default for SolveOptions {
     fn default() -> Self {
-        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true }
+        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new() }
     }
 }
 
@@ -259,6 +268,46 @@ pub(crate) struct System {
     invalid: Vec<ConstraintId>,
     /// Drag targets per representative parameter.
     drag_target: HashMap<u32, f64>,
+}
+
+/// Weight of the parameters outside `SolveOptions::light`.
+const STILL_WEIGHT: f64 = 100.0;
+
+impl System {
+    /// Representative free parameters not owned by `opts.light` (or its
+    /// points), plus those of `opts.still`.
+    fn still_reps(&mut self, sk: &Sketch, opts: &SolveOptions) -> Vec<usize> {
+        let mut ents: HashSet<EntityId> = opts.light.iter().filter_map(|id| sk.entity(*id)).flat_map(|e| e.point_refs().into_iter().chain(std::iter::once(e.id))).collect();
+        for id in &opts.still {
+            ents.remove(id);
+        }
+        let mut light_reps: HashSet<u32> = HashSet::new();
+        for i in 0..self.p.owner.len() {
+            if let Owner::Ent(id, _) = self.p.owner[i]
+                && ents.contains(&id)
+            {
+                light_reps.insert(find(&mut self.uf, i as u32));
+            }
+        }
+        for i in 0..self.p.owner.len() {
+            if let Owner::Ent(id, _) = self.p.owner[i]
+                && opts.still.contains(&id)
+            {
+                light_reps.remove(&find(&mut self.uf, i as u32));
+            }
+        }
+        (0..self.weight.len())
+            .filter(|&i| find(&mut self.uf, i as u32) as usize == i && !light_reps.contains(&(i as u32)) && !self.p.fixed[i] && self.weight[i] < DRAG_WEIGHT)
+            .collect()
+    }
+
+    /// Weigh every free parameter except those of `light` (and their
+    /// points) heavier (see `SolveOptions::light`).
+    fn weigh_still(&mut self, sk: &Sketch, opts: &SolveOptions) {
+        for i in self.still_reps(sk, opts) {
+            self.weight[i] = STILL_WEIGHT;
+        }
+    }
 }
 
 fn alias_pair(sk: &Sketch, kind: &ConstraintKind) -> Option<(EntityId, EntityId)> {
@@ -846,8 +895,23 @@ pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget],
     let mut excluded: HashSet<ConstraintId> = HashSet::new();
     let mut conflicting: Vec<ConstraintId> = Vec::new();
     let mut attempt = 0;
+    if !opts.light.is_empty() && drag.is_empty() {
+        // First try to move `light` alone (everything else held); the
+        // weighted solve below then only analyses the result.
+        let mut sys = System::build(sk, &excluded, drag);
+        for i in sys.still_reps(sk, opts) {
+            sys.p.fixed[i] = true;
+        }
+        let out = sys.solve(&SolveOptions { analyze: false, ..opts.clone() });
+        if out.all_converged && out.comp_conflicts.is_empty() && out.const_conflicts.is_empty() {
+            sys.write_back(sk);
+        }
+    }
     loop {
         let mut sys = System::build(sk, &excluded, drag);
+        if !opts.light.is_empty() {
+            sys.weigh_still(sk, opts);
+        }
         let out = sys.solve(opts);
         // Drags never drop constraints: a failed drag keeps the last good state.
         let retry = allow_exclusion && drag.is_empty() && !out.all_converged && !out.comp_conflicts.is_empty() && attempt < 8;
@@ -976,6 +1040,42 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
 }
 
 impl Sketch {
+    /// Options for solving after dimension `cid` got a new value: the
+    /// geometry that takes the change (`SolveOptions::light`).
+    ///
+    /// A fillet arc's radius (Onshape, qa5 SK5: 30.089 × 22.065 rectangle,
+    /// top-right R5 → R3 gives 28.089 × 22.065): the arc keeps its end point
+    /// (counter-clockwise) on the line there, so that line keeps its
+    /// length; the line at the arc's start moves with it, along with points
+    /// on it (the virtual sharp).
+    pub fn dimension_edit_options(&self, cid: ConstraintId) -> SolveOptions {
+        let mut opts = SolveOptions::default();
+        let Some(c) = self.constraint(cid) else { return opts };
+        let (ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. }) = c.kind else { return opts };
+        let Some(Geometry::Arc { start, end, .. }) = self.entity(curve).map(|e| &e.geometry) else { return opts };
+        let (start, end) = (*start, *end);
+        let tangent_lines: Vec<EntityId> = self
+            .constraints()
+            .filter(|t| t.driving)
+            .filter_map(|t| match t.kind {
+                ConstraintKind::Tangent { a, b } if b == curve => Some(a),
+                ConstraintKind::Tangent { a, b } if a == curve => Some(b),
+                _ => None,
+            })
+            .filter(|l| self.kind(*l) == Some(EntityKind::Line))
+            .collect();
+        let at = |p: EntityId| tangent_lines.iter().copied().find(|l| self.endpoints(*l).is_some_and(|(s, e)| s == p || e == p));
+        let (Some(moved), Some(_kept)) = (at(start), at(end)) else { return opts };
+        let on_moved = self.constraints().filter_map(|k| match k.kind {
+            ConstraintKind::Coincident { a, b } if b == moved && self.kind(a) == Some(EntityKind::Point) => Some(a),
+            ConstraintKind::Coincident { a, b } if a == moved && self.kind(b) == Some(EntityKind::Point) => Some(b),
+            _ => None,
+        });
+        opts.light = [curve, moved].into_iter().chain(on_moved).collect();
+        opts.still = vec![end];
+        opts
+    }
+
     /// Solves all driving constraints, warm-started from the current geometry.
     pub fn solve(&mut self) -> SolveReport {
         self.solve_with(&SolveOptions::default())

@@ -17,6 +17,7 @@ pub(crate) mod convert;
 mod evaluate;
 pub mod hole;
 mod sheetmetal;
+mod sm_flat;
 mod edge_change;
 mod offsets;
 mod packed;
@@ -148,6 +149,11 @@ pub struct CtxState {
     pub split_tools: Vec<(DVec3, DVec3, Vec<DVec3>)>,
     /// The face pieces each `opSplitFace` left (their snapshot points; `qSplitBy` faces).
     pub split_face_pieces: HashMap<FsId, Vec<DVec3>>,
+    /// Bodies made as copies (extracted surfaces, pattern instances) and the
+    /// operation number they were made at: tracking an entity started before
+    /// does not follow onto a copy lying on it (std sheet metal Bend copies
+    /// its bend face before deleting it).
+    pub copies: HashMap<BodyId, u32>,
 }
 
 /// The `Context` builtin.
@@ -213,6 +219,7 @@ impl FsContext {
                 pattern_instances: HashMap::new(),
                 split_tools: Vec::new(),
                 split_face_pieces: HashMap::new(),
+                copies: HashMap::new(),
                 attr_snapshots: HashMap::new(),
                 body_versions: HashMap::new(),
                 transient_versions: HashMap::new(),
@@ -378,6 +385,19 @@ impl CtxState {
     }
 
     /// Register an operation id; `None` if it was used before.
+    /// The number the next operation gets (snapshots remember it).
+    pub fn seq(&self) -> u32 {
+        self.next_seq
+    }
+
+    /// Mark the bodies operation `id` made as copies.
+    pub fn mark_copies(&mut self, id: &[Arc<str>]) {
+        let made: Vec<BodyId> = self.body_ops.iter().filter(|(_, op)| op.as_slice() == id).map(|(b, _)| b.clone()).collect();
+        for b in made {
+            self.copies.insert(b, self.next_seq);
+        }
+    }
+
     pub fn begin_op(&mut self, id: &[Arc<str>]) -> Option<FeatureId> {
         if !self.used_ids.insert(id.to_vec()) {
             return None;
@@ -542,6 +562,7 @@ pub fn register() {
         all.extend_from_slice(evaluate::NATIVES);
         all.extend_from_slice(hole::NATIVES);
         all.extend_from_slice(sheetmetal::NATIVES);
+        all.extend_from_slice(sm_flat::NATIVES);
         all.extend_from_slice(edge_change::NATIVES);
         all.extend_from_slice(offsets::NATIVES);
         all.extend_from_slice(packed::NATIVES);

@@ -168,3 +168,13 @@ fn every_sketch_font_lays_out_in_its_styles() {
     assert_eq!(sketch_font_of_file("OpenSans-BoldItalic.ttf"), Some("Open Sans"));
     assert_eq!(sketch_font_of_file("RobotoSlab-Regular.ttf"), Some("Roboto Slab"));
 }
+
+#[test]
+fn sketch_fonts_name_their_families() {
+    use noshape_sketch::text::{font_family_name, sketch_font_files};
+    let files = sketch_font_files("Open Sans");
+    assert_eq!(files.len(), 2, "regular and italic variable files");
+    assert_eq!(font_family_name(files[0]).as_deref(), Some("Open Sans"));
+    assert_eq!(font_family_name(sketch_font_files("PTSans")[0]).as_deref(), Some("PT Sans"));
+    assert_eq!(sketch_font_files("Allerta").len(), 1);
+}

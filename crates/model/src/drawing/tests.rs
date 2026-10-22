@@ -2186,3 +2186,48 @@ fn drawing_bom_merges_instances_in_the_same_configuration() {
     let grew: Vec<_> = rows.iter().zip(&after).filter(|(a, b)| b.1 == a.1 + 2).collect();
     assert_eq!(grew.len(), 1, "{rows:?} -> {after:?}");
 }
+
+/// Live asb 10-22 b: an auto centermark is a continuous cross ±a and,
+/// with Extended lines, four center lines from a + g to r + a + g, where a
+/// and g are Mark size and Gap size plus a hidden 0.045 in.
+#[test]
+fn auto_centermarks_follow_mark_gap_and_extended_lines() {
+    use super::sheet::LineStyle;
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let top = ViewId(2);
+    drawing.sheets[0].view_mut(top).unwrap().show_centerlines = true;
+    // The lines of one centermark (the first circle of its centre; a hole and
+    // its fillet edge share one): (style, distances of its ends from the centre).
+    let mark = |d: &Drawing| -> Vec<(LineStyle, f64, f64)> {
+        let b = render_sheet(d, 0, &sources, &cache, false).unwrap();
+        let pick = b.picks.iter().position(|p| matches!(p, PickTarget::AutoCentermark { view, .. } if *view == top)).unwrap() as u32;
+        let per_circle = if d.props.view_tab.centermark_extended { 6 } else { 2 };
+        let lines: Vec<_> = b.geometry.lines.iter().filter(|l| l.pick == pick).take(per_circle).collect();
+        let c = lines[0].points.iter().fold([0.0, 0.0], |s, p| [s[0] + p[0] / 2.0, s[1] + p[1] / 2.0]);
+        let dist = |p: &[f64; 2]| ((p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2)).sqrt();
+        lines.iter().map(|l| (l.style, dist(&l.points[0]), dist(&l.points[1]))).collect()
+    };
+    let inch = 25.4;
+    let lines = mark(&drawing);
+    assert_eq!(lines.len(), 6, "{lines:?}");
+    let cross: Vec<_> = lines.iter().filter(|l| l.0 == LineStyle::Thin).collect();
+    assert_eq!(cross.len(), 2);
+    assert!(cross.iter().all(|l| (l.1 - 0.045 * inch).abs() < 1e-9 && (l.2 - 0.045 * inch).abs() < 1e-9), "{cross:?}");
+    let ext: Vec<_> = lines.iter().filter(|l| l.0 == LineStyle::Centerline).collect();
+    assert_eq!(ext.len(), 4);
+    let r = ext[0].2 - ext[0].1;
+    assert!(ext.iter().all(|l| (l.1 - 0.09 * inch).abs() < 1e-9 && (l.2 - (r + 0.09 * inch)).abs() < 1e-9), "{ext:?}");
+    // Mark 0.2 in, Gap 0.1 in: cross ±0.245, lines from 0.39 to r + 0.39.
+    drawing.props.view_tab.centermark_mark_size = 0.2 * inch;
+    drawing.props.view_tab.centermark_gap_size = 0.1 * inch;
+    let lines = mark(&drawing);
+    assert!(lines.iter().filter(|l| l.0 == LineStyle::Thin).all(|l| (l.2 - 0.245 * inch).abs() < 1e-9));
+    assert!(lines.iter().filter(|l| l.0 == LineStyle::Centerline).all(|l| (l.1 - 0.39 * inch).abs() < 1e-9 && (l.2 - (r + 0.39 * inch)).abs() < 1e-9));
+    // ☐ Extended lines: only the cross.
+    drawing.props.view_tab.centermark_extended = false;
+    let lines = mark(&drawing);
+    assert_eq!(lines.len(), 2);
+    assert!(lines.iter().all(|l| l.0 == LineStyle::Thin));
+}

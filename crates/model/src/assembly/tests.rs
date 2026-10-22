@@ -3050,3 +3050,36 @@ fn fastened_offset_rotates_about_x_by_default() {
     assert_eq!(Mate::new(MateId(2), "Revolute 1".into(), MateType::Revolute, c(1), c(2)).rotation_axis, 2);
 }
 
+
+/// ANSI tapping screws (ASME B18.6.4): every tip type regenerates (live's
+/// component geometry: cones, blunt points, the D / G slots, the F flutes
+/// and the BT / T quarter cut), and the BT cut's sphere has live's radius
+/// (#8: c = (3L² − D²)/4L, R = L − c = 0.0883 in for L = 0.111, D = 0.164).
+#[test]
+fn tapping_screw_tips_regenerate() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Flat countersunk trim head tapping screw").expect("tapping screws in the catalogue");
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("#8-#6");
+    let tips: Vec<String> = c.params.iter().find(|p| p.label == "Tip type").unwrap().options.clone();
+    assert_eq!(tips, ["A", "AB", "B", "BF", "BP", "BT", "C", "D", "F", "G", "T"]);
+    for tip in &tips {
+        spec.params.insert("Tip type".into(), tip.clone());
+        spec.params.remove("Threads/inch");
+        spec.fix_length();
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("tip {tip}: {e}"));
+        let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
+        assert!(failed.is_empty(), "tip {tip}: {failed:?}");
+        let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        assert!(body.shape.volume().unwrap() > 0.0, "tip {tip}");
+        if tip == "BT" {
+            let radii: Vec<f64> = (0..body.faces.len())
+                .filter_map(|i| match body.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_surface().ok()? {
+                    noshape_kernel::Surface::Sphere { radius, .. } => Some(radius / 0.0254),
+                    _ => None,
+                })
+                .collect();
+            assert!(radii.iter().any(|r| (r - 0.0883).abs() < 5e-4), "BT sphere radius (in): {radii:?}");
+        }
+    }
+}

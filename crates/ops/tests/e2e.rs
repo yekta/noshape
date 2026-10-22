@@ -1148,6 +1148,19 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(kind_of(&mut ctx, o["annotation"].as_u64().unwrap()), "OrdinateGroup");
     assert!(last(&mut ctx).ends_with(":: Add to ordinate group"));
 
+    // Max/min: the hole's far side to the edge's end.
+    let mm = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "max_min", "picks": [[cx + r, cy], a0], "place": [cx, cy - 25.0] }));
+    assert_eq!(kind_of(&mut ctx, mm["annotation"].as_u64().unwrap()), "MaxMinDimension");
+    assert!(last(&mut ctx).ends_with(":: Maximum / minimum dimension"), "{}", last(&mut ctx));
+
+    let cm = call(&mut ctx, "drawing_centermark", json!({ "drawing": tab, "holes": [[cx - r, cy]] }));
+    assert_eq!(kind_of(&mut ctx, cm["annotations"][0].as_u64().unwrap()), "Centermark");
+    assert!(last(&mut ctx).ends_with(":: Centermark"));
+
+    let nt = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "BREAK ALL EDGES", "position": [40, 40], "leader": a0 }));
+    assert_eq!(kind_of(&mut ctx, nt["annotation"].as_u64().unwrap()), "Note");
+    assert!(last(&mut ctx).ends_with(":: Note"));
+
     let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
     assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));

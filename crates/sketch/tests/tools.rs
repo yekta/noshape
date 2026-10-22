@@ -255,3 +255,29 @@ fn patterns_transform_and_external() {
     // a non-external point cannot pierce
     assert!(sk.add_constraint(ConstraintKind::Pierce { point: q, target: p }).is_err());
 }
+
+/// SK5 (live, qa5 sketch tools): 30.089 × 22.065 rectangle, top-right
+/// fillet R5 changed to R3. The top line keeps its R5-trimmed length, the
+/// right edge moves 2 mm in: edges top 25.089, bottom 28.089, left 22.065,
+/// right 19.065.
+#[test]
+fn fillet_radius_change_moves_like_onshape() {
+    let mut sk = Sketch::new();
+    let r = sk.corner_rectangle(v(0.0, 0.0), v(0.030089, 0.022065));
+    let res = sk.fillet_corner(r.points[2], 0.005).unwrap();
+    let arc = res.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Arc)).unwrap();
+    assert!(sk.solve().is_solved());
+    let dim = sk.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).unwrap().id;
+    sk.set_dimension_value(dim, 0.003).unwrap();
+    let opts = sk.dimension_edit_options(dim);
+    assert!(sk.solve_with(&opts).is_solved());
+    let len = |l: EntityId| {
+        let c = sk.curve(l).unwrap();
+        (c.end_point() - c.start_point()).length() * 1000.0
+    };
+    let [bottom, right, top, left] = [r.curves[0], r.curves[1], r.curves[2], r.curves[3]];
+    for (l, want) in [(top, 25.089), (bottom, 28.089), (left, 22.065), (right, 19.065)] {
+        assert!(close(len(l), want, 1e-6), "{l:?}: {} vs {want}", len(l));
+    }
+    assert!((sk.point(r.points[0]).unwrap()).length() < 1e-12, "the far corner stays");
+}

@@ -103,3 +103,11 @@ Pass 6 (17:11) had found D5 fixed (d starts Dimension after Esc).
 Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 ✅ confirmed.
 | D8 balloon on an isometric-view cylinder | "----" | ✗ still |
 | D16 Sheet1 chip over Insert view title | gone | ✅ **fixed** |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| D8 balloon on an isometric-view cylinder | not re-run (the "qa5 assembly" doc is gone) | – |
+
+## Re-run pass 14 (2026-10-22, main aa75fdf, app /tmp/qa5/noshape-0503; doc rebuilt: /tmp/qa5/d14/asm.noshape via /root/qa5-scratch/pass14/mkasm2.py = mkasm + plate fixed, block, shaft)
+| Row | Ours | Status |
+|---|---|---|
+| D8 Callout on an assembly part in the iso view with a BOM table (Create Drawing › ANSI_A_MM, Suggested views; BOM table top right) | balloon shows the BOM item number "2" (p08, p09) | ✅ **fixed** |

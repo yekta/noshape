@@ -1209,10 +1209,21 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         continue;
                     }
                     let view_pick = picks.id(PickTarget::AutoCentermark { view: v.id, center: key });
-                    // Construction geometry › Centermarks: the arms pass the circle by the extension.
-                    let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r) * 1.15 + vt.centermark_extension);
-                    g.lines.push(Polyline2 { points: vec![[c[0] - ux[0] * r, c[1] - ux[1] * r], [c[0] + ux[0] * r, c[1] + ux[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });
-                    g.lines.push(Polyline2 { points: vec![[c[0] - uy[0] * r, c[1] - uy[1] * r], [c[0] + uy[0] * r, c[1] + uy[1] * r]], style: LineStyle::Centerline, closed: false, pick: view_pick });
+                    // Construction geometry › Centermarks (live asb 10-22 b): Onshape adds
+                    // 0.045 in to Mark size (a) and Gap size (g); a continuous cross ±a,
+                    // then ☑ Extended lines: four center lines from a + g to r + a + g.
+                    const HIDDEN: f64 = 0.045 * 25.4;
+                    let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r));
+                    let (a, gap) = (vt.centermark_mark_size + HIDDEN, vt.centermark_gap_size + HIDDEN);
+                    let at = |u: [f64; 2], t: f64| [c[0] + u[0] * t, c[1] + u[1] * t];
+                    for u in [ux, uy] {
+                        g.lines.push(Polyline2 { points: vec![at(u, -a), at(u, a)], style: LineStyle::Thin, closed: false, pick: view_pick });
+                    }
+                    if vt.centermark_extended {
+                        for u in [ux, uy, [-ux[0], -ux[1]], [-uy[0], -uy[1]]] {
+                            g.lines.push(Polyline2 { points: vec![at(u, a + gap), at(u, r + a + gap)], style: LineStyle::Centerline, closed: false, pick: view_pick });
+                        }
+                    }
                 }
                 g.cad_since(mark, CadLayer::Centermarks);
                 if let Some(c) = vt.centermark_color {

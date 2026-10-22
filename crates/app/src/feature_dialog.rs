@@ -2987,6 +2987,9 @@ impl Render for FeatureDialog {
         let status = self.status.clone();
         // Onshape: the title turns red while the feature is invalid.
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error));
+        // Live (qa5 BOOL4b): an Add with an empty merge scope can still be
+        // accepted (✓ enabled), and fails once it is.
+        let blocked = invalid && !status.as_ref().is_some_and(|s| s.1 == "No merge scope selected.");
         let title_color = if invalid { pal.text_invalid } else { pal.text };
         let name = noshape_model::interaction::display_name_computed(&self.feature, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&self.feature, k, &self.units, &self.variables)));
         // Live (dom/dialog-hole.txt, dialog-variable.txt): a name built from
@@ -3109,7 +3112,7 @@ impl Render for FeatureDialog {
                             .tab_stop(false)
                             .custom(
                                 gpui_kit::component::button::ButtonCustomVariant::new(cx)
-                                    .color(if invalid { gpui_kit::rgb(0xcce9cc).into() } else { pal.accept.into() })
+                                    .color(if blocked { gpui_kit::rgb(0xcce9cc).into() } else { pal.accept.into() })
                                     .hover(gpui_kit::rgb(0x74ce3a).into())
                                     .active(pal.accept.into())
                                     .shadow(false),
@@ -3120,7 +3123,7 @@ impl Render for FeatureDialog {
                             .h(px(28.))
                             .p_0()
                             .rounded(px(0.))
-                            .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
+                            .bg(if blocked { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
                             // Live (dom/cursors.txt): ✓ and ✗ show the default arrow
                             // (`.ns-dialog-button-ok/-cancel`), enabled or not.
                             .cursor(CursorStyle::Arrow)
@@ -3129,7 +3132,7 @@ impl Render for FeatureDialog {
                             // Onshape: the ✓ is disabled while the feature errors
                             // (Enter still commits it).
                             .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
-                                if !invalid {
+                                if !blocked {
                                     cx.emit(DialogEvent::Accept { repeat: false })
                                 }
                             })),

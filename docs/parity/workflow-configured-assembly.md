@@ -44,3 +44,8 @@ Side by side, Change configuration at the same spot (/root/ui-scratch/shots/ca3-
 
 The pixels match to within 1 level. In live the model shows through just as faintly whenever a dialog covers it; cf-052 only
 happens to have empty space behind the dialog. ✅ **CA3 closed** (no change).
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| Row | Ours | Status |
+|---|---|---|
+| CA4 "30" + Tab | "30 mm", focus moves to List 2 | ✅ **fixed** (c24); a value saved by the old binary still shows "25" without unit (legacy data) |

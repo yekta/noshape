@@ -213,7 +213,8 @@ impl Render for ReleasePrefsView {
                     )
                     // Live (prefs/05): [Add material library…] under the table
                     // opens the "Add material library" modal.
-                    .child(h_flex().mt(px(12.)).child(crate::os_ui::secondary_button("matlib-add-library", "Add material library…", cx).on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
+                    // Live 1902: a primary (blue) button, 34 px under the last row.
+                    .child(h_flex().mt(px(34.)).mb(px(38.)).child(crate::os_ui::primary_button("matlib-add-library", "Add material library…").on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
                         let view = cx.entity();
                         crate::material_libraries::open(move |_, _, cx| view.update(cx, |_, cx| cx.notify()), window, cx);
                     })))),

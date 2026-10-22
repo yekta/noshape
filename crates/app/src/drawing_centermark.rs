@@ -13,13 +13,7 @@ use gpui_kit::*;
 use noshape_model::drawing::*;
 
 /// A circle picked for a circular / linear centermark.
-#[derive(Clone, Debug)]
-pub struct CmCircle {
-    pub view: ViewId,
-    pub center: [f64; 2],
-    pub radius: f64,
-    pub r: Option<PointRef>,
-}
+pub use noshape_scene::drawing_tools::CmCircle;
 
 /// Centermark dialog state.
 #[derive(Clone, Debug)]
@@ -56,9 +50,8 @@ impl DrawingEditor {
         let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(self.cursor) else { return true };
         if mode == 0 {
             let id = self.current_sheet().next_annotation_id();
-            let refs = r.map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default();
-            let c = self.cursor;
-            self.edit_sheet("Centermark", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centermark { view, center, size: radius * 1.25, angle: 0.0, arms: [0.0; 4] }, position: c, refs, ..Default::default() }));
+            let (c, mark) = (self.cursor, CmCircle { view, center, radius, r });
+            self.edit_sheet("Centermark", cx, |s| s.annotations.push(noshape_scene::drawing_tools::centermark(id, &mark, c)));
             return true;
         }
         if let Some(d) = &mut self.centermark_dlg {
@@ -86,52 +79,9 @@ impl DrawingEditor {
         if d.picks.is_empty() {
             return;
         }
-        let view = d.picks[0].view;
-        let centers: Vec<[f64; 2]> = d.picks.iter().map(|p| p.center).collect();
         let pos = self.cursor;
-        let mut new: Vec<(AnnotationKind, Vec<AnnotationRef>)> = Vec::new();
-        let mark = |c: &CmCircle, angle: f64| (AnnotationKind::Centermark { view, center: c.center, size: c.radius * 1.25, angle, arms: [0.0; 4] }, c.r.clone().map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default());
-        if d.mode == 1 {
-            // Pattern center: the circle through the first three centers (or the mean).
-            let pc = match centers.len() {
-                0 => return,
-                1 | 2 => {
-                    let n = centers.len() as f64;
-                    centers.iter().fold([0.0, 0.0], |a, c| [a[0] + c[0] / n, a[1] + c[1] / n])
-                }
-                _ => AnnotationKind::circle_centerline(&centers[..3]).map(|(c, _)| c).unwrap_or(centers[0]),
-            };
-            for c in &d.picks {
-                let angle = if d.pattern { (c.center[1] - pc[1]).atan2(c.center[0] - pc[0]) } else { 0.0 };
-                new.push(mark(c, angle));
-                if d.radial_lines {
-                    new.push((AnnotationKind::Centerline { view, a: pc, b: c.center }, vec![]));
-                }
-            }
-            if d.bolt_circle && centers.len() >= 2 {
-                // Through three hole centers (associative), else center + a hole.
-                let (pts, refs): (Vec<[f64; 2]>, Vec<AnnotationRef>) = if centers.len() >= 3 {
-                    (centers[..3].to_vec(), d.picks[..3].iter().enumerate().filter_map(|(k, p)| p.r.clone().map(|point| AnnotationRef { slot: k as u8, point })).collect())
-                } else {
-                    (vec![pc, centers[0]], vec![])
-                };
-                new.push((AnnotationKind::CircleCenterline { view, points: pts }, refs));
-            }
-            if d.reference_center {
-                let s = d.picks.iter().map(|p| p.radius).fold(f64::MAX, f64::min) * 0.6;
-                new.push((AnnotationKind::Centermark { view, center: pc, size: s, angle: 0.0, arms: [0.0; 4] }, vec![]));
-            }
-        } else {
-            for c in &d.picks {
-                new.push(mark(c, 0.0));
-            }
-            if d.connecting {
-                for w in d.picks.windows(2) {
-                    new.push((AnnotationKind::Centerline { view, a: w[0].center, b: w[1].center }, vec![]));
-                }
-            }
-        }
-        let name = if d.mode == 1 { "Circular centermark" } else { "Linear centermark" };
+        let opts = noshape_scene::drawing_tools::CentermarkOpts { mode: d.mode, reference_center: d.reference_center, bolt_circle: d.bolt_circle, radial_lines: d.radial_lines, pattern: d.pattern, connecting: d.connecting };
+        let (new, name) = noshape_scene::drawing_tools::centermark_set(&d.picks, &opts);
         self.edit_sheet(name, cx, |s| {
             for (kind, refs) in new {
                 let id = s.next_annotation_id();

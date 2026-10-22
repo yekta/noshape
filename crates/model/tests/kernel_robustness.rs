@@ -1125,25 +1125,32 @@ fn chamfer_and_shell_on_filleted_box_match_onshape() {
     assert!(g.bad.is_empty(), "{}", g.bad.join("\n"));
 }
 
-/// The rest of live G46 / G50 (kern, in progress): Onshape's 1 mm shell after
-/// the 2 mm chamfer (6052.70 mm³; ours 6053.88: the patch's offset differs),
-/// the reordered model's rim triangle at 1 mm (Onshape 20 faces: one flat
-/// 0.0858 mm² triangle where we make two sloped faces) and its failure from
-/// 2.06 mm (Onshape: 2.05 works).
+/// Live G50 / G51: the chamfer-then-fillet box shelled: one flat rim
+/// triangle (20 faces), and Onshape's failure band from 2.053 mm up to the
+/// fillet radius (2.05 works, 3 works again).
 #[test]
-#[ignore = "kern: shell offsets at the chamfer/fillet corner (live G50)"]
-fn shell_details_match_onshape() {
+fn chamfer_then_fillet_shell_matches_onshape() {
+    let mut g = G46 { bad: Vec::new() };
+    let t = g.chamfer_first();
+    g.shell(&t, "1 mm", Ok((5990.519587, 20)), 0.02, "after chamfer + fillet");
+    g.shell(&t, "2.05 mm", Ok((11601.0764818, 20)), 0.02, "after chamfer + fillet");
+    g.shell(&t, "2.06 mm", Err("Could not shell part with selections."), 0.0, "after chamfer + fillet");
+    g.shell(&t, "2.5 mm", Err("Could not shell part with selections."), 0.0, "after chamfer + fillet");
+    assert!(g.bad.is_empty(), "{}", g.bad.join("\n"));
+}
+
+/// Live G50: Onshape's 1 mm shell after the 2 mm chamfer is 6052.70 mm³ (its
+/// error bars ±~3); ours 6053.88: the offset of the blend patch differs
+/// (inner patch 3.891 vs 4.189 mm²).
+#[test]
+#[ignore = "kern: the offset of the chamfer's blend patch (live G50)"]
+fn shell_after_chamfer_patch_matches_onshape() {
     let mut g = G46 { bad: Vec::new() };
     let base = g.filleted();
     let mut t = base.fork();
     let c_edge = t.edges_where(G46::corner);
     t.chamfer(c_edge, "2 mm");
     g.shell(&t, "1 mm", Ok((6052.696796, 21)), 0.3, "after fillet + chamfer 2");
-    let t = g.chamfer_first();
-    g.shell(&t, "1 mm", Ok((5990.519587, 20)), 0.02, "after chamfer + fillet");
-    g.shell(&t, "2.05 mm", Ok((11601.0764818, 20)), 0.02, "after chamfer + fillet");
-    g.shell(&t, "2.06 mm", Err("Could not shell part with selections."), 0.0, "after chamfer + fillet");
-    g.shell(&t, "2.5 mm", Err("Could not shell part with selections."), 0.0, "after chamfer + fillet");
     assert!(g.bad.is_empty(), "{}", g.bad.join("\n"));
 }
 

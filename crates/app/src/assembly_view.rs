@@ -3776,7 +3776,7 @@ impl AssemblyView {
                         // itself carries .58, so .86 here.
                         Button::new(id).ghost().child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))).opacity(0.86).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
                     } else {
-                        Button::new(id).ghost().child(svg().path(icon_path("dialog-cancel")).size(px(18.)).text_color(pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
+                        Button::new(id).ghost().child(svg().path(icon_path("dialog-cancel")).size(px(24.)).text_color(pal.cancel)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(close)
                     }),
             )
             .child(body)
@@ -3931,7 +3931,7 @@ impl AssemblyView {
                             .bg(gpui_kit::white())
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip("Cancel"))
-                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_mate(window, cx))),
                     ),
             )
@@ -4365,7 +4365,7 @@ impl AssemblyView {
                             .child(crate::ui::glyph("check", 18., gpui_kit::white()))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))),
                     )
-                    .child(Button::new("insert-close").ghost().cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))))
+                    .child(Button::new("insert-close").ghost().cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))))
                     .into_any_element()
     }
 
@@ -4443,7 +4443,7 @@ impl AssemblyView {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.relation = None;
                                 cx.notify();
@@ -5342,6 +5342,15 @@ impl Render for AssemblyView {
 mod tests {
     use super::feature_row_color;
     use crate::theme::p;
+
+    /// qa5 MT7: the mate angle reads as live ("0°" at 0, three decimals otherwise).
+    #[test]
+    fn mate_angle_labels_trim_zeros() {
+        use super::behaviors::mate_angle_label;
+        assert_eq!(mate_angle_label(0.0), "0");
+        assert_eq!(mate_angle_label(275.326), "275.326");
+        assert_eq!(mate_angle_label(90.5), "90.5");
+    }
 
     /// qa5 A3: new mates are hidden, and hidden rows are listed in grey.
     #[test]

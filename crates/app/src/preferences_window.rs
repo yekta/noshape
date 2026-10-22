@@ -40,7 +40,7 @@ const CHIP_BORDER: u32 = 0xaaaaaa;
 // ----------------------------------------------------------------- prefs
 
 /// Part Studio / Assembly settings of the page.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListPrefs {
     /// "Display parts list properties" (Part Studio parts list).
@@ -52,6 +52,27 @@ pub struct ListPrefs {
     /// Drawings › "Background color of model space": Light view (default Dark).
     #[serde(default)]
     pub drawing_light_model_space: bool,
+    /// Language › Display language (an `i18n::LANGUAGES` code; None: English).
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Theming › Dark mode.
+    #[serde(default)]
+    pub dark_mode: bool,
+    /// Onshape Labs, accepted in its consent dialog, and its FeatureScript
+    /// Co-complete feature (the Feature Studio switch's default).
+    #[serde(default)]
+    pub labs: bool,
+    #[serde(default)]
+    pub labs_co_complete: bool,
+    /// Environment profile settings: the user's profiles (the default one is
+    /// implicit) and the selected one (None: "Onshape (default)").
+    #[serde(default)]
+    pub env_profiles: Vec<crate::prefs_general::EnvProfile>,
+    #[serde(default)]
+    pub env_profile: Option<String>,
+    /// User export rules, in creation order.
+    #[serde(default)]
+    pub export_rules: Vec<noshape_model::export_rules::ExportRule>,
 }
 
 fn list_prefs_path() -> std::path::PathBuf {
@@ -204,6 +225,11 @@ pub struct PreferencesView {
     units: Entity<crate::units_prefs::UnitsPrefsView>,
     /// Decimal format section (units_prefs.rs).
     decimal: Entity<crate::units_prefs::DecimalPrefsView>,
+    language: Entity<crate::prefs_general::LanguagePrefsView>,
+    theming: Entity<crate::prefs_general::ThemingPrefsView>,
+    env_profile: Entity<crate::prefs_general::EnvProfilePrefsView>,
+    labs: Entity<crate::prefs_general::LabsPrefsView>,
+    export_rules: Entity<crate::prefs_export_rules::ExportRulesPrefsView>,
     /// Drawings section (drawing_prefs.rs).
     drawings: Entity<crate::drawing_prefs::DrawingPrefsView>,
     _subs: Vec<Subscription>,
@@ -229,7 +255,7 @@ impl PreferencesView {
             focus: cx.focus_handle(),
             page,
             scroll: ScrollHandle::new(),
-            saved,
+            saved: saved.clone(),
             edited: saved,
             tab: Tab::General,
             list_scroll: ScrollHandle::new(),
@@ -247,6 +273,11 @@ impl PreferencesView {
             mouse: cx.new(|_| crate::mouse_prefs::MousePrefsView::new()),
             units: cx.new(|_| crate::units_prefs::UnitsPrefsView::new()),
             decimal: cx.new(|_| crate::units_prefs::DecimalPrefsView::default()),
+            language: cx.new(|_| crate::prefs_general::LanguagePrefsView::default()),
+            theming: cx.new(|_| crate::prefs_general::ThemingPrefsView::default()),
+            env_profile: cx.new(|_| crate::prefs_general::EnvProfilePrefsView::default()),
+            labs: cx.new(|_| crate::prefs_general::LabsPrefsView),
+            export_rules: cx.new(|_| crate::prefs_export_rules::ExportRulesPrefsView),
             drawings: cx.new(|_| crate::drawing_prefs::DrawingPrefsView::new()),
             _subs: subs,
         };
@@ -409,7 +440,7 @@ impl PreferencesView {
     }
 
     /// A section heading: 18 px / 500 over a 1 px `#333` rule.
-    fn heading(title: &'static str, extra: Option<AnyElement>) -> Div {
+    pub(crate) fn heading(title: impl Into<SharedString>, extra: Option<AnyElement>) -> Div {
         let pal = p();
         v_flex().child(
             h_flex()
@@ -418,7 +449,7 @@ impl PreferencesView {
                 .gap(px(6.))
                 .border_b_1()
                 .border_color(pal.text)
-                .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
+                .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title.into()))
                 .children(extra),
         )
     }
@@ -450,7 +481,7 @@ impl PreferencesView {
     }
 
     /// "Save … settings": Onshape's primary button, faded until changed.
-    fn save_button(id: &'static str, label: &'static str, enabled: bool) -> Stateful<Div> {
+    pub(crate) fn save_button(id: &'static str, label: impl Into<SharedString>, enabled: bool) -> Stateful<Div> {
         let pal = p();
         div()
             .id(id)
@@ -463,7 +494,7 @@ impl PreferencesView {
             .text_size(px(14.))
             .text_color(rgb(0xffffff))
             .when(enabled, |d| d.cursor_pointer().hover(|d| d.bg(pal.accent_hover)))
-            .child(label)
+            .child(label.into())
     }
 
     fn render_list_settings(&self, cx: &mut Context<Self>) -> (AnyElement, AnyElement) {
@@ -898,7 +929,7 @@ impl PreferencesView {
             .into_any_element()
     }
 
-    fn checkbox_box(on: bool) -> Div {
+    pub(crate) fn checkbox_box(on: bool) -> Div {
         div()
             .size(px(13.))
             .flex_none()
@@ -1007,8 +1038,8 @@ impl Render for PreferencesView {
         let pal = p();
         crate::assets::set_scale_factor(window.scale_factor());
         if self.scroll_to_shortcuts {
-            // The sections are the scroll area's children: Keyboard shortcuts is the sixth.
-            match self.scroll.bounds_for_item(5) {
+            // The sections are the scroll area's children: Keyboard shortcuts is the ninth.
+            match self.scroll.bounds_for_item(8) {
                 Some(section) if self.page != Page::Profile => {
                     let off = self.scroll.offset();
                     let top = section.top() - self.scroll.bounds().top() - off.y;
@@ -1020,19 +1051,38 @@ impl Render for PreferencesView {
             }
         }
         if self.scroll_to_end {
-            let max = self.scroll.max_offset().y;
-            if max > px(0.) {
-                self.scroll.set_offset(point(px(0.), -max));
-                self.scroll_to_end = false;
-            } else {
-                window.request_animation_frame();
-            }
+            // User export rules is the 13th section (live: `focusView=export-rules`).
+            match self.scroll.bounds_for_item(12) {
+                Some(section) if self.page != Page::Profile => {
+                    let off = self.scroll.offset();
+                    let top = section.top() - self.scroll.bounds().top() - off.y;
+                    let y = top.min(self.scroll.max_offset().y).max(px(0.));
+                    self.scroll.set_offset(point(off.x, -y));
+                    self.scroll_to_end = false;
+                }
+                _ => window.request_animation_frame(),
         }
         let content: Vec<AnyElement> = if self.page == Page::Profile {
             vec![self.render_profile(cx)]
         } else {
             let (ps, asm) = self.render_list_settings(cx);
-            vec![self.decimal.clone().into_any_element(), self.units.clone().into_any_element(), self.mouse.clone().into_any_element(), ps, asm, self.render_shortcuts(window, cx), self.render_toolbars(cx), self.drawings.clone().into_any_element(), self.release.clone().into_any_element()]
+            // Live's order (behaviours "My account › Preferences, full page").
+            vec![
+                self.language.clone().into_any_element(),
+                self.theming.clone().into_any_element(),
+                self.decimal.clone().into_any_element(),
+                self.units.clone().into_any_element(),
+                self.mouse.clone().into_any_element(),
+                self.env_profile.clone().into_any_element(),
+                ps,
+                asm,
+                self.render_shortcuts(window, cx),
+                self.render_toolbars(cx),
+                self.drawings.clone().into_any_element(),
+                self.release.clone().into_any_element(),
+                self.export_rules.clone().into_any_element(),
+                self.labs.clone().into_any_element(),
+            ]
         };
         v_flex()
             .size_full()
@@ -1041,6 +1091,7 @@ impl Render for PreferencesView {
             .key_context(CONTEXT)
             .track_focus(&self.focus)
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
+            .relative()
             .child(self.render_title_bar(cx))
             .child(self.render_header())
             .child(
@@ -1066,6 +1117,7 @@ impl Render for PreferencesView {
                             .vertical_scrollbar(&self.scroll),
                     ),
             )
+            .children(crate::prefs_general::toast_overlay(cx))
     }
 }
 

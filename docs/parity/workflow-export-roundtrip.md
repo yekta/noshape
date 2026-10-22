@@ -31,3 +31,9 @@ Status: ✅ exact / expected, ✗ broken, ? live comparison pending.
 | Row | Ours | Status |
 |---|---|---|
 | EXP1 Rhino | export_failed "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT (scripts/build-opennurbs.sh)" | ✗ still (the engine build has no openNURBS) |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| EXP1 Rhino | "Rhino export needs openNURBS" | ✗ still |
+
+## Re-run pass 15 (2026-10-22, CLI /tmp/qa5/noshape-cli-0521 = target-engine 05:21; main still aa75fdf)
+CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS. ✗ still.
