@@ -1049,7 +1049,7 @@ impl DrawingEditor {
                     self.datum_placed(window, cx);
                 }
             }
-            Tool::SurfaceFinish => self.open_surface_finish_panel(None, c, "Ra 3.2", window, cx),
+            Tool::SurfaceFinish => self.open_surface_finish_panel(None, c, noshape_scene::drawing_tools::SURFACE_FINISH_DEFAULT, window, cx),
             _ => return false,
         }
         true
@@ -2049,7 +2049,7 @@ impl DrawingEditor {
                     }),
                     None => {
                         let id = self.current_sheet().next_annotation_id();
-                        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: pos, value, leaders: Vec::new() }, position: pos, ..Default::default() }));
+                        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(noshape_scene::drawing_tools::surface_finish(id, pos, value)));
                         self.tool = Tool::Select;
                     }
                 }
