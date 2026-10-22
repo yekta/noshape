@@ -48,6 +48,7 @@
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <BRepOffset_MakeOffset.hxx>
+#include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
@@ -1788,6 +1789,135 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
 
 } // namespace
 
+// A fillet wider than the faces it rolls on, which OCCT can't build (live
+// "fail preview 2": 50 mm on a top edge of a 40 x 30 x 20 mm block). Onshape
+// regenerates it as the part cut by the ball's sweep: the section between the
+// edge, its tangent points on the two planes and the ball's centre, less the
+// ball, along the edge (24000 -> 7458.6158 mm3, matched exactly; where OCCT
+// can build the fillet, the same solid as OCCT's). Only straight convex edges
+// between two planes, each end closed by a plane square to the edge, no two
+// edges sharing a vertex. Null when it doesn't apply.
+std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
+                                                            const std::vector<double>& rs)
+{
+  ShapeAncMap e2f, v2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  TopExp::MapShapesAndAncestors(input, TopAbs_VERTEX, TopAbs_FACE, v2f);
+  // A planar face's outward normal.
+  auto outward = [](const TopoDS_Face& f, gp_Vec& n) {
+    BRepAdaptor_Surface a(f, false);
+    if (a.GetType() != GeomAbs_Plane)
+      return false;
+    gp_Dir d = a.Plane().Axis().Direction();
+    if (!a.Plane().Position().Direct())
+      d.Reverse();
+    if (f.Orientation() == TopAbs_REVERSED)
+      d.Reverse();
+    n = gp_Vec(d);
+    return true;
+  };
+  ShapeIMap                 used;
+  ShapeList                 tools;
+  // Per edge: the ball's axis (a point and the edge's direction) and radius.
+  std::vector<std::pair<gp_Ax1, double>> balls;
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const TopoDS_Edge& E = es[i];
+    const double       r = rs.size() == 1 ? rs[0] : rs[i];
+    BRepAdaptor_Curve  c(E);
+    const ShapeList*   fl = e2f.Seek(E);
+    if (c.GetType() != GeomAbs_Line || fl == nullptr || fl->Extent() != 2)
+      return std::nullopt;
+    const TopoDS_Face f1 = TopoDS::Face(fl->First()), f2 = TopoDS::Face(fl->Last());
+    gp_Vec            n1, n2;
+    if (f1.IsSame(f2) || !outward(f1, n1) || !outward(f2, n2))
+      return std::nullopt;
+    // Convex: (n1 x n2) . t > 0, t the edge's direction as face 1 runs it.
+    TopoDS_Edge in1;
+    for (TopExp_Explorer x(f1, TopAbs_EDGE); x.More(); x.Next())
+      if (x.Current().IsSame(E))
+        in1 = TopoDS::Edge(x.Current());
+    if (in1.IsNull())
+      return std::nullopt;
+    TopoDS_Vertex va, vb;
+    TopExp::Vertices(in1, va, vb, true);
+    if (va.IsNull() || vb.IsNull() || va.IsSame(vb) || used.Contains(va) || used.Contains(vb))
+      return std::nullopt;
+    used.Add(va);
+    used.Add(vb);
+    const gp_Pnt a = BRep_Tool::Pnt(va), b = BRep_Tool::Pnt(vb);
+    const gp_Vec t(a, b);
+    const double L = t.Magnitude();
+    if (L < Precision::Confusion() || n1.Crossed(n2).Dot(t) <= 1e-9 * L)
+      return std::nullopt;
+    const gp_Vec u = t / L;
+    // Each end: three faces, the third a plane square to the edge.
+    for (const TopoDS_Vertex& v : {va, vb})
+    {
+      const ShapeList* at = v2f.Seek(v);
+      ShapeIMap        faces;
+      if (at != nullptr)
+        for (ShapeList::Iterator it(*at); it.More(); it.Next())
+          faces.Add(it.Value());
+      if (faces.Extent() != 3)
+        return std::nullopt;
+      bool capped = false;
+      for (int k = 1; k <= 3; ++k)
+      {
+        gp_Vec n;
+        capped = capped || (!faces(k).IsSame(f1) && !faces(k).IsSame(f2) && outward(TopoDS::Face(faces(k)), n) && std::abs(std::abs(n.Dot(u)) - 1) < 1e-9);
+      }
+      if (!capped)
+        return std::nullopt;
+    }
+    // The section: edge point, tangent point on face 1, ball centre, on face 2.
+    const double half = std::acos(std::max(-1.0, std::min(1.0, n1.Dot(n2)))) / 2;
+    const gp_Vec bis  = (n1 + n2).Normalized();
+    const gp_Pnt C    = a.Translated(-bis * (r / std::cos(half)));
+    BRepBuilderAPI_MakePolygon sec(a, C.Translated(n1 * r), C, C.Translated(n2 * r), true);
+    if (!sec.IsDone())
+      return std::nullopt;
+    const TopoDS_Shape wedge = BRepPrimAPI_MakePrism(BRepBuilderAPI_MakeFace(sec.Wire(), true).Face(), t).Shape();
+    const TopoDS_Shape ball  = BRepPrimAPI_MakeCylinder(gp_Ax2(C, gp_Dir(u)), r, L).Shape();
+    BRepAlgoAPI_Cut    tool(wedge, ball);
+    if (!tool.IsDone() || tool.HasErrors())
+      return std::nullopt;
+    tools.Append(tool.Shape());
+    balls.emplace_back(gp_Ax1(C, gp_Dir(u)), r);
+  }
+  BRepAlgoAPI_Cut      cut;
+  ShapeList            args;
+  args.Append(input);
+  cut.SetArguments(args);
+  cut.SetTools(tools);
+  cut.Build();
+  if (!cut.IsDone() || cut.HasErrors() || !valid_shape(cut.Shape()))
+    return std::nullopt;
+  HHist h = history_of({input}, cut);
+  // The faces the cut made: from the ball they belong to, generated by its edge.
+  ShapeIMap old;
+  for (TopExp_Explorer f(input, TopAbs_FACE); f.More(); f.Next())
+  {
+    const ShapeList& m = h->Modified(f.Current());
+    for (ShapeList::Iterator it(m); it.More(); it.Next())
+      old.Add(it.Value());
+    if (m.IsEmpty() && !h->IsRemoved(f.Current()))
+      old.Add(f.Current());
+  }
+  for (TopExp_Explorer f(cut.Shape(), TopAbs_FACE); f.More(); f.Next())
+  {
+    if (old.Contains(f.Current()))
+      continue;
+    BRepAdaptor_Surface a(TopoDS::Face(f.Current()), false);
+    if (a.GetType() != GeomAbs_Cylinder)
+      continue;
+    for (size_t i = 0; i < balls.size(); ++i)
+      if (std::abs(a.Cylinder().Radius() - balls[i].second) < 1e-9 * balls[i].second && gp_Lin(balls[i].first).Distance(a.Cylinder().Location()) < 1e-9 * balls[i].second)
+        h->AddGenerated(es[i], f.Current());
+  }
+  return std::make_pair(cut.Shape(), h);
+}
+
 OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked)
 {
@@ -1857,6 +1987,8 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
     if (!checked)
       throw;
     auto past = fillet_past_end_faces(s.shape, es, rs);
+    if (!past)
+      past = fillet_as_cut(s.shape, es, rs);
     if (!past)
       throw;
     return make_result({s.shape}, past->first, past->second.get());
