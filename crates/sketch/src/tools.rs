@@ -247,6 +247,32 @@ impl Sketch {
         }
     }
 
+    /// The parameter interval [`Sketch::trim`] would remove at `pick` (for
+    /// periodic curves `t1` may pass the period end): the Trim tool's hover
+    /// highlights only that piece (live, qa5 sketch tools).
+    pub fn trim_span(&self, id: EntityId, pick: DVec2) -> Option<(f64, f64)> {
+        let c = self.curve(id)?;
+        let tp = c.closest(pick).0;
+        let (a, b) = c.domain();
+        let cuts = self.cuts(id);
+        if c.is_periodic() {
+            let period = b - a;
+            let mut ts: Vec<f64> = cuts.iter().map(|x| a + (x.t - a).rem_euclid(period)).collect();
+            ts.sort_by(f64::total_cmp);
+            if ts.len() < 2 {
+                return Some((a, b));
+            }
+            let lo = ts.iter().rev().find(|t| **t < tp).copied().unwrap_or(*ts.last()?);
+            let hi = ts.iter().find(|t| **t > tp).copied().unwrap_or(ts[0]);
+            return Some(if lo < hi { (lo, hi) } else { (lo, hi + period) });
+        }
+        let eps = 1e-9 * (b - a);
+        let inner: Vec<f64> = cuts.iter().map(|x| x.t).filter(|t| *t > a + eps && *t < b - eps).collect();
+        let lo = inner.iter().rev().find(|t| **t < tp).copied().unwrap_or(a);
+        let hi = inner.iter().find(|t| **t > tp).copied().unwrap_or(b);
+        Some((lo, hi))
+    }
+
     /// Trim: removes the piece of `id` between the intersections around the
     /// picked point (deletes the whole entity if it has no intersections).
     pub fn trim(&mut self, id: EntityId, pick: DVec2) -> Result<EditResult> {
@@ -929,7 +955,14 @@ impl Sketch {
         let mut caps = Vec::new();
         for (items, closed) in self.chains(ids) {
             if items.len() == 1 && !closed {
+                let line = self.kind(items[0].0) == Some(EntityKind::Line);
                 let s = self.slot_around(items[0].0, width)?;
+                if line {
+                    // Live: only the end cap is dimensioned (the offsets tie the rest).
+                    caps.push(s.curves[1]);
+                    curves.extend(s.curves);
+                    continue;
+                }
                 caps.extend(s.curves.iter().copied().filter(|c| self.kind(*c) == Some(EntityKind::Arc) && self.entity(*c).and_then(|e| e.center()).is_some_and(|ctr| self.entity(items[0].0).is_some_and(|x| x.point_refs().contains(&ctr)))));
                 curves.extend(s.curves);
                 continue;

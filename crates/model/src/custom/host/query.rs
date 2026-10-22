@@ -1233,6 +1233,17 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                     }
                 }
             }
+            // Only what operations after `lastOperationId` made or changed:
+            // "entities derived from subquery in features between
+            // startTracking and when query is evaluated" (std feature.fs).
+            // Std Bend tracks its bend edges after copying the bend face;
+            // the untouched copy lies on them too.
+            let last: Vec<Arc<str>> = query.get("lastOperationId").as_array().map(|a| a.iter().filter_map(|c| c.as_str()).collect()).unwrap_or_default();
+            let since = q.st.ops.values().find(|o| !last.is_empty() && o.id == last).map_or(0, |o| o.seq + 1);
+            out.retain(|e| match q.owner(e) {
+                Some(Ent::Body(b)) => q.st.touched.get(&q.st.ctx.bodies[b].id).is_some_and(|s| *s > since),
+                _ => true,
+            });
             uniq(out)
         }
         "HISTORICAL" => Vec::new(),

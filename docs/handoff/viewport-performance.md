@@ -518,3 +518,37 @@ changes. I write the renderer part first (my files) and show crops before touchi
     radius², `performAggressiveCulling`): next item.
   - Fix d8d0955: the chord tolerance scales with quality too (BRepMesh keeps an existing coarser triangulation
     otherwise; "Use best available tessellation" = Very fine, 600 segments).
+- **2026-10-22 16:50 (perf): offscreen suite SIGSEGV, cause and fix.** The intermittent crash (02:50, 16:20; ~1 run in 8
+  under load) is in the Vulkan loader (`libvulkan.so.1`), in wgpu's `set_object_name` while one test thread builds a
+  pipeline and others are in `vkCreateInstance`. Not WGPU_DEBUG (1/8 with `WGPU_DEBUG=0` too); 0/10 with
+  `--test-threads=1`. `crates/render/tests/offscreen.rs` now holds a `GPU` mutex per test (one test on the GPU at a
+  time, ~20 s instead of ~6 s). Other test binaries that create several renderers on parallel threads can hit the same.
+- **Lowest level of detail (a1af5f5):** `renderer.rs` `lod_boxes` = webgl BodyManager `performAggressiveCulling`:
+  boxes (`Instance::lod_box`, the body's bounds in its color, `getDisplayIncrement`) for bodies under
+  `extent_culling_px` (2 px still, 10 px interactive: DEFAULT/AGGRESSIVE_EXTENT_CULLING_THRESHOLD_IN_PIXELS) and the
+  interactive `low_level_body_proportion` share ordered by triangles / r² (`getBenefitToCull`; Onshape uses the
+  server's coarse triangle count, we the displayed mesh's), only under 1% of the viewport diagonal
+  (MAXIMUM_BODY_CULL_DIAMETER_PROPORTION; 7.5% with the "more aggressive culling" capability, not modelled); bodies
+  outside the view count against the share. Pick and depth-sample passes draw full detail. Not done:
+  FULL_DETAIL_OCCURRENCE_REDUCTION_THRESHOLD (over 5000 occurrences, full-detail frames drop silhouettes/SSAO and use
+  the 10 px threshold). At the 1000-pin fit view each pin is ~50 px (> 1% ≈ 14 px), so Onshape boxes none there either.
+- **2026-10-22 18:40 (perf): macOS CI, chord vs angle display mesh** (perf.yml on perf-dev 56a9530, `variants`
+  chord:NOSHAPE_DISPLAY_MESH=chord; runs 39824106798 parts-1000, 39824123076 big-plate; Apple Paravirtual Metal).
+  Presented fps is capped near 20 by the runner (frame interval ~50 ms while the GPU finishes in ~12 ms), and these
+  builds report no GPU timestamps, so the GPU cost is `w.gpu_wait` (orbit, mean / p95):
+
+  | case | chord (old) | angle (Onshape, 144/circle) | mean |
+  |---|---|---|---|
+  | 1000 pins, macOS 14 | 14.2 / 21.9 ms | 19.8 / 27.2 ms | +39% |
+  | 1000 pins, macOS 15 | 12.6 / 18.9 ms | 20.6 / 39.6 ms | +64% |
+  | big plate, macOS 14 | 12.1 / 17.5 ms | 11.8 / 25.1 ms | flat, p95 +43% |
+  | big plate, macOS 15 | 12.0 / 17.5 ms | 10.3 / 21.7 ms | flat, p95 +24% |
+
+  UI-thread CPU per frame < 1 ms in all. The lowest-LOD boxes don't apply at these views (r.lod_boxes 0: pins ~50 px,
+  over 1% of the diagonal). Gating rule applied: `regen::angle_display_mesh()` is off by default (chord mesh),
+  `NOSHAPE_DISPLAY_MESH=angle` or `set_angle_display_mesh(true)` turns it on. To lift the gate: cut the per-triangle
+  GPU cost (each body's mesh is drawn for color, backface silhouettes and depth samples), then rerun both fixtures with
+  `variants` = `angle:NOSHAPE_DISPLAY_MESH=angle`.
+- Kernel side (lead, 18:00): kern is writing a fast planar-face triangulator in the kernel's mesh.cpp (the big plate's
+  two planar faces: 1.65 s of its 2.7 s display mesh in BRepMesh). Display density, LOD and upload stay perf's.
+  Rerun the big-plate fixture on CI when it lands.

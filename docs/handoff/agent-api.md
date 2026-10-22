@@ -636,3 +636,7 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   (drawing_gdt.rs, drawing_extra.rs surface finish, drawing_weld.rs -> scene builders).
   NEXT: those app switches + in-app check; aux view In line / Axis; datum on annotation lines; revision table /
   callout, general / custom tables, hatch, broken-out section, drawing sketch tools, insert image/DXF as ops.
+- 2026-10-22 ~15:45 (api): app switches GD&T / surface finish / weld landed and checked in the app; new ops
+  drawing_revision_table, drawing_revision_callout (+ app switch of drawing_revision.rs, checked in the app).
+  Remaining drawing: aligned/jogged section, broken-out section, crop polygon/spline, aux In line/Axis, hatch,
+  general/custom tables, insert image / DXF, drawing sketch tools, format painter, inspection items, Update.
