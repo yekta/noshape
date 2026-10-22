@@ -487,6 +487,8 @@ pub struct SketchEditor {
     pub pattern_distance: f64,
     pub pattern_angle: f64,
     pub pattern_second_count: usize,
+    /// A count arrow drag: the count and the arrow's position along its direction at the grab.
+    pattern_grab: Option<(usize, f64)>,
     pub pattern_second_distance: f64,
     pub pattern_second_angle: f64,
     pub circular_count: usize,
@@ -548,6 +550,11 @@ pub struct SketchEditor {
     pub conflicting: Vec<ConstraintId>,
     /// World units per pixel at the sketch (for snap radii).
     pub world_per_px: f64,
+    /// Screen to sketch map set by the app on every view change: the sketch
+    /// point under the screen origin and the sketch steps of one pixel right
+    /// and down. Manipulators sit on pixel centres with it (Onshape's crisp
+    /// 2D overlays, live sketch/303).
+    pub screen_map: Option<(DVec2, DVec2, DVec2)>,
     /// The sketch frame (lower-left, upper-right in sketch coordinates),
     /// fixed in the plane once first drawn (see [`Self::place_frame`]).
     pub frame_bounds: Option<(DVec2, DVec2)>,
@@ -643,6 +650,18 @@ const MANIPULATOR_OUTLINE: [u8; 4] = [0x98, 0x9f, 0xa3, 255];
 /// The fillet radius manipulator's stem (live sketch/1934: the arrow starts
 /// at the preview arc's midpoint and points at its centre).
 const FILLET_ARROW_STEM_PX: f64 = 28.0;
+/// Linear pattern manipulators (live sketch/136): a 16 px hollow square at
+/// the first instance, the count arrow's 30 px stem from its edge; labels
+/// ~95 px off diagonally; the spacing dimension 101 px to the side.
+const PATTERN_SQUARE_PX: f64 = 16.0;
+const PATTERN_ARROW_STEM_PX: f64 = 30.0;
+const PATTERN_ARROW_HANDLE_PX: f64 = PATTERN_SQUARE_PX * 0.5 + PATTERN_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX * 0.5;
+const PATTERN_LABEL_PX: f64 = 95.0;
+const PATTERN_DIM_PX: f64 = 101.0;
+/// Polygon side spinner (live sketch/91): 24 px out from the circumference
+/// point, its ◀ / ▶ 15 px either side of the count along the ray.
+const POLYGON_SPINNER_PX: f64 = 24.0;
+pub const POLYGON_SPINNER_ARROW_PX: f64 = 15.0;
 
 /// Onshape's hollow drag arrow (offset, fillet and chamfer manipulators):
 /// `start`, an `stem_px` stem, then the 31 x 23 px head, in `dir`.
@@ -655,6 +674,50 @@ fn push_hollow_arrow(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, d
         wide.push((vec![start, base], color, width));
         wide.push((vec![base + half, apex, base - half, base + half], color, width));
     }
+}
+
+/// A hollow square manipulator (live sketch/136), `side` px, centred on `q`.
+fn push_hollow_square(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, q: DVec2, px: f64, side: f64) {
+    let h = px * side * 0.5;
+    let pts = vec![q + DVec2::new(-h, -h), q + DVec2::new(h, -h), q + DVec2::new(h, h), q + DVec2::new(-h, h), q + DVec2::new(-h, -h)];
+    for (color, width) in [(MANIPULATOR_OUTLINE, 3.0), ([0xff, 0xff, 0xff, 0xff], 1.2)] {
+        wide.push((pts.clone(), color, width));
+    }
+}
+
+/// Text drawn as filled glyphs in the sketch overlay, so it can turn with
+/// a manipulator (gpui text can't rotate): Noto Sans outlines `em_px` high,
+/// centred on `at` with the baseline along `dir`, filled with scanlines.
+fn hatched_text(text: &str, at: DVec2, dir: DVec2, px: f64, em_px: f64) -> Vec<[DVec2; 2]> {
+    let layout = noshape_sketch::text::layout_text(text, "Noto Sans", false, false);
+    // Box units: ascender = 1 (Noto's ascender is 1.069 em).
+    let unit = px * em_px * 1.069;
+    let polys = layout.polylines(8);
+    let (Some(y0), Some(y1)) = (polys.iter().flatten().map(|p| p.y).min_by(f64::total_cmp), polys.iter().flatten().map(|p| p.y).max_by(f64::total_cmp)) else { return Vec::new() };
+    let centre = DVec2::new(layout.width * 0.5, (y0 + y1) * 0.5);
+    let (ux, uy) = (dir, dir.perp());
+    let map = |q: DVec2| at + ux * (q.x - centre.x) * unit + uy * (q.y - centre.y) * unit;
+    let mut out = Vec::new();
+    // Even-odd scanlines every 0.45 px (drawn 1 px wide: solid).
+    let step = 0.45 * px / unit;
+    let mut y = y0 + step * 0.5;
+    while y < y1 {
+        let mut xs: Vec<f64> = Vec::new();
+        for poly in &polys {
+            for w in poly.windows(2) {
+                let (a, b) = (w[0], w[1]);
+                if (a.y <= y) != (b.y <= y) {
+                    xs.push(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x));
+                }
+            }
+        }
+        xs.sort_by(f64::total_cmp);
+        for [x0, x1] in xs.as_chunks::<2>().0 {
+            out.push([map(DVec2::new(*x0, y)), map(DVec2::new(*x1, y))]);
+        }
+        y += step;
+    }
+    out
 }
 
 /// Distance from `p` to the segment `a`–`b`.
@@ -906,6 +969,7 @@ impl SketchEditor {
             pattern_distance: 0.02,
             pattern_angle: 0.0,
             pattern_second_count: 1,
+            pattern_grab: None,
             pattern_second_distance: 0.02,
             pattern_second_angle: PI * 0.5,
             circular_count: 3,
@@ -940,6 +1004,7 @@ impl SketchEditor {
             pressed_glyph: None,
             conflicting: Vec::new(),
             world_per_px: 1e-4,
+            screen_map: None,
             frame_bounds: None,
             message: None,
             issue_highlight: None,
@@ -1230,9 +1295,11 @@ impl SketchEditor {
         matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) && self.clicks.len() == 2
     }
 
-    /// Live (sketch/91): outside the polygon at the middle of the edge
-    /// after the clicked vertex, along that edge (its angle in radians).
-    pub fn polygon_side_control(&self) -> Option<(DVec2, usize, f64)> {
+    /// The side-count spinner "◀ 6 ▶" (live sketch/91): 24 px outside the
+    /// middle of the edge after the clicked vertex, laid along that edge's
+    /// outward normal (◀ inward, ▶ outward; measured: the ◀ / ▶ axis is
+    /// perpendicular to the edge); (centre, outward direction, sides).
+    pub fn polygon_side_control(&self) -> Option<(DVec2, DVec2, usize)> {
         if !self.polygon_sides_pending() {
             return None;
         }
@@ -1245,8 +1312,8 @@ impl SketchEditor {
         let v0 = c + DVec2::from_angle(start + off) * rv;
         let v1 = c + DVec2::from_angle(start + off + TAU / n) * rv;
         let mid = (v0 + v1) * 0.5;
-        let out = (mid - c).normalize_or_zero();
-        Some((mid + out * self.world_per_px * 16.0, self.polygon_sides, (v1 - v0).to_angle()))
+        let out = (mid - c).try_normalize().unwrap_or(DVec2::Y);
+        Some((mid + out * self.world_per_px * POLYGON_SPINNER_PX, out, self.polygon_sides))
     }
 
     /// The on-canvas polygon spinner locks an explicitly chosen side count.
@@ -1427,6 +1494,11 @@ impl SketchEditor {
         if self.tool.is_pattern()
             && let Some(h) = self.handle_at(&data.sketch, p)
         {
+            self.pattern_grab = self.selection_center(&data.sketch).and_then(|c| match h {
+                PatternHandle::LinearCount => Some((self.pattern_count, (p - c).dot(DVec2::from_angle(self.pattern_angle)))),
+                PatternHandle::LinearSecondCount => Some((self.pattern_second_count, (p - c).dot(DVec2::from_angle(self.pattern_second_angle)))),
+                _ => None,
+            });
             self.drag = Some(DragState::Handle(h));
             return EditOutcome::redraw();
         }
@@ -1819,6 +1891,17 @@ impl SketchEditor {
         probe.is_some_and(|q| (q - mid).dot(n) < 0.0)
     }
 
+    /// `p` moved onto the nearest pixel centre (unchanged without a screen map).
+    pub fn snap_to_pixel(&self, p: DVec2) -> DVec2 {
+        let Some((o, ex, ey)) = self.screen_map else { return p };
+        let m = glam::DMat2::from_cols(ex, ey);
+        if m.determinant().abs() < 1e-30 {
+            return p;
+        }
+        let s = m.inverse() * (p - o);
+        o + m * DVec2::new(s.x.floor() + 0.5, s.y.floor() + 0.5)
+    }
+
     /// The offset manipulator (live sketch/303): Onshape's hollow arrow,
     /// starting 11 px past the offset copy and pointing away from the curve;
     /// (start of the 18 px stem, apex of the 31 px head).
@@ -2026,22 +2109,27 @@ impl SketchEditor {
         if created.is_empty() {
             return None;
         }
-        // One width for every slot of the session: the first cap carries the
+        // One width for every slot of the session: the end cap (the one centred
+        // on the first curve's end, live REST "DIAMETER endCap") carries the
         // diameter dimension, the others are equal to it.
         let first = self.slot_session.filter(|f| data.sketch.entity(*f).is_some());
+        let end_point = data.sketch.endpoints(curves[0]).map(|(_, e)| e);
+        let lead = caps.iter().position(|c| end_point.is_some() && data.sketch.entity(*c).and_then(|e| e.center()) == end_point).unwrap_or(0);
         for (k, cap) in caps.iter().enumerate() {
             match first {
                 Some(f) => {
                     let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: f, b: *cap });
                 }
-                None if k == 0 => {
-                    let label = curve_mid(&data.sketch, *cap).map(|m| m + DVec2::new(1.0, 1.0).normalize() * self.world_per_px * 28.0);
-                    // Live: no value box opens for a slot (sketch/307–311).
+                None if k == lead => {
+                    // Live (sketch/1952): "Ø20" straight above the cap's centre at twice
+                    // the width, its leader radial (vertical). No value box opens
+                    // for a slot (sketch/307–311).
+                    let label = data.sketch.entity(*cap).and_then(|e| e.center()).and_then(|c| data.sketch.point(c)).map(|c| c + DVec2::Y * self.slot_width * 2.0);
                     let _ = add_dimension(data, ConstraintKind::Diameter { curve: *cap, value: self.slot_width }, label, None);
                     self.slot_session = Some(*cap);
                 }
                 None => {
-                    let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: caps[0], b: *cap });
+                    let _ = data.sketch.add_constraint(ConstraintKind::Equal { a: caps[lead], b: *cap });
                 }
             }
         }
@@ -3350,13 +3438,14 @@ impl SketchEditor {
                 let Some(c) = self.selection_center(sk) else { return out };
                 let dir = DVec2::from_angle(self.pattern_angle);
                 let step = dir * self.pattern_distance;
+                // Live (sketch/136): a square at the first instance (spacing and
+                // direction), then the count arrow right after it (handle = its head).
                 out.push((PatternHandle::LinearStep, c + step));
-                let n = self.pattern_count.max(2);
-                out.push((PatternHandle::LinearCount, c + step * (n - 1) as f64 + dir * px * 22.0));
+                out.push((PatternHandle::LinearCount, c + step + dir * px * PATTERN_ARROW_HANDLE_PX));
                 let second_dir = DVec2::from_angle(self.pattern_second_angle);
                 let second = second_dir * self.pattern_second_distance;
                 out.push((PatternHandle::LinearSecondStep, c + second));
-                out.push((PatternHandle::LinearSecondCount, c + second * (self.pattern_second_count.max(1) - 1) as f64 + second_dir * px * 22.0));
+                out.push((PatternHandle::LinearSecondCount, c + second + second_dir * px * PATTERN_ARROW_HANDLE_PX));
             }
             Tool::CircularPattern => {
                 out.push((PatternHandle::Center, self.pattern_center));
@@ -3379,6 +3468,30 @@ impl SketchEditor {
         out
     }
 
+    /// One linear pattern direction (live sketch/136): its unit direction,
+    /// step, count and the diagonal its label and spacing dimension go to
+    /// (first direction down-right of +X, second up-left of +Y, turned with
+    /// the direction).
+    fn linear_direction(&self, second: bool) -> (DVec2, DVec2, usize, DVec2) {
+        let (angle, distance, count) = if second {
+            (self.pattern_second_angle, self.pattern_second_distance, self.pattern_second_count)
+        } else {
+            (self.pattern_angle, self.pattern_distance, self.pattern_count)
+        };
+        let dir = DVec2::from_angle(angle);
+        let diag = dir.rotate(if second { DVec2::new(1.0, 1.0) } else { DVec2::new(1.0, -1.0) });
+        (dir, dir * distance, count, diag)
+    }
+
+    /// The spacing dimension of a linear pattern direction: its two feet
+    /// (seed and first instance, moved to the label's side).
+    fn linear_spacing_feet(&self, c: DVec2, second: bool) -> (DVec2, DVec2) {
+        let (dir, step, _, diag) = self.linear_direction(second);
+        let n = dir.perp();
+        let side = if diag.dot(n) >= 0.0 { n } else { -n } * self.world_per_px * PATTERN_DIM_PX;
+        (c + side, c + step + side)
+    }
+
     /// On-canvas instance-count labels of the active pattern (live Onshape:
     /// `3x` / `1x` next to each direction's count manipulator, click to
     /// type a count; sketch/136–138).
@@ -3388,8 +3501,13 @@ impl SketchEditor {
             .into_iter()
             .filter_map(|(h, at)| {
                 let n = match h {
-                    PatternHandle::LinearCount => self.pattern_count,
-                    PatternHandle::LinearSecondCount => self.pattern_second_count,
+                    PatternHandle::LinearCount | PatternHandle::LinearSecondCount => {
+                        // Centred ~95 px diagonally off the square (leader drawn in the overlay).
+                        let second = h == PatternHandle::LinearSecondCount;
+                        let (dir, _, n, diag) = self.linear_direction(second);
+                        let q = at - dir * px * PATTERN_ARROW_HANDLE_PX;
+                        return Some((h, q + diag * px * PATTERN_LABEL_PX, n));
+                    }
                     PatternHandle::CircularCount => self.circular_count,
                     _ => return None,
                 };
@@ -3411,15 +3529,16 @@ impl SketchEditor {
         match self.tool {
             Tool::LinearPattern => {
                 let Some(c) = self.selection_center(sk) else { return out };
-                for (h, angle, distance, count) in [
-                    (PatternHandle::LinearStep, self.pattern_angle, self.pattern_distance, self.pattern_count),
-                    (PatternHandle::LinearSecondStep, self.pattern_second_angle, self.pattern_second_distance, self.pattern_second_count),
+                for (h, distance, count) in [
+                    (PatternHandle::LinearStep, self.pattern_distance, self.pattern_count),
+                    (PatternHandle::LinearSecondStep, self.pattern_second_distance, self.pattern_second_count),
                 ] {
                     if h == PatternHandle::LinearSecondStep && count < 2 {
                         continue;
                     }
-                    let dir = DVec2::from_angle(angle);
-                    out.push((h, c + dir * distance * 0.5 - dir.perp() * px * 18.0, distance));
+                    // On the spacing dimension's line (live sketch/136).
+                    let (f1, f2) = self.linear_spacing_feet(c, h == PatternHandle::LinearSecondStep);
+                    out.push((h, (f1 + f2) * 0.5, distance));
                 }
             }
             Tool::CircularPattern => {
@@ -3504,9 +3623,11 @@ impl SketchEditor {
                 }
             }
             PatternHandle::LinearCount => {
-                if let Some(c) = self.selection_center(sk) {
-                    let along = (p - c).dot(DVec2::from_angle(self.pattern_angle)) - px * 22.0;
-                    self.pattern_count = ((along / self.pattern_distance.max(1e-12)).round().max(1.0) as usize + 1).clamp(2, 100);
+                // Each spacing dragged adds (or removes) an instance.
+                if let (Some(c), Some((n0, a0))) = (self.selection_center(sk), self.pattern_grab) {
+                    let along = (p - c).dot(DVec2::from_angle(self.pattern_angle));
+                    let k = ((along - a0) / self.pattern_distance.max(1e-12)).round() as i64;
+                    self.pattern_count = (n0 as i64 + k).clamp(2, 100) as usize;
                 }
             }
             PatternHandle::LinearSecondStep => {
@@ -3519,9 +3640,10 @@ impl SketchEditor {
                 }
             }
             PatternHandle::LinearSecondCount => {
-                if let Some(c) = self.selection_center(sk) {
-                    let along = (p - c).dot(DVec2::from_angle(self.pattern_second_angle)) - px * 22.0;
-                    self.pattern_second_count = ((along / self.pattern_second_distance.max(1e-12)).round().max(0.0) as usize + 1).clamp(1, 100);
+                if let (Some(c), Some((n0, a0))) = (self.selection_center(sk), self.pattern_grab) {
+                    let along = (p - c).dot(DVec2::from_angle(self.pattern_second_angle));
+                    let k = ((along - a0) / self.pattern_second_distance.max(1e-12)).round() as i64;
+                    self.pattern_second_count = (n0 as i64 + k).clamp(1, 100) as usize;
                 }
             }
             PatternHandle::Center => {
@@ -4222,6 +4344,7 @@ impl SketchEditor {
                         let (rv, off) = if self.tool == Tool::Polygon { (r, 0.0) } else { (r / (PI / n as f64).cos(), PI / n as f64) };
                         let pts: Vec<DVec2> = (0..=n).map(|i| *a + DVec2::from_angle(start + off + i as f64 / n as f64 * TAU) * rv).collect();
                         poly(&pts, preview_color, false);
+                        // Live (sketch/91): the construction circle is dash-dot.
                         dash_dot.push(circle_pts(*a, r, 72));
                     }
                 }
@@ -4381,7 +4504,7 @@ impl SketchEditor {
                 // Onshape's hollow arrow (as the Part Studio manipulators): a
                 // light grey 3 px outline under a 1.5 px white line.
                 let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
-                push_hollow_arrow(&mut wide, start, d, self.world_per_px, OFFSET_ARROW_STEM_PX);
+                push_hollow_arrow(&mut wide, self.snap_to_pixel(start), d, self.world_per_px, OFFSET_ARROW_STEM_PX);
             }
         }
         // Fillet: preview at the hovered corner (red when it doesn't fit) and the
@@ -4395,11 +4518,28 @@ impl SketchEditor {
             // has a short leader down to the arc's upper tangent point.
             if let Some((start, apex)) = self.fillet_arrow(&data.sketch) {
                 let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
-                push_hollow_arrow(&mut wide, start, d, self.world_per_px, FILLET_ARROW_STEM_PX);
+                push_hollow_arrow(&mut wide, self.snap_to_pixel(start), d, self.world_per_px, FILLET_ARROW_STEM_PX);
             }
             if let Some(pa) = self.fillet_label_foot(&data.sketch) {
                 let px = self.world_per_px;
                 wide.push((vec![pa + DVec2::new(-4.0 * px, 6.0 * px), pa + DVec2::new(-4.0 * px, 0.0), pa], [0x33, 0x33, 0x33, 255], 1.5));
+            }
+        }
+        // Polygon side spinner (live sketch/91): filled black ◀ / ▶ and the
+        // count laid along the ray (kept readable: never upside down).
+        if let Some((at, u, sides)) = self.polygon_side_control() {
+            let reading = if u.x < 0.0 { -u } else { u };
+            for sg in hatched_text(&sides.to_string(), at, reading, self.world_per_px, 16.0) {
+                wide.push((vec![sg[0], sg[1]], [0, 0, 0, 255], 1.0));
+            }
+            let px = self.world_per_px;
+            for k in [-1.0, 1.0] {
+                let tip = at + u * px * (POLYGON_SPINNER_ARROW_PX + 5.0) * k;
+                let base = tip - u * px * 10.0 * k;
+                for i in 0..=10 {
+                    let t = i as f64 / 10.0 * 2.0 - 1.0;
+                    wide.push((vec![tip, base + u.perp() * px * 5.0 * t], [0x33, 0x33, 0x33, 255], 1.0));
+                }
             }
         }
         let mut dim_preview: Vec<[DVec2; 2]> = Vec::new();
@@ -4435,6 +4575,14 @@ impl SketchEditor {
                     poly(&pd.sketch.tessellate(*id, self.world_per_px * 0.2), preview_color, false);
                 } else if let Some(q) = pd.sketch.point(*id) {
                     points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                }
+                // The cap / side joins (live sketch/1952: four light-blue dots).
+                if pd.sketch.kind(*id) == Some(EntityKind::Line)
+                    && let Some((a, b)) = pd.sketch.endpoints(*id)
+                {
+                    for q in [a, b].into_iter().filter_map(|e| pd.sketch.point(e)) {
+                        points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                    }
                 }
             }
             if let Some((cid, at, _)) = self.slot_dimension()
@@ -4494,15 +4642,47 @@ impl SketchEditor {
             for (h, q) in self.pattern_handles(&data.sketch) {
                 match h {
                     PatternHandle::LinearStep | PatternHandle::LinearSecondStep => {
+                        // Live (sketch/136): hollow squares at the seed and the first
+                        // instance, a light-blue dash-dot guide between them, the
+                        // count arrow after the square, the "3x" label's leader and
+                        // the spacing dimension with extension lines.
                         if let Some(c) = sel_c {
-                            let (angle, distance, count) = if h == PatternHandle::LinearStep { (self.pattern_angle, self.pattern_distance, self.pattern_count) } else { (self.pattern_second_angle, self.pattern_second_distance, self.pattern_second_count) };
-                            let dir = DVec2::from_angle(angle);
-                            let end = c + dir * distance * (count.max(2) - 1) as f64;
-                            poly(&[c, end], guide_color, true);
-                            let n = dir.perp();
-                            poly(&[q - dir * px * 9.0 + n * px * 5.0, q, q - dir * px * 9.0 - n * px * 5.0], guide_color, false);
+                            let second = h == PatternHandle::LinearSecondStep;
+                            let (dir, _, count, diag) = self.linear_direction(second);
+                            if !second {
+                                push_hollow_square(&mut wide, self.snap_to_pixel(c), px, PATTERN_SQUARE_PX);
+                            }
+                            let qs = self.snap_to_pixel(q);
+                            push_hollow_square(&mut wide, qs, px, PATTERN_SQUARE_PX);
+                            push_hollow_arrow(&mut wide, qs + dir * px * PATTERN_SQUARE_PX * 0.5, dir, px, PATTERN_ARROW_STEM_PX);
+                            let ink = [0x33, 0x33, 0x33, 255];
+                            let mut segs = Vec::new();
+                            // The leader runs into the square, its filled ~8 x 5 px arrowhead
+                            // tip just off the centre (live sketch/136), 1.5 px.
+                            let along = diag.normalize_or_zero();
+                            let tip = q + along * px * 3.0;
+                            let lead_end = q + diag * px * (PATTERN_LABEL_PX - 13.0);
+                            wide.push((vec![lead_end, tip], ink, 1.5));
+                            for i in 0..=16 {
+                                let t = i as f64 / 16.0 * 2.0 - 1.0;
+                                wide.push((vec![tip, tip + along * px * 8.0 + along.perp() * px * 2.5 * t], ink, 1.0));
+                            }
+                            if count >= 2 {
+                                wide.push((vec![c, q], preview_color, -1.0));
+                                let (f1, f2) = self.linear_spacing_feet(c, second);
+                                segs.push([c, f1]);
+                                segs.push([q, f2]);
+                                segs.push([f1, f2]);
+                                let d = (f2 - f1).try_normalize().unwrap_or(dir);
+                                arrow(&mut segs, f1, -d, px);
+                                arrow(&mut segs, f2, d, px);
+                            }
+                            for sg in segs {
+                                wide.push((vec![sg[0], sg[1]], ink, 1.0));
+                            }
                         }
                     }
+                    PatternHandle::LinearCount | PatternHandle::LinearSecondCount => {}
                     PatternHandle::Center => {
                         let r = px * 7.0;
                         poly(&[q - DVec2::X * r, q + DVec2::X * r], guide_color, false);
@@ -4537,6 +4717,9 @@ impl SketchEditor {
                         poly(&[q + DVec2::new(-s, -s), q + DVec2::new(s, -s), q + DVec2::new(s, s), q + DVec2::new(-s, s), q + DVec2::new(-s, -s)], handle_color, false);
                     }
                     _ => {}
+                }
+                if matches!(h, PatternHandle::LinearStep | PatternHandle::LinearSecondStep | PatternHandle::LinearCount | PatternHandle::LinearSecondCount) {
+                    continue;
                 }
                 let size = if active == Some(h) { 13.0 } else { 10.0 };
                 points.points.push(PointSprite { position: w(q), color: if active == Some(h) { guide_color } else { handle_color }, pick_id: 0, size, style: on_top, _pad: 0 });
@@ -4664,7 +4847,9 @@ impl SketchEditor {
         }
         for (pts, color, width) in wide {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
-            lines.push_polyline(&pts3, color, 0, width, on_top);
+            // A negative width marks a 2 px dash-dot guide.
+            let (width, style) = if width < 0.0 { (2.0, on_top | LineSegment::DASH_DOT) } else { (width, on_top) };
+            lines.push_polyline(&pts3, color, 0, width, style);
         }
         for pts in dash_dot {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
@@ -5288,7 +5473,12 @@ fn radial_dim(out: &mut Vec<[DVec2; 2]>, c: DVec2, r: f64, pos: DVec2, diameter:
     let dl = (pos - c).length();
     let tip = c + v * r;
     let far = if dl > r { pos } else { tip };
-    if diameter {
+    if diameter && span.is_some() && dl > r {
+        // An arc's diameter (live sketch/1946, a slot's end cap): one leader
+        // from the label to the near side, its arrow pointing in.
+        out.push([tip, far]);
+        arrow(out, tip, -v, s);
+    } else if diameter {
         let t2 = c - v * r;
         out.push([t2, far]);
         arrow(out, tip, v, s);
@@ -6242,12 +6432,13 @@ mod tests {
         click(&mut ed, &mut data, v(0.03, 0.02));
         assert_eq!(count(&data, EntityKind::Line), 0, "circumference is still a preview");
         ed.adjust_polygon_sides(1);
-        assert_eq!(ed.polygon_side_control().map(|c| c.1), Some(7));
-        // Outside the edge after the clicked vertex (0.03, 0.02), along it.
-        let (at, _, angle) = ed.polygon_side_control().unwrap();
+        assert_eq!(ed.polygon_side_control().map(|c| c.2), Some(7));
+        // Outside the middle of the edge after the clicked vertex (0.03, 0.02),
+        // along its outward normal.
+        let (at, out, _) = ed.polygon_side_control().unwrap();
         let edge_mid = (v(0.03, 0.02) + v(0.02, 0.02) + DVec2::from_angle(TAU / 7.0) * 0.01) * 0.5;
         assert!((at - v(0.02, 0.02)).length() > (edge_mid - v(0.02, 0.02)).length() && (at - edge_mid).length() < 0.003, "{at} {edge_mid}");
-        assert!((angle - (90.0f64 + 180.0 / 7.0).to_radians()).abs() < 1e-9, "{angle}");
+        assert!((out - (edge_mid - v(0.02, 0.02)).normalize()).length() < 1e-9, "{out}");
         ed.pointer_move(&mut data, v(0.08, 0.06), false, false);
         assert_eq!(ed.polygon_sides, 7, "spinner's explicit value stays locked");
         click(&mut ed, &mut data, v(0.08, 0.06));
@@ -6738,6 +6929,28 @@ mod tests {
         assert_eq!(d.texts.len(), 1, "edited in place");
         assert_eq!(d.texts[0].text, "Changed");
         assert!(ed.editing_text.is_none());
+    }
+
+    #[test]
+    fn hatched_text_is_a_filled_digit_along_its_direction() {
+        let px = 1e-4;
+        let bounds = |segs: &[[DVec2; 2]]| {
+            let pts: Vec<DVec2> = segs.iter().flatten().copied().collect();
+            let (mut lo, mut hi) = (pts[0], pts[0]);
+            for p in &pts {
+                lo = lo.min(*p);
+                hi = hi.max(*p);
+            }
+            (hi - lo) / px
+        };
+        let flat = hatched_text("6", DVec2::ZERO, DVec2::X, px, 16.0);
+        assert!(flat.len() > 15, "scanlines fill the glyph");
+        let size = bounds(&flat);
+        // A 16 px digit: ~9 px wide, ~12 px tall (live sketch/91).
+        assert!((7.0..12.0).contains(&size.x) && (10.0..14.0).contains(&size.y), "{size:?}");
+        // Laid along a vertical ray it turns: tall becomes wide.
+        let turned = bounds(&hatched_text("6", DVec2::ZERO, DVec2::Y, px, 16.0));
+        assert!((size.x - turned.y).abs() < 1.0 && (size.y - turned.x).abs() < 1.0, "{turned:?}");
     }
 
     #[test]
