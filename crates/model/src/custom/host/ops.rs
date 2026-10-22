@@ -1079,9 +1079,6 @@ fn op_extract_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("offset", length_param(offset.abs()));
     p.set("oppositeDirection", ParamValue::Bool(offset < 0.0));
     run_op_with(i, &cx, &id, "REGEN_ERROR", &p, crate::regen::features::surfaces::offset_surface)?;
-    if offset == 0.0 {
-        cx.state.lock().mark_copies(&id);
-    }
     Ok(Value::Undefined)
 }
 
