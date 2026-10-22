@@ -22,7 +22,7 @@ fn tr(s: &str) -> SharedString {
 const BLUE: u32 = 0x1651b0;
 const RED: u32 = 0xaa252d;
 
-fn rules() -> Vec<ExportRule> {
+fn saved_rules() -> Vec<ExportRule> {
     crate::export_naming::rules().rules
 }
 
@@ -36,7 +36,7 @@ pub struct ExportRulesPrefsView;
 impl Render for ExportRulesPrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        let rules = rules();
+        let rules = saved_rules();
         let help = div()
             .id("er-help")
             .child(crate::assets::icon("help-gray", 18., cx))
@@ -67,7 +67,7 @@ impl Render for ExportRulesPrefsView {
                                 .child(small(SharedString::from(format!("er-edit-{i}")), tr("Edit")).on_click(move |_, window, cx| open_dialog(v1.clone(), Some(i), window, cx)))
                                 .child(small(SharedString::from(format!("er-remove-{i}")), tr("Remove")).on_click(move |_, _, cx| {
                                     // Live: removed at once, no confirmation.
-                                    let mut rules = self::rules();
+                                    let mut rules = saved_rules();
                                     if i < rules.len() {
                                         let gone = rules.remove(i);
                                         save_rules(rules);
@@ -104,7 +104,7 @@ struct Edit {
 
 /// "Add export rule" (`editing` None) or "Edit export rule" (live er-902, 911).
 fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, window: &mut Window, cx: &mut App) {
-    let existing = editing.and_then(|i| rules().get(i).cloned());
+    let existing = editing.and_then(|i| saved_rules().get(i).cloned());
     let scope = existing.as_ref().map_or(ExportElement::Part, |r| r.element);
     let format = existing.as_ref().and_then(|r| scope.formats().iter().position(|f| *f == r.format)).unwrap_or(0);
     let state = Rc::new(RefCell::new(Edit { scope, format, complete: None }));
@@ -261,7 +261,7 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
                 if er::validate(&convention, scope).is_some() {
                     return false;
                 }
-                let mut rules = rules();
+                let mut rules = saved_rules();
                 if (ExportRules { rules: rules.clone() }).conflicts(scope, &format, editing) {
                     // Live er-919: the dialog closes with an error toast; nothing is saved.
                     crate::prefs_general::toast(crate::i18n::tr("Unable to save export rule. Another export rule already exists for that combination of company, object type, category, and file format."), cx);
