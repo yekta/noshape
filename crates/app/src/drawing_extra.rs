@@ -1993,16 +1993,7 @@ impl DrawingEditor {
                     if let Some(f) = format.clone() {
                         t.set_cell_format(row, col, f);
                     }
-                    if let TableKind::General { cells, .. } = &mut t.kind {
-                        while cells.len() <= row {
-                            cells.push(vec![]);
-                        }
-                        let n = cells.iter().map(|r| r.len()).max().unwrap_or(0).max(col + 1);
-                        for r in cells.iter_mut() {
-                            r.resize(n, String::new());
-                        }
-                        cells[row][col] = text.clone();
-                    }
+                    noshape_scene::drawing_tools::set_general_cell(t, row, col, &text);
                     // Grow the column to fit when needed.
                     let th = t.text_height;
                     let need = text.lines().map(|l| noshape_model::drawing::font::text_width(l, th)).fold(0.0, f64::max) + th * 1.6;

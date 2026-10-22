@@ -465,6 +465,21 @@ impl SheetPick<'_> {
     }
 }
 
+/// A general table cell typed (✓ of the cell editor): the cell grid grows
+/// to hold `row`, `col`.
+pub fn set_general_cell(t: &mut Table, row: usize, col: usize, text: &str) {
+    if let TableKind::General { cells, .. } = &mut t.kind {
+        while cells.len() <= row {
+            cells.push(vec![]);
+        }
+        let n = cells.iter().map(|r| r.len()).max().unwrap_or(0).max(col + 1);
+        for r in cells.iter_mut() {
+            r.resize(n, String::new());
+        }
+        cells[row][col] = text.to_string();
+    }
+}
+
 /// The Break view dialog's default gap: 6 mm, or 0.25 in in inch drawings.
 pub fn default_break_gap_mm(units_mm: bool) -> f64 {
     if units_mm { 6.0 } else { 0.25 * 25.4 }

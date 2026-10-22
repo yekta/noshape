@@ -209,7 +209,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("drawing:Spline", Planned),
     ("drawing:Spline point", Planned),
     ("drawing:Surface finish symbol", Op("drawing_surface_finish")),
-    ("drawing:Table", Planned),
+    ("drawing:Table", Op("drawing_table")),
     ("drawing:Update drawing", Planned),
     ("drawing:Virtual sharp", Op("drawing_virtual_sharp")),
     ("drawing:Weld symbol", Op("drawing_weld")),
