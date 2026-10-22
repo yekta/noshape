@@ -34,7 +34,7 @@ pub fn toast(text: impl Into<String>, cx: &mut App) {
     cx.refresh_windows();
     cx.spawn(async move |cx| {
         cx.background_executor().timer(Duration::from_secs(5)).await;
-        let _ = cx.update(|cx| {
+        cx.update(|cx| {
             if cx.try_global::<PrefsToast>().is_some_and(|t| t.1 == generation) {
                 cx.set_global(PrefsToast(None, generation));
                 cx.refresh_windows();

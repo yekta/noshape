@@ -26,7 +26,7 @@ fn cylinder(diameter: f64) -> PartStudio {
     let key = regen(&ps).display.sketches[0].regions[0].key.clone();
     let mut ex = ps.new_feature("extrude", &units).unwrap();
     ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
-    ex.params.set("depth", ParamValue::Expr(ExprValue::new(&format!("{} mm", diameter * 1000.0))));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new(format!("{} mm", diameter * 1000.0))));
     ps.features.push(ex);
     ps
 }

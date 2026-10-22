@@ -4,7 +4,7 @@
 //! name exported files from `${property}` placeholders.
 
 use crate::os_ui as os;
-use crate::preferences_window::{ListPrefs, PreferencesView};
+use crate::preferences_window::PreferencesView;
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::input::{Input, InputEvent, InputState, Position};
@@ -67,7 +67,7 @@ impl Render for ExportRulesPrefsView {
                                 .child(small(SharedString::from(format!("er-edit-{i}")), tr("Edit")).on_click(move |_, window, cx| open_dialog(v1.clone(), Some(i), window, cx)))
                                 .child(small(SharedString::from(format!("er-remove-{i}")), tr("Remove")).on_click(move |_, _, cx| {
                                     // Live: removed at once, no confirmation.
-                                    let mut rules = rules();
+                                    let mut rules = self::rules();
                                     if i < rules.len() {
                                         let gone = rules.remove(i);
                                         save_rules(rules);

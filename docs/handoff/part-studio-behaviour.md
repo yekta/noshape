@@ -1398,8 +1398,9 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   badge is the blue "Rollback bar" pill with the name or "N items" (`FeatureDragPill`).
 - **NAME3 (release blocker):** `Context.own_names` holds parts named from outside the studio (import file names in
   `apply_look`, Derived parts); `renumber_default_names` skips them. Test `features_b.rs::imported_part_names_are_not_renumbered`.
-  Check the real files in the app: /root/onshape-research/live/samples/g48-two.step, jt-2parts.jt (never copy them
-  into the repo).
+  Checked with the CLI (`import_files`, 10-22): g48-two.step → "Part 1" = G48 22595.371166, "Part 2" = cube 1000;
+  jt-2parts.jt → "Part 1" = 8000, "Part 2" = 1000 (the files' names). Our list order is the file's ("Part 2" row
+  first); live's row order for these imports isn't recorded yet (asked). Never copy the samples into the repo.
 - **INT2:** Intersect of parts that don't meet makes and changes nothing (info "Boolean resulted in no geometry
   change…"). Test `engine.rs::intersect_of_parts_apart_makes_nothing`.
 - **BOOL4b:** ✓ stays enabled for "No merge scope selected." (`feature_dialog.rs` `blocked`); the "do not intersect"
