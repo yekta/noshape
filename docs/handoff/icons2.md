@@ -837,3 +837,7 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   clean, guard 2 passed / 0 of 735; checked in app (context/r17-*, r18-slot): polygon spinner (edge after the clicked
   vertex, outward normal, rotated digit), slot Ø20 + join dots = live 1952, chamfer preview arrow. Marked ready/icons2.
   For skb (noted in sketch-behaviour.md): polygon circle radius, chamfer preview dims colour, picked slot line orange.
+- Glyph hover (skb note, live sketch/27 + 1956): the hovered constraint's entities draw pre-highlight orange #ffc685
+  (3 px) instead of the translucent yellow halo; master entities secondary yellow #f2ff80 (`constraint_masters`:
+  Symmetric's axis now; add the slot OFFSET's `localMaster`/`localSecond` centre line when skb adds OFFSET).
+  Test a_hovered_glyph_highlights_its_entities_orange_and_its_master_yellow; verified in app (context/r19-ghover).
