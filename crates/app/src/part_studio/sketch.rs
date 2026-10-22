@@ -3947,6 +3947,15 @@ impl PartStudioView {
             // Esc in a sketch cancels the tool / chain / selection, never the
             // sketch itself, even when the focus is in the Sketch dialog.
             .capture_action(cx.listener(|this, _: &Cancel, window, cx| {
+                // Esc closes the S toolbar or Select other first (live), also
+                // when the focus is in the Sketch dialog, whose own Cancel
+                // would end the sketch.
+                if this.sketch.is_some() && (this.ui.mini_toolbar.take().is_some() || this.ui.select_other.take().is_some()) {
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                    cx.notify();
+                    return;
+                }
                 let transient = this.show_shortcuts || this.context_menu.is_some() || this.ui.mini_toolbar.is_some() || this.ui.select_other.is_some() || this.ui.dependencies.is_some() || this.viewport.read(cx).zoom_window;
                 if !transient && this.sketch.is_some() {
                     if let Some(ui) = this.ui_mut() {

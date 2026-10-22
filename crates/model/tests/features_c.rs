@@ -60,7 +60,7 @@ impl Studio {
     fn ok(&mut self) -> RegenResult {
         let r = self.regen();
         for (f, s) in self.ps.features.iter().zip(&r.display.features) {
-            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning | FeatureStatus::Info), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
         }
         r
     }
@@ -738,6 +738,13 @@ fn derived_placed_at_mate_connectors() {
     assert!(near(bb0.min.x, mm(50.0), 1e-6) && near(bb0.min.z, 0.0, 1e-6), "{bb0:?}");
     assert!(near(bb1.min.x, mm(-50.0), 1e-6) && near(bb1.min.y, mm(20.0), 1e-6), "{bb1:?}");
     assert_ne!(derived[0].faces[0], derived[1].faces[0], "instances have distinct names");
+    // Live (ui 10-22 b): both parts keep the source name, each location gets
+    // the source's sketch, and 2+ locations is an info (the bubble).
+    assert_eq!(derived[0].name, derived[1].name);
+    assert_eq!(r.context.derived_sketches.iter().filter(|(f, _)| *f == d).count(), 2);
+    let (st, msg) = s.last_status();
+    assert_eq!(st, FeatureStatus::Info);
+    assert_eq!(msg, noshape_model::regen::features::importing::DERIVED_NO_INSTANCING);
 
     // Base mate connector (top face center) on the point: the block hangs below it.
     s.ps.features.last_mut().unwrap().params.set("placement", en("AT_MATE_CONNECTOR"));

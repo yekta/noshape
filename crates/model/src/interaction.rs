@@ -33,6 +33,11 @@ fn collect_ints(v: &serde_json::Value, out: &mut HashSet<u64>) {
 /// feature mentioned in its persistent name; for other values (sketch
 /// payloads...) every feature id found in it.
 fn param_refs(v: &ParamValue, out: &mut HashSet<u64>) {
+    param_refs_with(v, out, true);
+}
+
+/// [`param_refs`], optionally without whole parts (`Reference::Body`).
+fn param_refs_with(v: &ParamValue, out: &mut HashSet<u64>, bodies: bool) {
     fn name(n: &crate::reference::TopoName, out: &mut HashSet<u64>) {
         use crate::reference::TopoName as T;
         match n {
@@ -48,10 +53,11 @@ fn param_refs(v: &ParamValue, out: &mut HashSet<u64>) {
             T::Boundary { face, .. } => name(face, out),
         }
     }
-    fn reference(r: &Reference, out: &mut HashSet<u64>) {
+    fn reference(r: &Reference, out: &mut HashSet<u64>, bodies: bool) {
         match r {
             Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => name(n, out),
-            Reference::Implicit { on, .. } => reference(on, out),
+            Reference::Implicit { on, .. } => reference(on, out, bodies),
+            Reference::Body(_) if !bodies => {}
             r => {
                 if let Some(f) = r.depends_on() {
                     out.insert(f.0);
@@ -60,8 +66,8 @@ fn param_refs(v: &ParamValue, out: &mut HashSet<u64>) {
         }
     }
     match v {
-        ParamValue::Query(refs) => refs.iter().for_each(|r| reference(r, out)),
-        ParamValue::Array(items) => items.iter().flat_map(|i| i.0.values()).for_each(|x| param_refs(x, out)),
+        ParamValue::Query(refs) => refs.iter().for_each(|r| reference(r, out, bodies)),
+        ParamValue::Array(items) => items.iter().flat_map(|i| i.0.values()).for_each(|x| param_refs_with(x, out, bodies)),
         ParamValue::Bool(_) | ParamValue::Enum(_) | ParamValue::Expr(_) | ParamValue::Text(_) | ParamValue::Lookup(_) => {}
         other => {
             if let Ok(j) = serde_json::to_value(other) {
@@ -106,6 +112,22 @@ pub fn feature_dependencies(features: &[Feature], index: usize) -> Vec<FeatureId
     let Some(f) = features.get(index) else { return Vec::new() };
     let mut ints = HashSet::new();
     f.params.0.values().for_each(|v| param_refs(v, &mut ints));
+    let vars = used_variables(f);
+    features[..index]
+        .iter()
+        .filter(|u| ints.contains(&u.id.0) || defined_variable(u).is_some_and(|n| vars.contains(n)))
+        .map(|u| u.id)
+        .collect()
+}
+
+/// The parents a feature row's tooltip lists after "<-" (live: "Extrude 1
+/// <- Sketch 1"): [`feature_dependencies`] without features reached only
+/// through whole parts (live: an Extrude Add's merge scope, a Hole's scope
+/// and a Boolean's tools and targets add nothing).
+pub fn tooltip_dependencies(features: &[Feature], index: usize) -> Vec<FeatureId> {
+    let Some(f) = features.get(index) else { return Vec::new() };
+    let mut ints = HashSet::new();
+    f.params.0.values().for_each(|v| param_refs_with(v, &mut ints, false));
     let vars = used_variables(f);
     features[..index]
         .iter()
@@ -686,6 +708,16 @@ mod tests {
         assert_eq!(feature_dependencies(&ps.features, 3), vec![FeatureId(1003)]);
         assert!(feature_dependencies(&ps.features, 4).is_empty());
         assert_eq!(feature_dependents(&ps.features, 0), vec![FeatureId(1003)]);
+    }
+
+    #[test]
+    fn row_tooltips_skip_whole_part_references() {
+        // Live (qa5 BOOL1b, extrude merge scope): a feature reaching another
+        // only through a selected part lists nothing after "<-".
+        let ps = studio();
+        assert_eq!(tooltip_dependencies(&ps.features, 2), vec![FeatureId(1001), FeatureId(1002)]);
+        assert!(tooltip_dependencies(&ps.features, 3).is_empty());
+        assert_eq!(feature_dependencies(&ps.features, 3), vec![FeatureId(1003)]);
     }
 
     #[test]

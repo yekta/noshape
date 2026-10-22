@@ -2289,8 +2289,9 @@ impl PartStudioView {
             // Live (qa5 derived, part-studio/1582): an open Derived row lists
             // the sketches it brought in.
             if self.ui.derived_open.contains(&f.id) {
-                for (_, sk) in self.display.derived_sketches.iter().filter(|(d, _)| *d == f.id) {
-                    items.push(ListItem::DerivedSketch(12.0 * chain.len() as f32, *sk));
+                // Live (ui 10-22 b): one row per location's copy ("Sketch 1" twice).
+                for (k, (_, sk)) in self.display.derived_sketches.iter().filter(|(d, _)| *d == f.id).enumerate() {
+                    items.push(ListItem::DerivedSketch(12.0 * chain.len() as f32, *sk, k));
                 }
             }
             if prompt_anchor == Some(Some(f.id)) {
@@ -2548,7 +2549,7 @@ impl PartStudioView {
                 ListItem::Ellipsis => ellipsis(),
                 ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, cx)),
                 ListItem::Feature(x, id) => indent(x, self.render_feature_row_view(id, slot, cx)),
-                ListItem::DerivedSketch(x, id) => indent(x, self.render_derived_sketch_row(id, cx)),
+                ListItem::DerivedSketch(x, id, k) => indent(x, self.render_derived_sketch_row(id, k, cx)),
                 ListItem::Prompt => self.render_folder_prompt(cx),
             });
         }
@@ -3131,11 +3132,11 @@ impl PartStudioView {
 
     /// A sketch listed under its Derived row (live part-studio/1582): the
     /// sketch icon and name, 12 px in; a click selects the sketch.
-    fn render_derived_sketch_row(&self, id: FeatureId, cx: &mut Context<Self>) -> AnyElement {
+    fn render_derived_sketch_row(&self, id: FeatureId, copy: usize, cx: &mut Context<Self>) -> AnyElement {
         let Some(sk) = self.display.sketches.iter().find(|s| s.feature == id) else { return div().h(px(crate::ui::ROW_H)).into_any_element() };
         let r = Reference::Sketch(id);
         let selected = self.selection.contains(&r);
-        crate::ui::tree_row(SharedString::from(format!("dsk-{id}")), selected)
+        crate::ui::tree_row(SharedString::from(format!("dsk-{id}-{copy}")), selected)
             // Live 1582: the sketch icon at x 66, the name at 86.
             .pl(px(23.))
             .mr(px(5.))
@@ -3374,18 +3375,28 @@ impl PartStudioView {
             // Live (qa5 ADV12): a name made from Onshape's "Feature Name
             // Template" (a Hole's callout) reads "<callout> [Hole]".
             let templated = (f.type_id == "hole" && name != f.name).then(|| f.feature_type().map(|t| format!("{name} [{}]", t.name))).flatten();
+            // Live (ui 10-22 b): a Derived reads "Derived 1 <- <source studio>".
+            let derived_source = (f.type_id == "importDerived")
+                .then(|| {
+                    let key = f.params.text("partStudio").trim().to_string();
+                    self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| t.name.clone())
+                })
+                .flatten();
             move |cx: &App| -> SharedString {
                 if let Some(m) = &msg {
                     return m.clone().into();
                 }
-                let parents: Vec<String> = view
-                    .upgrade()
-                    .and_then(|v| {
-                        let studio = v.read(cx).studio(cx)?;
-                        let i = studio.features.iter().position(|g| g.id == id)?;
-                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect())
-                    })
-                    .unwrap_or_default();
+                let parents: Vec<String> = if let Some(src) = &derived_source {
+                    vec![src.clone()]
+                } else {
+                    view.upgrade()
+                        .and_then(|v| {
+                            let studio = v.read(cx).studio(cx)?;
+                            let i = studio.features.iter().position(|g| g.id == id)?;
+                            Some(noshape_model::interaction::tooltip_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect())
+                        })
+                        .unwrap_or_default()
+                };
                 // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2".
                 let head = templated.clone().unwrap_or_else(|| feature_name.clone());
                 match (parents.is_empty(), &templated) {
@@ -4171,7 +4182,8 @@ enum ListItem {
     /// Indent, feature.
     Feature(f32, FeatureId),
     /// Indent, a sketch a Derived feature brought in (its source id).
-    DerivedSketch(f32, FeatureId),
+    /// Indent, sketch, which location's copy.
+    DerivedSketch(f32, FeatureId, usize),
     Prompt,
 }
 
