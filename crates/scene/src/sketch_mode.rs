@@ -4576,6 +4576,14 @@ impl SketchEditor {
                 } else if let Some(q) = pd.sketch.point(*id) {
                     points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
                 }
+                // The cap / side joins (live sketch/1952: four light-blue dots).
+                if pd.sketch.kind(*id) == Some(EntityKind::Line)
+                    && let Some((a, b)) = pd.sketch.endpoints(*id)
+                {
+                    for q in [a, b].into_iter().filter_map(|e| pd.sketch.point(e)) {
+                        points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                    }
+                }
             }
             if let Some((cid, at, _)) = self.slot_dimension()
                 && let Some(c) = pd.sketch.constraint(cid)
