@@ -803,3 +803,24 @@ remove-selection, snap-mate, zoom-in).
   query box / Measure type / unit selects; analysis menu has "Thickness analysis…" (live doesn't on this account);
   Display states panel layout (live: name field first, underline input, no Update row); env picker tabs wrap in
   live; Section view header ~7 px higher than live, chip text lighter/smaller.
+
+## Round 15 (2026-10-22, worktree /root/wt/icons2, branch agent/icons2) — sketch manipulators (lead, qa5 wf 26)
+Refs: live/sketch/303 (offset), 1933-1934 + 301 (fillet), 136 (linear pattern), 1944b/1952 (slot), 91 (polygon);
+behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay) + app part_studio/sketch.rs (labels).
+- OFF1 (in transition snapshot): hollow arrow (`push_hollow_arrow`: #989fa3 3 px outline + 1.2 px white core; head
+  31x23 px) 11 px past the offset copy, 18 px stem; no value box at first (bundle: offset manipulator
+  `displayEditView:false`; Enter commits); `offset_value_label` (shown when the gap >= 30 px, live 123 vs 303) opens
+  the box on click (`open_offset_input`).
+- FIL1 (in snapshot): fillet radius manipulator = hollow arrow from the arc midpoint toward its centre (28 px stem),
+  "R<value>" label up-left of a short leader to the arc's upper tangent point (`fillet_value_label`); arrow hit-test
+  along the segment.
+- PAT1 (uncommitted at the restart): hollow 16 px squares at seed and first instance, count arrow after the square
+  (30 px stem), light-blue dash-dot seed->first guide, labels ~95 px diagonal with a leader + arrowhead,
+  spacing dimension 101 px to the label's side with extension lines and arrowheads; count drags relative to the
+  grab (`pattern_grab`). No grey sprite dots for linear handles.
+- POLY1 (uncommitted): dash-dot construction circle; spinner 24 px out on the centre->rim ray, ◀/▶ drawn rotated in
+  the overlay (hatched), count label upright (GPUI can't rotate text: lead to decide on a raster glyph).
+- SLOT1 (uncommitted): pending slot shows its Ø dimension (dimension_* read the preview via `dimension_source`)
+  and 4 tangent points; the diameter goes on the END cap, label at centre + (0, 2 x width) -> vertical radial leader.
+  Constraints (coincident x4, tangent x4, offset x3 instead of equal pairs): skb's, note left in sketch-behaviour.md.
+- Blocked at the restart: transition's crates/app/src/preferences_window.rs:1143 unclosed delimiter (another agent).

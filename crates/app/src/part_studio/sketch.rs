@@ -2604,21 +2604,35 @@ impl PartStudioView {
         let project = |q: DVec2| vp.project(frame.to_world(q)).map(|s| (s.x as f32, s.y as f32));
         let editing = self.dim_input.as_ref().map(|(c, st, _)| (*c, st.clone()));
 
-        if let Some((at, sides)) = ed.polygon_side_control()
+        // Polygon side spinner (live sketch/91): the count at the spinner's
+        // centre, the ◀ / ▶ (drawn by the editor along the ray) clickable.
+        if let Some((at, u, sides)) = ed.polygon_side_control()
             && let Some((x, y)) = project(at)
         {
-            out.push(h_flex().absolute().left(px(x - 30.)).top(px(y - 10.)).occlude()
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(Button::new("sk-polygon-less").label("◀").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    if let Some(ed) = &mut this.sketch { ed.adjust_polygon_sides(-1); }
-                    this.refresh_scene(false, cx); cx.notify();
-                })))
-                .child(div().text_sm().child(sides.to_string()))
-                .child(Button::new("sk-polygon-more").label("▶").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    if let Some(ed) = &mut this.sketch { ed.adjust_polygon_sides(1); }
-                    this.refresh_scene(false, cx); cx.notify();
-                })))
-                .into_any_element());
+            let arm = u * ed.world_per_px * crate::sketch_mode::POLYGON_SPINNER_ARROW_PX;
+            let text = sides.to_string();
+            let w = crate::sketch_mode::label_width_px(&text) as f32;
+            out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 11.)).h(px(22.)).flex().items_center().text_size(px(16.)).text_color(rgb(0x000000)).whitespace_nowrap().child(text).into_any_element());
+            for (id, k) in [("sk-polygon-less", -1.0), ("sk-polygon-more", 1.0)] {
+                let Some((ax, ay)) = project(at + arm * k) else { continue };
+                let delta: isize = if k < 0.0 { -1 } else { 1 };
+                out.push(
+                    div()
+                        .id(id)
+                        .absolute()
+                        .left(px(ax - 9.))
+                        .top(px(ay - 9.))
+                        .size(px(18.))
+                        .cursor_pointer()
+                        .occlude()
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if let Some(ed) = &mut this.sketch { ed.adjust_polygon_sides(delta); }
+                            this.refresh_scene(false, cx); cx.notify();
+                        }))
+                        .into_any_element(),
+                );
+            }
         }
 
         // ---- pattern instance counts (`3x`, click to type; live sketch/136–138)
@@ -2631,11 +2645,14 @@ impl PartStudioView {
                 out.push(div().absolute().left(px(x - 4.)).top(px(y - 12.)).w(px(56.)).occlude().child(Input::new(st).xsmall()).into_any_element());
                 continue;
             }
+            // Centred on the editor's anchor (live sketch/136: at the end of the leader).
+            let linear = matches!(h, crate::sketch_mode::PatternHandle::LinearCount | crate::sketch_mode::PatternHandle::LinearSecondCount);
+            let label_w = if linear { crate::sketch_mode::label_width_px(&format!("{n}x")) as f32 } else { 0.0 };
             out.push(
                 div()
                     .id(SharedString::from(format!("sk-count-{h:?}")))
                     .absolute()
-                    .left(px(x))
+                    .left(px(x - label_w * 0.5))
                     .top(px(y - 10.))
                     .text_size(px(16.))
                     .text_color(rgb(0x333333))
@@ -2665,11 +2682,13 @@ impl PartStudioView {
                 let bare = if dim == Dim::ANGLE { full.replace(" deg", "°") } else { full.split(' ').next().unwrap_or_default().to_string() };
                 (bare, full)
             };
+            // Centred on the spacing dimension's line (live sketch/136).
+            let label_w = crate::sketch_mode::label_width_px(&text) as f32;
             out.push(
                 div()
                     .id(SharedString::from(format!("sk-spacing-{h:?}")))
                     .absolute()
-                    .left(px(x - 20.))
+                    .left(px(x - label_w * 0.5))
                     .top(px(y - 10.))
                     .text_size(px(16.))
                     .text_color(rgb(0x333333))
