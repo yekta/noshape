@@ -273,6 +273,9 @@ pub struct PartStudioView {
     /// for the toast's Restore link (live sketch/68), with the toast text.
     canceled_edit: Option<(Feature, usize, bool, String)>,
     sketch: Option<SketchEditor>,
+    /// The sketch fillet radius last used in this tab: live's default is
+    /// R5 on a fresh load and then sticks per tab (behaviours.md 568).
+    sketch_fillet_radius: Option<f64>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
     context_menu: Option<(Point<Pixels>, Entity<crate::os_menu::OsMenu>, Subscription)>,
     measure_cache: Option<MeasureCache>,
@@ -403,6 +406,7 @@ impl PartStudioView {
             message: None,
             canceled_edit: None,
             sketch: None,
+            sketch_fillet_radius: None,
             context: None,
             context_menu: None,
             measure_cache: None,

@@ -82,7 +82,8 @@ jobs:
           key: occt-V8_0_1
 
       - name: Build (release)
-        run: cargo build --release --locked -p noshape
+        # The app and the agent CLI / MCP server (noshape-cli), shipped side by side.
+        run: cargo build --release --locked -p noshape -p noshape-cli
 
       - name: Bundle (macOS .app in .dmg)
         if: runner.os == 'macOS'
@@ -90,12 +91,18 @@ jobs:
           app=dist/noshape.app
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp target/release/noshape "$app/Contents/MacOS/noshape"
+          cp target/release/noshape-cli "$app/Contents/MacOS/noshape-cli"
           cp packaging/icons/noshape.icns "$app/Contents/Resources/noshape.icns"
           sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           plutil -lint "$app/Contents/Info.plist"
           strip -x "$app/Contents/MacOS/noshape"
-          # Ad-hoc signature so Apple Silicon will launch it (not notarized).
+          strip -x "$app/Contents/MacOS/noshape-cli"
+          # Ad-hoc signatures so Apple Silicon will launch them (not notarized):
+          # the CLI first (nested code), then the bundle.
+          codesign --force --sign - "$app/Contents/MacOS/noshape-cli"
           codesign --force --deep --sign - "$app"
+          # The CLI also loose in the dmg, next to noshape.app (same signed binary).
+          cp "$app/Contents/MacOS/noshape-cli" dist/noshape-cli
           ln -s /Applications dist/Applications
           # hdiutil underestimates the image size for large binaries; size it explicitly.
           size_mb=$(( $(du -sm dist | cut -f1) * 2 + 64 ))
@@ -108,8 +115,8 @@ jobs:
         run: |
           d="noshape-$VERSION-${{ matrix.asset }}"
           mkdir -p "$d"
-          cp target/release/noshape "$d/"
-          strip "$d/noshape"
+          cp target/release/noshape target/release/noshape-cli "$d/"
+          strip "$d/noshape" "$d/noshape-cli"
           cp packaging/linux/noshape.desktop README.md "$d/"
           cp packaging/icons/noshape-512.png "$d/noshape.png"
           cp packaging/icons/noshape.svg "$d/noshape.svg"
@@ -122,7 +129,7 @@ jobs:
         run: |
           $d = "noshape-$env:VERSION-${{ matrix.asset }}"
           New-Item -ItemType Directory -Force -Path $d | Out-Null
-          Copy-Item target/release/noshape.exe, README.md $d
+          Copy-Item target/release/noshape.exe, target/release/noshape-cli.exe, README.md $d
           Compress-Archive -Path $d -DestinationPath "$d.zip"
           "ASSET=$d.zip" >> $env:GITHUB_ENV
 

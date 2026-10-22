@@ -2936,7 +2936,8 @@ impl AssemblyView {
             Some(a) => DVec3::from(a).normalize_or(DVec3::Z),
             None => t.normalize_or(DVec3::Z),
         };
-        let text = if rotation { noshape_units::format_quantity(Quantity::radians(step.rotation_angle), &units) } else { noshape_units::format_quantity(Quantity::meters(t.length()), &units) };
+        // Live writes angles as "55 deg" (805/810).
+        let text = if rotation { noshape_units::format_quantity(Quantity::radians(step.rotation_angle), &units).replace('°', " deg") } else { noshape_units::format_quantity(Quantity::meters(t.length()), &units) };
         let value = cx.new(|cx| InputState::new(window, cx).default_value(text));
         let sub = cx.subscribe_in(&value, window, |this: &mut Self, _, ev: &InputEvent, _, cx| match ev {
             InputEvent::Change => this.reapply_display(cx),
