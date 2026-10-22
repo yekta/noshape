@@ -1670,16 +1670,17 @@ impl AssemblyView {
         let mut pane = crate::ui::right_resizable(v_flex().id("ex-pane").relative(), 0.).w(px(crate::ui::right_panel_w())).h_full().occlude().bg(rgb(0xffffff)).text_color(rgb(0x333333)).child(title);
         if views.is_empty() {
             // Zero state: the button, an illustration and the how-to.
+            // Live 800: the button centred on a 33 px #eaeaea band (1 px #aaa
+            // left and bottom) 2 px under the title, then the illustration.
             pane = pane.child(
                 v_flex()
                     .flex_1()
                     .items_center()
-                    .pt(px(8.))
-                    .child(add_button("ex-add-top", cx))
-                    .child(div().mt(px(105.)).opacity(0.35).child(crate::assets::icon("explode", 120., cx)))
+                    .child(h_flex().mt(px(2.)).w_full().h(px(34.)).justify_center().bg(rgb(0xeaeaea)).border_l_1().border_b_1().border_color(rgb(0xaaaaaa)).child(add_button("ex-add-top", cx)))
+                    .child(div().mt(px(98.)).child(crate::assets::icon("exploded-views-empty", 152., cx)))
                     .child(
                         v_flex()
-                            .mt(px(16.))
+                            .mt(px(22.))
                             .w(px(420.))
                             .items_center()
                             .text_size(px(13.33))
@@ -1790,14 +1791,16 @@ impl AssemblyView {
                     div()
                         .id(id)
                         .h(px(26.))
-                        .pl(px(25. + 15.))
-                        .pr(px(5.))
+                        // Live 801: a 7 px #b8b8b8 bar from 51 px in to 6 px
+                        // short of the panel's right edge.
+                        .pl(px(51.))
+                        .pr(px(6.))
                         .flex()
                         .items_center()
                         .cursor_grab()
                         .tooltip(crate::ui::tooltip("Rollback bar"))
-                        .child(div().w_full().h(px(6.)).bg(rgb(0xcccccc)))
-                        .on_drag(ExplodeRollbackDrag { view: i }, |d, _, _, cx| cx.new(|_| d.clone()))
+                        .child(div().w_full().h(px(7.)).bg(rgb(0xb8b8b8)))
+                        .on_drag(ExplodeRollbackDrag { view: i, grab: Point::default() }, |d, grab, _, cx| cx.new(|_| ExplodeRollbackDrag { grab, ..d.clone() }))
                         .into_any_element()
                 };
                 for (k, st) in v.steps.iter().enumerate() {
@@ -1805,7 +1808,8 @@ impl AssemblyView {
                         steps = steps.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
                     }
                     let rotation = st.rotation_axis.is_some();
-                    let step_sel = sel == Some((i, Some(k)));
+                    // The step whose dialog is open is selected too (live 805).
+                    let step_sel = sel == Some((i, Some(k))) || self.step_edit.as_ref().is_some_and(|se| se.view == i && se.step == k);
                     let label: SharedString = st.display_name(k).into();
                     let rolled_back = active && k >= upto;
                     let accent = pal.accent;
@@ -1870,15 +1874,7 @@ impl AssemblyView {
                             .on_drag(ExplodeStepDrag { index: k, label }, |d, _, _, cx| cx.new(|_| d.clone()))
                             .drag_over::<ExplodeStepDrag>(move |st, _, _, _| st.border_t_2().border_color(accent))
                             .on_drop(cx.listener(move |this, d: &ExplodeStepDrag, _, cx| this.move_explode_step(d.index, k, cx)))
-                            .drag_over::<ExplodeRollbackDrag>(move |st, _, _, _| st.border_b_2().border_color(accent))
-                            .on_drop(cx.listener(move |this, d: &ExplodeRollbackDrag, _, cx| {
-                                if d.view == i {
-                                    if this.explode != Some(i) {
-                                        this.activate_explode(Some(i), cx);
-                                    }
-                                    this.set_explode_progress((k + 1) as f64, cx);
-                                }
-                            })),
+
                     );
                 }
                 // The rollback bar only in explode mode (live 816: after Done
@@ -1886,16 +1882,70 @@ impl AssemblyView {
                 if active && upto >= n {
                     steps = steps.child(bar(SharedString::from(format!("ex-rb-{i}")), cx));
                 }
-                tree = tree.child(steps.when(n > 0, |d| d.child(div().absolute().left(px(14.)).top_0().bottom(px(-6.)).w(px(1.)).bg(rgb(0xd7d7d7)))));
+                // Dragging the rollback bar (live 820): the drop slot is the
+                // row boundary nearest the cursor, shown as a 2 px blue line
+                // with a ring at its left; dropping there plays the steps above.
+                let rows = n + usize::from(active);
+                let bar_row = upto;
+                let steps_above = move |b: usize| if active && bar_row < b { b - 1 } else { b };
+                if let Some((_, b)) = self.ui.explode_rb_drop.filter(|(v, _)| *v == i) {
+                    let y = b as f32 * 26. - 1.;
+                    steps = steps.child(
+                        div()
+                            .absolute()
+                            .top(px(y))
+                            .left(px(17.))
+                            .right(px(15.))
+                            .h(px(2.))
+                            .bg(blue)
+                            .child(div().absolute().left(px(-4.)).top(px(-4.)).size(px(10.)).rounded_full().border_2().border_color(blue).bg(rgb(0xcad8ed))),
+                    );
+                }
+                let steps = steps
+                    .on_drag_move::<ExplodeRollbackDrag>(cx.listener(move |this, e: &DragMoveEvent<ExplodeRollbackDrag>, _, cx| {
+                        if e.drag(cx).view != i {
+                            return;
+                        }
+                        let inside = e.bounds.contains(&e.event.position);
+                        let slot = inside.then(|| (((e.event.position.y - e.bounds.top()) / px(26.)).round().max(0.) as usize).min(rows));
+                        let new = slot.map(|b| (i, b));
+                        if this.ui.explode_rb_drop != new {
+                            this.ui.explode_rb_drop = new;
+                            cx.notify();
+                        }
+                    }))
+                    .on_drop(cx.listener(move |this, d: &ExplodeRollbackDrag, _, cx| {
+                        let slot = this.ui.explode_rb_drop.take();
+                        if d.view != i {
+                            return;
+                        }
+                        if let Some((_, b)) = slot {
+                            if this.explode != Some(i) {
+                                this.activate_explode(Some(i), cx);
+                            }
+                            this.set_explode_progress(steps_above(b) as f64, cx);
+                        }
+                        cx.notify();
+                    }));
+                // Live 801: a 1 px #d7d7d7 guide at x 16 down the view's rows
+                // (also with no steps yet), ending in a 9 px tick.
+                let has_rows = n > 0 || (active && upto >= n);
+                tree = tree.child(steps.when(has_rows, |d| {
+                    d.child(div().absolute().left(px(16.)).top_0().bottom_0().w(px(1.)).bg(rgb(0xd7d7d7)))
+                        .child(div().absolute().left(px(12.)).bottom_0().w(px(9.)).h(px(1.)).bg(rgb(0xd7d7d7)))
+                }));
             }
             pane = pane.child(tree);
             // The how-to box: one view, gone after its first step (live 805).
             if views.len() == 1 && views[0].steps.is_empty() {
                 pane = pane.child(
-                    div().mx(px(18.)).mt(px(18.)).mb(px(14.)).p(px(15.)).rounded(px(4.)).border_1().border_color(rgb(0xa6d5ec)).bg(rgb(0xd9edf7)).text_size(px(13.33)).text_color(rgb(0x094174)).child(
+                    // Live 801: 20 px in, 5 px from the right, 9 px under the tree; the
+                    // info tokens #def1fb / #b2ddf6; the text on one line.
+                    div().ml(px(20.)).mr(px(5.)).mt(px(9.)).mb(px(14.)).pt(px(15.)).px(px(15.)).pb(px(31.)).rounded(px(4.)).border_1().border_color(rgb(0xb2ddf6)).bg(rgb(0xdef1fb)).text_size(px(13.33)).text_color(rgb(0x094174)).child(
                         v_flex()
                             .child(div().font_weight(FontWeight::BOLD).child("Build steps by dragging components"))
-                            .child(div().child("Select components in the graphics area or the instance list, then drag or rotate them using the triad manipulator.")),
+                            // Live 801: the body line at 12 px (one line in the panel).
+                            .child(div().text_size(px(12.)).child("Select components in the graphics area or the instance list, then drag or rotate them using the triad manipulator.")),
                     ),
                 );
             }
@@ -2449,11 +2499,27 @@ pub(crate) enum TriadAction {
 #[derive(Clone)]
 pub(crate) struct ExplodeRollbackDrag {
     pub view: usize,
+    /// Where the bar was grabbed (the ghost is drawn that far up-left of the
+    /// cursor; padding by it centres the pill on the cursor).
+    pub grab: Point<Pixels>,
 }
 
 impl Render for ExplodeRollbackDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().w(px(200.)).h(px(6.)).bg(rgb(0xcccccc))
+        // Live 820: a 100 × 31 blue pill "Rollback bar" under the cursor.
+        div().pl((self.grab.x - px(50.)).max(px(0.))).pt((self.grab.y - px(15.)).max(px(0.))).child(
+        div()
+            .w(px(100.))
+            .h(px(31.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded_full()
+            .bg(rgb(0x1651b0))
+            .text_size(px(13.33))
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_color(rgb(0xffffff))
+            .child("Rollback bar"))
     }
 }
 
@@ -2936,7 +3002,8 @@ impl AssemblyView {
             Some(a) => DVec3::from(a).normalize_or(DVec3::Z),
             None => t.normalize_or(DVec3::Z),
         };
-        let text = if rotation { noshape_units::format_quantity(Quantity::radians(step.rotation_angle), &units) } else { noshape_units::format_quantity(Quantity::meters(t.length()), &units) };
+        // Live writes angles as "55 deg" (805/810).
+        let text = if rotation { noshape_units::format_quantity(Quantity::radians(step.rotation_angle), &units).replace('°', " deg") } else { noshape_units::format_quantity(Quantity::meters(t.length()), &units) };
         let value = cx.new(|cx| InputState::new(window, cx).default_value(text));
         let sub = cx.subscribe_in(&value, window, |this: &mut Self, _, ev: &InputEvent, _, cx| match ev {
             InputEvent::Change => this.reapply_display(cx),
