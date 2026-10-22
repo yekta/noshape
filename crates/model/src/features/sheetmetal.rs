@@ -355,9 +355,12 @@ pub fn tab() -> FeatureType {
 fn bend_top(max_angle: f64) -> Vec<ParamSpec> {
     let ac = |v: &ParamValues, t: &str| v.is("angleControlType", t);
     vec![
-        ParamSpec::query1("bendReference", "Bend line", QueryFilter::LINEAR_EDGE | QueryFilter::SKETCH_EDGE | QueryFilter::AXIS).hints(Hints::INITIAL_FOCUS),
+        // std: `GeometryType.LINE` only, so no "Select mate connector" button
+        // beside the field (live qa5 BEND2, dom/qa5-sm-dialog-bend.html).
+        ParamSpec::query1("bendReference", "Bend line", QueryFilter::LINEAR_EDGE | QueryFilter::SKETCH_EDGE).hints(Hints::INITIAL_FOCUS),
         ParamSpec::flip("holdOtherSide", "Hold opposite side"),
         ParamSpec::query1("face", "Sheet metal face to bend", QueryFilter::PLANAR_FACE),
+        // std `UIHint.SHOW_LABEL`: "Bend alignment [Bend line ▾]" (live).
         ParamSpec::enum_(
             "bendAlignment",
             "Bend alignment",
@@ -369,7 +372,8 @@ fn bend_top(max_angle: f64) -> Vec<ParamSpec> {
                 ("BENT_OUTSIDE", "Outer"),
                 ("BENT_MIDPLANE", "Middle"),
             ],
-        ),
+        )
+        .hints(Hints::SHOW_LABEL),
         ParamSpec::enum_("angleControlType", "Angle control type", ANGLE_CONTROL),
         ParamSpec::bool("oppositeAngle", "Opposite angle", false).hints(Hints::OPPOSITE_DIRECTION_CIRCULAR),
         ParamSpec::num("bendAngle", "Bend angle", NumSpec::angle(90.0, 1.0, max_angle)).visible(move |v| ac(v, "BEND_ANGLE")),
