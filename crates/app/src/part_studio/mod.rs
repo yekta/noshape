@@ -2823,12 +2823,14 @@ impl PartStudioView {
         let renaming = self.ui.part_renaming.as_ref().is_some_and(|(x, ..)| *x == b.id);
         // Live (selection/09, part-studio/450): the band spans the list with
         // the content indented 18 px, 24 px tall, 5 px short of the edge.
-        crate::ui::tree_row(SharedString::from(format!("part-{}", b.id)), selected)
+        // While renaming the row is white with no hover fill: `tree_row` gets
+        // `selected` so it sets no hover style (a second `.hover` panics, CRASH1).
+        crate::ui::tree_row(SharedString::from(format!("part-{}", b.id)), selected || renaming)
             .h(px(24.))
             .pl(px(23.))
             .mr(px(5.))
             .group("part-row")
-            .when(renaming, |d| d.bg(gpui_kit::rgb(0xffffff)).hover(|d| d.bg(gpui_kit::rgb(0xffffff))))
+            .when(renaming, |d| d.bg(gpui_kit::rgb(0xffffff)))
             .when(hidden, |d| d.text_color(pal.text_faint))
             .child(crate::ui::tree_icon(part_icon, hidden, cx))
             .child(match self.ui.part_renaming.as_ref().filter(|(x, ..)| *x == b.id).map(|(_, st, _)| st.clone()) {

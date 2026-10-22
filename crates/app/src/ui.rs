@@ -1227,6 +1227,45 @@ mod tests {
         Bounds { origin: point(px(x), px(y)), size: size(px(w), px(h)) }
     }
 
+    /// CRASH1: `tree_row` sets the hover fill of unselected rows, and GPUI
+    /// panics ("hover style already set") on a second `.hover`. No row chain
+    /// may add its own before its first child.
+    #[::core::prelude::v1::test]
+    fn tree_rows_never_set_a_second_hover() {
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
+        let mut bad = Vec::new();
+        for f in files {
+            let text = std::fs::read_to_string(&f).unwrap();
+            let lines: Vec<&str> = text.lines().collect();
+            for (i, l) in lines.iter().enumerate() {
+                if !l.contains("tree_row(") || l.contains("fn tree_row") || l.trim_start().starts_with("//") {
+                    continue;
+                }
+                for (j, m) in lines.iter().enumerate().skip(i + 1).take(14) {
+                    let m = m.trim_start();
+                    if m.starts_with(".child(") || m.starts_with(".children(") {
+                        break;
+                    }
+                    if m.contains(".hover(") {
+                        bad.push(format!("{}:{}", f.display(), j + 1));
+                    }
+                }
+            }
+        }
+        assert!(bad.is_empty(), "a second hover on a tree_row: {bad:?}");
+    }
+
     #[::core::prelude::v1::test]
     fn custom_feature_initials_and_regen_times_read_as_onshape() {
         assert_eq!(feature_initials("QA cube"), "Qc");
