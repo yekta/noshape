@@ -73,21 +73,15 @@ jobs:
         with:
           key: occt-V8_0_1
 
-      - name: features_a one test at a time
-        run: cargo test --locked -p noshape-model --test features_a -- --test-threads=1 2>&1 | tee features_a.log; exit ${PIPESTATUS[0]}
-        shell: bash
-        continue-on-error: true
+      - name: features_a (parallel, as the release CI runs it)
+        run: cargo test --locked -p noshape-model --test features_a
 
-      - name: features_a under lldb (native backtrace)
-        shell: bash
-        run: |
-          bin=$(cargo test --locked -p noshape-model --test features_a --no-run --message-format=json 2>/dev/null | python3 -c 'import sys,json
-          for l in sys.stdin:
-              try: m=json.loads(l)
-              except Exception: continue
-              if m.get("reason")=="compiler-artifact" and m.get("executable") and "features_a" in m["executable"]: print(m["executable"])' | tail -1)
-          echo "binary: $bin"
-          lldb --batch -o "run" -k "thread backtrace all" -k "quit 1" -- "$bin" --test-threads=1 2>&1 | tail -400
+      - name: features_a one test at a time
+        run: cargo test --locked -p noshape-model --test features_a -- --test-threads=1
+
+      - name: kernel display mesh guard
+        run: cargo test --locked -p noshape-kernel --test display_mesh_guard
+
       # The whole workspace (app included, tests included) must be warning-free.
       - name: Clippy (-D warnings)
         if: runner.os == 'Linux'
