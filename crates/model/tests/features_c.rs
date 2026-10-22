@@ -1295,3 +1295,14 @@ fn failed_extrude_reads_onshape_text() {
     });
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Failed to extrude selections, check input.".to_string()));
 }
+
+/// sweep.fs: a thin sweep checks its wall before the path.
+#[test]
+fn thin_sweep_checks_the_wall_first() {
+    let mut s = block();
+    s.add("sweep", |p| p.set("bodyType", en("THIN")));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select faces or sketch regions to sweep.".to_string()));
+    let mut s = block();
+    s.add("sweep", |_| {});
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select entities for sweep path.".to_string()));
+}
