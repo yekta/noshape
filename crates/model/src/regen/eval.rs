@@ -316,8 +316,10 @@ impl<'a> EvalCtx<'a> {
             match &s.kind {
                 ParamKind::Num(n) => {
                     let Ok(v) = self.eval_num_in(vals, s.id, n.kind) else { continue };
-                    if let Some(msg) = bounds_violation(v, n, self.units) {
-                        return err(format!("{}: {msg}", s.label));
+                    // Live (L32, L45, L55): Onshape's text for a value out of
+                    // its range, with the field marked.
+                    if bounds_violation(v, n, self.units).is_some() {
+                        return err_at(&[s.id], "A parameter value is not valid.");
                     }
                 }
                 ParamKind::Array { item, .. } => {
