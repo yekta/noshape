@@ -608,19 +608,21 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         return err("The rib profiles no longer exist");
     }
     let normal = ev.is("ribExtrusionDirection", "NORMAL_TO_SKETCH_PLANE");
-    // rib.fs: a closed profile has no side to extend toward.
-    if !normal && wires.iter().any(|w| w.is_closed().unwrap_or(false)) {
-        return err("Only open sketch profiles can be used when rib direction is parallel to sketch plane.");
+    // Live L23/L24: parallel to the sketch plane a closed profile or a chain
+    // of several edges fails on the profiles.
+    if !normal && wires.iter().any(|w| w.is_closed().unwrap_or(false) || w.edges().len() > 1) {
+        return crate::regen::eval::err_at(&["profiles"], RIB_FAILED);
     }
     let dir = if ev.bool("oppositeDirection") { -frame.normal } else { frame.normal };
     let mut parts = ev.resolve_bodies(ev.query("parts"));
     parts.retain(|i| ev.ctx.bodies[*i].kind == BodyKind::Solid);
-    let explicit = !parts.is_empty();
-    if !explicit {
+    // Live L22: no Parts is an error, no field marked (the dialog fills
+    // Parts when it opens). Ribs saved before that used every part.
+    if parts.is_empty() && ev.params.bool("legacyAllParts") {
         parts = (0..ev.ctx.bodies.len()).filter(|i| ev.ctx.bodies[*i].kind == BodyKind::Solid).collect();
     }
     if parts.is_empty() {
-        return err("Select parts for the rib");
+        return err("Select parts where the rib will be fitted into.");
     }
     let merge = ev.bool("mergeRibs");
     let mut made = 0;

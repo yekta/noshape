@@ -268,7 +268,7 @@ pub(crate) struct StepEdit {
     pub specify: bool,
     pub direction: Option<MateConnectorRef>,
     /// Distance or Rotation angle.
-    pub value: Entity<InputState>,
+    pub value: Entity<crate::quantity_field::QuantityInput>,
     pub lines: bool,
     pub line_refs: Vec<MateConnectorRef>,
     /// Field taking picks: 0 Instances, 1 direction / axis, 2 explode line entities.
@@ -470,6 +470,8 @@ impl AssemblyView {
         // The workspace draws this view as a cached view (`front_host`):
         // anything the document changes renders it again.
         subs.push(cx.observe(&doc, |_, _, cx| cx.notify()));
+        // Theming › Dark mode re-sets the graphics preferences: rebuild in the new colors.
+        subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| this.rebuild_scene(false, cx)));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             // Any tab can affect an assembly (Part Studios, sub-assemblies).
             DocEvent::TabChanged(t) => {
