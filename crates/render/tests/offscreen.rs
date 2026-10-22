@@ -1,7 +1,13 @@
 use noshape_render::*;
 
+/// One test on the GPU at a time: the Vulkan loader crashes (SIGSEGV in
+/// wgpu's `set_object_name`) when one test builds pipelines while another
+/// creates its instance.
+static GPU: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn renders_box_and_picks_faces() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -36,6 +42,7 @@ fn renders_box_and_picks_faces() {
 
 #[test]
 fn pipelined_frames_and_lazy_pick_regions() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -84,6 +91,7 @@ fn pipelined_frames_and_lazy_pick_regions() {
 
 #[test]
 fn visible_depth_samples_land_on_the_geometry() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -130,6 +138,7 @@ fn visible_depth_samples_land_on_the_geometry() {
 
 #[test]
 fn plane_depth_counts_only_in_the_with_planes_samples() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -218,6 +227,7 @@ fn iso_camera() -> Camera {
 /// hidden behind the part must not.
 #[test]
 fn pick_only_region_on_face_wins_the_pick() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -270,6 +280,7 @@ fn pick_only_region_on_face_wins_the_pick() {
 /// must be drawn solid.
 #[test]
 fn plate_edges_are_drawn_solid_over_faces() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -362,6 +373,7 @@ fn plate_edges_are_drawn_solid_over_faces() {
 /// when the data is really unchanged).
 #[test]
 fn every_scene_change_renders_fresh_content() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -424,6 +436,7 @@ fn every_scene_change_renders_fresh_content() {
 /// solid and showed it), and the cap shows dark hatch lines.
 #[test]
 fn section_caps_cover_the_cut() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -468,6 +481,7 @@ fn section_caps_cover_the_cut() {
 /// covers the cut, not faces the view ray reaches before the material).
 #[test]
 fn section_leaves_uncut_faces_unhatched() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -512,6 +526,7 @@ fn section_leaves_uncut_faces_unhatched() {
 /// the normal shading.
 #[test]
 fn zebra_stripes_replace_shading() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -559,6 +574,7 @@ fn zebra_stripes_replace_shading() {
 /// black ground): its top face reflects the sky, its sides the ground.
 #[test]
 fn reflection_mirrors_the_environment() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -601,6 +617,7 @@ fn reflection_mirrors_the_environment() {
 /// follows section clipping unless `ignore_clip`, and is never picked.
 #[test]
 fn image_quad_is_textured_and_depth_tested() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -698,6 +715,7 @@ fn image_quad_is_textured_and_depth_tested() {
 /// A large image (mip chain on the CPU, odd sizes) uploads and renders.
 #[test]
 fn image_with_odd_size_uploads_mips() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -727,6 +745,7 @@ fn image_with_odd_size_uploads_mips() {
 /// sketch's "underconstrained occluded" color).
 #[test]
 fn hidden_only_lines_show_only_behind_geometry() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -761,6 +780,7 @@ fn hidden_only_lines_show_only_behind_geometry() {
 /// lighter, flat (no highlight), and see-through.
 #[test]
 fn feature_preview_shading_matches_onshape() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -799,6 +819,7 @@ fn srgb_lin(c: u8) -> f32 {
 
 #[test]
 fn texture_frames_stay_on_the_gpu_and_textures_are_reused_once_released() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -857,6 +878,7 @@ fn texture_frames_stay_on_the_gpu_and_textures_are_reused_once_released() {
 #[test]
 fn view_cube_overlay_is_drawn_in_the_top_right_corner_only() {
     use noshape_render::overlay::{CubeColors, Overlay, ViewCube};
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -906,6 +928,7 @@ fn view_cube_overlay_is_drawn_in_the_top_right_corner_only() {
 #[test]
 fn overlay_path_pixel_clip_drops_pixels_outside_path_bounds() {
     use noshape_render::overlay::{CubeColors, Overlay, TextShading, ViewCube};
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -947,6 +970,7 @@ fn overlay_path_pixel_clip_drops_pixels_outside_path_bounds() {
 /// No red may show, orthographic or perspective, at 1x and 2x.
 #[test]
 fn edges_behind_faces_stay_hidden_at_close_zoom() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -1020,6 +1044,7 @@ fn edges_behind_faces_stay_hidden_at_close_zoom() {
 /// one selected and the right one hidden.
 #[test]
 fn shared_mesh_copies_keep_their_own_picks_and_states() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -1070,6 +1095,7 @@ fn shared_mesh_copies_keep_their_own_picks_and_states() {
 /// on, orthographic, at 1x and 2x.
 #[test]
 fn section_cap_hatch_follows_onshape() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -1161,6 +1187,7 @@ fn section_cap_hatch_follows_onshape() {
 /// target-only geometry fades in to 0.5.
 #[test]
 fn compare_blend_follows_onshape() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -1229,6 +1256,7 @@ fn compare_blend_follows_onshape() {
 #[test]
 fn label_quads_and_shadows_follow_gpui() {
     use noshape_render::overlay::{Label, Overlay, Quad, Shadow};
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {

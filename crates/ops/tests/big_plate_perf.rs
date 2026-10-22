@@ -23,6 +23,42 @@ fn timed(ctx: &mut Ctx, what: &str, tool: &str, args: Value) -> Value {
     v
 }
 
+/// The plate in a new document at `path` (each step timed).
+fn big_plate(ctx: &mut Ctx, path: &str) {
+    call(ctx, "document_create", json!({ "path": path }));
+    let tab = "Part Studio 1";
+    let sk = call(ctx, "sketch_create", json!({ "tab": tab, "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    let st = call(ctx, "sketch_draw", json!({ "tab": tab, "sketch": sketch, "tool": "corner_rectangle", "points": [[0, 0], [400, 400]] }));
+    let region = st["regions"][0]["id"].as_str().unwrap().to_string();
+    timed(ctx, "Extrude 1 (plate)", "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let sk = call(ctx, "sketch_create", json!({ "tab": tab, "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    let t = Instant::now();
+    let mut last = Value::Null;
+    for i in 0..20 {
+        for j in 0..20 {
+            let (x, y) = (10 + 20 * i, 10 + 20 * j);
+            last = call(ctx, "sketch_draw", json!({ "tab": tab, "sketch": sketch, "tool": "circle", "points": [[x, y], [x + 4, y]] }));
+        }
+    }
+    eprintln!("400 circles: {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+    let regions: Vec<Value> = last["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    eprintln!("regions: {}", regions.len());
+    let r = timed(ctx, "Extrude 2 (Remove, Through all)", "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": regions, "operationType": "REMOVE", "defaultScope": true, "endBound": "THROUGH_ALL" } }));
+    assert_eq!(r["feature_status"]["status"], "Ok", "{r}");
+}
+
+/// The plate as a benchmark fixture (`tests/perf/big-plate.noshape`,
+/// perf.yml `fixture`). `NOSHAPE_FIXTURE_OUT=<path>` writes it.
+#[test]
+#[ignore]
+fn write_big_plate_fixture() {
+    let out = std::env::var("NOSHAPE_FIXTURE_OUT").expect("NOSHAPE_FIXTURE_OUT");
+    let _ = std::fs::remove_file(&out);
+    big_plate(&mut Ctx::new(), &out);
+}
+
 #[test]
 #[ignore]
 fn big_plate_timing() {
@@ -30,28 +66,8 @@ fn big_plate_timing() {
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("plate.noshape");
     let mut ctx = Ctx::new();
-    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    big_plate(&mut ctx, path.to_str().unwrap());
     let tab = "Part Studio 1";
-    let sk = call(&mut ctx, "sketch_create", json!({ "tab": tab, "plane": "plane:top" }));
-    let sketch = sk["sketch"].as_str().unwrap().to_string();
-    let st = call(&mut ctx, "sketch_draw", json!({ "tab": tab, "sketch": sketch, "tool": "corner_rectangle", "points": [[0, 0], [400, 400]] }));
-    let region = st["regions"][0]["id"].as_str().unwrap().to_string();
-    timed(&mut ctx, "Extrude 1 (plate)", "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
-    let sk = call(&mut ctx, "sketch_create", json!({ "tab": tab, "plane": "plane:top" }));
-    let sketch = sk["sketch"].as_str().unwrap().to_string();
-    let t = Instant::now();
-    let mut last = Value::Null;
-    for i in 0..20 {
-        for j in 0..20 {
-            let (x, y) = (10 + 20 * i, 10 + 20 * j);
-            last = call(&mut ctx, "sketch_draw", json!({ "tab": tab, "sketch": sketch, "tool": "circle", "points": [[x, y], [x + 4, y]] }));
-        }
-    }
-    eprintln!("400 circles: {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
-    let regions: Vec<Value> = last["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
-    eprintln!("regions: {}", regions.len());
-    let r = timed(&mut ctx, "Extrude 2 (Remove, Through all)", "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": regions, "operationType": "REMOVE", "defaultScope": true, "endBound": "THROUGH_ALL" } }));
-    assert_eq!(r["feature_status"]["status"], "Ok", "{r}");
 
     // From scratch: feature evaluation vs display.
     let mut fresh = noshape_model::regen::Regenerator::new();

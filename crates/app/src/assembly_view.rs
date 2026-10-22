@@ -610,6 +610,12 @@ impl AssemblyView {
         self.doc.read(cx).session.doc.settings.units
     }
 
+    /// The variables an assembly field's expression sees (its inserted
+    /// Variable Studios), for the number fields' evaluation.
+    pub(super) fn variable_scope(&self, cx: &App) -> std::collections::BTreeMap<String, noshape_units::Quantity> {
+        self.assembly(cx).map(|a| noshape_model::variables::refs_variables(&self.doc.read(cx).session.doc, &a.variable_studios)).unwrap_or_default()
+    }
+
     // ------------------------------------------------------------ evaluation
 
     /// Assembly to evaluate (with the mate being edited applied) and solve options.
@@ -1595,7 +1601,9 @@ impl AssemblyView {
     fn open_mate_dialog(&mut self, mate: Mate, editing: Option<MateId>, window: &mut Window, cx: &mut Context<Self>) {
         let labeler = self.labeler(cx);
         let is_new = editing.is_none();
-        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, window, cx));
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let variables = self.variable_scope(cx);
+        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, units, variables, window, cx));
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &MateDialogEvent, window, cx| match ev {
             MateDialogEvent::Changed => {
                 this.schedule_eval(window, cx);

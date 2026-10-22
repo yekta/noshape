@@ -42,10 +42,10 @@ fn sketch_extrude_fillet_pattern_export_render() {
     assert_eq!(lines.len(), 4, "{rect}");
     let circle = call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "circle", "points": [[0, 0], [4, 0]] }));
     let circle_id = circle["created"].as_array().unwrap().iter().find(|e| e["type"] == "circle").unwrap()["id"].as_str().unwrap().to_string();
-    // The rectangle's automatic constraints are the UI's: horizontal/vertical sides.
+    // The rectangle's automatic constraints are the UI's (live's): Perpendicular, 2 Parallel, Horizontal.
     let st = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }));
     let kinds: Vec<&str> = st["constraints"].as_array().unwrap().iter().map(|c| c["type"].as_str().unwrap()).collect();
-    assert!(kinds.iter().filter(|k| **k == "Horizontal").count() >= 2 && kinds.iter().filter(|k| **k == "Vertical").count() >= 2, "{kinds:?}");
+    assert_eq!(kinds, ["Perpendicular", "Parallel", "Parallel", "Horizontal"], "{kinds:?}");
     // Ø10 by a diameter dimension; the bottom line 50 mm via an expression.
     let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": sketch, "kind": "diameter", "entities": [circle_id], "value": "10 mm" }));
     assert!(d["dimension"].as_str().unwrap().starts_with("dim:"));
