@@ -268,7 +268,7 @@ pub(crate) struct StepEdit {
     pub specify: bool,
     pub direction: Option<MateConnectorRef>,
     /// Distance or Rotation angle.
-    pub value: Entity<InputState>,
+    pub value: Entity<crate::quantity_field::QuantityInput>,
     pub lines: bool,
     pub line_refs: Vec<MateConnectorRef>,
     /// Field taking picks: 0 Instances, 1 direction / axis, 2 explode line entities.
@@ -2079,7 +2079,7 @@ impl AssemblyView {
             && dialog.read(cx).awaiting_pick()
         {
             if dialog.read(cx).picks_entities() && (c.connector.is_some() || c.instance == InstanceId::ORIGIN) {
-                self.message = Some((false, "Tangent mates take faces, edges or vertices.".into()));
+                self.message = Some((false, "Geometry is not supported for tangent mate.".into()));
                 return;
             }
             let is_new = self.mate.as_ref().is_some_and(|s| s.editing.is_none());
