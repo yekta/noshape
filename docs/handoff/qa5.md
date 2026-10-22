@@ -50,6 +50,7 @@ App under test = copy of /root/target-lead/debug/noshape (the merge queue builds
 - Pass 15 (10-22): CLI /tmp/qa5/noshape-cli-0521 (target-engine 05:21): IM5 FIXED; IM4, NAME3, IM1, IM2, I1, SF2, SF5, SF6, SM1, hem, SM3, ADV2, EXP1 unchanged. Log pass3/impmatrix14.log. Main still aa75fdf.
 - Pass 16 (10-22): workflow 27 sheet-metal joints/loft (workflow-sheet-metal-joints.md): loft New ✅ exact, SML1 new (loft Add unsupported), Make joint dialog ✅, SM4 still; Tab/Rip/Bend/Jog dialogs asked from live. Setup pass16/mksmloft.py.
 - Pass 17 (10-22): workflow 28 exploded views + named positions (workflow-exploded-named-positions.md), doc /tmp/qa5/d28/x.noshape: EXV1–EXV4, NP1 (minor); menus, dialogs, Apply toast ✅. Pass 17b: rotation step, rollback drag, driver mate + value cells: EXV5, EXV6, MNU2, NP2 (all minor).
+- Pass 18 (10-22 ~10:00–11:00): CLI /tmp/qa5/noshape-cli-0811 (target-engine 08:11): NAME3 FIXED; IM4 imports again but still corrupt (bbox 39 m); rest unchanged. App rows waiting for the queue to build main 3ce6952 (queue stuck in its 09:58 batch at 11:00). Log pass3/impmatrix15.log.
 - Re-run rule: when main moves (`git -C /root/noshape log -1 main`; the merge queue lands commits every few minutes) or a newer target-shared binary appears,
   copy it and re-run every ✗ row; each checklist has dated "Re-run pass N" / "Update from live's answer" sections.
 
