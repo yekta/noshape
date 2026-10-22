@@ -834,6 +834,10 @@ impl PartStudioView {
         // Hovering a feature or part in the list lights up all of its
         // geometry; a single hovered entity uses the hover highlight.
         let hovered = self.highlighted_hover(cx);
+        // Trim (live, qa5 sketch tools): only the piece that would go is
+        // highlighted (the sketch overlay draws it), not the whole curve.
+        let trimming = self.sketch.as_ref().is_some_and(|s| s.tool == crate::sketch_mode::Tool::Trim);
+        let hovered: Vec<Reference> = hovered.into_iter().filter(|r| !(trimming && matches!(r, Reference::SketchEntity { .. }))).collect();
         // A manipulator handle under the cursor hides the geometry hover.
         let on_handle = self.ui.manip_hover || self.ui.triad_hover.is_some();
         let single_hover = if hovered.len() == 1 && self.ui.list_hover.is_none() && self.ui.var_hover.is_none() && self.ui.ct.hover.is_none() && !on_handle { hovered.first().cloned() } else { None };
@@ -3418,9 +3422,10 @@ impl PartStudioView {
                         .and_then(|v| {
                             let studio = v.read(cx).studio(cx)?;
                             let i = studio.features.iter().position(|g| g.id == id)?;
-                            // Live (behaviours "Feature-row hover tooltips"): "<-" lists only
-                            // feature-level inputs, the sketches (Fillet, Chamfer, Shell,
-                            // Boolean: the name alone).
+                            // Live lists only the sketches a feature uses ("Extrude 1 <-
+                            // Sketch 1", "[Hole] <- Sketch 2"); parts picked in a Boolean
+                            // or a merge scope aren't named (qa5 BOOL1b, behaviours B4;
+                            // Fillet / Chamfer / Shell: the name alone).
                             Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(|g| g.name.clone())).collect())
                         })
                         .unwrap_or_default()

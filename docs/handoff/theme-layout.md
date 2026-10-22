@@ -1366,3 +1366,12 @@ Spec: `QuantitySpec::quantity(Dim::LENGTH | ANGLE | UNITLESS)` or `QuantitySpec:
   (`os_ui::select_field_focusable`: Space/Enter/↓ open), then d, ?, then the navbar; Generate is no tab stop. Tab
   on the assembly page itself (`Assembly && !Input`) → `FocusNavbar` (live: the dialog opens with the focus on the
   page body, the first Tab goes to Share).
+
+## From ui2 (10-22): dark mode (lead: ui2 owns it) — touches theme.rs and vendor gpui-pre color.rs
+- `theme::PALETTE_DARK` (live dom/dark-os-vars-computed.json), `p()` returns it while dark mode is on and no
+  light scope is open; `theme::set_dark` (Preferences › Theming) installs `theme::DARK_HEX` into the patched
+  gpui: `rgb()` / `rgba()` map literal light colours to dark ones (one relaxed atomic load in light mode; a
+  binary search in dark). `gpui_kit::with_light_colors(|| …)` keeps a subtree light (the drawing editor);
+  `gpui_kit::rgb_static` for colours that never change (Onshape's `--static` tokens). New hard-coded colours
+  are fine; if one must not flip in dark mode, use `rgb_static`. Plan and side-by-side table:
+  docs/parity/dark-mode.md.

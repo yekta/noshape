@@ -251,6 +251,15 @@ pub struct Instance {
     /// Compare mode ([`Scene::compare`]): which version this instance draws
     /// ([`compare::BASE`], [`compare::TARGET`]; 0: neither, always drawn).
     pub compare: u8,
+    /// The body (Onshape's body occurrence) this instance draws, 1-based
+    /// and dense per scene (0: none). At its lowest level of detail
+    /// ([`Detail`], `performAggressiveCulling`) all its instances give way
+    /// to its [`Instance::lod_box`].
+    pub body: u32,
+    /// The [`Instance::body`]'s lowest level of detail: its bounding box
+    /// (a unit cube placed by `transform`) in the body's color
+    /// (`getDisplayIncrement`), drawn only in the body's place.
+    pub lod_box: bool,
 }
 
 /// Versions and history › Compare, as Onshape draws it (webgl bundle): the
@@ -317,6 +326,8 @@ impl Instance {
             zebra: None,
             reflection: None,
             compare: 0,
+            body: 0,
+            lod_box: false,
         }
     }
     /// The version this instance draws in compare mode ([`compare`]).
@@ -379,6 +390,20 @@ impl Instance {
         self
     }
 
+    /// Part of body `id` ([`Instance::body`]).
+    pub fn body(mut self, id: u32) -> Self {
+        self.body = id;
+        self
+    }
+    /// Body `id`'s lowest level of detail ([`Instance::lod_box`]): `mesh` a
+    /// unit cube ([`lod_box_mesh`]), `bounds` the body's in its local space.
+    pub fn lod_box(mesh: MeshHandle, id: u32, (lo, hi): (Vec3, Vec3), color: [f32; 4]) -> Self {
+        let mut i = Self::new(Drawable::Mesh(mesh)).with_color(color).unpickable();
+        i.transform = Mat4::from_translation((lo + hi) * 0.5) * Mat4::from_scale((hi - lo).max(Vec3::splat(1e-9)));
+        i.body = id;
+        i.lod_box = true;
+        i
+    }
     /// Draw this mesh as Onshape's image-based (backface) silhouettes in
     /// the instance color, not as faces; never picked.
     pub fn back_silhouette(mut self) -> Self {
@@ -473,12 +498,29 @@ pub struct Detail {
     pub backface_silhouettes: bool,
     /// The section caps' outlines.
     pub section_edges: bool,
+    /// The share of bodies that may be drawn as their bounding box
+    /// ([`Instance::lod_box`]; `lowLevelBodyProportion`, 0..0.9).
+    pub low_level_body_proportion: f32,
+    /// Bodies smaller than this on screen (CSS px) are always drawn as
+    /// their box (`extentCullingThresholdPx`: 2 at full detail, 10 while
+    /// the camera moves).
+    pub extent_culling_px: f32,
 }
+
+/// `DEFAULT_EXTENT_CULLING_THRESHOLD_IN_PIXELS` /
+/// `AGGRESSIVE_EXTENT_CULLING_THRESHOLD_IN_PIXELS`.
+pub const EXTENT_CULLING_PX: f32 = 2.0;
+pub const INTERACTIVE_EXTENT_CULLING_PX: f32 = 10.0;
 
 impl Default for Detail {
     fn default() -> Self {
-        Self { edge_silhouettes: true, backface_silhouettes: true, section_edges: true }
+        Self { edge_silhouettes: true, backface_silhouettes: true, section_edges: true, low_level_body_proportion: 0.0, extent_culling_px: EXTENT_CULLING_PX }
     }
+}
+
+/// The unit cube (−0.5..0.5) every [`Instance::lod_box`] draws.
+pub fn lod_box_mesh() -> MeshData {
+    crate::primitives::box_mesh([-0.5; 3], [0.5; 3], 0)
 }
 
 impl Default for Style {

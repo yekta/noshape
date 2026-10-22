@@ -756,6 +756,32 @@ impl<'a, L: Lookup> Builder<'a, L> {
         }
     }
 
+    /// Onshape's OFFSET: `curve` at the radius of `reference` from `master`.
+    fn offset(&mut self, reference: EntityId, curve: EntityId, master: EntityId, side: f64) -> R {
+        let d = self.radius(reference)?;
+        match (self.kind(curve)?, self.kind(master)?) {
+            (EntityKind::Line, EntityKind::Line) => {
+                let (lc, lm) = (self.line(curve)?, self.line(master)?);
+                for p in [[lc[0], lc[1]], [lc[2], lc[3]]] {
+                    self.lin(Lin::new().pld(side, p, lm).rad(-1.0, &d));
+                }
+                Ok(())
+            }
+            (k, EntityKind::Point) if k.is_circular() => {
+                let r = self.radius(curve)?;
+                self.lin(Lin::new().rad(1.0, &r).rad(-1.0, &d));
+                let cid = self.sk.entity(curve).and_then(|e| e.center()).ok_or_else(|| format!("{curve} has no center"))?;
+                if !self.lk.same(cid, master) {
+                    let (cc, pm) = (self.center(curve)?, self.lk.point(master));
+                    self.lin(Lin::new().p(1.0, cc[0]).p(-1.0, pm[0]));
+                    self.lin(Lin::new().p(1.0, cc[1]).p(-1.0, pm[1]));
+                }
+                Ok(())
+            }
+            (kc, km) => Err(format!("offset not supported between {kc:?} and {km:?}")),
+        }
+    }
+
     fn curv_spec(&self, id: EntityId, at_end: bool) -> Result<(CurvSpec, SmallVec<[u32; 8]>), String> {
         match self.geom(id)? {
             Geometry::Line { .. } => Ok((CurvSpec::Line, SmallVec::new())),
@@ -901,6 +927,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 }
             }
             K::Tangent { a, b } => self.tangent(*a, *b, c),
+            K::Offset { reference, curve, master, side, .. } => self.offset(*reference, *curve, *master, *side),
             K::Equal { a, b } => {
                 let (ka, kb) = (self.kind(*a)?, self.kind(*b)?);
                 match (ka, kb) {
