@@ -47,7 +47,7 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 ## Update from live's answer "qa5 sketch tools" (behaviours.md ~7780, 7983) + lead's notes, 10-22
 | Row | Live | Ours | Status |
 |---|---|---|---|
-| FIL2 fillet default | **R5 on every fresh page load**, then sticky per tab (last radius used) | UI R5 on a fresh doc ✅ (pass 19); pass 14's R20 was a leftover → **FIL2 withdrawn**. CLI `sketch_fillet` still documents/uses "20 mm / 0.5 in" as default | ✅ UI; ✗ minor CLI default (api) |
+| FIL2 fillet default | **R5 on every fresh page load**, then sticky per tab (last radius used) | UI R5 on a fresh doc ✅ (pass 19); pass 14's R20 was a leftover → **FIL2 withdrawn**; sticky: R5 → 3 → the next fillet previews R3 (z40). CLI `sketch_fillet` still documents/uses "20 mm / 0.5 in" as default | ✅ UI; ✗ minor CLI default (api) |
 | SK5 radius edit (CLI, exact: rect (0,0)–(30.089,22.065), fillet top-right R5 → set the fillet's R) | R3: top 25.089, bottom 28.089, left 22.065, right 19.065. R8: top 25.089, bottom 33.089, left 22.065, right 14.065 (the edge trimmed first keeps its length, height stays, the far edge moves; a `visualSharp` point coincident with both lines) | R3: top **26.089**, bottom **29.089**, left **21.065**, right **18.065**. R8: top **23.589**, bottom **31.589**, left **23.565**, right **15.565** (the change is split over both edges; no visualSharp point) | ✗ **SK5** confirmed (skb; /root/qa5-scratch/pass20/sk5.py + sk5b.py) |
 | (new) corner rectangle constraints | PERPENDICULAR, 2 × PARALLEL, HORIZONTAL + corner coincidents (glyphs ∥ ∥ ⊥ — in sketch/303) | 2 × HORIZONTAL + 2 × VERTICAL (glyphs — — \| \|) | ✗ **RECT1** (skb) |
 | Trim hover | only the stub up to the intersection | whole line (k12) | ✗ **TRIM1** (skb) |
