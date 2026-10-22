@@ -509,3 +509,12 @@ changes. I write the renderer part first (my files) and show crops before touchi
   the viewport yet: Off would render at 1 px per logical px on HiDPI (scale 1.0 instead of `window.scale_factor()`
   in viewport.rs, picks mapped accordingly), On/Automatic = device pixels. Yours to wire (a cached atomic, not a
   file read per frame) — tell ui2 and I'll expose a reader.
+- **2026-10-22 09:55 (perf): cost of the angle-based display mesh** (Auto = 144 segments per circle, live 459), same loaded
+  machine (load 13–18), llvmpipe, old = aa75fdf display.rs (chord 8e-4 × diagonal, 0.35 rad):
+  - Big plate (400 holes): 59 212 → 232 012 triangles (×3.9); meshing the part 351 → 533 ms; regen from scratch 3.0 → 3.8 s.
+  - 1000 pins (5000 instances): 184 000 → 572 000 triangles (×3.1); frame mean 1612 → 9282 ms, worst 2035 → 16 980 ms
+    (software rendering, triangle bound; on a GPU 572k triangles is cheap). Onshape pays the same triangle count and
+    relies on interactive detail reduction (lowest-LOD boxes for up to 90 % of bodies, ordered by coarse triangles /
+    radius², `performAggressiveCulling`): next item.
+  - Fix d8d0955: the chord tolerance scales with quality too (BRepMesh keeps an existing coarser triangulation
+    otherwise; "Use best available tessellation" = Very fine, 600 segments).
