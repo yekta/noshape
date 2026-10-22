@@ -19,3 +19,6 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/j01�
 | 10 | Jog dialog | ? (asked) | as Bend + ▾ Blind · Jog offset 10 mm · ▾ Inside · ☑ Preserve material (jd-jog) | ? |
 
 Findings: SML1 (new). SM4, SM1, SM3 still. Live request "qa5 (10-22 pass 16, workflow 27 …)" filed for rows 7–10.
+
+## Re-run pass 18 (2026-10-22 ~10:00–11:00, CLI /tmp/qa5/noshape-cli-0811 = target-engine 08:11; main 3ce6952)
+CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS; SML1 loft Add "not supported yet". ✗ still.
