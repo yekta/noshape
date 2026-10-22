@@ -36,10 +36,12 @@ fn f3(p: DVec3) -> [f32; 3] {
 
 /// Onshape's display mesh is angle based (live 459): Auto draws a full
 /// circle with 144 segments whatever its size, `quality` scales that angle
-/// (`TessQuality::factor`). The chord tolerance is the body's size, so the
-/// angle alone decides.
+/// (`TessQuality::factor`). The chord tolerance is the body's size (times
+/// `quality`), so the angle alone decides; it still scales with `quality`
+/// because BRepMesh keeps a shape's existing triangulation unless the new
+/// chord tolerance is smaller (a finer quality must re-mesh).
 fn display_deflection(shape: &noshape_kernel::Shape, quality: f64) -> (f64, f64) {
-    let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
+    let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4) * quality;
     // BRepMesh's angular deflection is between a segment and the tangent,
     // half of the turn per segment.
     let auto = 2.0 * std::f64::consts::TAU / f64::from(crate::partstudio::TessQuality::Auto.segments_per_circle());
