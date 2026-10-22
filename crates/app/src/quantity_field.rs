@@ -269,6 +269,15 @@ impl QuantityInput {
         &self.committed
     }
 
+    /// Replace the text (committed as typed, rewritten by Onshape's rules),
+    /// e.g. when a dialog opens on an existing feature.
+    pub fn set_text(&mut self, text: impl Into<String>, window: &mut gpui_kit::Window, cx: &mut gpui_kit::Context<Self>) {
+        let text = self.rewrite(&text.into());
+        self.committed = text.clone();
+        self.state.update(cx, |s, cx| s.set_value(text, window, cx));
+        cx.notify();
+    }
+
     pub fn set_variables(&mut self, variables: std::collections::BTreeMap<String, noshape_units::Quantity>, cx: &mut gpui_kit::Context<Self>) {
         if variables != self.variables {
             self.variables = variables;
