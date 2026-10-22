@@ -3510,7 +3510,10 @@ impl AssemblyView {
         let vp = self.viewport.read(cx);
         let size = self.triad_size();
         let Some(o) = vp.project(f.origin) else { return vec![] };
-        let colors = [crate::theme::viewport::AXIS_X, crate::theme::viewport::AXIS_Y, crate::theme::viewport::AXIS_Z];
+        let colors = {
+            use crate::theme::{pick, viewport as l, viewport_dark as d};
+            [pick(l::AXIS_X, d::AXIS_X), pick(l::AXIS_Y, d::AXIS_Y), pick(l::AXIS_Z, d::AXIS_Z)]
+        };
         let mut out = Vec::new();
         for (k, (axis, letter)) in [(f.x(), "X"), (f.y(), "Y"), (f.z(), "Z")].into_iter().enumerate() {
             let Some(tip) = vp.project(f.origin + axis * size) else { continue };
@@ -3528,7 +3531,7 @@ impl AssemblyView {
                     .items_center()
                     .justify_center()
                     .text_size(px(11.))
-                    .text_color(rgb(colors[k]))
+                    .text_color(gpui_kit::rgb_static(colors[k]))
                     .child(letter)
                     .into_any_element(),
             );

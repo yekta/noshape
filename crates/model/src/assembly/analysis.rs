@@ -397,7 +397,7 @@ fn scoped_candidates(result: &AssemblyResult, target: &MateConnectorRef, seed_pa
         }
     }
     if out.is_empty() {
-        return Err("No matching geometry found".into());
+        return Err("Selected target did not contain identical geometry.".into());
     }
     Ok(out)
 }
@@ -578,7 +578,7 @@ pub fn matched_targets(result: &AssemblyResult, asm: &Assembly, pattern: &Instan
             }
         }
         if candidates.is_empty() {
-            return Err("No matching geometry found on the target instance".into());
+            return Err("Selected target did not contain identical geometry.".into());
         }
     }
     let seed_place = asm.instance(seed).map(|i| i.placement).unwrap_or_default();
