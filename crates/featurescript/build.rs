@@ -3,7 +3,9 @@
 use std::io::Write;
 
 fn main() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("std");
+    // Read at run time: a build script compiled in one worktree can be reused
+    // by another sharing the target dir (`env!` would point at the first).
+    let dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR")).join("std");
     println!("cargo:rerun-if-changed={}", dir.display());
     let mut names: Vec<String> = std::fs::read_dir(&dir)
         .expect("std directory")

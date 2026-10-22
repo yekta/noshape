@@ -1184,3 +1184,29 @@ fn an_unsolvable_sketch_is_in_error() {
     assert_eq!(status, FeatureStatus::Error);
 }
 
+
+/// Live/moveFace.fs: the faces are checked before the axis, a 0 offset
+/// leaves the part as it is, and Delete face of every face has Onshape's text.
+#[test]
+fn move_and_delete_face_onshape_errors() {
+    let mut s = block();
+    s.add("moveFace", |p| p.set("moveFaceType", en("ROTATE")));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select faces to move.".to_string()));
+
+    let mut s = block();
+    let r = s.ok();
+    let v0 = volume(&r, 0);
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
+    s.add("moveFace", move |p| {
+        p.set("moveFaces", q(top));
+        p.set("offsetDistance", expr("0 mm"));
+    });
+    assert!(near(volume(&s.ok(), 0), v0, 1e-12));
+
+    let mut s = block();
+    let r = s.ok();
+    let pts = [(50.0, 25.0, 25.0), (50.0, 25.0, 0.0), (50.0, 0.0, 12.5), (50.0, 50.0, 12.5), (0.0, 25.0, 12.5), (100.0, 25.0, 12.5)];
+    let faces: Vec<Reference> = pts.iter().map(|&(x, y, z)| face_at(&r, 0, DVec3::new(mm(x), mm(y), mm(z)))).collect();
+    s.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(faces)));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Cannot delete all faces of a part or surface.".to_string()));
+}

@@ -1398,8 +1398,9 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   badge is the blue "Rollback bar" pill with the name or "N items" (`FeatureDragPill`).
 - **NAME3 (release blocker):** `Context.own_names` holds parts named from outside the studio (import file names in
   `apply_look`, Derived parts); `renumber_default_names` skips them. Test `features_b.rs::imported_part_names_are_not_renumbered`.
-  Check the real files in the app: /root/onshape-research/live/samples/g48-two.step, jt-2parts.jt (never copy them
-  into the repo).
+  Checked with the CLI (`import_files`, 10-22): g48-two.step → "Part 1" = G48 22595.371166, "Part 2" = cube 1000;
+  jt-2parts.jt → "Part 1" = 8000, "Part 2" = 1000 (the files' names). Our list order is the file's ("Part 2" row
+  first); live's row order for these imports isn't recorded yet (asked). Never copy the samples into the repo.
 - **INT2:** Intersect of parts that don't meet makes and changes nothing (info "Boolean resulted in no geometry
   change…"). Test `engine.rs::intersect_of_parts_apart_makes_nothing`.
 - **BOOL4b:** ✓ stays enabled for "No merge scope selected." (`feature_dialog.rs` `blocked`); the "do not intersect"
@@ -1408,4 +1409,17 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
 - **DER4 (2nd try):** labeler falls back to the Derived feature whose source studio holds the creator feature
   (`derived_sources`), so it holds while the edited fillet has consumed the edge.
 - **VS4:** looks done already (`variables::new_studio` on every path); confirm in the app.
-- **DER7:** not reproduced yet; doc /tmp/psb/d/derive.noshape (copy of qa5's d23).
+- **Checked in the app (10-22, derive doc copy /tmp/psb/d/derive.noshape):** F33 line/dot on the hovered half,
+  hover fill, blue pill; BOOL4b ✓ enabled with the empty scope, then row red "No merge scope selected."; DER4 chip
+  "Edge of Derived 1" (not red); DER13 tooltip "Select edges or faces to fillet." after suppressing the source extrude.
+- **DER7 is not a rendering bug:** the "ghost" cylinder sits under the Select Part Studio panel, whose background is
+  live's `rgba(255,255,255,0.95)` (dom/fs-refparams-picker-studio.txt `div.ns-dialog.feature-dialog-resize`); the
+  pixel is exactly 5 % of the part (247 over 98). qa5's d24 shows the same layout. Only a part outside the panel looks
+  "normal". Left as is; a live shot with a part behind the panel would close it.
+- **Derived dialog rows 2–4 (DER1–DER3), rechecked 10-22:** pink "Select Part Studio…" field, "Placement" label, no
+  clock icon, branch glyph in the panel header, and picking the studio expands it inline with the ‹ back arrow are all
+  in. Live 407's "highlighted Part 1 row" and "Part 1 chip" are **hover**: the row's #def1fb hover fill and its
+  tooltip (`tip="Part 1"`, #d0dbe5); 418 (no hover) shows the row white. Panel rows now hover #def1fb (were #eaeaea).
+- **VS1 checked in the app:** Variable › Value `8`, Enter → "8 mm", dialog stays open; second Enter accepts (live
+  behaviours "qa5 pass 8 (2)"). The text selection after the first Enter can't be seen on Xvfb (Ctrl+A shows none
+  either), so that half is unchecked.

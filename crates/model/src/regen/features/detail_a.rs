@@ -31,12 +31,15 @@ fn edge_normals(shape: &Shape, faces: &[Shape], edge_faces: &[Vec<u32>], ei: usi
 
 // ------------------------------------------------------------------ draft
 
+/// Onshape's DRAFT_FAILED (draft.fs).
+const DRAFT_FAILED: &str = "Selected faces could not be drafted.";
+
 pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("draftFeatureType", "PARTING_LINE") {
         return parting_line_draft(ev);
     }
     let Some(np) = ev.query("neutralPlane").first() else { return crate::regen::eval::err_at(&["neutralPlane"], "Select a neutral plane.") };
-    let frame = ev.resolve_plane(np).ok_or_else(|| fe("The neutral plane could not be resolved"))?;
+    let Some(frame) = ev.resolve_plane(np) else { return crate::regen::eval::err_at(&["neutralPlane"], "Select a neutral plane.") };
     let refs = ev.query("draftFaces");
     if refs.is_empty() {
         return crate::regen::eval::err_at(&["draftFaces"], "Select faces to draft.");
@@ -46,7 +49,7 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
     let neutral = k::Plane::new(frame.origin, pull, frame.x);
     let groups = by_body(ev.resolve_faces(refs));
     if groups.is_empty() {
-        return err("The faces to draft no longer exist");
+        return crate::regen::eval::err_at(&["draftFaces"], "Select faces to draft.");
     }
     let refillet = ev.bool("reFillet");
     for (bi, faces) in groups.into_iter().rev() {
@@ -63,7 +66,7 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
             continue;
         }
         let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-        let res = draft_robust(&body.shape, &shapes, pull, &neutral, angle).map_err(kerr("Draft failed"))?;
+        let res = draft_robust(&body.shape, &shapes, pull, &neutral, angle).map_err(|_| fe(DRAFT_FAILED))?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
         ev.replace_body(bi, res.shape, face_names);
@@ -175,12 +178,12 @@ fn draft_reblend(ev: &mut EvalCtx, bi: usize, drafted: &[usize], blends: &[usize
         }
     }
     let del: Vec<Shape> = blends.iter().map(|f| faces[*f].clone()).collect();
-    let res = k::delete_faces(&body.shape, &del).map_err(kerr("Draft failed (the fillets could not be removed to reapply them)"))?;
+    let res = k::delete_faces(&body.shape, &del).map_err(|_| fe(DRAFT_FAILED))?;
     let n1 = crate::regen::eval::names_for(&res.shape, ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None));
     let img1 = |f: usize| -> Vec<u32> { res.history.modified(0, ShapeType::Face, f as u32) };
     let to_draft: Vec<u32> = drafted.iter().filter(|f| !removed.contains(f)).flat_map(|&f| img1(f)).collect();
     let shapes: Vec<Shape> = to_draft.iter().filter_map(|&f| res.shape.sub_shape(ShapeType::Face, f as usize).ok()).collect();
-    let res2 = draft_robust(&res.shape, &shapes, pull, neutral, angle).map_err(kerr("Draft failed"))?;
+    let res2 = draft_robust(&res.shape, &shapes, pull, neutral, angle).map_err(|_| fe(DRAFT_FAILED))?;
     let n2 = crate::regen::eval::names_for(&res2.shape, ev.name_result(&[&n1], &res2.history, &res2.shape, &BTreeMap::new(), None));
     let img = |f: usize| -> Vec<u32> { img1(f).into_iter().flat_map(|g| res2.history.modified(0, ShapeType::Face, g)).collect() };
     let ef2 = res2.shape.edge_faces()?;
@@ -203,7 +206,7 @@ fn draft_reblend(ev: &mut EvalCtx, bi: usize, drafted: &[usize], blends: &[usize
         return Ok(());
     }
     let shapes: Vec<Shape> = edges.iter().filter_map(|e| res2.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-    let res3 = k::fillet_checked(&res2.shape, &shapes, &radii).map_err(kerr("Draft failed (the fillets could not be reapplied)"))?;
+    let res3 = k::fillet_checked(&res2.shape, &shapes, &radii).map_err(|_| fe(DRAFT_FAILED))?;
     let mut names3 = ev.name_result(&[&n2], &res3.history, &res3.shape, &BTreeMap::new(), Some(&blend_role));
     let map: BTreeMap<Name, Name> = keep_name.into_iter().filter_map(|(ei, old)| n2.edges.get(ei).map(|en| (Arc::new(TopoName::face(ev.feature, Role::Blend(en.clone()))), old))).collect();
     for n in names3.iter_mut() {
@@ -220,14 +223,16 @@ fn draft_reblend(ev: &mut EvalCtx, bi: usize, drafted: &[usize], blends: &[usize
 /// direction): the faces next to the parting edges on the drafted side(s)
 /// are tapered about the parting plane.
 fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
-    let Some(pr) = ev.query("pullDirectionEntity").first() else { return err("Select the pull direction") };
-    let mut pull = ev.resolve_direction(pr).ok_or_else(|| fe("The pull direction could not be resolved"))?.normalize();
+    let no_pull = || crate::regen::eval::err_at(&["pullDirectionEntity"], "Select pull direction.");
+    let Some(pr) = ev.query("pullDirectionEntity").first() else { return no_pull() };
+    let Some(pull) = ev.resolve_direction(pr) else { return no_pull() };
+    let mut pull = pull.normalize();
     if ev.bool("pullDirection") {
         pull = -pull;
     }
     let edges = ev.resolve_edges(ev.query("partingEdges"));
     if edges.is_empty() {
-        return err("Select the parting edges");
+        return crate::regen::eval::err_at(&["partingEdges"], "Select parting edges.");
     }
     let bi = edges[0].0;
     if edges.iter().any(|e| e.0 != bi) {
@@ -288,13 +293,13 @@ fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
         let idx: Vec<usize> = names.iter().flat_map(|n| body.find_faces(n)).collect();
         let shapes: Vec<Shape> = idx.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
         let neutral = k::Plane::new(origin, dir, if dir.cross(DVec3::X).length() > 0.1 { DVec3::X } else { DVec3::Y });
-        let res = k::draft(&body.shape, &shapes, dir, &neutral, ang).map_err(kerr("Parting line draft failed"))?;
+        let res = k::draft(&body.shape, &shapes, dir, &neutral, ang).map_err(|_| fe(DRAFT_FAILED))?;
         let face_names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
         drafted = true;
         ev.replace_body(bi, res.shape, face_names);
     }
     if !drafted {
-        return err("No faces next to the parting edges to draft");
+        return err(DRAFT_FAILED);
     }
     Ok(())
 }
