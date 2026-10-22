@@ -773,3 +773,33 @@ remove-selection, snap-mate, zoom-in).
   states). Each needs a live reference before changing.
 - FREEZE 04:10: tree green at my last edit (cargo check -p noshape: Finished, 0 warnings), guard test 2 passed,
   tools/guard.py 0/732. No tree edits until "freeze lifted".
+
+## From ui2 (10-22): Onshape Labs flask
+- `onshape-labs-blue.svg` (Labs on: Preferences heading, Feature Studio Co-complete switch) and `onshape-labs.svg`
+  (grey, Labs off) are ui2's own drawings of live's `svg-icon-onshape-labs(-blue)` (a flask with a cube inside,
+  20 px). Redraw them in your style if you like; keep the names.
+
+## Round 14 (2026-10-22, after freeze lifted, main aa75fdf) — kit icons -> Onshape
+- Section view (section.rs): chip × always shown (live part-studio/71), side plane icon 16 -> 20 px. Verified r14-sec.
+- Bootstrap/ns-dialog close (11 px ×, #333 at .5 = `glyph("close", 21., #333)` at .86, same as Animate's
+  panel_frame plain close): Dependencies (behaviors.rs dep-close, pdep-close; verified r14-dep), Isolate (isolate_ui;
+  11x11 #999 = live), Reflection env picker (reflection.rs envp-close), keyboard shortcut sheet (view_tools sc-close,
+  assembly asm-sc-close), assembly Measure (asm-measure-x). Display states now uses the plain close (live nv-904).
+- Select carets -> drawing-tool-caret 12 px (8x4 #333 = live CSS caret): reflection env picker (Library/Type/Image;
+  verified r14-envp), flatten export format.
+- Selection-list × -> ui-clear 9 #666: assembly Group member rows.
+- Display states "+" (was a blue primary kit button): bordered 28 px box, add-button 20, #aaa (.42) until a name is
+  typed (live nv-904); verified.
+- Dialog header ✗ 18 -> 24 and ✓ 20 / kit Check 18 -> dialog-ok 24 app-wide (live 28x24 sprites): assembly_reflection,
+  graphics_prefs_dialog, assembly_mate_dialog, assembly_positions, in_context, assembly_standard, create_selection,
+  assembly_view (incl. panel_frame svg close), assembly_mass, assembly_props, assembly_behaviors, appearance,
+  assembly_panels, menus. Left: sketch.rs sk-dim-cancel 22 (dimension popup, not a dialog header).
+- Dependencies panel rows: mask svg 15 px -> full-colour feature_icon at LIST_ICON (17; 15 px ink = live) at .8,
+  so the sketch row shows its blue badge like live (both panels). Building to verify.
+- Left as is: thickness.rs (no live reference: Thickness analysis is unavailable on the capture account), release
+  dialog × (no live capture), start_window TriangleAlert, mv-x (Explode editing bar; no capture).
+- Notes for owners (not icons): tool search finds neither "Section view" nor "Reflection analysis" (live does);
+  live's shortcut modal has a ↗ pop-out before × and is ~1000 px wide; assembly Measure panel lacks live's
+  query box / Measure type / unit selects; analysis menu has "Thickness analysis…" (live doesn't on this account);
+  Display states panel layout (live: name field first, underline input, no Update row); env picker tabs wrap in
+  live; Section view header ~7 px higher than live, chip text lighter/smaller.

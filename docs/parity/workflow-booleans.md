@@ -58,3 +58,23 @@ Re-checked rows 2, 4 and 6 on /tmp/qa5/noshape-0014 (doc /tmp/qa5/d25c/b.noshape
 
 Withdrawn: none. Corrected: BOOL4 (live default is empty; the bug is the missing error state + BOOL3's behaviour on ✓).
 Open for psb: BOOL1, BOOL3 (severe), BOOL2, BOOL4, INT1, NAME1, NAME2, SPLIT1, COPY1; for ui: DEL1, DEL2, MENU1.
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+Docs /tmp/qa5/d25c/b2.noshape, /tmp/qa5/d25d/s.noshape, /tmp/qa5/d25b/merge.noshape (rebuilt with pass11/mkbool2.py). Shots r01–r25.
+| Row | Ours | Status |
+|---|---|---|
+| BOOL1 disjoint Union Part 1 + Part 3 | Parts (3) unchanged (8000 / 1570.796327 / 4000), message "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained." | ✅ geometry **fixed**; ✗ **BOOL1b** (psb/ui): the message sits **inside the dialog** (live: blue bubble at the top centre of the graphics, dialog without message) and the committed row's hover tooltip repeats it (live: just "Boolean 1") (r01–r03) |
+| NAME1 positional names | after Union 1+2 old Part 3 is listed "Part 2" | ✅ **fixed** (r04) |
+| NAME2 first pick survives | Part 2 then Part 1 → grey cylinder body survives, 9178.097245 | ✅ **fixed** (r05) |
+| BOOL2 Intersect ☑ Keep tools | Parts (4): 8000 / 1570.796327 / 4000 / Part 4 = 392.699082 | ✅ **fixed** (r09) |
+| INT1 Intersect ☐ Keep tools | new grey body listed second "Part 2" 392.699082; old Part 3 → "Part 1" | ✅ **fixed** (r10) |
+| (new) Intersect of **disjoint** Part 1 + Part 3, ☑ Keep tools | creates an extra **"Part 4" of 8000 mm³** (a copy of Part 1), Part 1 recoloured grey | ✗ **INT2** (psb; live not captured, but an empty intersection can't be 8000 mm³) (r06, r07) |
+| SPLIT1 | halves listed at the end: Pin, Part 2 (copy), **Part 3 = x 20..40, Part 4 = x 0..20**, both Part 1's colour | ✅ **fixed** (r16, r17) |
+| COPY1 | Transform copy keeps Part 3's blue | ✅ **fixed** (r11) |
+| DEL1 | chip "Part 3" | ✅ **fixed** (r12); dropdown Delete / Dissolve / Ignore composite parts ✅ (r13) |
+| DEL2 | Parts list › Delete… opens "Delete part 2" dialog, preview Parts (2) | ✅ **fixed** (r15) |
+| MENU1 | Hide, Hide other parts, Hide all parts present | ✅ **fixed** (r14) |
+| BOOL4 empty merge scope | empty pink "Merge scope", red title, red preview ✅; but ours also shows a blue bubble **"Selected tools and targets do not intersect."** and the **✓ is disabled** (live: ✓ allowed → red row "Extrude 4 did not regenerate properly: No merge scope selected.") | ✗ **BOOL4b** (psb, minor) (r20, r21) |
+| BOOL3 ☑ Merge with all | ONE part "Part 1" 14785.398163, 17 faces | ✅ **fixed** (r22) |
+| BOOL3 scope Part 1 + Part 3 | ONE part 14000 + cylinder 1570.796327 separate | ✅ **fixed** (r24) |
+| BOOL3 scope Part 1 only | Part 1 11000, Part 2 1570.796327, Part 3 4000 | ✅ **fixed** (r25) |

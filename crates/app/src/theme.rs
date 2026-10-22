@@ -165,6 +165,15 @@ pub fn p() -> &'static Palette {
     &PALETTE
 }
 
+/// Theming › Dark mode (ui2; the dark palette lands with the dark-mode work,
+/// docs/parity/dark-mode.md). Read with one relaxed load.
+static DARK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_dark(on: bool) {
+    DARK.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+
 pub fn with_alpha(c: Rgba, a: f32) -> Rgba {
     Rgba { a, ..c }
 }

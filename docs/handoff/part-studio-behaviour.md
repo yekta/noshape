@@ -1316,6 +1316,10 @@ rule). Behaviour unchanged. If you change these rules, edit `crates/ops/src/stud
   - Still open: make that cut succeed (live does). Probe: ignored test `f12_kernel_probe` on BREPs dumped to
     /root/psb-scratch/f12 (temporary debug prints DBGE/DBGF/DBGH in eval.rs, pattern.rs, hole.rs: **remove before
     reporting**).
+- **kern (10-22): F12's kernel half is fixed**: the empty cut came from the corrupt corner OCCT's own chamfer left
+  (B-spline slivers, self-intersecting per BOPAlgo_ArgumentAnalyzer); the chamfer there is now Parasolid's blend
+  patch (kern's F8 work) and every copy cuts. I tightened `engine.rs::f12_case`: the error branch is gone, the
+  pattern must succeed (all four cases pass).
 - **F12 done on our side** (qa4 gate on 5bd50b2 passes F12 and F19). The kernel half (OCCT's empty cut where a
   cylinder runs into the 3 mm fillet; live cuts it) went to kern via docs/handoff/kernel-robustness.md, with the BREPs in
   /root/psb-scratch/f12 and the probe in /root/psb-scratch/f12/probe.rs. Once kern fixes it, tighten the F12 test.
@@ -1386,3 +1390,22 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   "Error regenerating." and the field reads "Missing Part Studio"; row menu "Switch to <source>". DER7 (ghost) not done.
 - **Verified in the app (qa5 merge.noshape):** Add over three parts starts on New; picking Add leaves the scope empty
   → pink scope, red title and row; Merge with all → Parts (1) "Part 1"; F33 line and landing.
+
+### Pass 16, after the freeze (10-22): F33 rework + qa5 pass 13
+- **F33 (live rule):** `interaction::reordered_at(features, moving, to, after)`; the CLI keeps `reordered`. Rows track
+  the cursor's half during a feature drag (`ui.feature_drop`, `on_drag_move`); the drag_over style draws the 2 px line
+  on the top or bottom edge with the #e0f0fb hover fill, a hollow dot child sits at the line's left end, and the
+  badge is the blue "Rollback bar" pill with the name or "N items" (`FeatureDragPill`).
+- **NAME3 (release blocker):** `Context.own_names` holds parts named from outside the studio (import file names in
+  `apply_look`, Derived parts); `renumber_default_names` skips them. Test `features_b.rs::imported_part_names_are_not_renumbered`.
+  Check the real files in the app: /root/onshape-research/live/samples/g48-two.step, jt-2parts.jt (never copy them
+  into the repo).
+- **INT2:** Intersect of parts that don't meet makes and changes nothing (info "Boolean resulted in no geometry
+  change…"). Test `engine.rs::intersect_of_parts_apart_makes_nothing`.
+- **BOOL4b:** ✓ stays enabled for "No merge scope selected." (`feature_dialog.rs` `blocked`); the "do not intersect"
+  bubble is Remove/Intersect only.
+- **DER13:** fillet/chamfer whose edges are all gone: "Select edges or faces to fillet./chamfer." (faulty entities).
+- **DER4 (2nd try):** labeler falls back to the Derived feature whose source studio holds the creator feature
+  (`derived_sources`), so it holds while the edited fillet has consumed the edge.
+- **VS4:** looks done already (`variables::new_studio` on every path); confirm in the app.
+- **DER7:** not reproduced yet; doc /tmp/psb/d/derive.noshape (copy of qa5's d23).

@@ -96,7 +96,7 @@ d / n (workflow 3) ✅; p Projected view ✅; Shift+D, Shift+R, Ctrl+M, Shift+H 
 | KB4 | Right-drag orbit is ~1.6× faster than Onshape (0.9°/px vs 0.55°/px) | Shift+1, right-drag 50 px left | perf / ui (nav) |
 | KB3 | Isolate leaves the default planes visible (live hides planes/origin with the other parts) | Part 1, Shift+I | ui |
 | KB1 | Shift+N does nothing on a selected part (works on feature rows) | select Part 1 in the parts list, Shift+N | psb |
-| KB2 | Named views panel ignores Esc (verify live; Show dependencies / Appearance close on Esc) | Shift+V, Esc | ui |
+| KB2 | Named views panel ignores Esc (verify live; Show dependencies / Appearance close on Esc) | Shift+V, Esc | ui: **fixed 10-22** (`ui::ensure_placeholder` no longer re-enables revert-on-Esc; one Esc in "New view name" closes the panel) |
 | D13 | Drawing title block "DRAWN" name lost after closing and reopening the document | qa5 assembly drawing | asb |
 
 ## Re-run pass 3 (2026-10-21 15:15, /tmp/qa5/noshape-1448 = target-shared 14:48)
@@ -129,3 +129,8 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
 | KB3 Isolate | Default geometry rows greyed ✅; other parts stay opaque | ✗ still (partly) |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| Row | Ours | Status |
+|---|---|---|
+| KB3 Isolate | other parts and planes go translucent | ✅ **fixed** (k02); default-geometry rows stay black (live pn-900 greys Top/Front/Right, but its planes may have been hidden beforehand: not counted) |

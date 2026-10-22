@@ -627,6 +627,37 @@ fn save_sketch_options(o: SketchOptions) {
 const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
 /// Geometry being drawn (`SKETCH_PREVIEW_COLOR`).
 const PREVIEW_COLOR: [u8; 4] = [0x44, 0x9c, 0xcd, 255];
+/// Onshape's hollow arrow manipulator in a sketch (live sketch/303, offset):
+/// 11 px past the curve's copy, an 18 px stem, a 31 x 23 px head; outline
+/// #989fa3 (3 px) around a white core.
+const OFFSET_ARROW_GAP_PX: f64 = 11.0;
+const OFFSET_ARROW_STEM_PX: f64 = 18.0;
+const OFFSET_ARROW_HEAD_PX: f64 = 31.0;
+const OFFSET_ARROW_HEAD_W_PX: f64 = 23.0;
+const MANIPULATOR_OUTLINE: [u8; 4] = [0x98, 0x9f, 0xa3, 255];
+/// The fillet radius manipulator's stem (live sketch/1934: the arrow starts
+/// at the preview arc's midpoint and points at its centre).
+const FILLET_ARROW_STEM_PX: f64 = 28.0;
+
+/// Onshape's hollow drag arrow (offset, fillet and chamfer manipulators):
+/// `start`, an `stem_px` stem, then the 31 x 23 px head, in `dir`.
+fn push_hollow_arrow(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, dir: DVec2, px: f64, stem_px: f64) {
+    let base = start + dir * px * stem_px;
+    let apex = base + dir * px * OFFSET_ARROW_HEAD_PX;
+    let half = dir.perp() * px * OFFSET_ARROW_HEAD_W_PX * 0.5;
+    // A #989fa3 3 px outline under a white core (as the Part Studio manipulators).
+    for (color, width) in [(MANIPULATOR_OUTLINE, 3.0), ([0xff, 0xff, 0xff, 0xff], 1.2)] {
+        wide.push((vec![start, base], color, width));
+        wide.push((vec![base + half, apex, base - half, base + half], color, width));
+    }
+}
+
+/// Distance from `p` to the segment `a`–`b`.
+fn dist_to_segment(p: DVec2, a: DVec2, b: DVec2) -> f64 {
+    let ab = b - a;
+    let t = ((p - a).dot(ab) / ab.length_squared().max(1e-30)).clamp(0.0, 1.0);
+    (p - (a + ab * t)).length()
+}
 
 /// Unit kind of a dimension's value.
 pub fn dim_unit(k: &ConstraintKind) -> Dim {
@@ -1429,7 +1460,7 @@ impl SketchEditor {
                 self.press = (pending && !on_chain_end && !matches!(self.tool, Tool::Spline | Tool::Bezier | Tool::Point)).then_some(p);
                 out
             }
-            Tool::Fillet if self.fillet_handle(&data.sketch).is_some_and(|(_, m)| (m - p).length() <= self.world_per_px * 8.0) => {
+            Tool::Fillet if self.fillet_arrow(&data.sketch).is_some_and(|(a, b)| dist_to_segment(p, a, b) <= self.world_per_px * 10.0) => {
                 if let Some((arc, _)) = self.fillet_handle(&data.sketch) {
                     self.drag = Some(DragState::FilletRadius { arc });
                 }
@@ -1721,12 +1752,29 @@ impl SketchEditor {
         probe.is_some_and(|q| (q - mid).dot(n) < 0.0)
     }
 
-    /// The offset direction arrow (base on the curve, tip in the offset direction).
+    /// The offset manipulator (live sketch/303): Onshape's hollow arrow,
+    /// starting 11 px past the offset copy and pointing away from the curve;
+    /// (start of the 18 px stem, apex of the 31 px head).
     pub fn offset_arrow(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
         let (mid, n) = self.offset_frame(sk)?;
         let sign = if self.offset_flip != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
-        let len = (self.offset_distance).max(self.world_per_px * 30.0);
-        Some((mid, mid + n * sign * len))
+        let (dir, px) = (n * sign, self.world_per_px);
+        let start = mid + dir * (self.offset_distance + px * OFFSET_ARROW_GAP_PX);
+        Some((start, start + dir * px * (OFFSET_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX)))
+    }
+
+    /// The pending offset's distance label, between the curve and its copy;
+    /// clicking it opens the distance box (Onshape's offset tool opens its
+    /// in-place edit view from the preview dimension; the manipulator has
+    /// none). Shown once it fits: live sketch/123 shows "0.25" at a ~40 px
+    /// gap, sketch/303 (5 mm, ~19 px) none.
+    pub fn offset_value_label(&self, sk: &Sketch) -> Option<(DVec2, f64)> {
+        if self.tool != Tool::Offset || self.offset_distance < self.world_per_px * 30.0 {
+            return None;
+        }
+        let (mid, n) = self.offset_frame(sk)?;
+        let sign = if self.offset_flip != self.offset_flip_base(sk) { -1.0 } else { 1.0 };
+        Some((mid + n * sign * self.offset_distance * 0.5, self.offset_distance))
     }
 
     /// Create the pending offset (Enter / click in space); later clicks repeat it.
@@ -1755,6 +1803,37 @@ impl SketchEditor {
         }
         let arc = self.fillet_session.filter(|a| sk.entity(*a).is_some())?;
         Some((arc, curve_mid(sk, arc)?))
+    }
+
+    /// The radius manipulator (live sketch/1934): from the fillet arc's
+    /// midpoint toward its centre; (start, apex of the head).
+    pub fn fillet_arrow(&self, sk: &Sketch) -> Option<(DVec2, DVec2)> {
+        let (arc, m) = self.fillet_handle(sk)?;
+        let sk = self.pending_corner.as_ref().map(|(d, _)| &d.sketch).unwrap_or(sk);
+        let Some(Curve2::Arc { center, .. }) = sk.curve(arc) else { return None };
+        let d = (center - m).try_normalize()?;
+        Some((m, m + d * self.world_per_px * (FILLET_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX)))
+    }
+
+    /// Where the pending fillet's "R" leader meets the arc: its upper end
+    /// (live sketch/1934: the tangent point on the top edge).
+    fn fillet_label_foot(&self, sk: &Sketch) -> Option<DVec2> {
+        let (arc, _) = self.fillet_handle(sk)?;
+        let sk = self.pending_corner.as_ref().map(|(d, _)| &d.sketch).unwrap_or(sk);
+        let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = sk.curve(arc) else { return None };
+        let (a, b) = (center + DVec2::from_angle(start_angle) * radius, center + DVec2::from_angle(end_angle) * radius);
+        Some(if (a.y - b.y).abs() > 1e-12 { if a.y > b.y { a } else { b } } else if a.x < b.x { a } else { b })
+    }
+
+    /// The pending fillet's radius label ("R5", live sketch/1934): its
+    /// right-centre anchor, up-left of the leader, and the radius.
+    pub fn fillet_value_label(&self, sk: &Sketch) -> Option<(DVec2, f64)> {
+        if self.tool != Tool::Fillet || self.pending_corner.is_none() {
+            return None;
+        }
+        let pa = self.fillet_label_foot(sk)?;
+        let px = self.world_per_px;
+        Some((pa + DVec2::new(-7.5 * px, 13.0 * px), self.fillet_radius))
     }
 
     /// Preview of a fillet at the hovered corner: the arc, and whether it fits.
@@ -3936,6 +4015,8 @@ impl SketchEditor {
         let preview_color = PREVIEW_COLOR;
         let guide_color = INFERENCE_COLOR;
         let on_top = LineSegment::ON_TOP;
+        // Manipulators drawn wider than `poly`'s 2 px, added after it (in order).
+        let mut wide: Vec<(Vec<DVec2>, [u8; 4], f32)> = Vec::new();
         let mut poly = |pts: &[DVec2], color: [u8; 4], dashed: bool| {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, color, 0, 2.0, on_top | if dashed { LineSegment::DASHED } else { 0 });
@@ -4196,11 +4277,11 @@ impl SketchEditor {
                     poly(&tmp.tessellate(e, self.world_per_px), preview_color, false);
                 }
             }
-            if let Some((base, tip)) = self.offset_arrow(&data.sketch) {
-                let d = (tip - base).try_normalize().unwrap_or(DVec2::X);
-                let (h, s) = (self.world_per_px * 10.0, self.world_per_px * 5.0);
-                poly(&[base, tip], guide_color, false);
-                poly(&[tip - d * h + d.perp() * s, tip, tip - d * h - d.perp() * s], guide_color, false);
+            if let Some((start, apex)) = self.offset_arrow(&data.sketch) {
+                // Onshape's hollow arrow (as the Part Studio manipulators): a
+                // light grey 3 px outline under a 1.5 px white line.
+                let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
+                push_hollow_arrow(&mut wide, start, d, self.world_per_px, OFFSET_ARROW_STEM_PX);
             }
         }
         // Fillet: preview at the hovered corner (red when it doesn't fit) and the
@@ -4209,9 +4290,16 @@ impl SketchEditor {
             if let Some((arc, ok)) = self.fillet_preview(&data.sketch) {
                 poly(&arc, if ok { preview_color } else { crate::palette::rgb8(crate::palette::viewport::SKETCH_OVER) }, false);
             }
-            if let Some((_, m)) = self.fillet_handle(&data.sketch) {
-                let s = self.world_per_px * 5.0;
-                poly(&[m + DVec2::new(-s, -s), m + DVec2::new(s, -s), m + DVec2::new(s, s), m + DVec2::new(-s, s), m + DVec2::new(-s, -s)], [0x4c, 0xc9, 0xf0, 255], false);
+            // Live (sketch/1934): the radius manipulator is the hollow drag
+            // arrow from the arc's midpoint toward its centre; the "R" label
+            // has a short leader down to the arc's upper tangent point.
+            if let Some((start, apex)) = self.fillet_arrow(&data.sketch) {
+                let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
+                push_hollow_arrow(&mut wide, start, d, self.world_per_px, FILLET_ARROW_STEM_PX);
+            }
+            if let Some(pa) = self.fillet_label_foot(&data.sketch) {
+                let px = self.world_per_px;
+                wide.push((vec![pa + DVec2::new(-4.0 * px, 6.0 * px), pa + DVec2::new(-4.0 * px, 0.0), pa], [0x33, 0x33, 0x33, 255], 1.5));
             }
         }
         // Slot preview (light blue until committed).
@@ -4437,6 +4525,10 @@ impl SketchEditor {
             for s in &g.segments {
                 lines.segments.push(LineSegment { a: w(s[0]), b: w(s[1]), color, pick_id: 0, width, style: on_top });
             }
+        }
+        for (pts, color, width) in wide {
+            let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
+            lines.push_polyline(&pts3, color, 0, width, on_top);
         }
         (lines, points)
     }

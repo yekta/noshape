@@ -283,16 +283,12 @@ impl DrawingEditor {
                         }
                     });
                 } else {
-                    let id = self.current_sheet().next_annotation_id();
-                    // New notes take Drawing properties › Annotations › Text height.
-                    // Notes › Text height, else All annotations'.
-                    let default_h = self.drawing.props.ann_type(noshape_model::drawing::sheet::AnnType::Notes).height.unwrap_or(self.drawing.props.ann_text_height);
-                    let height_mm = h.unwrap_or(default_h);
-                    // The text height becomes the new Notes default.
-                    if h.is_some_and(|h| (h - default_h).abs() > 1e-9) {
-                        self.drawing.props.ann_type_mut(noshape_model::drawing::sheet::AnnType::Notes).height = Some(height_mm);
+                    // New notes take Drawing properties › Notes text height;
+                    // a typed height becomes the new Notes default.
+                    let sheet = self.sheet;
+                    if let Some(note) = noshape_scene::drawing_tools::new_note(&mut self.drawing, sheet, text, h, style, pos) {
+                        self.edit_sheet("Note", cx, |s| s.annotations.push(note));
                     }
-                    self.edit_sheet("Note", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Note { text, height_mm, style }, position: pos, ..Default::default() }));
                     self.tool = Tool::Select;
                 }
             }

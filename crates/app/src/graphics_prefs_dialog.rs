@@ -439,7 +439,7 @@ impl Render for GraphicsPrefsDialog {
                             .justify_center()
                             .bg(if changed { pal.accept } else { rgb(0xcce9cc) })
                             .cursor_pointer()
-                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept(cx))),
                     )
                     .child(
@@ -451,7 +451,7 @@ impl Render for GraphicsPrefsDialog {
                             .justify_center()
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 18., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel(cx))),
                     ),
             )

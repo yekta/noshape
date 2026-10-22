@@ -223,6 +223,15 @@ const POINT_DOG = 3;
 const POINT_CONE_TIP = 4;
 const POINT_ROUND = 5;
 const POINT_FLAT = 6;
+// ASME B18.6.4 tapping screw points beyond the cone ones: the blunt cone
+// (z = taper length, dp = point diameter) with a cutting feature:
+// BT / T: the quarter-cut slot (btSlot); D: a slot through one radius;
+// G: the slot through the full diameter; F: two flutes tilted 7 degrees
+// (tipSlots). C is POINT_CONE.
+const POINT_BT = 7;
+const POINT_TIP_D = 8;
+const POINT_TIP_G = 9;
+const POINT_TIP_F = 10;
 
 /** The head; returns [body, z of its top]. */
 function screwHead(context is Context, id is Id, def is map) returns array
@@ -376,7 +385,7 @@ function shankProfile(def is map, top is ValueWithUnits) returns array
     if (kind == POINT_CHAMFER)
         // 45 degrees down to the chamfer diameter dp.
         return join(pts, [{ "p" : rz(r, -l + (r - rp)) }, { "p" : rz(rp, -l) }, { "p" : rz(Z, -l) }]);
-    if (kind == POINT_CONE)
+    if (kind == POINT_CONE || kind == POINT_BT || kind == POINT_TIP_D || kind == POINT_TIP_G || kind == POINT_TIP_F)
         // A cone of length z down to the tip diameter dp.
         return join(pts, [{ "p" : rz(r, -l + def.z) }, { "p" : rz(rp, -l) }, { "p" : rz(Z, -l) }]);
     if (kind == POINT_CONE_TIP)
@@ -548,7 +557,68 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         revolveProfile(context, id + "shank", shankProfile(def, inside));
         uniteAll(context, id);
         driveCut(context, id + "drive", solidsOf(context, id), def, def.head == HEAD_NONE ? Z : head[1]);
+        if (def.point == POINT_BT)
+            btSlot(context, id + "bt", solidsOf(context, id), def);
+        else if (def.point == POINT_TIP_D || def.point == POINT_TIP_G || def.point == POINT_TIP_F)
+            tipSlots(context, id + "tipSlots", solidsOf(context, id), def);
     });
+
+/**
+ * Type BT / T cutting slot (as Onshape's component: a sketch revolved 90
+ * degrees, cut). In the axis plane, from the tip: up the axis to the top of
+ * the taper (L = z), an arc centred on the axis down to the basic diameter
+ * line at L/2, back down to the tip; revolved over the x < 0, y < 0
+ * quadrant. The arc's centre is (3L^2 - D^2) / (4L) above the tip, its
+ * radius L minus that.
+ */
+function btSlot(context is Context, id is Id, target is Query, def is map)
+{
+    const L = def.z;
+    const r = def.d / 2;
+    const tip = -def.l;
+    const c = (3 * L * L - def.d * def.d) / (4 * L);
+    const R = L - c;
+    const a1 = atan2(L / 2 - c, r);
+    const am = (a1 + 90 * degree) / 2;
+    const ring = revolveProfile(context, id + "ring", [{ "p" : rz(Z, tip) }, { "p" : rz(Z, tip + L) }, { "p" : rz(r, tip + L / 2), "mid" : rz(R * cos(am), tip + c + R * sin(am)) }, { "p" : rz(r, tip) }]);
+    const big = def.d * 2;
+    const quadrant = cuboid(context, id + "quadrant", vector(-big, -big, tip - big), vector(Z, Z, tip + L + big));
+    intersect(context, id + "slot", ring, quadrant);
+    subtract(context, id + "cut", target, solidsOf(context, id));
+}
+
+/**
+ * Type D / G slot and Type F flutes (Onshape's component sketches on the
+ * Front plane, cut Through all): width D / 11 over the taper length from
+ * the tip. D: one slot centred on the axis through the y < 0 radius; G: the
+ * same through the full diameter; F: two flutes through the y < 0 half,
+ * their walls tilted 7 degrees (leaning to -x going up), one's edge on the
+ * axis at the tip and the other's outer edge at the point radius.
+ */
+function tipSlots(context is Context, id is Id, target is Query, def is map)
+{
+    const w = def.d / 11;
+    const tip = -def.l;
+    const L = def.z;
+    const big = def.d * 2;
+    if (def.point == POINT_TIP_D || def.point == POINT_TIP_G)
+        cuboid(context, id + "slot", vector(-w / 2, -big, tip - big), vector(w / 2, def.point == POINT_TIP_G ? big : Z, tip + L));
+    else
+    {
+        const lean = L * tan(7 * degree);
+        for (var k = 0; k < 2; k += 1)
+        {
+            const x0 = k == 0 ? -w : def.dp / 2 - w;
+            const sketch = newSketchOnPlane(context, id + ("flute" ~ k), { "sketchPlane" : profilePlane() });
+            // Below the tip the flute only cuts air: start well under it.
+            skPolyline(sketch, "outline", { "points" : [rz(x0 + big * tan(7 * degree), tip - big), rz(x0 + w + big * tan(7 * degree), tip - big), rz(x0 + w - lean, tip + L), rz(x0 - lean, tip + L), rz(x0 + big * tan(7 * degree), tip - big)] });
+            skSolve(sketch);
+            opExtrude(context, id + ("fluteCut" ~ k), { "entities" : qSketchRegion(id + ("flute" ~ k)), "direction" : vector(0, -1, 0), "endBound" : BoundingType.BLIND, "endDepth" : big });
+            opDeleteBodies(context, id + ("deleteFlute" ~ k), { "entities" : qCreatedBy(id + ("flute" ~ k), EntityType.BODY) });
+        }
+    }
+    subtract(context, id + "cut", target, solidsOf(context, id));
+}
 
 // Nuts (definition.form).
 const NUT_HEX = 0;

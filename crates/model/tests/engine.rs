@@ -994,19 +994,9 @@ fn f12_case(w: f64, along_x: bool) {
         let r = t.regen();
         let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).collect();
         let names: Vec<_> = solids.iter().map(|b| (b.name.clone(), b.shape.volume().unwrap_or(0.0))).collect();
-        // Never a silent loss: a pattern OCCT can't cut reports it and leaves
-        // the parts as they were (the cut into the fillet, along Y: live cuts
-        // it; ours fails for now, see the handoff).
-        if let Some(st) = r.display.features.last().filter(|s| matches!(s.status, FeatureStatus::Error)) {
-            assert_eq!(solids.len(), 3, "{what} (w {w}, x {along_x}): a failed pattern keeps the parts: {:?} {names:?}", st.message);
-            let failed = total_volume(&r.context);
-            let last = t.ps.features.len() - 1;
-            t.ps.features[last].suppressed = true;
-            let without = total_volume(&t.regen().context);
-            t.ps.features[last].suppressed = false;
-            assert!(near(failed, without, 1e-9), "{what} (w {w}, x {along_x}): and leaves them unchanged: {failed} vs {without}");
-            return;
-        }
+        // Live cuts every copy, also the one running into the fillet (OCCT
+        // used to return an empty cut there, on the corrupt corner OCCT's own
+        // chamfer left; the chamfer is Parasolid's blend patch now).
         for (i, s) in r.display.features.iter().enumerate() {
             assert!(matches!(s.status, FeatureStatus::Ok), "{what} (w {w}, x {along_x}): feature {i} ({}) {:?}: {:?}", t.ps.features[i].type_id, s.status, s.message);
         }
@@ -1182,4 +1172,18 @@ fn union_pick_order_and_intersect_keep_tools() {
     assert_eq!(ps.len(), 4, "{ps:?}");
     assert_eq!(ps[..3].iter().map(|p| p.0.clone()).collect::<Vec<_>>(), [p1, p2, p3], "the tools stay: {ps:?}");
     assert!((ps[3].2 - 392.699082).abs() < 1e-4 && ps[3].1 == "Part 4", "{ps:?}");
+}
+
+/// qa5 INT2: Intersect of two parts that don't touch (Part 1 and Part 3),
+/// with or without ☑ Keep tools, makes nothing and changes nothing.
+#[test]
+fn intersect_of_parts_apart_makes_nothing() {
+    for keep in [true, false] {
+        let (mut t, [p1, _, p3]) = qa5_bool();
+        let before = parts(&t.ok());
+        t.add("booleanBodies", &[("operationType", en("INTERSECTION")), ("tools", q(vec![Reference::Body(p1.clone()), Reference::Body(p3.clone())])), ("keepTools", b(keep))]);
+        let ps = parts(&t.regen());
+        assert_eq!(ps.len(), 3, "keep {keep}: {ps:?}");
+        assert_eq!(ps.iter().map(|p| p.0.clone()).collect::<Vec<_>>(), before.iter().map(|p| p.0.clone()).collect::<Vec<_>>(), "keep {keep}");
+    }
 }

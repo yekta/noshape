@@ -42,7 +42,7 @@ fn fe(m: impl Into<String>) -> FeatureError {
 }
 
 /// The SM attribute (`SMAttribute`) of an entity with the given object type.
-fn sm_attribute(st: &CtxState, r: &Reference, object_type: &str) -> Option<Value> {
+pub(super) fn sm_attribute(st: &CtxState, r: &Reference, object_type: &str) -> Option<Value> {
     st.attributes.iter().find(|(x, v)| x == r && v.get("attribute").get("objectType").as_str().is_some_and(|t| &*t == object_type)).map(|(_, v)| v.get("attribute").clone())
 }
 
@@ -52,7 +52,7 @@ fn length_field(attr: &Value, key: &str) -> f64 {
 }
 
 /// The association attributes of an entity (copied to the part entities).
-fn associations(st: &CtxState, r: &Reference) -> Vec<Value> {
+pub(super) fn associations(st: &CtxState, r: &Reference) -> Vec<Value> {
     let tag = std_tag("sheetMetalAttribute.fs", "SMAssociationAttribute");
     st.attributes.iter().filter(|(x, v)| x == r && v.get("attribute").tag() == tag).map(|(_, v)| v.get("attribute").clone()).collect()
 }
@@ -401,16 +401,12 @@ fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f6
                 }
                 base
             };
-            // Another joint meeting the bend's end (the plate's edge to a Hem's
-            // arc) makes it a corner, not a partial bend: no bend relief (live
-            // qa5 Hem on G34: the front flange keeps its full end, 9378.1835 mm³).
-            let joint_here = (0..topo.edges.len()).any(|x| {
-                x != l.side[k] && topo.edge_faces[x].len() == 2 && {
-                    let (a, b) = topo.edge_ends[x];
-                    a.distance(v) < TOL || b.distance(v) < TOL
-                }
-            });
-            if joint_here {
+            // Another joint starting at the bend's end, or within its bend
+            // zone (the plate's edge to a Hem's arc, which starts where the
+            // bend's pull-back ends), makes it a corner, not a partial bend:
+            // no bend relief (live qa5 Hem on G34: the front flange keeps its
+            // full end, 9378.1835 mm³).
+            if joint_near(topo, v, l.side[k], radius + thickness) {
                 continue;
             }
             let straight = def.relief.depth * radius;
@@ -429,6 +425,18 @@ fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f6
         }
     }
     Ok(out)
+}
+
+/// Whether a joint other than bend edge `bend` starts at `v` or within
+/// `zone` of it (a corner where the bend ends: no bend relief, and a free
+/// side running on from the bend is pulled back with it).
+fn joint_near(topo: &Topo, v: DVec3, bend: usize, zone: f64) -> bool {
+    (0..topo.edges.len()).any(|x| {
+        x != bend && topo.edge_faces[x].len() == 2 && {
+            let (a, b) = topo.edge_ends[x];
+            a.distance(v) < zone + TOL || b.distance(v) < zone + TOL
+        }
+    })
 }
 
 /// A wall's pulled outline: its loop, normal and pulled side segments.
@@ -715,14 +723,44 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     // dom/fs-smprobe3-7.txt): thickened as they are, the walls meeting
     // them tangentially.
     let mut outlines = Vec::new();
+    // Walls with curved sides and no joints (a Corner break's arc): built
+    // as they are.
+    let mut plain = std::collections::BTreeSet::new();
     for (fi, face) in topo.faces.iter().enumerate() {
         if face.face_plane().map_err(|e| fe(e.to_string()))?.is_none() {
             outlines.push(None);
             continue;
         }
-        let l = wall_loop(face, &topo)?;
+        let l = match wall_loop(face, &topo) {
+            Ok(l) => l,
+            Err(e) => {
+                let jointed = (0..topo.edges.len()).any(|x| topo.edge_faces[x].contains(&(fi as u32)) && (def.bends.contains_key(&x) || def.rips.contains(&x)));
+                if jointed {
+                    return Err(e);
+                }
+                plain.insert(fi);
+                outlines.push(None);
+                continue;
+            }
+        };
         let (_, n) = face_normal(face)?;
-        let offset: Vec<f64> = l.side.iter().map(|e| setbacks.get(e).copied().unwrap_or_else(|| if def.rips.contains(e) { rip_offset(def, &topo, *e, fi) } else { 0.0 })).collect();
+        let mut offset: Vec<f64> = l.side.iter().map(|e| setbacks.get(e).copied().unwrap_or_else(|| if def.rips.contains(e) { rip_offset(def, &topo, *e, fi) } else { 0.0 })).collect();
+        // A free side running on from a bend into a corner (the front
+        // flange past its bend, beside a Hem): pulled back with the bend, no
+        // step (live qa5 Hem on G34, 9378.1835 mm³).
+        let m = l.pts.len();
+        for k in 0..m {
+            let Some(&radius) = def.bends.get(&l.side[k]) else { continue };
+            let dir = (l.pts[(k + 1) % m] - l.pts[k]).normalize();
+            for (j, v) in [((k + m - 1) % m, l.pts[k]), ((k + 1) % m, l.pts[(k + 1) % m])] {
+                let e = l.side[j];
+                let free = !def.bends.contains_key(&e) && !def.rips.contains(&e);
+                let along = (l.pts[(j + 1) % m] - l.pts[j]).normalize();
+                if free && along.cross(dir).length() <= 1e-9 && joint_near(&topo, v, l.side[k], radius + front + back) {
+                    offset[j] = offset[k];
+                }
+            }
+        }
         let sides = pulled_sides(&l, n, &offset);
         outlines.push(Some((l, n, sides)));
     }
@@ -863,6 +901,11 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     // Walls: pulled back from their bends and thickened.
     for (fi, outline) in outlines.iter().enumerate() {
         let Some((l, n, pulled)) = outline else {
+            if plain.contains(&fi) {
+                plain_wall(&topo, fi, front, back, &mut solids, &mut pieces)?;
+                wall_flats.push((fi, topo.faces[fi].clone()));
+                continue;
+            }
             rolled_bend(&topo, fi, front, back, &mut solids, &mut pieces)?;
             if let Some(st) = def.rolled.get(&fi).and_then(|r| rolled_strip(&topo, fi, *r)) {
                 strips.push(st);
@@ -920,6 +963,29 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         k::fuse_all(&solids, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape
     };
     Ok(Built { part: fused, pieces, topo, wall_flats, strips })
+}
+
+/// A wall without joints built as its definition face is (curved sides
+/// too): thickened, caps from the face, sides from the nearest edge.
+fn plain_wall(topo: &Topo, fi: usize, front: f64, back: f64, solids: &mut Vec<Shape>, pieces: &mut Vec<Piece>) -> FResult<()> {
+    let face = &topo.faces[fi];
+    let (_, n) = face_normal(face)?;
+    let base = k::transform(face, &k::Transform::Matrix(glam::DMat4::from_translation(-n * back)), true).map_err(|e| fe(e.to_string()))?.shape;
+    let slab = k::extrude(&base, n * (front + back)).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape;
+    let own: Vec<usize> = (0..topo.edges.len()).filter(|e| topo.edge_faces[*e].contains(&(fi as u32))).collect();
+    for f in slab.faces() {
+        let cap = matches!(f.face_surface(), Ok(k::Surface::Plane(pl)) if pl.unit_normal().cross(n).length() < 1e-9);
+        let from = if cap {
+            Def::Face(fi)
+        } else {
+            let c = inner_point(&f).unwrap_or_default();
+            let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
+            own.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge)
+        };
+        pieces.push(Piece { face: f, from });
+    }
+    solids.push(slab);
+    Ok(())
 }
 
 /// A rolled bend: definition face `fi` thickened (`front` along its normal).

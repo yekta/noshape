@@ -794,3 +794,32 @@ fn report_xt() {
         }
     }
 }
+
+/// qa5 IM4 / IM5 (samples outside the repo, skipped when absent): Onshape's
+/// shell of a chamfer blend patch (its inner face an offset of a B-spline
+/// whose boundary collapses to a point; live 6052.697 mm³ with its ±3 error
+/// bars) and eight circle wire bodies (live G38d) import, nothing refused.
+#[test]
+fn parasolid_offset_patch_and_wire_circles_from_onshape() {
+    let samples = std::path::Path::new("/root/onshape-research/live/samples");
+    let shell = samples.join("g50-g46-shell1.x_t");
+    if shell.exists() {
+        let parts = read_parasolid_parts(&shell, LengthUnit::Meter).unwrap_or_else(|e| panic!("g50-g46-shell1: {e}"));
+        assert_eq!(parts.len(), 1);
+        let s = &parts[0].shape;
+        assert!(s.is_valid(), "invalid");
+        assert_eq!(s.count(ShapeType::Face), 21);
+        let v = volume_properties(s).unwrap().mass * 1e9;
+        assert!((v - 6052.697).abs() < 3.0, "{v}");
+        let b = s.bounding_box(false).unwrap();
+        assert!((b.max - b.min).length() < 0.07, "{:?}", b.max - b.min);
+    }
+    let curves = samples.join("g38d-polycarb-curves.x_t");
+    if curves.exists() {
+        let parts = read_parasolid_parts(&curves, LengthUnit::Meter).unwrap_or_else(|e| panic!("g38d-polycarb-curves: {e}"));
+        assert_eq!(parts.len(), 8);
+        for p in &parts {
+            assert_eq!((p.shape.count(ShapeType::Edge), p.shape.count(ShapeType::Face)), (1, 0), "{:?}", p.name);
+        }
+    }
+}

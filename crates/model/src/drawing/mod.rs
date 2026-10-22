@@ -2597,16 +2597,17 @@ pub struct ViewTabProps {
     /// middle, no viewing line) instead of Line style.
     #[serde(default)]
     pub aux_arrow_format: bool,
-    /// Construction geometry: centermark and centerline colors (None: ink)
-    /// and how far centermark arms pass the circle (mm).
+    /// Construction geometry: centermark and centerline colors (None: ink);
+    /// `centermark_extension` is kept for old files (unused: live's rule is
+    /// Mark size / Gap size below).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub centermark_color: Option<[u8; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub centerline_color: Option<[u8; 3]>,
     pub centermark_extension: f64,
-    /// Construction geometry › Centermarks › Mark size and Gap size (mm; 0,
-    /// live's default: automatic) and Extended lines (live ☑). Shown and
-    /// kept; their look is still to be captured (asb request 10-22 b).
+    /// Construction geometry › Centermarks › Mark size and Gap size (mm,
+    /// live default 0; Onshape adds 0.045 in to both) and Extended lines
+    /// (live ☑): the auto centermark's cross and extended lines (build.rs).
     pub centermark_mark_size: f64,
     pub centermark_gap_size: f64,
     pub centermark_extended: bool,

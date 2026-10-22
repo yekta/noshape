@@ -11,7 +11,7 @@ use gpui_kit::component::checkbox::Checkbox;
 use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::flatten::Flattened;
@@ -485,7 +485,7 @@ impl PartStudioView {
             let v = view.clone();
             body = body
                 .child(
-                    h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child("Export format")).child(div().flex_1().child(Button::new("fl-format").ghost().xsmall().w_full().child(h_flex().w_full().child(div().flex_1().child(EXPORT_FORMATS[format])).child(Icon::new(IconName::ChevronDown).with_size(px(10.)))).dropdown_menu(move |mut m, _, _| {
+                    h_flex().h(px(26.)).gap_2().text_size(px(12.)).child(div().text_color(pal.text_muted).child("Export format")).child(div().flex_1().child(Button::new("fl-format").ghost().xsmall().w_full().child(h_flex().w_full().child(div().flex_1().child(EXPORT_FORMATS[format])).child(crate::ui::glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x333333)))).dropdown_menu(move |mut m, _, _| {
                         for (i, name) in EXPORT_FORMATS.iter().enumerate() {
                             let v = v.clone();
                             m = m.item(PopupMenuItem::new(*name).checked(i == format).on_click(move |_, _, cx| {

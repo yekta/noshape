@@ -240,6 +240,45 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "centermark",
+            summary: "Centermarks: single, circular (bolt circle) or linear",
+            description: "The Centermark tool and dialog: `holes` are clicks on hole circles of one view (sheet mm). single: a mark on each, one edit each (\"Centermark\"). circular: marks aligned to the pattern, with the bolt circle and reference center (and radial lines) as the dialog's options; linear: marks with connecting lines; one edit (\"Circular centermark\" / \"Linear centermark\").",
+            fields: with(
+                common(),
+                vec![
+                    opt("kind", json!({ "type": "string", "enum": ["single", "circular", "linear"], "default": "single" }), "Centermark type."),
+                    req("holes", points(1, 64), "A point on each hole's circle (sheet mm)."),
+                    opt("reference_center", json!({ "type": "boolean", "default": true }), "Circular: mark the pattern's center."),
+                    opt("bolt_circle", json!({ "type": "boolean", "default": true }), "Circular: the bolt circle through the holes."),
+                    opt("radial_lines", json!({ "type": "boolean", "default": false }), "Circular: lines from the center to each hole."),
+                    opt("align_to_pattern", json!({ "type": "boolean", "default": true }), "Circular: marks rotated to the pattern."),
+                    opt("connecting_lines", json!({ "type": "boolean", "default": true }), "Linear: lines between the marks."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: centermark,
+        },
+        Op {
+            group: "drawing",
+            verb: "note",
+            summary: "Note (text) with an optional leader",
+            description: "The Note tool and panel: `text` (several lines with \\n) placed at `position` (sheet mm); with `leader` (a vertex, circle center or edge point, sheet mm) a leader points there. `height` sets the text height (sheet mm; it becomes the drawing's note height default, as typing it in the panel does). One edit (\"Note\").",
+            fields: with(
+                common(),
+                vec![
+                    req("text", json!({ "type": "string", "minLength": 1 }), "The note's text."),
+                    req("position", point(), "Where the text goes (sheet mm)."),
+                    opt("leader", point(), "Where the leader points (a snap point, sheet mm)."),
+                    opt("height", json!({ "type": "number", "exclusiveMinimum": 0 }), "Text height (mm)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: note,
+        },
+        Op {
+            group: "drawing",
             verb: "view_table",
             summary: "Place a BOM, cut list or hole table of a view",
             description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its top-left corner at `position` (sheet mm). A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.",
@@ -686,4 +725,71 @@ fn datum(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (id, sheet) = (ann.id, t.sheet);
     t.d.sheets[sheet].annotations.push(ann);
     done(od, t, "Datum", "annotation", id)
+}
+
+fn centermark(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mode = enum_arg(a, "kind", &[("single", 0u8), ("circular", 1), ("linear", 2)], 0)?;
+    let d = dt::CentermarkOpts::default();
+    let o = dt::CentermarkOpts {
+        mode,
+        reference_center: a.bool_or("reference_center", d.reference_center)?,
+        bolt_circle: a.bool_or("bolt_circle", d.bolt_circle)?,
+        radial_lines: a.bool_or("radial_lines", d.radial_lines)?,
+        pattern: a.bool_or("align_to_pattern", d.pattern)?,
+        connecting: a.bool_or("connecting_lines", d.connecting)?,
+    };
+    let holes: Vec<[f64; 2]> = a.array("holes")?.iter().enumerate().map(|(i, p)| point_value(p, &format!("holes[{i}]"))).collect::<Result<_, _>>()?;
+    let t = target(od, a)?;
+    let (tab, sheet) = (t.tab, t.sheet);
+    let mut picks: Vec<dt::CmCircle> = Vec::new();
+    for (i, h) in holes.iter().enumerate() {
+        let Some(Pick::Circle { view, center, radius, r }) = t.m.pick(&Tool::Centermark, &[], *h).circle_pick(*h) else {
+            return Err(OpError::param(&format!("holes[{i}]"), "not on a hole's circle"));
+        };
+        if picks.first().is_some_and(|p| p.view != view) {
+            return Err(OpError::param(&format!("holes[{i}]"), "all holes must be in the same view"));
+        }
+        picks.push(dt::CmCircle { view, center, radius, r });
+    }
+    let mut d = t.d;
+    let mut ids: Vec<u64> = Vec::new();
+    if mode == 0 {
+        // Single: each click places a mark (one edit each).
+        for (c, h) in picks.iter().zip(&holes) {
+            let id = d.sheets[sheet].next_annotation_id();
+            d.sheets[sheet].annotations.push(dt::centermark(id, c, *h));
+            ids.push(id);
+            commit(od, tab, sheet, d.clone(), "Centermark")?;
+        }
+    } else {
+        let (new, name) = dt::centermark_set(&picks, &o);
+        let pos = *holes.last().expect("minItems 1");
+        for (kind, refs) in new {
+            let id = d.sheets[sheet].next_annotation_id();
+            d.sheets[sheet].annotations.push(noshape_model::drawing::Annotation { id, kind, position: pos, refs, ..Default::default() });
+            ids.push(id);
+        }
+        commit(od, tab, sheet, d, name)?;
+    }
+    let mut out = reply(od, tab, sheet, false)?;
+    out["annotations"] = json!(ids);
+    Ok(out.into())
+}
+
+fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let mut style = noshape_model::drawing::note::NoteStyle::default();
+    // A first click on a snap point anchors a leader.
+    if let Some(l) = a.get("leader") {
+        let c = point_value(l, "leader")?;
+        let p = t.m.pick(&Tool::Note, &[], c).snap_at(c).ok_or_else(|| OpError::param("leader", "not a vertex, circle center or edge point of a view"))?;
+        style.leaders.push(noshape_model::drawing::Leader { view: Some(p.view), point: p.p, nodes: Vec::new() });
+    }
+    let sheet = t.sheet;
+    let ann = dt::new_note(&mut t.d, sheet, a.str("text")?.to_string(), a.opt_f64("height")?, style, pt_arg(a, "position")?).ok_or_else(|| OpError::param("text", "a note needs text"))?;
+    let id = ann.id;
+    t.d.sheets[sheet].annotations.push(ann);
+    done(od, t, "Note", "annotation", id)
 }

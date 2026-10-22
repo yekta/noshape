@@ -804,3 +804,26 @@ fn mesh_parts_split_transform_union() {
     // 12000 + 2000 (the block's half outside the mesh box).
     assert!((mm3(b.shape.volume().unwrap()) - 14000.0).abs() < 1e-3, "{}", mm3(b.shape.volume().unwrap()));
 }
+
+/// qa5 NAME3: imported parts keep the file's names and order, even names
+/// like "Part 2" listed first ("Part N" renumbering is for parts made here).
+#[test]
+fn imported_part_names_are_not_renumbered() {
+    use noshape_model::features::importing::ImportPartInfo;
+    let a = noshape_kernel::make_box(&noshape_kernel::Plane::xy(), 0.01, 0.01, 0.01).unwrap();
+    let b = noshape_kernel::make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.03, 0.01, 0.01)).unwrap();
+    let brep = String::from_utf8(noshape_kernel::Shape::compound(&[a, b]).to_brep_bytes().unwrap()).unwrap();
+    let info = vec![
+        ImportPartInfo { name: Some("Part 2".into()), color: None, opacity: None, faces: Vec::new() },
+        ImportPartInfo { name: Some("Part 1".into()), color: None, opacity: None, faces: Vec::new() },
+    ];
+    let json = serde_json::to_string(&info).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| {
+        p.set("blobData", ParamValue::Text(brep));
+        p.set("partInfo", ParamValue::Text(json));
+    });
+    let r = s.ok();
+    let names: Vec<&str> = r.display.bodies.iter().map(|b| b.name.as_str()).collect();
+    assert_eq!(names, ["Part 2", "Part 1"]);
+}

@@ -968,9 +968,42 @@ fn op_draft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn op_delete_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let faces = evaluate_refs(i, &cx, def.get("deleteFaces"))?;
+    let leave_open = def_bool(&def, "leaveOpen", false);
     run_op(i, &cx, &id, "DIRECT_EDIT_DELETE_FACE_FAILED", |ev| {
+        let mut fresh = 0u32;
         for (bi, fs) in by_body(ev.resolve_faces(&faces)).into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
+            if leave_open && body.kind == BodyKind::Surface {
+                // Just remove the faces; each connected rest is its own sheet
+                // (std sheet metal Bend: the fixed and the moving side).
+                let keep: Vec<(Shape, Name)> = body.shape.faces().into_iter().enumerate().filter(|(j, _)| !fs.contains(j)).filter_map(|(j, f)| Some((f, body.faces.get(j)?.clone()))).collect();
+                if keep.is_empty() {
+                    ev.ctx.bodies.remove(bi);
+                    continue;
+                }
+                let shapes: Vec<Shape> = keep.iter().map(|k| k.0.clone()).collect();
+                let sewn = if shapes.len() == 1 { shapes[0].clone() } else { k::sew(&shapes, 1e-7, false)?.shape };
+                let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
+                let keys: Vec<_> = shapes.iter().map(key).collect();
+                let name_of = |f: &Shape| {
+                    let kf = key(f)?;
+                    let j = keys.iter().position(|k| k.is_some_and(|k| k.0.distance(kf.0) < 1e-9 && (k.1 - kf.1).abs() < 1e-9))?;
+                    Some(keep[j].1.clone())
+                };
+                let mut pieces: Vec<Shape> = sewn.shells();
+                let shelled: Vec<Shape> = pieces.iter().flat_map(|s| s.faces()).collect();
+                pieces.extend(sewn.faces().into_iter().filter(|f| !shelled.iter().any(|g| g.is_same(f))));
+                for (n, piece) in pieces.into_iter().enumerate() {
+                    let names: Vec<Name> = piece.faces().iter().map(|f| name_of(f).unwrap_or_else(|| Arc::new(TopoName::face(ev.feature, Role::New(0))))).collect();
+                    if n == 0 {
+                        ev.replace_body(bi, piece, names);
+                    } else {
+                        push_body(ev, BodyId { feature: ev.feature, index: fresh }, BodyKind::Surface, piece, names);
+                        fresh += 1;
+                    }
+                }
+                continue;
+            }
             let shapes: Vec<Shape> = fs.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
             let res = k::delete_faces(&body.shape, &shapes)?;
             let names = body.shape_names();
@@ -1046,6 +1079,9 @@ fn op_extract_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("offset", length_param(offset.abs()));
     p.set("oppositeDirection", ParamValue::Bool(offset < 0.0));
     run_op_with(i, &cx, &id, "REGEN_ERROR", &p, crate::regen::features::surfaces::offset_surface)?;
+    if offset == 0.0 {
+        cx.state.lock().mark_copies(&id);
+    }
     Ok(Value::Undefined)
 }
 

@@ -56,3 +56,5 @@ the rest pending (REQUESTS.md "qa5 tabs"). Status: ✅ ok, ✗ differs, ? live p
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
 | TABS5 rename undoable | Ctrl+Z leaves the rename (it undoes the studio's last feature instead) | ✅ **fixed** |
+
+- 10-22 (ui): DOC5 re-checked in the app. + after Part Studio 1 puts the new tab right after it; it stays there after an edit, Ctrl+Z, tab switches and a reopen ✅.

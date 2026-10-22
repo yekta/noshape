@@ -31,3 +31,11 @@ Live answered "qa5 pass 7" (4) + asb (d) "shaded drawing views": picker filters 
 | DSM3 Show/hide label | "Show shaded view" when unshaded ✅ — but the existing flat view **opened shaded** | ✗ (default state) |
 | DSM5 (new) shaded flat view | fills the **folded part's faces, offset** from the flat outline; **bend notes disappear** (one stray "D" left); black edges stay | ✗ **DSM5** (asb) |
 | DSM4 picker filters | 4 icons (Part Studios, Parts, Sketches, Flat patterns) vs live's 7 independent toggles | ✗ **DSM4** (asb) |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| Row | Ours | Status |
+|---|---|---|
+| DSM5 shaded flat view | fill matches the flat outline, bend lines/notes kept | ✅ **fixed** (s02) |
+| DSM3 label | "Hide shaded view" on the shaded view (consistent); the saved flat view is shaded from the old binary, so the default of a new flat view is not re-checked | ✅ label |
+| DSM2 bend notes | "DOWN 90.0° R2", "DOWN 180.0° R0.01" | ✗ still (DOWN vs live UP = SM5) |
+| DSM4 picker filters | 4 icons | ✗ still (live 7) |

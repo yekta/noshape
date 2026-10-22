@@ -29,3 +29,9 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 | 11 VS1 | Enter #1 in Value commits and normalises ("8" → "8 mm", fully selected), dialog stays open; Enter #2 accepts and closes (same two-step Enter as every feature dialog) | identical: Enter #1 → "8 mm" selected, title "#w = 8 mm", dialog open; Enter #2 closes, row "#w = 8 mm" (shots v03, v04) | ✅ **VS1 withdrawn** (pass 8 expected one-step Enter) |
 | 12 VS2 | the reorder is **allowed, with no message** in both directions; Extrude 1 then fails red "Extrude 1 did not regenerate properly: Variable not found, is suppressed, or has not been set." (Parts (0)), or resolves silently to a Variable Studio's w when one is in scope; Ctrl+Z undoes it in one step | refused with the red toast "Cannot reorder: Extrude 1 depends on Variable 1." (UI and CLI) | ✗ **VS2** (psb) |
 | 2 (default tick) | "Insert into all Part Studios and Assemblies" is ☑ only for the **first** Variable Studio in the workspace; every later one comes up ☐ | 4th studio (+ › Create Variable Studio in qa5-vs, which has vs all/vs1/vs2) comes up **☑** (shot v06) | ✗ **VS4** (psb), new |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| Row | Ours | Status |
+|---|---|---|
+| VS2 reorder Variable below Extrude 1 (CLI feature_reorder on a copy of qa5-vs) | allowed, no error; Extrude 1 OK (w resolved from the in-scope Variable Studio), 2000 mm³ | ✅ **fixed** (UI drag not re-checked) |
+| VS4 4th Variable Studio | "Insert into all…" ☐; inserted right after the active tab (= live) | ✅ **fixed** (v11) |

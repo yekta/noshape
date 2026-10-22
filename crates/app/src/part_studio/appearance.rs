@@ -105,8 +105,10 @@ fn hex_field(rgb: [u8; 3]) -> String {
 }
 
 /// Per-vertex sRGB colors of a body mesh: faces with a custom appearance
-/// get its color, others alpha 0 (the part color).
-pub fn face_colors(body: &noshape_model::display::BodyDisplay, appearances: &[FaceAppearance]) -> Option<Vec<[u8; 4]>> {
+/// get its color, others alpha 0 (the part color). `own` lists the studio's
+/// features: a feature's appearance also covers the faces of the bodies it
+/// made that came from elsewhere (a Derived's, named after their source).
+pub fn face_colors(body: &noshape_model::display::BodyDisplay, appearances: &[FaceAppearance], own: &std::collections::HashSet<FeatureId>) -> Option<Vec<[u8; 4]>> {
     let mut colors: Option<Vec<[u8; 4]>> = None;
     // Colours the features gave faces (an import's) first.
     for (fi, c) in body.face_colors.iter().enumerate() {
@@ -124,7 +126,7 @@ pub fn face_colors(body: &noshape_model::display::BodyDisplay, appearances: &[Fa
         for (fi, r) in body.face_refs.iter().enumerate() {
             let hit = match &a.target {
                 AppearanceTarget::Faces(faces) => faces.contains(r),
-                AppearanceTarget::Feature(f) => r.depends_on() == Some(*f),
+                AppearanceTarget::Feature(f) => r.depends_on() == Some(*f) || (body.id.feature == *f && r.depends_on().is_none_or(|d| !own.contains(&d))),
             };
             if !hit {
                 continue;
@@ -155,6 +157,7 @@ impl PartStudioView {
     /// face/feature appearances. Cached per display and inputs.
     pub(super) fn vertex_colors(&mut self, cx: &App) -> Option<VertexColors> {
         let appearances = self.studio(cx).map(|s| s.appearances.clone()).unwrap_or_default();
+        let own: std::collections::HashSet<FeatureId> = self.studio(cx).map(|s| s.features.iter().map(|f| f.id).collect()).unwrap_or_default();
         let curvature = self.ui.curvature_map.as_ref().map(|c| (c.kind, c.bar.palette, c.bar.bounds));
         let key = (Arc::as_ptr(&self.display) as usize, format!("{:?}{:?}{:?}", appearances, self.ui.analysis, curvature));
         if let Some((k, v)) = &self.ui.vcolor_cache
@@ -177,7 +180,7 @@ impl PartStudioView {
         for b in self.display.bodies.iter().filter(|b| !b.hidden) {
             let colors = match &self.ui.analysis {
                 Some(a) => Some(super::analysis::analysis_colors(b, a)),
-                None => face_colors(b, &appearances),
+                None => face_colors(b, &appearances, &own),
             };
             if let Some(c) = colors {
                 map.insert(b.id.clone(), Arc::new(c));
@@ -552,7 +555,7 @@ impl PartStudioView {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(crate::ui::panel_title("ps-appearance", div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)))
-                        .child(div().id("ap-ok").size(px(28.)).flex().items_center().justify_center().bg(if changed { pal.accept } else { gpui_kit::rgb(0xcce9cc) }).cursor(CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 20., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        .child(div().id("ap-ok").size(px(28.)).flex().items_center().justify_center().bg(if changed { pal.accept } else { gpui_kit::rgb(0xcce9cc) }).cursor(CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if changed {
                                 this.accept_appearance(cx);
                             }
@@ -565,7 +568,7 @@ impl PartStudioView {
                                 .items_center()
                                 .justify_center()
                                 .cursor(CursorStyle::Arrow)
-                                .child(crate::assets::icon("dialog-cancel", 18., cx))
+                                .child(crate::assets::icon("dialog-cancel", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.appearance_edit = None;
                                     cx.notify();

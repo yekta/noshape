@@ -293,8 +293,7 @@ impl PartStudioView {
                 .child(
                     div()
                         .id(SharedString::from(format!("{id}-x")))
-                        .opacity(0.)
-                        .group_hover("srow", |d| d.opacity(1.))
+                        // Live (part-studio/71): the × is always shown.
                         .cursor_pointer()
                         .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)))
                         .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
@@ -435,7 +434,8 @@ impl PartStudioView {
                                         .justify_center()
                                         .cursor_pointer()
                                         .hover(|d| d.bg(pal.panel_hover))
-                                        .child(crate::assets::icon("plane", 16., cx))
+                                        // Live (part-studio/71): a 20 px plane sprite in the 26 px side button.
+                                        .child(crate::assets::icon("plane", 20., cx))
                                         .tooltip(crate::ui::tooltip("Section plane facing the view"))
                                         .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.add_view_section_plane(w, cx))),
                                 ),

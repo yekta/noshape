@@ -22,6 +22,7 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <GeomAPI_Interpolate.hxx>
+#include <GeomAPI_PointsToBSplineSurface.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <Extrema_GenLocateExtPS.hxx>
@@ -613,6 +614,9 @@ struct Builder
   // Faces' own colours (SDL/TYSA_COLOUR on the face), by their surface.
   std::map<const Geom_Surface*, std::array<double, 3>> face_colour;
   std::map<long long, occ::handle<Geom_Curve>>   curves;
+  // Curves rebuilt here (intersections, SP-curves) rather than read: the
+  // last-resort check of a body looks at these only.
+  std::set<const Geom_Curve*> rebuilt_curves;
   std::map<long long, double>                    cone_cos; // cones: OCCT (u, v) = (u, v / cos a)
   std::map<long long, TopoDS_Vertex>             verts;
   std::map<long long, TopoDS_Edge>               edges;
@@ -740,6 +744,71 @@ struct Builder
       m.resize((size_t)n);
   }
 
+  // The offset of a B-spline surface with a boundary row or column of poles
+  // collapsed to one point, as a B-spline through offset points (normals at
+  // the collapsed boundary taken just inside it: the offset of the point is
+  // a curve), parameterised like the base so curves on it stay valid. Null
+  // when the base isn't like that or the fit fails.
+  static occ::handle<Geom_Surface> collapsed_offset(const occ::handle<Geom_Surface>& base, double d)
+  {
+    occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(base);
+    if (b.IsNull())
+      return nullptr;
+    const NCollection_Array2<gp_Pnt>& P = b->Poles();
+    auto row_collapsed = [&](int i) {
+      for (int j = P.LowerCol() + 1; j <= P.UpperCol(); ++j)
+        if (P(i, j).Distance(P(i, P.LowerCol())) > 1e-12)
+          return false;
+      return true;
+    };
+    auto col_collapsed = [&](int j) {
+      for (int i = P.LowerRow() + 1; i <= P.UpperRow(); ++i)
+        if (P(i, j).Distance(P(P.LowerRow(), j)) > 1e-12)
+          return false;
+      return true;
+    };
+    if (!row_collapsed(P.LowerRow()) && !row_collapsed(P.UpperRow()) && !col_collapsed(P.LowerCol()) && !col_collapsed(P.UpperCol()))
+      return nullptr;
+    double u0, u1, v0, v1;
+    b->Bounds(u0, u1, v0, v1);
+    const int                  N = 41;
+    NCollection_Array2<gp_Pnt> pts(1, N, 1, N);
+    for (int i = 0; i < N; ++i)
+      for (int j = 0; j < N; ++j)
+      {
+        const double u = u0 + (u1 - u0) * i / (N - 1), v = v0 + (v1 - v0) * j / (N - 1);
+        gp_Pnt       p;
+        gp_Vec       du, dv;
+        b->D1(u, v, p, du, dv);
+        gp_Vec nrm = du.Crossed(dv);
+        // At a collapsed boundary: the normal just inside it.
+        for (double h = 1e-6; nrm.Magnitude() < 1e-12 && h < 1e-1; h *= 10)
+        {
+          gp_Pnt q;
+          b->D1(std::min(std::max(u, u0 + h * (u1 - u0)), u1 - h * (u1 - u0)), std::min(std::max(v, v0 + h * (v1 - v0)), v1 - h * (v1 - v0)), q, du, dv);
+          nrm = du.Crossed(dv);
+        }
+        if (nrm.Magnitude() < 1e-12)
+          return nullptr;
+        pts(i + 1, j + 1) = p.Translated(nrm.Normalized() * d);
+      }
+    GeomAPI_PointsToBSplineSurface fit;
+    fit.Init(pts, Approx_IsoParametric, 3, 8, GeomAbs_C2, 1e-7 * (1 + std::abs(d)));
+    if (!fit.IsDone())
+      return nullptr;
+    occ::handle<Geom_BSplineSurface> f = fit.Surface();
+    // Its parameters run over the point indices: back to the base's.
+    NCollection_Array1<double> uk = f->UKnots(), vk = f->VKnots();
+    const double fu0 = uk(uk.Lower()), fu1 = uk(uk.Upper()), fv0 = vk(vk.Lower()), fv1 = vk(vk.Upper());
+    for (int i = uk.Lower(); i <= uk.Upper(); ++i)
+      uk(i) = u0 + (uk(i) - fu0) / (fu1 - fu0) * (u1 - u0);
+    for (int i = vk.Lower(); i <= vk.Upper(); ++i)
+      vk(i) = v0 + (vk(i) - fv0) / (fv1 - fv0) * (v1 - v0);
+    f->SetUKnots(uk);
+    f->SetVKnots(vk);
+    return f;
+  }
+
   occ::handle<Geom_Surface> surface(long long idx)
   {
     auto it = surfs.find(idx);
@@ -775,10 +844,17 @@ struct Builder
         s = blend_surface(n);
         break;
       case 60:
+      {
         // Parasolid offsets bases OCCT calls not C1 (a blend patch with a
-        // double knot): no continuity check.
-        s = new Geom_OffsetSurface(surface(n.ptr("surface")), n.real("offset"), true);
+        // double knot): no continuity check. A base whose boundary collapses
+        // to a point (Onshape's chamfer blend patch, live G50) has no normal
+        // there: the offset is fitted from the limit normals instead.
+        occ::handle<Geom_Surface> base = surface(n.ptr("surface"));
+        s                              = collapsed_offset(base, n.real("offset"));
+        if (s.IsNull())
+          s = new Geom_OffsetSurface(base, n.real("offset"), true);
         break;
+      }
       case 67:
         s = new Geom_SurfaceOfLinearExtrusion(curve(n.ptr("section")), D(n.vec("sweep")));
         break;
@@ -1000,6 +1076,7 @@ struct Builder
         break;
       case 38:
         c = intersection(n);
+        rebuilt_curves.insert(c.get());
         break;
       case 133:
         c = new Geom_TrimmedCurve(curve(n.ptr("basis_curve")), n.real("parm_1"), n.real("parm_2"));
@@ -1039,6 +1116,7 @@ struct Builder
         c = BRep_Tool::Curve(e, f, l);
         if (c.IsNull())
           fail_op("parasolid: could not build an SP-curve");
+        rebuilt_curves.insert(c.get());
         break;
       }
       default:
@@ -1703,29 +1781,31 @@ struct Builder
     return out;
   }
 
-  // A body with a rebuilt (B-spline) edge running far outside the box of its
-  // vertices and exact analytic edges fails instead of importing as garbage
-  // (qa5 IM4: an edge on the offset of a degenerate blend patch, 23 km long).
-  static void check_rebuilt(const TopoDS_Shape& body)
+  // Last resort: a body with a curve rebuilt here (an intersection or
+  // SP-curve) running far outside the box of everything else in it fails
+  // instead of importing as garbage. Bodies with nothing else to compare
+  // against are left alone.
+  void check_rebuilt(const TopoDS_Shape& body) const
   {
-    Bnd_Box ref;
+    Bnd_Box                   ref;
+    std::vector<TopoDS_Shape> rebuilt;
     for (TopExp_Explorer v(body, TopAbs_VERTEX); v.More(); v.Next())
       ref.Add(BRep_Tool::Pnt(TopoDS::Vertex(v.Current())));
-    std::vector<TopoDS_Shape> rebuilt;
     for (TopExp_Explorer e(body, TopAbs_EDGE); e.More(); e.Next())
     {
       const TopoDS_Edge& E = TopoDS::Edge(e.Current());
       if (BRep_Tool::Degenerated(E))
         continue;
-      const GeomAbs_CurveType t = BRepAdaptor_Curve(E).GetType();
-      if (t == GeomAbs_Line || t == GeomAbs_Circle || t == GeomAbs_Ellipse)
-        BRepBndLib::Add(E, ref, false);
-      else
+      double f, l;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(E, f, l);
+      if (!c.IsNull() && rebuilt_curves.count(c.get()))
         rebuilt.push_back(E);
+      else
+        BRepBndLib::Add(E, ref, false);
     }
-    if (ref.IsVoid() || rebuilt.empty())
+    if (ref.IsVoid() || rebuilt.empty() || ref.SquareExtent() < 1e-18)
       return;
-    ref.Enlarge(10 * std::sqrt(ref.SquareExtent()) + 1e-6);
+    ref.Enlarge(10 * std::sqrt(ref.SquareExtent()));
     double a0, b0, c0, a1, b1, c1;
     ref.Get(a0, b0, c0, a1, b1, c1);
     for (const TopoDS_Shape& E : rebuilt)

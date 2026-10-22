@@ -156,15 +156,19 @@ pub enum TessQuality {
 
 impl TessQuality {
     pub const ALL: [TessQuality; 5] = [TessQuality::Auto, TessQuality::Coarse, TessQuality::Medium, TessQuality::Fine, TessQuality::VeryFine];
-    /// Multiplier of the chord tolerance (smaller = finer).
-    pub fn factor(self) -> f64 {
+    /// Segments Onshape draws a full circle with (live 459: the browser's
+    /// mesh is angle based, the same at Ø20, Ø200 and Ø2000; Auto = Fine).
+    pub fn segments_per_circle(self) -> u32 {
         match self {
-            TessQuality::Auto => 1.0,
-            TessQuality::Coarse => 4.0,
-            TessQuality::Medium => 2.0,
-            TessQuality::Fine => 0.5,
-            TessQuality::VeryFine => 0.2,
+            TessQuality::Auto | TessQuality::Fine => 144,
+            TessQuality::Coarse => 24,
+            TessQuality::Medium => 48,
+            TessQuality::VeryFine => 600,
         }
+    }
+    /// Multiplier of Auto's angular deflection (smaller = finer).
+    pub fn factor(self) -> f64 {
+        f64::from(TessQuality::Auto.segments_per_circle()) / f64::from(self.segments_per_circle())
     }
     pub fn label(self) -> &'static str {
         match self {

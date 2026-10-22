@@ -1798,31 +1798,7 @@ impl DrawingEditor {
     /// Dimensions › Chamfer, 45° or not): its two legs as aligned linear
     /// dimensions (live drawing/255–259); None for Note style.
     fn chamfer_as_dimensions(&self, a: &Annotation) -> Option<Vec<Annotation>> {
-        let AnnotationKind::ChamferDimension { view, a: pa, b: pb, c: pc, d: pd } = a.kind else { return None };
-        let u = [pb[0] - pa[0], pb[1] - pa[1]];
-        let w = [pd[0] - pc[0], pd[1] - pc[1]];
-        let (lu, lw) = (len(u), len(w));
-        if lu < 1e-12 || lw < 1e-12 {
-            return None;
-        }
-        let wn = [w[0] / lw, w[1] / lw];
-        let along = u[0] * wn[0] + u[1] * wn[1];
-        let ang = (along.abs() / lu).min(1.0).acos().to_degrees();
-        let p = &self.drawing.props;
-        let as_dims = if (ang - 45.0).abs() < 0.05 { p.chamfer_45_dimension } else { p.chamfer_dimension };
-        if !as_dims {
-            return None;
-        }
-        let corner = [pa[0] + wn[0] * along, pa[1] + wn[1] * along];
-        let id = a.id;
-        let leg = |k: u64, x: [f64; 2], y: [f64; 2], slot: Option<(u8, u8)>| {
-            let refs: Vec<AnnotationRef> = match slot {
-                Some((from, to)) => a.refs.iter().filter(|r| r.slot == from).map(|r| AnnotationRef { slot: to, point: r.point.clone() }).collect(),
-                None => Vec::new(),
-            };
-            Annotation { id: id + k, kind: AnnotationKind::LinearDimension { view, a: x, b: y, offset: 6.0, orientation: DimOrientation::Aligned, override_text: None }, position: a.position, refs, ..Default::default() }
-        };
-        Some(vec![leg(0, pa, corner, Some((0, 0))), leg(1, corner, pb, Some((1, 1)))])
+        self.pk().chamfer_as_dimensions(a)
     }
 }
 

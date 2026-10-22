@@ -953,3 +953,10 @@ these rules, change it in commit.rs (the app and the API both use it). Backups: 
     each render compares the focused field with the last one and commits the one left.
   - Not in our panel yet (live has them): the Dashes spinboxes (Hidden / Tangent / Exploded edges, Cosmetic threads,
     Centerlines), line-thickness selects, table row text heights, Detail / Auxiliary arrowheads.
+- (api, 2026-10-22 06:30) More moved to `scene/drawing_tools/commit.rs` (same code; the API ops use it too):
+  Callout clicks (`free_callout`, `SheetPick::finish_callout`) in drawing_tools.rs; `chamfer_as_dimensions`
+  (drawing_tools.rs) and `more_dimension_pick` (drawing_more.rs; its private axis_pick / raw_line_pick / circle_at
+  wrappers removed) are now SheetPick methods; Centermark Single + Circular/Linear ✓ (`centermark`,
+  `centermark_set`, `CmCircle` / `CentermarkOpts`) in drawing_centermark.rs; Note panel ✓ for a new note
+  (`new_note`, incl. the typed height becoming the Notes default) in drawing_ui.rs. Behaviour unchanged; checked in
+  the app (callout with/without leader, centermark, max/min dimension; note after the next build).

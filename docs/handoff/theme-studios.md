@@ -664,6 +664,20 @@ Preferences, Release/Publish):**
   also shows a ‹ before the document name once a studio is picked (not done; what it does is not captured).
 - **Import to Onshape modal (live document/77):** body 6 px taller, footer 10 px under the buttons (was 13), so
   the rule and buttons sit where live's do; position already matched (760, 25).
+- **DSM4 (taken from asb):** drawing picker filter toggles restyled to live's `os-button os-clear` (30 px, 35 px
+  pitch, on = `os-active` #eaeaea under a #b6b6b6 edge); "only kinds the document has" = live (ng-if).
+- **Sketch Text tool (taken from skb):** live's 32 fonts (`noshape_sketch::text::SKETCH_FONTS`, default Open Sans,
+  zstd files in crates/sketch/fonts/sketch, 34 MB, README there), B / I hidden per family, ✓ ✕ 24 px. Checked:
+  the list = live's order, Allerta hides B and I and draws in Allerta.
+- **Drawing sheet fit** (`drawing_view.rs` `zoom_to_fit`): 40 px clear on each side, the bottom measured to the
+  window edge (`UNDER` 30 px, the tab bar) = live 156 within 1 px.
+- **Insert Variable Studio ?** → help "Variable Studios" (…/VariableStudio/variable_studio.htm?cshid=variable_studios).
+- variable_config.rs imports `noshape_units::ExprValue` itself (variable_studio.rs no longer re-exports it).
+- **Lead decisions 10-22:** keep Release management / Numbering scheme / the Revision table tool, moving release and
+  numbering to a Company settings page (help layout in /root/onshape-research/ui2-help); build Language (string
+  table, translations last), Theming + dark mode (ui2 owns it; plan in docs/parity/dark-mode.md), Environment
+  profile settings, User export rules, Onshape Labs (consent dialog, then an empty state: Labs features are
+  AI / cloud, excluded).
 - drawing_view.rs `DrawingEditor::geometry_dirty` is `pub(crate)` (asb's drawing_shaded.rs sets it).
 
 ## (was) PAUSED (lead, 20 Oct ~16:58, after the OOM reboot) — exact state

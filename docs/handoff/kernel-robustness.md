@@ -75,6 +75,15 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
 - **Onshape mass properties carry error bars**: REST volume = [value, min, max]; g49 2 mm 44789.850 in
   [44786.647, 44793.054]. The "IM2-kind" +0.12/+0.09 (g49), +0.0023 (g48), +0.0035 (g50-reorder) are inside them;
   our numbers are the exact integrals (g50-reorder equals an independent exact construction).
+- **G51 band (10-22):** `shell.cpp::in_onshape_mitre_band`: two equal perpendicular convex fillets meeting at a mitre
+  under the removed face, a 45° chamfer face touching both, the fillets' corner P on the removed face at signed
+  distance d ≤ 0 from the chamfer plane: Onshape fails for (2−√2)(r − d/√2) < t < r (rim-triangle leg c−2r+√2t =
+  2(r−t)); fits all six G51 cases incl. (5,2) (d > 0: no mitre). `by_regions` handles t ≥ r (sector without
+  cylinder). Tests: kernel `shell::chamfer_then_fillets_shell_like_onshape`, model
+  `kernel_robustness::chamfer_then_fillet_shell_matches_onshape`. Still ignored:
+  `shell_after_chamfer_patch_matches_onshape` (inner offset of the blend patch, 1.19 mm³).
+- **F12 kernel half (10-22): fixed by the F8 chamfer** (psb's BREPs had OCCT's corrupt corner); engine F12 test
+  tightened (must succeed).
 - **PERF1 chamfer/fillet of many edges:** `boolean.cpp::blend_in_slabs` (declared in internal.hpp): ≥ 48 edges →
   split the part by planes in gaps between the edges' reach (2 × size), blend each slab in parallel, join on the
   shared cut faces, unify. Probe `/root/kern-scratch/plate/slabs.cpp`: 400 rims 4.3 s → ~1.1 s with glue + USD

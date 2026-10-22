@@ -268,6 +268,33 @@ fn font_data(font: &str, bold: bool, italic: bool) -> &'static [u8] {
     family[usize::from(bold) + 2 * usize::from(italic)]
 }
 
+/// The font files of a Text tool family, unpacked (each once), e.g. for the
+/// Text dialog to draw its preview in the font.
+pub fn sketch_font_files(font: &str) -> Vec<&'static [u8]> {
+    let mut out: Vec<&'static [u8]> = Vec::new();
+    for (bold, italic) in [(false, false), (true, false), (false, true), (true, true)] {
+        let data = match sketch_face(font, bold, italic) {
+            Some(SketchFace::File(i, _)) => sketch_file(i),
+            Some(SketchFace::Noto) => font_data("Noto Sans", bold, italic),
+            None => continue,
+        };
+        if !out.iter().any(|d| std::ptr::eq(*d, data)) {
+            out.push(data);
+        }
+    }
+    out
+}
+
+/// The family name a font file declares (typographic family, else family):
+/// what a text system knows it by ("PT Sans" for the "PTSans" entry).
+pub fn font_family_name(data: &[u8]) -> Option<String> {
+    let face = ttf_parser::Face::parse(data, 0).ok()?;
+    let names = face.names();
+    [ttf_parser::name_id::TYPOGRAPHIC_FAMILY, ttf_parser::name_id::FAMILY]
+        .into_iter()
+        .find_map(|id| names.into_iter().find(|n| n.name_id == id && n.is_unicode()).and_then(|n| n.to_string()))
+}
+
 /// One piece of a glyph contour, in box units.
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextSegment {

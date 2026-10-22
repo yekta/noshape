@@ -117,6 +117,7 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
             };
             let base_name = provider.part_name(&tab, &b.id).unwrap_or_else(|| b.name.clone());
             let name = if inst == 0 { base_name } else { format!("{base_name} ({})", inst + 1) };
+            ev.ctx.own_names.insert(id.clone());
             let body = crate::regen::context::Body::new(id, name, b.kind, shape, faces, color, ev.feature);
             ev.ctx.bodies.push(std::sync::Arc::new(body));
         }
@@ -343,6 +344,8 @@ const MESH_PART_COLOR: [f32; 3] = [248.0 / 255.0, 135.0 / 255.0, 1.0 / 255.0];
 fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
     if let Some(name) = look.name.as_ref().filter(|n| !n.trim().is_empty()) {
         ev.ctx.bodies[bi] = std::sync::Arc::new(ev.ctx.bodies[bi].renamed(name.clone()));
+        let id = ev.ctx.bodies[bi].id.clone();
+        ev.ctx.own_names.insert(id);
     }
     let body = ev.ctx.bodies[bi].clone();
     if !(appearances && look.color.is_some()) && body.shape.is_mesh() {

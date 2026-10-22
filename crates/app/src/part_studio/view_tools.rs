@@ -6,7 +6,7 @@ use super::feature_icon;
 use crate::scene_builder::DisplayMode;
 use crate::theme::{p, with_alpha};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use gpui_kit::prelude::FluentBuilder as _;
 use noshape_model::features;
@@ -481,7 +481,9 @@ impl PartStudioView {
                                         .id("sc-close")
                                         .px_1()
                                         .cursor_pointer()
-                                        .child(Icon::new(IconName::Close).small().text_color(pal.text_muted))
+                                        // Live (shortcuts/01): the modal's × (10 px, #333 at .5).
+                                        .opacity(0.86)
+                                        .child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333)))
                                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_shortcut_sheet(window, cx))),
                                 ),
                         )

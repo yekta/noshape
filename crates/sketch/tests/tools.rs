@@ -255,3 +255,27 @@ fn patterns_transform_and_external() {
     // a non-external point cannot pierce
     assert!(sk.add_constraint(ConstraintKind::Pierce { point: q, target: p }).is_err());
 }
+
+/// SK5: a fillet's radius change moves the fillet and its two lines' cut
+/// ends only; the rest of an unconstrained rectangle stays put.
+#[test]
+fn fillet_radius_change_keeps_the_rest() {
+    for light in [false, true] {
+        let mut sk = Sketch::new();
+        let r = sk.corner_rectangle(v(0.0, 0.0), v(0.029, 0.022));
+        let corner = r.points[2];
+        let res = sk.fillet_corner(corner, 0.02).unwrap();
+        let arc = res.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Arc)).unwrap();
+        assert!(sk.solve().is_solved());
+        let still: Vec<(EntityId, DVec2)> = [r.points[0], r.points[1], r.points[3]].iter().map(|p| (*p, sk.point(*p).unwrap())).collect();
+        let dim = sk.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).unwrap().id;
+        sk.set_dimension_value(dim, 0.003).unwrap();
+        let opts = SolveOptions { light: if light { sk.constraint(dim).unwrap().kind.entities().to_vec() } else { vec![] }, ..Default::default() };
+        assert!(sk.solve_with(&opts).is_solved());
+        let moved: f64 = still.iter().map(|(p, at)| (sk.point(*p).unwrap() - *at).length()).fold(0.0, f64::max);
+        eprintln!("light={light} moved={moved}");
+        if light {
+            assert!(moved < 1e-6, "other corners moved {moved}");
+        }
+    }
+}

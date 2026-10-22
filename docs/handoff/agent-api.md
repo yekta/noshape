@@ -603,3 +603,24 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   * ~03:55 VS switch IN-APP VERIFIED (build 03:39, Xvfb :114, /root/api-scratch/vsdemo/v*.png): Add variable (name row ->
     Length 0 mm), Value "40" -> "40 mm", Description, second Add, Rename, Type -> Number (value turns red), row
     menu Move up / Move down / Delete, Ctrl+Z restores the row; history texts as before (read through live mode).
+- 2026-10-22 ~04:00-04:55 (api):
+  * Drawing annotation ops (ops/src/ops/drawing_tools.rs): drawing_hole_callout, drawing_callout (anchor optional =
+    free callout; text/above/below/left/right/border/chars/height = the Callout dialog), drawing_ordinate (origin,
+    side, points; one edit per click: "Ordinate dimension" then "Add to ordinate group"), drawing_datum (anchor,
+    position, label; datum_on attach to GD&T/dimension lines not yet). Shared builders added to
+    scene/drawing_tools/commit.rs: free_callout, SheetPick::finish_callout (qa5 D8 part under the anchor).
+    e2e drawing_callouts_ordinates_and_datums; coverage Callout/Datum/Hole callout/Ordinate -> ops, ceiling 47.
+  * App switch: drawing_tools.rs Balloon arms -> dt::free_callout / pk().finish_callout
+    (/root/api-scratch/drw5/apply_callout.py, backup drw5/bak2_drawing_tools.rs). Clippy clean;
+    IN-APP CHECK STILL TO DO (Callout with leader on an edge, free callout in empty space; history "Callout").
+  * Green-up 04:10 freeze: app clippy clean, scene/ops/cli clippy clean, ops+cli tests green (e2e 24, live 1).
+  * NEXT: in-app check of the callout switch; then note / centermark / GD&T / surface finish / weld /
+    max-min / foreshorten / chamfer (needs app chamfer_as_dimensions + more_dimension_pick moved to scene);
+    aux view In line / Axis modes; datum on annotation lines.
+- 2026-10-22 ~06:30 (api): freeze lifted at aa75fdf. New ops: drawing_dimension kinds chamfer / max_min / foreshorten
+  (more_dimension_pick + chamfer_as_dimensions moved to scene), drawing_centermark (single/circular/linear + dialog
+  options), drawing_note (text, leader, height). Coverage ceiling 42. App switches applied: drawing_more.rs,
+  drawing_tools.rs (chamfer), drawing_centermark.rs, drawing_ui.rs (note) (scripts /root/api-scratch/drw5/apply_*.py).
+  IN-APP VERIFIED (build 06:16): Callout with leader + free callout ("Callout"), Centermark single, Max/min dimension.
+  Note switch: verify after the 06:30+ build. CLI rebuilt for qa5 after this batch.
+  NEXT: GD&T, surface finish, weld (dialog-driven), aux view In line / Axis, datum on annotation lines.

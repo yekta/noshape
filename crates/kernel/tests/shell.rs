@@ -169,4 +169,11 @@ fn chamfer_then_fillets_shell_like_onshape() {
         assert_eq!((r.count(ShapeType::Face), r.count(ShapeType::Edge), r.count(ShapeType::Vertex)), (20, 50, 32), "{t}");
         assert!((v - want).abs() < 0.01, "{t}: {v} vs {want}");
     }
+    // Live G51: Onshape fails from 2.053 mm up to the fillet radius, then
+    // works again.
+    for t in [0.00206, 0.0025, 0.00299] {
+        assert!(shell_solid(&s, &top, t, ShellSide::Inside, ShellMethod::Auto).is_err(), "{t} should fail like Onshape");
+    }
+    let r = shell_solid(&s, &top, 0.003, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert!(r.is_valid() && vol(&r) > 0.0);
 }

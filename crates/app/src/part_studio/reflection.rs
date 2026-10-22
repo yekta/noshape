@@ -9,7 +9,7 @@ use crate::theme::p;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::sync::Arc;
@@ -215,14 +215,14 @@ impl PartStudioView {
                 .gap_2()
                 .text_size(px(13.))
                 .child(div().w(px(48.)).text_color(pal.text_muted).child(label))
-                .child(h_flex().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(div().flex_1().text_color(pal.text).child(value)).child(Icon::new(IconName::ChevronDown).with_size(px(12.)).text_color(pal.text_muted)))
+                .child(h_flex().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(div().flex_1().text_color(pal.text).child(value)).child(crate::ui::glyph("drawing-tool-caret", 12., pal.text)))
         };
         let mut body = v_flex().flex_1().p(px(6.)).gap(px(6.)).child(gpui_kit::base::input::input_frame(div().border_1().border_color(gpui_kit::rgb(0xbdbdbd)).rounded(px(2.)).child(Input::new(&search).appearance(false).small())));
         match tab {
             2 => {
                 let view = cx.entity();
                 let names: Vec<&'static str> = environment_maps::NAMES.iter().copied().filter(|n| query.is_empty() || n.to_lowercase().contains(&query)).collect();
-                let image_row = h_flex().h(px(28.)).gap_2().text_size(px(13.)).child(div().w(px(48.)).text_color(pal.text_muted).child("Image")).child(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Button::new("envp-image").ghost().small().w_full().child(h_flex().w_full().child(div().flex_1().text_color(pal.text).child(choice)).child(Icon::new(IconName::ChevronDown).with_size(px(12.)).text_color(pal.text_muted))).dropdown_menu(move |mut m, _, _| {
+                let image_row = h_flex().h(px(28.)).gap_2().text_size(px(13.)).child(div().w(px(48.)).text_color(pal.text_muted).child("Image")).child(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Button::new("envp-image").ghost().small().w_full().child(h_flex().w_full().child(div().flex_1().text_color(pal.text).child(choice)).child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))).dropdown_menu(move |mut m, _, _| {
                     for n in names.clone() {
                         let v = view.clone();
                         m = m.item(PopupMenuItem::new(n).checked(n == choice).on_click(move |_, _, cx| {
@@ -323,7 +323,9 @@ impl PartStudioView {
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
-                                .child(Icon::new(IconName::Close).with_size(px(14.)).text_color(pal.text_muted))
+                                // Live (analysis/11): the ns-dialog × (11 px, #333 at .5).
+                                .opacity(0.86)
+                                .child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.ui.env_picker = None;
                                     cx.notify();

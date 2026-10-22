@@ -712,15 +712,28 @@ impl PartStudioView {
             // plane asks for one in a blue bubble over the graphics.
             const NO_PLANE: &str = "Select a sketch plane";
             let no_plane = e.dialog.read(cx).feature.type_id == "sketch" && st.as_ref().is_some_and(|(k, m)| *k == FeatureStatus::Error && m == NO_PLANE);
+            // Live (qa5 BOOL1): a feature's info ("Boolean resulted in no
+            // geometry change…") is a blue bubble at the top centre of the
+            // graphics while the dialog is open; the dialog shows nothing.
+            let info = st.as_ref().filter(|(k, _)| *k == FeatureStatus::Info).map(|(_, m)| m.clone());
+            let st = st.filter(|(k, _)| *k != FeatureStatus::Info);
             if no_plane {
                 self.message = Some((FeatureStatus::Info, NO_PLANE.into()));
-            } else if self.message.as_ref().is_some_and(|(_, m)| m == NO_PLANE) {
+            } else if let Some(m) = &info {
+                self.message = Some((FeatureStatus::Info, m.clone()));
+            } else if self.message.as_ref().is_some_and(|(_, m)| m == NO_PLANE || self.ui.dialog_info.as_ref() == Some(m)) {
                 self.message = None;
             }
+            self.ui.dialog_info = info;
             e.dialog.update(cx, |d, cx| {
                 d.set_status(st, cx);
                 d.set_faulty(faulty, cx);
             });
+        } else if let Some(m) = self.ui.dialog_info.take()
+            && self.message.as_ref().is_some_and(|(_, x)| *x == m)
+        {
+            // Live (qa5 BOOL1): no bubble or toast once the dialog closes.
+            self.message = None;
         }
         // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
         // from what the previewed tool touches.
@@ -930,10 +943,35 @@ impl PartStudioView {
             .filter(|b| derived_ids.contains(&b.id.feature))
             .map(|b| (b.id.feature, b.face_refs.iter().chain(&b.edge_refs).cloned().collect()))
             .collect();
+        // …also when the entity is gone from the shown model (a fillet's
+        // edge while that fillet is edited): the source feature that created
+        // it belongs to a Derived feature's source studio.
+        let derived_sources: Vec<(FeatureId, std::collections::HashSet<FeatureId>)> = self
+            .studio(cx)
+            .map(|s| {
+                let doc = &self.doc.read(cx).session.doc;
+                s.features
+                    .iter()
+                    .filter(|f| f.type_id == "importDerived")
+                    .filter_map(|f| {
+                        let key = f.params.text("partStudio").trim().to_string();
+                        match doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| &t.content) {
+                            Some(noshape_model::document::TabContent::PartStudio(src)) => Some((f.id, src.features.iter().map(|g| g.id).collect())),
+                            _ => None,
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         Arc::new(move |r: &Reference| {
             let owner = |id: Option<FeatureId>| match id {
                 Some(i) if names.iter().any(|(x, _)| *x == i) || noshape_model::in_context::context_of(i).is_some() => Some(i),
-                _ => derived.iter().find(|(_, refs)| refs.contains(r)).map(|(f, _)| *f).or(id),
+                _ => derived
+                    .iter()
+                    .find(|(_, refs)| refs.contains(r))
+                    .map(|(f, _)| *f)
+                    .or_else(|| id.and_then(|i| derived_sources.iter().find(|(_, src)| src.contains(&i)).map(|(f, _)| *f)))
+                    .or(id),
             };
             let fname = |id: FeatureId| match noshape_model::in_context::context_of(id) {
                 Some(c) => contexts.iter().find(|(i, _)| *i == c).map(|(_, n)| n.clone()).unwrap_or_else(|| "context".into()),
@@ -1266,6 +1304,15 @@ impl PartStudioView {
     }
 
     // ------------------------------------------------------------ editing
+
+    /// A tool's shortcut. Live (ui 10-21 20:00): with a new dialog of the same
+    /// tool already open it changes nothing; another open dialog is replaced.
+    fn shortcut_feature(&mut self, type_id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit.as_ref().is_some_and(|e| e.is_new && e.dialog.read(cx).feature.type_id == type_id) {
+            return;
+        }
+        self.start_feature(type_id, window, cx);
+    }
 
     pub fn start_feature(&mut self, type_id: &str, window: &mut Window, cx: &mut Context<Self>) {
         // Starting Extrude/Revolve from an open sketch finishes the sketch and
@@ -2280,7 +2327,9 @@ impl PartStudioView {
             rollback,
             editing_id,
             related: self.related_features(cx),
-            makes_faces: d.bodies.iter().flat_map(|b| b.face_refs.iter().filter_map(|r| r.depends_on())).collect(),
+            // A Derived's bodies keep their source's face names: it makes the
+            // bodies it creates (live qa5 DER14: "Add appearance to feature…").
+            makes_faces: d.bodies.iter().flat_map(|b| b.face_refs.iter().filter_map(|r| r.depends_on()).chain([b.id.feature])).collect(),
             sketches: d.sketches.iter().map(|s| s.feature).collect(),
             planes: d.planes.iter().filter_map(|p| match p.reference {
                 Reference::FeaturePlane(id) => Some(id),
@@ -2823,12 +2872,14 @@ impl PartStudioView {
         let renaming = self.ui.part_renaming.as_ref().is_some_and(|(x, ..)| *x == b.id);
         // Live (selection/09, part-studio/450): the band spans the list with
         // the content indented 18 px, 24 px tall, 5 px short of the edge.
-        crate::ui::tree_row(SharedString::from(format!("part-{}", b.id)), selected)
+        // While renaming the row is white with no hover fill: `tree_row` gets
+        // `selected` so it sets no hover style (a second `.hover` panics, CRASH1).
+        crate::ui::tree_row(SharedString::from(format!("part-{}", b.id)), selected || renaming)
             .h(px(24.))
             .pl(px(23.))
             .mr(px(5.))
             .group("part-row")
-            .when(renaming, |d| d.bg(gpui_kit::rgb(0xffffff)).hover(|d| d.bg(gpui_kit::rgb(0xffffff))))
+            .when(renaming, |d| d.bg(gpui_kit::rgb(0xffffff)))
             .when(hidden, |d| d.text_color(pal.text_faint))
             .child(crate::ui::tree_icon(part_icon, hidden, cx))
             .child(match self.ui.part_renaming.as_ref().filter(|(x, ..)| *x == b.id).map(|(_, st, _)| st.clone()) {
@@ -3309,10 +3360,15 @@ impl PartStudioView {
         // dependencies scan the features above).
         let tip = {
             // Live (qa5 ADV3, fs sm6e): errors and warnings read "<Feature>
-            // did not regenerate properly: <message>".
+            // did not regenerate properly: <message>". Infos stay out of it
+            // (live qa5 BOOL1: "Boolean 1" only; they are the graphics bubble).
             let msg = state.and_then(|s| {
                 let m = s.message.clone()?;
-                Some(if matches!(s.status, FeatureStatus::Error | FeatureStatus::Warning) { format!("{} did not regenerate properly: {m}", f.name) } else { m })
+                match s.status {
+                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{} did not regenerate properly: {m}", f.name)),
+                    FeatureStatus::Info => None,
+                    _ => Some(m),
+                }
             });
             let (view, name, feature_name) = (cx.entity().downgrade(), name.clone(), f.name.clone());
             // Live (qa5 ADV12): a name made from Onshape's "Feature Name
@@ -3375,6 +3431,24 @@ impl PartStudioView {
                     .invisible()
                     .group_drag_over::<RollbackDrag>("feature-row", |s| s.visible()),
             ))
+            // The same dot on a feature drag's line, top or bottom edge (F33).
+            .when(cx.has_active_drag(), |d| {
+                let after = self.ui.feature_drop.get() == Some((i, true));
+                d.child(
+                    div()
+                        .absolute()
+                        .left(px(0.))
+                        .when(after, |d| d.bottom(px(-3.5)))
+                        .when(!after, |d| d.top(px(-2.5)))
+                        .size(px(7.))
+                        .rounded_full()
+                        .border_2()
+                        .border_color(pal.accent)
+                        .bg(gpui_kit::rgb(0xffffff))
+                        .invisible()
+                        .group_drag_over::<FeatureDrag>("feature-row", |s| s.visible()),
+                )
+            })
             .text_color(color)
             // Onshape (part-studio/31, 92): rolled back and suppressed rows are italic.
             .when(rolled_back || suppressed, |d| d.italic())
@@ -3497,12 +3571,39 @@ impl PartStudioView {
             }))
             .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
             .on_drop(cx.listener(move |this, _: &RollbackDrag, _, cx| this.set_rollback(Some(i), cx)))
-            .on_drag(FeatureDrag { id, index: i, name: f.name.clone().into() }, |d, _, _, cx| cx.new(|_| d.clone()))
-            // The drop line shows where the feature lands
-            // (`interaction::reordered`): above the row when moving up, below
-            // it when moving down (qa4 F33).
-            .drag_over::<FeatureDrag>(move |s, d, _, _| if d.index < i { s.border_b_2().border_color(p().accent) } else { s.border_t_2().border_color(p().accent) })
-            .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| this.drop_features(d.id, i, cx)));
+            // Live (F33): a blue pill with the feature's name, "2 items" for several.
+            .on_drag(
+                FeatureDrag {
+                    id,
+                    name: if selected && self.selected_features.len() > 1 { format!("{} items", self.selected_features.len()).into() } else { name.clone().into() },
+                },
+                |d, grab, _, cx| cx.new(|_| FeatureDragPill(grab, d.name.clone())),
+            )
+            // Live (F33): the half of the hovered row the cursor is in picks
+            // the slot, whichever way the drag goes: the upper half lands
+            // before the row (line on its top edge), the lower half after it
+            // (line on its bottom edge); the row gets the hover fill.
+            .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<FeatureDrag>, _, cx| {
+                if !e.bounds.contains(&e.event.position) {
+                    return;
+                }
+                let slot = Some((i, e.event.position.y >= e.bounds.center().y));
+                if this.ui.feature_drop.get() != slot {
+                    this.ui.feature_drop.set(slot);
+                    cx.notify();
+                }
+            }))
+            .drag_over::<FeatureDrag>({
+                let drop = self.ui.feature_drop.clone();
+                move |s, _, _, _| {
+                    let s = s.bg(gpui_kit::rgb(0xe0f0fb)).border_color(p().accent);
+                    if drop.get() == Some((i, true)) { s.border_b_2() } else { s.border_t_2() }
+                }
+            })
+            .on_drop(cx.listener(move |this, d: &FeatureDrag, _, cx| {
+                let after = this.ui.feature_drop.take().is_some_and(|(r, a)| r == i && a);
+                this.drop_features(d.id, i, after, cx);
+            }));
         let anchor = {
             let (scroll, (ix, indent)) = (self.ui.list_scroll.clone(), slot);
             move || {
@@ -3902,15 +4003,26 @@ impl Render for RollbackDragPill {
 #[derive(Clone)]
 struct FeatureDrag {
     id: FeatureId,
-    /// The dragged row's place in the list.
-    index: usize,
     name: SharedString,
 }
 
-impl Render for FeatureDrag {
+/// A feature drag's badge: the "Rollback bar" pill with the feature's name.
+struct FeatureDragPill(Point<Pixels>, SharedString);
+
+impl Render for FeatureDragPill {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let pal = p();
-        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(self.name.clone())
+        div().child(div()
+            .relative()
+            .left(self.0.x + px(12.))
+            .top(self.0.y - px(12.))
+            .px(px(10.))
+            .py(px(3.))
+            .rounded_full()
+            .bg(p().accent)
+            .text_size(px(13.))
+            .font_weight(FontWeight::BOLD)
+            .text_color(gpui_kit::rgb(0xffffff))
+            .child(self.1.clone()))
     }
 }
 
@@ -4448,9 +4560,9 @@ impl Render for PartStudioView {
                     this.start_part_rename(b, window, cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &Extrude, window, cx| this.start_feature("extrude", window, cx)))
-            .on_action(cx.listener(|this, _: &Revolve, window, cx| this.start_feature("revolve", window, cx)))
-            .on_action(cx.listener(|this, _: &Fillet, window, cx| this.start_feature("fillet", window, cx)))
+            .on_action(cx.listener(|this, _: &Extrude, window, cx| this.shortcut_feature("extrude", window, cx)))
+            .on_action(cx.listener(|this, _: &Revolve, window, cx| this.shortcut_feature("revolve", window, cx)))
+            .on_action(cx.listener(|this, _: &Fillet, window, cx| this.shortcut_feature("fillet", window, cx)))
             .on_action(cx.listener(|this, _: &ViewFront, _, cx| this.view(StandardView::Front, cx)))
             .on_action(cx.listener(|this, _: &ViewBack, _, cx| this.view(StandardView::Back, cx)))
             .on_action(cx.listener(|this, _: &ViewLeft, _, cx| this.view(StandardView::Left, cx)))

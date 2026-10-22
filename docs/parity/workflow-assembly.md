@@ -151,3 +151,14 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | A11 BOM edit + Ctrl+Z | not undone | ✅ (= live) |
 | A4 Slider flip | block still inside the plate | ✗ still |
 | A18 repeat insert, ✓ without entering graphics | (5.000025, 2.500025, 1.250025) | ✅ **fixed** (live exact 5 / 2.5 / 1.25) |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| Row | Ours | Status |
+|---|---|---|
+| A19 empty Replicate | pending red "Replicate 1" row + badge, root badge, red border on "Parts to find match in" | ✅ **fixed** (m80) |
+| A4 Slider flip | not re-run: the "qa5 assembly" doc was lost with /tmp/qa5/home | – |
+
+## Re-run pass 14 (2026-10-22, main aa75fdf, app /tmp/qa5/noshape-0503; doc rebuilt: /tmp/qa5/d14/asm.noshape via /root/qa5-scratch/pass14/mkasm2.py = mkasm + plate fixed, block, shaft)
+| Row | Ours | Status |
+|---|---|---|
+| A4 Slider (block top → plate top) + HUD flip primary axis | flip turns the block over: it sits on the plate (p02, p03) | ✅ **fixed** |

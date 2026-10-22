@@ -155,3 +155,12 @@ New findings: **SM14** flat DXF format/layers/text differ (fs/kern); **SM15** 1.
 |---|---|---|
 | SM1 flange (rollback after Flange 1) | 8383.1217, 20 faces | ✗ still (live 8511.4987) |
 | 3.2 hem (rollback after Hem 1) | 9254.2367, 30 faces | ✗ still (live 9378.1835, 33) |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| Row | Ours | Status |
+|---|---|---|
+| SM1 flange / 3.2 hem (CLI rollback) | 8383.1217 / 20 faces; 9254.2367 / 30 faces | ✗ still |
+| SM3 Corner › Closed (CLI feature_edit cornerStyle CLOSED) | "Closed corners are not supported yet" | ✗ still |
+
+## Re-run pass 15 (2026-10-22, CLI /tmp/qa5/noshape-cli-0521 = target-engine 05:21; main still aa75fdf)
+CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS. ✗ still.

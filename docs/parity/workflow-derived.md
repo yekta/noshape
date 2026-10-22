@@ -44,3 +44,23 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 | 32 | Right-click › Update context ▸ • Context 1 | silent update, plain arrow again | same (d44–d47) | ✅ |
 | 33 | Reopen the source Part Studio | dropdown "None", Plane 1 black outline ⇦ | same (d48) | ✅ |
 | 34 | Plane 1 selected: bottom readout | ? | **"Area: 4000000000000.000 mm²"** for a datum plane (d48) | ? DER12 (asked) |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+Fresh doc /tmp/qa5/d23b/derive.noshape (pass9/mkderive.py), configured /tmp/qa5/d23c/cfg.noshape, context /tmp/qa5/d23d/derive.noshape. Shots e01–e42. Live "qa5 derived" (behaviours.md ~7093) folded in.
+| Row | Ours | Status |
+|---|---|---|
+| DER1 empty dialog | pink "Select Part Studio…" box, "Placement" label, no clock icon | ✅ **fixed** (e02) |
+| DER2 panel icons | branch icon | ✅ **fixed** (e03) |
+| DER3 pick the studio | expands inline (Part 1, Sketch 1), ‹ back arrow; reopening shows it expanded | ✅ **fixed** (e04, e32) |
+| DER4 fillet chip on a derived edge | not red any more, but still **"Edge of deleted feature"** (live "Edge of Derived 1") | ✗ still (partly) (e09) |
+| DER5 ▸ expander | present; expands to "Sketch 1" (= live 1582) | ✅ **fixed** (e06) |
+| DER6 second derive of the same source | ✓ enabled, accepted, red row "Derived 2 did not regenerate properly: Creating multiple Derived features from the same source and configuration is not allowed. …" | ✅ **fixed** (e10, e11) |
+| DER7 ghosting | none | ✅ **fixed** (e10) |
+| DER8 insert derived part into an assembly | "qa5 dst" lists "Block"; inserts "Block <1>" with its fillet | ✅ **fixed** (e18, e19) |
+| DER9 renamed source part | panel and dst Parts show "Block" | ✅ **fixed** (e17) |
+| DER10 configuration change in the panel | contents empty + Generate enabled; Generate re-lists, disables | ✅ **fixed** (e33–e35) |
+| DER11 context icon | one icon (short ⇦ + dot), "Update available for Context 1" on the arrow | ✅ **fixed** (e42) |
+| TAB1 derived studio after reopen | Parts (1) + Appearance strip button at once | ✅ **fixed** (e31) |
+| Live (6) Derived row menu | Rename, Edit…, Add selection to folder…, Suppress, Dynamic suppression ▸, **Switch to qa5 src** ✅, Zoom to selection, Show dependencies…, Delete; **no "Add appearance to feature…"** (live has it; ours has it on Extrude rows) | ✗ **DER14** (psb, minor) (e05) |
+| Live (4) suppress src Extrude 1 | Derived 1 black ✅, Parts (0) ✅, Fillet 1 red ✅ but tooltip **"…: Selected edges no longer exist"** (live "…: Select edges or faces to fillet.") | ✗ **DER13** (psb, text) (e21, e22) |
+| (new) Parts list › right-click › **Rename** | **app crashes**: panic "hover style already set" (vendor/gpui-pre/src/elements/div.rs:843) from render_part_row (crates/app/src/part_studio/mod.rs:2831); reproduced twice; Shift+N inline rename works. Log /root/qa5-scratch/crash-0503-rename.log | ✗ **CRASH1** (ui, severe) (e13, e14) |

@@ -86,3 +86,9 @@ Status: ✅ matches expected/live, ✗ differs (finding #), ? live data pending.
 | SF5 Move boundary one Fill edge 10 mm | OK, 2400 mm², bbox −10..50 × 30..70 (all four edges move; live 1000) | ✗ still |
 | SF5 boundary-surface case 25 mm | "Unable to move selected entities." | ✅ text (as pass 7) |
 | SF6 bspline edge 10 mm | OK, area −514.304543 | ✗ still |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| SF2 / SF5 / SF6 | 8000 & 10 faces / 2400 mm² (all edges move) / −514.304543 (surface names now positional "Surface 1/2") | ✗ still |
+
+## Re-run pass 15 (2026-10-22, CLI /tmp/qa5/noshape-cli-0521 = target-engine 05:21; main still aa75fdf)
+CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS. ✗ still.

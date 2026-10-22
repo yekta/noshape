@@ -118,6 +118,107 @@ it, so re-take positions after every selection.
 | 7.2 | STEP contents | Products named as in live's export | ✗ F26 |
 | 7.3 | Quit, start, Recently opened, open | Thumbnail, all tabs and features back | ✅ (single click selects; double click opens: ? vs live) |
 
+## 8. Context menus: every item clicked once (added 10-22 after qa5's Parts-list Rename crash on aa75fdf)
+
+Each row: right-click the row, click the item once, check the result, then undo / Esc / close so the next item starts
+from the same state. **Any crash, hang or console panic fails the gate.** Items that open a dialog or panel: it opens
+and closes again with ✕/Esc/Cancel. Expected results follow live (behaviours.md "Right-click menus").
+
+**8.1 Feature row, sketch (Sketch 1)**
+| # | Item | Expected | Status |
+|---|---|---|---|
+| 8.1.1 | Rename | inline name field, all selected; Esc reverts | – |
+| 8.1.2 | Edit… | Sketch 1 opens for editing | – |
+| 8.1.3 | Copy sketch | copied (no visible change; Paste in another sketch pastes it) | – |
+| 8.1.4 | Show dimensions | the sketch's dimensions show in the graphics | – |
+| 8.1.5 | Add selection to folder… | Folder name popup beside the row | – |
+| 8.1.6 | Hide / Show | the sketch hides / shows; eye toggles | – |
+| 8.1.7 | Create Drawing of Sketch 1… | Create Drawing dialog | – |
+| 8.1.8 | Export as DXF/DWG… | export dialog | – |
+| 8.1.9 | Suppress / Unsuppress | struck-through italic / back | – |
+| 8.1.10 | Dynamic suppression ▸ Add expression… | expression popup | – |
+| 8.1.11 | Zoom to selection | view zooms to the sketch | – |
+| 8.1.12 | View normal to | view turns normal to its plane | – |
+| 8.1.13 | Show dependencies… | "Dependencies of Sketch 1" panel | – |
+| 8.1.14 | Roll to here | rollback bar moves under Sketch 1 | – |
+| 8.1.15 | Edit sketch appearance… | appearance editor | – |
+| 8.1.16 | Delete | deleted (Ctrl+Z restores) | – |
+
+**8.2 Feature row, other feature (Extrude 1)**
+| # | Item | Expected | Status |
+|---|---|---|---|
+| 8.2.1 | Rename | inline name field; Esc reverts | – |
+| 8.2.2 | Edit… | Extrude 1 dialog | – |
+| 8.2.3 | Edit Sketch 1… | Sketch 1 opens | – |
+| 8.2.4 | Show dimensions | dimensions show | – |
+| 8.2.5 | Add selection to folder… | Folder name popup | – |
+| 8.2.6 | Suppress / Unsuppress | struck-through / back | – |
+| 8.2.7 | Dynamic suppression ▸ Add expression… | expression popup | – |
+| 8.2.8 | Zoom to selection | zooms | – |
+| 8.2.9 | Show dependencies… | dependencies panel | – |
+| 8.2.10 | Roll to here | bar under Extrude 1 | – |
+| 8.2.11 | Add appearance to feature… | appearance editor | – |
+| 8.2.12 | Delete | deleted (Ctrl+Z restores) | – |
+
+**8.3 Several feature rows (Shift-click two)**
+| # | Item | Expected | Status |
+|---|---|---|---|
+| 8.3.1 | Add selection to folder… | Folder name popup | – |
+| 8.3.2 | Section view… | Section view dialog | – |
+| 8.3.3 | Suppress | both struck-through | – |
+| 8.3.4 | Dynamic suppression ▸ | submenu | – |
+| 8.3.5 | Clear selection | rows unselected | – |
+| 8.3.6 | Edit sketch appearance… / Add appearance to feature… | appearance editor | – |
+| 8.3.7 | Delete | both deleted (Ctrl+Z restores) | – |
+
+**8.4 Default geometry: plane (Top) and Origin**
+| # | Item | Expected | Status |
+|---|---|---|---|
+| 8.4.1 | Top › Rename | inline field; Esc reverts | – |
+| 8.4.2 | Top › New sketch… | Sketch dialog on Top | – |
+| 8.4.3 | Top › Offset plane… | Plane dialog, Offset, Top picked | – |
+| 8.4.4 | Top › Size to Part Studio | plane resizes to the parts | – |
+| 8.4.5 | Top › Hide / Show | plane hides / shows | – |
+| 8.4.6 | Top › Hide other planes | Front, Right hide | – |
+| 8.4.7 | Top › Hide all planes | all planes hide | – |
+| 8.4.8 | Top › Zoom to selection | zooms | – |
+| 8.4.9 | Top › View normal to | view normal to Top | – |
+| 8.4.10 | Top › Show dependencies… | dependencies panel | – |
+| 8.4.11 | Origin › Rename / Hide / Show dependencies… | as above | – |
+
+**8.5 Folder row**
+| # | Item | Expected | Status |
+|---|---|---|---|
+| 8.5.1 | Expand / Collapse | folder opens / closes | – |
+| 8.5.2 | Rename | inline field; Esc reverts | – |
+| 8.5.3 | Suppress / Unsuppress | its features struck-through / back | – |
+| 8.5.4 | Expand all / Collapse all | all folders open / close | – |
+| 8.5.5 | Unpack folder | folder removed, features stay | – |
+
+**8.6 Parts list row (Part 1)**
+| # | Item | Expected | Status |
+|---|---|---|---|
+| 8.6.1 | Rename | inline white field; Esc reverts (**crashed on aa75fdf**, qa5) | – |
+| 8.6.2 | Properties… | Properties dialog (Name focused) | – |
+| 8.6.3 | Assign material… | material panel | – |
+| 8.6.4 | Edit appearance… | appearance editor | – |
+| 8.6.5 | Copy here… | Transform dialog, Translate by XYZ, ☑ Copy part | – |
+| 8.6.6 | Copy Part 1 | copied (no toast) | – |
+| 8.6.7 | Create Drawing of Part 1… | Create Drawing dialog | – |
+| 8.6.8 | Export… | Export dialog | – |
+| 8.6.9 | Release… | Release dialog | – |
+| 8.6.10 | Hide / Show | part hides / shows | – |
+| 8.6.11 | Isolate… | Isolate panel | – |
+| 8.6.12 | Make transparent… | part translucent | – |
+| 8.6.13 | Zoom to selection | zooms | – |
+| 8.6.14 | Delete… | Delete part feature (Ctrl+Z restores) | – |
+
+**8.7 Parts list section header ("Parts (N)")**
+| # | Item | Expected | Status |
+|---|---|---|---|
+| 8.7.1 | Show / Hide parts list properties | properties columns show / hide | – |
+| 8.7.2 | Hide all parts | all parts hide | – |
+
 ## Findings (2026-10-21 run; owner per item)
 
 | # | Finding | Repro | Owner |
@@ -249,3 +350,27 @@ New findings (10-22):
 | F34 | **Default part colours** (`regen/display.rs PART_COLORS`): ours #9dcfed, #9a9a9a, #4e6fb7, #ebebeb, #c8e6f5, #fd9c28, #787878, #ebb115; live (behaviours.md "Default part colour rotation", dom/default-part-colors.txt, and live's STEP colours) #9dcfed, **#a5a5a5, #3b61b4, #eaeaea, #c4e2f3, #f88701, #7f7f7f, #fab601**. (Row 3.10 was passed by eye earlier.) | Linear pattern of a part ×3 | ui2 |
 
 Routing (lead, 10-22): F30, F32, F33 → psb; F31 → ui; F34 → ui2. 3.16: live request filed (REQUESTS.md, qa4 10-22).
+
+## v0.4.5 gate run: aa75fdf (target-lead build 05:03, files = aa75fdf), FRESH=1 profile, 2026-10-22 05:10–05:35, qa4
+
+**Result: PASS.** Every row matches its expected result. One note: the version footer reads "0.4.4.5bd50b21fc7b" (/root/noshape-lead's HEAD wasn't advanced to aa75fdf).
+
+| Section | Rows | Result |
+|---|---|---|
+| 1 New document | 1.1–1.4 | ✅ (footer hash stale, see above) |
+| 2 Sketch | 2.1–2.20 | ✅ (2.17/2.18: in the first pass the R20 / 40 dimensions after the F32 check didn't get created; not reproducible: re-checked in a second sketch, the same sequence (#z popup, Esc Esc, click away, D, arc, 20 Enter) gives R20 and Ø20) |
+| | F32 (Create variable popup left open, box closed with Esc, re-opened) | ✅ fixed: no stale popup |
+| 3 Features | 3.1–3.4, 3.7–3.11, 3.13–3.15 | ✅ |
+| | 3.5 chamfer 5 mm (F8) | ✅ red, tooltip "Chamfer 1 did not regenerate properly: Distance of chamfer on face too large." (= live G46); 2 mm builds |
+| | 3.6 shell 2.5 mm, top face removed (F9) | ✅ builds (this box: 9973.193 mm³; kern's 13946.59 mm³ is for its own sketch size) |
+| | 3.10 count + Enter (F30) | ✅ fixed: Enter in Instance count accepts the dialog |
+| | 3.12 Feature pattern of the Hole after the Part pattern (F12) | ✅ real holes, Parts (3) |
+| | 3.16 Boolean union of the disjoint Part 3 + Part 4 | ✅ blue note "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.", Parts (4) unchanged, row black after ✓ |
+| 4 Edit / history | 4.1 Extrude 1 → 25 mm (F12) | ✅ rolled back while editing; Part 1 kept |
+| | 4.3 drag Fillet 1 down onto Sketch 2 (F33) | ✅ fixed: the line is drawn below Sketch 2 and the feature lands there (line and result agree; live capture of the side still requested) |
+| | 4.2, 4.4–4.8 | ✅ |
+| 5 Variables … units | 5.1–5.11 | ✅ (5.6 F19 checked on a fresh session at 7.3: toast ≈3.4 s after opening, gone by ≈8.2 s) |
+| 6 Assembly / drawing | 6.1–6.7 | ✅ |
+| 7 Export / reopen | 7.1–7.3 | ✅ (7.2: flat products Part 1–4, no PRODUCT('SOLID'); **F34 fixed**: COLOUR_RGB 0.6157/0.8118/0.9294, 0.6471 (#a5a5a5), 0.2314/0.3804/0.7059 (#3b61b4), 0.9176 (#eaeaea) = live) |
+
+Open items (not blocking): F31 (Fillet ▾ scrollbar, ui) not re-checked; drawing panel fields (asb).

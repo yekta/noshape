@@ -167,8 +167,9 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         }
     };
     let groups = by_body(ev.resolve_edges(refs));
+    // Live (qa5 DER13): edges that are all gone read like an empty field.
     if groups.is_empty() {
-        return err("Selected edges no longer exist");
+        return crate::regen::eval::err_at(&["entities"], "Select edges or faces to fillet.");
     }
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
@@ -313,8 +314,9 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to fillet.");
     }
     let groups = by_body(ev.resolve_edges(refs));
+    // Live (qa5 DER13): edges that are all gone read like an empty field.
     if groups.is_empty() {
-        return err("Selected edges no longer exist");
+        return crate::regen::eval::err_at(&["entities"], "Select edges or faces to fillet.");
     }
     let radius_at = |p: glam::DVec3| at_vertex.iter().find(|(q, _)| (*q - p).length() < 1e-9).map(|v| v.1).unwrap_or(radius);
     for (bi, edges) in groups.into_iter().rev() {
@@ -352,8 +354,9 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
     };
     let overrides: BTreeSet<(usize, usize)> = ev.resolve_edges(ev.query("directionOverrides")).into_iter().collect();
     let groups = by_body(ev.resolve_edges(refs));
+    // Live (qa5 DER13): edges that are all gone read like an empty field.
     if groups.is_empty() {
-        return err("Selected edges no longer exist");
+        return crate::regen::eval::err_at(&["entities"], "Select edges or faces to chamfer.");
     }
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();

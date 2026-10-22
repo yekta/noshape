@@ -27,7 +27,7 @@ const ORIENTATIONS: [(&str, ViewOrientation); 7] = [
 ];
 
 /// Dimension tools: (name, tool, what the clicks pick).
-const DIMENSIONS: [(&str, DimTool, &str); 9] = [
+const DIMENSIONS: [(&str, DimTool, &str); 12] = [
     ("smart", DimTool::Linear, "the Dimension tool (d): click one edge (a line gives its length, a circle its diameter, an arc its radius) or two entities (points, lines, circles: distance, angle between lines, wall thickness of concentric circles)"),
     ("point_to_point", DimTool::Point2, "2 point linear: two vertices / circle centers"),
     ("point_to_line", DimTool::PointLine, "a point and a line"),
@@ -37,6 +37,9 @@ const DIMENSIONS: [(&str, DimTool, &str); 9] = [
     ("angle", DimTool::Angle, "two lines"),
     ("angle_3_point", DimTool::Angle3, "vertex, then a point on each leg"),
     ("arc_length", DimTool::ArcLength, "one arc"),
+    ("chamfer", DimTool::Chamfer, "the chamfer edge, then the edge it meets (Drawing properties decide a callout or two linear dimensions)"),
+    ("max_min", DimTool::MaxMin, "a circle (where on it picks maximum or minimum), then a point or another circle"),
+    ("foreshorten", DimTool::Foreshorten, "a hole or cylinder axis seen side-on, then the edge or point the diameter reaches"),
 ];
 
 pub(super) fn point() -> Value {
@@ -469,16 +472,23 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     for (i, c) in clicks.iter().enumerate() {
         let tool = Tool::Dimension { kind, picks: picks.clone() };
         let n = picks.len();
-        m.pick(&tool, &[], *c).dimension_click(kind, *c, &mut picks);
+        let pk = m.pick(&tool, &[], *c);
+        match kind {
+            DimTool::MaxMin | DimTool::Foreshorten => pk.more_dimension_pick(kind, &mut picks),
+            _ => pk.dimension_click(kind, *c, &mut picks),
+        }
         if picks.len() <= n {
             return Err(OpError::param(&format!("picks[{i}]"), "nothing the tool takes there (click on a view edge, or on a vertex / circle center; see drawing_get)"));
         }
     }
     let tool = Tool::Dimension { kind, picks };
-    let ann = m.pick(&tool, &[], place).pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("picks", "these picks don't make this dimension"))?;
+    let pk = m.pick(&tool, &[], place);
+    let ann = pk.pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("picks", "these picks don't make this dimension"))?;
     let id = ann.id;
+    // Chamfer, Dimensions style: the two legs as linear dimensions.
+    let anns = pk.chamfer_as_dimensions(&ann).unwrap_or_else(|| vec![ann]);
     let mut d = d;
-    d.sheets[sheet].annotations.push(ann);
+    d.sheets[sheet].annotations.extend(anns);
     commit(od, tab, sheet, d, kind.name())?;
     let mut out = reply(od, tab, sheet, false)?;
     out["annotation"] = json!(id);

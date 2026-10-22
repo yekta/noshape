@@ -292,6 +292,10 @@ pub struct Context {
     /// definition sheets): no part, no display; custom features see them
     /// through attribute queries only.
     pub fs_hidden_bodies: Vec<Arc<Body>>,
+    /// Parts named from outside the studio (an imported file's names, a
+    /// Derived source's): `renumber_default_names` leaves them as they are
+    /// (live, qa5 NAME3).
+    pub own_names: std::collections::BTreeSet<BodyId>,
 }
 
 /// One hole of a Hole feature: where it starts, its direction into the
@@ -355,7 +359,7 @@ impl Context {
                 BodyKind::Surface => ("Surface ", 1),
                 BodyKind::Wire | BodyKind::Point => ("Curve ", 2),
             };
-            let default = b.composite.is_none() && b.name.strip_prefix(prefix).is_some_and(|r| !r.is_empty() && r.bytes().all(|c| c.is_ascii_digit()));
+            let default = b.composite.is_none() && !self.own_names.contains(&b.id) && b.name.strip_prefix(prefix).is_some_and(|r| !r.is_empty() && r.bytes().all(|c| c.is_ascii_digit()));
             if !default {
                 continue;
             }

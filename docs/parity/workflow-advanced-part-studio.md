@@ -143,3 +143,13 @@ Pass 6 (17:11 build, d5745c9) had already found ADV8 fixed ("20 tpi"); not re-ch
 | SK1 unsolvable dimension | dialog title and row now red, ✓ disabled | ✅ **fixed** |
 | ADV12 hole row | tooltip "1/4-20 ↧ 12 mm \| ⌵Ø 12.878 mm X 82° [Hole]" ✅; row still shows both callout lines | ✗ still (partly) |
 | TAB1 | Part Studio 2 still opens with "Parts (0)" (Part Studio 3 listed its parts) | ✗ still |
+
+## Re-run pass 13 (2026-10-22 ~05:20–06:40, main aa75fdf: app /tmp/qa5/noshape-0503 = /root/target-lead/debug/noshape 05:03, CLI /tmp/qa5/noshape-cli-0226 = target-engine 02:26)
+| Row | Ours | Status |
+|---|---|---|
+| ADV2 loft (CLI) | 5927.754632 | ✗ still (live 5927.728022) |
+| ADV12 hole row name | "1/4-20 ↧ 12 mm \| ⌵Ø 12…" (both parts, ellipsis); tooltip "… [Hole] <- Sketch 2" | ✅ — **withdrawn**: live psb 10-21 p (behaviours ~7448) shows both callout parts; "first only" was a Simple hole (a04, a05) |
+| TAB1 Part Studio 2 on first open | Parts (1), 5 strip buttons | ✅ **fixed** (a01) |
+
+## Re-run pass 15 (2026-10-22, CLI /tmp/qa5/noshape-cli-0521 = target-engine 05:21; main still aa75fdf)
+CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS. ✗ still.

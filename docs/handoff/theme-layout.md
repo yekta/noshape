@@ -1121,7 +1121,7 @@ Replace instance / Interference detection. What live's `panelLayoutManager` (bun
 | **TABS5** rename not undoable | **done** (tab bar, Variable Studio tab rename (ui2's file, one word), tab manager folder rename, agent API `tab_rename`). | `edit_document_not_undoable`. Not checked in the app. |
 | **C5** toast | **done, verified** (centred on the window at y 85, over the right panel). | `part_studio/mod.rs render_viewport_overlay(window, cx)`: `deferred(anchored().position_mode(Window))`, priority 1. Assembly / drawing toasts not changed (check whether qa5 sees them too). |
 | **KB1** Shift+N on a part | already in the tree (psb: `start_part_rename` from `RenameSelected`). Not re-tested by ui. | `part_studio/mod.rs` RenameSelected. |
-| **KB2** Esc on tool panels | **half done.** Esc with focus in graphics → `close_tool_panel` (Named views, Mass properties, Measure; Appearance stays). **Bug left:** Esc with the focus in the Named views "New view name" input only clears the text and blurs; the panel stays open. Trace showed: no Cancel reaches the Part Studio, `close_named_views` isn't called, the input emits Change("") then Blur, although the InputState has `.revert_on_escape(false)` and the only `revert_escape` callers are state.rs:2323 and feature_dialog.rs:2777. **Next:** find who clears + blurs (put an eprintln in gpui-base `state.rs escape()` / `clean()` / `replace_text`, and check the key bindings for "escape" that match inside this panel); the goal is: one Esc closes the panel, typed text discarded (live). | `part_studio/view_tools.rs close_tool_panel / close_named_views`, the panel's `.on_action(Escape)`, `mod.rs` Cancel chain. |
+| **KB2** Esc on tool panels | **fixed 10-22** (to be re-checked in the app after the rebuild). Esc with focus in graphics → `close_tool_panel` (Named views, Mass properties, Measure; Appearance stays). The input bug: `ui::ensure_placeholder` called `set_search_box(false)` for every non-search placeholder, which switched `revert_on_escape` back on and overrode the panel's `.revert_on_escape(false)`. So Esc reverted to the empty baseline, blurred and swallowed the key. Now only search boxes are switched; other inputs keep what they were built with. The Esc then propagates to the panel's `on_action(Escape)` → `close_named_views`. | `ui.rs ensure_placeholder`, `part_studio/view_tools.rs toggle_named_views / close_named_views`. |
 | **KB3** planes in Isolate | **done, verified** (all planes and their names hidden, origin hidden; Make transparent leaves them). | `behaviors.rs` isolate display; `mod.rs render_viewport_underlay` skips plane names while isolating. |
 | **ADV4** hole rows | **done, verified** (icons, full values). Icons redrawn after live's crops (dialogs/adv4-*): `hole-cbore-*`, `hole-csink-*`, new `hole-tap-clearance`; tap drill row uses `hole-diameter`; `hole-tap-diameter.svg` deleted. **Found:** Inch countersink defaults read 10 mm / 90 deg, live 0.531 in / 82 deg (and cBore 0.4375 in / 0.25 in): the drilled ANSI table values aren't applied to cBore/cSink params; that's psb's hole model (`hole_tables apply_table_to_params`), report to psb. Run `cargo test -p noshape --test no_onshape_assets` for the new SVGs. | `feature_dialog.rs param_icon`, `assets/icons/hole-*.svg`. |
 | **ADV8** "20 tpi" | **done** (external-thread pitch options without the series; tapped holes keep "(UNC)"). Not checked in the app. | `model/src/features/hole_tables.rs thread_level`. |
@@ -1133,7 +1133,7 @@ Replace instance / Interference detection. What live's `panelLayoutManager` (bun
 
 ### Other work in the tree from this session
 - SM15 `noshape_units::to_fixed` (JS toFixed rounding, exported from lib.rs) + 33 display sites; units tests pass.
-- ADV5 helix "Handedness" label (`model/src/features/curve.rs` SHOW_LABEL).
+- Helix "Handedness": **no label** (10-22, live dom/dialog-helix.txt + qa5-adv-helix.html: a bare first-column select, tooltip "Handedness"; ADV5 was withdrawn). The earlier SHOW_LABEL in `model/src/features/curve.rs` is removed.
 - Tooltip press gate (vendor gpui-pre `TooltipPressGate`, a press hides the tooltip until the pointer leaves).
 - `os_ui::param_row` 194 px; panel snapping; toolbar collapse (see sections above).
 
@@ -1141,11 +1141,28 @@ Replace instance / Interference detection. What live's `panelLayoutManager` (bun
 - `/root/ui-scratch/numberinput-wip.patch`: shared `NumberField` / `NumberInput` / `step_keys` in `quantity_field.rs` and their use in analysis tools (Zebra, Reflection, Connection), draft angle, assembly zebra/reflection. Never compiled. Re-apply on a quiet tree, `cargo check`, then test (live table: behaviours.md "Input behaviour outside feature dialogs").
 - `/root/ui-scratch/tooltip-test.patch`: unit test `a_press_hides_the_tooltip_until_the_pointer_leaves` for ui.rs (now with `::gpui_kit::TooltipPressGate`). It failed to resolve in the app's test target with `gpui_kit::`; apply, then `cargo clippy -p noshape --all-targets` to see whether the absolute path works.
 
+### Verified 10-22 (in the app, after freeze aa75fdf)
+- ADV12: the Hole row shows the full name (both callout parts, truncated to the panel width); its tooltip is "Ø 6.35 mm ↧ 12 mm | ⌴Ø 10 mm ↧ 5 mm [Hole] <- Sketch 2" (live format).
+- DOC5: not reproducible any more. + with Part Studio 1 active puts the new tab right after it, activated, and it stays there through an edit, Ctrl+Z, tab switches and a reopen (tab ops are not undoable since `keep_tab_bar`).
+- Part Studio Tab order (live "ui (10-21 20:00)"):
+  - **Extrude:** query → End type select → flip → Depth → ± → Direction → Starting offset → Symmetric → Draft → Second end position → `?` → `{✓}` (our Share spot).
+  - **Plane:** select → offset → flip → Flip normal → `?` → `{✓}`.
+  - **From `{✓}`:** f fits and keeps the focus there. Shift+E with Plane open replaces it with a new Extrude and focuses its query field.
+  - **After clicking the active tab:** f fits.
+- Shift+E (and the Revolve/Fillet shortcuts) with a new dialog of the same tool already open: now does nothing (live), via `shortcut_feature`. Before, it restarted the dialog and lost the draft.
+
+### 10-22 lead batch (CRASH1, BOOL1b, DER14, VB1, STB1)
+- **CRASH1** (release blocker): Parts list › right-click › Rename panicked "hover style already set": `render_part_row` added `.hover` on top of `ui::tree_row`'s own (unselected rows). Now `tree_row(…, selected || renaming)` plus a white bg. Guard test `ui::tests::tree_rows_never_set_a_second_hover` scans every `tree_row(` chain.
+- **BOOL1b**: a feature's Info status (std reportFeatureInfo, e.g. "Boolean resulted in no geometry change…") is the blue top-centre graphics bubble (`self.message`) while its dialog is open, not the dialog status. It is cleared when it goes away or the dialog closes (`ui.dialog_info`, `apply_display`). Row tooltips no longer show infos (live "Boolean 1").
+- **DER14**: `makes_faces` also counts each body's creator, so the Derived row gets "Add appearance to feature…". `appearance::face_colors` takes the studio's feature ids: a feature's appearance also colours faces of its bodies named after features from elsewhere (a Derived's).
+- **VB1**: the sketch value box (and its Create variable popup) is collected in `on_top` and appended after the constraint and pattern glyphs in `render_sketch_labels`.
+- **STB1**: S toolbar = the assembly's `.os-mini-toolbar-panel` look: at cursor x+10 / y−30, 30 px tools at a 34 px pitch, rows 1 px apart, 4.5 px padding (175 wide), white .95, no border, square corners, 0 5 10 shadow, no tooltips, full-colour 20 px icons. In a sketch S re-opens at the cursor.
+
 ### Next steps, in order
-1. KB2 input Esc bug (above).
+1. Re-check in the app: CRASH1, BOOL1b, DER14, VB1, STB1 (and KB2 and the Shift+E no-op, done).
 2. Check TABS3/TABS5/ADV8/FS4 in the app; run `no_onshape_assets` and the app unit tests (`custom_feature_initials_and_regen_times_read_as_onshape`, `panels_snap_like_onshape`).
 3. FS4 tooltip second line; then FS2/FS5 with fs.
-4. DOC5 (a tab made with + later shown at the end): not reproduced statically; `place_after` and saving look right. Reproduce: + after a middle tab, then BOM edit / undo / tab switch / reopen.
+4. Derived at 2+ locations: std importDerived instantiates sketches per location and reports DERIVED_NO_INSTANCING. Live request "ui (10-22 b)" asks for the text and the ▸ listing; ours brings sketches only at the first location.
 5. Parked NumberInput patch; TAB1 with psb ("Parts (0)" after a tab switch).
 
 ### How to build and test (ui)

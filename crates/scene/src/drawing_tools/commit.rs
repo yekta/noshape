@@ -4,7 +4,7 @@
 //! tables with them.
 
 use super::geom::*;
-use super::{EdgeRef, Pick, PickedPoint, SheetPick, TableTool};
+use super::{DimTool, EdgeRef, Pick, PickedPoint, SheetPick, TableTool};
 use noshape_model::drawing::build::ViewPlacement;
 use noshape_model::drawing::views;
 use noshape_model::drawing::*;
@@ -181,6 +181,173 @@ impl SheetPick<'_> {
             callout.on_face |= callout.part.is_some() && views::view_source(self.current_sheet(), anchor.view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
         }
     }
+}
+
+impl SheetPick<'_> {
+    /// The Max/min and Foreshorten dimension tools' click at the cursor:
+    /// what it adds to `picks`.
+    pub fn more_dimension_pick(&self, kind: DimTool, picks: &mut Vec<Pick>) {
+        match (kind, picks.len()) {
+            (DimTool::MaxMin, 0) => picks.extend(self.circle_at()),
+            (DimTool::MaxMin, 1) => {
+                let Some(Pick::CircleAt { view, center, .. }) = picks.first().cloned() else { return };
+                let second = match self.circle_at() {
+                    Some(Pick::CircleAt { view: v, center: c2, .. }) if v == view && len(sub(c2, center)) < 1e-9 => None,
+                    Some(p @ Pick::CircleAt { view: v, .. }) if v == view => Some(p),
+                    _ => self.snap_at(self.cursor).filter(|p| p.view == view).map(Pick::Point),
+                };
+                picks.extend(second);
+            }
+            (DimTool::Foreshorten, 0) => picks.extend(self.axis_pick()),
+            (DimTool::Foreshorten, 1) => {
+                let view = match &picks[0] {
+                    Pick::Line { a, .. } => a.view,
+                    _ => return,
+                };
+                // A snap point, a model edge, any drawn line (silhouettes have no
+                // model edge), else the clicked point itself.
+                let e = self
+                    .snap_at(self.cursor)
+                    .filter(|p| p.view == view)
+                    .map(Pick::Point)
+                    .or_else(|| self.line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view)))
+                    .or_else(|| self.raw_line_pick().filter(|l| matches!(l, Pick::Line { a, .. } if a.view == view)))
+                    .or_else(|| self.placement(view).filter(|pl| pl.contains(self.cursor, 2.0)).map(|pl| Pick::Point(PickedPoint { view, p: pl.to_view(self.cursor), r: None })));
+                picks.extend(e);
+            }
+            _ => {}
+        }
+    }
+
+    /// A chamfer dimension in Drawing properties' "Dimensions" style: its
+    /// two legs as linear dimensions (None: kept as a chamfer callout).
+    pub fn chamfer_as_dimensions(&self, a: &Annotation) -> Option<Vec<Annotation>> {
+        let AnnotationKind::ChamferDimension { view, a: pa, b: pb, c: pc, d: pd } = a.kind else { return None };
+        let u = [pb[0] - pa[0], pb[1] - pa[1]];
+        let w = [pd[0] - pc[0], pd[1] - pc[1]];
+        let (lu, lw) = (len(u), len(w));
+        if lu < 1e-12 || lw < 1e-12 {
+            return None;
+        }
+        let wn = [w[0] / lw, w[1] / lw];
+        let along = u[0] * wn[0] + u[1] * wn[1];
+        let ang = (along.abs() / lu).min(1.0).acos().to_degrees();
+        let p = &self.drawing.props;
+        let as_dims = if (ang - 45.0).abs() < 0.05 { p.chamfer_45_dimension } else { p.chamfer_dimension };
+        if !as_dims {
+            return None;
+        }
+        let corner = [pa[0] + wn[0] * along, pa[1] + wn[1] * along];
+        let id = a.id;
+        let leg = |k: u64, x: [f64; 2], y: [f64; 2], slot: Option<(u8, u8)>| {
+            let refs: Vec<AnnotationRef> = match slot {
+                Some((from, to)) => a.refs.iter().filter(|r| r.slot == from).map(|r| AnnotationRef { slot: to, point: r.point.clone() }).collect(),
+                None => Vec::new(),
+            };
+            Annotation { id: id + k, kind: AnnotationKind::LinearDimension { view, a: x, b: y, offset: 6.0, orientation: DimOrientation::Aligned, override_text: None }, position: a.position, refs, ..Default::default() }
+        };
+        Some(vec![leg(0, pa, corner, Some((0, 0))), leg(1, corner, pb, Some((1, 1)))])
+    }
+}
+
+/// A circle picked by the Centermark tool.
+#[derive(Clone, Debug)]
+pub struct CmCircle {
+    pub view: ViewId,
+    pub center: [f64; 2],
+    pub radius: f64,
+    pub r: Option<PointRef>,
+}
+
+/// The Centermark dialog: `mode` 0 Single, 1 Circular, 2 Linear, and its
+/// options (the defaults are the dialog's when it opens).
+#[derive(Clone, Copy, Debug)]
+pub struct CentermarkOpts {
+    pub mode: u8,
+    pub reference_center: bool,
+    pub bolt_circle: bool,
+    pub radial_lines: bool,
+    pub pattern: bool,
+    pub connecting: bool,
+}
+
+impl Default for CentermarkOpts {
+    fn default() -> Self {
+        Self { mode: 0, reference_center: true, bolt_circle: true, radial_lines: false, pattern: true, connecting: true }
+    }
+}
+
+/// Centermark (Single): the mark of one circle, placed at `position`.
+pub fn centermark(id: u64, c: &CmCircle, position: [f64; 2]) -> Annotation {
+    let refs = c.r.clone().map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default();
+    Annotation { id, kind: AnnotationKind::Centermark { view: c.view, center: c.center, size: c.radius * 1.25, angle: 0.0, arms: [0.0; 4] }, position, refs, ..Default::default() }
+}
+
+/// Circular / Linear centermark ✓: the marks (and their centerlines, bolt
+/// circle, reference center) of `picks` (one view), and the edit's name.
+pub fn centermark_set(picks: &[CmCircle], o: &CentermarkOpts) -> (Vec<(AnnotationKind, Vec<AnnotationRef>)>, &'static str) {
+    let mut new: Vec<(AnnotationKind, Vec<AnnotationRef>)> = Vec::new();
+    let name = if o.mode == 1 { "Circular centermark" } else { "Linear centermark" };
+    let Some(first) = picks.first() else { return (new, name) };
+    let view = first.view;
+    let centers: Vec<[f64; 2]> = picks.iter().map(|p| p.center).collect();
+    let mark = |c: &CmCircle, angle: f64| (AnnotationKind::Centermark { view, center: c.center, size: c.radius * 1.25, angle, arms: [0.0; 4] }, c.r.clone().map(|point| vec![AnnotationRef { slot: 0, point }]).unwrap_or_default());
+    if o.mode == 1 {
+        // Pattern center: the circle through the first three centers (or the mean).
+        let pc = match centers.len() {
+            1 | 2 => {
+                let n = centers.len() as f64;
+                centers.iter().fold([0.0, 0.0], |a, c| [a[0] + c[0] / n, a[1] + c[1] / n])
+            }
+            _ => AnnotationKind::circle_centerline(&centers[..3]).map(|(c, _)| c).unwrap_or(centers[0]),
+        };
+        for c in picks {
+            let angle = if o.pattern { (c.center[1] - pc[1]).atan2(c.center[0] - pc[0]) } else { 0.0 };
+            new.push(mark(c, angle));
+            if o.radial_lines {
+                new.push((AnnotationKind::Centerline { view, a: pc, b: c.center }, vec![]));
+            }
+        }
+        if o.bolt_circle && centers.len() >= 2 {
+            // Through three hole centers (associative), else center + a hole.
+            let (pts, refs): (Vec<[f64; 2]>, Vec<AnnotationRef>) = if centers.len() >= 3 {
+                (centers[..3].to_vec(), picks[..3].iter().enumerate().filter_map(|(k, p)| p.r.clone().map(|point| AnnotationRef { slot: k as u8, point })).collect())
+            } else {
+                (vec![pc, centers[0]], vec![])
+            };
+            new.push((AnnotationKind::CircleCenterline { view, points: pts }, refs));
+        }
+        if o.reference_center {
+            let s = picks.iter().map(|p| p.radius).fold(f64::MAX, f64::min) * 0.6;
+            new.push((AnnotationKind::Centermark { view, center: pc, size: s, angle: 0.0, arms: [0.0; 4] }, vec![]));
+        }
+    } else {
+        for c in picks {
+            new.push(mark(c, 0.0));
+        }
+        if o.connecting {
+            for w in picks.windows(2) {
+                new.push((AnnotationKind::Centerline { view, a: w[0].center, b: w[1].center }, vec![]));
+            }
+        }
+    }
+    (new, name)
+}
+
+/// The Note panel's ✓ for a new note at `position`: the note (empty text:
+/// none). New notes take Drawing properties › Notes text height (else All
+/// annotations'); a typed `height` becomes the new Notes default.
+pub fn new_note(d: &mut Drawing, sheet: usize, text: String, height: Option<f64>, style: noshape_model::drawing::note::NoteStyle, position: [f64; 2]) -> Option<Annotation> {
+    if text.trim().is_empty() {
+        return None;
+    }
+    let id = d.sheets.get(sheet)?.next_annotation_id();
+    let default_h = d.props.ann_type(noshape_model::drawing::sheet::AnnType::Notes).height.unwrap_or(d.props.ann_text_height);
+    let height_mm = height.unwrap_or(default_h);
+    if height.is_some_and(|h| (h - default_h).abs() > 1e-9) {
+        d.props.ann_type_mut(noshape_model::drawing::sheet::AnnType::Notes).height = Some(height_mm);
+    }
+    Some(Annotation { id, kind: AnnotationKind::Note { text, height_mm, style }, position, ..Default::default() })
 }
 
 /// The Break view dialog's default gap: 6 mm, or 0.25 in in inch drawings.
