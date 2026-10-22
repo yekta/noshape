@@ -834,6 +834,10 @@ impl PartStudioView {
         // Hovering a feature or part in the list lights up all of its
         // geometry; a single hovered entity uses the hover highlight.
         let hovered = self.highlighted_hover(cx);
+        // Trim (live, qa5 sketch tools): only the piece that would go is
+        // highlighted (the sketch overlay draws it), not the whole curve.
+        let trimming = self.sketch.as_ref().is_some_and(|s| s.tool == crate::sketch_mode::Tool::Trim);
+        let hovered: Vec<Reference> = hovered.into_iter().filter(|r| !(trimming && matches!(r, Reference::SketchEntity { .. }))).collect();
         // A manipulator handle under the cursor hides the geometry hover.
         let on_handle = self.ui.manip_hover || self.ui.triad_hover.is_some();
         let single_hover = if hovered.len() == 1 && self.ui.list_hover.is_none() && self.ui.var_hover.is_none() && self.ui.ct.hover.is_none() && !on_handle { hovered.first().cloned() } else { None };
