@@ -872,3 +872,50 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   Conditional dims `"<dim>@<param>=<option>"` (standard/mod.rs). Tapping screws staged in scratch
   (gen/tapping.py, tap/fasteners.fs POINT_BT); blocked on tips C–T, Type III/VI recesses, indent heads (live
   requests filed). Plan: /root/skb-scratch/PLAN-catalogue.md.
+
+### 22 Oct morning: tapping screws, MT7 0°, SK5, CH1 (worktree /root/wt/skb from 07:00)
+* Tapping screws: catalogue 197 components; the 2 trim heads (Flat / Oval countersunk trim, Type I/IA only) are
+  in with all 11 tips (fasteners.fs POINT_BT 7, POINT_TIP_D/G/F 8–10; BT sphere R = L − (3L² − D²)/4L). Test
+  `tapping_screw_tips_regenerate` (#8-#6 trim). The other 8 tapping components wait for Type III/VI recess shapes
+  (live request 05:30) and the indent heads; `standard/mod.rs`: `param()` is row-aware, `fix_length()`.
+* MT7: the mate angle label trims zeros ("0°", `mate_angle_label`) and sits at the X-axis end at 0°.
+* SK5 (sketch solver): `SolveOptions::light` / `still` (first an exact pass with everything else held, then a
+  weighted fallback), `Sketch::dimension_edit_options(cid)`; the dimension edit path uses it. Fillet radius
+  rule from live (REST, qa5 sketch tools): the arc keeps its CCW end point (that line keeps its length), the
+  line at its start moves. Test `fillet_radius_change_moves_like_onshape` (30.089×22.065, R5→R3 = live's
+  edges). Open: the default fillet radius (live R20 earlier, R5 now; request 10-22 07:05); live also keeps a
+  `visualSharp` point after every fillet (ours only when something refers to the corner).
+* CH1: the pending sketch chamfer draws the light-blue chamfer line, both distance dimensions ("5", 50 px
+  outside the edges) and the hollow drag arrow from the first chamfer end along its edge (drag sets both
+  distances); Enter commits and opens distance 1's box, accepting it opens distance 2's
+  (`value_box_next`/`open_next_value_box`). Arrow look is icons2's.
+* EXV4: Done in an exploded view keeps its row expanded (`ui.explode_open`) and clears the selection and triad
+  (`activate_explode(None)`). EXV5: explode drags round like live (`explode_drag_round`: whole degrees, 0.1 mm /
+  0.01 in) and the step dialog writes angles as "55 deg". NP1: no Delete on the mate row menu while editing a
+  named position.
+* Tapping screws, 10-22 morning (b): catalogue 200 components. **Pan** (head as live's configuration strings:
+  Ø = A_max, height = recessed H_max for every head type, R_min edge fillet → `re`, crown sphere 1.65·D → `rf`;
+  fasteners.fs `panCrown`), **Fillister** and **Oval countersunk** are complete with **Type III** (square + 140°
+  cone, `DRIVE_SQUARE_III`) and **Type VI** (12-point closed fit spline + cone, `DRIVE_TYPE_VI`) from live's
+  FSRules columns (dom/skb-sc-recess-III-VI.json). Closed FS fit splines are periodic
+  (`Sketch::add_closed_fit_spline`, `Nurbs::periodic_end_derivative`), and a region loop of one closed spline is
+  one edge (regen/eval.rs `region_profile`), so the lobe wall is one face as live's. Pan #8 Slot = live's 10 faces;
+  III/VI = live minus the 0.002 in mouth fillet, which OCCT fails at 0.0508 mm (`try silent`; ignored test
+  `pan_head_tapping_screw_mouth_fillets` = kern follow-up). Still out: Flat countersunk (no FSRules III/VI data
+  yet, live request 07:45), Flat undercut, Oval undercut, Hex, Hex washer (Indent / Slot and indent heads).
+* Shared target dirs: worktrees in one group overwrite each other's workspace crates (cargo's hash ignores the
+  worktree path), so a build can link another worktree's stale crate. Touch your changed sources before a check.
+
+## From ui2 (10-22): assembly visuals taken from the lead (qa5 workflow 28, pass 17b), surgical edits
+- **EXV3** (assembly_scene.rs, assembly_view.rs): `Highlights.explode_triad` drops the plane handles in explode
+  mode (live 802); `Highlights.step_arrow` replaces the triad with one hollow arrow along the move while an
+  explode step is dragged or its dialog is open (a ring with an arrowhead for rotations; live 805 / 810); the
+  step being edited is highlighted in the panel.
+- **EXV2 / EXV1 / EXV6** (assembly_panels.rs `render_explode_panel`): tree guide at x 16 with a 9 px tick even
+  with no steps; rollback bar 7 px #b8b8b8 from 51 px to −6 px; the how-to box in live's info colours and
+  margins (one line); empty state: the button on a 33 px #eaeaea band and a new illustration
+  (`icons/exploded-views-empty.svg`, ui2's drawing); dragging the rollback bar shows live's blue "Rollback bar"
+  pill and drops on the row boundary nearest the cursor (`AsmUi.explode_rb_drop`, a 2 px blue line + ring).
+- **MNU2** (assembly_behaviors.rs mate menu): separators around "Edit named position driver mate…".
+- **NP2** (assembly_positions.rs): with drivers, "Name" sits in the lower row of a #eaeaea cell; mate and DOF
+  header cells #d7d7d7.

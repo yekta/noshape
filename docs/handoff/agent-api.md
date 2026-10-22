@@ -624,3 +624,15 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   IN-APP VERIFIED (build 06:16): Callout with leader + free callout ("Callout"), Centermark single, Max/min dimension.
   Note switch: verify after the 06:30+ build. CLI rebuilt for qa5 after this batch.
   NEXT: GD&T, surface finish, weld (dialog-driven), aux view In line / Axis, datum on annotation lines.
+- 2026-10-22 (api, worktree /root/wt/api, branch agent/api): new workflow (WORKFLOW.md): commit, merge main, check,
+  `git branch -f ready/api HEAD`; status in /tmp/lead/mq/api.status. Never `git stash` (shared by all worktrees).
+  Landed since the transition: drawing_gdt, drawing_surface_finish, drawing_weld (+ shared gdt / surface_finish /
+  weld / weld_target builders in scene commit.rs); release ships noshape-cli (a6169ca, main cebd793): macOS
+  noshape.app/Contents/MacOS/noshape-cli + loose in the dmg, Linux/Windows next to the app; README + AGENT_API.md
+  quick start per OS with the macOS quarantine note. sketch_fillet default = live's rule (R5 at first, then the
+  last radius used in that Part Studio while the document is open: OpenDoc.sketch_fillet_radius); e2e
+  sketch_fillet_radius_default_is_r5_then_sticky.
+  Parked app switches (apply when convenient, each checked in the app): /root/api-scratch/gdt/apply_app.py
+  (drawing_gdt.rs, drawing_extra.rs surface finish, drawing_weld.rs -> scene builders).
+  NEXT: those app switches + in-app check; aux view In line / Axis; datum on annotation lines; revision table /
+  callout, general / custom tables, hatch, broken-out section, drawing sketch tools, insert image/DXF as ops.
