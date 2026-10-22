@@ -15,20 +15,59 @@ use std::sync::Arc;
 
 // ------------------------------------------------------------------ delete face
 
-/// Fillet faces adjacent to the selection (non-planar faces created as blends).
+/// Fillet faces next to the selection, recognised from the geometry (live
+/// L11: also on imported parts): a cylinder, torus, sphere or B-spline
+/// (rolling-ball) face that is tangent to a deleted face along their edge and
+/// to another face along another edge. Fillets tangent to fillets found this
+/// way follow (a fillet chain). Faces our Fillet feature made count too.
 fn adjacent_fillets(body: &Body, faces: &BTreeSet<usize>) -> Vec<usize> {
-    let mut out = Vec::new();
-    for &f in faces {
-        for a in body.shape.adjacent_faces(f).unwrap_or_default() {
-            if faces.contains(&a) || out.contains(&a) {
-                continue;
-            }
-            let is_blend = matches!(body.faces[a].root(), TopoName::Face { role: Role::Blend(_), .. });
-            let curved = body.shape.sub_shape(ShapeType::Face, a).ok().and_then(|s| s.face_surface().ok()).is_some_and(|s| !matches!(s, k::Surface::Plane(_)));
-            if is_blend && curved {
-                out.push(a);
+    let all = body.shape.faces();
+    let Ok(ef) = body.shape.edge_faces() else { return Vec::new() };
+    let edges = body.shape.edges();
+    let blend_like = |f: usize| {
+        let named = matches!(body.faces[f].root(), TopoName::Face { role: Role::Blend(_), .. });
+        let shape = all[f].face_surface().ok();
+        named || matches!(shape, Some(k::Surface::Cylinder { .. } | k::Surface::Torus { .. } | k::Surface::Sphere { .. } | k::Surface::BSpline { .. }))
+    };
+    // Whether faces a and b meet tangentially along edge e.
+    let tangent = |e: usize, a: usize, b: usize| -> bool {
+        let Some(m) = edges.get(e).and_then(|x| x.edge_info().ok().and_then(|i| x.point_at((i.first_param + i.last_param) * 0.5).ok())) else { return false };
+        match (face_normal_near(&all[a], m), face_normal_near(&all[b], m)) {
+            (Some((_, na)), Some((_, nb))) => na.normalize().dot(nb.normalize()) > 1.0 - 1e-6,
+            _ => false,
+        }
+    };
+    // (neighbour, edge) pairs of a face.
+    let neighbours = |f: usize| -> Vec<(usize, usize)> {
+        ef.iter()
+            .enumerate()
+            .filter_map(|(e, fs)| match fs[..] {
+                [a, b] if a as usize == f && b as usize != f => Some((b as usize, e)),
+                [a, b] if b as usize == f && a as usize != f => Some((a as usize, e)),
+                _ => None,
+            })
+            .collect()
+    };
+    let mut seeds: BTreeSet<usize> = faces.clone();
+    let mut out: Vec<usize> = Vec::new();
+    loop {
+        let mut found = Vec::new();
+        for &s in &seeds {
+            for (f, e) in neighbours(s) {
+                if seeds.contains(&f) || out.contains(&f) || found.contains(&f) || !blend_like(f) || !tangent(e, s, f) {
+                    continue;
+                }
+                // Tangent to something else too (a fillet joins two faces).
+                if neighbours(f).into_iter().any(|(g, e2)| g != s && e2 != e && tangent(e2, f, g)) {
+                    found.push(f);
+                }
             }
         }
+        if found.is_empty() {
+            break;
+        }
+        out.extend(found.iter().copied());
+        seeds.extend(found);
     }
     out
 }
@@ -50,8 +89,13 @@ pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let mut set: BTreeSet<usize> = faces.into_iter().collect();
+        let fillets = adjacent_fillets(&body, &set);
         if ev.bool("includeFillet") {
-            set.extend(adjacent_fillets(&body, &set));
+            set.extend(fillets);
+        } else if heal == "HEAL" && !fillets.is_empty() {
+            // Live L11: a fillet left around the deleted faces can't be
+            // healed (Parasolid); OCCT would stretch it to close the gap.
+            return err(DELETE_FAILED);
         }
         let all = body.shape.faces();
         // Live: deleting every face removes the part, with no message.
