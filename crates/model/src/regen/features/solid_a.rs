@@ -438,7 +438,7 @@ fn thicken_names(ev: &EvalCtx, inp: &ThickenInput, out: &Shape, tmax: f64) -> Ve
 pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities");
     if refs.is_empty() {
-        return err("Select surfaces, faces or planes that enclose a volume");
+        return err("Select faces, parts, or planes to form a solid.");
     }
     let mut shapes: Vec<Shape> = Vec::new();
     let mut names: Vec<crate::naming::ShapeNames> = Vec::new();
@@ -470,11 +470,11 @@ pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if shapes.is_empty() {
-        return err("The selected entities no longer exist");
+        return err("Select faces, parts, or planes to form a solid.");
     }
-    let res = k::enclose(&shapes).map_err(kerr("Enclose failed"))?;
+    let res = k::enclose(&shapes).map_err(|_| fe("Failed to create a part from enclosed region."))?;
     if res.shape.count(ShapeType::Solid) == 0 {
-        return err("The selected entities don't enclose a volume");
+        return err("Selections do not enclose a region.");
     }
     let arg_refs: Vec<&crate::naming::ShapeNames> = names.iter().collect();
     let faces = ev.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
