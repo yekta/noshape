@@ -4,14 +4,14 @@
 //! name exported files from `${property}` placeholders.
 
 use crate::os_ui as os;
-use crate::preferences_window::{ListPrefs, PreferencesView};
+use crate::preferences_window::PreferencesView;
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::input::{Input, InputEvent, InputState, Position};
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::export_rules::{self as er, ExportRule, ExportScope};
+use noshape_model::export_rules::{self as er, ExportElement, ExportRule, ExportRules};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -22,25 +22,12 @@ fn tr(s: &str) -> SharedString {
 const BLUE: u32 = 0x1651b0;
 const RED: u32 = 0xaa252d;
 
-/// The saved rules.
-pub fn rules() -> Vec<ExportRule> {
-    ListPrefs::load().export_rules
+fn rules() -> Vec<ExportRule> {
+    crate::export_naming::rules().rules
 }
 
 fn save_rules(rules: Vec<ExportRule>) {
-    let mut prefs = ListPrefs::load();
-    prefs.export_rules = rules;
-    prefs.save();
-}
-
-/// The exported file's name: the scope's rule for `format` applied to the
-/// object's properties, else Onshape's default "<Part Studio> - <part>"
-/// (`default_name`; live 1883).
-pub fn file_name(scope: ExportScope, format: &str, default_name: &str, value: impl Fn(&str) -> Option<String>) -> String {
-    match er::rule_for(&rules(), scope, format) {
-        Some(r) => er::file_name(&r.convention, scope, value),
-        None => default_name.to_string(),
-    }
+    crate::export_naming::set_rules(&ExportRules { rules });
 }
 
 #[derive(Default)]
@@ -70,9 +57,9 @@ impl Render for ExportRulesPrefsView {
                         .h(px(44.))
                         .border_b_1()
                         .border_color(rgb(0xdee2e6))
-                        .child(cell(180., tr(r.scope.label()), false))
+                        .child(cell(180., tr(r.element.label()), false))
                         .child(cell(220., tr(&r.format), false))
-                        .child(div().flex_1().min_w_0().px(px(10.)).truncate().child(r.convention.clone()))
+                        .child(div().flex_1().min_w_0().px(px(10.)).truncate().child(r.template.clone()))
                         .child(
                             h_flex()
                                 .gap(px(4.))
@@ -80,11 +67,11 @@ impl Render for ExportRulesPrefsView {
                                 .child(small(SharedString::from(format!("er-edit-{i}")), tr("Edit")).on_click(move |_, window, cx| open_dialog(v1.clone(), Some(i), window, cx)))
                                 .child(small(SharedString::from(format!("er-remove-{i}")), tr("Remove")).on_click(move |_, _, cx| {
                                     // Live: removed at once, no confirmation.
-                                    let mut rules = rules();
+                                    let mut rules = self::rules();
                                     if i < rules.len() {
                                         let gone = rules.remove(i);
                                         save_rules(rules);
-                                        crate::prefs_general::toast(crate::i18n::tr("Successfully removed export rule with convention: __convention__").replace("__convention__", &gone.convention), cx);
+                                        crate::prefs_general::toast(crate::i18n::tr("Successfully removed export rule with convention: __convention__").replace("__convention__", &gone.template), cx);
                                         v2.update(cx, |_, cx| cx.notify());
                                     }
                                 })),
@@ -109,7 +96,7 @@ impl Render for ExportRulesPrefsView {
 
 /// The dialog's state across renders.
 struct Edit {
-    scope: ExportScope,
+    scope: ExportElement,
     format: usize,
     /// The autocomplete list: open, and the highlighted entry.
     complete: Option<usize>,
@@ -118,10 +105,10 @@ struct Edit {
 /// "Add export rule" (`editing` None) or "Edit export rule" (live er-902, 911).
 fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, window: &mut Window, cx: &mut App) {
     let existing = editing.and_then(|i| rules().get(i).cloned());
-    let scope = existing.as_ref().map_or(ExportScope::Part, |r| r.scope);
+    let scope = existing.as_ref().map_or(ExportElement::Part, |r| r.element);
     let format = existing.as_ref().and_then(|r| scope.formats().iter().position(|f| *f == r.format)).unwrap_or(0);
     let state = Rc::new(RefCell::new(Edit { scope, format, complete: None }));
-    let conv = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(existing.as_ref().map_or("${name}".to_string(), |r| r.convention.clone())));
+    let conv = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(existing.as_ref().map_or("${name}".to_string(), |r| r.template.clone())));
     {
         let st = state.clone();
         window
@@ -149,7 +136,7 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
         };
         let text = conv.read(cx).value().to_string();
         let error = er::validate(&text, scope);
-        let remaining = er::MAX_CONVENTION.saturating_sub(text.chars().count());
+        let remaining = er::MAX_TEMPLATE.saturating_sub(text.chars().count());
         let label = |t: &'static str, tip: &'static str, id: &'static str, cx: &App| {
             h_flex()
                 .w(px(130.))
@@ -162,9 +149,9 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
                 .child(div().id(id).child(crate::assets::icon("help-gray", 16., cx)).tooltip(crate::ui::tooltip(tr(tip))))
         };
         let st1 = state.clone();
-        let scope_select = os::select_field("er-scope", ExportScope::ALL.iter().map(|s| crate::i18n::tr(s.label())).collect(), ExportScope::ALL.iter().position(|s| *s == scope).unwrap_or(0), move |i, window, _| {
+        let scope_select = os::select_field("er-scope", ExportElement::ALL.iter().map(|s| crate::i18n::tr(s.label())).collect(), ExportElement::ALL.iter().position(|s| *s == scope).unwrap_or(0), move |i, window, _| {
             let mut e = st1.borrow_mut();
-            e.scope = ExportScope::ALL[i];
+            e.scope = ExportElement::ALL[i];
             e.format = 0;
             window.refresh();
         });
@@ -275,12 +262,12 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
                     return false;
                 }
                 let mut rules = rules();
-                if er::conflicts(&rules, scope, &format, editing) {
+                if (ExportRules { rules: rules.clone() }).conflicts(scope, &format, editing) {
                     // Live er-919: the dialog closes with an error toast; nothing is saved.
                     crate::prefs_general::toast(crate::i18n::tr("Unable to save export rule. Another export rule already exists for that combination of company, object type, category, and file format."), cx);
                     return true;
                 }
-                let rule = ExportRule { scope, format, convention: convention.clone() };
+                let rule = ExportRule { element: scope, format, template: convention.clone() };
                 match editing {
                     Some(i) if i < rules.len() => rules[i] = rule,
                     _ => rules.push(rule),
@@ -303,7 +290,7 @@ fn open_token(text: &str, caret: usize) -> Option<(usize, String)> {
 }
 
 /// The scope's variables matching what is typed after `${` (live: fuzzy).
-fn completions(text: &str, caret: usize, scope: ExportScope) -> Vec<(&'static str, &'static str)> {
+fn completions(text: &str, caret: usize, scope: ExportElement) -> Vec<(&'static str, &'static str)> {
     let typed = open_token(text, caret).map(|(_, t)| t.to_lowercase()).unwrap_or_default();
     scope
         .variables()
@@ -336,7 +323,7 @@ fn accept(input: &Entity<InputState>, name: &str, window: &mut Window, cx: &mut 
 }
 
 /// Colour runs for the convention: valid placeholders blue, others red.
-fn colored_runs(text: &str, scope: ExportScope) -> Vec<(std::ops::Range<usize>, HighlightStyle)> {
+fn colored_runs(text: &str, scope: ExportElement) -> Vec<(std::ops::Range<usize>, HighlightStyle)> {
     er::placeholders(text, scope)
         .into_iter()
         .map(|p| (p.range, HighlightStyle { color: Some(if p.valid { rgb(BLUE) } else { rgb(RED) }.into()), ..Default::default() }))
@@ -352,8 +339,8 @@ mod tests {
     fn completion_follows_the_typed_token() {
         assert_eq!(open_token("A_${na", 6), Some((4, "na".into())));
         assert_eq!(open_token("A_${name}", 9), None);
-        let c = completions("${pn", 4, ExportScope::Part);
+        let c = completions("${pn", 4, ExportElement::Part);
         assert!(c.iter().any(|(n, _)| *n == "partNumber"));
-        assert!(!completions("${partNumber", 12, ExportScope::PartStudio).iter().any(|(n, _)| *n == "partNumber"));
+        assert!(!completions("${partNumber", 12, ExportElement::PartStudio).iter().any(|(n, _)| *n == "partNumber"));
     }
 }
