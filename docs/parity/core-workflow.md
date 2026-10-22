@@ -385,3 +385,11 @@ find, ui fixing). The other 72 open what they should (screenshots /tmp/qa4/cm/aa
   appearance…, Add appearance to feature…" (psb, minor).
 - Dynamic suppression ▸ is a submenu: hover it, then click "Add expression…" (opens the "Dynamic suppression" dialog).
 Re-run the whole section on the build with ui's fix (`menurun.sh BIN menus-ps.txt TAG`, then menus-fm.txt).
+
+## v0.4.5 candidate /tmp/lead/noshape-v045 (aa75fdf + CRASH1 fix, branch release/v0.4.5), FRESH=1, 2026-10-22 07:20–07:50, qa4
+**PASS** (lead tags v0.4.5). Footer still 0.4.4 (version bump after this build).
+- 8.6.1 Parts list › Rename: white inline field, "Part 1" selected, no hover band while the pointer is on the row; "Bracket"
+  + Enter renames; no crash (crashed on aa75fdf).
+- Section 8, all 73 items (menurun.sh, fresh demo app per item): no crash; screenshots show each item's dialog / action.
+- Sections 1–2 smoke: New document, Sketch on Top (☑ Show constraints / ☑ Show errors), L chain + Enter dimension, G,
+  D value box selected, 25 Enter, ✓ → Sketch 1.
