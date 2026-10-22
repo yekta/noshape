@@ -350,6 +350,12 @@ pub fn new_note(d: &mut Drawing, sheet: usize, text: String, height: Option<f64>
     Some(Annotation { id, kind: AnnotationKind::Note { text, height_mm, style }, position, ..Default::default() })
 }
 
+/// The Geometric tolerance tool's click: the frame (and its extra rows /
+/// texts) placed at `position`, without leaders.
+pub fn gdt(id: u64, position: [f64; 2], frame: Vec<String>, extra: GdtExtra) -> Annotation {
+    Annotation { id, kind: AnnotationKind::Gdt { anchor: position, frame, leaders: vec![], extra: Box::new(extra) }, position, ..Default::default() }
+}
+
 /// The Break view dialog's default gap: 6 mm, or 0.25 in in inch drawings.
 pub fn default_break_gap_mm(units_mm: bool) -> f64 {
     if units_mm { 6.0 } else { 0.25 * 25.4 }

@@ -182,7 +182,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("drawing:First sheet", Ui("sheet navigation")),
     ("drawing:Foreshorten dimension", Op("drawing_dimension")),
     ("drawing:Format painter", Planned),
-    ("drawing:Geometric tolerance", Planned),
+    ("drawing:Geometric tolerance", Op("drawing_gdt")),
     ("drawing:Hatch region", Planned),
     ("drawing:Hide inspection items", Planned),
     ("drawing:Hole table", Op("drawing_view_table")),

@@ -10,9 +10,27 @@ use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, refs};
-use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Drawing, ViewId, ViewKind};
+use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Drawing, GdtLeader, ViewId, ViewKind};
 use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
+
+/// The Geometric tolerance dialog's symbols (index into `GDT_TYPES`).
+const GDT_SYMBOLS: [(&str, usize); 14] = [
+    ("position", 0),
+    ("concentricity", 1),
+    ("symmetry", 2),
+    ("parallelism", 3),
+    ("perpendicularity", 4),
+    ("angularity", 5),
+    ("cylindricity", 6),
+    ("flatness", 7),
+    ("roundness", 8),
+    ("straightness", 9),
+    ("profile_of_a_surface", 10),
+    ("profile_of_a_line", 11),
+    ("circular_runout", 12),
+    ("total_runout", 13),
+];
 
 /// The Callout dialog's border shapes.
 const BORDERS: [(&str, CalloutBorder); 12] = [
@@ -276,6 +294,39 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: note,
+        },
+        Op {
+            group: "drawing",
+            verb: "gdt",
+            summary: "Geometric tolerance (feature control frame)",
+            description: Box::leak(
+                format!(
+                    "The Geometric tolerance tool and dialog: the frame at `position` (sheet mm). Each row: `symbol` ({}; later rows default to composite), `tolerance` with optional `before` / `after` (e.g. \"Ø\", \"Ⓜ\"), up to three `datums` (\"A\", \"B Ⓜ\"), and `prefix` / `suffix` texts; `upper` / `lower` texts above and below. One edit (\"Geometric tolerance\").",
+                    GDT_SYMBOLS.iter().map(|s| s.0).collect::<Vec<_>>().join(", ")
+                )
+                .into_boxed_str(),
+            ),
+            fields: with(
+                common(),
+                vec![
+                    req("position", point(), "Where the frame goes (sheet mm)."),
+                    req(
+                        "rows",
+                        json!({ "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "object", "properties": {
+                            "symbol": { "type": "string", "enum": GDT_SYMBOLS.iter().map(|s| s.0).chain(["composite"]).collect::<Vec<_>>() },
+                            "tolerance": { "type": "string" }, "before": { "type": "string" }, "after": { "type": "string" },
+                            "datums": { "type": "array", "items": { "type": "string" }, "maxItems": 3 },
+                            "prefix": { "type": "string" }, "suffix": { "type": "string" } } } }),
+                        "Frame rows, top to bottom.",
+                    ),
+                    opt("upper", json!({ "type": "string" }), "Text above the frame."),
+                    opt("lower", json!({ "type": "string" }), "Text below the frame."),
+                    opt("leader", json!({ "type": "string", "enum": ["leader", "all_around", "all_over"], "default": "leader" }), "Leader type."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: gdt,
         },
         Op {
             group: "drawing",
@@ -792,4 +843,37 @@ fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = ann.id;
     t.d.sheets[sheet].annotations.push(ann);
     done(od, t, "Note", "annotation", id)
+}
+
+fn gdt(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let mut rows: Vec<dt::GdtRowValues> = Vec::new();
+    for (i, r) in a.array("rows")?.iter().enumerate() {
+        let p = format!("rows[{i}].");
+        let text = |k: &str| -> Result<String, OpError> {
+            match r.get(k) {
+                None | Some(Value::Null) => Ok(String::new()),
+                Some(Value::String(s)) => Ok(s.clone()),
+                Some(_) => Err(OpError::param(&format!("{p}{k}"), "a string")),
+            }
+        };
+        let symbol = match r.get("symbol").and_then(Value::as_str) {
+            None | Some("composite") => None,
+            Some(s) => Some(GDT_SYMBOLS.iter().find(|x| x.0 == s).map(|x| x.1).ok_or_else(|| OpError::param(&format!("{p}symbol"), "unknown symbol"))?),
+        };
+        let mut datums: [String; 3] = Default::default();
+        if let Some(list) = r.get("datums").and_then(Value::as_array) {
+            for (k, d) in list.iter().take(3).enumerate() {
+                datums[k] = d.as_str().ok_or_else(|| OpError::param(&format!("{p}datums[{k}]"), "a string"))?.to_string();
+            }
+        }
+        rows.push(dt::GdtRowValues { symbol, prefix: text("prefix")?, before: text("before")?, value: text("tolerance")?, after: text("after")?, datums, suffix: text("suffix")? });
+    }
+    let leader = enum_arg(a, "leader", &[("leader", GdtLeader::Leader), ("all_around", GdtLeader::AllAround), ("all_over", GdtLeader::AllOver)], GdtLeader::Leader)?;
+    let (frame, extra) = dt::gdt_values(&rows, a.opt_str("upper")?.unwrap_or(""), a.opt_str("lower")?.unwrap_or(""), leader).ok_or_else(|| OpError::param("rows", "nothing entered"))?;
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_annotation_id();
+    t.d.sheets[sheet].annotations.push(dt::gdt(id, pt_arg(a, "position")?, frame, extra));
+    done(od, t, "Geometric tolerance", "annotation", id)
 }
