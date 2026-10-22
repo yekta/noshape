@@ -952,3 +952,12 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   extended up, ∩ a sphere revolved about X). With kern's patch every #8 count = live (Pan III 19 / VI 15, Oval
   undercut III 18, Hex VI 27, Hex washer VI 29; heights = live's files). Tests accept live's count or the
   unfilleted one until kern lands; `pan_head_tapping_screw_mouth_fillets` is ignored until then.
+* Type I (Phillips), live's recipe (dom/skb-sc-recess-I-IA.json) on every ANSI tapping head (`recessTypeI` in
+  fasteners.fs): cross L × W + 4 kites (Cd, Fd/2) cut from the floor plane top − (D − T) up through the head; the
+  tool's arm ends drafted 26.3° about live's THREE_POINT plane (where the arm-end corners meet the head
+  top: the crown's height there, `headTopAt`; the top on flat heads) and its sides / kites by the slot angle about the floor (drafting
+  the tool, reversed pull, is robust where drafting the part's faces failed); live's healed delete face is built
+  directly (the cone is cut only inside the same drafted outline below the floor); 0.002 in mouth fillet.
+  Hex / Hex washer #8 = live's 63 / 65 faces, every face area within 0.5 % (fillets 1.5 %). Values from live's
+  MAIN tables for all 10 components (mainTables-5 + 576); Pan's cone uses RTHICK_IA (`rch`) as Onshape's part.
+  Crowned heads use the seamless crown for Type I too. Type IA: next (still the generic cross).
