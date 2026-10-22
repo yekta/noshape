@@ -470,6 +470,8 @@ impl AssemblyView {
         // The workspace draws this view as a cached view (`front_host`):
         // anything the document changes renders it again.
         subs.push(cx.observe(&doc, |_, _, cx| cx.notify()));
+        // Theming › Dark mode re-sets the graphics preferences: rebuild in the new colors.
+        subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| this.rebuild_scene(false, cx)));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             // Any tab can affect an assembly (Part Studios, sub-assemblies).
             DocEvent::TabChanged(t) => {
@@ -608,6 +610,12 @@ impl AssemblyView {
 
     fn units(&self, cx: &App) -> noshape_units::UnitPrefs {
         self.doc.read(cx).session.doc.settings.units
+    }
+
+    /// The variables an assembly field's expression sees (its inserted
+    /// Variable Studios), for the number fields' evaluation.
+    pub(super) fn variable_scope(&self, cx: &App) -> std::collections::BTreeMap<String, noshape_units::Quantity> {
+        self.assembly(cx).map(|a| noshape_model::variables::refs_variables(&self.doc.read(cx).session.doc, &a.variable_studios)).unwrap_or_default()
     }
 
     // ------------------------------------------------------------ evaluation
@@ -1595,7 +1603,9 @@ impl AssemblyView {
     fn open_mate_dialog(&mut self, mate: Mate, editing: Option<MateId>, window: &mut Window, cx: &mut Context<Self>) {
         let labeler = self.labeler(cx);
         let is_new = editing.is_none();
-        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, window, cx));
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let variables = self.variable_scope(cx);
+        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, units, variables, window, cx));
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &MateDialogEvent, window, cx| match ev {
             MateDialogEvent::Changed => {
                 this.schedule_eval(window, cx);

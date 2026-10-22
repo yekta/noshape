@@ -382,6 +382,89 @@ pub fn weld(id: u64, view: Option<ViewId>, target: [f64; 2], spec: noshape_model
     Annotation { id, kind: AnnotationKind::Weld { view, target, spec: Box::new(spec) }, position, ..Default::default() }
 }
 
+/// The Revision table dialog (defaults as it opens for a new table).
+#[derive(Clone, Copy, Debug)]
+pub struct RevisionTableOpts {
+    pub see_sheet1: bool,
+    pub visible_rows: u32,
+    pub newest_top: bool,
+    pub hide_callouts: bool,
+    pub corner: TableCorner,
+}
+
+impl Default for RevisionTableOpts {
+    fn default() -> Self {
+        Self { see_sheet1: false, visible_rows: 5, newest_top: false, hide_callouts: false, corner: TableCorner::TopRight }
+    }
+}
+
+/// The dialog's settings as a revision table kind (`old`: the edited
+/// table's, keeping its texts).
+pub fn revision_table_kind(o: &RevisionTableOpts, old: Option<&TableKind>) -> TableKind {
+    let mut k = old.cloned().filter(|k| matches!(k, TableKind::Revision { .. })).unwrap_or_else(TableKind::revision);
+    if let TableKind::Revision { see_sheet1, visible_rows, newest_top, hide_callouts, .. } = &mut k {
+        (*see_sheet1, *visible_rows, *newest_top, *hide_callouts) = (o.see_sheet1, o.visible_rows, o.newest_top, o.hide_callouts);
+    }
+    k
+}
+
+/// Revision table tool click: the table with its fixed corner at `c`.
+pub fn revision_table(id: u64, o: &RevisionTableOpts, c: [f64; 2]) -> Table {
+    let mut t = Table::new(id, revision_table_kind(o, None), c);
+    t.corner = o.corner;
+    t
+}
+
+/// The revision new callouts get: the latest (pending first), else "A".
+pub fn latest_revision(info: &noshape_model::drawing::build::SheetInfo) -> String {
+    info.revisions.last().map(|r| r.revision.clone()).unwrap_or_else(|| noshape_model::release::next_label(None))
+}
+
+/// Add revision callout: the triangle with `revision` at `c`.
+pub fn revision_callout(id: u64, c: [f64; 2], revision: String) -> Annotation {
+    Annotation { id, kind: AnnotationKind::RevisionCallout { anchor: c, revision, group: None }, position: c, ..Default::default() }
+}
+
+/// Jogged section: the orthogonal continuation (in the view's frame) from
+/// `last` toward `target`.
+pub fn ortho_view(last: [f64; 2], target: [f64; 2]) -> [f64; 2] {
+    let d = sub(target, last);
+    if d[0].abs() >= d[1].abs() { [target[0], last[1]] } else { [last[0], target[1]] }
+}
+
+impl SheetPick<'_> {
+    /// A click for the jogged / aligned section and broken-out tools: a snap
+    /// point (of `view` when given), else the point in the view under `c`.
+    pub fn view_point(&self, c: [f64; 2], view: Option<ViewId>) -> Option<PickedPoint> {
+        if let Some(p) = self.snap_at(c).filter(|p| view.is_none_or(|v| v == p.view)) {
+            return Some(p);
+        }
+        let v = view.or_else(|| self.view_at(c))?;
+        let pl = self.placement(v)?;
+        Some(PickedPoint { view: v, p: pl.to_view(c), r: None })
+    }
+
+    /// A cutting line's two end segments extended past the view's geometry.
+    pub fn extend_line_ends(&self, view: ViewId, points: &[[f64; 2]]) -> Vec<[f64; 2]> {
+        let mut pts = points.to_vec();
+        let Some(g) = self.geoms.get(&view) else { return pts };
+        let n = pts.len();
+        if n < 2 {
+            return pts;
+        }
+        let margin = (g.max[0] - g.min[0]).max(g.max[1] - g.min[1]) * 0.08 + 1e-4;
+        let corners = [[g.min[0] - margin, g.min[1] - margin], [g.max[0] + margin, g.min[1] - margin], [g.max[0] + margin, g.max[1] + margin], [g.min[0] - margin, g.max[1] + margin]];
+        let reach = |from: [f64; 2], dir: [f64; 2]| corners.iter().map(|k| dot(sub(*k, from), dir)).fold(0.0f64, f64::max);
+        let d0 = norm(sub(pts[0], pts[1]));
+        let t0 = reach(pts[1], d0).max(len(sub(pts[0], pts[1])));
+        pts[0] = add2(pts[1], mul(d0, t0));
+        let d1 = norm(sub(pts[n - 1], pts[n - 2]));
+        let t1 = reach(pts[n - 2], d1).max(len(sub(pts[n - 1], pts[n - 2])));
+        pts[n - 1] = add2(pts[n - 2], mul(d1, t1));
+        pts
+    }
+}
+
 /// The Break view dialog's default gap: 6 mm, or 0.25 in in inch drawings.
 pub fn default_break_gap_mm(units_mm: bool) -> f64 {
     if units_mm { 6.0 } else { 0.25 * 25.4 }

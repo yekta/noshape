@@ -121,6 +121,9 @@ pub struct GpuCache {
     /// Boundary (laminar) edges for "Highlight boundary edges": solid and
     /// dashed-on-top lines, keyed by mesh pointer (`None`: the body has none).
     boundary: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, Option<BoundaryLines>)>,
+    /// The unit cube of the bodies' lowest level of detail
+    /// ([`Instance::lod_box`]).
+    lod_box: Option<MeshHandle>,
 }
 
 
@@ -262,6 +265,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
+    let mut bodies = 0u32;
     for b in display.bodies.iter().filter(|b| !b.hidden) {
         let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
         let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
@@ -434,10 +438,21 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 scene.instances.push(Instance::new(Drawable::Lines(dashed)).with_color(red).unpickable().layer(3));
             }
         }
+        // Onshape's lowest level of detail of the body: its bounding box.
+        let body = bodies + 1;
+        bodies = body;
+        for i in &mut scene.instances[first_instance..] {
+            i.body = body;
+        }
+        if let Some(bounds) = cached.mesh.bounds().filter(|_| b.kind != BodyKind::Wire) {
+            let unit = cache.lod_box.get_or_insert_with(|| up.upload_mesh(&noshape_render::scene::lod_box_mesh())).clone();
+            let lod = Instance::lod_box(unit, body, bounds, color);
+            scene.instances.push(if opts.section_skip.contains(&b.id) { lod.ignore_clip() } else { lod });
+        }
         if let Some(s) = shared {
             let placement = placement_matrix(&s.transform);
             for i in &mut scene.instances[first_instance..] {
-                i.transform = placement;
+                i.transform = placement * i.transform;
             }
         }
         if display_only {
@@ -466,9 +481,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             loop_pts.push(corners[0]);
             border.push_polyline(&loop_pts, [0, 0, 0, 0], id, 2.0, 0);
             // Onshape: CONSTRUCTION_PLANE_AMBIENT_COLOR at CONSTRUCTION_PLANE_OPACITY, outline at 35%.
-            let fill = theme::lin(theme::viewport::PLANE_FILL);
-            let outline = theme::lin(theme::viewport::PLANE_OUTLINE);
-            let outline_alpha = theme::viewport::PLANE_OUTLINE_ALPHA * if opts.faint_planes { FAINT_PLANE_ALPHA } else { 1.0 };
+            let fill = theme::lin(theme::pick(theme::viewport::PLANE_FILL, theme::viewport_dark::PLANE_FILL));
+            let outline = theme::lin(theme::pick(theme::viewport::PLANE_OUTLINE, theme::viewport_dark::PLANE_OUTLINE));
+            let outline_alpha = theme::pick(theme::viewport::PLANE_OUTLINE_ALPHA, theme::viewport_dark::PLANE_OUTLINE_ALPHA) * if opts.faint_planes { FAINT_PLANE_ALPHA } else { 1.0 };
             if !opts.faint_planes {
                 scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([fill[0], fill[1], fill[2], 0.2]).ignore_clip().unlit().layer(5));
             }
@@ -483,7 +498,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         // While sketching it stays over the edge-on planes crossing it (live
         // sketch/06 shows the whole ring and dot).
         let style = 4 | if opts.editing_sketch.is_some() { LineSegment::ON_TOP } else { 0 };
-        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::viewport::ORIGIN), pick_id: id, size: 12.0, style, _pad: 0 }] };
+        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)), pick_id: id, size: 12.0, style, _pad: 0 }] };
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().ignore_clip().layer(6));
     }
 
@@ -528,7 +543,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
             }
             for d in &sk.dimensions {
-                let color: [u8; 4] = theme::rgb8(if d.driven { theme::viewport::DIM_DRIVEN } else { theme::viewport::SKETCH_FULL });
+                let color: [u8; 4] = theme::rgb8(if d.driven { theme::pick(theme::viewport::DIM_DRIVEN, theme::viewport_dark::DIM_DRIVEN) } else { theme::pick(theme::viewport::SKETCH_FULL, theme::viewport_dark::SKETCH_FULL) });
                 for seg in &d.lines {
                     lines.segments.push(LineSegment { a: seg[0], b: seg[1], color, pick_id: 0, width: 1.0, style: LineSegment::ON_TOP });
                 }
@@ -591,7 +606,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // (`#9aa5af`; live sketch/17: rgb(221,226,230) over the plane's
                 // rgb(245,248,250), which our linear blending reaches at 0.34).
                 let fill = if editing {
-                    let c = theme::lin(theme::viewport::SKETCH_REGION);
+                    let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], 0.34])
                 } else {
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
@@ -608,7 +623,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         let y = mc.z.cross(mc.x);
         let mut l = LineData::default();
         let len = 0.008f64;
-        for (axis, color) in [(mc.x, theme::rgb8(theme::viewport::AXIS_X)), (y, theme::rgb8(theme::viewport::AXIS_Y)), (mc.z, theme::rgb8(theme::viewport::AXIS_Z))] {
+        for (axis, color) in [(mc.x, theme::rgb8(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X))), (y, theme::rgb8(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y))), (mc.z, theme::rgb8(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)))] {
             let tip: [f32; 3] = (mc.origin + axis * len).as_vec3().into();
             l.segments.push(LineSegment { a: o, b: tip, color, pick_id: id, width: 2.0, style: LineSegment::ON_TOP });
         }
@@ -755,6 +770,33 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     let mut silhouette: Vec<Reference> = Vec::new();
 
     let mut mark = |r: &Reference, flag: u32, scene: &mut Scene| {
+        // A sketch region is drawn from the display, also when its sketch
+        // is hidden (no picks): the usual case for an extrude's region.
+        if let Reference::SketchRegion { sketch, key } = r
+            && let Some(sk) = display.sketches.iter().find(|s| s.feature == *sketch)
+            && let Some(reg) = sk.regions.iter().find(|g| &g.key == key)
+        {
+            // Live (dialogs/extrude-02, 04): a hovered region shows only
+            // its boundary in light orange; a selected one is filled
+            // amber with an amber boundary.
+            let hovered = flag == state::HOVER;
+            let c = if hovered { hov_color } else { sel_color };
+            // Region meshes sit 1 µm above the plane (regen
+            // display.rs); the outline goes back onto the plane so
+            // it doesn't count as hiding the sketch's own curves
+            // (the underconstrained-occluded pass drew them #4040ff).
+            let down = (sk.frame.normal * 1e-6).as_vec3();
+            let flat = |p: [f32; 3]| -> [f32; 3] { (glam::Vec3::from(p) - down).into() };
+            for (a, b) in region_outline(&reg.positions, &reg.indices) {
+                overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 2.0, style: 0 });
+            }
+            if !hovered {
+                let n: [f32; 3] = sk.frame.normal.as_vec3().into();
+                let mut fill = c;
+                fill[3] = if error { 0.3 } else { 0.4 };
+                overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill));
+            }
+        }
         for &id in built.picks.ids_for(r) {
             let t = built.picks.get(id);
             // An erroring input face shows only its red outline.
@@ -775,33 +817,6 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                         silhouette.push(r.clone());
                     }
                     boundary.extend(edges.into_iter().map(|e| (e, flag)));
-                }
-                PickKind::SketchRegion => {
-                    if let Reference::SketchRegion { sketch, key } = r
-                        && let Some(sk) = display.sketches.iter().find(|s| s.feature == *sketch)
-                        && let Some(reg) = sk.regions.iter().find(|g| &g.key == key)
-                    {
-                        // Live (dialogs/extrude-02, 04): a hovered region shows only
-                        // its boundary in light orange; a selected one is filled
-                        // amber with an amber boundary.
-                        let hovered = flag == state::HOVER;
-                        let c = if hovered { hov_color } else { sel_color };
-                        // Region meshes sit 1 µm above the plane (regen
-                        // display.rs); the outline goes back onto the plane so
-                        // it doesn't count as hiding the sketch's own curves
-                        // (the underconstrained-occluded pass drew them #4040ff).
-                        let down = (sk.frame.normal * 1e-6).as_vec3();
-                        let flat = |p: [f32; 3]| -> [f32; 3] { (glam::Vec3::from(p) - down).into() };
-                        for (a, b) in region_outline(&reg.positions, &reg.indices) {
-                            overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 2.0, style: 0 });
-                        }
-                        if !hovered {
-                            let n: [f32; 3] = sk.frame.normal.as_vec3().into();
-                            let mut fill = c;
-                            fill[3] = if error { 0.3 } else { 0.4 };
-                            overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill));
-                        }
-                    }
                 }
                 _ => {}
             }

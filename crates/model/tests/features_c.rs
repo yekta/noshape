@@ -1208,7 +1208,43 @@ fn move_and_delete_face_onshape_errors() {
     let pts = [(50.0, 25.0, 25.0), (50.0, 25.0, 0.0), (50.0, 0.0, 12.5), (50.0, 50.0, 12.5), (0.0, 25.0, 12.5), (100.0, 25.0, 12.5)];
     let faces: Vec<Reference> = pts.iter().map(|&(x, y, z)| face_at(&r, 0, DVec3::new(mm(x), mm(y), mm(z)))).collect();
     s.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(faces)));
-    assert_eq!(s.last_status(), (FeatureStatus::Error, "Cannot delete all faces of a part or surface.".to_string()));
+    // Live: every face of the part deleted removes it, with no message.
+    let r = s.ok();
+    assert!(r.context.bodies.is_empty());
+}
+
+/// Live L19 (thicken): both thicknesses 0 read "Invalid input selections.".
+/// (L17, two perpendicular faces of a block giving one L-shaped part of
+/// 2560 mm³ with a square corner, needs the kernel's intersection join.)
+#[test]
+fn thicken_as_live() {
+    let mut s2 = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s2.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s2.region(sid);
+    s2.add("thicken", move |p| {
+        p.set("entities", q(region));
+        p.set("thickness1", expr("0 mm"));
+        p.set("thickness2", expr("0 mm"));
+    });
+    assert_eq!(s2.last_status(), (FeatureStatus::Error, "Invalid input selections.".to_string()));
+}
+
+/// Live L7: Flip alignment against a plane facing the same way as the
+/// replaced face fails ("Could not replace faces as requested.").
+#[test]
+fn replace_face_flip_alignment_as_live() {
+    let mut s = block();
+    let pl = top_plane_at(&mut s, 30.0);
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
+    s.add("replaceFace", move |p| {
+        p.set("replaceFaces", q(top));
+        p.set("templateFace", q(Reference::FeaturePlane(pl)));
+        p.set("oppositeSense", ParamValue::Bool(true));
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Could not replace faces as requested.".to_string()));
 }
 
 /// Live (qa5 workflow 27, BEND1 / JOG1): a 60 × 40 × 2 plate, radius 2, and
@@ -1335,4 +1371,182 @@ fn failed_extrude_reads_onshape_text() {
         p.set("endBoundEntityFace", q(side));
     });
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Failed to extrude selections, check input.".to_string()));
+}
+
+/// sweep.fs: a thin sweep checks its wall before the path.
+#[test]
+fn thin_sweep_checks_the_wall_first() {
+    let mut s = block();
+    s.add("sweep", |p| p.set("bodyType", en("THIN")));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select faces or sketch regions to sweep.".to_string()));
+    let mut s = block();
+    s.add("sweep", |_| {});
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select entities for sweep path.".to_string()));
+}
+
+fn edge_near(r: &RegenResult, bi: usize, p: DVec3) -> Reference {
+    let b = &r.context.bodies[bi];
+    let v = noshape_kernel::make_vertex(p).unwrap();
+    for (i, e) in b.shape.edges().iter().enumerate() {
+        if noshape_kernel::distance(&v, e).is_ok_and(|d| d.distance < 1e-9) {
+            return Reference::Edge((*b.edges[i]).clone());
+        }
+    }
+    panic!("no edge at {p:?}");
+}
+
+/// Live L1/L2 ("psb L1-4 draft"): block 40×20×10, side faces split at z=5,
+/// parting edges at z=5, pull = Top. One sided 3°: 7921.8461 mm³ (upper
+/// faces narrow upward); first Opposite direction: 8079.0694 (same faces);
+/// Two sided 3° / 10°: 8348.7418; second Opposite off: 7819.7608.
+#[test]
+fn parting_line_draft_sides_as_live() {
+    let run = |sides: &str, opposite: bool, second_opposite: bool| -> f64 {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        let z5 = top_plane_at(&mut s, 5.0);
+        let r = s.ok();
+        let sides_at = |r: &RegenResult, z: f64| vec![face_at(r, 0, DVec3::new(mm(20.0), 0.0, mm(z))), face_at(r, 0, DVec3::new(mm(20.0), mm(20.0), mm(z))), face_at(r, 0, DVec3::new(0.0, mm(10.0), mm(z))), face_at(r, 0, DVec3::new(mm(40.0), mm(10.0), mm(z)))];
+        let targets = sides_at(&r, 5.0);
+        s.add("splitPart", move |p| {
+            p.set("splitType", en("FACE"));
+            p.set("faceTargets", ParamValue::Query(targets));
+            p.set("faceTools", q(Reference::FeaturePlane(z5)));
+        });
+        let r = s.ok();
+        let edges = vec![
+            edge_near(&r, 0, DVec3::new(mm(20.0), 0.0, mm(5.0))),
+            edge_near(&r, 0, DVec3::new(mm(20.0), mm(20.0), mm(5.0))),
+            edge_near(&r, 0, DVec3::new(0.0, mm(10.0), mm(5.0))),
+            edge_near(&r, 0, DVec3::new(mm(40.0), mm(10.0), mm(5.0))),
+        ];
+        let sides = sides.to_string();
+        s.add("draft", move |p| {
+            p.set("draftFeatureType", en("PARTING_LINE"));
+            p.set("partingEdges", ParamValue::Query(edges));
+            p.set("pullDirectionEntity", q(Reference::Plane(DatumPlane::Top)));
+            p.set("partingLineSides", en(&sides));
+            p.set("angle", expr("3 deg"));
+            p.set("secondAngle", expr("10 deg"));
+            p.set("pullDirection", ParamValue::Bool(opposite));
+            p.set("secondPullDirection", ParamValue::Bool(second_opposite));
+        });
+        volume(&s.ok(), 0) * 1e9
+    };
+    for (sides, opp, opp2, want) in [("ONE_SIDED", false, true, 7921.8461), ("ONE_SIDED", true, true, 8079.0694), ("TWO_SIDED", false, true, 8348.7418), ("TWO_SIDED", true, true, 8191.5184), ("TWO_SIDED", false, false, 7819.7608)] {
+        let v = run(sides, opp, opp2);
+        assert!((v - want).abs() < 1e-3, "{sides} opposite {opp} second {opp2}: {v} vs live {want}");
+    }
+}
+
+/// Live L12 ("psb L12-13 sweep"): a Ø10 circle at the middle of a 100 mm
+/// line sweeps the half toward the path's start (3926.9908 mm³), the other
+/// half with the path's Opposite direction, the whole path (7853.9816) with
+/// Extend to full path.
+#[test]
+fn sweep_from_the_middle_of_the_path_as_live() {
+    let run = |opposite: bool, extend: bool| -> (f64, f64) {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let path = polyline(&mut sk, &[(0.0, 0.0), (100.0, 0.0)], false);
+        let path_sketch = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let x50 = s.add("cPlane", |p| {
+            p.set("entities", q(Reference::Plane(DatumPlane::Right)));
+            p.set("offset", expr("50 mm"));
+        });
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_circle(DVec2::ZERO, 0.005);
+        let profile_sketch = s.sketch(Reference::FeaturePlane(x50), sk);
+        let region = s.region(profile_sketch);
+        s.add("sweep", move |p| {
+            p.set("profiles", q(region));
+            p.set("path", ParamValue::Query(path.iter().map(|&e| Reference::SketchEntity { sketch: path_sketch, entity: e }).collect()));
+            p.set("pathOppositeDirection", ParamValue::Bool(opposite));
+            p.set("extendToFullPath", ParamValue::Bool(extend));
+        });
+        let r = s.ok();
+        let bb = r.context.bodies[0].shape.bounding_box(false).unwrap();
+        (volume(&r, 0) * 1e9, (bb.min.x + bb.max.x) * 0.5 * 1e3)
+    };
+    let (v, cx) = run(false, false);
+    assert!((v - 3926.9908).abs() < 1e-3 && (cx - 25.0).abs() < 1e-6, "{v} centred at x {cx}");
+    let (v, cx) = run(true, false);
+    assert!((v - 3926.9908).abs() < 1e-3 && (cx - 75.0).abs() < 1e-6, "{v} centred at x {cx}");
+    let (v, _) = run(false, true);
+    assert!((v - 7853.9816).abs() < 1e-3, "{v}");
+}
+
+/// Live L11 ("psb L10-11 delete face"): block 40×20×10 with an R3 fillet on
+/// the top front edge, a Ø8×5 boss with an R1 fillet at its base. Deleting
+/// the boss (side + top) with Heal removes its base fillet too (7922.7433 =
+/// the filleted block), also on an imported copy (fillets are recognised
+/// from the geometry); without Delete fillet faces it can't heal.
+#[test]
+fn delete_face_removes_fillets_by_geometry_as_live() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let front_top = edge_near(&r, 0, DVec3::new(mm(20.0), 0.0, mm(10.0)));
+    s.add("fillet", move |p| {
+        p.set("entities", q(front_top));
+        p.set("radius", expr("3 mm"));
+    });
+    let z10 = top_plane_at(&mut s, 10.0);
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.02, 0.01), 0.004);
+    let bsk = s.sketch(Reference::FeaturePlane(z10), sk);
+    let region = s.region(bsk);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("5 mm"));
+        p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let base = edge_near(&r, 0, DVec3::new(mm(24.0), mm(10.0), mm(10.0)));
+    s.add("fillet", move |p| {
+        p.set("entities", q(base));
+        p.set("radius", expr("1 mm"));
+    });
+    let r = s.ok();
+    let boss = |r: &RegenResult| vec![face_at(r, 0, DVec3::new(mm(20.0), mm(10.0), mm(13.0))), face_at(r, 0, DVec3::new(mm(20.0), mm(10.0), mm(15.0)))];
+    let filleted_block = 8000.0 - 40.0 * (9.0 - 9.0 * PI / 4.0);
+    // Ours.
+    for include in [true, false] {
+        let mut t = Studio { ps: s.ps.clone(), ..Studio::new() };
+        let faces = boss(&r);
+        t.add("deleteFace", move |p| {
+            p.set("deleteFaces", ParamValue::Query(faces));
+            p.set("includeFillet", ParamValue::Bool(include));
+        });
+        if include {
+            let v = volume(&t.ok(), 0) * 1e9;
+            assert!((v - filleted_block).abs() < 1e-3, "{v} vs {filleted_block}");
+        } else {
+            assert_eq!(t.last_status(), (FeatureStatus::Error, "Could not delete selected faces.".to_string()));
+        }
+    }
+    // An imported copy: no fillet history.
+    let brep = String::from_utf8(r.context.bodies[0].shape.to_brep_bytes().unwrap()).unwrap();
+    let mut t = Studio::new();
+    t.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let ri = t.ok();
+    let faces = boss(&ri);
+    t.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(faces)));
+    let v = volume(&t.ok(), 0) * 1e9;
+    assert!((v - filleted_block).abs() < 1e-3, "imported: {v} vs {filleted_block}");
 }

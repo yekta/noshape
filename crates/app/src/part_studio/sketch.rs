@@ -498,6 +498,7 @@ impl PartStudioView {
         if let Some(ed) = &mut self.sketch {
             ed.world_per_px = wpp;
             ed.place_frame(center, size.y);
+            ed.screen_map = sketch_screen_map(vp, ed);
         }
     }
 
@@ -514,6 +515,7 @@ impl PartStudioView {
         let wpp_changed = self.sketch.as_ref().is_some_and(|ed| (ed.world_per_px - wpp).abs() > wpp * 1e-6);
         if let Some(ed) = &mut self.sketch {
             ed.world_per_px = wpp;
+            ed.screen_map = sketch_screen_map(vp.read(cx), ed);
         }
         match ev {
             ViewportEvent::CameraChanged => {
@@ -1070,15 +1072,24 @@ impl PartStudioView {
         // Enter on the untouched box keeps the exact value (the box shows it
         // rounded to 6 / 7 decimals).
         if self.sketch_data(cx).and_then(|data| crate::sketch_mode::dimension_edit_text(&data, cid, &units)).is_some_and(|shown| shown == text.trim()) {
+            let data = self.sketch_data(cx);
             if let Some(ed) = &mut self.sketch {
                 // A new dimension leaves nothing selected (see below).
                 if ed.dim_edit.take().is_some_and(|d| d.created) {
                     ed.selection.clear();
                     ed.selected_constraints.clear();
                 }
+                // A chamfer's first distance → its second (live).
+                if let Some(d) = &data {
+                    ed.open_next_value_box(d);
+                }
             }
             self.dim_input = None;
-            window.focus(&self.focus, cx);
+            if self.sketch.as_ref().is_some_and(|s| s.dim_edit.is_some()) {
+                self.sync_dim_edit(window, cx);
+            } else {
+                window.focus(&self.focus, cx);
+            }
             cx.notify();
             return;
         }
@@ -2617,27 +2628,30 @@ impl PartStudioView {
         let project = |q: DVec2| vp.project(frame.to_world(q)).map(|s| (s.x as f32, s.y as f32));
         let editing = self.dim_input.as_ref().map(|(c, st, _)| (*c, st.clone()));
 
-        // Live (sketch/91): "◀ 6 ▶" outside the polygon along the edge after the
-        // clicked vertex (the glyphs stay upright: GPUI can't rotate text).
-        if let Some((at, sides, angle)) = ed.polygon_side_control()
-            && let Some((x, y)) = project(at)
-        {
-            let step = ed.world_per_px * 14.0;
-            let dir = DVec2::from_angle(angle);
-            let (bx, by) = project(at - dir * step).unwrap_or((x - 14., y));
-            let (fx, fy) = project(at + dir * step).unwrap_or((x + 14., y));
-            let arrow = |id: &'static str, label: &'static str, ax: f32, ay: f32, delta: isize, cx: &Context<Self>| {
-                div().absolute().left(px(ax - 9.)).top(px(ay - 10.)).occlude()
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(Button::new(id).label(label).ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if let Some(ed) = &mut this.sketch { ed.adjust_polygon_sides(delta); }
-                        this.refresh_scene(false, cx); cx.notify();
-                    })))
-                    .into_any_element()
-            };
-            out.push(arrow("sk-polygon-less", "◀", bx, by, -1, cx));
-            out.push(div().absolute().left(px(x - 6.)).top(px(y - 10.)).text_sm().child(sides.to_string()).into_any_element());
-            out.push(arrow("sk-polygon-more", "▶", fx, fy, 1, cx));
+        // Polygon side spinner (live sketch/91): the editor draws "◀ 6 ▶" along
+        // the ray; the ◀ / ▶ are clickable here.
+        if let Some((at, u, _)) = ed.polygon_side_control() {
+            let arm = u * ed.world_per_px * crate::sketch_mode::POLYGON_SPINNER_ARROW_PX;
+            for (id, k) in [("sk-polygon-less", -1.0), ("sk-polygon-more", 1.0)] {
+                let Some((ax, ay)) = project(at + arm * k) else { continue };
+                let delta: isize = if k < 0.0 { -1 } else { 1 };
+                out.push(
+                    div()
+                        .id(id)
+                        .absolute()
+                        .left(px(ax - 9.))
+                        .top(px(ay - 9.))
+                        .size(px(18.))
+                        .cursor_pointer()
+                        .occlude()
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            if let Some(ed) = &mut this.sketch { ed.adjust_polygon_sides(delta); }
+                            this.refresh_scene(false, cx); cx.notify();
+                        }))
+                        .into_any_element(),
+                );
+            }
         }
 
         // ---- pattern instance counts (`3x`, click to type; live sketch/136–138)
@@ -2650,13 +2664,18 @@ impl PartStudioView {
                 out.push(div().absolute().left(px(x - 4.)).top(px(y - 12.)).w(px(56.)).occlude().child(Input::new(st).xsmall()).into_any_element());
                 continue;
             }
+            // Centred on the editor's anchor (live sketch/136: at the end of the leader).
+            let linear = matches!(h, crate::sketch_mode::PatternHandle::LinearCount | crate::sketch_mode::PatternHandle::LinearSecondCount);
+            let label_w = if linear { crate::sketch_mode::label_width_px(&format!("{n}x")) as f32 } else { 0.0 };
             out.push(
                 div()
                     .id(SharedString::from(format!("sk-count-{h:?}")))
                     .absolute()
-                    .left(px(x))
+                    .left(px(x - label_w * 0.5))
                     .top(px(y - 10.))
                     .text_size(px(16.))
+                    // Live (sketch/136): "3x" / "1x" at medium weight.
+                    .font_weight(FontWeight::MEDIUM)
                     .text_color(rgb(0x333333))
                     .cursor_pointer()
                     .whitespace_nowrap()
@@ -2684,11 +2703,13 @@ impl PartStudioView {
                 let bare = if dim == Dim::ANGLE { full.replace(" deg", "°") } else { full.split(' ').next().unwrap_or_default().to_string() };
                 (bare, full)
             };
+            // Centred on the spacing dimension's line (live sketch/136).
+            let label_w = crate::sketch_mode::label_width_px(&text) as f32;
             out.push(
                 div()
                     .id(SharedString::from(format!("sk-spacing-{h:?}")))
                     .absolute()
-                    .left(px(x - 20.))
+                    .left(px(x - label_w * 0.5))
                     .top(px(y - 10.))
                     .text_size(px(16.))
                     .text_color(rgb(0x333333))
@@ -4164,4 +4185,16 @@ fn unknown_variable(text: &str, vars: &std::collections::BTreeMap<String, noshap
         rest = &after[end..];
     }
     None
+}
+
+/// Screen to sketch map of the current view (sketch point under the
+/// viewport's origin, sketch steps of one pixel right and down), so the
+/// editor can put manipulators on pixel centres.
+fn sketch_screen_map(vp: &crate::viewport::Viewport, ed: &crate::sketch_mode::SketchEditor) -> Option<(DVec2, DVec2, DVec2)> {
+    let at = |x: f64, y: f64| {
+        let (o, d) = vp.ray(DVec2::new(x, y));
+        ed.plane_point(o, d)
+    };
+    let o = at(0.0, 0.0)?;
+    Some((o, at(1.0, 0.0)? - o, at(0.0, 1.0)? - o))
 }

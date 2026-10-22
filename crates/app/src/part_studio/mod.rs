@@ -834,6 +834,10 @@ impl PartStudioView {
         // Hovering a feature or part in the list lights up all of its
         // geometry; a single hovered entity uses the hover highlight.
         let hovered = self.highlighted_hover(cx);
+        // Trim (live, qa5 sketch tools): only the piece that would go is
+        // highlighted (the sketch overlay draws it), not the whole curve.
+        let trimming = self.sketch.as_ref().is_some_and(|s| s.tool == crate::sketch_mode::Tool::Trim);
+        let hovered: Vec<Reference> = hovered.into_iter().filter(|r| !(trimming && matches!(r, Reference::SketchEntity { .. }))).collect();
         // A manipulator handle under the cursor hides the geometry hover.
         let on_handle = self.ui.manip_hover || self.ui.triad_hover.is_some();
         let single_hover = if hovered.len() == 1 && self.ui.list_hover.is_none() && self.ui.var_hover.is_none() && self.ui.ct.hover.is_none() && !on_handle { hovered.first().cloned() } else { None };
@@ -3384,12 +3388,12 @@ impl PartStudioView {
             let msg = state.and_then(|s| {
                 let m = s.message.clone()?;
                 match s.status {
-                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{} did not regenerate properly: {m}", f.name)),
+                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{} did not regenerate properly: {m}", typed_name(f))),
                     FeatureStatus::Info => None,
                     _ => Some(m),
                 }
             });
-            let (view, name, feature_name) = (cx.entity().downgrade(), name.clone(), f.name.clone());
+            let (view, name, feature_name) = (cx.entity().downgrade(), name.clone(), typed_name(f));
             // Live (qa5 ADV12): a name made from Onshape's "Feature Name
             // Template" (a Hole's callout) reads "<callout> [Hole]".
             let templated = (f.type_id == "hole" && name != f.name).then(|| f.feature_type().map(|t| format!("{name} [{}]", t.name))).flatten();
@@ -3402,10 +3406,14 @@ impl PartStudioView {
                     .and_then(|v| {
                         let studio = v.read(cx).studio(cx)?;
                         let i = studio.features.iter().position(|g| g.id == id)?;
-                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect())
+                        // Live lists only the sketches a feature uses ("Extrude 1 <-
+                        // Sketch 1", "[Hole] <- Sketch 2"); parts picked in a Boolean
+                        // or a merge scope aren't named (qa5 BOOL1b, behaviours B4).
+                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(typed_name)).collect())
                     })
                     .unwrap_or_default();
-                // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2".
+                // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2"; a custom
+                // name gets its type ("Sweep L13 … <- Path [Sketch]").
                 let head = templated.clone().unwrap_or_else(|| feature_name.clone());
                 match (parents.is_empty(), &templated) {
                     (true, Some(t)) => t.clone().into(),
@@ -3827,7 +3835,8 @@ impl PartStudioView {
                 in_plane_contours(&pl.name, top_left, f.x, f.y, asc, &mut contours);
             }
         }
-        let c = Rgba::from(Hsla::from(pal.accent));
+        // Light: the accent blue; dark: white (`--os-construction-plane-text-color`).
+        let c = if noshape_scene::palette::is_dark() { gpui_kit::rgb_static(crate::theme::viewport_dark::PLANE_TEXT) } else { Rgba::from(Hsla::from(pal.accent)) };
         let mut fills = if contours.is_empty() { Vec::new() } else { vec![noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] }] };
         // Inspection datums: black, the selected one in the selection
         // color.
@@ -4846,4 +4855,15 @@ fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
             _ => 0,
         })
         .sum()
+}
+
+/// A feature's name for tooltips: a custom name that doesn't start with the
+/// feature's type gets the type in brackets (live behaviours "psb … feature
+/// sweep": "Move L5 rotate no axis [Move face] did not regenerate properly:
+/// …", "<- Path [Sketch]"); default names ("Draft 1") stay as they are.
+pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
+    match f.feature_type().map(|t| t.name) {
+        Some(t) if !f.name.starts_with(t) => format!("{} [{t}]", f.name),
+        _ => f.name.clone(),
+    }
 }
