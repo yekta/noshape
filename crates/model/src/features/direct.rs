@@ -64,7 +64,9 @@ pub fn replace_face() -> FeatureType {
         ParamSpec::query("replaceFaces", "Faces to replace", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS | Hints::SHOW_CREATE_SELECTION),
         ParamSpec::query("templateFace", "Faces to replace with", QueryFilter::ANY_FACE | QueryFilter::PLANE),
         hidden(ParamSpec::bool("showFlip", "Show flip", true)),
-        ParamSpec::bool("oppositeSense", "Flip alignment", false).visible(|v| v.bool("showFlip")),
+        // replaceFaceEditLogic: showFlip = at most one face to replace with
+        // (live L8: the row disappears with two).
+        ParamSpec::bool("oppositeSense", "Flip alignment", false).visible(|v| v.bool("showFlip") && v.query("templateFace").len() <= 1),
         ParamSpec::num("offset", "Offset distance", NONNEGATIVE_ZERO_DEFAULT),
         ParamSpec::flip("oppositeDirection", "Opposite direction"),
     ];
