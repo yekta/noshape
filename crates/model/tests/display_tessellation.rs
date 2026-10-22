@@ -42,6 +42,8 @@ fn circle_segments(r: &RegenResult) -> usize {
 
 #[test]
 fn circles_get_onshapes_segments_at_every_size() {
+    // Gated off by default (regen::angle_display_mesh).
+    noshape_model::regen::set_angle_display_mesh(true);
     for diameter in [0.02, 0.2, 2.0] {
         let r = regen(&cylinder(diameter));
         assert_eq!(circle_segments(&r), 144, "Ø{} mm in Auto", diameter * 1000.0);
