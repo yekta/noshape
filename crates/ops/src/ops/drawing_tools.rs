@@ -10,7 +10,7 @@ use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, refs};
-use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Drawing, GdtLeader, ViewId, ViewKind};
+use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Drawing, GdtLeader, TableCorner, ViewId, ViewKind};
 use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
 
@@ -92,6 +92,26 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: section_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "jogged_section_view",
+            summary: "Jogged section view (an orthogonal cutting line through several points)",
+            description: "The Jogged section view tool: clicks `points` (sheet mm, at least 2) on the parent view; each one continues the cutting line horizontally or vertically (in the view's frame) toward it, and finishing (Enter) extends both ends past the view. The section goes to `position`, projected from the first segment. One edit (\"Section view\").",
+            fields: with(common(), vec![view_id("parent", "View to section."), req("points", points(2, 16), "The cutting line's clicks (sheet mm)."), req("position", point(), "Where the section view goes (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: jogged_section_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "aligned_section_view",
+            summary: "Aligned section view (two cutting legs about a center, unfolded)",
+            description: "The Aligned section view tool: `center` (sheet mm) on the parent view, then `a` and `b`, the directions of the two cutting legs from it (each leg is extended past the view). The view goes to `position`, projected from the first leg. One edit (\"Aligned section view\").",
+            fields: with(common(), vec![view_id("parent", "View to section."), req("center", point(), "The legs' common point (sheet mm)."), req("a", point(), "A point along the first leg (sheet mm)."), req("b", point(), "A point along the second leg (sheet mm)."), req("position", point(), "Where the view goes (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: aligned_section_view,
         },
         Op {
             group: "drawing",
@@ -354,6 +374,36 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: weld,
+        },
+        Op {
+            group: "drawing",
+            verb: "revision_table",
+            summary: "Revision table (rows from the document's releases)",
+            description: "The Revision table tool and dialog: the table with its fixed corner at `position` (sheet mm). Its rows are the drawing's revisions from releases. One edit (\"Revision table\").",
+            fields: with(
+                common(),
+                vec![
+                    req("position", point(), "Where the fixed corner goes (sheet mm)."),
+                    opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "The table's fixed corner."),
+                    opt("visible_rows", json!({ "type": "integer", "minimum": 1, "default": 5 }), "Rows shown."),
+                    opt("newest_top", json!({ "type": "boolean", "default": false }), "Newest revision at the top."),
+                    opt("see_sheet1", json!({ "type": "boolean", "default": false }), "Show \"See sheet 1\" on other sheets."),
+                    opt("hide_callouts", json!({ "type": "boolean", "default": false }), "Hide revision callouts."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: revision_table,
+        },
+        Op {
+            group: "drawing",
+            verb: "revision_callout",
+            summary: "Revision callout (triangle with the revision)",
+            description: "Add revision callout: the triangle at `position` (sheet mm) with `revision` (default: the latest revision, else \"A\"). One edit (\"Revision callout\").",
+            fields: with(common(), vec![req("position", point(), "Where the callout goes (sheet mm)."), opt("revision", json!({ "type": "string" }), "Revision label.")]),
+            mutates: true,
+            destructive: false,
+            run: revision_callout,
         },
         Op {
             group: "drawing",
@@ -928,4 +978,93 @@ fn weld(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = t.d.sheets[sheet].next_annotation_id();
     t.d.sheets[sheet].annotations.push(dt::weld(id, view, target, spec, pt_arg(a, "position")?));
     done(od, t, "Weld symbol", "annotation", id)
+}
+
+fn revision_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let d = dt::RevisionTableOpts::default();
+    let o = dt::RevisionTableOpts {
+        see_sheet1: a.bool_or("see_sheet1", d.see_sheet1)?,
+        visible_rows: a.opt_u64("visible_rows")?.map(|n| n.clamp(1, 1000) as u32).unwrap_or(d.visible_rows),
+        newest_top: a.bool_or("newest_top", d.newest_top)?,
+        hide_callouts: a.bool_or("hide_callouts", d.hide_callouts)?,
+        corner: enum_arg(a, "corner", &[("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)], d.corner)?,
+    };
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_table_id();
+    t.d.sheets[sheet].tables.push(dt::revision_table(id, &o, pt_arg(a, "position")?));
+    done(od, t, "Revision table", "table", id)
+}
+
+fn revision_callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let revision = match a.opt_str("revision")?.map(str::trim).filter(|r| !r.is_empty()) {
+        Some(r) => r.to_string(),
+        None => dt::latest_revision(&t.m.info),
+    };
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_annotation_id();
+    t.d.sheets[sheet].annotations.push(dt::revision_callout(id, pt_arg(a, "position")?, revision));
+    done(od, t, "Revision callout", "annotation", id)
+}
+
+fn jogged_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let parent = view_arg(&t, a, "parent")?;
+    let mut pts: Vec<[f64; 2]> = Vec::new();
+    for (i, p) in a.array("points")?.iter().enumerate() {
+        let param = format!("points[{i}]");
+        let c = point_value(p, &param)?;
+        let tool = Tool::JoggedSection { parent: Some(parent), points: pts.clone(), done: false };
+        let pp = t.m.pick(&tool, &[], c).view_point(c, Some(parent)).ok_or_else(|| OpError::param(&param, "not on the parent view"))?;
+        match pts.last() {
+            None => pts.push(pp.p),
+            Some(last) => {
+                let q = dt::ortho_view(*last, pp.p);
+                if dt::geom::len(dt::geom::sub(q, *last)) > 1e-7 {
+                    pts.push(q);
+                }
+            }
+        }
+    }
+    if pts.len() < 2 {
+        return Err(OpError::param("points", "the cutting line needs two different points"));
+    }
+    // Finishing the line (Enter) extends its ends past the view.
+    let pts = t.m.pick(&Tool::Select, &[], [0.0; 2]).extend_line_ends(parent, &pts);
+    let tool = Tool::JoggedSection { parent: Some(parent), points: pts, done: true };
+    let v = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_view(&ViewOptions::default()).ok_or_else(|| OpError::param("position", "the section view can't be placed there"))?;
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Section view", "view", id.0)
+}
+
+fn aligned_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let parent = view_arg(&t, a, "parent")?;
+    let click = |name: &str, tool: &Tool| -> Result<[f64; 2], OpError> {
+        let c = pt_arg(a, name)?;
+        t.m.pick(tool, &[], c).view_point(c, Some(parent)).map(|p| p.p).ok_or_else(|| OpError::param(name, "not on the parent view"))
+    };
+    let tool0 = Tool::AlignedSection { parent: Some(parent), center: None, a: None, b: None };
+    let center = click("center", &tool0)?;
+    let leg = |name: &str| -> Result<[f64; 2], OpError> {
+        let p = click(name, &Tool::AlignedSection { parent: Some(parent), center: Some(center), a: None, b: None })?;
+        if dt::geom::len(dt::geom::sub(p, center)) <= 1e-7 {
+            return Err(OpError::param(name, "must differ from the center"));
+        }
+        Ok(t.m.pick(&Tool::Select, &[], [0.0; 2]).extend_line_ends(parent, &[p, center])[0])
+    };
+    let (la, lb) = (leg("a")?, leg("b")?);
+    let tool = Tool::AlignedSection { parent: Some(parent), center: Some(center), a: Some(la), b: Some(lb) };
+    let v = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_view(&ViewOptions::default()).ok_or_else(|| OpError::param("position", "the section view can't be placed there"))?;
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Aligned section view", "view", id.0)
 }

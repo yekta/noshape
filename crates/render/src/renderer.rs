@@ -571,9 +571,75 @@ struct DrawLists {
     slot_of: Vec<u32>,
     /// Compare mode: the version left out ([`crate::scene::compare`]; 0 none).
     skip_compare: u8,
+    /// Color passes: the frame's detail, for the bodies drawn as their box
+    /// ([`lod_boxes`]); pick passes always draw full detail.
+    lod: Option<Detail>,
+    lod_bodies: Vec<LodBody>,
+    lod_order: Vec<u32>,
+    /// By body id − 1: drawn as its [`Instance::lod_box`].
+    boxes: Vec<bool>,
+}
+
+/// A body for [`lod_boxes`]: its [`Instance::lod_box`]'s transform (the
+/// unit cube placed over its bounds) and its triangles.
+#[derive(Clone, Copy, Default)]
+pub struct LodBody {
+    pub box_transform: Mat4,
+    pub triangles: u32,
+    /// Has a box (wire bodies have none and are never boxed).
+    pub has_box: bool,
+}
+
+/// `MAXIMUM_BODY_CULL_DIAMETER_PROPORTION`: only bodies smaller than this
+/// share of the viewport diagonal are ever drawn as their box.
+const MAX_BOX_DIAMETER_PROPORTION: f32 = 0.01;
+
+/// Onshape's `performAggressiveCulling` (webgl BodyManager): which bodies
+/// to draw as their box (`boxes[id - 1]`). Those under
+/// `extent_culling_px` on screen and, with `low_level_body_proportion`
+/// above 0, that share of all bodies taken by most triangles per squared
+/// radius first (`getBenefitToCull`), the ones outside the view counting
+/// against it; either only while under 1% of the viewport diagonal. The
+/// viewport is `width` × `height` device pixels, `dpr` per CSS px.
+pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), detail: &Detail, order: &mut Vec<u32>, boxes: &mut Vec<bool>) {
+    boxes.clear();
+    boxes.resize(bodies.len(), false);
+    let dpr = dpr.max(1e-3);
+    // Clip-space y per world unit: row 1 of the view-projection's 3x3 (a
+    // rotation times the projection's y scale).
+    let y_scale = Vec3::new(view_proj.x_axis.y, view_proj.y_axis.y, view_proj.z_axis.y).length();
+    let max_px = MAX_BOX_DIAMETER_PROPORTION * (width as f32).hypot(height as f32) / dpr;
+    let radius = |b: &LodBody| 0.5 * (b.box_transform.x_axis + b.box_transform.y_axis + b.box_transform.z_axis).truncate().length();
+    order.clear();
+    order.extend((0..bodies.len() as u32).filter(|&i| bodies[i as usize].has_box));
+    let mut budget = (detail.low_level_body_proportion.clamp(0.0, 1.0) * bodies.len() as f32).floor() as i64;
+    if budget > 0 {
+        let benefit = |i: u32| {
+            let b = &bodies[i as usize];
+            b.triangles as f32 / radius(b).powi(2).max(1e-30)
+        };
+        order.sort_by(|&a, &b| benefit(b).total_cmp(&benefit(a)).then(a.cmp(&b)));
+    }
+    for (a, &i) in order.iter().enumerate() {
+        let b = &bodies[i as usize];
+        if outside_frustum((Vec3::splat(-0.5), Vec3::splat(0.5)), &(*view_proj * b.box_transform), (0.0, 0.0)) {
+            budget -= 1;
+            continue;
+        }
+        let w = (*view_proj * b.box_transform.w_axis).w.max(1e-9);
+        let px = 2.0 * radius(b) * y_scale / w * height as f32 * 0.5 / dpr;
+        if ((a as i64) < budget || px < detail.extent_culling_px) && px < max_px {
+            boxes[i as usize] = true;
+        }
+    }
 }
 
 impl DrawLists {
+    /// Whether body `id`'s box replaces it this pass.
+    fn boxed(&self, id: u32) -> bool {
+        id > 0 && self.boxes.get(id as usize - 1).copied().unwrap_or(false)
+    }
+
     /// Leave out what the style's [`Detail`] turns off (their slots stay
     /// assigned, unused).
     fn apply_detail(&mut self, detail: &Detail) {
@@ -601,12 +667,39 @@ impl DrawLists {
         self.lines_hidden.clear();
         self.points_hidden.clear();
         self.culled = 0;
+        self.boxes.clear();
+        if let Some(detail) = self.lod.filter(|_| !pick) {
+            self.lod_bodies.clear();
+            for inst in scene.instances.iter().filter(|i| i.body > 0) {
+                let k = inst.body as usize - 1;
+                if k >= self.lod_bodies.len() {
+                    self.lod_bodies.resize(k + 1, LodBody::default());
+                }
+                let b = &mut self.lod_bodies[k];
+                match &inst.drawable {
+                    _ if inst.lod_box => {
+                        b.box_transform = inst.transform;
+                        b.has_box = true;
+                    }
+                    Drawable::Mesh(m) if !inst.back_silhouette => b.triangles += m.0.index_count / 3,
+                    _ => {}
+                }
+            }
+            lod_boxes(&self.lod_bodies, view_proj, (width, height, dpr), &detail, &mut self.lod_order, &mut self.boxes);
+            if perf::enabled() {
+                perf::record_ms("r.lod_boxes", self.boxes.iter().filter(|b| **b).count() as f32);
+            }
+        }
         // Screen-space margin for wide lines, points and the pick widening.
         let margin = |px: f32| (2.0 * px * dpr / width as f32, 2.0 * px * dpr / height as f32);
         let mesh_margin = margin(2.0);
         let sprite_margin = margin(24.0);
         for (i, inst) in scene.instances.iter().enumerate() {
             if self.skip_compare != 0 && inst.compare == self.skip_compare {
+                continue;
+            }
+            // A body's box instead of the body, never both.
+            if inst.lod_box != self.boxed(inst.body) {
                 continue;
             }
             if pick {
@@ -1987,6 +2080,7 @@ impl Renderer {
             Some(_) => crate::scene::compare::BASE,
             None => 0,
         };
+        lists.lod = Some(req.style.detail);
         lists.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, false);
         lists.apply_detail(&req.style.detail);
         let bind_inst = self.prepare_slots(SLOTS_COLOR, &lists.slots);
@@ -1995,6 +2089,7 @@ impl Renderer {
         let compare_frame = req.scene.compare.map(|_| {
             let mut over = std::mem::take(&mut self.lists_over);
             over.skip_compare = 0;
+            over.lod = Some(req.style.detail);
             over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, false);
             over.apply_detail(&req.style.detail);
             let bind_over = self.prepare_slots(SLOTS_COMPARE_OVER, &over.slots);
@@ -2968,6 +3063,46 @@ fn room_of(bounds: Option<(glam::Vec3, glam::Vec3)>) -> [f32; 4] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A cube body `diag` px across at `x` (1 world unit = 1 px in a
+    /// 1000 × 800 viewport, so boxes stay under 12.8 px).
+    fn cube(x: f32, diag: f32, triangles: u32) -> LodBody {
+        LodBody { box_transform: Mat4::from_translation(Vec3::new(x, 0.0, 0.0)) * Mat4::from_scale(Vec3::splat(diag / 3f32.sqrt())), triangles, has_box: true }
+    }
+
+    fn boxed(bodies: &[LodBody], proportion: f32, extent_px: f32) -> Vec<bool> {
+        // Orthographic: x ±500, y ±400 to the clip square, w = 1.
+        let vp = Mat4::from_scale(Vec3::new(1.0 / 500.0, 1.0 / 400.0, 1.0 / 1000.0));
+        let detail = Detail { low_level_body_proportion: proportion, extent_culling_px: extent_px, ..Default::default() };
+        let (mut order, mut boxes) = (Vec::new(), Vec::new());
+        lod_boxes(bodies, &vp, (1000, 800, 1.0), &detail, &mut order, &mut boxes);
+        boxes
+    }
+
+    #[test]
+    fn lod_bodies_under_the_extent_threshold_are_boxes() {
+        let bodies = [cube(0.0, 1.5, 12), cube(10.0, 5.0, 12), cube(20.0, 20.0, 12)];
+        // Full detail: under 2 px.
+        assert_eq!(boxed(&bodies, 0.0, 2.0), [true, false, false]);
+        // While moving: under 10 px; never over 1% of the diagonal.
+        assert_eq!(boxed(&bodies, 0.0, 10.0), [true, true, false]);
+        assert_eq!(boxed(&bodies, 0.9, 30.0), [true, true, false]);
+        // Wire bodies have no box.
+        assert_eq!(boxed(&[LodBody { has_box: false, ..cube(0.0, 1.0, 0) }], 0.9, 10.0), [false]);
+    }
+
+    #[test]
+    fn lod_low_level_share_takes_the_densest_bodies_first() {
+        // Ten 5 px bodies; 30% go by triangles per squared radius.
+        let bodies: Vec<LodBody> = (0..10).map(|i| cube(i as f32 * 20.0, 5.0, [5, 90, 10, 80, 20, 70, 30, 60, 40, 50][i])).collect();
+        let want: Vec<bool> = (0..10).map(|i| [1, 3, 5].contains(&i)).collect();
+        assert_eq!(boxed(&bodies, 0.3, 2.0), want);
+        // Bodies outside the view count against the share.
+        let mut far = bodies.clone();
+        far[1] = cube(5000.0, 5.0, 90);
+        far[3] = cube(-5000.0, 5.0, 80);
+        assert_eq!(boxed(&far, 0.3, 2.0), vec![false; 10]);
+    }
 
     #[test]
     fn premultiply_and_downsample_images() {
