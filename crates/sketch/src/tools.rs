@@ -955,7 +955,14 @@ impl Sketch {
         let mut caps = Vec::new();
         for (items, closed) in self.chains(ids) {
             if items.len() == 1 && !closed {
+                let line = self.kind(items[0].0) == Some(EntityKind::Line);
                 let s = self.slot_around(items[0].0, width)?;
+                if line {
+                    // Live: only the end cap is dimensioned (the offsets tie the rest).
+                    caps.push(s.curves[1]);
+                    curves.extend(s.curves);
+                    continue;
+                }
                 caps.extend(s.curves.iter().copied().filter(|c| self.kind(*c) == Some(EntityKind::Arc) && self.entity(*c).and_then(|e| e.center()).is_some_and(|ctr| self.entity(items[0].0).is_some_and(|x| x.point_refs().contains(&ctr)))));
                 curves.extend(s.curves);
                 continue;

@@ -833,6 +833,8 @@ pub fn constraint_icon(k: &ConstraintKind) -> Option<&'static str> {
         Curvature { .. } => "curvature",
         Pierce { .. } => "pierce",
         Quadrant { .. } => "coincident",
+        // Live (qa5 sketch tools): the slot's three offsets, an arch glyph.
+        Offset { .. } => "offset",
         _ => return None,
     })
 }
@@ -5531,6 +5533,8 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         Quadrant { point, .. } => vec![point],
         Symmetric { a, b, .. } => vec![a, b],
         Fix { entity } => vec![entity],
+        // Live: the slot's three offset glyphs sit together at the end cap.
+        Offset { reference, .. } => vec![reference],
         Normal { line, curve } => vec![line, curve],
         Concentric { a, b } | Parallel { a, b } | Perpendicular { a, b } | Tangent { a, b } | Equal { a, b } | Collinear { a, b } | Curvature { a, b } => vec![a, b],
         _ => Vec::new(),
