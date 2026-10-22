@@ -720,6 +720,16 @@ fn hatched_text(text: &str, at: DVec2, dir: DVec2, px: f64, em_px: f64) -> Vec<[
     out
 }
 
+/// The master (reference) entities of a constraint, highlighted in the
+/// secondary yellow while its glyph is hovered (Onshape's OFFSET
+/// `localMaster` / `localSecond`; a symmetric constraint's line).
+fn constraint_masters(kind: &ConstraintKind) -> Vec<EntityId> {
+    match kind {
+        ConstraintKind::Symmetric { axis, .. } => vec![*axis],
+        _ => Vec::new(),
+    }
+}
+
 /// Distance from `p` to the segment `a`–`b`.
 fn dist_to_segment(p: DVec2, a: DVec2, b: DVec2) -> f64 {
     let ab = b - a;
@@ -4754,6 +4764,34 @@ impl SketchEditor {
             let picks = self.tool_picks();
             related.retain(|e| !picks.contains(e));
         }
+        // A hovered glyph (live sketch/27, 1956): its constrained entities turn
+        // pre-highlight orange; a master / reference entity (the symmetry line;
+        // the centre line of a slot's offset) turns secondary yellow.
+        let hover_roles: Vec<(EntityId, bool)> = self
+            .hover_constraint
+            .filter(|c| !self.selected_constraints.contains(c) && use_glyph_entity(*c).is_none())
+            .and_then(|c| data.sketch.constraint(c))
+            .map(|c| {
+                let masters = constraint_masters(&c.kind);
+                c.kind.entities().into_iter().map(|e| (e, masters.contains(&e))).collect()
+            })
+            .unwrap_or_default();
+        if !hover_roles.is_empty() {
+            let selected_entities: Vec<EntityId> = self.selected_constraints.iter().filter_map(|c| data.sketch.constraint(*c)).flat_map(|c| c.kind.entities()).collect();
+            let picks = self.tool_picks();
+            related.retain(|e| !hover_roles.iter().any(|(h, _)| h == e) || picks.contains(e) || selected_entities.contains(e) || self.mirror_axis == Some(*e));
+            for (e, master) in &hover_roles {
+                let color = if *master { [0xf2, 0xff, 0x80, 255] } else { crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT) };
+                if is_point(&data.sketch, *e) {
+                    if let Some(p) = data.sketch.point(*e) {
+                        points.points.push(PointSprite { position: w(p), color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
+                    }
+                } else {
+                    let pts3: Vec<[f32; 3]> = data.sketch.tessellate(*e, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
+                    lines.push_polyline(&pts3, color, 0, 3.0, on_top);
+                }
+            }
+        }
         for e in &related {
             if is_point(&data.sketch, *e) {
                 if let Some(p) = data.sketch.point(*e) {
@@ -7000,6 +7038,22 @@ mod tests {
         assert_eq!(d.texts.len(), 1, "edited in place");
         assert_eq!(d.texts[0].text, "Changed");
         assert!(ed.editing_text.is_none());
+    }
+
+    #[test]
+    fn a_hovered_glyph_highlights_its_entities_orange_and_its_master_yellow() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let a = d.sketch.add_point(v(-0.01, 0.0));
+        let b = d.sketch.add_point(v(0.01, 0.0));
+        let axis = d.sketch.add_line(v(0.0, -0.01), v(0.0, 0.01));
+        let cid = d.sketch.add_constraint(ConstraintKind::Symmetric { a, b, axis }).unwrap();
+        ed.hover_constraint = Some(cid);
+        let (lines, points) = ed.overlay(&d, &noshape_units::UnitPrefs::default());
+        let orange = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+        // Live (sketch/27, 1956): constrained entities orange, the master yellow.
+        assert_eq!(points.points.iter().filter(|p| p.color == orange).count(), 2, "both points orange");
+        assert!(lines.segments.iter().any(|s| s.color == [0xf2, 0xff, 0x80, 255]), "the symmetry line yellow");
+        assert!(!lines.segments.iter().any(|s| s.color == [0xf2, 0xff, 0x80, 150]), "no translucent halo for a hovered glyph");
     }
 
     #[test]
