@@ -45,6 +45,10 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["draftFaces"], "Select faces to draft.");
     }
     let angle = ev.angle("angle")?;
+    // Live L3: a 0° draft succeeds and changes nothing.
+    if angle.abs() < 1e-12 {
+        return Ok(());
+    }
     let pull = if ev.bool("pullDirection") { -frame.normal } else { frame.normal };
     let neutral = k::Plane::new(frame.origin, pull, frame.x);
     let groups = by_body(ev.resolve_faces(refs));
@@ -226,10 +230,9 @@ fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
     let no_pull = || crate::regen::eval::err_at(&["pullDirectionEntity"], "Select pull direction.");
     let Some(pr) = ev.query("pullDirectionEntity").first() else { return no_pull() };
     let Some(pull) = ev.resolve_direction(pr) else { return no_pull() };
-    let mut pull = pull.normalize();
-    if ev.bool("pullDirection") {
-        pull = -pull;
-    }
+    // Live L1/L2: the sides are taken from the pull direction as picked;
+    // each side's Opposite direction only flips that side's taper.
+    let pull = pull.normalize();
     let edges = ev.resolve_edges(ev.query("partingEdges"));
     if edges.is_empty() {
         return crate::regen::eval::err_at(&["partingEdges"], "Select parting edges.");
@@ -269,16 +272,20 @@ fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
-    let angle = ev.angle("angle")?;
+    // A positive angle narrows the part along the pull. One sided: the pull
+    // side narrows away from the parting line. Two sided (live L1): the
+    // first angle is the side opposite the pull, the second the pull side,
+    // and by default both narrow toward the parting line.
+    let s1 = if ev.bool("pullDirection") { -1.0 } else { 1.0 };
+    let angle = ev.angle("angle")? * s1;
     let sets: Vec<(Vec<usize>, DVec3, f64)> = match ev.enum_("partingLineSides") {
-        "SYMMETRIC" => vec![(above, pull, angle), (below, -pull, angle)],
+        "SYMMETRIC" => vec![(below, pull, angle), (above, pull, -angle)],
         "TWO_SIDED" => {
-            let a2 = ev.angle("secondAngle")?;
-            let a2 = if ev.bool("secondPullDirection") { a2 } else { -a2 };
-            vec![(above, pull, angle), (below, -pull, a2)]
+            let a2 = ev.angle("secondAngle")? * if ev.bool("secondPullDirection") { -1.0 } else { 1.0 };
+            vec![(below, pull, angle), (above, pull, a2)]
         }
         _ => {
-            if ev.bool("alongPull") { vec![(above, pull, angle)] } else { vec![(below, -pull, angle)] }
+            if ev.bool("alongPull") { vec![(above, pull, angle)] } else { vec![(below, pull, angle)] }
         }
     };
     let orig = body.faces.clone();
