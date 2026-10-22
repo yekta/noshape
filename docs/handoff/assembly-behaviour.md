@@ -905,3 +905,17 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   yet, live request 07:45), Flat undercut, Oval undercut, Hex, Hex washer (Indent / Slot and indent heads).
 * Shared target dirs: worktrees in one group overwrite each other's workspace crates (cargo's hash ignores the
   worktree path), so a build can link another worktree's stale crate. Touch your changed sources before a check.
+
+## From ui2 (10-22): assembly visuals taken from the lead (qa5 workflow 28, pass 17b), surgical edits
+- **EXV3** (assembly_scene.rs, assembly_view.rs): `Highlights.explode_triad` drops the plane handles in explode
+  mode (live 802); `Highlights.step_arrow` replaces the triad with one hollow arrow along the move while an
+  explode step is dragged or its dialog is open (a ring with an arrowhead for rotations; live 805 / 810); the
+  step being edited is highlighted in the panel.
+- **EXV2 / EXV1 / EXV6** (assembly_panels.rs `render_explode_panel`): tree guide at x 16 with a 9 px tick even
+  with no steps; rollback bar 7 px #b8b8b8 from 51 px to −6 px; the how-to box in live's info colours and
+  margins (one line); empty state: the button on a 33 px #eaeaea band and a new illustration
+  (`icons/exploded-views-empty.svg`, ui2's drawing); dragging the rollback bar shows live's blue "Rollback bar"
+  pill and drops on the row boundary nearest the cursor (`AsmUi.explode_rb_drop`, a 2 px blue line + ring).
+- **MNU2** (assembly_behaviors.rs mate menu): separators around "Edit named position driver mate…".
+- **NP2** (assembly_positions.rs): with drivers, "Name" sits in the lower row of a #eaeaea cell; mate and DOF
+  header cells #d7d7d7.
