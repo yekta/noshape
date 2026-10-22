@@ -382,6 +382,49 @@ pub fn weld(id: u64, view: Option<ViewId>, target: [f64; 2], spec: noshape_model
     Annotation { id, kind: AnnotationKind::Weld { view, target, spec: Box::new(spec) }, position, ..Default::default() }
 }
 
+/// The Revision table dialog (defaults as it opens for a new table).
+#[derive(Clone, Copy, Debug)]
+pub struct RevisionTableOpts {
+    pub see_sheet1: bool,
+    pub visible_rows: u32,
+    pub newest_top: bool,
+    pub hide_callouts: bool,
+    pub corner: TableCorner,
+}
+
+impl Default for RevisionTableOpts {
+    fn default() -> Self {
+        Self { see_sheet1: false, visible_rows: 5, newest_top: false, hide_callouts: false, corner: TableCorner::TopRight }
+    }
+}
+
+/// The dialog's settings as a revision table kind (`old`: the edited
+/// table's, keeping its texts).
+pub fn revision_table_kind(o: &RevisionTableOpts, old: Option<&TableKind>) -> TableKind {
+    let mut k = old.cloned().filter(|k| matches!(k, TableKind::Revision { .. })).unwrap_or_else(TableKind::revision);
+    if let TableKind::Revision { see_sheet1, visible_rows, newest_top, hide_callouts, .. } = &mut k {
+        (*see_sheet1, *visible_rows, *newest_top, *hide_callouts) = (o.see_sheet1, o.visible_rows, o.newest_top, o.hide_callouts);
+    }
+    k
+}
+
+/// Revision table tool click: the table with its fixed corner at `c`.
+pub fn revision_table(id: u64, o: &RevisionTableOpts, c: [f64; 2]) -> Table {
+    let mut t = Table::new(id, revision_table_kind(o, None), c);
+    t.corner = o.corner;
+    t
+}
+
+/// The revision new callouts get: the latest (pending first), else "A".
+pub fn latest_revision(info: &noshape_model::drawing::build::SheetInfo) -> String {
+    info.revisions.last().map(|r| r.revision.clone()).unwrap_or_else(|| noshape_model::release::next_label(None))
+}
+
+/// Add revision callout: the triangle with `revision` at `c`.
+pub fn revision_callout(id: u64, c: [f64; 2], revision: String) -> Annotation {
+    Annotation { id, kind: AnnotationKind::RevisionCallout { anchor: c, revision, group: None }, position: c, ..Default::default() }
+}
+
 /// The Break view dialog's default gap: 6 mm, or 0.25 in in inch drawings.
 pub fn default_break_gap_mm(units_mm: bool) -> f64 {
     if units_mm { 6.0 } else { 0.25 * 25.4 }

@@ -10,7 +10,7 @@ use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, refs};
-use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Drawing, GdtLeader, ViewId, ViewKind};
+use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Drawing, GdtLeader, TableCorner, ViewId, ViewKind};
 use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
 
@@ -354,6 +354,36 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: weld,
+        },
+        Op {
+            group: "drawing",
+            verb: "revision_table",
+            summary: "Revision table (rows from the document's releases)",
+            description: "The Revision table tool and dialog: the table with its fixed corner at `position` (sheet mm). Its rows are the drawing's revisions from releases. One edit (\"Revision table\").",
+            fields: with(
+                common(),
+                vec![
+                    req("position", point(), "Where the fixed corner goes (sheet mm)."),
+                    opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "The table's fixed corner."),
+                    opt("visible_rows", json!({ "type": "integer", "minimum": 1, "default": 5 }), "Rows shown."),
+                    opt("newest_top", json!({ "type": "boolean", "default": false }), "Newest revision at the top."),
+                    opt("see_sheet1", json!({ "type": "boolean", "default": false }), "Show \"See sheet 1\" on other sheets."),
+                    opt("hide_callouts", json!({ "type": "boolean", "default": false }), "Hide revision callouts."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: revision_table,
+        },
+        Op {
+            group: "drawing",
+            verb: "revision_callout",
+            summary: "Revision callout (triangle with the revision)",
+            description: "Add revision callout: the triangle at `position` (sheet mm) with `revision` (default: the latest revision, else \"A\"). One edit (\"Revision callout\").",
+            fields: with(common(), vec![req("position", point(), "Where the callout goes (sheet mm)."), opt("revision", json!({ "type": "string" }), "Revision label.")]),
+            mutates: true,
+            destructive: false,
+            run: revision_callout,
         },
         Op {
             group: "drawing",
@@ -928,4 +958,34 @@ fn weld(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = t.d.sheets[sheet].next_annotation_id();
     t.d.sheets[sheet].annotations.push(dt::weld(id, view, target, spec, pt_arg(a, "position")?));
     done(od, t, "Weld symbol", "annotation", id)
+}
+
+fn revision_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let d = dt::RevisionTableOpts::default();
+    let o = dt::RevisionTableOpts {
+        see_sheet1: a.bool_or("see_sheet1", d.see_sheet1)?,
+        visible_rows: a.opt_u64("visible_rows")?.map(|n| n.clamp(1, 1000) as u32).unwrap_or(d.visible_rows),
+        newest_top: a.bool_or("newest_top", d.newest_top)?,
+        hide_callouts: a.bool_or("hide_callouts", d.hide_callouts)?,
+        corner: enum_arg(a, "corner", &[("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)], d.corner)?,
+    };
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_table_id();
+    t.d.sheets[sheet].tables.push(dt::revision_table(id, &o, pt_arg(a, "position")?));
+    done(od, t, "Revision table", "table", id)
+}
+
+fn revision_callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let revision = match a.opt_str("revision")?.map(str::trim).filter(|r| !r.is_empty()) {
+        Some(r) => r.to_string(),
+        None => dt::latest_revision(&t.m.info),
+    };
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_annotation_id();
+    t.d.sheets[sheet].annotations.push(dt::revision_callout(id, pt_arg(a, "position")?, revision));
+    done(od, t, "Revision callout", "annotation", id)
 }
