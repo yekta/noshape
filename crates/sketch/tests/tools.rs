@@ -256,26 +256,53 @@ fn patterns_transform_and_external() {
     assert!(sk.add_constraint(ConstraintKind::Pierce { point: q, target: p }).is_err());
 }
 
-/// SK5: a fillet's radius change moves the fillet and its two lines' cut
-/// ends only; the rest of an unconstrained rectangle stays put.
+/// SK5 (live, qa5 sketch tools): 30.089 × 22.065 rectangle, top-right
+/// fillet R5, then a new radius. The top line keeps its R5-trimmed length
+/// (25.089) and the right edge follows the arc: width = 25.089 + R. R3:
+/// bottom 28.089, right 19.065; R8: bottom 33.089, right 14.065.
 #[test]
-fn fillet_radius_change_keeps_the_rest() {
-    for light in [false, true] {
+fn fillet_radius_change_moves_like_onshape() {
+    for (radius, bottom_len, right_len) in [(0.003, 28.089, 19.065), (0.008, 33.089, 14.065)] {
         let mut sk = Sketch::new();
-        let r = sk.corner_rectangle(v(0.0, 0.0), v(0.029, 0.022));
-        let corner = r.points[2];
-        let res = sk.fillet_corner(corner, 0.02).unwrap();
+        let r = sk.corner_rectangle(v(0.0, 0.0), v(0.030089, 0.022065));
+        let res = sk.fillet_corner(r.points[2], 0.005).unwrap();
         let arc = res.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Arc)).unwrap();
         assert!(sk.solve().is_solved());
-        let still: Vec<(EntityId, DVec2)> = [r.points[0], r.points[1], r.points[3]].iter().map(|p| (*p, sk.point(*p).unwrap())).collect();
         let dim = sk.constraints().find(|c| matches!(c.kind, ConstraintKind::Radius { curve, .. } if curve == arc)).unwrap().id;
-        sk.set_dimension_value(dim, 0.003).unwrap();
-        let opts = SolveOptions { light: if light { sk.constraint(dim).unwrap().kind.entities().to_vec() } else { vec![] }, ..Default::default() };
+        sk.set_dimension_value(dim, radius).unwrap();
+        let opts = sk.dimension_edit_options(dim);
         assert!(sk.solve_with(&opts).is_solved());
-        let moved: f64 = still.iter().map(|(p, at)| (sk.point(*p).unwrap() - *at).length()).fold(0.0, f64::max);
-        eprintln!("light={light} moved={moved}");
-        if light {
-            assert!(moved < 1e-6, "other corners moved {moved}");
+        let len = |l: EntityId| {
+            let c = sk.curve(l).unwrap();
+            (c.end_point() - c.start_point()).length() * 1000.0
+        };
+        let [bottom, right, top, left] = [r.curves[0], r.curves[1], r.curves[2], r.curves[3]];
+        for (l, want) in [(top, 25.089), (bottom, bottom_len), (left, 22.065), (right, right_len)] {
+            assert!(close(len(l), want, 1e-6), "R{radius}: {l:?}: {} vs {want}", len(l));
         }
+        assert!((sk.point(r.points[0]).unwrap()).length() < 1e-12, "the far corner stays");
     }
+}
+
+/// A closed fit spline (last point = first) is periodic: smooth at the seam.
+#[test]
+fn closed_fit_spline_is_smooth_at_the_seam() {
+    let mut sk = Sketch::new();
+    let mut pts: Vec<DVec2> = (0..12)
+        .map(|k| {
+            let a = (60.0 + 30.0 * k as f64).to_radians();
+            let r = if k % 2 == 0 { 0.0547 } else { 0.0775 };
+            v(r * a.cos(), r * a.sin())
+        })
+        .collect();
+    pts.push(pts[0]);
+    let id = sk.add_closed_fit_spline(&pts).unwrap();
+    let c = sk.curve(id).unwrap();
+    let (a, b) = c.domain();
+    assert!((c.point(a) - c.point(b)).length() < 1e-12);
+    let (ta, tb) = (c.tangent(a).normalize(), c.tangent(b).normalize());
+    assert!((ta - tb).length() < 1e-9, "seam tangents {ta} {tb}");
+    // Six-fold symmetry: the lobe tip at 90 degrees has a horizontal tangent.
+    let near_tip = (0..=200).map(|i| a + (b - a) * i as f64 / 200.0).map(|t| c.point(t)).fold(DVec2::ZERO, |m, p| if p.y > m.y { p } else { m });
+    assert!(near_tip.x.abs() < 2e-3 && (near_tip.y - 0.0775).abs() < 1e-3, "{near_tip}");
 }

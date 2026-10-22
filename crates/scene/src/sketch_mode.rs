@@ -281,6 +281,8 @@ enum DragState {
     OffsetArrow { start: DVec2, moved: bool },
     /// Dragging the fillet radius manipulator (the session's first fillet).
     FilletRadius { arc: EntityId },
+    /// Dragging the pending chamfer's distance arrow.
+    ChamferDistance,
     /// Trim tool drag: every curve the path crosses is trimmed.
     TrimPath { points: Vec<DVec2> },
 }
@@ -445,6 +447,9 @@ pub struct SketchEditor {
     /// Picks of the dimension being placed (click positions decide min/max).
     picks_placed: Vec<(EntityId, DVec2)>,
     pub dim_edit: Option<DimEdit>,
+    /// The value box to open after `dim_edit` is accepted (a chamfer's
+    /// second distance; live: Enter goes from distance 1 to distance 2).
+    value_box_next: Option<ConstraintId>,
     pub construction: bool,
     /// Show every constraint glyph (toolbar toggle).
     pub show_constraints: bool,
@@ -936,6 +941,7 @@ impl SketchEditor {
             picks: Vec::new(),
             picks_placed: Vec::new(),
             dim_edit: None,
+            value_box_next: None,
             construction: false,
             show_constraints: opened_options.show_constraints,
             show_expressions: opened_options.show_expressions,
@@ -1092,6 +1098,7 @@ impl SketchEditor {
 
     /// Cancel the in-progress operation (Esc). Returns true if something was cancelled.
     pub fn cancel(&mut self) -> bool {
+        self.value_box_next = None;
         if let Some(d) = self.dim_edit.take() {
             // Onshape resets the selection when the Dimension tool commits a
             // new dimension, so dismissing its box leaves nothing selected.
@@ -1288,16 +1295,25 @@ impl SketchEditor {
         matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) && self.clicks.len() == 2
     }
 
-    /// The side-count spinner "◀ 6 ▶" (live sketch/91): centred 24 px
-    /// outside the locked circumference point on the ray from the centre and
-    /// laid along that ray (◀ inward, ▶ outward); (centre, ray, sides).
+    /// The side-count spinner "◀ 6 ▶" (live sketch/91): 24 px outside the
+    /// middle of the edge after the clicked vertex, laid along that edge's
+    /// outward normal (◀ inward, ▶ outward; measured: the ◀ / ▶ axis is
+    /// perpendicular to the edge); (centre, outward direction, sides).
     pub fn polygon_side_control(&self) -> Option<(DVec2, DVec2, usize)> {
         if !self.polygon_sides_pending() {
             return None;
         }
-        let (ctr, rim) = (self.clicks[0].pos, self.clicks[1].pos);
-        let u = (rim - ctr).try_normalize().unwrap_or(DVec2::Y);
-        Some((rim + u * self.world_per_px * POLYGON_SPINNER_PX, u, self.polygon_sides))
+        let (c, rim) = (self.clicks[0].pos, self.clicks[1].pos);
+        let n = self.polygon_sides.clamp(3, 50) as f64;
+        let r = (rim - c).length();
+        let start = (rim - c).to_angle();
+        // Inscribed: the vertex is on the click; circumscribed: the edge midpoint.
+        let (rv, off) = if self.tool == Tool::Polygon { (r, 0.0) } else { (r / (PI / n).cos(), PI / n) };
+        let v0 = c + DVec2::from_angle(start + off) * rv;
+        let v1 = c + DVec2::from_angle(start + off + TAU / n) * rv;
+        let mid = (v0 + v1) * 0.5;
+        let out = (mid - c).try_normalize().unwrap_or(DVec2::Y);
+        Some((mid + out * self.world_per_px * POLYGON_SPINNER_PX, out, self.polygon_sides))
     }
 
     /// The on-canvas polygon spinner locks an explicitly chosen side count.
@@ -1328,12 +1344,14 @@ impl SketchEditor {
     /// Default tool sizes follow the document's length unit. Live Onshape,
     /// inch workspace: fillet R0.5, chamfer 0.25, offset 0.25, slot Ø0.5,
     /// linear pattern spacing 1 in (sketch/107–137); millimetre workspace:
-    /// R20, 5, 5, Ø20, 25 mm (sketch/300–312).
+    /// R5 (behaviours.md 568: on every fresh load, whatever the size or
+    /// zoom; then the last radius used in the tab), 5, 5, Ø20, 25 mm
+    /// (sketch/300–312).
     pub fn apply_unit_defaults(&mut self, length: noshape_units::LengthUnit) {
         use noshape_units::LengthUnit as L;
         const IN: f64 = 0.0254;
         let imperial = matches!(length, L::Inch | L::Foot | L::Yard);
-        let (fillet, quarter, slot, spacing) = if imperial { (0.5 * IN, 0.25 * IN, 0.5 * IN, IN) } else { (0.02, 0.005, 0.02, 0.025) };
+        let (fillet, quarter, slot, spacing) = if imperial { (0.5 * IN, 0.25 * IN, 0.5 * IN, IN) } else { (0.005, 0.005, 0.02, 0.025) };
         self.fillet_radius = fillet;
         self.chamfer_distance = quarter;
         self.offset_distance = quarter;
@@ -1542,6 +1560,10 @@ impl SketchEditor {
                 if let Some((arc, _)) = self.fillet_handle(&data.sketch) {
                     self.drag = Some(DragState::FilletRadius { arc });
                 }
+                EditOutcome::redraw()
+            }
+            Tool::Chamfer if self.chamfer_arrow().is_some_and(|(a, b)| dist_to_segment(p, a, b) <= self.world_per_px * 10.0) => {
+                self.drag = Some(DragState::ChamferDistance);
                 EditOutcome::redraw()
             }
             Tool::Fillet | Tool::Chamfer => self.corner_click(data, p, hovered),
@@ -1785,19 +1807,58 @@ impl SketchEditor {
     }
 
     fn after_chamfer(&mut self, data: &mut SketchData, r: &noshape_sketch::EditResult) {
-        let dims: Vec<ConstraintId> = r.constraints_added.iter().copied().filter(|c| data.sketch.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Distance { .. }))).collect();
-        for (k, d) in dims.iter().enumerate() {
-            if let Some(ConstraintKind::Distance { a, b, .. }) = data.sketch.constraint(*d).map(|c| c.kind.clone())
-                && let (Some(pa), Some(pb)) = (data.sketch.point(a), data.sketch.point(b))
-            {
-                let n = (pb - pa).try_normalize().unwrap_or(DVec2::X).perp();
-                let l = (pa + pb) * 0.5 + n * self.world_per_px * if k == 0 { 24.0 } else { -24.0 };
-                data.dimension_labels.insert(d.0, [l.x, l.y]);
-            }
+        let dims = chamfer_dims(&data.sketch, r);
+        for (cid, at) in chamfer_dim_labels(&data.sketch, &dims, self.world_per_px) {
+            data.dimension_labels.insert(cid.0, [at.x, at.y]);
         }
         if let Some(d) = dims.first() {
             self.open_value_box(data, *d);
         }
+        self.value_box_next = dims.get(1).copied();
+    }
+
+    /// After a value box was accepted: opens the queued one (a chamfer's
+    /// second distance). Returns whether a box opened.
+    pub fn open_next_value_box(&mut self, data: &SketchData) -> bool {
+        let Some(cid) = self.value_box_next.take() else { return false };
+        if data.sketch.constraint(cid).is_none() {
+            return false;
+        }
+        self.open_value_box(data, cid);
+        self.dim_edit.is_some()
+    }
+
+    /// The pending chamfer: its virtual sharp, the unit direction from it
+    /// along the first distance's edge, that distance's chamfer end and the
+    /// two distance dimensions.
+    fn chamfer_frame(&self) -> Option<(DVec2, DVec2, DVec2, Vec<ConstraintId>)> {
+        if self.tool != Tool::Chamfer {
+            return None;
+        }
+        let (data, result) = self.pending_corner.as_ref()?;
+        let dims = chamfer_dims(&data.sketch, result);
+        let Some(ConstraintKind::Distance { a, b, .. }) = data.sketch.constraint(*dims.first()?).map(|c| c.kind.clone()) else { return None };
+        let (sharp, end) = (data.sketch.point(a)?, data.sketch.point(b)?);
+        Some((sharp, (end - sharp).try_normalize()?, end, dims))
+    }
+
+    /// The pending chamfer's distance manipulator (live sketch/1960b): the
+    /// hollow drag arrow from the chamfer's end on the first edge, pointing
+    /// along it away from the corner; (start, apex of the head).
+    pub fn chamfer_arrow(&self) -> Option<(DVec2, DVec2)> {
+        let (_, u, end, _) = self.chamfer_frame()?;
+        Some((end, end + u * self.world_per_px * (FILLET_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX)))
+    }
+
+    /// The pending chamfer's preview distance labels (live sketch/1960:
+    /// "5", no unit), with their positions.
+    pub fn chamfer_value_labels(&self) -> Vec<(DVec2, f64)> {
+        let Some((data, result)) = self.pending_corner.as_ref().filter(|_| self.tool == Tool::Chamfer) else { return Vec::new() };
+        let dims = chamfer_dims(&data.sketch, result);
+        chamfer_dim_labels(&data.sketch, &dims, self.world_per_px)
+            .into_iter()
+            .filter_map(|(cid, at)| Some((at, data.sketch.constraint(cid)?.kind.value()?)))
+            .collect()
     }
 
     /// Offset curves of the pending offset with the current distance (preview / commit).
@@ -2013,6 +2074,15 @@ impl SketchEditor {
             self.pending_slot = Some((preview, created));
         }
         if committed { EditOutcome::changed() } else { EditOutcome::redraw() }
+    }
+
+    /// The pending slot's width dimension: its constraint, label position
+    /// and value (live sketch/304 shows "Ø20" before the slot commits).
+    pub fn slot_dimension(&self) -> Option<(ConstraintId, DVec2, f64)> {
+        let (pd, created) = self.pending_slot.as_ref()?;
+        let c = pd.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Diameter { curve, .. } if created.contains(&curve)))?;
+        let at = pd.dimension_labels.get(&c.id.0).map(|l| DVec2::new(l[0], l[1]))?;
+        Some((c.id, at, c.kind.value()?))
     }
 
     /// Is a slot preview waiting to be committed?
@@ -2913,6 +2983,19 @@ impl SketchEditor {
                 }
                 EditOutcome::redraw()
             }
+            Some(DragState::ChamferDistance) => {
+                // Both distances follow the cursor along the arrow's edge.
+                let Some((sharp, u, _, dims)) = self.chamfer_frame() else { return EditOutcome::none() };
+                let d = (p - sharp).dot(u).max(self.world_per_px);
+                if let Some((preview, _)) = &mut self.pending_corner {
+                    for cid in dims {
+                        let _ = preview.sketch.set_dimension_value(cid, d);
+                    }
+                    preview.sketch.solve();
+                    self.chamfer_distance = d;
+                }
+                EditOutcome::redraw()
+            }
             Some(DragState::FilletRadius { arc }) => {
                 let pending = self.pending_corner.is_some();
                 let data = if let Some((preview, _)) = &mut self.pending_corner { preview } else { data };
@@ -3146,6 +3229,7 @@ impl SketchEditor {
             }
             Some(DragState::Handle(_)) | Some(DragState::TrimPath { .. }) => EditOutcome::redraw(),
             Some(DragState::FilletRadius { .. }) => if self.pending_corner.is_some() { EditOutcome::redraw() } else { EditOutcome::changed() },
+            Some(DragState::ChamferDistance) => EditOutcome::redraw(),
             Some(DragState::OffsetArrow { moved, .. }) => {
                 if !moved {
                     self.offset_flip = !self.offset_flip;
@@ -3735,7 +3819,15 @@ impl SketchEditor {
             // `display_scale`), with its unit.
             data.dimension_exprs.insert(cid.0, ExprValue::new(text));
         }
-        let report = data.sketch.solve();
+        let opts = data.sketch.dimension_edit_options(cid);
+        let report = data.sketch.solve_with(&opts);
+        // The next fillet defaults to the radius just typed (live, 568).
+        if let Some(ConstraintKind::Radius { curve, value }) = data.sketch.constraint(cid).map(|c| c.kind.clone())
+            && self.fillet_session == Some(curve)
+            && report.is_solved()
+        {
+            self.fillet_radius = value;
+        }
         if !report.is_solved() {
             // Live (qa5 dim conflict): the value is taken (the label reads it,
             // the sketch turns red) but the last solved shape stays.
@@ -3753,7 +3845,6 @@ impl SketchEditor {
 
     /// Dimension label positions and texts for display (local coords).
     pub fn dimension_labels(&self, data: &SketchData, units: &UnitPrefs) -> Vec<(ConstraintId, DVec2, String, bool)> {
-        let data = self.dimension_source(data);
         let mut out = Vec::new();
         for c in data.sketch.constraints() {
             let Some(v) = c.kind.value() else { continue };
@@ -3775,7 +3866,6 @@ impl SketchEditor {
     /// Onshape writes their (horizontal) text beside the line, which stays
     /// unbroken (sketch/17 "2.5"); flatter ones break the line around it.
     pub fn labels_beside_line(&self, data: &SketchData) -> std::collections::HashSet<ConstraintId> {
-        let data = self.dimension_source(data);
         let labels: std::collections::HashMap<ConstraintId, DVec2> = data.sketch.constraints().filter_map(|c| Some((c.id, self.label_pos(data, c.id, &c.kind)?))).collect();
         let mut out = std::collections::HashSet::new();
         for g in self.dimension_graphics(data) {
@@ -3800,14 +3890,7 @@ impl SketchEditor {
     }
 
     /// Dimension graphics (extension/dimension lines, arrows, arcs) in local coords.
-    /// The sketch whose dimensions are shown: a pending slot's preview (live
-    /// sketch/1952: its "Ø20" shows before the slot is committed).
-    fn dimension_source<'a>(&'a self, data: &'a SketchData) -> &'a SketchData {
-        self.pending_slot.as_ref().map(|(preview, _)| preview).unwrap_or(data)
-    }
-
     pub fn dimension_graphics(&self, data: &SketchData) -> Vec<DimGraphic> {
-        let data = self.dimension_source(data);
         let sk = &data.sketch;
         let s = self.world_per_px;
         let mut out = Vec::new();
@@ -4154,6 +4237,8 @@ impl SketchEditor {
         let on_top = LineSegment::ON_TOP;
         // Manipulators drawn wider than `poly`'s 2 px, added after it (in order).
         let mut wide: Vec<(Vec<DVec2>, [u8; 4], f32)> = Vec::new();
+        // Construction previews, dash-dot (live sketch/91: the polygon's circle).
+        let mut dash_dot: Vec<Vec<DVec2>> = Vec::new();
         let mut poly = |pts: &[DVec2], color: [u8; 4], dashed: bool| {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, color, 0, 2.0, on_top | if dashed { LineSegment::DASHED } else { 0 });
@@ -4260,7 +4345,7 @@ impl SketchEditor {
                         let pts: Vec<DVec2> = (0..=n).map(|i| *a + DVec2::from_angle(start + off + i as f64 / n as f64 * TAU) * rv).collect();
                         poly(&pts, preview_color, false);
                         // Live (sketch/91): the construction circle is dash-dot.
-                        wide.push((circle_pts(*a, r, 72), preview_color, -1.0));
+                        dash_dot.push(circle_pts(*a, r, 72));
                     }
                 }
                 Tool::ThreePointCircle => match anchors.len() {
@@ -4457,20 +4542,49 @@ impl SketchEditor {
                 }
             }
         }
-        // Slot preview (light blue until committed), with its tangent points
-        // (the cap / side joins; live sketch/1952).
+        let mut dim_preview: Vec<[DVec2; 2]> = Vec::new();
+        // Chamfer: the pending chamfer line in light blue, its two distance
+        // dimensions and the distance arrow (live sketch/1959–1960).
+        if self.tool == Tool::Chamfer
+            && let Some((pd, result)) = &self.pending_corner
+        {
+            for id in &result.created {
+                if pd.sketch.kind(*id) == Some(EntityKind::Line) && !pd.sketch.entity(*id).is_some_and(|e| e.construction) {
+                    poly(&pd.sketch.tessellate(*id, self.world_per_px), preview_color, false);
+                }
+            }
+            let dims = chamfer_dims(&pd.sketch, result);
+            for (cid, at) in chamfer_dim_labels(&pd.sketch, &dims, self.world_per_px) {
+                let Some(c) = pd.sketch.constraint(cid) else { continue };
+                let mut segs = Vec::new();
+                dim_segments(&pd.sketch, &c.kind, at, self.world_per_px, &mut segs);
+                let text = dim_value_text(&c.kind, c.kind.value().unwrap_or(0.0) / dim_display_scale(&c.kind), units);
+                let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
+                dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, at, half)));
+            }
+            if let Some((start, apex)) = self.chamfer_arrow() {
+                let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
+                push_hollow_arrow(&mut wide, start, d, self.world_per_px, FILLET_ARROW_STEM_PX);
+            }
+        }
+        // Slot preview (light blue until committed), with its join points
+        // and the width dimension (live sketch/304: "Ø20" with a leader).
         if let Some((pd, created)) = &self.pending_slot {
             for id in created {
                 if pd.sketch.curve(*id).is_some() {
                     poly(&pd.sketch.tessellate(*id, self.world_per_px * 0.2), preview_color, false);
+                } else if let Some(q) = pd.sketch.point(*id) {
+                    points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
                 }
-                if pd.sketch.kind(*id) == Some(EntityKind::Line)
-                    && let Some((a, b)) = pd.sketch.endpoints(*id)
-                {
-                    for q in [a, b].into_iter().filter_map(|e| pd.sketch.point(e)) {
-                        points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 7.0, style: on_top, _pad: 0 });
-                    }
-                }
+            }
+            if let Some((cid, at, _)) = self.slot_dimension()
+                && let Some(c) = pd.sketch.constraint(cid)
+            {
+                let mut segs = Vec::new();
+                dim_segments(&pd.sketch, &c.kind, at, self.world_per_px, &mut segs);
+                let text = dim_value_text(&c.kind, c.kind.value().unwrap_or(0.0) / dim_display_scale(&c.kind), units);
+                let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
+                dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, at, half)));
             }
         }
         // Trim drag path.
@@ -4479,7 +4593,6 @@ impl SketchEditor {
         {
             poly(path, crate::palette::rgb8(0x555555), false);
         }
-        let mut dim_preview: Vec<[DVec2; 2]> = Vec::new();
         // Dimension being placed: drawn like a placed one (live sketch/12:
         // black, the line broken around the 16 px value at the cursor).
         if let Some((kind, pos, v)) = self.dimension_preview(data) {
@@ -4729,6 +4842,10 @@ impl SketchEditor {
             // A negative width marks a 2 px dash-dot guide.
             let (width, style) = if width < 0.0 { (2.0, on_top | LineSegment::DASH_DOT) } else { (width, on_top) };
             lines.push_polyline(&pts3, color, 0, width, style);
+        }
+        for pts in dash_dot {
+            let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
+            lines.push_polyline(&pts3, preview_color, 0, 2.0, on_top | LineSegment::DASH_DOT);
         }
         (lines, points)
     }
@@ -5390,6 +5507,33 @@ fn angle_arc(out: &mut Vec<[DVec2; 2]>, c: DVec2, s1: DVec2, s2: DVec2, r: f64, 
         arrow(out, c + DVec2::from_angle(a0) * r, t0, s);
         arrow(out, c + DVec2::from_angle(a1) * r, -t1, s);
     }
+}
+
+/// A sketch chamfer's two distance dimensions (virtual sharp → chamfer end).
+fn chamfer_dims(sk: &Sketch, r: &noshape_sketch::EditResult) -> Vec<ConstraintId> {
+    r.constraints_added.iter().copied().filter(|c| sk.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Distance { .. }))).collect()
+}
+
+/// Where a chamfer's distance labels go (live sketch/1960–1961): 50 px
+/// outside each edge, at the middle of the distance.
+fn chamfer_dim_labels(sk: &Sketch, dims: &[ConstraintId], px: f64) -> Vec<(ConstraintId, DVec2)> {
+    let ends: Vec<(ConstraintId, DVec2, DVec2)> = dims
+        .iter()
+        .filter_map(|cid| match sk.constraint(*cid)?.kind {
+            ConstraintKind::Distance { a, b, .. } => Some((*cid, sk.point(a)?, sk.point(b)?)),
+            _ => None,
+        })
+        .collect();
+    ends.iter()
+        .map(|&(cid, sharp, end)| {
+            let other = ends.iter().find(|e| e.0 != cid).map_or(sharp, |e| e.2);
+            let mut n = (end - sharp).try_normalize().unwrap_or(DVec2::X).perp();
+            if n.dot(other - sharp) > 0.0 {
+                n = -n;
+            }
+            (cid, (sharp + end) * 0.5 + n * px * 50.0)
+        })
+        .collect()
 }
 
 fn dim_segments(sk: &Sketch, k: &ConstraintKind, pos: DVec2, s: f64, out: &mut Vec<[DVec2; 2]>) {
@@ -6112,6 +6256,8 @@ mod tests {
         let line = d.sketch.add_line(v(0.01, 0.01), v(0.05, 0.01));
         click(&mut ed, &mut d, v(0.03, 0.01));
         assert!(ed.slot_pending(), "light-blue preview");
+        let (_, at, w) = ed.slot_dimension().expect("the preview shows its Ø20 dimension");
+        assert!((w - ed.slot_width).abs() < 1e-12 && at.x > 0.04, "{at} {w}");
         assert_eq!(count(&d, EntityKind::Arc), 0, "nothing committed yet");
         assert!(ed.dim_edit.is_none(), "no value box for a slot");
         click(&mut ed, &mut d, v(0.03, 0.04));
@@ -6279,6 +6425,12 @@ mod tests {
         assert_eq!(count(&data, EntityKind::Line), 0, "circumference is still a preview");
         ed.adjust_polygon_sides(1);
         assert_eq!(ed.polygon_side_control().map(|c| c.2), Some(7));
+        // Outside the middle of the edge after the clicked vertex (0.03, 0.02),
+        // along its outward normal.
+        let (at, out, _) = ed.polygon_side_control().unwrap();
+        let edge_mid = (v(0.03, 0.02) + v(0.02, 0.02) + DVec2::from_angle(TAU / 7.0) * 0.01) * 0.5;
+        assert!((at - v(0.02, 0.02)).length() > (edge_mid - v(0.02, 0.02)).length() && (at - edge_mid).length() < 0.003, "{at} {edge_mid}");
+        assert!((out - (edge_mid - v(0.02, 0.02)).normalize()).length() < 1e-9, "{out}");
         ed.pointer_move(&mut data, v(0.08, 0.06), false, false);
         assert_eq!(ed.polygon_sides, 7, "spinner's explicit value stays locked");
         click(&mut ed, &mut data, v(0.08, 0.06));
@@ -6676,6 +6828,58 @@ mod tests {
         assert!(ed.commit_corner(&mut d).changed);
         assert_eq!(count(&d, EntityKind::Arc), 1);
         assert!(ed.dim_edit.is_some(), "Enter opens the radius box");
+    }
+
+    /// Live (behaviours.md 568): the fillet default is R5 in a millimetre
+    /// workspace, and a radius typed into the first fillet's box becomes the
+    /// next default.
+    #[test]
+    fn fillet_default_r5_then_sticky() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        ed.apply_unit_defaults(noshape_units::LengthUnit::Millimeter);
+        assert_eq!(ed.fillet_radius, 0.005);
+        let a = d.sketch.add_point(v(0.0, 0.0));
+        let b = d.sketch.add_point(v(0.04, 0.0));
+        let c = d.sketch.add_point(v(0.0, 0.03));
+        d.sketch.add_line_between(a, b).unwrap();
+        d.sketch.add_line_between(a, c).unwrap();
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        assert!(ed.commit_corner(&mut d).changed);
+        let cid = ed.dim_edit.as_ref().expect("radius box").constraint;
+        ed.apply_dimension(&mut d, cid, "3", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        assert!((ed.fillet_radius - 0.003).abs() < 1e-12);
+    }
+
+    /// CH1 (live sketch/1959–1962): a corner click previews the 5 mm
+    /// chamfer with two distance labels and the drag arrow; Enter commits it
+    /// and opens distance 1's box, accepting that opens distance 2's.
+    #[test]
+    fn chamfer_preview_then_two_value_boxes() {
+        let (mut ed, mut d) = editor(Tool::Chamfer);
+        let a = d.sketch.add_point(v(0.0, 0.0));
+        let b = d.sketch.add_point(v(0.04, 0.0));
+        let c = d.sketch.add_point(v(0.0, 0.03));
+        d.sketch.add_line_between(a, b).unwrap();
+        d.sketch.add_line_between(a, c).unwrap();
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        assert!(ed.corner_pending() && ed.dim_edit.is_none(), "preview, no value box yet");
+        let labels = ed.chamfer_value_labels();
+        assert_eq!(labels.len(), 2);
+        assert!(labels.iter().all(|(at, v)| (v - 0.005).abs() < 1e-12 && (at.x < 0.0 || at.y < 0.0)), "labels outside the corner: {labels:?}");
+        let (start, apex) = ed.chamfer_arrow().expect("drag arrow");
+        assert!((start.length() - 0.005).abs() < 1e-9 && (apex - start).length() > 0.0);
+        // Dragging the arrow sets both distances.
+        ed.drag = Some(DragState::ChamferDistance);
+        let to = start + (apex - start).normalize() * 0.003;
+        ed.tool_drag(&mut d, to);
+        assert!(ed.chamfer_value_labels().iter().all(|(_, v)| (v - 0.008).abs() < 1e-9), "{:?}", ed.chamfer_value_labels());
+        ed.drag = None;
+        assert!(ed.commit_corner(&mut d).changed);
+        let first = ed.dim_edit.as_ref().expect("distance 1 box").constraint;
+        ed.dim_edit = None;
+        assert!(ed.open_next_value_box(&d));
+        assert_ne!(ed.dim_edit.as_ref().unwrap().constraint, first, "then distance 2");
+        assert!(!ed.open_next_value_box(&d));
     }
 
     #[test]

@@ -415,6 +415,22 @@ impl Sketch {
         self.add_entity(Geometry::FitSpline { points: ids, handles: Some((h0, h1)) }, false, false)
     }
 
+    /// Interpolating spline through `points` whose last point repeats the
+    /// first, closed smoothly (periodic seam tangent, stored as handles).
+    pub fn add_closed_fit_spline(&mut self, points: &[DVec2]) -> Result<EntityId> {
+        let d = Nurbs::periodic_end_derivative(points).ok_or_else(|| SketchError::InvalidGeometry("closed spline needs 3+ distinct points ending at the first".into()))?;
+        let n = points.len();
+        let total: f64 = points.windows(2).map(|w| (w[1] - w[0]).length()).sum();
+        let first = (points[1] - points[0]).length();
+        let last = (points[n - 1] - points[n - 2]).length();
+        let h0 = points[0] + d * (first / (3.0 * total));
+        let h1 = points[n - 1] - d * (last / (3.0 * total));
+        let mut ids: Vec<EntityId> = points[..n - 1].iter().map(|p| self.add_point(*p)).collect();
+        ids.push(ids[0]);
+        let (h0, h1) = (self.add_point(h0), self.add_point(h1));
+        self.add_entity(Geometry::FitSpline { points: ids, handles: Some((h0, h1)) }, false, false)
+    }
+
     pub fn add_conic(&mut self, start: DVec2, control: DVec2, end: DVec2, rho: f64) -> Result<EntityId> {
         let s = self.add_point(start);
         let c = self.add_point(control);

@@ -1210,3 +1210,23 @@ fn move_and_delete_face_onshape_errors() {
     s.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(faces)));
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Cannot delete all faces of a part or surface.".to_string()));
 }
+
+/// patternUtils.fs / curvePattern.fs: what is patterned is checked first, and
+/// the path / distance errors read like Onshape's.
+#[test]
+fn pattern_errors_as_onshape() {
+    let mut s = block();
+    s.add("linearPattern", |p| p.set("patternType", en("FEATURE")));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select features to pattern.".to_string()));
+    let mut s = block();
+    s.add("mirror", |p| p.set("patternType", en("FEATURE")));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select features to mirror.".to_string()));
+    let mut s = block();
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(25.0)));
+    s.add("curvePattern", move |p| {
+        p.set("patternType", en("FACE"));
+        p.set("faces", q(top));
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a path to pattern along.".to_string()));
+}

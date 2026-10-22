@@ -390,6 +390,43 @@ impl Nurbs {
         Self::interpolate_with_ends(pts, (h0 - pts[0]) * (3.0 * total / first), (pts[n - 1] - h1) * (3.0 * total / last))
     }
 
+    /// The seam derivative (chord-length parameter on [0, 1]) of the
+    /// periodic cubic spline through `pts`, whose last point repeats the
+    /// first: [`Nurbs::interpolate_with_ends`] with it at both ends closes
+    /// the curve smoothly (Onshape's closed fit splines are periodic).
+    pub fn periodic_end_derivative(pts: &[DVec2]) -> Option<DVec2> {
+        let n = pts.len().checked_sub(1)?;
+        if n < 3 || (pts[n] - pts[0]).length() > 1e-12 * (1.0 + pts[0].length()) {
+            return None;
+        }
+        let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
+        if total <= 1e-300 {
+            return None;
+        }
+        let h: Vec<f64> = (0..n).map(|k| (pts[k + 1] - pts[k]).length() / total).collect();
+        if h.iter().any(|x| *x <= 1e-300) {
+            return None;
+        }
+        // Cyclic system for the second derivatives M_k (M_n = M_0).
+        let mut a = nalgebra::DMatrix::<f64>::zeros(n, n);
+        let mut bx = nalgebra::DVector::<f64>::zeros(n);
+        let mut by = nalgebra::DVector::<f64>::zeros(n);
+        for k in 0..n {
+            let km = (k + n - 1) % n;
+            a[(k, km)] += h[km];
+            a[(k, k)] += 2.0 * (h[km] + h[k]);
+            a[(k, (k + 1) % n)] += h[k];
+            let r = (pts[k + 1] - pts[k]) / h[k] - (pts[k] - pts[if k == 0 { n - 1 } else { k - 1 }]) / h[km];
+            bx[k] = 6.0 * r.x;
+            by[k] = 6.0 * r.y;
+        }
+        let lu = a.lu();
+        let (mx, my) = (lu.solve(&bx)?, lu.solve(&by)?);
+        let m0 = DVec2::new(mx[0], my[0]);
+        let m1 = DVec2::new(mx[1 % n], my[1 % n]);
+        Some((pts[1] - pts[0]) / h[0] - (2.0 * m0 + m1) * (h[0] / 6.0))
+    }
+
     /// Handle positions giving the natural end tangents of [`Nurbs::interpolate`].
     pub fn natural_handles(pts: &[DVec2]) -> Option<(DVec2, DVec2)> {
         let n = pts.len();
