@@ -204,6 +204,30 @@ function panCrown(r is ValueWithUnits, k is ValueWithUnits, rc is ValueWithUnits
             { "p" : rz(Z, z0 + k), "mid" : rz(rc * sin(a), zc + rc * cos(a)) }];
 }
 
+/**
+ * A crowned head under a Type III square recess: the head's profile up to
+ * the crown's rim, extended straight up and revolved, intersected with the
+ * crown sphere (centre z = zc, radius rc) revolved about X. The sphere's
+ * seam and poles then lie at the centre's height, far below the crown, so no
+ * seam crosses the square mouth and its four fillets stay single faces
+ * (kern; live's 19 faces). Returns the head body.
+ */
+function seamlessCrown(context is Context, id is Id, toRim is array, rimR is ValueWithUnits, top is ValueWithUnits, zc is ValueWithUnits, rc is ValueWithUnits) returns Query
+{
+    const up = top + rc;
+    revolveProfile(context, id + "ext", join(toRim, [{ "p" : rz(rimR, up) }, { "p" : rz(Z, up) }]));
+    var p = XY_PLANE;
+    p.origin[2] = zc;
+    const sketch = newSketchOnPlane(context, id + "sphereSketch", { "sketchPlane" : p });
+    skArc(sketch, "half", { "start" : vector(-rc, Z), "mid" : vector(Z, rc), "end" : vector(rc, Z) });
+    skLineSegment(sketch, "chord", { "start" : vector(rc, Z), "end" : vector(-rc, Z) });
+    skSolve(sketch);
+    opRevolve(context, id + "sphere", { "entities" : qSketchRegion(id + "sphereSketch"), "axis" : line(vector(Z, Z, zc), vector(1, 0, 0)), "angleForward" : 2 * PI * radian });
+    opDeleteBodies(context, id + "deleteSphereSketch", { "entities" : qCreatedBy(id + "sphereSketch", EntityType.BODY) });
+    intersect(context, id + "crown", qCreatedBy(id + "ext", EntityType.BODY), qCreatedBy(id + "sphere", EntityType.BODY));
+    return qCreatedBy(id, EntityType.BODY);
+}
+
 /** A spherical cap of base radius r and height h on z0 (h > 0 up). */
 function domeCap(r is ValueWithUnits, h is ValueWithUnits, z0 is ValueWithUnits) returns array
 {
@@ -282,7 +306,18 @@ function screwHead(context is Context, id is Id, def is map) returns array
     if (kind == HEAD_ROUND)
     {
         // A collar (dc, c) under the head (DIN 967) lifts it by c.
-        const head = revolveProfile(context, id + "round", def.re > EPS && def.rf > EPS ? panCrown(def.dk / 2, def.k - def.c, def.rf, def.re, def.c) : roundHead(def.dk / 2, def.k - def.c, def.rf, def.c));
+        const pan = def.re > EPS && def.rf > EPS;
+        const profile = pan ? panCrown(def.dk / 2, def.k - def.c, def.rf, def.re, def.c) : roundHead(def.dk / 2, def.k - def.c, def.rf, def.c);
+        // Spherical crowns (the pan's, a dome) under a square recess: the
+        // profile up to the crown's rim, the crown from a seamless sphere.
+        const dome = !pan && def.rf >= def.dk / 2 - EPS && def.rf > EPS;
+        if (def.drive == DRIVE_SQUARE_III && (pan || dome))
+        {
+            const rim = profile[size(profile) - 2]["p"];
+            seamlessCrown(context, id + "round", subArray(profile, 0, size(profile) - 1), rim[0], def.k, def.k - def.rf, def.rf);
+        }
+        else
+            revolveProfile(context, id + "round", profile);
         if (def.c > EPS)
             cylinderZ(context, id + "collar", Z, def.c + EPS, def.dc / 2);
         return [qCreatedBy(id, EntityType.BODY), def.k];
@@ -290,11 +325,17 @@ function screwHead(context is Context, id is Id, def is map) returns array
     if (kind == HEAD_COUNTERSUNK || kind == HEAD_RAISED_COUNTERSUNK)
     {
         // The cone from dk on top down to the shank, a cylindrical edge c.
+        // Undercut heads (live's tapping screws): the 82 degree cone stops
+        // at the depth k, then a flat step in to the shank.
         var pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : rz(def.dk / 2, -def.c) }, { "p" : rz(def.dk / 2, Z) }];
+        if (def.undercut == 1)
+            pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : rz(def.dk / 2 - def.k * tan(41 * degree), -def.k) }, { "p" : rz(def.dk / 2, Z) }];
         if (kind == HEAD_RAISED_COUNTERSUNK && def.f > EPS)
         {
             const big = (def.dk * def.dk / 4 + def.f * def.f) / (2 * def.f);
             const midR = def.dk / 4;
+            if (def.drive == DRIVE_SQUARE_III)
+                return [seamlessCrown(context, id + "csk", pts, def.dk / 2, def.f, def.f - big, big), def.f];
             pts = append(pts, { "p" : rz(Z, def.f), "mid" : rz(midR, def.f - big + sqrt(big * big - midR * midR)) });
             return [revolveProfile(context, id + "csk", pts), def.f];
         }
@@ -412,14 +453,16 @@ function driveCut(context is Context, id is Id, target is Query, def is map, top
         else
         {
             // One closed spline through 12 points: lobe tips on Ø sd at
-            // 90 + 60k degrees, the valleys on Ø b at 60 + 60k.
+            // 90 + 60k degrees, the valleys on Ø b at 60 + 60k. It starts
+            // at 0 degrees, on the crown's seam, so the mouth edge keeps a
+            // single vertex there (kern: one fillet face, live's 15 faces).
             var p = XY_PLANE;
             p.origin[2] = top - side;
             const sketch = newSketchOnPlane(context, id + "lobeSketch", { "sketchPlane" : p });
             var pts = [];
             for (var k = 0; k < 12; k += 1)
             {
-                const a = (60 + 30 * k) * degree;
+                const a = (30 * k) * degree;
                 const rk = k % 2 == 0 ? def.b / 2 : def.sd / 2;
                 pts = append(pts, vector(rk * cos(a), rk * sin(a)));
             }
@@ -567,6 +610,10 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isLength(definition.rf, LENGTH_0);
         annotation { "Name" : "Head edge fillet" }
         isLength(definition.re, LENGTH_0);
+        annotation { "Name" : "Undercut head" }
+        isInteger(definition.undercut, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Indented head" }
+        isInteger(definition.indent, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "f" }
         isLength(definition.f, LENGTH_0);
         annotation { "Name" : "e1" }
@@ -643,6 +690,14 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
             inside = def.c > EPS && below == Z ? def.c / 2 : below + (head[1] - below) / 4;
         revolveProfile(context, id + "shank", shankProfile(def, inside));
         uniteAll(context, id);
+        // Live's indented hex heads: a flat dish of diameter 0.9 s, a sixth
+        // of the hex height deep, before any slot or recess.
+        if (def.indent == 1 && def.head == HEAD_HEX)
+        {
+            const screw = solidsOf(context, id);
+            cylinderZ(context, id + "indentTool", head[1] - (def.k - def.c) / 6, head[1] + def.k, def.s * 0.45);
+            subtract(context, id + "indent", screw, qCreatedBy(id + "indentTool", EntityType.BODY));
+        }
         driveCut(context, id + "drive", solidsOf(context, id), def, def.head == HEAD_NONE ? Z : head[1]);
         if (def.point == POINT_BT)
             btSlot(context, id + "bt", solidsOf(context, id), def);

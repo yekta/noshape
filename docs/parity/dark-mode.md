@@ -11,6 +11,12 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
   with the hook, same binary, alternating: light 5.10 / 5.85 / 5.60 / 5.30 / 6.00 / 6.50 (mean 5.73),
   dark 5.60 / 5.15 / 4.60 (mean 5.12). Run-to-run noise (±0.7 ms, shared machine) is larger than any hook cost;
   dark is not slower than light, and light pays only one relaxed load per colour.
+- Step 2 (viewport): `noshape_scene::palette::{set_dark, is_dark, pick, viewport_dark, background}`; the
+  scene builder picks dark plane fill/outline, origin, sketch full/over/driven, sketch regions, connector axes;
+  the viewport background is #333 and the view cube dark (faces #333, frames/arrows #999, labels #fff); plane
+  labels white. Measured vs dk-929: bg #333 = #333; one plane #3d = #3d; two #44 vs #46; plane edge peak
+  #86–#8a vs #84. Saving the theme in Preferences re-sets the graphics global, so part studios and assemblies
+  rebuild their scenes at once (no reload, as live).
 - Step 1 state (dk0 shot): chrome, panels, tabs, filter and toolbar background go dark; still open: icons
   (dark glyphs, need the dark asset path from icons2), viewport background and plane colours, then per-capture
   side by side below.

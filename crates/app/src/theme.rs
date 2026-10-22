@@ -141,7 +141,7 @@ pub const PALETTE: Palette = Palette {
 };
 
 /// Viewport colors (shared with the headless scene builder).
-pub use noshape_scene::palette::viewport;
+pub use noshape_scene::palette::{pick, viewport, viewport_dark};
 
 const fn rgb_const(hex: u32) -> Rgba {
     Rgba {
@@ -223,6 +223,7 @@ pub fn p() -> &'static Palette {
 /// through [`DARK_HEX`] (the patched gpui's `rgb()` / `rgba()` hook).
 pub fn set_dark(on: bool) {
     gpui_kit::set_hex_theme(on.then_some(&DARK_HEX[..]));
+    noshape_scene::palette::set_dark(on);
 }
 
 /// Light theme hex → dark theme hex for literal `rgb()` / `rgba()` colours, sorted by the light value:
