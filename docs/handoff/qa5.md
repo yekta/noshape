@@ -3,6 +3,8 @@
 Agent qa5. Role: drive the app like a CAD user, compare every step with live Onshape (/root/onshape-research/live/behaviours.md),
 keep one checklist per workflow in docs/parity/workflow-<name>.md, and send the lead batched findings (worst first, one owner each).
 No code edits, no builds. Writes only under docs/parity/, docs/handoff/qa5.md and /root/qa5-scratch (+ "qa5 …" lines in live/REQUESTS.md).
+**Since 10-22 07:00 (/root/wt/WORKFLOW.md):** edit docs only in the worktree **/root/wt/qa5** (branch agent/qa5), never in /root/noshape. Commit, `git merge main`, then `git branch -f ready/qa5 HEAD`; result in /tmp/lead/mq/qa5.status.
+App under test = copy of /root/target-lead/debug/noshape (the merge queue builds every merged main there); its commit = `git -C /root/noshape log -1 main`.
 
 ## Setup
 - Binaries: copy /root/target-shared/debug/noshape → /tmp/qa5/noshape-<HHMM>, /root/target-engine/debug/noshape-cli → /tmp/qa5/noshape-cli-<HHMM>.
@@ -46,7 +48,10 @@ No code edits, no builds. Writes only under docs/parity/, docs/handoff/qa5.md an
   Workflow 26 sketch tools: workflow-sketch-tools.md, doc /tmp/qa5/d26/sk.noshape (CLI-created mm doc). New: SK5 (solver reshapes rectangle on fillet R edit), CH1 (no chamfer preview), VB1 (glyphs over value box),
   OFF1, FIL1, PAT1, SLOT1, POLY1, STB1. Live request "qa5 (10-22 pass 14, workflow 26 …)" pending. Gotcha: s.sh `type two words` drops the space (xdotool gets 2 args).
 - Pass 15 (10-22): CLI /tmp/qa5/noshape-cli-0521 (target-engine 05:21): IM5 FIXED; IM4, NAME3, IM1, IM2, I1, SF2, SF5, SF6, SM1, hem, SM3, ADV2, EXP1 unchanged. Log pass3/impmatrix14.log. Main still aa75fdf.
-- Re-run rule: when a new Integrate commit lands (`git -C /root/noshape log -1 origin/main`) or a newer target-shared binary appears,
+- Pass 16 (10-22): workflow 27 sheet-metal joints/loft (workflow-sheet-metal-joints.md): loft New ✅ exact, SML1 new (loft Add unsupported), Make joint dialog ✅, SM4 still; Tab/Rip/Bend/Jog dialogs asked from live. Setup pass16/mksmloft.py.
+- Pass 17 (10-22): workflow 28 exploded views + named positions (workflow-exploded-named-positions.md), doc /tmp/qa5/d28/x.noshape: EXV1–EXV4, NP1 (minor); menus, dialogs, Apply toast ✅. Pass 17b: rotation step, rollback drag, driver mate + value cells: EXV5, EXV6, MNU2, NP2 (all minor).
+- Pass 18 (10-22 ~10:00–11:00): CLI /tmp/qa5/noshape-cli-0811 (target-engine 08:11): NAME3 FIXED; IM4 imports again but still corrupt (bbox 39 m); rest unchanged. App rows waiting for the queue to build main 3ce6952 (queue stuck in its 09:58 batch at 11:00). Log pass3/impmatrix15.log.
+- Re-run rule: when main moves (`git -C /root/noshape log -1 main`; the merge queue lands commits every few minutes) or a newer target-shared binary appears,
   copy it and re-run every ✗ row; each checklist has dated "Re-run pass N" / "Update from live's answer" sections.
 
 ## Progress
@@ -74,6 +79,8 @@ No code edits, no builds. Writes only under docs/parity/, docs/handoff/qa5.md an
 | 20 | configured part in an assembly (Change configuration, configured insert, BOM, Variable Studio) | workflow-configured-assembly.md | done pass 7 (CA1–CA4, A18 new) |
 | 21 | drawing of a configured assembly + BOM table after a configuration change | workflow-configured-assembly-drawing.md | done pass 8 (CA5, CA6 new; 19:24 build) |
 | 22 | Variable Studios driving a Part Studio (order, clashes, own variables) | workflow-variable-studios.md | done pass 8; live "qa5 pass 8" folded 10-22 (VS1 withdrawn, VS2 confirmed ✗, VS4 new) |
+| 28 | exploded views + named positions | workflow-exploded-named-positions.md | done pass 17 (EXV1–4, NP1) |
+| 27 | sheet-metal joints, loft, Tab/Rip/Bend/Jog | workflow-sheet-metal-joints.md | done pass 16 (SML1); live request pending |
 | 26 | sketch tools in depth (Trim, Offset, fillet/chamfer, Slot, patterns, Mirror, Spline, Polygon, S toolbar) | workflow-sketch-tools.md | done pass 14 (9 ✗); live request pending |
 | 25 | multi-part booleans (union/subtract/intersect, Keep tools, names, Split, Transform copy, Delete part, merge scope) | workflow-booleans.md | pass 13: 9/10 fixed; BOOL1b, BOOL4b, INT2 open |
 | 24 | mates and mate connectors in depth (flip rule, HUD, connector panel, Offset/Limits, mate values, Animate, Mate connector tool, Replace instance) | workflow-mates.md | done pass 10 (MT1–MT9) |
