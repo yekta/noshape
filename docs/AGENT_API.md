@@ -8,13 +8,24 @@ history entry, described exactly as the UI describes it (`Part Studio 1 :: Inser
 
 ## Quick start
 
-Build: `OCCT_ROOT=/path/to/occt cargo build --release -p noshape-cli` (no GUI dependencies).
+`noshape-cli` ships in every release bundle next to the app (macOS: inside the app and loose in the dmg;
+Linux tarball and Windows zip: next to `noshape` / `noshape.exe`). To build it yourself:
+`OCCT_ROOT=/path/to/occt cargo build --release -p noshape-cli` (no GUI dependencies).
 
 ### Claude Code
 
 ```sh
-claude mcp add noshape -- /path/to/noshape-cli mcp
+# macOS (noshape.app in Applications)
+claude mcp add noshape -- /Applications/noshape.app/Contents/MacOS/noshape-cli mcp
+# Linux (the tarball unpacked to ~/noshape-<version>-linux-x86_64)
+claude mcp add noshape -- ~/noshape-<version>-linux-x86_64/noshape-cli mcp
+# Windows (the zip unpacked to C:\noshape-<version>-windows-x86_64)
+claude mcp add noshape -- C:\noshape-<version>-windows-x86_64\noshape-cli.exe mcp
 ```
+
+On macOS the downloaded app and CLI are ad-hoc signed, not notarized: clear the download flag once with
+`xattr -dr com.apple.quarantine /Applications/noshape.app` (and `xattr -d com.apple.quarantine <path>` for a
+loose `noshape-cli` copied from the dmg), else macOS refuses to run them.
 
 or in a project's `.mcp.json` (any MCP client takes the same entry):
 
