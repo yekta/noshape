@@ -268,7 +268,7 @@ pub(crate) struct StepEdit {
     pub specify: bool,
     pub direction: Option<MateConnectorRef>,
     /// Distance or Rotation angle.
-    pub value: Entity<InputState>,
+    pub value: Entity<crate::quantity_field::QuantityInput>,
     pub lines: bool,
     pub line_refs: Vec<MateConnectorRef>,
     /// Field taking picks: 0 Instances, 1 direction / axis, 2 explode line entities.
