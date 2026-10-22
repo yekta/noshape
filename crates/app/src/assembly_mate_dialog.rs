@@ -99,7 +99,7 @@ pub struct MateDialog {
     pub configuring: Option<Vec<String>>,
     use_offset: bool,
     use_limits: bool,
-    offsets: [Entity<InputState>; 4],
+    offsets: [Entity<crate::quantity_field::QuantityInput>; 4],
     limits: HashMap<&'static str, (Entity<InputState>, Entity<InputState>)>,
     labeler: ConnectorLabeler,
     pub status: Option<String>,
@@ -151,18 +151,34 @@ impl MateDialog {
             .into_any_element()
     }
 
-    pub fn new(mate: Mate, is_new: bool, labeler: ConnectorLabeler, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    /// `units` and `variables` (the assembly's): the offset fields evaluate
+    /// with them (Onshape's number field, `quantity_field`).
+    pub fn new(mate: Mate, is_new: bool, labeler: ConnectorLabeler, units: noshape_units::UnitPrefs, variables: std::collections::BTreeMap<String, noshape_units::Quantity>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         // Live (qa5 MT5, dom/qa5-asm-036): "0 mm", "No minimum" are the
         // fields' values in regular text (their placeholder is empty).
         let mk = |text: String, default: &str, window: &mut Window, cx: &mut Context<Self>| {
             let text = if text.trim().is_empty() { default.to_string() } else { text };
             cx.new(|cx| InputState::new(window, cx).default_value(text))
         };
+        // Live ("Input behaviour outside feature dialogs", Fastened mate ›
+        // Offset X): Onshape's number field: all selected on click, "5" →
+        // "5 mm", "1+1" → "(1+1) mm", invalid pink, ↑ / ↓ ±1 mm, Esc reverts.
+        use crate::quantity_field::{QuantityInput, QuantitySpec};
+        let qty = |text: String, default: &str, dim: noshape_units::Dim, label: &'static str, window: &mut Window, cx: &mut Context<Self>| {
+            let text = if text.trim().is_empty() { default.to_string() } else { text };
+            let vars = variables.clone();
+            cx.new(|cx| {
+                let mut q = QuantityInput::new(text, QuantitySpec::quantity(dim).label(label), units, window, cx);
+                q.set_variables(vars, cx);
+                q
+            })
+        };
+        let len = noshape_units::Dim::LENGTH;
         let offsets = [
-            mk(text_of(&mate.offset_x), "0 mm", window, cx),
-            mk(text_of(&mate.offset_y), "0 mm", window, cx),
-            mk(text_of(&mate.offset_z), "0 mm", window, cx),
-            mk(text_of(&mate.rotation), "0 deg", window, cx),
+            qty(text_of(&mate.offset_x), "0 mm", len, "Offset X", window, cx),
+            qty(text_of(&mate.offset_y), "0 mm", len, "Offset Y", window, cx),
+            qty(text_of(&mate.offset_z), "0 mm", len, "Offset Z", window, cx),
+            qty(text_of(&mate.rotation), "0 deg", noshape_units::Dim::ANGLE, "Rotation angle", window, cx),
         ];
         let mut limits = HashMap::new();
         for key in ["rz", "x", "y", "z", "cone"] {
@@ -173,7 +189,16 @@ impl MateDialog {
             limits.insert(key, (lo, hi));
         }
         let mut subs = Vec::new();
-        let all: Vec<Entity<InputState>> = offsets.iter().cloned().chain(limits.values().flat_map(|(a, b)| [a.clone(), b.clone()])).collect();
+        // A committed offset previews; Enter with nothing new to apply
+        // accepts the mate (like a feature dialog).
+        for q in &offsets {
+            subs.push(cx.subscribe(q, |_: &mut Self, _, ev: &crate::quantity_field::QuantityEvent, cx| match ev {
+                crate::quantity_field::QuantityEvent::Committed(_) => cx.emit(MateDialogEvent::Changed),
+                crate::quantity_field::QuantityEvent::Enter => cx.emit(MateDialogEvent::Accept),
+                _ => {}
+            }));
+        }
+        let all: Vec<Entity<InputState>> = limits.values().flat_map(|(a, b)| [a.clone(), b.clone()]).collect();
         for s in all {
             subs.push(cx.subscribe_in(&s, window, |_: &mut Self, _, ev: &InputEvent, _, cx| match ev {
                 InputEvent::Change => cx.emit(MateDialogEvent::Changed),
@@ -327,7 +352,10 @@ impl MateDialog {
         let (a, b) = (self.a.clone()?, self.b.clone()?);
         let extra = if self.mate_type == MateType::Width { std::iter::once(self.c.clone()?).chain(self.d.clone()).collect() } else { vec![] };
         let (ox, oy, oz, orot) = offset_axes(self.mate_type);
-        let off = |i: usize, allowed: bool| if self.use_offset && allowed { Self::expr(&self.offsets[i], cx) } else { None };
+        let off = |i: usize, allowed: bool| {
+            let t = self.offsets[i].read(cx).text();
+            (self.use_offset && allowed && !t.trim().is_empty()).then(|| ExprValue::new(t.to_string()))
+        };
         let mut limits = Vec::new();
         if self.use_limits {
             for key in limit_keys(self.mate_type) {
@@ -505,12 +533,12 @@ impl Render for MateDialog {
             // "along X/Y/Z" icon and a 168 px quantity field; then the
             // "Rotate about X ▾" select (tooltip "Rotation axis") and the
             // "Rotation angle" row (12 px #666 label, 108 px field).
-            let axis_row = |icon: &'static str, st: &Entity<InputState>, cx: &App| {
+            let axis_row = |icon: &'static str, st: &Entity<crate::quantity_field::QuantityInput>, cx: &App| {
                 h_flex()
                     .w(px(194.))
                     .h(px(29.))
                     .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
-                    .child(gpui_kit::base::input::input_frame(div().w(px(168.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))))
+                    .child(div().w(px(168.)).h(px(26.)).child(st.clone()))
             };
             if ox {
                 offset_rows = offset_rows.child(self.cfg_param(noshape_model::assembly::config::param::OFFSET_X, axis_row("xyz-along-x", &self.offsets[0], cx), cx));
@@ -555,7 +583,7 @@ impl Render for MateDialog {
                     .w(px(194.))
                     .h(px(26.))
                     .child(div().w(px(86.)).h_full().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Rotation angle"))
-                    .child(gpui_kit::base::input::input_frame(div().w(px(108.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(&self.offsets[3]).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))));
+                    .child(div().w(px(108.)).h(px(26.)).child(self.offsets[3].clone()));
                 offset_rows = offset_rows.child(div().py(px(1.5)).child(select)).child(self.cfg_param(noshape_model::assembly::config::param::ROTATION, angle, cx));
             }
         }

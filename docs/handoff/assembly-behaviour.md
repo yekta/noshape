@@ -906,6 +906,20 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 * Shared target dirs: worktrees in one group overwrite each other's workspace crates (cargo's hash ignores the
   worktree path), so a build can link another worktree's stale crate. Touch your changed sources before a check.
 
+### 22 Oct midday: SK5 in the app, RECT1, TRIM1, SLOT1, POLY1, CH2
+* SK5 in the app: the sketch feature's regeneration re-applies dimension expressions; a single changed value
+  now solves with `Sketch::dimension_edit_options` (regen/features/sketch.rs), so a typed fillet radius moves only
+  the fillet and the far edge. Checked in the app (CLI-made 30.089 × 22.065 rectangle, fillet tool, typed value):
+  R3 → 28.089 / 19.065 / 25.089 / 22.065, R8 → 33.089 / 14.065 / 25.089 / 22.065 = live. Tests
+  `sketch_fillet_regen.rs`, scene `fillet_radius_edit_in_the_editor_moves_like_onshape`.
+* RECT1: `corner_rectangle` = live's Perpendicular (top, left), Parallel ×2, Horizontal (top).
+* TRIM1: `Sketch::trim_span`; with Trim the hovered curve isn't highlighted whole, the overlay draws only the piece
+  that would go (thick light orange + end dots). Checked in the app.
+* SLOT1: the pending slot shows its join points and the Ø width dimension ("Ø20", `slot_dimension`).
+* POLY1: the polygon preview's circle is dash-dot; the side spinner sits outside the edge after the clicked vertex
+  (◀ n ▶ laid out along the edge; the glyphs stay upright, GPUI can't rotate text).
+* CH2: chamfer preview "5" labels checked in the app; Enter on the untouched first box now opens the second.
+
 ## From ui2 (10-22): assembly visuals taken from the lead (qa5 workflow 28, pass 17b), surgical edits
 - **EXV3** (assembly_scene.rs, assembly_view.rs): `Highlights.explode_triad` drops the plane handles in explode
   mode (live 802); `Highlights.step_arrow` replaces the triad with one hollow arrow along the move while an
@@ -919,3 +933,22 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 - **MNU2** (assembly_behaviors.rs mate menu): separators around "Edit named position driver mate…".
 - **NP2** (assembly_positions.rs): with drivers, "Name" sits in the lower row of a #eaeaea cell; mate and DOF
   header cells #d7d7d7.
+* SLOT2 (live's 14 constraints): new `ConstraintKind::Offset { reference, curve, master_ref, master, side }`
+  (equations.rs `offset`: line ∥ master line at the reference's radius on `side`; circle/arc centred on a master
+  point with that radius). A line slot is now live's set: caps on their own centre points, 6 Coincident, 4 Tangent,
+  3 Offset (left, right, start cap from the end cap), and the tool's Diameter on the end cap only. Glyph "offset"
+  at the end cap (`glyph_entities`). Not done: live's yellow highlight of the master on glyph hover (icons2), arc
+  slots keep tangents + equal (no live data).
+
+### 22 Oct evening: all 10 ANSI tapping screws (catalogue 205)
+* Flat countersunk, Flat undercut, Oval undercut, Hex, Hex washer from live's MAIN tables
+  (dom/skb-sc-576-sources.json; generator style "live" in /root/skb-scratch/gen/tapping.py: head, slot, I/IA
+  (RLEN/RWID/RDEP), III, VI columns, per-size head types from live's option lists).
+* fasteners.fs: `undercut` (82° cone stops at k, flat step to the shank; oval: crown from rim to apex), `indent`
+  (hex: Ø0.9 s dish, (k − c)/6 deep, before slot/recess; Type I / VI heads carry it), hex washer = disc (c, dc)
+  under the hex, length from the washer bottom.
+* Mouth fillet (kern): FS opFillet must use the checked kernel fillet (kern's patch). Our side: Type VI spline
+  starts at 0° (on the crown seam); Type III crowns are built seamless (`seamlessCrown`: profile to the rim,
+  extended up, ∩ a sphere revolved about X). With kern's patch every #8 count = live (Pan III 19 / VI 15, Oval
+  undercut III 18, Hex VI 27, Hex washer VI 29; heights = live's files). Tests accept live's count or the
+  unfilleted one until kern lands; `pan_head_tapping_screw_mouth_fillets` is ignored until then.

@@ -446,3 +446,16 @@ New since then (all with T:sm/T:ux tests; GUI evidence in /tmp/skb/):
   otherwise. `DEFAULT_FONT` (Liberation Sans) stays for the app's own glyphs and older documents. FS host
   `font_of` maps Onshape font file names to these families (`sketch_font_of_file`). Test
   `every_sketch_font_lays_out_in_its_styles`.
+
+## Note from icons2 (10-22, qa5 wf 26 SLOT1) — for skb
+Live slot constraints (behaviours.md "qa5 sketch tools" (3), dom/qa5-sketch-tools-sketch1.json): COINCIDENT
+startCap.center–line.start, endCap.center–line.end, 4 cap/side end COINCIDENTs, TANGENT x4, OFFSET x3 (endCap/left,
+endCap/right ↔ centre line, endCap/startCap ↔ centre line end/start; drawn as 3 arch glyphs at the end cap), one
+DIAMETER on the endCap. Ours (k21) adds tangent + EQUAL pairs and no coincident/offset glyphs. icons2 only moved the
+Ø dimension onto the end cap (label 2 x width above its centre) and shows it while pending; the constraint set is yours.
+- (icons2, 10-22 after merging cebd793) Live sketch/91 measured: the "inscribed" polygon's dash-dot circle is TANGENT
+  to the edges (radius 72 px vs vertices at 84 px; the click is a vertex, the Ø label sits opposite it); ours draws
+  the circle through the vertices. Spinner: skb's position (outside the middle of the edge after the clicked vertex)
+  kept, icons2's orientation (◀/▶ axis = that edge's outward normal, measured -33.6° vs edge 56°) and rotated digit.
+- Chamfer preview (live 1960b): the two distance dims are black with filled arrowheads; ours draw light grey with
+  small ticks. The arrow (push_hollow_arrow) matches.
