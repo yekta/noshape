@@ -237,3 +237,23 @@ fn loft_through_three_sections_is_natural() {
     // (ThruSections carries circles as polynomial B-splines: ~1e-6 off.)
     assert!((v - want).abs() < 1e-5 * want, "{v} vs {want}");
 }
+
+/// Live "fail preview 2": a 50 mm fillet on a top edge of a 40 x 30 x 20 mm
+/// block, wider than both faces it rolls on, regenerates in Onshape as the
+/// block cut by the ball's sweep (24000 -> 7458.6158 mm³); OCCT can't build
+/// it. Smaller radii stay OCCT's fillet.
+#[test]
+fn fillet_wider_than_its_faces_like_onshape() {
+    setup();
+    let b = bx([0.0; 3], [40.0, 30.0, 20.0]);
+    let edge = edges_where(&b, |i| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && i.start.z > 19.99 * MM && i.end.z > 19.99 * MM);
+    assert_eq!(edge.len(), 1);
+    for (r, want) in [(2.0, 23965.66371), (19.0, 20901.14951), (50.0, 7458.615817)] {
+        let res = fillet_checked(&b, &edge, &[r * MM]).unwrap_or_else(|e| panic!("R{r}: {e}"));
+        assert!(res.shape.is_valid(), "R{r}");
+        assert!((vol_mm3(&res.shape) - want).abs() < 1e-3, "R{r}: {}", vol_mm3(&res.shape));
+    }
+    // R50: the top and front faces are gone, the round replaces them.
+    let res = fillet_checked(&b, &edge, &[50.0 * MM]).unwrap();
+    assert_eq!(res.shape.count(ShapeType::Face), 5);
+}
