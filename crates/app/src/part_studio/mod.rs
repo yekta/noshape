@@ -3406,7 +3406,10 @@ impl PartStudioView {
                     .and_then(|v| {
                         let studio = v.read(cx).studio(cx)?;
                         let i = studio.features.iter().position(|g| g.id == id)?;
-                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect())
+                        // Live lists only the sketches a feature uses ("Extrude 1 <-
+                        // Sketch 1", "[Hole] <- Sketch 2"); parts picked in a Boolean
+                        // or a merge scope aren't named (qa5 BOOL1b, behaviours B4).
+                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(|g| g.name.clone())).collect())
                     })
                     .unwrap_or_default();
                 // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2".
