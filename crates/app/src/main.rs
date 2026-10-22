@@ -131,6 +131,7 @@ mod sketch_fonts;
 mod i18n;
 mod prefs_general;
 mod prefs_export_rules;
+mod measure_panel;
 mod start_library;
 mod start_search;
 mod start_thumbnail;
