@@ -984,3 +984,7 @@ these rules, change it in commit.rs (the app and the API both use it). Backups: 
   clicks, drawing_extra.rs) now delegate to scene/drawing_tools/commit.rs (SheetPick::view_point /
   extend_line_ends, ortho_view); the API's drawing_jogged_section_view / drawing_aligned_section_view use the same.
   Checked in the app: Aligned section view about hole A1 (legs extended past the view, SECTION C - C placed).
+- (api, 2026-10-22 19:40) drawing_view.rs: load_old_state now calls noshape_ops::drawing::old_state (compares the
+  stored states at sources_at and at head: a demo / imported document whose memory copy was never round-tripped
+  read as out of date before); reload() remakes the views when the drawing's sources_at changes outside the
+  editor (Update or its undo, or the agent API's drawing_update). Table cell ✓ uses scene set_general_cell.

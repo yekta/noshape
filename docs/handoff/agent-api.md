@@ -640,3 +640,12 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   drawing_revision_table, drawing_revision_callout (+ app switch of drawing_revision.rs, checked in the app).
   Remaining drawing: aligned/jogged section, broken-out section, crop polygon/spline, aux In line/Axis, hatch,
   general/custom tables, insert image / DXF, drawing sketch tools, format painter, inspection items, Update.
+- 2026-10-22 ~19:40 (api): drawing out-of-date parity. The app stamps `Drawing.sources_at` with the head on every
+  drawing edit while up to date; after a model change the views keep their geometry until Update (qa5 D17). The API
+  now does the same: ops::drawing::{old_state, stamp_sources} (old_state compares the stored states at sources_at and
+  head, so documents never written back from memory compare like with like); SheetModel builds stale sources from
+  the old state and reports `out_of_date` (drawing_get); ops commit stamps; new op drawing_update ("Update").
+  App: load_old_state calls the shared old_state; reload() remakes the views when sources_at changes outside the
+  editor (Update / its undo / the agent API). e2e drawing_out_of_date_until_update. In-app: out-of-date after a
+  model change (live), kept on reopen, cleared by drawing_update through live mode.
+  Also landed: drawing_table, drawing_table_cell (+ shared set_general_cell), jogged / aligned section views.
