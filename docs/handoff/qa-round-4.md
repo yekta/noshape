@@ -890,3 +890,17 @@ step (live +0.05). Owner: drawing (asb). Sheet properties width not re-checked.
   tolerances, appearance / material; then assembly (needs an assembly variable scope passed from AssemblyView for #vars;
   mate limit fields store "No minimum" as text: handle before migrating); prefs. Removed unused builder/setters to keep
   zero warnings; re-add `text()` / `set_text` / `set_units` when a site needs them.
+
+## STATE FOR THE NEXT qa4 (10-22 ~06:50, new workflow)
+- **Work only in /root/wt/qa4 (branch agent/qa4)**; /root/noshape is retired (/root/wt/WORKFLOW.md). Commit small, check +
+  clippy + tests of touched crates, `git merge main`, `git branch -f ready/qa4 HEAD`; result in /tmp/lead/mq/qa4.status.
+  Release gates: test /root/target-lead/debug/noshape (queue builds every merged main there; copy it first).
+- **v0.4.5 gate on aa75fdf: PASS** (core-workflow.md) but the lead holds v0.4.5 for qa5's crash: Parts list › Rename
+  (gpui "hover style already set", ui fixing). New checklist **section 8** (every feature-list / parts-list context-menu
+  item, 73 rows). Dry run on aa75fdf: only 8.6.1 crashes. Runner: /root/qa4-scratch/menurun.sh BIN menus-ps.txt TAG and
+  menus-fm.txt (folder / multi-select need setup; 5th field = setup steps; "hX Y" = hover a submenu row). Re-run section 8
+  + the whole gate when the fix is merged.
+- **QuantityInput migration** (R13): done + committed in the transition snapshot: draft, analysis tools, thickness, flatten.
+  In progress (uncommitted in the worktree): assembly mate dialog offsets X/Y/Z + rotation (units + assembly variables
+  passed from AssemblyView::open_mate_dialog via `variables::refs_variables`; limit fields still InputState). Next: sketch
+  fields, feature-dialog tolerances, the other assembly panels (same variable scope), prefs.
