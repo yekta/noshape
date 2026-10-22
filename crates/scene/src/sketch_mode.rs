@@ -4462,6 +4462,25 @@ impl SketchEditor {
             let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
             dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, pos, half)));
         }
+        // Trim: the hovered curve's piece between its intersections, thick
+        // light orange with its end dots (live, qa5 sketch tools).
+        if self.tool == Tool::Trim
+            && self.drag.is_none()
+            && let (Some(h), Some(c)) = (self.hover, self.cursor)
+            && let Some(curve) = data.sketch.curve(h)
+            && let Some((t0, t1)) = data.sketch.trim_span(h, c)
+        {
+            let n = 64;
+            let (a, b) = curve.domain();
+            let period = b - a;
+            let at = |t: f64| curve.point(if curve.is_periodic() && t > b { t - period } else { t });
+            let pts: Vec<DVec2> = (0..=n).map(|i| at(t0 + (t1 - t0) * i as f64 / n as f64)).collect();
+            let color = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+            wide.push((pts, color, 4.0));
+            for q in [at(t0), at(t1)] {
+                points.points.push(PointSprite { position: w(q), color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
+            }
+        }
         // Split marker on the hovered curve.
         if self.tool == Tool::Split
             && let (Some(h), Some(c)) = (self.hover, self.cursor)
@@ -6645,6 +6664,37 @@ mod tests {
         assert!(ed.commit_corner(&mut d).changed);
         assert_eq!(count(&d, EntityKind::Arc), 1);
         assert!(ed.dim_edit.is_some(), "Enter opens the radius box");
+    }
+
+    /// SK5 in the editor (live, qa5 sketch tools): Corner rectangle
+    /// 30.089 × 22.065, fillet the top-right corner (R5), type 3 / 8 in its
+    /// box: the top keeps 25.089, the height stays, the right edge follows.
+    #[test]
+    fn fillet_radius_edit_in_the_editor_moves_like_onshape() {
+        for (text, bottom, right) in [("3", 28.089, 19.065), ("8", 33.089, 14.065)] {
+            let (mut ed, mut d) = editor(Tool::CornerRect);
+            ed.apply_unit_defaults(noshape_units::LengthUnit::Millimeter);
+            click(&mut ed, &mut d, v(0.0, 0.0));
+            click(&mut ed, &mut d, v(0.030089, 0.022065));
+            ed.set_tool(Tool::Fillet);
+            click(&mut ed, &mut d, v(0.030089, 0.022065));
+            assert!(ed.commit_corner(&mut d).changed);
+            let cid = ed.dim_edit.as_ref().expect("radius box").constraint;
+            ed.apply_dimension(&mut d, cid, text, &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+            let mut lens: Vec<(DVec2, f64)> = d
+                .sketch
+                .entities()
+                .filter(|e| e.kind() == EntityKind::Line && !e.construction)
+                .filter_map(|e| {
+                    let c = d.sketch.curve(e.id)?;
+                    Some(((c.start_point() + c.end_point()) * 0.5, (c.end_point() - c.start_point()).length() * 1000.0))
+                })
+                .collect();
+            lens.sort_by(|a, b| a.0.y.total_cmp(&b.0.y).then(a.0.x.total_cmp(&b.0.x)));
+            // bottom, right (shortened from the top), left, top by midpoint height.
+            let got: Vec<f64> = lens.iter().map(|l| (l.1 * 1000.0).round() / 1000.0).collect();
+            assert_eq!(got, vec![bottom, right, 22.065, 25.089], "R{text}: {lens:?}");
+        }
     }
 
     /// Live (behaviours.md 568): the fillet default is R5 in a millimetre
