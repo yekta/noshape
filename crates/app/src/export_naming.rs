@@ -14,7 +14,6 @@ pub fn rules() -> ExportRules {
 }
 
 /// Save the rules (Preferences › User export rules).
-#[allow(dead_code)] // The Preferences section (live G39) saves through it.
 pub fn set_rules(r: &ExportRules) {
     let _ = std::fs::write(rules_path(), serde_json::to_vec_pretty(r).unwrap_or_default());
 }
@@ -23,12 +22,13 @@ pub fn set_rules(r: &ExportRules) {
 /// tab or instance) in tab `tab` of document `document`, with the part's
 /// properties when it is one.
 pub fn values(document: &str, tab: &str, name: &str, props: Option<&noshape_model::partstudio::PartProperties>) -> NameValues {
+    // Live's property names (dom/preferences-export-rules-variables.json).
     let mut v = NameValues::new();
-    v.insert("Document name".into(), document.to_string());
-    v.insert("Tab name".into(), tab.to_string());
-    v.insert("Name".into(), name.to_string());
+    v.insert("document.name".into(), document.to_string());
+    v.insert("partStudio.name".into(), tab.to_string());
+    v.insert("name".into(), name.to_string());
     if let Some(p) = props {
-        for (k, val) in [("Part number", &p.part_number), ("Revision", &p.revision), ("Description", &p.description), ("Material", &p.material)] {
+        for (k, val) in [("partNumber", &p.part_number), ("revision", &p.revision), ("description", &p.description), ("material", &p.material)] {
             if let Some(val) = val {
                 v.insert(k.into(), val.clone());
             }
@@ -40,5 +40,7 @@ pub fn values(document: &str, tab: &str, name: &str, props: Option<&noshape_mode
 /// The default file name (without extension) for exporting `element` as
 /// `format` (Onshape's format label): the matching rule's, else `base`.
 pub fn default_name(element: ExportElement, format: &str, values: &NameValues, base: String) -> String {
-    rules().file_name(element, format, values, &base)
+    let mut values = values.clone();
+    values.insert("export.format".into(), format.to_string());
+    rules().file_name(element, format, &values, &base)
 }

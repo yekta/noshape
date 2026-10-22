@@ -70,9 +70,6 @@ pub struct ListPrefs {
     pub env_profiles: Vec<crate::prefs_general::EnvProfile>,
     #[serde(default)]
     pub env_profile: Option<String>,
-    /// User export rules, in creation order.
-    #[serde(default)]
-    pub export_rules: Vec<noshape_model::export_rules::ExportRule>,
 }
 
 fn list_prefs_path() -> std::path::PathBuf {
@@ -1061,6 +1058,7 @@ impl Render for PreferencesView {
                     self.scroll_to_end = false;
                 }
                 _ => window.request_animation_frame(),
+            }
         }
         let content: Vec<AnyElement> = if self.page == Page::Profile {
             vec![self.render_profile(cx)]
