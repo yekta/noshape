@@ -1180,3 +1180,26 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));
 }
+
+#[test]
+fn sketch_fillet_radius_default_is_r5_then_sticky() {
+    // Live: R5 on a fresh page, then the last radius used in that tab.
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "fillet_sticky.noshape", "plane:top");
+    let rect = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    let corner = |x: f64, y: f64| id_of(created(&rect, "point").into_iter().find(|p| near(&p["at"], x, y)).unwrap_or_else(|| panic!("no corner {x},{y}: {rect}")));
+    let radius = |f: &Value| {
+        let a = created(f, "arc")[0];
+        ((num(&a["start"][0]) - num(&a["center"][0])).powi(2) + (num(&a["start"][1]) - num(&a["center"][1])).powi(2)).sqrt()
+    };
+    let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk, "entities": [corner(40.0, 0.0)] }));
+    assert!((radius(&f) - 5.0).abs() < 1e-6, "{f}");
+    let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk, "entities": [corner(40.0, 30.0)], "radius": "3 mm" }));
+    assert!((radius(&f) - 3.0).abs() < 1e-6, "{f}");
+    // A new sketch in the same Part Studio: the last radius sticks.
+    let sk2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
+    let rect2 = call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    let c = id_of(created(&rect2, "point").into_iter().find(|p| near(&p["at"], 40.0, 0.0)).unwrap());
+    let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk2, "entities": [c] }));
+    assert!((radius(&f) - 3.0).abs() < 1e-6, "{f}");
+}
