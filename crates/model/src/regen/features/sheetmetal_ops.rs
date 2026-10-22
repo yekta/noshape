@@ -720,10 +720,10 @@ pub fn bend_inputs(ev: &EvalCtx) -> FResult<BendInputs> {
     }
     let d = ld.normalize();
     let lp = lp - n * (lp - fc).dot(n);
-    let mut wdir = n.cross(d);
-    if (fc - lp).dot(wdir) > 0.0 {
-        wdir = -wdir;
-    }
+    // The side that moves: along line direction × face normal, wherever the
+    // face's middle is (std generateFlatAlignedBoundarySheets; live: a line
+    // (30,0)→(30,40) on a 60 × 40 plate's top raises the x > 30 side).
+    let mut wdir = d.cross(n);
     if ev.bool("holdOtherSide") {
         wdir = -wdir;
     }
