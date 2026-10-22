@@ -39,3 +39,9 @@ Live answered "qa5 pass 7" (4) + asb (d) "shaded drawing views": picker filters 
 | DSM3 label | "Hide shaded view" on the shaded view (consistent); the saved flat view is shaded from the old binary, so the default of a new flat view is not re-checked | ✅ label |
 | DSM2 bend notes | "DOWN 90.0° R2", "DOWN 180.0° R0.01" | ✗ still (DOWN vs live UP = SM5) |
 | DSM4 picker filters | 4 icons | ✗ still (live 7) |
+
+asb note (10-22) on DSM4: the picker has all 7 toggles but, as live ("Inside a document that lacks some types, only the
+relevant ones show", behaviours.md "asb (c)"), shows only the kinds the document has (`drawing_chooser.rs`, `present`).
+"qa5 sheet metal" has no composite parts, surfaces or curves, so live shows the same 4 there (behaviours.md "Flat pattern
+view": Part Studios | Parts | Sketches | Flat patterns). To re-check: add a surface (e.g. Extrude › Surface) and a curve
+to that document; the Surfaces and Curves toggles should appear.
