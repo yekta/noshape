@@ -781,7 +781,7 @@ Each corner point in `entities` is filleted; two curves given one after the othe
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Corner points (entity ids), or pairs of curves. |
-| `radius` | string or number |  | Radius (default: the tool's, 20 mm / 0.5 in). |
+| `radius` | string or number |  | Radius (default: the tool's, as in Onshape: 5 mm (0.5 in in inch documents) at first, then the last radius used in this Part Studio). |
 
 #### sketch_chamfer
 
