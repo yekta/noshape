@@ -21,9 +21,9 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 6 | Kernel failure | "Selected faces could not be drafted." | "Draft failed: <kernel>" | 🔧 |
 | 7 | Parting edge parallel to pull | "Parting edge cannot be parallel to pull direction." on Parting edges | no check | ✗ |
 | 8 | Parting line scope | any parting line (non-planar, several parts), each edge's faces drafted about the edge | planar lines perpendicular to the pull, one part ("Parting lines must lie in a plane…", "…must belong to one part") | ✗ |
-| 9 | Two sided | first angle on the faces "away" from the pull, second on "along"; Opposite direction doesn't change which side One sided drafts | angle on the +pull side; sides follow the flipped pull | ✗ ? L1, L2 |
+| 9 | Two sided | first angle on the faces "away" from the pull, second on "along"; Opposite direction doesn't change which side One sided drafts | angle on the +pull side; sides follow the flipped pull | 🔧 live L1/L2: first angle below the parting line, second above, both narrowing toward it; each Opposite flips its side's taper only (test with live's 5 volumes) |
 | 10 | Edit logic | hint faces, focus on Entities to draft / Parting edges when editing | none; focus on Neutral plane | ✗ |
-| 11 | 0° draft, empty Entities to draft | — | — | ? L3, L4 |
+| 11 | 0° draft, empty Entities to draft | — | — | 🔧 L3 0° = no change; L4 ✅ |
 
 ## Move face
 | # | Area | Onshape | Ours | Status |
@@ -32,9 +32,9 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Check order | faces first: "Select faces to move." | direction / axis first | 🔧 |
 | 3 | No translation direction | "Cannot determine translation direction." on Direction | "Select a direction", no field | 🔧 |
 | 4 | Translate direction auto-fill | Direction = the first planar face picked (moveFaceEditingLogic) | stays empty | ✗ |
-| 5 | Rotate, no axis | text from evAxis | "Select a rotation axis" | ? L5 |
+| 5 | Rotate, no axis | text from evAxis | "Select a rotation axis" | 🔧 L5 "Cannot determine rotation axis." on Axis |
 | 6 | Up to entity, nothing / unresolvable | "Cannot resolve entities." on limitEntity | "Select the entity to move up to" | 🔧 |
-| 7 | Translate up to a plane | first face must be planar ("When moving up to a plane, first selected face must be planar.") and parallel ("Limit face must be parallel to face being moved.") | any plane, distance computed | 🔧 ? L6 |
+| 7 | Translate up to a plane | first face must be planar ("When moving up to a plane, first selected face must be planar.") and parallel ("Limit face must be parallel to face being moved.") | any plane, distance computed | 🔧 ✅ L6 (no field) |
 | 8 | Offset up to a non-parallel plane | the extended face meets the plane: distance 0 | distance along the normal | 🔧 |
 | 9 | 0 offset / translation | succeeds, part unchanged | went to the kernel | 🔧 |
 | 10 | Kernel failure | "Could not offset selected faces as requested." / "Could not transform selected faces as requested." | "Move face failed: …" | 🔧 |
@@ -46,18 +46,18 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields | Faces to replace, Faces to replace with, Flip alignment ☐, Offset distance 0 + flip | same | ✅ |
 | 2 | Empty Faces to replace | "Select faces to replace." on Faces to replace | no period, no field | 🔧 |
 | 3 | Failure | "Could not replace faces as requested." | our own texts with kernel detail | 🔧 |
-| 4 | Flip alignment | used; hidden when several replace-with faces; defaults on when the normals oppose (replaceFaceEditLogic) | ignored, always shown, always off | ✗ ? L7, L8 |
+| 4 | Flip alignment | used; hidden when several replace-with faces; defaults on when the normals oppose (replaceFaceEditLogic) | ignored, always shown, always off | 🔧 L7/L8: wrong sense fails "Could not replace faces as requested.", offset along the template's (flipped) normal, hidden with 2 faces, auto-ticked when the normals oppose |
 | 5 | Several replace-with faces | used (must be adjacent, one body) | only the first | ✗ |
-| 6 | Empty replace-with | kernel text | "Select the face or plane to replace with" | ? L9 |
+| 6 | Empty replace-with | kernel text | "Select the face or plane to replace with" | 🔧 L9 "Cannot resolve entities." on Faces to replace with |
 
 ## Delete face
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | Delete faces, Type Heal / Cap / Leave open (Heal), ☑ Delete fillet faces | same | ✅ |
 | 2 | Failure | "Could not delete selected faces." (live) | "Delete face failed (…): <kernel>", cap texts | 🔧 |
-| 3 | Every face picked | "Cannot delete all faces of a part or surface." | "Cannot delete every face of a part", Cap/Leave open only | 🔧 |
-| 4 | Surface picked first | Type switches to Leave open (deleteFaceEditLogic) | stays Heal | ✗ ? L10 |
-| 5 | Delete fillet faces | fillets of any origin (imported parts) | only fillets our Fillet feature named | ✗ ? L11 |
+| 3 | Every face picked | live: OK, the part disappears, no message | "Cannot delete every face of a part" | 🔧 |
+| 4 | Surface picked first | Type switches to Leave open (deleteFaceEditLogic) | stays Heal | 🔧 L10 |
+| 5 | Delete fillet faces | fillets of any origin (imported parts) | only fillets our Fillet feature named | 🔧 L11: fillets recognised from the geometry (cylinder / torus / sphere / B-spline face tangent to a deleted face and to another), imported parts too; Heal without them fails "Could not delete selected faces." (test with live's 7922.7433) |
 
 ## Sweep
 | # | Area | Onshape | Ours | Status |
@@ -69,9 +69,9 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 5 | Lock direction empty | "Select direction to lock." on lockDirectionQuery | own text, no field | 🔧 |
 | 6 | Pitch revolutions limit | "Computed number of revolutions outside limit (between 0 and 1000). Current value is N." on pitch | no check | 🔧 |
 | 7 | Failure | "Could not create valid swept body, check input." / thin "Failed to thicken swept body, check thickness." | "Sweep failed: …", own thin texts | 🔧 solid/surface; thin wall texts ✗ |
-| 8 | Path opposite direction, Extend to full path | change where the sweep starts / whether it covers the path | ignored | ✗ ? L12 |
+| 8 | Path opposite direction, Extend to full path | change where the sweep starts / whether it covers the path | ignored | 🔧 L12 (half toward the path's start / end; whole with Extend) |
 | 9 | Thin method | sweep a sheet, thicken it, trim ends to planes | offset the wall, then sweep (scale scales the wall; Trim ends off ignored) | ✗ |
-| 10 | Empty profiles texts | — | own texts | 🔧 "Select faces or sketch regions to sweep." on profiles ? L13 |
+| 10 | Empty profiles texts | — | own texts | 🔧 L13: solid/thin "Select faces or sketch regions to sweep." (field), surface "Select sketch curves to sweep." (no field), disconnected path no field, empty Faces to lock = None |
 
 ## Loft
 | # | Area | Onshape | Ours | Status |
@@ -81,20 +81,20 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 3 | Guides, Path | supported | "…not supported yet" | ✗ |
 | 4 | End conditions | applied, with their errors (planar profile, adjacent faces, tangency direction) | warning only | ✗ |
 | 5 | Connections | every connection; "Select a point on each profile to define a connection." | first only | ✗ |
-| 6 | Profile errors | "Point profiles can only exist as first or last profiles.", "Select a single sketch region or face per profile.", "Cannot use faces or regions with inner loops as profiles.", "Could not create valid profiles from selections." | own texts, no field | 🔧 texts ? L14 (fields) |
+| 6 | Profile errors | "Point profiles can only exist as first or last profiles.", "Select a single sketch region or face per profile.", "Cannot use faces or regions with inner loops as profiles.", "Could not create valid profiles from selections." | own texts, no field | 🔧 ✅ L14 (no field) |
 | 7 | Failure | "Could not create loft with given information. Check profile order, guide/profile intersections or end conditions." / thin "Failed to thicken lofted body, check thickness." | own texts | 🔧 |
 | 8 | Trim profiles / guides, Thin Trim ends, Show isocurves | applied | ignored | ✗ |
-| 9 | One profile | allowed with a closed guide / path | error | ? L15 |
+| 9 | One profile | allowed with a closed guide / path | error | 🔧 L15 "Select at least two profiles, a closed guide curve or a closed path." (no field); match connections still ? live |
 
 ## Thicken
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | order, labels, 5 mm, Thickness 2 = 0, Keep tools ☐, merge scope, Mid plane swap | same | ✅ |
 | 2 | Empty | "Select surfaces or faces to thicken." on entities | same | ✅ |
-| 3 | Keep tools off, some faces of a surface | the surface is kept unless all its faces are picked | deleted when any face is picked | ✗ ? L16 |
-| 4 | Adjacent faces | one operation: one body | each face separately | ✗ ? L17 |
-| 5 | Auto Add from a surface face | only faces of solids count (thicken.fs) | surface faces count (opens on Add) | ✗ ? L18 |
-| 6 | Errors | "Failed to thicken all selections." (likely) | "Thickness must be positive", "Thicken failed: …" | ? L19 |
+| 3 | Keep tools off, some faces of a surface | the surface is kept unless all its faces are picked | deleted when any face is picked | 🔧 L16 |
+| 4 | Adjacent faces | one operation: one body | each face separately | ✗ L17: one L-shaped part of 2560 mm³ (square corner); ours 2 slabs — needs the kernel's intersection join (kern); overlapping slabs of one body are fused |
+| 5 | Auto Add from a surface face | only faces of solids count (thicken.fs) | surface faces count (opens on Add) | 🔧 L18 (surface face stays New); the flip-arrow toggle on Add↔Remove ✗ |
+| 6 | Errors | "Failed to thicken all selections." (likely) | "Thickness must be positive", "Thicken failed: …" | 🔧 L19 "Invalid input selections." (no field) |
 
 ## Wrap
 | # | Area | Onshape | Ours | Status |
