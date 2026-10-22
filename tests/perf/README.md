@@ -14,5 +14,6 @@ instancing (`crates/ops/tests/many_parts.rs` `write_parts_1000_fixture`).
 `big-plate.noshape`: a 400 × 400 × 10 mm plate with a 20 × 20 grid of Ø8 mm holes, one dense part
 (`crates/ops/tests/big_plate_perf.rs` `write_big_plate_fixture`).
 
-Both are perf.yml `fixture`s (no baseline). To compare the display mesh before live 459 (chord based) with Onshape's
-angle-based one in the same run: `variants` = `chord:NOSHAPE_DISPLAY_MESH=chord`.
+Both are perf.yml `fixture`s (no baseline). Display meshes are chord based by default (Onshape's angle-based mesh,
+live 459, is gated off until its GPU cost is down: `regen::angle_display_mesh`). To compare both in one run:
+`variants` = `angle:NOSHAPE_DISPLAY_MESH=angle`.

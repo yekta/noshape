@@ -42,12 +42,12 @@ fn f3(p: DVec3) -> [f32; 3] {
 /// chord tolerance is smaller (a finer quality must re-mesh). `preview`
 /// meshes (instant feedback while a feature is edited) are Coarse.
 ///
-/// `NOSHAPE_DISPLAY_MESH=chord` meshes as before live 459 (chord 8e-4 of
-/// the body's diagonal, 0.35 rad; previews 4x the chord, 1.8x the angle),
-/// to compare the cost (perf.yml `variants`).
+/// Gated off for now ([`angle_display_mesh`]): bodies get the chord-based
+/// mesh from before live 459 (chord 8e-4 of the body's diagonal, 0.35 rad;
+/// previews 4x the chord, 1.8x the angle).
 fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool) -> (f64, f64) {
     let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
-    if chord_mesh() {
+    if !angle_display_mesh() {
         let defaults = RegenOptions::default();
         let (lin, ang) = ((diag * defaults.relative_deflection * quality).max(1e-6), defaults.angular_deflection * quality.clamp(0.4, 1.0));
         return if preview { (lin * 4.0, (ang * 1.8).min(0.9)) } else { (lin, ang) };
@@ -59,9 +59,31 @@ fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool
     (diag * quality, auto * quality)
 }
 
-fn chord_mesh() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("NOSHAPE_DISPLAY_MESH").is_ok_and(|v| v == "chord"))
+/// 0: not decided yet, 1: chord based, 2: angle based.
+static DISPLAY_MESH: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// Whether display meshes are Onshape's angle-based ones (live 459, 144
+/// segments per circle in Auto). Off until their GPU cost is down: on the
+/// macOS CI runners orbiting the 1000-pin fixture took 39–64% more GPU time
+/// per frame (perf.yml 2026-10-22, docs/handoff/viewport-performance.md).
+/// `NOSHAPE_DISPLAY_MESH=angle` (or `chord`) decides at start;
+/// [`set_angle_display_mesh`] after.
+pub fn angle_display_mesh() -> bool {
+    use std::sync::atomic::Ordering;
+    match DISPLAY_MESH.load(Ordering::Relaxed) {
+        0 => {
+            let angle = std::env::var("NOSHAPE_DISPLAY_MESH").is_ok_and(|v| v == "angle");
+            DISPLAY_MESH.store(if angle { 2 } else { 1 }, Ordering::Relaxed);
+            angle
+        }
+        m => m == 2,
+    }
+}
+
+/// Mesh bodies the angle-based way (`true`) or the chord-based way from
+/// now on ([`angle_display_mesh`]).
+pub fn set_angle_display_mesh(angle: bool) {
+    DISPLAY_MESH.store(if angle { 2 } else { 1 }, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// Tessellates one body shape at an angle factor relative to Auto (smaller
