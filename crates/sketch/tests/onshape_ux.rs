@@ -426,3 +426,30 @@ fn select_related_grows_tangent_chains_equal_sizes_and_parallels() {
     let parallel = sk.select_related(&[l1], RelatedSelection::Parallel);
     assert_eq!(parallel, vec![l1, l3, far]);
 }
+
+/// Live's slot (REST, qa5 sketch tools): 6 COINCIDENT, 4 TANGENT, 3 OFFSET
+/// (+ the tool's DIAMETER on the end cap = 14). The width follows the one
+/// dimension: both sides and the start cap move with it.
+#[test]
+fn slot_has_live_constraint_set_and_follows_its_width() {
+    let mut sk = Sketch::new();
+    let l = sk.add_line(v(0.0, 0.0), v(10.0, 0.0));
+    let s = sk.slot_around(l, 2.0).unwrap();
+    let count = |sk: &Sketch, name: &str| sk.constraints().filter(|c| c.kind.name() == name).count();
+    assert_eq!((count(&sk, "Coincident"), count(&sk, "Tangent"), count(&sk, "Offset")), (6, 4, 3));
+    let end_cap = s.curves[1];
+    let dim = sk.add_constraint(ConstraintKind::Diameter { curve: end_cap, value: 2.0 }).unwrap();
+    assert_eq!(sk.constraints().count(), 14);
+    let rep = sk.solve();
+    assert!(rep.is_solved() && rep.conflicting().is_empty(), "{rep:?}");
+    assert_eq!(rep.dof, Some(4), "only the centerline is free");
+    sk.set_dimension_value(dim, 4.0).unwrap();
+    assert!(sk.solve().is_solved());
+    for side in [s.curves[0], s.curves[2]] {
+        let c = sk.curve(side).unwrap();
+        assert!((c.start_point().y.abs() - 2.0).abs() < 1e-9 && (c.end_point().y.abs() - 2.0).abs() < 1e-9, "{c:?}");
+    }
+    let start_cap = sk.curve(s.curves[3]).unwrap();
+    assert!(matches!(start_cap, Curve2::Arc { radius, center, .. } if (radius - 2.0).abs() < 1e-9 && center.length() < 1e-9), "{start_cap:?}");
+    assert_eq!(sk.regions().len(), 1);
+}

@@ -86,6 +86,9 @@ struct CachedBody {
 #[derive(Default)]
 pub struct AsmGpuCache {
     bodies: HashMap<usize, (Weak<MeshBuffers>, Arc<CachedBody>)>,
+    /// The unit cube of the occurrences' lowest level of detail
+    /// ([`Instance::lod_box`]).
+    lod_box: Option<MeshHandle>,
 }
 
 pub struct AsmBuilt {
@@ -124,6 +127,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     let mut scene = Scene::default();
     let mut picks = AsmPickMap::default();
     cache.bodies.retain(|_, (w, _)| w.strong_count() > 0);
+    let mut bodies = 0u32;
     for (oi, o) in result.occurrences.iter().enumerate() {
         if o.hidden {
             continue;
@@ -152,6 +156,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
             picks.push(mk(r, PickKind::Vertex, a));
         }
         let t = to_mat4(&o.transform);
+        let first_instance = scene.instances.len();
         let mut color = o.color;
         let dimmed = opts.isolate.as_ref().is_some_and(|s| !s.contains(&o.top())) || opts.ghost_tops.contains(&o.top());
         if opts.ghost_tops.contains(&o.top()) {
@@ -191,6 +196,18 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 let dots = PointData { points: o.mesh.vertices.iter().map(|p| PointSprite { position: *p, color: [0x99, 0x99, 0x99, 255], pick_id: 0, size: 4.0, style: 0, _pad: 0 }).collect() };
                 scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&dots))).per_primitive_color().with_transform(t).unpickable().layer(2));
             }
+        }
+        // Onshape's lowest level of detail of the body occurrence: its
+        // bounding box.
+        bodies += 1;
+        for i in &mut scene.instances[first_instance..] {
+            i.body = bodies;
+        }
+        if let Some(bounds) = cached.mesh.bounds().filter(|_| !sketch) {
+            let unit = cache.lod_box.get_or_insert_with(|| up.upload_mesh(&noshape_render::scene::lod_box_mesh())).clone();
+            let mut lod = Instance::lod_box(unit, bodies, bounds, color);
+            lod.transform = t * lod.transform;
+            scene.instances.push(lod);
         }
     }
     let static_instances = scene.instances.len();

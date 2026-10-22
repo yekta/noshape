@@ -46,19 +46,20 @@ fn wrap_sources(ev: &EvalCtx) -> FResult<Vec<(Shape, Source, DVec3)>> {
         }
     }
     if out.is_empty() {
-        return err("Select planar faces or sketch regions to wrap");
+        return crate::regen::eval::err_at(&["source"], "Select planar faces or sketch regions to wrap.");
     }
     Ok(out)
 }
 
 /// Developable surface of a destination selection (face or plane).
 fn destination(ev: &EvalCtx) -> FResult<(Developable, Option<(usize, usize)>)> {
-    let Some(r) = ev.query("destination").first() else { return err("Select the target face") };
+    let no_target = || crate::regen::eval::err_at(&["destination"], "Select a cylindrical or conical face to wrap around.");
+    let Some(r) = ev.query("destination").first() else { return no_target() };
     match r {
         Reference::Face(_) => {
-            let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(r)).first() else { return err("The target face no longer exists") };
+            let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(r)).first() else { return no_target() };
             let f = ev.face_shape(bi, fi)?;
-            let d = Developable::of_face(&f).map_err(|_| fe("The target must be a cylindrical, conical or planar face"))?;
+            let Ok(d) = Developable::of_face(&f) else { return no_target() };
             Ok((d, Some((bi, fi))))
         }
         _ => {
@@ -105,13 +106,13 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
     let src = Developable::of_face(&src_faces[0]).map_err(|_| fe("The tools must be planar (wrap) or cylindrical / conical (unwrap)"))?;
     let unwrap = !matches!(src, Developable::Plane { .. });
     match (unwrap, &dst) {
-        (false, Developable::Plane { .. }) => return err("Select a cylindrical or conical target to wrap onto"),
+        (false, Developable::Plane { .. }) => return crate::regen::eval::err_at(&["destination"], "Select a cylindrical or conical face to wrap around."),
         (true, Developable::Cylinder { .. } | Developable::Cone { .. }) => return err("Unwrapping needs a planar target face or plane"),
         _ => {}
     }
     // All tools on one surface.
     for f in &src_faces[1..] {
-        let d = Developable::of_face(f).map_err(|_| fe("All tools must lie on one plane, cylinder or cone"))?;
+        let Ok(d) = Developable::of_face(f) else { return crate::regen::eval::err_at(&["source"], "Source entities must all lie on the same plane.") };
         let same = match (src, d) {
             (Developable::Plane { origin, normal, .. }, Developable::Plane { origin: o2, normal: n2, .. }) => normal.cross(n2).length() < 1e-9 && (o2 - origin).dot(normal).abs() < 1e-7,
             (Developable::Cylinder { origin, axis, radius, .. }, Developable::Cylinder { origin: o2, axis: a2, radius: r2, .. }) => {
@@ -120,7 +121,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
             (a, b) => a == b,
         };
         if !same {
-            return err("All tools must lie on one plane, cylinder or cone");
+            return crate::regen::eval::err_at(&["source"], "Source entities must all lie on the same plane.");
         }
     }
     // Anchors.
@@ -150,8 +151,14 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
     let zp = ax_z - plane_n * ax_z.dot(plane_n);
     let (a_src, a_dst): (DVec3, DVec3) = if ev.bool("customAnchors") {
         let get = |id: &str| ev.query(id).first().and_then(|r| ev.resolve_vertex_point(r));
-        let (Some(s), Some(d)) = (get("sourceAnchor"), get("destinationAnchor")) else { return err("Select both anchor points") };
-        (s, d)
+        // wrap.fs marks each missing anchor.
+        match (get("sourceAnchor"), get("destinationAnchor")) {
+            (Some(s), Some(d)) => (s, d),
+            (s, d) => {
+                let missing: Vec<&str> = [("sourceAnchor", s.is_none()), ("destinationAnchor", d.is_none())].into_iter().filter(|m| m.1).map(|m| m.0).collect();
+                return crate::regen::eval::err_at(&missing, "Select anchor points.");
+            }
+        }
     } else if unwrap {
         // Middle of the source faces on the surface, projected onto the plane.
         let f0 = &src_faces[0];
@@ -181,7 +188,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
         (flat_dir(&src, f_src, src_ref, axis_dir), flat_dir(&dst, f_dst, dst_ref, ax_z))
     };
     if d_src.length() < 0.5 || d_dst.length() < 0.5 {
-        return err("The wrap direction could not be determined; specify anchor points");
+        return crate::regen::eval::err_at(&["customAnchors"], "Anchor points could not be automatically chosen. Select \"Specify anchor points\" option to choose them manually.");
     }
     // Orientation: keep the tool's side facing the same way as the target normal.
     let p_src3 = src.point(f_src, src_ref);
@@ -215,7 +222,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
             let Some((bi, _)) = dst_face else { return err("Split needs a target face of a part") };
             let body = ev.ctx.bodies[bi].clone();
             let edges: Vec<Shape> = out_faces.iter().flat_map(|f| f.edges()).collect();
-            let imp = k::imprint(&body.shape, &edges).map_err(|e| fe(format!("The wrapped edges could not split the target: {e}")))?;
+            let imp = k::imprint(&body.shape, &edges).map_err(|_| fe("Failed to imprint edges onto destination face."))?;
             let names = ev.name_result(&[&body.shape_names(), &ShapeNames::default()], &imp.history, &imp.shape, &BTreeMap::new(), None);
             if imp.shape.count(ShapeType::Face) <= body.shape.count(ShapeType::Face) {
                 ev.warnings.push("The wrapped edges did not split the target face".into());
