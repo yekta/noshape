@@ -3394,6 +3394,9 @@ impl PartStudioView {
             // Live (qa5 ADV12): a name made from Onshape's "Feature Name
             // Template" (a Hole's callout) reads "<callout> [Hole]".
             let templated = (f.type_id == "hole" && name != f.name).then(|| f.feature_type().map(|t| format!("{name} [{}]", t.name))).flatten();
+            // Live (behaviours "Feature-row hover tooltips"): a sketch reads
+            // "Sketch 1 (Hidden) is not fully defined".
+            let sketch_tip = (f.type_id == "sketch").then(|| format!("{name}{}{}", if f.hidden { " (Hidden)" } else { "" }, if underdefined { " is not fully defined" } else { "" }));
             // Live (ui 10-22 b): a Derived reads "Derived 1 <- <source studio>".
             let derived_source = (f.type_id == "importDerived")
                 .then(|| {
@@ -3405,6 +3408,9 @@ impl PartStudioView {
                 if let Some(m) = &msg {
                     return m.clone().into();
                 }
+                if let Some(t) = &sketch_tip {
+                    return t.clone().into();
+                }
                 let parents: Vec<String> = if let Some(src) = &derived_source {
                     vec![src.clone()]
                 } else {
@@ -3412,7 +3418,10 @@ impl PartStudioView {
                         .and_then(|v| {
                             let studio = v.read(cx).studio(cx)?;
                             let i = studio.features.iter().position(|g| g.id == id)?;
-                            Some(noshape_model::interaction::tooltip_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).map(|g| g.name.clone())).collect())
+                            // Live (behaviours "Feature-row hover tooltips"): "<-" lists only
+                            // feature-level inputs, the sketches (Fillet, Chamfer, Shell,
+                            // Boolean: the name alone).
+                            Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(|g| g.name.clone())).collect())
                         })
                         .unwrap_or_default()
                 };
@@ -3986,10 +3995,11 @@ impl PartStudioView {
     }
 
     fn render_view_controls(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        // Onshape: the view cube sits 15 px from the viewport's top-right
-        // corner; view and render options live in its dropdown menu (§3.7).
+        // Onshape: the view cube sits 14 px below the viewport's top and 15 px
+        // from its right (live part-studio/53, pixel-matched); view and render
+        // options live in its dropdown menu (§3.7).
         let cube = self.render_view_cube(cx);
-        div().absolute().top(px(15.)).right(px(15.)).child(cube).into_any_element()
+        div().absolute().top(px(14.)).right(px(15.)).child(cube).into_any_element()
     }
 }
 

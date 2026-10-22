@@ -75,6 +75,8 @@ pub struct UiState {
     pub select_other: Option<SelectOther>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
+    /// The open Camera and render options menu (its button shows pressed).
+    pub camera_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
     /// Feature list search box.
     pub filter: Option<(Entity<InputState>, Subscription)>,
     pub filter_query: String,
@@ -342,6 +344,7 @@ impl UiState {
             pointer: None,
             select_other: None,
             mini_toolbar: None,
+            camera_menu: None,
             filter: None,
             filter_query: String::new(),
             list_hover: None,
