@@ -16,6 +16,19 @@ enum End {
 }
 
 pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
+    // Onshape's EXTRUDE_FAILED for a failing geometry operation (live
+    // "Contrast: a failed EXTRUDE", 10-22): the kernel's reason isn't shown.
+    eval_inner(ev).map_err(|e| {
+        if e.message.starts_with(crate::regen::eval::KERNEL_FAILURE) {
+            log::debug!("extrude: {}", e.message);
+            crate::regen::eval::FeatureError { message: "Failed to extrude selections, check input.".into(), ..e }
+        } else {
+            e
+        }
+    })
+}
+
+fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
     let thin = match body_type.as_str() {
         "SURFACE" => return surface(ev),

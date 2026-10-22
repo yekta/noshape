@@ -273,6 +273,9 @@ pub struct PartStudioView {
     /// for the toast's Restore link (live sketch/68), with the toast text.
     canceled_edit: Option<(Feature, usize, bool, String)>,
     sketch: Option<SketchEditor>,
+    /// The sketch fillet radius last used in this tab: live's default is
+    /// R5 on a fresh load and then sticks per tab (behaviours.md 568).
+    sketch_fillet_radius: Option<f64>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
     context_menu: Option<(Point<Pixels>, Entity<crate::os_menu::OsMenu>, Subscription)>,
     measure_cache: Option<MeasureCache>,
@@ -403,6 +406,7 @@ impl PartStudioView {
             message: None,
             canceled_edit: None,
             sketch: None,
+            sketch_fillet_radius: None,
             context: None,
             context_menu: None,
             measure_cache: None,
@@ -811,7 +815,19 @@ impl PartStudioView {
         let (mut selection, mut accent) = match &self.edit {
             Some(e) => {
                 let d = e.dialog.read(cx);
-                (d.active_refs(), d.selected_refs())
+                // A feature picked in a field (Features to pattern) shows its
+                // geometry (live part-studio/2022–2023: the seed wall outlined).
+                let with_geometry = |refs: Vec<Reference>| -> Vec<Reference> {
+                    let mut out = Vec::new();
+                    for r in refs {
+                        if let Reference::Feature(f) = r {
+                            out.extend(self.feature_geometry(f));
+                        }
+                        out.push(r);
+                    }
+                    out
+                };
+                (with_geometry(d.active_refs()), with_geometry(d.selected_refs()))
             }
             None => (self.highlighted_selection(), Vec::new()),
         };
@@ -849,7 +865,10 @@ impl PartStudioView {
         self.sync_manipulator(cx);
         self.sync_pick_filter(cx);
         let built = self.built.as_ref().expect("built");
-        let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, self.gpu.uploader());
+        // Live (behaviours "URGENT (10-22)"): a failing feature's inputs are
+        // drawn red while its dialog is open.
+        let failing = self.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).status, Some((noshape_model::display::FeatureStatus::Error, _))));
+        let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing, self.gpu.uploader());
         // Parts picked in a dialog field: outlined, not filled (live part-studio/440).
         if self.edit.is_some() {
             for r in selection.iter().chain(&accent) {
