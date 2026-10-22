@@ -5536,7 +5536,10 @@ fn glyph_entities(sk: &Sketch, k: &ConstraintKind) -> Vec<EntityId> {
         // Live: the slot's three offset glyphs sit together at the end cap.
         Offset { reference, .. } => vec![reference],
         Normal { line, curve } => vec![line, curve],
-        Concentric { a, b } | Parallel { a, b } | Perpendicular { a, b } | Tangent { a, b } | Equal { a, b } | Collinear { a, b } | Curvature { a, b } => vec![a, b],
+        // Live draws a tangent's glyph once, on its first entity (the line of
+        // a fillet, the cap of a slot; qa5 sketch tools).
+        Tangent { a, .. } => vec![a],
+        Concentric { a, b } | Parallel { a, b } | Perpendicular { a, b } | Equal { a, b } | Collinear { a, b } | Curvature { a, b } => vec![a, b],
         _ => Vec::new(),
     }
 }
@@ -6089,6 +6092,20 @@ mod tests {
         let (mut ed, mut d) = editor(Tool::Spline);
         click(&mut ed, &mut d, v(0.01, 0.01));
         assert!(ed.escape_commit(&mut d).is_none());
+    }
+
+    /// Live's slot glyphs (qa5 sketch tools): a coincident at each of the 6
+    /// joints, 4 tangents (on the caps only), 3 offsets at the end cap.
+    #[test]
+    fn slot_glyphs_are_lives() {
+        let (mut ed, mut d) = editor(Tool::Slot);
+        d.sketch.add_line(v(0.01, 0.01), v(0.05, 0.01));
+        click(&mut ed, &mut d, v(0.03, 0.01));
+        assert!(ed.commit_slot(&mut d).changed);
+        let glyphs = ed.constraint_glyphs(&d);
+        let n = |icon: &str| glyphs.iter().filter(|g| g.icon == icon).count();
+        assert_eq!((n("coincident"), n("tangent"), n("offset")), (6, 4, 3));
+        assert!(glyphs.iter().filter(|g| g.icon == "tangent").all(|g| d.sketch.kind(g.entity) == Some(EntityKind::Arc)), "tangent glyphs on the caps");
     }
 
     #[test]
