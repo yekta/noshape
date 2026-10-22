@@ -55,6 +55,13 @@ pub enum ConstraintKind {
     /// Line `a` is `ratio` times as long as line `b` (keeps the aspect of a
     /// sketch text box). Not shown as a constraint glyph.
     LengthRatio { a: EntityId, b: EntityId, ratio: f64 },
+    /// Onshape's OFFSET (Slot tool): `curve` is an offset of `master` by the
+    /// radius of `reference`, a circle or arc around `master_ref` (live's
+    /// slot: the end cap around the centerline's end). A line is parallel to
+    /// a master line at that distance on `side` (+1 left of the master's
+    /// direction, −1 right); a circle or arc is centred on a master point
+    /// with that radius.
+    Offset { reference: EntityId, curve: EntityId, master_ref: EntityId, master: EntityId, side: f64 },
 
     // ----- dimensions -----
     /// Point-point, point-line, line-line (parallel) or anything-circle distance.
@@ -175,6 +182,10 @@ impl ConstraintKind {
                 v.push(*axis);
             }
             Fix { entity } => v.push(*entity),
+            // The reference (the slot's end cap) first: live draws the glyph there.
+            Offset { reference, curve, master_ref, master, .. } => {
+                v.extend([*reference, *curve, *master, *master_ref]);
+            }
             Normal { line, curve } => {
                 v.push(*line);
                 v.push(*curve);
@@ -247,6 +258,12 @@ impl ConstraintKind {
                 r(axis)
             }
             Fix { entity } => r(entity),
+            Offset { reference, curve, master_ref, master, .. } => {
+                r(reference);
+                r(curve);
+                r(master_ref);
+                r(master)
+            }
             Normal { line, curve } => {
                 r(line);
                 r(curve)
@@ -292,6 +309,7 @@ impl ConstraintKind {
             Midpoint { .. } => "Midpoint",
             Symmetric { .. } => "Symmetric",
             Fix { .. } => "Fix",
+            Offset { .. } => "Offset",
             Normal { .. } => "Normal",
             Collinear { .. } => "Collinear",
             Curvature { .. } => "Curvature",
