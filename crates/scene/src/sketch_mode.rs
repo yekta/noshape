@@ -675,6 +675,41 @@ fn push_hollow_square(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, q: DVec2, px: 
     }
 }
 
+/// Text drawn as filled glyphs in the sketch overlay, so it can turn with
+/// a manipulator (gpui text can't rotate): Noto Sans outlines `em_px` high,
+/// centred on `at` with the baseline along `dir`, filled with scanlines.
+fn hatched_text(text: &str, at: DVec2, dir: DVec2, px: f64, em_px: f64) -> Vec<[DVec2; 2]> {
+    let layout = noshape_sketch::text::layout_text(text, "Noto Sans", false, false);
+    // Box units: ascender = 1 (Noto's ascender is 1.069 em).
+    let unit = px * em_px * 1.069;
+    let polys = layout.polylines(8);
+    let (Some(y0), Some(y1)) = (polys.iter().flatten().map(|p| p.y).min_by(f64::total_cmp), polys.iter().flatten().map(|p| p.y).max_by(f64::total_cmp)) else { return Vec::new() };
+    let centre = DVec2::new(layout.width * 0.5, (y0 + y1) * 0.5);
+    let (ux, uy) = (dir, dir.perp());
+    let map = |q: DVec2| at + ux * (q.x - centre.x) * unit + uy * (q.y - centre.y) * unit;
+    let mut out = Vec::new();
+    // Even-odd scanlines every 0.45 px (drawn 1 px wide: solid).
+    let step = 0.45 * px / unit;
+    let mut y = y0 + step * 0.5;
+    while y < y1 {
+        let mut xs: Vec<f64> = Vec::new();
+        for poly in &polys {
+            for w in poly.windows(2) {
+                let (a, b) = (w[0], w[1]);
+                if (a.y <= y) != (b.y <= y) {
+                    xs.push(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x));
+                }
+            }
+        }
+        xs.sort_by(f64::total_cmp);
+        for [x0, x1] in xs.as_chunks::<2>().0 {
+            out.push([map(DVec2::new(*x0, y)), map(DVec2::new(*x1, y))]);
+        }
+        y += step;
+    }
+    out
+}
+
 /// Distance from `p` to the segment `a`–`b`.
 fn dist_to_segment(p: DVec2, a: DVec2, b: DVec2) -> f64 {
     let ab = b - a;
@@ -4388,8 +4423,13 @@ impl SketchEditor {
                 wide.push((vec![pa + DVec2::new(-4.0 * px, 6.0 * px), pa + DVec2::new(-4.0 * px, 0.0), pa], [0x33, 0x33, 0x33, 255], 1.5));
             }
         }
-        // Polygon side spinner arrows (live sketch/91): filled black ◀ / ▶ along the ray.
-        if let Some((at, u, _)) = self.polygon_side_control() {
+        // Polygon side spinner (live sketch/91): filled black ◀ / ▶ and the
+        // count laid along the ray (kept readable: never upside down).
+        if let Some((at, u, sides)) = self.polygon_side_control() {
+            let reading = if u.x < 0.0 { -u } else { u };
+            for sg in hatched_text(&sides.to_string(), at, reading, self.world_per_px, 16.0) {
+                wide.push((vec![sg[0], sg[1]], [0, 0, 0, 255], 1.0));
+            }
             let px = self.world_per_px;
             for k in [-1.0, 1.0] {
                 let tip = at + u * px * (POLYGON_SPINNER_ARROW_PX + 5.0) * k;
@@ -6647,6 +6687,28 @@ mod tests {
         assert_eq!(d.texts.len(), 1, "edited in place");
         assert_eq!(d.texts[0].text, "Changed");
         assert!(ed.editing_text.is_none());
+    }
+
+    #[test]
+    fn hatched_text_is_a_filled_digit_along_its_direction() {
+        let px = 1e-4;
+        let bounds = |segs: &[[DVec2; 2]]| {
+            let pts: Vec<DVec2> = segs.iter().flatten().copied().collect();
+            let (mut lo, mut hi) = (pts[0], pts[0]);
+            for p in &pts {
+                lo = lo.min(*p);
+                hi = hi.max(*p);
+            }
+            (hi - lo) / px
+        };
+        let flat = hatched_text("6", DVec2::ZERO, DVec2::X, px, 16.0);
+        assert!(flat.len() > 15, "scanlines fill the glyph");
+        let size = bounds(&flat);
+        // A 16 px digit: ~9 px wide, ~12 px tall (live sketch/91).
+        assert!((7.0..12.0).contains(&size.x) && (10.0..14.0).contains(&size.y), "{size:?}");
+        // Laid along a vertical ray it turns: tall becomes wide.
+        let turned = bounds(&hatched_text("6", DVec2::ZERO, DVec2::Y, px, 16.0));
+        assert!((size.x - turned.y).abs() < 1.0 && (size.y - turned.x).abs() < 1.0, "{turned:?}");
     }
 
     #[test]

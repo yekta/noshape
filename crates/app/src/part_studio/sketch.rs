@@ -2604,15 +2604,10 @@ impl PartStudioView {
         let project = |q: DVec2| vp.project(frame.to_world(q)).map(|s| (s.x as f32, s.y as f32));
         let editing = self.dim_input.as_ref().map(|(c, st, _)| (*c, st.clone()));
 
-        // Polygon side spinner (live sketch/91): the count at the spinner's
-        // centre, the ◀ / ▶ (drawn by the editor along the ray) clickable.
-        if let Some((at, u, sides)) = ed.polygon_side_control()
-            && let Some((x, y)) = project(at)
-        {
+        // Polygon side spinner (live sketch/91): the editor draws "◀ 6 ▶" along
+        // the ray; the ◀ / ▶ are clickable here.
+        if let Some((at, u, _)) = ed.polygon_side_control() {
             let arm = u * ed.world_per_px * crate::sketch_mode::POLYGON_SPINNER_ARROW_PX;
-            let text = sides.to_string();
-            let w = crate::sketch_mode::label_width_px(&text) as f32;
-            out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 11.)).h(px(22.)).flex().items_center().text_size(px(16.)).text_color(rgb(0x000000)).whitespace_nowrap().child(text).into_any_element());
             for (id, k) in [("sk-polygon-less", -1.0), ("sk-polygon-more", 1.0)] {
                 let Some((ax, ay)) = project(at + arm * k) else { continue };
                 let delta: isize = if k < 0.0 { -1 } else { 1 };
