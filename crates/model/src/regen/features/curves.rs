@@ -21,8 +21,10 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     // taper from geometry, height from geometry.
     let (mut base, mut z, mut x, mut r0, mut taper, geom_height) = match axis_type.as_str() {
         "AXIS" => {
-            let Some(r) = ev.query("axis").first() else { return err("Select a helix axis") };
-            let (o, d) = ev.resolve_axis(r).ok_or_else(|| FeatureError::new("Select a line, edge or mate connector as the helix axis"))?;
+            // helix.fs: "Select an object with an axis." on the axis field.
+            let no_axis = || crate::regen::eval::err_at(&["axis"], "Select an object with an axis.");
+            let Some(r) = ev.query("axis").first() else { return no_axis() };
+            let Some((o, d)) = ev.resolve_axis(r) else { return no_axis() };
             let opp_origin = ev.bool("oppositeOrigin");
             // Axis start at one end of a linear edge.
             let mut origin = o;
@@ -46,9 +48,10 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
             (origin, dir, canonical_x(dir), ev.length("startRadius")?, 0.0, None)
         }
         "CIRCLE" => {
-            let Some(&(bi, ei)) = ev.resolve_edges(ev.query("edge")).first() else { return err("Select a circular edge") };
+            let no_circle = || crate::regen::eval::err_at(&["edge"], "Select a circle or arc.");
+            let Some(&(bi, ei)) = ev.resolve_edges(ev.query("edge")).first() else { return no_circle() };
             let e = ev.edge_shape(bi, ei)?;
-            let k::Curve::Circle { center, axis, x_dir, radius } = e.edge_curve()? else { return err("Select a circular edge") };
+            let k::Curve::Circle { center, axis, x_dir, radius } = e.edge_curve()? else { return no_circle() };
             let z = if opposite { -axis } else { axis };
             (center, z.normalize(), x_dir, radius, 0.0, None)
         }
