@@ -1482,3 +1482,71 @@ fn sweep_from_the_middle_of_the_path_as_live() {
     let (v, _) = run(false, true);
     assert!((v - 7853.9816).abs() < 1e-3, "{v}");
 }
+
+/// Live L11 ("psb L10-11 delete face"): block 40×20×10 with an R3 fillet on
+/// the top front edge, a Ø8×5 boss with an R1 fillet at its base. Deleting
+/// the boss (side + top) with Heal removes its base fillet too (7922.7433 =
+/// the filleted block), also on an imported copy (fillets are recognised
+/// from the geometry); without Delete fillet faces it can't heal.
+#[test]
+fn delete_face_removes_fillets_by_geometry_as_live() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let front_top = edge_near(&r, 0, DVec3::new(mm(20.0), 0.0, mm(10.0)));
+    s.add("fillet", move |p| {
+        p.set("entities", q(front_top));
+        p.set("radius", expr("3 mm"));
+    });
+    let z10 = top_plane_at(&mut s, 10.0);
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.02, 0.01), 0.004);
+    let bsk = s.sketch(Reference::FeaturePlane(z10), sk);
+    let region = s.region(bsk);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("5 mm"));
+        p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let base = edge_near(&r, 0, DVec3::new(mm(24.0), mm(10.0), mm(10.0)));
+    s.add("fillet", move |p| {
+        p.set("entities", q(base));
+        p.set("radius", expr("1 mm"));
+    });
+    let r = s.ok();
+    let boss = |r: &RegenResult| vec![face_at(r, 0, DVec3::new(mm(20.0), mm(10.0), mm(13.0))), face_at(r, 0, DVec3::new(mm(20.0), mm(10.0), mm(15.0)))];
+    let filleted_block = 8000.0 - 40.0 * (9.0 - 9.0 * PI / 4.0);
+    // Ours.
+    for include in [true, false] {
+        let mut t = Studio { ps: s.ps.clone(), ..Studio::new() };
+        let faces = boss(&r);
+        t.add("deleteFace", move |p| {
+            p.set("deleteFaces", ParamValue::Query(faces));
+            p.set("includeFillet", ParamValue::Bool(include));
+        });
+        if include {
+            let v = volume(&t.ok(), 0) * 1e9;
+            assert!((v - filleted_block).abs() < 1e-3, "{v} vs {filleted_block}");
+        } else {
+            assert_eq!(t.last_status(), (FeatureStatus::Error, "Could not delete selected faces.".to_string()));
+        }
+    }
+    // An imported copy: no fillet history.
+    let brep = String::from_utf8(r.context.bodies[0].shape.to_brep_bytes().unwrap()).unwrap();
+    let mut t = Studio::new();
+    t.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let ri = t.ok();
+    let faces = boss(&ri);
+    t.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(faces)));
+    let v = volume(&t.ok(), 0) * 1e9;
+    assert!((v - filleted_block).abs() < 1e-3, "imported: {v} vs {filleted_block}");
+}

@@ -57,7 +57,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Failure | "Could not delete selected faces." (live) | "Delete face failed (…): <kernel>", cap texts | 🔧 |
 | 3 | Every face picked | live: OK, the part disappears, no message | "Cannot delete every face of a part" | 🔧 |
 | 4 | Surface picked first | Type switches to Leave open (deleteFaceEditLogic) | stays Heal | 🔧 L10 |
-| 5 | Delete fillet faces | fillets of any origin (imported parts) | only fillets our Fillet feature named | ✗ L11: live recognises fillets geometrically (imported parts too); without them Heal fails |
+| 5 | Delete fillet faces | fillets of any origin (imported parts) | only fillets our Fillet feature named | 🔧 L11: fillets recognised from the geometry (cylinder / torus / sphere / B-spline face tangent to a deleted face and to another), imported parts too; Heal without them fails "Could not delete selected faces." (test with live's 7922.7433) |
 
 ## Sweep
 | # | Area | Onshape | Ours | Status |
