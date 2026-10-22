@@ -268,6 +268,8 @@ pub(crate) struct AsmUi {
     /// Measure tool (`[`): picked entities and their measurements.
     pub measure: Option<Vec<(Vec<InstanceId>, Reference)>>,
     pub measure_result: Vec<(String, noshape_model::regen::measure::Measurement)>,
+    /// The Measure panel's type and unit choices.
+    pub measure_settings: crate::measure_panel::MeasureSettings,
     /// Section view (Shift+X): plane origin, normal, offset, flipped, offset field.
     pub section: Option<AsmSection>,
     /// Isolate / Make transparent slider: opacity of the transparent instances.
@@ -320,6 +322,9 @@ pub(crate) struct AsmUi {
     /// Exploded views pane: the selected row (view, step) and the views
     /// expanded with their › expander.
     pub explode_sel: Option<(usize, Option<usize>)>,
+    /// While the rollback bar is dragged: the view and the row boundary it
+    /// would drop on (live 820: the nearest boundary, a blue line).
+    pub explode_rb_drop: Option<(usize, usize)>,
     pub explode_open: HashSet<usize>,
     /// Width of the docked right pane (with its strip), set each render.
     pub dock_w: f32,
@@ -1769,8 +1774,11 @@ impl AssemblyView {
         m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, ids2.clone(), cx)));
         // Named-position editing mode: no driver, suppression or Animate
         // items (live 152).
+        // Live (qa5 MNU2): separators on both sides of the driver item.
         if movable && !np_editing {
+            m.push(MenuEntry::Sep);
             m.push(item("Edit named position driver mate…", move |t, _, cx| t.open_np_driver(id, cx)));
+            m.push(MenuEntry::Sep);
         }
         match &mate {
             _ if np_editing => {}
@@ -3683,60 +3691,44 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// The Measure panel (`crate::measure_panel`, live part-studio/82 and
+    /// icons2 Round 14): docked at the bottom right like the Part Studio's.
     pub(super) fn render_measure(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        use noshape_model::regen::measure::Measurement;
         let picks = self.ui.measure.as_ref()?;
-        let pal = p();
+        let asm = self.assembly(cx)?;
+        // The field's entries: "Face of Part 1 <2>".
+        let selected: Vec<String> = picks
+            .iter()
+            .map(|(path, r)| {
+                let inst = path.last().and_then(|id| asm.instance(*id)).map(|i| i.name.clone()).unwrap_or_default();
+                let kind = match r {
+                    Reference::Face(_) => "Face",
+                    Reference::Edge(_) => "Edge",
+                    Reference::Vertex(_) => "Vertex",
+                    _ => "Entity",
+                };
+                format!("{kind} of {inst}")
+            })
+            .collect();
         let units = self.units(cx);
-        let l = |x: f64| noshape_units::format_quantity(noshape_units::Quantity::meters(x), &units);
-        let mut rows: Vec<(String, String)> = Vec::new();
-        for (label, m) in &self.ui.measure_result {
-            let v = match m {
-                Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) => l(*x),
-                Measurement::Area(x) => noshape_units::format_quantity(noshape_units::Quantity::new(*x, noshape_units::Dim { length: 2, angle: 0 }), &units),
-                Measurement::Volume(x) => noshape_units::format_quantity(noshape_units::Quantity::new(*x, noshape_units::Dim { length: 3, angle: 0 }), &units),
-                Measurement::Angle(x) => noshape_units::format_quantity(noshape_units::Quantity::radians(*x), &units),
-                Measurement::Percent(x) => format!("{} %", noshape_units::to_fixed(*x, 2)),
-                Measurement::Point(p) => format!("{}, {}, {}", l(p.x), l(p.y), l(p.z)),
-                Measurement::Distance { distance, dx, dy, dz, .. } => {
-                    rows.push(("ΔX / ΔY / ΔZ".into(), format!("{} / {} / {}", l(*dx), l(*dy), l(*dz))));
-                    l(*distance)
-                }
-            };
-            rows.push((label.clone(), v));
-        }
-        if picks.is_empty() {
-            rows.push(("Select entities to measure".into(), String::new()));
-        }
-        let mut body = v_flex().p_2().gap_1();
-        for (k, v) in rows {
-            body = body.child(h_flex().gap_3().text_xs().child(div().w(px(110.)).text_color(pal.text_muted).child(k)).child(div().text_color(pal.text).child(v)));
-        }
-        Some(
-            v_flex()
-                .id("asm-measure")
-                .occlude()
-                .absolute()
-                .bottom(px(16.))
-                .right(px(64.))
-                .w(px(300.))
-                .rounded_md()
-                .bg(pal.panel_raised)
-                .border_1()
-                .border_color(pal.border_strong)
-                .shadow_lg()
-                .child(
-                    h_flex()
-                        .px_2()
-                        .py_1()
-                        .border_b_1()
-                        .border_color(pal.border)
-                        .child(div().flex_1().text_sm().text_color(pal.text).child("Measure"))
-                        .child(Button::new("asm-measure-x").ghost().xsmall().opacity(0.86).child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_measure(cx)))),
-                )
-                .child(body)
-                .into_any_element(),
-        )
+        let settings = self.ui.measure_settings;
+        let rows = crate::measure_panel::rows(&self.ui.measure_result, &settings, &units);
+        let (v1, v2) = (cx.entity(), cx.entity());
+        let panel = crate::measure_panel::panel(
+            selected,
+            rows,
+            settings,
+            units,
+            std::rc::Rc::new(move |s, cx| {
+                v1.update(cx, |this, cx| {
+                    this.ui.measure_settings = s;
+                    cx.notify();
+                })
+            }),
+            std::rc::Rc::new(move |_, cx| v2.update(cx, |this, cx| this.toggle_measure(cx))),
+            cx,
+        );
+        Some(div().absolute().bottom(px(36.)).right(px(40.)).child(panel).into_any_element())
     }
 
     /// Shift+X: section view on (through the hovered planar face or the
