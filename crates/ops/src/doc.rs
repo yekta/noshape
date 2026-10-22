@@ -22,11 +22,15 @@ pub struct OpenDoc {
     /// Each Part Studio's chosen configuration (the Configurations box's
     /// values; view state, not stored in the document).
     pub active_config: HashMap<TabId, ConfigValues>,
+    /// The sketch fillet radius last used in each Part Studio: live's
+    /// default for the next fillet (5 mm on a fresh page, then sticky per
+    /// tab until the page reloads; here, while the document is open).
+    pub sketch_fillet_radius: HashMap<TabId, f64>,
 }
 
 impl OpenDoc {
     pub fn new(session: Session) -> Self {
-        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new() }
+        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new(), sketch_fillet_radius: HashMap::new() }
     }
 
     pub fn doc(&self) -> &Document {
