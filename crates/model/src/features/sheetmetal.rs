@@ -398,7 +398,7 @@ pub fn jog() -> FeatureType {
     p.extend(k_factor_override(always));
     p.extend([
         ParamSpec::enum_("offsetType", "Bounding type", &[("BLIND", "Blind"), ("UP_TO_ENTITY", "Up to entity"), ("THICKNESS", "Thickness")]),
-        ParamSpec::num("bendOffset", "Jog offset", NumSpec::length(10.0, 0.375).bounded(0.0, 500.0)).visible(move |v| bt(v, "BLIND")),
+        ParamSpec::num("bendOffset", "Jog offset", ZERO_INCLUSIVE_OFFSET.bounded(0.0, 500.0)).visible(move |v| bt(v, "BLIND")),
         ParamSpec::query1("jogLimit", "Up to entity", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::POINT_LIKE | QueryFilter::EDGE)
             .visible(move |v| bt(v, "UP_TO_ENTITY")),
         ParamSpec::bool("jogLimitOffset", "Offset distance", false)
