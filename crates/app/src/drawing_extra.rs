@@ -1873,31 +1873,7 @@ impl DrawingEditor {
     /// A point on a GD&T frame or a dimension's lines under sheet point
     /// `c` for the Datum tool to sit on.
     pub fn datum_attach_at(&self, c: [f64; 2]) -> Option<([f64; 2], noshape_model::drawing::DatumOn)> {
-        let b = self.built.as_ref()?;
-        let tol = self.tol_mm(5.0);
-        let mut best: Option<(f64, [f64; 2], noshape_model::drawing::DatumOn)> = None;
-        let mut count: std::collections::HashMap<u64, u32> = Default::default();
-        for l in &b.geometry.lines {
-            let Some(PickTarget::Annotation(id)) = b.picks.get(l.pick as usize) else { continue };
-            let line = *count.entry(*id).and_modify(|n| *n += 1).or_insert(0);
-            let ok = self.current_sheet().annotations.iter().find(|a| a.id == *id).is_some_and(|a| matches!(a.kind, AnnotationKind::Gdt { .. }) || a.kind.is_dimension());
-            if !ok {
-                continue;
-            }
-            let n = l.points.len();
-            for seg in 0..if l.closed && n > 2 { n } else { n.saturating_sub(1) } {
-                let (w0, w1) = (l.points[seg], l.points[(seg + 1) % n]);
-                let d = sub(w1, w0);
-                let dd = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
-                let t = (((c[0] - w0[0]) * d[0] + (c[1] - w0[1]) * d[1]) / dd).clamp(0.0, 1.0);
-                let q = [w0[0] + d[0] * t, w0[1] + d[1] * t];
-                let dist = len(sub(c, q));
-                if dist < tol && best.as_ref().is_none_or(|b| dist < b.0) {
-                    best = Some((dist, q, noshape_model::drawing::DatumOn { ann: *id, line, seg: seg as u32, t }));
-                }
-            }
-        }
-        best.map(|(_, q, o)| (q, o))
+        self.pk().datum_attach_at(c)
     }
 
     /// Properties / edit panel of an annotation.

@@ -99,7 +99,10 @@ impl SheetModel {
                 }
             }
         }
-        let info = sheet_info(session, tab);
+        let mut info = sheet_info(session, tab);
+        // Custom tables (the editor evaluates them in the background).
+        let fs_at = |v: &str| crate::derived::ExternalRef::parse(v).and_then(|e| crate::derived::external_snapshot(&e.path, e.microversion).ok()).map(|d| (*d).clone());
+        info.custom_tables = noshape_model::drawing::tables::evaluate_custom_tables(doc, &drawing, &sources, &fs_at);
         let built = (!drawing.sheets.is_empty()).then(|| Arc::new(assemble_sheet(&drawing, sheet, &geoms, &sources, &info)));
         SheetModel { tab, drawing, sheet, sources, geoms, built, info, out_of_date }
     }

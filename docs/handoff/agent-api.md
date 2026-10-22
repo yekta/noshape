@@ -649,3 +649,15 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   editor (Update / its undo / the agent API). e2e drawing_out_of_date_until_update. In-app: out-of-date after a
   model change (live), kept on reopen, cleared by drawing_update through live mode.
   Also landed: drawing_table, drawing_table_cell (+ shared set_general_cell), jogged / aligned section views.
+- 2026-10-22 ~22:00 (api): more drawing ops on shared builders (app switched, see drawing-behaviour.md):
+  drawing_broken_out_section (default depth = half the model depth, `depth` / `depth_to` up to a point, `index`
+  edits), drawing_crop_view shapes polygon / spline, drawing_hatch_region (sheet-sketch or view-region profiles,
+  ANSI / ISO / General patterns, edit by id), drawing_custom_table (this document's Feature Studio tables; edit =
+  "Custom table properties"), drawing_insert_image / drawing_insert_cad (file tab, or a local path imported as a
+  file tab first: "Import <name>"), drawing_sketch (line, circle, 3 point circle, tangent arc, rectangles, spline,
+  spline point, point, trim; one edit per call), drawing_format_painter, drawing_inspection (add / reorder /
+  automatic / edit / move / remove / hide / show / shape), drawing_properties (read all; `set` any DrawingProps
+  fields), drawing_auxiliary_view `mode` normal / in_line / axis, drawing_datum on GD&T frames / dimension lines.
+  drawing_get now lists crop / breaks / broken_out per view, table
+  rows (header, title; custom tables evaluated in SheetModel), hatches, images and sketch_entities.
+  Remaining drawing: custom tables from other documents' versions. Planned ceiling now 23 (none in drawing).

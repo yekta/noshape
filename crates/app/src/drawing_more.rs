@@ -199,13 +199,7 @@ impl DrawingEditor {
             Tool::BrokenOut { parent: Some(view), points, done: false } if points.len() >= 3 => {
                 self.tool = Tool::BrokenOut { parent: Some(view), points: points.clone(), done: true };
                 // Default depth: half the model's depth along the line of sight.
-                let half = (|| {
-                    let g = self.geoms.get(&view)?;
-                    let (key, part) = views::view_source(self.current_sheet(), view)?;
-                    let src = self.sources.get(&key)?;
-                    Some(views::model_depth(&src.context, part.as_ref(), g.frame.as_ref()?) / 2.0)
-                })()
-                .unwrap_or(0.01);
+                let half = self.pk().broken_out_default_depth(view);
                 let u = format::length_units(&self.drawing, &DimFormat::default());
                 let depth = self.input(&format::format_number(half / u.meters(), None, 3), window, cx);
                 Self::focus_input(&depth, window, cx);
@@ -647,15 +641,11 @@ impl DrawingEditor {
         let num = |s: String| s.trim().parse::<f64>().ok().filter(|v| v.is_finite());
         match panel {
             Panel::BrokenOut { view, edit, profile, spline, depth, depth_ref } => {
-                let Some(d) = num(val(&depth, cx)).map(|v| v * u).filter(|v| *v > 0.0).or(depth_ref.as_ref().map(|_| 0.0)) else {
+                let Some(b) = noshape_scene::drawing_tools::broken_out(profile, spline, num(val(&depth, cx)).map(|v| v * u), depth_ref) else {
                     self.status = Some("Invalid depth".into());
                     return;
                 };
-                let b = BrokenOut { profile, spline, depth: d, depth_ref };
-                self.edit_view("Broken-out section", view, cx, |v| match edit {
-                    Some(i) if i < v.broken_out.len() => v.broken_out[i] = b,
-                    _ => v.broken_out.push(b),
-                });
+                self.edit_view("Broken-out section", view, cx, |v| noshape_scene::drawing_tools::set_broken_out(v, edit, b));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::View(view)];
             }
