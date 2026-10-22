@@ -312,7 +312,7 @@ pub fn point(ev: &mut EvalCtx) -> FResult<()> {
 pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
     let idx = ev.resolve_bodies(ev.query("bodies"));
     if idx.is_empty() {
-        return err("Select parts, surfaces or curves to group");
+        return err("Select entities to create a composite part.");
     }
     let closed = ev.bool("closed");
     make_composite(ev, &idx, closed, 0)

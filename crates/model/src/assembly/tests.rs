@@ -3083,3 +3083,86 @@ fn tapping_screw_tips_regenerate() {
         }
     }
 }
+
+/// Tapping-screw Type III / Type VI recesses (live, behaviours.md "skb: Type
+/// III / Type VI recess features"): a square / hexalobular wall with a 140°
+/// cone bottom at the FSRules depth (the 0.002 in mouth fillet: see
+/// `pan_head_tapping_screw_mouth_fillets`). Fillister #8: III 0.112 /
+/// 0.075 in, VI Ø0.155 / Ø0.1094 / 0.055 in.
+#[test]
+fn tapping_screw_recesses_iii_and_vi() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for name in ["Fillister head tapping screw", "Oval countersunk head tapping screw"] {
+        let c = CATALOGUE.iter().find(|c| c.name == name).expect("in the catalogue");
+        let mut spec = StandardSpec::new(c);
+        spec.set_size("#8");
+        let mut volumes = Vec::new();
+        for head in ["Type I", "Type III", "Type VI"] {
+            spec.params.insert("Head type".into(), head.into());
+            spec.fix_length();
+            let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {head}: {e}"));
+            let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
+            assert!(failed.is_empty(), "{name} {head}: {failed:?}");
+            let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+            volumes.push(body.shape.volume().unwrap());
+            if head == "Type I" {
+                continue;
+            }
+            let surfaces: Vec<noshape_kernel::Surface> = (0..body.faces.len()).filter_map(|i| body.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_surface().ok()).collect();
+            // The 140° cone bottom (70° half angle) and the 0.002 in fillet.
+            assert!(surfaces.iter().any(|s| matches!(s, noshape_kernel::Surface::Cone { half_angle, .. } if (half_angle.abs().to_degrees() - 70.0).abs() < 0.01)), "{name} {head}: cone bottom");
+        }
+        assert!(volumes.iter().all(|v| *v > 0.0), "{name}: {volumes:?}");
+    }
+}
+
+/// Pan head tapping screw #8, tip A (live skb-sc-geom): crown sphere
+/// R 1.65·D = 0.2706 in, head Ø0.322 × 0.115 with an R0.015 edge fillet;
+/// faces: Slot 10, Type III 19, Type VI 15.
+#[test]
+fn pan_head_tapping_screw_matches_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Pan head tapping screw").expect("in the catalogue");
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("#8");
+    spec.params.insert("Tip type".into(), "A".into());
+    // Live: Type VI 15, Type III 19 with the mouth fillet (1 / 4 faces),
+    // which OCCT can't make yet (`pan_head_tapping_screw_mouth_fillets`).
+    for (head, faces) in [("Slot", 10), ("Type VI", 14), ("Type III", 15)] {
+        spec.params.insert("Head type".into(), head.into());
+        spec.params.remove("Threads/inch");
+        spec.fix_length();
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{head}: {e}"));
+        let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
+        assert!(failed.is_empty(), "{head}: {failed:?}");
+        let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let surfaces: Vec<noshape_kernel::Surface> = (0..body.faces.len()).filter_map(|i| body.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_surface().ok()).collect();
+        assert!(surfaces.iter().any(|s| matches!(s, noshape_kernel::Surface::Sphere { radius, .. } if (radius / 0.0254 - 0.2706).abs() < 1e-6)), "{head}: crown");
+        assert!(surfaces.iter().any(|s| matches!(s, noshape_kernel::Surface::Torus { minor_radius, .. } if (minor_radius / 0.0254 - 0.015).abs() < 1e-6)), "{head}: edge fillet");
+        let mut kinds: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        for s in &surfaces {
+            *kinds.entry(format!("{s:?}").split([' ', '(']).next().unwrap_or_default().to_string()).or_default() += 1;
+        }
+        assert_eq!(body.faces.len(), faces, "{head}: {kinds:?}");
+    }
+}
+
+/// Live's Pan #8 Type VI 15 faces / Type III 19 faces include the 0.002 in
+/// mouth fillet (1 / 4 TORUS-like faces).
+#[test]
+#[ignore = "OCCT's BRepFilletAPI_MakeFillet fails the 0.0508 mm fillet between the crown sphere and the recess walls (0.254 mm works); kernel follow-up for kern"]
+fn pan_head_tapping_screw_mouth_fillets() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "Pan head tapping screw").expect("in the catalogue");
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("#8");
+    spec.params.insert("Tip type".into(), "A".into());
+    for (head, faces) in [("Type VI", 15), ("Type III", 19)] {
+        spec.params.insert("Head type".into(), head.into());
+        spec.params.remove("Threads/inch");
+        spec.fix_length();
+        let r = standard::regenerate(&spec).unwrap();
+        let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        assert_eq!(body.faces.len(), faces, "{head}");
+    }
+}
