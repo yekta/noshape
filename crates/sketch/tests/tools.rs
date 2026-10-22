@@ -283,3 +283,26 @@ fn fillet_radius_change_moves_like_onshape() {
         assert!((sk.point(r.points[0]).unwrap()).length() < 1e-12, "the far corner stays");
     }
 }
+
+/// A closed fit spline (last point = first) is periodic: smooth at the seam.
+#[test]
+fn closed_fit_spline_is_smooth_at_the_seam() {
+    let mut sk = Sketch::new();
+    let mut pts: Vec<DVec2> = (0..12)
+        .map(|k| {
+            let a = (60.0 + 30.0 * k as f64).to_radians();
+            let r = if k % 2 == 0 { 0.0547 } else { 0.0775 };
+            v(r * a.cos(), r * a.sin())
+        })
+        .collect();
+    pts.push(pts[0]);
+    let id = sk.add_closed_fit_spline(&pts).unwrap();
+    let c = sk.curve(id).unwrap();
+    let (a, b) = c.domain();
+    assert!((c.point(a) - c.point(b)).length() < 1e-12);
+    let (ta, tb) = (c.tangent(a).normalize(), c.tangent(b).normalize());
+    assert!((ta - tb).length() < 1e-9, "seam tangents {ta} {tb}");
+    // Six-fold symmetry: the lobe tip at 90 degrees has a horizontal tangent.
+    let near_tip = (0..=200).map(|i| a + (b - a) * i as f64 / 200.0).map(|t| c.point(t)).fold(DVec2::ZERO, |m, p| if p.y > m.y { p } else { m });
+    assert!(near_tip.x.abs() < 2e-3 && (near_tip.y - 0.0775).abs() < 1e-3, "{near_tip}");
+}
