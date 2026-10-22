@@ -43,3 +43,6 @@ Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 
 | MT7 selected Revolute at 0° | mated face amber, instance rows highlighted, triad letters, no circle ✅; label **"0.000°" italic, past the X axis** (live "0°" upright on the X-axis end, trailing zeros dropped) | ✗ still (label only) (m60) |
 | MT8 Mate connector tool | no preview slider; Move rows X↘ Y↗ Z↑ icons, Rotate about Z | ✅ **fixed** (m61, m62) |
 | MT9 Replace instance → unresolvable mate | stays red, tooltip "Revolute 1 has error: Mate cannot resolve mate connectors. (Hidden)" | ✅ **fixed** (m75, m76) |
+
+## Re-run pass 19 (2026-10-22 ~11:00–11:40, app /tmp/qa5/noshape-1013 = /root/target-lead/debug/noshape 10:13: the queue's 09:58 batch build = main 3ce6952 + the ready branches of that batch; CLI 08:11)
+| MT7 label at 0° | small blue "0°" on the X-axis end over the red X (z11) | ✅ **fixed** |
