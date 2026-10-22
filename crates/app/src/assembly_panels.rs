@@ -135,10 +135,13 @@ pub(crate) struct PatternSession {
     pub axis2: Option<MateConnectorRef>,
     /// Connector field receiving picks (0 = direction / axis / plane, 1 = second direction).
     pub active: Option<usize>,
-    pub distance: Entity<InputState>,
-    pub count: Entity<InputState>,
-    pub distance2: Entity<InputState>,
-    pub count2: Entity<InputState>,
+    /// Onshape's number fields (`quantity_field`): Distance (Angle for a
+    /// circular pattern), Instance count, and the second direction's.
+    pub distance: Entity<crate::quantity_field::QuantityInput>,
+    pub count: Entity<crate::quantity_field::QuantityInput>,
+    pub distance2: Entity<crate::quantity_field::QuantityInput>,
+    pub count2: Entity<crate::quantity_field::QuantityInput>,
+    _field_subs: Vec<Subscription>,
     pub opposite: bool,
     pub opposite2: bool,
     pub equal: bool,
@@ -881,10 +884,31 @@ impl AssemblyView {
         // Live ("qa5 assembly" 6): Distance 25 mm, Angle 360 deg, Instance
         // count 2.
         let (d, n) = noshape_ops::assembly::pattern_defaults(kind == PatternDialogKind::Circular);
-        let mk = |t: &str, window: &mut Window, cx: &mut Context<Self>| {
-            let t = t.to_string();
-            cx.new(|cx| InputState::new(window, cx).default_value(t))
+        // Live ("Input behaviour outside feature dialogs", Assembly Linear
+        // pattern › Instance count): all selected on click, "1+1" accepted,
+        // "1 in" / "abc" invalid ("Enter a valid expression."), ↑ / ↓ ±1, Esc
+        // reverts; a committed value updates the preview.
+        use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
+        let (units, vars) = (self.units(cx), self.variable_scope(cx));
+        let mut subs = Vec::new();
+        let mut mk = |t: &str, spec: QuantitySpec, window: &mut Window, cx: &mut Context<Self>| {
+            let (t, vars) = (t.to_string(), vars.clone());
+            let q = cx.new(|cx| {
+                let mut q = QuantityInput::new(t, spec, units, window, cx);
+                q.set_variables(vars, cx);
+                q
+            });
+            subs.push(cx.subscribe(&q, |this: &mut Self, _, ev: &QuantityEvent, cx| {
+                if matches!(ev, QuantityEvent::Committed(_)) {
+                    this.update_pattern_preview(cx);
+                    cx.notify();
+                }
+            }));
+            q
         };
+        let circular = kind == PatternDialogKind::Circular;
+        let first = if circular { QuantitySpec::quantity(noshape_units::Dim::ANGLE).label("Angle") } else { QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Distance") };
+        let count = || QuantitySpec::count().range(Some(1.), Some(2500.)).label("Instance count");
         let seeds: Vec<InstanceId> = self.assembly(cx).map(|a| self.selected.iter().copied().filter(|id| a.generated_by(*id).is_none()).collect()).unwrap_or_default();
         let name = self.assembly(cx).map(|a| a.next_feature_name(kind.title())).unwrap_or_default();
         PatternSession {
@@ -896,10 +920,11 @@ impl AssemblyView {
             axis2: None,
             // Live: the dialog opens with Instances focused.
             active: None,
-            distance: mk(d, window, cx),
-            count: mk(n, window, cx),
-            distance2: mk("50 mm", window, cx),
-            count2: mk("2", window, cx),
+            distance: mk(d, first, window, cx),
+            count: mk(n, count(), window, cx),
+            distance2: mk("50 mm", QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Distance"), window, cx),
+            count2: mk("2", count(), window, cx),
+            _field_subs: subs,
             opposite: false,
             opposite2: false,
             equal: kind == PatternDialogKind::Circular,
@@ -954,7 +979,7 @@ impl AssemblyView {
         s.name = pat.name.clone();
         s.seeds = pat.seeds.clone();
         s.active = None;
-        let set = |st: &Entity<InputState>, t: String, window: &mut Window, cx: &mut Context<Self>| st.update(cx, |s, cx| s.set_value(t, window, cx));
+        let set = |st: &Entity<crate::quantity_field::QuantityInput>, t: String, window: &mut Window, cx: &mut Context<Self>| st.update(cx, |q, cx| q.set_text(t, window, cx));
         match &pat.kind {
             PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, centered } => {
                 s.axis = Some(direction.clone());
@@ -1007,8 +1032,10 @@ impl AssemblyView {
         if s.seeds.is_empty() {
             return Err("Select the instances to pattern (seed)".into());
         }
-        let text = |st: &Entity<InputState>| st.read(cx).value().to_string();
-        let count = |st: &Entity<InputState>| text(st).trim().parse::<f64>().ok().map(|v| v.round().clamp(1.0, 2500.0) as u32).ok_or("Instance count must be a whole number");
+        let text = |st: &Entity<crate::quantity_field::QuantityInput>| st.read(cx).text().to_string();
+        // An invalid count is marked in its field (pink, "Enter a valid
+        // expression."); the pattern waits for a valid one.
+        let count = |st: &Entity<crate::quantity_field::QuantityInput>| st.read(cx).value().map(|v| v.round() as u32).ok_or("Instance count must be a whole number");
         let kind = match s.kind {
             PatternDialogKind::Linear => {
                 let direction = s.axis.clone().ok_or("Select a direction (edge, face or mate connector)")?;
@@ -1167,7 +1194,7 @@ impl AssemblyView {
                     cx.notify();
                 }))
         };
-        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.));
+        let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| os::param_row_plain(label, st.clone());
         let mut body = v_flex().pb(px(2.)).child(div().px(px(3.)).pt(px(5.)).child(instances));
         let (opposite, equal, centered, second) = (s.opposite, s.equal, s.centered, s.second);
         match kind {

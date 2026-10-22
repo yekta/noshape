@@ -3388,12 +3388,12 @@ impl PartStudioView {
             let msg = state.and_then(|s| {
                 let m = s.message.clone()?;
                 match s.status {
-                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{} did not regenerate properly: {m}", f.name)),
+                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{} did not regenerate properly: {m}", typed_name(f))),
                     FeatureStatus::Info => None,
                     _ => Some(m),
                 }
             });
-            let (view, name, feature_name) = (cx.entity().downgrade(), name.clone(), f.name.clone());
+            let (view, name, feature_name) = (cx.entity().downgrade(), name.clone(), typed_name(f));
             // Live (qa5 ADV12): a name made from Onshape's "Feature Name
             // Template" (a Hole's callout) reads "<callout> [Hole]".
             let templated = (f.type_id == "hole" && name != f.name).then(|| f.feature_type().map(|t| format!("{name} [{}]", t.name))).flatten();
@@ -3409,10 +3409,11 @@ impl PartStudioView {
                         // Live lists only the sketches a feature uses ("Extrude 1 <-
                         // Sketch 1", "[Hole] <- Sketch 2"); parts picked in a Boolean
                         // or a merge scope aren't named (qa5 BOOL1b, behaviours B4).
-                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(|g| g.name.clone())).collect())
+                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(typed_name)).collect())
                     })
                     .unwrap_or_default();
-                // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2".
+                // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2"; a custom
+                // name gets its type ("Sweep L13 … <- Path [Sketch]").
                 let head = templated.clone().unwrap_or_else(|| feature_name.clone());
                 match (parents.is_empty(), &templated) {
                     (true, Some(t)) => t.clone().into(),
@@ -4853,4 +4854,15 @@ fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
             _ => 0,
         })
         .sum()
+}
+
+/// A feature's name for tooltips: a custom name that doesn't start with the
+/// feature's type gets the type in brackets (live behaviours "psb … feature
+/// sweep": "Move L5 rotate no axis [Move face] did not regenerate properly:
+/// …", "<- Path [Sketch]"); default names ("Draft 1") stay as they are.
+pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
+    match f.feature_type().map(|t| t.name) {
+        Some(t) if !f.name.starts_with(t) => format!("{} [{t}]", f.name),
+        _ => f.name.clone(),
+    }
 }
