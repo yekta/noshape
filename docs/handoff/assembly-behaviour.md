@@ -933,3 +933,9 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 - **MNU2** (assembly_behaviors.rs mate menu): separators around "Edit named position driver mate…".
 - **NP2** (assembly_positions.rs): with drivers, "Name" sits in the lower row of a #eaeaea cell; mate and DOF
   header cells #d7d7d7.
+* SLOT2 (live's 14 constraints): new `ConstraintKind::Offset { reference, curve, master_ref, master, side }`
+  (equations.rs `offset`: line ∥ master line at the reference's radius on `side`; circle/arc centred on a master
+  point with that radius). A line slot is now live's set: caps on their own centre points, 6 Coincident, 4 Tangent,
+  3 Offset (left, right, start cap from the end cap), and the tool's Diameter on the end cap only. Glyph "offset"
+  at the end cap (`glyph_entities`). Not done: live's yellow highlight of the master on glyph hover (icons2), arc
+  slots keep tangents + equal (no live data).
