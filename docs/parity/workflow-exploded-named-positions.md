@@ -20,4 +20,13 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/x01�
 | 12 | Row right-click | Apply, Edit, Duplicate, Update, (Move down/up with 2+ rows), Delete Named position N (159) | Apply, Edit, Duplicate, Update, Delete Named position 1 (x13) | ✅ |
 | 13 | Apply | green toast "✓ Named position N is applied. ×"; applied row blue with a 2 px left bar (160) | same (x14) | ✅ |
 
-Not covered yet: rotation step (ring drag), rollback-bar drag in the explode tree, driving-mate selector and value cells (needs an unhidden Revolute; next pass).
+## Pass 17b (same build, same doc; shots y01–y11)
+| # | Step | Live | Ours | Status |
+|---|---|---|---|---|
+| 14 | Drag the Z-tip ring | dialog Rotation ▾, Instances, ☐ Specify axis, **Rotation angle 55 deg**, ☑ Explode lines, field; curved arrow; row "⟲ Explode step 2" (810) | same fields and row; angle **"-37.565°"** (live writes "55 deg"; its drags look rounded: also "Distance 18.9 mm" vs our "12.436 mm") (cmp-y03) | ✗ **EXV5** (skb, minor: value rounding / "deg" unit text) |
+| 15 | Drag the rollback bar above step 2 | blue pill "Rollback bar" under the cursor + blue drop line; drop slot = nearest row boundary (upper half → above); step 2 italic grey, only step 1 shown (820, 821) | drop works with the cursor on the boundary: step 2 italic grey, only step 1 applied ✅ (y07); but **no "Rollback bar" pill** (a grey ghost bar instead), and at 4 px into step 2's upper half the drop line went **below** step 2 (y04) | ✗ **EXV6** (ui, minor) |
+| 16 | Revolute row menu (normal mode) | … Isolate…, Make transparent… \| Edit named position driver mate… \| Suppress, Dynamic suppression ▸ \| Animate… … (separators around the driver item) | same items; **no separators** around "Edit named position driver mate…" (y08) | ✗ **MNU2** (ui, minor) |
+| 17 | Edit named position driver mate… | banner "Editing Named position 1 [Done]", 220 px "Driving mate selector": "Mates to drive positions" › Revolute 1 › ☐ ↻ - Z (152) | same; checkbox label "⟳ - z" (lower-case) (y09) | ✅ (case ?) |
+| 18 | Tick + ✓ | two-level header "Revolute 1" over "⟳ - z"; each row "0 deg" (154) | same (y10) | ✅ |
+| 19 | Type 90 + Enter in the value cell | stores "90 deg"; cell has a 2 px blue frame while focused (155) | "90 deg" stored, the part turns 90° ✅; header styling differs: live "Name" header text bottom-aligned in a lighter cell, mate header cells darker; ours centred, same grey (cmp-y11) | ✗ **NP2** (ui, minor) |
+
