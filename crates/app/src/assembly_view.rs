@@ -279,6 +279,21 @@ pub(crate) struct StepEdit {
     pub _sub: Subscription,
 }
 
+/// An explode drag's value as live rounds it (qa5 EXV5, live 805/810:
+/// "Distance 18.9 mm", "Rotation angle 55 deg"): whole degrees, 0.1 mm
+/// (0.01 in in imperial workspaces).
+pub(crate) fn explode_drag_round(v: f64, rotation: bool, units: &noshape_units::UnitPrefs) -> f64 {
+    use noshape_units::LengthUnit as L;
+    let step = if rotation {
+        1f64.to_radians()
+    } else if matches!(units.length, L::Inch | L::Foot | L::Yard) {
+        0.000254
+    } else {
+        0.0001
+    };
+    (v / step).round() * step
+}
+
 #[derive(Clone, Copy, PartialEq)]
 enum SidePanel {
     Bom,
@@ -1743,6 +1758,17 @@ impl AssemblyView {
     }
 
     fn activate_explode(&mut self, i: Option<usize>, cx: &mut Context<Self>) {
+        // Done (qa5 EXV4, live 823): the view's row stays expanded with its
+        // steps, and nothing stays selected (no triad).
+        if i.is_none()
+            && let Some(prev) = self.explode
+        {
+            self.ui.explode_open.insert(prev);
+            self.selected.clear();
+            self.ui.entity_sel.clear();
+            self.selected_mate = None;
+            self.triad = None;
+        }
         self.explode = i;
         self.explode_progress = None;
         self.explode_preview = None;
@@ -2422,7 +2448,10 @@ impl AssemblyView {
                     Some(ManipHandle::Ring(_)) => {
                         let (center, axis, v0) = (d.plane_point, d.plane_normal, d.ring_v0);
                         let Some(v) = self.ring_vector(*position, center, axis, cx) else { return };
-                        let angle = v0.cross(v).dot(axis).atan2(v0.dot(v));
+                        let mut angle = v0.cross(v).dot(axis).atan2(v0.dot(v));
+                        if d.explode {
+                            angle = explode_drag_round(angle, true, &self.units(cx));
+                        }
                         let d = self.drag.as_mut().unwrap();
                         d.value = angle;
                         d.pending = Some(DVec3::ZERO);
@@ -2437,7 +2466,10 @@ impl AssemblyView {
                         if den.abs() < 1e-12 {
                             return;
                         }
-                        let s = (b * e - c * dd) / den;
+                        let mut s = (b * e - c * dd) / den;
+                        if d.explode {
+                            s = explode_drag_round(s, false, &self.units(cx));
+                        }
                         let p = d.plane_point + axis * s;
                         let d = self.drag.as_mut().unwrap();
                         d.value = s;
@@ -5350,6 +5382,17 @@ mod tests {
         assert_eq!(mate_angle_label(0.0), "0");
         assert_eq!(mate_angle_label(275.326), "275.326");
         assert_eq!(mate_angle_label(90.5), "90.5");
+    }
+
+    /// qa5 EXV5: explode drags round like live (whole degrees, 0.1 mm).
+    #[test]
+    fn explode_drag_values_round() {
+        use super::explode_drag_round;
+        let mm = noshape_units::UnitPrefs::default();
+        assert!((explode_drag_round(0.012436, false, &mm) - 0.0124).abs() < 1e-12);
+        assert!((explode_drag_round((-37.565f64).to_radians(), true, &mm).to_degrees() + 38.0).abs() < 1e-9);
+        let inch = noshape_units::UnitPrefs { length: noshape_units::LengthUnit::Inch, ..Default::default() };
+        assert!((explode_drag_round(0.0254 * 0.7432, false, &inch) / 0.0254 - 0.74).abs() < 1e-9);
     }
 
     /// qa5 A3: new mates are hidden, and hidden rows are listed in grey.
