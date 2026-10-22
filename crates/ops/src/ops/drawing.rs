@@ -147,6 +147,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "update",
+            summary: "Update an out-of-date drawing from the current model",
+            description: "After the model changes, a drawing's views keep the geometry they were made from and the drawing is out of date (`out_of_date` in drawing_get; the app's yellow Update button). Update remakes every view from the current document. One edit (\"Update\") when out of date; otherwise nothing changes.",
+            fields: vec![doc_field(), drawing_field(), sheet_field()],
+            mutates: true,
+            destructive: false,
+            run: update,
+        },
+        Op {
+            group: "drawing",
             verb: "export",
             summary: "Export a drawing to PDF, DWG, DXF, DWT or SVG",
             description: "The Export Drawing modal: all sheets (or `sheets`: \"current\" or a range like \"1-3, 5\") to one file; PDF and DWT hold every sheet, other formats with several sheets are zipped (one file per sheet).",
@@ -203,6 +213,7 @@ pub(super) fn part_arg(a: &Args) -> Result<Option<noshape_model::BodyId>, OpErro
 /// Commit an edited drawing as the editor does ("<tab> :: <description>").
 pub(super) fn commit(od: &mut OpenDoc, tab: TabId, sheet: usize, mut d: Drawing, description: &str) -> Result<(), OpError> {
     dr::finish_edit(&mut d, sheet);
+    dr::stamp_sources(&od.session, &mut d);
     od.session.edit_tab(tab, description, |c| {
         if let TabContent::Drawing(x) = c {
             *x = d;
@@ -357,6 +368,7 @@ pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> 
     v["drawing"] = json!(od.doc().tab(tab).map(|t| t.name.clone()));
     v["tab"] = json!(tab.to_string());
     v["sheets"] = json!(d.sheets.iter().map(|s| s.name.clone()).collect::<Vec<_>>());
+    v["out_of_date"] = json!(m.out_of_date);
     Ok(v)
 }
 
@@ -499,6 +511,19 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         out["text"] = json!(texts.join(" "));
     }
     Ok(out.into())
+}
+
+fn update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = drawing_tab(od, a)?;
+    let mut d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
+    let sheet = sheet_index(&d, a)?;
+    if dr::old_state(&od.session, &d).is_some() {
+        // The views are made from the current document from now on.
+        d.sources_at = od.session.head().ok().map(|m| m.to_string());
+        commit(od, tab, sheet, d, "Update")?;
+    }
+    Ok(reply(od, tab, sheet, false)?.into())
 }
 
 fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

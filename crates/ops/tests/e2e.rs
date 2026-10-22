@@ -1243,3 +1243,34 @@ fn drawing_jogged_and_aligned_sections() {
     assert!(last(&mut ctx).ends_with(":: Aligned section view"));
 
 }
+
+#[test]
+fn drawing_out_of_date_until_update() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_update.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    // A drawing edit stamps the state its views are made from.
+    call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "A", "position": [30, 30] }));
+    // The tallest view's height on the sheet (a side view shows the 20 mm thickness).
+    let height = |ctx: &mut Ctx| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+        let h = g["views"].as_array().unwrap().iter().map(|v| num(&v["bounds"]["max"][1]) - num(&v["bounds"]["min"][1])).fold(0.0f64, f64::max);
+        (h, g["out_of_date"].as_bool().unwrap())
+    };
+    let (h0, ood) = height(&mut ctx);
+    assert!(!ood);
+    // Change the model: the views keep their geometry, the drawing is out of date.
+    call(&mut ctx, "feature_edit", json!({ "tab": "Part Studio 1", "feature": "Extrude 1", "params": { "depth": "40 mm" } }));
+    let (h1, ood) = height(&mut ctx);
+    assert!(ood, "out of date after the model changed");
+    assert!((h1 - h0).abs() < 1e-6, "views keep their geometry until Update: {h0} -> {h1}");
+    // A drawing edit while out of date keeps the old state.
+    call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "B", "position": [30, 40] }));
+    assert!(height(&mut ctx).1, "still out of date");
+    call(&mut ctx, "drawing_update", json!({ "drawing": tab }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Update"));
+    let (h2, ood) = height(&mut ctx);
+    assert!(!ood);
+    assert!(h2 > h0 + 1.0, "updated views: {h0} -> {h2}");
+}
