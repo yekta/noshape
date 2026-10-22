@@ -330,6 +330,33 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "surface_finish",
+            summary: "Surface finish symbol",
+            description: "The Surface finish symbol tool and panel: the symbol at `position` (sheet mm, on the edge it sits on) with the roughness text `value` (the panel starts with \"Ra 3.2\"). One edit (\"Surface finish\").",
+            fields: with(common(), vec![req("position", point(), "Where the symbol sits (sheet mm)."), opt("value", json!({ "type": "string", "default": "Ra 3.2" }), "Roughness text.")]),
+            mutates: true,
+            destructive: false,
+            run: surface_finish,
+        },
+        Op {
+            group: "drawing",
+            verb: "weld",
+            summary: "Weld symbol",
+            description: Box::leak(
+                format!(
+                    "The Weld symbol tool and dialog: the arrow points at `target` (a vertex, edge or point of a view, sheet mm), the reference line starts at `position`. `spec` is the dialog: `arrow` and `other` sides ({{joint, size, depth, length, pitch, contour, finish, root, groove}}; joints: {}; contours: None, Flat, Convex, Concave; finishes: \"\", C, G, H, M, R, U), `spacer` ({}), `stagger`, `stagger_right`, `symmetric`, `flip`, `flip_id_line`, `all_around`, `flag` (None, Up, Down), `reference` (tail text). One edit (\"Weld symbol\").",
+                    noshape_model::drawing::weld::WeldJoint::ALL.iter().map(|j| format!("{j:?}")).collect::<Vec<_>>().join(", "),
+                    noshape_model::drawing::weld::JointSpacer::ALL.iter().map(|j| format!("{j:?}")).collect::<Vec<_>>().join(", ")
+                )
+                .into_boxed_str(),
+            ),
+            fields: with(common(), vec![req("target", point(), "What the arrow points at (sheet mm)."), req("position", point(), "Where the reference line starts (sheet mm)."), opt("spec", json!({ "type": "object" }), "The Weld symbol dialog (see the description); empty: no joint symbol.")]),
+            mutates: true,
+            destructive: false,
+            run: weld,
+        },
+        Op {
+            group: "drawing",
             verb: "view_table",
             summary: "Place a BOM, cut list or hole table of a view",
             description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its top-left corner at `position` (sheet mm). A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.",
@@ -876,4 +903,29 @@ fn gdt(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = t.d.sheets[sheet].next_annotation_id();
     t.d.sheets[sheet].annotations.push(dt::gdt(id, pt_arg(a, "position")?, frame, extra));
     done(od, t, "Geometric tolerance", "annotation", id)
+}
+
+fn surface_finish(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_annotation_id();
+    let value = a.opt_str("value")?.unwrap_or(dt::SURFACE_FINISH_DEFAULT).to_string();
+    t.d.sheets[sheet].annotations.push(dt::surface_finish(id, pt_arg(a, "position")?, value));
+    done(od, t, "Surface finish", "annotation", id)
+}
+
+fn weld(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let spec: noshape_model::drawing::weld::WeldSpec = match a.get("spec") {
+        None | Some(Value::Null) => Default::default(),
+        Some(v) => serde_json::from_value(v.clone()).map_err(|e| OpError::param("spec", &e.to_string()))?,
+    };
+    let c = pt_arg(a, "target")?;
+    let (view, target) = t.m.pick(&Tool::Weld, &[], c).weld_target(c);
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_annotation_id();
+    t.d.sheets[sheet].annotations.push(dt::weld(id, view, target, spec, pt_arg(a, "position")?));
+    done(od, t, "Weld symbol", "annotation", id)
 }
