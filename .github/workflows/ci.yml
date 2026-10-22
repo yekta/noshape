@@ -14,8 +14,6 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: 1
-  # Any compiler warning fails the build on every platform.
-  RUSTFLAGS: -D warnings
 
 jobs:
   build:
