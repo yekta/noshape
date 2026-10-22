@@ -40,8 +40,10 @@ Live answered "qa5 pass 7" (4) + asb (d) "shaded drawing views": picker filters 
 | DSM2 bend notes | "DOWN 90.0° R2", "DOWN 180.0° R0.01" | ✗ still (DOWN vs live UP = SM5) |
 | DSM4 picker filters | 4 icons | ✗ still (live 7) |
 
-asb note (10-22) on DSM4: the picker has all 7 toggles but, as live ("Inside a document that lacks some types, only the
-relevant ones show", behaviours.md "asb (c)"), shows only the kinds the document has (`drawing_chooser.rs`, `present`).
-"qa5 sheet metal" has no composite parts, surfaces or curves, so live shows the same 4 there (behaviours.md "Flat pattern
-view": Part Studios | Parts | Sketches | Flat patterns). To re-check: add a surface (e.g. Extrude › Surface) and a curve
-to that document; the Surfaces and Curves toggles should appear.
+## Re-run pass 19 (2026-10-22 ~11:00–11:40, app /tmp/qa5/noshape-1013 = /root/target-lead/debug/noshape 10:13: the queue's 09:58 batch build = main 3ce6952 + the ready branches of that batch; CLI 08:11)
+| DSM2 bend notes | "DOWN 90.0° R2" (z12) | ✗ still |
+| DSM4 picker filters | 4 icons (z13) | ✗ still |
+
+## DSM4 re-check (10-22, app /tmp/qa5/noshape-1013; doc /tmp/qa5/d29/kinds.noshape from /root/qa5-scratch/pass20/mkkinds.py: parts, a composite part, a surface, a curve, sketches, a sheet-metal studio)
+- Live (behaviours ~6840): filter icons Part Studios, Parts, Composite parts, Sketches, Surfaces, Curves, Flat patterns; **a document that lacks some kinds shows only the relevant ones**.
+- Ours with all kinds present: **7 icons in that order** (z31). The sheet-metal doc has no composite parts, surfaces or curves, hence 4. → **DSM4 withdrawn** (asb's report was right).

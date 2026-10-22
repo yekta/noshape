@@ -78,3 +78,10 @@ Docs /tmp/qa5/d25c/b2.noshape, /tmp/qa5/d25d/s.noshape, /tmp/qa5/d25b/merge.nosh
 | BOOL3 ☑ Merge with all | ONE part "Part 1" 14785.398163, 17 faces | ✅ **fixed** (r22) |
 | BOOL3 scope Part 1 + Part 3 | ONE part 14000 + cylinder 1570.796327 separate | ✅ **fixed** (r24) |
 | BOOL3 scope Part 1 only | Part 1 11000, Part 2 1570.796327, Part 3 4000 | ✅ **fixed** (r25) |
+
+## Re-run pass 19 (2026-10-22 ~11:00–11:40, app /tmp/qa5/noshape-1013 = /root/target-lead/debug/noshape 10:13: the queue's 09:58 batch build = main 3ce6952 + the ready branches of that batch; CLI 08:11)
+| Row | Ours | Status |
+|---|---|---|
+| BOOL1b no-change message | blue bubble at the top centre of the graphics, dialog without message (z05) ✅; committed row tooltip **"Boolean 1 <- Extrude 1, Extrude 3"** (live: just "Boolean 1") (z06) | ✅ bubble / ✗ tooltip (minor) |
+| INT2 disjoint Intersect ☑ Keep tools | Parts (3) unchanged (8000 / 1570.796327 / 4000) | ✅ **fixed** |
+| BOOL4b empty merge scope | ✓ enabled, no extra bubble; ✓ → red row "Extrude 4 did not regenerate properly: No merge scope selected.", parts unchanged (z09, z10) | ✅ **fixed** |
