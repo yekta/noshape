@@ -19,3 +19,17 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/j01�
 | 10 | Jog dialog | ? (asked) | as Bend + ▾ Blind · Jog offset 10 mm · ▾ Inside · ☑ Preserve material (jd-jog) | ? |
 
 Findings: SML1 (new). SM4, SM1, SM3 still. Live request "qa5 (10-22 pass 16, workflow 27 …)" filed for rows 7–10.
+
+## Re-run pass 18 (2026-10-22 ~10:00–11:00, CLI /tmp/qa5/noshape-cli-0811 = target-engine 08:11; main 3ce6952)
+CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS; SML1 loft Add "not supported yet". ✗ still.
+
+## Update from live's answer "qa5 sm tools" (behaviours.md ~7995) + CLI pass 20 (/root/qa5-scratch/pass20/smtools.py, CLI 08:11)
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| 7 Tab dialog | Tab profile (required, pink when unfocused) · Flange to merge · Subtraction offset 0 mm · Subtraction scope | same fields (jd-tab) | ✅ (pink state not checked) |
+| 8 Rip | **there is no Rip tool** (tool search: "No items match"); rips only as Joint type Rip | our tool search opens a **"Rip 1"** feature (Vertex pairs to split with, ☑ Use default minimal gap) | ✗ **RIP1** (fs/ui: an extra tool) |
+| 9 Bend dialog | Bend line + flip arrow · Sheet metal face to bend · **Bend alignment ▾** Bend line \| Hold line \| Hold other line \| Inner \| Outer \| Middle · ▾ Bend angle \| Align to geometry \| Angle from direction + ↻ · 90 deg · ☑ ☑ | Bend line has an **extra clock icon**; first select has no "Bend alignment" label (jd-bend); option lists not checked | ✗ minor (BEND2) |
+| 9b Bend result (plate 60×40 t2 r2, line x=30 on the top face) | 4812.566370614357 mm³, 14 faces; **x<30 stays flat**, the x>30 part goes up (wall x 29.72..31.72) | **4812.566371, 14 faces** ✅ but bbox x 28.28..60: the **x<30 part goes up** and x>30 stays flat | ✗ **BEND1** (fs: wrong side held) |
+| 10 Jog dialog | … Bounding type ▾ Blind \| Up to entity \| Thickness · **Jog offset 5 mm** · Jog offset anchor ▾ Inside \| Nominal \| Outside · ☑ Preserve material | Jog offset **10 mm** (jd-jog; CLI default bendOffset 10 mm) | ✗ **JOG1** (fs) |
+| 10b Jog result (defaults) | 4825.132741228719 mm³, 22 faces; raised flange z 7..9, x 33.72..55.889 | **4825.132741, 22 faces** ✅; bbox z 0..14 (10 mm offset) and min x 9.11 (the x<30 side is raised, as in BEND1) | ✗ JOG1 + BEND1 |
+| Tab result (rect (60,10)–(75,30) on the top face) | — | OK, 5400 mm³ (4800 + 600), 12 faces | ? (live volume not given) |
