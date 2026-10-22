@@ -55,6 +55,30 @@ window lists recent documents and folders with thumbnails.
 
 **Import and export.** Import STEP, IGES and BREP; export STEP, IGES, STL, OBJ and BREP.
 
+## Using noshape from Claude Code and other agents
+
+Every release bundle ships `noshape-cli` next to the app: a command line tool and an MCP server that can do
+everything the app does (see [docs/AGENT_API.md](docs/AGENT_API.md)). Add it to Claude Code with the path for
+your system:
+
+| Download | Command |
+|---|---|
+| macOS (`.dmg`, app dragged to Applications) | `claude mcp add noshape -- /Applications/noshape.app/Contents/MacOS/noshape-cli mcp` |
+| Linux (`.tar.gz`, unpacked to `~/noshape-<version>-linux-x86_64`) | `claude mcp add noshape -- ~/noshape-<version>-linux-x86_64/noshape-cli mcp` |
+| Windows (`.zip`, unpacked to `C:\noshape-<version>-windows-x86_64`) | `claude mcp add noshape -- C:\noshape-<version>-windows-x86_64\noshape-cli.exe mcp` |
+
+Use the folder you actually unpacked to. The dmg also holds a loose `noshape-cli` next to `noshape.app` if you
+prefer to put it on your `PATH`. When the app has a document open, the CLI edits it live in the window.
+
+**macOS:** the app and the CLI are signed ad hoc, not notarized, so macOS blocks them when they come from a
+download ("cannot be opened" / "developer cannot be verified"). After copying the app to Applications, clear the
+download flag once (this covers the CLI inside the app too):
+
+```sh
+xattr -dr com.apple.quarantine /Applications/noshape.app
+xattr -d com.apple.quarantine /path/to/noshape-cli    # only for a loose copy taken from the dmg
+```
+
 ## Building
 
 You need Rust (stable), a C++17 compiler and CMake. Build OCCT once, then build the app:

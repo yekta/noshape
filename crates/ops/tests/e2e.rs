@@ -1161,6 +1161,21 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(kind_of(&mut ctx, nt["annotation"].as_u64().unwrap()), "Note");
     assert!(last(&mut ctx).ends_with(":: Note"));
 
+    let g = call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [60, 60], "rows": [{ "symbol": "position", "before": "Ø", "tolerance": "0.1", "datums": ["A", "B"] }] }));
+    assert_eq!(kind_of(&mut ctx, g["annotation"].as_u64().unwrap()), "Gdt");
+    assert!(last(&mut ctx).ends_with(":: Geometric tolerance"));
+    let e = try_call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [60, 60], "rows": [{ "symbol": "wobble" }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("rows[0].symbol"), "{e:?}");
+
+    let sf = call(&mut ctx, "drawing_surface_finish", json!({ "drawing": tab, "position": quarter(&lines[0]) }));
+    assert_eq!(kind_of(&mut ctx, sf["annotation"].as_u64().unwrap()), "SurfaceFinish");
+    assert!(last(&mut ctx).ends_with(":: Surface finish"));
+    let w = call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [a0[0] - 20.0, a0[1] + 20.0], "spec": { "arrow": { "joint": "Fillet", "size": "6" }, "all_around": true } }));
+    assert_eq!(kind_of(&mut ctx, w["annotation"].as_u64().unwrap()), "Weld");
+    assert!(last(&mut ctx).ends_with(":: Weld symbol"));
+    let e = try_call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [10, 10], "spec": { "arrow": { "joint": "Glue" } } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("spec"), "{e:?}");
+
     let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
     assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));

@@ -1827,8 +1827,11 @@ impl AssemblyView {
                 }),
             ],
         });
-        m.push(MenuEntry::Sep);
-        m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_mate(id, cx)));
+        // Named-position editing mode: no Delete either (qa5 NP1, live 152).
+        if !np_editing {
+            m.push(MenuEntry::Sep);
+            m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_mate(id, cx)));
+        }
         m
     }
 
