@@ -76,7 +76,7 @@ pub fn ops() -> Vec<Op> {
             "fillet",
             "Fillet sketch corners (the Sketch fillet tool)",
             "Each corner point in `entities` is filleted; two curves given one after the other are filleted where they meet (the tool's two-curve mode). All fillets of one call are one tool session: the first gets a radius dimension set to `radius` (a value or expression), later ones are constrained equal to it, as in Onshape.",
-            vec![req("entities", ids(), "Corner points (entity ids), or pairs of curves."), opt("radius", value(), "Radius (default: the tool's, 20 mm / 0.5 in).")],
+            vec![req("entities", ids(), "Corner points (entity ids), or pairs of curves."), opt("radius", value(), "Radius (default: the tool's, as in Onshape: 5 mm (0.5 in in inch documents) at first, then the last radius used in this Part Studio).")],
             fillet,
         ),
         op(
@@ -320,6 +320,12 @@ fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, 
     };
     let mut ed = editor(&t);
     ed.set_tool(tool);
+    // The fillet radius is sticky per tab (live): the last one used.
+    if tool == Tool::Fillet
+        && let Some(r) = od.sketch_fillet_radius.get(&tab)
+    {
+        ed.fillet_radius = *r;
+    }
     if let Some((_, m)) = &size_text {
         if tool == Tool::Fillet {
             ed.fillet_radius = *m;
@@ -363,6 +369,9 @@ fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, 
     }
     ed.dim_edit = None;
     ed.message = None;
+    if tool == Tool::Fillet && changed {
+        od.sketch_fillet_radius.insert(tab, ed.fillet_radius);
+    }
     finish(od, t, &ed, changed, &before)
 }
 

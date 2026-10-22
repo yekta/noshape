@@ -258,6 +258,12 @@ pub struct Highlights {
     /// Move manipulator (triad with pickable axis arrows and rotation rings)
     /// and the hovered handle.
     pub manipulator: Option<(Frame, f64, Option<ManipHandle>)>,
+    /// Explode mode (live assembly/802): the triad has no plane handles.
+    pub explode_triad: bool,
+    /// An explode step being made or edited (live 805 / 810): instead of the
+    /// triad, one arrow along the move (origin, direction, size), or for a
+    /// rotation a ring with an arrowhead around the axis.
+    pub step_arrow: Option<(DVec3, DVec3, f64, bool)>,
     /// Pickable assembly origin triad (size) and whether it is hovered/selected.
     pub origin: Option<(f64, bool)>,
     /// Pickable assembly mate connector triads: (frame, size, highlighted).
@@ -600,12 +606,15 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         const EDGE: [u8; 4] = [0x96, 0x9d, 0xa3, 255];
         const CORE: [u8; 4] = [0xf7, 0xf7, 0xf8, 255];
         const HOVER: [u8; 4] = [0x3e, 0x94, 0xff, 255];
+        const EXPLODE_CORE: [u8; 4] = [0xcd, 0xd0, 0xd3, 255];
         let size = *size;
+        // Explode mode (live 802): a 2 px #cdd0d3 core between the grey edges.
+        let (core, core_w) = if h.explode_triad { (EXPLODE_CORE, 2.0) } else { (CORE, 1.6) };
         let p3 = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
         let stroke = |ol: &mut LineData, pts: &[DVec3], closed: bool, id: u32, hl: bool| {
             let n = pts.len();
             let segs = if closed { n } else { n.saturating_sub(1) };
-            for (w, c) in [(4.0, if hl { HOVER } else { EDGE }), (1.6, if hl { HOVER } else { CORE })] {
+            for (w, c) in [(4.0, if hl { HOVER } else { EDGE }), (core_w, if hl { HOVER } else { core })] {
                 for i in 0..segs {
                     ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: id, width: w, style: LineSegment::ON_TOP });
                 }
@@ -636,7 +645,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             stroke(&mut ol, &[rc - side * (size * 0.17), rc + side * (size * 0.17)], false, rid, rhl);
             scene.set_state(rid, 0);
             // Plane handle for the plane normal to axis k: a parallelogram
-            // between the other two axes, with a faint pickable fill.
+            // between the other two axes, with a faint pickable fill (not in
+            // explode mode, live 802).
+            if h.explode_triad {
+                continue;
+            }
             let (u, v) = (side, other);
             let pid = overlay_id(built, OverlayPick::Manip(ManipHandle::Plane(k)));
             let phl = *hovered == Some(ManipHandle::Plane(k));
@@ -655,10 +668,49 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         let chl = *hovered == Some(ManipHandle::Center);
         let o: [f32; 3] = p3(f.origin);
         op.points.push(PointSprite { position: o, color: if chl { HOVER } else { EDGE }, pick_id: cid, size: 17.0, style: LineSegment::ON_TOP, _pad: 0 });
-        op.points.push(PointSprite { position: o, color: CORE, pick_id: cid, size: 12.0, style: LineSegment::ON_TOP, _pad: 0 });
+        op.points.push(PointSprite { position: o, color: core, pick_id: cid, size: 12.0, style: LineSegment::ON_TOP, _pad: 0 });
         op.points.push(PointSprite { position: o, color: if chl { HOVER } else { EDGE }, pick_id: cid, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
         op.points.push(PointSprite { position: o, color: [255, 255, 255, 255], pick_id: cid, size: 7.0, style: LineSegment::ON_TOP, _pad: 0 });
         scene.set_state(cid, 0);
+    }
+    if let Some((o, dir, size, rotation)) = h.step_arrow
+        && let Some(d) = dir.try_normalize()
+    {
+        // The explode triad's hollow stroke (grey edge, #cdd0d3 core), unpickable.
+        const EDGE: [u8; 4] = [0x96, 0x9d, 0xa3, 255];
+        const CORE: [u8; 4] = [0xcd, 0xd0, 0xd3, 255];
+        let p3 = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
+        let mut stroke = |pts: &[DVec3], closed: bool| {
+            let n = pts.len();
+            let segs = if closed { n } else { n.saturating_sub(1) };
+            for (w, c) in [(4.0, EDGE), (2.0, CORE)] {
+                for i in 0..segs {
+                    ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: 0, width: w, style: LineSegment::ON_TOP });
+                }
+            }
+        };
+        let side = d.any_orthonormal_vector();
+        let other = d.cross(side);
+        if rotation {
+            // A ring about the axis, open at the end with an arrowhead.
+            let r = size * 0.3;
+            let pts: Vec<DVec3> = (0..=40).map(|i| {
+                let t = i as f64 / 40.0 * std::f64::consts::TAU * 0.85;
+                o + (side * t.cos() + other * t.sin()) * r
+            }).collect();
+            let (end, tan) = {
+                let t = std::f64::consts::TAU * 0.85;
+                (o + (side * t.cos() + other * t.sin()) * r, (-side * t.sin() + other * t.cos()).normalize())
+            };
+            stroke(&pts, false);
+            let w = size * 0.07;
+            let nrm = (end - o).normalize();
+            stroke(&[end + nrm * w, end + tan * (size * 0.14), end - nrm * w], true);
+        } else {
+            let (base, tip, w) = (size * 0.62, size * 0.86, size * 0.07);
+            stroke(&[o, o + d * base], false);
+            stroke(&[o + d * base + side * w, o + d * tip, o + d * base - side * w], true);
+        }
     }
     if !ol.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&ol))).per_primitive_color().ignore_clip().layer(22));

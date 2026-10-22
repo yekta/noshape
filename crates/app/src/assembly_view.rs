@@ -1088,6 +1088,25 @@ impl AssemblyView {
             h.cursor_mark = Some((p, size * 0.4));
         }
         h.manipulator = self.manipulator(cx).map(|f| (f, size * 1.6, self.manip_hover.or(self.ui.manip_selected)));
+        h.explode_triad = self.explode_edit;
+        // An explode step being made / edited: one arrow along the move
+        // instead of the triad (live 805, 810).
+        if self.explode_edit {
+            let arrow = match (&self.drag, &self.step_edit) {
+                (Some(d), _) if self.explode_preview.is_some() => match d.handle {
+                    Some(ManipHandle::Axis(_)) => Some((d.plane_normal * if d.value < 0.0 { -1.0 } else { 1.0 }, false)),
+                    Some(ManipHandle::Ring(_)) => Some((d.plane_normal, true)),
+                    _ => None,
+                },
+                (_, Some(se)) => Some((se.base_dir, se.rotation)),
+                _ => None,
+            };
+            if let Some((dir, rotation)) = arrow
+                && let Some((f, s, _)) = h.manipulator.take()
+            {
+                h.step_arrow = Some((f.origin, dir, s, rotation));
+            }
+        }
         // Pickable overlays changed: the pick buffer must be redrawn too.
         let mut sig: Vec<f64> = Vec::new();
         if let Some((f, s, _)) = &h.manipulator {
