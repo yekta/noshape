@@ -1161,7 +1161,45 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(kind_of(&mut ctx, nt["annotation"].as_u64().unwrap()), "Note");
     assert!(last(&mut ctx).ends_with(":: Note"));
 
+    let g = call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [60, 60], "rows": [{ "symbol": "position", "before": "Ø", "tolerance": "0.1", "datums": ["A", "B"] }] }));
+    assert_eq!(kind_of(&mut ctx, g["annotation"].as_u64().unwrap()), "Gdt");
+    assert!(last(&mut ctx).ends_with(":: Geometric tolerance"));
+    let e = try_call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [60, 60], "rows": [{ "symbol": "wobble" }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("rows[0].symbol"), "{e:?}");
+
+    let sf = call(&mut ctx, "drawing_surface_finish", json!({ "drawing": tab, "position": quarter(&lines[0]) }));
+    assert_eq!(kind_of(&mut ctx, sf["annotation"].as_u64().unwrap()), "SurfaceFinish");
+    assert!(last(&mut ctx).ends_with(":: Surface finish"));
+    let w = call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [a0[0] - 20.0, a0[1] + 20.0], "spec": { "arrow": { "joint": "Fillet", "size": "6" }, "all_around": true } }));
+    assert_eq!(kind_of(&mut ctx, w["annotation"].as_u64().unwrap()), "Weld");
+    assert!(last(&mut ctx).ends_with(":: Weld symbol"));
+    let e = try_call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [10, 10], "spec": { "arrow": { "joint": "Glue" } } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("spec"), "{e:?}");
+
     let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
     assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));
+}
+
+#[test]
+fn sketch_fillet_radius_default_is_r5_then_sticky() {
+    // Live: R5 on a fresh page, then the last radius used in that tab.
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "fillet_sticky.noshape", "plane:top");
+    let rect = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    let corner = |x: f64, y: f64| id_of(created(&rect, "point").into_iter().find(|p| near(&p["at"], x, y)).unwrap_or_else(|| panic!("no corner {x},{y}: {rect}")));
+    let radius = |f: &Value| {
+        let a = created(f, "arc")[0];
+        ((num(&a["start"][0]) - num(&a["center"][0])).powi(2) + (num(&a["start"][1]) - num(&a["center"][1])).powi(2)).sqrt()
+    };
+    let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk, "entities": [corner(40.0, 0.0)] }));
+    assert!((radius(&f) - 5.0).abs() < 1e-6, "{f}");
+    let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk, "entities": [corner(40.0, 30.0)], "radius": "3 mm" }));
+    assert!((radius(&f) - 3.0).abs() < 1e-6, "{f}");
+    // A new sketch in the same Part Studio: the last radius sticks.
+    let sk2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
+    let rect2 = call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    let c = id_of(created(&rect2, "point").into_iter().find(|p| near(&p["at"], 40.0, 0.0)).unwrap());
+    let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk2, "entities": [c] }));
+    assert!((radius(&f) - 3.0).abs() < 1e-6, "{f}");
 }

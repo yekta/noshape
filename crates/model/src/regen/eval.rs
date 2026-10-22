@@ -30,7 +30,7 @@ impl FeatureError {
 
 impl From<k::KernelError> for FeatureError {
     fn from(e: k::KernelError) -> Self {
-        FeatureError::new(format!("Geometry operation failed: {e}"))
+        FeatureError::new(format!("{KERNEL_FAILURE}{e}"))
     }
 }
 
@@ -41,6 +41,9 @@ pub fn err<T>(m: impl Into<String>) -> FResult<T> {
 }
 
 /// An error caused by the given parameters (see [`FeatureError::faulty`]).
+/// The prefix of a kernel failure's message (`From<KernelError>`).
+pub const KERNEL_FAILURE: &str = "Geometry operation failed: ";
+
 pub fn err_at<T>(faulty: &[&'static str], m: impl Into<String>) -> FResult<T> {
     Err(FeatureError { faulty: faulty.to_vec(), ..FeatureError::new(m) })
 }
@@ -1136,6 +1139,19 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
             let e = out[0].1;
             let full = P::Arc { center: *center, radius: *radius, start_angle: *a0, end_angle: *a0 + (a1 - a0) + (b1 - b0), ccw: *ccw };
             out = vec![(full, e)];
+        }
+        // Likewise a closed spline (a periodic fit spline, split at its
+        // seam): one edge, so its extrusion is one face (live's lobed recess).
+        if out.len() == 2
+            && out[0].1 == out[1].1
+            && matches!((&out[0].0, &out[1].0), (P::Spline { .. }, P::Spline { .. }))
+            && let Some(noshape_sketch::Curve2::Nurbs(n)) = s.sketch.curve(noshape_sketch::EntityId(out[0].1))
+            && noshape_sketch::Curve2::Nurbs(n.clone()).is_closed()
+        {
+            let forward = lp.sources.first().is_none_or(|x| x.forward);
+            let n = if forward { n } else { n.reversed() };
+            let e = out[0].1;
+            out = vec![(P::Spline { control_points: n.ctrl, knots: n.knots, degree: n.degree, weights: n.weights }, e)];
         }
         out
     };
