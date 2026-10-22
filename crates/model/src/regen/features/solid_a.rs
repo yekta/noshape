@@ -19,15 +19,25 @@ use std::collections::BTreeMap;
 
 // ------------------------------------------------------------------ sweep
 
+/// Onshape's SWEEP_FAILED.
+const SWEEP_FAILED: &str = "Could not create valid swept body, check input.";
+
+/// Onshape's LOFT_FAILED.
+const LOFT_FAILED: &str = "Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.";
+
 pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
+    // sweep.fs: a thin sweep checks its wall before the path.
+    if body_type == "THIN" && ev.query("wallShape").is_empty() {
+        return crate::regen::eval::err_at(&["wallShape"], "Select faces or sketch regions to sweep.");
+    }
     let path_edges = resolve_curves(ev, ev.query("path"))?;
     if path_edges.is_empty() {
         return crate::regen::eval::err_at(&["path"], "Select entities for sweep path.");
     }
     let wires = wires_from(&path_edges)?;
     if wires.len() != 1 {
-        return err("The sweep path must be one connected chain of edges");
+        return crate::regen::eval::err_at(&["path"], "Sweep path curves are not all connected.");
     }
     let path = wires[0].clone();
     // Twist: total rotation about the path (Turns, Angle, or one turn per Pitch length).
@@ -36,7 +46,11 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
             "ANGLE" => ev.angle("angle")?,
             "PITCH" => {
                 let len: f64 = path.edges().iter().filter_map(|e| e.length().ok()).sum();
-                std::f64::consts::TAU * len / ev.length("pitch")?
+                let turns = len / ev.length("pitch")?;
+                if !(0.0..=1000.0).contains(&turns) {
+                    return crate::regen::eval::err_at(&["pitch"], format!("Computed number of revolutions outside limit (between 0 and 1000). Current value is {turns}."));
+                }
+                std::f64::consts::TAU * turns
             }
             _ => std::f64::consts::TAU * ev.real("turns")?,
         };
@@ -47,8 +61,10 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let mut opts = k::SweepOptions { scale_end: if ev.bool("hasScale") { ev.real("scaleFactor")? } else { 1.0 }, twist, ..Default::default() };
     let lock_dir = match ev.enum_("profileControl") {
         "LOCK_DIRECTION" => {
-            let Some(r) = ev.query("lockDirectionQuery").first() else { return err("Select a direction to lock") };
-            Some(ev.resolve_direction(r).ok_or_else(|| fe("The lock direction could not be resolved"))?)
+            let no_dir = || crate::regen::eval::err_at(&["lockDirectionQuery"], "Select direction to lock.");
+            let Some(r) = ev.query("lockDirectionQuery").first() else { return no_dir() };
+            let Some(d) = ev.resolve_direction(r) else { return no_dir() };
+            Some(d)
         }
         _ => None,
     };
@@ -82,7 +98,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
             } else if let Some(d) = lock_dir {
                 opts.mode = k::SweepMode::Binormal(d);
             }
-            let res = sweep(&p.shape, &opts).map_err(kerr("Sweep failed"))?;
+            let res = sweep(&p.shape, &opts).map_err(|_| fe(SWEEP_FAILED))?;
             let names = sweep_names(ev, &p, &res, false, false);
             tools.push(NamedShape::new(res.shape, names));
         }
@@ -94,7 +110,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let thin = body_type == "THIN";
     let refs = ev.query(if thin { "wallShape" } else { "profiles" });
     if refs.is_empty() {
-        return err(if thin { "Select edges or faces to define the path of the thin wall" } else { "Select sketch regions or planar faces to sweep" });
+        return crate::regen::eval::err_at(&[if thin { "wallShape" } else { "profiles" }], "Select faces or sketch regions to sweep.");
     }
     let profiles = if thin { super::thin::thin_profiles(ev, refs)? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
@@ -106,9 +122,9 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         } else if let Some(d) = lock_dir {
             opts.mode = k::SweepMode::Binormal(d);
         }
-        let res = sweep(&p.shape, &opts).map_err(kerr("Sweep failed"))?;
+        let res = sweep(&p.shape, &opts).map_err(|_| fe(SWEEP_FAILED))?;
         if res.shape.count(ShapeType::Solid) == 0 {
-            return err("Sweep did not produce a solid (check that the profile is closed and the path is valid)");
+            return err(SWEEP_FAILED);
         }
         // OCCT sweeps a profile round a bend tighter than the profile into a
         // self-intersecting solid; Onshape refuses it.
@@ -150,7 +166,7 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
         if (refs.len() == 1 && matches!(refs[0], Reference::Vertex(_) | Reference::Origin | Reference::MateConnector { .. } | Reference::Implicit { .. }))
             || matches!(&refs[0], Reference::SketchEntity { sketch, entity } if ev.ctx.sketch(*sketch).is_some_and(|s| s.sketch.point(noshape_sketch::EntityId(*entity)).is_some()))
         {
-            let p = ev.resolve_vertex_point(&refs[0]).ok_or_else(|| fe("A loft point profile no longer exists"))?;
+            let p = ev.resolve_vertex_point(&refs[0]).ok_or_else(|| fe("Could not create valid profiles from selections."))?;
             out.push(Section { shape: k::make_vertex(p)?, profile: None });
             continue;
         }
@@ -165,7 +181,7 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
                 }
             }
             if wires.len() != 1 {
-                return err(format!("Loft profile {} must be one connected chain of curves", i + 1));
+                return err("Could not create valid profiles from selections.");
             }
             let w = wires.remove(0);
             out.push(Section { shape: w.clone(), profile: Some(wire_profile(w, &edges, Source::Index(i as u32))) });
@@ -180,7 +196,7 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
             {
                 let faces = b.shape.faces();
                 if faces.len() != 1 {
-                    return err("A loft profile surface must have a single face");
+                    return err("Select a single sketch region or face per profile.");
                 }
                 let f = faces[0].clone();
                 let edge_sources = f.edges().iter().map(|e| b.shape.index_of(e, ShapeType::Edge).map(|k| Source::Topo(b.edges[k].clone())).unwrap_or(Source::Index(0))).collect();
@@ -192,11 +208,11 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
             }
         }
         if profiles.len() != 1 {
-            return err(format!("Loft profile {} must be a single face or sketch region", i + 1));
+            return err("Select a single sketch region or face per profile.");
         }
         let p = profiles.remove(0);
         if p.shape.wires().len() > 1 {
-            return err(format!("Loft profile {} has inner loops; each profile must be a single contour", i + 1));
+            return err("Cannot use faces or regions with inner loops as profiles.");
         }
         out.push(Section { shape: p.shape.clone(), profile: Some(p) });
     }
@@ -246,7 +262,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["sheetProfilesArray", "wireProfilesArray"], "Select profiles in order from start to finish.");
     }
     if sections[1..sections.len() - 1].iter().any(|s| s.profile.is_none()) {
-        return err("Only the first and last loft profiles can be points");
+        return err("Point profiles can only exist as first or last profiles.");
     }
     if !ev.is("startCondition", "DEFAULT") || !ev.is("endCondition", "DEFAULT") {
         ev.warnings.push("Loft start/end conditions are not supported yet and were ignored".into());
@@ -274,9 +290,9 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             opts.start_points = Some(starts);
         }
     }
-    let res = k::loft(&shapes, &opts).map_err(kerr("Loft failed"))?;
+    let res = k::loft(&shapes, &opts).map_err(|_| fe(LOFT_FAILED))?;
     if solid && res.shape.count(ShapeType::Solid) == 0 {
-        return err("Loft did not produce a solid");
+        return err(LOFT_FAILED);
     }
     let names = loft_names(ev, &sections, &res, solid);
     if body_type == "THIN" {
@@ -288,7 +304,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             face_sources: names.iter().map(|n| Source::Topo(n.clone())).collect(),
             edge_sources: crate::regen::eval::names_for(&res.shape, names.clone()).edges.iter().map(|n| Source::Topo(n.clone())).collect(),
         };
-        let th = k::thicken(&res.shape, t1, t2).map_err(kerr("Thin loft failed (thickness too large?)"))?;
+        let th = k::thicken(&res.shape, t1, t2).map_err(|_| fe("Failed to thicken lofted body, check thickness."))?;
         if th.shape.count(ShapeType::Solid) == 0 {
             return err("Thin loft did not produce a solid");
         }
@@ -519,6 +535,10 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         return err("The rib profiles no longer exist");
     }
     let normal = ev.is("ribExtrusionDirection", "NORMAL_TO_SKETCH_PLANE");
+    // rib.fs: a closed profile has no side to extend toward.
+    if !normal && wires.iter().any(|w| w.is_closed().unwrap_or(false)) {
+        return err("Only open sketch profiles can be used when rib direction is parallel to sketch plane.");
+    }
     let dir = if ev.bool("oppositeDirection") { -frame.normal } else { frame.normal };
     let mut parts = ev.resolve_bodies(ev.query("parts"));
     parts.retain(|i| ev.ctx.bodies[*i].kind == BodyKind::Solid);
@@ -537,7 +557,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let mut shape = body.shape.clone();
         for w in &wires {
-            let res = if normal { rib_normal(&shape, w, dir, t) } else { k::rib(&shape, w, &plane, t).map_err(kerr("Rib failed")) };
+            let res = if normal { rib_normal(&shape, w, dir, t) } else { k::rib(&shape, w, &plane, t).map_err(|_| fe(RIB_FAILED)) };
             match res {
                 Ok(r) => {
                     shape = r.shape;
@@ -550,7 +570,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             continue;
         }
         if merge {
-            let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), std::slice::from_ref(&shape), &k::BooleanOptions::default())?;
+            let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), std::slice::from_ref(&shape), &k::BooleanOptions::default()).map_err(|_| fe("Failed to merge ribs into parts."))?;
             let empty = crate::naming::ShapeNames::default();
             let names = ev.name_result(&[&body.shape_names(), &empty], &res.history, &res.shape, &BTreeMap::new(), None);
             ev.replace_body(bi, res.shape, names);
@@ -561,7 +581,8 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if made == 0 {
-        return Err(last_err.unwrap_or_else(|| fe("The rib profiles don't meet the parts")));
+        // Onshape: RIB_PROFILE_FAILED when a profile failed, else RIB_NO_INTERSECTIONS.
+        return Err(last_err.filter(|e| e.message != RIB_MISS).unwrap_or_else(|| fe(RIB_MISS)));
     }
     if !new_ribs.is_empty() {
         for (i, t) in new_ribs.into_iter().enumerate() {
@@ -573,19 +594,23 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
     Ok(())
 }
 
+/// Onshape's RIB_PROFILE_FAILED / RIB_NO_INTERSECTIONS.
+const RIB_FAILED: &str = "Failed to create a rib from a selected profile.";
+const RIB_MISS: &str = "None of the ribs intersected a part.";
+
 /// Rib normal to the sketch plane: the profile thickened in-plane, extruded
 /// along `dir` up to the part, fused with it.
 fn rib_normal(base: &Shape, wire: &Shape, dir: DVec3, t: f64) -> FResult<k::OpResult> {
-    let outline = k::offset_wire_2d(wire, t * 0.5, k::JoinType::Arc, false).map_err(kerr("Rib failed"))?;
+    let outline = k::offset_wire_2d(wire, t * 0.5, k::JoinType::Arc, false).map_err(|_| fe(RIB_FAILED))?;
     let outline = outline.wires().into_iter().next().unwrap_or(outline);
-    let face = k::make_face_from_wire(&outline, true).map_err(kerr("Rib failed"))?;
-    let body = k::extrude_up_to(&face, dir, base, 0.0).map_err(kerr("Rib does not reach the part"))?;
+    let face = k::make_face_from_wire(&outline, true).map_err(|_| fe(RIB_FAILED))?;
+    let body = k::extrude_up_to(&face, dir, base, 0.0).map_err(|_| fe(RIB_MISS))?;
     if body.shape.count(ShapeType::Solid) == 0 {
-        return err("Rib does not reach the part");
+        return err(RIB_MISS);
     }
     let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(base), &[body.shape], &k::BooleanOptions::default())?;
     if res.shape.count(ShapeType::Solid) != base.count(ShapeType::Solid) {
-        return err("Rib does not touch the part");
+        return err(RIB_MISS);
     }
     Ok(res)
 }

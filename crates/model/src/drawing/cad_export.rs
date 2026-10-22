@@ -306,8 +306,26 @@ pub fn to_dxf_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8,
     if version <= DxfVersion::AC1009 {
         return Ok(to_dxf_r12(&r12_sheets(sheets), insunits).into_bytes());
     }
-    let doc = cad_document_sheets(sheets, insunits, version)?;
+    let mut doc = cad_document_sheets(sheets, insunits, version)?;
+    strip_layouts_r14(&mut doc, version);
     DxfWriter::new(&doc).write_to_vec().map_err(|e| e.to_string())
+}
+
+/// Release 13 / 14 DXF has no layouts (LAYOUT objects came with 2000): live
+/// drw2-k-dxfR14 has an empty ACAD_LAYOUT dictionary and no LAYOUT objects,
+/// so the default "Model" / "Layout1" go and the block records point at none.
+fn strip_layouts_r14(doc: &mut CadDocument, version: DxfVersion) {
+    if version > DxfVersion::AC1014 {
+        return;
+    }
+    let dict = doc.header.acad_layout_dict_handle;
+    doc.objects.retain(|_, o| !matches!(o, acadrust::objects::ObjectType::Layout(_)));
+    if let Some(acadrust::objects::ObjectType::Dictionary(d)) = doc.objects.get_mut(&dict) {
+        d.entries.clear();
+    }
+    for b in doc.block_records.iter_mut() {
+        b.layout = Handle::NULL;
+    }
 }
 
 /// Several sheets in one DWG file, like [`to_dxf_sheets`].
@@ -1109,7 +1127,8 @@ pub fn to_dwg_pages(pages: &[SheetGeometry], insunits: u8, version: DxfVersion) 
 
 /// ASCII DXF of a 2000+ version.
 pub fn to_dxf_version(g: &SheetGeometry, insunits: u8, version: DxfVersion) -> Result<Vec<u8>, String> {
-    let doc = cad_document(g, insunits, version)?;
+    let mut doc = cad_document(g, insunits, version)?;
+    strip_layouts_r14(&mut doc, version);
     DxfWriter::new(&doc).write_to_vec().map_err(|e| e.to_string())
 }
 
@@ -1171,8 +1190,14 @@ mod tests {
             assert!((t - e).abs() < 1e-6, "{targets:?} vs {want:?}");
         }
         // Release 14: model space only (no layouts); Release 11-12 likewise.
-        let r14 = cad_document_sheets(&sheets, 1, DxfVersion::AC1014).unwrap();
-        assert!(!r14.objects.values().any(|o| matches!(o, acadrust::objects::ObjectType::Layout(l) if l.name.starts_with("Sheet"))));
+        // Live drw2-k-dxfR14: no LAYOUT objects at all (not even Model / Layout1).
+        let r14 = String::from_utf8(to_dxf_sheets(&sheets, 1, DxfVersion::AC1014).unwrap()).unwrap();
+        let lines: Vec<&str> = r14.lines().map(str::trim).collect();
+        let objects = lines.chunks(2).filter(|p| p.len() == 2 && p[0] == "0").map(|p| p[1]).collect::<Vec<_>>();
+        assert!(r14.contains("AC1014") && !objects.contains(&"LAYOUT"), "{objects:?}");
+        assert!(!lines.contains(&"Layout1") && !lines.contains(&"Sheet1"));
+        let back = acadrust::DxfReader::from_reader(std::io::Cursor::new(r14.into_bytes())).unwrap().read().unwrap();
+        assert!(back.entities().count() >= 3 * sheets[0].1.lines.len());
         let r12 = String::from_utf8(to_dxf_sheets(&sheets, 1, DxfVersion::AC1009).unwrap()).unwrap();
         assert!(r12.contains("AC1009") && !r12.contains("AcDbViewport"));
     }
