@@ -733,13 +733,18 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
 
 /// Apply hover/selection state and rebuild highlight overlays for pick-only
 /// elements. Returns a new scene sharing all static GPU buffers.
-pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, up: &Uploader) -> Scene {
+/// `error`: the edited feature fails. Live (behaviours "URGENT (10-22)",
+/// part-studio/2022, 2028): its inputs are drawn red instead of the orange
+/// selection: edges and face outlines red, sketch regions red-outlined with
+/// a light red fill, no face fill.
+#[allow(clippy::too_many_arguments)]
+pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, error: bool, up: &Uploader) -> Scene {
     let _t = noshape_render::perf::scope("s.with_highlights");
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), compare: built.scene.compare };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4])> = Vec::new();
     let mut overlay_lines = LineData::default();
-    let sel_color = theme::lin(theme::viewport::SELECTION);
+    let sel_color = theme::lin(if error { theme::viewport::ERROR } else { theme::viewport::SELECTION });
     let hov_color = theme::lin(theme::viewport::PREHIGHLIGHT);
     // Onshape outlines hovered and selected faces (their boundary edges
     // light orange / amber) instead of tinting a hovered face.
@@ -751,8 +756,12 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
 
     let mut mark = |r: &Reference, flag: u32, scene: &mut Scene| {
         for &id in built.picks.ids_for(r) {
-            scene.add_flag(id, flag);
-            let Some(t) = built.picks.get(id) else { continue };
+            let t = built.picks.get(id);
+            // An erroring input face shows only its red outline.
+            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) {
+                scene.add_flag(id, flag);
+            }
+            let Some(t) = t else { continue };
             match t.kind {
                 PickKind::Vertex => {
                     if let Some(a) = t.anchor {
@@ -760,7 +769,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                         overlay_pts.points.push(PointSprite { position: a.as_vec3().into(), color: lin_to_u8(c), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
                     }
                 }
-                PickKind::Face if flag & (state::HOVER | state::SELECTED) != 0 => {
+                PickKind::Face if flag & (state::HOVER | state::SELECTED | state::ERROR) != 0 => {
                     let edges = face_edges(display, r);
                     if edges.is_empty() && display.bodies.iter().any(|b| !b.hidden && b.face_refs.contains(r)) {
                         silhouette.push(r.clone());
@@ -789,7 +798,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                         if !hovered {
                             let n: [f32; 3] = sk.frame.normal.as_vec3().into();
                             let mut fill = c;
-                            fill[3] = 0.4;
+                            fill[3] = if error { 0.3 } else { 0.4 };
                             overlay_regions.push((MeshData { positions: reg.positions.clone(), normals: vec![n; reg.positions.len()], pick_ids: vec![0; reg.positions.len()], indices: reg.indices.clone() }, fill));
                         }
                     }
@@ -799,12 +808,18 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         }
     };
     for r in accent {
-        mark(r, state::ACCENT, &mut scene);
+        mark(r, if error { state::ERROR } else { state::ACCENT }, &mut scene);
     }
     // A whole selected part: Onshape's lighter part amber (live #c09039 …
     // #f0b850, part-studio/09), not a selected face's.
     for r in selection {
-        let flag = if matches!(r, Reference::Body(_)) { state::SELECTED | state::BODY } else { state::SELECTED };
+        let flag = if error {
+            state::ERROR
+        } else if matches!(r, Reference::Body(_)) {
+            state::SELECTED | state::BODY
+        } else {
+            state::SELECTED
+        };
         mark(r, flag, &mut scene);
     }
     if let Some(h) = hover {

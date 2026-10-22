@@ -30,7 +30,7 @@ impl FeatureError {
 
 impl From<k::KernelError> for FeatureError {
     fn from(e: k::KernelError) -> Self {
-        FeatureError::new(format!("Geometry operation failed: {e}"))
+        FeatureError::new(format!("{KERNEL_FAILURE}{e}"))
     }
 }
 
@@ -41,6 +41,9 @@ pub fn err<T>(m: impl Into<String>) -> FResult<T> {
 }
 
 /// An error caused by the given parameters (see [`FeatureError::faulty`]).
+/// The prefix of a kernel failure's message (`From<KernelError>`).
+pub const KERNEL_FAILURE: &str = "Geometry operation failed: ";
+
 pub fn err_at<T>(faulty: &[&'static str], m: impl Into<String>) -> FResult<T> {
     Err(FeatureError { faulty: faulty.to_vec(), ..FeatureError::new(m) })
 }
