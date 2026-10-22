@@ -797,8 +797,9 @@ fn report_xt() {
 
 /// qa5 IM4 / IM5 (samples outside the repo, skipped when absent): Onshape's
 /// shell of a chamfer blend patch (its inner face an offset of a B-spline
-/// whose boundary collapses to a point; live 6052.697 mm³ with its ±3 error
-/// bars) and eight circle wire bodies (live G38d) import, nothing refused.
+/// whose boundary collapses to a point, trimmed intersection edges on it;
+/// live 6052.697 mm³, ours 6053.32) and eight circle wire bodies (live
+/// G38d) import, nothing refused.
 #[test]
 #[ignore = "IM5 in progress (kern): the import safeguard still refuses these valid files"]
 fn parasolid_offset_patch_and_wire_circles_from_onshape() {
@@ -811,7 +812,7 @@ fn parasolid_offset_patch_and_wire_circles_from_onshape() {
         assert!(s.is_valid(), "invalid");
         assert_eq!(s.count(ShapeType::Face), 21);
         let v = volume_properties(s).unwrap().mass * 1e9;
-        assert!((v - 6052.697).abs() < 3.0, "{v}");
+        assert!((v - 6052.697).abs() < 1.0, "{v}");
         let b = s.bounding_box(false).unwrap();
         assert!((b.max - b.min).length() < 0.07, "{:?}", b.max - b.min);
     }
