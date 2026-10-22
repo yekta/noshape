@@ -66,12 +66,14 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   `/root/kern-scratch/g46/cavity.cpp`: chamfer-then-fillet shell = Onshape's 20/50/32 at 1, 1.5, 2, 2.05 mm,
   volumes within 0.007 (= Onshape's bias; 1 mm = its x_t 5990.5231). Onshape fails ≥ 2.06 mm: rule unknown,
   live **G51** asked (thresholds for other chamfer/radius pairs).
-- **IM4 (qa5 pass 12):** g50-g46-shell1.x_t imported as garbage (offset of Onshape's degenerate blend patch: edges
-  through the apex row, where the offset normal is undefined, wander 23 km). Now: intersection refinement keeps
-  chart points unless the refined point is near (100 × chordal_error or 1 % of chart spacing), and
-  `check_rebuilt` fails a body whose edges leave its vertices' box (enlarged by its diagonal) with "parasolid: a
-  curve of the file could not be rebuilt". Proper import open: rebuild such offsets as a fitted B-spline using
-  the limit normals at the degenerate row (the offset apex becomes a curve).
+- **IM4 / IM5 (qa5 pass 12-13), fixed 10-22:** g50-g46-shell1.x_t's real fault was ours: an edge on a TRIMMED_CURVE
+  (133) whose basis is an intersection (38) took parm_1/parm_2, which are Parasolid's parameters of that curve, not
+  of our rebuilt B-spline: the range ran off the curve and healing made it 42 km long. Edges on a rebuilt basis
+  (38/137) now take their range from their vertices (`edge()`). The file imports valid, 21 faces, 6053.32 mm³
+  (live 6052.697, inside its error bars); OCCT's own Geom_OffsetSurface handles the patch's collapsed boundary,
+  no fitting needed. `check_rebuilt` (last resort, runs BEFORE healing, which copies curves) only checks edges on
+  rebuilt curves against the box of everything else; it refused g38d-polycarb-curves.x_t (IM5) when it also
+  checked edges of single-vertex bodies. Test: export.rs `parasolid_offset_patch_and_wire_circles_from_onshape`.
 - **Onshape mass properties carry error bars**: REST volume = [value, min, max]; g49 2 mm 44789.850 in
   [44786.647, 44793.054]. The "IM2-kind" +0.12/+0.09 (g49), +0.0023 (g48), +0.0035 (g50-reorder) are inside them;
   our numbers are the exact integrals (g50-reorder equals an independent exact construction).

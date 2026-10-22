@@ -113,8 +113,6 @@ pub struct Snapshot {
     pub body_type: &'static str,
     /// Taken from a sketch entity.
     pub sketch: bool,
-    /// The operation number when it was taken ([`CtxState::seq`]).
-    pub seq: u32,
 }
 
 pub struct QueryCx<'a> {
@@ -545,7 +543,7 @@ impl<'a> QueryCx<'a> {
                 vec![shape.project_point(p).ok()?.point]
             }
         };
-        Some(Snapshot { etype, points, body_type: self.body_type(e), sketch: self.is_sketch(e), seq: self.st.seq() })
+        Some(Snapshot { etype, points, body_type: self.body_type(e), sketch: self.is_sketch(e) })
     }
 
     /// What a transient id stands for now. Operations rename entities, and
@@ -604,8 +602,7 @@ impl<'a> QueryCx<'a> {
         const TOL: f64 = 1e-7;
         let on = |e: &Ent, p: DVec3| self.shape(e).and_then(|s| k::make_vertex(p).ok().and_then(|v| k::distance(&v, &s).ok())).is_some_and(|d| d.distance < TOL);
         // Hidden bodies too: std sheet metal tracks its (hidden) definition.
-        let mut found: Vec<Ent> = self
-            .all_with(Some(snap.etype), true)
+        self.all_with(Some(snap.etype), true)
             .into_iter()
             // Solids only to solids; sheets, wires and sketches among
             // themselves (std follows a sketch line onto a sheet's edge).
@@ -628,17 +625,7 @@ impl<'a> QueryCx<'a> {
                 }
                 false
             })
-            .collect();
-        // Found on a body and on a copy made since (std Bend copies its bend
-        // face, then deletes it): the body's. Only on a copy: the copy's.
-        let copy = |e: &Ent| match self.owner(e) {
-            Some(Ent::Body(b)) => self.st.copies.get(&self.st.ctx.bodies[b].id).is_some_and(|s| *s > snap.seq),
-            _ => false,
-        };
-        if found.iter().any(|e| !copy(e)) {
-            found.retain(|e| !copy(e));
-        }
-        found
+            .collect()
     }
 
     /// Size used by qLargest / qSmallest: length, area or volume.
