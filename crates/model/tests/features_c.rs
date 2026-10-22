@@ -1271,3 +1271,68 @@ fn pattern_errors_as_onshape() {
     });
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a path to pattern along.".to_string()));
 }
+
+/// Live "lp wall over" (behaviours "URGENT (10-22): Feature pattern…"): a
+/// 0.5 mm wall overhanging the block's end by 1 mm, Feature pattern 2 mm × 2.
+/// Reapply features off fails with Onshape's text and keeps only the seed;
+/// on, the second wall adds its 21 mm³ of overhang.
+#[test]
+fn feature_pattern_of_overhanging_wall_as_live() {
+    let build = |reapply: bool| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (100.0, 0.0), (100.0, 20.0), (0.0, 20.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(-1.0, 0.0), (21.0, 0.0), (21.0, 11.0), (-1.0, 11.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Right), sk);
+        let region = s.region(sid);
+        let wall = s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("0.5 mm"));
+            p.set("operationType", en("ADD"));
+            p.set("defaultScope", ParamValue::Bool(true));
+        });
+        s.add("linearPattern", move |p| {
+            p.set("patternType", en("FEATURE"));
+            p.set("instanceFunction", q(Reference::Feature(wall)));
+            p.set("directionOne", q(Reference::Plane(DatumPlane::Right)));
+            p.set("distance", expr("2 mm"));
+            p.set("instanceCount", expr("2"));
+            p.set("fullFeaturePattern", ParamValue::Bool(reapply));
+        });
+        s
+    };
+    let mut off = build(false);
+    let r = off.regen();
+    let st = r.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Could not create all instances as entered. Try selecting \"Reapply features\" option.")));
+    assert!(near(volume(&r, 0), mm(100.0) * mm(20.0) * mm(10.0) + mm(0.5) * 21e-6 * 2.0, 1e-9), "{}", volume(&r, 0));
+    let mut on = build(true);
+    let r = on.ok();
+    assert!(near(volume(&r, 0) * 1e9, 20042.0, 1e-6), "{}", volume(&r, 0) * 1e9);
+}
+
+/// Live "Contrast: a failed EXTRUDE" (10-22): Up to face on a face the
+/// profile can't reach reads Onshape's text, not the kernel's.
+#[test]
+fn failed_extrude_reads_onshape_text() {
+    let mut s = block();
+    let r = s.ok();
+    let side = face_at(&r, 0, DVec3::new(0.0, mm(25.0), mm(12.5)));
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(120.0, 10.0), (130.0, 10.0), (130.0, 20.0), (120.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("endBound", en("UP_TO_SURFACE"));
+        p.set("endBoundEntityFace", q(side));
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Failed to extrude selections, check input.".to_string()));
+}
