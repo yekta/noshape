@@ -3126,9 +3126,10 @@ fn pan_head_tapping_screw_matches_live() {
     let mut spec = StandardSpec::new(c);
     spec.set_size("#8");
     spec.params.insert("Tip type".into(), "A".into());
-    // Live: Type VI 15, Type III 19 with the mouth fillet (1 / 4 faces),
-    // which OCCT can't make yet (`pan_head_tapping_screw_mouth_fillets`).
-    for (head, faces) in [("Slot", 10), ("Type VI", 14), ("Type III", 15)] {
+    // Live: Type VI 15, Type III 19 with the 0.002 in mouth fillet (1 / 4
+    // faces); FeatureScript's opFillet builds it once it uses the checked
+    // kernel fillet (kern), until then the recess has no fillet faces.
+    for (head, faces, unfilleted) in [("Slot", 10, 10), ("Type VI", 15, 14), ("Type III", 19, 15)] {
         spec.params.insert("Head type".into(), head.into());
         spec.params.remove("Threads/inch");
         spec.fix_length();
@@ -3143,14 +3144,14 @@ fn pan_head_tapping_screw_matches_live() {
         for s in &surfaces {
             *kinds.entry(format!("{s:?}").split([' ', '(']).next().unwrap_or_default().to_string()).or_default() += 1;
         }
-        assert_eq!(body.faces.len(), faces, "{head}: {kinds:?}");
+        assert!(body.faces.len() == faces || body.faces.len() == unfilleted, "{head}: {} faces, live {faces}: {kinds:?}", body.faces.len());
     }
 }
 
 /// Live's Pan #8 Type VI 15 faces / Type III 19 faces include the 0.002 in
 /// mouth fillet (1 / 4 TORUS-like faces).
 #[test]
-#[ignore = "OCCT's BRepFilletAPI_MakeFillet fails the 0.0508 mm fillet between the crown sphere and the recess walls (0.254 mm works); kernel follow-up for kern"]
+#[ignore = "needs FeatureScript opFillet on the checked kernel fillet (kern's opfillet-checked patch; passes with it, seamless crowns in place)"]
 fn pan_head_tapping_screw_mouth_fillets() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let c = CATALOGUE.iter().find(|c| c.name == "Pan head tapping screw").expect("in the catalogue");
@@ -3166,3 +3167,62 @@ fn pan_head_tapping_screw_mouth_fillets() {
         assert_eq!(body.faces.len(), faces, "{head}");
     }
 }
+
+/// The remaining ANSI tapping screws (live, behaviours.md "skb (10-22 07:45)"):
+/// #8 tip A face counts as live's geometry files; until FeatureScript's
+/// opFillet uses the checked kernel fillet (kern) the 0.002 in mouth fillet
+/// of Type III / VI may be missing (the second count). Flat countersunk has
+/// no live file: counted as its siblings. Undercut heads stop the 41° cone at the head height with a flat
+/// step; hex heads with a 30° top chamfer, the indent a Ø0.9 s dish; the hex
+/// washer's disc under the hex.
+#[test]
+fn remaining_tapping_screws_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    // (head type, live's faces, without the 0.002 in mouth fillet).
+    type Heads = &'static [(&'static str, usize, usize)];
+    let cases: [(&str, Heads); 5] = [
+        ("Flat countersunk head tapping screw", &[("Slot", 8, 8), ("Type III", 17, 13), ("Type VI", 13, 12)]),
+        ("Flat undercut countersunk head tapping screw", &[("Slot", 9, 9), ("Type III", 18, 14)]),
+        ("Oval undercut countersunk head tapping screw", &[("Slot", 9, 9), ("Type III", 18, 14)]),
+        ("Hex head tapping screw", &[("Plain", 16, 16), ("Indent", 18, 18), ("Slot", 20, 20), ("Slot and indent", 24, 24), ("Type VI", 27, 26)]),
+        ("Hex washer head tapping screw", &[("Plain", 18, 18), ("Indent", 20, 20), ("Slot", 22, 22), ("Slot and indent", 26, 26), ("Type VI", 29, 28)]),
+    ];
+    let mut wrong = Vec::new();
+    for (name, heads) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size("#8");
+        spec.params.insert("Tip type".into(), "A".into());
+        for (head, faces, unfilleted) in heads {
+            spec.params.insert("Head type".into(), (*head).into());
+            spec.params.remove("Threads/inch");
+            spec.fix_length();
+            let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {head}: {e}"));
+            let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
+            assert!(failed.is_empty(), "{name} {head}: {failed:?}");
+            let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+            if body.faces.len() != *faces && body.faces.len() != *unfilleted {
+                wrong.push(format!("{name} {head}: {} faces, live {faces}", body.faces.len()));
+            }
+            // Overall height as live's geometry files (in; a slot can take the apex).
+            let live_h = match (name, *head) {
+                ("Flat undercut countersunk head tapping screw", _) => Some(1.25),
+                ("Oval undercut countersunk head tapping screw", "Slot") => Some(1.3016),
+                ("Oval undercut countersunk head tapping screw", "Type III") => Some(1.2963),
+                ("Hex head tapping screw", _) => Some(1.36),
+                ("Hex washer head tapping screw", _) => Some(1.391),
+                _ => None,
+            };
+            if let Some(h) = live_h {
+                let b = body.shape.bounding_box(true).unwrap();
+                let got = (b.max.z - b.min.z) / 0.0254;
+                // (An unfilleted mouth stands 0.0005 in higher on a crown.)
+                if (got - h).abs() > 8e-4 {
+                    wrong.push(format!("{name} {head}: height {got:.4} in, live {h}"));
+                }
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
