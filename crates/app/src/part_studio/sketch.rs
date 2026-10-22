@@ -1072,15 +1072,24 @@ impl PartStudioView {
         // Enter on the untouched box keeps the exact value (the box shows it
         // rounded to 6 / 7 decimals).
         if self.sketch_data(cx).and_then(|data| crate::sketch_mode::dimension_edit_text(&data, cid, &units)).is_some_and(|shown| shown == text.trim()) {
+            let data = self.sketch_data(cx);
             if let Some(ed) = &mut self.sketch {
                 // A new dimension leaves nothing selected (see below).
                 if ed.dim_edit.take().is_some_and(|d| d.created) {
                     ed.selection.clear();
                     ed.selected_constraints.clear();
                 }
+                // A chamfer's first distance → its second (live).
+                if let Some(d) = &data {
+                    ed.open_next_value_box(d);
+                }
             }
             self.dim_input = None;
-            window.focus(&self.focus, cx);
+            if self.sketch.as_ref().is_some_and(|s| s.dim_edit.is_some()) {
+                self.sync_dim_edit(window, cx);
+            } else {
+                window.focus(&self.focus, cx);
+            }
             cx.notify();
             return;
         }

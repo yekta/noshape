@@ -85,11 +85,11 @@ impl DrawingEditor {
 
     /// The dialog's settings as a table kind (keeping edited texts).
     fn revision_kind(d: &RevisionDlg, old: Option<&TableKind>) -> TableKind {
-        let mut k = old.cloned().filter(|k| matches!(k, TableKind::Revision { .. })).unwrap_or_else(TableKind::revision);
-        if let TableKind::Revision { see_sheet1, visible_rows, newest_top, hide_callouts, .. } = &mut k {
-            (*see_sheet1, *visible_rows, *newest_top, *hide_callouts) = (d.see_sheet1, d.visible_rows, d.newest_top, d.hide_callouts);
-        }
-        k
+        noshape_scene::drawing_tools::revision_table_kind(&Self::revision_opts(d), old)
+    }
+
+    fn revision_opts(d: &RevisionDlg) -> noshape_scene::drawing_tools::RevisionTableOpts {
+        noshape_scene::drawing_tools::RevisionTableOpts { see_sheet1: d.see_sheet1, visible_rows: d.visible_rows, newest_top: d.newest_top, hide_callouts: d.hide_callouts, corner: d.corner }
     }
 
     /// Editing a table: apply the dialog live.
@@ -110,8 +110,7 @@ impl DrawingEditor {
     pub fn place_revision_table(&mut self, c: [f64; 2], cx: &mut Context<Self>) {
         let Some(d) = &self.revision_dlg else { return };
         let id = self.drawing.sheets[self.sheet].next_table_id();
-        let mut t = Table::new(id, Self::revision_kind(d, None), c);
-        t.corner = d.corner;
+        let t = noshape_scene::drawing_tools::revision_table(id, &Self::revision_opts(d), c);
         self.edit_sheet("Revision table", cx, |s| s.tables.push(t));
         self.revision_dlg = None;
         self.tool = Tool::Select;
@@ -121,12 +120,12 @@ impl DrawingEditor {
 
     /// The revision new callouts get: the latest (pending first), else "A".
     pub fn latest_revision(&self) -> String {
-        self.info.revisions.last().map(|r| r.revision.clone()).unwrap_or_else(|| noshape_model::release::next_label(None))
+        noshape_scene::drawing_tools::latest_revision(&self.info)
     }
 
     pub fn place_revision_callout(&mut self, revision: String, c: [f64; 2], cx: &mut Context<Self>) {
         let id = self.drawing.sheets[self.sheet].next_annotation_id();
-        self.edit_sheet("Revision callout", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::RevisionCallout { anchor: c, revision, group: None }, position: c, ..Default::default() }));
+        self.edit_sheet("Revision callout", cx, |s| s.annotations.push(noshape_scene::drawing_tools::revision_callout(id, c, revision)));
         self.tool = Tool::Select;
         self.selection = vec![Sel::Annotation(id)];
         cx.notify();

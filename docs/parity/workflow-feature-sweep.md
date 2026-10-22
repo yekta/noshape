@@ -64,14 +64,14 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 |---|---|---|---|---|
 | 1 | Fields | order, labels, defaults, Twist / Scale / Thin / Trim ends groups (dialog-sweep.txt) | same | ✅ |
 | 2 | Empty path | "Select entities for sweep path." on path | same | ✅ |
-| 3 | Thin, check order | wall checked before path: "Select faces or sketch regions to sweep." on wallShape | path first; own text, no field | ✗ |
-| 4 | Path not one chain | "Sweep path curves are not all connected." on path | own text, no field | ✗ |
-| 5 | Lock direction empty | "Select direction to lock." on lockDirectionQuery | own text, no field | ✗ |
-| 6 | Pitch revolutions limit | "Computed number of revolutions outside limit (between 0 and 1000). Current value is N." on pitch | no check | ✗ |
-| 7 | Failure | "Could not create valid swept body, check input." / thin "Failed to thicken swept body, check thickness." | "Sweep failed: …", own thin texts | ✗ |
+| 3 | Thin, check order | wall checked before path: "Select faces or sketch regions to sweep." on wallShape | path first; own text, no field | 🔧 |
+| 4 | Path not one chain | "Sweep path curves are not all connected." on path | own text, no field | 🔧 |
+| 5 | Lock direction empty | "Select direction to lock." on lockDirectionQuery | own text, no field | 🔧 |
+| 6 | Pitch revolutions limit | "Computed number of revolutions outside limit (between 0 and 1000). Current value is N." on pitch | no check | 🔧 |
+| 7 | Failure | "Could not create valid swept body, check input." / thin "Failed to thicken swept body, check thickness." | "Sweep failed: …", own thin texts | 🔧 solid/surface; thin wall texts ✗ |
 | 8 | Path opposite direction, Extend to full path | change where the sweep starts / whether it covers the path | ignored | ✗ ? L12 |
 | 9 | Thin method | sweep a sheet, thicken it, trim ends to planes | offset the wall, then sweep (scale scales the wall; Trim ends off ignored) | ✗ |
-| 10 | Empty profiles texts | — | own texts | ? L13 |
+| 10 | Empty profiles texts | — | own texts | 🔧 "Select faces or sketch regions to sweep." on profiles ? L13 |
 
 ## Loft
 | # | Area | Onshape | Ours | Status |
@@ -81,8 +81,8 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 3 | Guides, Path | supported | "…not supported yet" | ✗ |
 | 4 | End conditions | applied, with their errors (planar profile, adjacent faces, tangency direction) | warning only | ✗ |
 | 5 | Connections | every connection; "Select a point on each profile to define a connection." | first only | ✗ |
-| 6 | Profile errors | "Point profiles can only exist as first or last profiles.", "Select a single sketch region or face per profile.", "Cannot use faces or regions with inner loops as profiles.", "Could not create valid profiles from selections." | own texts, no field | ✗ ? L14 |
-| 7 | Failure | "Could not create loft with given information. Check profile order, guide/profile intersections or end conditions." / thin "Failed to thicken lofted body, check thickness." | own texts | ✗ |
+| 6 | Profile errors | "Point profiles can only exist as first or last profiles.", "Select a single sketch region or face per profile.", "Cannot use faces or regions with inner loops as profiles.", "Could not create valid profiles from selections." | own texts, no field | 🔧 texts ? L14 (fields) |
+| 7 | Failure | "Could not create loft with given information. Check profile order, guide/profile intersections or end conditions." / thin "Failed to thicken lofted body, check thickness." | own texts | 🔧 |
 | 8 | Trim profiles / guides, Thin Trim ends, Show isocurves | applied | ignored | ✗ |
 | 9 | One profile | allowed with a closed guide / path | error | ? L15 |
 
@@ -102,7 +102,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields | Creation type Solid / Surface / Split (Surface), operations for Solid, flip, Trim to target, anchors, Thickness 2.5 | same | ✅ |
 | 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✗ |
 | 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | ✗ ? L20 |
-| 4 | Errors | "Select planar faces or sketch regions to wrap." (source), "Select a cylindrical or conical face to wrap around." (destination), "Source entities must all lie on the same plane.", "Select anchor points.", auto-anchor text, "Failed to imprint edges onto destination face.", ambiguous anchor | own texts, no fields | ✗ |
+| 4 | Errors | "Select planar faces or sketch regions to wrap." (source), "Select a cylindrical or conical face to wrap around." (destination), "Source entities must all lie on the same plane.", "Select anchor points.", auto-anchor text, "Failed to imprint edges onto destination face.", ambiguous anchor | own texts, no fields | 🔧 (unwrap keeps its own texts) |
 | 5 | Dialog dump | — | — | ? L21 |
 
 ## Rib
@@ -112,9 +112,9 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Empty profiles | "Select sketch profiles to create the ribs." on profiles | same | ✅ |
 | 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | ✗ ? L22 |
 | 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | ✗ ? L22 |
-| 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | ✗ ? L23 |
+| 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | 🔧 ? L23 |
 | 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | ✗ |
-| 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | ✗ |
+| 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | 🔧 |
 | 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✗ ? L24 |
 
 ## Offset surface
@@ -205,12 +205,12 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields | order, labels, enum texts, defaults, bounds, visibility (dialog-hole.txt) | same | ✅ |
 | 2 | Standard tables | holetables.gen.fs (already in crates/featurescript/std) | our own close values; missing sizes, pipe taps, PEM; labels like "1/64 (0.0156)" | ✗ |
 | 3 | Tap drill default | 5 mm / 0.25 in | 4.2 mm / 0.201 in | ✗ |
-| 4 | Check order | counterbore, countersink, tolerances, tap drill, end, start, then "No hole points selected." | points first | ✗ |
-| 5 | Counterbore / countersink errors | "The counterbore diameter must be larger than the hole diameter." (marks both), "The counterbore depth must be smaller than the hole depth.", "The countersink diameter must be larger than the hole diameter."; no countersink-depth error | own texts, no fields; countersink depth error | ✗ |
-| 6 | Up to entity / selected plane empty | "Select an entity or mate connector to terminate the hole." / "Select a start entity." on the field | own texts, late | ✗ |
+| 4 | Check order | counterbore, countersink, tolerances, tap drill, end, start, then "No hole points selected." | points first | 🔧 |
+| 5 | Counterbore / countersink errors | "The counterbore diameter must be larger than the hole diameter." (marks both), "The counterbore depth must be smaller than the hole depth.", "The countersink diameter must be larger than the hole diameter."; no countersink-depth error | own texts, no fields; countersink depth error | 🔧 texts and fields; the countersink-depth error stays ? L47 |
+| 6 | Up to entity / selected plane empty | "Select an entity or mate connector to terminate the hole." / "Select a start entity." on the field | own texts, late | 🔧 |
 | 7 | Merge scope | auto-filled with the parts the hole reaches, direction flipped toward them; empty: "No target parts selected for hole." | empty = every solid | ✗ ? L56, L57 |
-| 8 | Misses | "None of the holes intersected a part." (scope); warning "Some selections did not produce holes."; blind hole that misses must fail | own texts; silent; blind miss succeeds | ✗ |
-| 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | ✗ ? L51 |
+| 8 | Misses | "None of the holes intersected a part." (scope); warning "Some selections did not produce holes."; blind hole that misses must fail | own texts; silent; blind miss succeeds | 🔧 |
+| 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | 🔧 ? L51 |
 | 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | ✗ ? L61 |
 | 11 | Depth / Tapped depth / Tap clearance | kept consistent by edit logic; inconsistency warning | independent | ✗ ? L49, L50 |
-| 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | ✗ |
+| 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; other infos ✗ |
