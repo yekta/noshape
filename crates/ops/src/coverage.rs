@@ -161,7 +161,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("drawing:2-point linear dimension", Op("drawing_dimension")),
     ("drawing:3-point angular dimension", Op("drawing_dimension")),
     ("drawing:3-point circle centerline", Op("drawing_centerline")),
-    ("drawing:Aligned section view", Planned),
+    ("drawing:Aligned section view", Op("drawing_aligned_section_view")),
     ("drawing:Arc length dimension", Op("drawing_dimension")),
     ("drawing:Auxiliary view", Op("drawing_auxiliary_view")),
     ("drawing:BOM table", Op("drawing_view_table")),

@@ -980,3 +980,7 @@ these rules, change it in commit.rs (the app and the API both use it). Backups: 
   `surface_finish`, `SURFACE_FINISH_DEFAULT`, `weld_target`, `weld`, `RevisionTableOpts`, `revision_table`,
   `revision_table_kind`, `latest_revision`, `revision_callout`) — the same builders the agent API uses. Behaviour
   unchanged; each checked in the app (frames / symbols placed, same history text).
+- (api, 2026-10-22 17:30) `view_point`, `ortho_view` and `extend_line_ends` (jogged / aligned section and broken-out
+  clicks, drawing_extra.rs) now delegate to scene/drawing_tools/commit.rs (SheetPick::view_point /
+  extend_line_ends, ortho_view); the API's drawing_jogged_section_view / drawing_aligned_section_view use the same.
+  Checked in the app: Aligned section view about hole A1 (legs extended past the view, SECTION C - C placed).

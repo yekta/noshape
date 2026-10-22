@@ -772,39 +772,17 @@ impl DrawingEditor {
 
     /// Extend the end legs of a cutting line past the view's geometry.
     fn extend_line_ends(&self, view: ViewId, points: &[[f64; 2]]) -> Vec<[f64; 2]> {
-        let mut pts = points.to_vec();
-        let Some(g) = self.geoms.get(&view) else { return pts };
-        let n = pts.len();
-        if n < 2 {
-            return pts;
-        }
-        let margin = (g.max[0] - g.min[0]).max(g.max[1] - g.min[1]) * 0.08 + 1e-4;
-        let corners = [[g.min[0] - margin, g.min[1] - margin], [g.max[0] + margin, g.min[1] - margin], [g.max[0] + margin, g.max[1] + margin], [g.min[0] - margin, g.max[1] + margin]];
-        let reach = |from: [f64; 2], dir: [f64; 2]| corners.iter().map(|k| dot(sub(*k, from), dir)).fold(0.0f64, f64::max);
-        let d0 = norm(sub(pts[0], pts[1]));
-        let t0 = reach(pts[1], d0).max(len(sub(pts[0], pts[1])));
-        pts[0] = add(pts[1], mul(d0, t0));
-        let d1 = norm(sub(pts[n - 1], pts[n - 2]));
-        let t1 = reach(pts[n - 2], d1).max(len(sub(pts[n - 1], pts[n - 2])));
-        pts[n - 1] = add(pts[n - 2], mul(d1, t1));
-        pts
+        self.pk().extend_line_ends(view, points)
     }
 
     /// A point in a view: snap, else the cursor position in the view.
     pub(crate) fn view_point(&self, view: Option<ViewId>) -> Option<PickedPoint> {
-        let c = self.cursor;
-        if let Some(p) = self.snap_at(c).filter(|p| view.is_none_or(|v| v == p.view)) {
-            return Some(p);
-        }
-        let v = view.or_else(|| self.view_at(c))?;
-        let pl = self.placement(v)?;
-        Some(PickedPoint { view: v, p: pl.to_view(c), r: None })
+        self.pk().view_point(self.cursor, view)
     }
 
     /// Orthogonal continuation (in the view's frame) from `last` toward `target`.
     fn ortho_view(last: [f64; 2], target: [f64; 2]) -> [f64; 2] {
-        let d = sub(target, last);
-        if d[0].abs() >= d[1].abs() { [target[0], last[1]] } else { [last[0], target[1]] }
+        noshape_scene::drawing_tools::ortho_view(last, target)
     }
 
     /// Help crop_view: crops can't be made from detail, break or flat
