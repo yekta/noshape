@@ -121,6 +121,9 @@ pub struct GpuCache {
     /// Boundary (laminar) edges for "Highlight boundary edges": solid and
     /// dashed-on-top lines, keyed by mesh pointer (`None`: the body has none).
     boundary: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, Option<BoundaryLines>)>,
+    /// The unit cube of the bodies' lowest level of detail
+    /// ([`Instance::lod_box`]).
+    lod_box: Option<MeshHandle>,
 }
 
 
@@ -262,6 +265,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
+    let mut bodies = 0u32;
     for b in display.bodies.iter().filter(|b| !b.hidden) {
         let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
         let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
@@ -434,10 +438,21 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 scene.instances.push(Instance::new(Drawable::Lines(dashed)).with_color(red).unpickable().layer(3));
             }
         }
+        // Onshape's lowest level of detail of the body: its bounding box.
+        let body = bodies + 1;
+        bodies = body;
+        for i in &mut scene.instances[first_instance..] {
+            i.body = body;
+        }
+        if let Some(bounds) = cached.mesh.bounds().filter(|_| b.kind != BodyKind::Wire) {
+            let unit = cache.lod_box.get_or_insert_with(|| up.upload_mesh(&noshape_render::scene::lod_box_mesh())).clone();
+            let lod = Instance::lod_box(unit, body, bounds, color);
+            scene.instances.push(if opts.section_skip.contains(&b.id) { lod.ignore_clip() } else { lod });
+        }
         if let Some(s) = shared {
             let placement = placement_matrix(&s.transform);
             for i in &mut scene.instances[first_instance..] {
-                i.transform = placement;
+                i.transform = placement * i.transform;
             }
         }
         if display_only {
