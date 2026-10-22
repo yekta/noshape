@@ -2987,9 +2987,12 @@ impl Render for FeatureDialog {
         let status = self.status.clone();
         // Onshape: the title turns red while the feature is invalid.
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error));
-        // Live (qa5 BOOL4b): an Add with an empty merge scope can still be
-        // accepted (✓ enabled), and fails once it is.
-        let blocked = invalid && !status.as_ref().is_some_and(|s| s.1 == "No merge scope selected.");
+        // Live: ✓ is disabled while a field shows the error (pink: an empty
+        // required selection), and stays the normal green for an error of
+        // the regeneration itself ("has-regen-error", lp-over-failure-capture
+        // 10-22) and for an Add with an empty merge scope (qa5 BOOL4b).
+        let pink = self.ty.params.iter().any(|s| s.is_visible(&self.feature.params) && matches!(s.kind, ParamKind::Query { .. }) && self.field_error(s.id).is_some()) || !self.parse_errors.is_empty();
+        let blocked = invalid && pink && !status.as_ref().is_some_and(|s| s.1 == "No merge scope selected.");
         let title_color = if invalid { pal.text_invalid } else { pal.text };
         let name = noshape_model::interaction::display_name_computed(&self.feature, &|k| self.computed.get(k).cloned().or_else(|| shown_length(&self.feature, k, &self.units, &self.variables)));
         // Live (dom/dialog-hole.txt, dialog-variable.txt): a name built from

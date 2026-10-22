@@ -689,7 +689,7 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32) -> LineOut {
     let pick = global_pick(l.pick);
     let st = state_of(pick) & state_mask;
     var width = l.width * inst.extra.x + g.viewport.w;
-    if ((st & (HOVER | SELECTED)) != 0u) { width = width * 1.8 + 1.0; }
+    if ((st & (HOVER | SELECTED | ERROR)) != 0u) { width = width * 1.8 + 1.0; }
     let half = max(width * g.viewport.z * 0.5, 0.5);
 
     var c = select(ca, cb, t > 0.5);
