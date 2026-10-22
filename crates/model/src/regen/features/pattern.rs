@@ -81,22 +81,28 @@ fn code2(i: i64, j: i64) -> u32 {
 
 fn linear_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
     let Some(r1) = ev.query("directionOne").first() else { return crate::regen::eval::err_at(&["directionOne"], "Select a pattern direction.") };
-    let mut d1 = ev.resolve_direction(r1).ok_or_else(|| fe("The pattern direction could not be resolved"))?.normalize();
+    let Some(d1) = ev.resolve_direction(r1) else { return crate::regen::eval::err_at(&["directionOne"], "Select a pattern direction.") };
+    let mut d1 = d1.normalize();
     if ev.bool("oppositeDirection") {
         d1 = -d1;
     }
     let s1 = ev.length("distance")?;
     let n1 = ev.integer("instanceCount")?.max(1);
-    let (d2, s2, n2, c2) = if ev.bool("hasSecondDir") {
-        let Some(r2) = ev.query("directionTwo").first() else { return err("Select the second pattern direction") };
-        let mut d = ev.resolve_direction(r2).ok_or_else(|| fe("The second pattern direction could not be resolved"))?.normalize();
-        if ev.bool("oppositeDirectionTwo") {
-            d = -d;
+    // linearPattern.fs: an empty second direction only matters when its
+    // count is above 1.
+    let n2_set = ev.integer("instanceCountTwo")?.max(1);
+    let second = if ev.bool("hasSecondDir") { ev.query("directionTwo").first().and_then(|r| ev.resolve_direction(r)) } else { None };
+    let (d2, s2, n2, c2) = match second {
+        Some(d) => {
+            let d = d.normalize() * if ev.bool("oppositeDirectionTwo") { -1.0 } else { 1.0 };
+            (d, ev.length("distanceTwo")?, n2_set, ev.bool("isCenteredTwo"))
         }
-        (d, ev.length("distanceTwo")?, ev.integer("instanceCountTwo")?.max(1), ev.bool("isCenteredTwo"))
-    } else {
-        (DVec3::ZERO, 0.0, 1, false)
+        None if ev.bool("hasSecondDir") && n2_set > 1 => return crate::regen::eval::err_at(&["directionTwo"], "Select a pattern direction."),
+        None => (DVec3::ZERO, 0.0, 1, false),
     };
+    if n1 * n2 > 2500 {
+        return err("Cannot have more than 2500 instances in a pattern.");
+    }
     let skip = skipped(ev, true)?;
     let mut out = Vec::new();
     for j in index_range(n2, c2) {
@@ -112,7 +118,7 @@ fn linear_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
 
 fn circular_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
     let Some(r) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select a pattern axis.") };
-    let (origin, mut axis) = ev.resolve_axis(r).ok_or_else(|| fe("The pattern axis could not be resolved"))?;
+    let Some((origin, mut axis)) = ev.resolve_axis(r) else { return crate::regen::eval::err_at(&["axis"], "Select a pattern axis.") };
     if ev.bool("oppositeDirection") {
         axis = -axis;
     }
@@ -248,16 +254,23 @@ fn chain_path(edges: &[SourcedEdge]) -> FResult<Path> {
 fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
     let edges = resolve_curves(ev, ev.query("edges"))?;
     if edges.is_empty() {
-        return err("Select a path to pattern along");
+        return crate::regen::eval::err_at(&["edges"], "Select a path to pattern along.");
     }
-    let path = chain_path(&edges)?;
+    let orient = ev.enum_("orientationType").to_string();
+    // curvePattern.fs checks the faces before building the path.
+    if orient == "LOCK_FACES" && ev.query("lockedFaces").is_empty() {
+        return crate::regen::eval::err_at(&["lockedFaces"], "Select face to be normal to.");
+    }
+    let path = chain_path(&edges).or_else(|_| crate::regen::eval::err_at(&["edges"], "Edges do not form a continuous path."))?;
     let len = path.length();
     let n = ev.integer("instanceCount")?.max(1);
     let closed = path.pts.first().zip(path.pts.last()).is_some_and(|(a, b)| a.distance(*b) < 1e-6);
     let spacing = if ev.is("spacingType", "DISTANCE") {
         let d = ev.length("distance")?;
-        if d * (n - 1) as f64 > len + 1e-9 {
-            return err("The path is too short for the instance count and distance");
+        // A closed path needs room for the gap back to the start.
+        let (need, have) = if closed { (d * n as f64, len - d) } else { (d * (n - 1) as f64, len) };
+        if n > 1 && have - need < -1e-9 {
+            return crate::regen::eval::err_at(&["distance"], "Cannot create a curve pattern when the entered distance is larger than the path length.");
         }
         d
     } else if closed {
@@ -267,13 +280,12 @@ fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
     } else {
         0.0
     };
-    let orient = ev.enum_("orientationType").to_string();
     // Normal to face: each instance's frame is (curve tangent, the faces' normal
     // made perpendicular to it), mapped from the frame at the seed.
     let faces: Vec<k::Shape> = if orient == "LOCK_FACES" {
         let f: Vec<k::Shape> = ev.resolve_faces(ev.query("lockedFaces")).into_iter().filter_map(|(bi, fi)| ev.ctx.bodies[bi].shape.sub_shape(ShapeType::Face, fi).ok()).collect();
         if f.is_empty() {
-            return err("Select faces to be normal to");
+            return crate::regen::eval::err_at(&["lockedFaces"], "Select face to be normal to.");
         }
         f
     } else {
@@ -322,9 +334,21 @@ fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
 
 // ------------------------------------------------------------------ entry points
 
+/// Both linear directions set and parallel (linearPattern.fs reports it).
+fn parallel_directions(ev: &EvalCtx) -> bool {
+    if !ev.bool("hasSecondDir") {
+        return false;
+    }
+    let dir = |id: &str| ev.query(id).first().and_then(|r| ev.resolve_direction(r));
+    dir("directionOne").zip(dir("directionTwo")).is_some_and(|(a, b)| a.normalize().cross(b.normalize()).length() < 1e-9)
+}
+
 pub fn linear_pattern(ev: &mut EvalCtx) -> FResult<()> {
     check_seeds(ev, "pattern")?;
     let inst = linear_instances(ev)?;
+    if parallel_directions(ev) {
+        ev.infos.push("Parallel directions selected for first and second direction.".into());
+    }
     run_pattern(ev, inst)
 }
 
@@ -335,6 +359,7 @@ pub fn circular_pattern(ev: &mut EvalCtx) -> FResult<()> {
 }
 
 pub fn curve_pattern(ev: &mut EvalCtx) -> FResult<()> {
+    check_seeds(ev, "pattern")?;
     let inst = curve_instances(ev)?;
     run_pattern(ev, inst)
 }
@@ -342,7 +367,7 @@ pub fn curve_pattern(ev: &mut EvalCtx) -> FResult<()> {
 pub fn mirror(ev: &mut EvalCtx) -> FResult<()> {
     check_seeds(ev, "mirror")?;
     let Some(r) = ev.query("mirrorPlane").first() else { return crate::regen::eval::err_at(&["mirrorPlane"], "Select a mirror plane.") };
-    let frame = ev.resolve_plane(r).ok_or_else(|| fe("The mirror plane could not be resolved"))?;
+    let Some(frame) = ev.resolve_plane(r) else { return crate::regen::eval::err_at(&["mirrorPlane"], "Select a mirror plane.") };
     run_pattern(ev, vec![Instance { code: 1, t: k::Transform::Mirror(kernel_plane(&frame)) }])
 }
 
@@ -350,6 +375,7 @@ pub fn mirror(ev: &mut EvalCtx) -> FResult<()> {
 /// an empty dialog says "Select parts to pattern." (or mirror).
 fn check_seeds(ev: &EvalCtx, verb: &str) -> FResult<()> {
     match ev.enum_("patternType") {
+        "FEATURE" if ev.query("instanceFunction").is_empty() => crate::regen::eval::err_at(&["instanceFunction"], format!("Select features to {verb}.")),
         "FEATURE" => Ok(()),
         "FACE" if ev.query("faces").is_empty() => crate::regen::eval::err_at(&["faces"], format!("Select faces to {verb}.")),
         "FACE" => Ok(()),
@@ -358,20 +384,34 @@ fn check_seeds(ev: &EvalCtx, verb: &str) -> FResult<()> {
     }
 }
 
+/// "mirror" for Mirror, else "pattern" (Onshape's error texts).
+fn verb(ev: &EvalCtx) -> &'static str {
+    if ev.features.iter().any(|f| f.id == ev.feature && f.type_id == "mirror") { "mirror" } else { "pattern" }
+}
+
 fn run_pattern(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> {
     match ev.enum_("patternType") {
         "FEATURE" => feature_pattern(ev, &instances),
         "FACE" => {
             let groups = by_body(ev.resolve_faces(ev.query("faces")));
             if groups.is_empty() {
-                return err("Select faces to pattern");
+                let verb = verb(ev);
+                return crate::regen::eval::err_at(&["faces"], format!("Select faces to {verb}."));
             }
             if instances.is_empty() {
                 return Ok(());
             }
             let groups: Vec<(BodyId, Vec<usize>)> = groups.into_iter().map(|(bi, fs)| (ev.ctx.bodies[bi].id.clone(), fs)).collect();
+            // Onshape's PATTERN_FACE_FAILED / MIRROR_FACE_FAILED: the reason isn't shown.
+            let failed = if verb(ev) == "mirror" { "Failed to create face mirror, check input." } else { "Failed to create pattern, check input." };
             for (id, fs) in groups {
-                pattern_faces(ev, &id, &fs, &instances)?;
+                pattern_faces(ev, &id, &fs, &instances).map_err(|e| {
+                    if e.message == "Cancelled" {
+                        return e;
+                    }
+                    log::debug!("face pattern: {}", e.message);
+                    fe(failed)
+                })?;
             }
             Ok(())
         }
@@ -584,7 +624,8 @@ fn boxes_meet(a: &k::BoundingBox, b: &k::BoundingBox, tol: f64) -> bool {
 fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     let mut feats: Vec<FeatureId> = ev.query("instanceFunction").iter().filter_map(|r| if let Reference::Feature(f) = r { Some(*f) } else { None }).collect();
     if feats.is_empty() {
-        return err("Select features to pattern");
+        let verb = verb(ev);
+        return crate::regen::eval::err_at(&["instanceFunction"], format!("Select features to {verb}."));
     }
     // Feature-list order (not selection order).
     let order = |f: &FeatureId| ev.features.iter().position(|x| x.id == *f).unwrap_or(usize::MAX);
@@ -659,12 +700,12 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             if let Some(b) = index_of_body(ev, &id).map(|bi| &ev.ctx.bodies[bi])
                 && face_pattern_fails(b, &fs, instances)
             {
-                return err(SWITCH_TO_PER_INSTANCE);
+                return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
             }
             pattern_faces(ev, &id, &fs, instances)?;
         }
         if !found {
-            return err(NO_GEOMETRY_FROM_FEATURES);
+            return crate::regen::eval::err_at(&["instanceFunction"], NO_GEOMETRY_FROM_FEATURES);
         }
     }
     Ok(())
@@ -998,13 +1039,13 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
             }
         }
     }
+    // patternUtils.fs: instances that fail are skipped silently; only when
+    // none works the feature fails.
     if ok == 0 {
-        return Err(fe(failures.into_iter().next().unwrap_or_else(|| "Pattern failed".into())));
-    }
-    if !failures.is_empty() {
-        let n = failures.len();
-        let first = failures.into_iter().next().unwrap_or_default();
-        ev.warnings.push(format!("{n} pattern instance(s) failed: {first}"));
+        if let Some(first) = failures.first() {
+            log::debug!("feature pattern: every instance failed ({first})");
+        }
+        return crate::regen::eval::err_at(&["instanceFunction"], "Could not pattern selected features.");
     }
     Ok(())
 }
@@ -1096,7 +1137,10 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
         }
     }
     if ok == 0 {
-        return Err(fe(failures.into_iter().next().unwrap_or_else(|| "Pattern failed".into())));
+        if let Some(first) = failures.first() {
+            log::debug!("feature pattern: every instance failed ({first})");
+        }
+        return crate::regen::eval::err_at(&["instanceFunction"], "Could not pattern selected features.");
     }
     for (si, t) in tools.into_iter().enumerate() {
         if t.is_empty() {
@@ -1108,10 +1152,9 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
         };
         ev.apply_operation(t, &ops[si], scope, BodyKind::Solid)?;
     }
+    // Instances that failed are skipped silently (patternUtils.fs).
     if !failures.is_empty() {
-        let n = failures.len();
-        let first = failures.into_iter().next().unwrap_or_default();
-        ev.warnings.push(format!("{n} pattern instance(s) failed: {first}"));
+        log::debug!("feature pattern: {} instance(s) failed", failures.len());
     }
     Ok(())
 }

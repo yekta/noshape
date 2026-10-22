@@ -64,3 +64,11 @@ Fresh doc /tmp/qa5/d23b/derive.noshape (pass9/mkderive.py), configured /tmp/qa5/
 | Live (6) Derived row menu | Rename, Edit…, Add selection to folder…, Suppress, Dynamic suppression ▸, **Switch to qa5 src** ✅, Zoom to selection, Show dependencies…, Delete; **no "Add appearance to feature…"** (live has it; ours has it on Extrude rows) | ✗ **DER14** (psb, minor) (e05) |
 | Live (4) suppress src Extrude 1 | Derived 1 black ✅, Parts (0) ✅, Fillet 1 red ✅ but tooltip **"…: Selected edges no longer exist"** (live "…: Select edges or faces to fillet.") | ✗ **DER13** (psb, text) (e21, e22) |
 | (new) Parts list › right-click › **Rename** | **app crashes**: panic "hover style already set" (vendor/gpui-pre/src/elements/div.rs:843) from render_part_row (crates/app/src/part_studio/mod.rs:2831); reproduced twice; Shift+N inline rename works. Log /root/qa5-scratch/crash-0503-rename.log | ✗ **CRASH1** (ui, severe) (e13, e14) |
+
+## Re-run pass 19 (2026-10-22 ~11:00–11:40, app /tmp/qa5/noshape-1013 = /root/target-lead/debug/noshape 10:13: the queue's 09:58 batch build = main 3ce6952 + the ready branches of that batch; CLI 08:11)
+| Row | Ours | Status |
+|---|---|---|
+| CRASH1 Parts list › right-click › Rename | inline editor, no crash (z01) | ✅ **fixed** |
+| DER4 fillet chip on a derived edge | "Edge of Derived 1" (z03) | ✅ **fixed** |
+| DER13 fillet error after suppressing the source | "Fillet 1 did not regenerate properly: Select edges or faces to fillet." (z04) | ✅ **fixed** |
+| DER14 Derived row menu | has "Add appearance to feature…" (z02) | ✅ **fixed** |

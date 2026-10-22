@@ -415,7 +415,9 @@ fn sk_fit_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if pts.len() < 2 {
             return Err(raise_error(i, "SKETCH_SPLINE_FAILED", None));
         }
-        let e = b.sketch.add_fit_spline(&pts).map_err(|_| raise_error(i, "SKETCH_SPLINE_FAILED", None))?;
+        // The same first and last point: a closed (periodic) spline.
+        let closed = pts.len() >= 4 && (pts[0] - pts[pts.len() - 1]).length() <= 1e-12 * (1.0 + pts[0].length());
+        let e = if closed { b.sketch.add_closed_fit_spline(&pts) } else { b.sketch.add_fit_spline(&pts) }.map_err(|_| raise_error(i, "SKETCH_SPLINE_FAILED", None))?;
         if construction(&def) {
             let _ = b.sketch.set_construction(e, true);
         }
