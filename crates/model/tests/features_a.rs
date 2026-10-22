@@ -314,11 +314,17 @@ fn hole_countersink_through() {
     assert!(near(removed, expect, 1e-3), "{removed} vs {expect}");
 }
 
+/// A tapped hole cuts its Diameter, which the standard sets to the tap drill
+/// (holetables.gen.fs: M5 × 0.8 holeDiameter = tapDrillDiameter = 4.2 mm, as
+/// the dialog copies it); the tap drill only replaces it with a fastener fit
+/// (hole.fs `hasClearance`), so an edited Diameter is what gets cut.
 #[test]
-fn hole_tapped_uses_tap_drill() {
-    let path = ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M5".into()]);
-    let (removed, _) = hole_with(&[("isoHoleTableEx", path), ("endStyleV2", en("THROUGH"))]);
+fn hole_tapped_cuts_its_diameter() {
+    let path = || ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M5".into()]);
+    let (removed, _) = hole_with(&[("isoHoleTableEx", path()), ("endStyleV2", en("THROUGH")), ("holeDiameterV3", e("4.2 mm"))]);
     assert!(near(removed, PI * 0.0021f64.powi(2) * 0.025, 1e-3), "{removed}");
+    let (removed, _) = hole_with(&[("isoHoleTableEx", path()), ("endStyleV2", en("THROUGH")), ("holeDiameterV3", e("4.5 mm"))]);
+    assert!(near(removed, PI * 0.00225f64.powi(2) * 0.025, 1e-3), "{removed}");
 }
 
 #[test]
@@ -726,4 +732,26 @@ fn mirror_feature_pattern_of_pocket() {
     let removed = 0.1 * 0.02 * 0.01 - total_volume(&res.context);
     assert!(near(removed, 2.0 * PI * 0.003f64.powi(2) * 0.005, 1e-3), "{removed}");
     assert_eq!(res.context.bodies[0].faces.len(), 6 + 4);
+}
+
+/// hole.fs: a blind hole started from a sketch plane above the part that
+/// ends before reaching it cuts nothing and fails ("None of the holes
+/// intersected a part."); the counterbore check comes before the points.
+#[test]
+fn hole_misses_and_order_as_onshape() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.05, "25 mm");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("40 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.03, 0.02));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("startStyle", en("SKETCH")), ("holeDepthV3", e("5 mm"))]);
+    let st = t.regen().display.features.last().cloned().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("None of the holes intersected a part.")));
+
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.05, "25 mm");
+    t.add("hole", &[("unitsSystem", en("METRIC")), ("styleV2", en("C_BORE")), ("holeDiameterV3", e("10 mm")), ("cBoreDiameterV3", e("8 mm"))]);
+    let st = t.regen().display.features.last().cloned().unwrap();
+    assert_eq!(st.message.as_deref(), Some("The counterbore diameter must be larger than the hole diameter."));
 }

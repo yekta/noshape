@@ -16,7 +16,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Disableable as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{Annotation, AnnotationKind, GdtExtra, GdtLeader};
+use noshape_model::drawing::{AnnotationKind, GdtExtra, GdtLeader};
 
 /// The Type list (glyph, name) in Onshape's order.
 pub use noshape_scene::drawing_tools::GDT_TYPES;
@@ -201,7 +201,7 @@ impl DrawingEditor {
         let Some((frame, extra)) = self.gdt_values(cx) else { return true };
         let c = self.cursor;
         let id = self.current_sheet().next_annotation_id();
-        self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: c, frame, leaders: vec![], extra: Box::new(extra) }, position: c, ..Default::default() }));
+        self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(noshape_scene::drawing_tools::gdt(id, c, frame, extra)));
         cx.notify();
         true
     }

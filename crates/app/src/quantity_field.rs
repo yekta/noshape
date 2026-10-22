@@ -264,6 +264,11 @@ impl QuantityInput {
         self.evaluate(&self.committed).ok()
     }
 
+    /// The committed text (what an owner stores as the expression).
+    pub fn text(&self) -> &str {
+        &self.committed
+    }
+
     pub fn set_variables(&mut self, variables: std::collections::BTreeMap<String, noshape_units::Quantity>, cx: &mut gpui_kit::Context<Self>) {
         if variables != self.variables {
             self.variables = variables;
@@ -408,6 +413,15 @@ impl gpui_kit::Render for QuantityInput {
             // Esc: the kit reverts (and blurs); the owner hears of it after.
             .capture_action(cx.listener(|_, _: &Escape, window, cx| {
                 cx.defer_in(window, |_, _, cx| cx.emit(QuantityEvent::Escape));
+            }))
+            // In a dialog that binds Esc to Cancel (feature and mate dialogs:
+            // "FeatureDialog > Input"), an edited field reverts first and
+            // keeps the key; the next Esc cancels the dialog (live).
+            .capture_action(cx.listener(|this, _: &crate::actions::Cancel, window, cx| {
+                if this.state.update(cx, |s, cx| s.revert_escape(window, cx)) {
+                    cx.stop_propagation();
+                    cx.emit(QuantityEvent::Escape);
+                }
             }))
             // ↑ / ↓ step a plain committed value; Shift ×10 (the input's
             // select-up / -down), Ctrl ×0.1 (no input binding).
