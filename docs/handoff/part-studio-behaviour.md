@@ -1416,3 +1416,10 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   live's `rgba(255,255,255,0.95)` (dom/fs-refparams-picker-studio.txt `div.ns-dialog.feature-dialog-resize`); the
   pixel is exactly 5 % of the part (247 over 98). qa5's d24 shows the same layout. Only a part outside the panel looks
   "normal". Left as is; a live shot with a part behind the panel would close it.
+- **Derived dialog rows 2–4 (DER1–DER3), rechecked 10-22:** pink "Select Part Studio…" field, "Placement" label, no
+  clock icon, branch glyph in the panel header, and picking the studio expands it inline with the ‹ back arrow are all
+  in. Live 407's "highlighted Part 1 row" and "Part 1 chip" are **hover**: the row's #def1fb hover fill and its
+  tooltip (`tip="Part 1"`, #d0dbe5); 418 (no hover) shows the row white. Panel rows now hover #def1fb (were #eaeaea).
+- **VS1 checked in the app:** Variable › Value `8`, Enter → "8 mm", dialog stays open; second Enter accepts (live
+  behaviours "qa5 pass 8 (2)"). The text selection after the first Enter can't be seen on Xvfb (Ctrl+A shows none
+  either), so that half is unchecked.
