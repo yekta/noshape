@@ -247,6 +247,32 @@ impl Sketch {
         }
     }
 
+    /// The parameter interval [`Sketch::trim`] would remove at `pick` (for
+    /// periodic curves `t1` may pass the period end): the Trim tool's hover
+    /// highlights only that piece (live, qa5 sketch tools).
+    pub fn trim_span(&self, id: EntityId, pick: DVec2) -> Option<(f64, f64)> {
+        let c = self.curve(id)?;
+        let tp = c.closest(pick).0;
+        let (a, b) = c.domain();
+        let cuts = self.cuts(id);
+        if c.is_periodic() {
+            let period = b - a;
+            let mut ts: Vec<f64> = cuts.iter().map(|x| a + (x.t - a).rem_euclid(period)).collect();
+            ts.sort_by(f64::total_cmp);
+            if ts.len() < 2 {
+                return Some((a, b));
+            }
+            let lo = ts.iter().rev().find(|t| **t < tp).copied().unwrap_or(*ts.last()?);
+            let hi = ts.iter().find(|t| **t > tp).copied().unwrap_or(ts[0]);
+            return Some(if lo < hi { (lo, hi) } else { (lo, hi + period) });
+        }
+        let eps = 1e-9 * (b - a);
+        let inner: Vec<f64> = cuts.iter().map(|x| x.t).filter(|t| *t > a + eps && *t < b - eps).collect();
+        let lo = inner.iter().rev().find(|t| **t < tp).copied().unwrap_or(a);
+        let hi = inner.iter().find(|t| **t > tp).copied().unwrap_or(b);
+        Some((lo, hi))
+    }
+
     /// Trim: removes the piece of `id` between the intersections around the
     /// picked point (deletes the whole entity if it has no intersections).
     pub fn trim(&mut self, id: EntityId, pick: DVec2) -> Result<EditResult> {

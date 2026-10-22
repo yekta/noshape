@@ -905,3 +905,17 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   yet, live request 07:45), Flat undercut, Oval undercut, Hex, Hex washer (Indent / Slot and indent heads).
 * Shared target dirs: worktrees in one group overwrite each other's workspace crates (cargo's hash ignores the
   worktree path), so a build can link another worktree's stale crate. Touch your changed sources before a check.
+
+### 22 Oct midday: SK5 in the app, RECT1, TRIM1, SLOT1, POLY1, CH2
+* SK5 in the app: the sketch feature's regeneration re-applies dimension expressions; a single changed value
+  now solves with `Sketch::dimension_edit_options` (regen/features/sketch.rs), so a typed fillet radius moves only
+  the fillet and the far edge. Checked in the app (CLI-made 30.089 × 22.065 rectangle, fillet tool, typed value):
+  R3 → 28.089 / 19.065 / 25.089 / 22.065, R8 → 33.089 / 14.065 / 25.089 / 22.065 = live. Tests
+  `sketch_fillet_regen.rs`, scene `fillet_radius_edit_in_the_editor_moves_like_onshape`.
+* RECT1: `corner_rectangle` = live's Perpendicular (top, left), Parallel ×2, Horizontal (top).
+* TRIM1: `Sketch::trim_span`; with Trim the hovered curve isn't highlighted whole, the overlay draws only the piece
+  that would go (thick light orange + end dots). Checked in the app.
+* SLOT1: the pending slot shows its join points and the Ø width dimension ("Ø20", `slot_dimension`).
+* POLY1: the polygon preview's circle is dash-dot; the side spinner sits outside the edge after the clicked vertex
+  (◀ n ▶ laid out along the edge; the glyphs stay upright, GPUI can't rotate text).
+* CH2: chamfer preview "5" labels checked in the app; Enter on the untouched first box now opens the second.

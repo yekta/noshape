@@ -45,16 +45,19 @@ impl Sketch {
         }
     }
 
-    /// Axis-aligned rectangle from two opposite corners (2 horizontal + 2 vertical).
+    /// Axis-aligned rectangle from two opposite corners. Live Onshape (REST,
+    /// qa5 sketch tools): Perpendicular top / left, Parallel bottom / top and
+    /// left / right, Horizontal top.
     pub fn corner_rectangle(&mut self, p0: DVec2, p1: DVec2) -> ShapeIds {
         let (lo, hi) = (p0.min(p1), p0.max(p1));
         let pts: Vec<EntityId> = [lo, DVec2::new(hi.x, lo.y), hi, DVec2::new(lo.x, hi.y)].iter().map(|p| self.add_point(*p)).collect();
         let lines = self.closed_polyline(&pts);
         let mut out = ShapeIds { points: pts, curves: lines.clone(), ..Default::default() };
-        self.c(&mut out, ConstraintKind::Horizontal { a: lines[0], b: None });
-        self.c(&mut out, ConstraintKind::Horizontal { a: lines[2], b: None });
-        self.c(&mut out, ConstraintKind::Vertical { a: lines[1], b: None });
-        self.c(&mut out, ConstraintKind::Vertical { a: lines[3], b: None });
+        let [bottom, right, top, left] = [lines[0], lines[1], lines[2], lines[3]];
+        self.c(&mut out, ConstraintKind::Perpendicular { a: top, b: left });
+        self.c(&mut out, ConstraintKind::Parallel { a: bottom, b: top });
+        self.c(&mut out, ConstraintKind::Parallel { a: left, b: right });
+        self.c(&mut out, ConstraintKind::Horizontal { a: top, b: None });
         out
     }
 
