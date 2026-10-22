@@ -95,6 +95,26 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "jogged_section_view",
+            summary: "Jogged section view (an orthogonal cutting line through several points)",
+            description: "The Jogged section view tool: clicks `points` (sheet mm, at least 2) on the parent view; each one continues the cutting line horizontally or vertically (in the view's frame) toward it, and finishing (Enter) extends both ends past the view. The section goes to `position`, projected from the first segment. One edit (\"Section view\").",
+            fields: with(common(), vec![view_id("parent", "View to section."), req("points", points(2, 16), "The cutting line's clicks (sheet mm)."), req("position", point(), "Where the section view goes (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: jogged_section_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "aligned_section_view",
+            summary: "Aligned section view (two cutting legs about a center, unfolded)",
+            description: "The Aligned section view tool: `center` (sheet mm) on the parent view, then `a` and `b`, the directions of the two cutting legs from it (each leg is extended past the view). The view goes to `position`, projected from the first leg. One edit (\"Aligned section view\").",
+            fields: with(common(), vec![view_id("parent", "View to section."), req("center", point(), "The legs' common point (sheet mm)."), req("a", point(), "A point along the first leg (sheet mm)."), req("b", point(), "A point along the second leg (sheet mm)."), req("position", point(), "Where the view goes (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: aligned_section_view,
+        },
+        Op {
+            group: "drawing",
             verb: "detail_view",
             summary: "Detail view of a circular region of a view",
             description: "The Detail view tool: the circle centered at `center` (sheet mm; a vertex or circle center there is snapped) with `radius` (sheet mm) on the parent view, shown at `scale` (default twice the parent's) at `position`. One edit (\"Detail view\").",
@@ -988,4 +1008,63 @@ fn revision_callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = t.d.sheets[sheet].next_annotation_id();
     t.d.sheets[sheet].annotations.push(dt::revision_callout(id, pt_arg(a, "position")?, revision));
     done(od, t, "Revision callout", "annotation", id)
+}
+
+fn jogged_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let parent = view_arg(&t, a, "parent")?;
+    let mut pts: Vec<[f64; 2]> = Vec::new();
+    for (i, p) in a.array("points")?.iter().enumerate() {
+        let param = format!("points[{i}]");
+        let c = point_value(p, &param)?;
+        let tool = Tool::JoggedSection { parent: Some(parent), points: pts.clone(), done: false };
+        let pp = t.m.pick(&tool, &[], c).view_point(c, Some(parent)).ok_or_else(|| OpError::param(&param, "not on the parent view"))?;
+        match pts.last() {
+            None => pts.push(pp.p),
+            Some(last) => {
+                let q = dt::ortho_view(*last, pp.p);
+                if dt::geom::len(dt::geom::sub(q, *last)) > 1e-7 {
+                    pts.push(q);
+                }
+            }
+        }
+    }
+    if pts.len() < 2 {
+        return Err(OpError::param("points", "the cutting line needs two different points"));
+    }
+    // Finishing the line (Enter) extends its ends past the view.
+    let pts = t.m.pick(&Tool::Select, &[], [0.0; 2]).extend_line_ends(parent, &pts);
+    let tool = Tool::JoggedSection { parent: Some(parent), points: pts, done: true };
+    let v = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_view(&ViewOptions::default()).ok_or_else(|| OpError::param("position", "the section view can't be placed there"))?;
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Section view", "view", id.0)
+}
+
+fn aligned_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let parent = view_arg(&t, a, "parent")?;
+    let click = |name: &str, tool: &Tool| -> Result<[f64; 2], OpError> {
+        let c = pt_arg(a, name)?;
+        t.m.pick(tool, &[], c).view_point(c, Some(parent)).map(|p| p.p).ok_or_else(|| OpError::param(name, "not on the parent view"))
+    };
+    let tool0 = Tool::AlignedSection { parent: Some(parent), center: None, a: None, b: None };
+    let center = click("center", &tool0)?;
+    let leg = |name: &str| -> Result<[f64; 2], OpError> {
+        let p = click(name, &Tool::AlignedSection { parent: Some(parent), center: Some(center), a: None, b: None })?;
+        if dt::geom::len(dt::geom::sub(p, center)) <= 1e-7 {
+            return Err(OpError::param(name, "must differ from the center"));
+        }
+        Ok(t.m.pick(&Tool::Select, &[], [0.0; 2]).extend_line_ends(parent, &[p, center])[0])
+    };
+    let (la, lb) = (leg("a")?, leg("b")?);
+    let tool = Tool::AlignedSection { parent: Some(parent), center: Some(center), a: Some(la), b: Some(lb) };
+    let v = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_view(&ViewOptions::default()).ok_or_else(|| OpError::param("position", "the section view can't be placed there"))?;
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Aligned section view", "view", id.0)
 }
