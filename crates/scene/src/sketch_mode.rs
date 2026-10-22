@@ -1230,8 +1230,23 @@ impl SketchEditor {
         matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) && self.clicks.len() == 2
     }
 
-    pub fn polygon_side_control(&self) -> Option<(DVec2, usize)> {
-        self.polygon_sides_pending().then(|| (self.clicks[1].pos + DVec2::Y * self.world_per_px * 24.0, self.polygon_sides))
+    /// Live (sketch/91): outside the polygon at the middle of the edge
+    /// after the clicked vertex, along that edge (its angle in radians).
+    pub fn polygon_side_control(&self) -> Option<(DVec2, usize, f64)> {
+        if !self.polygon_sides_pending() {
+            return None;
+        }
+        let (c, rim) = (self.clicks[0].pos, self.clicks[1].pos);
+        let n = self.polygon_sides.clamp(3, 50) as f64;
+        let r = (rim - c).length();
+        let start = (rim - c).to_angle();
+        // Inscribed: the vertex is on the click; circumscribed: the edge midpoint.
+        let (rv, off) = if self.tool == Tool::Polygon { (r, 0.0) } else { (r / (PI / n).cos(), PI / n) };
+        let v0 = c + DVec2::from_angle(start + off) * rv;
+        let v1 = c + DVec2::from_angle(start + off + TAU / n) * rv;
+        let mid = (v0 + v1) * 0.5;
+        let out = (mid - c).normalize_or_zero();
+        Some((mid + out * self.world_per_px * 16.0, self.polygon_sides, (v1 - v0).to_angle()))
     }
 
     /// The on-canvas polygon spinner locks an explicitly chosen side count.
@@ -1976,6 +1991,15 @@ impl SketchEditor {
             self.pending_slot = Some((preview, created));
         }
         if committed { EditOutcome::changed() } else { EditOutcome::redraw() }
+    }
+
+    /// The pending slot's width dimension: its constraint, label position
+    /// and value (live sketch/304 shows "Ø20" before the slot commits).
+    pub fn slot_dimension(&self) -> Option<(ConstraintId, DVec2, f64)> {
+        let (pd, created) = self.pending_slot.as_ref()?;
+        let c = pd.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Diameter { curve, .. } if created.contains(&curve)))?;
+        let at = pd.dimension_labels.get(&c.id.0).map(|l| DVec2::new(l[0], l[1]))?;
+        Some((c.id, at, c.kind.value()?))
     }
 
     /// Is a slot preview waiting to be committed?
@@ -4091,6 +4115,8 @@ impl SketchEditor {
         let on_top = LineSegment::ON_TOP;
         // Manipulators drawn wider than `poly`'s 2 px, added after it (in order).
         let mut wide: Vec<(Vec<DVec2>, [u8; 4], f32)> = Vec::new();
+        // Construction previews, dash-dot (live sketch/91: the polygon's circle).
+        let mut dash_dot: Vec<Vec<DVec2>> = Vec::new();
         let mut poly = |pts: &[DVec2], color: [u8; 4], dashed: bool| {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, color, 0, 2.0, on_top | if dashed { LineSegment::DASHED } else { 0 });
@@ -4196,7 +4222,7 @@ impl SketchEditor {
                         let (rv, off) = if self.tool == Tool::Polygon { (r, 0.0) } else { (r / (PI / n as f64).cos(), PI / n as f64) };
                         let pts: Vec<DVec2> = (0..=n).map(|i| *a + DVec2::from_angle(start + off + i as f64 / n as f64 * TAU) * rv).collect();
                         poly(&pts, preview_color, false);
-                        poly(&circle_pts(*a, r, 72), preview_color, true);
+                        dash_dot.push(circle_pts(*a, r, 72));
                     }
                 }
                 Tool::ThreePointCircle => match anchors.len() {
@@ -4401,12 +4427,24 @@ impl SketchEditor {
                 push_hollow_arrow(&mut wide, start, d, self.world_per_px, FILLET_ARROW_STEM_PX);
             }
         }
-        // Slot preview (light blue until committed).
+        // Slot preview (light blue until committed), with its join points
+        // and the width dimension (live sketch/304: "Ø20" with a leader).
         if let Some((pd, created)) = &self.pending_slot {
             for id in created {
                 if pd.sketch.curve(*id).is_some() {
                     poly(&pd.sketch.tessellate(*id, self.world_per_px * 0.2), preview_color, false);
+                } else if let Some(q) = pd.sketch.point(*id) {
+                    points.points.push(PointSprite { position: w(q), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
                 }
+            }
+            if let Some((cid, at, _)) = self.slot_dimension()
+                && let Some(c) = pd.sketch.constraint(cid)
+            {
+                let mut segs = Vec::new();
+                dim_segments(&pd.sketch, &c.kind, at, self.world_per_px, &mut segs);
+                let text = dim_value_text(&c.kind, c.kind.value().unwrap_or(0.0) / dim_display_scale(&c.kind), units);
+                let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
+                dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, at, half)));
             }
         }
         // Trim drag path.
@@ -4627,6 +4665,10 @@ impl SketchEditor {
         for (pts, color, width) in wide {
             let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
             lines.push_polyline(&pts3, color, 0, width, on_top);
+        }
+        for pts in dash_dot {
+            let pts3: Vec<[f32; 3]> = pts.iter().map(|p| w(*p)).collect();
+            lines.push_polyline(&pts3, preview_color, 0, 2.0, on_top | LineSegment::DASH_DOT);
         }
         (lines, points)
     }
@@ -6032,6 +6074,8 @@ mod tests {
         let line = d.sketch.add_line(v(0.01, 0.01), v(0.05, 0.01));
         click(&mut ed, &mut d, v(0.03, 0.01));
         assert!(ed.slot_pending(), "light-blue preview");
+        let (_, at, w) = ed.slot_dimension().expect("the preview shows its Ø20 dimension");
+        assert!((w - ed.slot_width).abs() < 1e-12 && at.x > 0.04, "{at} {w}");
         assert_eq!(count(&d, EntityKind::Arc), 0, "nothing committed yet");
         assert!(ed.dim_edit.is_none(), "no value box for a slot");
         click(&mut ed, &mut d, v(0.03, 0.04));
@@ -6199,6 +6243,11 @@ mod tests {
         assert_eq!(count(&data, EntityKind::Line), 0, "circumference is still a preview");
         ed.adjust_polygon_sides(1);
         assert_eq!(ed.polygon_side_control().map(|c| c.1), Some(7));
+        // Outside the edge after the clicked vertex (0.03, 0.02), along it.
+        let (at, _, angle) = ed.polygon_side_control().unwrap();
+        let edge_mid = (v(0.03, 0.02) + v(0.02, 0.02) + DVec2::from_angle(TAU / 7.0) * 0.01) * 0.5;
+        assert!((at - v(0.02, 0.02)).length() > (edge_mid - v(0.02, 0.02)).length() && (at - edge_mid).length() < 0.003, "{at} {edge_mid}");
+        assert!((angle - (90.0f64 + 180.0 / 7.0).to_radians()).abs() < 1e-9, "{angle}");
         ed.pointer_move(&mut data, v(0.08, 0.06), false, false);
         assert_eq!(ed.polygon_sides, 7, "spinner's explicit value stays locked");
         click(&mut ed, &mut data, v(0.08, 0.06));
