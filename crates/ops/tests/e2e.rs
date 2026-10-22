@@ -1176,6 +1176,13 @@ fn drawing_callouts_ordinates_and_datums() {
     let e = try_call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [10, 10], "spec": { "arrow": { "joint": "Glue" } } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("spec"), "{e:?}");
 
+    let rt = call(&mut ctx, "drawing_revision_table", json!({ "drawing": tab, "position": [400, 290], "visible_rows": 3 }));
+    assert!(rt["table"].as_u64().is_some(), "{rt}");
+    assert!(last(&mut ctx).ends_with(":: Revision table"));
+    let rc = call(&mut ctx, "drawing_revision_callout", json!({ "drawing": tab, "position": [100, 100] }));
+    assert_eq!(kind_of(&mut ctx, rc["annotation"].as_u64().unwrap()), "RevisionCallout");
+    assert!(last(&mut ctx).ends_with(":: Revision callout"));
+
     let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
     assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));

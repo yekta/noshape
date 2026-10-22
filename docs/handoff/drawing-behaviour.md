@@ -974,3 +974,9 @@ these rules, change it in commit.rs (the app and the API both use it). Backups: 
 - **Panel fields checked in the app (mm demo):** Notes Text height "4 mm" + Tab → 4.0000, "abc" + Tab → reverts,
   ▾ visible; Stack gap "1 mm" + Tab → stays, hover "Must be a number"; 1.25 + Enter, ↑ → 1.3000. The pale orange
   now fills the input itself (it was hidden under the input's white).
+- (api, 2026-10-22 15:45) Geometric tolerance click (drawing_gdt.rs), Surface finish ✓ and its "Ra 3.2" start value
+  (drawing_extra.rs), Weld symbol target + place (drawing_weld.rs), Revision table placement / settings, latest
+  revision and Revision callout (drawing_revision.rs) now call scene/drawing_tools/commit.rs (`gdt`,
+  `surface_finish`, `SURFACE_FINISH_DEFAULT`, `weld_target`, `weld`, `RevisionTableOpts`, `revision_table`,
+  `revision_table_kind`, `latest_revision`, `revision_callout`) — the same builders the agent API uses. Behaviour
+  unchanged; each checked in the app (frames / symbols placed, same history text).

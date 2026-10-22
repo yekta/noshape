@@ -203,7 +203,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("drawing:Projected view", Op("drawing_projected_view")),
     ("drawing:Quad & mid snap point", Ui("cursor snapping preference")),
     ("drawing:Radial dimension", Op("drawing_dimension")),
-    ("drawing:Revision table", Planned),
+    ("drawing:Revision table", Op("drawing_revision_table")),
     ("drawing:Section view", Op("drawing_section_view")),
     ("drawing:Sketch point", Planned),
     ("drawing:Spline", Planned),
