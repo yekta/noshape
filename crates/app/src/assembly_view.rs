@@ -1561,7 +1561,9 @@ impl AssemblyView {
     fn open_mate_dialog(&mut self, mate: Mate, editing: Option<MateId>, window: &mut Window, cx: &mut Context<Self>) {
         let labeler = self.labeler(cx);
         let is_new = editing.is_none();
-        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, window, cx));
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let variables = self.assembly(cx).map(|a| noshape_model::variables::refs_variables(&self.doc.read(cx).session.doc, &a.variable_studios)).unwrap_or_default();
+        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, units, variables, window, cx));
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &MateDialogEvent, window, cx| match ev {
             MateDialogEvent::Changed => {
                 this.schedule_eval(window, cx);
