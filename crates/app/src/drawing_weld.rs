@@ -21,7 +21,7 @@ use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::drawing::weld::{FINISHES, JointSpacer, WeldContour, WeldFlag, WeldJoint, WeldSide, WeldSpec};
-use noshape_model::drawing::{Annotation, AnnotationKind, ViewId};
+use noshape_model::drawing::{AnnotationKind, ViewId};
 
 /// Text boxes of one side, in [`WeldDlg::inputs`] order.
 const SIDE_FIELDS: usize = 6;
@@ -175,10 +175,7 @@ impl DrawingEditor {
         let target = self.weld_dlg.as_ref().and_then(|d| d.target);
         match target {
             None => {
-                let t = match self.snap_at(c).or_else(|| self.any_point(c)) {
-                    Some(p) => (Some(p.view), p.p),
-                    None => (None, c),
-                };
+                let t = self.pk().weld_target(c);
                 if let Some(d) = &mut self.weld_dlg {
                     d.target = Some(t);
                 }
@@ -186,7 +183,7 @@ impl DrawingEditor {
             Some((view, target)) => {
                 let Some(spec) = self.weld_spec(cx) else { return true };
                 let id = self.current_sheet().next_annotation_id();
-                self.edit_sheet("Weld symbol", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Weld { view, target, spec: Box::new(spec) }, position: c, ..Default::default() }));
+                self.edit_sheet("Weld symbol", cx, |s| s.annotations.push(noshape_scene::drawing_tools::weld(id, view, target, spec, c)));
                 if let Some(d) = &mut self.weld_dlg {
                     d.edit = Some(id);
                     d.placed = true;
