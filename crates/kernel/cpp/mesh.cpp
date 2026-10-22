@@ -4,11 +4,7 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepLib_ToolTriangulatedShape.hxx>
 #include <BRepMesh_Context.hxx>
-#include <BRepMesh_DelabellaMeshAlgoFactory.hxx>
-#include <BRepMesh_FaceDiscret.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
-#include <BRepMesh_MeshAlgoFactory.hxx>
-#include <IMeshTools_MeshAlgoFactory.hxx>
 #include <IMeshTools_Parameters.hxx>
 #include <Precision.hxx>
 
@@ -25,22 +21,6 @@
 namespace noshape {
 
 namespace {
-// Planar faces through Delabella (same triangles, much faster on faces
-// with thousands of boundary edges: the comb-shaped sides of 1000 fins,
-// 2.9 s → 1.9 s for the part), every other surface through BRepMesh's own.
-class PlanarFastAlgoFactory : public IMeshTools_MeshAlgoFactory
-{
-public:
-  occ::handle<IMeshTools_MeshAlgo> GetAlgo(const GeomAbs_SurfaceType type, const IMeshTools_Parameters& prm) const override
-  {
-    return (type == GeomAbs_Plane ? myPlanar : myDefault)->GetAlgo(type, prm);
-  }
-
-private:
-  occ::handle<IMeshTools_MeshAlgoFactory> myPlanar  = new BRepMesh_DelabellaMeshAlgoFactory();
-  occ::handle<IMeshTools_MeshAlgoFactory> myDefault = new BRepMesh_MeshAlgoFactory();
-};
-
 struct FaceTri
 {
   occ::handle<Poly_Triangulation> tri;
@@ -83,8 +63,11 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     prm.MinSize                  = Precision::Confusion();
     // Faces whose stored triangulation already satisfies the deflection are
     // skipped by BRepMesh (triangulations are reused).
+    // Every surface through BRepMesh's own algorithms. Not Delabella for
+    // planar faces: it dereferences null on some of them on macOS arm64
+    // (features_a pattern_instance_references_survive_upstream_edit,
+    // v0.4.6 CI run 39827462890).
     occ::handle<BRepMesh_Context> ctx = new BRepMesh_Context();
-    ctx->SetFaceDiscret(new BRepMesh_FaceDiscret(new PlanarFastAlgoFactory()));
     BRepMesh_IncrementalMesh mesher;
     mesher.SetShape(s.shape);
     mesher.ChangeParameters() = prm;

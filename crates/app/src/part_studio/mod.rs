@@ -719,12 +719,15 @@ impl PartStudioView {
             // Live (qa5 BOOL1): a feature's info ("Boolean resulted in no
             // geometry change…") is a blue bubble at the top centre of the
             // graphics while the dialog is open; the dialog shows nothing.
-            let info = st.as_ref().filter(|(k, _)| *k == FeatureStatus::Info).map(|(_, m)| m.clone());
+            // A warning (live L27, Fill) is a yellow bubble there, with the
+            // title red.
+            let bubble = st.as_ref().filter(|(k, _)| matches!(k, FeatureStatus::Info | FeatureStatus::Warning)).cloned();
+            let info = bubble.as_ref().map(|(_, m)| m.clone());
             let st = st.filter(|(k, _)| *k != FeatureStatus::Info);
             if no_plane {
                 self.message = Some((FeatureStatus::Info, NO_PLANE.into()));
-            } else if let Some(m) = &info {
-                self.message = Some((FeatureStatus::Info, m.clone()));
+            } else if let Some(b) = &bubble {
+                self.message = Some(b.clone());
             } else if self.message.as_ref().is_some_and(|(_, m)| m == NO_PLANE || self.ui.dialog_info.as_ref() == Some(m)) {
                 self.message = None;
             }
@@ -3370,8 +3373,9 @@ impl PartStudioView {
         } else if suppressed || f.hidden {
             pal.text_faint
         } else {
+            // Live L27: a warning's row is red like an error's.
             match status {
-                FeatureStatus::Error => pal.text_invalid,
+                FeatureStatus::Error | FeatureStatus::Warning => pal.text_invalid,
                 _ => pal.text,
             }
         };
