@@ -476,6 +476,13 @@ impl Default for DetailSettings {
 }
 
 impl DetailSettings {
+    /// How many [`DetailSettings::decrease`] steps from full detail (for the
+    /// perf logs).
+    pub fn steps(&self) -> u32 {
+        let off = |on: bool| u32::from(!on);
+        off(self.edge_silhouettes || self.section_edges) + off(self.ssao) + off(self.backface_silhouettes) + (self.low_level_body_proportion / LOW_LEVEL_BODY_PROPORTION_STEP).round() as u32
+    }
+
     /// `decreaseDetail`: edge silhouettes and section edges, then ambient
     /// occlusion, then backface silhouettes, then more bodies at their
     /// lowest LOD. Whether anything changed.
@@ -1241,6 +1248,21 @@ mod tests {
             early.draw_start(ms(i * 70));
         }
         assert!(!early.below_threshold());
+    }
+
+    #[test]
+    fn detail_step_count_follows_decrease() {
+        let mut d = DetailSettings::default();
+        assert_eq!(d.steps(), 0);
+        let mut last = 0;
+        while d.decrease() {
+            let n = d.steps();
+            assert!(n == last || n == last + 1, "{last} -> {n}");
+            last = n;
+        }
+        // Silhouettes/section edges, AO, backface silhouettes, 9 body steps
+        // (the share reaches 0.9 by 0.8999999999999999, one more decrease).
+        assert_eq!(last, 12);
     }
 
     #[test]

@@ -772,6 +772,12 @@ impl DrawLists {
                 self.silhouettes.clear();
                 self.back_silhouettes.clear();
             }
+            if o.skip_backsil {
+                self.back_silhouettes.clear();
+            }
+            if o.skip_silhouettes {
+                self.silhouettes.clear();
+            }
             if o.skip_meshes {
                 self.opaque.clear();
                 self.transparent.clear();
@@ -984,13 +990,18 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
 
 /// Diagnostics for GPU cost analysis (`NOSHAPE_PERF_MSAA=<n>` overrides the
 /// sample count, `NOSHAPE_PERF_SKIP=lines,meshes` skips draw categories in
-/// the color pass, `instancing` draws every copy with its own call and its
-/// own buffers, see [`instancing_disabled`]). Unset in normal use.
+/// the color pass (`backsil`: the backface silhouette meshes alone,
+/// `silhouettes`: the edge silhouettes alone, `ao`: ambient occlusion),
+/// `instancing` draws every copy with its own call and its own buffers, see
+/// [`instancing_disabled`]). Unset in normal use.
 struct PerfOverrides {
     msaa: Option<u32>,
     skip_lines: bool,
     skip_meshes: bool,
     skip_instancing: bool,
+    skip_backsil: bool,
+    skip_silhouettes: bool,
+    skip_ao: bool,
 }
 
 /// `NOSHAPE_PERF_SKIP=instancing`: no instanced calls, and the scene builder
@@ -1009,6 +1020,9 @@ fn perf_overrides() -> &'static PerfOverrides {
             skip_lines: skip.contains("lines"),
             skip_meshes: skip.contains("meshes"),
             skip_instancing: skip.contains("instancing"),
+            skip_backsil: skip.split(',').any(|t| t == "backsil"),
+            skip_silhouettes: skip.split(',').any(|t| t == "silhouettes"),
+            skip_ao: skip.split(',').any(|t| t == "ao"),
         }
     })
 }
@@ -2119,7 +2133,7 @@ impl Renderer {
 
         let t_encode = perf::scope("r.encode_submit");
         let Self { device, queue, pipelines, targets, bind_color, pending, ao, timer, overlay_gpu, text_shading, section_caps, compare_none, .. } = self;
-        let ao_on = ao_strength > 0.001 && ao.is_some();
+        let ao_on = ao_strength > 0.001 && ao.is_some() && !perf_overrides().skip_ao;
         let timer_slot = timer.as_ref().and_then(|t| t.free_slot());
         let pipelines = pipelines.as_ref().expect("pipelines");
         let ts = targets.get_mut(&target).expect("target");
