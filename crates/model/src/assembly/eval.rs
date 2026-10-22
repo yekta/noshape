@@ -338,19 +338,19 @@ pub fn relation_values(kind: RelationType, a: MateType, b: MateType) -> Result<(
     match kind {
         RelationType::Gear => match (rotational_value(a), rotational_value(b)) {
             (Some(x), Some(y)) => Ok((x, y)),
-            _ => Err("Gear relations require two rotational degrees of freedom".into()),
+            _ => Err("Gear relations require two rotational degrees of freedom.".into()),
         },
         RelationType::RackAndPinion => match (rotational_value(a), translational_value(b)) {
             (Some(x), Some(y)) => Ok((x, y)),
-            _ => Err("Rack and pinion relations require one rotational and one translational degree of freedom".into()),
+            _ => Err("Rack and pinion relations require one translational degree of freedom and one rotational degree of freedom.".into()),
         },
         RelationType::Screw => match a {
             MateType::Cylindrical => Ok((0, 3)),
-            _ => Err("Screw relations require one cylindrical mate".into()),
+            _ => Err("Screw relations require one cylindrical mate.".into()),
         },
         RelationType::Linear => match (translational_value(a), translational_value(b)) {
             (Some(x), Some(y)) => Ok((x, y)),
-            _ => Err("Linear relations require two translational degrees of freedom".into()),
+            _ => Err("Linear relations require two translational degrees of freedom.".into()),
         },
     }
 }
@@ -2303,7 +2303,7 @@ impl AssemblyEvaluator {
                     let d = other(s)?.z();
                     let x = d - f.z() * f.z().dot(d);
                     if x.length_squared() < 1e-12 {
-                        return Err("Secondary axis can't be parallel to the primary axis".into());
+                        return Err("Failed to resolve mate connector. Secondary axis conflicts with primary axis.".into());
                     }
                     f = Frame::from_axes(f.origin, f.z(), x.normalize());
                 }
@@ -2389,7 +2389,7 @@ impl AssemblyEvaluator {
                 (sm.a, sm.a_local, sm.b, sm.b_local) = (a.0, a.1, b.0, b.1);
                 if m.mate_type == MateType::Width {
                     if m.extra.is_empty() {
-                        prepared.failed_mates.push((m.id, "Width mate needs two width mate connectors".into()));
+                        prepared.failed_mates.push((m.id, "Two width mate connectors are required.".into()));
                         continue;
                     }
                     let mut bad = None;
@@ -2406,7 +2406,9 @@ impl AssemblyEvaluator {
                 }
             }
             if sm.a == sm.b && m.mate_type != MateType::Width {
-                prepared.failed_mates.push((m.id, "Both mate connectors are on the same rigid set".into()));
+                // Onshape's texts: one instance, or members of one group.
+                let text = if m.a.instance == m.b.instance { "Mate connectors are on same instance." } else { "Mate cannot be added between member of same group." };
+                prepared.failed_mates.push((m.id, text.into()));
                 continue;
             }
             fill_solver_mate(m, &mut sm, &units);
@@ -2614,17 +2616,17 @@ impl AssemblyEvaluator {
 
     fn prepare_relation(&self, asm: &Assembly, r: &Relation, prepared: &Prepared, units: &UnitPrefs) -> Result<PreparedRelation, String> {
         let b_id = if r.relation_type == RelationType::Screw { r.mates[0] } else { r.mates[1] };
-        let ma = asm.mate(r.mates[0]).ok_or("Relation mate does not exist")?;
-        let mb = asm.mate(b_id).ok_or("Relation mate does not exist")?;
+        let ma = asm.mate(r.mates[0]).ok_or("One or more mates in this relation do not exist.")?;
+        let mb = asm.mate(b_id).ok_or("One or more mates in this relation do not exist.")?;
         if ma.suppressed || mb.suppressed {
-            return Err("Relation mate is suppressed".into());
+            return Err("One or more mates in this relation are suppressed.".into());
         }
         if r.relation_type != RelationType::Screw && ma.id == mb.id {
             return Err("A relation needs two different mates".into());
         }
         let values = relation_values(r.relation_type, ma.mate_type, mb.mate_type)?;
         if !prepared.mates.iter().any(|(id, _, _)| *id == ma.id) || !prepared.mates.iter().any(|(id, _, _)| *id == mb.id) {
-            return Err("Relation mate could not be resolved".into());
+            return Err("One or more mates in this relation are invalid.".into());
         }
         let dim = match r.relation_type {
             RelationType::Gear | RelationType::Linear => Dim::UNITLESS,
@@ -2645,7 +2647,7 @@ impl AssemblyEvaluator {
     fn tangent_pair(&self, _asm: &Assembly, leaves: &[LeafInstance], prepared: &Prepared, stored: &HashMap<InstanceId, Frame>, m: &super::Mate, units: &UnitPrefs) -> Result<(usize, usize, TangentPair), String> {
         let geom = |c: &MateConnectorRef| -> Result<(usize, TangentGeom, Vec<TangentFace>), String> {
             if c.connector.is_some() || c.instance == InstanceId::ORIGIN {
-                return Err("Tangent mates take faces, edges or vertices (not mate connectors)".into());
+                return Err("Geometry is not supported for tangent mate.".into());
             }
             let mut full = vec![c.instance];
             full.extend(c.path.iter().copied());
@@ -2673,10 +2675,10 @@ impl AssemblyEvaluator {
         let (a, ga, chain_a) = geom(&m.a)?;
         let (b, gb, chain_b) = geom(&m.b)?;
         if a == b {
-            return Err("Both entities are on the same rigid set".into());
+            return Err("Mate connectors are on same instance.".into());
         }
         if !solver::tangent_supported(&ga, &gb) {
-            return Err("Tangent mates between these two surface types are not supported (cones and tori mate with planes, spheres and vertices)".into());
+            return Err("Geometry is not supported for tangent mate.".into());
         }
         // Internal contact when one curved surface currently encloses the other.
         let (wga, wgb) = (ga.transformed(&prepared_pose(stored, prepared, a)), gb.transformed(&prepared_pose(stored, prepared, b)));
