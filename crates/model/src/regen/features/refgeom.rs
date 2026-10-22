@@ -244,7 +244,7 @@ pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
             let d = ev.resolve_direction(r).ok_or_else(|| not_found("secondary axis entity"))?;
             let x = d - cs.z * cs.z.dot(d);
             if x.length_squared() < 1e-12 {
-                return err("Secondary axis can't be parallel to the primary axis");
+                return err("Failed to resolve mate connector. Secondary axis conflicts with primary axis.");
             }
             cs.x = x.normalize();
         }
