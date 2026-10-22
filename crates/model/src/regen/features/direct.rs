@@ -33,6 +33,14 @@ fn adjacent_fillets(body: &Body, faces: &BTreeSet<usize>) -> Vec<usize> {
     out
 }
 
+/// Onshape's DIRECT_EDIT_DELETE_FAILED (live, behaviours "Delete face").
+const DELETE_FAILED: &str = "Could not delete selected faces.";
+
+/// The kernel's reason isn't shown (opDeleteFace).
+fn failed<E>(_: E) -> crate::regen::eval::FeatureError {
+    fe(DELETE_FAILED)
+}
+
 pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
     let groups = by_body(ev.resolve_faces(ev.query("deleteFaces")));
     if groups.is_empty() {
@@ -46,18 +54,18 @@ pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
             set.extend(adjacent_fillets(&body, &set));
         }
         let all = body.shape.faces();
+        if set.len() >= all.len() {
+            return err("Cannot delete all faces of a part or surface.");
+        }
         match heal.as_str() {
             "HEAL" => {
                 let del: Vec<Shape> = set.iter().map(|f| all[*f].clone()).collect();
-                let res = k::delete_faces(&body.shape, &del).map_err(kerr("Delete face failed (the neighboring faces could not be extended to close the gap)"))?;
+                let res = k::delete_faces(&body.shape, &del).map_err(failed)?;
                 let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
                 ev.replace_body(bi, res.shape, names);
             }
             "CAP" | "VOID" => {
                 let keep: Vec<usize> = (0..all.len()).filter(|f| !set.contains(f)).collect();
-                if keep.is_empty() {
-                    return err("Cannot delete every face of a part");
-                }
                 let mut inputs: Vec<Shape> = keep.iter().map(|f| all[*f].clone()).collect();
                 let mut arg_names: Vec<ShapeNames> = keep.iter().map(|f| ShapeNames { faces: vec![body.faces[*f].clone()], ..Default::default() }).collect();
                 let cap = heal == "CAP";
@@ -70,17 +78,17 @@ pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
                         .filter(|(_, fs)| fs.iter().any(|f| sel.contains(f)) && fs.iter().any(|f| !sel.contains(f)))
                         .filter_map(|(ei, _)| body.shape.sub_shape(ShapeType::Edge, ei).ok())
                         .collect();
-                    let wires = k::edges_to_wires(&Shape::compound(&boundary), 1e-6)?;
+                    let wires = k::edges_to_wires(&Shape::compound(&boundary), 1e-6).map_err(failed)?;
                     for (c, face) in cap_faces(&wires)?.into_iter().enumerate() {
                         inputs.push(face);
                         arg_names.push(ShapeNames { faces: vec![Arc::new(TopoName::face(ev.feature, Role::New(c as u32)))], ..Default::default() });
                     }
                 }
-                let res = k::sew(&inputs, 1e-6, cap).map_err(kerr("Delete face failed"))?;
+                let res = k::sew(&inputs, 1e-6, cap).map_err(failed)?;
                 let (shape, kind) = if cap {
                     match res.shape.solids().into_iter().next() {
                         Some(s) => (s, body.kind),
-                        None => return err("Delete face: the capped faces don't form a closed part"),
+                        None => return err(DELETE_FAILED),
                     }
                 } else {
                     (res.shape.clone(), BodyKind::Surface)
@@ -104,7 +112,7 @@ fn cap_faces(wires: &[Shape]) -> FResult<Vec<Shape>> {
     let mut planar: Vec<(k::Plane, f64, Shape)> = Vec::new();
     let mut out = Vec::new();
     for w in wires {
-        let f = k::make_face_from_wire(w, false).map_err(|_| fe("Delete face: the opening could not be capped"))?;
+        let f = k::make_face_from_wire(w, false).map_err(|_| fe(DELETE_FAILED))?;
         match f.face_plane()? {
             Some(pl) => planar.push((pl, f.area().unwrap_or(0.0), w.clone())),
             None => out.push(f),
@@ -127,7 +135,7 @@ fn cap_faces(wires: &[Shape]) -> FResult<Vec<Shape>> {
                 holes.push(wj.clone());
             }
         }
-        out.push(k::make_face(pl, outer, &holes).map_err(|_| fe("Delete face: the opening could not be capped"))?);
+        out.push(k::make_face(pl, outer, &holes).map_err(|_| fe(DELETE_FAILED))?);
     }
     Ok(out)
 }
@@ -135,8 +143,10 @@ fn cap_faces(wires: &[Shape]) -> FResult<Vec<Shape>> {
 // ------------------------------------------------------------------ move face
 
 /// Point of a limit entity and, for planar entities, its normal.
+/// Onshape marks `limitEntity` for both limit fields (moveFace.fs).
 fn limit_point(ev: &EvalCtx, id: &str) -> FResult<(DVec3, Option<DVec3>)> {
-    let Some(r) = ev.query(id).first() else { return err("Select the entity to move up to") };
+    let unresolved = || crate::regen::eval::err_at(&["limitEntity"], "Cannot resolve entities.");
+    let Some(r) = ev.query(id).first() else { return unresolved() };
     if let Some(f) = ev.resolve_plane(r)
         && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::Face(_))
     {
@@ -152,7 +162,7 @@ fn limit_point(ev: &EvalCtx, id: &str) -> FResult<(DVec3, Option<DVec3>)> {
     if let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(r)).first() {
         return Ok((ev.face_shape(bi, fi)?.centroid()?, None));
     }
-    err("The entity to move up to no longer exists")
+    unresolved()
 }
 
 /// Move faces by a rigid transform: remove them (healing the gap with the
@@ -187,12 +197,20 @@ pub(crate) fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4
 
 pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
     let ty = ev.enum_("moveFaceType").to_string();
+    // moveFace.fs: the faces are checked before the direction or axis.
+    let create = ev.is("outputType", "CREATE");
+    let groups = by_body(ev.resolve_faces(ev.query("moveFaces")));
+    if !create && groups.is_empty() {
+        return crate::regen::eval::err_at(&["moveFaces"], "Select faces to move.");
+    }
     let sign = if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
     let up_to = ev.is("limitType", "UP_TO_ENTITY") && ty != "ROTATE";
     let extra = if up_to && ev.bool("hasOffset") { ev.length("offset")? * if ev.bool("oppositeOffsetDirection") { -1.0 } else { 1.0 } } else { 0.0 };
     let translate_dir = if ty == "TRANSLATE" {
-        let Some(r) = ev.query("direction").first() else { return err("Select a direction") };
-        Some(ev.resolve_direction(r).ok_or_else(|| fe("The direction could not be resolved"))?.normalize())
+        let no_direction = || crate::regen::eval::err_at(&["direction"], "Cannot determine translation direction.");
+        let Some(r) = ev.query("direction").first() else { return no_direction() };
+        let Some(d) = ev.resolve_direction(r) else { return no_direction() };
+        Some(d.normalize())
     } else {
         None
     };
@@ -203,13 +221,11 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         None
     };
-    if ev.is("outputType", "CREATE") {
+    if create {
         return move_face_create(ev, &ty, translate_dir, rotation, sign);
     }
-    let groups = by_body(ev.resolve_faces(ev.query("moveFaces")));
-    if groups.is_empty() {
-        return crate::regen::eval::err_at(&["moveFaces"], "Select faces to move.");
-    }
+    // Onshape's texts: the kernel's reason isn't shown.
+    let failed_msg = if ty == "OFFSET" { "Could not offset selected faces as requested." } else { "Could not transform selected faces as requested." };
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
@@ -226,25 +242,41 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                     let rp = k::Plane::new(m.transform_point3(pl.origin), m.transform_vector3(pl.unit_normal()), m.transform_vector3(pl.unit_x()));
                     let template = k::make_plane_face(&rp, -extent, extent, -extent, extent)?;
                     let name = body.faces[fi].clone();
-                    replace_with(ev, bi, &name, &template)?;
+                    replace_with(ev, bi, &name, &template).map_err(|_| fe(failed_msg))?;
                 }
             } else {
-                move_rigid(ev, bi, &faces, &m)?;
+                move_rigid(ev, bi, &faces, &m).map_err(|_| fe(failed_msg))?;
             }
             continue;
         }
         // Distance (blind or up to an entity).
-        let c0 = shapes.first().ok_or_else(|| fe("Select faces to move"))?.centroid()?;
+        let c0 = shapes.first().ok_or_else(|| fe("Select faces to move."))?.centroid()?;
         let dist = if up_to {
             let id = if ty == "TRANSLATE" { "limitEntity" } else { "limitQuery" };
             let (p, pn) = limit_point(ev, id)?;
-            let along = match translate_dir {
-                Some(d) => d,
-                None => shapes[0].normal_at_point(c0)?,
-            };
-            let d = match pn {
-                Some(n) if along.dot(n).abs() > 1e-9 => (p - c0).dot(n) / along.dot(n),
-                _ => (p - c0).dot(along),
+            let face_n = shapes[0].face_plane()?.map(|pl| pl.unit_normal());
+            let parallel = |n: DVec3, m: DVec3| (n.dot(m).abs() - 1.0).abs() < 1e-9;
+            let d = match (translate_dir, pn) {
+                // Translate up to a plane: the first face must be planar and
+                // parallel to it (getTranslationTransformToEntity).
+                (Some(along), Some(n)) => {
+                    let Some(fnorm) = face_n else { return crate::regen::eval::err_at(&["moveFaces"], "When moving up to a plane, first selected face must be planar.") };
+                    if !parallel(fnorm, n) {
+                        return err("Limit face must be parallel to face being moved.");
+                    }
+                    if along.dot(n).abs() < 1e-9 {
+                        return crate::regen::eval::err_at(&["moveFaces"], "First face cannot be moved to limit entity.");
+                    }
+                    (p - c0).dot(n) / along.dot(n)
+                }
+                (Some(along), None) => (p - c0).dot(along),
+                // Offset up to an entity: along the face normal; a plane that
+                // isn't parallel meets the extended face, so the distance is 0.
+                (None, Some(n)) => {
+                    let along = face_n.map_or_else(|| shapes[0].normal_at_point(c0), Ok)?;
+                    if parallel(along, n) { (p - c0).dot(along) } else { 0.0 }
+                }
+                (None, None) => (p - c0).dot(shapes[0].normal_at_point(c0)?),
             };
             d + extra
         } else if ty == "TRANSLATE" {
@@ -252,6 +284,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         } else {
             ev.length("offsetDistance")? * sign
         };
+        // A 0 distance succeeds and changes nothing (V484_MOVE_FACE_0_DISTANCE).
+        if dist.abs() < 1e-12 {
+            continue;
+        }
         let res = match translate_dir {
             None => match k::offset_faces(&body.shape, &shapes, dist) {
                 Ok(r) if r.shape.is_valid() && r.shape.count(ShapeType::Solid) > 0 => r,
@@ -261,7 +297,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                     if let Err(e) = &other {
                         log::debug!("move face: offset failed ({e}), trying booleans");
                     }
-                    offset_by_booleans(ev, bi, &faces, dist).map_err(|e| crate::regen::eval::FeatureError::new(format!("Move face failed: {}", e.message)))?;
+                    offset_by_booleans(ev, bi, &faces, dist).map_err(|e| {
+                        log::debug!("move face: booleans failed ({})", e.message);
+                        fe(failed_msg)
+                    })?;
                     continue;
                 }
             },
@@ -276,10 +315,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                     }
                 }
                 if rigid {
-                    move_rigid(ev, bi, &faces, &DMat4::from_translation(d * dist))?;
+                    move_rigid(ev, bi, &faces, &DMat4::from_translation(d * dist)).map_err(|_| fe(failed_msg))?;
                     continue;
                 }
-                k::offset_faces_each(&body.shape, &shapes, &each).map_err(kerr("Move face failed"))?
+                k::offset_faces_each(&body.shape, &shapes, &each).map_err(|_| fe(failed_msg))?
             }
         };
         let offset_role = |n: &Name| Role::Offset(n.clone());
@@ -420,10 +459,13 @@ fn move_face_create(ev: &mut EvalCtx, ty: &str, dir: Option<DVec3>, rotation: Op
 /// Replace faces with the surface of a template face (or plane): the region
 /// between each face and the template is added (template outside the part)
 /// or removed (inside), so the neighbours run up to the template.
+/// Onshape's DIRECT_EDIT_REPLACE_FACE_FAILED (opReplaceFace).
+const REPLACE_FAILED: &str = "Could not replace faces as requested.";
+
 pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     let groups = by_body(ev.resolve_faces(ev.query("replaceFaces")));
     if groups.is_empty() {
-        return err("Select faces to replace");
+        return crate::regen::eval::err_at(&["replaceFaces"], "Select faces to replace.");
     }
     let Some(tr) = ev.query("templateFace").first().cloned() else { return err("Select the face or plane to replace with") };
     let extent = ev.model_extent();
@@ -441,13 +483,16 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     if off.abs() > 1e-12 {
         template = match template.face_plane()? {
             Some(pl) => template.translated(pl.unit_normal() * off)?,
-            None => k::offset_shape(&template, off, k::JoinType::Arc).map_err(kerr("The template face could not be offset"))?.shape,
+            None => k::offset_shape(&template, off, k::JoinType::Arc).map_err(|_| fe(REPLACE_FAILED))?.shape,
         };
     }
     for (bi, faces) in groups.into_iter().rev() {
         let names: Vec<Name> = faces.iter().map(|&f| ev.ctx.bodies[bi].faces[f].clone()).collect();
         for n in names {
-            replace_with(ev, bi, &n, &template)?;
+            replace_with(ev, bi, &n, &template).map_err(|e| {
+                log::debug!("replace face: {}", e.message);
+                fe(REPLACE_FAILED)
+            })?;
         }
     }
     Ok(())
