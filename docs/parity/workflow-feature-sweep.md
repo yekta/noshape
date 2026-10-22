@@ -121,16 +121,16 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | order, labels, 5 mm (0 allowed), Create selection, flip | same | ✅ |
-| 2 | Nothing resolves | "Select faces, surfaces, or sketch regions to offset from." on surfacesAndFaces | "Nothing to offset"; one missing face fails the feature | ✗ |
+| 2 | Nothing resolves | "Select faces, surfaces, or sketch regions to offset from." on surfacesAndFaces | "Nothing to offset"; one missing face fails the feature | 🔧 |
 | 3 | Kernel failure | — | raw kernel text | ? L25, L26 |
 
 ## Fill
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | order, Guides group, Sample size 5, isocurves 10, Merge with all ☑ | same | ✅ |
-| 2 | Empty edges | "Select laminar edges or curves as fill surface boundary." on edges | own text, no field | ✗ |
+| 2 | Empty edges | "Select laminar edges or curves as fill surface boundary." on edges | own text, no field | 🔧 |
 | 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | ✗ |
-| 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | ✗ ? L27 |
+| 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | 🔧 ? L27 (internal-edge variant) |
 | 5 | Guides | errors and warnings ("Select guide entities." …); exact curves in Precise mode | not checked; always sampled | ✗ |
 | 6 | Add when the edges are surface edges | automatic (SF7) | no | ✗ (SF7) |
 
@@ -140,25 +140,25 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ |
 | 2 | Profile arrays | driven-query rows "[None] Edge of Sketch 1", max 2 picks each | "Add Profile" UI, no cap | ✗ |
 | 3 | Boundary condition label | SHOW_LABEL | no label | ✗ |
-| 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | ✗ ? L28 |
+| 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 ? L28 |
 | 5 | Boundary conditions | applied, with their errors | warning only | ✗ |
-| 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | ✗ |
+| 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | 🔧 |
 
 ## Enclose
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | Result body operation, Entities, Merge with all ☐, merge scope, Keep tools ☐ | same | ✅ |
-| 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | ✗ ? L29 |
-| 3 | No region | "Selections do not enclose a region." | own text | ✗ ? L30 |
-| 4 | Failure | "Failed to create a part from enclosed region." | "Enclose failed: …" | ✗ |
+| 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | 🔧 ? L29 (field) |
+| 3 | No region | "Selections do not enclose a region." | own text | 🔧 ? L30 |
+| 4 | Failure | "Failed to create a part from enclosed region." | "Enclose failed: …" | 🔧 |
 | 5 | Sketch regions | allowed | filtered out | ? L31 |
 
 ## Helix
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | order, labels, defaults (dialog-helix.txt) | same | ✅ |
-| 2 | Axis empty | "Select an object with an axis." on axis | own text, no field | ✗ |
-| 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | ✗ |
+| 2 | Axis empty | "Select an object with an axis." on axis | own text, no field | 🔧 |
+| 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | 🔧 |
 | 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | ✗ ? L32 |
 | 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | ✗ ? L33 |
 | 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | ✗ |
@@ -170,7 +170,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | Entities, Closed ☐; closed consumes members | same | ✅ |
-| 2 | Empty | "Select entities to create a composite part." (likely) | own text, no field | ? L36 |
+| 2 | Empty | "Select entities to create a composite part." (likely) | own text, no field | 🔧 ? L36 |
 | 3 | Overlapping composites | "Cannot create a closed composite part that partially overlaps another composite part." (and open) | no check | ✗ ? L36 |
 
 ## Mate connector (Part Studio)
@@ -189,15 +189,15 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 |---|---|---|---|---|
 | 1 | Fields | Face / Feature labels, no operation tabs, Reapply only for Feature (☐), defaults | same | ✅ |
 | 2 | Empty Face mode | "Select faces to pattern." / "…mirror." on faces, before the direction | same | ✅ |
-| 3 | Empty Feature mode | "Select features to pattern." / "…mirror." on Features, before the direction / plane | direction first, then "Select features to pattern" | ✗ |
-| 4 | Unresolvable plane / direction / axis | "Select a mirror plane." / "Select a pattern direction." / "Select a pattern axis." on the field | "…could not be resolved" | ✗ |
-| 5 | Linear second direction empty | error only when its count > 1: "Select a pattern direction." on directionTwo | always, own text | ✗ |
-| 6 | Reapply failures | "Could not pattern selected features." when all fail; partial failures silent | first failure's text; partial warning; geometric fallback | ✗ ? L40 |
+| 3 | Empty Feature mode | "Select features to pattern." / "…mirror." on Features, before the direction / plane | direction first, then "Select features to pattern" | 🔧 |
+| 4 | Unresolvable plane / direction / axis | "Select a mirror plane." / "Select a pattern direction." / "Select a pattern axis." on the field | "…could not be resolved" | 🔧 |
+| 5 | Linear second direction empty | error only when its count > 1: "Select a pattern direction." on directionTwo | always, own text | 🔧 |
+| 6 | Reapply failures | "Could not pattern selected features." when all fail; partial failures silent | first failure's text; partial warning; geometric fallback | 🔧 texts and silent partial failures; the geometric fallback when a feature can't be re-run stays ✗ ? L40 |
 | 7 | Sketch in a feature pattern | re-run, info "Sketch dimensions and constraints using the Origin or the default planes as reference will not be reapplied. Learn more" | skipped | ✗ ? L41 |
-| 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | ✗ ? L42, L43 |
+| 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | 🔧 texts; off-part instances still become parts ✗ ? L42, L43 |
 | 9 | Feature selection in Faces to pattern | a feature-list click adds its faces | not supported | ✗ ? L44 |
-| 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | ✗ ? L45 |
-| 11 | Limits and infos | "Cannot have more than 2500 instances in a pattern.", parallel directions info, skip-instance infos | missing | ✗ |
+| 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | 🔧 except the start-point info ✗ ? L45 |
+| 11 | Limits and infos | "Cannot have more than 2500 instances in a pattern.", parallel directions info, skip-instance infos | missing | 🔧 2500 limit (linear) and parallel info; skip-instance infos ✗ |
 
 ## Hole
 | # | Area | Onshape | Ours | Status |
