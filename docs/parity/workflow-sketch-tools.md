@@ -28,3 +28,18 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 
 Findings: SK5 (solver reshapes geometry on a fillet radius edit), CH1 (no chamfer preview), VB1 (glyphs over the value box), OFF1, FIL1, PAT1, SLOT1, POLY1, STB1.
 Live request "qa5 (10-22 pass 14, workflow 26 …)" filed for row 3 hover, row 8 and the committed slot glyphs.
+
+## Re-run pass 19 (2026-10-22 ~11:00–11:40, app /tmp/qa5/noshape-1013 = /root/target-lead/debug/noshape 10:13: the queue's 09:58 batch build = main 3ce6952 + the ready branches of that batch; CLI 08:11)
+Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
+| Row | Ours | Status |
+|---|---|---|
+| OFF1 Offset after a click | hollow grey arrow, no value box (z20) | ✅ **fixed** |
+| FIL1 fillet manipulator | hollow grey arrow + "R" leader (z21) | ✅ **fixed** |
+| (new) **FIL2** default sketch-fillet radius | **R5** (z21, z22); live mm default **R20 mm** (sketch/301; pass 14 had R20) | ✗ **FIL2** (skb, regression) |
+| VB1 glyphs over the value box | box clear (z22) | ✅ **fixed** |
+| SK5 rectangle after R5 → R3 | left edge still moves ~10 px (was ~37 px from R20); bottom edge stays (z23) | ✗ still (smaller; live answer pending) |
+| SLOT1 slot preview / committed | unchanged (z24, z25) | ✗ still |
+| PAT1 linear pattern preview | unchanged (z26) | ✗ still |
+| POLY1 polygon | solid construction circle, horizontal spinner (z27) | ✗ still |
+| STB1 S toolbar | at cursor x+10, y−30, square corners (z28) | ✅ **fixed** |
+| CH1 chamfer preview | preview chamfer + hollow arrow + two dimension lines ✅, but **no dimension values** (only extension lines and tiny arrowheads; live shows "5" twice) (z29) | ✗ **CH2** (skb, partly) |
