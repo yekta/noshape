@@ -393,3 +393,39 @@ Re-run the whole section on the build with ui's fix (`menurun.sh BIN menus-ps.tx
 - Section 8, all 73 items (menurun.sh, fresh demo app per item): no crash; screenshots show each item's dialog / action.
 - Sections 1–2 smoke: New document, Sketch on Top (☑ Show constraints / ☑ Show errors), L chain + Enter dimension, G,
   D value box selected, 25 Enter, ✓ → Sketch 1.
+
+## v0.4.6 gate: main 8da7e78 (target-lead build 14:40, embeds 8da7e78248bc), FRESH=1, 2026-10-22 15:20–16:40, qa4
+**Result: FAIL on (b)** (the failed Extrude's input region isn't drawn red). Everything else passes.
+
+| Row | Result |
+|---|---|
+| Sections 1–7 | ✅ (as the aa75fdf run; 3.5 5 mm chamfer red, 2 mm builds; 3.6 shell builds; 3.12/4.1 F12; 3.16 blue note; F19 toast ≈3.4 s / gone ≈8.2 s; STEP 4 products, live colours). 2.17: my script's R20/40 after the #w-popup + "abc" steps didn't get created (twice now); the same steps by hand create them every time, so not counted. |
+| Section 8 (73 context-menu items) | ✅ all alive, incl. 8.6.1 Parts list › Rename |
+| (a) "lp wall over" Feature pattern (CLI-built, live G-URGENT model) | ✅ Reapply off: row and dialog title red, tooltip exactly `Linear pattern 1 did not regenerate properly: Could not create all instances as entered. Try selecting "Reapply features" option.`, ✓ enabled green, seed wall + direction drawn red, no second wall. Reapply on: title black, orange preview, two walls, volume **20042 mm³** (= live). |
+| (b) failed Extrude (Up to face on the block's parallel x=0 face) | ✗ title / row red, tooltip exactly `Extrude 2 did not regenerate properly: Failed to extrude selections, check input.`, ✓ enabled, no ghost; the up-to face's edge is red, **but the input sketch region (10×10 square) isn't drawn at all**: live draws it as a red outline with a light red fill. |
+| (c) Parts list › Rename | ✅ white field, all selected, no hover band; "Bracket" + Enter renames; no crash |
+| (d) import g48-two.step | ✅ names as live: Part 1 = G48 body (1.379 in³ ≈ 22597 mm³), Part 2 = the 10 mm cube. **New finding:** selecting Part 1 highlights the cube too, selecting Part 2 highlights the cube plus a face of the G48 body (selection highlight crosses the imported parts); the Parts list shows Part 2 above Part 1 (live order not captured). |
+| (e) noshape-cli live mode (CLI built from 8da7e78) | ✅ with failext.noshape open in the app: sketch_create / sketch_draw / feature_add extrude via the CLI appear in the window at once (Sketch 3, Extrude 3, Part 2); Ctrl+Z in the app undoes the extrude. |
+
+Models: /root/qa4-scratch/mk-models.py CLI DIR (lpwall.noshape, failext.noshape).
+
+## v0.4.6 candidate /tmp/lead/noshape-v046 + noshape-cli-v046 (main 8da7e78, built 17:06, footer `0.4.4.8da7e78248bc`), FRESH=1, 2026-10-22 17:00–17:55, qa4
+**Result: FAIL on (b)** (same as the target-lead run). Everything else passes. New finding R1 (below).
+
+| Row | Result |
+|---|---|
+| Sections 1–4 | ✅ (2.17 scripted miss as before; by hand OK) |
+| Section 5 | ✅ #w = 20 drives Extrude 1; area 688.210 mm² / "Parallel dist 0.000 mm"; mass props Part 1 17073.686 mm³ (centre of mass still blank, F18); config row "Long". **Now fixed:** 5.2 Plane ▾ list scrolls to Composite part / Tag (F17); 5.9 yellow "Select sketches or features to configure [Done]" banner (F21). |
+| Section 6 | ✅ Insert (configuration picker shown), filter "3", Fastened 1 solves, Drawing ANSI_A_MM, 3 views, dimension "32.81". ? both inserted instances show the fixed icon and Fastened 1 is drawn grey (live not checked). |
+| Section 7 | ✅ STEP: 4 MANIFOLD_SOLID_BREP, products Part 1–4; quit / Recently opened (thumbnail) / reopen: all tabs, features, Configurations panel back. |
+| Section 8 (73 items, menurun.sh, fresh demo app each) | ✅ all ALIVE, every screenshot shows its dialog / action |
+| (a) lp wall over | ✅ red row + title, tooltip exact, ✓ green, seed wall and Right plane red; Reapply on: black title, two walls, **20042 mm³** |
+| (b) failed Extrude | ✗ title / row red, tooltip exact (`Extrude 2 did not regenerate properly: Failed to extrude selections, check input.`), ✓ enabled, up-to face edge red; **the input region (x 50–60, y 10–20 on Top) is not drawn** (checked iso and Top view, zoomed) |
+| (c) Parts list › Rename | ✅ white field, "Part 1" selected; "Bracket" + Enter; no crash |
+| (d) import g48-two.step | ✅ names (Part 1 = G48 body, Part 2 = cube); still: selection highlight crosses parts (Part 1 lights the cube too; Part 2 lights the cube + a G48 face), list order Part 2 above Part 1 |
+| (e) CLI live mode | ✅ sketch_create / sketch_draw / feature_add on the open failext.noshape appear at once (Sketch 3, Extrude 3, Part 2); Ctrl+Z in the app removes Extrude 3 |
+
+**R1 (new, render):** select two default planes (Top + Right, or Front + Right; feature list or viewport) → every part is drawn
+with black jagged halos and see-through holes (hole cylinders visible through the top faces), plus the green dashed
+intersection line; one plane selected draws normally; clearing the selection restores it. Reproduced 3×. Not compared
+with v0.4.5 (binary no longer on disk).

@@ -2998,7 +2998,7 @@ impl Render for FeatureDialog {
         // Live (dom/dialog-hole.txt, dialog-variable.txt): a name built from
         // the parameters ("Ø 0.25 in ↧ 0.5 in", "#? = 0 in") is followed
         // by the feature type in brackets.
-        let tip_name = if name == self.feature.name { name.clone() } else { format!("{name} [{}]", self.ty.name) };
+        let tip_name = if name == self.feature.name { crate::part_studio::typed_name(&self.feature) } else { format!("{name} [{}]", self.ty.name) };
         // The sketch's red title has no tooltip: the bubble asks for a plane.
         let error_tip: Option<String> = status.as_ref().filter(|s| s.0 == FeatureStatus::Error && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
         let ref_panel = self.render_reference_panel(window, cx);

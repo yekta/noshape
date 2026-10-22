@@ -45,16 +45,19 @@ impl Sketch {
         }
     }
 
-    /// Axis-aligned rectangle from two opposite corners (2 horizontal + 2 vertical).
+    /// Axis-aligned rectangle from two opposite corners. Live Onshape (REST,
+    /// qa5 sketch tools): Perpendicular top / left, Parallel bottom / top and
+    /// left / right, Horizontal top.
     pub fn corner_rectangle(&mut self, p0: DVec2, p1: DVec2) -> ShapeIds {
         let (lo, hi) = (p0.min(p1), p0.max(p1));
         let pts: Vec<EntityId> = [lo, DVec2::new(hi.x, lo.y), hi, DVec2::new(lo.x, hi.y)].iter().map(|p| self.add_point(*p)).collect();
         let lines = self.closed_polyline(&pts);
         let mut out = ShapeIds { points: pts, curves: lines.clone(), ..Default::default() };
-        self.c(&mut out, ConstraintKind::Horizontal { a: lines[0], b: None });
-        self.c(&mut out, ConstraintKind::Horizontal { a: lines[2], b: None });
-        self.c(&mut out, ConstraintKind::Vertical { a: lines[1], b: None });
-        self.c(&mut out, ConstraintKind::Vertical { a: lines[3], b: None });
+        let [bottom, right, top, left] = [lines[0], lines[1], lines[2], lines[3]];
+        self.c(&mut out, ConstraintKind::Perpendicular { a: top, b: left });
+        self.c(&mut out, ConstraintKind::Parallel { a: bottom, b: top });
+        self.c(&mut out, ConstraintKind::Parallel { a: left, b: right });
+        self.c(&mut out, ConstraintKind::Horizontal { a: top, b: None });
         out
     }
 
@@ -270,26 +273,38 @@ impl Sketch {
         let mut out = ShapeIds::default();
         match e.geometry {
             crate::entities::Geometry::Line { start, end } => {
+                // Live (REST, qa5 sketch tools): end caps on their own centre
+                // points, each joint a COINCIDENT, 4 TANGENT, 3 OFFSET from the
+                // centerline (both sides and the start cap, by the end cap's
+                // radius); the width dimension goes on the end cap.
                 let (p0, p1) = (self.point(start).unwrap(), self.point(end).unwrap());
                 let d = p1 - p0;
                 if d.length() < 1e-12 {
                     return Err(SketchError::InvalidGeometry("degenerate slot centerline".into()));
                 }
                 let n = d.normalize().perp() * h;
-                let b0 = self.add_point(p0 - n);
-                let b1 = self.add_point(p1 - n);
-                let a1 = self.add_point(p1 + n);
-                let a0 = self.add_point(p0 + n);
-                let bottom = self.add_line_between(b0, b1)?;
-                let cap1 = self.add_arc_between(end, b1, a1)?;
-                let top = self.add_line_between(a1, a0)?;
-                let cap0 = self.add_arc_between(start, a0, b0)?;
-                out.points = vec![b0, b1, a1, a0];
-                out.curves = vec![bottom, cap1, top, cap0];
-                for (l, c) in [(bottom, cap1), (top, cap1), (top, cap0), (bottom, cap0)] {
-                    self.c(&mut out, ConstraintKind::Tangent { a: l, b: c });
+                let c0 = self.add_point(p0);
+                let c1 = self.add_point(p1);
+                let (sa, sb) = (self.add_point(p0 + n), self.add_point(p0 - n));
+                let (eb, ea) = (self.add_point(p1 - n), self.add_point(p1 + n));
+                let (la, lb) = (self.add_point(p0 + n), self.add_point(p1 + n));
+                let (ra, rb) = (self.add_point(p0 - n), self.add_point(p1 - n));
+                // Caps run CCW: the start cap from the left side round the back.
+                let start_cap = self.add_arc_between(c0, sa, sb)?;
+                let end_cap = self.add_arc_between(c1, eb, ea)?;
+                let left = self.add_line_between(la, lb)?;
+                let right = self.add_line_between(ra, rb)?;
+                out.points = vec![c0, c1, sa, sb, eb, ea, la, lb, ra, rb];
+                out.curves = vec![right, end_cap, left, start_cap];
+                for (a, b) in [(c0, start), (c1, end), (sa, la), (sb, ra), (eb, rb), (ea, lb)] {
+                    self.c(&mut out, ConstraintKind::Coincident { a, b });
                 }
-                self.c(&mut out, ConstraintKind::Equal { a: cap0, b: cap1 });
+                for (l, c) in [(left, start_cap), (right, start_cap), (left, end_cap), (right, end_cap)] {
+                    self.c(&mut out, ConstraintKind::Tangent { a: c, b: l });
+                }
+                for (curve, master_ref, master, side) in [(left, end, id, 1.0), (right, end, id, -1.0), (start_cap, end, start, 1.0)] {
+                    self.c(&mut out, ConstraintKind::Offset { reference: end_cap, curve, master_ref, master, side });
+                }
             }
             crate::entities::Geometry::Arc { center, start, end } => {
                 let (c, s, en) = (self.point(center).unwrap(), self.point(start).unwrap(), self.point(end).unwrap());

@@ -1342,6 +1342,14 @@ impl DrawingEditor {
 
 impl Render for DrawingEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Live (dk-950): in dark mode only the shell is dark; the drawing's
+        // toolbar, canvas, sheet and panels stay in the light theme.
+        gpui_kit::with_light_colors(|| self.render_light(window, cx))
+    }
+}
+
+impl DrawingEditor {
+    fn render_light(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         // A closed view dialog took the focus with it (its fields): the sheet
         // takes it back, so shortcuts work at once (qa5 D5; live keeps them).
         if window.focused(cx).is_none() {
@@ -1561,5 +1569,6 @@ impl Render for DrawingEditor {
                 let canvas_el = canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border);
                 gpui_kit::component::h_flex().flex_1().min_h_0().relative().children(sheet_bar).child(canvas_el)
             })
+            .into_any_element()
     }
 }

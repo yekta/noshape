@@ -103,6 +103,9 @@ pub struct CtxState {
     pub merged_creators: HashMap<BodyId, Vec<FsId>>,
     /// The operation that created each body (exact, see `body_creator`).
     pub body_ops: HashMap<BodyId, FsId>,
+    /// The operation number after the last operation that made or changed
+    /// each body (bodies from earlier features are not listed).
+    pub touched: HashMap<BodyId, u32>,
     used_ids: HashSet<FsId>,
     next_seq: u32,
     /// Feature status per id (`@functionReportFeatureStatus`).
@@ -196,6 +199,7 @@ impl FsContext {
                 ops: HashMap::new(),
                 merged_creators: HashMap::new(),
                 body_ops: HashMap::new(),
+                touched: HashMap::new(),
                 used_ids: HashSet::new(),
                 next_seq: 1,
                 status: HashMap::new(),
@@ -626,11 +630,16 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
         Ok(v) => {
             let created: Vec<BodyId> = ctx.bodies.iter().filter(|b| b.id.feature == marker).map(|b| wrap_body_id(&b.id, marker, st.feature)).collect();
             rename_created(&mut ctx, marker, st.feature);
+            let seq = st.next_seq;
             for b in created {
+                st.touched.insert(b.clone(), seq);
                 st.body_ops.insert(b, id.to_vec());
             }
             // Bodies the operation changed (their attributes may need to follow renames).
             let changed: HashSet<BodyId> = ctx.bodies.iter().filter(|b| snapshot.bodies.iter().any(|o| o.id == b.id && !Arc::ptr_eq(o, b))).map(|b| b.id.clone()).collect();
+            for b in &changed {
+                st.touched.insert(b.clone(), seq);
+            }
             st.ctx = ctx;
             for b in &changed {
                 *st.body_versions.entry(b.clone()).or_default() += 1;

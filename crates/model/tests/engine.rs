@@ -1187,3 +1187,22 @@ fn intersect_of_parts_apart_makes_nothing() {
         assert_eq!(ps.iter().map(|p| p.0.clone()).collect::<Vec<_>>(), before.iter().map(|p| p.0.clone()).collect::<Vec<_>>(), "keep {keep}");
     }
 }
+
+/// Live "fail preview 2": Fillet 1 (2 mm on the top front edge of a
+/// 40 x 30 x 20 mm block) edited to 50 mm regenerates OK in Onshape, the
+/// volume going from 24000 to 7458.6158 mm³ (wider than both faces: the
+/// block cut by the ball's sweep).
+#[test]
+fn fillet_wider_than_its_faces_regenerates_like_onshape() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.03, "20 mm");
+    let r = t.ok();
+    let edge = edge_near(&r.context.bodies[0], DVec3::new(0.02, 0.0, 0.02));
+    let fillet = t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("2 mm"))]);
+    t.ok();
+    t.set(fillet, "radius", e("50 mm"));
+    let r = t.ok();
+    let v = total_volume(&r.context) * 1e9;
+    assert!((v - 7458.6158).abs() < 1e-3, "{v}");
+    assert_eq!(r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).count(), 1);
+}
