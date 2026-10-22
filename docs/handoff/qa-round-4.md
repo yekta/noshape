@@ -915,5 +915,14 @@ step (live +0.05). Owner: drawing (asb). Sheet properties width not re-checked.
   live (Fastened mate › Offset X, all 8 steps). Ready as part of 535b852.
 - Builds are slow now (no incremental, unique codegen-units per worktree): check/clippy ≈ 30–38 min, tests ≈ 35 min.
   Use 2 h (7200000 ms) background limits; mark ready only after reading the clippy output (don't chain `&& ready`).
+- v0.4.6 candidate (/tmp/lead/noshape-v046, 17:06): FAIL on (b) again; new R1 (two default planes selected → parts
+  drawn with black jagged halos / see-through holes); F17 and F21 now fixed; footer still 0.4.4.8da7e78248bc. Table in
+  core-workflow.md. Section 8 montage: /tmp/qa4/cm/mont.png.
+- QuantityInput: assembly Linear / Circular pattern dialog Distance (Angle) + Instance count, both directions (3404e43),
+  checked in the app against behaviours.md:5246 (count: 1+1 shown as typed, '1 in' / 'abc' invalid, ±1, wheel, Esc after
+  typing reverts + blurs; distance '(1+1) mm' → '2 mm' unfocused). Open (not part of the batch, pre-existing): Esc on an
+  *unedited* focused field there does nothing (the dialog has no "FeatureDialog" key context, so the kit's Escape
+  propagates to nothing); with focus outside the fields Esc closes the dialog. Adding the context also binds Tab →
+  DialogTab, which the pattern dialog doesn't handle yet.
 - Next: sketch fields (sketch.rs open_otf_input / open_count_edit / option_input / offset / bezier / tolerances),
   feature_dialog.rs:623 tolerances, the other assembly panels (same assembly variable scope), prefs.
