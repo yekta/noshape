@@ -123,7 +123,9 @@ impl PartStudioView {
             }
         }
         let custom: Vec<&'static features::FeatureType> = self.doc.read(cx).custom_features().feature_types().into_iter().collect();
-        for t in features::all().chain(custom) {
+        // Only tools: hidden feature types (Rip, Recognize, …) are not in
+        // live's tool search either.
+        for t in features::all().filter(|t| t.in_toolbar).chain(custom) {
             order += 1;
             if let Some((f, span)) = score(t.name) {
                 found.push(((f, span, order), PaletteItem::Feature(t.id)));
