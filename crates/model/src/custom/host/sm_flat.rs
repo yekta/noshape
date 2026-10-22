@@ -161,7 +161,7 @@ fn break_corner(f: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
     let mut face = k::make_face_from_wire(&wire, true).map_err(fe)?;
     let normal = |s: &Shape| -> FResult<DVec3> {
         let [u0, u1, v0, v1] = s.uv_bounds().map_err(fe)?;
-        Ok(s.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map_err(fe)?)
+        s.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map_err(fe)
     };
     if normal(&face)?.dot(normal(f)?) < 0.0 {
         face = face.reversed().map_err(fe)?;

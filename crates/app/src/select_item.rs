@@ -359,7 +359,8 @@ impl SelectItemPanel {
                 .flex_none()
                 .pl(px(indent))
                 .when(on, |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
-                .when(!on, |d| d.hover(|d| d.bg(p().panel_hover)))
+                // Live 407: a hovered row is pale blue (with the name as a tooltip).
+                .when(!on, |d| d.hover(|d| d.bg(gpui_kit::rgb(0xdef1fb))))
                 .cursor_pointer()
                 .children(expander)
                 .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(picture))
