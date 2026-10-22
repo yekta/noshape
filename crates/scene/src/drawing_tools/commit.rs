@@ -350,6 +350,38 @@ pub fn new_note(d: &mut Drawing, sheet: usize, text: String, height: Option<f64>
     Some(Annotation { id, kind: AnnotationKind::Note { text, height_mm, style }, position, ..Default::default() })
 }
 
+/// The Geometric tolerance tool's click: the frame (and its extra rows /
+/// texts) placed at `position`, without leaders.
+pub fn gdt(id: u64, position: [f64; 2], frame: Vec<String>, extra: GdtExtra) -> Annotation {
+    Annotation { id, kind: AnnotationKind::Gdt { anchor: position, frame, leaders: vec![], extra: Box::new(extra) }, position, ..Default::default() }
+}
+
+/// The Surface finish panel's ✓: the symbol with `value` ("Ra 3.2") where
+/// the tool was clicked.
+pub fn surface_finish(id: u64, position: [f64; 2], value: String) -> Annotation {
+    Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: position, value, leaders: Vec::new() }, position, ..Default::default() }
+}
+
+/// The Surface finish panel's starting value.
+pub const SURFACE_FINISH_DEFAULT: &str = "Ra 3.2";
+
+impl SheetPick<'_> {
+    /// The Weld symbol tool's first click: the entity the arrow points at
+    /// (a snap point or a view's geometry, in its view), else the sheet point.
+    pub fn weld_target(&self, c: [f64; 2]) -> (Option<ViewId>, [f64; 2]) {
+        match self.snap_at(c).or_else(|| self.any_point(c)) {
+            Some(p) => (Some(p.view), p.p),
+            None => (None, c),
+        }
+    }
+}
+
+/// The Weld symbol tool's second click: the symbol with `spec`, its
+/// reference line starting at `position`.
+pub fn weld(id: u64, view: Option<ViewId>, target: [f64; 2], spec: noshape_model::drawing::weld::WeldSpec, position: [f64; 2]) -> Annotation {
+    Annotation { id, kind: AnnotationKind::Weld { view, target, spec: Box::new(spec) }, position, ..Default::default() }
+}
+
 /// The Break view dialog's default gap: 6 mm, or 0.25 in in inch drawings.
 pub fn default_break_gap_mm(units_mm: bool) -> f64 {
     if units_mm { 6.0 } else { 0.25 * 25.4 }

@@ -286,3 +286,48 @@ fn narrow_rib_feature_pattern_without_reapply_matches_onshape() {
         assert_eq!(solids[0].shape.count(noshape_kernel::ShapeType::Face), 6 + 5 * n, "on top {on_top}");
     }
 }
+
+/// The user's v0.4.5 model: a long block 100 × 20 × 10 mm, a 0.5 mm wall
+/// added at its end, overhanging it (y -1..21 mm, 12 mm high), and a
+/// default Feature pattern of the wall along the block, 2 mm, 2 instances.
+/// Onshape fails it asking for Reapply features (checked live by the user);
+/// with Reapply features it makes two walls 2 mm apart.
+fn overhanging_wall(reapply: bool) -> RegenResult {
+    let mut s = Studio { ps: PartStudio::new(), units: UnitPrefs::default() };
+    let block = s.region(rect(0.0, 0.0, 0.1, 0.02));
+    s.add("extrude", &[("entities", q(vec![block])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let wall = s.region(rect(0.0, -0.001, 0.0005, 0.021));
+    let wall = s.add("extrude", &[("entities", q(vec![wall])), ("depth", e("12 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    s.add(
+        "linearPattern",
+        &[
+            ("patternType", en("FEATURE")),
+            ("instanceFunction", q(vec![Reference::Feature(wall)])),
+            ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])),
+            ("distance", e("2 mm")),
+            ("instanceCount", e("2")),
+            ("operationType", en("ADD")),
+            ("defaultScope", ParamValue::Bool(true)),
+            ("fullFeaturePattern", ParamValue::Bool(reapply)),
+        ],
+    );
+    s.regen()
+}
+
+#[test]
+fn overhanging_wall_feature_pattern_matches_onshape() {
+    let r = overhanging_wall(false);
+    let (st, msg) = status(&r);
+    assert!(matches!(st, FeatureStatus::Error), "{st:?}");
+    assert_eq!(msg.as_deref(), Some("Could not create all instances as entered. Try selecting \"Reapply features\" option."));
+    let r = overhanging_wall(true);
+    assert!(matches!(status(&r).0, FeatureStatus::Ok), "{:?}", status(&r));
+    let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.shape.count(noshape_kernel::ShapeType::Solid) > 0).collect();
+    assert_eq!(solids.len(), 1);
+    // The block, and per wall its 0.5 × 22 × 12 mm less the 0.5 × 20 × 10 mm inside the block.
+    let v = solids[0].shape.volume().unwrap() * 1e9;
+    assert!((v - (20000.0 + 2.0 * 32.0)).abs() < 1e-6, "{v}");
+    // The second wall's overhang 2 mm along: material at x 2.25 mm, y -0.5 mm.
+    let inside = |x: f64, y: f64| matches!(solids[0].shape.classify_point(glam::DVec3::new(x, y, 0.005), 1e-9), Ok(noshape_kernel::PointClass::Inside));
+    assert!(inside(0.00025, -0.0005) && inside(0.00225, -0.0005) && !inside(0.00125, -0.0005));
+}

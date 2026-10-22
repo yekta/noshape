@@ -179,6 +179,31 @@ function roundHead(r is ValueWithUnits, k is ValueWithUnits, rf is ValueWithUnit
     return [{ "p" : rz(Z, z0) }, { "p" : rz(r, z0) }, { "p" : rz(r, z0 + k - c) }, { "p" : rz(r - c, z0 + k), "mid" : rz(r - m, z0 + k - m) }, { "p" : rz(Z, z0 + k) }];
 }
 
+/**
+ * A pan head (live's tapping screws): the side of radius r up to an edge
+ * fillet re, tangent to a crown sphere of radius rc whose top is at z0 + k.
+ */
+function panCrown(r is ValueWithUnits, k is ValueWithUnits, rc is ValueWithUnits, re is ValueWithUnits, z0 is ValueWithUnits) returns array
+{
+    const zc = z0 + k - rc;
+    const fx = r - re;
+    const fz = zc + sqrt((rc - re) * (rc - re) - fx * fx);
+    // The tangent point on the sphere, along the line from its centre
+    // through the fillet's centre.
+    const dist = sqrt(fx * fx + (fz - zc) * (fz - zc));
+    const tx = fx * rc / dist;
+    const tz = zc + (fz - zc) * rc / dist;
+    // Arc midpoints: the fillet's halfway between +x and the tangent
+    // direction; the crown's halfway between the tangent point and the top.
+    const ux = 1 + fx / dist;
+    const uz = (fz - zc) / dist;
+    const ul = sqrt(ux * ux + uz * uz);
+    const a = atan2(tx, tz - zc) / 2;
+    return [{ "p" : rz(Z, z0) }, { "p" : rz(r, z0) }, { "p" : rz(r, fz) },
+            { "p" : rz(tx, tz), "mid" : rz(fx + re * ux / ul, fz + re * uz / ul) },
+            { "p" : rz(Z, z0 + k), "mid" : rz(rc * sin(a), zc + rc * cos(a)) }];
+}
+
 /** A spherical cap of base radius r and height h on z0 (h > 0 up). */
 function domeCap(r is ValueWithUnits, h is ValueWithUnits, z0 is ValueWithUnits) returns array
 {
@@ -206,6 +231,12 @@ const DRIVE_SLOT = 2;
 const DRIVE_CROSS = 3;
 const DRIVE_POZI = 4;
 const DRIVE_HEXALOBULAR = 5;
+// ASME B18.6.4 tapping-screw recesses as live models them (behaviours.md
+// "skb: Type III / Type VI recess features"): square side sd / hexalobular
+// spline through Ø sd and Ø b, both with a 140 degree cone bottom at depth t
+// and a 0.002 in mouth fillet.
+const DRIVE_SQUARE_III = 6;
+const DRIVE_TYPE_VI = 7;
 
 // Necks under the head (definition.neck).
 const NECK_NONE = 0;
@@ -251,7 +282,7 @@ function screwHead(context is Context, id is Id, def is map) returns array
     if (kind == HEAD_ROUND)
     {
         // A collar (dc, c) under the head (DIN 967) lifts it by c.
-        const head = revolveProfile(context, id + "round", roundHead(def.dk / 2, def.k - def.c, def.rf, def.c));
+        const head = revolveProfile(context, id + "round", def.re > EPS && def.rf > EPS ? panCrown(def.dk / 2, def.k - def.c, def.rf, def.re, def.c) : roundHead(def.dk / 2, def.k - def.c, def.rf, def.c));
         if (def.c > EPS)
             cylinderZ(context, id + "collar", Z, def.c + EPS, def.dc / 2);
         return [qCreatedBy(id, EntityType.BODY), def.k];
@@ -369,6 +400,60 @@ function driveCut(context is Context, id is Id, target is Query, def is map, top
         opDeleteBodies(context, id + "deleteLobeSketch", { "entities" : qCreatedBy(id + "lobeSketch", EntityType.BODY) });
         tool = qCreatedBy(id + "lobes", EntityType.BODY);
     }
+    else if (kind == DRIVE_SQUARE_III || kind == DRIVE_TYPE_VI)
+    {
+        // The walls go down to where the 70 degree (140 included) cone
+        // from the wall radius r reaches the depth t.
+        const square = kind == DRIVE_SQUARE_III;
+        const r = square ? def.sd / 2 : def.b / 2;
+        const side = def.t - r * tan(20 * degree);
+        if (square)
+            prismZ(context, id + "square", top - side, side + reach, polygonPoints(4, def.sd, 0));
+        else
+        {
+            // One closed spline through 12 points: lobe tips on Ø sd at
+            // 90 + 60k degrees, the valleys on Ø b at 60 + 60k.
+            var p = XY_PLANE;
+            p.origin[2] = top - side;
+            const sketch = newSketchOnPlane(context, id + "lobeSketch", { "sketchPlane" : p });
+            var pts = [];
+            for (var k = 0; k < 12; k += 1)
+            {
+                const a = (60 + 30 * k) * degree;
+                const rk = k % 2 == 0 ? def.b / 2 : def.sd / 2;
+                pts = append(pts, vector(rk * cos(a), rk * sin(a)));
+            }
+            pts = append(pts, pts[0]);
+            skFitSpline(sketch, "lobes", { "points" : pts });
+            skSolve(sketch);
+            opExtrude(context, id + "lobes", { "entities" : qSketchRegion(id + "lobeSketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : side + reach });
+            opDeleteBodies(context, id + "deleteLobeSketch", { "entities" : qCreatedBy(id + "lobeSketch", EntityType.BODY) });
+        }
+        revolveProfile(context, id + "cone", [{ "p" : rz(Z, top - def.t) }, { "p" : rz(r, top - side) }, { "p" : rz(r, top + reach) }, { "p" : rz(Z, top + reach) }]);
+        unite(context, id + "recess", [solidsOf(context, id)]);
+        subtract(context, id + "cut", target, solidsOf(context, id));
+        // The mouth: the edges around the recess that stay in the upper
+        // half of its wall (the walls' vertical edges reach the bottom).
+        const reachR = (square ? def.sd / 2 * sqrt(2) : def.sd / 2) * 1.05;
+        // (The cut gives the screw a new identity: it is the one solid left.)
+        const screw = qUnion(evaluateQuery(context, qBodyType(qEverything(EntityType.BODY), BodyType.SOLID)));
+        var mouth = [];
+        for (var e in evaluateQuery(context, qOwnedByBody(screw, EntityType.EDGE)))
+        {
+            const bounds = evBox3d(context, { "topology" : e });
+            if (max([abs(bounds.minCorner[0]), abs(bounds.maxCorner[0]), abs(bounds.minCorner[1]), abs(bounds.maxCorner[1])]) < reachR && bounds.minCorner[2] > top - side / 2)
+                mouth = append(mouth, e);
+        }
+        // (OCCT can't make this 0.05 mm fillet yet; the part stays without it.)
+        if (size(mouth) > 0)
+        {
+            try silent
+            {
+                opFillet(context, id + "mouth", { "entities" : qUnion(mouth), "radius" : 0.002 * inch });
+            }
+        }
+        return;
+    }
     subtract(context, id + "cut", target, tool);
 }
 
@@ -480,6 +565,8 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isLength(definition.c, LENGTH_0);
         annotation { "Name" : "rf" }
         isLength(definition.rf, LENGTH_0);
+        annotation { "Name" : "Head edge fillet" }
+        isLength(definition.re, LENGTH_0);
         annotation { "Name" : "f" }
         isLength(definition.f, LENGTH_0);
         annotation { "Name" : "e1" }
