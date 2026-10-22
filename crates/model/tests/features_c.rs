@@ -1218,6 +1218,47 @@ fn move_and_delete_face_onshape_errors() {
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Cannot delete all faces of a part or surface.".to_string()));
 }
 
+/// Live (qa5 workflow 27, BEND1 / JOG1): a 60 × 40 × 2 plate, radius 2, and
+/// a line (30,0)→(30,40) on its top through the middle. The side along line
+/// direction × face normal (x > 30) moves; Jog's default offset is 5 mm.
+#[test]
+fn bend_and_jog_move_the_side_live_moves() {
+    let build = |ty: &'static str| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (0.0, 40.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("sheetMetalStart", move |p| {
+            p.set("process", en("THICKEN"));
+            p.set("regions", q(region));
+            set_model(p, "2 mm", "2 mm");
+        });
+        let mut sk = noshape_sketch::Sketch::new();
+        let line = polyline(&mut sk, &[(30.0, 0.0), (30.0, 40.0)], false);
+        let lid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r = s.ok();
+        let top = face_at(&r, 0, DVec3::new(mm(30.0), mm(20.0), mm(2.0)));
+        s.add(ty, move |p| {
+            p.set("bendReference", entities(lid, &line));
+            p.set("face", q(top));
+        });
+        s.ok()
+    };
+    let r = build("sheetMetalBend");
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(volume(&r, 0), 4812.566370614357e-9, 1e-15), "bend volume {}", volume(&r, 0));
+    assert_eq!(r.context.bodies[0].faces.len(), 14);
+    // x < 30 stays flat; the wall rises at x 29.7223453..31.7223453.
+    assert!(near(bb.min.x, 0.0, 1e-9) && near(bb.max.x, mm(31.7223453), 1e-9) && near(bb.max.z, mm(31.7223453), 1e-9), "{bb:?}");
+    let r = build("sheetMetalJog");
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(volume(&r, 0), 4825.132741228719e-9, 1e-15), "jog volume {}", volume(&r, 0));
+    assert_eq!(r.context.bodies[0].faces.len(), 22);
+    // Inside anchor: raised plate z 7..9; preserve material pulls its end in to 55.889.
+    assert!(near(bb.min.x, 0.0, 1e-9) && near(bb.max.z, mm(9.0), 1e-9) && near(bb.max.x, mm(55.889), 1e-6), "{bb:?}");
+}
+
 /// patternUtils.fs / curvePattern.fs: what is patterned is checked first, and
 /// the path / distance errors read like Onshape's.
 #[test]
@@ -1236,4 +1277,69 @@ fn pattern_errors_as_onshape() {
         p.set("faces", q(top));
     });
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a path to pattern along.".to_string()));
+}
+
+/// Live "lp wall over" (behaviours "URGENT (10-22): Feature pattern…"): a
+/// 0.5 mm wall overhanging the block's end by 1 mm, Feature pattern 2 mm × 2.
+/// Reapply features off fails with Onshape's text and keeps only the seed;
+/// on, the second wall adds its 21 mm³ of overhang.
+#[test]
+fn feature_pattern_of_overhanging_wall_as_live() {
+    let build = |reapply: bool| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (100.0, 0.0), (100.0, 20.0), (0.0, 20.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(-1.0, 0.0), (21.0, 0.0), (21.0, 11.0), (-1.0, 11.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Right), sk);
+        let region = s.region(sid);
+        let wall = s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("0.5 mm"));
+            p.set("operationType", en("ADD"));
+            p.set("defaultScope", ParamValue::Bool(true));
+        });
+        s.add("linearPattern", move |p| {
+            p.set("patternType", en("FEATURE"));
+            p.set("instanceFunction", q(Reference::Feature(wall)));
+            p.set("directionOne", q(Reference::Plane(DatumPlane::Right)));
+            p.set("distance", expr("2 mm"));
+            p.set("instanceCount", expr("2"));
+            p.set("fullFeaturePattern", ParamValue::Bool(reapply));
+        });
+        s
+    };
+    let mut off = build(false);
+    let r = off.regen();
+    let st = r.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Could not create all instances as entered. Try selecting \"Reapply features\" option.")));
+    assert!(near(volume(&r, 0), mm(100.0) * mm(20.0) * mm(10.0) + mm(0.5) * 21e-6 * 2.0, 1e-9), "{}", volume(&r, 0));
+    let mut on = build(true);
+    let r = on.ok();
+    assert!(near(volume(&r, 0) * 1e9, 20042.0, 1e-6), "{}", volume(&r, 0) * 1e9);
+}
+
+/// Live "Contrast: a failed EXTRUDE" (10-22): Up to face on a face the
+/// profile can't reach reads Onshape's text, not the kernel's.
+#[test]
+fn failed_extrude_reads_onshape_text() {
+    let mut s = block();
+    let r = s.ok();
+    let side = face_at(&r, 0, DVec3::new(0.0, mm(25.0), mm(12.5)));
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(120.0, 10.0), (130.0, 10.0), (130.0, 20.0), (120.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("endBound", en("UP_TO_SURFACE"));
+        p.set("endBoundEntityFace", q(side));
+    });
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Failed to extrude selections, check input.".to_string()));
 }
