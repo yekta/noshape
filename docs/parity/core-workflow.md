@@ -374,3 +374,14 @@ Routing (lead, 10-22): F30, F32, F33 → psb; F31 → ui; F34 → ui2. 3.16: liv
 | 7 Export / reopen | 7.1–7.3 | ✅ (7.2: flat products Part 1–4, no PRODUCT('SOLID'); **F34 fixed**: COLOUR_RGB 0.6157/0.8118/0.9294, 0.6471 (#a5a5a5), 0.2314/0.3804/0.7059 (#3b61b4), 0.9176 (#eaeaea) = live) |
 
 Open items (not blocking): F31 (Fillet ▾ scrollbar, ui) not re-checked; drawing panel fields (asb).
+
+## Section 8 dry run on aa75fdf (2026-10-22 06:40–07:10, qa4; /root/qa4-scratch/menurun.sh, one fresh demo app per item)
+73 items (8.1–8.7 on the demo Part Studio: Sketch 1, Extrude 1, multi-select, Top, Origin, folder, Part 1, "Parts (1)"):
+**one crash: 8.6.1 Parts list › Rename** (panic at vendor/gpui-pre/src/elements/div.rs:843, "hover style already set"; qa5's
+find, ui fixing). The other 72 open what they should (screenshots /tmp/qa4/cm/aa-*.png). Notes:
+- 8.1.4 / 8.2.4 Show dimensions: the part turns see-through (live too), but the demo's Sketch 1 has no dimensions: check
+  the labels on the gate document (live: the sketch's dimensions drawn in 3D on its plane).
+- 8.3.6: with Sketch 1 + Extrude 1 selected ours lists only "Add appearance to feature…"; live lists "Edit sketch
+  appearance…, Add appearance to feature…" (psb, minor).
+- Dynamic suppression ▸ is a submenu: hover it, then click "Add expression…" (opens the "Dynamic suppression" dialog).
+Re-run the whole section on the build with ui's fix (`menurun.sh BIN menus-ps.txt TAG`, then menus-fm.txt).
