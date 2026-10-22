@@ -328,7 +328,19 @@ impl AssemblyView {
         let dof_w: Vec<f32> = drivers.iter().map(|(m, ix)| crate::ui::col_w(T, &dof_key(m, ix), 140.)).collect();
         // Header: Name (spanning both levels) + mate name over DOF label.
         let mut head = h_flex().items_start().border_l_1().border_color(border).bg(head_bg).font_weight(FontWeight::BOLD);
-        head = head.child(cell(name_w).relative().h(px(if two_level { 68. } else { 34. })).justify_center().bg(if two_level { rgb(0xd7d7d7) } else { head_bg }).child("Name").child(crate::ui::col_grip(T, "name", 140.)));
+        // Live 155 (qa5 NP2): with drivers, "Name" sits in the lower row of a
+        // #eaeaea cell; the mate and degree-of-freedom cells are #d7d7d7.
+        let driver_bg = rgb(0xd7d7d7);
+        head = head.child(
+            cell(name_w)
+                .relative()
+                .h(px(if two_level { 68. } else { 34. }))
+                .justify_center()
+                .when(two_level, |d| d.items_end().pb(px(9.)))
+                .bg(head_bg)
+                .child("Name")
+                .child(crate::ui::col_grip(T, "name", 140.)),
+        );
         let mut i = 0;
         while i < drivers.len() {
             let m = drivers[i].0;
@@ -336,9 +348,9 @@ impl AssemblyView {
             let mname = asm.mate(m).map(|x| x.name.clone()).unwrap_or_default();
             let mut sub = h_flex();
             for (k, (m, ix)) in drivers[i..i + span].iter().enumerate() {
-                sub = sub.child(cell(dof_w[i + k]).relative().justify_center().child(dof_label(*ix)).child(crate::ui::col_grip(T, &dof_key(m, ix), 140.)));
+                sub = sub.child(cell(dof_w[i + k]).relative().justify_center().bg(driver_bg).child(dof_label(*ix)).child(crate::ui::col_grip(T, &dof_key(m, ix), 140.)));
             }
-            head = head.child(v_flex().child(cell(dof_w[i..i + span].iter().sum()).justify_center().child(mname)).child(sub));
+            head = head.child(v_flex().child(cell(dof_w[i..i + span].iter().sum()).justify_center().bg(driver_bg).child(mname)).child(sub));
             i += span;
         }
         let editing_cell = |row: usize, col: usize| self.ui.np_cell.as_ref().filter(|c| c.row == row && c.col == col).map(|c| c.input.clone());
