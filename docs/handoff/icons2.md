@@ -824,3 +824,12 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   and 4 tangent points; the diameter goes on the END cap, label at centre + (0, 2 x width) -> vertical radial leader.
   Constraints (coincident x4, tangent x4, offset x3 instead of equal pairs): skb's, note left in sketch-behaviour.md.
 - Blocked at the restart: transition's crates/app/src/preferences_window.rs:1143 unclosed delimiter (another agent).
+- Verified in app (after main 3ce6952): offset arrow (crisp: #989fa3|white|#989fa3 = live 303), fillet arrow + "R20"
+  leader, linear pattern (squares, count arrows, 3x/1x leaders, 25 dimension), slot Ø20 above the end cap with one
+  arrow (= live 1952), polygon spinner with the rotated count (= live 91). context/r15-*, r16-*.
+- Follow-ups: `SketchEditor.screen_map` (set by the app from viewport rays) + `snap_to_pixel` put arrow starts and
+  square centres on pixel centres; pattern leaders 1.5 px into the square with a filled 8 x 5 px arrowhead; count
+  labels medium weight; an arc's diameter dimension is one leader to the near side (radial_dim).
+- For skb: our fillet default is R20 where the newer live capture (1933) shows R5 on a ~30 mm rectangle (older
+  behaviours line 212 says R20: likely geometry-dependent); live highlights the clicked corner point orange; live's
+  rectangle shows corner constraint glyphs ours lacks. A new polygon starts with the last side count used.

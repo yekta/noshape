@@ -490,6 +490,7 @@ impl PartStudioView {
         if let Some(ed) = &mut self.sketch {
             ed.world_per_px = wpp;
             ed.place_frame(center, size.y);
+            ed.screen_map = sketch_screen_map(vp, ed);
         }
     }
 
@@ -506,6 +507,7 @@ impl PartStudioView {
         let wpp_changed = self.sketch.as_ref().is_some_and(|ed| (ed.world_per_px - wpp).abs() > wpp * 1e-6);
         if let Some(ed) = &mut self.sketch {
             ed.world_per_px = wpp;
+            ed.screen_map = sketch_screen_map(vp.read(cx), ed);
         }
         match ev {
             ViewportEvent::CameraChanged => {
@@ -2650,6 +2652,8 @@ impl PartStudioView {
                     .left(px(x - label_w * 0.5))
                     .top(px(y - 10.))
                     .text_size(px(16.))
+                    // Live (sketch/136): "3x" / "1x" at medium weight.
+                    .font_weight(FontWeight::MEDIUM)
                     .text_color(rgb(0x333333))
                     .cursor_pointer()
                     .whitespace_nowrap()
@@ -4140,4 +4144,16 @@ fn unknown_variable(text: &str, vars: &std::collections::BTreeMap<String, noshap
         rest = &after[end..];
     }
     None
+}
+
+/// Screen to sketch map of the current view (sketch point under the
+/// viewport's origin, sketch steps of one pixel right and down), so the
+/// editor can put manipulators on pixel centres.
+fn sketch_screen_map(vp: &crate::viewport::Viewport, ed: &crate::sketch_mode::SketchEditor) -> Option<(DVec2, DVec2, DVec2)> {
+    let at = |x: f64, y: f64| {
+        let (o, d) = vp.ray(DVec2::new(x, y));
+        ed.plane_point(o, d)
+    };
+    let o = at(0.0, 0.0)?;
+    Some((o, at(1.0, 0.0)? - o, at(0.0, 1.0)? - o))
 }

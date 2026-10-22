@@ -545,6 +545,11 @@ pub struct SketchEditor {
     pub conflicting: Vec<ConstraintId>,
     /// World units per pixel at the sketch (for snap radii).
     pub world_per_px: f64,
+    /// Screen to sketch map set by the app on every view change: the sketch
+    /// point under the screen origin and the sketch steps of one pixel right
+    /// and down. Manipulators sit on pixel centres with it (Onshape's crisp
+    /// 2D overlays, live sketch/303).
+    pub screen_map: Option<(DVec2, DVec2, DVec2)>,
     /// The sketch frame (lower-left, upper-right in sketch coordinates),
     /// fixed in the plane once first drawn (see [`Self::place_frame`]).
     pub frame_bounds: Option<(DVec2, DVec2)>,
@@ -993,6 +998,7 @@ impl SketchEditor {
             pressed_glyph: None,
             conflicting: Vec::new(),
             world_per_px: 1e-4,
+            screen_map: None,
             frame_bounds: None,
             message: None,
             issue_highlight: None,
@@ -1822,6 +1828,17 @@ impl SketchEditor {
         let Ok(r) = tmp.offset(&[first], self.world_per_px.max(1e-9)) else { return false };
         let probe = r.created.iter().filter_map(|e| tmp.curve(*e)).map(|c| c.closest(mid).1).min_by(|x, y| (*x - mid).length().total_cmp(&(*y - mid).length()));
         probe.is_some_and(|q| (q - mid).dot(n) < 0.0)
+    }
+
+    /// `p` moved onto the nearest pixel centre (unchanged without a screen map).
+    pub fn snap_to_pixel(&self, p: DVec2) -> DVec2 {
+        let Some((o, ex, ey)) = self.screen_map else { return p };
+        let m = glam::DMat2::from_cols(ex, ey);
+        if m.determinant().abs() < 1e-30 {
+            return p;
+        }
+        let s = m.inverse() * (p - o);
+        o + m * DVec2::new(s.x.floor() + 0.5, s.y.floor() + 0.5)
     }
 
     /// The offset manipulator (live sketch/303): Onshape's hollow arrow,
@@ -4402,7 +4419,7 @@ impl SketchEditor {
                 // Onshape's hollow arrow (as the Part Studio manipulators): a
                 // light grey 3 px outline under a 1.5 px white line.
                 let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
-                push_hollow_arrow(&mut wide, start, d, self.world_per_px, OFFSET_ARROW_STEM_PX);
+                push_hollow_arrow(&mut wide, self.snap_to_pixel(start), d, self.world_per_px, OFFSET_ARROW_STEM_PX);
             }
         }
         // Fillet: preview at the hovered corner (red when it doesn't fit) and the
@@ -4416,7 +4433,7 @@ impl SketchEditor {
             // has a short leader down to the arc's upper tangent point.
             if let Some((start, apex)) = self.fillet_arrow(&data.sketch) {
                 let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
-                push_hollow_arrow(&mut wide, start, d, self.world_per_px, FILLET_ARROW_STEM_PX);
+                push_hollow_arrow(&mut wide, self.snap_to_pixel(start), d, self.world_per_px, FILLET_ARROW_STEM_PX);
             }
             if let Some(pa) = self.fillet_label_foot(&data.sketch) {
                 let px = self.world_per_px;
@@ -4512,15 +4529,23 @@ impl SketchEditor {
                             let second = h == PatternHandle::LinearSecondStep;
                             let (dir, _, count, diag) = self.linear_direction(second);
                             if !second {
-                                push_hollow_square(&mut wide, c, px, PATTERN_SQUARE_PX);
+                                push_hollow_square(&mut wide, self.snap_to_pixel(c), px, PATTERN_SQUARE_PX);
                             }
-                            push_hollow_square(&mut wide, q, px, PATTERN_SQUARE_PX);
-                            push_hollow_arrow(&mut wide, q + dir * px * PATTERN_SQUARE_PX * 0.5, dir, px, PATTERN_ARROW_STEM_PX);
+                            let qs = self.snap_to_pixel(q);
+                            push_hollow_square(&mut wide, qs, px, PATTERN_SQUARE_PX);
+                            push_hollow_arrow(&mut wide, qs + dir * px * PATTERN_SQUARE_PX * 0.5, dir, px, PATTERN_ARROW_STEM_PX);
                             let ink = [0x33, 0x33, 0x33, 255];
                             let mut segs = Vec::new();
+                            // The leader runs into the square, its filled ~8 x 5 px arrowhead
+                            // tip just off the centre (live sketch/136), 1.5 px.
+                            let along = diag.normalize_or_zero();
+                            let tip = q + along * px * 3.0;
                             let lead_end = q + diag * px * (PATTERN_LABEL_PX - 13.0);
-                            segs.push([lead_end, q + diag * px * PATTERN_SQUARE_PX * 0.5]);
-                            arrow(&mut segs, q + diag * px * PATTERN_SQUARE_PX * 0.5, -diag, px * 0.6);
+                            wide.push((vec![lead_end, tip], ink, 1.5));
+                            for i in 0..=16 {
+                                let t = i as f64 / 16.0 * 2.0 - 1.0;
+                                wide.push((vec![tip, tip + along * px * 8.0 + along.perp() * px * 2.5 * t], ink, 1.0));
+                            }
                             if count >= 2 {
                                 wide.push((vec![c, q], preview_color, -1.0));
                                 let (f1, f2) = self.linear_spacing_feet(c, second);
@@ -5323,7 +5348,12 @@ fn radial_dim(out: &mut Vec<[DVec2; 2]>, c: DVec2, r: f64, pos: DVec2, diameter:
     let dl = (pos - c).length();
     let tip = c + v * r;
     let far = if dl > r { pos } else { tip };
-    if diameter {
+    if diameter && span.is_some() && dl > r {
+        // An arc's diameter (live sketch/1946, a slot's end cap): one leader
+        // from the label to the near side, its arrow pointing in.
+        out.push([tip, far]);
+        arrow(out, tip, -v, s);
+    } else if diameter {
         let t2 = c - v * r;
         out.push([t2, far]);
         arrow(out, tip, v, s);
