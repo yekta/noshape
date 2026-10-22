@@ -39,20 +39,36 @@ fn f3(p: DVec3) -> [f32; 3] {
 /// (`TessQuality::factor`). The chord tolerance is the body's size (times
 /// `quality`), so the angle alone decides; it still scales with `quality`
 /// because BRepMesh keeps a shape's existing triangulation unless the new
-/// chord tolerance is smaller (a finer quality must re-mesh).
-fn display_deflection(shape: &noshape_kernel::Shape, quality: f64) -> (f64, f64) {
-    let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4) * quality;
+/// chord tolerance is smaller (a finer quality must re-mesh). `preview`
+/// meshes (instant feedback while a feature is edited) are Coarse.
+///
+/// `NOSHAPE_DISPLAY_MESH=chord` meshes as before live 459 (chord 8e-4 of
+/// the body's diagonal, 0.35 rad; previews 4x the chord, 1.8x the angle),
+/// to compare the cost (perf.yml `variants`).
+fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool) -> (f64, f64) {
+    let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
+    if chord_mesh() {
+        let defaults = RegenOptions::default();
+        let (lin, ang) = ((diag * defaults.relative_deflection * quality).max(1e-6), defaults.angular_deflection * quality.clamp(0.4, 1.0));
+        return if preview { (lin * 4.0, (ang * 1.8).min(0.9)) } else { (lin, ang) };
+    }
+    let quality = if preview { quality.max(crate::partstudio::TessQuality::Coarse.factor()) } else { quality };
     // BRepMesh's angular deflection is between a segment and the tangent,
     // half of the turn per segment.
     let auto = 2.0 * std::f64::consts::TAU / f64::from(crate::partstudio::TessQuality::Auto.segments_per_circle());
-    (diag, auto * quality)
+    (diag * quality, auto * quality)
+}
+
+fn chord_mesh() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_DISPLAY_MESH").is_ok_and(|v| v == "chord"))
 }
 
 /// Tessellates one body shape at an angle factor relative to Auto (smaller
 /// = finer, [`display_deflection`]), e.g. for an assembly instance's "Use
 /// best available tessellation".
 pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<MeshBuffers> {
-    let (lin, ang) = display_deflection(shape, quality);
+    let (lin, ang) = display_deflection(shape, quality, false);
     let t = noshape_kernel::tessellate(shape, lin, ang, true).ok()?;
     Some(
         MeshBuffers {
@@ -71,9 +87,7 @@ pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<M
 /// Tessellates a body's `shape` for the display (`quality` scales Auto's
 /// angle; preview meshes are Coarse).
 fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts: &RegenOptions) -> Arc<MeshBuffers> {
-    // Preview meshes (instant feedback) are Coarse.
-    let quality = if opts.preview_meshes { quality.max(crate::partstudio::TessQuality::Coarse.factor()) } else { quality };
-    let (lin, ang) = display_deflection(shape, quality);
+    let (lin, ang) = display_deflection(shape, quality, opts.preview_meshes);
     let tt = std::time::Instant::now();
     let tess = noshape_kernel::tessellate(shape, lin, ang, true);
     if perf_enabled() {

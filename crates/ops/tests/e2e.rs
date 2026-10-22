@@ -1176,6 +1176,13 @@ fn drawing_callouts_ordinates_and_datums() {
     let e = try_call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [10, 10], "spec": { "arrow": { "joint": "Glue" } } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("spec"), "{e:?}");
 
+    let rt = call(&mut ctx, "drawing_revision_table", json!({ "drawing": tab, "position": [400, 290], "visible_rows": 3 }));
+    assert!(rt["table"].as_u64().is_some(), "{rt}");
+    assert!(last(&mut ctx).ends_with(":: Revision table"));
+    let rc = call(&mut ctx, "drawing_revision_callout", json!({ "drawing": tab, "position": [100, 100] }));
+    assert_eq!(kind_of(&mut ctx, rc["annotation"].as_u64().unwrap()), "RevisionCallout");
+    assert!(last(&mut ctx).ends_with(":: Revision callout"));
+
     let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
     assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));
@@ -1202,4 +1209,29 @@ fn sketch_fillet_radius_default_is_r5_then_sticky() {
     let c = id_of(created(&rect2, "point").into_iter().find(|p| near(&p["at"], 40.0, 0.0)).unwrap());
     let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk2, "entities": [c] }));
     assert!((radius(&f) - 3.0).abs() < 1e-6, "{f}");
+}
+
+#[test]
+fn drawing_jogged_and_aligned_sections() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_sections.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let (top, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone())))).unwrap();
+    let top_id = top["id"].as_u64().unwrap();
+    let (cx, cy) = (num(&circle["center"][0]), num(&circle["center"][1]));
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let views_of = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().clone();
+    // Jogged section: across to the hole center, then up; aligned section about the hole.
+    let min_x = num(&top["bounds"]["min"][0]);
+    let jg = call(&mut ctx, "drawing_jogged_section_view", json!({ "drawing": tab, "parent": top_id, "points": [[min_x + 3.0, cy - 5.0], [cx, cy - 5.0], [cx, cy + 5.0]], "position": [cx, cy - 80.0] }));
+    let jv = views_of(&mut ctx).into_iter().find(|v| v["id"] == jg["view"]).unwrap();
+    assert_eq!(jv["kind"], "section", "{jv}");
+    assert!(last(&mut ctx).ends_with(":: Section view"));
+    let al = call(&mut ctx, "drawing_aligned_section_view", json!({ "drawing": tab, "parent": top_id, "center": [cx, cy], "a": [cx + 10.0, cy], "b": [cx, cy + 10.0], "position": [cx + 120.0, cy - 60.0] }));
+    let av = views_of(&mut ctx).into_iter().find(|v| v["id"] == al["view"]).unwrap();
+    assert_eq!(av["kind"], "aligned_section", "{av}");
+    assert!(last(&mut ctx).ends_with(":: Aligned section view"));
+
 }
