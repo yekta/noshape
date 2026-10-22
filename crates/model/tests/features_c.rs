@@ -1211,6 +1211,47 @@ fn move_and_delete_face_onshape_errors() {
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Cannot delete all faces of a part or surface.".to_string()));
 }
 
+/// Live (qa5 workflow 27, BEND1 / JOG1): a 60 × 40 × 2 plate, radius 2, and
+/// a line (30,0)→(30,40) on its top through the middle. The side along line
+/// direction × face normal (x > 30) moves; Jog's default offset is 5 mm.
+#[test]
+fn bend_and_jog_move_the_side_live_moves() {
+    let build = |ty: &'static str| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (0.0, 40.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("sheetMetalStart", move |p| {
+            p.set("process", en("THICKEN"));
+            p.set("regions", q(region));
+            set_model(p, "2 mm", "2 mm");
+        });
+        let mut sk = noshape_sketch::Sketch::new();
+        let line = polyline(&mut sk, &[(30.0, 0.0), (30.0, 40.0)], false);
+        let lid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r = s.ok();
+        let top = face_at(&r, 0, DVec3::new(mm(30.0), mm(20.0), mm(2.0)));
+        s.add(ty, move |p| {
+            p.set("bendReference", entities(lid, &line));
+            p.set("face", q(top));
+        });
+        s.ok()
+    };
+    let r = build("sheetMetalBend");
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(volume(&r, 0), 4812.566370614357e-9, 1e-15), "bend volume {}", volume(&r, 0));
+    assert_eq!(r.context.bodies[0].faces.len(), 14);
+    // x < 30 stays flat; the wall rises at x 29.7223453..31.7223453.
+    assert!(near(bb.min.x, 0.0, 1e-9) && near(bb.max.x, mm(31.7223453), 1e-9) && near(bb.max.z, mm(31.7223453), 1e-9), "{bb:?}");
+    let r = build("sheetMetalJog");
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(volume(&r, 0), 4825.132741228719e-9, 1e-15), "jog volume {}", volume(&r, 0));
+    assert_eq!(r.context.bodies[0].faces.len(), 22);
+    // Inside anchor: raised plate z 7..9; preserve material pulls its end in to 55.889.
+    assert!(near(bb.min.x, 0.0, 1e-9) && near(bb.max.z, mm(9.0), 1e-9) && near(bb.max.x, mm(55.889), 1e-6), "{bb:?}");
+}
+
 /// patternUtils.fs / curvePattern.fs: what is patterned is checked first, and
 /// the path / distance errors read like Onshape's.
 #[test]
