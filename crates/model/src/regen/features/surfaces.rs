@@ -25,11 +25,8 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
         let one = std::slice::from_ref(r);
         match r {
             Reference::Face(_) => {
-                let found = ev.resolve_faces(one);
-                if found.is_empty() {
-                    return err("A selected face no longer exists");
-                }
-                for (bi, fi) in found {
+                // Faces that no longer resolve are left out (offsetSurface.fs).
+                for (bi, fi) in ev.resolve_faces(one) {
                     faces.push((ev.face_shape(bi, fi)?, ev.ctx.bodies[bi].faces[fi].clone()));
                 }
             }
@@ -50,7 +47,7 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if faces.is_empty() {
-        return err("Nothing to offset");
+        return crate::regen::eval::err_at(&["surfacesAndFaces"], "Select faces, surfaces, or sketch regions to offset from.");
     }
     let d = ev.length("offset")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
     let shapes: Vec<Shape> = faces.iter().map(|f| f.0.clone()).collect();
@@ -107,6 +104,9 @@ fn adjacent_face(ev: &EvalCtx, edge: &Shape) -> Option<Shape> {
     None
 }
 
+/// Onshape's BSURF_FAILED.
+const BSURF_FAILED: &str = "Could not create boundary surface with given information. Check profile order, intersections or end conditions.";
+
 pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
     let rows = ev.params.array("edges");
     let mut boundary = Vec::new();
@@ -116,7 +116,7 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
         rows_refs.push(pre);
     }
     if rows_refs.iter().all(|r| r.is_empty()) {
-        return err("Select boundary edges to fill");
+        return crate::regen::eval::err_at(&["edges"], "Select laminar edges or curves as fill surface boundary.");
     }
     for (i, refs) in rows_refs.iter().enumerate() {
         let row = rows.get(i);
@@ -131,11 +131,11 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
         };
         for e in curve_edges(ev, refs)? {
             if boundary.iter().any(|b: &k::FillEdge| b.edge.is_same(&e)) {
-                return err("An edge is selected more than once");
+                return err("A boundary edge can have only one type of continuity constraint.");
             }
             let support = if continuity == k::Continuity::Position { None } else { adj.clone().or_else(|| adjacent_face(ev, &e)) };
             if continuity != k::Continuity::Position && support.is_none() {
-                return err("Tangency and curvature need an adjacent face for each edge");
+                return err("Cannot create tangency or curvature constraint for a curve selection.");
             }
             boundary.push(k::FillEdge { edge: e, support, continuity });
         }
@@ -144,14 +144,14 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
     let edges: Vec<Shape> = boundary.iter().map(|b| b.edge.clone()).collect();
     let wires = chain_wires(&edges)?;
     if wires.len() > 1 {
-        return err("The boundary edges must form a single loop");
+        return err("Cannot create fill surface between multiple loops.");
     }
     if let Some(w) = wires.first()
         && !w.is_closed().unwrap_or(true)
     {
         let pts = sample_chain(&order_chain(&edges, 1e-6)?, 1)?;
         if pts.len() < 2 || (pts[0] - pts[pts.len() - 1]).length() > 1e-6 {
-            return err("The boundary edges must form a closed loop");
+            return err("Boundary edges selected do not form a closed loop.");
         }
     }
     let mut points = Vec::new();
@@ -238,6 +238,10 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     };
     let (u, cu) = collect(ev, "uProfilesArray", "uProfileEntities", "uCondition")?;
     let (v, cv) = collect(ev, "vProfilesArray", "vProfileEntities", "vCondition")?;
+    // bsurf.fs: at least two profiles in all.
+    if u.len() + v.len() < 2 {
+        return crate::regen::eval::err_at(&["uProfilesArray", "vProfilesArray"], "Select edges to specify at least two profiles.");
+    }
     if u.len() > 2 || v.len() > 2 {
         return err("Select at most two profiles in each direction");
     }
@@ -248,14 +252,11 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
         // Four-sided (or three-sided) patch through all boundary curves.
         let all: Vec<Shape> = u.iter().chain(v.iter()).flatten().cloned().collect();
         let boundary: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
-        k::fill_surface(&boundary, &[]).map_err(|e| FeatureError::new(format!("Could not build the boundary surface: {e}")))?.shape
+        k::fill_surface(&boundary, &[]).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
     } else {
         let profiles = if u.is_empty() { &v } else { &u };
-        if profiles.len() < 2 {
-            return err("Select two profiles in one direction, or profiles in both directions");
-        }
-        let sections: Vec<Shape> = profiles.iter().map(|es| k::make_wire(&order_chain(es, 1e-6)?.into_iter().map(|(e, _)| e).collect::<Vec<_>>()).map_err(FeatureError::from)).collect::<FResult<_>>()?;
-        k::loft(&sections, &k::LoftOptions { solid: false, ruled: false, closed: false, ..Default::default() })?.shape
+        let sections: Vec<Shape> = profiles.iter().map(|es| k::make_wire(&order_chain(es, 1e-6)?.into_iter().map(|(e, _)| e).collect::<Vec<_>>()).map_err(|_| FeatureError::new(BSURF_FAILED))).collect::<FResult<_>>()?;
+        k::loft(&sections, &k::LoftOptions { solid: false, ruled: false, closed: false, ..Default::default() }).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
     };
     let names = new_face_names(ev, &shape);
     surface_result(ev, NamedShape::new(shape, names))

@@ -224,7 +224,8 @@ impl PartStudioView {
     /// Create/update/drop the sketch editor to match the edit session.
     pub(super) fn sync_sketch_editor(&mut self, cx: &mut Context<Self>) {
         let Some(id) = self.editing_sketch_id(cx) else {
-            if self.sketch.take().is_some() {
+            if let Some(ed) = self.sketch.take() {
+                self.sketch_fillet_radius = Some(ed.fillet_radius);
                 self.opts.editing_sketch = None;
                 self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
             }
@@ -257,10 +258,16 @@ impl PartStudioView {
                 }
             }
             _ => {
+                if let Some(ed) = &self.sketch {
+                    self.sketch_fillet_radius = Some(ed.fillet_radius);
+                }
                 self.sketch = Some(SketchEditor::new(id, frame));
                 let length = self.doc.read(cx).session.doc.settings.units.length;
                 if let Some(ed) = &mut self.sketch {
                     ed.apply_unit_defaults(length);
+                    if let Some(r) = self.sketch_fillet_radius {
+                        ed.fillet_radius = r;
+                    }
                 }
                 // A fresh sketch starts with no tool active (live
                 // sketch/00, 01, 44: no toolbar button is down after the
@@ -274,7 +281,8 @@ impl PartStudioView {
     }
 
     pub(super) fn leave_sketch(&mut self, cx: &mut Context<Self>) {
-        if self.sketch.take().is_some() {
+        if let Some(ed) = self.sketch.take() {
+            self.sketch_fillet_radius = Some(ed.fillet_radius);
             self.dim_input = None;
             self.opts.editing_sketch = None;
             // Live: "Sketch could not be solved." goes when the sketch closes.
@@ -1124,6 +1132,8 @@ impl PartStudioView {
                     ed.selection.clear();
                     ed.selected_constraints.clear();
                 }
+                // A chamfer's first distance → its second (live).
+                ed.open_next_value_box(data);
             }
             r
         });
@@ -1131,6 +1141,9 @@ impl PartStudioView {
             Some(Ok(())) => {
                 self.dim_input = None;
                 self.regen_sync(window, cx);
+                if self.sketch.as_ref().is_some_and(|s| s.dim_edit.is_some()) {
+                    self.sync_dim_edit(window, cx);
+                }
                 // Solvable again: the warning goes (live).
                 if self.message.as_ref().is_some_and(|(_, m)| m == crate::sketch_mode::SKETCH_NOT_SOLVED) {
                     self.message = None;
@@ -2604,21 +2617,27 @@ impl PartStudioView {
         let project = |q: DVec2| vp.project(frame.to_world(q)).map(|s| (s.x as f32, s.y as f32));
         let editing = self.dim_input.as_ref().map(|(c, st, _)| (*c, st.clone()));
 
-        if let Some((at, sides)) = ed.polygon_side_control()
+        // Live (sketch/91): "◀ 6 ▶" outside the polygon along the edge after the
+        // clicked vertex (the glyphs stay upright: GPUI can't rotate text).
+        if let Some((at, sides, angle)) = ed.polygon_side_control()
             && let Some((x, y)) = project(at)
         {
-            out.push(h_flex().absolute().left(px(x - 30.)).top(px(y - 10.)).occlude()
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .child(Button::new("sk-polygon-less").label("◀").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    if let Some(ed) = &mut this.sketch { ed.adjust_polygon_sides(-1); }
-                    this.refresh_scene(false, cx); cx.notify();
-                })))
-                .child(div().text_sm().child(sides.to_string()))
-                .child(Button::new("sk-polygon-more").label("▶").ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    if let Some(ed) = &mut this.sketch { ed.adjust_polygon_sides(1); }
-                    this.refresh_scene(false, cx); cx.notify();
-                })))
-                .into_any_element());
+            let step = ed.world_per_px * 14.0;
+            let dir = DVec2::from_angle(angle);
+            let (bx, by) = project(at - dir * step).unwrap_or((x - 14., y));
+            let (fx, fy) = project(at + dir * step).unwrap_or((x + 14., y));
+            let arrow = |id: &'static str, label: &'static str, ax: f32, ay: f32, delta: isize, cx: &Context<Self>| {
+                div().absolute().left(px(ax - 9.)).top(px(ay - 10.)).occlude()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(Button::new(id).label(label).ghost().xsmall().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some(ed) = &mut this.sketch { ed.adjust_polygon_sides(delta); }
+                        this.refresh_scene(false, cx); cx.notify();
+                    })))
+                    .into_any_element()
+            };
+            out.push(arrow("sk-polygon-less", "◀", bx, by, -1, cx));
+            out.push(div().absolute().left(px(x - 6.)).top(px(y - 10.)).text_sm().child(sides.to_string()).into_any_element());
+            out.push(arrow("sk-polygon-more", "▶", fx, fy, 1, cx));
         }
 
         // ---- pattern instance counts (`3x`, click to type; live sketch/136–138)
@@ -3249,6 +3268,25 @@ impl PartStudioView {
             let text = format!("R{}", full.split(' ').next().unwrap_or_default());
             let w = crate::sketch_mode::label_width_px(&text) as f32;
             out.push(div().absolute().left(px(x - w)).top(px(y - 11.)).h(px(22.)).flex().items_center().text_size(px(16.)).text_color(rgb(0x000000)).whitespace_nowrap().child(text).into_any_element());
+        }
+
+        // ---- pending chamfer's distance labels ("5", no unit; live sketch/1960)
+        for (at, d) in ed.chamfer_value_labels() {
+            let Some((x, y)) = project(at) else { continue };
+            let full = noshape_units::format_quantity(Quantity::new(d, Dim::LENGTH), &units);
+            let text = full.split(' ').next().unwrap_or_default().to_string();
+            let w = crate::sketch_mode::label_width_px(&text) as f32;
+            out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 11.)).h(px(22.)).flex().items_center().text_size(px(16.)).text_color(rgb(0x000000)).whitespace_nowrap().child(text).into_any_element());
+        }
+
+        // ---- pending slot's width ("Ø20", live sketch/304)
+        if let Some((_, at, d)) = ed.slot_dimension()
+            && let Some((x, y)) = project(at)
+        {
+            let full = noshape_units::format_quantity(Quantity::new(d, Dim::LENGTH), &units);
+            let text = format!("Ø{}", full.split(' ').next().unwrap_or_default());
+            let w = crate::sketch_mode::label_width_px(&text) as f32;
+            out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 11.)).h(px(22.)).flex().items_center().text_size(px(16.)).text_color(rgb(0x000000)).whitespace_nowrap().child(text).into_any_element());
         }
 
         // ---- offset distance: its label between the curve and the copy (click

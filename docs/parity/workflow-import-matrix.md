@@ -81,3 +81,12 @@ impmatrix14 vs impmatrix13: 115 of 116 identical.
 | IM4 g50-g46-shell1.x_t | still refused ("a curve of the file could not be rebuilt") | ✗ still |
 | NAME3 multi-part import names | unchanged (positional: g48-two Part 1 = cube) | ✗ still |
 | IM1, IM2, I1 | unchanged | ✗ still |
+
+## Re-run pass 18 (2026-10-22 ~10:00–11:00, CLI /tmp/qa5/noshape-cli-0811 = target-engine 08:11; main 3ce6952)
+impmatrix15 vs impmatrix14: 109 identical.
+| Row | Ours | Status |
+|---|---|---|
+| NAME3 multi-part import names | file names kept again: g48-two Part 1 = 22595.371166 (G48), Part 2 = 1000 cube; g47-3parts / g48-ap203/ap214/inch listed Part 3, 2, 1; jt-2parts Part 1 = 8000, Part 2 = 1000 | ✅ **fixed** |
+| IM4 g50-g46-shell1.x_t | imports again (no refusal) but still **corrupt**: 21 faces, volume 4550.392098, area 11830.50, bbox 0..38955.54 × 0..16845.92 × 0..320.42 mm (live 6052.69679568, a ~50×30×30 part) | ✗ still |
+| IM5 g38d curves | 8 wires | ✅ (stays fixed) |
+| IM1, IM2, I1 | unchanged | ✗ still |
