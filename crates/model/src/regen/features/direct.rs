@@ -54,8 +54,11 @@ pub fn delete_face(ev: &mut EvalCtx) -> FResult<()> {
             set.extend(adjacent_fillets(&body, &set));
         }
         let all = body.shape.faces();
+        // Live: deleting every face removes the part, with no message.
         if set.len() >= all.len() {
-            return err("Cannot delete all faces of a part or surface.");
+            let id = body.id.clone();
+            ev.ctx.bodies.retain(|b| b.id != id);
+            continue;
         }
         match heal.as_str() {
             "HEAL" => {
@@ -215,8 +218,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         None
     };
     let rotation = if ty == "ROTATE" {
-        let Some(r) = ev.query("axis").first() else { return err("Select a rotation axis") };
-        let (o, a) = ev.resolve_axis(r).ok_or_else(|| fe("The axis could not be resolved"))?;
+        // Live L5: "Cannot determine rotation axis." on Axis.
+        let no_axis = || crate::regen::eval::err_at(&["axis"], "Cannot determine rotation axis.");
+        let Some(r) = ev.query("axis").first() else { return no_axis() };
+        let Some((o, a)) = ev.resolve_axis(r) else { return no_axis() };
         Some((o, a.normalize(), ev.angle("angle")? * sign))
     } else {
         None
@@ -467,19 +472,37 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["replaceFaces"], "Select faces to replace.");
     }
-    let Some(tr) = ev.query("templateFace").first().cloned() else { return err("Select the face or plane to replace with") };
+    // Live L9: an empty or unresolvable Faces to replace with.
+    let unresolved = || crate::regen::eval::err_at(&["templateFace"], "Cannot resolve entities.");
+    let Some(tr) = ev.query("templateFace").first().cloned() else { return unresolved() };
     let extent = ev.model_extent();
     let mut template = match &tr {
         Reference::Face(_) => {
-            let Some(&(tb, tf)) = ev.resolve_faces(std::slice::from_ref(&tr)).first() else { return err("The template face no longer exists") };
+            let Some(&(tb, tf)) = ev.resolve_faces(std::slice::from_ref(&tr)).first() else { return unresolved() };
             ev.face_shape(tb, tf)?
         }
         _ => {
-            let Some(p) = ev.resolve_plane(&tr) else { return err("Select a face or plane to replace with") };
+            let Some(p) = ev.resolve_plane(&tr) else { return unresolved() };
             k::make_plane_face(&crate::regen::eval::kernel_plane(&p), -extent, extent, -extent, extent)?
         }
     };
-    let off = ev.length("offset")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
+    // Flip alignment reverses the template's sense (live L7/L8): the
+    // replaced faces must then face the same way as the template, else it
+    // fails; the offset goes along the template's (flipped) normal.
+    let sense = if ev.params.get("oppositeSense").is_some() && ev.bool("oppositeSense") { -1.0 } else { 1.0 };
+    let template_normal = |p: DVec3| -> Option<DVec3> { template.project_point(p).ok().and_then(|q| template.normal_at_point(q.point).ok()) };
+    for (bi, faces) in &groups {
+        for &f in faces {
+            let face = ev.ctx.bodies[*bi].shape.sub_shape(ShapeType::Face, f)?;
+            let c = face.centroid()?;
+            if let (Ok(n), Some(t)) = (face.normal_at_point(c), template_normal(c))
+                && n.dot(t * sense) < 0.0
+            {
+                return err(REPLACE_FAILED);
+            }
+        }
+    }
+    let off = ev.length("offset")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 } * sense;
     if off.abs() > 1e-12 {
         template = match template.face_plane()? {
             Some(pl) => template.translated(pl.unit_normal() * off)?,

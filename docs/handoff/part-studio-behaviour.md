@@ -1423,3 +1423,12 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
 - **VS1 checked in the app:** Variable › Value `8`, Enter → "8 mm", dialog stays open; second Enter accepts (live
   behaviours "qa5 pass 8 (2)"). The text selection after the first Enter can't be seen on Xvfb (Ctrl+A shows none
   either), so that half is unchecked.
+
+### For kern (10-22): Thicken of several faces with a square corner (live L17)
+- Live "psb L16-19 thicken": block 40×20×10, Thicken top + front face (adjacent, 90°), New, 2 mm → **one part, 2560 mm³**
+  (1600 + 800 + a 40×2×2 square corner), 8 faces. Same with Keep tools.
+- Ours: `op_thicken` uses `MakeThickSolidBySimple`; on the two faces sewn into one shell it gave 2008.9 mm³ (wrong). The
+  model now thickens each face and fuses the slabs of one body (`solid_a.rs::thicken`, `ThickenInput::group`), which gives
+  2 parts (the slabs only touch along an edge). Needed: a shell thicken with an intersection join (e.g.
+  `MakeThickSolidByJoin(shell, {}, t, tol, BRepOffset_Skin, false, false, GeomAbs_Intersection)`), then the model can pass
+  the sewn shell again. Test to extend: `features_c.rs::thicken_as_live`.
