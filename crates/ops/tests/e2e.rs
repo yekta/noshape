@@ -1183,6 +1183,14 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(kind_of(&mut ctx, rc["annotation"].as_u64().unwrap()), "RevisionCallout");
     assert!(last(&mut ctx).ends_with(":: Revision callout"));
 
+    let gt = call(&mut ctx, "drawing_table", json!({ "drawing": tab, "position": [200, 60], "rows": 2, "columns": 3, "header_row": true }));
+    let gid = gt["table"].as_u64().unwrap();
+    assert!(last(&mut ctx).ends_with(":: Table"));
+    call(&mut ctx, "drawing_table_cell", json!({ "drawing": tab, "table": gid, "row": 0, "column": 1, "text": "QTY" }));
+    assert!(last(&mut ctx).ends_with(":: Edit cell"));
+    let e = try_call(&mut ctx, "drawing_table_cell", json!({ "drawing": tab, "table": rt["table"], "row": 0, "column": 0, "text": "x" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
+
     let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
     assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));

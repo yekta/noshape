@@ -407,6 +407,36 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "table",
+            summary: "General table (rows x columns of text)",
+            description: "The Table tool and dialog: an empty table of `rows` x `columns` (defaults 2 x 2; 1–60 x 1–20) with an optional title row and header row, its fixed corner at `position` (sheet mm). One edit (\"Table\"). Fill it with drawing_table_cell.",
+            fields: with(
+                common(),
+                vec![
+                    req("position", point(), "Where the fixed corner goes (sheet mm)."),
+                    opt("rows", json!({ "type": "integer", "minimum": 1, "maximum": 60, "default": 2 }), "Rows."),
+                    opt("columns", json!({ "type": "integer", "minimum": 1, "maximum": 20, "default": 2 }), "Columns."),
+                    opt("title_row", json!({ "type": "boolean", "default": false }), "A title row on top."),
+                    opt("header_row", json!({ "type": "boolean", "default": false }), "A header row."),
+                    opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "The table's fixed corner."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: general_table,
+        },
+        Op {
+            group: "drawing",
+            verb: "table_cell",
+            summary: "Type text into a general table cell",
+            description: "The cell editor of a general table: `text` into cell (`row`, `column`), counted from 0 (the header row, if any, is row 0). The table grows when the cell lies beyond it. One edit (\"Edit cell\").",
+            fields: with(common(), vec![req("table", json!({ "type": "integer" }), "Table id (drawing_get)."), req("row", json!({ "type": "integer", "minimum": 0 }), "Row."), req("column", json!({ "type": "integer", "minimum": 0 }), "Column."), req("text", json!({ "type": "string" }), "Cell text.")]),
+            mutates: true,
+            destructive: false,
+            run: table_cell,
+        },
+        Op {
+            group: "drawing",
             verb: "view_table",
             summary: "Place a BOM, cut list or hole table of a view",
             description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its top-left corner at `position` (sheet mm). A hole table measures from `origin` (a vertex or circle center of the view, sheet mm). One edit with the tool's name.",
@@ -989,7 +1019,7 @@ fn revision_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         visible_rows: a.opt_u64("visible_rows")?.map(|n| n.clamp(1, 1000) as u32).unwrap_or(d.visible_rows),
         newest_top: a.bool_or("newest_top", d.newest_top)?,
         hide_callouts: a.bool_or("hide_callouts", d.hide_callouts)?,
-        corner: enum_arg(a, "corner", &[("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)], d.corner)?,
+        corner: enum_arg(a, "corner", &CORNERS, d.corner)?,
     };
     let sheet = t.sheet;
     let id = t.d.sheets[sheet].next_table_id();
@@ -1067,4 +1097,34 @@ fn aligned_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut t = t;
     t.d.sheets[t.sheet].views.push(v);
     done(od, t, "Aligned section view", "view", id.0)
+}
+
+const CORNERS: [(&str, TableCorner); 4] = [("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)];
+
+fn general_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let n = |k: &str| -> Result<String, OpError> { Ok(a.opt_u64(k)?.map(|n| n.to_string()).unwrap_or_default()) };
+    let (rows, cols) = dt::table_size(&n("rows")?, &n("columns")?);
+    let corner = enum_arg(a, "corner", &CORNERS, TableCorner::TopRight)?;
+    let mut table = dt::general_table(rows, cols, a.bool_or("title_row", false)?, a.bool_or("header_row", false)?, corner, pt_arg(a, "position")?);
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_table_id();
+    table.id = id;
+    t.d.sheets[sheet].tables.push(table);
+    done(od, t, "Table", "table", id)
+}
+
+fn table_cell(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let id = a.opt_u64("table")?.ok_or_else(|| OpError::param("table", "a table id"))?;
+    let sheet = t.sheet;
+    let table = t.d.sheets[sheet].tables.iter_mut().find(|x| x.id == id).ok_or_else(|| OpError::param("table", "no such table on the sheet"))?;
+    if !matches!(table.kind, noshape_model::drawing::TableKind::General { .. }) {
+        return Err(OpError::param("table", "not a general table (BOM, hole, cut list and revision tables fill themselves)"));
+    }
+    let (row, col) = (a.opt_u64("row")?.unwrap_or(0) as usize, a.opt_u64("column")?.unwrap_or(0) as usize);
+    dt::set_general_cell(table, row, col, a.str("text")?);
+    done(od, t, "Edit cell", "table", id)
 }
