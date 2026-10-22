@@ -63,7 +63,7 @@ pub(crate) struct McSession {
     pub rot_axis: u8,
     pub hidden: bool,
     /// X / Y / Z translation and rotation angle.
-    pub inputs: [Entity<InputState>; 4],
+    pub inputs: [Entity<crate::quantity_field::QuantityInput>; 4],
     /// Opened from a mate dialog's connector field (the mate keeps it).
     pub for_mate: Option<usize>,
     /// Field receiving picks while `active`: 0 origin entity, 1 between
@@ -91,7 +91,7 @@ impl McSession {
     pub fn to_implicit(&self, cx: &App) -> Option<MateConnectorRef> {
         let mut r = self.on.clone()?;
         let expr = |i: usize| {
-            let t = self.inputs[i].read(cx).value().to_string();
+            let t = self.inputs[i].read(cx).text().to_string();
             (!t.trim().is_empty()).then(|| ExprValue::new(t))
         };
         r.flip = self.flip;
@@ -104,7 +104,7 @@ impl McSession {
     pub fn to_connector(&self, cx: &App) -> Option<AsmMateConnector> {
         let on = self.on.clone()?;
         let expr = |i: usize| {
-            let t = self.inputs[i].read(cx).value().to_string();
+            let t = self.inputs[i].read(cx).text().to_string();
             (!t.trim().is_empty()).then(|| ExprValue::new(t))
         };
         let mut c = AsmMateConnector::new(self.id, self.name.clone(), on);
@@ -241,7 +241,7 @@ impl AssemblyView {
                         m.rot_axis = mv.rotation_axis;
                         let vals = [text(&mv.translation[0]), text(&mv.translation[1]), text(&mv.translation[2]), text(&mv.rotation)];
                         for (st, v) in m.inputs.clone().iter().zip(vals) {
-                            st.update(cx, |s, cx| s.set_value(v, window, cx));
+                            st.update(cx, |s, cx| s.set_text(v, window, cx));
                         }
                     }
                 }
@@ -271,16 +271,31 @@ impl AssemblyView {
         };
         // Live (qa5 MT5): "0 mm" / "0 deg" are the Move fields' values in
         // regular text, not placeholders.
+        // Live ("Input behaviour outside feature dialogs"): the Move fields
+        // are Onshape's number field, as the Fastened mate's Offset X.
+        use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
         let zeros = ["0 mm", "0 mm", "0 mm", "0 deg"];
-        let inputs: [Entity<InputState>; 4] = std::array::from_fn(|i| {
+        // The parameter names of mateConnector.fs (the hover "X translation: 5 mm").
+        let labels = ["X translation", "Y translation", "Z translation", "Rotation angle"];
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let variables = self.variable_scope(cx);
+        let inputs: [Entity<QuantityInput>; 4] = std::array::from_fn(|i| {
             let t = if init[i].trim().is_empty() { zeros[i].to_string() } else { init[i].clone() };
-            cx.new(|cx| InputState::new(window, cx).default_value(t))
+            let dim = if i == 3 { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
+            let vars = variables.clone();
+            cx.new(|cx| {
+                let mut q = QuantityInput::new(t, QuantitySpec::quantity(dim).label(labels[i]), units, window, cx);
+                q.set_variables(vars, cx);
+                q
+            })
         });
         let mut subs = Vec::new();
-        for st in &inputs {
-            subs.push(cx.subscribe_in(st, window, |this: &mut Self, _, ev: &InputEvent, window, cx| match ev {
-                InputEvent::Change => this.schedule_eval(window, cx),
-                InputEvent::PressEnter { .. } => this.accept_mc(window, cx),
+        // A committed value previews; Enter with nothing new to apply
+        // accepts the connector (like a feature dialog).
+        for q in &inputs {
+            subs.push(cx.subscribe_in(q, window, |this: &mut Self, _, ev: &QuantityEvent, window, cx| match ev {
+                QuantityEvent::Committed(_) => this.schedule_eval(window, cx),
+                QuantityEvent::Enter => this.accept_mc(window, cx),
                 _ => {}
             }));
         }
@@ -504,7 +519,7 @@ impl AssemblyView {
                 cx.notify();
             }))
         };
-        let value_row = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.));
+        let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| os::param_row_plain(label, st.clone());
         let icon_tool = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -539,12 +554,12 @@ impl AssemblyView {
             .when(moving, |d| {
                 // Live (qa5/asm-043, MT8): X↘ Y↗ Z↑ axis icons, as the
                 // mate dialog's offsets.
-                let axis_row = |icon: &'static str, st: &Entity<InputState>, cx: &App| {
+                let axis_row = |icon: &'static str, st: &Entity<crate::quantity_field::QuantityInput>, cx: &App| {
                     h_flex()
                         .w(px(194.))
                         .h(px(29.))
                         .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
-                        .child(gpui_kit::base::input::input_frame(div().w(px(168.)).h(px(26.)).border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))))
+                        .child(div().w(px(168.)).h(px(26.)).child(st.clone()))
                 };
                 d.child(axis_row("xyz-along-x", &s.inputs[0], cx))
                     .child(axis_row("xyz-along-y", &s.inputs[1], cx))
@@ -3031,12 +3046,7 @@ impl AssemblyView {
         };
         // Live writes angles as "55 deg" (805/810).
         let text = if rotation { noshape_units::format_quantity(Quantity::radians(step.rotation_angle), &units).replace('°', " deg") } else { noshape_units::format_quantity(Quantity::meters(t.length()), &units) };
-        let value = cx.new(|cx| InputState::new(window, cx).default_value(text));
-        let sub = cx.subscribe_in(&value, window, |this: &mut Self, _, ev: &InputEvent, _, cx| match ev {
-            InputEvent::Change => this.reapply_display(cx),
-            InputEvent::PressEnter { .. } => this.accept_step_edit(cx),
-            _ => {}
-        });
+        let (value, sub) = self.step_value_input(rotation, text, window, cx);
         self.selected = step.instances.clone();
         self.step_edit = Some(StepEdit {
             view: i,
@@ -3058,13 +3068,33 @@ impl AssemblyView {
         self.reapply_display(cx);
     }
 
+    /// The Distance / Rotation angle field of the "Explode step" dialog:
+    /// Onshape's number field (live "Input behaviour outside feature
+    /// dialogs"); a commit previews, Enter with nothing new accepts.
+    fn step_value_input(&self, rotation: bool, text: String, window: &mut Window, cx: &mut Context<Self>) -> (Entity<crate::quantity_field::QuantityInput>, Subscription) {
+        use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
+        let units = self.units(cx);
+        let variables = self.variable_scope(cx);
+        let spec = if rotation { QuantitySpec::quantity(Dim::ANGLE).label("Rotation angle") } else { QuantitySpec::quantity(Dim::LENGTH).label("Distance") };
+        let value = cx.new(|cx| {
+            let mut q = QuantityInput::new(text, spec, units, window, cx);
+            q.set_variables(variables, cx);
+            q
+        });
+        let sub = cx.subscribe_in(&value, window, |this: &mut Self, _, ev: &QuantityEvent, _, cx| match ev {
+            QuantityEvent::Committed(_) => this.reapply_display(cx),
+            QuantityEvent::Enter => this.accept_step_edit(cx),
+            _ => {}
+        });
+        (value, sub)
+    }
+
     /// The step as the dialog defines it (None while a value doesn't parse).
     pub(super) fn step_from_edit(&self, cx: &App) -> Option<ExplodeStep> {
         let s = self.step_edit.as_ref()?;
         let stored = self.assembly(cx).and_then(|a| a.exploded_views.get(s.view).and_then(|v| v.steps.get(s.step).cloned()))?;
         let units = self.units(cx);
-        let dim = if s.rotation { Dim::ANGLE } else { Dim::LENGTH };
-        let v = noshape_units::evaluate_as(s.value.read(cx).value().as_ref(), dim, &units, &EmptyScope).ok()?.value;
+        let v = s.value.read(cx).value()?;
         // ☑ Specify direction / axis: the picked entity's Z (and, for a
         // rotation, its origin as the pivot).
         let picked = s.specify.then(|| s.direction.as_ref().and_then(|d| self.result.connector_world(d, &units))).flatten();
@@ -3230,11 +3260,14 @@ impl AssemblyView {
                     menu = menu.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, window, cx| {
                         v.update(cx, |this, cx| {
                             let zero = if rot { "0 deg" } else { "0 mm" };
-                            if let Some(s) = &mut this.step_edit
-                                && s.rotation != rot
-                            {
-                                s.rotation = rot;
-                                s.value.update(cx, |st, cx| st.set_value(zero, window, cx));
+                            if this.step_edit.as_ref().is_some_and(|s| s.rotation != rot) {
+                                // The field's unit changes with the kind.
+                                let (value, sub) = this.step_value_input(rot, zero.to_string(), window, cx);
+                                if let Some(s) = &mut this.step_edit {
+                                    s.rotation = rot;
+                                    s.value = value;
+                                    s._sub = sub;
+                                }
                             }
                             this.reapply_display(cx);
                         })
@@ -3256,7 +3289,7 @@ impl AssemblyView {
             body = body.child(div().mx(px(3.)).my(px(4.)).child(crate::os_ui::query_box("se-direction", if rotation { "Axis" } else { "Direction" }, active == 1, dir_rows).on_click(Self::step_edit_activate(1, cx))));
         }
         body = body
-            .child(crate::os_ui::param_row(if rotation { "Rotation angle" } else { "Distance" }, gpui_kit::base::input::input_frame(div().w(px(110.)).child(crate::os_ui::input_h(Input::new(&value).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)))))
+            .child(crate::os_ui::param_row_plain(if rotation { "Rotation angle" } else { "Distance" }, value))
             .child(crate::os_ui::checkbox("se-lines", "Explode lines", lines).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(s) = &mut this.step_edit {
                     s.lines = !s.lines;
