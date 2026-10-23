@@ -42,6 +42,13 @@ pub(crate) struct StdUi {
     /// The two scroll groups (hierarchy, parameters).
     pub hier_scroll: ScrollHandle,
     pub param_scroll: ScrollHandle,
+    /// A size live lists but can't build, shown in the Size select while
+    /// every other field keeps the previous size's data (behaviours "skb
+    /// (10-23 14:00)").
+    pub failed_size: Option<String>,
+    /// Live's red toasts at the top centre ("Standard content component
+    /// failed to solve. …"); they stack, each ✕ closes one.
+    pub toasts: Vec<String>,
 }
 
 /// Where Insert puts the part in a hole that already holds standard content.
@@ -66,6 +73,7 @@ impl AssemblyView {
     /// Choose a level (0 standard, 1 category, 2 class, 3 component): the
     /// levels below fall back to their first entry, as in Onshape.
     fn std_choose(&mut self, level: usize, value: &str, cx: &mut Context<Self>) {
+        self.ui.std.failed_size = None;
         let cur = self.std_spec();
         let mut path = [cur.standard.clone(), cur.category.clone(), cur.class.clone(), cur.component.clone()];
         path[level] = value.to_string();
@@ -92,7 +100,21 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// The Size select: a size the server can't build (live) shows its
+    /// error toast and leaves everything else as it was.
+    fn std_pick_size(&mut self, size: &str, cx: &mut Context<Self>) {
+        let spec = self.std_spec();
+        if let Some(msg) = standard::component(&spec).and_then(|c| c.failure(size)) {
+            self.ui.std.failed_size = Some(size.to_string());
+            self.ui.std.toasts.push(format!("Standard content component failed to solve. {msg}"));
+            cx.notify();
+            return;
+        }
+        self.std_edit_spec(cx, |s| s.set_size(size));
+    }
+
     fn std_edit_spec(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut StandardSpec)) {
+        self.ui.std.failed_size = None;
         let mut spec = self.std_spec();
         f(&mut spec);
         self.ui.std.spec = Some(spec);
@@ -180,6 +202,12 @@ impl AssemblyView {
     /// follows the cursor and snaps to mate connectors (click places it).
     fn std_insert(&mut self, mode: Stack, cx: &mut Context<Self>) {
         let spec = self.std_spec();
+        // Live: a size the server can't build inserts nothing.
+        if let Some(msg) = self.ui.std.failed_size.as_deref().and_then(|f| standard::component(&spec).and_then(|c| c.failure(f))) {
+            self.ui.std.toasts.push(format!("Insertable standard content failed to generate. {msg}"));
+            cx.notify();
+            return;
+        }
         // Replace instance's picker: the component becomes the replacement.
         if self.pick_replacement(InstanceSource::Standard { spec: spec.clone() }, spec.part_name(), cx) {
             return;
@@ -377,7 +405,8 @@ impl AssemblyView {
         // Group 2 (114 px, scrolls): the component's parameters, 146 px selects.
         let mut params = v_flex().id("std-params").h(px(114.)).flex_none().overflow_y_scroll().track_scroll(&self.ui.std.param_scroll).on_scroll_wheel(cx.listener(|_, _: &ScrollWheelEvent, _, cx| cx.notify()));
         let sizes: Vec<String> = c.size_names().into_iter().map(String::from).collect();
-        let size_select = Self::std_select("std-size", 146., spec.size.clone(), sizes, locked, |t, v, cx| t.std_edit_spec(cx, |s| s.set_size(v)), cx);
+        let shown_size = self.ui.std.failed_size.clone().unwrap_or_else(|| spec.size.clone());
+        let size_select = Self::std_select("std-size", 146., shown_size, sizes, locked, |t, v, cx| t.std_pick_size(v, cx), cx);
         // Live: a 26 px borderless icon button 9 px right of the select.
         let auto = div()
             .id("std-auto-size-btn")

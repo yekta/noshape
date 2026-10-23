@@ -19,6 +19,13 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// `NOSHAPE_PERF_DETAIL=full`: interactive frames keep full detail (to
+/// measure what each part of a frame costs).
+fn perf_full_detail() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_PERF_DETAIL").is_ok_and(|v| v == "full"))
+}
+
 /// `style` with what Onshape's interactive detail settings leave out.
 fn interactive_style(style: noshape_render::Style, d: &nav::DetailSettings) -> noshape_render::Style {
     let mut s = style;
@@ -843,9 +850,13 @@ impl Viewport {
         let bg = noshape_scene::palette::background();
         self.style.background_top = bg;
         self.style.background_bottom = bg;
-        // Interactive frames draw what the detail manager leaves in.
-        let style = if interactive {
+        // Interactive frames draw what the detail manager leaves in
+        // (benchmarks can keep full detail: `NOSHAPE_PERF_DETAIL=full`).
+        let style = if interactive && !perf_full_detail() {
             self.detail.update(&mut self.frame_timer);
+            if noshape_render::perf::enabled() {
+                noshape_render::perf::record_ms("v.detail_steps", self.detail.interactive.steps() as f32);
+            }
             interactive_style(self.style, &self.detail.interactive)
         } else {
             self.style
