@@ -996,8 +996,9 @@ fn failed_feature_pattern_shows_its_instances() {
     let st = res.display.features.last().unwrap();
     assert_eq!(st.status, FeatureStatus::Error);
     let m = st.error_mesh.as_ref().expect("error geometry");
-    // 4 ghosts × (the wall's 6 faces + the floor and end face it merged into).
-    assert_eq!(m.face_ranges.len(), 32);
+    // 4 ghosts × (the wall's 6 faces + the floor it merged into; the end
+    // face it merged into is just the wall's own end face).
+    assert_eq!(m.face_ranges.len(), 28);
     let xs: Vec<f32> = m.positions.iter().map(|p| p[0]).collect();
     let (lo, hi) = xs.iter().fold((f32::MAX, f32::MIN), |(a, b), x| (a.min(*x), b.max(*x)));
     // 2 to 8 mm along the edge (its direction either way), the floor's
