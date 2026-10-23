@@ -3491,4 +3491,14 @@ fn as568_o_rings_match_live() {
     // Outside diameter = inside + 2 sections; height = the section.
     assert!(((bb.max.x - bb.min.x) / 0.0254 - (0.029 + 2.0 * 0.037)).abs() < 1e-4, "{bb:?}");
     assert!(((bb.max.z - bb.min.z) / 0.0254 - 0.037).abs() < 1e-4, "{bb:?}");
+    // ISO 3601-1: live's size names carry inside diameter x width (mm), shown
+    // per size in the read-only Inside diameter / Width.
+    let c = CATALOGUE.iter().find(|c| c.name == "ISO 3601-1:2012 O-rings for aerospace applications").unwrap();
+    assert_eq!(c.materials(), ["Butyl", "Nitrile", "Silicone Rubber", "Teflon"]);
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("-A0020 (2 x 1.8)");
+    assert_eq!((spec.param("Inside diameter"), spec.param("Width")), ("2", "1.8"));
+    let r = standard::regenerate(&spec).unwrap();
+    let bb = r.context.body(&standard::part_body(&r).unwrap()).unwrap().shape.bounding_box(true).unwrap();
+    assert!(((bb.max.x - bb.min.x) * 1e3 - (2.0 + 2.0 * 1.8)).abs() < 1e-3, "{bb:?}");
 }
