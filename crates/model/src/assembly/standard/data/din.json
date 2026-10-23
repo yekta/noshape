@@ -15056,6 +15056,13 @@
      }
     ],
     "source": "Onshape standard content table DATA_DIN_6885-1_PARALLEL_KEY_MAIN (document None, version None)",
+    "failing": [
+     {
+      "name": "440mm - 550mm",
+      "index": 25,
+      "message": "com.belmonttech.service.exception.BTBadRequestException: Feature script error: @stringToNumber: String is not a number"
+     }
+    ],
     "sizeLabel": "Shaft diameter",
     "params": [
      {

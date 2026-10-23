@@ -974,7 +974,7 @@ fn mirror_instances_across_connector_plane() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Mirror 1".into(),
-        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false },
+        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false, derived: vec![], placement: vec![] },
         seeds: vec![InstanceId(1)],
         generated: vec![],
         suppressed: false,
@@ -1438,7 +1438,7 @@ fn handed_mirror_creates_mirrored_part() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Mirror 1".into(),
-        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: true },
+        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: true, derived: vec![], placement: vec![] },
         seeds: vec![InstanceId(1)],
         generated: vec![],
         suppressed: false,
@@ -1473,6 +1473,12 @@ fn handed_mirror_creates_mirrored_part() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let w = res.connector_world(&conn(created[0].0, small, Inference::Centroid), &units).unwrap();
     assert!((w.origin.y + 0.09).abs() < 1e-6, "rigid copy: {:?}", w.origin);
+    // Live's Mirror strategy: Mirror action Derived for this seed alone.
+    if let PatternKind::Mirror { derived, .. } = &mut asm.patterns[0].kind {
+        derived.push(InstanceId(1));
+    }
+    asm.sync_pattern(MateId(70));
+    assert!(matches!(asm.instance(created[0]).unwrap().source, InstanceSource::MirroredPart { .. }));
 }
 
 #[test]
@@ -3476,6 +3482,20 @@ fn din_keys_match_live() {
         let bb = b.shape.bounding_box(true).unwrap();
         assert!(bb.min.z.abs() < 1e-9 && (bb.max.y + bb.min.y).abs() < 1e-9, "{name} {size}: {bb:?}");
     }
+    // Type AB (live's Extrude 1 regions): round at -Y, square at +Y.
+    let c = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.length = Some("6".into());
+    spec.params.insert("Type".into(), "AB".into());
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let round: Vec<f64> = (0..b.faces.len())
+        .filter_map(|i| match b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            noshape_kernel::Surface::Cylinder { origin, .. } => Some(origin.y),
+            _ => None,
+        })
+        .collect();
+    assert!(round.len() == 1 && round[0] < 0.0, "AB round end: {round:?}");
     // The chosen Type names the part as live ("Parallel key B x 2 x 2 x 6").
     let c = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
     let mut spec = StandardSpec::new(c);
@@ -3500,6 +3520,31 @@ fn as568_o_rings_match_live() {
     // Outside diameter = inside + 2 sections; height = the section.
     assert!(((bb.max.x - bb.min.x) / 0.0254 - (0.029 + 2.0 * 0.037)).abs() < 1e-4, "{bb:?}");
     assert!(((bb.max.z - bb.min.z) / 0.0254 - 0.037).abs() < 1e-4, "{bb:?}");
+    // ISO 3601-1: live's size names carry inside diameter x width (mm), shown
+    // per size in the read-only Inside diameter / Width.
+    let c = CATALOGUE.iter().find(|c| c.name == "ISO 3601-1:2012 O-rings for aerospace applications").unwrap();
+    assert_eq!(c.materials(), ["Butyl", "Nitrile", "Silicone Rubber", "Teflon"]);
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("-A0020 (2 x 1.8)");
+    assert_eq!((spec.param("Inside diameter"), spec.param("Width")), ("2", "1.8"));
+    let r = standard::regenerate(&spec).unwrap();
+    let bb = r.context.body(&standard::part_body(&r).unwrap()).unwrap().shape.bounding_box(true).unwrap();
+    assert!(((bb.max.x - bb.min.x) * 1e3 - (2.0 + 2.0 * 1.8)).abs() < 1e-3, "{bb:?}");
+}
+
+/// Sizes live lists but can't build (behaviours "skb (10-23 14:00)"): listed
+/// in live's order with the server's message; no geometry.
+#[test]
+fn failing_standard_sizes_are_listed_with_live_errors() {
+    use super::standard::CATALOGUE;
+    let c = CATALOGUE.iter().find(|c| c.name == "Half dog point hex socket set screw").unwrap();
+    let names = c.size_names();
+    assert_eq!(&names[names.len() - 2..], ["1-8", "1-12"]);
+    assert_eq!(c.failure("1-8"), Some("Not found."));
+    assert!(c.size("1-8").is_none() && c.failure("7/8-9").is_none());
+    let k = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
+    assert_eq!(k.size_names().last(), Some(&"440mm - 550mm"));
+    assert_eq!(k.failure("440mm - 550mm"), Some("com.belmonttech.service.exception.BTBadRequestException: Feature script error: @stringToNumber: String is not a number"));
 }
 
 /// Acorn high / low crown nuts 1/4-20 (live dom/skb-sc-geom, default): 26 faces
