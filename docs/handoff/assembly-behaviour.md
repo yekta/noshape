@@ -1013,9 +1013,14 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 * Flat countersunk tapping screw (live Type VI file, 14 faces): the cone runs at 41° from the head edge and an arc
   tangent to it and the shank ends at the head height on the shank (`cskFillet`; radius from the tangencies,
   0.0398 in at #8). Its Type VI mouth fillet still fails in OCCT on the Ø0.132 recess (13 faces, test allows it).
+* DIN keys (6885-1, 6883, 6886) from live's FSRules tables (dom/skb-sc-fsrules-tables.json, loaded by
+  live_tables.py for components skb-sc-comp lacks): the key along Y on the XY plane, Type A round ends, B square,
+  AB one round end (+Y: unconfirmed, PART 2), tapers 1:100 falling towards +Y from h at -Y (`key` forms 0/1/3/5/6).
+  Part names swap the chosen option for the default's " A x " token. 6885-1's 440–550 size has no length list in
+  live's data (left out). `din_keys_match_live` pins faces, areas and orientation. B17.1 keys wait for PART 2.
 * Deviations left: our kernel reports the acorn's spindle torus (negative major radius) as a surface of revolution
   (kern); live's acorn 1/4 hex measures 0.438 where its table says 0.4375 (0.1 % area). ISO 7380's head uses HEAD_TOP_DIA (no rule yet).
 * Waiting on live (REQUESTS "skb (10-23 06:30)"): toothed lock washers, retaining rings, PEM® (44), NAS (6),
-  T-slot nut, askew head bolt, keys (PART 2 with every /features expression after 16:52 UTC); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
+  T-slot nut, askew head bolt, B17.1 keys (PART 2 with every /features expression after 16:52 UTC); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
   slotted spring pins (no live table). The face-type/area diagnostic is /root/skb-scratch/zz_live_face_types.rs
   (paste into assembly/tests.rs to run; reads the live captures directly).

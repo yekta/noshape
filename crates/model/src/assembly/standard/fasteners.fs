@@ -1449,6 +1449,8 @@ const KEY_SQUARE_ENDS = 1;
 const KEY_WOODRUFF = 2;
 const KEY_TAPER = 3;
 const KEY_GIB_HEAD = 4;
+const KEY_ROUND_TAPER = 5;
+const KEY_ONE_ROUND_END = 6;
 
 annotation { "Feature Type Name" : "Key" }
 export const key = defineFeature(function(context is Context, id is Id, definition is map)
@@ -1485,31 +1487,40 @@ export const key = defineFeature(function(context is Context, id is Id, definiti
             opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
             return;
         }
+        // Live (DIN 6885-1 / 6883 / 6886): the key along Y, width b along X,
+        // bottom on the XY plane; round ends of radius b / 2 (A), square (B),
+        // one round end (AB, at +Y); tapered keys fall 1:100 towards +Y from
+        // h at the -Y end.
+        const roundLow = form == KEY_ROUND_ENDS || form == KEY_ROUND_TAPER;
+        const roundHigh = roundLow || form == KEY_ONE_ROUND_END;
+        const r = b / 2;
+        const y0 = roundLow ? -l / 2 + r : -l / 2;
+        const y1 = roundHigh ? l / 2 - r : l / 2;
         const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : XY_PLANE });
-        if (form == KEY_ROUND_ENDS)
-        {
-            skLineSegment(sketch, "s1", { "start" : vector(-l / 2 + b / 2, -b / 2), "end" : vector(l / 2 - b / 2, -b / 2) });
-            skArc(sketch, "e1", { "start" : vector(l / 2 - b / 2, -b / 2), "mid" : vector(l / 2, Z), "end" : vector(l / 2 - b / 2, b / 2) });
-            skLineSegment(sketch, "s2", { "start" : vector(l / 2 - b / 2, b / 2), "end" : vector(-l / 2 + b / 2, b / 2) });
-            skArc(sketch, "e2", { "start" : vector(-l / 2 + b / 2, b / 2), "mid" : vector(-l / 2, Z), "end" : vector(-l / 2 + b / 2, -b / 2) });
-        }
+        skLineSegment(sketch, "s1", { "start" : vector(r, y0), "end" : vector(r, y1) });
+        if (roundHigh)
+            skArc(sketch, "e1", { "start" : vector(r, y1), "mid" : vector(Z, l / 2), "end" : vector(-r, y1) });
         else
-            skPolyline(sketch, "outline", { "points" : [vector(-l / 2, -b / 2), vector(l / 2, -b / 2), vector(l / 2, b / 2), vector(-l / 2, b / 2), vector(-l / 2, -b / 2)] });
+            skLineSegment(sketch, "e1", { "start" : vector(r, y1), "end" : vector(-r, y1) });
+        skLineSegment(sketch, "s2", { "start" : vector(-r, y1), "end" : vector(-r, y0) });
+        if (roundLow)
+            skArc(sketch, "e2", { "start" : vector(-r, y0), "mid" : vector(Z, -l / 2), "end" : vector(r, y0) });
+        else
+            skLineSegment(sketch, "e2", { "start" : vector(-r, y0), "end" : vector(r, y0) });
         skSolve(sketch);
         opExtrude(context, id + "key", { "entities" : qSketchRegion(id + "sketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : h });
         opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
         const body = qCreatedBy(id + "key", EntityType.BODY);
-        if (form == KEY_TAPER || form == KEY_GIB_HEAD)
+        if (form == KEY_TAPER || form == KEY_ROUND_TAPER || form == KEY_GIB_HEAD)
         {
-            // Taper 1:100 on the top face, h at the thick (head) end (-X).
-            const cut = cuboid(context, id + "taperTool", vector(-l, -b, h), vector(l, b, h + b));
-            opTransform(context, id + "tilt", { "bodies" : cut, "transform" : rotationAround(line(vector(-l / 2, Z, h), vector(0, 1, 0)), atan(0.01)) });
+            const cut = cuboid(context, id + "taperTool", vector(-b, -l, h), vector(b, l, h + l));
+            opTransform(context, id + "tilt", { "bodies" : cut, "transform" : rotationAround(line(vector(Z, -l / 2, h), vector(1, 0, 0)), -atan(0.01)) });
             subtract(context, id + "taperCut", body, cut);
         }
         if (form == KEY_GIB_HEAD && definition.h1 > EPS)
         {
             // The gib head (height h1, as long as it is high) at the thick end.
-            cuboid(context, id + "head", vector(-l / 2 - definition.h1, -b / 2, Z), vector(-l / 2 + EPS, b / 2, definition.h1));
+            cuboid(context, id + "head", vector(-b / 2, -l / 2 - definition.h1, Z), vector(b / 2, -l / 2 + EPS, definition.h1));
             uniteAll(context, id);
         }
     });

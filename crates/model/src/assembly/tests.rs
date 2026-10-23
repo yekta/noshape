@@ -3427,3 +3427,48 @@ fn ansi_nuts_and_lock_washers_match_live() {
         assert!((area / live_area - 1.0).abs() < 1e-3, "{name}: area {area} live {live_area}");
     }
 }
+
+/// DIN keys as live's B-rep (dom/skb-sc-geom, smallest and largest sizes):
+/// along Y on the XY plane, round ends (Type A), tapered 1:100 from the -Y end.
+#[test]
+fn din_keys_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    // (DIN 6885-1's largest size, 440mm - 550mm, has no length list in live's
+    // tables: its LENGTHS rows say "440mm - 500mm"; it is left out.)
+    let cases: [(&str, &str, &str, usize, usize, f64); 5] = [
+        ("DIN 6885-1 Parallel keys", "6mm - 8mm", "6", 2, 4, 5.084956e-5),
+        ("DIN 6883 Tapered key", "22mm - 30mm", "20", 0, 6, 5.944080e-4),
+        ("DIN 6883 Tapered key", "200mm - 230mm", "400", 0, 6, 5.440100e-2),
+        ("DIN 6886 Stressed tapered key", "6mm - 8mm", "6", 2, 4, 5.042161e-5),
+        ("DIN 6886 Stressed tapered key", "75mm - 85mm", "250", 2, 4, 1.748775e-2),
+    ];
+    for (name, size, length, cylinders, planes, live_area) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        spec.length = Some(length.into());
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {size}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let (mut cyl, mut pl, mut area) = (0, 0, 0.0);
+        for i in 0..b.faces.len() {
+            let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+            area += f.area().unwrap();
+            match f.face_surface().unwrap() {
+                noshape_kernel::Surface::Cylinder { .. } => cyl += 1,
+                noshape_kernel::Surface::Plane(_) => pl += 1,
+                s => panic!("{name} {size}: {s:?}"),
+            }
+        }
+        assert_eq!((cyl, pl), (cylinders, planes), "{name} {size}");
+        assert!((area / live_area - 1.0).abs() < 1e-4, "{name} {size}: area {area} live {live_area}");
+        // The thick end at -Y (live's taper falls towards +Y).
+        let bb = b.shape.bounding_box(true).unwrap();
+        assert!(bb.min.z.abs() < 1e-9 && (bb.max.y + bb.min.y).abs() < 1e-9, "{name} {size}: {bb:?}");
+    }
+    // The chosen Type names the part as live ("Parallel key B x 2 x 2 x 6").
+    let c = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.length = Some("6".into());
+    spec.params.insert("Type".into(), "B".into());
+    assert_eq!(spec.part_name(), "Parallel key B x 2 x 2 x 6");
+}
