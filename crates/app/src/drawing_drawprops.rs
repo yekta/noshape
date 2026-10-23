@@ -387,19 +387,9 @@ impl DrawingEditor {
     }
 
     fn set_drawing_prop(&mut self, f: &dyn Fn(&mut DrawingProps), cx: &mut Context<Self>) {
-        self.edit("Drawing properties", cx, |d| {
-            // ☑ Lock drawing properties: only the lock itself changes.
-            let before = d.props.clone();
-            f(&mut d.props);
-            if before.locked && d.props.locked {
-                d.props = before;
-                return;
-            }
-            // Keep the metric flag in step with the chosen units.
-            if let Some(u) = d.props.units {
-                d.units_mm = !u.imperial();
-            }
-        });
+        // ☑ Lock drawing properties: only the lock itself changes; the
+        // metric flag follows the chosen units.
+        self.edit("Drawing properties", cx, |d| noshape_scene::drawing_tools::set_drawing_props(d, f));
     }
 
     pub fn render_drawing_props(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {

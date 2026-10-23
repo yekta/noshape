@@ -116,11 +116,7 @@ impl DrawingEditor {
     /// The dialog's table kind (keeping the pinned Part Studio version).
     fn custom_kind(d: &CustomDlg, old: Option<&TableKind>) -> Option<TableKind> {
         let (studio, t) = (d.studio?, d.chosen.as_ref()?);
-        let version = match old {
-            Some(TableKind::Custom { version, .. }) => version.clone(),
-            _ => None,
-        };
-        Some(TableKind::Custom { studio, version, fs: t.fs, name: t.name.clone(), fs_version: t.version.clone(), bottom_to_top: d.bottom_to_top })
+        Some(noshape_scene::drawing_tools::custom_table_kind(studio, t.fs, t.name.clone(), t.version.clone(), d.bottom_to_top, old))
     }
 
     /// Editing a table: apply the dialog live.
@@ -162,11 +158,7 @@ impl DrawingEditor {
         let corner = d.corner;
         let c = self.cursor;
         let id = self.current_sheet().next_table_id();
-        self.edit_sheet("Custom table", cx, |s| {
-            let mut t = Table::new(id, kind, c);
-            t.corner = corner;
-            s.tables.push(t);
-        });
+        self.edit_sheet("Custom table", cx, |s| s.tables.push(noshape_scene::drawing_tools::custom_table(id, kind, corner, c)));
         self.custom_tables.dlg = None;
         self.tool = Tool::Select;
         self.selection = vec![Sel::Table(id)];

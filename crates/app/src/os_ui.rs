@@ -320,7 +320,7 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
         .rounded(px(2.))
         .border_1()
         .border_color(if active { pal.accent } else { pal.border })
-        .bg(if active { pal.info_fill } else { pal.panel })
+        .bg(if active { pal.query_active } else { pal.panel })
         .cursor_pointer()
         .child(
             div()

@@ -676,7 +676,7 @@ fn annotation_cad_layers(k: &AnnotationKind) -> (CadLayer, CadLayer) {
 }
 
 /// Lookup of property fields for a sheet.
-fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources, key: &str) -> Option<String> {
+pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources, key: &str) -> Option<String> {
     let sheet = drawing.sheets.get(si)?;
     // Part shown by the first base view of this sheet (else of the drawing).
     let part = || {
