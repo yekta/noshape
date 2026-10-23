@@ -966,7 +966,7 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
 - Sheet metal Bend / Sheet metal model: icons = live (no change).
 - Not icons, for the assembly owner: our Mirror shows "Create mirrored (opposite-handed) parts" which live's
   dialog doesn't (dom/dialog-asm-mirror-*); Replicate's empty "Parts to find match in" lacks live's pink fill.
-- dialog-ok (every dialog ✓) redrawn as our own stroked polyline (3.04 px, round join) fitted to the sprite at 24/48
-  (alpha diff 0.025 -> 0.005): the old flat polygon's arms were ~1 px thinner than live's (assembly/2215, 2262 at 1x).
-  Fitter: /root/icons2-scratch/b3/fitok.py (sprite), fitok2.py (live 1x crop on #009400 + sprite 2x).
-  Note: resvg draws the sprite's short arm 1 px lower than Chrome; fit to live pixels when they disagree.
+- dialog-ok (every dialog ✓) redrawn by hand as a 2.5-unit stroked polyline with a round joint (20-grid
+  4.4,8.9 8.9,13.5 15.7,5.7), read off the sprite at 200 px on a grid: alpha diff 0.025 -> 0.009. The old flat polygon's
+  arms were ~1 px thinner than live's (assembly/2215, 2262 at 1x). Rule 7: a parameter-search fitter was used first
+  and deleted; the values here are hand-picked. resvg draws the sprite's short arm 1 px lower than Chrome does.
