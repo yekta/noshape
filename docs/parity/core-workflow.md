@@ -20,14 +20,14 @@ it, so re-take positions after every selection.
 | 1.1 | Start window › Create › Document… | Dialog with the name "Untitled document" selected | ✅ |
 | 1.2 | Type a name, Enter | Creates and opens it | ✅ |
 | 1.3 | New document contents | Part Studio 1 (active) + Assembly 1; "Features (4)", Default geometry, rollback bar under Right, "Parts (0)"; isometric | ✅ |
-| 1.4 | Start window footer version | (ours) should read the release version | ✗ F27 |
+| 1.4 | Start window footer version | (ours) should read the release version | ✅ re-checked 10-23 on main 88fbf8f5: footer "(0.4.6.88fbf8f5fa11)" = release version + commit (was ✗ F27) |
 
 ## 2. Sketch on Top (live: "Sketch mode", "Input behaviour" › G)
 
 | # | Step | Live | Status |
 |---|---|---|---|
 | 2.1 | Sketch, then click Top in the list | Sketch 1 dialog, plane "Top plane", no tool active, view not rotated | ✅ |
-| 2.2 | Sketch dialog defaults | ☐ Disable imprinting, **☑ Show constraints**, ☐ Show expressions, ☑ Show errors | ✗ F1 |
+| 2.2 | Sketch dialog defaults | ☐ Disable imprinting, **☑ Show constraints**, ☐ Show expressions, ☑ Show errors | ✅ re-checked 10-23 (main 88fbf8f5): ☑ Show constraints, ☑ Show errors (was ✗ F1) |
 | 2.3 | N | Animated view normal to the plane | ✅ |
 | 2.4 | L, click, click, click (chain) | Previous segment's length boxed, live length in blue | ✅ |
 | 2.5 | Enter mid-chain | The boxed length becomes a driving dimension; the tool stays | ✅ |
@@ -37,11 +37,11 @@ it, so re-take positions after every selection.
 | 2.9 | D, pick circle, place | Value box opens with the full value selected ("20.479094 mm") | ✅ |
 | 2.10 | Bare "25" + Enter | Ø25, box closes | ✅ (but see F3) |
 | 2.11 | Double-click the dimension, "1 in" + Enter | Ø25.4, tan background | ✅ |
-| 2.12 | "10+5" + Enter | Label "ƒ 15" (expression prefix) | ✗ F4 |
-| 2.13 | Re-open it | Box shows "(10+5) mm" | ✗ F5 |
+| 2.12 | "10+5" + Enter | Label "ƒ 15" (expression prefix) | ✅ re-checked 10-23: "ƒ 15" (was ✗ F4) |
+| 2.13 | Re-open it | Box shows "(10+5) mm" | ✅ re-checked 10-23: "(10+5) mm" (was ✗ F5) |
 | 2.14 | Type, Esc | Reverts and blurs; box stays | ✅ |
-| 2.15 | Unknown "#w" + Enter | "Create variable" popup next to the field (Name "w") | ✗ F6 |
-| 2.16 | "abc" + Enter | Pink field, red underline, ✓ disabled, box stays open, hover "Enter a valid expression." | ✗ F7 |
+| 2.15 | Unknown "#w" + Enter | "Create variable" popup next to the field (Name "w") | ✅ re-checked 10-23: Create variable popup, Name "w" (was ✗ F6) |
+| 2.16 | "abc" + Enter | Pink field, red underline, ✓ disabled, box stays open, hover "Enter a valid expression." | ✅ re-checked 10-23: pink, red underline, ✓ disabled (was ✗ F7) |
 | 2.17 | Arc radius, point-point, line-point dimensions | Created, typed values applied | ✅ |
 | 2.18 | Type the value immediately after the placing click | Applied (keys not lost) | ✅ (checked with 20 ms steps) |
 | 2.19 | Enter with no tool active | Does **not** accept the sketch (live sketch/311) | ✅ (see F2) |
@@ -59,26 +59,26 @@ it, so re-take positions after every selection.
 | 3.5 | Chamfer on the vertical edge meeting both 3 mm fillets: 5 mm, then 2 mm | 5 mm: **error "Distance of chamfer on face too large."** (live G46: Onshape refuses it too); 2 mm builds Onshape's 10-face shape | (F8 fixed per kern 10-22; re-run) |
 | 3.6 | Shell, remove top face, 2.5 / 1 mm | Shells (2.5 mm: 13946.59 mm³, 21 faces, kern 10-22) | (F9 fixed per kern 10-22; re-run) |
 | 3.7 | After Enter committed a value, Esc | Cancels the dialog (no pending edit) | ✅ |
-| 3.8 | Sketch points on the top face; Hole from the sketch | One chip "Vertices of Sketch 2"; one hole per point | ✗ F10 |
+| 3.8 | Sketch points on the top face; Hole from the sketch | One chip "Vertices of Sketch 2"; one hole per point | ✅ re-checked 10-23: one chip "Vertices of Sketch 2", one hole per point (was ✗ F10) |
 | 3.9 | Hole defaults and callout | Drilled 1/4 (6.35 mm), 12 mm blind, 118 deg; "Ø6.35 ↧ 12" callout; row "Ø 6.35 mm ↧ 12 mm" | ✅ |
 | 3.10 | Linear pattern, Part type: Part 1, edge, 40 mm × 3 | Part 2/3, default colour rotation #a5a5a5, #3b61b4 | ✅ |
-| 3.11 | Direction field, click near the edge's midpoint | Filtered to the edge ("Edge of Part 1") | ✗ F11 |
-| 3.12 | Linear pattern, Feature type: Hole, edge, 10 mm × 2 | Holes copied on Part 1 | ✗ F12 (Part 1 destroyed) |
-| 3.13 | Esc while a select's search box is open | Closes the list only | ✗ F13 |
+| 3.11 | Direction field, click near the edge's midpoint | Filtered to the edge ("Edge of Part 1") | ✅ re-checked 10-23: an edge/line, not a midpoint (was ✗ F11) |
+| 3.12 | Linear pattern, Feature type: Hole, edge, 10 mm × 2 | Holes copied on Part 1 | ✅ re-checked 10-23: holes copied 10 mm along the edge, Part 1 intact (was ✗ F12 (Part 1 destroyed)) |
+| 3.13 | Esc while a select's search box is open | Closes the list only | ✅ re-checked 10-23: list closes, dialog stays (was ✗ F13) |
 | 3.14 | Mirror, Part type: Part 3 about Right | Part 4 | ✅ |
-| 3.15 | Shift+X while a feature dialog is open | ? | ✗ F14 (Section view opens on top of the open Mirror dialog) |
+| 3.15 | Shift+X while a feature dialog is open | ? | ✅ re-checked 10-23: Shift+X does nothing while the dialog is open (was ✗ F14 (Section view opens on top of the open Mirror dialog)) |
 | 3.16 | Boolean union Part 3 + Part 4 | Touching parts: one part. Parts that don't touch (live 10-22): **two unchanged parts, the row stays black with no error**, and while editing a blue info bubble **"Boolean resulted in no geometry change…"** (psb BOOL1) | ✅ touching; disjoint: re-run |
 
 ## 4. Edit, roll back, reorder, suppress, delete, undo (live: "Rollback bar", "Right-click menus")
 
 | # | Step | Live | Status |
 |---|---|---|---|
-| 4.1 | Double-click Extrude 1, depth 25, Enter Enter | Rolled back while editing; model regenerates | ✗ F12 (Part 1 disappears silently) |
+| 4.1 | Double-click Extrude 1, depth 25, Enter Enter | Rolled back while editing; model regenerates | ✅ re-checked 10-23: rolled back while editing; Part 1 kept (was ✗ F12 (Part 1 disappears silently)) |
 | 4.2 | Feature row right-click › Suppress | Struck-through italic; model updates | ✅ |
 | 4.3 | Drag Fillet 1 below Chamfer 1 | Drop line + pill; reordered | ✅ (Fillet then fails: F8) |
 | 4.4 | Ctrl+Z / Ctrl+Y / Ctrl+Z | Undo / redo the reorder | ✅ |
 | 4.5 | Click a row, ↑ ↑ / ↓ ↓ | Rollback bar moves; light blue while focused | ✅ |
-| 4.6 | Select a feature row, Delete key | Deletes it | ✗ F15 |
+| 4.6 | Select a feature row, Delete key | Deletes it | ✅ re-checked 10-23: Delete removes the feature, Ctrl+Z restores (was ✗ F15) |
 | 4.7 | Right-click › Delete; Ctrl+Z | Deleted; restored | ✅ |
 | 4.8 | Error header | At the default panel width live truncates to "Features ..." beside the error icon (part-studio/94, 570); a wider panel shows "Features (N)" | ✅ (F16 withdrawn) |
 
@@ -87,23 +87,23 @@ it, so re-take positions after every selection.
 | # | Step | Live | Status |
 |---|---|---|---|
 | 5.1 | Variable (Plane ▾ dropdown): w, 20 | "#w = 20 mm" | ✅ |
-| 5.2 | Plane ▾ dropdown contents | … Variable, Query variable, **Composite part, Tag** | ✗ F17 (last items cut off at the window bottom) |
+| 5.2 | Plane ▾ dropdown contents | … Variable, Query variable, **Composite part, Tag** | ✅ (v0.4.6 gate): list scrolls to Composite part / Tag (was ✗ F17 (last items cut off at the window bottom)) |
 | 5.3 | Drag the variable to the top; Extrude 1 depth "#w" | Parts 20 mm | ✅ |
 | 5.4 | Select a face / two faces | "Area: 856.366 mm²" / a distance | ✅ |
 | 5.5 | Mass properties, no material | ? centre of mass shown | ? F18 (centre of mass and inertia blank) |
-| 5.6 | Material warning | Goes with the Mass properties dialog | ✗ F19 (stays; later covers the sketch dialog's ✓) |
+| 5.6 | Material warning | Goes with the Mass properties dialog | ✅ (v0.4.6 gate): page toast ≈3.4 s, gone ≈8 s (= live) (was ✗ F19 (stays; later covers the sketch dialog's ✓)) |
 | 5.7 | Configurations panel › Configure Part Studio; add row "Long" | List input, Default / Long, info box | ✅ |
-| 5.8 | Right-click a feature parameter (Variable Value) | "Configure …" | ✗ F20 (only Cut/Copy/Paste/Select All) |
-| 5.9 | + Configure features | Yellow banner "Select … to configure [Done]" | ✗ F21 (no banner seen) |
-| 5.10 | Strip tooltip after the panel opens | Hides | ✗ F22 (stays over the panel) |
-| 5.11 | ☰ › Workspace units… while a sketch is open; Length → Inch, ✓ | Units change; the sketch stays open; geometry unchanged | ✗ F23, F24 |
+| 5.8 | Right-click a feature parameter (Variable Value) | "Configure …" | ✅ re-checked 10-23: Depth › right-click › "Configure" (was ✗ F20 (only Cut/Copy/Paste/Select All)) |
+| 5.9 | + Configure features | Yellow banner "Select … to configure [Done]" | ✅ (v0.4.6 gate): yellow "Select sketches or features to configure [Done]" (was ✗ F21 (no banner seen)) |
+| 5.10 | Strip tooltip after the panel opens | Hides | ✅ re-checked 10-23: no tooltip left over the panel (was ✗ F22 (stays over the panel)) |
+| 5.11 | ☰ › Workspace units… while a sketch is open; Length → Inch, ✓ | Units change; the sketch stays open; geometry unchanged | ✅ re-checked 10-23: the Workspace units dialog accepts the open sketch first (Sketch 3 kept), geometry unchanged; live order not captured (was ✗ F23, F24) |
 
 ## 6. Assembly and drawing (live: "Assembly", "Drawing")
 
 | # | Step | Live | Status |
 |---|---|---|---|
 | 6.1 | Assembly tab, I | Insert dialog | ✅ |
-| 6.2 | Click Part 2, click; click Part 3, click | Inserted; **the first instance lands at the origin** | ✗ F25 |
+| 6.2 | Click Part 2, click; click Part 3, click | Inserted; **the first instance lands at the origin** | ✅ re-checked 10-23: first instance at the assembly origin (was ✗ F25) |
 | 6.3 | Instance filter "3" | Filters the list | ✅ |
 | 6.4 | Fastened mate (M): two faces | Mate HUD, solves, "Fastened 1" | ✅ |
 | 6.5 | + › Create Drawing…, ANSI_A_MM, OK | Model picker, then Insert view following the cursor | ✅ |
@@ -115,7 +115,7 @@ it, so re-take positions after every selection.
 | # | Step | Live | Status |
 |---|---|---|---|
 | 7.1 | Part Studio tab › Export…, STEP | Dialog (Parasolid default), STEP options, file written | ✅ (3 solids, mm) |
-| 7.2 | STEP contents | Products named as in live's export | ✗ F26 |
+| 7.2 | STEP contents | Products named as in live's export | ✅ (v0.4.6 gate): flat products Part 1…n, AP242 header (was ✗ F26) |
 | 7.3 | Quit, start, Recently opened, open | Thumbnail, all tabs and features back | ✅ (single click selects; double click opens: ? vs live) |
 
 ## 8. Context menus: every item clicked once (added 10-22 after qa5's Parts-list Rename crash on aa75fdf)
@@ -468,3 +468,15 @@ Screenshots: /root/qa4-scratch/gate-v047/.
 | (c) smoke | ✓ new doc, rectangle sketch, Extrude, Fillet; quit / reopen; section 8: 73/73 ALIVE, screenshots as before |
 
 Notes: Enter in Instance count accepts the dialog (Tab used); Xvfb :110 died once during the run (restarted).
+
+## Re-check of the ✗ rows on main 88fbf8f5 (qa4, 2026-10-23 16:00–17:30, FRESH=1, binary /root/qa4-scratch/bin/noshape-main)
+All 21 ✗ rows of sections 1–7 pass now (marked above). The history ✗ (line "4 Edit / history", the 10-21 F12 run) is fixed (4.1).
+Open findings re-checked: F31 ✅ (Fillet ▾: plain two-row list), F33 ✅ (dragging Fillet 1 down onto the Hole row: drop line
+under the Hole row, lands under it), F8/F9/F18 closed earlier. Still open, routed in docs/handoff/qa5-routing.md:
+- IMP1 (kern): imported parts share face names → selection highlight crosses parts (g48-two: Part 1 lights the cube, Part 2
+  lights the cube + two G48 faces). `importing.rs import_foreign` names each body with `new_face_names` → `Role::New(ordinal)`
+  per body under one feature, so body 0 and body 1 both have New(0…5).
+- IMP2 (live request): Parts list after importing g48-two reads Part 2 above Part 1; live order not captured.
+- R1 (render): two default planes selected → black halos / see-through parts (also v0.4.5).
+- PAT-DIR (psb, v0.4.7 gate): failed Feature pattern's Direction drawn orange (selection) instead of red.
+- ASM-ESC (ui/asb): Esc in an unedited focused field of the assembly pattern dialog does nothing (no "FeatureDialog" context).
