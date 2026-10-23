@@ -681,7 +681,7 @@ impl Render for MateDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
+                            .bg(pal.accept).when(invalid, |d| d.opacity(0.2))
                             .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
                             .child(crate::assets::icon("dialog-ok", 24., cx))

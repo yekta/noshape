@@ -1027,7 +1027,7 @@ impl AssemblyView {
         }
         if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::External { .. }) {
             let tg = targets.clone();
-            m.push(icon_item("Change to version…", "legend-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
+            m.push(icon_item("Change to version…", "change-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
         m.push(export);
         // Live qa5 CA2: Release… after Export… (the instances' parts).
@@ -2814,7 +2814,7 @@ impl AssemblyView {
                         }
                     })))
                     .child(div().flex_1())
-                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
+                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")),
             );
         // Live dom dialog-animate: 220 px, the plain grey ×.
         Self::panel_frame_with("Animate mate", body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close", true).w(px(220.)).into_any_element()

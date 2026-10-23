@@ -1212,7 +1212,7 @@ impl PartStudioView {
         let (_, st, _) = self.ui.dyn_suppression.as_ref()?;
         let pal = p();
         let field = gpui_kit::component::input::Input::new(st).appearance(false).text_size(px(13.33)).h(px(25.));
-        let help = div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?");
+        let help = div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?");
         Some(
             v_flex()
                 .id("dyn-suppression")

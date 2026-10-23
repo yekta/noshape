@@ -927,3 +927,20 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   * Open for live (REQUESTS icons2 10-23 07:30): sheet metal, more context menus/dialogs, tab manager, history,
     properties panels in dark; glyphs tinted rgb(0x666666) (ui-dropdown-arrow, ui-caret-down, close, info, pin,
     folder, undo, import-file) wait for those captures (sprite vars differ per glyph).
+- Block 2, part 3 (live answered dk-971…dk-9a2):
+  * Sheet metal dropdown = live dk-972 except Flex PCB model / Finish flex PCB model: pcb-start / pcb-end redrawn
+    on the pcb-*-button sprites (curved bend, chip box; 6.4/7.7 -> 2.3/3.4 light); pcb-end's ✓ is white in dark.
+  * Context menus (dk-974/975/983/984) = live except "Change to version…": live uses the inserted-version symbol
+    (dashed line + dot): new icon change-version (assembly + drawing tab menus). com-indicator ring 0.8 -> 1 (live).
+  * Disabled dialog ✓ (15 places): was #cce9cc (light-only colour); live = the whole button at 20% opacity, which
+    gives #cce9cc on white and (41,70,41) with a (92,92,92) ✓ on #333 (dk-978). Now bg(accept) + opacity(0.2).
+  * Running toolbar tool: live #eaeaea light (dialogs/*-01-open, sketch/1933/1940) and #555 dark (dk-978/932):
+    --os-icon-button-fill--selected; was #b2ddf6 / #134e96.
+  * Assembly linear/circular pattern flip: showed the flipped art when not flipped (dk-987): now like the Part
+    Studio dialogs (*-opposite art when unflipped).
+  * "?" help dots (28 places): theme::help_dot(light) = each place's light grey, #aeaeae in dark (dk-978/987),
+    the "?" in the dialog background (Onshape's knockout); section view's too.
+  * Not fixed (ui2's, reported): Insert dialog header is a white bar in dark; mate-type flyout white in dark;
+    51 bg(gpui_kit::white()) app-wide; Create button blue on the documents page.
+  * Dialogs hole, fillet, linear pattern, mirror, sweep, flange, fastened, revolute, asm linear pattern, replicate:
+    icons = live dark.

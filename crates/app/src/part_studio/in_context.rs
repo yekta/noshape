@@ -693,7 +693,7 @@ impl PartStudioView {
                 );
             }
         }
-        let help = div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?");
+        let help = div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?");
         Some(
             v_flex()
                 .id("insert-go")

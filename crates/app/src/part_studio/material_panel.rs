@@ -465,7 +465,7 @@ impl PartStudioView {
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .bg(if can_apply { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
+                                .bg(pal.accept).when(!can_apply, |d| d.opacity(0.2))
                                 .when(can_apply, |d| d.cursor_pointer())
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_material(cx))),
@@ -490,7 +490,7 @@ impl PartStudioView {
                 .child(h_flex().border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).child(tab("mat-tab-lib", !custom, false, cx)).child(tab("mat-tab-custom", custom, true, cx)))
                 .child(div().id("mat-body").flex_1().min_h_0().overflow_y_scroll().child(body))
                 // The dialog's help button at the bottom right (live 14 px, 4 px in).
-                .child(div().absolute().right(px(4.)).bottom(px(4.)).size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?"))
+                .child(div().absolute().right(px(4.)).bottom(px(4.)).size(px(14.)).rounded_full().bg(crate::theme::help_dot(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?"))
                 .into_any_element(),
         )
     }

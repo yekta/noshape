@@ -1080,7 +1080,7 @@ impl AssemblyView {
                     .border_l_1()
                     .border_color(rgb(0xcccccc))
                     .child(div().flex_1().flex().justify_center().when(!empty, |d| d.child(self.render_add_asm_config_input(cx))))
-                    .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?"))),
+                    .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?"))),
             )
             .into_any_element()
     }

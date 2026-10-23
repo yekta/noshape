@@ -1216,11 +1216,13 @@ impl AssemblyView {
             PatternDialogKind::Linear | PatternDialogKind::Circular => {
                 let circular = kind == PatternDialogKind::Circular;
                 body = body.child(div().px(px(3.)).pt(px(5.)).child(axis_box(self, "pat-axis", &s.axis, if circular { "Axis of pattern" } else { "Direction" }, 0, cx)));
+                // Unflipped, Onshape shows the art of its *-opposite symbols
+                // (live dark/dk-987), like the Part Studio dialogs.
                 let flip = match (circular, opposite) {
-                    (true, true) => "flip-circular-opposite",
-                    (true, false) => "flip-circular",
-                    (false, true) => "flip-direction-opposite",
-                    (false, false) => "flip-direction",
+                    (true, false) => "flip-circular-opposite",
+                    (true, true) => "flip-circular",
+                    (false, false) => "flip-direction-opposite",
+                    (false, true) => "flip-direction",
                 };
                 body = body
                     .child(div().h(px(5.)))
@@ -1256,7 +1258,7 @@ impl AssemblyView {
                         cx.notify();
                     })));
                     if second {
-                        let flip2 = if s.opposite2 { "flip-direction-opposite" } else { "flip-direction" };
+                        let flip2 = if s.opposite2 { "flip-direction" } else { "flip-direction-opposite" };
                         let opp2 = s.opposite2;
                         body = body
                             .child(div().px(px(3.)).pt(px(5.)).child(axis_box(self, "pat-axis2", &s.axis2, "Direction", 1, cx)))
@@ -1358,7 +1360,7 @@ impl AssemblyView {
             }
         }
         // The help ? at the bottom right.
-        body = body.child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")));
+        body = body.child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")));
         let close = |this: &mut Self, cx: &mut Context<Self>| {
             this.pattern = None;
             // Drop the preview.
@@ -1401,7 +1403,7 @@ impl AssemblyView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(if valid { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
+                            .bg(pal.accept).when(!valid, |d| d.opacity(0.2))
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
                             .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -2339,7 +2341,7 @@ impl AssemblyView {
                     ),
             )
             .child(list)
-            .child(h_flex().h(px(26.)).flex_none().justify_end().px(px(6.)).bg(pal.panel).border_t_1().border_color(pal.border).child(div().id("cfg-help").track_focus(&help_focus).focus(|s| s.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }])).size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")))
+            .child(h_flex().h(px(26.)).flex_none().justify_end().px(px(6.)).bg(pal.panel).border_t_1().border_color(pal.border).child(div().id("cfg-help").track_focus(&help_focus).focus(|s| s.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }])).size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")))
             .into_any_element()
     }
 

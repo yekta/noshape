@@ -19,7 +19,7 @@ use noshape_model::assembly::BomBehavior;
 
 /// The dialogs' gray "?" help button (14 px, `#888`).
 pub(super) fn help_dot() -> Div {
-    div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")
+    div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")
 }
 
 use crate::properties_dialog::parse_mass;

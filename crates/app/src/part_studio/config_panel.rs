@@ -257,7 +257,7 @@ impl PartStudioView {
                         .border_t_1()
                         .border_color(gpui_kit::rgb(0xcccccc))
                         .child(div().flex_1().flex().justify_center().children((panel == RightPanel::Variables).then(|| self.variable_panel_footer(cx))).children(if panel == RightPanel::CustomTables { self.custom_tables_footer(cx) } else { None }).children(configured.then(|| self.render_add_config_input(cx))))
-                        .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+                        .child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")),
                 )
                 // Add custom tables flyout over the panel's top right (live 639).
                 .relative()
