@@ -105,20 +105,15 @@ pub fn danger_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
         .rounded(px(3.))
 }
 
-/// Onshape's gray modal "Cancel" button: `#d7d7d7`, hover `#eeeeee`.
+/// Onshape's gray modal "Cancel" button: `#d7d7d7`, hover `#eeeeee`,
+/// `#333` text. It stays light in the dark theme (live dark/dk-9bb Export
+/// Drawing, dk-999 Properties: `btn-secondary` rgb(215,215,215)).
 pub fn cancel_button(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Button {
-    let pal = p();
+    let (fill, hover, text) = (gpui_kit::rgb_static(CANCEL_FILL), gpui_kit::rgb_static(CANCEL_HOVER), gpui_kit::rgb_static(0x333333));
     Button::new(id)
-        .custom(
-            ButtonCustomVariant::new(cx)
-                .color(rgb(CANCEL_FILL).into())
-                .foreground(pal.text.into())
-                .hover(rgb(CANCEL_HOVER).into())
-                .active(rgb(CANCEL_FILL).into())
-                .shadow(false),
-        )
-        .bg(rgb(CANCEL_FILL))
-        .child(div().text_size(px(14.)).child(label.into()))
+        .custom(ButtonCustomVariant::new(cx).color(fill.into()).foreground(text.into()).hover(hover.into()).active(fill.into()).shadow(false))
+        .bg(fill)
+        .child(div().text_size(px(14.)).text_color(text).child(label.into()))
         .h(px(34.))
         .px(px(11.))
         .rounded(px(3.))
