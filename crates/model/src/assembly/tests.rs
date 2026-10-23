@@ -3127,9 +3127,8 @@ fn pan_head_tapping_screw_matches_live() {
     spec.set_size("#8");
     spec.params.insert("Tip type".into(), "A".into());
     // Live: Type VI 15, Type III 19 with the 0.002 in mouth fillet (1 / 4
-    // faces); FeatureScript's opFillet builds it once it uses the checked
-    // kernel fillet (kern), until then the recess has no fillet faces.
-    for (head, faces, unfilleted) in [("Slot", 10, 10), ("Type VI", 15, 14), ("Type III", 19, 15)] {
+    // faces).
+    for (head, faces) in [("Slot", 10), ("Type VI", 15), ("Type III", 19)] {
         spec.params.insert("Head type".into(), head.into());
         spec.params.remove("Threads/inch");
         spec.fix_length();
@@ -3144,14 +3143,13 @@ fn pan_head_tapping_screw_matches_live() {
         for s in &surfaces {
             *kinds.entry(format!("{s:?}").split([' ', '(']).next().unwrap_or_default().to_string()).or_default() += 1;
         }
-        assert!(body.faces.len() == faces || body.faces.len() == unfilleted, "{head}: {} faces, live {faces}: {kinds:?}", body.faces.len());
+        assert_eq!(body.faces.len(), faces, "{head}: {kinds:?}");
     }
 }
 
 /// Live's Pan #8 Type VI 15 faces / Type III 19 faces include the 0.002 in
 /// mouth fillet (1 / 4 TORUS-like faces).
 #[test]
-#[ignore = "needs FeatureScript opFillet on the checked kernel fillet (kern's opfillet-checked patch; passes with it, seamless crowns in place)"]
 fn pan_head_tapping_screw_mouth_fillets() {
     use super::standard::{self, CATALOGUE, StandardSpec};
     let c = CATALOGUE.iter().find(|c| c.name == "Pan head tapping screw").expect("in the catalogue");
