@@ -526,8 +526,9 @@ fn thicken_names(ev: &EvalCtx, inp: &ThickenInput, out: &Shape, tmax: f64) -> Ve
 
 pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities");
+    // Live L29: the empty field is marked.
     if refs.is_empty() {
-        return err("Select faces, parts, or planes to form a solid.");
+        return crate::regen::eval::err_at(&["entities"], "Select faces, parts, or planes to form a solid.");
     }
     let mut shapes: Vec<Shape> = Vec::new();
     let mut names: Vec<crate::naming::ShapeNames> = Vec::new();
@@ -550,6 +551,13 @@ pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
                     owners.push(b.id.clone());
                 }
             }
+            // Live L31: sketch regions can be picked.
+            Reference::SketchRegion { .. } => {
+                for p in ev.profiles(std::slice::from_ref(r))? {
+                    shapes.push(p.shape);
+                    names.push(Default::default());
+                }
+            }
             _ => {
                 if let Some(frame) = ev.resolve_plane(r) {
                     shapes.push(big_plane_face(ev, &kernel_plane(&frame))?);
@@ -559,11 +567,18 @@ pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if shapes.is_empty() {
-        return err("Select faces, parts, or planes to form a solid.");
+        return crate::regen::eval::err_at(&["entities"], "Select faces, parts, or planes to form a solid.");
     }
-    let res = k::enclose(&shapes).map_err(|_| fe("Failed to create a part from enclosed region."))?;
+    let mut res = k::enclose(&shapes).map_err(|_| fe("Failed to create a part from enclosed region."))?;
     if res.shape.count(ShapeType::Solid) == 0 {
         return err("Selections do not enclose a region.");
+    }
+    // Live L31: every enclosed region goes into one part.
+    let solids = res.shape.solids();
+    if solids.len() > 1 {
+        let fused = k::boolean(k::BooleanOp::Fuse, &solids[..1], &solids[1..], &k::BooleanOptions::default()).map_err(|_| fe("Failed to create a part from enclosed region."))?;
+        let un = k::unify_same_domain(&fused.shape)?;
+        res = k::OpResult { shape: un.shape, history: res.history };
     }
     let arg_refs: Vec<&crate::naming::ShapeNames> = names.iter().collect();
     let faces = ev.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
