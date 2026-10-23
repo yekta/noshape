@@ -312,9 +312,16 @@ pub fn param_row_plain(label: impl Into<SharedString>, field: impl IntoElement) 
 /// `#def1fb` with a `#1651b0` outline while it takes the picks. Empty it
 /// shows `label` (12 px `#555`); with entries the label shrinks to the top.
 pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, active: bool, rows: Vec<AnyElement>) -> Stateful<Div> {
+    query_box_tip(id, label, None, active, rows)
+}
+
+/// [`query_box`] whose label's tooltip is `tip` instead of the label (live:
+/// a field in error shows the error, "Select one or more instances.").
+pub fn query_box_tip(id: impl Into<ElementId>, label: impl Into<SharedString>, tip: Option<SharedString>, active: bool, rows: Vec<AnyElement>) -> Stateful<Div> {
     let pal = p();
     let empty = rows.is_empty();
     let label: SharedString = label.into();
+    let tip = tip.unwrap_or_else(|| label.clone());
     gpui_kit::component::v_flex()
         .id(id)
         .min_h(px(26.))
@@ -333,7 +340,7 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
                 .when(!empty, |d| d.pt(px(2.)).text_size(px(10.)))
                 .text_color(rgb(0x555555))
                 // Live: the label's tooltip is the label ("Mate connectors", "Instances").
-                .tooltip(crate::ui::tooltip(label.clone()))
+                .tooltip(crate::ui::tooltip(tip))
                 .child(label),
         )
         .children(rows)
