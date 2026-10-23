@@ -123,6 +123,9 @@ pub struct SheetGeometry {
     pub fonts: Vec<FontSpan>,
     /// Colored areas drawn under all the ink (pending revision rows).
     pub backdrops: Vec<(Vec<[f64; 2]>, [u8; 3])>,
+    /// Translucent areas drawn over all the ink (a release watermark):
+    /// outline, colour, opacity. The colour mode leaves them as they are.
+    pub overlays: Vec<(Vec<[f64; 2]>, [u8; 3], f32)>,
     /// Grey areas behind property fields, on screen only (Drawing
     /// properties › Notes › Hide property background turns them off).
     pub field_backdrops: Vec<Vec<[f64; 2]>>,
