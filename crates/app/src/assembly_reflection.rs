@@ -10,12 +10,11 @@
 use super::*;
 use crate::part_studio::environment_maps;
 use crate::part_studio::reflection::{EnvImageRef, ReflectionSettings};
-use gpui_kit::component::input::InputEvent;
 
 /// The open Reflection analysis dialog.
 pub(crate) struct ReflectionDialog {
     pub settings: ReflectionSettings,
-    rotation: Entity<InputState>,
+    rotation: Entity<crate::quantity_field::QuantityInput>,
     /// The "Select image" panel: tab (0 Current document, 1 Other
     /// documents, 2 Libraries), the library image shown, its search box.
     picker: Option<(u8, &'static str, Entity<InputState>)>,
@@ -28,19 +27,23 @@ impl AssemblyView {
         // start hidden (live analysis/10).
         let mut settings = self.ui.reflection.clone().or_else(|| self.ui.reflection_last.clone()).unwrap_or_default();
         settings.show_edges = self.ui.reflection.as_ref().is_some_and(|r| r.show_edges);
-        let rotation = cx.new(|cx| InputState::new(window, cx).default_value(format!("{} deg", settings.rotation_deg)));
-        let sub = cx.subscribe_in(&rotation, window, |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
-            InputEvent::Change => {
-                let units = this.units(cx);
-                if let Ok(q) = noshape_units::evaluate_as(st.read(cx).value().trim(), noshape_units::Dim::ANGLE, &units, &noshape_units::EmptyScope)
-                    && let Some(d) = &mut this.ui.reflection_dialog
-                {
-                    d.settings.rotation_deg = q.value.to_degrees();
-                    this.rebuild_scene(false, cx);
-                }
+        // Onshape's number field, as the Part Studio's: a commit applies.
+        use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
+        let units = self.units(cx);
+        let variables = self.variable_scope(cx);
+        let rotation = cx.new(|cx| {
+            let mut q = QuantityInput::new(format!("{} deg", settings.rotation_deg), QuantitySpec::quantity(noshape_units::Dim::ANGLE).label("Rotation angle"), units, window, cx);
+            q.set_variables(variables, cx);
+            q
+        });
+        let sub = cx.subscribe(&rotation, |this: &mut Self, st, ev: &QuantityEvent, cx| {
+            if let QuantityEvent::Committed(_) = ev
+                && let Some(v) = st.read(cx).value()
+                && let Some(d) = &mut this.ui.reflection_dialog
+            {
+                d.settings.rotation_deg = v.to_degrees();
+                this.rebuild_scene(false, cx);
             }
-            InputEvent::PressEnter { .. } => this.close_reflection(true, cx),
-            _ => {}
         });
         self.ui.reflection_dialog = Some(ReflectionDialog { settings, rotation, picker: None, _sub: sub });
         self.rebuild_scene(false, cx);
@@ -184,7 +187,7 @@ impl AssemblyView {
             )
             .child(
                 h_flex()
-                    .child(div().child(crate::os_ui::param_row("Rotation angle", crate::os_ui::input_h(Input::new(&rotation).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))))
+                    .child(div().child(crate::os_ui::param_row_plain("Rotation angle", rotation)))
                     .child(
                         // Live: the 26 px column right of the 194 px row (icon at 443).
                         div()
