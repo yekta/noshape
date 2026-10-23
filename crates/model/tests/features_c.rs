@@ -506,7 +506,7 @@ fn total_area(r: &RegenResult, bi: usize) -> f64 {
 }
 
 #[test]
-fn wrap_surface_solid_split_and_unwrap() {
+fn wrap_surface_solid_and_split() {
     let (mut s, region) = cylinder_and_tool();
     let r = s.ok();
     let target = cylinder_face(&r, 0);
@@ -534,20 +534,15 @@ fn wrap_surface_solid_split_and_unwrap() {
     let surf2 = r2.context.bodies.iter().position(|b| b.id.feature == w).unwrap();
     assert_eq!(names, r2.context.bodies[surf2].faces);
 
-    // Unwrap the wrapped face onto the tangent plane: same area, flat again.
+    // A cylindrical face as a tool fails: Onshape has no unwrap (live L20).
     let wf = Reference::Face((*r.context.bodies[surf].faces[0]).clone());
-    let pl = s.ps.features.iter().find(|f| f.type_id == "cPlane").unwrap().id;
+    let t3 = cylinder_face(&r, 0);
     s.add("wrap", move |p| {
         p.set("resultType", en("SURFACE"));
         p.set("source", q(wf));
-        p.set("destination", q(Reference::FeaturePlane(pl)));
+        p.set("destination", q(t3));
     });
-    let r = s.ok();
-    let un = r.context.bodies.len() - 1;
-    assert!(near(total_area(&r, un), mm(200.0) * 1e-3, 1e-10), "unwrapped area {}", total_area(&r, un));
-    let bb = r.context.bodies[un].shape.bounding_box(true).unwrap();
-    assert!(near(bb.max.x, mm(20.0), 1e-6) && near(bb.min.x, mm(20.0), 1e-6), "unwrapped onto x = 20: {bb:?}");
-    assert!(near(bb.max.y - bb.min.y, mm(10.0), 1e-6), "{bb:?}");
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select planar faces or sketch regions to wrap.".to_string()));
 
     // Solid: thickened outward and added to the cylinder.
     let (mut s, region) = cylinder_and_tool();

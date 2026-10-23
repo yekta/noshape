@@ -3,8 +3,7 @@
 //!
 //! **Wrap** maps planar faces / sketch regions onto a cylinder or cone
 //! through the surfaces' isometric developments (lengths and areas are
-//! kept), or the reverse: cylindrical / conical faces onto a plane
-//! ("unwrap"). The default anchor follows Onshape: the source anchor lies on
+//! kept). The default anchor follows Onshape: the source anchor lies on
 //! the target axis projected into the source plane (closest to the source
 //! center) and maps to its projection on the target; the axis direction is
 //! kept. Results: surfaces, thickened solids merged per the operation type,
@@ -62,10 +61,8 @@ fn destination(ev: &EvalCtx) -> FResult<(Developable, Option<(usize, usize)>)> {
             let Ok(d) = Developable::of_face(&f) else { return no_target() };
             Ok((d, Some((bi, fi))))
         }
-        _ => {
-            let Some(p) = ev.resolve_plane(r) else { return err("The target must be a cylindrical, conical or planar face, or a plane") };
-            Ok((Developable::Plane { origin: p.origin, x_dir: p.x, normal: p.normal }, None))
-        }
+        // A plane can't be a target (live L20).
+        _ => no_target(),
     }
 }
 
@@ -103,12 +100,13 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
     let sources = wrap_sources(ev)?;
     let (dst, dst_face) = destination(ev)?;
     let src_faces: Vec<Shape> = sources.iter().map(|s| s.0.clone()).collect();
-    let src = Developable::of_face(&src_faces[0]).map_err(|_| fe("The tools must be planar (wrap) or cylindrical / conical (unwrap)"))?;
-    let unwrap = !matches!(src, Developable::Plane { .. });
-    match (unwrap, &dst) {
-        (false, Developable::Plane { .. }) => return crate::regen::eval::err_at(&["destination"], "Select a cylindrical or conical face to wrap around."),
-        (true, Developable::Cylinder { .. } | Developable::Cone { .. }) => return err("Unwrapping needs a planar target face or plane"),
-        _ => {}
+    // Live L20: only planar tools.
+    let src = match Developable::of_face(&src_faces[0]) {
+        Ok(d @ Developable::Plane { .. }) => d,
+        _ => return crate::regen::eval::err_at(&["source"], "Select planar faces or sketch regions to wrap."),
+    };
+    if matches!(dst, Developable::Plane { .. }) {
+        return crate::regen::eval::err_at(&["destination"], "Select a cylindrical or conical face to wrap around.");
     }
     // All tools on one surface.
     for f in &src_faces[1..] {
@@ -135,8 +133,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
         }
         (lo + hi) * 0.5
     };
-    let curved = if unwrap { &src } else { &dst };
-    let flat_side = if unwrap { &dst } else { &src };
+    let (curved, flat_side) = (&dst, &src);
     let (ax_o, ax_z) = axis_of(curved).ok_or_else(|| fe("The wrap surfaces are invalid"))?;
     let plane_n = match *flat_side {
         Developable::Plane { normal, .. } => normal.normalize(),
@@ -159,12 +156,6 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
                 return crate::regen::eval::err_at(&missing, "Select anchor points.");
             }
         }
-    } else if unwrap {
-        // Middle of the source faces on the surface, projected onto the plane.
-        let f0 = &src_faces[0];
-        let b = f0.uv_bounds()?;
-        let p = f0.point_at_uv((b[0] + b[1]) * 0.5, (b[2] + b[3]) * 0.5)?;
-        (p, to_plane(p))
     } else {
         let c = to_plane(src_center);
         let a = if zp.length() > 1e-9 {
@@ -176,27 +167,21 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
         };
         (a, a)
     };
-    let ref_curved = curved.angle_of(if unwrap { a_src } else { a_dst }, 0.0);
-    let (src_ref, dst_ref) = if unwrap { (ref_curved, 0.0) } else { (0.0, ref_curved) };
-    let f_src = if unwrap { src.project(a_src, src_ref) } else { src.flat(a_src, src_ref) };
+    let ref_curved = curved.angle_of(a_dst, 0.0);
+    let (src_ref, dst_ref) = (0.0, ref_curved);
+    let f_src = src.flat(a_src, src_ref);
     let f_dst = dst.project(a_dst, dst_ref);
     // Directions: the axis direction is kept.
     let axis_dir = if zp.length() > 1e-9 { zp.normalize() } else { k::Plane::new(plane_o, plane_n, DVec3::X).unit_x() };
-    let (d_src, d_dst) = if unwrap {
-        (flat_dir(&src, f_src, src_ref, ax_z), flat_dir(&dst, f_dst, dst_ref, axis_dir))
-    } else {
-        (flat_dir(&src, f_src, src_ref, axis_dir), flat_dir(&dst, f_dst, dst_ref, ax_z))
-    };
+    let (d_src, d_dst) = (flat_dir(&src, f_src, src_ref, axis_dir), flat_dir(&dst, f_dst, dst_ref, ax_z));
     if d_src.length() < 0.5 || d_dst.length() < 0.5 {
         return crate::regen::eval::err_at(&["customAnchors"], "Anchor points could not be automatically chosen. Select \"Specify anchor points\" option to choose them manually.");
     }
     // Orientation: keep the tool's side facing the same way as the target normal.
-    let p_src3 = src.point(f_src, src_ref);
     let p_dst3 = dst.point(f_dst, dst_ref);
-    let n_src = if unwrap { normal_at(&src, p_src3, src_ref) } else { sources[0].2 };
-    let n_src = if unwrap && src_faces[0].normal_at_point(p_src3).map(|n| n.dot(n_src) < 0.0).unwrap_or(false) { -n_src } else { n_src };
+    let n_src = sources[0].2;
     let n_dst_surf = normal_at(&dst, p_dst3, dst_ref);
-    let aligned = n_src.dot(if unwrap { plane_n } else { n_dst_surf }) >= 0.0 || unwrap;
+    let aligned = n_src.dot(n_dst_surf) >= 0.0;
     let n_dst = if aligned { n_dst_surf } else { -n_dst_surf };
     let (_, _, ns_flat) = src.flat_axes(f_src, src_ref);
     let (_, _, nd_flat) = dst.flat_axes(f_dst, dst_ref);

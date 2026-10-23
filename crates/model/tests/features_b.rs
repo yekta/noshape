@@ -831,3 +831,47 @@ fn imported_part_names_are_not_renumbered() {
     let names: Vec<&str> = r.display.bodies.iter().map(|b| b.name.as_str()).collect();
     assert_eq!(names, ["Part 2", "Part 1"]);
 }
+
+/// Live L28 ("psb L28 boundary", 2099/2100): one U and one V profile meeting
+/// at a corner make the sheet the U sweeps along the V; a V crossing the U
+/// profiles in their middle can't be matched at the ends.
+type Seg = ((f64, f64), (f64, f64));
+
+#[test]
+fn boundary_one_u_one_v_as_live() {
+    let run = |u: &[Seg], v: &[Seg]| {
+        let mut s = Studio::new();
+        let mut one = |a: (f64, f64), b: (f64, f64)| {
+            let mut sk = noshape_sketch::Sketch::new();
+            let l = sk.add_line(DVec2::new(a.0, a.1), DVec2::new(b.0, b.1)).0;
+            (s.sketch(Reference::Plane(DatumPlane::Top), sk), l)
+        };
+        let us: Vec<_> = u.iter().map(|(a, b)| one(*a, *b)).collect();
+        let vs: Vec<_> = v.iter().map(|(a, b)| one(*a, *b)).collect();
+        s.add("boundarySurface", move |p| {
+            let rows = |list: &[(FeatureId, u32)], ents: &str, cond: &str| {
+                ParamValue::Array(
+                    list.iter()
+                        .map(|(sk, e)| {
+                            let mut v = ParamValues::default();
+                            v.set(ents, ParamValue::Query(vec![Reference::SketchEntity { sketch: *sk, entity: *e }]));
+                            v.set(cond, ParamValue::Enum("DEFAULT".into()));
+                            v
+                        })
+                        .collect(),
+                )
+            };
+            p.set("uProfilesArray", rows(&us, "uProfileEntities", "uCondition"));
+            p.set("vProfilesArray", rows(&vs, "vProfileEntities", "vCondition"));
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap().clone();
+        (st.status, st.message, r.context.bodies.iter().position(|b| b.kind == BodyKind::Surface).map(|i| surface_area(&r, i)))
+    };
+    let (st, msg, area) = run(&[((0.0, 0.0), (0.04, 0.0))], &[((0.0, 0.0), (0.0, 0.02))]);
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!(near(area.unwrap(), 0.04 * 0.02, 1e-9), "{area:?}");
+    let (st, msg, _) = run(&[((0.0, 0.0), (0.04, 0.0)), ((0.0, 0.02), (0.04, 0.02))], &[((0.02, -0.005), (0.02, 0.025))]);
+    assert_eq!(st, FeatureStatus::Error);
+    assert_eq!(msg.as_deref(), Some("Could not extract boundary profiles matching at end points."));
+}

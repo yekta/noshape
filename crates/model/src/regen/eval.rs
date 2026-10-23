@@ -116,6 +116,9 @@ pub struct EvalCtx<'a> {
     pub computed: Vec<(String, crate::display::ComputedValue)>,
     /// See [`crate::display::FeatureState::touched`].
     pub touched: Vec<BodyId>,
+    /// See [`crate::display::FeatureState::error_mesh`]: shapes shown when
+    /// the feature fails.
+    pub error_shapes: Vec<Shape>,
     /// Sketch being edited (for display of constraint states).
     pub editing_sketch: Option<FeatureId>,
     /// Other Part Studios of the document (for Derived).
@@ -216,7 +219,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), touched: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None, cancel: None }
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None, cancel: None }
     }
 
     /// The run was aborted (a newer edit made it stale): stop and return

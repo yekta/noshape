@@ -1360,7 +1360,7 @@ impl FeatureDialog {
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Create variable"))
-                    .child(div().id("cv-ok").size(px(28.)).flex().items_center().justify_center().bg(if blocked { gpui_kit::rgb(0xcce9cc) } else { pal.accept }).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.commit_create_variable(window, cx))))
+                    .child(div().id("cv-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(blocked, |d| d.opacity(0.2)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.commit_create_variable(window, cx))))
                     .child(div().id("cv-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.cancel_create_variable(window, cx)))),
             )
             .child(target)
@@ -1943,7 +1943,7 @@ impl FeatureDialog {
                             .justify_center()
                             .text_size(px(12.))
                             .cursor_pointer()
-                            .when(selected, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
+                            .when(selected, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                             .when(!selected, |d| d.text_color(pal.text).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.border)).hover(|d| d.text_color(pal.text)))
                             .child(*label)
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)))
@@ -2174,7 +2174,7 @@ impl FeatureDialog {
                                     .group("field-x")
                                     .cursor_pointer()
                                     // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                    .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
+                                    .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         cx.stop_propagation();
                                         cx.emit(DialogEvent::HoverRef(None));
@@ -2422,7 +2422,7 @@ impl FeatureDialog {
                                         .cursor_pointer()
                                         .group("field-x")
                                         // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                        .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
+                                        .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                         .on_click(cx.listener(remove(k))),
                                 )
                             });
@@ -2501,7 +2501,7 @@ impl FeatureDialog {
                                             .cursor_pointer()
                                             .group("field-x")
                                             // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                            .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
+                                            .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                             .on_click(cx.listener(remove(k))),
                                     ),
                             )
@@ -3116,7 +3116,7 @@ impl Render for FeatureDialog {
                             .tab_stop(false)
                             .custom(
                                 gpui_kit::component::button::ButtonCustomVariant::new(cx)
-                                    .color(if blocked { gpui_kit::rgb(0xcce9cc).into() } else { pal.accept.into() })
+                                    .color(pal.accept.into())
                                     .hover(gpui_kit::rgb(0x74ce3a).into())
                                     .active(pal.accept.into())
                                     .shadow(false),
@@ -3127,7 +3127,7 @@ impl Render for FeatureDialog {
                             .h(px(28.))
                             .p_0()
                             .rounded(px(0.))
-                            .bg(if blocked { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
+                            .bg(pal.accept).when(blocked, |d| d.opacity(0.2))
                             // Live (dom/cursors.txt): ✓ and ✗ show the default arrow
                             // (`.ns-dialog-button-ok/-cancel`), enabled or not.
                             .cursor(CursorStyle::Arrow)
@@ -3220,15 +3220,12 @@ impl Render for FeatureDialog {
                             .relative()
                             .top(px(-2.))
                             .rounded_full()
-                            .bg(gpui_kit::rgb(0xa0a0a0))
-                            .hover(|d| d.bg(pal.text_muted))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .text_size(px(9.5))
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(gpui_kit::rgb(0xffffff))
-                            .child("?")
+                            // Live: the help-button sprite (dom svg-icon-help-button),
+                            // its "?" cut out.
+                            .child(crate::ui::glyph("help-dot", 13.3, crate::theme::help_dot(0xa0a0a0)))
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip(format!("{} help", self.ty.name)))
                             // Help: the feature's description (offline help).

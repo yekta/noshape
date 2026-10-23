@@ -314,6 +314,7 @@ pub fn param_row_plain(label: impl Into<SharedString>, field: impl IntoElement) 
 pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, active: bool, rows: Vec<AnyElement>) -> Stateful<Div> {
     let pal = p();
     let empty = rows.is_empty();
+    let label: SharedString = label.into();
     gpui_kit::component::v_flex()
         .id(id)
         .min_h(px(26.))
@@ -324,13 +325,16 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
         .cursor_pointer()
         .child(
             div()
+                .id("query-label")
                 .px(px(6.))
                 // Live (dom dialog-mate-connector): `pad 6px 6px 5px` on a
                 // 13.33 px line, 26 px with the border.
                 .when(empty, |d| d.pt(px(6.)).pb(px(5.)).line_height(px(13.33)).text_size(px(12.)))
                 .when(!empty, |d| d.pt(px(2.)).text_size(px(10.)))
                 .text_color(rgb(0x555555))
-                .child(label.into()),
+                // Live: the label's tooltip is the label ("Mate connectors", "Instances").
+                .tooltip(crate::ui::tooltip(label.clone()))
+                .child(label),
         )
         .children(rows)
 }
