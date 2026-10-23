@@ -159,18 +159,21 @@ function uniteAll(context is Context, id is Id)
  */
 function cornerChamfer(context is Context, id is Id, body is Query, z0 is ValueWithUnits, h is ValueWithUnits, dw is ValueWithUnits, top is boolean, bottom is boolean)
 {
-    cornerChamferAngle(context, id, body, z0, h, dw, top, bottom, 30 * degree);
+    cornerChamferAngle(context, id, body, z0, h, dw, dw, top, bottom, 30 * degree);
 }
 
-/** `cornerChamfer` at `angle` from the face (30 degrees hex, 25 square). */
-function cornerChamferAngle(context is Context, id is Id, body is Query, z0 is ValueWithUnits, h is ValueWithUnits, dw is ValueWithUnits, top is boolean, bottom is boolean, angle is ValueWithUnits)
+/**
+ * `cornerChamfer` at `angle` from the face (30 degrees hex, 25 square),
+ * starting on the circle dwTop on the top face (a conical top when small).
+ */
+function cornerChamferAngle(context is Context, id is Id, body is Query, z0 is ValueWithUnits, h is ValueWithUnits, dw is ValueWithUnits, dwTop is ValueWithUnits, top is boolean, bottom is boolean, angle is ValueWithUnits)
 {
     if (!top && !bottom)
         return;
     const slope = 1 / tan(angle);
     const big = dw * 10 + h * 10;
     const r0 = bottom ? dw / 2 : big;
-    const r1 = top ? dw / 2 : big;
+    const r1 = top ? dwTop / 2 : big;
     const z1 = z0 + h;
     // Where the two cones cross, inside the prism's height.
     const zc = min(max((r1 - r0 + (z1 + z0) * slope) / (2 * slope), z0), z1);
@@ -358,6 +361,19 @@ function screwHead(context is Context, id is Id, def is map) returns array
         var pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : rz(def.dk / 2, -def.c) }, { "p" : rz(def.dk / 2, Z) }];
         if (def.undercut == 1)
             pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : rz(def.dk / 2 - def.k * tan(41 * degree), -def.k) }, { "p" : rz(def.dk / 2, Z) }];
+        // Live's flat countersunk tapping screw (Sketch 1): the 82 degree
+        // cone from the head's edge, an arc tangent to it and to the shank,
+        // k measured to the arc's end on the shank.
+        const ca = cos(41 * degree);
+        const sa = sin(41 * degree);
+        const rfc = (ca * (def.d - def.dk) / 2 + sa * def.k) / (1 - ca);
+        if (def.cskFillet == 1 && def.undercut != 1 && rfc > EPS)
+        {
+            const cx = def.d / 2 + rfc;
+            const tangent = rz(cx - rfc * ca, -def.k + rfc * sa);
+            const mid = normalize(vector(-1 - ca, sa));
+            pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : tangent, "mid" : rz(cx + rfc * mid[0], -def.k + rfc * mid[1]) }, { "p" : rz(def.dk / 2, Z) }];
+        }
         if (kind == HEAD_RAISED_COUNTERSUNK && def.f > EPS)
         {
             const big = (def.dk * def.dk / 4 + def.f * def.f) / (2 * def.f);
@@ -880,6 +896,8 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isLength(definition.re, LENGTH_0);
         annotation { "Name" : "Undercut head" }
         isInteger(definition.undercut, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Countersink fillet" }
+        isInteger(definition.cskFillet, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "Indented head" }
         isInteger(definition.indent, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "Type I corner distance" }
@@ -1099,6 +1117,14 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         isLength(definition.rb, LENGTH_0);
         annotation { "Name" : "Drill depth" }
         isLength(definition.dd, LENGTH_0);
+        annotation { "Name" : "Top chamfer diameter" }
+        isLength(definition.dt, LENGTH_0);
+        annotation { "Name" : "Countersink on top" }
+        isInteger(definition.cskTop, { (unitless) : [0, 1, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Collar bore" }
+        isLength(definition.cb, LENGTH_0);
+        annotation { "Name" : "Collar bore depth" }
+        isLength(definition.cd, LENGTH_0);
     }
     {
         const form = definition.form;
@@ -1111,7 +1137,7 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         const dw = definition.dw > EPS ? definition.dw : definition.s;
         // (Live's ANSI square machine screw nut has none: angle 0.)
         if (definition.ca > 0)
-            cornerChamferAngle(context, id + "chamfer", body, z0, bodyTop - z0, dw, true, definition.both == 1 && z0 <= EPS, definition.ca * degree);
+            cornerChamferAngle(context, id + "chamfer", body, z0, bodyTop - z0, dw, definition.dt > EPS ? definition.dt : dw, true, definition.both == 1 && z0 <= EPS, definition.ca * degree);
         if (z0 > EPS)
             cylinderZ(context, id + "flange", Z, z0 + EPS, definition.dc / 2);
         if (form == NUT_CASTLE)
@@ -1139,7 +1165,17 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         else if (form == NUT_CAP)
             // The domed cap (diameter de) from w up to the overall height m.
             revolveProfile(context, id + "cap", roundHead(definition.de / 2, definition.m - bodyTop + EPS, definition.de / 2, bodyTop - EPS));
-        if (form == NUT_INSERT)
+        if (form == NUT_INSERT && definition.cb > EPS)
+        {
+            // Live's ANSI nylon insert lock nuts: the collar (diameter de)
+            // from w to m, its top outer edge rounded 0.2 (m - w); the
+            // hole cut below bores it out (cb, cd deep).
+            const rc = definition.de / 2;
+            const rr = (definition.m - bodyTop) * 0.2;
+            revolveProfile(context, id + "collar", [{ "p" : rz(Z, bodyTop - EPS) }, { "p" : rz(rc, bodyTop - EPS) }, { "p" : rz(rc, definition.m - rr) },
+                        { "p" : rz(rc - rr, definition.m), "mid" : rz(rc - rr + rr * cos(45 * degree), definition.m - rr + rr * sin(45 * degree)) }, { "p" : rz(Z, definition.m) }]);
+        }
+        else if (form == NUT_INSERT)
             // The collar holding the insert (diameter de) up to h... m.
             cylinderZ(context, id + "collar", bodyTop - EPS, definition.m, definition.de / 2);
         if (form == NUT_WELD && definition.h > EPS)
@@ -1157,8 +1193,21 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
             const rd = definition.d / 2;
             const cut = rd - rh;
             // A cap nut's hole is drilled dd deep with a 118 degree tip.
-            const top = form == NUT_CAP && definition.dd > EPS ? [{ "p" : rz(rh, definition.dd) }, { "p" : rz(Z, definition.dd + rh / tan(59 * degree)) }] :
-                [{ "p" : rz(rh, definition.m - cut) }, { "p" : rz(rd + EPS, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
+            var top = [{ "p" : rz(rh, definition.m - cut) }, { "p" : rz(rd + EPS, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
+            if (form == NUT_CAP && definition.dd > EPS)
+                top = [{ "p" : rz(rh, definition.dd) }, { "p" : rz(Z, definition.dd + rh / tan(59 * degree)) }];
+            else if (form == NUT_INSERT && definition.cb > EPS)
+            {
+                // The collar's bore (cb) down to its floor (cd deep, else
+                // the hex top), the countersink on the floor; a bore
+                // narrower than d cuts the countersink short.
+                const zf = definition.cd > EPS ? definition.m - definition.cd : bodyTop;
+                const rb = definition.cb / 2;
+                top = rd < rb ? [{ "p" : rz(rh, zf - cut) }, { "p" : rz(rd, zf) }, { "p" : rz(rb, zf) }, { "p" : rz(rb, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }] :
+                    [{ "p" : rz(rh, zf - cut) }, { "p" : rz(rb, zf - cut + rb - rh) }, { "p" : rz(rb, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
+            }
+            else if (definition.cskTop == 0)
+                top = [{ "p" : rz(rh, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
             subtract(context, id + "holeCut", nutBody, revolveProfile(context, id + "hole", concatenateArrays([[{ "p" : rz(Z, -definition.h - EPS) }, { "p" : rz(rd + EPS, -definition.h - EPS) }, { "p" : rz(rh, -definition.h + cut) }], top])));
         }
         else

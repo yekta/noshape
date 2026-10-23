@@ -3200,8 +3200,8 @@ fn pan_head_tapping_screw_mouth_fillets() {
 /// The remaining ANSI tapping screws (live, behaviours.md "skb (10-22 07:45)"):
 /// #8 tip A face counts as live's geometry files (the 0.002 in mouth fillet
 /// of Type III / VI included: FeatureScript's opFillet is the checked kernel
-/// fillet). Flat countersunk has
-/// no live file: counted as its siblings. Undercut heads stop the 41° cone at the head height with a flat
+/// fillet). Flat countersunk: live's Type VI file (14 faces, its under-head
+/// arc a torus); Slot / Type III counted the same way. Undercut heads stop the 41° cone at the head height with a flat
 /// step; hex heads with a 30° top chamfer, the indent a Ø0.9 s dish; the hex
 /// washer's disc under the hex.
 #[test]
@@ -3210,7 +3210,7 @@ fn remaining_tapping_screws_match_live() {
     // (head type, live's faces).
     type Heads = &'static [(&'static str, usize)];
     let cases: [(&str, Heads); 5] = [
-        ("Flat countersunk head tapping screw", &[("Slot", 8), ("Type III", 17), ("Type VI", 13)]),
+        ("Flat countersunk head tapping screw", &[("Slot", 9), ("Type III", 18), ("Type VI", 14)]),
         ("Flat undercut countersunk head tapping screw", &[("Slot", 9), ("Type III", 18)]),
         ("Oval undercut countersunk head tapping screw", &[("Slot", 9), ("Type III", 18)]),
         ("Hex head tapping screw", &[("Plain", 16), ("Indent", 18), ("Slot", 20), ("Slot and indent", 24), ("Type VI", 27)]),
@@ -3230,9 +3230,10 @@ fn remaining_tapping_screws_match_live() {
             let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
             assert!(failed.is_empty(), "{name} {head}: {failed:?}");
             let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
-            // Flat countersunk has no live file; its smaller Type VI (Ø0.132 in)
-            // has lobes too tight for OCCT's 0.002 in mouth fillet: 12 or 13.
-            let unproven = name == "Flat countersunk head tapping screw" && *head == "Type VI" && body.faces.len() == 12;
+            // Flat countersunk Type VI: live's 14 (behaviours "skb (10-23
+            // 03:30)") has the mouth fillet, which OCCT can't make on this
+            // smaller Ø0.132 in recess yet: 13.
+            let unproven = name == "Flat countersunk head tapping screw" && *head == "Type VI" && body.faces.len() == 13;
             if body.faces.len() != *faces && !unproven {
                 wrong.push(format!("{name} {head}: {} faces, live {faces}", body.faces.len()));
             }
@@ -3381,7 +3382,7 @@ fn type_ia_recipe_regenerates_on_every_head() {
 
 /// ANSI nuts and spring lock washers built from Onshape's own tables
 /// (dom/skb-sc-comp) as live's B-rep (dom/skb-sc-geom, default size): face
-/// types and total area (m²).
+/// types and total area (m²); lock nuts at live's smallest and largest size.
 #[test]
 fn ansi_nuts_and_lock_washers_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
@@ -3395,9 +3396,24 @@ fn ansi_nuts_and_lock_washers_match_live() {
         ("Regular spring lock washer", &[("Cone", 2), ("Cylinder", 2), ("Plane", 2), ("Torus", 4)], 2.515125e-5),
         ("High collar spring lock washer", &[("Cone", 2), ("Cylinder", 2), ("Plane", 2), ("Torus", 4)], 2.258067e-5),
     ];
-    for (name, kinds, live_area) in cases {
+    // Lock nuts at the sizes live captured (their default bodies are placeholders).
+    let sized: [(&str, &str, Case); 6] = [
+        ("Hex lock nut", "#4-40", ("", &[("Cone", 8), ("Cylinder", 1), ("Plane", 8)], 1.082215e-4)),
+        ("Hex lock nut", "4-4", ("", &[("Cone", 8), ("Cylinder", 1), ("Plane", 8)], 9.182168e-2)),
+        ("Hex lock nut with nylon insert", "#2-56", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 9), ("Torus", 1)], 1.379852e-4)),
+        ("Hex lock nut with nylon insert", "1-1/2-6", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 8), ("Torus", 1)], 1.237012e-2)),
+        ("Hex thin lock nut with nylon insert", "#4-40", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 9), ("Torus", 1)], 1.659259e-4)),
+        ("Hex thin lock nut with nylon insert", "1-1/2-12", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 9), ("Torus", 1)], 1.464824e-2)),
+    ];
+    let all = cases.iter().map(|(n, k, a)| (*n, None, *k, *a)).chain(sized.iter().map(|(n, size, (_, k, a))| (*n, Some(*size), *k, *a)));
+    for (name, size, kinds, live_area) in all {
         let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
-        let r = standard::regenerate(&StandardSpec::new(c)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let mut spec = StandardSpec::new(c);
+        if let Some(size) = size {
+            spec.set_size(size);
+        }
+        let name = format!("{name} {}", spec.size);
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name}: {e}"));
         let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
         let mut got: std::collections::BTreeMap<String, usize> = Default::default();
         let mut area = 0.0;

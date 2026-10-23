@@ -997,7 +997,7 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   New: ANSI hex / heavy hex flat (+ jam) nuts, hex machine screw nut, square / heavy square / square machine
   screw nut, hex / thick / heavy hex slotted nuts, hex lock nut, nylon insert lock nut, acorn high / low crown
   nuts, hardened structural washer, regular / heavy-duty / extra-duty / high collar spring lock washers.
-  Catalogue 205 → 242 components; report 159 → 96 problems.
+  Catalogue 205 → 243 components; report 159 → 95 problems.
 * Geometry from live's B-rep (dom/skb-sc-geom; `gen/brep.py <pattern>` dumps one): ANSI nuts have the hole at the
   minor diameter (`dh`) with 90° countersinks to the major on both faces; 30° corner chamfers (`ca` 25 on square
   nuts, 0 on the square machine screw nut; flat nuts the top only); slotted nuts' slots end in half cylinders
@@ -1006,10 +1006,16 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   Spring lock washers (form 8): faces sloping 2.5°, rounds (MEAN_WIDTH − BEARING_WIDTH)/2 as profile arcs
   (`roundedProfile`: exact tori; opFillet gave B-spline patches), split THICKNESS/2. Test
   `ansi_nuts_and_lock_washers_match_live` pins face types and total areas (live's to 0.1 %).
+* Lock nuts (live's real-size captures; their "default" bodies are config placeholders): Hex lock nut = a 30°
+  conical top from the major diameter (`dt`), countersunk below only (`cskTop` 0); nylon insert nuts = the hex to
+  HEIGHT, a collar as wide as the flats to OVERALL_HEIGHT rounded 0.2 of its height, bored 0.75 s to the hex top
+  (thin: 0.7 s, 0.345 of the collar deep; `cb`, `cd`). Both sizes of each pinned in the test.
+* Flat countersunk tapping screw (live Type VI file, 14 faces): the cone runs at 41° from the head edge and an arc
+  tangent to it and the shank ends at the head height on the shank (`cskFillet`; radius from the tangencies,
+  0.0398 in at #8). Its Type VI mouth fillet still fails in OCCT on the Ø0.132 recess (13 faces, test allows it).
 * Deviations left: our kernel reports the acorn's spindle torus (negative major radius) as a surface of revolution
-  (kern); live's acorn 1/4 hex measures 0.438 where its table says 0.4375 (0.1 % area). The two lock nuts' live
-  default bodies are 1 in placeholders (re-capture asked). ISO 7380's head uses HEAD_TOP_DIA (no rule yet).
+  (kern); live's acorn 1/4 hex measures 0.438 where its table says 0.4375 (0.1 % area). ISO 7380's head uses HEAD_TOP_DIA (no rule yet).
 * Waiting on live (REQUESTS "skb (10-23 06:30)"): toothed lock washers, retaining rings, PEM® (44), NAS (6),
-  T-slot nut, askew head bolt, thin nylon lock nut, keys; DIN 7050/7051/967 recesses, DIN 6908 height, taper and
+  T-slot nut, askew head bolt, keys (PART 2 with every /features expression after 16:52 UTC); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
   slotted spring pins (no live table). The face-type/area diagnostic is /root/skb-scratch/zz_live_face_types.rs
   (paste into assembly/tests.rs to run; reads the live captures directly).
