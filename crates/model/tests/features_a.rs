@@ -1064,3 +1064,118 @@ fn hole_merge_scope_as_live() {
     assert!(t.ps.features.iter().find(|f| f.id == h).unwrap().params.bool("legacyAllParts"));
     t.ok();
 }
+
+/// Live L40/L42: instances off the part. A face pattern fails "Pattern
+/// could not be created on the same part." and makes no part; a Feature
+/// pattern (Reapply off) skips an off-part instance silently and fails when
+/// every instance is off.
+#[test]
+fn pattern_instances_off_the_part_as_live() {
+    let pocket = PI * 0.003f64.powi(2) * 0.005;
+    let v0 = 0.1 * 0.02 * 0.01;
+    // Face pattern of the pocket, instance 2 at x = 105 (off the 100 mm block).
+    let mut t = T::new();
+    let (_, _, cut) = pocket_setup(&mut t);
+    let res = t.ok();
+    let body = &res.context.bodies[0];
+    let faces: Vec<Reference> = body.faces.iter().filter(|n| n.creator() == Some(cut)).map(|n| Reference::Face((**n).clone())).collect();
+    t.add("linearPattern", &[("patternType", en("FACE")), ("faces", q(faces)), ("directionOne", q(vec![x_axis_dir()])), ("distance", e("95 mm")), ("instanceCount", e("2"))]);
+    let res = t.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    assert_eq!(st.message.as_deref(), Some("Pattern could not be created on the same part."));
+    assert!(st.faulty.is_empty());
+    assert_eq!(res.context.bodies.len(), 1);
+    // Feature pattern, 50 mm × 3: x = 60 cut, x = 110 off the part, silently.
+    let mut t = T::new();
+    let (_, _, cut) = pocket_setup(&mut t);
+    t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(cut)])), ("directionOne", q(vec![x_axis_dir()])), ("distance", e("50 mm")), ("instanceCount", e("3"))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    assert!(near(v0 - total_volume(&res.context), 2.0 * pocket, 1e-3));
+    // Toward −x every instance is off the part: an error.
+    let lp = t.ps.features.last().unwrap().id;
+    t.set(lp, "distance", e("20 mm"));
+    t.set(lp, "instanceCount", e("2"));
+    t.set(lp, "oppositeDirection", b(true));
+    let res = t.regen();
+    assert_eq!(res.display.features.last().unwrap().status, FeatureStatus::Error);
+    assert_eq!(res.context.bodies.len(), 1);
+}
+
+/// linearPattern.fs / circularPattern.fs: skipping the seed (index 0) or an
+/// index past the count is an info, the seed's first.
+#[test]
+fn pattern_skip_instance_infos() {
+    let msg = |items: Vec<i64>| -> Option<String> {
+        let mut t = T::new();
+        let (_, _, cut) = pocket_setup(&mut t);
+        let rows = items
+            .iter()
+            .map(|i| {
+                let mut v = ParamValues::default();
+                v.set("index1", e(&i.to_string()));
+                v.set("index2", e("0"));
+                v
+            })
+            .collect();
+        t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(cut)])), ("directionOne", q(vec![x_axis_dir()])), ("distance", e("20 mm")), ("instanceCount", e("3")), ("skipInstances", b(true)), ("skippedInstances", ParamValue::Array(rows))]);
+        let r = t.regen();
+        let st = r.display.features.last().unwrap();
+        (st.status == FeatureStatus::Info).then(|| st.message.clone().unwrap_or_default())
+    };
+    assert_eq!(msg(vec![1]), None);
+    assert_eq!(msg(vec![5]).as_deref(), Some("Index is outside patterned instance count."));
+    assert_eq!(msg(vec![5, 0]).as_deref(), Some("Original pattern instance will not be skipped."));
+}
+
+/// path.fs / curvePattern.fs: the path starts at the end nearer the seed
+/// (a line drawn the other way gives the same instances), and a start away
+/// from the seed gives the info.
+#[test]
+fn curve_pattern_start_as_fs() {
+    let run = |a: (f64, f64), b2: (f64, f64)| {
+        let mut t = T::new();
+        let (_, x) = t.block(0.0, 0.0, 0.01, 0.01, "10 mm");
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(a.0, a.1), DVec2::new(b2.0, b2.1));
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        t.add("curvePattern", &[("entities", q(vec![body_ref(&BodyId { feature: x, index: 0 })])), ("edges", q(vec![Reference::SketchEntity { sketch: s, entity: l.0 }])), ("instanceCount", e("5"))]);
+        let res = t.regen();
+        let st = res.display.features.last().unwrap().clone();
+        let maxx = res.context.bodies.iter().map(|b| b.shape.bounding_box(true).unwrap().max.x).fold(0.0, f64::max);
+        (st.status, st.message, maxx)
+    };
+    let (st, msg, maxx) = run((0.1, 0.0), (0.0, 0.0));
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!((maxx - 0.11).abs() < 1e-6, "{maxx}");
+    let (st, msg, _) = run((0.05, 0.0), (0.15, 0.0));
+    assert_eq!(st, FeatureStatus::Info);
+    assert_eq!(msg.as_deref(), Some("For best results ensure that the path start point and pattern seed are touching."));
+}
+
+/// hole.fs HOLE_TAP_TOO_DEEP: a tapped depth past the hole's depth in the
+/// part is an info.
+#[test]
+fn hole_tapped_depth_readjusted_info() {
+    let msg = |tapped: &str| -> Option<String> {
+        let mut t = T::new();
+        let (s, p) = hole_block(&mut t);
+        t.add(
+            "hole",
+            &[
+                ("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p }])),
+                ("unitsSystem", en("METRIC")),
+                ("isoHoleTableEx", ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M6".into(), "1.00 mm (Coarse)".into(), "None".into()])),
+                ("showTappedDepth", b(true)),
+                ("holeDepthV3", e("8 mm")),
+                ("tappedDepthV3", e(tapped)),
+            ],
+        );
+        let r = t.regen();
+        let st = r.display.features.last().unwrap();
+        (st.status == FeatureStatus::Info).then(|| st.message.clone().unwrap_or_default())
+    };
+    assert_eq!(msg("6 mm"), None);
+    assert_eq!(msg("9 mm").as_deref(), Some("Tapped depth readjusted. Tapped depth input is greater than minimum computed Hole depth. Learn more"));
+}
