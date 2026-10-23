@@ -50,9 +50,24 @@ the error-string table's.
 | 23 | Mate's geometry gone, instance kept (MT9) | "Mate cannot resolve mate connectors." (part deleted: row 28) | same | ✅ |
 
 ## Mates (dialogs, defaults, DOF)
-Fastened and Revolute: see workflow-mates.md (MT1–MT9). Slider, Planar, Cylindrical, Pin slot, Ball, Parallel,
-Tangent, Width: ? (dialog dumps requested).
+Live dumps dom/dialog-mate-{type}-{empty,filled}.txt (10-22 20:30) and the DOF table (behaviours "E9 / E15 / E16 / DOF").
+
+| # | Item | Onshape | Ours (before) | Status |
+|---|---|---|---|---|
+| M1 | Rows per type | Slider / Planar / Revolute: Offset, Limits; Cylindrical / Ball: Limits (no Offset); Pin slot: Offset, Limits; Parallel: Limits; Fastened: Offset; Tangent: two "Face, edge or vertex" + ☑ Tangent propagation; Width: "Tab mate connector(s)", "Width mate connectors" ("Simulation connection" excluded: cloud/simulation) | same rows; Tangent / Width field labels differed | 🔧 (row 26–27) |
+| M2 | Bottom row | flip, Reorient secondary axis, Animate mate degree of freedom, Solve ("Solve full assembly") for all but Tangent (flip only) and Width (none: a 22 px row with ?) | all four for every type; Solve "Solve all mates including this one" | 🔧 |
+| M3 | Type dropdown order | Slider, Cylindrical, Revolute, Pin slot, Planar, Ball, Fastened, Parallel | same | ✅ |
+| M4 | DOF / Animate chooser order | ⟳ z first, then ↹ x, y, z; no Animate for Ball / Fastened (context menu) | translations first; Animate on Ball | 🔧 (row 30) |
+| M5 | Tooltips | title = name (or the error), "Mate type", query label = its label, chips "<label> (Click to edit)" / "Delete <label>" | partly | 🔧 (row 32) |
 
 ## Relations, patterns, Replicate, Group, Insert
-? (dialog dumps requested); Group and Insert dialogs: dom/dialog-assembly-group.txt, dialog-assembly-insert.txt
-(compared in earlier passes, A-items in workflow-assembly.md).
+Live dumps dom/dialog-relation-*, dom/dialog-asm-*, dom/dialog-assembly-group.txt.
+
+| # | Item | Onshape | Ours (before) | Status |
+|---|---|---|---|---|
+| R1 | Relation dialog | Relation type ▾ (tooltip "Relation type"), Mate(s), value ("Relation ratio" 1 / "Distance per revolution" 25 mm), ☐ Reverse direction; chips "⟳ - z - Revolute 1" with "Delete …" ×; title tooltip = name | no type tooltip, chips without × or tooltip, title tooltip only on error | 🔧 |
+| P1 | Linear / Circular pattern | Instances, Direction / Axis of pattern (+ "Select mate connector (ctrl+m)"), Distance 25 mm / Angle 360 deg, Instance count 2, Equal spacing, Centered, (linear) Second direction; empty: title + Instances tooltip "Select one or more instances." | no connector-button tooltip, chips without tooltip / ×, empty Instances label tooltip | 🔧 |
+| P2 | Mirror | Instances to mirror, Mirror plane, [Mirror strategy…] (tooltip "Select how instances are mirrored.") | + a "Create mirrored (opposite-handed) parts" checkbox live doesn't have | ✗ (what Mirror strategy… opens asked: REQUESTS "skb (10-23 14:30)") |
+| P3 | Replicate | Instances, Mate to be matched, Face match scope ▾ ("Match faces in parts"), Parts to find match in; errors as the field's tooltip ("A target scope must be selected.", then "Missing mate to be matched.") | no scope tooltip, errors only in the title | 🔧 |
+| P4 | Part pattern | no such tool in an assembly (tool search "pattern": linear / circular only) | Part pattern dialog kind exists (not offered) | ✅ |
+| G1 | Group dialog | 220 px, "Group 1", Instances, ✓ at 0.2 while empty, "Nothing selected." | panel "Group" | 🔧 (row 31) |

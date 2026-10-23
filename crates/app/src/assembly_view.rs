@@ -4500,13 +4500,41 @@ impl AssemblyView {
             .enumerate()
             .filter_map(|(slot, id)| {
                 let m = self.assembly(cx)?.mate(id?)?;
-                Some(crate::os_ui::query_row(SharedString::from(format!("rel-mate-{slot}")), noshape_ops::assembly::relation_mate_label(kind, slot, m.mate_type, &m.name)).into_any_element())
+                let label = noshape_ops::assembly::relation_mate_label(kind, slot, m.mate_type, &m.name);
+                // Live (dom/dialog-relation-*-filled): the chip's tooltip is its
+                // label, the × "Delete <label>" empties that slot.
+                Some(
+                    crate::os_ui::query_row(SharedString::from(format!("rel-mate-{slot}")), label.clone())
+                        .tooltip(crate::ui::tooltip(label.clone()))
+                        .child(
+                            div()
+                                .id(SharedString::from(format!("rel-mate-x-{slot}")))
+                                .px(px(5.))
+                                .text_size(px(16.67))
+                                .text_color(gpui_kit::rgb(0x666666))
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip(format!("Delete {label}")))
+                                .child("×")
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    if let Some(r) = &mut this.relation {
+                                        if slot == 0 {
+                                            r.a = None;
+                                        } else {
+                                            r.b = None;
+                                        }
+                                    }
+                                    cx.notify();
+                                })),
+                        )
+                        .into_any_element(),
+                )
             })
             .collect();
         let value = crate::os_ui::param_row(noshape_ops::assembly::relation_value_label(kind), crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.));
         let body = v_flex()
             .pb(px(2.))
-            .child(div().px(px(3.)).pt(px(5.)).child(select))
+            .child(div().id("rel-type").px(px(3.)).pt(px(5.)).tooltip(crate::ui::tooltip("Relation type")).child(select))
             // The Mate(s) field is active while the dialog is open.
             .child(div().px(px(3.)).pt(px(5.)).child(crate::os_ui::query_box("rel-mates", "Mate(s)", true, rows)))
             .child(div().h(px(5.)))
@@ -4539,8 +4567,8 @@ impl AssemblyView {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(if valid { pal.text } else { pal.text_invalid })
                             .truncate()
-                            .child(name)
-                            .when_some(title_tip, |d, t| d.tooltip(crate::ui::tooltip(t))),
+                            .tooltip(crate::ui::tooltip(title_tip.unwrap_or_else(|| name.clone())))
+                            .child(name),
                     )
                     .child(
                         div()

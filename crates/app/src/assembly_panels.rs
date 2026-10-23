@@ -1210,9 +1210,50 @@ impl AssemblyView {
         let Some(s) = &self.pattern else { return div().into_any_element() };
         let kind = s.kind;
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let seed_rows: Vec<AnyElement> = s.seeds.iter().filter_map(|i| names.get(i).cloned()).enumerate().map(|(k, n)| os::query_row(SharedString::from(format!("pat-seed-{k}")), n).into_any_element()).collect();
+        // Live (dom/dialog-asm-*-filled): a chip's tooltip is its label; its ×
+        // ("Delete <label>") removes it.
+        let chip = |id: SharedString, label: String, cx: &mut Context<Self>, remove: Box<dyn Fn(&mut Self)>| -> AnyElement {
+            os::query_row(id.clone(), label.clone())
+                .tooltip(crate::ui::tooltip(label.clone()))
+                .child(
+                    div()
+                        .id(SharedString::from(format!("{id}-x")))
+                        .px(px(5.))
+                        .text_size(px(16.67))
+                        .text_color(rgb(0x666666))
+                        .cursor_pointer()
+                        .tooltip(crate::ui::tooltip(format!("Delete {label}")))
+                        .child("×")
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            remove(this);
+                            this.update_pattern_preview(cx);
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        };
+        let seed_rows: Vec<AnyElement> = s
+            .seeds
+            .iter()
+            .filter_map(|i| names.get(i).cloned().map(|n| (*i, n)))
+            .enumerate()
+            .map(|(k, (id, n))| {
+                chip(
+                    SharedString::from(format!("pat-seed-{k}")),
+                    n,
+                    cx,
+                    Box::new(move |this: &mut Self| {
+                        if let Some(p) = &mut this.pattern {
+                            p.seeds.retain(|x| *x != id);
+                        }
+                    }),
+                )
+            })
+            .collect();
         let instances_label = if kind == PatternDialogKind::Mirror { "Instances to mirror" } else { "Instances" };
-        let instances = os::query_box("pat-instances", instances_label, s.active.is_none(), seed_rows).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+        let seeds_tip = s.seeds.is_empty().then(|| SharedString::from("Select one or more instances."));
+        let instances = os::query_box_tip("pat-instances", instances_label, seeds_tip, s.active.is_none(), seed_rows).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
             if let Some(p) = &mut this.pattern {
                 p.active = None;
             }
@@ -1220,7 +1261,27 @@ impl AssemblyView {
             cx.notify();
         }));
         let axis_box = |this: &Self, id: &'static str, value: &Option<MateConnectorRef>, label: &'static str, field: usize, cx: &mut Context<Self>| {
-            let rows: Vec<AnyElement> = value.as_ref().map(|c| vec![os::query_row(SharedString::from(format!("{id}-v")), (this.labeler(cx))(c)).into_any_element()]).unwrap_or_default();
+            let rows: Vec<AnyElement> = value
+                .as_ref()
+                .map(|c| {
+                    let label = (this.labeler(cx))(c);
+                    vec![chip(
+                        SharedString::from(format!("{id}-v")),
+                        label,
+                        cx,
+                        Box::new(move |this: &mut Self| {
+                            if let Some(p) = &mut this.pattern {
+                                if field == 0 {
+                                    p.axis = None;
+                                } else {
+                                    p.axis2 = None;
+                                }
+                                p.active = Some(field);
+                            }
+                        }),
+                    )]
+                })
+                .unwrap_or_default();
             let active = this.pattern.as_ref().is_some_and(|p| p.active == Some(field));
             h_flex()
                 .gap(px(3.))
@@ -1233,7 +1294,7 @@ impl AssemblyView {
                     cx.notify();
                 }))))
                 // The query takes mate connectors: Onshape's mate connector button.
-                .child(div().flex_none().size(px(24.)).flex().items_center().justify_center().child(crate::assets::icon("mate-connector", 18., cx)))
+                .child(div().id(SharedString::from(format!("{id}-mc"))).flex_none().size(px(24.)).flex().items_center().justify_center().tooltip(crate::ui::tooltip("Select mate connector (ctrl+m)")).child(crate::assets::icon("mate-connector", 18., cx)))
         };
         let regen_error = self.pattern_regen_error(s, cx);
         // Live E13: a bad count leaves the title black (the field is pink).
@@ -1346,6 +1407,7 @@ impl AssemblyView {
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .child(crate::assets::icon("part-studio", 18., cx))
+                            .tooltip(crate::ui::tooltip("Select how instances are mirrored."))
                             .child(div().text_size(px(13.33)).child("Mirror strategy…")),
                     )
                     .child(os::checkbox("mir-handed", "Create mirrored (opposite-handed) parts", handed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -1357,7 +1419,10 @@ impl AssemblyView {
             }
             PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {
                 let mate_rows: Vec<AnyElement> = s.mate.and_then(|m| self.assembly(cx).and_then(|a| a.mate(m).map(|x| x.name.clone()))).map(|n| vec![os::query_row("pat-mate-v", n).into_any_element()]).unwrap_or_default();
-                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box("pat-mate", "Mate to be matched", false, mate_rows)));
+                // Live: once the target scope is set, a missing mate is this
+                // field's error (its label's tooltip).
+                let mate_tip = (kind == PatternDialogKind::Replicate && !s.scope_refs.is_empty() && s.mate.is_none()).then(|| SharedString::from("Missing mate to be matched."));
+                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("pat-mate", "Mate to be matched", mate_tip, false, mate_rows)));
                 if kind == PatternDialogKind::Replicate {
                     // Live ("qa5 assembly" 5, help: Replicate 6–7): the match
                     // scope, then "Parts to find match in" (red while empty).
@@ -1367,7 +1432,7 @@ impl AssemblyView {
                     let current = options.iter().position(|o| *o == scope).unwrap_or(0);
                     let opts = options.to_vec();
                     let view = cx.entity().downgrade();
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::select_field("rep-scope", opts.iter().map(|o| o.label().to_string()).collect(), current, move |i, _, cx| {
+                    body = body.child(div().id("rep-scope-field").px(px(3.)).pt(px(5.)).tooltip(crate::ui::tooltip("Face match scope")).child(os::select_field("rep-scope", opts.iter().map(|o| o.label().to_string()).collect(), current, move |i, _, cx| {
                         let Some(o) = opts.get(i).copied() else { return };
                         if let Some(v) = view.upgrade() {
                             v.update(cx, |this, cx| {
@@ -1400,7 +1465,8 @@ impl AssemblyView {
                         .collect();
                     let active = s.active == Some(2);
                     // Live (qa5 A19): empty, the field is red (label and border).
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box("rep-parts", "Parts to find match in", active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid).border_color(pal.error)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    let scope_tip = s.scope_refs.is_empty().then(|| SharedString::from("A target scope must be selected."));
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", "Parts to find match in", scope_tip, active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid).border_color(pal.error)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }
@@ -1459,7 +1525,8 @@ impl AssemblyView {
                             .text_color(if valid || count_error { pal.text } else { pal.text_invalid })
                             .truncate()
                             .child(s.name.clone())
-                            .when_some(title_tip, |d, t| d.tooltip(crate::ui::tooltip(t))),
+                            // Live: the name, or the regeneration error.
+                            .tooltip(crate::ui::tooltip(title_tip.unwrap_or_else(|| s.name.clone()))),
                     )
                     .child(
                         div()
