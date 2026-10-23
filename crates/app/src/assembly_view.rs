@@ -471,7 +471,13 @@ impl AssemblyView {
         // anything the document changes renders it again.
         subs.push(cx.observe(&doc, |_, _, cx| cx.notify()));
         // Theming › Dark mode re-sets the graphics preferences: rebuild in the new colors.
-        subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| this.rebuild_scene(false, cx)));
+        subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| {
+            // The perspective field of view follows the preference, as in
+            // the Part Studio.
+            let fov = (crate::graphics_prefs::get(cx).fov_deg as f64).to_radians();
+            this.viewport.update(cx, |vp, _| vp.camera.fov_y = fov);
+            this.rebuild_scene(false, cx);
+        }));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             // Any tab can affect an assembly (Part Studios, sub-assemblies).
             DocEvent::TabChanged(t) => {
@@ -5035,12 +5041,6 @@ impl AssemblyView {
                             })
                         })
                     }))
-                    // Right-click › Set as default: new graphics areas start so.
-                    .set_default(move |_, _, cx| {
-                        let mut d = crate::view_defaults::get(cx);
-                        d.perspective = perspective;
-                        crate::view_defaults::set(d, cx);
-                    })
                     .item(crate::os_menu::OsMenuItem::new("Show mates").checked(show_mates).on_click(move |_, _, cx| {
                         v3.update(cx, |this, cx| {
                             this.show_mates = !this.show_mates;
