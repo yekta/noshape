@@ -1039,3 +1039,70 @@ fn per_tab_undo_and_tab_deletion() {
     let r = doc.restore_with_description(main, with_b, "Restore").unwrap();
     assert!(doc.manifest(r).unwrap().contains_key("tab/b"));
 }
+
+/// `path` with a SQLite side-file suffix ("-wal", "-shm", "-wal.stale").
+fn side(path: &std::path::Path, suffix: &str) -> PathBuf {
+    let mut p = path.as_os_str().to_owned();
+    p.push(suffix);
+    PathBuf::from(p)
+}
+
+#[test]
+fn foreign_side_files_are_moved_aside_on_open() {
+    // qa4: a document next to the -wal/-shm of an earlier file with the same
+    // name panicked with "unknown branch".
+    let dir = TempDir::new();
+    let path = dir.file("doc.noshape");
+    {
+        let mut d = Document::create(&path, &[("tab/a", b"mine".as_slice())]).unwrap();
+        let main = d.default_branch().unwrap();
+        d.commit(main, &[("tab/a", Some(b"mine-v2".as_slice()))], "edit").unwrap();
+    }
+    assert!(!side(&path, "-wal").exists(), "a clean close leaves no log");
+    // Another document, mid-session: its log holds a commit whose older
+    // blobs are only in that document's own file.
+    let other = dir.file("other.noshape");
+    drop(Document::create(&other, &[("tab/x", vec![7u8; 40_000])]).unwrap());
+    {
+        let mut o = Document::open(&other).unwrap();
+        let b = o.default_branch().unwrap();
+        o.commit(b, &[("tab/y", Some(vec![9u8; 30_000]))], "w").unwrap();
+        std::fs::copy(side(&other, "-wal"), side(&path, "-wal")).unwrap();
+        std::fs::copy(side(&other, "-shm"), side(&path, "-shm")).unwrap();
+    }
+    // Read with that log, the document doesn't hold together…
+    assert!(Document::open_read_only(&path).and_then(|d| d.probe()).is_err());
+    // …so opening sets the log aside (kept as *.stale) and reads its own content.
+    let d = Document::open(&path).unwrap();
+    let head = d.head(d.default_branch().unwrap()).unwrap();
+    assert_eq!(d.read_all(head).unwrap()["tab/a"], b"mine-v2");
+    assert!(side(&path, "-wal.stale").exists());
+}
+
+#[test]
+fn a_log_that_belongs_to_the_document_is_kept() {
+    // An open session's log (another handle still has it open) is the
+    // document's own: nothing is moved.
+    let dir = TempDir::new();
+    let path = dir.file("doc.noshape");
+    let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+    let main = d.default_branch().unwrap();
+    d.commit(main, &[("tab/a", Some(b"two".as_slice()))], "edit").unwrap();
+    assert!(side(&path, "-wal").exists());
+    let again = Document::open(&path).unwrap();
+    let head = again.head(again.default_branch().unwrap()).unwrap();
+    assert_eq!(again.read_all(head).unwrap()["tab/a"], b"two");
+    assert!(!side(&path, "-wal.stale").exists());
+}
+
+#[test]
+fn creating_over_leftover_side_files_moves_them_aside() {
+    let dir = TempDir::new();
+    let path = dir.file("doc.noshape");
+    std::fs::write(side(&path, "-wal"), b"left from an earlier file").unwrap();
+    std::fs::write(side(&path, "-shm"), b"left too").unwrap();
+    let d = Document::create(&path, &[("tab/a", b"new".as_slice())]).unwrap();
+    let head = d.head(d.default_branch().unwrap()).unwrap();
+    assert_eq!(d.read_all(head).unwrap()["tab/a"], b"new");
+    assert_eq!(std::fs::read(side(&path, "-wal.stale")).unwrap(), b"left from an earlier file");
+}

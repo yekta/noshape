@@ -1423,6 +1423,20 @@ impl AssemblyView {
         };
         v_flex()
             .id("pattern-dialog")
+            // Feature-dialog keys (qa4): Esc on a field cancels the dialog, also
+            // an unedited one; Enter ✓; Tab walks the fields.
+            .key_context("FeatureDialog")
+            .on_action(cx.listener(|_, _: &crate::actions::DialogTab, window, cx| window.focus_next(cx)))
+            .on_action(cx.listener(|_, _: &crate::actions::DialogTabPrev, window, cx| window.focus_prev(cx)))
+            .on_action(cx.listener(move |this, _: &crate::actions::Accept, _, cx| {
+                if valid {
+                    this.accept_pattern(cx);
+                }
+            }))
+            .on_action(cx.listener(move |this, _: &crate::actions::Cancel, window, cx| {
+                close(this, cx);
+                window.focus(&this.focus, cx);
+            }))
             .w(px(220.))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
