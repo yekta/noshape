@@ -11,7 +11,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{AnnotationKind, ViewId};
+use noshape_model::drawing::ViewId;
 
 /// Pushes one highlight segment (from, to, colour, width in px).
 type SegFn = dyn FnMut(&mut noshape_render::LineData, [f64; 2], [f64; 2], [u8; 4], f32);
@@ -54,64 +54,7 @@ impl DrawingEditor {
     /// direction on the sheet, anchor in view coordinates).
     pub fn aux_pick(&mut self) -> Option<(noshape_model::drawing::ViewId, [f64; 2], [f64; 2])> {
         let mode = self.aux_dlg.as_ref().map(|d| d.mode).unwrap_or(0);
-        let c = self.cursor;
-        match mode {
-            // In line: a sheet sketch line or a centerline annotation.
-            1 => {
-                let seg: Option<([f64; 2], [f64; 2])> = self
-                    .sketch_line_at(c)
-                    .or_else(|| self.current_sheet().annotations.iter().find_map(|a| {
-                        let AnnotationKind::Centerline { view, a: pa, b: pb } = &a.kind else { return None };
-                        let pl = self.placement(*view)?;
-                        let (sa, sb) = (pl.to_sheet(*pa), pl.to_sheet(*pb));
-                        (noshape_model::drawing::views::dist_to_segment(c, sa, sb) < self.tol_mm(6.0)).then_some((sa, sb))
-                    }));
-                let (sa, sb) = seg?;
-                let mid = [(sa[0] + sb[0]) / 2.0, (sa[1] + sb[1]) / 2.0];
-                let v = self.view_at(mid)?;
-                let pl = self.placement(v)?;
-                Some((v, unit(sub2(sb, sa)), pl.to_view(mid)))
-            }
-            // Axis: a hole's axis seen side-on (its centerline or a cylinder
-            // silhouette); the view looks down it.
-            2 => {
-                let v = self.view_at(c)?;
-                let pl = self.placement(v)?;
-                let g = self.geoms.get(&v)?;
-                let vp = pl.to_view(c);
-                let tol = self.tol_mm(8.0) / (pl.scale * 1000.0);
-                let axis = g
-                    .axes
-                    .iter()
-                    .copied()
-                    .filter(|a| noshape_model::drawing::views::dist_to_segment(vp, a[0], a[1]) < tol)
-                    .min_by(|a, b| noshape_model::drawing::views::dist_to_segment(vp, a[0], a[1]).total_cmp(&noshape_model::drawing::views::dist_to_segment(vp, b[0], b[1])))
-                    .or_else(|| match self.line_pick() {
-                        Some(Pick::Line { a, b }) => Some([a.p, b.p]),
-                        _ => None,
-                    })?;
-                let (sa, sb) = (pl.to_sheet(axis[0]), pl.to_sheet(axis[1]));
-                let d = unit(sub2(sb, sa));
-                Some((v, [-d[1], d[0]], [(axis[0][0] + axis[1][0]) / 2.0, (axis[0][1] + axis[1][1]) / 2.0]))
-            }
-            // Normal: a straight model edge.
-            _ => {
-                let Some(Pick::Line { a, b }) = self.line_pick() else { return None };
-                let pl = self.placement(a.view)?;
-                Some((a.view, unit(sub2(pl.to_sheet(b.p), pl.to_sheet(a.p))), [(a.p[0] + b.p[0]) / 2.0, (a.p[1] + b.p[1]) / 2.0]))
-            }
-        }
-    }
-
-    /// A straight sheet sketch line near a sheet point.
-    fn sketch_line_at(&self, c: [f64; 2]) -> Option<([f64; 2], [f64; 2])> {
-        let sk = &self.current_sheet().sketch.sketch;
-        sk.entities().find_map(|e| {
-            let noshape_sketch::Geometry::Line { start, end } = e.geometry else { return None };
-            let (a, b) = (sk.point(start)?, sk.point(end)?);
-            let (a, b) = ([a.x, a.y], [b.x, b.y]);
-            (noshape_model::drawing::views::dist_to_segment(c, a, b) < self.tol_mm(6.0)).then_some((a, b))
-        })
+        self.pk().aux_pick(mode)
     }
 
     /// Reference indicator › Edit auxiliary view: the dialog for that view

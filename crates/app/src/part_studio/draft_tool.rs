@@ -225,7 +225,7 @@ impl PartStudioView {
                 .rounded(px(2.))
                 .border_1()
                 .border_color(if active { pal.accent } else { gpui_kit::rgb(0xd7d7d7) })
-                .bg(if active { gpui_kit::rgb(0xdef1fb) } else { gpui_kit::rgb(0xffffff) })
+                .bg(if active { crate::theme::p().query_active } else { gpui_kit::rgb(0xffffff) })
                 .cursor_pointer()
                 .child(div().px(px(6.)).when(empty, |d| d.py(px(6.)).text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(pal.text_muted).child(caption))
                 .children(rows)

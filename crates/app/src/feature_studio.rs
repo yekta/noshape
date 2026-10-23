@@ -1837,20 +1837,23 @@ pub(crate) fn line_styles(src: &str) -> Vec<Vec<(Range<usize>, HighlightStyle)>>
 }
 
 fn tok_style(t: Tok) -> HighlightStyle {
-    let color = |hex: u32| -> Hsla { rgb(hex).into() };
+    let color = |hex: u32| -> Hsla { gpui_kit::rgb_static(hex).into() };
+    // Light: Onshape's FeatureScript editor (Ace's default comment green,
+    // keywords and numbers in plain blue). Dark: Ace twilight as Onshape
+    // computes it (live dom/dark-drawing-fs-vs.json): comments #ccc,
+    // keywords #cda869, strings #8f9d6a, numbers #cf6a4c, variables #7587a6.
+    let dark = gpui_kit::hex_theme_active();
+    let pick = |light: u32, dark_hex: u32| color(if dark { dark_hex } else { light });
     let mut s = HighlightStyle::default();
     match t {
         Tok::Comment => {
-            // Light editor palette (Onshape's FeatureScript editor is light).
-            // Ace's default comment green.
-            s.color = Some(color(0x4c886b));
+            s.color = Some(pick(0x4c886b, 0xcccccc));
             s.font_style = Some(FontStyle::Italic);
         }
-        Tok::String => s.color = Some(color(0x036a07)),
-        Tok::Number => s.color = Some(color(0x0000cd)),
-        // Onshape's editor: keywords and numbers in plain blue.
-        Tok::Keyword => s.color = Some(color(0x0000ff)),
-        Tok::Variable => s.color = Some(color(0x318495)),
+        Tok::String => s.color = Some(pick(0x036a07, 0x8f9d6a)),
+        Tok::Number => s.color = Some(pick(0x0000cd, 0xcf6a4c)),
+        Tok::Keyword => s.color = Some(pick(0x0000ff, 0xcda869)),
+        Tok::Variable => s.color = Some(pick(0x318495, 0x7587a6)),
         Tok::Plain => {}
     }
     s
