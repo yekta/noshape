@@ -1393,7 +1393,7 @@ impl DrawingEditor {
             return;
         }
         let sel = self.sel_at(pick, self.cursor);
-        if self.bg_senary_click(sel, m.shift, cx) {
+        if self.table_cell_click(sel, m.shift, cx) {
             return;
         }
         // Onshape: selection is additive with a plain click (clicking a
