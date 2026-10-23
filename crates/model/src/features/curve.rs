@@ -51,7 +51,8 @@ pub fn helix() -> FeatureType {
         ParamSpec::query1("startPoint", "Start point", QueryFilter::VERTEX | QueryFilter::SKETCH_POINT).visible(move |v| !start_angle(v)),
         ParamSpec::enum_("endType", "End condition", &[("HEIGHT", "Height"), ("END_POINT", "End point")]).hints(Hints::SHOW_LABEL).visible(has_end),
         // Zero height is a flat spiral.
-        ParamSpec::num("height", "Height", NumSpec::positive_length(25.0, 1.0)).visible(move |v| height_end(v) && !axis_ty(v, "SURFACE")),
+        // helix.fs NONNEGATIVE_LENGTH_BOUNDS: 1e-5 m minimum (live L32: 0 is invalid).
+        ParamSpec::num("height", "Height", NumSpec { min: 1e-5, ..NumSpec::positive_length(25.0, 1.0) }).visible(move |v| height_end(v) && !axis_ty(v, "SURFACE")),
         ParamSpec::bool("endRadToggle", "End radius", false)
             .hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW)
             .visible(move |v| height_end(v) && axis_ty(v, "AXIS")),

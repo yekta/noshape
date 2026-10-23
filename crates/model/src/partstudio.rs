@@ -42,13 +42,13 @@ impl Feature {
 
 /// Which rules a studio was saved under: 1, an empty merge scope is an error
 /// unless "Merge with all" is on; 2, a Rib with no Parts is an error (live
-/// L22); 0, older studios.
+/// L22); 3, a Mate connector needs an owner (live L37); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(2)
+        ScopeRule(3)
     }
 }
 
@@ -305,6 +305,12 @@ impl PartStudio {
         if self.scope_rule.0 < 2 {
             for f in self.features.iter_mut().filter(|f| f.type_id == "rib" && f.params.query("parts").is_empty()) {
                 f.params.set("legacyAllParts", ParamValue::Bool(true));
+            }
+        }
+        // Mate connectors without an owner worked before.
+        if self.scope_rule.0 < 3 {
+            for f in self.features.iter_mut().filter(|f| f.type_id == "mateConnector" && f.params.query("ownerPart").is_empty()) {
+                f.params.set("legacyNoOwner", ParamValue::Bool(true));
             }
         }
         self.scope_rule = ScopeRule::default();

@@ -179,8 +179,9 @@ fn mate_connector_on_edge_origin_and_flips() {
     assert!(vnear(c0.origin, DVec3::new(0.05, 0.0, 0.0)), "{:?}", c0.origin);
     assert!(near(c0.z.x.abs(), 1.0, 1e-9), "z along the edge {:?}", c0.z);
     let c1 = &r.context.connectors[1];
-    // Origin X: Z = +X, moved 1 mm along it, then flipped.
-    assert!(vnear(c1.origin, DVec3::new(0.001, 0.0, 0.0)), "{:?}", c1.origin);
+    // Origin X: Z = +X, flipped first, then moved 1 mm along the flipped Z
+    // (live L38: the move goes in the flipped / reoriented frame).
+    assert!(vnear(c1.origin, DVec3::new(-0.001, 0.0, 0.0)), "{:?}", c1.origin);
     assert!(vnear(c1.z, -DVec3::X), "{:?}", c1.z);
     assert!(c1.x.dot(c1.z).abs() < 1e-12);
 }
