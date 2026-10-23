@@ -1663,7 +1663,7 @@ fn sheet_metal_loft_add_bends_onto_the_plate() {
         p.set("booleanScope", q(part));
     });
     let r = s.ok();
-    assert_eq!(r.context.bodies.len(), 1);
+    assert_eq!(r.context.bodies.len(), 1, "{:?}", r.context.bodies.iter().map(|b| (b.kind, b.shape.volume().unwrap_or(0.0) * 1e9, b.faces.len())).collect::<Vec<_>>());
     let b = &r.context.bodies[0];
     assert!(near(volume(&r, 0), 9805.52442264952e-9, 1e-15), "volume {}", volume(&r, 0) * 1e9);
     assert_eq!(b.faces.len(), 14);
