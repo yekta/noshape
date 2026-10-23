@@ -395,7 +395,7 @@ impl PartStudioView {
                         .items_center()
                         .justify_center()
                         .bg(rgb_u32(hex))
-                        .when(on, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(1.), spread_radius: px(0.), inset: false }]).child(crate::ui::glyph("check", 12., gpui_kit::rgb(0xffffff)))),
+                        .when(on, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(1.), spread_radius: px(0.), inset: false }]).child(crate::ui::glyph("check", 12., gpui_kit::rgb_static(0xffffff)))),
                 )
                 .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.set_edit_color(c, w, cx)))
                 .into_any_element()
@@ -622,7 +622,7 @@ impl PartStudioView {
                         .child(div().h(px(19.)).flex_none().px(px(5.)).pt(px(3.)).text_size(px(12.)).line_height(px(13.2)).child(tess_note))
                 })
                 .child(div().flex_1())
-                .child(h_flex().h(px(26.)).flex_none().justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")))
+                .child(h_flex().h(px(26.)).flex_none().justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")))
                 .into_any_element(),
         )
     }

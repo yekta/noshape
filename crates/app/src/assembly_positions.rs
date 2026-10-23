@@ -476,7 +476,7 @@ impl AssemblyView {
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_named_position_row(None, cx))),
                         ),
                     )
-                    .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?"))),
+                    .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?"))),
             )
             .into_any_element()
     }
@@ -580,7 +580,7 @@ impl AssemblyView {
                                     .border_1()
                                     .border_color(if on { rgb(0x1651b0) } else { rgb(0x888888) })
                                     .bg(if on { rgb(0x1651b0) } else { rgb(0xffffff) })
-                                    .when(on, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(rgb(0xffffff)))),
+                                    .when(on, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                             )
                             .child(div().text_size(px(13.33)).text_color(rgb(0x666666)).child(dof_label(ix)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -649,7 +649,7 @@ impl AssemblyView {
                             .child(list),
                     ),
                 )
-                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")))
+                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")))
                 .into_any_element(),
         )
     }

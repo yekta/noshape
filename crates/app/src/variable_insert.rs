@@ -236,7 +236,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                             .rounded(px(3.))
                             .border_1()
                             .border_color(rgb(0xaaaaaa))
-                            .bg(gpui_kit::white())
+                            .bg(crate::theme::p().panel)
                             .child(div().id(SharedString::from(format!("ivs-cfg-open-{id}"))).px(px(5.)).h_full().flex().items_center().child(crate::assets::icon("configuration", 18., cx)).on_click({
                                 let (st, key) = (st.clone(), key.clone());
                                 move |_, window, cx| {
@@ -421,7 +421,7 @@ fn config_box(ctx: &Rows, id: TabId, key: &(Option<std::path::PathBuf>, TabId), 
                 .rounded(px(3.))
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
-                .bg(gpui_kit::white())
+                .bg(crate::theme::p().panel)
                 .cursor_pointer()
                 .hover(|d| d.bg(pal.panel_hover))
                 .text_size(px(14.))
@@ -660,7 +660,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
         let header = h_flex()
             .h(px(28.))
             .flex_none()
-            .bg(gpui_kit::white())
+            .bg(crate::theme::p().panel)
             .border_b_1()
             .border_color(rgb(0xd7d7d7))
             .child(
@@ -713,7 +713,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                 .rounded(px(3.))
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
-                .bg(gpui_kit::white())
+                .bg(crate::theme::p().panel)
                 .child(gpui_kit::component::input::Input::new(&search).appearance(false).text_size(px(13.33)).pl(px(5.))),
         );
         let (doc_e, before_e) = (doc_c.clone(), before_c.clone());

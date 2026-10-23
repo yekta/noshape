@@ -407,7 +407,7 @@ impl PartStudioView {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .when(patterns, |d| d.child(Icon::new(IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb(0xffffff)))),
+                    .when(patterns, |d| d.child(Icon::new(IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
             )
             .child(div().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child("Select patterns"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -501,7 +501,7 @@ impl PartStudioView {
                         .h(px(22.))
                         .pr(px(4.))
                         .justify_end()
-                        .child(div().size(px(14.)).rounded_full().bg(with_alpha(pal.text, 0.55)).flex().items_center().justify_center().text_size(px(10.)).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+                        .child(div().size(px(14.)).rounded_full().bg(with_alpha(pal.text, 0.55)).flex().items_center().justify_center().text_size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)).child("?")),
                 )
                 .into_any_element(),
         )
@@ -523,8 +523,8 @@ impl PartStudioView {
                 .items_center()
                 .text_size(px(13.33))
                 .text_color(gpui_kit::rgb(0x000000))
-                .when(on, |d| d.bg(highlight).text_color(gpui_kit::rgb(0xffffff)))
-                .hover(|d| d.bg(highlight).text_color(gpui_kit::rgb(0xffffff)))
+                .when(on, |d| d.bg(highlight).text_color(gpui_kit::rgb_static(0xffffff)))
+                .hover(|d| d.bg(highlight).text_color(gpui_kit::rgb_static(0xffffff)))
                 .child(*label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(cs) = &mut this.ui.create_selection {

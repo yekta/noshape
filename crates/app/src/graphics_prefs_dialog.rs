@@ -482,7 +482,7 @@ impl Render for GraphicsPrefsDialog {
                                 this.update(|g| *g = GraphicsPrefs::default(), cx);
                             })),
                     )
-                    .child(div().size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")),
+                    .child(div().size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")),
             )
     }
 }

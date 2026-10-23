@@ -842,7 +842,7 @@ impl Render for MateDialog {
                                     .px(px(10.))
                                     .flex()
                                     .items_center()
-                                    .bg(gpui_kit::white())
+                                    .bg(crate::theme::p().panel)
                                     .border_1()
                                     .border_color(gpui_kit::rgb(0xaaaaaa))
                                     .rounded(px(3.5))
@@ -865,7 +865,7 @@ impl Render for MateDialog {
                                     .justify_center()
                                     .text_size(px(10.))
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(gpui_kit::rgb(0xffffff))
+                                    .text_color(gpui_kit::rgb_static(0xffffff))
                                     .child("?"),
                             ),
                     )

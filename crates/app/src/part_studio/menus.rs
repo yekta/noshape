@@ -948,7 +948,7 @@ impl PartStudioView {
                     cx.notify();
                 }))
         };
-        let help = || div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?");
+        let help = || div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?");
         // Onshape's selection box: `#def1fb` with a 1 px `#1651b0` border when
         // active, the caption small on top once something is listed.
         // `invalid`: entries in red (live: parts without a material).

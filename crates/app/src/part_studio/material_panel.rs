@@ -241,7 +241,7 @@ impl PartStudioView {
                     .py(px(2.))
                     .text_size(px(13.33))
                     .cursor_pointer()
-                    .hover(|d| d.bg(gpui_kit::rgb(0x1e90ff)).text_color(gpui_kit::rgb(0xffffff)))
+                    .hover(|d| d.bg(gpui_kit::rgb(0x1e90ff)).text_color(gpui_kit::rgb_static(0xffffff)))
                     .child(n.clone())
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(m) = &mut this.ui.material_panel {
@@ -490,7 +490,7 @@ impl PartStudioView {
                 .child(h_flex().border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).child(tab("mat-tab-lib", !custom, false, cx)).child(tab("mat-tab-custom", custom, true, cx)))
                 .child(div().id("mat-body").flex_1().min_h_0().overflow_y_scroll().child(body))
                 // The dialog's help button at the bottom right (live 14 px, 4 px in).
-                .child(div().absolute().right(px(4.)).bottom(px(4.)).size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?"))
+                .child(div().absolute().right(px(4.)).bottom(px(4.)).size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?"))
                 .into_any_element(),
         )
     }

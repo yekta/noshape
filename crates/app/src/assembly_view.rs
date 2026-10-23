@@ -3857,7 +3857,7 @@ impl AssemblyView {
                     .flex_none()
                     .pl(px(6.))
                     // Live `ns-dialog-header`: white, 1 px `#d7d7d7` under it.
-                    .bg(gpui_kit::white())
+                    .bg(crate::theme::p().panel)
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(match drag {
@@ -3989,7 +3989,7 @@ impl AssemblyView {
                             .rounded(px(4.))
                             .border_1()
                             .border_color(gpui_kit::rgb(0xaaaaaa))
-                            .bg(gpui_kit::white())
+                            .bg(crate::theme::p().panel)
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .text_size(px(14.))
@@ -4021,7 +4021,7 @@ impl AssemblyView {
                             .rounded(px(4.))
                             .border_1()
                             .border_color(gpui_kit::rgb(0xaaaaaa))
-                            .bg(gpui_kit::white())
+                            .bg(crate::theme::p().panel)
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip("Cancel"))
                             .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
@@ -4416,7 +4416,7 @@ impl AssemblyView {
                         .h(px(29.))
                         .flex_none()
                         .pl(px(6.))
-                        .bg(gpui_kit::white())
+                        .bg(crate::theme::p().panel)
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child("Select replacement component"))
@@ -4445,7 +4445,7 @@ impl AssemblyView {
                     .h(px(29.))
                     .flex_none()
                     .pl(px(6.))
-                    .bg(gpui_kit::white())
+                    .bg(crate::theme::p().panel)
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child("Insert parts and assemblies"))
@@ -4663,7 +4663,7 @@ impl AssemblyView {
                     .border_t_1()
                     .border_color(gpui_kit::rgb(0xcccccc))
                     .child(div().flex_1().flex().justify_center().child(crate::variable_insert::panel_footer(self.doc.clone(), self.tab, cx)))
-                    .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+                    .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")),
             )
             .into_any_element()
     }

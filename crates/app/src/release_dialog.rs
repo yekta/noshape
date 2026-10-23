@@ -1967,7 +1967,7 @@ impl Render for ReleaseDialog {
                 .px(px(11.))
                 .rounded(px(3.))
                 .text_size(px(14.))
-                .text_color(gpui_kit::rgb(0xffffff))
+                .text_color(gpui_kit::rgb_static(0xffffff))
                 .bg(gpui_kit::rgb(bg))
                 .when(!enabled, |d| d.opacity(0.5))
                 .when(enabled, |d| d.cursor_pointer())
@@ -2333,7 +2333,7 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                     })
                     .when(e.obsoleted_by.is_none(), |d| {
                         let item = item.clone();
-                        d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(10.)).py(px(4.)).rounded(px(3.)).cursor_pointer().text_size(px(13.)).text_color(gpui_kit::rgb(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").on_click(move |_, window, cx| {
+                        d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(10.)).py(px(4.)).rounded(px(3.)).cursor_pointer().text_size(px(13.)).text_color(gpui_kit::rgb_static(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").on_click(move |_, window, cx| {
                             window.close_dialog(cx);
                             if let Some(it) = item.clone() {
                                 let name = format!("Obsolete {} {}", it.part_number, it.revision);

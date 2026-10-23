@@ -316,7 +316,7 @@ impl PartStudioView {
             .px(px(10.))
             .gap(px(3.))
             .rounded(px(5.25))
-            .bg(gpui_kit::white())
+            .bg(crate::theme::p().panel)
             .border_1()
             .border_color(gpui_kit::rgb(GRID))
             .cursor_pointer()
@@ -420,7 +420,7 @@ impl PartStudioView {
                     h_flex()
                         .h(px(29.))
                         .flex_none()
-                        .bg(gpui_kit::white())
+                        .bg(crate::theme::p().panel)
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().pl(px(4.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Add custom tables"))
@@ -583,7 +583,7 @@ impl PartStudioView {
         if graph {
             // Legend, then Main (italic grey, hollow, not selectable) and the versions.
             col = col.child(h_flex().h(px(30.)).px(px(6.)).gap(px(10.)).text_size(px(12.)).child("○ Workspace").child("● Version"));
-            col = col.child(h_flex().h(px(36.)).child(div().w(px(140.)).flex().justify_center().child(div().size(px(13.)).rounded_full().border_2().border_color(blue).bg(gpui_kit::white()))).child(div().text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x888888)).child("Main")));
+            col = col.child(h_flex().h(px(36.)).child(div().w(px(140.)).flex().justify_center().child(div().size(px(13.)).rounded_full().border_2().border_color(blue).bg(crate::theme::p().panel))).child(div().text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x888888)).child("Main")));
             for (i, v) in d.versions.iter().enumerate() {
                 let on = d.version == Some(i);
                 col = col.child(

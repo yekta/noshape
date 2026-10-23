@@ -262,6 +262,12 @@ pub const PALETTE_DARK: Palette = Palette {
 /// The palette in effect: dark while Preferences › Theming › Dark mode is on,
 /// except inside `gpui_kit::with_light_colors` (parts that stay light, as a
 /// drawing's canvas does in Onshape).
+/// The light palette, whatever the theme: what stays light in dark mode
+/// (the drawing editor and its dialogs, as live's drawing iframe).
+pub fn light() -> &'static Palette {
+    &PALETTE
+}
+
 pub fn p() -> &'static Palette {
     if gpui_kit::hex_theme_active() { &PALETTE_DARK } else { &PALETTE }
 }
@@ -352,5 +358,35 @@ mod dark_tests {
         // Black (shadows) and the ✓ green stay as they are.
         assert!(!DARK_HEX.iter().any(|(from, _)| *from == 0x000000 || *from == 0x009400));
         assert!(DARK_HEX.contains(&(0xffffff, 0x333333)) && DARK_HEX.contains(&(0x333333, 0xffffff)));
+    }
+}
+
+#[cfg(test)]
+mod white_guard {
+    /// Fills follow the theme: a bare `white()` background stays white in
+    /// dark mode (use a palette role, `theme::light()` for what stays light,
+    /// or `rgb_static` for a colour that is white in both themes).
+    #[test]
+    fn no_bare_white_backgrounds() {
+        // Built from pieces so this test's own source doesn't match.
+        let pats = [["bg(gpui_kit::", "white())"].concat(), [".bg(", "white())"].concat()];
+        let mut bad = Vec::new();
+        let mut stack = vec![std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/src"))];
+        while let Some(dir) = stack.pop() {
+            for e in std::fs::read_dir(&dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    let text = std::fs::read_to_string(&p).unwrap();
+                    for (i, line) in text.lines().enumerate() {
+                        if pats.iter().any(|p| line.contains(p.as_str())) {
+                            bad.push(format!("{}:{}", p.display(), i + 1));
+                        }
+                    }
+                }
+            }
+        }
+        assert!(bad.is_empty(), "bare white() backgrounds:\n{}", bad.join("\n"));
     }
 }

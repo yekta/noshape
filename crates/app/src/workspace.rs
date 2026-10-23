@@ -1340,7 +1340,7 @@ impl Workspace {
             .child(
                 crate::ui::rail_button("rail-performance", "performance", perf_open, true, cx).pl(px(1.))
                     // A software renderer is a performance error (live: a red badge).
-                    .when(perf_error, |d| d.child(div().absolute().left(px(22.)).top(px(16.)).size(px(11.)).rounded_full().bg(gpui_kit::white()).child(crate::assets::icon("error", 11., cx))))
+                    .when(perf_error, |d| d.child(div().absolute().left(px(22.)).top(px(16.)).size(px(11.)).rounded_full().bg(gpui_kit::rgb_static(0xffffff)).child(crate::assets::icon("error", 11., cx))))
                     .tip(if perf_error { "Performance errors detected" } else { "Performance" }, TipSide::Right)
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_doc_panel(false, cx))),
             )
@@ -1604,12 +1604,12 @@ impl Render for Workspace {
                                 // Compare mode: the toolbar row becomes white with the
                                 // centred "Comparing Main and V3" bar (live 953).
                                 .children(crate::compare_mode::render_bar(&self.doc, cx).map(|bar| {
-                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(gpui_kit::white()).occlude().flex().justify_center().child(bar)
+                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(crate::theme::p().panel).occlude().flex().justify_center().child(bar)
                                 }))
                                 // A protected workspace (workspace_protection.rs): its banner
                                 // at the top centre (not over the compare bar).
                                 .children(crate::workspace_protection::render_banner(&self.doc, matches!(self.active.and_then(|a| self.views.get(&a)), Some(TabView::PartStudio(_))), cx).filter(|_| crate::compare_mode::rows(&self.doc, cx).is_none()).map(|banner| {
-                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(gpui_kit::white()).occlude().flex().justify_center().child(banner)
+                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(crate::theme::p().panel).occlude().flex().justify_center().child(banner)
                                 }))
                                 .children(self.render_toast(cx))
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).

@@ -259,7 +259,7 @@ impl OsSelect {
                 .items_center()
                 .pl(px(TEXT_INSET))
                 .text_size(px(14.))
-                .when(on, |d| d.bg(accent).text_color(gpui_kit::rgb(0xffffff)))
+                .when(on, |d| d.bg(accent).text_color(gpui_kit::rgb_static(0xffffff)))
                 .when(!on, |d| d.text_color(gpui_kit::rgb(0x666666)))
                 .child(text)
                 .on_hover(cx.listener(move |this, h: &bool, _, cx| {

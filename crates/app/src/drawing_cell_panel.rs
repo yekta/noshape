@@ -298,7 +298,7 @@ impl DrawingEditor {
             });
 
         // Row 2: font and text.
-        let field = |w: f32| div().w(px(w)).h(px(24.)).bg(gpui_kit::white()).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
+        let field = |w: f32| div().w(px(w)).h(px(24.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
         let family = first.font.clone().unwrap_or_else(|| FONT_FAMILIES[0].to_string());
         let fonts: Vec<(String, bool, FormatEdit)> = FONT_FAMILIES
             .iter()

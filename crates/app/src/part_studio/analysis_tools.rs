@@ -1140,7 +1140,7 @@ impl PartStudioView {
                         )
                     })
                     .child(div().flex_1())
-                    .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xa0a0a0)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+                    .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xa0a0a0)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")),
             )
             .into_any_element();
         let mut out = vec![dialog];

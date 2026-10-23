@@ -441,7 +441,7 @@ impl PartStudioView {
                                 ),
                         )
                         .child(items_field)
-                        .child(h_flex().justify_end().child(div().size(px(14.)).rounded_full().bg(with_alpha(pal.text, 0.55)).flex().items_center().justify_center().text_size(px(10.)).text_color(gpui_kit::rgb(0xffffff)).child("?"))),
+                        .child(h_flex().justify_end().child(div().size(px(14.)).rounded_full().bg(with_alpha(pal.text, 0.55)).flex().items_center().justify_center().text_size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)).child("?"))),
                 )
                 .into_any_element(),
         )
