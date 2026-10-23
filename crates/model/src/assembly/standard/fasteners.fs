@@ -1076,6 +1076,7 @@ const NUT_CASTLE = 3;
 const NUT_CAP = 4;
 const NUT_INSERT = 5;
 const NUT_WELD = 6;
+const NUT_T_SLOT = 7;
 
 annotation { "Feature Type Name" : "Nut" }
 export const nut = defineFeature(function(context is Context, id is Id, definition is map)
@@ -1125,6 +1126,12 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         isLength(definition.cb, LENGTH_0);
         annotation { "Name" : "Collar bore depth" }
         isLength(definition.cd, LENGTH_0);
+        annotation { "Name" : "T-slot nut length" }
+        isLength(definition.tl, LENGTH_0);
+        annotation { "Name" : "Tongue fillet" }
+        isLength(definition.tr, LENGTH_0);
+        annotation { "Name" : "Corner chamfer" }
+        isLength(definition.tc, LENGTH_0);
     }
     {
         const form = definition.form;
@@ -1133,11 +1140,35 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         const z0 = definition.c;
         // A castle nut's hex ends at w and its crown (de) goes up to m.
         const bodyTop = (form == NUT_CASTLE || form == NUT_CAP || form == NUT_INSERT) && definition.w > EPS ? definition.w : definition.m;
-        const body = prismZ(context, id + "body", z0, bodyTop - z0, polygonPoints(sides, definition.s, 0));
-        const dw = definition.dw > EPS ? definition.dw : definition.s;
-        // (Live's ANSI square machine screw nut has none: angle 0.)
-        if (definition.ca > 0)
-            cornerChamferAngle(context, id + "chamfer", body, z0, bodyTop - z0, dw, definition.dt > EPS ? definition.dt : dw, true, definition.both == 1 && z0 <= EPS, definition.ca * degree);
+        if (form == NUT_T_SLOT)
+        {
+            // Live's ANSI T-slot nut: the section (width s to height w, the
+            // tongue n wide up to m, 45 degree corner chamfers tc, the
+            // tongue's root filleted tr) extruded tl along Y, centred.
+            const hs = definition.s / 2;
+            const hn = definition.n / 2;
+            const w = definition.w;
+            const ch = definition.tc;
+            const rf = definition.tr;
+            const sketch = newSketchOnPlane(context, id + "tSketch", { "sketchPlane" : plane(vector(Z, definition.tl / 2, Z), vector(0, -1, 0), vector(1, 0, 0)) });
+            var pts = [vector(-hs + ch, Z), vector(hs - ch, Z), vector(hs, ch), vector(hs, w - ch), vector(hs - ch, w), vector(hn + rf, w)];
+            skPolyline(sketch, "right", { "points" : pts });
+            skArc(sketch, "rightRoot", { "start" : vector(hn + rf, w), "mid" : vector(hn + rf - rf * cos(45 * degree), w + rf - rf * sin(45 * degree)), "end" : vector(hn, w + rf) });
+            skPolyline(sketch, "tongue", { "points" : [vector(hn, w + rf), vector(hn, definition.m), vector(-hn, definition.m), vector(-hn, w + rf)] });
+            skArc(sketch, "leftRoot", { "start" : vector(-hn, w + rf), "mid" : vector(-hn - rf + rf * cos(45 * degree), w + rf - rf * sin(45 * degree)), "end" : vector(-hn - rf, w) });
+            skPolyline(sketch, "left", { "points" : [vector(-hn - rf, w), vector(-hs + ch, w), vector(-hs, w - ch), vector(-hs, ch), vector(-hs + ch, Z)] });
+            skSolve(sketch);
+            opExtrude(context, id + "tNut", { "entities" : qSketchRegion(id + "tSketch"), "direction" : vector(0, -1, 0), "endBound" : BoundingType.BLIND, "endDepth" : definition.tl });
+            opDeleteBodies(context, id + "deleteTSketch", { "entities" : qCreatedBy(id + "tSketch", EntityType.BODY) });
+        }
+        else
+        {
+            const body = prismZ(context, id + "body", z0, bodyTop - z0, polygonPoints(sides, definition.s, 0));
+            const dw = definition.dw > EPS ? definition.dw : definition.s;
+            // (Live's ANSI square machine screw nut has none: angle 0.)
+            if (definition.ca > 0)
+                cornerChamferAngle(context, id + "chamfer", body, z0, bodyTop - z0, dw, definition.dt > EPS ? definition.dt : dw, true, definition.both == 1 && z0 <= EPS, definition.ca * degree);
+        }
         if (z0 > EPS)
             cylinderZ(context, id + "flange", Z, z0 + EPS, definition.dc / 2);
         if (form == NUT_CASTLE)

@@ -3397,7 +3397,9 @@ fn ansi_nuts_and_lock_washers_match_live() {
         ("High collar spring lock washer", &[("Cone", 2), ("Cylinder", 2), ("Plane", 2), ("Torus", 4)], 2.258067e-5),
     ];
     // Lock nuts at the sizes live captured (their default bodies are placeholders).
-    let sized: [(&str, &str, Case); 6] = [
+    let sized: [(&str, &str, Case); 8] = [
+        ("T-slot nut", "5/16", ("", &[("Cone", 2), ("Cylinder", 3), ("Plane", 14)], 8.159743e-4)),
+        ("T-slot nut", "1-1/2", ("", &[("Cone", 2), ("Cylinder", 3), ("Plane", 14)], 1.994554e-2)),
         ("Hex lock nut", "#4-40", ("", &[("Cone", 8), ("Cylinder", 1), ("Plane", 8)], 1.082215e-4)),
         ("Hex lock nut", "4-4", ("", &[("Cone", 8), ("Cylinder", 1), ("Plane", 8)], 9.182168e-2)),
         ("Hex lock nut with nylon insert", "#2-56", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 9), ("Torus", 1)], 1.379852e-4)),
