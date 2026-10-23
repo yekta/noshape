@@ -20,6 +20,7 @@ mod material_libraries;
 mod numbering_prefs;
 mod tool_synonyms;
 mod drawing_watermark;
+mod release_conditions;
 mod release_prefs;
 mod release_settings;
 mod revision_tools;
@@ -107,7 +108,6 @@ mod files;
 mod gpu;
 mod graphics_prefs;
 mod graphics_prefs_dialog;
-mod view_defaults;
 mod history_panel;
 mod compare_graphics;
 mod compare_mode;
@@ -349,7 +349,6 @@ fn main() {
         cx.set_text_rendering_mode(gpui_kit::TextRenderingMode::Grayscale);
         apply_theme(cx);
         graphics_prefs::init(cx);
-        view_defaults::init(cx);
         actions::bind_default_keys(cx);
         feature_studio::bind_keys(cx);
         // Mouse controls (also hands "Use pen input as mouse" to the platform).

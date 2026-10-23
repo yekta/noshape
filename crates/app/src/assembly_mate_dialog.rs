@@ -480,7 +480,10 @@ impl MateDialog {
             let edit_tip = format!("{text} (Click to edit)");
             let bold = self.editing_field == Some(field);
             rows.push(
-                os::query_row(SharedString::from(format!("mc-field-{field}")), text)
+                os::query_row(SharedString::from(format!("mc-field-{field}")), text.clone())
+                    // Live: the chip's tooltip ("Mate connector of Part 1 <2>
+                    // (Click to edit)"; Tangent's faces: the label).
+                    .tooltip(crate::ui::tooltip(if self.mate_type == MateType::Tangent { text.to_string() } else { format!("{text} (Click to edit)") }))
                     .when(bold, |d| d.font_weight(FontWeight::BOLD))
                     .when(lost.is_some(), |d| d.text_color(pal.text_invalid))
                     .hover(|d| d.bg(pal.row_hover))
@@ -798,20 +801,22 @@ impl Render for MateDialog {
                         .when(self.use_limits, |d| d.child(limit_rows))
                     })
                     // Onshape's bottom row: flip primary axis, reorient secondary
-                    // axis, animate, Solve; the help ? at the right.
+                    // axis, animate, Solve; the help ? at the right. Live
+                    // (dom/dialog-mate-*-filled): Tangent has the flip only,
+                    // Width none of them (a 22 px row with the ?).
                     .child(
                         h_flex()
-                            .h(px(30.))
+                            .h(px(if t == MateType::Width { 22. } else { 30. }))
                             .px(px(3.))
                             .gap(px(4.))
-                            .child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx))))
-                            .child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .when(t != MateType::Width, |d| d.child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx)))))
+                            .when(!matches!(t, MateType::Tangent | MateType::Width), |d| d.child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.reorient = (this.reorient + 1) % 4;
                                 cx.emit(MateDialogEvent::Changed);
                                 cx.notify();
-                            })))
+                            }))))
                             // Animate: preview the mate's motion (mates with degrees of freedom).
-                            .map(|d| {
+                            .when(!matches!(t, MateType::Tangent | MateType::Width), |d| {
                                 let can = !noshape_model::assembly::eval::mate_dofs(t).is_empty();
                                 d.child(
                                     div()
@@ -836,7 +841,7 @@ impl Render for MateDialog {
                                         })),
                                 )
                             })
-                            .child(
+                            .when(!matches!(t, MateType::Tangent | MateType::Width), |d| d.child(
                                 // Live dom dialog-mate-fastened-filled: 52 x 21, 1 px
                                 // `#aaa`, radius 3.5, 12.25 px.
                                 div()
@@ -856,7 +861,7 @@ impl Render for MateDialog {
                                     .child("Solve")
                                     .tooltip(crate::ui::tooltip("Solve full assembly"))
                                     .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Solve))),
-                            )
+                            ))
                             .child(div().flex_1())
                             .child(
                                 div()

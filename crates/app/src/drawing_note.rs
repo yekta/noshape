@@ -172,7 +172,7 @@ impl DrawingEditor {
                 s.font = Some(TextFont { family: fam.into(), bold: b, italic: i });
             })));
         }
-        let field = |w: f32| div().w(px(w)).h(px(24.)).bg(gpui_kit::white()).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
+        let field = |w: f32| div().w(px(w)).h(px(24.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
         let font_box = field(238.)
             .id("note-font")
             .pl(px(6.))
@@ -331,7 +331,7 @@ impl DrawingEditor {
                 .pr(px(4.))
                 .flex()
                 .items_center()
-                .bg(gpui_kit::white())
+                .bg(crate::theme::light().panel)
                 .border_b_1()
                 .border_color(gpui_kit::rgb(0xdddddd))
                 .text_size(px(13.33))

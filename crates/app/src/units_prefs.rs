@@ -354,7 +354,7 @@ impl Render for DecimalPrefsView {
                                     .border_1()
                                     .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
                                     .bg(if on { rgb(0x0075ff) } else { rgb(0xffffff) })
-                                    .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(rgb(0xffffff)))),
+                                    .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                             )
                             .child("Use comma as decimal separator")
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {

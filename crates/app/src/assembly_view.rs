@@ -471,7 +471,13 @@ impl AssemblyView {
         // anything the document changes renders it again.
         subs.push(cx.observe(&doc, |_, _, cx| cx.notify()));
         // Theming › Dark mode re-sets the graphics preferences: rebuild in the new colors.
-        subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| this.rebuild_scene(false, cx)));
+        subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| {
+            // The perspective field of view follows the preference, as in
+            // the Part Studio.
+            let fov = (crate::graphics_prefs::get(cx).fov_deg as f64).to_radians();
+            this.viewport.update(cx, |vp, _| vp.camera.fov_y = fov);
+            this.rebuild_scene(false, cx);
+        }));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             // Any tab can affect an assembly (Part Studios, sub-assemblies).
             DocEvent::TabChanged(t) => {
@@ -3470,11 +3476,7 @@ impl AssemblyView {
         let grounded = self.assembly(cx).is_some_and(|a| !a.fixed_instances().is_empty());
         // Live (qa5 A19): the root row carries an error badge while a feature
         // (or the pattern being defined) is in error.
-        let has_error = self.result.mates.iter().any(|m| !m.ok)
-            || self.result.nodes.iter().any(|n| n.error.is_some())
-            || self.result.connectors.iter().any(|c| c.message.is_some() && c.frame.is_none())
-            || !self.result.pattern_errors.is_empty()
-            || self.result.relations.iter().any(|r| !r.ok)
+        let has_error = self.result.has_errors()
             || self.pattern.as_ref().is_some_and(|s| s.editing.is_none() && self.pattern_from_session(s, cx).is_err());
         let view = cx.entity();
         h_flex()
@@ -3861,7 +3863,7 @@ impl AssemblyView {
                     .flex_none()
                     .pl(px(6.))
                     // Live `ns-dialog-header`: white, 1 px `#d7d7d7` under it.
-                    .bg(gpui_kit::white())
+                    .bg(crate::theme::p().panel)
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(match drag {
@@ -4026,7 +4028,7 @@ impl AssemblyView {
                             .rounded(px(4.))
                             .border_1()
                             .border_color(gpui_kit::rgb(0xaaaaaa))
-                            .bg(gpui_kit::white())
+                            .bg(crate::theme::p().panel)
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip("Cancel"))
                             .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
@@ -4421,7 +4423,7 @@ impl AssemblyView {
                         .h(px(29.))
                         .flex_none()
                         .pl(px(6.))
-                        .bg(gpui_kit::white())
+                        .bg(crate::theme::p().panel)
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child("Select replacement component"))
@@ -4450,7 +4452,7 @@ impl AssemblyView {
                     .h(px(29.))
                     .flex_none()
                     .pl(px(6.))
-                    .bg(gpui_kit::white())
+                    .bg(crate::theme::p().panel)
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child("Insert parts and assemblies"))
@@ -4500,13 +4502,41 @@ impl AssemblyView {
             .enumerate()
             .filter_map(|(slot, id)| {
                 let m = self.assembly(cx)?.mate(id?)?;
-                Some(crate::os_ui::query_row(SharedString::from(format!("rel-mate-{slot}")), noshape_ops::assembly::relation_mate_label(kind, slot, m.mate_type, &m.name)).into_any_element())
+                let label = noshape_ops::assembly::relation_mate_label(kind, slot, m.mate_type, &m.name);
+                // Live (dom/dialog-relation-*-filled): the chip's tooltip is its
+                // label, the × "Delete <label>" empties that slot.
+                Some(
+                    crate::os_ui::query_row(SharedString::from(format!("rel-mate-{slot}")), label.clone())
+                        .tooltip(crate::ui::tooltip(label.clone()))
+                        .child(
+                            div()
+                                .id(SharedString::from(format!("rel-mate-x-{slot}")))
+                                .px(px(5.))
+                                .text_size(px(16.67))
+                                .text_color(gpui_kit::rgb(0x666666))
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip(format!("Delete {label}")))
+                                .child("×")
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    if let Some(r) = &mut this.relation {
+                                        if slot == 0 {
+                                            r.a = None;
+                                        } else {
+                                            r.b = None;
+                                        }
+                                    }
+                                    cx.notify();
+                                })),
+                        )
+                        .into_any_element(),
+                )
             })
             .collect();
         let value = crate::os_ui::param_row(noshape_ops::assembly::relation_value_label(kind), crate::os_ui::input_h(Input::new(&r.ratio).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.));
         let body = v_flex()
             .pb(px(2.))
-            .child(div().px(px(3.)).pt(px(5.)).child(select))
+            .child(div().id("rel-type").px(px(3.)).pt(px(5.)).tooltip(crate::ui::tooltip("Relation type")).child(select))
             // The Mate(s) field is active while the dialog is open.
             .child(div().px(px(3.)).pt(px(5.)).child(crate::os_ui::query_box("rel-mates", "Mate(s)", true, rows)))
             .child(div().h(px(5.)))
@@ -4539,8 +4569,8 @@ impl AssemblyView {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(if valid { pal.text } else { pal.text_invalid })
                             .truncate()
-                            .child(name)
-                            .when_some(title_tip, |d, t| d.tooltip(crate::ui::tooltip(t))),
+                            .tooltip(crate::ui::tooltip(title_tip.unwrap_or_else(|| name.clone())))
+                            .child(name),
                     )
                     .child(
                         div()
@@ -5011,12 +5041,6 @@ impl AssemblyView {
                             })
                         })
                     }))
-                    // Right-click › Set as default: new graphics areas start so.
-                    .set_default(move |_, _, cx| {
-                        let mut d = crate::view_defaults::get(cx);
-                        d.perspective = perspective;
-                        crate::view_defaults::set(d, cx);
-                    })
                     .item(crate::os_menu::OsMenuItem::new("Show mates").checked(show_mates).on_click(move |_, _, cx| {
                         v3.update(cx, |this, cx| {
                             this.show_mates = !this.show_mates;

@@ -99,7 +99,7 @@ pub fn danger_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
     Button::new(id)
         .custom(ButtonCustomVariant::new(cx).color(rgb(0xbd3039).into()).foreground(rgb(0xffffff).into()).hover(rgb(0xd27177).into()).active(rgb(0xa3272f).into()).shadow(false))
         .bg(rgb(0xbd3039))
-        .child(div().text_size(px(14.)).text_color(rgb(0xffffff)).child(label.into()))
+        .child(div().text_size(px(14.)).text_color(gpui_kit::rgb_static(0xffffff)).child(label.into()))
         .h(px(34.))
         .px(px(11.))
         .rounded(px(3.))
@@ -269,7 +269,7 @@ pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bo
                 .border_1()
                 .border_color(if on { pal.accent } else { rgb(0x888888) })
                 .bg(if on { pal.accent } else { rgb(0xffffff) })
-                .when(on, |d| d.child(Icon::new(gpui_kit::component::IconName::Check).size(px(10.)).text_color(rgb(0xffffff)))),
+                .when(on, |d| d.child(Icon::new(gpui_kit::component::IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
         )
         .child(label.into())
 }
@@ -312,9 +312,16 @@ pub fn param_row_plain(label: impl Into<SharedString>, field: impl IntoElement) 
 /// `#def1fb` with a `#1651b0` outline while it takes the picks. Empty it
 /// shows `label` (12 px `#555`); with entries the label shrinks to the top.
 pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, active: bool, rows: Vec<AnyElement>) -> Stateful<Div> {
+    query_box_tip(id, label, None, active, rows)
+}
+
+/// [`query_box`] whose label's tooltip is `tip` instead of the label (live:
+/// a field in error shows the error, "Select one or more instances.").
+pub fn query_box_tip(id: impl Into<ElementId>, label: impl Into<SharedString>, tip: Option<SharedString>, active: bool, rows: Vec<AnyElement>) -> Stateful<Div> {
     let pal = p();
     let empty = rows.is_empty();
     let label: SharedString = label.into();
+    let tip = tip.unwrap_or_else(|| label.clone());
     gpui_kit::component::v_flex()
         .id(id)
         .min_h(px(26.))
@@ -333,7 +340,7 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
                 .when(!empty, |d| d.pt(px(2.)).text_size(px(10.)))
                 .text_color(rgb(0x555555))
                 // Live: the label's tooltip is the label ("Mate connectors", "Instances").
-                .tooltip(crate::ui::tooltip(label.clone()))
+                .tooltip(crate::ui::tooltip(tip))
                 .child(label),
         )
         .children(rows)
