@@ -3473,6 +3473,20 @@ fn din_keys_match_live() {
         let bb = b.shape.bounding_box(true).unwrap();
         assert!(bb.min.z.abs() < 1e-9 && (bb.max.y + bb.min.y).abs() < 1e-9, "{name} {size}: {bb:?}");
     }
+    // Type AB (live's Extrude 1 regions): round at -Y, square at +Y.
+    let c = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.length = Some("6".into());
+    spec.params.insert("Type".into(), "AB".into());
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let round: Vec<f64> = (0..b.faces.len())
+        .filter_map(|i| match b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().face_surface().unwrap() {
+            noshape_kernel::Surface::Cylinder { origin, .. } => Some(origin.y),
+            _ => None,
+        })
+        .collect();
+    assert!(round.len() == 1 && round[0] < 0.0, "AB round end: {round:?}");
     // The chosen Type names the part as live ("Parallel key B x 2 x 2 x 6").
     let c = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
     let mut spec = StandardSpec::new(c);
