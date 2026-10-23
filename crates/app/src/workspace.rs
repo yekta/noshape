@@ -1149,7 +1149,7 @@ impl Workspace {
                         // clipboard): point every view at a version of the document.
                         let menu = if kind == "drawing" {
                             let v12 = view.clone();
-                            menu.item(I::new("Change to version…").icon_name("legend-version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
+                            menu.item(I::new("Change to version…").icon_name("change-version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
                         } else {
                             menu
                         };

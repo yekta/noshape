@@ -2070,7 +2070,7 @@ impl PartStudioView {
                                 .pr(px(4.))
                                 .text_size(px(12.))
                                 .child(div().flex_1().text_color(if count > 250 { gpui_kit::rgb(0xaa252d) } else { gpui_kit::rgb(0x333333) }).child(format!("{count}/250 characters")))
-                                .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
+                                .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))),
                         )
                         .when_some(error, |this, error| this.child(div().px(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xaa252d)).child(error))),
                 )
@@ -2911,7 +2911,7 @@ impl PartStudioView {
                                         .justify_center()
                                         .rounded(px(4.))
                                         // Live: pale green (disabled) while the field is invalid.
-                                        .bg(if dim_invalid { rgb(0xcce9cc) } else { pal.accept })
+                                        .bg(pal.accept).when(dim_invalid, |d| d.opacity(0.2))
                                         .cursor_pointer()
                                         .when(!dim_invalid, |d| d.hover(|d| d.bg(rgb(0x74ce3a))))
                                         .child(Icon::new(gpui_kit::component::IconName::Check).with_size(px(16.)).text_color(rgb(0xffffff)))

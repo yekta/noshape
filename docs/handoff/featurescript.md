@@ -716,18 +716,27 @@ Still to do:
    80), so it was backed out. Find out why (std's flange relief tracking by name?) before retrying.
 5. SM16: done (std editing logic runs in dialogs; `std_feature::editing_logic_in`).
 
-### What still fails with the std route forced on (NOSHAPE_STD_SHEET_METAL=1, 23 Oct, 19 tests)
+### What still fails with the std route forced on (NOSHAPE_STD_SHEET_METAL=1, 23 Oct ~09:30)
 Gate for switching it on: every one of these passes (or is shown to test native-only internals and is rewritten
-against live numbers).
-- Finish sheet metal model: "Select one or more sheet metal parts." (sheetmetal_frames finish_sheet_metal_deactivates,
-  features_c recognize_rebuilds_sheet_metal_model, features_b sheet_metal_thicken_region).
-- EXTRUDE process: flat lengths +4 mm per bend (l_bracket 80.13 vs 76.13, u_channel 110.25 vs 102.25) and
-  features_b sheet_metal_extrude_l_bracket_volume 3211.3 vs 3051.3 mm³.
-- hem_straight_and_rolled (bbox z to 4.02), bend_feature_keeps_flat_length (count 3), flange_outer_alignment (bend line
-  up flag), convert_rips_and_bends_like_onshape (BUTT geometry), corner_break_and_relief_and_tab (relief 6.2046 vs
-  6.1027 mm³).
-- Jog: "Could not imprint the bend line on the face." (two features_c tests); Form: "Select location on selected
-  active sheet metal faces."; Sheet metal loft: "Error regenerating." (both loft tests); Rip doesn't split the plate.
-- bend_and_jog_move_the_side_live_moves: only the bbox tolerance (std bodies carry a 1e-7 gap).
+against live numbers). Fixed today: Finish (tests now select parts as live requires; reportFeatureInfo → Info),
+std Jog default case (= live 4825.132741228719 / 22 faces: tracking keeps what ops after lastOperationId changed,
+split pieces and moved pieces of tracked faces, opSplitFace ownExistingImprints, opBoolean eraseImprintedEdges,
+opFitSpline 2 points → line, straight degree-1 B-splines count as lines).
+- Jog with Preserve material off: after bend 1 the model is inconsistent (bend strip wrapped down to z −1, moving
+  wall rotated up to z 47, pieces not composed into one sheet, the fixed edge found twice → two fit wires); bend 2
+  then fails checkSplitResults. Look at the clip path (clipping planes / copyClipped) and transformMovingSurface's
+  rotation sign for this case.
+- Sheet metal loft: host natives @evTessellatedLoftMatches / @opTessellatedLoft are in (host/loft.rs, the native
+  loft's faceting). The hopper now passes on std except its last case (4-gon to triangle: the native route says
+  "same number of segments"; what live does with unequal corner counts is unknown, ask live). Loft Add on std
+  leaves the wall a separate body (4800 + 4924.388 = live's New result): std's
+  joinSMDefinitionSurfaceBodiesWithAutoMatching does not join the definition sheets yet.
+- Form: "Select location on selected active sheet metal faces." (sheetMetalFormed.fs:249).
+- Rip: the diagonal rip leaves one body (features_c rip_splits_wall_between_vertices).
+- Tests that read native-only internals (r.context.sheet_metal walls/bends): recognize_rebuilds_sheet_metal_model,
+  jog_offsets_wall_and_keeps_flat_length (wall count); rewrite against geometry / live numbers.
+- EXTRUDE process: flat lengths +4 mm per bend and L bracket 3211.3 vs 3051.3 mm³ (std puts the material outside
+  the turn); live asked (REQUESTS.md "fs (10-23 05:00)").
+- sheetmetal_frames (8): hem bbox, bend count, flange outer bend direction, convert BUTT, corner relief volume.
 - drawing::tests::flat_pattern_view_shows_bend_lines_and_notes.
 Not mine but seen: drawing::tests::flat_pattern_view_shows_bend_lines_and_notes fails on "DOWN 90.0° R3" (format.rs angle).

@@ -243,7 +243,7 @@ impl PartStudioView {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(!ok, |d| d.text_color(gpui_kit::rgb(0xaa252d))).child(title))
-                        .child(div().id("vi-ok").size(px(28.)).flex().items_center().justify_center().bg(if ok { pal.accept } else { gpui_kit::rgb(0xcce9cc) }).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_variable_input(cx))))
+                        .child(div().id("vi-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, |d| d.opacity(0.2)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_variable_input(cx))))
                         .child(div().id("vi-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.ui.var_input = None;
                             cx.notify();

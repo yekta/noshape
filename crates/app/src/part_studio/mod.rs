@@ -2220,7 +2220,7 @@ impl PartStudioView {
                     }
                 })
             });
-        let help = div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?");
+        let help = div().size(px(16.)).rounded_full().flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 17.8, crate::theme::help_dot(0x999999)));
         let text = format!("Versions are view only. Viewing {version}.");
         crate::ui::toolbar()
             .id("part-studio-version-bar")
@@ -2271,7 +2271,7 @@ impl PartStudioView {
             .child(
                 crate::ui::tool_button("tb-custom-features", "custom-feature", false, cx)
                     .w(px(crate::ui::TOOL_CELL + crate::ui::TOOL_CARET_W))
-                    .child(crate::ui::glyph("tool-caret", 12., p().text))
+                    .child(crate::ui::glyph("tool-caret", 10., p().text))
                     .tooltip("Custom features in this workspace")
                     // Live (part-studio/1251–1252, qa5 FS4): no heading; each
                     // entry has its initials icon ("Qc") and the name, with

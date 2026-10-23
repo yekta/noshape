@@ -908,3 +908,41 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
     documents); notes keep their measured #ebebeb in light.
   * In app (dark): feature list planes = live dk-924; feature menu icons = live; documents nav = live dk-910.
     Not icons, for ui2: our Create button is #3e94ff, live's dark Create is the darker #1651b0-ish blue.
+- Block 2, part 2 (in-app dark vs live dk-9xx):
+  * Sketch toolbar = live dk-932 except sketch linear pattern (top-left square outline-secondary #bababa, was white):
+    fixed. scratch tools/autotry.py tries var-based recolourings (accent red/green flips, outline-secondary grey)
+    against the live dark symbol and keeps the best: +13 (check, cancel, mate limits, offset, chevrons, ...);
+    tailconv.py (--themed-secondary) for the mate icons (outline-tertiary #888 -> #ccc: revolute, slider, ...),
+    link/select-box (fill-secondary themed #d7d7d7); inspection/config illustrations #555 (fill-quinary).
+  * Toolbar split-tool caret: the `expanded` sprite is 10x6 and live draws it 1:1; ours was the glyph at 12 px
+    (12x8, thicker). Now 10 px = live's 10x6 (light and dark), ui.rs tool_caret + custom features button.
+  * Tree expanders: Palette.icon_tertiary (#666 / #999 = --os-icon-fill-tertiary). ui::caret used rgb(0x666666),
+    which DARK_HEX sends to #ccc; live dark is #999 (dk-940). Assembly instance/mate row chevrons were the 11 px
+    ui-chevron in pal.text (white, 5x10); live = the same 8x12 expander as the headers in #999: now expander-* 14.
+  * Selection-list/chip × (ui-clear #666) -> icon_tertiary: live dark #999 (dk-926), was #ccc.
+  * Mate dialog / assembly "Solve" buttons were bg(gpui_kit::white()) with inherited text: white-on-white in dark.
+    Now rgb(0xffffff) (themed) + pal.text. 51 other bg(white()) remain app-wide (ui2's call; reported).
+  * Feature dialog (dk-926): flip arrow, tolerance, ✓/✗ match; live's ± "+" is crisp where ours (and the sprite at
+    1:1) is split over two columns: a sub-pixel placement difference, not art.
+  * Open for live (REQUESTS icons2 10-23 07:30): sheet metal, more context menus/dialogs, tab manager, history,
+    properties panels in dark; glyphs tinted rgb(0x666666) (ui-dropdown-arrow, ui-caret-down, close, info, pin,
+    folder, undo, import-file) wait for those captures (sprite vars differ per glyph).
+- Block 2, part 3 (live answered dk-971…dk-9a2):
+  * Sheet metal dropdown = live dk-972 except Flex PCB model / Finish flex PCB model: pcb-start / pcb-end redrawn
+    on the pcb-*-button sprites (curved bend, chip box; 6.4/7.7 -> 2.3/3.4 light); pcb-end's ✓ is white in dark.
+  * Context menus (dk-974/975/983/984) = live except "Change to version…": live uses the inserted-version symbol
+    (dashed line + dot): new icon change-version (assembly + drawing tab menus). com-indicator ring 0.8 -> 1 (live).
+  * Disabled dialog ✓ (15 places): was #cce9cc (light-only colour); live = the whole button at 20% opacity, which
+    gives #cce9cc on white and (41,70,41) with a (92,92,92) ✓ on #333 (dk-978). Now bg(accept) + opacity(0.2).
+  * Running toolbar tool: live #eaeaea light (dialogs/*-01-open, sketch/1933/1940) and #555 dark (dk-978/932):
+    --os-icon-button-fill--selected; was #b2ddf6 / #134e96.
+  * Assembly linear/circular pattern flip: showed the flipped art when not flipped (dk-987): now like the Part
+    Studio dialogs (*-opposite art when unflipped).
+  * "?" help dots (30 places; ui2 reported them darker than live in dark): live = the help-button sprite, a disc
+    with the "?" cut out. Now glyph("help-dot") (opaque copy of help-filled: a glyph tint keeps the art's alpha)
+    in theme::help_dot(light) = each place's measured light grey, #aeaeae in dark. Measured after: disc 160 light /
+    174 dark = live (fillet-01, dk-978); was a bold text "?" on a disc DARK_HEX mapped (#aaa -> #888, darker).
+  * Not fixed (ui2's, reported): Insert dialog header is a white bar in dark; mate-type flyout white in dark;
+    51 bg(gpui_kit::white()) app-wide; Create button blue on the documents page.
+  * Dialogs hole, fillet, linear pattern, mirror, sweep, flange, fastened, revolute, asm linear pattern, replicate:
+    icons = live dark.
