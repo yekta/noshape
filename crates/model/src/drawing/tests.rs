@@ -2231,3 +2231,60 @@ fn auto_centermarks_follow_mark_gap_and_extended_lines() {
     assert_eq!(lines.len(), 2);
     assert!(lines.iter().all(|l| l.0 == LineStyle::Thin));
 }
+
+/// Live drw2-en-ansi-a / drw2-k-dxf2018: the full text style table (36
+/// with Standard, Noto Sans in the ACAD xdata, the fixed-height styles at
+/// the text height) and one style per kind of text: title block values in
+/// -Fields, view labels in -View-Label, notes in -NoteStyle as
+/// `{\pxq?;…}`, hole tags in -Hole-Tag, table cells in their table's
+/// Title / Header / Data row style.
+#[test]
+fn cad_export_text_styles_per_kind_like_onshape() {
+    use super::cad_export::to_dxf_version;
+    use acadrust::{DxfVersion, EntityType};
+    let doc = super::showcase::showcase_document();
+    let drawing = doc.tabs.iter().find_map(|t| match &t.content {
+        TabContent::Drawing(d) => Some(d.clone()),
+        _ => None,
+    }).unwrap();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    // Every sheet (the hole table, BOM and free table are on different ones).
+    let docs: Vec<_> = (0..drawing.sheets.len()).map(|si| {
+        let built = render_sheet(&drawing, si, &sources, &cache, true).unwrap();
+        let g = export::prepare(&built.geometry, &export::ExportOptions { strokes: true, ..Default::default() });
+        let dxf = to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap();
+        (g, acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap())
+    }).collect();
+    let (g, d) = &docs[0];
+    // The style table.
+    let styles: Vec<_> = d.text_styles.iter().collect();
+    assert_eq!(styles.len(), 36, "{:?}", styles.iter().map(|s| &s.name).collect::<Vec<_>>());
+    let st = |n: &str| styles.iter().find(|s| s.name == n).unwrap_or_else(|| panic!("no {n}"));
+    assert_eq!(st("Onshape-Standard-NoteStyle").true_type_font, "Noto Sans");
+    assert_eq!(st("Onshape-Standard-JapaneseFields").font_file, "NotoSansJP-Regular.otf");
+    assert!((st("Onshape-Standard-View-Label").height - g.style.dim_text).abs() < 1e-9);
+    assert_eq!(st("Onshape-Standard-Fields").height, 0.0);
+    // Texts by kind (MTEXT in model space and in the tables' blocks).
+    let mut mtexts: Vec<(String, String)> = Vec::new();
+    for (_, d) in &docs {
+        for e in d.entities().chain(d.block_records.iter().flat_map(|b| d.entities_in_block(&b.name))) {
+            if let EntityType::MText(m) = e {
+                mtexts.push((m.style.clone(), m.value.clone()));
+            }
+        }
+    }
+    let style_of = |text: &str| mtexts.iter().filter(|(_, v)| v.contains(text)).map(|(s, _)| s.clone()).collect::<Vec<_>>();
+    let has = |text: &str, style: &str| style_of(text).iter().any(|s| s == style);
+    assert!(mtexts.iter().any(|(s, v)| s == "Onshape-Standard-View-Label" && v.contains("SECTION")), "{mtexts:?}");
+    assert!(mtexts.iter().any(|(s, _)| s == "Onshape-Standard-Fields"), "{mtexts:?}");
+    assert!(has("TITLE", "Onshape-Standard"), "{:?}", style_of("TITLE"));
+    let notes: Vec<_> = mtexts.iter().filter(|(s, _)| s == "Onshape-Standard-NoteStyle").collect();
+    assert!(!notes.is_empty() && notes.iter().all(|(_, v)| v.starts_with("{\\pxq") && v.ends_with('}')), "{notes:?}");
+    assert!(mtexts.iter().any(|(s, v)| s == "Onshape-Standard-Hole-Tag" && v.starts_with('A')), "{mtexts:?}");
+    assert!(mtexts.iter().any(|(s, v)| s == "Onshape-Standard-HoleTable-HeaderRow" && v == "{TAG}"), "{mtexts:?}");
+    assert!(mtexts.iter().any(|(s, _)| s == "Onshape-Standard-HoleTable-DataRow"));
+    assert!(mtexts.iter().any(|(s, _)| s == "Onshape-Standard-BomTable-HeaderRow"));
+    assert!(mtexts.iter().any(|(s, v)| s == "Onshape-Standard-Table-TitleRow" && v.contains("REVISIONS")), "{mtexts:?}");
+    assert!(mtexts.iter().filter(|(s, _)| s.starts_with("Onshape-Standard-Table-")).all(|(_, v)| v.starts_with("{\\pxq")));
+}

@@ -119,6 +119,36 @@ impl CadLayer {
     }
 }
 
+/// The live text style of a kind of text (drw2-k-dxf2018; untagged texts
+/// are Onshape-Standard, or Onshape-Standard-Bold when bold).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CadTextStyle {
+    /// Title block property values.
+    Fields,
+    ViewLabel,
+    Note,
+    /// Hole table tags in the view.
+    HoleTag,
+}
+
+impl CadTextStyle {
+    pub fn name(self) -> &'static str {
+        match self {
+            CadTextStyle::Fields => "Onshape-Standard-Fields",
+            CadTextStyle::ViewLabel => "Onshape-Standard-View-Label",
+            CadTextStyle::Note => "Onshape-Standard-NoteStyle",
+            CadTextStyle::HoleTag => "Onshape-Standard-Hole-Tag",
+        }
+    }
+}
+
+/// Texts of one text style (last span wins).
+#[derive(Clone, Debug, PartialEq)]
+pub struct CadTextStyleSpan {
+    pub texts: std::ops::Range<usize>,
+    pub style: CadTextStyle,
+}
+
 /// Lines, texts and fills of one export layer (last span wins).
 #[derive(Clone, Debug, PartialEq)]
 pub struct CadSpan {
@@ -157,6 +187,18 @@ impl SheetGeometry {
                 i = j;
             }
         }
+    }
+
+    /// Put the texts from `t0` in text style `style`.
+    pub fn cad_text_style_since(&mut self, t0: usize, style: CadTextStyle) {
+        if t0 < self.texts.len() {
+            self.cad_text_styles.push(CadTextStyleSpan { texts: t0..self.texts.len(), style });
+        }
+    }
+
+    /// Text style of text `i` (None: Onshape-Standard / -Bold).
+    pub fn cad_text_style(&self, i: usize) -> Option<CadTextStyle> {
+        self.cad_text_styles.iter().rev().find(|s| s.texts.contains(&i)).map(|s| s.style)
     }
 
     /// Export layer of line `i`: its format layer, its tag, else its style's.

@@ -49,7 +49,10 @@ pub enum CadObject {
     /// A table: its top-left corner, column widths, row heights (top to
     /// bottom) and each row's cell texts (sheet mm): ACAD_TABLE over a *T
     /// block of what the sheet draws (2004+), else that block's INSERT.
-    Table { corner: [f64; 2], widths: Vec<f64>, heights: Vec<f64>, cells: Vec<Vec<String>> },
+    /// `rows`: each grid row's text style (live: per table kind, Title /
+    /// Header / Data row); `aligned`: the cells' MTEXT carry their paragraph
+    /// alignment (live: free tables only, `{\pxqc;…}`).
+    Table { corner: [f64; 2], widths: Vec<f64>, heights: Vec<f64>, cells: Vec<Vec<String>>, rows: Vec<&'static str>, aligned: bool },
     /// A closed cubic spline as a chain of Bézier spans (`3n + 1` poles,
     /// sheet mm): SPLINE.
     Spline { poles: Vec<[f64; 2]> },
@@ -94,7 +97,7 @@ impl SheetGeometry {
     }
 
     /// Everything since `m` is this table.
-    pub(crate) fn add_cad_table(&mut self, m: super::sheet::GeomMark, layout: &super::tables::TableLayout, data: &super::tables::TableData) {
+    pub(crate) fn add_cad_table(&mut self, m: super::sheet::GeomMark, layout: &super::tables::TableLayout, data: &super::tables::TableData, kind: &super::TableKind) {
         if layout.xs.len() < 2 || layout.ys.len() < 2 {
             return;
         }
@@ -104,9 +107,16 @@ impl SheetGeometry {
         }
         cells.extend(data.all_rows().into_iter().cloned());
         let widths = layout.xs.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
-        let heights = layout.ys.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
+        let heights: Vec<f64> = layout.ys.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
+        // Row styles (live drw2-k-dxf2018 / drw2-en-ansi-a STYLE table).
+        let [title, header, row] = table_row_styles(kind);
+        let n = heights.len();
+        let body = layout.title as usize;
+        let header_row = data.header.is_some().then(|| if data.header_bottom { n - 1 } else { body });
+        let rows = (0..n).map(|r| if layout.title && r == 0 { title } else if Some(r) == header_row { header } else { row }).collect();
+        let aligned = matches!(kind, super::TableKind::General { .. });
         let obj = self.cad_objects.len();
-        self.cad_objects.push(CadObject::Table { corner: [layout.xs[0], layout.ys[0]], widths, heights, cells });
+        self.cad_objects.push(CadObject::Table { corner: [layout.xs[0], layout.ys[0]], widths, heights, cells, rows, aligned });
         self.cad_members.push(CadMember { lines: m.0..self.lines.len(), texts: m.1..self.texts.len(), fills: m.2..self.fills.len(), obj });
     }
 
@@ -225,5 +235,18 @@ impl SheetGeometry {
             self.cad_objects.push(CadObject::Dimension(CadDim { kind, measurement, text_mid, scale: env.scale(view) }));
             self.cad_members.push(CadMember { lines: l0..l1, texts: t0..t1, fills: f0..f1, obj });
         }
+    }
+}
+
+/// The Title / Header / Data row text styles of a table kind (live).
+fn table_row_styles(kind: &super::TableKind) -> [&'static str; 3] {
+    use super::TableKind as K;
+    match kind {
+        K::Bom { .. } => ["Onshape-Standard-BomTable-TitleRow", "Onshape-Standard-BomTable-HeaderRow", "Onshape-Standard-BomTable-DataRow"],
+        K::Hole { .. } => ["Onshape-Standard-HoleTable-TitleRow", "Onshape-Standard-HoleTable-HeaderRow", "Onshape-Standard-HoleTable-DataRow"],
+        K::Revision { .. } => ["Onshape-Standard-RevisionTable-TitleRow", "Onshape-Standard-RevisionTable-HeaderRow", "Onshape-Standard-RevisionTable-DataRow"],
+        K::CutList { .. } => ["Onshape-Standard-CutlistTable-TitleRow", "Onshape-Standard-CutlistTable-HeaderRow", "Onshape-Standard-CutlistTable-DataRow"],
+        K::Custom { .. } => ["Onshape-Standard-CustomTable-TitleRow", "Onshape-Standard-CustomTable-HeaderRow", "Onshape-Standard-CustomTable-DataRow"],
+        _ => ["Onshape-Standard-Table-TitleRow", "Onshape-Standard-Table-HeaderRow", "Onshape-Standard-Table-DataRow"],
     }
 }
