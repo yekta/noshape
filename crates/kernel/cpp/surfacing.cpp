@@ -25,6 +25,9 @@
 #include <GeomAPI_PointsToBSplineSurface.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <Geom_BSplineSurface.hxx>
+#include <Geom_Line.hxx>
+#include <Geom_Circle.hxx>
+#include <GeomConvert_CurveToAnaCurve.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Plane.hxx>
@@ -320,7 +323,36 @@ OpOut op_wrap_faces(const OcShapeList& faces, const DevSurf& src_d, const DevSur
         if (c2.IsNull())
           fail_op("wrap: an edge has no curve on its face");
         occ::handle<Geom2d_Curve> out;
-        if (affine)
+        occ::handle<Geom_Curve>   exact; // its 3D curve, when known exactly
+        occ::handle<Geom2d_Curve> basis = c2;
+        while (basis->IsKind(STANDARD_TYPE(Geom2d_TrimmedCurve)))
+          basis = occ::down_cast<Geom2d_TrimmedCurve>(basis)->BasisCurve();
+        const gp_Pnt2d a2 = c2->Value(f), b2 = c2->Value(l);
+        const gp_Pnt2d p0(A[0] * a2.X() + A[1] * a2.Y() + A[4], A[2] * a2.X() + A[3] * a2.Y() + A[5]);
+        const gp_Pnt2d p1(A[0] * b2.X() + A[1] * b2.Y() + A[4], A[2] * b2.X() + A[3] * b2.Y() + A[5]);
+        const bool     along = std::abs(p1.X() - p0.X()) < 1e-12 && std::abs(p1.Y() - p0.Y()) > 1e-12;
+        const bool     around = std::abs(p1.Y() - p0.Y()) < 1e-12 && std::abs(p1.X() - p0.X()) > 1e-12;
+        if (affine && dst.kind == 1 && basis->IsKind(STANDARD_TYPE(Geom2d_Line)) && (along || around))
+        {
+          // A straight side onto the cylinder along its axis is a line, around
+          // it an arc, as in Onshape (std sheet metal Bend calls evLine on the
+          // wrapped bend's sides). Both parametrized like the segment in (u, v).
+          const gp_Vec2d d2(p0, p1);
+          out = new Geom2d_TrimmedCurve(new Geom2d_Line(p0, gp_Dir2d(d2)), 0.0, d2.Magnitude());
+          gp_Pnt P;
+          gp_Vec du, dv;
+          dsurf->D1(p0.X(), p0.Y(), P, du, dv);
+          if (along)
+            exact = new Geom_Line(P, gp_Dir(dv * (p1.Y() > p0.Y() ? 1.0 : -1.0)));
+          else
+          {
+            const gp_Pnt C((P.XYZ() + dsurf->Value(p0.X() + kPi, p0.Y()).XYZ()) * 0.5);
+            const gp_Dir X(gp_Vec(C, P));
+            const gp_Dir Y(du * (p1.X() > p0.X() ? 1.0 : -1.0));
+            exact = new Geom_Circle(gp_Ax2(C, X.Crossed(Y), X), P.Distance(C));
+          }
+        }
+        else if (affine)
         {
           occ::handle<Geom2d_TrimmedCurve> tc = new Geom2d_TrimmedCurve(c2, f, l);
           occ::handle<Geom2d_BSplineCurve> bs = Geom2dConvert::CurveToBSplineCurve(tc);
@@ -358,6 +390,11 @@ OpOut op_wrap_faces(const OcShapeList& faces, const DevSurf& src_d, const DevSur
         if (!me.IsDone())
           fail_op("wrap: could not build a mapped edge");
         TopoDS_Edge ne = me.Edge();
+        if (!exact.IsNull())
+        {
+          B.UpdateEdge(ne, exact, BRep_Tool::Tolerance(ne));
+          B.Range(ne, t0, t1, true);
+        }
         B.Add(nw, ne.Oriented(E.Orientation()));
         hist->AddGenerated(E, ne);
         ++n_edges;
