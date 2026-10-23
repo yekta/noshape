@@ -165,7 +165,7 @@ pub(crate) struct ManipValue {
     pub ids: Vec<InstanceId>,
     pub start: HashMap<InstanceId, Placement>,
     pub explode: bool,
-    pub input: Entity<InputState>,
+    pub input: Entity<crate::quantity_field::QuantityInput>,
     _sub: Subscription,
 }
 
@@ -1520,30 +1520,36 @@ impl AssemblyView {
             // Plane drags and manipulator moves have no single typed value.
             ManipHandle::Plane(_) | ManipHandle::Center => return,
         };
-        let text = noshape_units::format_quantity(q, &units);
-        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
-        let sub = cx.subscribe_in(&input, window, |this: &mut Self, _, ev: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = ev {
-                this.apply_manip_value(window, cx);
+        use crate::quantity_field::{CommitVia, QuantityEvent, QuantityInput, QuantitySpec};
+        let text = noshape_units::format_quantity(q, &units).replace('°', " deg");
+        // Live (behaviours "qa4 (10-23 a) (4)"): Onshape's canvas number box,
+        // focused with the text selected; Enter / ↑ / ↓ move the part (from
+        // where the drag started) and keep it open; a click on the canvas
+        // discards the text.
+        let dim = if matches!(handle, ManipHandle::Axis(_)) { Dim::LENGTH } else { Dim::ANGLE };
+        let input = cx.new(|cx| QuantityInput::new(text, QuantitySpec::quantity(dim).canvas(), units, window, cx));
+        let sub = cx.subscribe_in(&input, window, |this: &mut Self, _, ev: &QuantityEvent, window, cx| {
+            match ev {
+                QuantityEvent::Committed(CommitVia::Enter | CommitVia::Step) => this.apply_manip_value(cx),
+                // Esc: the text reverts to the last committed value and the
+                // box blurs; it stays shown (live).
+                QuantityEvent::Escape => window.focus(&this.focus, cx),
+                _ => {}
             }
+        });
+        let state = input.read(cx).state().clone();
+        state.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
         });
         self.manip_value = Some(ManipValue { handle, axis: d.plane_normal, center: d.plane_point, ids: d.ids.clone(), start: d.start.clone(), explode: d.explode, input, _sub: sub });
         cx.notify();
     }
 
-    fn apply_manip_value(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn apply_manip_value(&mut self, cx: &mut Context<Self>) {
         let Some(mv) = &self.manip_value else { return };
-        let units = self.units(cx);
-        let dim = if matches!(mv.handle, ManipHandle::Axis(_)) { Dim::LENGTH } else { Dim::ANGLE };
-        let text = mv.input.read(cx).value().to_string();
-        let v = match noshape_units::evaluate_as(&text, dim, &units, &EmptyScope) {
-            Ok(q) => q.value,
-            Err(e) => {
-                self.message = Some((true, format!("{e}")));
-                cx.notify();
-                return;
-            }
-        };
+        // Invalid: the box is pink and nothing moves (live).
+        let Some(v) = mv.input.read(cx).value() else { return };
         if mv.explode {
             // Edit the last explode step's distance / angle.
             let (handle, axis) = (mv.handle, mv.axis);
@@ -1567,47 +1573,78 @@ impl AssemblyView {
             self.apply_solved(solved, cx);
             self.edit(&format!("Move : {name}"), cx, |_| {});
         }
-        window.focus(&self.focus, cx);
-        self.manip_value = None;
+        // The box stays open, focused and selected (live).
         cx.notify();
     }
 
     pub(super) fn render_manip_value(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let pal = p();
+        // During the drag (live: the box is there from the start), the
+        // dragged distance / angle, not yet editable.
+        let dragging = self.drag.as_ref().filter(|d| d.started && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_))));
+        if self.manip_value.is_none()
+            && let Some(d) = dragging
+        {
+            let units = self.units(cx);
+            let q = if matches!(d.handle, Some(ManipHandle::Axis(_))) { Quantity::meters(d.value) } else { Quantity::radians(d.value) };
+            let text = noshape_units::format_quantity(q, &units).replace('°', " deg");
+            let pos = self.manip_box_pos(d.handle?, d.plane_point, cx)?;
+            let pal = p();
+            return Some(
+                div()
+                    .absolute()
+                    .left(px(pos.x as f32 + 8.))
+                    .top(px(pos.y as f32 - 13.))
+                    .w(px(75.))
+                    .h(px(26.))
+                    .px(px(3.))
+                    .flex()
+                    .items_center()
+                    .justify_end()
+                    .border_1()
+                    .border_color(pal.accent)
+                    .text_size(px(13.33))
+                    .text_color(pal.text)
+                    .child(text)
+                    .into_any_element(),
+            );
+        }
         let mv = self.manip_value.as_ref()?;
-        let f = self.manipulator(cx).map(|f| f.origin).unwrap_or(mv.center);
-        let vp = self.viewport.read(cx);
-        let (pos, size) = (vp.project(f)?, vp.size());
-        // Keep the box inside the viewport (left of the triad near the right edge).
-        let pos = DVec2::new(if pos.x + 300.0 > size.x { pos.x - 320.0 } else { pos.x }, pos.y.min(size.y - 60.0));
-        let label = match mv.handle {
-            ManipHandle::Axis(k) => format!("{} distance", ["X", "Y", "Z"][k]),
-            ManipHandle::Ring(k) => format!("Angle about {}", ["X", "Y", "Z"][k]),
-            ManipHandle::Plane(_) | ManipHandle::Center => String::new(),
-        };
+        let pos = self.manip_box_pos(mv.handle, mv.center, cx)?;
+        let input = mv.input.clone();
+        // Live: a bare input, 75 x 26, no label, no buttons.
         Some(
-            h_flex()
+            div()
                 .id("manip-value")
                 .occlude()
                 .absolute()
-                .left(px(pos.x as f32 + 24.))
-                .top(px(pos.y as f32 + 24.))
-                .gap_1()
-                .p_1()
-                .rounded_md()
-                .border_1()
-                .border_color(pal.accent)
-                .bg(pal.panel_raised)
-                .shadow_lg()
-                .child(div().text_xs().text_color(pal.text_muted).child(label))
-                .child(div().w(px(90.)).child(Input::new(&mv.input).xsmall()))
-                .child(Button::new("mv-ok").icon(Icon::empty().path(icon_path("check"))).primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.apply_manip_value(window, cx))))
-                .child(Button::new("mv-x").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.manip_value = None;
-                    cx.notify();
-                })))
+                .left(px(pos.x as f32 + 8.))
+                .top(px(pos.y as f32 - 13.))
+                .w(px(75.))
+                .h(px(26.))
+                .child(input.clone())
+                // Tab commits and the focus stays in the box (live).
+                .capture_key_down(cx.listener(move |_, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key == "tab" {
+                        cx.stop_propagation();
+                        // (The commit moves the part, as Enter does.)
+                        input.update(cx, |q, cx| q.commit_now(window, cx));
+                    }
+                }))
                 .into_any_element(),
         )
+    }
+
+    /// Where the triad's value box sits: next to the dragged arrow's tip
+    /// (the arrows are 1.6 triad sizes long), following the triad.
+    fn manip_box_pos(&self, handle: ManipHandle, fallback: DVec3, cx: &App) -> Option<DVec2> {
+        let tip = match (self.manipulator(cx), handle) {
+            (Some(f), ManipHandle::Axis(k) | ManipHandle::Ring(k)) => f.origin + [f.x(), f.y(), f.z()][k] * self.triad_size() * 1.6,
+            (Some(f), _) => f.origin,
+            (None, _) => fallback,
+        };
+        let vp = self.viewport.read(cx);
+        let (pos, size) = (vp.project(tip)?, vp.size());
+        Some(DVec2::new(pos.x.min(size.x - 90.0), pos.y.min(size.y - 30.0)))
     }
 
     /// Top banner for modes (snap, show mates, explode editing, placing).

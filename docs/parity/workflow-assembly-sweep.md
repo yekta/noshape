@@ -46,6 +46,7 @@ the error-string table's.
 | 30 | Animate | absent for Ball / Fastened; 0→360 deg / 0→25 mm, Steps 300, Reciprocate; one DOF auto-filled, several: empty until picked in "Select degree of freedom" (⟳ z first, then ↹ x, y, z) | Animate on Ball; 0→half the assembly size; first DOF pre-filled, translations first, chips "↔" | 🔧 |
 | 31 | Group dialog | 220 px feature dialog "Group 1", Instances field active, ✓ at 0.2 while empty, title tooltip "Group 1 did not regenerate properly: Nothing selected."; E2 "Mate cannot be added between member of same group." | panel "Group", a hint line, a primary ✓ button | 🔧 |
 | 32 | Mate dialog tooltips (dom/dialog-mate-*) | title "<name>" (or the error), type select "Mate type", query label "Mate connectors", Solve "Solve full assembly"; empty Tangent "Nothing selected." | title tip only on error, no type / label tips, Solve "Solve all mates including this one" | 🔧 |
+| 33 | Triad value box (behaviours "qa4 (10-23 a) (4)", icons2) | a bare 75 x 26 canvas input at the arrow tip, shown during and after the drag, focused + selected; Enter / ↑↓ / Tab move from the drag start and keep it open; "0.1 in" → "2.54 mm", "1+1" → "2 mm"; invalid pink, no tooltip; Esc reverts to the last committed value and blurs; a canvas click discards | a label, an input, ✓ and ✕ in a raised panel; Enter applied and closed | 🔧 |
 | 23 | Mate's geometry gone, instance kept (MT9) | "Mate cannot resolve mate connectors." (part deleted: row 28) | same | ✅ |
 
 ## Mates (dialogs, defaults, DOF)
