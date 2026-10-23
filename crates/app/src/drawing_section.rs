@@ -212,7 +212,7 @@ impl DrawingEditor {
                 .text_size(px(13.33))
                 .cursor_pointer()
                 .border_b_1()
-                .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.accent).font_weight(FontWeight::MEDIUM))
+                .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.emphasis).font_weight(FontWeight::MEDIUM))
                 .when(!on, |d| d.border_color(gpui_kit::rgb(0xdddddd)).text_color(pal.text))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_section_mode(m, cx)))
@@ -362,7 +362,7 @@ impl DrawingEditor {
                                     .text_size(px(12.))
                                     .cursor_pointer()
                                     .border_b_1()
-                                    .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.accent))
+                                    .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.emphasis))
                                     .when(!on, |d| d.border_color(gpui_kit::rgb(0xdddddd)))
                                     .child(label)
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
