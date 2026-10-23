@@ -101,28 +101,28 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 |---|---|---|---|---|
 | 1 | Fields | Creation type Solid / Surface / Split (Surface), operations for Solid, flip, Trim to target, anchors, Thickness 2.5 | same | ✅ |
 | 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✗ |
-| 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | ✗ ? L20 |
+| 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | 🔧 L20 (no unwrap; forced picks fail with live's texts) |
 | 4 | Errors | "Select planar faces or sketch regions to wrap." (source), "Select a cylindrical or conical face to wrap around." (destination), "Source entities must all lie on the same plane.", "Select anchor points.", auto-anchor text, "Failed to imprint edges onto destination face.", ambiguous anchor | own texts, no fields | 🔧 (unwrap keeps its own texts) |
-| 5 | Dialog dump | — | — | ? L21 |
+| 5 | Dialog dump | — | — | 🔧 L21 Position group collapsed (FS compiler lacks the group, dialog comparison excludes wrap) |
 
 ## Rib
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | order, labels, Thickness 2.5 mm, Parallel, Opposite direction ☑, Draft ☐ 3°, Extend ☐, Merge ribs ☑ | same | ✅ |
 | 2 | Empty profiles | "Select sketch profiles to create the ribs." on profiles | same | ✅ |
-| 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | ✗ ? L22 |
-| 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | ✗ ? L22 |
+| 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | 🔧 L22 (no field); older ribs keep using every part |
+| 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | 🔧 L22 Parts filled with the studio's parts on open |
 | 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | 🔧 ? L23 |
 | 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | ✗ |
 | 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | 🔧 |
-| 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✗ ? L24 |
+| 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✅ L24: one body per profile chain (live: the L rib is one body); parallel needs one straight edge 🔧; Extend profiles ✗ |
 
 ## Offset surface
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | order, labels, 5 mm (0 allowed), Create selection, flip | same | ✅ |
 | 2 | Nothing resolves | "Select faces, surfaces, or sketch regions to offset from." on surfacesAndFaces | "Nothing to offset"; one missing face fails the feature | 🔧 |
-| 3 | Kernel failure | — | raw kernel text | ? L25, L26 |
+| 3 | Kernel failure | — | raw kernel text | 🔧 L25 "Could not offset selected faces as requested."; L26 one surface per picked face |
 
 ## Fill
 | # | Area | Onshape | Ours | Status |
@@ -140,7 +140,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ |
 | 2 | Profile arrays | driven-query rows "[None] Edge of Sketch 1", max 2 picks each | "Add Profile" UI, no cap | ✗ |
 | 3 | Boundary condition label | SHOW_LABEL | no label | ✗ |
-| 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 ? L28 |
+| 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 L28; a third profile / mid-span crossing fail with live's texts 🔧; 1U+1V should build a sheet ✗ |
 | 5 | Boundary conditions | applied, with their errors | warning only | ✗ |
 | 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | 🔧 |
 
@@ -148,10 +148,10 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | Result body operation, Entities, Merge with all ☐, merge scope, Keep tools ☐ | same | ✅ |
-| 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | 🔧 ? L29 (field) |
-| 3 | No region | "Selections do not enclose a region." | own text | 🔧 ? L30 |
+| 2 | Empty | "Select faces, parts, or planes to form a solid." | own text | 🔧 L29 Entities marked |
+| 3 | No region | "Selections do not enclose a region." | own text | 🔧 ✅ L30 |
 | 4 | Failure | "Failed to create a part from enclosed region." | "Enclose failed: …" | 🔧 |
-| 5 | Sketch regions | allowed | filtered out | ? L31 |
+| 5 | Sketch regions | allowed | filtered out | 🔧 L31 accepted; enclosed regions make one part |
 
 ## Helix
 | # | Area | Onshape | Ours | Status |
@@ -159,30 +159,30 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields | order, labels, defaults (dialog-helix.txt) | same | ✅ |
 | 2 | Axis empty | "Select an object with an axis." on axis | own text, no field | 🔧 |
 | 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | 🔧 |
-| 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | ✗ ? L32 |
+| 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | 🔧 L32 "A parameter value is not valid." (any out-of-range value, all features) |
 | 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | ✗ ? L33 |
 | 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | ✗ |
 | 7 | Computed revolutions / pitch | filled | never | ✗ |
 | 8 | Show start and end profiles | magenta circles | nothing | ✗ |
-| 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | ? L34, L35 |
+| 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | ✗ L34 preselected line → Axis tab; L35 start angle follows each surface's own frame |
 
 ## Composite part
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | Entities, Closed ☐; closed consumes members | same | ✅ |
-| 2 | Empty | "Select entities to create a composite part." (likely) | own text, no field | 🔧 ? L36 |
+| 2 | Empty | "Select entities to create a composite part." (likely) | own text, no field | 🔧 L36 Entities marked |
 | 3 | Overlapping composites | "Cannot create a closed composite part that partially overlaps another composite part." (and open) | no check | ✗ ? L36 |
 
 ## Mate connector (Part Studio)
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields, empty origin | order, labels; "Cannot resolve entities." on Origin entity | same | ✅ |
-| 2 | Empty owner | "Cannot determine owner of mate connector." on Select owner entity | no error | ✗ ? L37 |
-| 3 | Owner / attachment auto-fill | from the origin entity or the only part (connectorEditLogic) | none | ✗ ? L37 |
+| 2 | Empty owner | "Cannot determine owner of mate connector." on Select owner entity | no error | 🔧 L37 (owner inferred from the origin's part or the only part, as the dialog does) |
+| 3 | Owner / attachment auto-fill | from the origin entity or the only part (connectorEditLogic) | none | 🔧 L37 |
 | 4 | To selection, empty | "Select an entity for the mate connector attachment." on Attach to | no check | ✗ |
 | 5 | Owner / attachment at regen | the connector follows them | not stored | ✗ |
-| 6 | Move vs Reorient secondary axis | translation in the reoriented frame (likely) | translated first | ? L38 |
-| 7 | Between entities / Realign errors | built-in texts | own texts | ? L39 |
+| 6 | Move vs Reorient secondary axis | translation in the reoriented frame (likely) | translated first | 🔧 L38 order: flip/reorient, move, rotate; "+Y" = X to −Y |
+| 7 | Between entities / Realign errors | built-in texts | own texts | 🔧 L39 "Failed to resolve mate connector coordinate system."; empty Realign axis = OK |
 
 ## Mirror / patterns: Face and Feature modes, Curve pattern
 | # | Area | Onshape | Ours | Status |
@@ -195,7 +195,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 6 | Reapply failures | "Could not pattern selected features." when all fail; partial failures silent | first failure's text; partial warning; geometric fallback | 🔧 texts and silent partial failures; the geometric fallback when a feature can't be re-run stays ✗ ? L40 |
 | 7 | Sketch in a feature pattern | re-run, info "Sketch dimensions and constraints using the Origin or the default planes as reference will not be reapplied. Learn more" | skipped | ✗ ? L41 |
 | 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | 🔧 texts; off-part instances still become parts ✗ ? L42, L43 |
-| 9 | Feature selection in Faces to pattern | a feature-list click adds its faces | not supported | ✗ ? L44 |
+| 9 | Feature selection in Faces to pattern | a feature-list click adds its faces | not supported | ✅ L44 (live adds nothing either; Hole not verified) |
 | 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | 🔧 except the start-point info ✗ ? L45 |
 | 11 | Limits and infos | "Cannot have more than 2500 instances in a pattern.", parallel directions info, skip-instance infos | missing | 🔧 2500 limit (linear) and parallel info; skip-instance infos ✗ |
 
@@ -210,7 +210,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 6 | Up to entity / selected plane empty | "Select an entity or mate connector to terminate the hole." / "Select a start entity." on the field | own texts, late | 🔧 |
 | 7 | Merge scope | auto-filled with the parts the hole reaches, direction flipped toward them; empty: "No target parts selected for hole." | empty = every solid | ✗ ? L56, L57 |
 | 8 | Misses | "None of the holes intersected a part." (scope); warning "Some selections did not produce holes."; blind hole that misses must fail | own texts; silent; blind miss succeeds | 🔧 |
-| 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | 🔧 ? L51 |
-| 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | ✗ ? L61 |
-| 11 | Depth / Tapped depth / Tap clearance | kept consistent by edit logic; inconsistency warning | independent | ✗ ? L49, L50 |
+| 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | 🔧 L51 (+ fit info bubble) |
+| 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | 🔧 L61 apex at the offset, Depth shows 4.092 |
+| 11 | Depth / Tapped depth / Tap clearance | kept consistent by edit logic; inconsistency warning | independent | 🔧 L49/L50 linked in the dialog (no mismatch warning, as live) |
 | 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; other infos ✗ |
