@@ -1158,11 +1158,23 @@ Replace instance / Interference detection. What live's `panelLayoutManager` (bun
 - **VB1**: the sketch value box (and its Create variable popup) is collected in `on_top` and appended after the constraint and pattern glyphs in `render_sketch_labels`.
 - **STB1**: S toolbar = the assembly's `.os-mini-toolbar-panel` look: at cursor x+10 / y−30, 30 px tools at a 34 px pitch, rows 1 px apart, 4.5 px padding (175 wide), white .95, no border, square corners, 0 5 10 shadow, no tooltips, full-colour 20 px icons. In a sketch S re-opens at the cursor.
 
+Checked in the app 10-22 (main + ui-main):
+- **BOOL1b:** the bubble shows while the dialog is open; the dialog is clean and the ✓ is green. After ✓ there is no bubble or toast. The row tooltip had read "Boolean 1 <- Extrude 1"; tooltips now use `interaction::tooltip_dependencies`, which skips whole-part references (live: Extrude Add scope, Hole, Boolean list none).
+- **DER14:** the menu item is there, and ✓ colours the derived part.
+- **Derived 2 locations:** the bubble text, "Part 1" twice, ▸ "Sketch 1" twice, sketches at both places, tooltip "Derived 1 <- Part Studio 1".
+- **VB1:** the value box covers the corner glyph.
+- **STB1:** opens at cursor +10/−30, 174×61, square corners, no border.
+  - Esc in a sketch used to cancel the sketch through the focused Sketch dialog; now the sketch's capture handler closes the S toolbar / Select other first.
+
 ### Next steps, in order
-1. Re-check in the app: CRASH1, BOOL1b, DER14, VB1, STB1 (and KB2 and the Shift+E no-op, done).
+1. Live request "ui (10-22 c)": tool search for Section view / Reflection analysis (live notes disagree), and the Shift+/ modal's ↗ pop-out (what it opens).
 2. Check TABS3/TABS5/ADV8/FS4 in the app; run `no_onshape_assets` and the app unit tests (`custom_feature_initials_and_regen_times_read_as_onshape`, `panels_snap_like_onshape`).
 3. FS4 tooltip second line; then FS2/FS5 with fs.
-4. Derived at 2+ locations: std importDerived instantiates sketches per location and reports DERIVED_NO_INSTANCING. Live request "ui (10-22 b)" asks for the text and the ▸ listing; ours brings sketches only at the first location.
+4. Derived at 2+ locations: **done 10-22** (live behaviours "ui (10-22 b)").
+   - `importing.rs` copies the source sketches per location, and every instance keeps the source part name ("Part 1" twice).
+   - It reports the info `DERIVED_NO_INSTANCING` ("Using derived feature to make instances is not recommended. Consider using an Assembly instead."), shown as the graphics bubble while editing (BOOL1b path).
+   - The ▸ lists one row per copy (`ListItem::DerivedSketch(.., copy)`), and the row tooltip reads "Derived 1 <- <source studio>".
+   - Known gap: picks and references on a second copy resolve to the first (same sketch id).
 5. Parked NumberInput patch; TAB1 with psb ("Parts (0)" after a tab switch).
 
 ### How to build and test (ui)
@@ -1354,3 +1366,12 @@ Spec: `QuantitySpec::quantity(Dim::LENGTH | ANGLE | UNITLESS)` or `QuantitySpec:
   (`os_ui::select_field_focusable`: Space/Enter/↓ open), then d, ?, then the navbar; Generate is no tab stop. Tab
   on the assembly page itself (`Assembly && !Input`) → `FocusNavbar` (live: the dialog opens with the focus on the
   page body, the first Tab goes to Share).
+
+## From ui2 (10-22): dark mode (lead: ui2 owns it) — touches theme.rs and vendor gpui-pre color.rs
+- `theme::PALETTE_DARK` (live dom/dark-os-vars-computed.json), `p()` returns it while dark mode is on and no
+  light scope is open; `theme::set_dark` (Preferences › Theming) installs `theme::DARK_HEX` into the patched
+  gpui: `rgb()` / `rgba()` map literal light colours to dark ones (one relaxed atomic load in light mode; a
+  binary search in dark). `gpui_kit::with_light_colors(|| …)` keeps a subtree light (the drawing editor);
+  `gpui_kit::rgb_static` for colours that never change (Onshape's `--static` tokens). New hard-coded colours
+  are fine; if one must not flip in dark mode, use `rgb_static`. Plan and side-by-side table:
+  docs/parity/dark-mode.md.

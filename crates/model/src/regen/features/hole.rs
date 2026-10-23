@@ -48,8 +48,10 @@ impl LocSource {
 fn locations(ev: &EvalCtx) -> FResult<Vec<Location>> {
     let mut out: Vec<Location> = Vec::new();
     let refs = ev.query("locations");
+    // Coincident points make one hole only when they face the same way
+    // (live L60: points on the top and front faces of a corner make two).
     let mut push = |l: Location| {
-        if !out.iter().any(|o| o.point.distance(l.point) < 1e-9) {
+        if !out.iter().any(|o| o.point.distance(l.point) < 1e-9 && o.normal.normalize().dot(l.normal.normalize()) > 1.0 - 1e-9) {
             out.push(l);
         }
     };
@@ -133,7 +135,11 @@ fn is_default(ev: &EvalCtx, feature: &str, id: &str) -> bool {
 
 struct HoleDims {
     diameter: f64,
+    /// The tap drill diameter of a tapped hole (drawing callouts).
     tap_drill: Option<f64>,
+    /// Cut with the tap drill in the last part: only with a fastener fit
+    /// (hole.fs `hasClearance`); otherwise the whole hole is Diameter.
+    clearance: bool,
     cbore: Option<(f64, f64)>,
     csink: Option<(f64, f64)>,
 }
@@ -169,7 +175,20 @@ fn hole_dims(ev: &EvalCtx) -> FResult<HoleDims> {
     if diameter <= 0.0 {
         return err("Hole diameter must be positive");
     }
-    Ok(HoleDims { diameter, tap_drill, cbore, csink })
+    // hole.fs checks these before the locations.
+    if cbore.is_some_and(|(cd, _)| cd <= diameter) {
+        return crate::regen::eval::err_at(&["holeDiameterV3", "cBoreDiameterV3"], "The counterbore diameter must be larger than the hole diameter.");
+    }
+    if let Some((_, cdepth)) = cbore
+        && ev.is("endStyleV2", "BLIND")
+        && cdepth >= len("holeDepthV3")?
+    {
+        return crate::regen::eval::err_at(&["holeDepthV3", "cBoreDepthV3"], "The counterbore depth must be smaller than the hole depth.");
+    }
+    if csink.is_some_and(|(sd, _)| sd <= diameter) {
+        return crate::regen::eval::err_at(&["holeDiameterV3", "cSinkDiameterV3"], "The countersink diameter must be larger than the hole diameter.");
+    }
+    Ok(HoleDims { diameter, tap_drill, clearance: vals.bool("hasClearance"), cbore, csink })
 }
 
 /// Hole cross-section as (radius, depth) points, depth into the material
@@ -179,44 +198,54 @@ fn hole_profile(d: f64, dims: &HoleDims, h: f64, tip: f64, over: f64) -> FResult
     let mut pts: Vec<DVec2> = vec![v2(0.0, -over)];
     if let Some((cd, cdepth)) = dims.cbore {
         let cr = cd * 0.5;
-        if cr <= r {
-            return err("Counterbore diameter must be larger than the hole diameter");
-        }
-        if cdepth >= h {
-            return err("Counterbore is deeper than the hole");
+        if cdepth > h {
+            return crate::regen::eval::err_at(&["holeDepthV3", "cBoreDepthV3"], "The counterbore depth must be smaller than the hole depth.");
         }
         pts.extend([v2(cr, -over), v2(cr, cdepth), v2(r, cdepth)]);
     } else if let Some((sd, sa)) = dims.csink {
         let sr = sd * 0.5;
-        if sr <= r {
-            return err("Countersink diameter must be larger than the hole diameter");
-        }
         if !(sa > 0.0 && sa < std::f64::consts::PI) {
             return err("Countersink angle must be between 0 and 180 degrees");
         }
         let c = (sr - r) / (sa * 0.5).tan();
-        if c >= h {
-            return err("Countersink is deeper than the hole");
+        // Live L47: a countersink deeper than the hole is allowed; the cone
+        // ends at the hole diameter with a flat bottom around the drill.
+        if c >= h + tip {
+            pts.extend([v2(sr, -over), v2(sr, 0.0), v2(r, c), v2(0.0, c)]);
+            pts.dedup_by(|a, b| a.distance(*b) < 1e-12);
+            return Ok(pts);
         }
         pts.extend([v2(sr, -over), v2(sr, 0.0), v2(r, c)]);
     } else {
         pts.push(v2(r, -over));
     }
-    pts.push(v2(r, h));
-    pts.push(v2(0.0, h + tip));
+    if h > pts.last().map_or(0.0, |p| p.y) {
+        pts.push(v2(r, h));
+    }
+    pts.push(v2(0.0, (h + tip).max(pts.last().map_or(0.0, |p| p.y))));
     pts.dedup_by(|a, b| a.distance(*b) < 1e-12);
     Ok(pts)
 }
 
+/// Live L51: a fastener fit on a hole through one part.
+const FIT_INFO: &str = "Fastener fit will not be applied if there are fewer than two parts per hole.";
+
 pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
+    // hole.fs order: sizes, then the end and start entities, then the points.
+    let dims = hole_dims(ev)?;
+    if ev.is("endStyleV2", "UP_TO_ENTITY") && ev.query("endBoundEntity").is_empty() {
+        return crate::regen::eval::err_at(&["endBoundEntity"], "Select an entity or mate connector to terminate the hole.");
+    }
+    if ev.is("startStyle", "PLANE") && ev.query("startBoundEntity").is_empty() {
+        return crate::regen::eval::err_at(&["startBoundEntity"], "Select a start entity.");
+    }
     let locs = locations(ev)?;
     if locs.is_empty() {
         return crate::regen::eval::err_at(&["locations"], "No hole points selected.");
     }
     if locs.len() > 500 {
-        return err("A hole feature can have at most 500 locations");
+        return crate::regen::eval::err_at(&["locations"], "Too many hole locations were selected, maximum: 500.");
     }
-    let dims = hole_dims(ev)?;
     // Onshape (hole.fs → getFitToleranceLimits): a Fit with tolerance /
     // Fit (tolerance only) whose class has no limits at this size fails the
     // feature with the table's message.
@@ -234,8 +263,14 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         return err("There are no parts to cut holes in");
     }
     let start_plane = if start_style == "PLANE" {
-        let Some(r) = ev.query("startBoundEntity").first() else { return err("Select a hole start plane") };
-        Some(ev.resolve_plane(r).ok_or_else(|| fe("The hole start plane could not be resolved"))?)
+        let no_start = || crate::regen::eval::err_at(&["startBoundEntity"], "Select a start entity.");
+        let Some(r) = ev.query("startBoundEntity").first() else { return no_start() };
+        let Some(f) = ev.resolve_plane(r) else { return no_start() };
+        // Live L54: every hole must be perpendicular to the start plane.
+        if locs.iter().any(|l| l.normal.normalize().dot(f.normal.normalize()).abs() < 1.0 - 1e-9) {
+            return err("Some Hole directions are not perpendicular to selected inputs.");
+        }
+        Some(f)
     } else {
         None
     };
@@ -255,6 +290,10 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     // Tools grouped by the body ids they cut.
     let mut groups: BTreeMap<Vec<BodyId>, Vec<NamedShape>> = BTreeMap::new();
     let mut any_hit = false;
+    // Locations that made no hole (hole.fs warns when only some miss).
+    let mut missed = 0;
+    // A fastener fit on a hole through fewer than two parts (live L51).
+    let mut fit_unused = false;
     // Depth of an Up to next / Up to entity hole, shown read-only.
     let mut up_to_depth_found: Option<f64> = None;
     for loc in &locs {
@@ -289,27 +328,32 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             .collect();
         let hit_bodies: Vec<(usize, f64, f64)> = rel.iter().filter_map(|(bi, iv)| Some((*bi, iv.first()?.0, iv.last()?.1))).collect();
         if hit_bodies.is_empty() {
+            missed += 1;
             continue;
         }
-        any_hit = true;
         let r_main = dims.diameter * 0.5;
         let (h, tip) = match end.as_str() {
             "BLIND" => (ev.length("holeDepthV3")?, tip_len(tip_angle, r_main)),
             "THROUGH" => (hit_bodies.iter().map(|x| x.2).fold(0.0, f64::max) + r_main.max(1e-4), 0.0),
             "UP_TO_NEXT" => {
                 let next = rel.iter().flat_map(|(_, iv)| iv.iter()).map(|(_, b)| *b).fold(f64::INFINITY, f64::min);
-                (next - tip_offset, tip_len(tip_angle, r_main))
+                // Live L61: the tip's apex is at the entity minus the offset.
+                let tip = tip_len(tip_angle, r_main);
+                (next - tip_offset - if tip_offset != 0.0 { tip } else { 0.0 }, tip)
             }
             "UP_TO_ENTITY" => {
-                let Some(r) = ev.query("endBoundEntity").first() else { return err("Select an entity to end the hole at") };
-                (up_to_depth(ev, r, s, dir)? - tip_offset, tip_len(tip_angle, r_main))
+                let Some(r) = ev.query("endBoundEntity").first() else { return crate::regen::eval::err_at(&["endBoundEntity"], "Select an entity or mate connector to terminate the hole.") };
+                let tip = tip_len(tip_angle, r_main);
+                (up_to_depth(ev, r, s, dir)? - tip_offset - if tip_offset != 0.0 { tip } else { 0.0 }, tip)
             }
             other => return err(format!("Unsupported hole termination {other}")),
         };
         if h.is_nan() || h <= 1e-9 {
             return err("The hole has zero depth (check the termination and direction)");
         }
-        up_to_depth_found.get_or_insert(h);
+        // Live L61: with an offset the Depth field shows the shaft depth less
+        // the offset (4.092 for a 6.092 shaft and a 2 mm offset).
+        up_to_depth_found.get_or_insert(h - tip_offset);
         // Overshoot above the start when that is outside every part.
         let over = {
             let o = r_main * 0.25;
@@ -360,10 +404,13 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         ordered.sort_by(|a, b| a.1.total_cmp(&b.1));
         ordered.retain(|x| x.1 < h + tip);
         if ordered.is_empty() {
+            missed += 1;
             continue;
         }
+        any_hit = true;
         let ids = |v: &[(usize, f64, f64)]| -> Vec<BodyId> { v.iter().map(|x| ev.ctx.bodies[x.0].id.clone()).collect() };
-        match dims.tap_drill {
+        fit_unused |= dims.clearance && ordered.len() < 2;
+        match dims.tap_drill.filter(|_| dims.clearance) {
             Some(td) if (td - dims.diameter).abs() > 1e-9 && ordered.len() > 1 => {
                 let (front, last) = ordered.split_at(ordered.len() - 1);
                 let a = make_tool(dims.diameter)?;
@@ -382,7 +429,14 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if !any_hit {
-        return err(if explicit_scope.is_empty() { "The holes don't hit any part (try Opposite direction)" } else { "The holes don't hit any part in the merge scope" });
+        return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
+    }
+    // Live L53: a location that makes no hole fails the whole feature.
+    if missed > 0 {
+        return err("Hole creates invalid geometry.");
+    }
+    if fit_unused {
+        ev.infos.push(FIT_INFO.into());
     }
     for (ids, tools) in groups {
         let targets: Vec<usize> = ids.iter().filter_map(|id| index_of_body(ev, id)).collect();

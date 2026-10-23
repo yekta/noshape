@@ -10,7 +10,7 @@ use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, refs};
-use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Drawing, GdtLeader, ViewId, ViewKind};
+use noshape_model::drawing::{AnnotationKind, BreakStyle, CalloutBorder, CalloutStyle, Crop, Drawing, GdtLeader, TableCorner, ViewId, ViewKind};
 use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
 
@@ -95,6 +95,26 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "jogged_section_view",
+            summary: "Jogged section view (an orthogonal cutting line through several points)",
+            description: "The Jogged section view tool: clicks `points` (sheet mm, at least 2) on the parent view; each one continues the cutting line horizontally or vertically (in the view's frame) toward it, and finishing (Enter) extends both ends past the view. The section goes to `position`, projected from the first segment. One edit (\"Section view\").",
+            fields: with(common(), vec![view_id("parent", "View to section."), req("points", points(2, 16), "The cutting line's clicks (sheet mm)."), req("position", point(), "Where the section view goes (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: jogged_section_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "aligned_section_view",
+            summary: "Aligned section view (two cutting legs about a center, unfolded)",
+            description: "The Aligned section view tool: `center` (sheet mm) on the parent view, then `a` and `b`, the directions of the two cutting legs from it (each leg is extended past the view). The view goes to `position`, projected from the first leg. One edit (\"Aligned section view\").",
+            fields: with(common(), vec![view_id("parent", "View to section."), req("center", point(), "The legs' common point (sheet mm)."), req("a", point(), "A point along the first leg (sheet mm)."), req("b", point(), "A point along the second leg (sheet mm)."), req("position", point(), "Where the view goes (sheet mm).")]),
+            mutates: true,
+            destructive: false,
+            run: aligned_section_view,
+        },
+        Op {
+            group: "drawing",
             verb: "detail_view",
             summary: "Detail view of a circular region of a view",
             description: "The Detail view tool: the circle centered at `center` (sheet mm; a vertex or circle center there is snapped) with `radius` (sheet mm) on the parent view, shown at `scale` (default twice the parent's) at `position`. One edit (\"Detail view\").",
@@ -119,12 +139,13 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "drawing",
             verb: "auxiliary_view",
-            summary: "Auxiliary view looking normal to a straight edge",
-            description: "The Auxiliary view tool (Normal): `edge` is a click on a straight model edge of the parent view (sheet mm); the view looks along it and goes to `position` (at least 15 mm from the parent, perpendicular to the edge). One edit (\"Auxiliary view\").",
+            summary: "Auxiliary view: normal to an edge, in line with a sketch line / centerline, or down a hole's axis",
+            description: "The Auxiliary view tool. `edge` is a click (sheet mm) on the fold line for `mode`: normal, a straight model edge of the parent view (the view looks along it); in_line, a sheet sketch line or a centerline annotation; axis, a hole's axis seen side-on (its centerline or silhouette; the view looks down it). The view goes to `position` (at least 15 mm from the parent, perpendicular to the fold line). One edit (\"Auxiliary view\").",
             fields: with(
                 common(),
                 vec![
-                    req("edge", point(), "A point on a straight edge of a view (sheet mm)."),
+                    opt("mode", json!({ "type": "string", "enum": ["normal", "in_line", "axis"], "default": "normal" }), "The dialog's tab."),
+                    req("edge", point(), "A point on the fold line (sheet mm)."),
                     req("position", point(), "Where the view goes (sheet mm)."),
                     opt("label", json!({ "type": "string" }), "Auxiliary id (default the sheet's next letter)."),
                     opt("reverse", json!({ "type": "boolean", "default": false }), "Reverse the direction."),
@@ -159,19 +180,180 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "crop_view",
             summary: "Crop a view to a rectangle or circle",
-            description: "The Crop view tool: a rectangle with corners `from` and `to`, or a circle centered at `from` through `to` (sheet mm; `from` snaps to a vertex there). One edit (\"Crop view\").",
+            description: "The Crop view tools: a rectangle with corners `from` and `to`, a circle centered at `from` through `to` (sheet mm; `from` snaps to a vertex there), or a closed polygon / spline through `points` (sheet mm, at least 3; vertices snap). One edit (\"Crop view\"); a view's new crop replaces its old one.",
             fields: with(
                 common(),
                 vec![
                     view_id("view", "View to crop."),
-                    opt("shape", json!({ "type": "string", "enum": ["rectangle", "circle"], "default": "rectangle" }), "Crop shape."),
-                    req("from", point(), "Rectangle corner / circle center (sheet mm)."),
-                    req("to", point(), "Opposite corner / a point on the circle (sheet mm)."),
+                    opt("shape", json!({ "type": "string", "enum": ["rectangle", "circle", "polygon", "spline"], "default": "rectangle" }), "Crop shape."),
+                    opt("from", point(), "Rectangle corner / circle center (sheet mm)."),
+                    opt("to", point(), "Opposite corner / a point on the circle (sheet mm)."),
+                    opt("points", points(3, 1000), "Polygon / spline points (sheet mm)."),
                 ],
             ),
             mutates: true,
             destructive: false,
             run: crop_view,
+        },
+        Op {
+            group: "drawing",
+            verb: "broken_out_section",
+            summary: "Broken-out section: cut away a closed profile of a view",
+            description: "The Broken-out section tool: the closed spline profile through `points` (sheet mm, at least 3; vertices snap) cut into the view to a blind `depth` from the model's nearest point (default: half the model's depth along the line of sight, as the dialog), or up to the model point snapped at `depth_to`. `index` edits the view's existing broken-out section instead. One edit (\"Broken-out section\"). Projected views of the view show the cut too.",
+            fields: with(
+                common(),
+                vec![
+                    opt("view", json!({ "type": "integer" }), "View to cut (default: the view under the first point)."),
+                    req("points", points(3, 1000), "Profile points (sheet mm)."),
+                    opt("depth", json!({ "type": ["string", "number"] }), "Blind depth: a length (\"5 mm\"; a bare number is in workspace units)."),
+                    opt("depth_to", point(), "Up to entity: a model point (vertex, circle center...) of a view of the same model (sheet mm)."),
+                    opt("index", json!({ "type": "integer", "minimum": 0 }), "Edit the view's broken-out section number `index` (0-based, drawing_get) instead of adding one."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: broken_out_section,
+        },
+        Op {
+            group: "drawing",
+            verb: "hatch_region",
+            summary: "Hatch closed profiles of the sheet sketch or of views",
+            description: "The Hatch region dialog: each of `points` (sheet mm) picks the smallest closed sheet-sketch profile around it, else the smallest closed region of the visible edges of the view there (not detail or break views); a region per profile. Pattern tab `standard` and `pattern` (its name as listed in the dialog, e.g. \"ANSI31 general\", or just its first word \"ANSI31\"; default the tab's default), `scale` and `angle` (\"Auto\" or a number; not on the General tab), `color` (default: the drawing's hatch color). `hatch` edits that hatch region instead (its profile replaced when `points` are given). One edit (\"Hatch region\" / \"Edit hatch\"); replies with the hatch ids.",
+            fields: with(
+                common(),
+                vec![
+                    opt("points", points(1, 100), "Points inside the profiles to hatch (sheet mm)."),
+                    opt("standard", json!({ "type": "string", "enum": ["ansi", "iso", "general"], "default": "ansi" }), "Pattern tab."),
+                    opt("pattern", json!({ "type": "string" }), "Pattern name."),
+                    opt("scale", json!({ "type": ["string", "number"], "default": "Auto" }), "Pattern scale (\"Auto\" = 1)."),
+                    opt("angle", json!({ "type": ["string", "number"], "default": "Auto" }), "Pattern angle in degrees (\"Auto\": the pattern's own)."),
+                    opt("color", json!({ "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 }, "minItems": 3, "maxItems": 3 }), "Color [r, g, b] (default: the drawing's hatch color)."),
+                    opt("hatch", json!({ "type": "integer" }), "Hatch region id to edit (drawing_get)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: hatch_region,
+        },
+        Op {
+            group: "drawing",
+            verb: "custom_table",
+            summary: "Insert a custom table, or edit a custom table's properties",
+            description: "The Custom table dialog: custom table `table` (its name or display name) defined by a Feature Studio of this document, computed on Part Studio `studio` (default: the Part Studio of `view`, else the first one shown in the drawing), placed with its `corner` at `position` (sheet mm). With `id`: Custom table properties of that table (Part Studio, table, order, corner; unset fields kept). One edit (\"Custom table\" / \"Custom table properties\"). Its rows are in drawing_get's tables.",
+            fields: with(
+                common(),
+                vec![
+                    opt("table", json!({ "type": "string" }), "Custom table name or display name."),
+                    opt("feature_studio", json!({ "type": "string" }), "Feature Studio tab (name or id) defining it, when several define the name."),
+                    opt("studio", json!({ "type": "string" }), "Part Studio tab (name or id)."),
+                    opt("view", json!({ "type": "integer" }), "A view whose Part Studio to use."),
+                    opt("position", point(), "Where the fixed corner goes (sheet mm; inserting)."),
+                    opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "Fixed corner."),
+                    opt("bottom_to_top", json!({ "type": "boolean", "default": false }), "Row order bottom to top."),
+                    opt("id", json!({ "type": "integer" }), "Custom table to edit (drawing_get)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: custom_table,
+        },
+        Op {
+            group: "drawing",
+            verb: "insert_image",
+            summary: "Insert an image on the sheet",
+            description: "Toolbar › Insert image: image file tab `file` of the document (PNG, JPEG, GIF), or a local file `path` imported first as a file tab (its own edit \"Import <name>\", as the picker's Import). Placed as a drag from `position` to `to` (sheet mm; the image's aspect kept), or without `to` 30 mm high with its lower-left corner at `position`. One edit (\"Insert image\"); replies with the image id.",
+            fields: with(
+                common(),
+                vec![
+                    opt("file", json!({ "type": "string" }), "Image file tab (name or id)."),
+                    opt("path", json!({ "type": "string" }), "Local image file to import and insert."),
+                    req("position", point(), "Drag start / lower-left corner (sheet mm)."),
+                    opt("to", point(), "Drag end (sheet mm)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: insert_image,
+        },
+        Op {
+            group: "drawing",
+            verb: "insert_cad",
+            summary: "Insert a DXF or DWG as drawing sketch geometry",
+            description: "Toolbar › Insert DXF or DWG: the model-space wireframe of DXF / DWG file tab `file` (or local file `path`, imported first as a file tab: its own edit \"Import <name>\") becomes sheet sketch geometry at the file's own coordinates (its unit, else the drawing's; blocks and polylines exploded, colors dropped). One edit (\"Insert DXF or DWG\"); replies with the number of entities.",
+            fields: with(
+                common(),
+                vec![opt("file", json!({ "type": "string" }), "DXF / DWG file tab (name or id)."), opt("path", json!({ "type": "string" }), "Local DXF / DWG file to import and insert.")],
+            ),
+            mutates: true,
+            destructive: false,
+            run: insert_cad,
+        },
+        Op {
+            group: "drawing",
+            verb: "sketch",
+            summary: "Drawing sketch tools: line, circles, rectangles, tangent arc, spline, points, trim",
+            description: "The drawing toolbar's sketch tools on the sheet sketch, on clicks `picks` (sheet mm) as in the editor: a click snaps to a sketch point (within 6 px), else to a view snap point (vertex, center...), and lines within 1.5° of horizontal / vertical get that constraint. line: a chain through the clicks; circle (center, then a point on it), corner_rectangle / center_rectangle (two corners / center and corner) and tangent_arc (a line or arc end point, then the arc's end): pairs of clicks; circle_3_point: triples; spline: one spline through all clicks; spline_point: each click on a spline adds a point there; point: a sketch point per click; trim: each click trims the curve under it (or deletes a point). One edit with the tool's name (\"Line\", \"Center point circle\", ...).",
+            fields: with(
+                common(),
+                vec![
+                    req("tool", json!({ "type": "string", "enum": ["line", "circle", "circle_3_point", "tangent_arc", "corner_rectangle", "center_rectangle", "spline", "spline_point", "point", "trim"] }), "Sketch tool."),
+                    req("picks", points(1, 1000), "Clicks (sheet mm)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: drawing_sketch,
+        },
+        Op {
+            group: "drawing",
+            verb: "format_painter",
+            summary: "Format painter: copy a dimension's or annotation's format to others",
+            description: "The Format painter dialog: from annotation `source` (a dimension, note, GD&T frame..., drawing_get ids) to each of `targets`, pasting its style (on by default), tolerance and precision, and / or content. One edit (\"Format painter\").",
+            fields: with(
+                common(),
+                vec![
+                    req("source", json!({ "type": "integer" }), "Annotation to copy from."),
+                    req("targets", json!({ "type": "array", "items": { "type": "integer" }, "minItems": 1 }), "Annotations to paint."),
+                    opt("style", json!({ "type": "boolean", "default": true }), "Paste style."),
+                    opt("tolerance_precision", json!({ "type": "boolean", "default": false }), "Paste tolerance and precision."),
+                    opt("content", json!({ "type": "boolean", "default": false }), "Paste content."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: format_painter,
+        },
+        Op {
+            group: "drawing",
+            verb: "inspection",
+            summary: "Inspection items: number annotations (manual, reorder, automatic), edit, move, remove, hide, border shape",
+            description: "The Inspection item tool and its menus. add: number `annotations` in order, from `number` (Reorder inspection items) or the drawing's next number (\"Inspection item\"). automatic: number every dimension and annotation of `scope` (drawing, sheet, or the view `view`) (\"Inspection items\"). edit: annotation `id` gets `number` (\"Edit inspection item\"). move: `id`'s number moves to annotation `to` (\"Move inspection item\"). remove: `annotations` lose theirs (\"Remove inspection item\"); remove_all (\"Remove all inspection items\"). hide / show: the toolbar's Hide inspection items toggle (\"Hide inspection items\" / \"Show inspection items\"). shape: the bubbles' border `shape` (\"Inspection border shape\"). drawing_get lists each annotation's `inspection` number.",
+            fields: with(
+                common(),
+                vec![
+                    req("action", json!({ "type": "string", "enum": ["add", "automatic", "edit", "move", "remove", "remove_all", "hide", "show", "shape"] }), "What to do."),
+                    opt("annotations", json!({ "type": "array", "items": { "type": "integer" } }), "Annotations (add, remove)."),
+                    opt("number", json!({ "type": "integer", "minimum": 1 }), "First number (add: reorder) / the number (edit)."),
+                    opt("id", json!({ "type": "integer" }), "Annotation (edit, move)."),
+                    opt("to", json!({ "type": "integer" }), "Annotation the number moves to (move)."),
+                    opt("scope", json!({ "type": "string", "enum": ["drawing", "sheet", "view"], "default": "drawing" }), "Automatic scope."),
+                    opt("view", json!({ "type": "integer" }), "View (scope view)."),
+                    opt("shape", json!({ "type": "string", "enum": ["circle", "oval", "rectangle", "triangle", "flag"] }), "Border shape (shape)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: inspection,
+        },
+        Op {
+            group: "drawing",
+            verb: "properties",
+            summary: "Read or change the Drawing properties (units, precision, text, arrows, views, tables, inspection...)",
+            description: "The Drawing properties panel: without `set`, replies with the properties (`properties`: field names and values, lengths in mm; unset optional fields and false flags are left out). `set` changes the fields it names (same names and value shapes; null clears an optional one), as the panel does: with `locked` on before and after, nothing else changes; choosing `units` sets the drawing's metric flag. One edit (\"Drawing properties\").",
+            fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Fields to change (see the reply without `set`).")]),
+            mutates: true,
+            destructive: false,
+            run: properties,
         },
         Op {
             group: "drawing",
@@ -250,7 +432,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "datum",
             summary: "Datum feature symbol",
-            description: "The Datum tool: the triangle on the geometry at `anchor` (a vertex or edge point, sheet mm), the label box at `position` (at least 3 mm away). The label is the next free letter (A, B, …; I, O, Q, S, X, Z skipped) unless given. One edit (\"Datum\").",
+            description: "The Datum tool: the triangle at `anchor` (sheet mm): on a GD&T frame edge or a dimension's lines when there (it follows them), else on the geometry (a vertex or edge point), the label box at `position` (at least 3 mm away). The label is the next free letter (A, B, …; I, O, Q, S, X, Z skipped) unless given. One edit (\"Datum\").",
             fields: with(common(), vec![req("anchor", point(), "Where the triangle attaches (sheet mm)."), req("position", point(), "Where the label box goes (sheet mm)."), opt("label", json!({ "type": "string" }), "Datum letter.")]),
             mutates: true,
             destructive: false,
@@ -354,6 +536,66 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: weld,
+        },
+        Op {
+            group: "drawing",
+            verb: "revision_table",
+            summary: "Revision table (rows from the document's releases)",
+            description: "The Revision table tool and dialog: the table with its fixed corner at `position` (sheet mm). Its rows are the drawing's revisions from releases. One edit (\"Revision table\").",
+            fields: with(
+                common(),
+                vec![
+                    req("position", point(), "Where the fixed corner goes (sheet mm)."),
+                    opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "The table's fixed corner."),
+                    opt("visible_rows", json!({ "type": "integer", "minimum": 1, "default": 5 }), "Rows shown."),
+                    opt("newest_top", json!({ "type": "boolean", "default": false }), "Newest revision at the top."),
+                    opt("see_sheet1", json!({ "type": "boolean", "default": false }), "Show \"See sheet 1\" on other sheets."),
+                    opt("hide_callouts", json!({ "type": "boolean", "default": false }), "Hide revision callouts."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: revision_table,
+        },
+        Op {
+            group: "drawing",
+            verb: "revision_callout",
+            summary: "Revision callout (triangle with the revision)",
+            description: "Add revision callout: the triangle at `position` (sheet mm) with `revision` (default: the latest revision, else \"A\"). One edit (\"Revision callout\").",
+            fields: with(common(), vec![req("position", point(), "Where the callout goes (sheet mm)."), opt("revision", json!({ "type": "string" }), "Revision label.")]),
+            mutates: true,
+            destructive: false,
+            run: revision_callout,
+        },
+        Op {
+            group: "drawing",
+            verb: "table",
+            summary: "General table (rows x columns of text)",
+            description: "The Table tool and dialog: an empty table of `rows` x `columns` (defaults 2 x 2; 1–60 x 1–20) with an optional title row and header row, its fixed corner at `position` (sheet mm). One edit (\"Table\"). Fill it with drawing_table_cell.",
+            fields: with(
+                common(),
+                vec![
+                    req("position", point(), "Where the fixed corner goes (sheet mm)."),
+                    opt("rows", json!({ "type": "integer", "minimum": 1, "maximum": 60, "default": 2 }), "Rows."),
+                    opt("columns", json!({ "type": "integer", "minimum": 1, "maximum": 20, "default": 2 }), "Columns."),
+                    opt("title_row", json!({ "type": "boolean", "default": false }), "A title row on top."),
+                    opt("header_row", json!({ "type": "boolean", "default": false }), "A header row."),
+                    opt("corner", json!({ "type": "string", "enum": ["top_left", "top_right", "bottom_left", "bottom_right"], "default": "top_right" }), "The table's fixed corner."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: general_table,
+        },
+        Op {
+            group: "drawing",
+            verb: "table_cell",
+            summary: "Type text into a general table cell",
+            description: "The cell editor of a general table: `text` into cell (`row`, `column`), counted from 0 (the header row, if any, is row 0). The table grows when the cell lies beyond it. One edit (\"Edit cell\").",
+            fields: with(common(), vec![req("table", json!({ "type": "integer" }), "Table id (drawing_get)."), req("row", json!({ "type": "integer", "minimum": 0 }), "Row."), req("column", json!({ "type": "integer", "minimum": 0 }), "Column."), req("text", json!({ "type": "string" }), "Cell text.")]),
+            mutates: true,
+            destructive: false,
+            run: table_cell,
         },
         Op {
             group: "drawing",
@@ -547,7 +789,17 @@ fn auxiliary_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let t = target(od, a)?;
     let e = pt_arg(a, "edge")?;
     let tool0 = Tool::Auxiliary { parent: None };
-    let (view, dir, anchor) = t.m.pick(&tool0, &[], e).aux_edge().ok_or_else(|| OpError::param("edge", "Select a straight edge of a view"))?;
+    let mode = enum_arg(a, "mode", &[("normal", 0u8), ("in_line", 1), ("axis", 2)], 0)?;
+    let (view, dir, anchor) = t.m.pick(&tool0, &[], e).aux_pick(mode).ok_or_else(|| {
+        OpError::param(
+            "edge",
+            match mode {
+                1 => "Select a sheet sketch line or a centerline",
+                2 => "Select a hole's axis (its centerline or silhouette) in a view",
+                _ => "Select a straight edge of a view",
+            },
+        )
+    })?;
     refused(&t, "auxiliary", view, "edge")?;
     let letter = match a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty()) {
         Some(l) => l.to_string(),
@@ -574,10 +826,7 @@ fn break_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let gap = a.opt_f64("gap")?.unwrap_or(dt::default_break_gap_mm(t.d.units_mm));
     let pl = t.m.pick(&Tool::Select, &[], [0.0; 2]).placement(view).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
     let b = dt::view_break(&pl, vertical, pt_arg(a, "from")?, pt_arg(a, "to")?, style, gap).ok_or_else(|| OpError::param("to", "the break band is empty"))?;
-    let sheet = t.sheet;
-    if let Some(v) = t.d.sheets[sheet].views.iter_mut().find(|v| v.id == view) {
-        v.breaks.push(b);
-    }
+    edit_view(&mut t, view, |v| v.breaks.push(b));
     done(od, t, "Break view", "view", view.0)
 }
 
@@ -586,18 +835,80 @@ fn crop_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut t = target(od, a)?;
     let view = view_arg(&t, a, "view")?;
     refused(&t, "crop", view, "view")?;
-    let circle = enum_arg(a, "shape", &[("rectangle", false), ("circle", true)], false)?;
-    let f = pt_arg(a, "from")?;
-    let tool0 = Tool::Crop { parent: Some(view), first: None, circle };
-    let pk = t.m.pick(&tool0, &[], f);
-    let f = pk.snap_at(f).and_then(|s| pk.pick_sheet(&s)).unwrap_or(f);
-    let pl = pk.placement(view).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
-    let crop = dt::view_crop(&pl, circle, f, pt_arg(a, "to")?).ok_or_else(|| OpError::param("to", "the crop shape is empty"))?;
-    let sheet = t.sheet;
-    if let Some(v) = t.d.sheets[sheet].views.iter_mut().find(|v| v.id == view) {
-        v.crop = Some(crop);
-    }
+    let shape = enum_arg(a, "shape", &[("rectangle", 0), ("circle", 1), ("polygon", 2), ("spline", 3)], 0)?;
+    let crop = if shape >= 2 {
+        let (_, pts) = profile(&t, a, Some(view))?;
+        if shape == 3 { Crop::Spline(pts) } else { Crop::Polygon(pts) }
+    } else {
+        let circle = shape == 1;
+        let f = pt_arg(a, "from")?;
+        let tool0 = Tool::Crop { parent: Some(view), first: None, circle };
+        let pk = t.m.pick(&tool0, &[], f);
+        let f = pk.snap_at(f).and_then(|s| pk.pick_sheet(&s)).unwrap_or(f);
+        let pl = pk.placement(view).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
+        dt::view_crop(&pl, circle, f, pt_arg(a, "to")?).ok_or_else(|| OpError::param("to", "the crop shape is empty"))?
+    };
+    edit_view(&mut t, view, |v| v.crop = Some(crop));
     done(od, t, "Crop view", "view", view.0)
+}
+
+/// Profile clicks `points` (sheet mm) as the profile tools take them: the
+/// first picks the view (unless given), each snaps to a point of it.
+fn profile(t: &Target, a: &Args, view: Option<ViewId>) -> Result<(ViewId, Vec<[f64; 2]>), OpError> {
+    let cs: Vec<[f64; 2]> = a.array("points")?.iter().enumerate().map(|(i, p)| point_value(p, &format!("points[{i}]"))).collect::<Result<_, _>>()?;
+    if cs.len() < 3 {
+        return Err(OpError::param("points", "at least 3 points"));
+    }
+    let mut view = view;
+    let mut pts = Vec::new();
+    for (i, c) in cs.iter().enumerate() {
+        let p = t.m.pick(&Tool::Select, &[], *c).view_point(*c, view).ok_or_else(|| OpError::param(&format!("points[{i}]"), "not in a view"))?;
+        view = Some(p.view);
+        pts.push(p.p);
+    }
+    Ok((view.expect("3 points"), pts))
+}
+
+/// Edit view `id` of the sheet (a mirror of a view on another sheet: the
+/// real view), as the drawing editor does.
+fn edit_view(t: &mut Target, id: ViewId, f: impl FnOnce(&mut noshape_model::drawing::DrawingView)) {
+    let (si, id) = t.d.real_view_of(t.sheet, id);
+    if let Some(v) = t.d.sheets.get_mut(si).and_then(|s| s.view_mut(id)) {
+        f(v);
+    }
+}
+
+fn broken_out_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let units = od.session.doc.settings.units;
+    let mut t = target(od, a)?;
+    let given = match a.opt_u64("view")? {
+        Some(_) => Some(view_arg(&t, a, "view")?),
+        None => None,
+    };
+    let (view, pts) = profile(&t, a, given)?;
+    let index = a.opt_u64("index")?.map(|i| i as usize);
+    if let Some(i) = index
+        && t.d.sheets[t.sheet].view(view).is_none_or(|v| i >= v.broken_out.len())
+    {
+        return Err(OpError::param("index", "the view has no broken-out section with that index"));
+    }
+    let depth_ref = match a.get("depth_to") {
+        Some(v) => {
+            let c = point_value(v, "depth_to")?;
+            Some(t.m.pick(&Tool::Select, &[], c).snap_at(c).and_then(|p| p.r).ok_or_else(|| OpError::param("depth_to", "not a model point (vertex, circle center...)"))?)
+        }
+        None => None,
+    };
+    let depth = match a.get("depth") {
+        Some(v) => Some(super::sketch::length_value(v, &units).map_err(|e| OpError::param("depth", &e.message))?),
+        None if depth_ref.is_none() => Some(t.m.pick(&Tool::Select, &[], [0.0; 2]).broken_out_default_depth(view)),
+        None => None,
+    };
+    let spline = index.and_then(|i| t.d.sheets[t.sheet].view(view)?.broken_out.get(i).map(|b| b.spline)).unwrap_or(true);
+    let b = dt::broken_out(pts, spline, depth, depth_ref).ok_or_else(|| OpError::param("depth", "Invalid depth"))?;
+    edit_view(&mut t, view, |v| dt::set_broken_out(v, index, b));
+    done(od, t, "Broken-out section", "view", view.0)
 }
 
 // ------------------------------------------------------------ annotations
@@ -793,13 +1104,15 @@ fn datum(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut t = target(od, a)?;
     let c = pt_arg(a, "anchor")?;
     let pk = t.m.pick(&Tool::Datum { anchor: None }, &[], c);
-    let anchor = pk.snap_at(c).and_then(|s| pk.pick_sheet(&s)).unwrap_or(c);
+    // On a GD&T frame edge or a dimension's lines, else on the geometry.
+    let on = pk.datum_attach_at(c);
+    let anchor = on.map(|o| o.0).or_else(|| pk.snap_at(c).and_then(|s| pk.pick_sheet(&s))).unwrap_or(c);
     let label = match a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty()) {
         Some(l) => l.to_string(),
         None => pk.next_datum_label(),
     };
     let tool = Tool::Datum { anchor: Some(anchor) };
-    let ann = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_annotation(&ToolValues { datum_label: Some(label), ..Default::default() }).ok_or_else(|| OpError::param("position", "at least 3 mm from the anchor"))?;
+    let ann = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_annotation(&ToolValues { datum_label: Some(label), datum_on: on.map(|o| o.1), ..Default::default() }).ok_or_else(|| OpError::param("position", "at least 3 mm from the anchor"))?;
     let (id, sheet) = (ann.id, t.sheet);
     t.d.sheets[sheet].annotations.push(ann);
     done(od, t, "Datum", "annotation", id)
@@ -928,4 +1241,571 @@ fn weld(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = t.d.sheets[sheet].next_annotation_id();
     t.d.sheets[sheet].annotations.push(dt::weld(id, view, target, spec, pt_arg(a, "position")?));
     done(od, t, "Weld symbol", "annotation", id)
+}
+
+fn revision_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let d = dt::RevisionTableOpts::default();
+    let o = dt::RevisionTableOpts {
+        see_sheet1: a.bool_or("see_sheet1", d.see_sheet1)?,
+        visible_rows: a.opt_u64("visible_rows")?.map(|n| n.clamp(1, 1000) as u32).unwrap_or(d.visible_rows),
+        newest_top: a.bool_or("newest_top", d.newest_top)?,
+        hide_callouts: a.bool_or("hide_callouts", d.hide_callouts)?,
+        corner: enum_arg(a, "corner", &CORNERS, d.corner)?,
+    };
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_table_id();
+    t.d.sheets[sheet].tables.push(dt::revision_table(id, &o, pt_arg(a, "position")?));
+    done(od, t, "Revision table", "table", id)
+}
+
+fn revision_callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let revision = match a.opt_str("revision")?.map(str::trim).filter(|r| !r.is_empty()) {
+        Some(r) => r.to_string(),
+        None => dt::latest_revision(&t.m.info),
+    };
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_annotation_id();
+    t.d.sheets[sheet].annotations.push(dt::revision_callout(id, pt_arg(a, "position")?, revision));
+    done(od, t, "Revision callout", "annotation", id)
+}
+
+fn jogged_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let parent = view_arg(&t, a, "parent")?;
+    let mut pts: Vec<[f64; 2]> = Vec::new();
+    for (i, p) in a.array("points")?.iter().enumerate() {
+        let param = format!("points[{i}]");
+        let c = point_value(p, &param)?;
+        let tool = Tool::JoggedSection { parent: Some(parent), points: pts.clone(), done: false };
+        let pp = t.m.pick(&tool, &[], c).view_point(c, Some(parent)).ok_or_else(|| OpError::param(&param, "not on the parent view"))?;
+        match pts.last() {
+            None => pts.push(pp.p),
+            Some(last) => {
+                let q = dt::ortho_view(*last, pp.p);
+                if dt::geom::len(dt::geom::sub(q, *last)) > 1e-7 {
+                    pts.push(q);
+                }
+            }
+        }
+    }
+    if pts.len() < 2 {
+        return Err(OpError::param("points", "the cutting line needs two different points"));
+    }
+    // Finishing the line (Enter) extends its ends past the view.
+    let pts = t.m.pick(&Tool::Select, &[], [0.0; 2]).extend_line_ends(parent, &pts);
+    let tool = Tool::JoggedSection { parent: Some(parent), points: pts, done: true };
+    let v = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_view(&ViewOptions::default()).ok_or_else(|| OpError::param("position", "the section view can't be placed there"))?;
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Section view", "view", id.0)
+}
+
+fn aligned_section_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let t = target(od, a)?;
+    let parent = view_arg(&t, a, "parent")?;
+    let click = |name: &str, tool: &Tool| -> Result<[f64; 2], OpError> {
+        let c = pt_arg(a, name)?;
+        t.m.pick(tool, &[], c).view_point(c, Some(parent)).map(|p| p.p).ok_or_else(|| OpError::param(name, "not on the parent view"))
+    };
+    let tool0 = Tool::AlignedSection { parent: Some(parent), center: None, a: None, b: None };
+    let center = click("center", &tool0)?;
+    let leg = |name: &str| -> Result<[f64; 2], OpError> {
+        let p = click(name, &Tool::AlignedSection { parent: Some(parent), center: Some(center), a: None, b: None })?;
+        if dt::geom::len(dt::geom::sub(p, center)) <= 1e-7 {
+            return Err(OpError::param(name, "must differ from the center"));
+        }
+        Ok(t.m.pick(&Tool::Select, &[], [0.0; 2]).extend_line_ends(parent, &[p, center])[0])
+    };
+    let (la, lb) = (leg("a")?, leg("b")?);
+    let tool = Tool::AlignedSection { parent: Some(parent), center: Some(center), a: Some(la), b: Some(lb) };
+    let v = t.m.pick(&tool, &[], pt_arg(a, "position")?).pending_view(&ViewOptions::default()).ok_or_else(|| OpError::param("position", "the section view can't be placed there"))?;
+    let id = v.id;
+    let mut t = t;
+    t.d.sheets[t.sheet].views.push(v);
+    done(od, t, "Aligned section view", "view", id.0)
+}
+
+const CORNERS: [(&str, TableCorner); 4] = [("top_left", TableCorner::TopLeft), ("top_right", TableCorner::TopRight), ("bottom_left", TableCorner::BottomLeft), ("bottom_right", TableCorner::BottomRight)];
+
+fn general_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let n = |k: &str| -> Result<String, OpError> { Ok(a.opt_u64(k)?.map(|n| n.to_string()).unwrap_or_default()) };
+    let (rows, cols) = dt::table_size(&n("rows")?, &n("columns")?);
+    let corner = enum_arg(a, "corner", &CORNERS, TableCorner::TopRight)?;
+    let mut table = dt::general_table(rows, cols, a.bool_or("title_row", false)?, a.bool_or("header_row", false)?, corner, pt_arg(a, "position")?);
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_table_id();
+    table.id = id;
+    t.d.sheets[sheet].tables.push(table);
+    done(od, t, "Table", "table", id)
+}
+
+fn table_cell(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let id = a.opt_u64("table")?.ok_or_else(|| OpError::param("table", "a table id"))?;
+    let sheet = t.sheet;
+    let table = t.d.sheets[sheet].tables.iter_mut().find(|x| x.id == id).ok_or_else(|| OpError::param("table", "no such table on the sheet"))?;
+    if !matches!(table.kind, noshape_model::drawing::TableKind::General { .. }) {
+        return Err(OpError::param("table", "not a general table (BOM, hole, cut list and revision tables fill themselves)"));
+    }
+    let (row, col) = (a.opt_u64("row")?.unwrap_or(0) as usize, a.opt_u64("column")?.unwrap_or(0) as usize);
+    dt::set_general_cell(table, row, col, a.str("text")?);
+    done(od, t, "Edit cell", "table", id)
+}
+
+fn hatch_region(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::hatch_pat;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let edit = a.opt_u64("hatch")?;
+    let existing = match edit {
+        Some(id) => Some(t.d.sheets[t.sheet].sketch.hatches.iter().find(|h| h.id == id).cloned().ok_or_else(|| OpError::param("hatch", "no such hatch region on the sheet"))?),
+        None => None,
+    };
+    let text = |name: &str| -> Result<Option<String>, OpError> {
+        Ok(match a.get(name) {
+            None => None,
+            Some(Value::Number(n)) => Some(n.to_string()),
+            Some(Value::String(s)) => Some(s.clone()),
+            Some(_) => return Err(OpError::param(name, "\"Auto\" or a number")),
+        })
+    };
+    let standard = match a.opt_str("standard")? {
+        Some(_) => enum_arg(a, "standard", &[("ansi", 0), ("iso", 1), ("general", 2)], 0)?,
+        None => existing.as_ref().map_or(0, |h| h.standard),
+    };
+    let pattern = match a.opt_str("pattern")? {
+        Some(name) => {
+            let (_, list) = hatch_pat::GROUPS[standard];
+            let lower = name.trim().to_lowercase();
+            list.iter().position(|p| p.name.to_lowercase() == lower).or_else(|| list.iter().position(|p| p.name.split_whitespace().next().is_some_and(|w| w.to_lowercase() == lower))).ok_or_else(|| OpError::param("pattern", &format!("one of {}", list.iter().map(|p| p.name).collect::<Vec<_>>().join(", "))))?
+        }
+        None => existing.as_ref().filter(|h| h.standard == standard).map_or(hatch_pat::default_pattern(standard), |h| h.pattern),
+    };
+    // Unset fields keep the edited hatch's values (as the dialog opens them).
+    let (scale0, angle0) = match &existing {
+        Some(h) => (format!("{}", h.scale), if h.angle.abs() < 1e-9 { "Auto".to_string() } else { format!("{}", (h.angle + hatch_pat::base_angle(h.standard, h.pattern)).rem_euclid(360.0)) }),
+        None => ("Auto".into(), "Auto".into()),
+    };
+    let color = match a.opt_array("color")? {
+        Some(c) => Some([0, 1, 2].map(|i| c.get(i).and_then(Value::as_u64).unwrap_or(0).min(255) as u8)),
+        None => existing.as_ref().and_then(|h| h.color),
+    };
+    let mut profiles = existing.as_ref().map(|h| vec![((h.boundary.clone(), h.holes.clone()), h.view)]).unwrap_or_default();
+    if let Some(ps) = a.opt_array("points")? {
+        for (i, p) in ps.iter().enumerate() {
+            let name = format!("points[{i}]");
+            let c = point_value(p, &name)?;
+            let picked = t.m.pick(&Tool::Select, &[], c).hatch_profile_at(c).ok_or_else(|| OpError::param(&name, "not inside a closed profile of the sheet sketch or a view (detail and break views take no hatches)"))?;
+            dt::hatch_toggle(&mut profiles, picked, edit.is_some());
+        }
+    }
+    if profiles.is_empty() {
+        return Err(OpError::param("points", "pick at least one closed profile"));
+    }
+    let opts = dt::HatchOpts { standard, pattern, scale: text("scale")?.unwrap_or(scale0), angle: text("angle")?.unwrap_or(angle0), drawing_color: color.is_none(), color, profiles };
+    let sk = &mut t.d.sheets[t.sheet].sketch;
+    let regions = opts.regions(edit.unwrap_or_else(|| sk.next_hatch_id()));
+    let ids: Vec<u64> = regions.iter().map(|r| r.id).collect();
+    dt::apply_hatches(sk, edit, regions);
+    commit(od, t.tab, t.sheet, t.d, if edit.is_some() { "Edit hatch" } else { "Hatch region" })?;
+    let mut out = reply(od, t.tab, t.sheet, false)?;
+    out["hatches"] = json!(ids);
+    Ok(out.into())
+}
+
+fn custom_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::document::TabContent;
+    use noshape_model::drawing::TableKind;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let doc = od.doc();
+    let edit = a.opt_u64("id")?;
+    let old = match edit {
+        Some(id) => match t.d.sheets[t.sheet].table(id).map(|x| (x.kind.clone(), x.corner)) {
+            Some((k @ TableKind::Custom { .. }, c)) => Some((k, c)),
+            _ => return Err(OpError::param("id", "no custom table with that id on the sheet")),
+        },
+        None => None,
+    };
+    let (old_studio, old_fs, old_name, old_fs_version, old_btt) = match &old {
+        Some((TableKind::Custom { studio, fs, name, fs_version, bottom_to_top, .. }, _)) => (Some(*studio), Some(*fs), Some(name.clone()), fs_version.clone(), *bottom_to_top),
+        _ => (None, None, None, None, false),
+    };
+    // The Part Studio: given, the view's, the edited table's, else the first in the drawing.
+    let studio = match (a.opt_str("studio")?, a.opt_u64("view")?) {
+        (Some(s), _) => {
+            let id = crate::doc::find_tab(doc, s).map_err(|e| OpError::param("studio", &e.message))?;
+            if !matches!(doc.tab(id).map(|t| &t.content), Some(TabContent::PartStudio(_))) {
+                return Err(OpError::param("studio", "not a Part Studio"));
+            }
+            id
+        }
+        (None, Some(_)) => {
+            let v = view_arg(&t, a, "view")?;
+            views_source_tab(&t, v).ok_or_else(|| OpError::param("view", "the view doesn't show a Part Studio"))?
+        }
+        (None, None) => match old_studio {
+            Some(s) => s,
+            None => {
+                let keys = noshape_model::drawing::views::referenced_sources(&t.d);
+                doc.ordered_tabs().into_iter().find(|tab| matches!(tab.content, TabContent::PartStudio(_)) && keys.iter().any(|k| k.tab == tab.id)).map(|tab| tab.id).ok_or_else(|| OpError::param("studio", "the drawing shows no Part Studio: give one"))?
+            }
+        },
+    };
+    // The custom table: this document's Feature Studios.
+    let (fs, name, fs_version) = match a.opt_str("table")? {
+        Some(want) => {
+            let only = match a.opt_str("feature_studio")? {
+                Some(f) => Some(crate::doc::find_tab(doc, f).map_err(|e| OpError::param("feature_studio", &e.message))?),
+                None => None,
+            };
+            let scripts = noshape_model::custom::DocumentScripts::from_document(doc);
+            let all: Vec<(noshape_model::document::TabId, String, String)> = scripts.studios().flat_map(|(tab, _, c)| c.tables.iter().map(move |d| (tab, d.name.clone(), d.display_name.clone()))).filter(|(tab, ..)| only.is_none_or(|o| o == *tab)).collect();
+            let hit = all.iter().find(|x| x.1 == want).or_else(|| all.iter().find(|x| x.2 == want)).ok_or_else(|| OpError::param("table", &format!("no custom table \"{want}\" in this document's Feature Studios{}", if all.is_empty() { String::new() } else { format!(" (one of {})", all.iter().map(|x| x.2.as_str()).collect::<Vec<_>>().join(", ")) })))?;
+            (hit.0, hit.1.clone(), None)
+        }
+        None => match (old_fs, old_name) {
+            (Some(f), Some(n)) => (f, n, old_fs_version),
+            _ => return Err(OpError::param("table", "required")),
+        },
+    };
+    let bottom_to_top = a.bool_or("bottom_to_top", old_btt)?;
+    let corner = enum_arg(a, "corner", &CORNERS, old.as_ref().map_or(TableCorner::TopRight, |o| o.1))?;
+    let kind = dt::custom_table_kind(studio, fs, name, fs_version, bottom_to_top, old.as_ref().map(|o| &o.0));
+    let sheet = t.sheet;
+    let (id, description) = match edit {
+        Some(id) => {
+            if let Some(x) = t.d.sheets[sheet].tables.iter_mut().find(|x| x.id == id) {
+                x.kind = kind;
+                x.corner = corner;
+            }
+            (id, "Custom table properties")
+        }
+        None => {
+            let id = t.d.sheets[sheet].next_table_id();
+            let table = dt::custom_table(id, kind, corner, pt_arg(a, "position")?);
+            t.d.sheets[sheet].tables.push(table);
+            (id, "Custom table")
+        }
+    };
+    done(od, t, description, "table", id)
+}
+
+/// The Part Studio a view shows.
+fn views_source_tab(t: &Target, v: ViewId) -> Option<noshape_model::document::TabId> {
+    noshape_model::drawing::views::view_source(&t.d.sheets[t.sheet], v).map(|(k, _)| k.tab)
+}
+
+/// The file an insert tool takes: a file tab of `kind`, or a local file
+/// imported as a file tab first (the picker's Import).
+fn insert_file(od: &mut OpenDoc, a: &Args, kind: noshape_model::file_tab::FileKind, what: &str) -> Result<noshape_model::file_tab::FileTab, OpError> {
+    use noshape_model::document::TabContent;
+    use noshape_model::file_tab::FileTab;
+    let file = match (a.opt_str("file")?, a.opt_str("path")?) {
+        (Some(f), _) => {
+            let id = crate::doc::find_tab(od.doc(), f).map_err(|e| OpError::param("file", &e.message))?;
+            match od.doc().tab(id).map(|t| &t.content) {
+                Some(TabContent::File(x)) => x.clone(),
+                _ => return Err(OpError::param("file", "not a file tab")),
+            }
+        }
+        (None, Some(p)) => {
+            let path = std::path::Path::new(p);
+            let bytes = std::fs::read(path).map_err(|e| OpError::param("path", &format!("can't read {p}: {e}")))?;
+            let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+            let file = FileTab::new(&name, &bytes, noshape_model::file_tab::now());
+            if file.kind() != kind {
+                return Err(OpError::param("path", &format!("not {what}")));
+            }
+            let f2 = file.clone();
+            od.session.edit_document(&format!("Import {name}"), |d| {
+                crate::import::add_file_tab(d, f2, None, None);
+            })?;
+            file
+        }
+        (None, None) => return Err(OpError::param("file", "a file tab, or a local file `path`")),
+    };
+    if file.kind() != kind {
+        return Err(OpError::param("file", &format!("not {what}")));
+    }
+    Ok(file)
+}
+
+fn insert_image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let file = insert_file(od, a, noshape_model::file_tab::FileKind::Image, "an image (PNG, JPEG, GIF)")?;
+    let aspect = file.bytes().ok_or_else(|| OpError::param("file", "the file data is damaged")).and_then(|b| dt::image_aspect(&b).map_err(|e| OpError::param("file", &format!("Insert image failed: {e}"))))?;
+    let mut t = target(od, a)?;
+    let start = pt_arg(a, "position")?;
+    let end = match a.get("to") {
+        Some(v) => point_value(v, "to")?,
+        None => start,
+    };
+    let (pos, size) = t.m.pick(&Tool::Select, &[], end).image_box(start, aspect);
+    let id = dt::add_sheet_image(&mut t.d.sheets[t.sheet], file.file_name.clone(), file.data_base64.clone(), pos, size);
+    done(od, t, "Insert image", "image", id)
+}
+
+fn insert_cad(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let file = insert_file(od, a, noshape_model::file_tab::FileKind::Drawing2d, "a DXF or DWG file")?;
+    let d = file.bytes().ok_or_else(|| OpError::param("file", "the file data is damaged")).and_then(|b| noshape_sketch::cad::parse_cad(&b).map_err(|e| OpError::param("file", &format!("Insert DXF or DWG failed: {e}"))))?;
+    let mut t = target(od, a)?;
+    let units_mm = t.d.units_mm;
+    let sk = &mut t.d.sheets[t.sheet].sketch;
+    let n = dt::insert_cad(sk, &d, units_mm);
+    let _ = sk.sketch.solve();
+    commit(od, t.tab, t.sheet, t.d, "Insert DXF or DWG")?;
+    let mut out = reply(od, t.tab, t.sheet, false)?;
+    out["entities"] = json!(n);
+    Ok(out.into())
+}
+
+fn drawing_sketch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use dt::SkTool;
+    use noshape_sketch::{DVec2, EntityId};
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let tool = enum_arg(
+        a,
+        "tool",
+        &[
+            ("line", SkTool::Line),
+            ("circle", SkTool::Circle),
+            ("circle_3_point", SkTool::Circle3),
+            ("tangent_arc", SkTool::TangentArc),
+            ("corner_rectangle", SkTool::CornerRect),
+            ("center_rectangle", SkTool::CenterRect),
+            ("spline", SkTool::Spline),
+            ("spline_point", SkTool::SplinePoint),
+            ("point", SkTool::Point),
+            ("trim", SkTool::Trim),
+        ],
+        SkTool::Line,
+    )?;
+    let cs: Vec<[f64; 2]> = a.array("picks")?.iter().enumerate().map(|(i, p)| point_value(p, &format!("picks[{i}]"))).collect::<Result<_, _>>()?;
+    let need = match tool {
+        SkTool::Circle | SkTool::CornerRect | SkTool::CenterRect | SkTool::TangentArc => 2,
+        SkTool::Circle3 => 3,
+        _ => 1,
+    };
+    if !cs.len().is_multiple_of(need) || (matches!(tool, SkTool::Line | SkTool::Spline) && cs.len() < 2) {
+        return Err(OpError::param("picks", &format!("{} takes {}", tool.name(), if need == 1 { "two or more clicks".to_string() } else { format!("clicks in groups of {need}") })));
+    }
+    let v2 = |p: [f64; 2]| DVec2::new(p[0], p[1]);
+    let sheet = t.sheet;
+    // The sketch as edited so far: later clicks snap to points made by earlier ones.
+    let mut work = t.d.clone();
+    let before = work.sheets[sheet].sketch.sketch.entities().count();
+    let (mut pts, mut from): (Vec<[f64; 2]>, Option<EntityId>) = (Vec::new(), None);
+    for (i, c) in cs.iter().enumerate() {
+        let state = Tool::Sketch { tool, pts: pts.clone(), from: from.map(|e| e.0) };
+        let mut pk = t.m.pick(&state, &[], *c);
+        pk.drawing = &work;
+        let last = pts.last().copied();
+        let (p, existing, infer) = pk.sketch_target(last, *c);
+        let hovered = pk.sketch_entity_at();
+        let point_at = pk.sketch_point_at(*c).map(|x| x.0);
+        let sk = &mut work.sheets[sheet].sketch.sketch;
+        let bad = |m: &str| OpError::param(&format!("picks[{i}]"), m);
+        match tool {
+            SkTool::Line => match last {
+                Some(a0) if ((p[0] - a0[0]).powi(2) + (p[1] - a0[1]).powi(2)).sqrt() >= 1e-6 => {
+                    let end = dt::sketch_line(sk, from, a0, existing, p, infer);
+                    (pts, from) = (vec![p], Some(end));
+                }
+                Some(_) => {}
+                None => (pts, from) = (vec![p], existing),
+            },
+            SkTool::Circle | SkTool::CornerRect | SkTool::CenterRect => match last {
+                Some(a0) => {
+                    dt::sketch_two_click(sk, tool, from, a0, p);
+                    (pts, from) = (vec![], None);
+                }
+                None => (pts, from) = (vec![p], existing),
+            },
+            SkTool::Circle3 => {
+                pts.push(p);
+                if pts.len() == 3 {
+                    sk.three_point_circle(v2(pts[0]), v2(pts[1]), v2(pts[2])).map_err(|e| bad(&e.to_string()))?;
+                    pts.clear();
+                }
+            }
+            SkTool::TangentArc => match (last, from) {
+                (Some(_), Some(start)) => {
+                    sk.tangent_arc(start, v2(p)).map_err(|e| bad(&e.to_string()))?;
+                    (pts, from) = (vec![], None);
+                }
+                _ => match existing {
+                    Some(id) if !sk.users_of_point(id).is_empty() => (pts, from) = (vec![p], Some(id)),
+                    _ => return Err(bad("Click the end of a line or arc")),
+                },
+            },
+            SkTool::Spline => pts.push(p),
+            SkTool::SplinePoint => {
+                let id = hovered.ok_or_else(|| bad("not on a spline of the sheet sketch"))?;
+                sk.insert_spline_point(id, v2(p)).map_err(|e| bad(&e.to_string()))?;
+            }
+            SkTool::Point => {
+                sk.add_point(v2(p));
+            }
+            SkTool::Trim => {
+                let id = hovered.or(point_at).ok_or_else(|| bad("not on sheet sketch geometry"))?;
+                dt::sketch_trim(sk, id, *c);
+            }
+        }
+    }
+    let sk = &mut work.sheets[sheet].sketch.sketch;
+    if tool == SkTool::Spline && !dt::sketch_spline(sk, &pts) {
+        return Err(OpError::param("picks", "a spline takes two or more distinct points"));
+    }
+    let _ = sk.solve();
+    let created = sk.entities().count() as i64 - before as i64;
+    t.d = work;
+    commit(od, t.tab, sheet, t.d, tool.name())?;
+    let mut out = reply(od, t.tab, sheet, false)?;
+    out["created"] = json!(created);
+    Ok(out.into())
+}
+
+fn format_painter(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::painter::{PaintOptions, paint};
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let d0 = PaintOptions::default();
+    let options = PaintOptions { style: a.bool_or("style", d0.style)?, tolerance_precision: a.bool_or("tolerance_precision", d0.tolerance_precision)?, content: a.bool_or("content", d0.content)? };
+    let src = a.opt_u64("source")?.unwrap_or(0);
+    let sheet = &mut t.d.sheets[t.sheet];
+    let source = sheet.annotations.iter().find(|x| x.id == src).cloned().ok_or_else(|| OpError::param("source", "no such annotation on the sheet"))?;
+    for (i, v) in a.array("targets")?.iter().enumerate() {
+        let id = v.as_u64().ok_or_else(|| OpError::param(&format!("targets[{i}]"), "an annotation id"))?;
+        if id == src {
+            continue;
+        }
+        let dst = sheet.annotations.iter_mut().find(|x| x.id == id).ok_or_else(|| OpError::param(&format!("targets[{i}]"), "no such annotation on the sheet"))?;
+        paint(&source, dst, options);
+    }
+    done(od, t, "Format painter", "source", src)
+}
+
+fn inspection(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::InspectionShape;
+    use noshape_model::drawing::inspection::Scope;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let si = t.sheet;
+    let ann = |t: &Target, name: &str, id: Option<u64>| -> Result<u64, OpError> {
+        let id = id.ok_or_else(|| OpError::param(name, "an annotation id"))?;
+        t.d.sheets[si].annotations.iter().any(|x| x.id == id).then_some(id).ok_or_else(|| OpError::param(name, "no such annotation on the sheet"))
+    };
+    let list = |t: &Target| -> Result<Vec<u64>, OpError> {
+        let v = a.opt_array("annotations")?.ok_or_else(|| OpError::param("annotations", "required"))?;
+        v.iter().enumerate().map(|(i, x)| ann(t, &format!("annotations[{i}]"), x.as_u64())).collect()
+    };
+    let description = match a.str("action")? {
+        "add" => {
+            let first = a.opt_u64("number")?.map(|n| n as u32);
+            for (k, id) in list(&t)?.into_iter().enumerate() {
+                // Reorder: the Number field counts up after each item.
+                let n = first.map(|f| f + k as u32).unwrap_or_else(|| t.d.next_inspection_number());
+                dt::set_inspection(&mut t.d.sheets[si], id, Some(n));
+            }
+            "Inspection item"
+        }
+        "automatic" => {
+            let scope = match a.opt_str("scope")?.unwrap_or("drawing") {
+                "sheet" => Scope::Sheet(si),
+                "view" => Scope::View(si, view_arg(&t, a, "view")?),
+                "drawing" => Scope::Drawing,
+                _ => return Err(OpError::param("scope", "drawing, sheet or view")),
+            };
+            t.d.auto_inspection(scope);
+            "Inspection items"
+        }
+        "edit" => {
+            let id = ann(&t, "id", a.opt_u64("id")?)?;
+            let n = a.opt_u64("number")?.ok_or_else(|| OpError::param("number", "required"))? as u32;
+            if t.d.sheets[si].annotations.iter().find(|x| x.id == id).is_none_or(|x| x.inspection.is_none()) {
+                return Err(OpError::param("id", "the annotation has no inspection item"));
+            }
+            dt::set_inspection(&mut t.d.sheets[si], id, Some(n));
+            "Edit inspection item"
+        }
+        "move" => {
+            let (from, to) = (ann(&t, "id", a.opt_u64("id")?)?, ann(&t, "to", a.opt_u64("to")?)?);
+            if t.d.sheets[si].annotations.iter().find(|x| x.id == from).is_none_or(|x| x.inspection.is_none()) {
+                return Err(OpError::param("id", "the annotation has no inspection item"));
+            }
+            if from != to {
+                dt::move_inspection(&mut t.d.sheets[si], from, to);
+            }
+            "Move inspection item"
+        }
+        "remove" => {
+            for id in list(&t)? {
+                dt::set_inspection(&mut t.d.sheets[si], id, None);
+            }
+            "Remove inspection item"
+        }
+        "remove_all" => {
+            t.d.remove_all_inspection();
+            "Remove all inspection items"
+        }
+        "hide" => {
+            t.d.props.hide_inspection = true;
+            "Hide inspection items"
+        }
+        "show" => {
+            t.d.props.hide_inspection = false;
+            "Show inspection items"
+        }
+        "shape" => {
+            let shapes = [("circle", InspectionShape::Circle), ("oval", InspectionShape::Oval), ("rectangle", InspectionShape::Rectangle), ("triangle", InspectionShape::Triangle), ("flag", InspectionShape::Flag)];
+            if a.get("shape").is_none() {
+                return Err(OpError::param("shape", "required"));
+            }
+            t.d.props.inspection_shape = enum_arg(a, "shape", &shapes, InspectionShape::Circle)?;
+            "Inspection border shape"
+        }
+        _ => return Err(OpError::param("action", "add, automatic, edit, move, remove, remove_all, hide, show or shape")),
+    };
+    commit(od, t.tab, si, t.d, description)?;
+    Ok(reply(od, t.tab, si, false)?.into())
+}
+
+fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let props = |d: &Drawing| serde_json::to_value(&d.props).expect("json");
+    let Some(set) = a.object("set")? else {
+        return Ok(json!({ "properties": props(&t.d) }).into());
+    };
+    let mut j = props(&t.d);
+    for (k, v) in set {
+        j[k] = v.clone();
+    }
+    let new: noshape_model::drawing::DrawingProps = serde_json::from_value(j).map_err(|e| OpError::param("set", &format!("{e}")))?;
+    // Unset / off fields are left out of the JSON: any other value that
+    // didn't land names no property.
+    let back = serde_json::to_value(&new).expect("json");
+    if let Some((k, _)) = set.iter().find(|(k, v)| back.get(k.as_str()).is_none() && !matches!(v, Value::Null | Value::Bool(false))) {
+        return Err(OpError::param("set", &format!("no property `{k}`")));
+    }
+    dt::set_drawing_props(&mut t.d, |p| *p = new);
+    let sheet = t.sheet;
+    commit(od, t.tab, sheet, t.d, "Drawing properties")?;
+    let d = dr::drawing_of(od.doc(), t.tab).cloned().expect("drawing");
+    let mut out = reply(od, t.tab, sheet, false)?;
+    out["properties"] = props(&d);
+    Ok(out.into())
 }

@@ -444,6 +444,9 @@ impl Document {
         if path.exists() {
             return Err(StoreError::AlreadyExists(path.to_path_buf()));
         }
+        // A log or index left by an earlier file of this name would be
+        // replayed into the new one.
+        move_side_files_aside(path)?;
         let mut conn = Connection::open_with_flags(
             path,
             OpenFlags::SQLITE_OPEN_READ_WRITE
@@ -526,6 +529,10 @@ impl Document {
                 format!("{} not found", path.display()),
             )));
         }
+        if !read_only && Self::stale_side_files(path) {
+            log::warn!("{}: its -wal/-shm files belong to another file; moving them aside", path.display());
+            move_side_files_aside(path)?;
+        }
         let flags = if read_only {
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX
         } else {
@@ -548,6 +555,42 @@ impl Document {
             author: local_user_name(),
             manifest_cache: RefCell::default(),
         })
+    }
+
+    /// Side files left by an earlier file of the same name: the document
+    /// reads fine without its write-ahead log but not with it. Checked over
+    /// read-only connections, which never checkpoint the foreign log into the
+    /// file.
+    fn stale_side_files(path: &Path) -> bool {
+        if !side_files(path)[0].exists() {
+            return false;
+        }
+        let readable = |doc: Result<Document>| doc.and_then(|d| d.probe()).is_ok();
+        !readable(Self::open_impl(path, true)) && readable(Self::open_ignoring_log(path))
+    }
+
+    /// The file alone, read-only, with any write-ahead log ignored
+    /// (SQLite's `immutable` URI parameter).
+    fn open_ignoring_log(path: &Path) -> Result<Document> {
+        let mut uri = String::from("file:");
+        for c in path.to_string_lossy().chars() {
+            match c {
+                '%' | '?' | '#' => uri.push_str(&format!("%{:02X}", c as u32)),
+                c => uri.push(c),
+            }
+        }
+        uri.push_str("?immutable=1");
+        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+        let mut conn = Connection::open_with_flags(uri, flags)?;
+        schema::configure(&conn, false)?;
+        schema::check_and_migrate(&mut conn, false)?;
+        Ok(Document { conn, path: path.to_path_buf(), read_only: true, author: local_user_name(), manifest_cache: RefCell::default() })
+    }
+
+    /// The document's default branch and everything at its head can be read.
+    pub(crate) fn probe(&self) -> Result<()> {
+        self.read_all(self.head(self.default_branch()?)?)?;
+        Ok(())
     }
 
     pub fn path(&self) -> &Path {
@@ -1301,4 +1344,26 @@ pub fn owner_and_last_author(conn: &Connection) -> rusqlite::Result<(String, Str
             .map(Option::unwrap_or_default)
     };
     Ok((q("ASC")?, q("DESC")?))
+}
+
+/// SQLite's write-ahead log and shared-memory index next to `path`.
+fn side_files(path: &Path) -> [std::path::PathBuf; 2] {
+    ["-wal", "-shm"].map(|suffix| {
+        let mut p = path.as_os_str().to_owned();
+        p.push(suffix);
+        std::path::PathBuf::from(p)
+    })
+}
+
+/// Renames `path`'s -wal/-shm (if any) to `*.stale` so SQLite won't replay
+/// them; they are kept, not deleted.
+fn move_side_files_aside(path: &Path) -> Result<()> {
+    for f in side_files(path) {
+        if f.exists() {
+            let mut to = f.as_os_str().to_owned();
+            to.push(".stale");
+            std::fs::rename(&f, std::path::PathBuf::from(to)).map_err(StoreError::Io)?;
+        }
+    }
+    Ok(())
 }

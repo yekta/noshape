@@ -293,6 +293,21 @@ pub fn param_row(label: impl Into<SharedString>, field: impl IntoElement) -> Div
         .child(div().flex_1().min_w_0().h(px(26.)).border_b_1().border_color(pal.border).hover(|d| d.border_color(pal.accent)).child(field))
 }
 
+/// [`param_row`] for a field that draws its own underline (a
+/// `quantity_field::QuantityInput`).
+pub fn param_row_plain(label: impl Into<SharedString>, field: impl IntoElement) -> Div {
+    let pal = p();
+    h_flex()
+        .flex_none()
+        .w(px(194.))
+        .h(px(26.))
+        .pl(px(5.))
+        .pr(px(3.))
+        .gap(px(6.))
+        .child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(label.into()))
+        .child(div().flex_1().min_w_0().h(px(26.)).child(field))
+}
+
 /// A selection (query) box: white with a 1 px `#d7d7d7` outline, or
 /// `#def1fb` with a `#1651b0` outline while it takes the picks. Empty it
 /// shows `label` (12 px `#555`); with entries the label shrinks to the top.
@@ -305,7 +320,7 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
         .rounded(px(2.))
         .border_1()
         .border_color(if active { pal.accent } else { pal.border })
-        .bg(if active { pal.info_fill } else { pal.panel })
+        .bg(if active { pal.query_active } else { pal.panel })
         .cursor_pointer()
         .child(
             div()

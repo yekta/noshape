@@ -268,7 +268,7 @@ pub(crate) struct StepEdit {
     pub specify: bool,
     pub direction: Option<MateConnectorRef>,
     /// Distance or Rotation angle.
-    pub value: Entity<InputState>,
+    pub value: Entity<crate::quantity_field::QuantityInput>,
     pub lines: bool,
     pub line_refs: Vec<MateConnectorRef>,
     /// Field taking picks: 0 Instances, 1 direction / axis, 2 explode line entities.
@@ -470,6 +470,8 @@ impl AssemblyView {
         // The workspace draws this view as a cached view (`front_host`):
         // anything the document changes renders it again.
         subs.push(cx.observe(&doc, |_, _, cx| cx.notify()));
+        // Theming › Dark mode re-sets the graphics preferences: rebuild in the new colors.
+        subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| this.rebuild_scene(false, cx)));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             // Any tab can affect an assembly (Part Studios, sub-assemblies).
             DocEvent::TabChanged(t) => {
@@ -608,6 +610,12 @@ impl AssemblyView {
 
     fn units(&self, cx: &App) -> noshape_units::UnitPrefs {
         self.doc.read(cx).session.doc.settings.units
+    }
+
+    /// The variables an assembly field's expression sees (its inserted
+    /// Variable Studios), for the number fields' evaluation.
+    pub(super) fn variable_scope(&self, cx: &App) -> std::collections::BTreeMap<String, noshape_units::Quantity> {
+        self.assembly(cx).map(|a| noshape_model::variables::refs_variables(&self.doc.read(cx).session.doc, &a.variable_studios)).unwrap_or_default()
     }
 
     // ------------------------------------------------------------ evaluation
@@ -1595,7 +1603,9 @@ impl AssemblyView {
     fn open_mate_dialog(&mut self, mate: Mate, editing: Option<MateId>, window: &mut Window, cx: &mut Context<Self>) {
         let labeler = self.labeler(cx);
         let is_new = editing.is_none();
-        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, window, cx));
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let variables = self.variable_scope(cx);
+        let dialog = cx.new(|cx| MateDialog::new(mate, is_new, labeler, units, variables, window, cx));
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &MateDialogEvent, window, cx| match ev {
             MateDialogEvent::Changed => {
                 this.schedule_eval(window, cx);
@@ -2069,7 +2079,7 @@ impl AssemblyView {
             && dialog.read(cx).awaiting_pick()
         {
             if dialog.read(cx).picks_entities() && (c.connector.is_some() || c.instance == InstanceId::ORIGIN) {
-                self.message = Some((false, "Tangent mates take faces, edges or vertices.".into()));
+                self.message = Some((false, "Geometry is not supported for tangent mate.".into()));
                 return;
             }
             let is_new = self.mate.as_ref().is_some_and(|s| s.editing.is_none());

@@ -1,0 +1,127 @@
+# Dark mode (Preferences › Theming) vs live
+
+ui2 owns it (lead 10-22). Live: behaviours "Dark theme (ui 20 Oct)", dom/dark-tokens-table.md, dom/dark-os-vars-computed.json,
+dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to these captures** (lead condition).
+
+## Mechanism (in main once merged)
+- `theme::PALETTE_DARK` + `theme::p()` (palette roles); `theme::DARK_HEX` through the patched gpui `rgb()` / `rgba()`
+  (one relaxed atomic load in light mode, binary search in dark, no allocation); `gpui_kit::with_light_colors` for
+  parts that stay light (drawing editor); `gpui_kit::rgb_static` for `--static` colours.
+- Typing cost (UI thread, 200 keys into the feature filter, --demo): before the hook 4.90 / 4.90 / 4.70 ms per key;
+  with the hook, same binary, alternating: light 5.10 / 5.85 / 5.60 / 5.30 / 6.00 / 6.50 (mean 5.73),
+  dark 5.60 / 5.15 / 4.60 (mean 5.12). Run-to-run noise (±0.7 ms, shared machine) is larger than any hook cost;
+  dark is not slower than light, and light pays only one relaxed load per colour.
+- Step 2 (viewport): `noshape_scene::palette::{set_dark, is_dark, pick, viewport_dark, background}`; the
+  scene builder picks dark plane fill/outline, origin, sketch full/over/driven, sketch regions, connector axes;
+  the viewport background is #333 and the view cube dark (faces #333, frames/arrows #999, labels #fff); plane
+  labels white. Measured vs dk-929: bg #333 = #333; one plane #3d = #3d; two #44 vs #46; plane edge peak
+  #86–#8a vs #84. Saving the theme in Preferences re-sets the graphics global, so part studios and assemblies
+  rebuild their scenes at once (no reload, as live).
+- Step 1 state (dk0 shot): chrome, panels, tabs, filter and toolbar background go dark; still open: icons
+  (dark glyphs, need the dark asset path from icons2), viewport background and plane colours, then per-capture
+  side by side below.
+
+## Side by side (live capture | ours | notes | status)
+| capture | ours | notes | status |
+|---|---|---|---|
+| dk-910-documents | /tmp/ui2/dkdocs.png | page #333, navbar #1c1c1c, left nav, list, details, footer: same colours | ☑ colours |
+| dk-911-documents-row-hover | dkdocs | hover = `--os-hover-primary` #0a4780 (the capture shows no pointer on a row) | ☑ |
+| dk-912-documents-row-selected |  | selected row `accent_soft` #134e96 = live | ☑ |
+| dk-913-create-menu | | | ☐ |
+| dk-913b-create-menu-hover | | | ☐ |
+| dk-914-new-document-modal | | | ☐ |
+| dk-915-state | | | ☐ |
+| dk-920-partstudio | dk2/dk3 | viewport #333, planes, cube, navbar, toolbar, rail #2c2c2c, panel #333 = live; static icons outlined (icons2) | ◐ icons |
+| dk-921-partstudio | | | ☐ |
+| dk-922-feature-hover | | | ☐ |
+| dk-923-feature-selected | | | ☐ |
+| dk-924-feature-rmb | | | ☐ |
+| dk-925-tool-tooltip | | | ☐ |
+| dk-926-feature-dialog | dkext2 | dialog #333, active query box #142434 + #3e94ff border, related row #092046, selected #134e96 = live | ☑ |
+| dk-927-variable-table | | | ☐ |
+| dk-928-configurations | | | ☐ |
+| dk-929-face-selected-measure | dk3 | bg, planes 1/2 stacked, plane edges, origin, cube = live within a few levels | ☑ |
+| dk-930-face-hover | | | ☐ |
+| dk-931-sketch-line | | | ☐ |
+| dk-932-sketch-dimension | | | ☐ |
+| dk-933-sketch-after | | | ☐ |
+| dk-940-assembly | dkasm | chrome, list and viewport match; static icons outlined (icons2) | ◐ icons |
+| dk-941-mate-dialog | | | ☐ |
+| dk-942-bom | | | ☐ |
+| dk-950-drawing | | | ☐ |
+| dk-951-drawing-properties | | | ☐ |
+| dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
+| dk-961-variable-studio | | | ☐ |
+| dk-990-restored-light | | | ☐ |
+
+## Plan notes
+# Dark mode (lead 10-22: ui2 owns it; coordinate in ui's handoff theme-layout.md)
+
+Live: behaviours "Dark theme (ui 20 Oct)", dom/dark-tokens-table.{md,json} (287 themed tokens), dark/dk-9xx.
+Switch applies immediately (no reload). Drawings: only the shell is dark (toolbar, sheet surround, sheet, Drawing
+properties stay light). Feature Studio: ACE twilight colours. `--…--static` tokens keep light values.
+
+## Layers
+1. **Palette** (theme.rs, ui's file): `PALETTE_DARK` with each field's dark token (comments name the token),
+   `theme::set_dark(bool)` (AtomicBool), `p()` returns the active one. ~46 fields; values from the token table:
+   app_bg #333, panel #333, panel_raised #333, panel_hover #666, panel_active #555, tool_hover #666,
+   tool_hover_group #555, tool_active #134e96?, rail #2c2c2c (left strip measured (44,44,44)), focus #3e94ff,
+   text #fff, text_muted #ccc, text_faint #999?, accent #3e94ff, accent_soft #134e96 (selected row (19,78,150)),
+   row_hover #0a4780, tooltip …, tab_bar #555 (measured (81,81,81)), tab_inactive …, menu_outline #ccc,
+   dialog_bg #333 (95%?), info_fill #094174 / #142434, border #555, border_strong #888, search_fill (85,88,96)…
+   Each from the table, then checked against dk-9xx pixels.
+2. **Hard-coded literals** (~1800 `rgb(0x…)` / `rgba(0x…)` across every agent's files): a hook in the patched
+   gpui (`vendor/gpui-pre/src/color.rs`): `set_hex_theme(Option<fn(u32) -> u32>)` consulted by `rgb()` / `rgba()`
+   (alpha kept), plus `with_light_colors(|| …)` (thread-local depth) for subtrees that stay light (drawing
+   canvas + its toolbar/panels, the sheet; images; viewport-matched swatches such as appearance colours).
+   The map = the token table's majority light→dark value for each light hex (37 of 70 light hexes are
+   ambiguous: #fff is background (→#333) and text-on-blue (stays #fff); #1651b0 accent (→#3e94ff) vs primary
+   button fill (stays)). Ambiguous call sites switch to `theme::fixed(hex)` (= Onshape's `--static`), found by
+   comparing every dk-9xx capture side by side.
+3. **Icons:** icons2 captured dark icon sources (icons2-dark-*.png, -sprite.svg): mono icons recolour via
+   their `currentColor` / fill → icon tint from the palette; check icons2's notes (behaviours 6244…).
+4. **Viewport:** background stays per live (the graphics area #333? live "graphics background … #333";
+   default planes fill (76,76,76) edges (100,100,100)) → scene palette `viewport` dark set (noshape_scene).
+5. **Feature Studio** ACE-like colours: twilight token set in feature_studio.rs highlighting.
+6. Refresh: `set_dark` + `cx.refresh_windows()`; cached slices must re-render (notify every view: add a global
+   theme epoch the Slice cache keys on).
+
+## Steps
+a. palette + toggle + Preferences Theming wiring (pref `dark_mode`), b. gpui hook + majority map + light scope for
+drawings, c. side-by-side pass over dk-910…961 fixing exceptions per area, d. viewport + FS + icons.
+Tell ui in theme-layout.md before touching theme.rs / vendor color.rs.
+
+## Icons (detail)
+Live: one sprite for both themes; colours from `--os-icon-*` vars (outline-primary #333→#fff, fill-primary
+#fff→#333, accent-primary #1651b0→#3e94ff, accent-tertiary #333→#fff; `--static` keep light; full ~70 vars per
+theme in dom/icons2-dark-icon-fills.json). Ours: literal fills/strokes (#333 ×985, #000 ×426, #fff ×196, #1651B0
+×149 …). → `AppAssets::load("icons/dark/<name>.svg")` = the light SVG with colours rewritten by that var map
+(per-icon exceptions from icons2-dark-icon-fills.json where an icon uses a --static var); `assets::icon()` /
+`icon_path()` return the dark path while dark (separate paths keep GPUI's raster cache per theme). Tell icons2.
+
+### Step 3 (built): how dark icons load — for icons2
+- `assets::icon()` in dark mode (not inside the drawing editor) rasterises `crates/app/assets/icons/dark/<name>.svg`
+  when it exists, else the light SVG with the themed colours flipped (#333/#000 → #fff, #1651b0 → #3e94ff);
+  the raster cache is keyed per theme. `svg()` mask icons are tinted by the palette and need nothing.
+- The flip is right for icons whose Onshape symbol uses only themed vars. Where a symbol uses `--static` vars
+  Onshape keeps the light art in dark (white faces, #333 outline, #999 secondary: dark/icons2-dark-*-2x.png),
+  and our art has no white faces, so those need drawn `icons/dark/` art. From icons2's work/map.json and the
+  live sprite's var names (scratch /root/ui2-scratch/dark-icon-categories.json):
+  - all `--static` (74): appearance, bend-relief, body-draft, bom, chamfer, composite-part, constrained-surface, corner-relief, cut-list, decal, draft, drawing, drawing-no-views, drawing-update, enclose, end-cap, error, external-thread, extrude, face-blend, fillet, flange, flat-pattern, folder, form, frame, gusset, hem, hole, inserted-version-update, instance, intersection-curve, isolate, isoparametric, joint, linear-pattern, list-error-filter, loft, mate-connector, mate-connector-assembly, mate-connector-qlv-item, mc-select, menu-delete, mirror, msg-error, msg-warning, offset-surface, part-mesh, performance-info, performance-warning, regen-error, remove-circle, replace-face, rib, sheet, sheet-metal, sheet-metal-loft, sheet-metal-make-joint, sheet-metal-table, shell, split, standard-content, sub-assembly, sweep, tab, thicken, toast-error, toast-info, toast-success, toast-warning, update-all-button, view-cube, warning, wire-body.
+  - mixed static + themed (92): add-appearance, aligned-rectangle, assembly, bezier, boolean, boundary-surface, center-point-arc, center-rectangle, cfg-last-viewed, cfg-reset-default, circle, circular-pattern, config-show, configuration, configuration-visibiliity, conic, corner-rectangle, create-partstudio-incontext, create-variable, curvature, curve-pattern, delete-face, delete-part, derived, derived-mirror, edit-curve, ellipse, elliptical-arc, explode, fastened, featurescript-table, fill, flip, flip-circular, flip-circular-opposite, flip-direction, flip-direction-opposite, frame-trim, fs-snip-op, hole-depth, hole-diameter, hole-drill-angle, hole-table, insert-variable, insp-default-tol, inspection-table, intersection, jog, line, menu-create-drawing, midpoint-line, modify-fillet, move-boundary, move-face, mutual-trim, named-position, part, part-studio, paste, point-sketch, polygon-circumscribed, polygon-inscribed, realign-mate-dialog, replace-part, replicate, revolve, ruled-surface, sheet-insert, sheet-metal-bend, sheet-metal-end, snap-mode, spline, split-sketch, stack-closest, stack-furthest, sub-assembly-rigid, surface-body, tangent-arc, text, three-point-arc, three-point-circle, transform, under-defined, use, user-avatar, variable-studio, variable-table, variables-panel, wrap, xyz-along-x, xyz-along-y, xyz-along-z.
+  - literal colours, no vars (27): branch, chevron-right, connectivity-analysis-g0, connectivity-analysis-g1, connectivity-analysis-g2, connectivity-analysis-g3, connectivity-analysis-no-connection, corner-break, cube, f-sphere, history, mbd-status, note, performance, plane, properties, recent, release-drafts, src-created, src-owned, src-public, src-recent, src-shared, tab-search, tm-detailed, tm-sort, tool-caret.
+  - no sprite reference (99): check against live dark crops.
+  - themed only (256): the flip should match; spot-check.
+
+## Lead conditions (10-22)
+- Light mode: one relaxed atomic load in rgb()/rgba() (drafts/color_hook.rs: `HEX_THEME_ON` + `#[cold]` slow path).
+- Dark: static sorted `(light, dark)` array, binary search, no allocation.
+- Measure typing-frame cost before/after: script `typing-bench.sh`: app on --demo, focus the feature filter box,
+  `xdotool type --delay 30` 200 chars, read utime+stime of the app (/proc/<pid>/stat, ticks) before/after → CPU ms
+  per keystroke; 3 runs each: (a) before the hook (current main), (b) hook in, light, (c) hook in, dark.
+  Also NOSHAPE_PERF=1 logs if they carry a UI frame stage.
+- Done = every studio and dialog side by side with dark/dk-9xx captures, pixel-close (keep a table in
+  docs/parity/dark-mode.md with each capture, our crop, diff notes).
+- Baseline (10-22 ~05:40, main 5bd50b2 + WIP, before the hook): UI thread 4.90 / 4.90 / 4.70 ms CPU per key
+  (200 keys into the feature filter, --demo; whole process ≈ 120 ms/key = llvmpipe, not comparable).
+

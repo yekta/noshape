@@ -974,3 +974,33 @@ these rules, change it in commit.rs (the app and the API both use it). Backups: 
 - **Panel fields checked in the app (mm demo):** Notes Text height "4 mm" + Tab → 4.0000, "abc" + Tab → reverts,
   ▾ visible; Stack gap "1 mm" + Tab → stays, hover "Must be a number"; 1.25 + Enter, ↑ → 1.3000. The pale orange
   now fills the input itself (it was hidden under the input's white).
+- (api, 2026-10-22 15:45) Geometric tolerance click (drawing_gdt.rs), Surface finish ✓ and its "Ra 3.2" start value
+  (drawing_extra.rs), Weld symbol target + place (drawing_weld.rs), Revision table placement / settings, latest
+  revision and Revision callout (drawing_revision.rs) now call scene/drawing_tools/commit.rs (`gdt`,
+  `surface_finish`, `SURFACE_FINISH_DEFAULT`, `weld_target`, `weld`, `RevisionTableOpts`, `revision_table`,
+  `revision_table_kind`, `latest_revision`, `revision_callout`) — the same builders the agent API uses. Behaviour
+  unchanged; each checked in the app (frames / symbols placed, same history text).
+- (api, 2026-10-22 17:30) `view_point`, `ortho_view` and `extend_line_ends` (jogged / aligned section and broken-out
+  clicks, drawing_extra.rs) now delegate to scene/drawing_tools/commit.rs (SheetPick::view_point /
+  extend_line_ends, ortho_view); the API's drawing_jogged_section_view / drawing_aligned_section_view use the same.
+  Checked in the app: Aligned section view about hole A1 (legs extended past the view, SECTION C - C placed).
+- (api, 2026-10-22 19:40) drawing_view.rs: load_old_state now calls noshape_ops::drawing::old_state (compares the
+  stored states at sources_at and at head: a demo / imported document whose memory copy was never round-tripped
+  read as out of date before); reload() remakes the views when the drawing's sources_at changes outside the
+  editor (Update or its undo, or the agent API's drawing_update). Table cell ✓ uses scene set_general_cell.
+- (api, 2026-10-22 22:00) More drawing tools now call scene/drawing_tools/commit.rs, shared with the agent API:
+  broken-out section (drawing_more.rs: `SheetPick::broken_out_default_depth`, `broken_out`, `set_broken_out`), Hatch
+  region clicks and ✓ (drawing_hatch.rs: `SheetPick::hatch_profile_at`, `hatch_toggle`, `apply_hatches`), Custom
+  table kind / placement (drawing_custom_table.rs: `custom_table_kind`, `custom_table`), Insert image
+  (drawing_images.rs: `image_aspect`, `SheetPick::image_box`, `add_sheet_image`), Insert DXF or DWG
+  (drawing_sketch.rs: `insert_cad`) and the drawing sketch tools' clicks (drawing_sketch.rs: `SheetPick::
+  sketch_point_at / sketch_entity_at / sketch_target`, `sketch_line`, `sketch_two_click`, `sketch_spline`,
+  `sketch_trim`), Drawing properties edits (drawing_drawprops.rs: `set_drawing_props`, the lock / units rule),
+  inspection item edits (drawing_inspection.rs: `set_inspection`, `move_inspection`), the Auxiliary view dialog's
+  Normal / In line / Axis pick (drawing_aux.rs: `SheetPick::aux_pick`) and the Datum tool's attach to GD&T frames /
+  dimension lines (drawing_extra.rs: `SheetPick::datum_attach_at`). Behaviour unchanged. model/drawing/build.rs: `field_value` is now `pub` (the API reports table
+  text as drawn).
+- (api, 2026-10-23 00:40) Seen while checking the switches in the app (also on main a061cb3, so not from them):
+  Auxiliary view › Axis on the demo drawing's right view (the holes' hidden silhouettes highlight on hover) answers
+  "Select a hole axis" on click (not investigated; probably no `axes` in that view and `line_pick` not taking the
+  hidden edges). In line on a 2 point centerline works.

@@ -10,14 +10,91 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+// NOSHAPE PATCH: an app colour theme for hex colours. While a table is
+// installed (`set_hex_theme`), `rgb()` / `rgba()` map each colour through it
+// (sorted `(from, to)` pairs, binary search, no allocation), except inside
+// `with_light_colors`. With none installed (the default) the only cost is one
+// relaxed atomic load.
+static HEX_THEME_ON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static HEX_THEME_PTR: std::sync::atomic::AtomicPtr<(u32, u32)> = std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+static HEX_THEME_LEN: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+thread_local! {
+    static LIGHT_DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// NOSHAPE PATCH: install (sorted by `from`) or remove the hex colour theme.
+pub fn set_hex_theme(table: Option<&'static [(u32, u32)]>) {
+    debug_assert!(table.is_none_or(|t| t.windows(2).all(|w| w[0].0 < w[1].0)));
+    let t = table.unwrap_or(&[]);
+    HEX_THEME_LEN.store(t.len(), std::sync::atomic::Ordering::Release);
+    HEX_THEME_PTR.store(t.as_ptr().cast_mut(), std::sync::atomic::Ordering::Release);
+    HEX_THEME_ON.store(table.is_some(), std::sync::atomic::Ordering::Relaxed);
+}
+
+/// NOSHAPE PATCH: whether hex colours are being themed here (a table is
+/// installed and no `with_light_colors` scope is open on this thread).
+pub fn hex_theme_active() -> bool {
+    HEX_THEME_ON.load(std::sync::atomic::Ordering::Relaxed) && LIGHT_DEPTH.with(|d| d.get()) == 0
+}
+
+/// NOSHAPE PATCH: run `f` with hex colours unthemed (parts that stay light,
+/// e.g. a drawing's canvas in Onshape's dark mode).
+pub fn with_light_colors<R>(f: impl FnOnce() -> R) -> R {
+    LIGHT_DEPTH.with(|d| d.set(d.get() + 1));
+    let r = f();
+    LIGHT_DEPTH.with(|d| d.set(d.get() - 1));
+    r
+}
+
+#[inline]
+fn themed(rgb24: u32) -> u32 {
+    if !HEX_THEME_ON.load(std::sync::atomic::Ordering::Relaxed) {
+        return rgb24;
+    }
+    themed_slow(rgb24)
+}
+
+#[cold]
+fn themed_slow(rgb24: u32) -> u32 {
+    if LIGHT_DEPTH.with(|d| d.get()) > 0 {
+        return rgb24;
+    }
+    let len = HEX_THEME_LEN.load(std::sync::atomic::Ordering::Acquire);
+    let ptr = HEX_THEME_PTR.load(std::sync::atomic::Ordering::Acquire);
+    if ptr.is_null() || len == 0 {
+        return rgb24;
+    }
+    // SAFETY: only `&'static` tables are installed; pointer and length are
+    // stored together before the flag is raised.
+    let table = unsafe { std::slice::from_raw_parts(ptr, len) };
+    match table.binary_search_by_key(&rgb24, |e| e.0) {
+        Ok(i) => table[i].1,
+        Err(_) => rgb24,
+    }
+}
+
 /// Convert an RGB hex color code number to a color type
 pub fn rgb(hex: u32) -> Rgba {
-    let [_, r, g, b] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
+    let [_, r, g, b] = themed(hex & 0xff_ffff).to_be_bytes().map(|b| (b as f32) / 255.0);
     Rgba { r, g, b, a: 1.0 }
 }
 
 /// Convert an RGBA hex color code number to [`Rgba`]
 pub fn rgba(hex: u32) -> Rgba {
+    let rgb24 = themed(hex >> 8);
+    let [r, g, b, a] = ((rgb24 << 8) | (hex & 0xff)).to_be_bytes().map(|b| (b as f32) / 255.0);
+    Rgba { r, g, b, a }
+}
+
+/// NOSHAPE PATCH: [`rgb`] without the hex theme (Onshape's `--static` colours).
+pub fn rgb_static(hex: u32) -> Rgba {
+    let [_, r, g, b] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
+    Rgba { r, g, b, a: 1.0 }
+}
+
+/// NOSHAPE PATCH: [`rgba`] without the hex theme.
+pub fn rgba_static(hex: u32) -> Rgba {
     let [r, g, b, a] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
     Rgba { r, g, b, a }
 }

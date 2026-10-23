@@ -12,6 +12,7 @@ use crate::scene_builder::{DisplayMode, TangentEdges};
 use crate::theme::{p, with_alpha};
 use glam::{DQuat, DVec2};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::Selectable as _;
 use gpui_kit::component::h_flex;
 use gpui_kit::*;
 use noshape_render::{Projection, StandardView};
@@ -222,7 +223,9 @@ pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, viewport: DV
                 }
             }),
         )
-        .child(div().absolute().left(px(106.)).top(px(128.)).child(menu))
+        // Occludes the viewport: its click would take the focus back from the
+        // just-opened menu, and Esc would no longer close it.
+        .child(div().absolute().left(px(106.)).top(px(128.)).occlude().child(menu))
         .into_any_element()
 }
 
@@ -285,10 +288,15 @@ impl PartStudioView {
         let boundary = self.opts.highlight_boundary;
         // Onshape: the view-mode cube icon with a ▾ under the cube.
         let pal = p();
-        let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
+        // Live (part-studio/21, 53): no fill at rest, #eaeaea on hover,
+        // #e5e5e5 while its menu is open; an 8x4 #333 caret.
+        let open = self.ui.camera_menu.as_ref().is_some_and(|m| crate::os_menu::is_open_menu(m, cx));
+        let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(gpui_kit::rgb(0xe5e5e5).into()).shadow(false);
         let button = Button::new("camera-menu")
             .custom(variant)
-            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("ui-caret-down", 9., pal.text)))
+            // The open style paints the variant's active colour.
+            .open(open)
+            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x333333))))
             .w(px(44.))
             .h(px(28.))
             .p_0()
@@ -297,7 +305,9 @@ impl PartStudioView {
                 // Opens under the button, right-aligned with it (live: 222 px,
                 // Onshape's context-menu style). The button's bottom-right
                 // corner, from the widget's painted origin.
-                let at = this.ui.cube_origin.map(|o| point(o.x + px(WIDGET_PX), o.y + px(156.))).unwrap_or_default();
+                // Live (part-studio/53): the menu's right border at the
+                // widget's right edge + 1.
+                let at = this.ui.cube_origin.map(|o| point(o.x + px(WIDGET_PX + 1.), o.y + px(156.))).unwrap_or_default();
                 let view = view.clone();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
                 m = m.camera();
@@ -402,6 +412,7 @@ impl PartStudioView {
                 m = m.separator();
                 m.item(item(if section { "Turn off section view" } else { "Section view…" }, Box::new(|this, w, cx| this.toggle_section(w, cx))).icon_name("menu-section-view"))
                 });
+                this.ui.camera_menu = Some(menu.downgrade());
                 crate::os_menu::open_anchored(at, Anchor::TopRight, menu, window, cx);
             }));
         // Live (part-studio/21): the tooltip sits left of the button.

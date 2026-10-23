@@ -223,7 +223,8 @@ pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
     let mut cs = origin_csys(ev, &origin_ref, &inference, secondary)?;
 
     if ev.is("originType", "BETWEEN_ENTITIES") {
-        let Some(r) = ev.query("originAdditionalQuery").first() else { return err("Select the second entity to place the origin between") };
+        // Live L39: no second entity, no field marked.
+        let Some(r) = ev.query("originAdditionalQuery").first() else { return err("Failed to resolve mate connector coordinate system.") };
         let target = match ev.resolve_faces(std::slice::from_ref(r)).first() {
             Some(&(bi, fi)) => ev.face_shape(bi, fi)?.project_point(cs.origin)?.point,
             None => match ev.resolve_plane(r) {
@@ -243,12 +244,27 @@ pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
             let d = ev.resolve_direction(r).ok_or_else(|| not_found("secondary axis entity"))?;
             let x = d - cs.z * cs.z.dot(d);
             if x.length_squared() < 1e-12 {
-                return err("Secondary axis can't be parallel to the primary axis");
+                return err("Failed to resolve mate connector. Secondary axis conflicts with primary axis.");
             }
             cs.x = x.normalize();
         }
     }
 
+    // Live L38: flip and reorient first, then the move in that frame, then
+    // the rotation about the moved origin (it doesn't change the move).
+    if ev.bool("flipPrimary") {
+        cs = cs.rotated(cs.x, std::f64::consts::PI);
+    }
+    // "+Y" turns X to the old −Y (live: X (0,−1,0) on a +Z face).
+    let quarter = match ev.enum_("secondaryAxisType") {
+        "PLUS_Y" => -1.0,
+        "MINUS_X" => 2.0,
+        "MINUS_Y" => 1.0,
+        _ => 0.0,
+    };
+    if quarter != 0.0 {
+        cs = cs.rotated(cs.z, quarter * std::f64::consts::FRAC_PI_2);
+    }
     if ev.bool("transform") {
         let (tx, ty, tz) = (ev.length("translationX")?, ev.length("translationY")?, ev.length("translationZ")?);
         cs.origin += cs.x * tx + cs.y() * ty + cs.z * tz;
@@ -263,23 +279,22 @@ pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
 
-    if ev.bool("flipPrimary") {
-        cs = cs.rotated(cs.x, std::f64::consts::PI);
-    }
-    let quarter = match ev.enum_("secondaryAxisType") {
-        "PLUS_Y" => 1.0,
-        "MINUS_X" => 2.0,
-        "MINUS_Y" => 3.0,
-        _ => 0.0,
-    };
-    if quarter != 0.0 {
-        cs = cs.rotated(cs.z, quarter * std::f64::consts::FRAC_PI_2);
-    }
-
+    // Live L37: the owner is required (the dialog fills it); connectors
+    // saved before kept working without one.
     if ev.bool("allowOwnerEntity") && ev.bool("requireOwnerPart") {
         let owner = ev.query("ownerPart");
-        if !owner.is_empty() && ev.resolve_bodies(owner).is_empty() {
-            return err("Owner part could not be resolved");
+        // An empty owner is what connectorEditLogic would fill: the origin
+        // entity's part, else the only part.
+        let inferred = || {
+            let one = std::slice::from_ref(&origin_ref);
+            ev.resolve_faces(one).first().map(|x| x.0).or_else(|| ev.resolve_edges(one).first().map(|x| x.0)).or_else(|| (ev.ctx.bodies.len() == 1).then_some(0))
+        };
+        let unknown = if owner.is_empty() { !ev.params.bool("legacyNoOwner") && inferred().is_none() } else { ev.resolve_bodies(owner).is_empty() };
+        if unknown {
+            return crate::regen::eval::err_at(&["ownerPart"], "Cannot determine owner of mate connector.");
+        }
+        if ev.is("attachmentOption", "TO_SELECTION") && ev.query("attachTo").is_empty() {
+            return crate::regen::eval::err_at(&["attachTo"], "Select an entity for the mate connector attachment.");
         }
     }
 

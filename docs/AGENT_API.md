@@ -246,7 +246,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-142 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
+158 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -256,7 +256,7 @@ the app.
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_view_table`](#drawing_view_table)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
@@ -1605,6 +1605,18 @@ Clicks the dimension tool on the view geometry at `picks` (sheet mm; click on an
 | `picks` | array of array of number | required | The picking clicks (sheet mm). |
 | `place` | array of number | required | Where the dimension text goes (sheet mm). |
 
+#### drawing_update
+
+Update an out-of-date drawing from the current model (edits the document (one undoable history entry)).
+
+After the model changes, a drawing's views keep the geometry they were made from and the drawing is out of date (`out_of_date` in drawing_get; the app's yellow Update button). Update remakes every view from the current document. One edit ("Update") when out of date; otherwise nothing changes.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+
 #### drawing_export
 
 Export a drawing to PDF, DWG, DXF, DWT or SVG.
@@ -1648,6 +1660,38 @@ The Section view tool: the cutting line goes through `point` (sheet mm; a vertex
 | `exclude` | array of string |  | Parts excluded from the cut (`body:…`). |
 | `cut_from_section` | boolean |  | Sectioning a section view: cut from the section. |
 
+#### drawing_jogged_section_view
+
+Jogged section view (an orthogonal cutting line through several points) (edits the document (one undoable history entry)).
+
+The Jogged section view tool: clicks `points` (sheet mm, at least 2) on the parent view; each one continues the cutting line horizontally or vertically (in the view's frame) toward it, and finishing (Enter) extends both ends past the view. The section goes to `position`, projected from the first segment. One edit ("Section view").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `parent` | integer | required | View to section. |
+| `points` | array of array of number | required | The cutting line's clicks (sheet mm). |
+| `position` | array of number | required | Where the section view goes (sheet mm). |
+
+#### drawing_aligned_section_view
+
+Aligned section view (two cutting legs about a center, unfolded) (edits the document (one undoable history entry)).
+
+The Aligned section view tool: `center` (sheet mm) on the parent view, then `a` and `b`, the directions of the two cutting legs from it (each leg is extended past the view). The view goes to `position`, projected from the first leg. One edit ("Aligned section view").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `parent` | integer | required | View to section. |
+| `center` | array of number | required | The legs' common point (sheet mm). |
+| `a` | array of number | required | A point along the first leg (sheet mm). |
+| `b` | array of number | required | A point along the second leg (sheet mm). |
+| `position` | array of number | required | Where the view goes (sheet mm). |
+
 #### drawing_detail_view
 
 Detail view of a circular region of a view (edits the document (one undoable history entry)).
@@ -1671,16 +1715,17 @@ The Detail view tool: the circle centered at `center` (sheet mm; a vertex or cir
 
 #### drawing_auxiliary_view
 
-Auxiliary view looking normal to a straight edge (edits the document (one undoable history entry)).
+Auxiliary view: normal to an edge, in line with a sketch line / centerline, or down a hole's axis (edits the document (one undoable history entry)).
 
-The Auxiliary view tool (Normal): `edge` is a click on a straight model edge of the parent view (sheet mm); the view looks along it and goes to `position` (at least 15 mm from the parent, perpendicular to the edge). One edit ("Auxiliary view").
+The Auxiliary view tool. `edge` is a click (sheet mm) on the fold line for `mode`: normal, a straight model edge of the parent view (the view looks along it); in_line, a sheet sketch line or a centerline annotation; axis, a hole's axis seen side-on (its centerline or silhouette; the view looks down it). The view goes to `position` (at least 15 mm from the parent, perpendicular to the fold line). One edit ("Auxiliary view").
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
-| `edge` | array of number | required | A point on a straight edge of a view (sheet mm). |
+| `mode` | one of `normal`, `in_line`, `axis` |  | The dialog's tab. |
+| `edge` | array of number | required | A point on the fold line (sheet mm). |
 | `position` | array of number | required | Where the view goes (sheet mm). |
 | `label` | string |  | Auxiliary id (default the sheet's next letter). |
 | `reverse` | boolean |  | Reverse the direction. |
@@ -1708,7 +1753,7 @@ The Break view tool: removes the band between `from` and `to` (sheet mm) across 
 
 Crop a view to a rectangle or circle (edits the document (one undoable history entry)).
 
-The Crop view tool: a rectangle with corners `from` and `to`, or a circle centered at `from` through `to` (sheet mm; `from` snaps to a vertex there). One edit ("Crop view").
+The Crop view tools: a rectangle with corners `from` and `to`, a circle centered at `from` through `to` (sheet mm; `from` snaps to a vertex there), or a closed polygon / spline through `points` (sheet mm, at least 3; vertices snap). One edit ("Crop view"); a view's new crop replaces its old one.
 
 | field | type | | description |
 |---|---|---|---|
@@ -1716,9 +1761,160 @@ The Crop view tool: a rectangle with corners `from` and `to`, or a circle center
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `view` | integer | required | View to crop. |
-| `shape` | one of `rectangle`, `circle` |  | Crop shape. |
-| `from` | array of number | required | Rectangle corner / circle center (sheet mm). |
-| `to` | array of number | required | Opposite corner / a point on the circle (sheet mm). |
+| `shape` | one of `rectangle`, `circle`, `polygon`, `spline` |  | Crop shape. |
+| `from` | array of number |  | Rectangle corner / circle center (sheet mm). |
+| `to` | array of number |  | Opposite corner / a point on the circle (sheet mm). |
+| `points` | array of array of number |  | Polygon / spline points (sheet mm). |
+
+#### drawing_broken_out_section
+
+Broken-out section: cut away a closed profile of a view (edits the document (one undoable history entry)).
+
+The Broken-out section tool: the closed spline profile through `points` (sheet mm, at least 3; vertices snap) cut into the view to a blind `depth` from the model's nearest point (default: half the model's depth along the line of sight, as the dialog), or up to the model point snapped at `depth_to`. `index` edits the view's existing broken-out section instead. One edit ("Broken-out section"). Projected views of the view show the cut too.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer |  | View to cut (default: the view under the first point). |
+| `points` | array of array of number | required | Profile points (sheet mm). |
+| `depth` | string or number |  | Blind depth: a length ("5 mm"; a bare number is in workspace units). |
+| `depth_to` | array of number |  | Up to entity: a model point (vertex, circle center...) of a view of the same model (sheet mm). |
+| `index` | integer |  | Edit the view's broken-out section number `index` (0-based, drawing_get) instead of adding one. |
+
+#### drawing_hatch_region
+
+Hatch closed profiles of the sheet sketch or of views (edits the document (one undoable history entry)).
+
+The Hatch region dialog: each of `points` (sheet mm) picks the smallest closed sheet-sketch profile around it, else the smallest closed region of the visible edges of the view there (not detail or break views); a region per profile. Pattern tab `standard` and `pattern` (its name as listed in the dialog, e.g. "ANSI31 general", or just its first word "ANSI31"; default the tab's default), `scale` and `angle` ("Auto" or a number; not on the General tab), `color` (default: the drawing's hatch color). `hatch` edits that hatch region instead (its profile replaced when `points` are given). One edit ("Hatch region" / "Edit hatch"); replies with the hatch ids.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `points` | array of array of number |  | Points inside the profiles to hatch (sheet mm). |
+| `standard` | one of `ansi`, `iso`, `general` |  | Pattern tab. |
+| `pattern` | string |  | Pattern name. |
+| `scale` | string or number |  | Pattern scale ("Auto" = 1). |
+| `angle` | string or number |  | Pattern angle in degrees ("Auto": the pattern's own). |
+| `color` | array of integer |  | Color [r, g, b] (default: the drawing's hatch color). |
+| `hatch` | integer |  | Hatch region id to edit (drawing_get). |
+
+#### drawing_custom_table
+
+Insert a custom table, or edit a custom table's properties (edits the document (one undoable history entry)).
+
+The Custom table dialog: custom table `table` (its name or display name) defined by a Feature Studio of this document, computed on Part Studio `studio` (default: the Part Studio of `view`, else the first one shown in the drawing), placed with its `corner` at `position` (sheet mm). With `id`: Custom table properties of that table (Part Studio, table, order, corner; unset fields kept). One edit ("Custom table" / "Custom table properties"). Its rows are in drawing_get's tables.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `table` | string |  | Custom table name or display name. |
+| `feature_studio` | string |  | Feature Studio tab (name or id) defining it, when several define the name. |
+| `studio` | string |  | Part Studio tab (name or id). |
+| `view` | integer |  | A view whose Part Studio to use. |
+| `position` | array of number |  | Where the fixed corner goes (sheet mm; inserting). |
+| `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | Fixed corner. |
+| `bottom_to_top` | boolean |  | Row order bottom to top. |
+| `id` | integer |  | Custom table to edit (drawing_get). |
+
+#### drawing_insert_image
+
+Insert an image on the sheet (edits the document (one undoable history entry)).
+
+Toolbar › Insert image: image file tab `file` of the document (PNG, JPEG, GIF), or a local file `path` imported first as a file tab (its own edit "Import <name>", as the picker's Import). Placed as a drag from `position` to `to` (sheet mm; the image's aspect kept), or without `to` 30 mm high with its lower-left corner at `position`. One edit ("Insert image"); replies with the image id.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `file` | string |  | Image file tab (name or id). |
+| `path` | string |  | Local image file to import and insert. |
+| `position` | array of number | required | Drag start / lower-left corner (sheet mm). |
+| `to` | array of number |  | Drag end (sheet mm). |
+
+#### drawing_insert_cad
+
+Insert a DXF or DWG as drawing sketch geometry (edits the document (one undoable history entry)).
+
+Toolbar › Insert DXF or DWG: the model-space wireframe of DXF / DWG file tab `file` (or local file `path`, imported first as a file tab: its own edit "Import <name>") becomes sheet sketch geometry at the file's own coordinates (its unit, else the drawing's; blocks and polylines exploded, colors dropped). One edit ("Insert DXF or DWG"); replies with the number of entities.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `file` | string |  | DXF / DWG file tab (name or id). |
+| `path` | string |  | Local DXF / DWG file to import and insert. |
+
+#### drawing_sketch
+
+Drawing sketch tools: line, circles, rectangles, tangent arc, spline, points, trim (edits the document (one undoable history entry)).
+
+The drawing toolbar's sketch tools on the sheet sketch, on clicks `picks` (sheet mm) as in the editor: a click snaps to a sketch point (within 6 px), else to a view snap point (vertex, center...), and lines within 1.5° of horizontal / vertical get that constraint. line: a chain through the clicks; circle (center, then a point on it), corner_rectangle / center_rectangle (two corners / center and corner) and tangent_arc (a line or arc end point, then the arc's end): pairs of clicks; circle_3_point: triples; spline: one spline through all clicks; spline_point: each click on a spline adds a point there; point: a sketch point per click; trim: each click trims the curve under it (or deletes a point). One edit with the tool's name ("Line", "Center point circle", ...).
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `tool` | one of `line`, `circle`, `circle_3_point`, `tangent_arc`, `corner_rectangle`, `center_rectangle`, `spline`, `spline_point`, `point`, `trim` | required | Sketch tool. |
+| `picks` | array of array of number | required | Clicks (sheet mm). |
+
+#### drawing_format_painter
+
+Format painter: copy a dimension's or annotation's format to others (edits the document (one undoable history entry)).
+
+The Format painter dialog: from annotation `source` (a dimension, note, GD&T frame..., drawing_get ids) to each of `targets`, pasting its style (on by default), tolerance and precision, and / or content. One edit ("Format painter").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `source` | integer | required | Annotation to copy from. |
+| `targets` | array of integer | required | Annotations to paint. |
+| `style` | boolean |  | Paste style. |
+| `tolerance_precision` | boolean |  | Paste tolerance and precision. |
+| `content` | boolean |  | Paste content. |
+
+#### drawing_inspection
+
+Inspection items: number annotations (manual, reorder, automatic), edit, move, remove, hide, border shape (edits the document (one undoable history entry)).
+
+The Inspection item tool and its menus. add: number `annotations` in order, from `number` (Reorder inspection items) or the drawing's next number ("Inspection item"). automatic: number every dimension and annotation of `scope` (drawing, sheet, or the view `view`) ("Inspection items"). edit: annotation `id` gets `number` ("Edit inspection item"). move: `id`'s number moves to annotation `to` ("Move inspection item"). remove: `annotations` lose theirs ("Remove inspection item"); remove_all ("Remove all inspection items"). hide / show: the toolbar's Hide inspection items toggle ("Hide inspection items" / "Show inspection items"). shape: the bubbles' border `shape` ("Inspection border shape"). drawing_get lists each annotation's `inspection` number.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `action` | one of `add`, `automatic`, `edit`, `move`, `remove`, `remove_all`, `hide`, `show`, `shape` | required | What to do. |
+| `annotations` | array of integer |  | Annotations (add, remove). |
+| `number` | integer |  | First number (add: reorder) / the number (edit). |
+| `id` | integer |  | Annotation (edit, move). |
+| `to` | integer |  | Annotation the number moves to (move). |
+| `scope` | one of `drawing`, `sheet`, `view` |  | Automatic scope. |
+| `view` | integer |  | View (scope view). |
+| `shape` | one of `circle`, `oval`, `rectangle`, `triangle`, `flag` |  | Border shape (shape). |
+
+#### drawing_properties
+
+Read or change the Drawing properties (units, precision, text, arrows, views, tables, inspection...) (edits the document (one undoable history entry)).
+
+The Drawing properties panel: without `set`, replies with the properties (`properties`: field names and values, lengths in mm; unset optional fields and false flags are left out). `set` changes the fields it names (same names and value shapes; null clears an optional one), as the panel does: with `locked` on before and after, nothing else changes; choosing `units` sets the drawing's metric flag. One edit ("Drawing properties").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `set` | object |  | Fields to change (see the reply without `set`). |
 
 #### drawing_centerline
 
@@ -1802,7 +1998,7 @@ The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, s
 
 Datum feature symbol (edits the document (one undoable history entry)).
 
-The Datum tool: the triangle on the geometry at `anchor` (a vertex or edge point, sheet mm), the label box at `position` (at least 3 mm away). The label is the next free letter (A, B, …; I, O, Q, S, X, Z skipped) unless given. One edit ("Datum").
+The Datum tool: the triangle at `anchor` (sheet mm): on a GD&T frame edge or a dimension's lines when there (it follows them), else on the geometry (a vertex or edge point), the label box at `position` (at least 3 mm away). The label is the next free letter (A, B, …; I, O, Q, S, X, Z skipped) unless given. One edit ("Datum").
 
 | field | type | | description |
 |---|---|---|---|
@@ -1893,6 +2089,72 @@ The Weld symbol tool and dialog: the arrow points at `target` (a vertex, edge or
 | `target` | array of number | required | What the arrow points at (sheet mm). |
 | `position` | array of number | required | Where the reference line starts (sheet mm). |
 | `spec` | object |  | The Weld symbol dialog (see the description); empty: no joint symbol. |
+
+#### drawing_revision_table
+
+Revision table (rows from the document's releases) (edits the document (one undoable history entry)).
+
+The Revision table tool and dialog: the table with its fixed corner at `position` (sheet mm). Its rows are the drawing's revisions from releases. One edit ("Revision table").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `position` | array of number | required | Where the fixed corner goes (sheet mm). |
+| `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | The table's fixed corner. |
+| `visible_rows` | integer |  | Rows shown. |
+| `newest_top` | boolean |  | Newest revision at the top. |
+| `see_sheet1` | boolean |  | Show "See sheet 1" on other sheets. |
+| `hide_callouts` | boolean |  | Hide revision callouts. |
+
+#### drawing_revision_callout
+
+Revision callout (triangle with the revision) (edits the document (one undoable history entry)).
+
+Add revision callout: the triangle at `position` (sheet mm) with `revision` (default: the latest revision, else "A"). One edit ("Revision callout").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `position` | array of number | required | Where the callout goes (sheet mm). |
+| `revision` | string |  | Revision label. |
+
+#### drawing_table
+
+General table (rows x columns of text) (edits the document (one undoable history entry)).
+
+The Table tool and dialog: an empty table of `rows` x `columns` (defaults 2 x 2; 1–60 x 1–20) with an optional title row and header row, its fixed corner at `position` (sheet mm). One edit ("Table"). Fill it with drawing_table_cell.
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `position` | array of number | required | Where the fixed corner goes (sheet mm). |
+| `rows` | integer |  | Rows. |
+| `columns` | integer |  | Columns. |
+| `title_row` | boolean |  | A title row on top. |
+| `header_row` | boolean |  | A header row. |
+| `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | The table's fixed corner. |
+
+#### drawing_table_cell
+
+Type text into a general table cell (edits the document (one undoable history entry)).
+
+The cell editor of a general table: `text` into cell (`row`, `column`), counted from 0 (the header row, if any, is row 0). The table grows when the cell lies beyond it. One edit ("Edit cell").
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `table` | integer | required | Table id (drawing_get). |
+| `row` | integer | required | Row. |
+| `column` | integer | required | Column. |
+| `text` | string | required | Cell text. |
 
 #### drawing_view_table
 

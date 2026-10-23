@@ -40,14 +40,15 @@ impl Feature {
     }
 }
 
-/// Which merge-scope rule a studio was saved under (1: an empty scope is an
-/// error unless "Merge with all" is on; 0: older studios).
+/// Which rules a studio was saved under: 1, an empty merge scope is an error
+/// unless "Merge with all" is on; 2, a Rib with no Parts is an error (live
+/// L22); 3, a Mate connector needs an owner (live L37); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(1)
+        ScopeRule(3)
     }
 }
 
@@ -292,15 +293,27 @@ impl PartStudio {
         // Before Onshape's "No merge scope selected." rule an empty merge
         // scope merged with the parts the tool touched; "Merge with all"
         // gives those studios the same result.
-        if self.scope_rule == ScopeRule::legacy() {
+        if self.scope_rule.0 < 1 {
             for f in &mut self.features {
                 let adds = matches!(f.params.get("operationType"), Some(ParamValue::Enum(o)) if o == "ADD" || o == "REMOVE" || o == "INTERSECT");
                 if adds && f.params.get("defaultScope").is_some() && !f.params.bool("defaultScope") && f.params.query("booleanScope").is_empty() {
                     f.params.set("defaultScope", ParamValue::Bool(true));
                 }
             }
-            self.scope_rule = ScopeRule::default();
         }
+        // Ribs without Parts used every part; they keep doing so.
+        if self.scope_rule.0 < 2 {
+            for f in self.features.iter_mut().filter(|f| f.type_id == "rib" && f.params.query("parts").is_empty()) {
+                f.params.set("legacyAllParts", ParamValue::Bool(true));
+            }
+        }
+        // Mate connectors without an owner worked before.
+        if self.scope_rule.0 < 3 {
+            for f in self.features.iter_mut().filter(|f| f.type_id == "mateConnector" && f.params.query("ownerPart").is_empty()) {
+                f.params.set("legacyNoOwner", ParamValue::Bool(true));
+            }
+        }
+        self.scope_rule = ScopeRule::default();
     }
 
     /// Effective number of evaluated features (rollback bar position).

@@ -573,6 +573,7 @@ impl DrawingEditor {
 
     fn reload(&mut self, cx: &mut Context<Self>) {
         self.update_info(cx);
+        let sources_at = self.drawing.sources_at.clone();
         if let Some(TabContent::Drawing(d)) = self.doc.read(cx).session.doc.tab(self.tab).map(|t| &t.content) {
             // Undoing a sheet's views keeps its scale shown (live; qa5 D14).
             let shown: Vec<u32> = self.drawing.sheets.iter().filter(|s| s.scale_shown || !s.views.is_empty()).map(|s| s.uid).collect();
@@ -583,6 +584,21 @@ impl DrawingEditor {
         }
         if self.drawing.sheets.is_empty() {
             self.drawing.sheets.push(Sheet::default());
+        }
+        // The state the views are made from changed outside this editor (an
+        // Update or its undo, or the agent API): remake the views from it.
+        if self.drawing.sources_at != sources_at {
+            match self.load_old_state(cx) {
+                Some(old) => {
+                    for k in &old.1 {
+                        self.sources.remove(k);
+                    }
+                    self.old_state = Some(old);
+                    self.ensure_sources(false, cx);
+                }
+                None if self.out_of_date || self.old_state.is_some() => self.ensure_sources(true, cx),
+                None => {}
+            }
         }
         // Undo / redo of a sheet switch: show the stored sheet.
         let active = self.drawing.active_sheet.min(self.drawing.sheets.len() - 1);
@@ -694,14 +710,7 @@ impl DrawingEditor {
     /// The document state the views were last made from, when the sources
     /// changed since (the views keep their geometry until Update).
     fn load_old_state(&self, cx: &App) -> Option<(noshape_model::Document, Vec<SourceKey>)> {
-        let mv: noshape_store::MicroversionId = self.drawing.sources_at.as_ref()?.parse().ok()?;
-        let session = &self.doc.read(cx).session;
-        let old = noshape_model::Document::from_blobs(&session.store.read_all(mv).ok()?).ok()?;
-        let keys: Vec<SourceKey> = views::referenced_sources(&self.drawing)
-            .into_iter()
-            .filter(|k| k.version.is_none() && old.tab(k.tab).is_some() && views::source_hash(&old, k).is_some_and(|h| views::source_hash(&session.doc, k) != Some(h)))
-            .collect();
-        (!keys.is_empty()).then_some((old, keys))
+        noshape_ops::drawing::old_state(&self.doc.read(cx).session, &self.drawing)
     }
 
     /// The document at a version (cached; versions don't change).
@@ -1333,6 +1342,14 @@ impl DrawingEditor {
 
 impl Render for DrawingEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Live (dk-950): in dark mode only the shell is dark; the drawing's
+        // toolbar, canvas, sheet and panels stay in the light theme.
+        gpui_kit::with_light_colors(|| self.render_light(window, cx))
+    }
+}
+
+impl DrawingEditor {
+    fn render_light(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         // A closed view dialog took the focus with it (its fields): the sheet
         // takes it back, so shortcuts work at once (qa5 D5; live keeps them).
         if window.focused(cx).is_none() {
@@ -1552,5 +1569,6 @@ impl Render for DrawingEditor {
                 let canvas_el = canvas_el.h_full().min_w_0().border_t_1().border_color(pal.border);
                 gpui_kit::component::h_flex().flex_1().min_h_0().relative().children(sheet_bar).child(canvas_el)
             })
+            .into_any_element()
     }
 }

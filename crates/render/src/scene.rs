@@ -219,6 +219,9 @@ pub struct Instance {
     pub pickable: bool,
     /// Excluded from section-view clipping (e.g. sketch overlays, planes).
     pub ignore_clip: bool,
+    /// Left out of [`Scene::bounds`] (the depth range and zoom to fit): an
+    /// annotation such as a measure line can reach far beyond the model.
+    pub no_bounds: bool,
     /// Drawn with its flat color, without lighting (construction planes).
     /// See [`Instance::back_silhouette`].
     pub back_silhouette: bool,
@@ -319,6 +322,7 @@ impl Instance {
             color_mode: ColorMode::Instance,
             pickable: !image,
             ignore_clip: false,
+            no_bounds: false,
             unlit: false,
             back_silhouette: false,
             preview: false,
@@ -388,6 +392,12 @@ impl Instance {
     }
     pub fn ignore_clip(mut self) -> Self {
         self.ignore_clip = true;
+        self
+    }
+
+    /// See [`Instance::no_bounds`].
+    pub fn no_bounds(mut self) -> Self {
+        self.no_bounds = true;
         self
     }
 
@@ -743,7 +753,7 @@ impl Scene {
     /// World-space bounds of all instances.
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
         let mut acc: Option<(Vec3, Vec3)> = None;
-        for inst in &self.instances {
+        for inst in self.instances.iter().filter(|i| !i.no_bounds) {
             let b = match &inst.drawable {
                 Drawable::Mesh(m) => m.bounds(),
                 Drawable::Lines(l) => l.bounds(),

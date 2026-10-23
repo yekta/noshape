@@ -904,3 +904,40 @@ step (live +0.05). Owner: drawing (asb). Sheet properties width not re-checked.
   In progress (uncommitted in the worktree): assembly mate dialog offsets X/Y/Z + rotation (units + assembly variables
   passed from AssemblyView::open_mate_dialog via `variables::refs_variables`; limit fields still InputState). Next: sketch
   fields, feature-dialog tolerances, the other assembly panels (same variable scope), prefs.
+
+### R14 (10-22 afternoon)
+- v0.4.5: PASS on /tmp/lead/noshape-v045 (tagged by the lead). v0.4.6 gate on main 8da7e78: FAIL only on (b) (failed
+  Extrude's input region not drawn red); findings: import selection highlight crosses parts (g48-two), Parts list order
+  Part 2 above Part 1. Full table in core-workflow.md. Models for (a)/(b): /root/qa4-scratch/mk-models.py CLI DIR (needs a
+  noshape-cli from the same main; build `-p noshape-cli` in the worktree, ~35 min).
+- QuantityInput: mate dialog offsets X/Y/Z + rotation migrated (units + assembly variables passed from
+  AssemblyView::open_mate_dialog; QuantityInput catches the dialog's Cancel so Esc reverts first). Checked in the app vs
+  live (Fastened mate › Offset X, all 8 steps). Ready as part of 535b852.
+- Builds are slow now (no incremental, unique codegen-units per worktree): check/clippy ≈ 30–38 min, tests ≈ 35 min.
+  Use 2 h (7200000 ms) background limits; mark ready only after reading the clippy output (don't chain `&& ready`).
+- v0.4.6 candidate (/tmp/lead/noshape-v046, 17:06): FAIL on (b) again; new R1 (two default planes selected → parts
+  drawn with black jagged halos / see-through holes); F17 and F21 now fixed; footer still 0.4.4.8da7e78248bc. Table in
+  core-workflow.md. Section 8 montage: /tmp/qa4/cm/mont.png.
+- QuantityInput: assembly Linear / Circular pattern dialog Distance (Angle) + Instance count, both directions (3404e43),
+  checked in the app against behaviours.md:5246 (count: 1+1 shown as typed, '1 in' / 'abc' invalid, ±1, wheel, Esc after
+  typing reverts + blurs; distance '(1+1) mm' → '2 mm' unfocused). Open (not part of the batch, pre-existing): Esc on an
+  *unedited* focused field there does nothing (the dialog has no "FeatureDialog" key context, so the kit's Escape
+  propagates to nothing); with focus outside the fields Esc closes the dialog. Adding the context also binds Tab →
+  DialogTab, which the pattern dialog doesn't handle yet.
+- QuantityInput batches landed / ready (10-22 night, each checked in the app against behaviours.md:5240–5246): mate
+  connector Move X/Y/Z + Rotation angle (hover names from mateConnector.fs: "X translation"…), Explode step Distance /
+  Rotation angle (field rebuilt on Translation ↔ Rotation), assembly Zebra Stripe count (1–100, no expressions; Enter no
+  longer closes the panel, as live) and Reflection Rotation angle, Animate mate Start / End / Steps (rebuilt on a DOF
+  change). Skipped on purpose: the assembly triad value box (on-canvas box like the sketch dimension box; no live data).
+- R1 (two default planes selected → black halos / see-through parts) is also on v0.4.5: not a regression.
+- Remaining assembly InputStates: names, search, BOM cells (text fields); the Mass properties override field
+  (assembly_mass.rs:74) is still to check against live before migrating.
+- Migration status (10-23): every os-param-number field outside feature dialogs / on-canvas boxes that live has data
+  for is on QuantityInput. Left, each needing a live capture first (request via the lead): (1) assembly Mass properties
+  › Override value (assembly_mass.rs:74); (2) Appearance editor R / G / B / A / hex (appearance.rs:214–216: Angular
+  quantity field or a colour-picker widget?); (3) Hole › tolerance Symmetrical / Deviation / Limits value fields
+  (feature_dialog.rs:629: noshape draws a boxed kit input; dom/dialog-hole-tolerance.txt only has the Default type);
+  (4) the assembly triad value box (assembly_panels.rs:1445). Sketch on-canvas boxes (dimension, OTF, offset, pattern
+  count, Bezier degree) stay as they are (lead: not a pure refactor). Prefs have no numeric fields.
+- Next: sketch fields (sketch.rs open_otf_input / open_count_edit / option_input / offset / bezier / tolerances),
+  feature_dialog.rs:623 tolerances, the other assembly panels (same assembly variable scope), prefs.

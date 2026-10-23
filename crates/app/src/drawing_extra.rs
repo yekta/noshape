@@ -772,39 +772,17 @@ impl DrawingEditor {
 
     /// Extend the end legs of a cutting line past the view's geometry.
     fn extend_line_ends(&self, view: ViewId, points: &[[f64; 2]]) -> Vec<[f64; 2]> {
-        let mut pts = points.to_vec();
-        let Some(g) = self.geoms.get(&view) else { return pts };
-        let n = pts.len();
-        if n < 2 {
-            return pts;
-        }
-        let margin = (g.max[0] - g.min[0]).max(g.max[1] - g.min[1]) * 0.08 + 1e-4;
-        let corners = [[g.min[0] - margin, g.min[1] - margin], [g.max[0] + margin, g.min[1] - margin], [g.max[0] + margin, g.max[1] + margin], [g.min[0] - margin, g.max[1] + margin]];
-        let reach = |from: [f64; 2], dir: [f64; 2]| corners.iter().map(|k| dot(sub(*k, from), dir)).fold(0.0f64, f64::max);
-        let d0 = norm(sub(pts[0], pts[1]));
-        let t0 = reach(pts[1], d0).max(len(sub(pts[0], pts[1])));
-        pts[0] = add(pts[1], mul(d0, t0));
-        let d1 = norm(sub(pts[n - 1], pts[n - 2]));
-        let t1 = reach(pts[n - 2], d1).max(len(sub(pts[n - 1], pts[n - 2])));
-        pts[n - 1] = add(pts[n - 2], mul(d1, t1));
-        pts
+        self.pk().extend_line_ends(view, points)
     }
 
     /// A point in a view: snap, else the cursor position in the view.
     pub(crate) fn view_point(&self, view: Option<ViewId>) -> Option<PickedPoint> {
-        let c = self.cursor;
-        if let Some(p) = self.snap_at(c).filter(|p| view.is_none_or(|v| v == p.view)) {
-            return Some(p);
-        }
-        let v = view.or_else(|| self.view_at(c))?;
-        let pl = self.placement(v)?;
-        Some(PickedPoint { view: v, p: pl.to_view(c), r: None })
+        self.pk().view_point(self.cursor, view)
     }
 
     /// Orthogonal continuation (in the view's frame) from `last` toward `target`.
     fn ortho_view(last: [f64; 2], target: [f64; 2]) -> [f64; 2] {
-        let d = sub(target, last);
-        if d[0].abs() >= d[1].abs() { [target[0], last[1]] } else { [last[0], target[1]] }
+        noshape_scene::drawing_tools::ortho_view(last, target)
     }
 
     /// Help crop_view: crops can't be made from detail, break or flat
@@ -1049,7 +1027,7 @@ impl DrawingEditor {
                     self.datum_placed(window, cx);
                 }
             }
-            Tool::SurfaceFinish => self.open_surface_finish_panel(None, c, "Ra 3.2", window, cx),
+            Tool::SurfaceFinish => self.open_surface_finish_panel(None, c, noshape_scene::drawing_tools::SURFACE_FINISH_DEFAULT, window, cx),
             _ => return false,
         }
         true
@@ -1895,31 +1873,7 @@ impl DrawingEditor {
     /// A point on a GD&T frame or a dimension's lines under sheet point
     /// `c` for the Datum tool to sit on.
     pub fn datum_attach_at(&self, c: [f64; 2]) -> Option<([f64; 2], noshape_model::drawing::DatumOn)> {
-        let b = self.built.as_ref()?;
-        let tol = self.tol_mm(5.0);
-        let mut best: Option<(f64, [f64; 2], noshape_model::drawing::DatumOn)> = None;
-        let mut count: std::collections::HashMap<u64, u32> = Default::default();
-        for l in &b.geometry.lines {
-            let Some(PickTarget::Annotation(id)) = b.picks.get(l.pick as usize) else { continue };
-            let line = *count.entry(*id).and_modify(|n| *n += 1).or_insert(0);
-            let ok = self.current_sheet().annotations.iter().find(|a| a.id == *id).is_some_and(|a| matches!(a.kind, AnnotationKind::Gdt { .. }) || a.kind.is_dimension());
-            if !ok {
-                continue;
-            }
-            let n = l.points.len();
-            for seg in 0..if l.closed && n > 2 { n } else { n.saturating_sub(1) } {
-                let (w0, w1) = (l.points[seg], l.points[(seg + 1) % n]);
-                let d = sub(w1, w0);
-                let dd = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
-                let t = (((c[0] - w0[0]) * d[0] + (c[1] - w0[1]) * d[1]) / dd).clamp(0.0, 1.0);
-                let q = [w0[0] + d[0] * t, w0[1] + d[1] * t];
-                let dist = len(sub(c, q));
-                if dist < tol && best.as_ref().is_none_or(|b| dist < b.0) {
-                    best = Some((dist, q, noshape_model::drawing::DatumOn { ann: *id, line, seg: seg as u32, t }));
-                }
-            }
-        }
-        best.map(|(_, q, o)| (q, o))
+        self.pk().datum_attach_at(c)
     }
 
     /// Properties / edit panel of an annotation.
@@ -2015,16 +1969,7 @@ impl DrawingEditor {
                     if let Some(f) = format.clone() {
                         t.set_cell_format(row, col, f);
                     }
-                    if let TableKind::General { cells, .. } = &mut t.kind {
-                        while cells.len() <= row {
-                            cells.push(vec![]);
-                        }
-                        let n = cells.iter().map(|r| r.len()).max().unwrap_or(0).max(col + 1);
-                        for r in cells.iter_mut() {
-                            r.resize(n, String::new());
-                        }
-                        cells[row][col] = text.clone();
-                    }
+                    noshape_scene::drawing_tools::set_general_cell(t, row, col, &text);
                     // Grow the column to fit when needed.
                     let th = t.text_height;
                     let need = text.lines().map(|l| noshape_model::drawing::font::text_width(l, th)).fold(0.0, f64::max) + th * 1.6;
@@ -2049,7 +1994,7 @@ impl DrawingEditor {
                     }),
                     None => {
                         let id = self.current_sheet().next_annotation_id();
-                        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::SurfaceFinish { anchor: pos, value, leaders: Vec::new() }, position: pos, ..Default::default() }));
+                        self.edit_sheet("Surface finish", cx, |s| s.annotations.push(noshape_scene::drawing_tools::surface_finish(id, pos, value)));
                         self.tool = Tool::Select;
                     }
                 }
