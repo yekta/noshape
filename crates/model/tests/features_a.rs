@@ -851,3 +851,39 @@ fn hole_table_groups_holes_per_part() {
     let rows: Vec<(String, String, String, String)> = tables[0].rows.iter().map(|r| (r.text("tag").into(), r.text("size").into(), r.text("angle").into(), r.text("qty").into())).collect();
     assert_eq!(rows, [("A".into(), "⌀5 mm ↧ 5 mm".into(), "118 deg".into(), "2".into()), ("B".into(), "⌀3 mm THRU".into(), "".into(), "1".into())]);
 }
+
+/// Live L49/L50: Tapped M6 × 1.00, Blind. A new size gives Tap clearance 0;
+/// Depth 20 → clearance 15; clearance 2 → Tapped depth 18; Depth 25 →
+/// clearance 7; Depth 8 → Tapped depth 1.
+#[test]
+fn tapped_hole_depths_stay_linked_as_live() {
+    use noshape_model::features::hole_tables::link_tapped_depths;
+    let units = UnitPrefs::default();
+    let mut v = ParamValues::default();
+    v.set("unitsSystem", ParamValue::Enum("METRIC".into()));
+    v.set("styleV2", ParamValue::Enum("SIMPLE".into()));
+    v.set("endStyleV2", ParamValue::Enum("BLIND".into()));
+    v.set("showTappedDepth", ParamValue::Bool(true));
+    v.set("isoHoleTableEx", ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M5".into()]));
+    v.set("holeDepthV3", ParamValue::Expr(ExprValue::new("5 mm")));
+    v.set("tappedDepthV3", ParamValue::Expr(ExprValue::new("5 mm")));
+    v.set("tapClearance", ParamValue::Expr(ExprValue::new("3")));
+    let step = |v: &mut ParamValues, id: &str, text: &str| -> Vec<(String, String)> {
+        let prev = v.clone();
+        if id == "size" {
+            v.set("isoHoleTableEx", ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M6".into(), "1.00 mm".into()]));
+        } else {
+            v.set(id, ParamValue::Expr(ExprValue::new(text)));
+        }
+        let out: Vec<(String, String)> = link_tapped_depths(&prev, v, &units).into_iter().map(|(k, p)| (k.to_string(), match &p { ParamValue::Expr(e) => e.text.clone(), _ => String::new() })).collect();
+        for (k, t) in &out {
+            v.set(Box::leak(k.clone().into_boxed_str()), ParamValue::Expr(ExprValue::new(t.as_str())));
+        }
+        out
+    };
+    assert_eq!(step(&mut v, "size", ""), [("tapClearance".to_string(), "0".to_string())]);
+    assert_eq!(step(&mut v, "holeDepthV3", "20 mm"), [("tapClearance".to_string(), "15".to_string())]);
+    assert_eq!(step(&mut v, "tapClearance", "2"), [("tappedDepthV3".to_string(), "18 mm".to_string())]);
+    assert_eq!(step(&mut v, "holeDepthV3", "25 mm"), [("tapClearance".to_string(), "7".to_string())]);
+    assert_eq!(step(&mut v, "holeDepthV3", "8 mm"), [("tappedDepthV3".to_string(), "1 mm".to_string())]);
+}

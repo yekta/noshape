@@ -860,6 +860,54 @@ pub fn apply_table_to_params(params: &mut ParamValues) -> bool {
 
 /// Size whose major diameter matches `diameter` (m) within `tol` (external
 /// thread auto-sizing). Returns the default path for that size.
+/// Onshape's hole edit logic for a blind tapped hole (live L49/L50): Depth,
+/// Tapped depth and Tap clearance stay linked, Depth = Tapped depth + Tap
+/// clearance × pitch. A new size sets the clearance to 0 (Depth = Tapped
+/// depth); a new Depth moves the clearance (or the tapped depth when the
+/// Depth is less than it); a new clearance moves the tapped depth; a new
+/// tapped depth moves the Depth. Returns the parameters to change.
+pub fn link_tapped_depths(prev: &ParamValues, now: &ParamValues, units: &noshape_units::UnitPrefs) -> Vec<(&'static str, ParamValue)> {
+    use noshape_units::{Dim, Quantity};
+    if !now.bool("showTappedDepth") || !now.is("endStyleV2", "BLIND") {
+        return Vec::new();
+    }
+    let (pid, table) = hole_table_param(now);
+    let Some(pitch) = table_values(table, &complete_path(table, now.lookup(pid))).and_then(|s| s.pitch).filter(|p| *p > 0.0) else { return Vec::new() };
+    let empty = std::collections::BTreeMap::<String, Quantity>::new();
+    let val = |v: &ParamValues, id: &str, dim: Dim| -> Option<f64> {
+        let e = v.expr(id)?;
+        e.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&e.text, dim, units, &empty).ok().map(|q| q.value))
+    };
+    let (Some(depth), Some(tapped), Some(clear)) = (val(now, "holeDepthV3", Dim::LENGTH), val(now, "tappedDepthV3", Dim::LENGTH), val(now, "tapClearance", Dim::UNITLESS)) else { return Vec::new() };
+    let changed = |id: &str, dim: Dim| match (val(prev, id, dim), val(now, id, dim)) {
+        (Some(a), Some(b)) => (a - b).abs() > 1e-12,
+        _ => false,
+    };
+    let len = |m: f64| ParamValue::Expr(ExprValue::new(noshape_units::format_quantity(Quantity::new(m.max(0.0), Dim::LENGTH), units)));
+    let count = |c: f64| ParamValue::Expr(ExprValue::new(noshape_units::format_number(c.max(0.0), 6)));
+    let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    if prev.lookup(pid) != now.lookup(pid) {
+        let mut out = Vec::new();
+        if !close(clear, 0.0) {
+            out.push(("tapClearance", count(0.0)));
+        }
+        if !close(depth, tapped) {
+            out.push(("holeDepthV3", len(tapped)));
+        }
+        return out;
+    }
+    if changed("holeDepthV3", Dim::LENGTH) {
+        return if depth >= tapped { vec![("tapClearance", count((depth - tapped) / pitch))] } else { vec![("tappedDepthV3", len(depth - clear * pitch))] };
+    }
+    if changed("tapClearance", Dim::UNITLESS) {
+        return vec![("tappedDepthV3", len(depth - clear * pitch))];
+    }
+    if changed("tappedDepthV3", Dim::LENGTH) {
+        return vec![("holeDepthV3", len(tapped + clear * pitch))];
+    }
+    Vec::new()
+}
+
 pub fn external_thread_for_diameter(standard_id: &str, diameter: f64, tol: f64) -> Option<Vec<String>> {
     let std = standard(standard_id)?;
     let s = std.sizes.iter().find(|s| (s.major * std.unit - diameter).abs() <= tol)?;
