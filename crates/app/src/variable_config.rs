@@ -201,7 +201,7 @@ impl VariableStudioView {
             .text_size(px(size))
             .font_weight(weight)
             .text_color(color)
-            .child(text.clone())
+            .child(crate::ui::user_text(text.clone()))
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                 if e.click_count() >= 2 {
                     this.start_cfg_text(key.clone(), text.clone(), commit.clone(), window, cx);
@@ -1252,7 +1252,7 @@ impl Render for IdsDialog {
         let table = |title: &str, name_head: &str, rows: Vec<(String, AnyElement)>| {
             let mut t = v_flex().border_l_1().border_t_1().border_color(grid).child(h_flex().child(head(200., name_head)).child(head(366., "Internal ID")));
             for (name, editor) in rows {
-                t = t.child(h_flex().child(cell(200.).bg(rgb(0xf5f5f5)).text_color(pal.text_muted).child(name)).child(editor));
+                t = t.child(h_flex().child(cell(200.).bg(rgb(0xf5f5f5)).text_color(pal.text_muted).child(crate::ui::user_text(name))).child(editor));
             }
             v_flex().gap(px(4.)).when(multiple, |d| d.child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(rgb(0x1651b0)).child(title.to_string()))).child(t)
         };

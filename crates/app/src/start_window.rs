@@ -818,7 +818,7 @@ impl StartView {
                 .text_size(px(14.))
                 .text_color(pal.text)
                 .child(os::glyph(if folder { os::GLYPH_FOLDER } else { os::GLYPH_DOCUMENT }, 18., pal.text))
-                .child(name.to_string()),
+                .child(crate::ui::user_text(name.to_string())),
         )
     }
 
@@ -1214,7 +1214,7 @@ impl StartView {
         for (k, l) in labels.labels.iter().enumerate().filter(|(_, l)| query.is_empty() || l.to_lowercase().contains(&query)) {
             let on = labels.has(path, l);
             let (v, p2, l2) = (view.clone(), path.to_path_buf(), l.clone());
-            col = col.child(os::checkbox(("label-check", k), l.clone(), on).on_click(move |_, window, cx| {
+            col = col.child(os::user_checkbox(("label-check", k), l.clone(), on).on_click(move |_, window, cx| {
                 v.update(cx, |t, cx| t.toggle_label(&p2, &l2, cx));
                 window.refresh();
             }));
@@ -1289,7 +1289,7 @@ impl StartView {
                         .when(active, |d| d.font_weight(FontWeight::SEMIBOLD).child(div().absolute().left_0().top_0().bottom_0().w(px(4.)).bg(pal.accent)))
                         .when(!active, |d| d.hover(|d| d.bg(rgb(0xf5f5f5))))
                         .child(os::glyph(os::GLYPH_LABEL, 16., color))
-                        .child(div().truncate().child(l))
+                        .child(div().truncate().child(crate::ui::user_text(l)))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(source.clone(), cx))),
                 );
             }
@@ -1377,7 +1377,7 @@ impl StartView {
                 .mt(px(11.))
                 .gap(px(4.))
                 .child(os::glyph(os::GLYPH_DOCUMENT, 20., pal.text))
-                .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name))
+                .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::ui::user_text(name)))
         };
         // Live documents/24: a section is 53 px with one value (label and value
         // 20 px apart, values 25 px apart), `#ccc` rule above.
@@ -1443,7 +1443,7 @@ impl StartView {
                         .mt(px(13.))
                         .gap(px(4.))
                         .child(os::glyph(os::GLYPH_DOCUMENT, 20., pal.text))
-                        .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(d.name.clone())),
+                        .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::ui::user_text(d.name.clone()))),
                 )
                 .child(
                     div()
@@ -1497,9 +1497,9 @@ impl StartView {
                 )
                 .children(d.history.iter().map(|(name, ws, author, t)| {
                     let name_el = if *ws {
-                        div().px(px(3.)).rounded(px(3.)).border_1().border_color(pal.accent).bg(rgb(0xd0dbe5)).font_weight(FontWeight::MEDIUM).child(name.clone())
+                        div().px(px(3.)).rounded(px(3.)).border_1().border_color(pal.accent).bg(rgb(0xd0dbe5)).font_weight(FontWeight::MEDIUM).child(crate::ui::user_text(name.clone()))
                     } else {
-                        div().font_weight(FontWeight::MEDIUM).child(name.clone())
+                        div().font_weight(FontWeight::MEDIUM).child(crate::ui::user_text(name.clone()))
                     };
                     h_flex()
                         .h(px(50.))
@@ -1522,7 +1522,7 @@ impl StartView {
                             .h(px(32.))
                             .gap(px(4.))
                             .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
-                            .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name)),
+                            .child(div().truncate().text_size(px(17.33)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::ui::user_text(name))),
                     )
                     .child(div().h(px(8.)))
                     .child(section("Owner", vec!["me".into()]))
@@ -2072,7 +2072,7 @@ impl StartView {
                     .text_size(px(14.))
                     .text_color(pal.text)
                     .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
-                    .child(div().flex_1().min_w_0().truncate().child(name.clone()))
+                    .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                         this.selected = Some(f1.clone());
                         if ev.click_count() >= 2 && !this.trash.items.iter().any(|t| t.stored() == f1) {
@@ -2258,7 +2258,7 @@ impl StartView {
                     .border_color(rgb(0xececec))
                     .when(selected, |r| r.bg(pal.accent_soft))
                     .when(!selected, |r| r.hover(|r| r.bg(pal.row_hover)))
-                    .child(h_flex().w(px(350.)).flex_none().pl(px(16.)).gap(px(10.)).child(os::glyph(os::GLYPH_FOLDER, 20., pal.text)).child(div().min_w_0().truncate().child(name)))
+                    .child(h_flex().w(px(350.)).flex_none().pl(px(16.)).gap(px(10.)).child(os::glyph(os::GLYPH_FOLDER, 20., pal.text)).child(div().min_w_0().truncate().child(crate::ui::user_text(name))))
                     .child(div().w(px(200.)).flex_none().pl(px(16.)).child(lib::format_onshape_time(modified)))
                     .child(div().w(px(200.)).flex_none().pl(px(16.)).child("me"))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
@@ -2314,7 +2314,7 @@ impl StartView {
                     .text_size(px(14.))
                     .text_color(pal.text)
                     .child(div().w(px(82.)).h(px(54.)).flex_none().rounded(px(4.)).bg(rgb(0xf5f5f5)).flex().items_center().justify_center().child(self.thumbnail(&d, 76., 48., false)))
-                    .child(div().flex_1().min_w_0().truncate().child(d.name.clone()))
+                    .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(d.name.clone())))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
                     .os_context_menu(move |menu, _, cx| {
                         let path = d2.path.clone();
@@ -2621,10 +2621,10 @@ impl StartView {
                             .pr(px(15.))
                             .gap(px(14.))
                             .child(self.thumbnail(d, 64.0, 36.0, false))
-                            .child(div().min_w_0().truncate().text_color(if d.broken { pal.warning } else { pal.text }).child(d.name.clone()))
+                            .child(div().min_w_0().truncate().text_color(if d.broken { pal.warning } else { pal.text }).child(crate::ui::user_text(d.name.clone())))
                             // The workspace chip (live documents-list: 14 px workspace icon, 11 px name).
                             .when(!d.workspace.is_empty(), |r| {
-                                r.child(h_flex().flex_none().ml(px(-7.)).gap(px(1.)).text_size(px(11.)).text_color(pal.text).child(os::glyph(os::GLYPH_WORKSPACE, 14., pal.text)).child(d.workspace.clone()))
+                                r.child(h_flex().flex_none().ml(px(-7.)).gap(px(1.)).text_size(px(11.)).text_color(pal.text).child(os::glyph(os::GLYPH_WORKSPACE, 14., pal.text)).child(crate::ui::user_text(d.workspace.clone())))
                             })
                             .when(open, |r| r.child(Self::open_badge())),
                     )
@@ -2968,7 +2968,7 @@ fn user_menu(cx: &App) -> AnyElement {
             h_flex()
                 .gap(px(5.))
                 .child(crate::assets::icon("user-avatar", 22., cx))
-                .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(150.)).truncate().child(name))
+                .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(150.)).truncate().child(crate::ui::user_text(name)))
                 .child(os::glyph(os::GLYPH_CARET, 8., pal.text)),
         )
         .os_dropdown_menu("user-menu-dd", false, |m, _, _| {

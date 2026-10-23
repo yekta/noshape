@@ -321,7 +321,7 @@ impl FsSearchPane {
                     .border_color(rgb(0xeeeeee))
                     .child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 14., pal.text))
                     .child(crate::assets::icon("feature-studio", 18., cx))
-                    .child(div().text_size(px(14.)).text_color(pal.text).child(g.name.clone()))
+                    .child(div().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(g.name.clone())))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if !this.collapsed.remove(&tab) {
                             this.collapsed.insert(tab);

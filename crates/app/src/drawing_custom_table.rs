@@ -537,7 +537,7 @@ impl DrawingEditor {
             let chosen = d.chosen.clone();
             let fs_tab = chosen.as_ref().filter(|t| t.version.is_none()).map(|t| t.fs);
             dlg = dlg
-                .child(row("Document:", div().text_size(px(13.)).child(doc_name).into_any_element()))
+                .child(row("Document:", div().text_size(px(13.)).child(crate::ui::user_text(doc_name)).into_any_element()))
                 .child(row("Workspace:", div().text_size(px(13.)).child(ws_name).into_any_element()))
                 // "Custom table: [Part Studio icon] FS sizes" — the table's
                 // name, linking to its Part Studio (live drawing/271).
@@ -577,7 +577,7 @@ impl DrawingEditor {
                             .cursor_pointer()
                             .hover(|r| r.bg(gpui_kit::rgb(0xdef1fb)))
                             .child(crate::assets::icon("part-studio", 20., cx))
-                            .child(div().text_size(px(14.)).child(name))
+                            .child(div().text_size(px(14.)).child(crate::ui::user_text(name)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_studio(tab, cx))),
                     );
                 }

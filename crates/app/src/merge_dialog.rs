@@ -224,7 +224,7 @@ fn chip(name: &str, lane: usize, size: f32) -> Div {
         let mix = |v: f32| v + (1. - v) * 0.7;
         Rgba { r: mix(c.r), g: mix(c.g), b: mix(c.b), a: 1. }
     };
-    div().px(px(3.)).rounded(px(3.)).border_1().border_color(rgb(border)).bg(fill).text_size(px(size)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).child(name.to_string())
+    div().px(px(3.)).rounded(px(3.)).border_1().border_color(rgb(border)).bg(fill).text_size(px(size)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).child(crate::ui::user_text(name.to_string()))
 }
 
 /// A strategy's icon for a row (icons2 from live: Keep shows the discard ×
@@ -467,7 +467,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
                         .text_size(px(13.))
                         .text_color(pal.text)
                         .child(crate::assets::icon(r.icon, 18., cx))
-                        .child(div().min_w_0().truncate().child(r.name.clone()))
+                        .child(div().min_w_0().truncate().child(crate::ui::user_text(r.name.clone())))
                         // Live mg-903: ⓘ "For this tab type, edits from separate
                         // branches cannot be merged." and "Open in <source>".
                         .when(r.unmergeable_type, |d| {
@@ -540,7 +540,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
             })
             .child(if n_same == 1 { "1 tab has no changes".to_string() } else { format!("{n_same} tabs have no changes") });
         let same_rows = plan.unchanged.iter().enumerate().filter(|_| unchanged_open).map(|(i, (name, icon))| {
-            h_flex().h(px(ROW_H)).pl(px(18.)).gap(px(4.)).when(i % 2 == 0, |d| d.bg(rgb(STRIPE))).text_size(px(13.)).text_color(pal.text).child(crate::assets::icon(icon, 18., cx)).child(name.clone()).into_any_element()
+            h_flex().h(px(ROW_H)).pl(px(18.)).gap(px(4.)).when(i % 2 == 0, |d| d.bg(rgb(STRIPE))).text_size(px(13.)).text_color(pal.text).child(crate::assets::icon(icon, 18., cx)).child(crate::ui::user_text(name.clone())).into_any_element()
         });
         // Notices (help merge-dialog-no-changes-02, protections-4.1-no-merge-01).
         let notice = if plan.protected_with_changes {
