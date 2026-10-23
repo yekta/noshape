@@ -19,6 +19,7 @@ pub enum RightPanel {
     Variables,
     Configurations,
     CustomTables,
+    HoleTable,
     Inspection,
     SheetMetal,
     CutList,
@@ -174,6 +175,7 @@ impl PartStudioView {
             RightPanel::Variables => self.render_variables(window, cx),
             RightPanel::Configurations => self.render_configurations(window, cx),
             RightPanel::CustomTables => self.render_custom_tables(cx),
+            RightPanel::HoleTable => self.render_hole_table(cx),
             RightPanel::Inspection => self.render_inspection(cx),
             RightPanel::SheetMetal => self.render_sheet_metal_panel(cx),
             RightPanel::CutList => self.render_cut_list_panel(cx),
@@ -183,6 +185,7 @@ impl PartStudioView {
             RightPanel::Variables => "Variable table",
             RightPanel::Configurations => "Configurations",
             RightPanel::CustomTables => "Custom tables",
+            RightPanel::HoleTable => "Hole table",
             RightPanel::Inspection => "Model definitions",
             RightPanel::SheetMetal => "Sheet metal",
             RightPanel::CutList => "Cut list",
@@ -2118,6 +2121,15 @@ impl PartStudioView {
             .into_any_element()
     }
 
+    /// Hole table (live L59, part-studio/2181): read-only, one section per
+    /// part ("▾ Part 1 ⋯"), Tag | Size | Drill angle | Qty, a row per
+    /// distinct hole (tags A, B, …), the callout on several lines.
+    fn render_hole_table(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let tables = self.context.as_ref().map(|c| noshape_model::interaction::hole_table(c, &units)).unwrap_or_default();
+        v_flex().children(tables.iter().enumerate().map(|(i, t)| self.table_section(1000 + i, t, cx)).collect::<Vec<_>>()).into_any_element()
+    }
+
     /// Inspection table (live part-studio/77): "Model  No models.", the
     /// inspection tool row and the empty-state help.
     fn render_inspection(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -2566,6 +2578,8 @@ impl PartStudioView {
             .when(!self.display.bodies.is_empty() || !self.display.sketches.is_empty(), |d| d.child(btn("panel-appearance", "appearance", "Appearance panel", RightPanel::Appearance, cx)))
             .child(btn("panel-config", "configuration", "Configuration panel", RightPanel::Configurations, cx))
             .child(btn("panel-custom", "featurescript-table", "Custom tables", RightPanel::CustomTables, cx))
+            // Live L59 (part-studio/2181): the Hole table panel follows.
+            .child(btn("panel-holes", "hole-table", "Hole table", RightPanel::HoleTable, cx))
             .child(btn("panel-inspection", "mbd-status", "Inspection table", RightPanel::Inspection, cx))
             .child(btn("panel-vars", "variable-table", "Variable table", RightPanel::Variables, cx))
             .when(self.has_sheet_metal(), |d| d.child(btn("panel-sm", "sheet-metal-table", "Sheet metal: flat pattern and bend table", RightPanel::SheetMetal, cx)))

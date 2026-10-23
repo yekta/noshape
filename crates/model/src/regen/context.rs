@@ -324,6 +324,10 @@ pub struct HoleRecord {
     /// The hole runs out of the last part it cuts (the Part Studio callout
     /// then reads THRU, live dialogs/hole-30).
     pub exits: bool,
+    /// The parts it cuts (the Hole table lists the hole under each).
+    pub parts: Vec<BodyId>,
+    /// Drill tip angle (None: flat).
+    pub tip_angle: Option<f64>,
 }
 
 impl HoleRecord {

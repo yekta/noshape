@@ -389,6 +389,12 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
                 inch: !iso,
                 diameter_fit: diameter_fit.clone(),
                 exits: end == "THROUGH" || h + 1e-9 >= hit_bodies.iter().map(|x| x.2).fold(0.0, f64::max),
+                parts: {
+                    let mut v: Vec<(usize, f64, f64)> = hit_bodies.iter().filter(|x| x.1 < h + tip).cloned().collect();
+                    v.sort_by(|a, b| a.1.total_cmp(&b.1));
+                    v.iter().map(|x| ev.ctx.bodies[x.0].id.clone()).collect()
+                },
+                tip_angle,
             });
         }
         let frame = k::Plane::new(s, -dir, perp(dir));

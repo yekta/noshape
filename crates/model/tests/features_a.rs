@@ -828,3 +828,26 @@ fn hole_point_off_the_part_fails_the_hole() {
     let st = t.regen().display.features.last().cloned().unwrap();
     assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Hole creates invalid geometry.")));
 }
+
+/// Live L59: the Hole table lists a part's holes, one row per distinct
+/// hole (A, B) with its count.
+#[test]
+fn hole_table_groups_holes_per_part() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_point(DVec2::new(0.01, 0.01));
+    let b2 = sk.add_point(DVec2::new(0.02, 0.01));
+    let c = sk.add_point(DVec2::new(0.03, 0.01));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let pt = |e: noshape_sketch::EntityId| Reference::SketchEntity { sketch: s, entity: e.0 };
+    t.add("hole", &[("locations", q(vec![pt(a), pt(b2)])), ("unitsSystem", en("METRIC")), ("tableSynced", b(true)), ("holeDiameterV3", e("5 mm")), ("holeDepthV3", e("5 mm"))]);
+    t.add("hole", &[("locations", q(vec![pt(c)])), ("unitsSystem", en("METRIC")), ("tableSynced", b(true)), ("holeDiameterV3", e("3 mm")), ("endStyleV2", en("THROUGH"))]);
+    let r = t.ok();
+    let units = UnitPrefs::default();
+    let tables = noshape_model::interaction::hole_table(&r.context, &units);
+    assert_eq!(tables.len(), 1);
+    let rows: Vec<(String, String, String, String)> = tables[0].rows.iter().map(|r| (r.text("tag").into(), r.text("size").into(), r.text("angle").into(), r.text("qty").into())).collect();
+    assert_eq!(rows, [("A".into(), "⌀5 mm ↧ 5 mm".into(), "118 deg".into(), "2".into()), ("B".into(), "⌀3 mm THRU".into(), "".into(), "1".into())]);
+}
