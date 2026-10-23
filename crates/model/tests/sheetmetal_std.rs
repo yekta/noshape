@@ -149,7 +149,6 @@ fn face_at(r: &RegenResult, p: DVec3) -> Reference {
 /// plate's top face (live: OK, like sm8 dom/fs-smprobe3-8.txt; ours said
 /// "The tab must lie in the plane of a sheet metal wall").
 #[test]
-#[ignore = "in progress (fs): std-run sheet metal, not yet verified"]
 fn tab_merges_into_the_top_face() {
     let mut s = g34();
     let r = s.ok();
@@ -172,7 +171,7 @@ fn tab_merges_into_the_top_face() {
     });
     let r = s.ok();
     // The tab adds 20 × 10 × 2 mm to the part.
-    assert!((volume_mm3(&r) - (8511.4987 + 400.0)).abs() < 1e-3, "{} mm³", volume_mm3(&r));
+    assert!((volume_mm3(&r) - (8511.4987 + 400.0)).abs() < 1e-3, "{} mm³ {:#?}", volume_mm3(&r), face_report(&r));
 }
 
 /// The flat pattern of G34 (std-built, live's placement: the plate stays at
