@@ -260,7 +260,7 @@ impl Render for UnitsPrefsView {
                             .child(
                                 div()
                                     .id("units-learn-more")
-                                    .text_color(rgb(0x0b5394))
+                                    .text_color(crate::theme::p().link)
                                     .underline()
                                     .cursor_pointer()
                                     .child("Learn more about default units.")
@@ -278,9 +278,9 @@ impl Render for UnitsPrefsView {
                                 .flex()
                                 .items_center()
                                 .rounded(px(5.25))
-                                .bg(rgb(0x1651b0))
+                                .bg(gpui_kit::rgb_static(0x1651b0))
                                 .text_size(px(14.))
-                                .text_color(rgb(0xffffff))
+                                .text_color(gpui_kit::rgb_static(0xffffff))
                                 .when(!changed, |d| d.opacity(0.4))
                                 .when(changed, |d| {
                                     d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
@@ -371,9 +371,9 @@ impl Render for DecimalPrefsView {
                                 .flex()
                                 .items_center()
                                 .rounded(px(5.25))
-                                .bg(rgb(0x1651b0))
+                                .bg(gpui_kit::rgb_static(0x1651b0))
                                 .text_size(px(14.))
-                                .text_color(rgb(0xffffff))
+                                .text_color(gpui_kit::rgb_static(0xffffff))
                                 .when(!changed, |d| d.opacity(0.4))
                                 .when(changed, |d| {
                                     d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, window, cx| {

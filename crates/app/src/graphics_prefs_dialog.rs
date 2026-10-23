@@ -397,7 +397,7 @@ impl Render for GraphicsPrefsDialog {
                 .justify_center()
                 .text_size(px(13.33))
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                .when(on, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
                 .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(pal.border))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -437,7 +437,7 @@ impl Render for GraphicsPrefsDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(if changed { pal.accept } else { rgb(0xcce9cc) })
+                            .bg(pal.accept).when(!changed, |d| d.opacity(0.2))
                             .cursor_pointer()
                             .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept(cx))),
@@ -482,7 +482,7 @@ impl Render for GraphicsPrefsDialog {
                                 this.update(|g| *g = GraphicsPrefs::default(), cx);
                             })),
                     )
-                    .child(div().size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")),
+                    .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
             )
     }
 }

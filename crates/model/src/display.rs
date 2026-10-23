@@ -322,6 +322,10 @@ pub struct FeatureState {
     /// Parts an Add / Remove / Intersect tool touched while its merge scope
     /// was empty: the dialog's default scope (live part-studio/234, qa5 BOOL4).
     pub touched: Vec<BodyId>,
+    /// A failed feature's error geometry, drawn while its dialog is open:
+    /// a Feature pattern's instances that couldn't be made (user's live
+    /// shot 2026-10-23: red edges, dark red faces).
+    pub error_mesh: Option<Arc<MeshBuffers>>,
 }
 
 /// A computed parameter value: a length (meters) or text such as "Multiple".

@@ -202,7 +202,7 @@ impl Render for ThemingPrefsView {
         // Live dk-900: a blue "beta" pill and a (?) after "Dark mode".
         let beta = h_flex()
             .gap(px(6.))
-            .child(div().px(px(5.)).h(px(16.)).flex().items_center().rounded(px(8.)).bg(rgb(0x1651b0)).text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("beta"))
+            .child(div().px(px(5.)).h(px(16.)).flex().items_center().rounded(px(8.)).bg(gpui_kit::rgb_static(0x1651b0)).text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("beta"))
             .child(help("pref-dark-help", "Dark mode is a limited feature and is currently not available in Drawings, PCB Studio and any external apps.", cx))
             .into_any_element();
         section(

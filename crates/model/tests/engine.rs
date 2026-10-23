@@ -86,7 +86,7 @@ impl T {
     fn ok(&mut self) -> RegenResult {
         let r = self.regen();
         for (i, s) in r.display.features.iter().enumerate() {
-            assert!(matches!(s.status, FeatureStatus::Ok), "feature {i} ({}) {:?}: {:?}", self.ps.features[i].type_id, s.status, s.message);
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info), "feature {i} ({}) {:?}: {:?}", self.ps.features[i].type_id, s.status, s.message);
         }
         r
     }

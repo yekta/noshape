@@ -199,7 +199,7 @@ impl PartStudioView {
                 .text_center()
                 .whitespace_normal()
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                .when(on, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
                 .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

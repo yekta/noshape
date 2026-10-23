@@ -281,7 +281,7 @@ pub fn thicken() -> FeatureType {
 pub fn enclose() -> FeatureType {
     let mut p = vec![
         operation_type(always),
-        ParamSpec::query("entities", "Entities", QueryFilter::BODY | QueryFilter::ANY_FACE | QueryFilter::PLANE).hints(Hints::INITIAL_FOCUS),
+        ParamSpec::query("entities", "Entities", QueryFilter::BODY | QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::PLANE).hints(Hints::INITIAL_FOCUS),
     ];
     p.extend(solid_merge_scope(always, QueryFilter::SOLID_BODY));
     p.push(ParamSpec::bool("keepTools", "Keep tools", false));

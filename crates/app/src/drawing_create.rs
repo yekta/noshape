@@ -569,7 +569,7 @@ impl Render for CreateDrawingDialog {
                 // Live drawing/01: the chosen tile `#9ccef0` with a 2 px blue bottom edge,
                 // the other white with a 1 px `#ccc` outline.
                 .bg(if on { gpui_kit::rgb(0x9ccef0) } else { pal.panel })
-                .when(on, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::SEMIBOLD).text_color(pal.accent))
+                .when(on, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::SEMIBOLD).text_color(pal.emphasis))
                 .when(!on, |d| d.border_1().border_color(gpui_kit::rgb(0xcccccc)))
                 .when(!enabled, |d| d.opacity(0.5))
                 // Live drawing/01: the 55x40 tile art is drawn at 1.2x (66 px), centred on a square canvas.

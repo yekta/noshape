@@ -236,9 +236,9 @@ impl Render for MousePrefsView {
                                 .flex()
                                 .items_center()
                                 .rounded(px(5.25))
-                                .bg(rgb(0x1651b0))
+                                .bg(gpui_kit::rgb_static(0x1651b0))
                                 .text_size(px(14.))
-                                .text_color(rgb(0xffffff))
+                                .text_color(gpui_kit::rgb_static(0xffffff))
                                 .when(!changed, |d| d.opacity(0.4))
                                 .when(changed, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.save(cx))))
                                 .child("Save mouse controls"),

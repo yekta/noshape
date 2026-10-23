@@ -45,7 +45,8 @@ the error-string table's.
 | 29 | Secondary axis conflict (E16) | the title red with the error tooltip, only the secondary chip red | no title error | 🔧 |
 | 30 | Animate | absent for Ball / Fastened; 0→360 deg / 0→25 mm, Steps 300, Reciprocate; one DOF auto-filled, several: empty until picked in "Select degree of freedom" (⟳ z first, then ↹ x, y, z) | Animate on Ball; 0→half the assembly size; first DOF pre-filled, translations first, chips "↔" | 🔧 |
 | 31 | Group dialog | 220 px feature dialog "Group 1", Instances field active, ✓ at 0.2 while empty, title tooltip "Group 1 did not regenerate properly: Nothing selected."; E2 "Mate cannot be added between member of same group." | panel "Group", a hint line, a primary ✓ button | 🔧 |
-| 23 | Mate's part deleted | E15: "Failed to resolve the instance for mate." (row 28) | "Mate cannot resolve mate connectors." (MT9) | ✗ |
+| 32 | Mate dialog tooltips (dom/dialog-mate-*) | title "<name>" (or the error), type select "Mate type", query label "Mate connectors", Solve "Solve full assembly"; empty Tangent "Nothing selected." | title tip only on error, no type / label tips, Solve "Solve all mates including this one" | 🔧 |
+| 23 | Mate's geometry gone, instance kept (MT9) | "Mate cannot resolve mate connectors." (part deleted: row 28) | same | ✅ |
 
 ## Mates (dialogs, defaults, DOF)
 Fastened and Revolute: see workflow-mates.md (MT1–MT9). Slider, Planar, Cylindrical, Pin slot, Ball, Parallel,
