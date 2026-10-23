@@ -505,8 +505,8 @@ pub fn tool_caret(id: impl Into<ElementId>, cx: &App) -> Button {
     let pal = p();
     Button::new(id)
         .custom(tool_variant(cx, false, true))
-        // Live: a 10 x 5 px caret, about 2 px thick.
-        .child(glyph("tool-caret", 12., pal.text))
+        // Live: the 10 x 6 `expanded` sprite at 1:1, about 2 px thick.
+        .child(glyph("tool-caret", 10., pal.text))
         .w(px(TOOL_CARET_W))
         .h(px(TOOL_CELL))
         .p_0()
@@ -758,7 +758,8 @@ pub fn input_with_placeholder(st: &Entity<gpui_kit::component::input::InputState
 }
 
 pub fn caret(open: bool) -> Div {
-    // Live (Parts / Default geometry headers): a thin 12 x 6 `#666` chevron.
+    // Live (Parts / Default geometry headers): a thin 12 x 6 chevron,
+    // `--os-icon-fill-tertiary` (#666, #999 in dark: live dark/dk-940).
     div()
         .w(px(16.))
         .ml(px(-3.))
@@ -769,7 +770,7 @@ pub fn caret(open: bool) -> Div {
         .justify_center()
         // Live: the expander (`.node-expander`) shows the pointer.
         .cursor_pointer()
-        .child(glyph(if open { "expander-down" } else { "expander-right" }, 14., gpui_kit::rgb(0x666666)))
+        .child(glyph(if open { "expander-down" } else { "expander-right" }, 14., p().icon_tertiary))
 }
 
 /// A single-color glyph (chevrons, carets): an app icon drawn as a mask
