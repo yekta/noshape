@@ -74,6 +74,12 @@ pub struct Palette {
     pub accent_soft: Rgba,
     /// Hovered list rows and menu items (`--os-tree-item-background--hover`).
     pub row_hover: Rgba,
+    /// A selection (query) box while it takes the picks
+    /// (`--os-info-background-secondary`; dark live dk-926).
+    pub query_active: Rgba,
+    /// Feature rows related to the selected one, e.g. the sketch of a
+    /// selected extrude (light sampled; dark live dk-926 rgb(9,32,70)).
+    pub row_related: Rgba,
     /// Tooltip fill (`--os-tooltip-fill`).
     pub tooltip: Rgba,
     /// Bottom tab bar background (`--os-tab-bar-background`).
@@ -128,6 +134,8 @@ pub const PALETTE: Palette = Palette {
     accent_hover: rgb_const(0x769fcc),
     accent_soft: rgb_const(0xb2ddf6),
     row_hover: rgb_const(0xdef1fb),
+    query_active: rgb_const(0xdef1fb),
+    row_related: rgb_const(0xecf0f4),
     tooltip: rgb_const(0xd0dbe5),
     tab_bar: rgb_const(0xd7d7d7),
     tab_inactive: rgb_const(0xeaeaea),
@@ -200,6 +208,8 @@ pub const PALETTE_DARK: Palette = Palette {
     accent_hover: rgb_const(0x769fcc),
     accent_soft: rgb_const(0x134e96),
     row_hover: rgb_const(0x0a4780),
+    query_active: rgb_const(0x142434),
+    row_related: rgb_const(0x092046),
     tooltip: rgb_const(0x4b5761),
     tab_bar: rgb_const(0x555555),
     tab_inactive: rgb_const(0x1c1c1c),

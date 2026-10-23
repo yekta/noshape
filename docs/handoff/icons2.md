@@ -839,5 +839,8 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   For skb (noted in sketch-behaviour.md): polygon circle radius, chamfer preview dims colour, picked slot line orange.
 - Glyph hover (skb note, live sketch/27 + 1956): the hovered constraint's entities draw pre-highlight orange #ffc685
   (3 px) instead of the translucent yellow halo; master entities secondary yellow #f2ff80 (`constraint_masters`:
-  Symmetric's axis now; add the slot OFFSET's `localMaster`/`localSecond` centre line when skb adds OFFSET).
+  superseded: live capture (behaviours "sketch constraint-glyph hover colours", sketch/2203–2217) shows every hover
+  orange incl. symmetry/mirror lines; yellow only for a point-pair symmetric's owning lines (Mirror tool pairs) and,
+  from sketch/1956, the slot OFFSET's centre line + end (`constraint_masters(kind, sk)`). Pierce / pattern glyph:
+  live capture still pending.
   Test a_hovered_glyph_highlights_its_entities_orange_and_its_master_yellow; verified in app (context/r19-ghover).

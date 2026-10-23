@@ -396,7 +396,10 @@ fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f6
                 let (next, base) = if j == (k + m - 1) % m { ((j + m - 1) % m, l.pts[j]) } else { ((j + 1) % m, l.pts[(j + 1) % m]) };
                 let e2 = l.side[next];
                 let along2 = (l.pts[(next + 1) % m] - l.pts[next]).normalize();
-                if def.bends.contains_key(&e2) || def.rips.contains(&e2) || along2.cross(dir).length() > 1e-9 {
+                // Only a connector as short as the move (not a wall's side
+                // to a tab running parallel to the bend: qa5 Tab on G34).
+                let connector = (l.pts[(j + 1) % m] - l.pts[j]).length();
+                if def.bends.contains_key(&e2) || def.rips.contains(&e2) || along2.cross(dir).length() > 1e-9 || connector > radius + thickness + TOL {
                     continue;
                 }
                 base

@@ -720,12 +720,19 @@ fn hatched_text(text: &str, at: DVec2, dir: DVec2, px: f64, em_px: f64) -> Vec<[
     out
 }
 
-/// The master (reference) entities of a constraint, highlighted in the
-/// secondary yellow while its glyph is hovered (Onshape's OFFSET
-/// `localMaster` / `localSecond`; a symmetric constraint's line).
-fn constraint_masters(kind: &ConstraintKind) -> Vec<EntityId> {
+/// Entities a hovered glyph shows in the secondary yellow (live
+/// behaviours "sketch constraint-glyph hover colours", sketch/2203–2217;
+/// everything else it constrains turns pre-highlight orange, the symmetry or
+/// mirror line included): a point-pair symmetric's owning lines (the Mirror
+/// tool's pairs) and a slot offset's centre line and its end (sketch/1956).
+fn constraint_masters(kind: &ConstraintKind, sk: &Sketch) -> Vec<EntityId> {
     match kind {
-        ConstraintKind::Symmetric { axis, .. } => vec![*axis],
+        ConstraintKind::Offset { master_ref, master, .. } => vec![*master_ref, *master],
+        ConstraintKind::Symmetric { a, b, .. } if is_point(sk, *a) && is_point(sk, *b) => sk
+            .entities()
+            .filter(|e| e.kind() == EntityKind::Line && e.endpoints().is_some_and(|(s, en)| [s, en].iter().any(|p| p == a || p == b)))
+            .map(|e| e.id)
+            .collect(),
         _ => Vec::new(),
     }
 }
@@ -4764,16 +4771,17 @@ impl SketchEditor {
             let picks = self.tool_picks();
             related.retain(|e| !picks.contains(e));
         }
-        // A hovered glyph (live sketch/27, 1956): its constrained entities turn
-        // pre-highlight orange; a master / reference entity (the symmetry line;
-        // the centre line of a slot's offset) turns secondary yellow.
+        // A hovered glyph (live sketch/27, 1956, 2203–2217): its constrained
+        // entities turn pre-highlight orange; `constraint_masters` secondary yellow.
         let hover_roles: Vec<(EntityId, bool)> = self
             .hover_constraint
             .filter(|c| !self.selected_constraints.contains(c) && use_glyph_entity(*c).is_none())
             .and_then(|c| data.sketch.constraint(c))
             .map(|c| {
-                let masters = constraint_masters(&c.kind);
-                c.kind.entities().into_iter().map(|e| (e, masters.contains(&e))).collect()
+                let masters = constraint_masters(&c.kind, &data.sketch);
+                let mut roles: Vec<(EntityId, bool)> = c.kind.entities().into_iter().filter(|e| !masters.contains(e)).map(|e| (e, false)).collect();
+                roles.extend(masters.into_iter().map(|e| (e, true)));
+                roles
             })
             .unwrap_or_default();
         if !hover_roles.is_empty() {
@@ -7041,7 +7049,7 @@ mod tests {
     }
 
     #[test]
-    fn a_hovered_glyph_highlights_its_entities_orange_and_its_master_yellow() {
+    fn a_hovered_glyph_highlights_orange_and_a_mirrored_pairs_lines_yellow() {
         let (mut ed, mut d) = editor(Tool::Select);
         let a = d.sketch.add_point(v(-0.01, 0.0));
         let b = d.sketch.add_point(v(0.01, 0.0));
@@ -7050,10 +7058,18 @@ mod tests {
         ed.hover_constraint = Some(cid);
         let (lines, points) = ed.overlay(&d, &noshape_units::UnitPrefs::default());
         let orange = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
-        // Live (sketch/27, 1956): constrained entities orange, the master yellow.
+        // Live (sketch/2203–2217): two free points about a line: all orange, no yellow.
+        let yellow = [0xf2, 0xff, 0x80, 255];
         assert_eq!(points.points.iter().filter(|p| p.color == orange).count(), 2, "both points orange");
-        assert!(lines.segments.iter().any(|s| s.color == [0xf2, 0xff, 0x80, 255]), "the symmetry line yellow");
+        assert!(lines.segments.iter().any(|s| s.color == orange) && !lines.segments.iter().any(|s| s.color == yellow), "the symmetry line orange");
         assert!(!lines.segments.iter().any(|s| s.color == [0xf2, 0xff, 0x80, 150]), "no translucent halo for a hovered glyph");
+        // A Mirror-made point pair: the lines owning the points turn yellow.
+        let (p1, p2) = (d.sketch.add_point(v(-0.02, 0.01)), d.sketch.add_point(v(0.02, 0.01)));
+        let l1 = d.sketch.add_line_between(a, p1).unwrap();
+        let l2 = d.sketch.add_line_between(b, p2).unwrap();
+        let (lines, _) = ed.overlay(&d, &noshape_units::UnitPrefs::default());
+        let yellow_lines = lines.segments.iter().filter(|s| s.color == yellow).count();
+        assert!(yellow_lines >= 2, "{l1:?} {l2:?} yellow");
     }
 
     #[test]

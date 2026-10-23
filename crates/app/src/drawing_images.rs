@@ -6,7 +6,6 @@
 
 use crate::drawing_view::*;
 use gpui_kit::*;
-use noshape_model::drawing::SheetImage;
 use noshape_render::{Drawable, ImageData, ImageHandle, Instance};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -41,10 +40,7 @@ impl DrawingEditor {
         let this = cx.entity().downgrade();
         let doc = self.doc.clone();
         crate::file_tab_view::pick_file(doc, "Insert image", &[noshape_model::file_tab::FileKind::Image], &["png", "jpg", "jpeg", "gif"], window, cx, move |file, _, cx| {
-            let read = file.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| {
-                let img = image::load_from_memory(&b).map_err(|e| e.to_string())?;
-                Ok(img.width() as f64 / img.height().max(1) as f64)
-            });
+            let read = file.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| noshape_scene::drawing_tools::image_aspect(&b));
             this.update(cx, |this, cx| {
                 match read {
                     Ok(aspect) => {
@@ -61,17 +57,7 @@ impl DrawingEditor {
 
     /// The image box from the drag start to the cursor (aspect kept).
     fn image_box(&self, start: [f64; 2], aspect: f64) -> ([f64; 2], [f64; 2]) {
-        let c = self.cursor;
-        let (dx, dy) = ((c[0] - start[0]).abs(), (c[1] - start[1]).abs());
-        if dx.max(dy) < self.tol_mm(4.0) {
-            // A plain click: 30 mm high at the click.
-            return (start, [30.0 * aspect, 30.0]);
-        }
-        let h = (dx / aspect).max(dy);
-        let w = h * aspect;
-        let x = if c[0] < start[0] { start[0] - w } else { start[0] };
-        let y = if c[1] < start[1] { start[1] - h } else { start[1] };
-        ([x, y], [w, h])
+        self.pk().image_box(start, aspect)
     }
 
     /// Mouse down while placing: the drag starts. True when used.
@@ -90,8 +76,7 @@ impl DrawingEditor {
         self.tool = Tool::Select;
         self.status = None;
         self.edit_sheet("Insert image", cx, |s| {
-            let id = s.images.iter().map(|i| i.id).max().unwrap_or(0) + 1;
-            s.images.push(SheetImage { id, name, data_base64: data, pos, size });
+            noshape_scene::drawing_tools::add_sheet_image(s, name, data, pos, size);
         });
         true
     }

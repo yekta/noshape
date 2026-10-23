@@ -30,6 +30,37 @@ pub struct SheetModel {
     pub geoms: HashMap<ViewId, Arc<ViewGeometry>>,
     pub built: Option<Arc<BuiltSheet>>,
     pub info: SheetInfo,
+    /// A view's source changed since the views were made: they keep that
+    /// geometry until Update (the yellow Update button; qa5 D17).
+    pub out_of_date: bool,
+}
+
+/// The document state the drawing's views were last made from, when a
+/// source changed since (the views keep their geometry until Update): that
+/// document and the changed sources. Pinned sources never go out of date.
+pub fn old_state(session: &crate::session::Session, drawing: &Drawing) -> Option<(Document, Vec<SourceKey>)> {
+    let mv: noshape_store::MicroversionId = drawing.sources_at.as_ref()?.parse().ok()?;
+    let head = session.head().ok()?;
+    if head == mv {
+        return None;
+    }
+    // Both states as stored, so a document never written back from memory
+    // (a new or imported one) compares like with like.
+    let old = Document::from_blobs(&session.store.read_all(mv).ok()?).ok()?;
+    let current = Document::from_blobs(&session.store.read_all(head).ok()?).ok()?;
+    let keys: Vec<SourceKey> = views::referenced_sources(drawing)
+        .into_iter()
+        .filter(|k| k.version.is_none() && old.tab(k.tab).is_some() && views::source_hash(&old, k).is_some_and(|h| views::source_hash(&current, k) != Some(h)))
+        .collect();
+    (!keys.is_empty()).then_some((old, keys))
+}
+
+/// Before a drawing edit is committed: up-to-date views were made from the
+/// current document state (an out-of-date drawing keeps its `sources_at`).
+pub fn stamp_sources(session: &crate::session::Session, drawing: &mut Drawing) {
+    if old_state(session, drawing).is_none() {
+        drawing.sources_at = session.head().ok().map(|m| m.to_string());
+    }
 }
 
 impl SheetModel {
@@ -41,6 +72,16 @@ impl SheetModel {
         let versions = |id: &str| session.document_at_version(id).ok().flatten();
         let mut sources = views::regenerate_sources_with(doc, &drawing, &versions);
         let mut assemblies = crate::derived::assembly_evaluator(Default::default());
+        // Views not updated since a change: their sources as they were made.
+        let old = old_state(session, &drawing);
+        let out_of_date = old.is_some();
+        if let Some((old_doc, keys)) = old {
+            for k in keys {
+                if let Some(src) = views::regenerate_source(&old_doc, &k, &mut noshape_model::regen::Regenerator::new(), &mut assemblies) {
+                    sources.insert(k, src);
+                }
+            }
+        }
         let missing: Vec<&SourceKey> = extra.iter().filter(|k| !sources.contains_key(*k)).collect();
         for k in missing {
             if let Some(src) = views::regenerate_source(doc, k, &mut noshape_model::regen::Regenerator::new(), &mut assemblies) {
@@ -58,9 +99,12 @@ impl SheetModel {
                 }
             }
         }
-        let info = sheet_info(session, tab);
+        let mut info = sheet_info(session, tab);
+        // Custom tables (the editor evaluates them in the background).
+        let fs_at = |v: &str| crate::derived::ExternalRef::parse(v).and_then(|e| crate::derived::external_snapshot(&e.path, e.microversion).ok()).map(|d| (*d).clone());
+        info.custom_tables = noshape_model::drawing::tables::evaluate_custom_tables(doc, &drawing, &sources, &fs_at);
         let built = (!drawing.sheets.is_empty()).then(|| Arc::new(assemble_sheet(&drawing, sheet, &geoms, &sources, &info)));
-        SheetModel { tab, drawing, sheet, sources, geoms, built, info }
+        SheetModel { tab, drawing, sheet, sources, geoms, built, info, out_of_date }
     }
 
     /// The shared tools' view of this sheet with `tool` active and the
