@@ -605,9 +605,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // The sketch being edited shows its closed regions filled
                 // (`#9aa5af`; live sketch/17: rgb(221,226,230) over the plane's
                 // rgb(245,248,250), which our linear blending reaches at 0.34).
+                // Dark: `#f2f2f2` at 20% (`--os-sketch-face-color`), #616161
+                // over one plane's #3d3d3d: 0.09 in linear light.
                 let fill = if editing {
                     let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
-                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], 0.34])
+                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], theme::pick(0.34, 0.09)])
                 } else {
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
                 };
@@ -651,11 +653,12 @@ fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState,
         match st {
             SketchEntityState::Under => g.sketch_under,
             SketchEntityState::Full => g.sketch_constrained,
-            SketchEntityState::Over => v::SKETCH_OVER,
+            SketchEntityState::Over => theme::pick(v::SKETCH_OVER, theme::viewport_dark::SKETCH_OVER),
             SketchEntityState::Inactive => g.inactive_color,
         }
     };
     let a = if construction { 200 } else { 255 };
+    let hex = theme::sketch_color_for_theme(hex);
     [((hex >> 16) & 0xff) as u8, ((hex >> 8) & 0xff) as u8, (hex & 0xff) as u8, a]
 }
 

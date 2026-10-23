@@ -4131,10 +4131,17 @@ fn dimension_label_colors(ed: &SketchEditor, cid: noshape_sketch::ConstraintId, 
         (Some(rgb(0xd9a566)), rgb(0x000000))
     } else if ed.hover_constraint == Some(cid) {
         (Some(rgb(0xd9bfa0)), rgb(0x000000))
-    } else if ed.show_errors && ed.conflicting.contains(&cid) {
-        (None, rgb(crate::theme::viewport::SKETCH_OVER))
     } else {
-        (None, if driving { rgb(0x000000) } else { rgb(crate::theme::viewport::DIM_DRIVEN) })
+        // Dark (live dk-933): white values, driven #ccc, conflicts #ff6b6b.
+        use crate::theme::{pick, viewport as l, viewport_dark as d};
+        let hex = if ed.show_errors && ed.conflicting.contains(&cid) {
+            pick(l::SKETCH_OVER, d::SKETCH_OVER)
+        } else if driving {
+            pick(l::SKETCH_FULL, d::SKETCH_FULL)
+        } else {
+            pick(l::DIM_DRIVEN, d::DIM_DRIVEN)
+        };
+        (None, gpui_kit::rgb_static(hex))
     }
 }
 
