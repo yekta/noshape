@@ -731,7 +731,9 @@ opFitSpline 2 points → line, straight degree-1 B-splines count as lines).
   "same number of segments"; what live does with unequal corner counts is unknown, asked live). Loft Add on std
   passes (= live 9805.5244): qCreatedBy falls back to faces/edges of hidden definition sheets when nothing visible
   matches (std finds the new joint by qCreatedBy(loft) after joining the sheets).
-- Form: "Select location on selected active sheet metal faces." (sheetMetalFormed.fs:249).
+- Form: the test now sets targetFaces (what std's formedEditLogic fills in the dialog); std then fails importing
+  the tool: "Failed to import form tools … use Tag feature" (IMPORT_DERIVED_NO_PARTS): the test's form Part Studio
+  (form_studio in features_c.rs) has no std form-tool tags; build it with std's Tag feature to test the std route.
 - Rip: the diagonal rip leaves one body (features_c rip_splits_wall_between_vertices).
 - Tests that read native-only internals (r.context.sheet_metal walls/bends): recognize_rebuilds_sheet_metal_model,
   jog_offsets_wall_and_keeps_flat_length (wall count); rewrite against geometry / live numbers.
