@@ -848,3 +848,19 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   Studio has a composite (live 01 vs 320; was always shown). Properties modal: ƒ, calculator glyph, undo/redo = live
   132/133; for ui2: live joins the read-only (grey) Mass field and the calculator button into one input group (shared
   border, no gap), ours draws two separate boxes. Named positions panel: no own icons beyond "?".
+
+## Round 16 (2026-10-23) — dark-mode art for Onshape's static-colour icons (lead, from ui2's dark mode)
+- Live: one sprite for both themes; `--static` vars keep light values in dark (behaviours "Dark theme icon sources").
+  The 74 icons in /root/ui2-scratch/dark-icon-categories.json "static" now have `crates/app/assets/icons/dark/<name>.svg`
+  (assets.rs loads them as-is in dark; other icons get the themed #333->#fff flip).
+- Recipe (scratch tools/mkdark.py NAME WHITE_D): our light art with #333-at-opacity greys made solid, plus white
+  faces under everything (`--os-icon-fill-primary--static` #fff) from OUR outline geometry (one path per subpath:
+  overlapping subpaths cancel by winding). Badges (error/warning/info/toasts, update-all, regen) get a white copy of
+  their own silhouette so the knocked-out glyph reads white. Hand-drawn: mate-connector-qlv-item (#666 rings + white
+  ring/quarter), wire-body (white strokes), hole (#333 bore crescent), the stroked warning triangles.
+- Reference: tools/darkref.py renders the LIVE sprite symbol (dark/icons2-dark-sprite.svg) with varsDark substituted
+  (the ui-ref copies have vars resolved); tools/darkiter.py NAME [SVG] scores on #333 through the 2x raster path;
+  tools/dv.py OUT NAMES shows ref|ours. Scores (d20): median 1.10, worst standard-content 4.1, menu-delete 5.6 (same
+  look, slight size), mate-connector-qlv-item 4.4, plus a dozen 2-3.5. guard.py 0/74, guard test 2 passed.
+- In-app check: run with XDG_CONFIG_HOME=/tmp/icons2/cfgdark (preferences.json {"dark_mode": true}) so the shared
+  ~/.config/noshape isn't touched; compare with live/dark/dk-920-partstudio, dk-940-assembly.
