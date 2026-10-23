@@ -555,7 +555,7 @@ impl PartStudioView {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(crate::ui::panel_title("ps-appearance", div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)))
-                        .child(div().id("ap-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!changed, |d| d.opacity(0.2)).cursor(CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        .child(div().id("ap-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!changed, crate::ui::disabled_accept).cursor(CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if changed {
                                 this.accept_appearance(cx);
                             }

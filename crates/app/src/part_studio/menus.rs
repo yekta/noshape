@@ -1061,7 +1061,7 @@ impl PartStudioView {
                             .border_b_1()
                             .border_color(pal.border)
                             .child(crate::ui::panel_title("ps-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties")))
-                            .child(div().size(px(28.)).flex().items_center().justify_center().bg(crate::theme::p().accept).opacity(0.2).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)))
+                            .child(div().size(px(28.)).flex().items_center().justify_center().bg(crate::theme::p().accept).when(true, crate::ui::disabled_accept).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)))
                             .child(close("mass-close", cx)),
                     )
                     // Live: 46 px from the last inertia row to the dialog's

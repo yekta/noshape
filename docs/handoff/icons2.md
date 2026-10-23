@@ -946,3 +946,27 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
     51 bg(gpui_kit::white()) app-wide; Create button blue on the documents page.
   * Dialogs hole, fillet, linear pattern, mirror, sweep, flange, fastened, revolute, asm linear pattern, replicate:
     icons = live dark.
+
+## Round 18 block 3 (2026-10-23, new icons2 after the approval-prompt hang; predecessor 234b2118)
+- Scratch: everything under /root/icons2-scratch (no /tmp: approval prompts hang the agent). App: tools/app3.sh
+  start|shot NAME|stop (binary copy /root/icons2-scratch/bin/noshape, state in run/, shots in v/, window by PID);
+  tools/sbs3.py OURS LIVE OUT x0 y0 x1 y1 k = live | ours crops.
+- Light disabled dialog ✓: `crate::ui::disabled_accept` (light = #cce9cc fill, so the white ✓ stays white;
+  dark = opacity 0.2 as live dk-978). 15 sites + Insert dialog (which also drew an 18 px `check` glyph instead of
+  the 24 px ok sprite, live dom/dialog-assembly-insert).
+- Mate dialog vs live asw-* / dom/dialog-mate-*: Tangent = flip only (26 px row, icon follows the flag alone:
+  -opposite empty and filled), Width = no tools (22 px help row); neither has the mate-type select.
+  Other types: flip/realign/play/Solve = live (Simulation connection row is simulation, excluded).
+- Relations (gear/rack/screw/linear): type select is now the OsSelect (`os-select-bootstrap`, 8x4 caret) like the
+  mate select, flush at the dialog edge; help ? on the Reverse direction row (live dom/dialog-relation-*).
+- Assembly linear/circular pattern, mirror: connector button = mc-select 20 px in a 26 px button flush against the
+  field (was mate-connector 18/24 with a gap); flips 19 px in 26 (was 18/24); Mirror strategy… = mirror icon 20 px,
+  27 px row, 2 px pad, 14 px text (was part-studio 18). Replicate scope select = OsSelect. Pattern help ? 4 px from
+  the bottom right: over the last checkbox row (linear w/o second direction, circular), else after a 22 px spacer.
+- Sheet metal Bend / Sheet metal model: icons = live (no change).
+- Not icons, for the assembly owner: our Mirror shows "Create mirrored (opposite-handed) parts" which live's
+  dialog doesn't (dom/dialog-asm-mirror-*); Replicate's empty "Parts to find match in" lacks live's pink fill.
+- dialog-ok (every dialog ✓) redrawn as our own stroked polyline (3.04 px, round join) fitted to the sprite at 24/48
+  (alpha diff 0.025 -> 0.005): the old flat polygon's arms were ~1 px thinner than live's (assembly/2215, 2262 at 1x).
+  Fitter: /root/icons2-scratch/b3/fitok.py (sprite), fitok2.py (live 1x crop on #009400 + sprite 2x).
+  Note: resvg draws the sprite's short arm 1 px lower than Chrome; fit to live pixels when they disagree.

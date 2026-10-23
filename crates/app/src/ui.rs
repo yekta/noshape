@@ -764,6 +764,14 @@ pub fn caret(open: bool) -> Div {
         .child(glyph(if open { "expander-down" } else { "expander-right" }, 14., p().icon_tertiary))
 }
 
+/// A dialog's disabled green ✓ button (after `.bg(accept)`). Live: the button at
+/// 20% opacity: #cce9cc with a white ✓ in light, (41,70,41) with a grey ✓ in dark
+/// (dialogs/*-01-open, dark/dk-978). GPUI applies opacity per primitive, which
+/// would tint the light ✓, so light uses the blended colour instead.
+pub fn disabled_accept<E: Styled>(e: E) -> E {
+    if gpui_kit::hex_theme_active() { e.opacity(0.2) } else { e.bg(gpui_kit::rgb(0xcce9cc)) }
+}
+
 /// A single-color glyph (chevrons, carets): an app icon drawn as a mask
 /// tinted with `color`.
 pub fn glyph(name: &str, size: f32, color: impl Into<Hsla>) -> Svg {
