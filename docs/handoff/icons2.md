@@ -891,3 +891,20 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   analysis hq-off, thickness Loader/ChevronDown, start_window TriangleAlert (broken document). Assembly triad value
   box (assembly_panels mv-ok/mv-x): live 2306-2309 is a bare input box with no ✓/× and no label: a layout change
   for the assembly owner, not an icon swap (reported to the lead).
+- Block 2 (dark sweep), part 1:
+  * assets.rs flip_themed_colors no longer touches `<mask>` contents: it turned the masks' black (cut-out) into
+    white, so every masked gap (help "?", gaps around arrows/badges, sketch point holes) vanished in dark. Test
+    flip_themed_colors_keeps_mask_cutouts.
+  * scratch tools/darksweep.py: every mapped icon AS THE APP DRAWS IT in dark (dark file, else the light art through
+    the same flip) vs its live symbol with varsDark; lists "excess" = dark score minus light score. 74 -> 20 left,
+    all context-coloured (currentColor: documents-page nav, history, chevrons, tab manager; tinted illustrations;
+    tm-detailed's literal #333) — checked in the app / requested live (REQUESTS "icons2 10-23 07:30").
+  * 49 more dark files: symbols with LITERAL colours (cube, sphere, plane #d2d2d2 faces, file, mbd-status) or
+    static vars that ui2's lists missed (feature-folder, hole-*, import-foreign/derived, show-mates, insert-rigid,
+    file-image/cad/dwg/pdf with themed page fill, fill-tertiary #666->#999 icons: settings, chevron-down, home,
+    open-*, fs-info; accent-cancel -> #ff6b6b: fs-error, dialog-cancel; ...).
+  * delete (assembly/sketch menus) = menu-delete's sprite geometry.
+  * Palette.illustration (#eee / #555 = --os-icon-fill-quinary) for the tinted empty-state illustrations (notes,
+    documents); notes keep their measured #ebebeb in light.
+  * In app (dark): feature list planes = live dk-924; feature menu icons = live; documents nav = live dk-910.
+    Not icons, for ui2: our Create button is #3e94ff, live's dark Create is the darker #1651b0-ish blue.
