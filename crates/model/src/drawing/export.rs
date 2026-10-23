@@ -97,6 +97,8 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     let mut lk: Vec<Option<CadLayer>> = (0..g.lines.len()).map(|i| cad_of(&g.cad, 0, i)).collect();
     let mut fk: Vec<Option<CadLayer>> = (0..g.fills.len()).map(|i| cad_of(&g.cad, 2, i)).collect();
     let mut tk: Vec<Option<CadLayer>> = Vec::new();
+    // Text styles of the kept texts (exploded text has none).
+    let mut ts: Vec<Option<super::cad_layers::CadTextStyle>> = Vec::new();
     // CAD objects (dimensions) per element, kept the same way.
     let (mut lo, text_obj, mut fo) = g.cad_members_of();
     let mut to: Vec<Option<usize>> = Vec::new();
@@ -123,6 +125,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             tc.push(c);
             tl.push(layer);
             tk.push(kind);
+            ts.push(g.cad_text_style(i));
             to.push(obj);
             tf.push(g.text_font(i).cloned());
             continue;
@@ -168,6 +171,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         filter(&mut lk, &keep_l);
         filter(&mut fk, &keep_f);
         filter(&mut tk, &keep_t);
+        filter(&mut ts, &keep_t);
         lo.resize(keep_l.len(), None);
         filter(&mut lo, &keep_l);
         filter(&mut fo, &keep_f);
@@ -198,6 +202,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     out.cad = lk.iter().enumerate().filter_map(|(i, l)| span(i, l, 0)).chain(tk.iter().enumerate().filter_map(|(i, l)| span(i, l, 1))).chain(fk.iter().enumerate().filter_map(|(i, l)| span(i, l, 2))).collect();
     let member = |i: usize, o: &Option<usize>, k: u8| o.map(|obj| super::cad_objects::CadMember { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, obj });
     out.cad_members = lo.iter().enumerate().filter_map(|(i, o)| member(i, o, 0)).chain(to.iter().enumerate().filter_map(|(i, o)| member(i, o, 1))).chain(fo.iter().enumerate().filter_map(|(i, o)| member(i, o, 2))).collect();
+    out.cad_text_styles = ts.into_iter().enumerate().filter_map(|(i, s)| s.map(|style| super::cad_layers::CadTextStyleSpan { texts: i..i + 1, style })).collect();
     out.fonts = tf.into_iter().enumerate().filter_map(|(i, f)| f.map(|font| FontSpan { texts: i..i + 1, font })).collect();
     out
 }
