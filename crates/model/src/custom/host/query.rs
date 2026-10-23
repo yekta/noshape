@@ -956,7 +956,17 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 Ent::Body(b) => q.st.merged_creators.get(&q.st.ctx.bodies[*b].id).is_some_and(|cs| cs.iter().any(|c| has_prefix(c, &id))),
                 _ => false,
             };
-            filter(q.all(None).into_iter().filter(|e| q.created_by(e).is_some_and(|c| has_prefix(&c, &id)) || merged(e)).collect())
+            let visible = filter(q.all(None).into_iter().filter(|e| q.created_by(e).is_some_and(|c| has_prefix(&c, &id)) || merged(e)).collect());
+            if !visible.is_empty() {
+                visible
+            } else {
+                // Nothing visible: the faces / edges it made may now be part of
+                // a (hidden) sheet metal definition (std loft Add joins its sheet
+                // to the definition, then finds the new joint by qCreatedBy).
+                // Not the definition body itself (std flange's merge checks that
+                // its boolean created no body).
+                filter(q.all_with(None, true).into_iter().filter(|e| !matches!(e, Ent::Body(_)) && q.created_by(e).is_some_and(|c| has_prefix(&c, &id))).collect())
+            }
         }
         "SKETCH_REGION" => {
             let Some(id) = id_of(query.get("featureId")) else { return Ok(Vec::new()) };

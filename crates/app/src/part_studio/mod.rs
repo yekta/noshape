@@ -387,7 +387,7 @@ impl PartStudioView {
             cache: GpuCache::default(),
             selection: Vec::new(),
             hover: None,
-            opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, highlight_boundary: crate::view_defaults::get(cx).highlight_boundary, ..Default::default() },
+            opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, ..Default::default() },
             edit: None,
             selected_features: Vec::new(),
             regen: Arc::new(Mutex::new(Regenerator::new())),
@@ -891,16 +891,19 @@ impl PartStudioView {
             let d = e.dialog.read(cx);
             for r in d.active_refs().into_iter().chain(d.selected_refs()) {
                 match r {
-                    // The seed keeps its shading, outlined orange (live
+                    // The seed keeps its shading with a light selection
+                    // tint, outlined orange, its hidden edges dashed (live
                     // #717560 end face, #ffa90a edges).
                     Reference::Feature(f) => {
-                        for g in self.feature_geometry(f).into_iter().filter(|g| matches!(g, Reference::Face(_))) {
-                            for &id in built.picks.ids_for(&g) {
+                        let faces: Vec<Reference> = self.feature_geometry(f).into_iter().filter(|g| matches!(g, Reference::Face(_))).collect();
+                        for g in &faces {
+                            for &id in built.picks.ids_for(g) {
                                 if let Some(s) = scene.states.get_mut(id as usize) {
-                                    *s &= !noshape_render::state::SELECTED;
+                                    *s = (*s & !(noshape_render::state::SELECTED | noshape_render::state::ACCENT)) | noshape_render::state::TINT;
                                 }
                             }
                         }
+                        scene.instances.extend(scene_builder::hidden_edges_dashed(&self.display, &faces, self.gpu.uploader()));
                     }
                     r => {
                         for &id in built.picks.ids_for(&r) {

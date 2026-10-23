@@ -1433,7 +1433,10 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   live solved rgb(123,30,36) α 0.60 in sRGB, same on top and front), depth-tested; edges #bd3039, 3.5 px, on top.
   The seed keeps its shading with an orange outline (Feature geometry loses SELECTED on faces); the other inputs
   (Direction) get ERROR (red). Other failing features still draw their inputs red.
-- Not matched yet: live's dashed orange hidden edges of the seed; our part lighting is lighter on the block front.
+- The seed (10-23, after v0.4.7): its faces get state TINT (20 % selection amber over the shading, mixed in sRGB:
+  live end face #4e6876 → #717560, ours #707360) instead of SELECTED/ACCENT (ACCENT's 0.55 made it beige), and its
+  boundary edges are also drawn dashed orange where hidden (`scene/builder.rs::hidden_edges_dashed`). Our part
+  lighting stays lighter on the block front than live's.
 - Test `features_a.rs::failed_feature_pattern_shows_its_instances`. Shots: psb-scratch/shots/v047-*.png.
 
 ### Feature sweep, open rows (10-23): Helix L34/L35, pattern L41, Hole L52/L58

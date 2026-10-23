@@ -372,9 +372,10 @@ impl Viewport {
         Self {
             gpu,
             target_id,
-            // Orthographic unless Perspective view was set as default
-            // (camera menu right-click › Set as default; Onshape: off).
-            camera: Camera { projection: crate::view_defaults::get(cx).projection(), ..Camera::default() },
+            // Orthographic (Onshape: Perspective view is per tab, for the
+            // session; live 10-23 a2) at the Graphics preferences' field of
+            // view (vertical, like Onshape's `perspective(angle, aspect)`).
+            camera: Camera { fov_y: (crate::graphics_prefs::get(cx).fov_deg as f64).to_radians(), ..Camera::default() },
             scene: Arc::new(Scene::default()),
             scene_bounds: None,
             style: Style::default(),

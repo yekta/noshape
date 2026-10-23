@@ -56,6 +56,7 @@ const ERROR: u32 = 16u;
 const DIM: u32 = 32u;
 const QUERY: u32 = 64u;
 const OUTLINE: u32 = 128u;
+const TINT: u32 = 512u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -179,30 +180,24 @@ fn mesh_vertex(v: MeshIn, slot: u32) -> MeshOut {
     return o;
 }
 
+// Onshape's part lighting (woolsthorpe bundle: `lightFragment` and the
+// solid-face vertex shader), in sRGB values like WebGL: ambient 0.5 × the
+// color (COLOR_AMBIENT_FACTOR), one light along eye-space (1, 1, 1) — to
+// the right, up and toward the viewer — at 0.5 times the color
+// (COLOR_DIFFUSE_FACTOR 1), and Blinn-Phong specular in the Specular color
+// (#999999) with exponent Shininess × 1000 (the preference's 3 % is
+// DEFAULT_SHININESS 30) toward the eye.
 fn shade(world: vec3<f32>, normal_in: vec3<f32>, front: bool, base: vec3<f32>) -> vec3<f32> {
     var n = normalize(normal_in);
     if (!front) { n = -n; }
-    var v: vec3<f32>;
-    if (g.camera_pos.w > 0.5) {
-        v = normalize(g.camera_pos.xyz - world);
-    } else {
-        v = -g.camera_fwd.xyz;
-    }
     let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
-    // Onshape's look, fitted to its rendered face colors (a box in the
-    // default view: top 0.98, right 0.71, front 0.28 of the base color plus
-    // a broad highlight on the top face): one key light above and to the
-    // right of the viewer, flat ambient, no fill light.
-    let key = normalize(right * 0.52 + g.camera_up.xyz * 0.65 + v * 0.55);
-    // (Scaled by 0.745 when the default part color became the live
-    // `#9dcfed`; fitted against `#8ab5cf` before.)
-    let diff = max(dot(n, key), 0.0) * 0.611;
-    let ambient = 0.212;
-    let h = normalize(key + v);
-    // Shininess 3% (Onshape's default) gives a broad highlight (exponent 6);
-    // the default specular color #999 gives 0.42 of white.
-    let spec = pow(max(dot(n, h), 0.0), max(g.specular.w * 200.0, 1.0)) * g.specular.rgb * 1.32;
-    return base * (diff + ambient) + spec;
+    let light = normalize(right + g.camera_up.xyz - g.camera_fwd.xyz);
+    let eye = normalize(g.camera_pos.xyz - world);
+    let h = normalize(light + eye);
+    let c = linear_to_srgb(base);
+    let spec = pow(max(dot(n, h), 0.0), max(g.specular.w * 1000.0, 1.0)) * linear_to_srgb(g.specular.rgb);
+    let lit = c * 0.5 + max(dot(n, light), 0.0) * 0.5 * c + spec;
+    return srgb_to_linear(clamp(lit, vec3(0.0), vec3(1.0)));
 }
 
 // Feature previews (instance params.y bit 4): no part lighting. Onshape's
@@ -326,6 +321,8 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
             c = shade(i.world, i.normal, front, c);
         }
     }
+    // A light selection tint over the shading, mixed in sRGB (state TINT).
+    if ((st & TINT) != 0u) { c = srgb_to_linear(mix(linear_to_srgb(c), linear_to_srgb(g.select.rgb), 0.2)); }
     // Back faces revealed by a section cut are tinted so cut solids read well.
     if (!front && g.flags.x != 0u) { c = mix(c, g.accent.rgb * 0.5, 0.5); }
     // params.y bit 7: Isolate ghost, mixed toward white in sRGB (extra.y).
