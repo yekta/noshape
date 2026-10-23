@@ -1958,6 +1958,11 @@ impl Workspace {
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 let mut new_id = None;
                 this.doc.update(cx, |doc, cx| {
+                    // The views are made from the document as it is now: a
+                    // later change to a source puts the drawing out of date,
+                    // edited or not.
+                    let mut drawing = drawing;
+                    drawing.sources_at = doc.session.head().ok().map(|m| m.to_string());
                     doc.edit_document(&format!("Insert tab : {name}"), cx, |d| {
                         new_id = Some(docedit::insert_drawing_tab(d, &name, drawing, source.as_ref().map(|s| s.tab)));
                     });
