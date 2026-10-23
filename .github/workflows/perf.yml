@@ -35,7 +35,7 @@ on:
       jobs:
         description: Which jobs to run
         type: choice
-        options: [all, smoke, bench]
+        options: [all, smoke, bench, model]
         default: all
       variants:
         description: 'Extra texture orbit runs on macOS and Linux, e.g. msaa1:NOSHAPE_PERF_MSAA=1 noinst:NOSHAPE_PERF_SKIP=instancing'
@@ -73,7 +73,7 @@ jobs:
   # GitHub publishes it).
   smoke:
     name: Smoke ${{ matrix.name }}
-    if: (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'bench'
+    if: (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'bench' && inputs.jobs != 'model'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 240
     strategy:
@@ -158,7 +158,7 @@ jobs:
 
   bench:
     name: ${{ matrix.name }}
-    if: (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'smoke'
+    if: (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && inputs.jobs != 'smoke' && inputs.jobs != 'model'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 240
     strategy:
@@ -269,3 +269,64 @@ jobs:
       - name: Gates
         if: steps.analyze.outputs.status != '0'
         run: exit 1
+
+  # Regeneration performance (jobs: model only): qa5's 400-hole plate
+  # (crates/model/tests/big_plate.rs, PERF1: holes, a 400-edge chamfer and a
+  # depth edit, each under 2 s like Onshape's ~1 s) in a release build of
+  # `ref` on each OS; the times go to the run summary.
+  model:
+    name: Model perf ${{ matrix.name }}
+    if: github.event_name == 'workflow_dispatch' && inputs.jobs == 'model'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS (Apple silicon), os: macos-latest }
+          - { name: Linux x86_64, os: ubuntu-24.04 }
+          - { name: Windows x86_64, os: windows-latest }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Install (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config libfontconfig-dev libfreetype-dev libzstd-dev
+
+      - name: Install (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja || true
+
+      - name: MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: model-perf-occt-V8_0_1
+
+      - name: Big plate (release)
+        shell: bash
+        env:
+          NOSHAPE_PERF: '1'
+        run: |
+          status=0
+          cargo test --release --locked -p noshape-model --test big_plate -- --ignored --nocapture --test-threads=1 2>&1 | tee big_plate.log || status=$?
+          { echo "### ${{ matrix.name }}"; grep -E "big plate:|tessellate Part 1|boolean_into Cut" big_plate.log || true; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
