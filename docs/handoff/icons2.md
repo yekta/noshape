@@ -864,3 +864,20 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   look, slight size), mate-connector-qlv-item 4.4, plus a dozen 2-3.5. guard.py 0/74, guard test 2 passed.
 - In-app check: run with XDG_CONFIG_HOME=/tmp/icons2/cfgdark (preferences.json {"dark_mode": true}) so the shared
   ~/.config/noshape isn't touched; compare with live/dark/dk-920-partstudio, dk-940-assembly.
+- (fix) the preferences key is camelCase: `{"darkMode": true}`.
+
+## Round 17 (2026-10-23) — dark art for the "mixed" icons (static parts + themed parts), lead: worst-visible first
+- 82 more `icons/dark/<name>.svg` (156 total): the mixed list /tmp/icons2/mixed-base.txt (base = our light art through
+  the app's themed flip), worst first. Per element, map the live symbol's var to its dark value
+  (scratch tools/roles.py OUT NAMES paints each var a colour beside the dark ref and ours): `--static` stays light,
+  themed flips (outline-primary/accent-tertiary #333->#fff, outline-secondary ->#bababa, fill-secondary #999->#d7d7d7,
+  fill-tertiary #666->#999, fill-primary #fff->#333, accent-primary ->#3e94ff, cancel ->#ff6b6b, success ->#35bc35).
+- White faces go on the stroke CENTRE (or the inner edge of a filled outline), not the outer edge: an outer-edge face
+  leaves an anti-aliased white halo around the dark outline on #333.
+- Helpers: tools/sketchdark.py (sketch tools: curve ->#bababa, point rings ->#3e94ff with white centres, rings r<=2.5
+  only), tools/tailconv.py (only static part = #999 fill-secondary), tools/lv.py (live light|dark|ours light|ours dark).
+- Not needed: edit-curve, boolean, flip*, curvature, paste, xyz-along-z — the themed flip already gives the live
+  colours (#333 at .5 flipped to #fff at .5 on #333 = #999).
+- Scores (d20) all <= 3.3 except snap-mode 4.8, stack-closest 2.9; was 9-47. Worst three static: standard-content
+  4.1 -> 0.5 (washer face moved to the washer), menu-delete 5.4 (white X instead of a white disc; the rest is our
+  light art's size, matched to the live menu), mate-connector-qlv-item stays 4.4 (sub-pixel ring placement).
