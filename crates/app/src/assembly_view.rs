@@ -3412,6 +3412,11 @@ impl AssemblyView {
                     this.pick_relation_mate(id, cx);
                     return;
                 }
+                // Animate: clicking the animated mate's row opens the DOF chooser.
+                if this.anim.as_ref().is_some_and(|a| !a.preview && a.mate == id) {
+                    this.open_dof_chooser(cx);
+                    return;
+                }
                 this.selected_mate = if this.selected_mate == Some(id) { None } else { Some(id) };
                 this.selected.clear();
                 this.refresh_scene(false, cx);
@@ -3827,11 +3832,7 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ render: panels
 
-    fn panel_frame(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str) -> Div {
-        Self::panel_frame_with(title, body, close, id, false)
-    }
-
-    /// `panel_frame`; `plain_close`: Onshape's grey × at 50 % (`btn-close`,
+    /// A panel frame; `plain_close`: Onshape's grey × at 50 % (`btn-close`,
     /// live dom dialog-animate) instead of the red cancel ✕.
     pub(super) fn panel_frame_with(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, plain_close: bool) -> Div {
         Self::panel_frame_full(title, body, close, id, plain_close, None)

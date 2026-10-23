@@ -41,9 +41,10 @@ the error-string table's.
 | 25 | Dialog errors (all assembly feature dialogs) | red title with tooltip "<name> did not regenerate properly: <text>" (mate, relation, pattern) | red title, no tooltip; mate errors in a yellow alert box | 🔧 |
 | 26 | Tangent dialog fields | two "Face, edge or vertex" fields; incomplete: "Tangent mate needs two entities." | one "Mate connectors" field | 🔧 |
 | 27 | Width tab field | "Tab mate connector(s)" | "Tab mate connectors" | 🔧 |
-| 28 | Part deleted (E15) | instance rows red "Failed to resolve instance."; connector mate "Failed to resolve the instance for mate." (its chip red); face mate "Selection is invalid." with "Missing entity of …" chips; mate connector "Failed to resolve mate connector origin."; badges "Assembly contains error" / "Mate error" | ours differs | ✗ |
-| 29 | Secondary axis conflict (E16) | only the secondary chip red | ours differs | ✗ |
-| 30 | Animate | absent for Ball / Fastened; 0→360 deg / 0→25 mm, Steps 300, Reciprocate, DOF chooser | ours differs | ✗ |
+| 28 | Part deleted (E15) | instance rows red "Failed to resolve instance."; connector mate "Failed to resolve the instance for mate." (its chip red); face mate "Selection is invalid." with "Missing entity of …" chips; mate connector "Failed to resolve mate connector origin."; badges "Assembly contains error" / "Mate error" | "Part no longer exists in its Part Studio …", "Instance no longer exists"; no badge tooltips | 🔧 |
+| 29 | Secondary axis conflict (E16) | the title red with the error tooltip, only the secondary chip red | no title error | 🔧 |
+| 30 | Animate | absent for Ball / Fastened; 0→360 deg / 0→25 mm, Steps 300, Reciprocate; one DOF auto-filled, several: empty until picked in "Select degree of freedom" (⟳ z first, then ↹ x, y, z) | Animate on Ball; 0→half the assembly size; first DOF pre-filled, translations first, chips "↔" | 🔧 |
+| 31 | Group dialog | 220 px feature dialog "Group 1", Instances field active, ✓ at 0.2 while empty, title tooltip "Group 1 did not regenerate properly: Nothing selected."; E2 "Mate cannot be added between member of same group." | panel "Group", a hint line, a primary ✓ button | 🔧 |
 | 23 | Mate's part deleted | E15: "Failed to resolve the instance for mate." (row 28) | "Mate cannot resolve mate connectors." (MT9) | ✗ |
 
 ## Mates (dialogs, defaults, DOF)

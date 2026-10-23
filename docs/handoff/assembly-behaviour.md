@@ -966,3 +966,20 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   (L·1.25 Pan, ·1.125 Oval, ·1 Flat): V-grooves (live's extrude to plane 1 + healed delete face = a tetrahedron
   per wing, sides cut by rotated boxes) or blind HeadHeight/2 on flat heads; RFILLET_IA on the 8 arm-side/core
   edges. Pan #8 with kern's checked fillet = live's 43 faces, every area to 7 digits; without it 35 (no fillets).
+
+## Assembly sweep (skb 10-23, docs/parity/workflow-assembly-sweep.md rows 14–31)
+* Model (`eval.rs`): `RelationStatus.inactive`; relations on inactive/suppressed mates are Inactive ("One or more
+  mates is inactive or suppressed"), relations that fight each other show no error (live E8); a mate on a suppressed
+  instance carries the reason "One or more instances is suppressed" (tooltip "<name> (Inactive: …)"). New failures:
+  "Mate is between fixed instances." (both bodies fixed), limits min > max (E11). A part gone from its Part Studio:
+  node "Failed to resolve instance.", mates "Failed to resolve the instance for mate." (Tangent: "Selection is
+  invalid."), assembly mate connectors "Failed to resolve mate connector origin." (`Prepared.inactive_instances`).
+* App: every assembly feature dialog (mate, relation, pattern / replicate, mate connector, group) has live's red
+  title with the tooltip "<name> did not regenerate properly: <text>"; the mate dialog's old yellow alert box is gone
+  (E1: a same-instance pick is silently refused). Pattern count errors keep the title black (live). Lost parts:
+  red chips, Tangent chips "Missing entity of <instance>" (`MateDialog.lost`). Root badge "Assembly contains
+  error", Mate features folder badge "Mate error", ⚠ on the fix icons when 2+ are fixed.
+* Animate: no Animate… for Ball; translations 0 → 25 mm; one DOF auto-fills, several open empty and the mate row /
+  chip box opens "Select degree of freedom" (rotation first: `anim_dofs`). Chips use ↹ like the relation dialog.
+* Group dialog: live's 220 px feature dialog ("Group 1", Instances field, ✓ at 0.2 while empty, "Nothing selected.").
+* Open: the named-position DOF columns still use "↔" (no live capture of that glyph).
