@@ -1462,6 +1462,16 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   give "Could not extract boundary profiles matching at end points.". Test `features_b.rs::boundary_one_u_one_v_as_live`.
 - **L35 not matched:** live's start angle follows Parasolid's surface frames; noted in the parity doc.
 
+### Hole Merge scope (10-23, live L56/L57)
+- `hole.rs`: every evaluation reports the parts the holes reach in `touched` (the holes in scope plus any other
+  solid on each hole's axis within its length, `spans`); an empty scope then fails "No target parts selected for
+  hole." on `scope`. `regen/mod.rs` now keeps `touched` on errors too.
+- `behaviors.rs::hole_scope_logic`: a new Hole's scope is `touched` until the user sets the field (follows the
+  depth: 5 mm into the top of two stacked parts → Part 2, 15 → Part 1, Part 2; checked in the app).
+- `ScopeRule` 4: holes saved without a scope get `legacyAllParts` (cut every part as before).
+- Tests: `features_a.rs::hole_merge_scope_as_live`; the test helpers give holes the studio's parts as scope.
+- Open: the flip arrow clearing the scope; scope logic on edited (not new) holes.
+
 ### For kern (10-22): Thicken of several faces with a square corner (live L17)
 - Live "psb L16-19 thicken": block 40×20×10, Thicken top + front face (adjacent, 90°), New, 2 mm → **one part, 2560 mm³**
   (1600 + 800 + a 40×2×2 square corner), 8 faces. Same with Keep tools.

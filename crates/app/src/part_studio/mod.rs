@@ -745,6 +745,7 @@ impl PartStudioView {
         // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
         // from what the previewed tool touches.
         self.boolean_edit_logic(cx);
+        self.hole_scope_logic(cx);
         self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);
         if !self.fitted_once {
