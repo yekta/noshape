@@ -430,3 +430,27 @@ with black jagged halos and see-through holes (hole cylinders visible through th
 intersection line; one plane selected draws normally; clearing the selection restores it. Reproduced 3×. **Not a
 regression:** /tmp/lead/noshape-v045 shows the same with Top + Right on the demo plate (black halos, see-through holes,
 banding on the side faces).
+
+## v0.4.6 final candidate /tmp/lead/noshape-v046b + noshape-cli-v046b (release/v0.4.6 751df66 = 8da7e78 + version, toolchain pin, CI fix, BRepMesh planar meshing), FRESH=1, 2026-10-23 01:38–02:40, qa4
+**Result: FAIL on (b) only** (unchanged from 8da7e78; the fix isn't on the release branch). Everything else passes.
+
+| Row | Result |
+|---|---|
+| Display (new planar meshing) | ✅ demo plate shaded with edges / shaded without edges, zoomed on holes + fillets; Flange (annular planar faces with bolt-circle holes); tests/perf/big-plate (one planar face, hundreds of holes): no cracks, slivers or stray triangles; edges right |
+| (a) lp wall over | ✅ red row + title, tooltip exact, ✓ green, seed wall + Right plane red; Reapply on: two walls, 20042 mm³ |
+| (b) failed Extrude | ✗ as before: red title / row, tooltip exact, ✓ enabled, up-to face edge red; input region not drawn |
+| (e) CLI live mode | ✅ sketch_create / sketch_draw / feature_add on the open failext.noshape appear at once; Ctrl+Z removes Extrude 3 |
+| Section 8 (73 items) | ✅ all ALIVE; screenshots as the 8da7e78 run (montage /tmp/qa4/cm/mont46c.png) |
+
+Note: opening a .noshape whose stale `-wal` / `-shm` (from an older file of the same name) sit beside it panics at start
+("could not open document: unknown branch …", main.rs:348 `expect`) instead of an error dialog; same code on main.
+
+## v0.4.6 candidate c /tmp/lead/noshape-v046c (release/v0.4.6 + psb 9b27922), 2026-10-23 02:50–03:10, qa4
+**PASS** on the two rows asked for.
+- (b) failed Extrude (Up to face, failext.noshape): the input region (10×10 square at x 50–60) is drawn with a red outline
+  and a light red fill, as live part-studio/2028; title / row red, tooltip exact, ✓ enabled. Still different from 2028:
+  live draws the region's **4 vertices as grey dots** and the **extrude direction arrow** on the region; noshape shows
+  neither in the failed state (open, psb).
+- (a) lp wall over (fresh CLI model): Reapply off red with the exact tooltip, seed wall + Right plane red; Reapply on two
+  walls, 20042 mm³.
+- Test note: a model accepted with Reapply on in an earlier run keeps it (file saved); rebuild the models for each run.
