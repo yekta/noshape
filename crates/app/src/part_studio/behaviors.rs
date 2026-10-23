@@ -2951,7 +2951,7 @@ impl PartStudioView {
         }
         let dialog = e.dialog.clone();
         let ty = dialog.read(cx).feature.type_id.clone();
-        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib") {
+        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector") {
             self.direct_edit_logic(&dialog, cx);
             return;
         }
@@ -3052,6 +3052,26 @@ impl PartStudioView {
                 let solids: Vec<Reference> = ctx.map(|c| c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect()).unwrap_or_default();
                 if !solids.is_empty() {
                     changes.push(("parts", ParamValue::Query(solids)));
+                }
+            }
+            // connectorEditLogic (live L37): the owner is the origin entity's
+            // part, else the only part; attached to a picked face, else to
+            // the owner.
+            "mateConnector" if !user_set.contains("ownerPart") && params.query("ownerPart").is_empty() => {
+                let origin = params.query("originQuery").first().cloned();
+                let parts: Vec<BodyId> = ctx.map(|c| c.bodies.iter().map(|b| b.id.clone()).collect()).unwrap_or_default();
+                let owner = origin.as_ref().and_then(|r| self.body_of(r)).or_else(|| (parts.len() == 1).then(|| parts[0].clone()));
+                if let Some(o) = owner {
+                    changes.push(("ownerPart", ParamValue::Query(vec![Reference::Body(o)])));
+                    if !user_set.contains("attachmentOption") {
+                        match &origin {
+                            Some(r @ Reference::Face(_)) => {
+                                changes.push(("attachmentOption", ParamValue::Enum("TO_SELECTION".into())));
+                                changes.push(("attachTo", ParamValue::Query(vec![r.clone()])));
+                            }
+                            _ => changes.push(("attachmentOption", ParamValue::Enum("TO_OWNER".into()))),
+                        }
+                    }
                 }
             }
             "replaceFace" if !user_set.contains("oppositeSense") => {
