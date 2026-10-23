@@ -19,6 +19,7 @@ mod config_visibility;
 mod material_libraries;
 mod numbering_prefs;
 mod tool_synonyms;
+mod drawing_watermark;
 mod release_prefs;
 mod release_settings;
 mod revision_tools;

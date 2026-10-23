@@ -119,6 +119,12 @@ fn studio_parts(doc: &DocModel, studio: TabId, config: &noshape_model::configura
     ctx.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| (b.id.clone(), b.name.clone())).unzip()
 }
 
+/// A tab's Properties › "Not revision managed" (drawings, Variable
+/// Studios, files: store meta "tab_not_revision_managed:<id>").
+pub fn tab_not_revision_managed(doc: &DocModel, tab: TabId) -> bool {
+    doc.session.store.get_meta(&format!("tab_not_revision_managed:{}", tab.0)).ok().flatten().is_some_and(|b| b == b"1")
+}
+
 /// Release items for a tab (tab menu Release…; Release__typical_release_workflow):
 /// a Part Studio's parts; an Assembly and everything in its Bill of
 /// Materials (parts and subassemblies); a Drawing and the parts or
@@ -802,7 +808,8 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
                 ItemKind::VariableStudio => "Onshape Variable Studio",
                 _ => "Onshape File",
             };
-            (category, MetaValues { name: item.name.clone(), description: desc, part_number: tab_part_number(d, tab), ..MetaValues::default() })
+            let meta = noshape_model::partstudio::ItemMeta { not_revision_managed: tab_not_revision_managed(d, tab), ..Default::default() };
+            (category, MetaValues { name: item.name.clone(), description: desc, part_number: tab_part_number(d, tab), meta, ..MetaValues::default() })
         }
     };
     let spec = MetaSpec { category, material, computed_mass, bom_options: None, values };
@@ -842,6 +849,8 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
                     _ => {
                         let _ = d.session.store.set_meta(&format!("tab_description:{}", item.tab.0), Some(v.description.as_bytes()));
                         let _ = d.session.store.set_meta(&format!("tab_part_number:{}", item.tab.0), Some(v.part_number.as_bytes()));
+                        let nrm: &[u8] = if v.meta.not_revision_managed { b"1" } else { b"" };
+                        let _ = d.session.store.set_meta(&format!("tab_not_revision_managed:{}", item.tab.0), Some(nrm));
                     }
                 }
             });
