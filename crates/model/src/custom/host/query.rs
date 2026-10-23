@@ -113,6 +113,8 @@ pub struct Snapshot {
     pub body_type: &'static str,
     /// Taken from a sketch entity.
     pub sketch: bool,
+    /// A face's whole shape: its split pieces (and copies of them) lie on it.
+    pub face: Option<k::Shape>,
 }
 
 pub struct QueryCx<'a> {
@@ -543,7 +545,8 @@ impl<'a> QueryCx<'a> {
                 vec![shape.project_point(p).ok()?.point]
             }
         };
-        Some(Snapshot { etype, points, body_type: self.body_type(e), sketch: self.is_sketch(e) })
+        let face = (etype == EType::Face).then(|| shape.clone());
+        Some(Snapshot { etype, points, body_type: self.body_type(e), sketch: self.is_sketch(e), face })
     }
 
     /// What a transient id stands for now. Operations rename entities, and
@@ -612,6 +615,14 @@ impl<'a> QueryCx<'a> {
             })
             .filter(|e| {
                 if snap.points.iter().all(|p| on(e, *p)) {
+                    return true;
+                }
+                // A piece of a split face (std Jog clips its face away from the
+                // old face's middle): an inner point on the old face.
+                if let Some(old) = &snap.face
+                    && let Some(m) = self.snapshot(e).and_then(|s| s.points.first().copied())
+                    && k::make_vertex(m).ok().and_then(|v| k::distance(&v, old).ok()).is_some_and(|d| d.distance < TOL)
+                {
                     return true;
                 }
                 // A piece of a split straight edge: its middle on the old segment.

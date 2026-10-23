@@ -168,6 +168,31 @@ pub fn forget_if(id: WindowId, cx: &mut App) -> bool {
     is_prefs
 }
 
+/// The account pages' title bar: the logo, and the user at the right.
+pub(crate) fn account_title_bar(cx: &App) -> AnyElement {
+    let pal = p();
+    TitleBar::new()
+        .h(px(crate::ui::NAVBAR_H))
+        .bg(pal.panel_inactive)
+        .border_b_1()
+        .border_color(pal.border)
+        .child(
+            h_flex()
+                .w_full()
+                .h_full()
+                .child(h_flex().gap(px(5.)).pl(px(8.)).child(crate::assets::icon("noshape-logo", 22., cx)).child(div().text_size(px(21.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape")))
+                .child(div().flex_1())
+                .child(
+                    h_flex()
+                        .pr(px(14.))
+                        .gap(px(5.))
+                        .child(crate::assets::icon("user-avatar", 22., cx))
+                        .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(180.)).truncate().child(noshape_store::local_user_name())),
+                ),
+        )
+        .into_any_element()
+}
+
 /// The open "Edit shortcut" popup.
 struct EditShortcut {
     entry: &'static Entry,
@@ -214,8 +239,8 @@ pub struct PreferencesView {
     toolbar_draft: ToolbarPrefs,
     name: Entity<InputState>,
     name_saved: String,
-    /// Release management and Material libraries sections (release_prefs.rs).
-    release: Entity<crate::release_prefs::ReleasePrefsView>,
+    /// Material libraries section (material_prefs.rs).
+    materials: Entity<crate::material_prefs::MaterialLibrariesView>,
     /// Mouse controls section (mouse_prefs.rs).
     mouse: Entity<crate::mouse_prefs::MousePrefsView>,
     /// Units section (units_prefs.rs).
@@ -266,7 +291,7 @@ impl PreferencesView {
             asm_toolbar_draft: crate::assembly_view::AsmToolbarPrefs::load(),
             name,
             name_saved,
-            release: cx.new(|cx| crate::release_prefs::ReleasePrefsView::new(window, cx)),
+            materials: cx.new(crate::material_prefs::MaterialLibrariesView::new),
             mouse: cx.new(|_| crate::mouse_prefs::MousePrefsView::new()),
             units: cx.new(|_| crate::units_prefs::UnitsPrefsView::new()),
             decimal: cx.new(|_| crate::units_prefs::DecimalPrefsView::default()),
@@ -367,27 +392,7 @@ impl PreferencesView {
     // ------------------------------------------------------------ rendering
 
     fn render_title_bar(&self, cx: &App) -> AnyElement {
-        let pal = p();
-        TitleBar::new()
-            .h(px(crate::ui::NAVBAR_H))
-            .bg(pal.panel_inactive)
-            .border_b_1()
-            .border_color(pal.border)
-            .child(
-                h_flex()
-                    .w_full()
-                    .h_full()
-                    .child(h_flex().gap(px(5.)).pl(px(8.)).child(crate::assets::icon("noshape-logo", 22., cx)).child(div().text_size(px(21.)).font_weight(FontWeight::LIGHT).text_color(pal.text_muted).child("noshape")))
-                    .child(div().flex_1())
-                    .child(
-                        h_flex()
-                            .pr(px(14.))
-                            .gap(px(5.))
-                            .child(crate::assets::icon("user-avatar", 22., cx))
-                            .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(180.)).truncate().child(noshape_store::local_user_name())),
-                    ),
-            )
-            .into_any_element()
+        account_title_bar(cx)
     }
 
     fn render_header(&self) -> AnyElement {
@@ -1077,7 +1082,7 @@ impl Render for PreferencesView {
                 self.render_shortcuts(window, cx),
                 self.render_toolbars(cx),
                 self.drawings.clone().into_any_element(),
-                self.release.clone().into_any_element(),
+                self.materials.clone().into_any_element(),
                 self.export_rules.clone().into_any_element(),
                 self.labs.clone().into_any_element(),
             ]

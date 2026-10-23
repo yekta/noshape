@@ -216,6 +216,10 @@ pub struct DrawingEditor {
     fills: Option<MeshHandle>,
     /// Filled sheet text: (ink, dangling).
     texts: [Option<MeshHandle>; 2],
+    /// Release management › Watermarks: the sheet's watermark text, and its
+    /// mesh (rebuilt with the sheet).
+    watermark: Option<String>,
+    watermark_mesh: Option<MeshHandle>,
     /// Colored fills and texts (see `drawing_scene::sheet_colored`).
     colored: (ColoredHandles, ColoredHandles),
     /// Backdrops under the ink (see `drawing_scene::sheet_backdrops`).
@@ -449,6 +453,8 @@ impl DrawingEditor {
             lines_zoom: 0.0,
             fills: None,
             texts: [None, None],
+            watermark: None,
+            watermark_mesh: None,
             colored: (Vec::new(), Vec::new()),
             backdrops: Vec::new(),
             paper: None,
@@ -890,6 +896,8 @@ impl DrawingEditor {
         let model = d.sheets.get(si).and_then(|s| s.imported.as_ref()).is_some_and(|i| i.model);
         let dark = model && !crate::preferences_window::ListPrefs::load().drawing_light_model_space;
         self.model_bg = model.then_some(if dark { 0x000000 } else { 0xffffff });
+        // A model space has no paper and no watermark.
+        self.watermark = if model { None } else { crate::drawing_watermark::text(self.doc.read(cx), self.tab) };
         if dark {
             let g = &mut built.geometry;
             let all = noshape_model::drawing::sheet::ColorSpan { lines: 0..g.lines.len(), texts: 0..g.texts.len(), fills: 0..g.fills.len(), rgb: [255, 255, 255] };
@@ -1023,6 +1031,17 @@ impl DrawingEditor {
         self.lines = Some(up.upload_lines(&drawing_scene::sheet_lines(&built, self.zoom, &dangling, &skip)));
         self.lines_zoom = self.zoom;
         self.fills = Some(up.upload_mesh(&drawing_scene::sheet_fills(&built)));
+        self.watermark_mesh = self.watermark.as_ref().and_then(|t| {
+            let (pts, idx) = noshape_model::drawing::font::text_fill_font(&crate::drawing_watermark::geometry(t, w, h), None);
+            let mut m = noshape_render::MeshData::default();
+            for p in pts {
+                m.positions.push([p[0] as f32, p[1] as f32, -0.5]);
+                m.normals.push([0.0, 0.0, 1.0]);
+                m.pick_ids.push(0);
+            }
+            m.indices = idx;
+            (!m.indices.is_empty()).then(|| up.upload_mesh(&m))
+        });
         let (ink, red) = drawing_scene::sheet_text(&built, &dangling);
         self.texts = [ink, red].map(|m| (!m.indices.is_empty()).then(|| up.upload_mesh(&m)));
         let lin = |c: [u8; 3]| crate::theme::lin(((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32);
@@ -1081,6 +1100,9 @@ impl DrawingEditor {
         // Onshape: the white sheet sits flat on the gray surround (no shadow).
         if let Some((_shadow, paper, _)) = self.paper.as_ref().filter(|_| self.model_bg.is_none()) {
             scene.instances.push(Instance::new(Drawable::Mesh(paper.clone())).with_color([1.0, 1.0, 1.0, 1.0]).unlit().unpickable().layer(-5));
+            if let Some(m) = &self.watermark_mesh {
+                scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(crate::theme::lin(crate::drawing_watermark::COLOR)).unlit().unpickable().layer(-4));
+            }
         }
         // Inserted images and backdrops, under the sheet geometry.
         scene.instances.extend(self.image_instances());

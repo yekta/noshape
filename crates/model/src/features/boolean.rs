@@ -33,7 +33,7 @@ pub fn split() -> FeatureType {
     let part = |v: &ParamValues| v.is("splitType", "PART");
     let face = |v: &ParamValues| v.is("splitType", "FACE");
     let dir = move |v: &ParamValues| face(v) && v.is("projectionType", "DIRECTION");
-    let p = vec![
+    let mut p = vec![
         ParamSpec::enum_("splitType", "Split type", &[("PART", "Part"), ("FACE", "Face")]).hints(Hints::HORIZONTAL_ENUM),
         ParamSpec::query("targets", "Parts, surfaces, or curves to split", QueryFilter::BODY | QueryFilter::WIRE_BODY)
             .hints(Hints::INITIAL_FOCUS)
@@ -51,11 +51,17 @@ pub fn split() -> FeatureType {
             QueryFilter::ANY_EDGE | QueryFilter::SHEET_BODY | QueryFilter::WIRE_BODY | QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR,
         )
         .visible(face),
+    ];
+    let mut projection = group("edgeProjectionOptionsGroup", "Edge projection options", true, vec![
         ParamSpec::enum_("projectionType", "Projection direction type", &[("DIRECTION", "Direction"), ("NORMAL_TO_TARGET", "Normal to target")]).visible(face),
         ParamSpec::bool("useSketchPlaneDirection", "Use sketch plane direction", true).visible(dir),
         ParamSpec::query1("directionQuery", "Direction", QueryFilter::DIRECTION).visible(move |v| dir(v) && !v.bool("useSketchPlaneDirection")),
-        ParamSpec::bool("keepToolSurfaces", "Keep tool surfaces and curves", true).visible(face),
-    ];
+    ]);
+    // Its title shows in Face mode only.
+    let head = projection.remove(0).visible(face);
+    projection.insert(0, head);
+    p.extend(projection);
+    p.push(ParamSpec::bool("keepToolSurfaces", "Keep tool surfaces and curves", true).visible(face));
     FeatureType::new("splitPart", "Split", Category::Solid, p).icon("split").describe("Split parts with a plane, face or surface, or split faces with curves")
 }
 

@@ -472,13 +472,26 @@ impl Render for MetaForm {
                                 })),
                             ),
                     )
+                    // Live (assembly/132): one 34 px group, the grey field
+                    // (#ccc outline, square right corners) running into the
+                    // 36 px calculator button, whose #aaa outline divides them;
+                    // not overridden, the field is #eee with a #ccc outline.
                     .child(
                         h_flex()
                             .p(px(1.))
-                            .child(div().flex_1().when(!mass_on, |d| d.bg(rgb(0xeeeeee))).child(text_field(&self.mass)))
+                            .child({
+                                let joined = !self.mass_computed;
+                                let input = Input::new(&self.mass)
+                                    .h(px(34.))
+                                    .text_size(px(14.))
+                                    .when(joined, |i| i.rounded_r(px(0.)))
+                                    .when(!mass_on, |i| i.bg(rgb(0xeeeeee)).border_color(rgb(0xcccccc)));
+                                div().flex_1().child(input)
+                            })
                             .when(!self.mass_computed, |d| d.child(
                                 div()
                                     .id("meta-calc")
+                                    .ml(px(-1.))
                                     .w(px(36.))
                                     .h(px(34.))
                                     .flex()

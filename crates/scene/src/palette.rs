@@ -75,6 +75,8 @@ pub mod viewport_dark {
     pub const ORIGIN: u32 = 0xffffff;
     pub const SKETCH_FULL: u32 = 0xffffff;
     pub const SKETCH_OVER: u32 = 0xff6b6b;
+    /// `--os-sketch-underconstrained-line-point-color`.
+    pub const SKETCH_UNDER: u32 = 0x3e94ff;
     pub const SKETCH_REGION: u32 = 0xf2f2f2;
     pub const DIM_DRIVEN: u32 = 0xcccccc;
     pub const AXIS_X: u32 = 0xdd979b;
@@ -97,6 +99,18 @@ pub fn is_dark() -> bool {
 /// `light`, or `dark` in the dark theme: `pick(viewport::ORIGIN, viewport_dark::ORIGIN)`.
 pub fn pick<T>(light: T, dark: T) -> T {
     if is_dark() { dark } else { light }
+}
+
+/// A sketch color from the Graphics preferences as drawn in the theme: in
+/// dark, the light defaults become Onshape's dark ones (fully defined
+/// `#000` → `#fff`, underdefined `#0000d0` → `#3e94ff`; live dk-931–933);
+/// colors the user picked stay as they are.
+pub fn sketch_color_for_theme(hex: u32) -> u32 {
+    match hex {
+        0x000000 if is_dark() => viewport_dark::SKETCH_FULL,
+        0x0000d0 if is_dark() => viewport_dark::SKETCH_UNDER,
+        _ => hex,
+    }
 }
 
 /// Viewport background: white, `#333` in the dark theme.

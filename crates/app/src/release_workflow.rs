@@ -266,8 +266,9 @@ static FONTS: std::sync::LazyLock<Arc<resvg::usvg::fontdb::Database>> = std::syn
     Arc::new(db)
 });
 
-/// SVG → GPUI image (BGRA) at the window's scale.
-fn rasterize(svg: &str, w: f32, h: f32, sf: f32) -> Option<Arc<RenderImage>> {
+/// SVG → GPUI image (BGRA): `svg` (opaque: a background rect fills it) as
+/// an image `w` x `h` at scale `sf`.
+pub(crate) fn rasterize(svg: &str, w: f32, h: f32, sf: f32) -> Option<Arc<RenderImage>> {
     use resvg::{tiny_skia, usvg};
     let opt = usvg::Options { fontdb: FONTS.clone(), font_family: "Roboto".into(), ..Default::default() };
     let tree = usvg::Tree::from_str(svg, &opt).ok()?;

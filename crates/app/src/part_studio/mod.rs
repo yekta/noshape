@@ -387,7 +387,7 @@ impl PartStudioView {
             cache: GpuCache::default(),
             selection: Vec::new(),
             hover: None,
-            opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, ..Default::default() },
+            opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, highlight_boundary: crate::view_defaults::get(cx).highlight_boundary, ..Default::default() },
             edit: None,
             selected_features: Vec::new(),
             regen: Arc::new(Mutex::new(Regenerator::new())),
@@ -1580,6 +1580,9 @@ impl PartStudioView {
         self.ui.preview_opacity = 1.0;
         self.ui.preview_before = None;
         self.ui.before_context = None;
+        // A new feature's first change runs std's editing logic with an
+        // empty old definition; an edited one starts from its values.
+        self.ui.std_edit_old = (!is_new).then(|| dialog.read(cx).feature.params.clone());
         self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history });
         // Live ("Panels vs feature dialogs"): opening a feature dialog closes
         // the tool panels (Mass and section properties, Named views) for good;

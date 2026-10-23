@@ -137,7 +137,13 @@ fn whole_standard_library_compiles() {
 /// Real custom features from /root/onshape-featurescripts (skipped when absent).
 #[test]
 fn real_feature_studios_compile() {
-    let Ok(dir) = std::fs::read_dir("/root/onshape-featurescripts") else { return };
+    // Real Feature Studios from github.com/yekta/onshape-featurescripts: that
+    // repo has no licence, so they are not copied in as fixtures.
+    const DIR: &str = "/root/onshape-featurescripts";
+    let Ok(dir) = std::fs::read_dir(DIR) else {
+        eprintln!("real_feature_studios_compile skipped: {DIR} is not on this machine (clone github.com/yekta/onshape-featurescripts there to run it)");
+        return;
+    };
     for e in dir.flatten() {
         let p = e.path();
         if p.extension().is_none_or(|x| x != "fs") {

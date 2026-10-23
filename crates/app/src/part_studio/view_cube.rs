@@ -343,6 +343,12 @@ impl PartStudioView {
                         })
                     })
                 }));
+                // Right-click › Set as default: new graphics areas start so.
+                m = m.set_default(move |_, _, cx| {
+                    let mut d = crate::view_defaults::get(cx);
+                    d.perspective = perspective;
+                    crate::view_defaults::set(d, cx);
+                });
                 let v = view.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new("Orient normal to sketch on edit").checked(orient).on_click(move |_, _, cx| {
                     v.update(cx, |this, cx| {
@@ -406,6 +412,11 @@ impl PartStudioView {
                         })
                     }
                 }));
+                m = m.set_default(move |_, _, cx| {
+                    let mut d = crate::view_defaults::get(cx);
+                    d.highlight_boundary = boundary;
+                    crate::view_defaults::set(d, cx);
+                });
                 if dialog_open {
                     return m;
                 }
