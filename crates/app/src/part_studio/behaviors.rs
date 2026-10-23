@@ -3171,6 +3171,31 @@ impl PartStudioView {
         });
     }
 
+    /// A new Hole's Merge scope is the parts its holes reach
+    /// (`FeatureState::touched`), and follows a deeper or shallower hole,
+    /// until the user sets it (live L57: Blind 5 into the top of two stacked
+    /// parts gives "Part 2", Depth 15 "Part 1, Part 2").
+    pub(super) fn hole_scope_logic(&mut self, cx: &mut Context<Self>) {
+        let Some(e) = &self.edit else { return };
+        if !e.is_new {
+            return;
+        }
+        let dialog = e.dialog.clone();
+        let (ty, id, user, scope) = {
+            let d = dialog.read(cx);
+            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), d.feature.params.query("scope").to_vec())
+        };
+        if ty != "hole" || user {
+            return;
+        }
+        let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
+        let want: Vec<Reference> = touched.into_iter().map(Reference::Body).collect();
+        if want.is_empty() || want == scope {
+            return;
+        }
+        dialog.update(cx, |d, cx| d.set_value_auto("scope", ParamValue::Query(want), cx));
+    }
+
     /// Onshape's booleanStepEditLogic (booleanHeuristics.fs) for a new
     /// Extrude / Revolve / Sweep / Loft, from the parts its tool touches in
     /// the preview (`FeatureState::touched`): one part → Add into it; none

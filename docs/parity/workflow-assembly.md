@@ -162,3 +162,17 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | Row | Ours | Status |
 |---|---|---|
 | A4 Slider (block top → plate top) + HUD flip primary axis | flip turns the block over: it sits on the plate (p02, p03) | ✅ **fixed** |
+
+## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
+| Row | Ours | Status |
+|---|---|---|
+| A1 fit | F fits all three instances; the far block runs under the right strip as in live ins-902 | ✅ |
+| A10 toolbar tooltip after click | gone once the dialog opens (b01) | ✅ **fixed** |
+| A11 BOM typing into a selected cell | "QA1" stored, Enter moves down (b05) | ✅ **fixed** |
+| A13 relations | tool search "relation": Gear relation, Screw relation, Linear relation, Rack and pinion relation (b10) | ✅ **fixed** |
+| A6 pattern dialogs | "Linear pattern 1" feature dialog (✓ ✕, red title, pending red row with badge): Instances, Direction (+ clock), Distance 25 mm, Instance count 2 (+ flip), ☐ Equal spacing, ☐ Centered, ☐ Second direction (b11) | ✅ **fixed** |
+| A8 pattern preview | grey preview copy while editing (b14) | ✅ **fixed** |
+| A9 direction from an edge | the copy moves along the picked edge (implicit "Mate connector of Part 1 <1>" on the edge), not the face normal; it goes toward −X (b14) | ✅ direction / ? sign |
+| A5 MC inference | hovering the hole rim: rim highlighted, connector at the hole centre, no dots on other parts (b16) | ✅ **fixed** |
+| DOC5 new Assembly tab position | + › Create Assembly with Part Studio 1 active → "Assembly 2" right after Part Studio 1, stays there after tab switches (t01) | ✅ **fixed** |
+| A15 / A18 | fixed in pass 8 (rows in workflow-configured-assembly.md are stale) | ✅ |

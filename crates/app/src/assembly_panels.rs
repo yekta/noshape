@@ -1283,8 +1283,9 @@ impl AssemblyView {
                 })
                 .unwrap_or_default();
             let active = this.pattern.as_ref().is_some_and(|p| p.active == Some(field));
+            // Live: the field ends where the button starts, both top-aligned.
             h_flex()
-                .gap(px(3.))
+                .items_start()
                 .child(div().flex_1().min_w_0().child(os::query_box(id, label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
                         p.active = Some(field);
@@ -1293,8 +1294,10 @@ impl AssemblyView {
                     this.refresh_scene(false, cx);
                     cx.notify();
                 }))))
-                // The query takes mate connectors: Onshape's mate connector button.
-                .child(div().id(SharedString::from(format!("{id}-mc"))).flex_none().size(px(24.)).flex().items_center().justify_center().tooltip(crate::ui::tooltip("Select mate connector (ctrl+m)")).child(crate::assets::icon("mate-connector", 18., cx)))
+                // The query takes mate connectors: Onshape's 26 px "Select mate
+                // connector" button, the 20 px mate-connector-button sprite
+                // (live dom/dialog-asm-*-pattern-*, -mirror-*).
+                .child(div().id(SharedString::from(format!("{id}-mc"))).flex_none().size(px(26.)).flex().items_center().justify_center().rounded(px(3.)).hover(|d| d.bg(pal.panel_hover)).tooltip(crate::ui::tooltip("Select mate connector (ctrl+m)")).child(crate::assets::icon("mc-select", 20., cx)))
         };
         let regen_error = self.pattern_regen_error(s, cx);
         // Live E13: a bad count leaves the title black (the field is pink).
@@ -1311,13 +1314,14 @@ impl AssemblyView {
             div()
                 .id(id)
                 .flex_none()
-                .size(px(24.))
+                .size(px(26.))
                 .flex()
                 .items_center()
                 .justify_center()
                 .cursor_pointer()
                 .when(on, |d| d.bg(pal.panel_active))
-                .child(crate::assets::icon(icon, 18., cx))
+                // Live (dom/dialog-asm-*-pattern-*): 20 x 19 flip svgs in a 26 px cell.
+                .child(crate::assets::icon(icon, 19., cx))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     f(this);
                     this.update_pattern_preview(cx);
@@ -1398,17 +1402,19 @@ impl AssemblyView {
                             .id("mir-strategy")
                             .mx(px(3.))
                             .mt(px(5.))
-                            .h(px(28.))
-                            .px(px(6.))
-                            .gap(px(6.))
+                            // Live dom/dialog-asm-mirror-filled: 27 px, 2 px padding,
+                            // the 20 px mirror-button sprite, 14 px text 4 px after it.
+                            .h(px(27.))
+                            .px(px(2.))
+                            .gap(px(4.))
                             .border_1()
                             .border_color(pal.border)
                             .rounded(px(2.))
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("part-studio", 18., cx))
                             .tooltip(crate::ui::tooltip("Select how instances are mirrored."))
-                            .child(div().text_size(px(13.33)).child("Mirror strategy…")),
+                            .child(crate::assets::icon("mirror", 20., cx))
+                            .child(div().text_size(px(14.)).child("Mirror strategy…")),
                     )
                     .child(os::checkbox("mir-handed", "Create mirrored (opposite-handed) parts", handed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
@@ -1429,24 +1435,9 @@ impl AssemblyView {
                     use noshape_model::assembly::ReplicateScope;
                     let scope = self.replicate_scope(s, cx);
                     let options: &[ReplicateScope] = if self.replicate_on_edge(s, cx) { &ReplicateScope::EDGE } else { &ReplicateScope::FACE };
-                    let current = options.iter().position(|o| *o == scope).unwrap_or(0);
-                    let opts = options.to_vec();
-                    let view = cx.entity().downgrade();
-                    body = body.child(div().id("rep-scope-field").px(px(3.)).pt(px(5.)).tooltip(crate::ui::tooltip("Face match scope")).child(os::select_field("rep-scope", opts.iter().map(|o| o.label().to_string()).collect(), current, move |i, _, cx| {
-                        let Some(o) = opts.get(i).copied() else { return };
-                        if let Some(v) = view.upgrade() {
-                            v.update(cx, |this, cx| {
-                                if let Some(p) = &mut this.pattern {
-                                    if p.scope != Some(o) {
-                                        p.scope_refs.clear();
-                                    }
-                                    p.scope = Some(o);
-                                }
-                                this.update_pattern_preview(cx);
-                                cx.notify();
-                            });
-                        }
-                    })));
+                    let items = options.iter().map(|o| (SharedString::from(o.label()), SharedString::from(o.label()))).collect();
+                    self.replicate_select.update(cx, |sel, _| sel.set_items(items, scope.label()));
+                    body = body.child(div().id("rep-scope-field").pt(px(6.)).tooltip(crate::ui::tooltip("Face match scope")).child(div().w(px(194.)).h(px(28.)).child(self.replicate_select.clone())));
                     let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
                     let rows: Vec<AnyElement> = s
                         .scope_refs
@@ -1479,8 +1470,11 @@ impl AssemblyView {
                 // incomplete pattern only greys the ✓ and reddens the fields.
             }
         }
-        // The help ? at the bottom right.
-        body = body.child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
+        // The help ? 4 px from the dialog's bottom right (live
+        // dom/dialog-asm-*): over the last row when that is a checkbox,
+        // else under an os-help-button-row-spacer (22 px with our 2 px pb).
+        let help_over_last = matches!(kind, PatternDialogKind::Circular) || (kind == PatternDialogKind::Linear && !s.second);
+        body = body.relative().when(!help_over_last, |d| d.child(div().h(px(20.)))).child(div().absolute().right(px(4.)).bottom(px(4.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
         let close = |this: &mut Self, cx: &mut Context<Self>| {
             this.pattern = None;
             // Drop the preview.
@@ -1538,7 +1532,7 @@ impl AssemblyView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(pal.accept).when(!valid, |d| d.opacity(0.2))
+                            .bg(pal.accept).when(!valid, crate::ui::disabled_accept)
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
                             .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -1907,10 +1901,11 @@ impl AssemblyView {
                     .flex_1()
                     .items_center()
                     .child(h_flex().mt(px(2.)).w_full().h(px(34.)).justify_center().bg(rgb(0xeaeaea)).border_l_1().border_b_1().border_color(rgb(0xaaaaaa)).child(add_button("ex-add-top", cx)))
-                    .child(div().mt(px(98.)).child(crate::assets::icon("exploded-views-empty", 152., cx)))
+                    // Live assembly/800: the illustration is 148x149 px of ink at 1489,243.
+                    .child(div().mt(px(92.)).child(crate::assets::icon("exploded-views-empty", 170., cx)))
                     .child(
                         v_flex()
-                            .mt(px(22.))
+                            .mt(px(9.))
                             .w(px(420.))
                             .items_center()
                             .text_size(px(13.33))
