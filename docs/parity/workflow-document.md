@@ -54,4 +54,4 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data missing.
 ## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
 - DOC4 (Main row Delete), merge cards (row 9), DOC3 (paste of a copied part: Derived Part Studio field), C5/SM10 toast: fixes
   cited in code (history_panel.rs, merge_dialog.rs, part_studio); C5 toast auto-dismiss seen. Not all re-run in the app.
-- DOC5 ✅ (workflow-tabs.md). DOC1 (IGES header) / I5 (Parasolid header): export, routed to **api** (qa5-routing.md EXP1).
+- DOC5 ✅ (workflow-tabs.md). DOC1 (IGES header) / I5 (Parasolid header): export, routed to **api** (qa5-routing.md EXP-HDR, qa4 entry "EXP1").

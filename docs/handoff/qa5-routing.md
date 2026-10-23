@@ -118,3 +118,4 @@ STATUS AN4 (qa4, 2026-10-23): two extruded boxes overlapping 10 mm give "10 mm x
 copy) is still loose per qa5's kern row above, so AN4 stays open (kern).
 STATUS POLY1 (qa4, 2026-10-23): same as qa5's skb row: the solid circle remains; the spinner appears once a vertex is clicked
 (qa4 looked before clicking one).
+STATUS EXP1 (qa4 entry, 2026-10-23): renamed **EXP-HDR** (api, export header fields) to avoid qa5's EXP1 (Rhino export, kern).
