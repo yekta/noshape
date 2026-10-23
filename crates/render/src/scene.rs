@@ -550,7 +550,10 @@ pub fn lod_box_mesh() -> MeshData {
 /// body's bounding-box diagonal. 144-segment circles cost little drawn as
 /// fill but a lot as edge quads; on screen a level only shows from where
 /// its error passes [`LINE_LOD_MAX_ERROR_PX`].
-pub const LINE_LOD_TOLERANCES: [f32; 4] = [0.0, 1e-3, 4e-3, 1.6e-2];
+/// Steps of 4 from 1/16000: a large body with small detail (the big
+/// plate's Ø8 holes, ~16 px each at fit while the plate is ~1100 px)
+/// still drops its sub-pixel segments.
+pub const LINE_LOD_TOLERANCES: [f32; 6] = [0.0, 6.25e-5, 2.5e-4, 1e-3, 4e-3, 1.6e-2];
 /// The screen error (CSS px) a simplified edge level may have.
 pub const LINE_LOD_MAX_ERROR_PX: f32 = 0.25;
 
