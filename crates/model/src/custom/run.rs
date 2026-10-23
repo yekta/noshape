@@ -127,6 +127,8 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                 };
                 super::reference::reference_value(*kind, file.as_ref())
             }
+            // A group title is not a parameter.
+            ParamKindFs::Group { .. } => Value::Undefined,
             ParamKindFs::Anything => match values.get(&d.id) {
                 Some(ParamValue::Text(s)) => Value::str(s.as_str()),
                 _ => Value::Undefined,
