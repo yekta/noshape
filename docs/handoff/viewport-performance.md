@@ -598,3 +598,15 @@ changes. I write the renderer part first (my files) and show crops before touchi
   `shade()`; offscreen `part_faces_are_lit_like_onshape` checks all six normals against it and psb's live samples
   (part-studio/2258: top #8cb9d4, front #4e6876 = 0.5 × #9dcfed). The old fit (one key light in linear space, 0.212
   ambient) drew faces lighter (front #788a96).
+  Checked (ac087cc5 + this): clippy; display_tessellation (one level per part normally; Shift+R levels up to Very
+  fine; coarse levels stay coarse after a finer meshing), shared meshes, render 10 + offscreen 24, scene, app 107.
+  Assemblies: Onshape's assembly camera menu has "View in high quality" (live qa5 VC8) and ours has none yet; when it is
+  added, its studios need the Shift+R regen levels (`relative_deflection` × 0.25) for the occurrences' meshes
+  (`PartOccurrence::coarser` / `levels_from` carry them) and `MESH_ERROR_PX_HIGH_QUALITY_ASSEMBLY` (1 px) as the
+  viewport's `detail.mesh_error_px`.
+- **2026-10-23 (perf): perspective (live 10-23 a2, "perf 16:30").** Onshape's camera is 45° vertical
+  (`perspective(angle, aspect)`); turning perspective on keeps the scale at the scene centre (eye 308 mm from the fins 25
+  centre after an orthographic half-height of 127.5 mm); Zoom to fit in perspective puts the eye at padded half-height /
+  tan 22.5° + padded half-depth (live: near 136.2, far 284.5) — all as ours. A "stronger" look comes from the
+  orthographic zoom at the moment of switching, not the field of view. No Set as default, per tab for the session
+  (c3a5d65b); assemblies now follow the 45° preference too.
