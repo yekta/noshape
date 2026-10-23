@@ -745,6 +745,7 @@ impl PartStudioView {
         // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
         // from what the previewed tool touches.
         self.boolean_edit_logic(cx);
+        self.hole_scope_logic(cx);
         self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);
         if !self.fitted_once {
@@ -905,8 +906,13 @@ impl PartStudioView {
                         }
                         scene.instances.extend(scene_builder::hidden_edges_dashed(&self.display, &faces, self.gpu.uploader()));
                     }
+                    // Red, not selected: a selected stroke draws over the
+                    // error color (qa4 gate v0.4.7: the edge was orange).
                     r => {
                         for &id in built.picks.ids_for(&r) {
+                            if let Some(s) = scene.states.get_mut(id as usize) {
+                                *s &= !(noshape_render::state::SELECTED | noshape_render::state::ACCENT | noshape_render::state::BODY);
+                            }
                             scene.add_flag(id, noshape_render::state::ERROR);
                         }
                     }
