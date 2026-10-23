@@ -1183,6 +1183,14 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(kind_of(&mut ctx, rc["annotation"].as_u64().unwrap()), "RevisionCallout");
     assert!(last(&mut ctx).ends_with(":: Revision callout"));
 
+    let gt = call(&mut ctx, "drawing_table", json!({ "drawing": tab, "position": [200, 60], "rows": 2, "columns": 3, "header_row": true }));
+    let gid = gt["table"].as_u64().unwrap();
+    assert!(last(&mut ctx).ends_with(":: Table"));
+    call(&mut ctx, "drawing_table_cell", json!({ "drawing": tab, "table": gid, "row": 0, "column": 1, "text": "QTY" }));
+    assert!(last(&mut ctx).ends_with(":: Edit cell"));
+    let e = try_call(&mut ctx, "drawing_table_cell", json!({ "drawing": tab, "table": rt["table"], "row": 0, "column": 0, "text": "x" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
+
     let dt = call(&mut ctx, "drawing_datum", json!({ "drawing": tab, "anchor": quarter(&lines[1]), "position": [quarter(&lines[1])[0], quarter(&lines[1])[1] + 15.0] }));
     assert_eq!(kind_of(&mut ctx, dt["annotation"].as_u64().unwrap()), "Datum");
     assert!(last(&mut ctx).ends_with(":: Datum"));
@@ -1234,4 +1242,322 @@ fn drawing_jogged_and_aligned_sections() {
     assert_eq!(av["kind"], "aligned_section", "{av}");
     assert!(last(&mut ctx).ends_with(":: Aligned section view"));
 
+}
+
+#[test]
+fn drawing_out_of_date_until_update() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_update.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    // A drawing edit stamps the state its views are made from.
+    call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "A", "position": [30, 30] }));
+    // The tallest view's height on the sheet (a side view shows the 20 mm thickness).
+    let height = |ctx: &mut Ctx| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+        let h = g["views"].as_array().unwrap().iter().map(|v| num(&v["bounds"]["max"][1]) - num(&v["bounds"]["min"][1])).fold(0.0f64, f64::max);
+        (h, g["out_of_date"].as_bool().unwrap())
+    };
+    let (h0, ood) = height(&mut ctx);
+    assert!(!ood);
+    // Change the model: the views keep their geometry, the drawing is out of date.
+    call(&mut ctx, "feature_edit", json!({ "tab": "Part Studio 1", "feature": "Extrude 1", "params": { "depth": "40 mm" } }));
+    let (h1, ood) = height(&mut ctx);
+    assert!(ood, "out of date after the model changed");
+    assert!((h1 - h0).abs() < 1e-6, "views keep their geometry until Update: {h0} -> {h1}");
+    // A drawing edit while out of date keeps the old state.
+    call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "B", "position": [30, 40] }));
+    assert!(height(&mut ctx).1, "still out of date");
+    call(&mut ctx, "drawing_update", json!({ "drawing": tab }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Update"));
+    let (h2, ood) = height(&mut ctx);
+    assert!(!ood);
+    assert!(h2 > h0 + 1.0, "updated views: {h0} -> {h2}");
+}
+
+#[test]
+fn drawing_broken_out_sections_and_profile_crops() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_broken_out.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let views_of = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().clone();
+    let vs = views_of(&mut ctx);
+    let (a, b) = (&vs[0], &vs[1]);
+    // A triangle inside a view's bounds, around its middle.
+    let tri = |v: &Value| {
+        let (x0, y0, x1, y1) = (num(&v["bounds"]["min"][0]), num(&v["bounds"]["min"][1]), num(&v["bounds"]["max"][0]), num(&v["bounds"]["max"][1]));
+        let (cx, cy, w, h) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0, (x1 - x0) / 4.0, (y1 - y0) / 4.0);
+        json!([[cx - w, cy - h], [cx + w, cy - h], [cx, cy + h]])
+    };
+    // Broken-out: the view under the first point, the dialog's default depth.
+    let r = call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "points": tri(a) }));
+    assert_eq!(r["view"], a["id"], "{r}");
+    assert!(last(&mut ctx).ends_with(":: Broken-out section"));
+    let v = views_of(&mut ctx).into_iter().find(|v| v["id"] == a["id"]).unwrap();
+    let d0 = num(&v["broken_out"][0]["depth_mm"]);
+    assert!(d0 > 0.0, "{v}");
+    // Edit it to a 3 mm blind depth.
+    call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": a["id"], "points": tri(a), "depth": "3 mm", "index": 0 }));
+    let v = views_of(&mut ctx).into_iter().find(|v| v["id"] == a["id"]).unwrap();
+    assert_eq!(v["broken_out"].as_array().unwrap().len(), 1, "{v}");
+    assert!((num(&v["broken_out"][0]["depth_mm"]) - 3.0).abs() < 1e-9, "{v}");
+    let e = try_call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": a["id"], "points": tri(a), "depth": 0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("depth"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": a["id"], "points": tri(a), "index": 4 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("index"), "{e:?}");
+    // Spline and polygon crops of the other view.
+    call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "spline", "points": tri(b) }));
+    assert!(last(&mut ctx).ends_with(":: Crop view"));
+    assert_eq!(views_of(&mut ctx).into_iter().find(|v| v["id"] == b["id"]).unwrap()["crop"], "spline");
+    call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "polygon", "points": tri(b) }));
+    assert_eq!(views_of(&mut ctx).into_iter().find(|v| v["id"] == b["id"]).unwrap()["crop"], "polygon");
+    let e = try_call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "polygon", "points": [[1, 1], [2, 2]] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("points"), "{e:?}");
+}
+
+#[test]
+fn drawing_hatch_regions() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_hatch.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    // Inside the top view's outline, off the hole: the face region.
+    let (top, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone())))).unwrap();
+    let (x0, y0) = (num(&top["bounds"]["min"][0]), num(&top["bounds"]["min"][1]));
+    let (cx, cy) = (num(&circle["center"][0]), num(&circle["center"][1]));
+    let inside = [x0 + (cx - x0) * 0.3, y0 + (cy - y0) * 0.3];
+    let h = call(&mut ctx, "drawing_hatch_region", json!({ "drawing": tab, "points": [inside], "standard": "iso", "pattern": "ISO02W100", "scale": 2 }));
+    assert!(last(&mut ctx).ends_with(":: Hatch region"));
+    let id = h["hatches"][0].as_u64().unwrap();
+    let hs = h["hatches"].clone();
+    assert_eq!(hs.as_array().unwrap().len(), 1, "{h}");
+    let got = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    let hj = &got["hatches"][0];
+    assert_eq!(hj["view"], top["id"], "{hj}");
+    assert_eq!(hj["standard"], "iso", "{hj}");
+    assert!(hj["pattern"].as_str().unwrap().starts_with("ISO02W100"), "{hj}");
+    assert_eq!(num(&hj["scale"]), 2.0, "{hj}");
+    // Edit: the General tab (scale back to 1), a red color.
+    call(&mut ctx, "drawing_hatch_region", json!({ "drawing": tab, "hatch": id, "standard": "general", "color": [255, 0, 0] }));
+    assert!(last(&mut ctx).ends_with(":: Edit hatch"));
+    let got = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    assert_eq!(got["hatches"].as_array().unwrap().len(), 1, "{got}");
+    assert_eq!(got["hatches"][0]["standard"], "general");
+    assert_eq!(got["hatches"][0]["color"], json!([255, 0, 0]));
+    assert_eq!(num(&got["hatches"][0]["scale"]), 1.0);
+    // Off every profile, and a bad pattern name.
+    let e = try_call(&mut ctx, "drawing_hatch_region", json!({ "drawing": tab, "points": [[5, 5]] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("points[0]"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_hatch_region", json!({ "drawing": tab, "points": [inside], "pattern": "nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("pattern"), "{e:?}");
+}
+
+#[test]
+fn drawing_custom_table_from_a_feature_studio() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_custom_table.noshape");
+    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    let src = r#"FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
+annotation { "Table Type Name" : "Part faces" }
+export const partFaces = defineTable(function(context is Context, definition is map) returns Table
+    precondition
+    {
+    }
+    {
+        const columns = [tableColumnDefinition("name", "Part"), tableColumnDefinition("faces", "Faces")];
+        var rows = [];
+        for (var body in evaluateQuery(context, qAllModifiableSolidBodies()))
+            rows = append(rows, tableRow({ "name" : getProperty(context, { "entity" : body, "propertyType" : PropertyType.NAME }), "faces" : size(evaluateQuery(context, qOwnedByBody(body, EntityType.FACE))) }, body));
+        return table("Faces", columns, rows);
+    });
+"#;
+    call(&mut ctx, "featurestudio_edit", json!({ "source": src }));
+    call(&mut ctx, "featurestudio_commit", json!({}));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    // By display name; the Part Studio the drawing shows.
+    let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "table": "Part faces", "position": [400, 280] }));
+    assert!(last(&mut ctx).ends_with(":: Custom table"));
+    let id = r["table"].as_u64().unwrap();
+    let t = r["tables"].as_array().unwrap().iter().find(|t| t["id"] == id).unwrap().clone();
+    assert_eq!(t["kind"], "Custom", "{t}");
+    assert_eq!(t["header"], json!(["Part", "Faces"]), "{t}");
+    // The block with a hole: 6 planar faces and the hole's.
+    assert!(t["rows"][0][1].as_str().unwrap().parse::<u32>().unwrap() >= 7, "{t}");
+    // Properties: bottom to top, another corner.
+    call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "id": id, "bottom_to_top": true, "corner": "bottom_left" }));
+    assert!(last(&mut ctx).ends_with(":: Custom table properties"));
+    let e = try_call(&mut ctx, "drawing_custom_table", json!({ "drawing": tab, "table": "nope", "position": [10, 10] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("table"), "{e:?}");
+    assert!(e.message.contains("Part faces"), "{e:?}");
+}
+
+#[test]
+fn drawing_insert_image_and_cad() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_insert.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let hist = |ctx: &mut Ctx, n: usize| call(ctx, "history_list", json!({ "limit": n }))["history"].as_array().unwrap().iter().map(|h| h["description"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    // A local square PNG: imported as a file tab, then placed 30 mm high.
+    let png = root.join("packaging/icons/noshape-256.png");
+    let r = call(&mut ctx, "drawing_insert_image", json!({ "drawing": tab, "path": png.to_str().unwrap(), "position": [20, 20] }));
+    let h = hist(&mut ctx, 2);
+    assert!(h[0].ends_with(":: Insert image") && h[1].contains("Import noshape-256.png"), "{h:?}");
+    let img = &r["images"][0];
+    assert_eq!(img["id"], r["image"], "{r}");
+    assert_eq!(img["size"], json!([30.0, 30.0]), "{img}");
+    // From the file tab now in the document, dragged 50 mm wide (aspect kept).
+    let r = call(&mut ctx, "drawing_insert_image", json!({ "drawing": tab, "file": "noshape-256.png", "position": [100, 20], "to": [150, 30] }));
+    assert_eq!(r["images"][1]["size"], json!([50.0, 50.0]), "{r}");
+    let e = try_call(&mut ctx, "drawing_insert_image", json!({ "drawing": tab, "file": "Part Studio 1", "position": [10, 10] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("file"), "{e:?}");
+    // A DXF as sheet sketch geometry.
+    let dxf = root.join("crates/sketch/tests/fixtures/dwg/r2000_entities-2d.dxf");
+    let r = call(&mut ctx, "drawing_insert_cad", json!({ "drawing": tab, "path": dxf.to_str().unwrap() }));
+    assert!(hist(&mut ctx, 1)[0].ends_with(":: Insert DXF or DWG"));
+    let n = r["entities"].as_u64().unwrap();
+    assert!(n > 0, "{r}");
+    assert!(r["sketch_entities"].as_u64().unwrap() >= n, "{r}");
+    let e = try_call(&mut ctx, "drawing_insert_cad", json!({ "drawing": tab, "path": png.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("path"), "{e:?}");
+}
+
+#[test]
+fn drawing_sketch_tools() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_sketch.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    // A closed triangle: the last click lands on the first point (no new point).
+    let r = call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "line", "picks": [[30, 250], [60, 250], [45, 270], [30, 250]] }));
+    assert!(last(&mut ctx).ends_with(":: Line"));
+    assert_eq!(r["created"], 6, "3 points, 3 lines: {r}");
+    let r = call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "circle", "picks": [[100, 250], [110, 250]] }));
+    assert!(last(&mut ctx).ends_with(":: Center point circle"));
+    assert!(r["created"].as_i64().unwrap() >= 1, "{r}");
+    call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "point", "picks": [[150, 250]] }));
+    assert!(last(&mut ctx).ends_with(":: Sketch point"));
+    let r = call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "spline", "picks": [[30, 200], [50, 210], [70, 200], [90, 210]] }));
+    assert!(last(&mut ctx).ends_with(":: Spline"));
+    let n = r["sketch_entities"].as_u64().unwrap();
+    let r = call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "spline_point", "picks": [[60, 205]] }));
+    assert!(last(&mut ctx).ends_with(":: Spline point"));
+    assert!(r["sketch_entities"].as_u64().unwrap() > n, "{r}");
+    let e = try_call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "spline_point", "picks": [[200, 100]] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("picks[0]"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "circle", "picks": [[1, 1]] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("picks"), "{e:?}");
+    // Trim the lone point away.
+    let before = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["sketch_entities"].as_u64().unwrap();
+    let r = call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "trim", "picks": [[150, 250]] }));
+    assert!(last(&mut ctx).ends_with(":: Trim"));
+    assert_eq!(r["sketch_entities"].as_u64().unwrap(), before - 1, "{r}");
+}
+
+#[test]
+fn drawing_format_painter_copies_content() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_painter.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let a = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "FROM", "position": [30, 30] }))["annotation"].clone();
+    let b = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "TO", "position": [30, 60] }))["annotation"].clone();
+    let text = |ctx: &mut Ctx, id: &Value| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|x| x["id"] == *id).unwrap()["text"].clone();
+    // Style only (the default) keeps the text.
+    call(&mut ctx, "drawing_format_painter", json!({ "drawing": tab, "source": a, "targets": [b] }));
+    assert_eq!(text(&mut ctx, &b), "TO");
+    call(&mut ctx, "drawing_format_painter", json!({ "drawing": tab, "source": a, "targets": [b], "content": true }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Format painter"));
+    assert_eq!(text(&mut ctx, &b), "FROM");
+    let e = try_call(&mut ctx, "drawing_format_painter", json!({ "drawing": tab, "source": a, "targets": [999] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("targets[0]"), "{e:?}");
+}
+
+#[test]
+fn drawing_inspection_items() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_inspection.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let ids: Vec<Value> = ["A", "B", "C"].iter().enumerate().map(|(i, t)| call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": t, "position": [30, 30 + 15 * i] }))["annotation"].clone()).collect();
+    let numbers = |ctx: &mut Ctx| -> Vec<Value> {
+        let g = call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+        ids.iter().map(|id| g["annotations"].as_array().unwrap().iter().find(|x| x["id"] == *id).unwrap()["inspection"].clone()).collect()
+    };
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "add", "annotations": [ids[0], ids[1]] }));
+    assert!(last(&mut ctx).ends_with(":: Inspection item"));
+    assert_eq!(numbers(&mut ctx), vec![json!(1), json!(2), Value::Null]);
+    // Reorder from 5.
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "add", "annotations": [ids[1], ids[0]], "number": 5 }));
+    assert_eq!(numbers(&mut ctx), vec![json!(6), json!(5), Value::Null]);
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "edit", "id": ids[0], "number": 9 }));
+    assert!(last(&mut ctx).ends_with(":: Edit inspection item"));
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "move", "id": ids[0], "to": ids[2] }));
+    assert_eq!(numbers(&mut ctx), vec![Value::Null, json!(5), json!(9)]);
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "remove", "annotations": [ids[1]] }));
+    assert_eq!(numbers(&mut ctx), vec![Value::Null, Value::Null, json!(9)]);
+    // Automatic numbers dimensions, GD&T, surface finishes... (not notes).
+    let sf = call(&mut ctx, "drawing_surface_finish", json!({ "drawing": tab, "position": [200, 30] }))["annotation"].clone();
+    let g = call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "automatic" }));
+    assert!(last(&mut ctx).ends_with(":: Inspection items"));
+    assert_eq!(g["annotations"].as_array().unwrap().iter().find(|x| x["id"] == sf).unwrap()["inspection"], 10, "{g}");
+    assert_eq!(numbers(&mut ctx), vec![Value::Null, Value::Null, json!(9)]);
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "hide" }));
+    assert!(last(&mut ctx).ends_with(":: Hide inspection items"));
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "shape", "shape": "flag" }));
+    assert!(last(&mut ctx).ends_with(":: Inspection border shape"));
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "remove_all" }));
+    assert_eq!(numbers(&mut ctx), vec![Value::Null, Value::Null, Value::Null]);
+    let e = try_call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "edit", "id": ids[0], "number": 2 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("id"), "{e:?}");
+}
+
+#[test]
+fn drawing_properties_get_and_set() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_props.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "drawing_properties", json!({ "drawing": tab }))["properties"].clone();
+    assert!(p["inspection_text_height"].is_number(), "{p}");
+    let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "inspection_text_height": 3.5, "decimal_comma": true } }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Drawing properties"));
+    assert_eq!(r["properties"]["inspection_text_height"], 3.5, "{r}");
+    assert_eq!(r["properties"]["decimal_comma"], true, "{r}");
+    // Locked: nothing but the lock changes.
+    call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "locked": true } }));
+    let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "inspection_text_height": 5.0 } }));
+    assert_eq!(r["properties"]["inspection_text_height"], 3.5, "{r}");
+    let e = try_call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "nope": 1 } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set"), "{e:?}");
+}
+
+#[test]
+fn drawing_auxiliary_view_in_line_with_a_sketch_line() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_aux_inline.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let v = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"][0].clone();
+    let (x0, y0, x1, y1) = (num(&v["bounds"]["min"][0]), num(&v["bounds"]["min"][1]), num(&v["bounds"]["max"][0]), num(&v["bounds"]["max"][1]));
+    // A 45° sketch line across the view's middle (off its corners).
+    let (cx, cy, h) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0, (x1 - x0).min(y1 - y0) / 4.0);
+    call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "line", "picks": [[cx - h * 0.7, cy - h * 0.6], [cx + h * 0.7, cy + h * 0.8]] }));
+    let e = try_call(&mut ctx, "drawing_auxiliary_view", json!({ "drawing": tab, "mode": "in_line", "edge": [x0 - 30.0, y0 - 30.0], "position": [0, 0] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("edge"), "{e:?}");
+    let mid = [cx, cy + h * 0.1];
+    let r = call(&mut ctx, "drawing_auxiliary_view", json!({ "drawing": tab, "mode": "in_line", "edge": mid, "position": [mid[0] + 80.0, mid[1] - 80.0] }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Auxiliary view"));
+    let id = r["view"].clone();
+    assert_eq!(r["views"].as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["kind"], "auxiliary", "{r}");
 }

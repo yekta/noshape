@@ -257,7 +257,6 @@ fn face_report(r: &RegenResult) -> Vec<String> {
 /// Bend (sheetMetalBend) of the 60 × 40 plate along a sketch line across
 /// it at x = 30, 90°: two walls and a bend, flat as long as the plate.
 #[test]
-#[ignore = "in progress (fs): std Bend fails at opSplitFace"]
 fn bend_keeps_flat_length() {
     let mut s = Studio::new();
     let region = s.rectangle(60.0, 40.0);
@@ -311,4 +310,40 @@ fn corner_break_fillets_a_free_corner() {
     assert!((volume_mm3(&r) - expected).abs() < 1e-6, "{} mm³ vs {expected}", volume_mm3(&r));
     let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
     assert!((flat.area() * 1e6 - expected / 2.0).abs() < 1e-4, "flat area {}", flat.area() * 1e6);
+}
+
+/// Live (qa5 workflow 27): Bend of a 60 × 40 × 2 plate, radius 2, along a
+/// line (30,0)→(30,40) on its top: 4812.566370614357 mm³, 14 faces; x < 30
+/// stays, the wall rises at x 29.7223453..31.7223453.
+#[test]
+fn bend_matches_live() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let (a, b) = (sk.add_point(glam::DVec2::new(mm(30.0), 0.0)), sk.add_point(glam::DVec2::new(mm(30.0), mm(40.0))));
+    let line = sk.add_line_between(a, b).unwrap().0;
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let top = face_at(&r, DVec3::new(30.0, 20.0, 2.0));
+    s.add("sheetMetalBend", move |p| {
+        p.set("bendReference", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line }]));
+        p.set("face", ParamValue::Query(vec![top]));
+    });
+    let r = s.ok();
+    let body = &r.context.bodies[part(&r)];
+    assert!((volume_mm3(&r) - 4812.566370614357).abs() < 1e-6, "{} mm³", volume_mm3(&r));
+    assert_eq!(body.faces.len(), 14);
+    let bb = body.shape.bounding_box(true).unwrap();
+    // Within the box's tolerance gap (1e-7 m).
+    let near = |a: f64, b: f64| (a * 1e3 - b).abs() < 2e-4;
+    assert!(near(bb.min.x, 0.0) && near(bb.max.x, 31.7223453) && near(bb.max.z, 31.7223453), "{bb:?}");
 }
