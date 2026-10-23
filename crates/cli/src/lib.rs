@@ -39,7 +39,17 @@ pub fn command() -> Command {
 }
 
 fn print(v: &Value) {
-    println!("{}", serde_json::to_string_pretty(v).unwrap_or_default());
+    emit(&format!("{}\n", serde_json::to_string_pretty(v).unwrap_or_default()));
+}
+
+/// Writes to stdout; a closed pipe (`noshape-cli … | head`) ends the
+/// process quietly instead of panicking (qa5 API1).
+fn emit(s: &str) {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    if out.write_all(s.as_bytes()).and_then(|_| out.flush()).is_err() {
+        std::process::exit(0);
+    }
 }
 
 fn output_json(out: &OpOutput) -> Value {
@@ -82,7 +92,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
         }
         Some(("tools", _)) => Ok(json!({ "tools": mcp::tool_list() })),
         Some(("docs", _)) => {
-            print!("{}", noshape_ops::reference::markdown());
+            emit(&noshape_ops::reference::markdown());
             return 0;
         }
         Some(("call", sm)) => {
@@ -121,7 +131,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
                     Err(e) => Err(json!({ "error": "invalid_argument", "message": format!("not JSON: {e}") })),
                 };
                 failed |= r.is_err();
-                println!("{}", serde_json::to_string(&r.unwrap_or_else(|e| e)).unwrap_or_default());
+                emit(&format!("{}\n", serde_json::to_string(&r.unwrap_or_else(|e| e)).unwrap_or_default()));
             }
             return if failed { 2 } else { 0 };
         }
