@@ -262,8 +262,9 @@ pub struct Instance {
     pub body: u32,
     /// The body's display level this instance belongs to: 0 every level;
     /// k ≥ 1 drawn only while the body shows level k − 1 (0 Coarse … 3
-    /// Very fine, [`mesh_lod_level`]): its mesh, edges, silhouettes and
-    /// picks at that tessellation.
+    /// Very fine, [`mesh_lod_level`]; bodies have several only viewing in
+    /// high quality): its mesh, edges, silhouettes and picks at that
+    /// tessellation.
     pub mesh_lod: u8,
     /// Edge lines with levels of detail: 0 none (always drawn); k ≥ 1 the
     /// body's edges simplified to [`LINE_LOD_TOLERANCES`]`[k - 1]` of its
@@ -551,13 +552,13 @@ pub const MESH_ERROR_PX_HIGH_QUALITY_ASSEMBLY: f32 = 1.0;
 /// sagitta of 12, 24, 72 and 300 segments per circle).
 pub const MESH_LOD_CHORD_RATIOS: [f32; 4] = [0.03407418, 0.00855514, 0.00095178, 5.4831e-5];
 
-/// Onshape's `getTessellationIndexToGoUnderThreshold`: a body
-/// `radius_px` CSS px in bounding radius on screen steps up from Coarse
-/// while its chordal error there is at least `threshold_px`, up to
-/// `max_level` (its finest).
-pub fn mesh_lod_level(radius_px: f32, threshold_px: f32, max_level: u8) -> u8 {
-    let mut level = 0;
-    while level < max_level && (level as usize) < MESH_LOD_CHORD_RATIOS.len() && radius_px * MESH_LOD_CHORD_RATIOS[level as usize] >= threshold_px {
+/// Onshape's `getTessellationIndexToGoUnderThreshold` (View in high
+/// quality): a body `radius_px` CSS px in bounding radius on screen steps
+/// up from its own level `from` while its chordal error there is at least
+/// `threshold_px`, up to `to` (Very fine).
+pub fn mesh_lod_level(radius_px: f32, threshold_px: f32, from: u8, to: u8) -> u8 {
+    let mut level = from;
+    while level < to && (level as usize) < MESH_LOD_CHORD_RATIOS.len() && radius_px * MESH_LOD_CHORD_RATIOS[level as usize] >= threshold_px {
         level += 1;
     }
     level

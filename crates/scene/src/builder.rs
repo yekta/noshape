@@ -460,7 +460,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             }
             if levels.len() > 1 {
                 for i in &mut scene.instances[level_first..] {
-                    i.mesh_lod = li as u8 + 1;
+                    i.mesh_lod = b.levels_from + li as u8 + 1;
                 }
             }
             if is_finest {

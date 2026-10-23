@@ -596,14 +596,15 @@ pub struct LodBody {
     pub triangles: u32,
     /// Has a box (wire bodies have none and are never boxed).
     pub has_box: bool,
-    /// Its finest display level ([`Instance::mesh_lod`] − 1; 0 without
-    /// levels) and its Coarse mesh (the key of the finest level it has
-    /// shown, [`MeshLodMemory`]; 0 without levels).
-    pub max_level: u8,
+    /// Its display levels present (bit k: level k, [`Instance::mesh_lod`]
+    /// − 1; 0 without levels) and the mesh of its coarsest (the key of the
+    /// finest level it has shown, [`MeshLodMemory`]).
+    pub levels: u8,
     pub coarse_mesh: usize,
+    coarse_level: u8,
 }
 
-/// The finest display level each body has shown, by (its Coarse mesh,
+/// The finest display level each body has shown, by (its coarsest mesh,
 /// body id): Onshape keeps a body's finest tessellation once loaded, so a
 /// body doesn't go coarser when the camera zooms out.
 pub type MeshLodMemory = std::collections::HashMap<(usize, u32), u8>;
@@ -729,17 +730,22 @@ impl DrawLists {
                 self.lod_bodies.resize(k + 1, LodBody::default());
             }
             let b = &mut self.lod_bodies[k];
-            b.max_level = b.max_level.max(inst.mesh_lod.saturating_sub(1));
+            if inst.mesh_lod > 0 {
+                b.levels |= 1 << (inst.mesh_lod - 1);
+            }
             match &inst.drawable {
                 _ if inst.lod_box => {
                     b.box_transform = inst.transform;
                     b.has_box = true;
                 }
-                // Onshape ranks by the coarse triangle count.
-                Drawable::Mesh(m) if !inst.back_silhouette && inst.mesh_lod <= 1 => {
-                    b.triangles += m.0.index_count / 3;
-                    if inst.mesh_lod == 1 && b.coarse_mesh == 0 {
-                        b.coarse_mesh = Arc::as_ptr(&m.0) as usize;
+                Drawable::Mesh(m) if !inst.back_silhouette => {
+                    // The coarsest level's mesh: the memory key and (Onshape
+                    // ranks by the coarse triangle count) the triangles.
+                    if inst.mesh_lod > 0 && (b.coarse_level == 0 || inst.mesh_lod < b.coarse_level) {
+                        (b.coarse_level, b.coarse_mesh, b.triangles) = (inst.mesh_lod, Arc::as_ptr(&m.0) as usize, 0);
+                    }
+                    if inst.mesh_lod == b.coarse_level {
+                        b.triangles += m.0.index_count / 3;
                     }
                 }
                 _ => {}
@@ -753,12 +759,15 @@ impl DrawLists {
                 memory.clear();
             }
             for (i, b) in self.lod_bodies.iter().enumerate() {
-                let mut level = mesh_lod_level(self.diagonal_px[i] * 0.5, self.mesh_error_px, b.max_level);
-                if b.coarse_mesh != 0 {
-                    let shown = memory.entry((b.coarse_mesh, i as u32 + 1)).or_insert(0);
-                    level = level.max(*shown).min(b.max_level);
-                    *shown = level;
+                if b.levels == 0 {
+                    self.mesh_levels.push(0);
+                    continue;
                 }
+                let (from, to) = (b.levels.trailing_zeros() as u8, 7 - b.levels.leading_zeros() as u8);
+                let mut level = mesh_lod_level(self.diagonal_px[i] * 0.5, self.mesh_error_px, from, to);
+                let shown = memory.entry((b.coarse_mesh, i as u32 + 1)).or_insert(from);
+                level = level.max(*shown).min(to);
+                *shown = level;
                 self.mesh_levels.push(level);
             }
             if let Some(detail) = self.lod.filter(|_| !pick) {
@@ -3210,18 +3219,22 @@ mod tests {
 
     #[test]
     fn mesh_lod_levels_refine_like_onshape() {
-        // Coarse until the chordal error reaches 3 px: Medium from a ~88 px
-        // bounding radius (0.03407418 × r ≥ 3), Fine from ~351 px, never
-        // past the body's finest.
-        assert_eq!(mesh_lod_level(25.0, MESH_ERROR_PX, 2), 0);
-        assert_eq!(mesh_lod_level(87.0, MESH_ERROR_PX, 2), 0);
-        assert_eq!(mesh_lod_level(89.0, MESH_ERROR_PX, 2), 1);
-        assert_eq!(mesh_lod_level(400.0, MESH_ERROR_PX, 2), 2);
-        assert_eq!(mesh_lod_level(1e6, MESH_ERROR_PX, 2), 2);
-        assert_eq!(mesh_lod_level(1e6, MESH_ERROR_PX, 0), 0);
-        // View in high quality (Part Studio): 0.1 px, up to Very fine.
-        assert_eq!(mesh_lod_level(25.0, MESH_ERROR_PX_HIGH_QUALITY_STUDIO, 3), 2);
-        assert_eq!(mesh_lod_level(200.0, MESH_ERROR_PX_HIGH_QUALITY_STUDIO, 3), 3);
+        // View in high quality in a Part Studio (0.1 px), an Auto part (Fine
+        // up to Very fine): live 10-23 a3 saw 144 segments at ~70 px and 600
+        // from ~550 px; Fine's chordal error (0.00095178 × r) reaches
+        // 0.1 px from a ~105 px bounding radius.
+        let t = MESH_ERROR_PX_HIGH_QUALITY_STUDIO;
+        assert_eq!(mesh_lod_level(35.0, t, 2, 3), 2);
+        assert_eq!(mesh_lod_level(100.0, t, 2, 3), 2);
+        assert_eq!(mesh_lod_level(110.0, t, 2, 3), 3);
+        assert_eq!(mesh_lod_level(275.0, t, 2, 3), 3);
+        // A Coarse part refines through Medium and Fine.
+        assert_eq!(mesh_lod_level(5.0, t, 0, 3), 1);
+        assert_eq!(mesh_lod_level(20.0, t, 0, 3), 2);
+        // A single level never changes; 3 px (outside high quality) keeps
+        // a part where it is at any practical size.
+        assert_eq!(mesh_lod_level(1e6, t, 2, 2), 2);
+        assert_eq!(mesh_lod_level(2000.0, MESH_ERROR_PX, 2, 3), 2);
     }
 
     #[test]

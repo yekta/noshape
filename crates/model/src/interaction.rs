@@ -897,6 +897,7 @@ mod tests {
             hidden: false,
             mesh: std::sync::Arc::new(mesh),
             coarser: Vec::new(),
+            levels_from: 0,
             face_refs: vec![face(0), face(1)],
             edge_refs: vec![edge.clone()],
             vertex_refs: vec![],

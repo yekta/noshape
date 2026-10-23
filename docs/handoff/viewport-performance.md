@@ -581,3 +581,13 @@ changes. I write the renderer part first (my files) and show crops before touchi
   macOS 14 / 15, vs chord): pins angle +36% / +14%, plate +34% / +19%; edge silhouettes then the largest share
   (−2.9 ms on macOS 14 without them); Onshape's edge silhouettes are a per-frame GPU pass over candidates too
   (primitiveType SILHOUETTES), so their cost follows the mesh level. Next: per-body levels chosen like Onshape.
+- **2026-10-23 16:30 (perf): live 10-23 a3 corrects the LOD: no screen-space LOD outside high quality.** An Auto Ø20
+  cylinder is 144 segments at every size (~36 px to ~900 px), no refinement over time, no drop (behaviours.md "Mesh
+  LOD"). The bundle agrees: for an Auto part `getBestAvailableTessellationSettingIndex` is null unless aggressive, so
+  only View in high quality refines (0.1 px Part Studio, up to Very fine; live: 144 at ~70 px, 600 from ~550 px; the
+  600 mesh stays after zooming out and after Shift+R off, until reload). So 3d22994f's Coarse-when-small (the
+  −8…−11 % on the pins, runs 39951849983 / 39951863224) was a deviation and is undone: bodies have one level (their
+  Tessellation quality) and, once Shift+R was used in the session, their level up to Very fine
+  (`BodyDisplay::levels_from` / `coarser`), the viewport picking by the 0.1 px rule (3 px with Shift+R off: refined
+  bodies keep their level, others stay put) and never dropping one it showed. The angle mesh stays gated; the next
+  lever is the edge silhouette candidates (largest share at 144/circle).

@@ -133,10 +133,13 @@ pub struct BodyDisplay {
     /// The finest display level the body gets (its Tessellation quality,
     /// Auto = Fine; Very fine viewing in high quality).
     pub mesh: Arc<MeshBuffers>,
-    /// Its coarser display levels, coarsest first (`TessQuality::LEVELS`;
-    /// empty for preview meshes): the viewport draws the coarsest whose
-    /// chordal error is under a few pixels on screen.
+    /// Its coarser display levels, coarsest first (`TessQuality::LEVELS`
+    /// from [`BodyDisplay::levels_from`]): only viewing in high quality,
+    /// where the viewport refines a body once its chordal error on screen
+    /// is large enough (Onshape); empty otherwise.
     pub coarser: Vec<Arc<MeshBuffers>>,
+    /// The index in `TessQuality::LEVELS` of its coarsest level.
+    pub levels_from: u8,
     pub face_refs: Vec<Reference>,
     pub edge_refs: Vec<Reference>,
     pub vertex_refs: Vec<Reference>,

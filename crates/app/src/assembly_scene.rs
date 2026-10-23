@@ -208,7 +208,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
             }
             if levels.len() > 1 {
                 for i in &mut scene.instances[level_first..] {
-                    i.mesh_lod = li as u8 + 1;
+                    i.mesh_lod = o.levels_from + li as u8 + 1;
                 }
             }
             if is_finest {

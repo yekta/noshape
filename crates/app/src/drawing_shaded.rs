@@ -225,6 +225,7 @@ impl Job {
                 hidden: false,
                 mesh: Arc::new(mesh),
                 coarser: Vec::new(),
+                levels_from: 0,
                 face_refs: vec![],
                 edge_refs: vec![],
                 vertex_refs: vec![],
