@@ -2427,6 +2427,7 @@ impl PartStudioView {
             }
             let selected = self.selection.contains(&r);
             let hidden = hidden_defaults.contains(&r);
+            let dimmed = default_row_dimmed(hidden, self.ui.isolate.as_ref());
             let r2 = r.clone();
             let r3 = r.clone();
             let icon = if label == "Origin" { "origin" } else { "plane" };
@@ -2442,9 +2443,10 @@ impl PartStudioView {
                     // Live: the eye's center 19 px from the row's end.
                     .pr(px(11.))
                     .group("dg-row")
-                    // Onshape: hidden default geometry is listed in gray.
-                    .when(hidden, |d| d.text_color(pal.text_faint))
-                    .child(crate::ui::tree_icon(icon, hidden, cx))
+                    // Onshape: hidden default geometry is listed in gray, and
+                    // so is all of it while parts are isolated (qa5 KB3).
+                    .when(dimmed, |d| d.text_color(pal.text_faint))
+                    .child(crate::ui::tree_icon(icon, dimmed, cx))
                     .child(match renaming {
                         Some(st) => div().flex_1().child(gpui_kit::component::input::Input::new(&st).xsmall()).into_any_element(),
                         None => div().flex_1().truncate().child(name).into_any_element(),
@@ -4960,5 +4962,26 @@ pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
     match f.feature_type().map(|t| t.name) {
         Some(t) if !f.name.starts_with(t) => format!("{} [{t}]", f.name),
         _ => f.name.clone(),
+    }
+}
+
+/// A Default geometry row drawn gray: hidden, or any while parts are
+/// isolated (Isolate takes the planes away; live qa5 KB3, ui/pn-900).
+fn default_row_dimmed(hidden: bool, isolate: Option<&behaviors::Isolation>) -> bool {
+    hidden || isolate.is_some_and(|i| i.mode == behaviors::IsolateMode::Isolate)
+}
+
+#[cfg(test)]
+mod default_row_tests {
+    use super::*;
+
+    #[test]
+    fn default_geometry_rows_gray_while_isolating() {
+        let iso = |mode| behaviors::Isolation { mode, bodies: Vec::new(), opacity: 0.0, select_transparent: false, expand: 0 };
+        assert!(!default_row_dimmed(false, None));
+        assert!(default_row_dimmed(true, None));
+        assert!(default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Isolate))));
+        // Make transparent keeps the planes, so their rows stay black.
+        assert!(!default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Transparent))));
     }
 }
