@@ -4980,6 +4980,7 @@ fn default_row_dimmed(hidden: bool, isolate: Option<&behaviors::Isolation>) -> b
 #[cfg(test)]
 mod default_row_tests {
     use super::*;
+    use std::prelude::v1::test;
 
     #[test]
     fn default_geometry_rows_gray_while_isolating() {
