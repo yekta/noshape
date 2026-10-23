@@ -55,7 +55,10 @@ Rule (user, via lead): any difference from Onshape is a bug (except cloud-only a
      contain a face to remove (`still_has_faces`); keep the first valid one, else a ShapeFix-repaired one whose
      faces are unchanged (`repaired_same_faces`, so names stay right); else fail with Onshape's "Could not shell
      part with selections.". Empty field messages: "Select faces to remove." / "Select parts to hollow.".
-   - Still open, **for the lead (kernel limitation, Onshape succeeds)**: OCCT's offset fails outright when the
+   - **Resolved (kern, 10-23):** the kernel's own shell (`shell_solid`: regions / offset / slabs) builds these, checked
+     against Onshape's volumes (kernel_robustness S1, S2 and `shell_bracket_matches_onshape`). Onshape itself fails the
+     real bracket at exactly 2.5 mm (the hole's offset wall touches the front wall's); we fail it the same way.
+     Original note, for history: OCCT's offset fails outright when the
      shelled walls would merge or overlap. Repro on the real bracket (features copied with Ctrl+C, then
      `{"noshape_features": …}` into a test): 100x40x12 plate, 3 corner fillets (Width 5 mm), Ø10 hole about
      10 mm from the front edge, Shell top face 2.5 mm → both joins fail, and so does the closed Hollow offset
