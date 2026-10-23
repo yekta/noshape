@@ -220,7 +220,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .text_size(px(13.33))
-                                .when(active, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::MEDIUM).text_color(pal.accent))
+                                .when(active, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::MEDIUM).text_color(pal.emphasis))
                                 .when(!active, |d| d.border_b_1().border_color(pal.border).text_color(pal.text))
                                 .child(label)
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -239,7 +239,7 @@ impl PartStudioView {
                             .border_color(pal.accent)
                             .text_size(px(13.33))
                             .font_weight(FontWeight::MEDIUM)
-                            .text_color(pal.accent)
+                            .text_color(pal.emphasis)
                             .child(title)
                             .into_any_element()
                     })
@@ -348,6 +348,7 @@ impl PartStudioView {
                 .text_size(px(13.33))
                 .text_color(pal.text)
                 .when(bold, |d| d.justify_center().font_weight(FontWeight::BOLD))
+                .when(!bold, |d| d.bg(pal.bg_senary))
                 .truncate()
                 .child(text)
         };
@@ -357,7 +358,7 @@ impl PartStudioView {
             .pl(px(5.))
             .pr(px(6.))
             .gap(px(4.))
-            .bg(gpui_kit::rgb(0xeaeaea))
+            .bg(crate::theme::p().table_header)
             .border_1()
             .border_color(grid)
             // ⌄ folds the table; ⋯ = Copy table only (live part-studio/562).
@@ -385,13 +386,13 @@ impl PartStudioView {
                 })
             });
         // Live (164): only the header cells are gray, not the rest of the row.
-        let columns = h_flex().border_l_1().border_color(grid).children(["Name", "Variable type", "Value", "Description"].map(|h| cell(h.into(), true).text_size(px(14.)).bg(gpui_kit::rgb(0xeaeaea))));
+        let columns = h_flex().border_l_1().border_color(grid).children(["Name", "Variable type", "Value", "Description"].map(|h| cell(h.into(), true).text_size(px(14.)).bg(pal.table_header)));
         // The Part Studio's own variables are its Variable features (Help
         // PartStudio__variable_table); every cell edits them.
         // Only the variables before the rollback bar (live 10-20 o).
         let var_rows = self.studio(cx).map(noshape_model::variable_table::active_rows).unwrap_or_default();
         let count = var_rows.len();
-        let input_cell_sized = move |st: &Entity<InputState>, size: f32| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(size)).pl(px(4.))));
+        let input_cell_sized = move |st: &Entity<InputState>, size: f32| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).bg(crate::theme::p().bg_senary).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(size)).pl(px(4.))));
         let input_cell = move |st: &Entity<InputState>| input_cell_sized(st, 13.33);
         // A Name cell holding an invalid name: pink with a red border and the
         // reason as tooltip (live part-studio/554–555).
@@ -976,7 +977,7 @@ impl PartStudioView {
         }
         let cell = || div().w(px(140.)).h(px(34.)).flex_none().px(px(3.)).flex().items_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.));
         let badge = div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child(usages.len().to_string());
-        let mut out = section.child(h_flex().border_l_1().border_color(grid).child(cell().bg(gpui_kit::rgb(0xeaeaea)).justify_center().gap(px(4.)).font_weight(FontWeight::BOLD).child("Usages").child(badge)));
+        let mut out = section.child(h_flex().border_l_1().border_color(grid).child(cell().bg(crate::theme::p().table_header).justify_center().gap(px(4.)).font_weight(FontWeight::BOLD).child("Usages").child(badge)));
         for u in usages {
             out = out.child(h_flex().border_l_1().border_color(grid).child(cell().child(div().truncate().child(u))));
         }
@@ -1017,7 +1018,7 @@ impl PartStudioView {
             .flex_none()
             .px(px(6.))
             .gap(px(4.))
-            .bg(gpui_kit::rgb(0xeaeaea))
+            .bg(crate::theme::p().table_header)
             .border_t_1()
             .border_b_1()
             .border_l_1()
@@ -1186,7 +1187,7 @@ impl PartStudioView {
         const COL_W: f32 = 140.;
         const ROW_H: f32 = 34.;
         let cell = |w: f32| div().w(px(w)).h(px(ROW_H)).flex_none().px(px(3.)).flex().items_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.));
-        let head = |w: f32| cell(w).bg(gpui_kit::rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD);
+        let head = |w: f32| cell(w).bg(pal.table_header).justify_center().font_weight(FontWeight::BOLD);
         // Column widths: live's grips (`ui::col_grip`), per input table (live:
         // widening Size's Name left Shape's alone).
         let table = format!("config-{iid}");
@@ -1237,7 +1238,7 @@ impl PartStudioView {
                         h_flex()
                             .border_l_1()
                             .border_color(grid)
-                            .child(div().w(px(name_w)).h(px(ROW_H * 2.)).relative().flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).bg(gpui_kit::rgb(0xeaeaea)).font_weight(FontWeight::BOLD).text_size(px(14.)).child(first).child(crate::ui::col_grip(&table, "name", NAME_W)))
+                            .child(div().w(px(name_w)).h(px(ROW_H * 2.)).relative().flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).bg(crate::theme::p().table_header).font_weight(FontWeight::BOLD).text_size(px(14.)).child(first).child(crate::ui::col_grip(&table, "name", NAME_W)))
                             .child(v_flex().child(groups).child(params)),
                     );
                 }
@@ -1577,7 +1578,7 @@ impl PartStudioView {
             .pl(px(9.))
             .pr(px(4.))
             .gap(px(8.))
-            .bg(gpui_kit::rgb(0xeaeaea))
+            .bg(crate::theme::p().table_header)
             .border_1()
             .border_color(gpui_kit::rgb(0xcccccc))
             .child(h_flex().flex_1().min_w_0().gap(px(4.)).text_size(px(16.)).font_weight(FontWeight::MEDIUM).child(div().text_color(pal.text).child("Properties for")).child(part_menu))
@@ -1652,11 +1653,11 @@ impl PartStudioView {
         };
         let mut head = h_flex().border_l_1().border_color(grid);
         for i in &inputs {
-            head = head.child(cell().justify_center().bg(gpui_kit::rgb(0xeaeaea)).font_weight(FontWeight::BOLD).child(div().truncate().child(i.name.clone())));
+            head = head.child(cell().justify_center().bg(crate::theme::p().table_header).font_weight(FontWeight::BOLD).child(div().truncate().child(i.name.clone())));
         }
         for prop in &props {
             let prop = *prop;
-            let h = cell().id(SharedString::from(format!("cp-head-{prop}"))).justify_center().gap(px(3.)).bg(gpui_kit::rgb(0xeaeaea)).font_weight(FontWeight::BOLD).child(div().truncate().child(prop))
+            let h = cell().id(SharedString::from(format!("cp-head-{prop}"))).justify_center().gap(px(3.)).bg(crate::theme::p().table_header).font_weight(FontWeight::BOLD).child(div().truncate().child(prop))
                 // Live 637: "Mass ƒ", the value is otherwise computed.
                 .when(prop == "Mass", |d| d.child(div().italic().font_weight(FontWeight::NORMAL).child("ƒ")));
             head = head.child(delete_column(h, prop));
@@ -2218,7 +2219,7 @@ impl PartStudioView {
                 .h(px(34.))
                 .px(px(6.))
                 .gap(px(4.))
-                .bg(gpui_kit::rgb(0xeaeaea))
+                .bg(crate::theme::p().table_header)
                 .border_1()
                 .border_color(gpui_kit::rgb(0xcccccc))
                 .child(crate::ui::glyph("ui-chevron-down", 10., pal.text))
@@ -2230,13 +2231,13 @@ impl PartStudioView {
                 .h(px(34.))
                 .px(px(6.))
                 .gap(px(4.))
-                .bg(gpui_kit::rgb(0xeaeaea))
+                .bg(crate::theme::p().table_header)
                 .border_1()
                 .border_color(gpui_kit::rgb(0xcccccc))
                 .child(crate::ui::glyph("ui-chevron-down", 10., pal.text))
                 .child(div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
         };
-        let cell = |t: String, bold: bool| div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text).when(bold, |d| d.font_weight(FontWeight::BOLD).bg(gpui_kit::rgb(0xeaeaea))).child(t);
+        let cell = |t: String, bold: bool| div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().justify_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text).when(bold, |d| d.font_weight(FontWeight::BOLD).bg(crate::theme::p().table_header)).child(t);
         let n = letters.len();
         let units = self.doc.read(cx).session.doc.settings.units;
         // Types ▾ (live 599-click-types): nothing ticked shows every row;
@@ -2547,11 +2548,17 @@ impl PartStudioView {
                 // Live (00, 183): white while no panel is open; with one
                 // open the others turn `#eaeaea` and the open one stays white
                 // and joins the panel (no right border).
-                .bg(if on || active.is_none() { pal.panel } else { gpui_kit::rgb(0xeaeaea) })
+                // Dark (live dk-920, dk-929): #333 with no panel, every button
+                // #1c1c1c with one open; the #aaa outline stays.
+                .bg(match (active.is_none(), on) {
+                    (true, _) => pal.panel,
+                    (false, true) => pal.bg_senary,
+                    (false, false) => pal.strip_inactive,
+                })
                 .hover(|d| d.bg(pal.panel_hover))
                 .cursor_pointer()
                 .border_1()
-                .border_color(pal.border_strong)
+                .border_color(gpui_kit::rgb_static(0xaaaaaa))
                 .when(on, |d| d.border_r_0())
                 .child(crate::assets::icon(icon, 20., cx))
                 .tip(tip, crate::ui::TipSide::Left)

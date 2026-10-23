@@ -35,11 +35,11 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-921-partstudio | | | ☐ |
 | dk-922-feature-hover | | | ☐ |
 | dk-923-feature-selected | | | ☐ |
-| dk-924-feature-rmb | | | ☐ |
-| dk-925-tool-tooltip | | | ☐ |
+| dk-924-feature-rmb | dkrmb2 | menu #333, #ccc outline (static), #ddd separators, Delete ⊗ (masked icons keep their mask) | ☑ |
+| dk-925-tool-tooltip | dktip | title #4b5761, body #333, white text; the description text is ours (tool_text.rs policy) | ☑ colours |
 | dk-926-feature-dialog | dkext2 | dialog #333, active query box #142434 + #3e94ff border, related row #092046, selected #134e96 = live | ☑ |
-| dk-927-variable-table | | | ☐ |
-| dk-928-configurations | | | ☐ |
+| dk-927-variable-table | dkvt5 | title #90cef1 (emphasis) over #3e94ff, bars and headers #555 (table_header), cells #1c1c1c (bg_senary) | ☑ |
+| dk-928-configurations | dkcfg | Configure Part Studio button, empty state; strip #1c1c1c with #aaa outlines while a panel is open | ☑ |
 | dk-929-face-selected-measure | dk3 | bg, planes 1/2 stacked, plane edges, origin, cube = live within a few levels | ☑ |
 | dk-930-face-hover | | | ☐ |
 | dk-931-sketch-line | dksk2 | under-defined #3e94ff, sketch box #90cef1, white origin; regions #f2f2f2 at 20% (#616161 on a plane) | ☑ |
@@ -51,7 +51,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-950-drawing | | | ☐ |
 | dk-951-drawing-properties | | | ☐ |
 | dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
-| dk-961-variable-studio | | | ☐ |
+| dk-961-variable-studio |  | title bar and headers #555, cells #1c1c1c (shared cell code) | ◐ not captured |
 | dk-990-restored-light | | | ☐ |
 
 ## Plan notes

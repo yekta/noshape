@@ -597,7 +597,8 @@ impl Render for OsMenu {
             .border_1()
             // Live (part-studio/53): the camera menu's border is #d7d7d7 like
             // a dropdown's; right-click menus use #ccc.
-            .border_color(gpui_kit::rgb(if dropdown || camera { 0xd7d7d7 } else { 0xcccccc }))
+            // Static: dark mode keeps the light outline (live dk-924: #ccc).
+            .border_color(gpui_kit::rgb_static(if dropdown || camera { 0xd7d7d7 } else { 0xcccccc }))
             .rounded(px(if dropdown { 5.25 } else { 4. }))
             .when(dropdown, |d| d.py(px(4.)).min_w(px(253.)).text_color(gpui_kit::rgb(0x555555)))
             .when_some(self.min_width, |d, w| d.min_w(px(w)))

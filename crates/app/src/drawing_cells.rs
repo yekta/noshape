@@ -54,7 +54,7 @@ pub fn parse_cells(text: &str) -> Option<Vec<Vec<String>>> {
 impl DrawingEditor {
     /// A click in Select mode on a table: select the cell (Shift: extend the
     /// block). True when handled. Clicking elsewhere clears the cells.
-    pub fn table_cell_click(&mut self, sel: Option<Sel>, shift: bool, cx: &mut Context<Self>) -> bool {
+    pub fn bg_senary_click(&mut self, sel: Option<Sel>, shift: bool, cx: &mut Context<Self>) -> bool {
         let Some(Sel::Table(id)) = sel else {
             self.cell_sel = None;
             return false;

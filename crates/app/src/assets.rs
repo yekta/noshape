@@ -102,11 +102,19 @@ fn dark_icon(name: &str, light: Cow<'static, [u8]>) -> Cow<'static, [u8]> {
 }
 
 /// `svg` with the hex colours Onshape themes replaced by their dark values.
+/// Masks (`<mask>…</mask>`) keep their colours: their black and white are
+/// coverage, not paint.
 fn flip_themed_colors(svg: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(svg.len());
     let mut i = 0;
+    let mut in_mask = false;
     while i < svg.len() {
-        if svg[i] == b'#' {
+        if svg[i..].starts_with(b"<mask") {
+            in_mask = true;
+        } else if svg[i..].starts_with(b"</mask>") {
+            in_mask = false;
+        }
+        if svg[i] == b'#' && !in_mask {
             let n = svg[i + 1..].iter().take_while(|c| c.is_ascii_hexdigit()).count();
             let to: Option<&[u8]> = match svg[i + 1..i + 1 + n].to_ascii_lowercase().as_slice() {
                 b"333" | b"333333" | b"000" | b"000000" => Some(b"ffffff"),
@@ -142,5 +150,9 @@ mod tests {
         let svg = br##"<path fill="#333" stroke="#333333"/><path fill="#1651B0" stroke="#3333aa"/><g fill="#999"/>"##;
         let out = String::from_utf8(super::flip_themed_colors(svg)).unwrap();
         assert_eq!(out, r##"<path fill="#ffffff" stroke="#ffffff"/><path fill="#3e94ff" stroke="#3333aa"/><g fill="#999"/>"##);
+        // A mask's black cuts, it isn't ink.
+        let masked = br##"<mask id="m"><circle fill="#fff"/><path stroke="#000"/></mask><rect fill="#333333" mask="url(#m)"/>"##;
+        let out = String::from_utf8(super::flip_themed_colors(masked)).unwrap();
+        assert_eq!(out, r##"<mask id="m"><circle fill="#fff"/><path stroke="#000"/></mask><rect fill="#ffffff" mask="url(#m)"/>"##);
     }
 }
