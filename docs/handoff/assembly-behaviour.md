@@ -961,3 +961,8 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   Hex / Hex washer #8 = live's 63 / 65 faces, every face area within 0.5 % (fillets 1.5 %). Values from live's
   MAIN tables for all 10 components (mainTables-5 + 576); Pan's cone uses RTHICK_IA (`rch`) as Onshape's part.
   Crowned heads use the seamless crown for Type I too. Type IA: next (still the generic cross).
+* Type IA, live's recipe (`recessTypeIA`): one arm drafted 26.3° about plane 1 and patterned 90° (Fillister: onto
+  itself, one arm), core Ø RCOREDIA_IA at the floor tapering by the slot angle with a 28° cone, four 10° wings
+  (L·1.25 Pan, ·1.125 Oval, ·1 Flat): V-grooves (live's extrude to plane 1 + healed delete face = a tetrahedron
+  per wing, sides cut by rotated boxes) or blind HeadHeight/2 on flat heads; RFILLET_IA on the 8 arm-side/core
+  edges. Pan #8 with kern's checked fillet = live's 43 faces, every area to 7 digits; without it 35 (no fillets).
