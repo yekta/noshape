@@ -26,6 +26,9 @@ pub mod viewport {
     pub const BOUNDARY_EDGE: u32 = 0xe00000;
     /// Errors (`ERROR_HIGHLIGHT_COLOR1`).
     pub const ERROR: u32 = 0xbd3039;
+    /// Faces of a failed feature's error geometry (a Feature pattern's
+    /// instances; the user's live shot 2026-10-23 reads `#923c21`, flat).
+    pub const ERROR_FILL: u32 = 0x923c21;
     /// Construction plane fill (`--os-construction-plane-ambient-color`),
     /// drawn unlit at 20%: one plane reads `#f5f8fa`, three stacked `#e7edf2`.
     pub const PLANE_FILL: u32 = 0xcedbe5;

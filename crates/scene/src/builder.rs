@@ -871,6 +871,32 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     scene
 }
 
+/// A failed feature's error geometry while its dialog is open (Onshape,
+/// the user's live shot 2026-10-23 of a Feature pattern): its faces filled
+/// flat dark red where they show (just above what they lie on), its edges
+/// red and drawn on top, so instances inside the part show too.
+pub fn error_geometry(mesh: &noshape_model::display::MeshBuffers, up: &Uploader) -> Vec<Instance> {
+    let mut out = Vec::new();
+    if !mesh.indices.is_empty() {
+        // 1 µm off the face, like sketch regions: copies lying on a part
+        // face win the depth test.
+        let positions = mesh.positions.iter().zip(&mesh.normals).map(|(p, n)| std::array::from_fn(|i| p[i] + n[i] * 1e-6)).collect();
+        let m = MeshData { positions, normals: mesh.normals.clone(), pick_ids: vec![0; mesh.positions.len()], indices: mesh.indices.clone() };
+        out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(theme::lin(theme::viewport::ERROR_FILL)).unlit().unpickable().ignore_clip().layer(8));
+    }
+    let color = lin_to_u8(theme::lin(theme::viewport::ERROR));
+    let mut lines = LineData::default();
+    for pl in &mesh.edges {
+        for w in pl.windows(2) {
+            lines.segments.push(LineSegment { a: w[0], b: w[1], color, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+        }
+    }
+    if !lines.segments.is_empty() {
+        out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(12));
+    }
+    out
+}
+
 /// An edge by its quantized end points.
 type EdgeKey = ([i64; 3], [i64; 3]);
 

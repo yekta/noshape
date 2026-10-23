@@ -1424,6 +1424,17 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   behaviours "qa5 pass 8 (2)"). The text selection after the first Enter can't be seen on Xvfb (Ctrl+A shows none
   either), so that half is unchecked.
 
+### Failed Feature pattern preview (10-23, v0.4.7, user's live shot 2026-10-23-onshape-failed-pattern-x5.png)
+- A face pattern that can't be made keeps its instances as error geometry (`pattern.rs::failed_instances` →
+  `EvalCtx::error_shapes` → `FeatureState::error_mesh`): the patterned faces moved to every instance. The patterned
+  faces are the feature's and the part's faces it merged into (coplanar with a face of the seed's tool, found by
+  re-running the seed as New, `seed_tool`): Parasolid counts the merged floor / side as the feature's, which is
+  where live's long red lines and the dark red side come from.
+- Drawn while the dialog is open (`scene/builder.rs::error_geometry`): faces flat `#923c21` 1 µm off, edges red on
+  top; the inputs then keep the normal selection colors (the seed orange). Other failing features still draw their
+  inputs red. Colors are from the user's shot; live will capture the exact ones.
+- Test `features_a.rs::failed_feature_pattern_shows_its_instances`. App shots: psb-scratch/shots/v047-*.png.
+
 ### Feature sweep, open rows (10-23): Helix L34/L35, pattern L41, Hole L52/L58
 - **Hole tables (L58):** `features/hole_tables.rs` no longer holds its own data. It parses the embedded
   `holetables.gen.fs` once (FS parser, `LazyLock`) into levels in source order (= live's dropdown order) and reads

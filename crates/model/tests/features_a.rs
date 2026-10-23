@@ -976,3 +976,38 @@ fn rib_extend_profiles_as_live() {
     ok(run((0.002, 0.015), (0.038, 0.015), false), 4562.0);
     assert_eq!(run((0.002, 0.015), (0.038, 0.015), true), Err("Failed to create a rib from a selected profile.".into()));
 }
+
+/// Live "lp wall over" (behaviours "URGENT (10-22)") with 5 instances, as
+/// the user's shot of 2026-10-23: the failing Feature pattern carries every
+/// instance that couldn't be made, as the faces it patterns (the wall's and
+/// the floor and end face it merged into) moved to each instance.
+#[test]
+fn failed_feature_pattern_shows_its_instances() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.02, "10 mm");
+    // Right plane: sketch x = world Y, y = Z.
+    let s = t.sketch(Reference::Plane(DatumPlane::Right), rect(-0.001, 0.0, 0.021, 0.011));
+    let r = t.regions(s)[0].clone();
+    let w = t.extrude(r, "0.5 mm", "ADD");
+    let res = t.regen();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.05, 0.0, 0.0));
+    t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(w)])), ("directionOne", q(vec![edge])), ("distance", e("2 mm")), ("instanceCount", e("5"))]);
+    let res = t.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    let m = st.error_mesh.as_ref().expect("error geometry");
+    // 4 instances × (4 wall faces + the merged floor and end face).
+    assert_eq!(m.face_ranges.len(), 24);
+    let xs: Vec<f32> = m.positions.iter().map(|p| p[0]).collect();
+    let (lo, hi) = xs.iter().fold((f32::MAX, f32::MIN), |(a, b), x| (a.min(*x), b.max(*x)));
+    // 2 to 8 mm along the edge (its direction either way), the floor's
+    // copies running the block's length.
+    let fwd = (lo - 0.002).abs() < 1e-6 && (hi - 0.108).abs() < 1e-6;
+    let back = (lo + 0.008).abs() < 1e-6 && (hi - 0.098).abs() < 1e-6;
+    assert!(fwd || back, "{lo} {hi}");
+    // Reapply on: no error, no error geometry.
+    let lp = t.ps.features.last().unwrap().id;
+    t.set(lp, "fullFeaturePattern", b(true));
+    let res = t.regen();
+    assert!(res.display.features.last().unwrap().error_mesh.is_none());
+}

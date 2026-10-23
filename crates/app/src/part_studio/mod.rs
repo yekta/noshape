@@ -875,7 +875,14 @@ impl PartStudioView {
         // Live (behaviours "URGENT (10-22)"): a failing feature's inputs are
         // drawn red while its dialog is open.
         let failing = self.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).status, Some((noshape_model::display::FeatureStatus::Error, _))));
-        let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing, self.gpu.uploader());
+        // A failed Feature pattern shows the instances it couldn't make, and
+        // its inputs keep the usual selection colors (the user's live shot
+        // 2026-10-23: the seed wall orange, the instances red).
+        let error_mesh = self.edit.as_ref().filter(|_| failing).and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id)).and_then(|s| s.error_mesh.clone());
+        if let Some(m) = &error_mesh {
+            extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
+        }
+        let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
         // Parts picked in a dialog field: outlined, not filled (live part-studio/440).
         if self.edit.is_some() {
             for r in selection.iter().chain(&accent) {
