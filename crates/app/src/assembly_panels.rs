@@ -1414,7 +1414,7 @@ impl AssemblyView {
             }
         }
         // The help ? at the bottom right.
-        body = body.child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")));
+        body = body.child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
         let close = |this: &mut Self, cx: &mut Context<Self>| {
             this.pattern = None;
             // Drop the preview.
@@ -2406,7 +2406,7 @@ impl AssemblyView {
                     ),
             )
             .child(list)
-            .child(h_flex().h(px(26.)).flex_none().justify_end().px(px(6.)).bg(pal.panel).border_t_1().border_color(pal.border).child(div().id("cfg-help").track_focus(&help_focus).focus(|s| s.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }])).size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")))
+            .child(h_flex().h(px(26.)).flex_none().justify_end().px(px(6.)).bg(pal.panel).border_t_1().border_color(pal.border).child(div().id("cfg-help").track_focus(&help_focus).focus(|s| s.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }])).size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))))
             .into_any_element()
     }
 

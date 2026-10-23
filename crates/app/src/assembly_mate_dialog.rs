@@ -860,14 +860,14 @@ impl Render for MateDialog {
                                     .size(px(14.))
                                     .mr(px(4.))
                                     .rounded_full()
-                                    .bg(crate::theme::help_dot(0x999999))
+                                    
                                     .flex()
                                     .items_center()
                                     .justify_center()
                                     .text_size(px(10.))
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(crate::theme::p().dialog_bg)
-                                    .child("?"),
+                                    
+                                    .child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999))),
                             ),
                     )
                     // Configure mode: the mate's suppression as a checkbox (live 195).

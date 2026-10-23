@@ -938,8 +938,10 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
     --os-icon-button-fill--selected; was #b2ddf6 / #134e96.
   * Assembly linear/circular pattern flip: showed the flipped art when not flipped (dk-987): now like the Part
     Studio dialogs (*-opposite art when unflipped).
-  * "?" help dots (28 places): theme::help_dot(light) = each place's light grey, #aeaeae in dark (dk-978/987),
-    the "?" in the dialog background (Onshape's knockout); section view's too.
+  * "?" help dots (30 places; ui2 reported them darker than live in dark): live = the help-button sprite, a disc
+    with the "?" cut out. Now glyph("help-dot") (opaque copy of help-filled: a glyph tint keeps the art's alpha)
+    in theme::help_dot(light) = each place's measured light grey, #aeaeae in dark. Measured after: disc 160 light /
+    174 dark = live (fillet-01, dk-978); was a bold text "?" on a disc DARK_HEX mapped (#aaa -> #888, darker).
   * Not fixed (ui2's, reported): Insert dialog header is a white bar in dark; mate-type flyout white in dark;
     51 bg(gpui_kit::white()) app-wide; Create button blue on the documents page.
   * Dialogs hole, fillet, linear pattern, mirror, sweep, flange, fastened, revolute, asm linear pattern, replicate:

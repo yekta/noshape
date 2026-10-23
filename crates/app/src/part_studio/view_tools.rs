@@ -318,7 +318,7 @@ impl PartStudioView {
                             this.ui.palette_no_highlight = !this.ui.palette_no_highlight;
                             cx.notify();
                         })))
-                        .child(div().size(px(14.)).ml(px(6.)).rounded_full().bg(crate::theme::help_dot(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")),
+                        .child(div().size(px(14.)).ml(px(6.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
                 );
         Some(
             div()
@@ -773,7 +773,7 @@ impl PartStudioView {
                             }))),
                     )
                 })
-                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")))
+                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))))
                 .into_any_element(),
         )
     }

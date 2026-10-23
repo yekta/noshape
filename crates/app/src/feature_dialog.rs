@@ -3220,15 +3220,12 @@ impl Render for FeatureDialog {
                             .relative()
                             .top(px(-2.))
                             .rounded_full()
-                            .bg(crate::theme::help_dot(0xa0a0a0))
-                            .hover(|d| d.bg(pal.text_muted))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .text_size(px(9.5))
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(pal.dialog_bg)
-                            .child("?")
+                            // Live: the help-button sprite (dom svg-icon-help-button),
+                            // its "?" cut out.
+                            .child(crate::ui::glyph("help-dot", 13.3, crate::theme::help_dot(0xa0a0a0)))
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip(format!("{} help", self.ty.name)))
                             // Help: the feature's description (offline help).

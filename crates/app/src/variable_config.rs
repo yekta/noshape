@@ -888,7 +888,7 @@ impl VariableStudioView {
             .child(div().flex_1())
             .children(add)
             .child(div().flex_1())
-            .child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?"));
+            .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999))));
         v_flex()
             .w(px(PANEL_W))
             .h_full()

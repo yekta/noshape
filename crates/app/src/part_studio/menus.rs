@@ -948,7 +948,7 @@ impl PartStudioView {
                     cx.notify();
                 }))
         };
-        let help = || div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?");
+        let help = || div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)));
         // Onshape's selection box: `#def1fb` with a 1 px `#1651b0` border when
         // active, the caption small on top once something is listed.
         // `invalid`: entries in red (live: parts without a material).

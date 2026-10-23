@@ -490,7 +490,7 @@ impl PartStudioView {
                 .child(h_flex().border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).child(tab("mat-tab-lib", !custom, false, cx)).child(tab("mat-tab-custom", custom, true, cx)))
                 .child(div().id("mat-body").flex_1().min_h_0().overflow_y_scroll().child(body))
                 // The dialog's help button at the bottom right (live 14 px, 4 px in).
-                .child(div().absolute().right(px(4.)).bottom(px(4.)).size(px(14.)).rounded_full().bg(crate::theme::help_dot(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?"))
+                .child(div().absolute().right(px(4.)).bottom(px(4.)).size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa))))
                 .into_any_element(),
         )
     }

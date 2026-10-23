@@ -2070,7 +2070,7 @@ impl PartStudioView {
                                 .pr(px(4.))
                                 .text_size(px(12.))
                                 .child(div().flex_1().text_color(if count > 250 { gpui_kit::rgb(0xaa252d) } else { gpui_kit::rgb(0x333333) }).child(format!("{count}/250 characters")))
-                                .child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")),
+                                .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))),
                         )
                         .when_some(error, |this, error| this.child(div().px(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xaa252d)).child(error))),
                 )

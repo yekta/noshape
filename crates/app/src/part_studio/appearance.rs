@@ -622,7 +622,7 @@ impl PartStudioView {
                         .child(div().h(px(19.)).flex_none().px(px(5.)).pt(px(3.)).text_size(px(12.)).line_height(px(13.2)).child(tess_note))
                 })
                 .child(div().flex_1())
-                .child(h_flex().h(px(26.)).flex_none().justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")))
+                .child(h_flex().h(px(26.)).flex_none().justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))))
                 .into_any_element(),
         )
     }

@@ -2884,7 +2884,7 @@ impl AssemblyView {
                         }
                     })))
                     .child(div().flex_1())
-                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")),
+                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))),
             );
         // Live dom dialog-animate: 220 px, the plain grey ×.
         Self::panel_frame_with("Animate mate", body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close", true).w(px(220.)).into_any_element()
@@ -3136,7 +3136,7 @@ impl AssemblyView {
             .pb(px(2.))
             // The Instances field is active while the dialog is open.
             .child(div().px(px(3.)).pt(px(5.)).child(crate::os_ui::query_box("grp-instances", "Instances", true, rows)))
-            .child(h_flex().justify_end().px(px(4.)).pt(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().bg(crate::theme::help_dot(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(crate::theme::p().dialog_bg).child("?")));
+            .child(h_flex().justify_end().px(px(4.)).pt(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
         v_flex()
             .id("group-dialog")
             .w(px(220.))
