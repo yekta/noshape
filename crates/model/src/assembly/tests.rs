@@ -3377,3 +3377,37 @@ fn type_ia_recipe_regenerates_on_every_head() {
     }
 }
 
+
+
+/// ANSI nuts and spring lock washers built from Onshape's own tables
+/// (dom/skb-sc-comp) as live's B-rep (dom/skb-sc-geom, default size): face
+/// types and total area (m²).
+#[test]
+fn ansi_nuts_and_lock_washers_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    type Case = (&'static str, &'static [(&'static str, usize)], f64);
+    let cases: [Case; 7] = [
+        ("Hex flat nut", &[("Cone", 8), ("Cylinder", 1), ("Plane", 8)], 7.898129e-3),
+        ("Hex machine screw nut", &[("Cone", 14), ("Cylinder", 1), ("Plane", 8)], 4.520420e-5),
+        ("Square nut", &[("Cone", 10), ("Cylinder", 1), ("Plane", 6)], 5.276197e-4),
+        ("Hex slotted nut", &[("Cone", 19), ("Cylinder", 7), ("Plane", 25)], 4.755728e-4),
+        ("Heavy hex slotted nut", &[("Cone", 13), ("Cylinder", 8), ("Plane", 31)], 6.322624e-4),
+        ("Regular spring lock washer", &[("Cone", 2), ("Cylinder", 2), ("Plane", 2), ("Torus", 4)], 2.515125e-5),
+        ("High collar spring lock washer", &[("Cone", 2), ("Cylinder", 2), ("Plane", 2), ("Torus", 4)], 2.258067e-5),
+    ];
+    for (name, kinds, live_area) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let r = standard::regenerate(&StandardSpec::new(c)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut got: std::collections::BTreeMap<String, usize> = Default::default();
+        let mut area = 0.0;
+        for i in 0..b.faces.len() {
+            let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+            area += f.area().unwrap();
+            *got.entry(format!("{:?}", f.face_surface().unwrap()).split([' ', '(']).next().unwrap().to_string()).or_default() += 1;
+        }
+        let want: std::collections::BTreeMap<String, usize> = kinds.iter().map(|(k, n)| (k.to_string(), *n)).collect();
+        assert_eq!(got, want, "{name}");
+        assert!((area / live_area - 1.0).abs() < 1e-3, "{name}: area {area} live {live_area}");
+    }
+}
