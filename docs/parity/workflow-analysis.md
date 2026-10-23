@@ -63,5 +63,5 @@ Status: ✅ matches live/expected, ✗ differs (finding #), ? live data missing.
 | Finding | Result |
 |---|---|
 | AN2 Section view prompt | ✅ "…cylinder, cone, or mate connector." (section.rs) |
-| AN4 interference tooltip | ✅ "10 mm x 10 mm x 10 mm" for a 10 mm cube overlap |
+| AN4 interference tooltip | "10 mm x 10 mm x 10 mm" for two extruded boxes overlapping 10 mm ✅; qa5's repro (block + shifted copy) still loose → stays open (kern, qa5 routing) |
 | AN1, AN3, ADV1 | fixes cited in code; not re-run this pass |

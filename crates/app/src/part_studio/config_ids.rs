@@ -133,7 +133,7 @@ impl Render for FsIdsDialog {
         let table = |title: &str, name_head: &str, rows: Vec<(String, AnyElement)>| {
             let mut t = v_flex().border_l_1().border_t_1().border_color(grid).child(h_flex().child(head(200., name_head)).child(head(300., "Internal FeatureScript ID")));
             for (name, editor) in rows {
-                t = t.child(h_flex().child(cell(200.).bg(gpui_kit::rgb(0xf5f5f5)).child(name)).child(editor));
+                t = t.child(h_flex().child(cell(200.).bg(gpui_kit::rgb(0xf5f5f5)).child(crate::ui::user_text(name))).child(editor));
             }
             v_flex().gap(px(4.)).when(multiple, |d| d.child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x1651b0)).child(title.to_string()))).child(t)
         };

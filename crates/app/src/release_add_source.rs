@@ -364,7 +364,7 @@ impl AddItemsDialog {
                 v_flex()
                     .flex_1()
                     .min_w_0()
-                    .child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name))
+                    .child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::ui::user_text(name)))
                     .child(h_flex().gap(px(3.)).text_size(px(13.)).text_color(pal.text_muted).child(crate::assets::icon("version-graph", 12., cx)).child(sub)),
             )
             .child(square("add-create-version", "version", "Create version…", false, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.create_version(window, cx))))
@@ -496,7 +496,7 @@ impl AddItemsDialog {
                     .when(on, |r| r.bg(gpui_kit::rgb(0xb2ddf6)))
                     .when(!on, |r| r.hover(|r| r.bg(pal.panel_hover)))
                     .child(node(false, i + 1 == n))
-                    .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(v.label.clone()))
+                    .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(crate::ui::user_text(v.label.clone())))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(s) = &mut this.source {
                             s.choose(Some(i));
@@ -616,9 +616,9 @@ impl AddItemsDialog {
                     .pl(px(2.))
                     .cursor_pointer()
                     .hover(|d| d.bg(pal.panel_hover))
-                    .tooltip(crate::ui::tooltip(d.name.clone()))
+                    .tooltip(crate::ui::user_tooltip(d.name.clone()))
                     .child(div().w(px(74.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(thumb))
-                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(d.name.clone()))
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(d.name.clone())))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_document(path.clone(), cx))),
             );
         }

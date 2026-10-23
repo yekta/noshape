@@ -90,7 +90,7 @@ Docs /tmp/qa5/d25c/b2.noshape, /tmp/qa5/d25d/s.noshape, /tmp/qa5/d25b/merge.nosh
 | Finding | Result |
 |---|---|
 | NAME1 positional names | ✅ after Union Part 1 + Part 2 (CLI, mk-three.py), old Part 3 is listed as "Part 2" |
-| BOOL1b committed row tooltip | ✅ "Boolean 1" |
+| BOOL1b committed row tooltip | ✅ "Boolean 1" for a union of **overlapping** parts; the disjoint (no-change) case is still "Boolean 1 <- Extrude 1, Extrude 3" (qa5 routing, psb) |
 | MENU1 part menu | ✅ Hide, Hide other parts, Hide all parts |
 | COPY1 Copy here colour | ✅ the copy keeps the source's colour (dark blue) |
 | INT1, SPLIT1, DEL2 | fixed in qa5's later pass |

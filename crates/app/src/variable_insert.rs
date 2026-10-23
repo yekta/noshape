@@ -193,7 +193,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                 .cursor_pointer()
                 .relative()
                 .group(SharedString::from(format!("ivs-row-{id}")))
-                .tooltip(crate::ui::tooltip(name.clone()))
+                .tooltip(crate::ui::user_tooltip(name.clone()))
                 // Live 159: the picked studio light blue from x 18 (not under
                 // the expander), no check mark.
                 .child(
@@ -225,7 +225,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                         }),
                 )
                 .child(div().ml(px(16.)).w(px(50.)).h(px(30.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon("variable-studio", 30., cx)))
-                .child(div().ml(px(16.)).flex_1().min_w_0().truncate().child(name))
+                .child(div().ml(px(16.)).flex_1().min_w_0().truncate().child(crate::ui::user_text(name)))
                 // A configured studio: [▦ ▾] opens its configuration box.
                 .when(!cfg.is_empty(), |d| {
                     let (st, key) = (state.clone(), cfg_key.clone());
@@ -364,7 +364,7 @@ fn config_box(ctx: &Rows, id: TabId, key: &(Option<std::path::PathBuf>, TabId), 
                     .id(SharedString::from(format!("ivs-in-{id}-{}", input.id)))
                     .h(px(28.))
                     .gap(px(6.))
-                    .child(div().flex_none().text_color(pal.text_muted).child(input.name.clone()))
+                    .child(div().flex_none().text_color(pal.text_muted).child(crate::ui::user_text(input.name.clone())))
                     .child(
                         h_flex()
                             .flex_1()
@@ -402,7 +402,7 @@ fn config_box(ctx: &Rows, id: TabId, key: &(Option<std::path::PathBuf>, TabId), 
                     })
                     .into_any_element()
             }
-            _ => h_flex().h(px(28.)).child(div().flex_1().text_color(pal.text_muted).child(input.name.clone())).child(chosen).into_any_element(),
+            _ => h_flex().h(px(28.)).child(div().flex_1().text_color(pal.text_muted).child(crate::ui::user_text(input.name.clone()))).child(chosen).into_any_element(),
         };
         col = col.child(row);
     }
@@ -527,7 +527,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                                 .cursor_pointer()
                                 .hover(|d| d.bg(rgb(0xdef1fb)))
                                 .child(os::glyph(os::GLYPH_DOCUMENT, 18., pal.text_muted))
-                                .child(div().flex_1().truncate().child(name))
+                                .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
                                 .on_click(move |_, window, _| {
                                     let mut s = st.borrow_mut();
                                     s.document = Some(d.clone());
@@ -555,7 +555,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                             .font_weight(FontWeight::MEDIUM)
                             .cursor_pointer()
                             .child(os::glyph(os::GLYPH_BACK, 16., pal.text))
-                            .child(name)
+                            .child(crate::ui::user_text(name))
                             .on_click(move |_, window, _| {
                                 st.borrow_mut().document = None;
                                 window.refresh();
@@ -599,7 +599,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                                     .cursor_pointer()
                                     .when(on, |d| d.bg(pal.accent_soft).font_weight(FontWeight::MEDIUM))
                                     .hover(|d| d.bg(rgb(0xdef1fb)))
-                                    .child(v.label.clone())
+                                    .child(crate::ui::user_text(v.label.clone()))
                                     .on_click(move |_, window, _| {
                                         st.borrow_mut().version = Some(mv.clone());
                                         window.refresh();
@@ -946,10 +946,10 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
                 .bg(rgb(0xffffff))
                 .text_size(px(14.))
                 .text_color(pal.text_muted)
-                .child(cell().child(v.name.clone()))
+                .child(cell().child(crate::ui::user_text(v.name.clone())))
                 .child(cell().child(kind))
                 .child(cell().child(value))
-                .child(cell().child(v.description.clone()))
+                .child(cell().child(crate::ui::user_text(v.description.clone())))
                 .into_any_element()
         })
         .collect();

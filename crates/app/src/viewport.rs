@@ -1871,17 +1871,30 @@ fn box_ids(buf: &PickBuffer, a: DVec2, b: DVec2, s: f64, crossing: bool) -> Vec<
     v
 }
 
-/// The view cube's face labels: glyph contours in cube space (laid out once).
+/// The view cube's face labels: glyph contours in cube space, in the UI
+/// language (live German "Oben", "Vorn", "Rechts"; laid out once per language).
 fn cube_face_labels() -> &'static Vec<([i8; 3], noshape_render::overlay::Contours)> {
-    static LABELS: std::sync::OnceLock<Vec<([i8; 3], noshape_render::overlay::Contours)>> = std::sync::OnceLock::new();
-    LABELS.get_or_init(|| {
-        noshape_render::overlay::view_cube::FACES
+    type Labels = Vec<([i8; 3], noshape_render::overlay::Contours)>;
+    static LABELS: std::sync::OnceLock<std::sync::Mutex<HashMap<&'static str, &'static Labels>>> = std::sync::OnceLock::new();
+    let code = crate::i18n::current();
+    let mut cache = LABELS.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    cache.entry(code).or_insert_with(|| {
+        // The CJK languages need their Noto face (Liberation Sans has no CJK glyphs).
+        let font = match code {
+            "ja" => "Noto Sans Japanese",
+            "ko" => "Noto Sans Korean",
+            "zh-CN" => "Noto Sans Chinese Simplified",
+            "zh-TW" => "Noto Sans Chinese Traditional",
+            _ => noshape_sketch::text::DEFAULT_FONT,
+        };
+        let labels: Labels = noshape_render::overlay::view_cube::FACES
             .iter()
             .map(|(n, name)| {
-                let layout = noshape_sketch::text::layout_text(name, noshape_sketch::text::DEFAULT_FONT, false, false);
+                let layout = noshape_sketch::text::layout_text(&crate::i18n::tr(name), font, false, false);
                 (*n, Arc::new(noshape_render::overlay::view_cube::face_label(*n, layout.width, &layout.polylines(5))))
             })
-            .collect()
+            .collect();
+        Box::leak(Box::new(labels))
     })
 }
 
