@@ -1521,7 +1521,13 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let labeler = self.labeler(cx);
         let is_derived = feature.type_id == "importDerived";
-        let dialog = cx.new(|cx| FeatureDialog::new(feature, units, labeler, cx));
+        let dialog = cx.new(|cx| {
+            let mut d = FeatureDialog::new(feature, units, labeler, cx);
+            if !is_new {
+                d.focus_for_edit();
+            }
+            d
+        });
         if is_derived {
             let provider = self.doc.read(cx).derived_provider();
             let doc = self.doc.read(cx).session.doc.clone();

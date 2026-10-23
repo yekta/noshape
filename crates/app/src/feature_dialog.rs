@@ -368,6 +368,15 @@ impl FeatureDialog {
             .map(|s| s.id.to_string())
     }
 
+    /// Editing an existing feature: the first visible selection field marked
+    /// INITIAL_FOCUS_ON_EDIT is the active one (uihint.gen.fs), else the
+    /// first visible one as for a new feature.
+    pub fn focus_for_edit(&mut self) {
+        if let Some(s) = self.ty.params.iter().find(|s| s.is_visible(&self.feature.params) && s.hints.has(Hints::INITIAL_FOCUS_ON_EDIT) && matches!(s.kind, ParamKind::Query { .. })) {
+            self.active_query = Some(s.id.to_string());
+        }
+    }
+
     /// Onshape: when an edit hides the active selection field (Part pattern
     /// switched to Feature pattern, say), the first visible one becomes active
     /// so picks keep going somewhere.
@@ -473,6 +482,15 @@ impl FeatureDialog {
     /// A dialog without selection fields starts typing in its first text or
     /// number field (Onshape: the Variable dialog opens with Name focused).
     pub fn focus_first_field(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        // An edited feature's INITIAL_FOCUS_ON_EDIT field (`focus_for_edit`)
+        // takes the focus instead of the first list.
+        if let Some(id) = self.active_query.clone()
+            && self.ty.params.iter().any(|s| s.id == id && s.hints.has(Hints::INITIAL_FOCUS_ON_EDIT))
+        {
+            let h = self.tab_stop(&format!("q:{id}"), cx);
+            window.focus(&h, cx);
+            return true;
+        }
         let params = &self.feature.params;
         let mut first: Option<(&'static str, String)> = None;
         for s in self.ty.params.iter().filter(|s| s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN)) {
