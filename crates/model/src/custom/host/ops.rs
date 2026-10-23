@@ -848,6 +848,11 @@ fn op_fit_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if pts.len() < 2 {
             return err("A spline needs at least two points");
         }
+        // Through two points, nothing else: a line (std Jog reads its fitted
+        // bend reference with evLine).
+        if pts.len() == 2 && tangents.is_empty() {
+            return add_wire(ev, k::make_line(pts[0], pts[1])?);
+        }
         let closed = pts.len() > 2 && (pts[0] - pts[pts.len() - 1]).length() < 1e-9;
         let p = if closed { &pts[..pts.len() - 1] } else { &pts[..] };
         let s = k::make_interpolated_spline(p, &tangents, closed)?;
@@ -1125,7 +1130,12 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let targets: Vec<Shape> = ev.resolve_faces(ev.query("faceTargets")).into_iter().filter_map(|(b, f)| ev.face_shape(b, f).ok()).collect();
         let n_targets = targets.len();
         let targets = Shape::compound(&targets);
-        crate::regen::features::split::split_part(ev)?;
+        match crate::regen::features::split::split_part(ev) {
+            // Owning existing imprints (std Jog splits up front): nothing new
+            // to split is fine; the edges already there are this split's.
+            Err(e) if own_existing && e.message == "The tools don't split the selected faces" => {}
+            r => r?,
+        }
         // The pieces of the target faces (their snapshot points: uv middle, on the face).
         let mut pieces = Vec::new();
         for (bid, _) in &before {
@@ -1180,10 +1190,18 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             on.extend(existing.iter().filter(|(a, m, z)| in_plane(*a) && in_plane(*m) && in_plane(*z)).map(|e| e.1));
             tools.push((pl.origin, n, on));
         }
-        Ok((made, tools, pieces))
+        Ok((made, tools, pieces, owners))
     })?;
-    let (new_edges, tools, pieces) = new_edges;
+    let (new_edges, tools, pieces, owners) = new_edges;
     let mut st = cx.state.lock();
+    if own_existing {
+        // Its edges derive from this split even where it changed nothing
+        // (tracking keeps what operations since its start made or changed).
+        let seq = st.next_seq;
+        for b in owners {
+            st.touched.insert(b, seq);
+        }
+    }
     st.split_tools.extend(tools);
     st.split_face_pieces.insert(id.clone(), pieces);
     drop(st);

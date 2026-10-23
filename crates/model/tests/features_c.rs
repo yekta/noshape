@@ -60,7 +60,15 @@ impl Studio {
     fn ok(&mut self) -> RegenResult {
         let r = self.regen();
         for (f, s) in self.ps.features.iter().zip(&r.display.features) {
-            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning | FeatureStatus::Info), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
+            // With std's FeatureScript notices (std-run features: the failing call's stack).
+            assert!(
+                matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning | FeatureStatus::Info),
+                "{} ({}) failed: {:?} {:?}",
+                f.name,
+                f.type_id,
+                s.message,
+                noshape_model::custom::run::output_of(f.id).map(|o| o.notices)
+            );
         }
         r
     }
