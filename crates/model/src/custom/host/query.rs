@@ -563,6 +563,12 @@ impl<'a> QueryCx<'a> {
         if tracked.is_empty() {
             return found;
         }
+        // A face's name lineage holds (only edges take each other's names):
+        // its pieces by name, moved ones too (std Jog's rotated moving face),
+        // with what lies where it was.
+        if snap.etype == EType::Face && !found.is_empty() {
+            return uniq(found.into_iter().chain(tracked).collect());
+        }
         let kept: Vec<Ent> = found.into_iter().filter(|e| tracked.contains(e)).collect();
         if kept.is_empty() { tracked } else { kept }
     }
