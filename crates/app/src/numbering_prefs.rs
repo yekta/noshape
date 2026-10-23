@@ -1,5 +1,4 @@
-//! "Numbering scheme settings" (Onshape's Company settings › Numbering
-//! schemes; here in the account preferences under Release management).
+//! Company settings › Numbering schemes: "Numbering scheme settings".
 //! Help Plans/numbering_schemes and its image accounts/co-numschemes-03.png:
 //! tabs Release objects | Standard content | Items | Release names; a
 //! "Number generation" select (Manual entry / Sequential part number
@@ -276,7 +275,6 @@ impl Render for NumberingPrefsView {
         // `#333` rule, the content 15 px in.
         v_flex()
             .w_full()
-            .mt(px(38.))
             .pl(px(15.))
             .child(h_flex().ml(px(-15.)).h(px(32.)).pl(px(15.)).gap(px(6.)).border_b_1().border_color(pal.text).child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Numbering scheme settings")).child(crate::assets::icon("help-gray", 20., cx)))
             .child(div().pt(px(10.)).child(tabs))

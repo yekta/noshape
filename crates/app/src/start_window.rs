@@ -2971,7 +2971,10 @@ fn user_menu(cx: &App) -> AnyElement {
                 .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(150.)).truncate().child(name))
                 .child(os::glyph(os::GLYPH_CARET, 8., pal.text)),
         )
-        .os_dropdown_menu("user-menu-dd", false, |m, _, _| m.item(OsMenuItem::new("Preferences…").on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::Preferences, cx))))
+        .os_dropdown_menu("user-menu-dd", false, |m, _, _| {
+            m.item(OsMenuItem::new("Preferences…").on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::Preferences, cx)))
+                .item(OsMenuItem::new("Company settings").on_click(|_, _, cx| crate::company_settings::show(crate::company_settings::Section::ReleaseManagement, cx)))
+        })
         .into_any_element()
 }
 
