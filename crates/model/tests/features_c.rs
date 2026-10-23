@@ -60,7 +60,15 @@ impl Studio {
     fn ok(&mut self) -> RegenResult {
         let r = self.regen();
         for (f, s) in self.ps.features.iter().zip(&r.display.features) {
-            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning | FeatureStatus::Info), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
+            // With std's FeatureScript notices (std-run features: the failing call's stack).
+            assert!(
+                matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning | FeatureStatus::Info),
+                "{} ({}) failed: {:?} {:?}",
+                f.name,
+                f.type_id,
+                s.message,
+                noshape_model::custom::run::output_of(f.id).map(|o| o.notices)
+            );
         }
         r
     }
@@ -835,7 +843,9 @@ fn recognize_rebuilds_sheet_metal_model() {
         p.set("depth", expr("20 mm"));
         set_model(p, "2 mm", "3 mm");
     });
-    s.add("sheetMetalEnd", |_| {});
+    // Finish needs its parts (live: "Select one or more sheet metal parts.").
+    let part = Reference::Body(s.ok().context.bodies[0].id.clone());
+    s.add("sheetMetalEnd", move |p| p.set("sheetMetalParts", ParamValue::Query(vec![part])));
     let r = s.ok();
     let expected = flat(&r, 0).size();
     let id = r.context.bodies[0].id.clone();
@@ -1272,13 +1282,14 @@ fn bend_and_jog_move_the_side_live_moves() {
     assert!(near(volume(&r, 0), 4812.566370614357e-9, 1e-15), "bend volume {}", volume(&r, 0));
     assert_eq!(r.context.bodies[0].faces.len(), 14);
     // x < 30 stays flat; the wall rises at x 29.7223453..31.7223453.
-    assert!(near(bb.min.x, 0.0, 1e-9) && near(bb.max.x, mm(31.7223453), 1e-9) && near(bb.max.z, mm(31.7223453), 1e-9), "{bb:?}");
+    // Within the box's tolerance gap (std-built bodies carry 1e-7 m).
+    assert!(near(bb.min.x, 0.0, 2e-7) && near(bb.max.x, mm(31.7223453), 2e-7) && near(bb.max.z, mm(31.7223453), 2e-7), "{bb:?}");
     let r = build("sheetMetalJog");
     let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!(near(volume(&r, 0), 4825.132741228719e-9, 1e-15), "jog volume {}", volume(&r, 0));
     assert_eq!(r.context.bodies[0].faces.len(), 22);
     // Inside anchor: raised plate z 7..9; preserve material pulls its end in to 55.889.
-    assert!(near(bb.min.x, 0.0, 1e-9) && near(bb.max.z, mm(9.0), 1e-9) && near(bb.max.x, mm(55.889), 1e-6), "{bb:?}");
+    assert!(near(bb.min.x, 0.0, 2e-7) && near(bb.max.z, mm(9.0), 2e-7) && near(bb.max.x, mm(55.889), 1e-6), "{bb:?}");
 }
 
 /// patternUtils.fs / curvePattern.fs: what is patterned is checked first, and
@@ -1610,4 +1621,47 @@ fn mate_connector_frame_order_as_live() {
     let mut e = Studio::new();
     e.add("mateConnector", |p| p.set("originQuery", q(Reference::Origin)));
     assert_eq!(e.last_status(), (FeatureStatus::Error, "Cannot determine owner of mate connector.".to_string()));
+}
+
+/// Live (qa5 "sm loft", SML1): Sheet metal loft, Add, from a 60 × 40 × 2
+/// plate's top edge at y = 40 (radius 2) to a line (0,70)–(60,70) on a plane
+/// 30 mm up: one body of 9805.52442264952 mm³, 14 faces; the plate trimmed
+/// to y = 39.2116736 by a 43.0248° bend; the line on the wall's outer face.
+#[test]
+fn sheet_metal_loft_add_bends_onto_the_plate() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (0.0, 40.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", q(region));
+        set_model(p, "2 mm", "2 mm");
+    });
+    let pl = s.add("cPlane", |p| {
+        p.set("entities", q(Reference::Plane(DatumPlane::Top)));
+        p.set("offset", expr("30 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let line = polyline(&mut sk, &[(0.0, 70.0), (60.0, 70.0)], false);
+    let s2 = s.sketch(Reference::FeaturePlane(pl), sk);
+    let r = s.ok();
+    let body = &r.context.bodies[0];
+    let ei = body.shape.edges().iter().position(|e| e.endpoints().is_ok_and(|(a, b)| ((a + b) * 0.5 - DVec3::new(mm(30.0), mm(40.0), mm(2.0))).length() < 1e-9)).unwrap();
+    let edge = Reference::Edge((*body.edges[ei]).clone());
+    let part = Reference::Body(body.id.clone());
+    s.add("sheetMetalLoft", move |p| {
+        p.set("surfaceOperationType", en("ADD"));
+        p.set("profile1", q(edge));
+        p.set("profile2", entities(s2, &line));
+        p.set("booleanScope", q(part));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let b = &r.context.bodies[0];
+    assert!(near(volume(&r, 0), 9805.52442264952e-9, 1e-15), "volume {}", volume(&r, 0) * 1e9);
+    assert_eq!(b.faces.len(), 14);
+    let data = r.context.sheet_metal.get(&b.id).unwrap();
+    assert_eq!((data.walls.len(), data.bends.len()), (2, 1));
 }

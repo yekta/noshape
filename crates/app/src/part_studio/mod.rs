@@ -1620,6 +1620,9 @@ impl PartStudioView {
         self.ui.preview_opacity = 1.0;
         self.ui.preview_before = None;
         self.ui.before_context = None;
+        // A new feature's first change runs std's editing logic with an
+        // empty old definition; an edited one starts from its values.
+        self.ui.std_edit_old = (!is_new).then(|| dialog.read(cx).feature.params.clone());
         self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history });
         // Live ("Panels vs feature dialogs"): opening a feature dialog closes
         // the tool panels (Mass and section properties, Named views) for good;

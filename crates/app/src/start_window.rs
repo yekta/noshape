@@ -1396,7 +1396,7 @@ impl StartView {
                 if d.notes.trim().is_empty() {
                     v_flex()
                         .child(name_row(d.name.clone()))
-                        .child(v_flex().items_center().pt(px(43.)).gap(px(20.)).child(svg().path(crate::assets::icon_path("notes-empty")).size(px(140.)).text_color(rgb(0xebebeb))).child(div().text_size(px(14.67)).text_color(rgb(0x666666)).child("No notes available")))
+                        .child(v_flex().items_center().pt(px(43.)).gap(px(20.)).child(svg().path(crate::assets::icon_path("notes-empty")).size(px(140.)).text_color(if gpui_kit::hex_theme_active() { crate::theme::p().illustration } else { gpui_kit::rgb(0xebebeb) })).child(div().text_size(px(14.67)).text_color(rgb(0x666666)).child("No notes available")))
                         .into_any_element()
                 } else {
                     v_flex()
@@ -1536,7 +1536,7 @@ impl StartView {
                 .items_center()
                 .pt(px(35.))
                 .gap(px(24.))
-                .child(svg().path(crate::assets::icon_path("documents-empty")).w(px(200.)).h(px(95.)).text_color(rgb(0xeeeeee)))
+                .child(svg().path(crate::assets::icon_path("documents-empty")).w(px(200.)).h(px(95.)).text_color(crate::theme::p().illustration))
                 .child(div().text_center().text_size(px(14.67)).text_color(rgb(0x666666)).child("Select a document or folder to view its details"))
                 .into_any_element(),
         };
@@ -2971,7 +2971,10 @@ fn user_menu(cx: &App) -> AnyElement {
                 .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(150.)).truncate().child(name))
                 .child(os::glyph(os::GLYPH_CARET, 8., pal.text)),
         )
-        .os_dropdown_menu("user-menu-dd", false, |m, _, _| m.item(OsMenuItem::new("Preferences…").on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::Preferences, cx))))
+        .os_dropdown_menu("user-menu-dd", false, |m, _, _| {
+            m.item(OsMenuItem::new("Preferences…").on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::Preferences, cx)))
+                .item(OsMenuItem::new("Company settings").on_click(|_, _, cx| crate::company_settings::show(crate::company_settings::Section::ReleaseManagement, cx)))
+        })
         .into_any_element()
 }
 

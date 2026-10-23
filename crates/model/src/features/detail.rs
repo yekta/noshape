@@ -59,7 +59,7 @@ pub fn chamfer() -> FeatureType {
 pub fn face_blend() -> FeatureType {
     let rem = Hints::REMEMBER_PREVIOUS_VALUE;
     let radius = |v: &ParamValues| v.is("blendControlType", "RADIUS");
-    let p = vec![
+    let mut p = vec![
         ParamSpec::query("side1", "Side 1", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS),
         ParamSpec::flip("flipSide1", "Flip side 1"),
         ParamSpec::query("side2", "Side 2", QueryFilter::ANY_FACE),
@@ -69,7 +69,8 @@ pub fn face_blend() -> FeatureType {
             .visible(|v| v.bool("propagation")),
         ParamSpec::num("propagationAngle", "Maximum angle", NumSpec::angle(0.0, 0.0, 180.0))
             .visible(|v| v.bool("propagation") && v.is("propagationType", "CUSTOM")),
-        // Group "Cross section".
+    ];
+    p.extend(group("crossSectionGroup", "Cross section", true, vec![
         ParamSpec::enum_("crossSection", "Cross section", &[("ROLLING_BALL", "Rolling ball"), ("SWEPT_PROFILE", "Swept profile")])
             .hints(Hints::SHOW_LABEL | rem),
         ParamSpec::query1("spine", "Spine", QueryFilter::EDGE).visible(|v| v.is("crossSection", "SWEPT_PROFILE")),
@@ -84,7 +85,8 @@ pub fn face_blend() -> FeatureType {
             .hints(Hints::SHOW_LABEL | rem),
         ParamSpec::num("rho", "Rho", NumSpec::real(0.5, 0.0, 0.99999)).visible(|v| v.is("crossSectionShape", "CONIC")),
         ParamSpec::num("magnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.99999)).visible(|v| v.is("crossSectionShape", "CURVATURE")),
-        // Group "Constraints and limits" (collapsed by default).
+    ]));
+    p.extend(group("constraintsAndLimitsGroup", "Constraints and limits", false, vec![
         ParamSpec::bool("tangentHoldLines", "Tangent hold lines", false),
         ParamSpec::query("tangentEdges", "Tangent edges", QueryFilter::EDGE).visible(|v| v.bool("tangentHoldLines")),
         ParamSpec::query("inverseTangentEdges", "Inverse tangent edges", QueryFilter::EDGE).visible(|v| v.bool("tangentHoldLines")),
@@ -116,12 +118,14 @@ pub fn face_blend() -> FeatureType {
         .visible(|v| v.bool("hasLimits")),
         ParamSpec::bool("hasHelpPoint", "Help point", false),
         ParamSpec::query1("helpPoint", "Help point", QueryFilter::VERTEX | QueryFilter::MATE_CONNECTOR).visible(|v| v.bool("hasHelpPoint")),
+    ]));
+    p.extend([
         ParamSpec::enum_("trim", "Trim type", &[("WALLS", "Walls"), ("SHORT", "Short"), ("LONG", "Long"), ("NO_TRIM", "No trim")])
             .hints(Hints::SHOW_LABEL | rem),
         ParamSpec::bool("detach", "Detached", false),
         ParamSpec::bool("showIsocurves", "Show isocurves", false),
         ParamSpec::num("curveCount", "Count", ISO_GRID).visible(|v| v.bool("showIsocurves")),
-    ];
+    ]);
     FeatureType::new("faceBlend", "Face blend", Category::Detail, p).describe("Blend two sets of faces, connected or not")
 }
 
