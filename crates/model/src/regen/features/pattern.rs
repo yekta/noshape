@@ -754,40 +754,40 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
     Ok(())
 }
 
-/// What Onshape shows for a face pattern it can't make (user's live shot
-/// 2026-10-23, 5 instances): the patterned faces copied to every instance.
-/// Those are the feature's faces and the part's faces it merged into: a
-/// coplanar face of the part running on into the seed is the feature's face
-/// too in Parasolid (live 2022: the floor under a flush wall).
+/// What Onshape shows for a face pattern it can't make (live "lp wall over"
+/// 2256–2262, the user's shot of 2026-10-23): a ghost of every instance, the
+/// seed's whole tool body moved there, plus the part's faces the seed merged
+/// into (a coplanar face of the part running on into the tool is the
+/// feature's face too in Parasolid: the user's flush side) moved likewise.
 fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], instances: &[Instance]) -> Vec<Shape> {
-    let mut faces = fs.to_vec();
     let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
-    if let Some(tool) = seed_tool(ev, f) {
-        let tool_planes: Vec<(k::Plane, DVec3)> = tool
-            .faces()
-            .iter()
-            .filter_map(|t| match (t.face_surface(), t.centroid()) {
-                (Ok(k::Surface::Plane(pl)), Ok(c)) => Some((pl, c)),
-                _ => None,
-            })
-            .collect();
-        for i in 0..body.faces.len() {
-            if faces.contains(&i) {
-                continue;
+    let mut ghost: Vec<Shape> = Vec::new();
+    match seed_tool(ev, f) {
+        Some(tool) => {
+            let tool_planes: Vec<(k::Plane, DVec3)> = tool
+                .faces()
+                .iter()
+                .filter_map(|t| match (t.face_surface(), t.centroid()) {
+                    (Ok(k::Surface::Plane(pl)), Ok(c)) => Some((pl, c)),
+                    _ => None,
+                })
+                .collect();
+            for i in (0..body.faces.len()).filter(|i| !fs.contains(i)) {
+                let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { continue };
+                let Ok(k::Surface::Plane(pl)) = face.face_surface() else { continue };
+                let n = pl.normal.normalize_or_zero();
+                let merged = tool_planes.iter().any(|(tp, c)| {
+                    tp.normal.normalize_or_zero().dot(n).abs() > 1.0 - 1e-9 && (tp.origin - pl.origin).dot(n).abs() < tol && k::make_vertex(*c).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
+                });
+                if merged {
+                    ghost.push(face);
+                }
             }
-            let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { continue };
-            let Ok(k::Surface::Plane(pl)) = face.face_surface() else { continue };
-            let n = pl.normal.normalize_or_zero();
-            let merged = tool_planes.iter().any(|(tp, c)| {
-                tp.normal.normalize_or_zero().dot(n).abs() > 1.0 - 1e-9 && (tp.origin - pl.origin).dot(n).abs() < tol && k::make_vertex(*c).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
-            });
-            if merged {
-                faces.push(i);
-            }
+            ghost.push(tool);
         }
+        None => ghost.extend(fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok())),
     }
-    let shapes: Vec<Shape> = faces.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok()).collect();
-    let seed = Shape::compound(&shapes);
+    let seed = Shape::compound(&ghost);
     instances.iter().filter_map(|inst| k::transform(&seed, &inst.t, true).ok().map(|r| r.shape)).collect()
 }
 

@@ -27,8 +27,14 @@ pub mod viewport {
     /// Errors (`ERROR_HIGHLIGHT_COLOR1`).
     pub const ERROR: u32 = 0xbd3039;
     /// Faces of a failed feature's error geometry (a Feature pattern's
-    /// instances; the user's live shot 2026-10-23 reads `#923c21`, flat).
-    pub const ERROR_FILL: u32 = 0x923c21;
+    /// ghost instances). Live "lp wall over" 2258, solved over two
+    /// backgrounds: rgb(123,30,36) at α 0.60 on both the top and the front
+    /// faces (so drawn flat here; the browser blends in sRGB). Our renderer
+    /// blends in linear light, where [`ERROR_FILL_ALPHA`] gives the live
+    /// results (#825d6b over the top, #693c45 over the front) within a few
+    /// levels.
+    pub const ERROR_FILL: u32 = 0x7b1e24;
+    pub const ERROR_FILL_ALPHA: f32 = 0.75;
     /// Construction plane fill (`--os-construction-plane-ambient-color`),
     /// drawn unlit at 20%: one plane reads `#f5f8fa`, three stacked `#e7edf2`.
     pub const PLANE_FILL: u32 = 0xcedbe5;

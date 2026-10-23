@@ -978,9 +978,9 @@ fn rib_extend_profiles_as_live() {
 }
 
 /// Live "lp wall over" (behaviours "URGENT (10-22)") with 5 instances, as
-/// the user's shot of 2026-10-23: the failing Feature pattern carries every
-/// instance that couldn't be made, as the faces it patterns (the wall's and
-/// the floor and end face it merged into) moved to each instance.
+/// the user's shot of 2026-10-23 and live 2256–2262: the failing Feature
+/// pattern carries a ghost of every instance it couldn't make (the wall's
+/// tool body and the floor and end face it merged into, moved there).
 #[test]
 fn failed_feature_pattern_shows_its_instances() {
     let mut t = T::new();
@@ -996,8 +996,8 @@ fn failed_feature_pattern_shows_its_instances() {
     let st = res.display.features.last().unwrap();
     assert_eq!(st.status, FeatureStatus::Error);
     let m = st.error_mesh.as_ref().expect("error geometry");
-    // 4 instances × (4 wall faces + the merged floor and end face).
-    assert_eq!(m.face_ranges.len(), 24);
+    // 4 ghosts × (the wall's 6 faces + the floor and end face it merged into).
+    assert_eq!(m.face_ranges.len(), 32);
     let xs: Vec<f32> = m.positions.iter().map(|p| p[0]).collect();
     let (lo, hi) = xs.iter().fold((f32::MAX, f32::MIN), |(a, b), x| (a.min(*x), b.max(*x)));
     // 2 to 8 mm along the edge (its direction either way), the floor's

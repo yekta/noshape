@@ -883,6 +883,33 @@ impl PartStudioView {
             extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
         }
         let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        // Live (lp wall over 2258): the pattern's other inputs (its
+        // Direction) are drawn red; the seed keeps the selection colors.
+        if error_mesh.is_some()
+            && let Some(e) = &self.edit
+        {
+            let d = e.dialog.read(cx);
+            for r in d.active_refs().into_iter().chain(d.selected_refs()) {
+                match r {
+                    // The seed keeps its shading, outlined orange (live
+                    // #717560 end face, #ffa90a edges).
+                    Reference::Feature(f) => {
+                        for g in self.feature_geometry(f).into_iter().filter(|g| matches!(g, Reference::Face(_))) {
+                            for &id in built.picks.ids_for(&g) {
+                                if let Some(s) = scene.states.get_mut(id as usize) {
+                                    *s &= !noshape_render::state::SELECTED;
+                                }
+                            }
+                        }
+                    }
+                    r => {
+                        for &id in built.picks.ids_for(&r) {
+                            scene.add_flag(id, noshape_render::state::ERROR);
+                        }
+                    }
+                }
+            }
+        }
         // Parts picked in a dialog field: outlined, not filled (live part-studio/440).
         if self.edit.is_some() {
             for r in selection.iter().chain(&accent) {
