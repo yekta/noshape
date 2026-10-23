@@ -746,7 +746,7 @@ impl Render for MateDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
+                            .bg(pal.accept).when(invalid, |d| d.opacity(0.2))
                             .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
                             .child(crate::assets::icon("dialog-ok", 24., cx))
@@ -845,11 +845,12 @@ impl Render for MateDialog {
                                     .px(px(10.))
                                     .flex()
                                     .items_center()
-                                    .bg(gpui_kit::white())
+                                    .bg(gpui_kit::rgb(0xffffff))
                                     .border_1()
                                     .border_color(gpui_kit::rgb(0xaaaaaa))
                                     .rounded(px(3.5))
                                     .text_size(px(12.25))
+                                    .text_color(crate::theme::p().text)
                                     .cursor_pointer()
                                     .hover(|d| d.bg(gpui_kit::rgb(0xe6e6e6)))
                                     .child("Solve")
@@ -862,14 +863,14 @@ impl Render for MateDialog {
                                     .size(px(14.))
                                     .mr(px(4.))
                                     .rounded_full()
-                                    .bg(gpui_kit::rgb(0x999999))
+                                    
                                     .flex()
                                     .items_center()
                                     .justify_center()
                                     .text_size(px(10.))
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(gpui_kit::rgb(0xffffff))
-                                    .child("?"),
+                                    
+                                    .child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999))),
                             ),
                     )
                     // Configure mode: the mate's suppression as a checkbox (live 195).

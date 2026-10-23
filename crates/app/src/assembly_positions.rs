@@ -476,7 +476,7 @@ impl AssemblyView {
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_named_position_row(None, cx))),
                         ),
                     )
-                    .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?"))),
+                    .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa))))),
             )
             .into_any_element()
     }
@@ -649,7 +649,7 @@ impl AssemblyView {
                             .child(list),
                     ),
                 )
-                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")))
+                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x888888)))))
                 .into_any_element(),
         )
     }

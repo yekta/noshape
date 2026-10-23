@@ -18,6 +18,7 @@ mod evaluate;
 pub mod hole;
 mod sheetmetal;
 mod sm_flat;
+mod loft;
 mod edge_change;
 mod offsets;
 mod packed;
@@ -548,6 +549,7 @@ pub fn register() {
         all.extend_from_slice(hole::NATIVES);
         all.extend_from_slice(sheetmetal::NATIVES);
         all.extend_from_slice(sm_flat::NATIVES);
+        all.extend_from_slice(loft::NATIVES);
         all.extend_from_slice(edge_change::NATIVES);
         all.extend_from_slice(offsets::NATIVES);
         all.extend_from_slice(packed::NATIVES);

@@ -386,7 +386,7 @@ impl PartStudioView {
                                 .opacity(0.)
                                 .group_hover("flrow", |d| d.opacity(1.))
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)))
+                                .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     if let Some(s) = &mut this.ui.flatten {

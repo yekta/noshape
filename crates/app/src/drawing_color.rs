@@ -151,7 +151,7 @@ impl DrawingEditor {
                 .items_center()
                 .text_size(px(12.))
                 .cursor_pointer()
-                .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.accent))
+                .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.emphasis))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(d) = &mut this.color_dlg {

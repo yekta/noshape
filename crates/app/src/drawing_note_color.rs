@@ -202,7 +202,7 @@ impl DrawingEditor {
             });
         })));
         body = body.child(div().mt(px(8.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x777777)).child("Custom colors")).child(custom_row);
-        body = body.child(h_flex().justify_end().pb(px(4.)).child(div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")));
+        body = body.child(h_flex().justify_end().pb(px(4.)).child(div().size(px(16.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 17.8, crate::theme::help_dot(0x999999)))));
         Some(
             v_flex()
                 .id("dr-note-color")

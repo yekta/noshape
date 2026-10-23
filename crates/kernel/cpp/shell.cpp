@@ -33,6 +33,9 @@
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
+#include <ElCLib.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepGProp.hxx>
 #include <BRepLProp_SLProps.hxx>
@@ -257,6 +260,8 @@ struct Built
   HHist        history;
 };
 
+bool inner_point(const TopoDS_Face& f, gp_Pnt& p, gp_Dir& n);
+
 // Path 1: offset the whole solid (removed faces stay in place), then
 // subtract. `sign` is -1 for an inward wall, +1 outward.
 bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t,
@@ -308,6 +313,28 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   const double vo = volume_of(outer), vi = volume_of(inner), vr = volume_of(r);
   if (!(vi > 0 && vr > 0 && vi < vo && std::abs(vo - vi - vr) <= 1e-6 * vo))
     return false;
+  // The part's own faces that stay (inward: the outside, outward: the
+  // cavity) are all still there: a point inside each lies on the result. An
+  // offset that is wrong but adds up loses some of them (live "kern Shell
+  // bracket": a chamfer round the top, 1 mm: 12 faces, Parasolid's 34).
+  {
+    const TopoDS_Shape so = single_solid(r);
+    ShapeIMap kept_out;
+    for (const TopoDS_Shape& f : removed)
+      kept_out.Add(f);
+    for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+    {
+      gp_Pnt p;
+      gp_Dir n;
+      if (kept_out.Contains(e.Current()) || !inner_point(TopoDS::Face(e.Current()), p, n))
+        continue;
+      // (On the result's boundary: its distance, not the solid classifier,
+      // which calls points on a face OUT at times.)
+      BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(p).Vertex(), so);
+      if (!d.IsDone() || d.Value() > 1e-7)
+        return false;
+    }
+  }
   // Offsets extended past a face's boundary come out as separate faces on
   // the same surface; merge them so the topology (and the names) match the
   // slab construction's.
@@ -389,6 +416,70 @@ bool in_onshape_mitre_band(const TopoDS_Shape& solid, const std::vector<TopoDS_S
           return true;
       }
     }
+  return false;
+}
+
+// Live "kern (10-23 09:00) Shell bracket": Parasolid can't shell inward when
+// a hole's wall, offset to r + t, exactly touches a plane's offset (moved t
+// into the material): the Ø10 hole 10 mm from the bracket's front fails at
+// exactly 2.5 mm (2.499 and 2.501 work). A kept concave cylinder whose axis is
+// parallel to a kept plane on its material side at r + 2 t (to 1e-8 m), the
+// line where they'd touch on both faces.
+bool offsets_touch(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
+{
+  ShapeIMap rm;
+  for (const TopoDS_Shape& f : removed)
+    rm.Add(f);
+  auto inside = [](const TopoDS_Face& f, const gp_Pnt& p) {
+    GeomAPI_ProjectPointOnSurf pr(p, BRep_Tool::Surface(f));
+    if (pr.NbPoints() == 0 || pr.LowerDistance() > 1e-7)
+      return false;
+    double u, v;
+    pr.LowerDistanceParameters(u, v);
+    BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), 1e-9);
+    return fc.State() == TopAbs_IN;
+  };
+  std::vector<std::pair<TopoDS_Face, gp_Pln>> planes;
+  std::vector<std::pair<TopoDS_Face, gp_Cylinder>> holes;
+  for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(e.Current());
+    if (rm.Contains(f))
+      continue;
+    BRepAdaptor_Surface a(f, false);
+    if (a.GetType() == GeomAbs_Plane)
+      planes.emplace_back(f, a.Plane());
+    // Concave: the outward normal points at the axis.
+    else if (a.GetType() == GeomAbs_Cylinder && (a.Cylinder().Position().Direct() == (f.Orientation() == TopAbs_REVERSED)))
+      holes.emplace_back(f, a.Cylinder());
+  }
+  for (const auto& [cf, cyl] : holes)
+  {
+    const gp_Dir ax = cyl.Axis().Direction();
+    // The hole's middle along its axis (its face's box centre on the axis).
+    Bnd_Box bb;
+    BRepBndLib::Add(cf, bb, false);
+    const gp_Pnt mid((bb.CornerMin().XYZ() + bb.CornerMax().XYZ()) / 2);
+    const gp_Pnt c = ElCLib::Value(ElCLib::Parameter(gp_Lin(cyl.Axis()), mid), gp_Lin(cyl.Axis()));
+    for (const auto& [pf, pl] : planes)
+    {
+      gp_Dir n = pl.Axis().Direction();
+      if (!pl.Position().Direct())
+        n.Reverse();
+      if (pf.Orientation() == TopAbs_REVERSED)
+        n.Reverse();
+      if (std::abs(n.Dot(ax)) > 1e-9)
+        continue;
+      // Signed: the axis on the material side (inside the plane) is negative.
+      const double s = gp_Vec(pl.Location(), c).Dot(gp_Vec(n));
+      if (s >= 0 || std::abs(-s - (cyl.Radius() + 2 * t)) > 1e-8)
+        continue;
+      const gp_Pnt on_hole = c.Translated(gp_Vec(n) * cyl.Radius());
+      const gp_Pnt on_plane = c.Translated(gp_Vec(n) * -s);
+      if (inside(cf, on_hole) && inside(pf, on_plane))
+        return true;
+    }
+  }
   return false;
 }
 
@@ -1309,6 +1400,8 @@ OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thic
   const double sign = outward ? 1.0 : -1.0;
   if (!outward && in_onshape_mitre_band(solid.shape, removed, thickness))
     fail_op("shell failed (Parasolid can't build this wall: live G51)");
+  if (!outward && offsets_touch(solid.shape, removed, thickness))
+    fail_op("shell failed (Parasolid can't build walls whose offsets touch)");
   Built        b;
   // method: 0 = automatic, 1 = offset only, 2 = slabs only (tests).
   const bool done = (method == 0 && by_regions(solid.shape, removed, thickness, sign, b)) ||
