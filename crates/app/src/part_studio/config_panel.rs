@@ -665,12 +665,34 @@ impl PartStudioView {
             .child(own)
             .when(empty, |d| {
                 d.child(
+                        // Live (part-studio/77, at 1×): the illustration's ink
+                        // 312–461, two text lines from 488, the second ending
+                        // in the help link (as the other panels').
                         v_flex()
                             .items_center()
-                            .pt(px(60.))
-                            .gap(px(10.))
-                            .child(div().opacity(0.15).child(crate::assets::icon("variable-table", 180., cx)))
-                            .child(div().max_w(px(400.)).text_size(px(13.33)).text_color(pal.text_muted).text_center().child("Add variables to drive sketch and feature parameters in the Part Studio.")),
+                            .pt(px(100.))
+                            .child(div().opacity(0.15).child(crate::assets::icon("variable-table", 171., cx)))
+                            .child(
+                                v_flex()
+                                    .mt(px(-1.))
+                                    .items_center()
+                                    .text_size(px(13.33))
+                                    .line_height(px(20.8))
+                                    .text_color(pal.text_muted)
+                                    .child("Add variables to drive sketch and feature parameters in the Part")
+                                    .child(
+                                        h_flex().child("Studio.\u{a0}").child(
+                                            div()
+                                                .id("vt-help")
+                                                .font_weight(FontWeight::BOLD)
+                                                .text_color(gpui_kit::rgb(0x094174))
+                                                .underline()
+                                                .cursor_pointer()
+                                                .child("Learn more about variable tables.")
+                                                .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/variable_table.htm")),
+                                        ),
+                                    ),
+                            ),
                     )
             })
             .into_any_element()
@@ -785,7 +807,9 @@ impl PartStudioView {
                     .child(caret)
                     .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()),
             )
-            .child(div().mt(px(105.)).child(crate::assets::icon("config-illustration", 160., cx)))
+            // Live (part-studio/77, measured at 1×): the illustration's ink
+            // 252–401, the text lines' tops 428, 449, 469, 490 (20.8 px lines).
+            .child(div().mt(px(106.)).child(crate::assets::icon("config-illustration", 154., cx)))
             .child({
                 // Onshape's text in its own four lines (the panel is as wide as
                 // live), the help link continuing the third line (bold,
@@ -801,10 +825,10 @@ impl PartStudioView {
                         .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/configurations.htm"))
                 };
                 v_flex()
-                    .mt(px(18.))
+                    .mt(px(16.))
                     .items_center()
                     .text_size(px(13.33))
-                    .line_height(px(20.))
+                    .line_height(px(20.8))
                     .text_color(pal.text_muted)
                     .child("Add configurations to drive different design variants of a Part")
                     .child("Studio using sketch dimensions of parts and surfaces, feature")
@@ -2074,9 +2098,13 @@ impl PartStudioView {
 
     /// An empty panel's illustration and help text with its "Learn more"
     /// link (live part-studio/77).
-    fn panel_empty_state(&self, illustration: &'static str, size: f32, lines: &[&'static str], link: (&'static str, &'static str), url: &'static str, cx: &mut Context<Self>) -> Div {
+    /// `art`: the illustration, its size and the gap from it to the text
+    /// (the illustrations' margins differ).
+    fn panel_empty_state(&self, art: (&'static str, f32, f32), lines: &[&'static str], link: (&'static str, &'static str), url: &'static str, cx: &mut Context<Self>) -> Div {
+        let (illustration, size, gap) = art;
         let pal = p();
-        let mut text = v_flex().mt(px(16.)).items_center().text_size(px(13.33)).line_height(px(20.)).text_color(pal.text_muted);
+        // Live (part-studio/77): 20.8 px lines (21, 21, 21, 20, 21 at 1×).
+        let mut text = v_flex().mt(px(gap)).items_center().text_size(px(13.33)).line_height(px(20.8)).text_color(pal.text_muted);
         for (i, l) in lines.iter().enumerate() {
             if i + 1 == lines.len() {
                 text = text.child(
@@ -2101,9 +2129,9 @@ impl PartStudioView {
             .items_center()
             .pt(px(4.))
             .child(self.add_custom_tables_button(cx))
-            .child(div().mt(px(95.)).child(self.panel_empty_state(
-                "custom-tables-illustration",
-                160.,
+            // Live (part-studio/77): the illustration's ink from y 252.
+            .child(div().mt(px(98.)).child(self.panel_empty_state(
+                ("custom-tables-illustration", 160., 15.),
                 &[
                     "Custom tables allow you to view information from the current",
                     "Part Studio. They are defined using FeatureScript. Sample or",
@@ -2141,6 +2169,7 @@ impl PartStudioView {
         v_flex()
             .child(
                 h_flex()
+                    .mt(px(3.))
                     .h(px(30.))
                     .px(px(6.))
                     .gap(px(8.))
@@ -2187,10 +2216,10 @@ impl PartStudioView {
                             }),
                     ),
             )
-            .child(self.render_inspection_tools(cx))
-            .child(div().mt(px(60.)).child(self.panel_empty_state(
-                "inspection-illustration",
-                130.,
+            .child(div().mt(px(9.)).child(self.render_inspection_tools(cx)))
+            // Live (part-studio/77): the illustration's ink 304–453 (170 × 149).
+            .child(div().mt(px(93.)).child(self.panel_empty_state(
+                ("inspection-illustration", 172., 9.),
                 &[
                     "Add tolerances to sketch dimensions and feature parameters, or",
                     "add annotations and dimensions with the Inspection panel tools",
@@ -2365,20 +2394,33 @@ impl PartStudioView {
                 });
                 crate::os_menu::open(e.position(), menu, window, cx);
             });
+        // Live (part-studio/77, at 1×): a 46 px #f5f5f5 band across the panel
+        // (from x 1206 to the panel's right edge), the 30 px tools 11 px from
+        // its top, a 1 px #d7d7d7 line one pixel above its bottom.
         h_flex()
-            .h(px(36.))
-            .px(px(6.))
-            .gap(px(4.))
+            .relative()
+            .ml(px(-7.))
+            .mr(px(-6.))
+            .h(px(46.))
+            .pt(px(11.))
+            .items_start()
+            // The scrolling panel body clips the band at x 1207 (live 1206);
+            // the first tool still starts at live's x (ink 1217).
+            .pl(px(5.))
+            .pr(px(6.))
             .bg(gpui_kit::rgb(0xf5f5f5))
+            .child(div().absolute().left_0().right_0().bottom(px(1.)).h(px(1.)).bg(gpui_kit::rgb(0xd7d7d7)))
             // Esc ends the tool (the studio's Cancel action).
+            // Live (dom/psb-r-inspection-1.json): the tools' centers sit 33,
+            // 84, 120, 158, 194 and 230 px right of Datum's.
             .child(tool("insp-datum", "datum", "Datum", cx))
-            .child(h_flex().child(tool("insp-dimension", "dimension", "Dimension", cx)).child(dim_caret))
-            .child(tool("insp-gtol", "insp-gtol", "Geometric tolerance", cx))
-            .child(tool("insp-weld", "insp-weld", "Weld symbol", cx))
-            .child(div().w(px(1.)).h(px(20.)).mx(px(4.)).bg(pal.border))
-            .child(tool("insp-coincident", "coincident", "Set coincident", cx))
-            .child(tool("insp-parallel", "parallel", "Set parallel", cx))
-            .child(tool("insp-align", "insp-text-align", "Set text alignment", cx))
+            .child(h_flex().ml(px(3.)).child(tool("insp-dimension", "dimension", "Dimension", cx)).child(dim_caret))
+            .child(div().ml(px(7.)).child(tool("insp-gtol", "insp-gtol", "Geometric tolerance", cx)))
+            .child(div().ml(px(6.)).child(tool("insp-weld", "insp-weld", "Weld symbol", cx)))
+            .child(div().w(px(1.)).h(px(20.)).mt(px(5.)).ml(px(3.)).bg(pal.border))
+            .child(div().ml(px(4.)).child(tool("insp-coincident", "coincident", "Set coincident", cx)))
+            .child(div().ml(px(6.)).child(tool("insp-parallel", "parallel", "Set parallel", cx)))
+            .child(div().ml(px(6.)).child(tool("insp-align", "insp-text-align", "Set text alignment", cx)))
             .into_any_element()
     }
 

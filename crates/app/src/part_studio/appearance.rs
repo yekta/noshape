@@ -796,7 +796,9 @@ impl PartStudioView {
                 }))
         };
         v_flex()
-            .child(h_flex().w_full().mt(px(-5.)).mx(px(-5.)).child(tab("ap-tab-parts", "Parts and surfaces", !sketches_tab, false, cx)).child(tab("ap-tab-sketches", "Sketches and curves", sketches_tab, true, cx)))
+            // Live (dom/panel-appearance.txt): the tab row has 4 px of top
+            // padding under the title (tabs 111–137, rows from 147).
+            .child(h_flex().w_full().mt(px(-1.)).mx(px(-5.)).child(tab("ap-tab-parts", "Parts and surfaces", !sketches_tab, false, cx)).child(tab("ap-tab-sketches", "Sketches and curves", sketches_tab, true, cx)))
             .child(v_flex().pt(px(10.)).children(rows))
             .into_any_element()
     }

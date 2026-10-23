@@ -963,7 +963,7 @@ impl PartStudioView {
                 .when(active, |d| d.bg(pal.row_hover))
                 // Live (dom/dialog-mass-properties.txt): 26 px empty, 42 with one
                 // chip (16 px label strip + 24 px chip rows) with the border.
-                .child(div().px(px(6.)).flex().items_center().when(empty, |d| d.h(px(24.)).text_size(px(12.))).when(!empty, |d| d.h(px(16.)).pt(px(2.)).text_size(px(10.))).text_color(gpui_kit::rgb(0x555555)).child(label.to_string()))
+                .child(div().px(px(6.)).flex().items_center().when(empty, |d| d.h(px(25.)).pt(px(2.)).text_size(px(12.))).when(!empty, |d| d.h(px(16.)).pt(px(2.)).text_size(px(10.))).text_color(gpui_kit::rgb(0x555555)).child(label.to_string()))
                 .children(items.into_iter().map(|t| h_flex().h(px(24.)).px(px(6.)).text_size(px(13.33)).text_color(if invalid { pal.text_invalid } else { gpui_kit::rgb(0x555555) }).child(div().flex_1().truncate().child(t)).child(div().text_color(pal.text_muted).child("×"))))
         };
         // Label and right-aligned read-only value on an underline (12 px `#666` label).
