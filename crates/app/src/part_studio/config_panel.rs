@@ -979,7 +979,7 @@ impl PartStudioView {
             );
         }
         let cell = || div().w(px(140.)).h(px(34.)).flex_none().px(px(3.)).flex().items_center().border_r_1().border_b_1().border_color(grid).text_size(px(14.));
-        let badge = div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child(usages.len().to_string());
+        let badge = div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child(usages.len().to_string());
         let mut out = section.child(h_flex().border_l_1().border_color(grid).child(cell().bg(crate::theme::p().table_header).justify_center().gap(px(4.)).font_weight(FontWeight::BOLD).child("Usages").child(badge)));
         for u in usages {
             out = out.child(h_flex().border_l_1().border_color(grid).child(cell().child(div().truncate().child(u))));
@@ -1265,7 +1265,7 @@ impl PartStudioView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .when(rk == "true", |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb(0xffffff))))
+                            .when(rk == "true", |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff))))
                             .into_any_element()
                     };
                     let (da, db, vr) = (iid.clone(), rk.clone(), view.clone());
@@ -2743,7 +2743,7 @@ impl Render for VarTableDrag {
             .rounded_full()
             .bg(gpui_kit::rgb(0x0b3d78))
             .text_size(px(13.))
-            .text_color(gpui_kit::rgb(0xffffff))
+            .text_color(gpui_kit::rgb_static(0xffffff))
             .child(self.name.clone())
             .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())
     }

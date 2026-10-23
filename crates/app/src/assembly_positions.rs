@@ -580,7 +580,7 @@ impl AssemblyView {
                                     .border_1()
                                     .border_color(if on { rgb(0x1651b0) } else { rgb(0x888888) })
                                     .bg(if on { rgb(0x1651b0) } else { rgb(0xffffff) })
-                                    .when(on, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(rgb(0xffffff)))),
+                                    .when(on, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                             )
                             .child(div().text_size(px(13.33)).text_color(rgb(0x666666)).child(dof_label(ix)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

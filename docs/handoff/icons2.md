@@ -946,3 +946,55 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
     51 bg(gpui_kit::white()) app-wide; Create button blue on the documents page.
   * Dialogs hole, fillet, linear pattern, mirror, sweep, flange, fastened, revolute, asm linear pattern, replicate:
     icons = live dark.
+
+## Round 18 block 3 (2026-10-23, new icons2 after the approval-prompt hang; predecessor 234b2118)
+- Scratch: everything under /root/icons2-scratch (no /tmp: approval prompts hang the agent). App: tools/app3.sh
+  start|shot NAME|stop (binary copy /root/icons2-scratch/bin/noshape, state in run/, shots in v/, window by PID);
+  tools/sbs3.py OURS LIVE OUT x0 y0 x1 y1 k = live | ours crops.
+- Light disabled dialog ✓: `crate::ui::disabled_accept` (light = #cce9cc fill, so the white ✓ stays white;
+  dark = opacity 0.2 as live dk-978). 15 sites + Insert dialog (which also drew an 18 px `check` glyph instead of
+  the 24 px ok sprite, live dom/dialog-assembly-insert).
+- Mate dialog vs live asw-* / dom/dialog-mate-*: Tangent = flip only (26 px row, icon follows the flag alone:
+  -opposite empty and filled), Width = no tools (22 px help row); neither has the mate-type select.
+  Other types: flip/realign/play/Solve = live (Simulation connection row is simulation, excluded).
+- Relations (gear/rack/screw/linear): type select is now the OsSelect (`os-select-bootstrap`, 8x4 caret) like the
+  mate select, flush at the dialog edge; help ? on the Reverse direction row (live dom/dialog-relation-*).
+- Assembly linear/circular pattern, mirror: connector button = mc-select 20 px in a 26 px button flush against the
+  field (was mate-connector 18/24 with a gap); flips 19 px in 26 (was 18/24); Mirror strategy… = mirror icon 20 px,
+  27 px row, 2 px pad, 14 px text (was part-studio 18). Replicate scope select = OsSelect. Pattern help ? 4 px from
+  the bottom right: over the last checkbox row (linear w/o second direction, circular), else after a 22 px spacer.
+- Sheet metal Bend / Sheet metal model: icons = live (no change).
+- Not icons, for the assembly owner: our Mirror shows "Create mirrored (opposite-handed) parts" which live's
+  dialog doesn't (dom/dialog-asm-mirror-*); Replicate's empty "Parts to find match in" lacks live's pink fill.
+- dialog-ok (every dialog ✓) redrawn by hand as a 2.5-unit stroked polyline with a round joint (20-grid
+  4.4,8.9 8.9,13.5 15.7,5.7), read off the sprite at 200 px on a grid: alpha diff 0.025 -> 0.009. The old flat polygon's
+  arms were ~1 px thinner than live's (assembly/2215, 2262 at 1x). Rule 7: a parameter-search fitter was used first
+  and deleted; the values here are hand-picked. resvg draws the sprite's short arm 1 px lower than Chrome does.
+
+## Round 19 (2026-10-23) — whole-app sweep, cursors, feature/parts-list icons (lead)
+- Tools (scratch): b4/inuse.json = icons the code uses (string literals + format! prefixes: 677 of 737 files;
+  feature-list icons are built from type ids, see b4/feature-icons.txt), tools/dv3.py (ref | ours | diff at 40 px),
+  tools/sc.py NAME FILE... (rank.py's score for candidate files), tools/nat4.py (png refs at the crop's native size +
+  floor), b4/floor*.json. app3.sh: `CFG=/root/icons2-scratch/run/cfgdark` starts the app in dark with a PRIVATE
+  config dir (darkMode in preferences.json; never flip the shared ~/.config/noshape).
+- **Metric floor:** rank.py's 20/40 px score of Onshape's own sprite moved 1/4 px. 77 of the 80 sprite-ref icons
+  above 3 already beat their own floor (e.g. composite-part 5.7 vs floor 14.2): the rest is sub-quarter-pixel.
+  PNG refs scored at native size (nat4.py): all within floor except transparency (blurry ref, CAM-only) and
+  tab-card-empty-assembly (+2.1 grey levels, 100 px hover card, line weight).
+- Fixed: parallel 4.44 -> 2.85 (bar lengths, blue 1.0); part-configured redrawn to the sprite's design (dark-blue
+  table badge top-left, 22.2 -> 1.5; dark file = static colours + white face); dark sheet-metal-end face no longer
+  fills the open box top (excess 2.1 -> 1.1); 12 hatch swatches' tone (median |d| 2.3 -> 1.1 of 255);
+  drawing-suggested-views inner outlines 1 unit; Create drawing tiles drawn at 63.25 (= live's 1.15 px/unit, ink
+  62 px = live); exploded-views-empty 152 -> 170 px, mt 98 -> 81 (live 800: 148x149 ink, ours was 132x131).
+- Map: override-b4.txt (in-use icons that had no ref: part-configured, tab-*, list-underdefined-overlay, ...);
+  projection-first-angle -> sprite:first-angle (was a 400 px png; 6.57 vs floor 10.1).
+- Not fixable / by design: file-pdf, document (rule 6 / third-party marks), calendar, transparency and the
+  view-orientation icons (blurry refs), onshape-labs-blue (noshape cube in the flask, rule 6), hatch textures
+  (moiré in the live crops: matched in tone), ui-dropdown-arrow / expander-* / ui-chevron-down (tinted glyphs or
+  blurry refs; carets match live's collapsed/expanded sprites at 4x to 0.25 px), weld-arrow (+1.5 grey, variants worse).
+- Cursors: docs/parity/cursors.md + live dom/cursors.txt already cover every state; the feature-dialog count
+  cursor row is stale (implemented: part_studio/mod.rs counts the dialog's picks). Live requests filed for the
+  snap-mate drag, fixed-instance drag, busy regen and the Mate connector tool before its first pick.
+- Feature list: 88 feature types; all resolve to icons except hidden copyPart / nameEntity / sheetMetalRecognize
+  (no file: imported docs only). Light: all at or under the floor; dark: every one within 2 of its light score (sheet-metal-end fixed).
+  No live ref for point, refold, unfold, sheet-metal-rip (request filed, with a dark Finish-sheet-metal row).

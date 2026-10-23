@@ -552,3 +552,10 @@ changes. I write the renderer part first (my files) and show crops before touchi
 - Kernel side (lead, 18:00): kern is writing a fast planar-face triangulator in the kernel's mesh.cpp (the big plate's
   two planar faces: 1.65 s of its 2.7 s display mesh in BRepMesh). Display density, LOD and upload stay perf's.
   Rerun the big-plate fixture on CI when it lands.
+- **2026-10-23 (perf): part shading = Onshape's lighting model** (woolsthorpe bundle `lightFragment` and the solid-face
+  vertex shader; COLOR_AMBIENT_FACTOR 0.5, COLOR_DIFFUSE_FACTOR 1, DEFAULT_SHININESS 30 = Shininess 3 % × 1000,
+  DEFAULT_SPECULAR #999999): in sRGB, 0.5·C + max(N·L, 0)·0.5·C + pow(max(N·H, 0), 30)·#999, one light along eye-space
+  (1, 1, 1), H toward the eye; AO multiplies after (Onshape: in sRGB too; ours still linear, to check). `shaders.wgsl`
+  `shade()`; offscreen `part_faces_are_lit_like_onshape` checks all six normals against it and psb's live samples
+  (part-studio/2258: top #8cb9d4, front #4e6876 = 0.5 × #9dcfed). The old fit (one key light in linear space, 0.212
+  ambient) drew faces lighter (front #788a96).

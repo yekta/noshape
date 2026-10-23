@@ -165,7 +165,7 @@ pub(crate) struct ManipValue {
     pub ids: Vec<InstanceId>,
     pub start: HashMap<InstanceId, Placement>,
     pub explode: bool,
-    pub input: Entity<InputState>,
+    pub input: Entity<crate::quantity_field::QuantityInput>,
     _sub: Subscription,
 }
 
@@ -1210,9 +1210,50 @@ impl AssemblyView {
         let Some(s) = &self.pattern else { return div().into_any_element() };
         let kind = s.kind;
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let seed_rows: Vec<AnyElement> = s.seeds.iter().filter_map(|i| names.get(i).cloned()).enumerate().map(|(k, n)| os::query_row(SharedString::from(format!("pat-seed-{k}")), n).into_any_element()).collect();
+        // Live (dom/dialog-asm-*-filled): a chip's tooltip is its label; its ×
+        // ("Delete <label>") removes it.
+        let chip = |id: SharedString, label: String, cx: &mut Context<Self>, remove: Box<dyn Fn(&mut Self)>| -> AnyElement {
+            os::query_row(id.clone(), label.clone())
+                .tooltip(crate::ui::tooltip(label.clone()))
+                .child(
+                    div()
+                        .id(SharedString::from(format!("{id}-x")))
+                        .px(px(5.))
+                        .text_size(px(16.67))
+                        .text_color(rgb(0x666666))
+                        .cursor_pointer()
+                        .tooltip(crate::ui::tooltip(format!("Delete {label}")))
+                        .child("×")
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            remove(this);
+                            this.update_pattern_preview(cx);
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        };
+        let seed_rows: Vec<AnyElement> = s
+            .seeds
+            .iter()
+            .filter_map(|i| names.get(i).cloned().map(|n| (*i, n)))
+            .enumerate()
+            .map(|(k, (id, n))| {
+                chip(
+                    SharedString::from(format!("pat-seed-{k}")),
+                    n,
+                    cx,
+                    Box::new(move |this: &mut Self| {
+                        if let Some(p) = &mut this.pattern {
+                            p.seeds.retain(|x| *x != id);
+                        }
+                    }),
+                )
+            })
+            .collect();
         let instances_label = if kind == PatternDialogKind::Mirror { "Instances to mirror" } else { "Instances" };
-        let instances = os::query_box("pat-instances", instances_label, s.active.is_none(), seed_rows).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+        let seeds_tip = s.seeds.is_empty().then(|| SharedString::from("Select one or more instances."));
+        let instances = os::query_box_tip("pat-instances", instances_label, seeds_tip, s.active.is_none(), seed_rows).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
             if let Some(p) = &mut this.pattern {
                 p.active = None;
             }
@@ -1220,10 +1261,31 @@ impl AssemblyView {
             cx.notify();
         }));
         let axis_box = |this: &Self, id: &'static str, value: &Option<MateConnectorRef>, label: &'static str, field: usize, cx: &mut Context<Self>| {
-            let rows: Vec<AnyElement> = value.as_ref().map(|c| vec![os::query_row(SharedString::from(format!("{id}-v")), (this.labeler(cx))(c)).into_any_element()]).unwrap_or_default();
+            let rows: Vec<AnyElement> = value
+                .as_ref()
+                .map(|c| {
+                    let label = (this.labeler(cx))(c);
+                    vec![chip(
+                        SharedString::from(format!("{id}-v")),
+                        label,
+                        cx,
+                        Box::new(move |this: &mut Self| {
+                            if let Some(p) = &mut this.pattern {
+                                if field == 0 {
+                                    p.axis = None;
+                                } else {
+                                    p.axis2 = None;
+                                }
+                                p.active = Some(field);
+                            }
+                        }),
+                    )]
+                })
+                .unwrap_or_default();
             let active = this.pattern.as_ref().is_some_and(|p| p.active == Some(field));
+            // Live: the field ends where the button starts, both top-aligned.
             h_flex()
-                .gap(px(3.))
+                .items_start()
                 .child(div().flex_1().min_w_0().child(os::query_box(id, label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
                         p.active = Some(field);
@@ -1232,8 +1294,10 @@ impl AssemblyView {
                     this.refresh_scene(false, cx);
                     cx.notify();
                 }))))
-                // The query takes mate connectors: Onshape's mate connector button.
-                .child(div().flex_none().size(px(24.)).flex().items_center().justify_center().child(crate::assets::icon("mate-connector", 18., cx)))
+                // The query takes mate connectors: Onshape's 26 px "Select mate
+                // connector" button, the 20 px mate-connector-button sprite
+                // (live dom/dialog-asm-*-pattern-*, -mirror-*).
+                .child(div().id(SharedString::from(format!("{id}-mc"))).flex_none().size(px(26.)).flex().items_center().justify_center().rounded(px(3.)).hover(|d| d.bg(pal.panel_hover)).tooltip(crate::ui::tooltip("Select mate connector (ctrl+m)")).child(crate::assets::icon("mc-select", 20., cx)))
         };
         let regen_error = self.pattern_regen_error(s, cx);
         // Live E13: a bad count leaves the title black (the field is pink).
@@ -1250,13 +1314,14 @@ impl AssemblyView {
             div()
                 .id(id)
                 .flex_none()
-                .size(px(24.))
+                .size(px(26.))
                 .flex()
                 .items_center()
                 .justify_center()
                 .cursor_pointer()
                 .when(on, |d| d.bg(pal.panel_active))
-                .child(crate::assets::icon(icon, 18., cx))
+                // Live (dom/dialog-asm-*-pattern-*): 20 x 19 flip svgs in a 26 px cell.
+                .child(crate::assets::icon(icon, 19., cx))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     f(this);
                     this.update_pattern_preview(cx);
@@ -1337,16 +1402,19 @@ impl AssemblyView {
                             .id("mir-strategy")
                             .mx(px(3.))
                             .mt(px(5.))
-                            .h(px(28.))
-                            .px(px(6.))
-                            .gap(px(6.))
+                            // Live dom/dialog-asm-mirror-filled: 27 px, 2 px padding,
+                            // the 20 px mirror-button sprite, 14 px text 4 px after it.
+                            .h(px(27.))
+                            .px(px(2.))
+                            .gap(px(4.))
                             .border_1()
                             .border_color(pal.border)
                             .rounded(px(2.))
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("part-studio", 18., cx))
-                            .child(div().text_size(px(13.33)).child("Mirror strategy…")),
+                            .tooltip(crate::ui::tooltip("Select how instances are mirrored."))
+                            .child(crate::assets::icon("mirror", 20., cx))
+                            .child(div().text_size(px(14.)).child("Mirror strategy…")),
                     )
                     .child(os::checkbox("mir-handed", "Create mirrored (opposite-handed) parts", handed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
@@ -1357,31 +1425,19 @@ impl AssemblyView {
             }
             PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {
                 let mate_rows: Vec<AnyElement> = s.mate.and_then(|m| self.assembly(cx).and_then(|a| a.mate(m).map(|x| x.name.clone()))).map(|n| vec![os::query_row("pat-mate-v", n).into_any_element()]).unwrap_or_default();
-                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box("pat-mate", "Mate to be matched", false, mate_rows)));
+                // Live: once the target scope is set, a missing mate is this
+                // field's error (its label's tooltip).
+                let mate_tip = (kind == PatternDialogKind::Replicate && !s.scope_refs.is_empty() && s.mate.is_none()).then(|| SharedString::from("Missing mate to be matched."));
+                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("pat-mate", "Mate to be matched", mate_tip, false, mate_rows)));
                 if kind == PatternDialogKind::Replicate {
                     // Live ("qa5 assembly" 5, help: Replicate 6–7): the match
                     // scope, then "Parts to find match in" (red while empty).
                     use noshape_model::assembly::ReplicateScope;
                     let scope = self.replicate_scope(s, cx);
                     let options: &[ReplicateScope] = if self.replicate_on_edge(s, cx) { &ReplicateScope::EDGE } else { &ReplicateScope::FACE };
-                    let current = options.iter().position(|o| *o == scope).unwrap_or(0);
-                    let opts = options.to_vec();
-                    let view = cx.entity().downgrade();
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::select_field("rep-scope", opts.iter().map(|o| o.label().to_string()).collect(), current, move |i, _, cx| {
-                        let Some(o) = opts.get(i).copied() else { return };
-                        if let Some(v) = view.upgrade() {
-                            v.update(cx, |this, cx| {
-                                if let Some(p) = &mut this.pattern {
-                                    if p.scope != Some(o) {
-                                        p.scope_refs.clear();
-                                    }
-                                    p.scope = Some(o);
-                                }
-                                this.update_pattern_preview(cx);
-                                cx.notify();
-                            });
-                        }
-                    })));
+                    let items = options.iter().map(|o| (SharedString::from(o.label()), SharedString::from(o.label()))).collect();
+                    self.replicate_select.update(cx, |sel, _| sel.set_items(items, scope.label()));
+                    body = body.child(div().id("rep-scope-field").pt(px(6.)).tooltip(crate::ui::tooltip("Face match scope")).child(div().w(px(194.)).h(px(28.)).child(self.replicate_select.clone())));
                     let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
                     let rows: Vec<AnyElement> = s
                         .scope_refs
@@ -1400,7 +1456,8 @@ impl AssemblyView {
                         .collect();
                     let active = s.active == Some(2);
                     // Live (qa5 A19): empty, the field is red (label and border).
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box("rep-parts", "Parts to find match in", active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid).border_color(pal.error)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    let scope_tip = s.scope_refs.is_empty().then(|| SharedString::from("A target scope must be selected."));
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", "Parts to find match in", scope_tip, active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid).border_color(pal.error)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }
@@ -1413,8 +1470,11 @@ impl AssemblyView {
                 // incomplete pattern only greys the ✓ and reddens the fields.
             }
         }
-        // The help ? at the bottom right.
-        body = body.child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
+        // The help ? 4 px from the dialog's bottom right (live
+        // dom/dialog-asm-*): over the last row when that is a checkbox,
+        // else under an os-help-button-row-spacer (22 px with our 2 px pb).
+        let help_over_last = matches!(kind, PatternDialogKind::Circular) || (kind == PatternDialogKind::Linear && !s.second);
+        body = body.relative().when(!help_over_last, |d| d.child(div().h(px(20.)))).child(div().absolute().right(px(4.)).bottom(px(4.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
         let close = |this: &mut Self, cx: &mut Context<Self>| {
             this.pattern = None;
             // Drop the preview.
@@ -1459,7 +1519,8 @@ impl AssemblyView {
                             .text_color(if valid || count_error { pal.text } else { pal.text_invalid })
                             .truncate()
                             .child(s.name.clone())
-                            .when_some(title_tip, |d, t| d.tooltip(crate::ui::tooltip(t))),
+                            // Live: the name, or the regeneration error.
+                            .tooltip(crate::ui::tooltip(title_tip.unwrap_or_else(|| s.name.clone()))),
                     )
                     .child(
                         div()
@@ -1468,7 +1529,7 @@ impl AssemblyView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(pal.accept).when(!valid, |d| d.opacity(0.2))
+                            .bg(pal.accept).when(!valid, crate::ui::disabled_accept)
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
                             .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -1522,30 +1583,36 @@ impl AssemblyView {
             // Plane drags and manipulator moves have no single typed value.
             ManipHandle::Plane(_) | ManipHandle::Center => return,
         };
-        let text = noshape_units::format_quantity(q, &units);
-        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
-        let sub = cx.subscribe_in(&input, window, |this: &mut Self, _, ev: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = ev {
-                this.apply_manip_value(window, cx);
+        use crate::quantity_field::{CommitVia, QuantityEvent, QuantityInput, QuantitySpec};
+        let text = noshape_units::format_quantity(q, &units).replace('°', " deg");
+        // Live (behaviours "qa4 (10-23 a) (4)"): Onshape's canvas number box,
+        // focused with the text selected; Enter / ↑ / ↓ move the part (from
+        // where the drag started) and keep it open; a click on the canvas
+        // discards the text.
+        let dim = if matches!(handle, ManipHandle::Axis(_)) { Dim::LENGTH } else { Dim::ANGLE };
+        let input = cx.new(|cx| QuantityInput::new(text, QuantitySpec::quantity(dim).canvas(), units, window, cx));
+        let sub = cx.subscribe_in(&input, window, |this: &mut Self, _, ev: &QuantityEvent, window, cx| {
+            match ev {
+                QuantityEvent::Committed(CommitVia::Enter | CommitVia::Step) => this.apply_manip_value(cx),
+                // Esc: the text reverts to the last committed value and the
+                // box blurs; it stays shown (live).
+                QuantityEvent::Escape => window.focus(&this.focus, cx),
+                _ => {}
             }
+        });
+        let state = input.read(cx).state().clone();
+        state.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
         });
         self.manip_value = Some(ManipValue { handle, axis: d.plane_normal, center: d.plane_point, ids: d.ids.clone(), start: d.start.clone(), explode: d.explode, input, _sub: sub });
         cx.notify();
     }
 
-    fn apply_manip_value(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn apply_manip_value(&mut self, cx: &mut Context<Self>) {
         let Some(mv) = &self.manip_value else { return };
-        let units = self.units(cx);
-        let dim = if matches!(mv.handle, ManipHandle::Axis(_)) { Dim::LENGTH } else { Dim::ANGLE };
-        let text = mv.input.read(cx).value().to_string();
-        let v = match noshape_units::evaluate_as(&text, dim, &units, &EmptyScope) {
-            Ok(q) => q.value,
-            Err(e) => {
-                self.message = Some((true, format!("{e}")));
-                cx.notify();
-                return;
-            }
-        };
+        // Invalid: the box is pink and nothing moves (live).
+        let Some(v) = mv.input.read(cx).value() else { return };
         if mv.explode {
             // Edit the last explode step's distance / angle.
             let (handle, axis) = (mv.handle, mv.axis);
@@ -1569,47 +1636,78 @@ impl AssemblyView {
             self.apply_solved(solved, cx);
             self.edit(&format!("Move : {name}"), cx, |_| {});
         }
-        window.focus(&self.focus, cx);
-        self.manip_value = None;
+        // The box stays open, focused and selected (live).
         cx.notify();
     }
 
     pub(super) fn render_manip_value(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let pal = p();
+        // During the drag (live: the box is there from the start), the
+        // dragged distance / angle, not yet editable.
+        let dragging = self.drag.as_ref().filter(|d| d.started && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_))));
+        if self.manip_value.is_none()
+            && let Some(d) = dragging
+        {
+            let units = self.units(cx);
+            let q = if matches!(d.handle, Some(ManipHandle::Axis(_))) { Quantity::meters(d.value) } else { Quantity::radians(d.value) };
+            let text = noshape_units::format_quantity(q, &units).replace('°', " deg");
+            let pos = self.manip_box_pos(d.handle?, d.plane_point, cx)?;
+            let pal = p();
+            return Some(
+                div()
+                    .absolute()
+                    .left(px(pos.x as f32 + 8.))
+                    .top(px(pos.y as f32 - 13.))
+                    .w(px(75.))
+                    .h(px(26.))
+                    .px(px(3.))
+                    .flex()
+                    .items_center()
+                    .justify_end()
+                    .border_1()
+                    .border_color(pal.accent)
+                    .text_size(px(13.33))
+                    .text_color(pal.text)
+                    .child(text)
+                    .into_any_element(),
+            );
+        }
         let mv = self.manip_value.as_ref()?;
-        let f = self.manipulator(cx).map(|f| f.origin).unwrap_or(mv.center);
-        let vp = self.viewport.read(cx);
-        let (pos, size) = (vp.project(f)?, vp.size());
-        // Keep the box inside the viewport (left of the triad near the right edge).
-        let pos = DVec2::new(if pos.x + 300.0 > size.x { pos.x - 320.0 } else { pos.x }, pos.y.min(size.y - 60.0));
-        let label = match mv.handle {
-            ManipHandle::Axis(k) => format!("{} distance", ["X", "Y", "Z"][k]),
-            ManipHandle::Ring(k) => format!("Angle about {}", ["X", "Y", "Z"][k]),
-            ManipHandle::Plane(_) | ManipHandle::Center => String::new(),
-        };
+        let pos = self.manip_box_pos(mv.handle, mv.center, cx)?;
+        let input = mv.input.clone();
+        // Live: a bare input, 75 x 26, no label, no buttons.
         Some(
-            h_flex()
+            div()
                 .id("manip-value")
                 .occlude()
                 .absolute()
-                .left(px(pos.x as f32 + 24.))
-                .top(px(pos.y as f32 + 24.))
-                .gap_1()
-                .p_1()
-                .rounded_md()
-                .border_1()
-                .border_color(pal.accent)
-                .bg(pal.panel_raised)
-                .shadow_lg()
-                .child(div().text_xs().text_color(pal.text_muted).child(label))
-                .child(div().w(px(90.)).child(Input::new(&mv.input).xsmall()))
-                .child(Button::new("mv-ok").icon(Icon::empty().path(icon_path("check"))).primary().xsmall().on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.apply_manip_value(window, cx))))
-                .child(Button::new("mv-x").icon(IconName::Close).ghost().xsmall().on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.manip_value = None;
-                    cx.notify();
-                })))
+                .left(px(pos.x as f32 + 8.))
+                .top(px(pos.y as f32 - 13.))
+                .w(px(75.))
+                .h(px(26.))
+                .child(input.clone())
+                // Tab commits and the focus stays in the box (live).
+                .capture_key_down(cx.listener(move |_, e: &KeyDownEvent, window, cx| {
+                    if e.keystroke.key == "tab" {
+                        cx.stop_propagation();
+                        // (The commit moves the part, as Enter does.)
+                        input.update(cx, |q, cx| q.commit_now(window, cx));
+                    }
+                }))
                 .into_any_element(),
         )
+    }
+
+    /// Where the triad's value box sits: next to the dragged arrow's tip
+    /// (the arrows are 1.6 triad sizes long), following the triad.
+    fn manip_box_pos(&self, handle: ManipHandle, fallback: DVec3, cx: &App) -> Option<DVec2> {
+        let tip = match (self.manipulator(cx), handle) {
+            (Some(f), ManipHandle::Axis(k) | ManipHandle::Ring(k)) => f.origin + [f.x(), f.y(), f.z()][k] * self.triad_size() * 1.6,
+            (Some(f), _) => f.origin,
+            (None, _) => fallback,
+        };
+        let vp = self.viewport.read(cx);
+        let (pos, size) = (vp.project(tip)?, vp.size());
+        Some(DVec2::new(pos.x.min(size.x - 90.0), pos.y.min(size.y - 30.0)))
     }
 
     /// Top banner for modes (snap, show mates, explode editing, placing).
@@ -1800,7 +1898,8 @@ impl AssemblyView {
                     .flex_1()
                     .items_center()
                     .child(h_flex().mt(px(2.)).w_full().h(px(34.)).justify_center().bg(rgb(0xeaeaea)).border_l_1().border_b_1().border_color(rgb(0xaaaaaa)).child(add_button("ex-add-top", cx)))
-                    .child(div().mt(px(98.)).child(crate::assets::icon("exploded-views-empty", 152., cx)))
+                    // Live assembly/800: the illustration is 148x149 px of ink at 1489,243.
+                    .child(div().mt(px(81.)).child(crate::assets::icon("exploded-views-empty", 170., cx)))
                     .child(
                         v_flex()
                             .mt(px(22.))
@@ -2641,7 +2740,7 @@ impl Render for ExplodeRollbackDrag {
             .bg(rgb(0x1651b0))
             .text_size(px(13.33))
             .font_weight(FontWeight::SEMIBOLD)
-            .text_color(rgb(0xffffff))
+            .text_color(gpui_kit::rgb_static(0xffffff))
             .child("Rollback bar"))
     }
 }

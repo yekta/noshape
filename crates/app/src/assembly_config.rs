@@ -305,7 +305,7 @@ impl AssemblyView {
         v_flex()
             .items_center()
             .pt(px(8.))
-            .child(h_flex().rounded(px(5.25)).border_1().border_color(border).bg(gpui_kit::white()).child(main).child(caret))
+            .child(h_flex().rounded(px(5.25)).border_1().border_color(border).bg(crate::theme::p().panel).child(main).child(caret))
             .child(div().mt(px(105.)).child(crate::assets::icon("config-illustration", 160., cx)))
             .child(
                 v_flex()

@@ -76,7 +76,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.21 | Shift+V named views | keyboard_shortcuts | ✅ |
 | 2.22 | Shift+R view in high quality (4x finer tessellation, notice) | keyboard_shortcuts | 🔧 |
 | 2.23 | Alt+click selects through transparent geometry | keyboard_shortcuts | 🔧 (isolate/transparent and translucent part appearances) |
-| 2.24 | Perspective view only from the camera menu (no key, like Onshape; O was a noshape extra, removed 10-23); off by default, right-click › Set as default (also Highlight boundary edges), kept per user | View__perspective_view | ✅ |
+| 2.24 | Perspective view only from the camera menu (no key, like Onshape; O was a noshape extra, removed 10-23); off in every new graphics area, per Part Studio tab for the session (no Set as default, no preference: live 10-23 a2); field of view 45° vertical (Graphics preferences) in Part Studios and assemblies | View__perspective_view | ✅ |
 
 ## 3. Selection (Home__selection, Home__select_other, A §5)
 

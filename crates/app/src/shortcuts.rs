@@ -1047,6 +1047,13 @@ mod tests {
     }
 
     #[test]
+    fn a_fresh_graphics_area_is_orthographic() {
+        // Onshape (live 10-23 a2): a new Part Studio, a reloaded tab and
+        // another document all open orthographic; nothing stores it.
+        assert_eq!(noshape_render::Camera::default().projection, noshape_render::Projection::Orthographic);
+    }
+
+    #[test]
     fn o_does_not_toggle_perspective() {
         // Onshape has no key for Perspective view (A-partstudio-ui 6.3): a
         // stray O must not flip the projection. O is the sketch's Offset.

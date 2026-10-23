@@ -241,7 +241,7 @@ impl PartStudioView {
                     .py(px(2.))
                     .text_size(px(13.33))
                     .cursor_pointer()
-                    .hover(|d| d.bg(gpui_kit::rgb(0x1e90ff)).text_color(gpui_kit::rgb(0xffffff)))
+                    .hover(|d| d.bg(gpui_kit::rgb(0x1e90ff)).text_color(gpui_kit::rgb_static(0xffffff)))
                     .child(n.clone())
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(m) = &mut this.ui.material_panel {
@@ -465,7 +465,7 @@ impl PartStudioView {
                                 .flex()
                                 .items_center()
                                 .justify_center()
-                                .bg(pal.accept).when(!can_apply, |d| d.opacity(0.2))
+                                .bg(pal.accept).when(!can_apply, crate::ui::disabled_accept)
                                 .when(can_apply, |d| d.cursor_pointer())
                                 .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_material(cx))),

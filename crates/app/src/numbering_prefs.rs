@@ -147,7 +147,7 @@ fn select(id: &'static str, value: &str, open: bool, width: f32, options: Vec<St
 }
 
 fn option(id: SharedString, text: &'static str) -> Stateful<Div> {
-    div().id(id).px(px(10.)).py(px(4.)).text_size(px(14.)).cursor_pointer().hover(|d| d.bg(rgb(0x1e90ff)).text_color(rgb(0xffffff))).child(text)
+    div().id(id).px(px(10.)).py(px(4.)).text_size(px(14.)).cursor_pointer().hover(|d| d.bg(rgb(0x1e90ff)).text_color(gpui_kit::rgb_static(0xffffff))).child(text)
 }
 
 /// A 34 px bordered box of the flow chart (inputs and previews).

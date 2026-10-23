@@ -480,7 +480,10 @@ impl MateDialog {
             let edit_tip = format!("{text} (Click to edit)");
             let bold = self.editing_field == Some(field);
             rows.push(
-                os::query_row(SharedString::from(format!("mc-field-{field}")), text)
+                os::query_row(SharedString::from(format!("mc-field-{field}")), text.clone())
+                    // Live: the chip's tooltip ("Mate connector of Part 1 <2>
+                    // (Click to edit)"; Tangent's faces: the label).
+                    .tooltip(crate::ui::tooltip(if self.mate_type == MateType::Tangent { text.to_string() } else { format!("{text} (Click to edit)") }))
                     .when(bold, |d| d.font_weight(FontWeight::BOLD))
                     .when(lost.is_some(), |d| d.text_color(pal.text_invalid))
                     .hover(|d| d.bg(pal.row_hover))
@@ -688,7 +691,10 @@ impl Render for MateDialog {
         // flip-direction while Onshape's flip flag is off, -opposite when on.
         // Live (qa5 MT1): until both connectors are picked the icon points
         // up-right, whatever the flag.
-        let flip_shown = self.flip_primary || self.a.is_none() || self.b.is_none();
+        // Live dom/dialog-mate-tangent-empty / -filled: Tangent shows the flag
+        // alone (-opposite in both).
+        let flip_shown = self.flip_primary || (t != MateType::Tangent && (self.a.is_none() || self.b.is_none()));
+        let full_row = !matches!(t, MateType::Tangent | MateType::Width);
         let (flip_icon, reorient_icon) = (crate::assets::icon(flip_icon_name(flip_shown), 20., cx), crate::assets::icon("realign-mate-dialog", 20., cx));
         let small_tool = |id: &'static str, icon: AnyElement, tip: &'static str, on: bool| {
             div()
@@ -746,7 +752,7 @@ impl Render for MateDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(pal.accept).when(invalid, |d| d.opacity(0.2))
+                            .bg(pal.accept).when(invalid, crate::ui::disabled_accept)
                             .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
                             .child(crate::assets::icon("dialog-ok", 24., cx))
@@ -771,7 +777,8 @@ impl Render for MateDialog {
                 // below, 5 px before the 27 px checkbox rows (no gaps).
                 v_flex()
                     .pb(px(2.))
-                    .child(div().h(px(28.)).child(type_field))
+                    // Live dom/dialog-mate-tangent-*, -width-*: no mate type select.
+                    .when(full_row, |d| d.child(div().h(px(28.)).child(type_field)))
                     .children(query_boxes.into_iter().map(|q| div().px(px(3.)).pt(px(5.)).child(q)))
                     .child(div().h(px(5.)))
                     .when(t == MateType::Tangent, |d| {
@@ -798,20 +805,23 @@ impl Render for MateDialog {
                         .when(self.use_limits, |d| d.child(limit_rows))
                     })
                     // Onshape's bottom row: flip primary axis, reorient secondary
-                    // axis, animate, Solve; the help ? at the right.
+                    // axis, animate, Solve; the help ? at the right. Live
+                    // dom/dialog-mate-tangent-*: Tangent has only the flip (26 px
+                    // row); dialog-mate-width-*: Width has no tools, only the help
+                    // row (os-help-button-row-spacer, 22 px).
                     .child(
                         h_flex()
-                            .h(px(30.))
+                            .h(px(match t { MateType::Width => 22., MateType::Tangent => 26., _ => 30. }))
                             .px(px(3.))
                             .gap(px(4.))
-                            .child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx))))
-                            .child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .when(t != MateType::Width, |d| d.child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx)))))
+                            .when(full_row, |d| d.child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.reorient = (this.reorient + 1) % 4;
                                 cx.emit(MateDialogEvent::Changed);
                                 cx.notify();
-                            })))
+                            }))))
                             // Animate: preview the mate's motion (mates with degrees of freedom).
-                            .map(|d| {
+                            .when(full_row, |d| {
                                 let can = !noshape_model::assembly::eval::mate_dofs(t).is_empty();
                                 d.child(
                                     div()
@@ -836,7 +846,7 @@ impl Render for MateDialog {
                                         })),
                                 )
                             })
-                            .child(
+                            .when(full_row, |d| d.child(
                                 // Live dom dialog-mate-fastened-filled: 52 x 21, 1 px
                                 // `#aaa`, radius 3.5, 12.25 px.
                                 div()
@@ -856,11 +866,12 @@ impl Render for MateDialog {
                                     .child("Solve")
                                     .tooltip(crate::ui::tooltip("Solve full assembly"))
                                     .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Solve))),
-                            )
+                            ))
                             .child(div().flex_1())
                             .child(
                                 div()
                                     .size(px(14.))
+                                    .when(t == MateType::Tangent, |d| d.mt(px(4.)))
                                     .mr(px(4.))
                                     .rounded_full()
                                     

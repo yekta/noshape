@@ -123,7 +123,7 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                         .border_1()
                         .border_color(rgb(if on { 0x0d6efd } else { 0xaaaaaa }))
                         .bg(rgb(if on { 0x0d6efd } else { 0xffffff }))
-                        .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(rgb(0xffffff)))),
+                        .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                 )
                 // GPUI has no inline boxes: the ? sits after the label's last line.
                 .child(
