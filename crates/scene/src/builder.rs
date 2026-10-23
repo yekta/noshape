@@ -177,6 +177,8 @@ pub struct SceneOptions {
     /// Section view clipping planes (normal, offset along normal), up to
     /// three; geometry is cut away where all of them clip it.
     pub section: Vec<(glam::DVec3, f64)>,
+    /// The section plane being edited (drawn selected, see `Scene::clip_selected`).
+    pub section_selected: Option<usize>,
     /// Per-vertex colors (sRGB) replacing a body's color: analysis maps
     /// and face appearances. Indexed like the body's mesh positions.
     pub vertex_colors: Option<VertexColors>,
@@ -635,6 +637,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     let mut planes = opts.section.iter().map(|(n, d)| noshape_render::ClipPlane::new(n.as_vec3(), *d as f32));
     scene.clip = planes.next();
     scene.clip_extra = planes.take(2).collect();
+    if let Some(slot) = opts.section_selected.and_then(|i| scene.clip_selected.get_mut(i)) {
+        *slot = true;
+    }
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
     BuiltScene { scene, picks, static_instances }
@@ -758,7 +763,7 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, error: bool, up: &Uploader) -> Scene {
     let _t = noshape_render::perf::scope("s.with_highlights");
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), compare: built.scene.compare };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4])> = Vec::new();
     let mut overlay_lines = LineData::default();

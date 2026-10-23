@@ -624,6 +624,10 @@ pub struct Scene {
     /// Up to two more section planes (with `clip`): geometry is removed
     /// where all planes clip it.
     pub clip_extra: Vec<ClipPlane>,
+    /// Section planes drawn selected (`clip` first, then `clip_extra`): the
+    /// one being edited in the Section view dialog. Onshape mixes its cap 80%
+    /// toward the section pre-highlight color (webgl endcap shader).
+    pub clip_selected: [bool; 3],
     /// Compare mode: instances tagged [`Instance::compare`] are the two
     /// versions (see [`compare`]).
     pub compare: Option<Compare>,

@@ -463,17 +463,25 @@ pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usi
 /// [`select_field`] with `disabled` options (greyed, not pickable: an
 /// `<option disabled>`).
 pub fn select_field_with(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
-    select_field_inner(id, options, disabled, current, None, on_select)
+    select_field_inner(id, options, disabled, current, None, false, on_select)
+}
+
+/// A plain `<select>` styled as an Onshape list field (`ns-enum-value`,
+/// live Named views, psb/nv-911): 26 px, a 1 px `#d7d7d7` underline only,
+/// black 14 px text 7 px in, Chrome's `#777` arrow 6 px from the end; it
+/// opens Chrome's native list like [`select_field`].
+pub fn select_field_flat(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, disabled, current, None, true, on_select)
 }
 
 /// [`select_field`] as a Tab stop (`focus`): a focused select opens with
 /// Space, Enter or ↓, as a `<select>` (live Change configuration: Tab walks
 /// Configuration, List input 1, d, ?).
 pub fn select_field_focusable(id: impl Into<ElementId>, options: Vec<String>, current: usize, focus: &FocusHandle, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
-    select_field_inner(id, options, Vec::new(), current, Some(focus.clone()), on_select)
+    select_field_inner(id, options, Vec::new(), current, Some(focus.clone()), false, on_select)
 }
 
-fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, focus: Option<FocusHandle>, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, focus: Option<FocusHandle>, flat: bool, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
     let pal = p();
     let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
     let on_select = Rc::new(on_select);
@@ -510,24 +518,23 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
                 })
         })
         .relative()
-        .h(px(34.))
         .w_full()
         .flex()
         .items_center()
-        .pl(px(11.))
-        .pr(px(10.))
-        .rounded(px(5.25))
-        .border_1()
-        .border_color(rgb(0xaaaaaa))
+        .when(!flat, |d| d.h(px(34.)).pl(px(11.)).pr(px(10.)).rounded(px(5.25)).border_1().border_color(rgb(0xaaaaaa)).text_color(pal.text))
+        .when(flat, |d| d.h(px(26.)).pl(px(6.)).pr(px(6.)).border_b_1().border_color(rgb(0xd7d7d7)).text_color(rgb(0x000000)))
         .bg(rgb(0xffffff))
         .cursor_pointer()
         .text_size(px(14.))
-        .text_color(pal.text)
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .child(div().flex_1().truncate().child(label))
         .child(glyph(GLYPH_CARET, 8., rgb(0x777777))) // live assembly/181-182: `#777`
         .on_click(move |_, window, cx| open(window, cx))
 }
+
+/// A solid circled × (Named views "Remove view", live psb/nv-911): the disc
+/// in `currentColor` with the × cut out (our own drawing).
+pub const GLYPH_REMOVE_CIRCLE: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><mask id="rc-m" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20"><rect width="20" height="20" fill="#fff"/><path d="M6.5 6.5L13.5 13.5M13.5 6.5L6.5 13.5" stroke="#000" stroke-width="2.1"/></mask><circle cx="10" cy="10" r="7" fill="currentColor" mask="url(#rc-m)"/></svg>"##;
 
 // Feature Studio toolbar and search pane glyphs (our own drawings).
 pub const GLYPH_ARROW_LEFT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 10H2.5M7.4 4.6 2.5 10l4.9 5.4"/></svg>"#;
