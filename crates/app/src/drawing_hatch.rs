@@ -22,7 +22,6 @@ use gpui_kit::*;
 use noshape_model::drawing::ViewId;
 use noshape_model::drawing::hatch_pat::{self, GROUPS};
 use noshape_model::drawing::sheet_sketch::HatchRegion;
-use noshape_sketch::DVec2;
 
 /// A closed profile: outer boundary and holes (sheet mm).
 pub type Profile = (Vec<[f64; 2]>, Vec<Vec<[f64; 2]>>);
@@ -122,60 +121,12 @@ impl DrawingEditor {
         if self.hatch_dlg.is_none() || !matches!(self.tool, Tool::Select) {
             return false;
         }
-        let c = DVec2::new(self.cursor[0], self.cursor[1]);
-        let regions = self.sketch().sketch.regions();
-        let pts = |l: &noshape_sketch::ProfileLoop| l.tessellate(0.05).into_iter().map(|p| [p.x, p.y]).collect::<Vec<_>>();
-        // The smallest closed sketch profile containing the point, else the
-        // smallest closed region of the view's visible edges.
-        let picked = match regions.iter().filter(|r| r.contains(c)).min_by(|a, b| a.area().abs().total_cmp(&b.area().abs())) {
-            Some(r) => Some(((pts(&r.outer), r.holes.iter().map(pts).collect()), None)),
-            None => self.view_region_at(self.cursor),
-        };
-        let Some(picked) = picked else { return true };
+        let Some(picked) = self.pk().hatch_profile_at(self.cursor) else { return true };
         if let Some(d) = &mut self.hatch_dlg {
-            // A profile already in the list toggles off.
-            match d.profiles.iter().position(|p| *p == picked) {
-                Some(i) => {
-                    d.profiles.remove(i);
-                }
-                None if d.edit.is_some() => d.profiles = vec![picked],
-                None => d.profiles.push(picked),
-            }
+            noshape_scene::drawing_tools::hatch_toggle(&mut d.profiles, picked, d.edit.is_some());
         }
         self.hatch_preview(cx);
         true
-    }
-
-    /// The closed region of a view's visible edges around a sheet point
-    /// (view coordinates). Detail and break views take no hatches.
-    fn view_region_at(&mut self, s: [f64; 2]) -> Option<(Profile, Option<ViewId>)> {
-        use noshape_model::drawing::ViewKind;
-        let v = self.view_at(s)?;
-        let view = self.current_sheet().view(v)?;
-        if matches!(view.kind, ViewKind::Detail { .. }) || !view.breaks.is_empty() {
-            return None;
-        }
-        let pl = self.placement(v)?;
-        let g = self.geoms.get(&v)?;
-        let mut sk = noshape_sketch::Sketch::new();
-        let mut n = 0;
-        for e in g.edges.iter().filter(|e| e.visible) {
-            for w in e.points.windows(2) {
-                if ((w[1][0] - w[0][0]).powi(2) + (w[1][1] - w[0][1]).powi(2)).sqrt() > 1e-9 {
-                    sk.add_line(DVec2::new(w[0][0], w[0][1]), DVec2::new(w[1][0], w[1][1]));
-                    n += 1;
-                }
-            }
-            if n > 6000 {
-                break;
-            }
-        }
-        let p = pl.to_view(s);
-        let c = DVec2::new(p[0], p[1]);
-        let regions = sk.regions();
-        let r = regions.iter().filter(|r| r.contains(c)).min_by(|a, b| a.area().abs().total_cmp(&b.area().abs()))?;
-        let pts = |l: &noshape_sketch::ProfileLoop| l.tessellate(1e-5).into_iter().map(|p| [p.x, p.y]).collect::<Vec<_>>();
-        Some(((pts(&r.outer), r.holes.iter().map(pts).collect()), Some(v)))
     }
 
     /// Ids for the dialog's regions: the edited one, else new ones.
@@ -229,12 +180,7 @@ impl DrawingEditor {
             self.refresh(cx);
         } else {
             let edit = d.edit;
-            self.edit_sheet(if edit.is_some() { "Edit hatch" } else { "Hatch region" }, cx, |s| {
-                if let Some(id) = edit {
-                    s.sketch.hatches.retain(|x| x.id != id);
-                }
-                s.sketch.hatches.extend(regions);
-            });
+            self.edit_sheet(if edit.is_some() { "Edit hatch" } else { "Hatch region" }, cx, |s| noshape_scene::drawing_tools::apply_hatches(&mut s.sketch, edit, regions));
         }
         self.status = None;
         cx.notify();
