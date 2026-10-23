@@ -225,6 +225,7 @@ impl Render for ThemingPrefsView {
                     crate::theme::set_dark(this.edited);
                     // The viewports rebuild their scenes in the new colors.
                     crate::graphics_prefs::set(crate::graphics_prefs::get(cx), false, cx);
+                    crate::apply_kit_theme(cx);
                     cx.refresh_windows();
                     toast(crate::i18n::tr("Theme updated."), cx);
                 })))),
