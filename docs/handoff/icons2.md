@@ -765,7 +765,7 @@ remove-selection, snap-mate, zoom-in).
   * Selection-list × (kit Close 11/12) -> ui-clear 9 px #666 in create_selection.rs (red on group hover),
     draft_tool.rs, section.rs, flatten_tool.rs. Animate dialog chip × -> ui-clear 10 px #666 in a 20x24 span.
   * Assign material panel: verified in app = live (context/r13-am2.png).
-- Open (not done): Section view chip × is hover-only in ours (section.rs `.opacity(0.)` + group_hover), live always
+- (DONE 10-23, verified in app = live part-studio/71: × always shown, plane 20 px = 17x18 ink) Was open: Section view chip × is hover-only in ours (section.rs `.opacity(0.)` + group_hover), live always
   shows it; its add-plane icon is `plane` 16 px, live ~18x18 ink (part-studio/71). Remaining kit icons: Close in
   release_dialog (x2), isolate_ui, reflection, view_tools, behaviors dep-close (x2), assembly_behaviors (shortcuts,
   group x, measure x), assembly_panels mv-x, analysis hq-off; Check ticks in checkboxes (ours ≈ live glyph);
@@ -881,3 +881,13 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
 - Scores (d20) all <= 3.3 except snap-mode 4.8, stack-closest 2.9; was 9-47. Worst three static: standard-content
   4.1 -> 0.5 (washer face moved to the washer), menu-delete 5.4 (white X instead of a white disc; the rest is our
   light art's size, matched to the live menu), mate-connector-qlv-item stays 4.4 (sub-pixel ring placement).
+
+## Round 18 (2026-10-23) — leftovers, dark sweep of the whole app (lead)
+- Block 1: menu-delete redrawn on the sprite's geometry (disc r7 centred, X arms ±3.5 width 2): live's menu disc
+  is 11 px at 16 = the sprite's size (live menus/rmb-asm-list-instance.png), ours was 12.2 and 0.5 px off. light 0.07.
+  Inspection empty-state illustration 130 -> 172 px (live part-studio/77). Section chip ×/plane were already done.
+  anim-reverse = 16x18 ink at 20 (live ~16x17): done. importDerived/importForeign icons: done.
+- Kit icons left WITHOUT a live reference: release_dialog Close x2 (Release is "Upgrade" on our live account),
+  analysis hq-off, thickness Loader/ChevronDown, start_window TriangleAlert (broken document). Assembly triad value
+  box (assembly_panels mv-ok/mv-x): live 2306-2309 is a bare input box with no ✓/× and no label: a layout change
+  for the assembly owner, not an icon swap (reported to the lead).

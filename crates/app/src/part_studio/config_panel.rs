@@ -2190,7 +2190,8 @@ impl PartStudioView {
             .child(self.render_inspection_tools(cx))
             .child(div().mt(px(60.)).child(self.panel_empty_state(
                 "inspection-illustration",
-                130.,
+                // Live part-studio/77: 172 px wide.
+                172.,
                 &[
                     "Add tolerances to sketch dimensions and feature parameters, or",
                     "add annotations and dimensions with the Inspection panel tools",
