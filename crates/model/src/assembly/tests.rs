@@ -3522,3 +3522,18 @@ fn as568_o_rings_match_live() {
     let bb = r.context.body(&standard::part_body(&r).unwrap()).unwrap().shape.bounding_box(true).unwrap();
     assert!(((bb.max.x - bb.min.x) * 1e3 - (2.0 + 2.0 * 1.8)).abs() < 1e-3, "{bb:?}");
 }
+
+/// Sizes live lists but can't build (behaviours "skb (10-23 14:00)"): listed
+/// in live's order with the server's message; no geometry.
+#[test]
+fn failing_standard_sizes_are_listed_with_live_errors() {
+    use super::standard::CATALOGUE;
+    let c = CATALOGUE.iter().find(|c| c.name == "Half dog point hex socket set screw").unwrap();
+    let names = c.size_names();
+    assert_eq!(&names[names.len() - 2..], ["1-8", "1-12"]);
+    assert_eq!(c.failure("1-8"), Some("Not found."));
+    assert!(c.size("1-8").is_none() && c.failure("7/8-9").is_none());
+    let k = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
+    assert_eq!(k.size_names().last(), Some(&"440mm - 550mm"));
+    assert_eq!(k.failure("440mm - 550mm"), Some("com.belmonttech.service.exception.BTBadRequestException: Feature script error: @stringToNumber: String is not a number"));
+}

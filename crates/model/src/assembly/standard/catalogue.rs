@@ -77,6 +77,17 @@ pub struct Param {
     pub forms: BTreeMap<String, BTreeMap<String, f64>>,
 }
 
+/// A size of live's Size list whose configuration the server can't build
+/// (behaviours.md "skb (10-23 14:00)").
+#[derive(Clone, Debug, Deserialize)]
+pub struct FailingSize {
+    pub name: String,
+    /// Its position in live's Size list.
+    pub index: usize,
+    /// The server's message, after "Standard content component failed to solve. ".
+    pub message: String,
+}
+
 /// One size row.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -153,6 +164,10 @@ pub struct Component {
     #[serde(default)]
     pub params: Vec<Param>,
     pub sizes: Vec<Size>,
+    /// Sizes live lists but can't build (the server's error): picking one
+    /// shows the message; see [`Component::failure`].
+    #[serde(default)]
+    pub failing: Vec<FailingSize>,
     /// The size it opens on when not the first (live: the ANSI Type A
     /// washer opens on 3/8).
     #[serde(default)]
@@ -222,7 +237,8 @@ impl Component {
         self.sizes.iter().find(|s| s.name == name)
     }
 
-    /// Size names in live's order (rows differing by parameters once).
+    /// Size names in live's order (rows differing by parameters once),
+    /// failing sizes included at their places.
     pub fn size_names(&self) -> Vec<&str> {
         let mut out: Vec<&str> = Vec::new();
         for s in &self.sizes {
@@ -230,7 +246,15 @@ impl Component {
                 out.push(&s.name);
             }
         }
+        for f in &self.failing {
+            out.insert(f.index.min(out.len()), &f.name);
+        }
         out
+    }
+
+    /// The server's error for a size live lists but can't build.
+    pub fn failure(&self, size: &str) -> Option<&str> {
+        self.failing.iter().find(|f| f.name == size).map(|f| f.message.as_str())
     }
 
     /// The size a component opens on (live: the first, or `default_size`).

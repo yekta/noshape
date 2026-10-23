@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, LazyLock};
 
 mod catalogue;
-pub use catalogue::{CATALOGUE, Component, Param, Shape, Size, ThreadRule};
+pub use catalogue::{CATALOGUE, Component, FailingSize, Param, Shape, Size, ThreadRule};
 
 /// Tab id of the built-in standard content Feature Studio (never a tab of a
 /// user document).

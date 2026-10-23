@@ -37131,59 +37131,21 @@
        "2.5",
        "3"
       ]
-     },
-     {
-      "name": "1-8",
-      "label": "Half dog point hex socket set screw 1-8",
-      "d": 1.0,
-      "dims": {
-       "dp": 0.75,
-       "z": 0.26,
-       "d": 1.0,
-       "sd": 0.562,
-       "t": 0.562,
-       "lts": 0.0
-      },
-      "lengths": [
-       "0.75",
-       "0.875",
-       "1",
-       "1.5",
-       "2",
-       "2.5",
-       "3",
-       "4",
-       "4.5",
-       "5"
-      ]
-     },
-     {
-      "name": "1-12",
-      "label": "Half dog point hex socket set screw 1-12",
-      "d": 1.0,
-      "dims": {
-       "dp": 0.75,
-       "z": 0.26,
-       "d": 1.0,
-       "sd": 0.562,
-       "t": 0.562,
-       "lts": 0.0
-      },
-      "lengths": [
-       "0.75",
-       "0.875",
-       "1",
-       "1.5",
-       "2",
-       "2.5",
-       "3",
-       "4",
-       "4.5",
-       "5"
-      ]
      }
     ],
     "source": "Onshape standard content table DATA_AI_SOCKET_SET_SCREW_HALF_DOG_POINT_MAIN (document 6a1bb71cfe7ce8963f9ff7cc, version V9)",
+    "failing": [
+     {
+      "name": "1-8",
+      "index": 33,
+      "message": "Not found."
+     },
+     {
+      "name": "1-12",
+      "index": 34,
+      "message": "Not found."
+     }
+    ],
     "defaultSize": "5/8-18"
    },
    {
@@ -38265,59 +38227,21 @@
        "2.5",
        "3"
       ]
-     },
+     }
+    ],
+    "source": "Onshape standard content table DATA_AI_SOCKET_SET_SCREW_HALF_DOG_POINT_MAIN (document 336e5e2929d2addd52df6560, version V9)",
+    "failing": [
      {
       "name": "1-8",
-      "label": "Nylon tip point hex socket set screw 1-8",
-      "d": 1.0,
-      "dims": {
-       "dp": 0.75,
-       "z": 0.26,
-       "d": 1.0,
-       "sd": 0.562,
-       "t": 0.562,
-       "lts": 0.0
-      },
-      "lengths": [
-       "0.75",
-       "0.875",
-       "1",
-       "1.5",
-       "2",
-       "2.5",
-       "3",
-       "4",
-       "4.5",
-       "5"
-      ]
+      "index": 33,
+      "message": "Not found."
      },
      {
       "name": "1-12",
-      "label": "Nylon tip point hex socket set screw 1-12",
-      "d": 1.0,
-      "dims": {
-       "dp": 0.75,
-       "z": 0.26,
-       "d": 1.0,
-       "sd": 0.562,
-       "t": 0.562,
-       "lts": 0.0
-      },
-      "lengths": [
-       "0.75",
-       "0.875",
-       "1",
-       "1.5",
-       "2",
-       "2.5",
-       "3",
-       "4",
-       "4.5",
-       "5"
-      ]
+      "index": 34,
+      "message": "Not found."
      }
-    ],
-    "source": "Onshape standard content table DATA_AI_SOCKET_SET_SCREW_HALF_DOG_POINT_MAIN (document 336e5e2929d2addd52df6560, version V9)"
+    ]
    },
    {
     "category": "Bolts & screws",

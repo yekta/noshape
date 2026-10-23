@@ -4918,6 +4918,36 @@ impl AssemblyView {
                     .into_any_element(),
             );
         }
+        // Standard content's red toasts (live: stacked at the top centre).
+        if !self.ui.std.toasts.is_empty() {
+            let mut col = v_flex().gap(px(4.)).items_center();
+            for (i, t) in self.ui.std.toasts.iter().enumerate() {
+                col = col.child(crate::os_ui::message_bubble(
+                    SharedString::from(format!("std-toast-{i}")),
+                    crate::ui::AlertKind::Error,
+                    t.clone(),
+                    cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if i < this.ui.std.toasts.len() {
+                            this.ui.std.toasts.remove(i);
+                        }
+                        cx.notify();
+                    }),
+                    cx,
+                ));
+            }
+            out.push(
+                div()
+                    .absolute()
+                    .top(px(9.))
+                    .left_0()
+                    .right_0()
+                    .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() }))
+                    .flex()
+                    .justify_center()
+                    .child(col)
+                    .into_any_element(),
+            );
+        }
         if let Some(el) = self.render_mini_toolbar(cx) {
             out.push(el);
         }
