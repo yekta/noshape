@@ -372,6 +372,8 @@ impl MateDialog {
     /// Live's title tooltip text: "<name> did not regenerate properly: <message>".
     fn regen_error(&self, cx: &App) -> Option<String> {
         let incomplete = match self.mate_type {
+            // Live: "Nothing selected." while empty, then "Tangent mate needs two entities.".
+            MateType::Tangent if self.a.is_none() && self.b.is_none() => Some("Nothing selected."),
             MateType::Tangent if self.a.is_none() || self.b.is_none() => Some("Tangent mate needs two entities."),
             MateType::Width if self.a.is_none() || self.b.is_none() || self.c.is_none() => Some("Two width mate connectors are required."),
             MateType::Tangent | MateType::Width => None,
@@ -563,7 +565,7 @@ impl Render for MateDialog {
         // hangs under the emptied field, plain rows, the current type blue.
         let types: Vec<MateType> = if MATE_TYPE_ORDER.contains(&t) { MATE_TYPE_ORDER.to_vec() } else { vec![t] };
         self.type_select.update(cx, |sel, _| sel.set_items(types.iter().map(|mt| (SharedString::from(mt.name()), SharedString::from(mt.name()))).collect(), t.name()));
-        let type_field = div().w(px(194.)).child(self.type_select.clone());
+        let type_field = div().id("mate-type-field").w(px(194.)).tooltip(crate::ui::tooltip("Mate type")).child(self.type_select.clone());
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;
         let lkeys = limit_keys(t);
@@ -733,7 +735,8 @@ impl Render for MateDialog {
                             .text_color(if regen_error.is_some() { pal.text_invalid } else { pal.text })
                             .truncate()
                             .child(self.name.clone())
-                            .when_some(regen_error, |d, t| d.tooltip(crate::ui::tooltip(t))),
+                            // Live: the title's tooltip is the name, or the regeneration error.
+                            .tooltip(crate::ui::tooltip(regen_error.unwrap_or_else(|| self.name.clone()))),
                     )
                     // Configure mode: only ✕ (live 194).
                     .when(self.configuring.is_none(), |d| d.child(
@@ -851,7 +854,7 @@ impl Render for MateDialog {
                                     .cursor_pointer()
                                     .hover(|d| d.bg(gpui_kit::rgb(0xe6e6e6)))
                                     .child("Solve")
-                                    .tooltip(crate::ui::tooltip("Solve all mates including this one"))
+                                    .tooltip(crate::ui::tooltip("Solve full assembly"))
                                     .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Solve))),
                             )
                             .child(div().flex_1())
