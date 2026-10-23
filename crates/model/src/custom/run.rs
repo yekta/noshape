@@ -282,7 +282,7 @@ pub(crate) fn run_editing_logic(
     let new_def = definition(&cx, decls, &news, &ev, None).ok()?;
     let mut flags = Map::new();
     for d in decls {
-        flags.insert(Value::str(d.id.as_str()), Value::bool(specified.iter().any(|s| *s == d.id)));
+        flags.insert(Value::str(d.id.as_str()), Value::bool(specified.contains(&d.id)));
     }
     let args = vec![cx.value(), host::id_value(&[Arc::<str>::from(feature.to_string())]), old_def, new_def.clone(), Value::map(flags), query_of_refs(&cx, &hidden)];
     let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())));
