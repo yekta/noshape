@@ -444,3 +444,13 @@ banding on the side faces).
 
 Note: opening a .noshape whose stale `-wal` / `-shm` (from an older file of the same name) sit beside it panics at start
 ("could not open document: unknown branch …", main.rs:348 `expect`) instead of an error dialog; same code on main.
+
+## v0.4.6 candidate c /tmp/lead/noshape-v046c (release/v0.4.6 + psb 9b27922), 2026-10-23 02:50–03:10, qa4
+**PASS** on the two rows asked for.
+- (b) failed Extrude (Up to face, failext.noshape): the input region (10×10 square at x 50–60) is drawn with a red outline
+  and a light red fill, as live part-studio/2028; title / row red, tooltip exact, ✓ enabled. Still different from 2028:
+  live draws the region's **4 vertices as grey dots** and the **extrude direction arrow** on the region; noshape shows
+  neither in the failed state (open, psb).
+- (a) lp wall over (fresh CLI model): Reapply off red with the exact tooltip, seed wall + Right plane red; Reapply on two
+  walls, 20042 mm³.
+- Test note: a model accepted with Reapply on in an earlier run keeps it (file saved); rebuild the models for each run.
