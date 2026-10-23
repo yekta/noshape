@@ -54,3 +54,14 @@ STATUS PAT-DIR: fixed on release/v0.4.7 (lead 2026-10-23); qa4 re-checks it in t
 - Repro: sketch on Top, Inscribed polygon, click a centre, move out. Expected (live sketch/91): dash-dot construction circle,
   "Ø…" label, "◀6▶" spinner rotated along the edge next to the vertex. Actual: solid circle, no spinner.
 - Evidence: /root/qa4-scratch/gate-v047/poly1-main-a0e360a3.png.
+
+## D10 — api — drawing PDF export: isometric view comes out shaded, Detail view circle/clip lost
+- Source: qa5 workflow-drawing §4.2 (last seen pass 3, not re-run since). On screen hidden-line; in the PDF shaded.
+
+## D12 — api — drawing DXF export explodes geometry
+- Source: qa5 workflow-drawing §4.4: circles/arcs, hatches, dimensions and tables become lines/polylines; layer names differ
+  from Onshape's. Not re-run since pass 3.
+
+## DSM2 — fs — flat-pattern bend notes say DOWN where live says UP
+- Source: qa5 workflow-drawing-sheet-metal (SM5). "DOWN 90.0° R2" vs live "UP 90.0° …". `sheetmetal/flat.rs:300` prints
+  `FlatBendLine.up`; `model/tests/sheetmetal_frames.rs:271` asserts a flange is not up. asb: fixed by fs's std-route switch.
