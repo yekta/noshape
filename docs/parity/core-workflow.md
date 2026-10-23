@@ -480,3 +480,13 @@ under the Hole row, lands under it), F8/F9/F18 closed earlier. Still open, route
 - R1: fixed on main (833bfb0b), re-checked in the app: closed.
 - PAT-DIR (psb, v0.4.7 gate): failed Feature pattern's Direction drawn orange (selection) instead of red.
 - ASM-ESC: fixed on main (833bfb0b), re-checked in the app: closed.
+
+## v0.4.7 re-gate: release/v0.4.7 30979bc1 (target-lead build 20:09, 0 warnings, footer 0.4.7.30979bc1aae4), FRESH=1, 2026-10-23 20:10–21:30, qa4
+**Result: FAIL on (b)** (Zoom to fit in perspective); (a), (c), (d) PASS. Screenshots /root/qa4-scratch/gate-v047b/.
+
+| Item | Result |
+|---|---|
+| (a) failed Feature pattern | ✅ Direction edge #bd3039, Right-plane Direction red; ×2/×5/×10 → 1/4/9 ghosts, red edges, seed orange outline. Ghost fill (planes hidden) (124,56,68) (112,60,68) (120,40,44) vs live 2258 (128,56,64) (104,60,68) (104,40,44) |
+| (b) projection | ✅ right-click Perspective view / Highlight boundary edges: no menu; new Part Studio and reopened document orthographic; perspective per tab. ✗ **Zoom to fit in perspective shrinks the model** (live 2315: the eye moves closer, the model fills the view); our ortho fit is also tighter than live's 2313. Convergence right after ticking Perspective ≈ live 2314 (fins 25 by mk-fins.py, planes hidden) |
+| (c) shading, Isometric, faces clear of planes | ✅ front (79,104,119) vs #4e6876; top (142,187,214) vs #8cb9d4; side (118,156,178) = live 2265. A translucent default plane over a coplanar face lightens it (lp wall front on the Front plane reads #788a96) |
+| (d) regressions | ✅ failed Extrude red region / tooltip / ✓ enabled; section 8 73/73 ALIVE |
