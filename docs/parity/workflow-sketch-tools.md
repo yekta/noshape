@@ -62,3 +62,15 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | PAT1 linear pattern preview | hollow arrow manipulators, square handles, "3x" with leader, spacing dimension "25" with extension lines (k43) | ✅ **fixed** |
 | POLY1 polygon | spinner "◀6▶" rotated along the edge ✅; construction circle still drawn **solid** while the side count is pending (k44z) although sketch_mode pushes it as dash-dot | ✗ partly → routed skb |
 | CH2 chamfer preview | two dimensions labelled "5", hollow arrow (k45) | ✅ **fixed** |
+
+## Re-check on main a0e360a3 (qa4, 2026-10-23 19:30–20:40, FRESH=1, /root/qa4-scratch/bin/noshape-main)
+| Finding | Result |
+|---|---|
+| RECT1 corner rectangle | ✅ glyphs ⊥ ∥ — (Perpendicular, Parallel, Horizontal) |
+| FIL1 sketch fillet | ✅ R5 preview, "R5" leader, hollow grey arrow (R5 = live mm default, FIL2 withdrawn) |
+| CH2 sketch chamfer | ✅ preview with two "5" dimensions and a hollow arrow |
+| SLOT1 slot preview | ✅ "Ø20" with a vertical leader, four tangent points |
+| TRIM1 trim hover | ✅ only the stub up to the slot lights up |
+| PAT1 linear pattern | ✅ hollow arrows, square handles, "3x" with a leader, 25 spacing dimension with extension lines |
+| **POLY1** inscribed polygon | ✗ **still** (= qa5 pass 21): construction circle solid while pending (looked before the vertex click, so the spinner wasn't checked) → qa5-routing POLY1 (skb). Evidence /root/qa4-scratch/gate-v047/poly1-main-a0e360a3.png |
+| OFF1, VB1, STB1, SK5 | fixed in earlier passes / code (SK5 matches live's numbers, d1a1d056 test) |
