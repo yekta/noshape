@@ -345,7 +345,13 @@ fn main() {
             } else if args.iter().any(|a| a == "--demo-tables") {
                 Some(noshape_model::demo_fab::custom_tables_document())
             } else if args.iter().any(|a| a == "--demo-drawing") { Some(noshape_model::demo::demo_document_with_drawing()) } else if demo { Some(noshape_model::demo::demo_document()) } else { None };
-            files::open_document_window(path, initial, gpu.clone(), cx).expect("could not open document");
+            // A file that can't be opened (damaged, not a noshape document,
+            // stale side files) lands on the Documents page with an error,
+            // never a panic.
+            if let Err(e) = files::open_document_window(path, initial, gpu.clone(), cx) {
+                log::error!("could not open document: {e:#}");
+                start_window::show_with_error(format!("Could not open document: {e:#}"), cx);
+            }
         } else {
             files::show_start_window(cx);
         }

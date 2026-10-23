@@ -2462,7 +2462,10 @@ impl PartStudioView {
                 }
             }
         }
-        let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().layer(21));
+        // Out of the scene bounds (qa4 R1): a distance to a default plane ends
+        // far out on it, and the depth range fitted to that let edges show
+        // through the parts.
+        let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().no_bounds().layer(21));
         self.ui.measure_lines = Some((self.selection.clone(), inst.clone()));
         inst.into_iter().collect()
     }

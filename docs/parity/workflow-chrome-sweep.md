@@ -42,3 +42,23 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | # | What | Live | Ours | Status |
 |---|---|---|---|---|
 | KS1 | ↗ pop-out next to × | `a.osx-popout-link` (14 px arrow-up-right, no tooltip) opens a full-size "Keyboard shortcuts" page: no tabs or search, every category at once in two columns, the legend bar, a footer; the modal stays open | missing | ✗ next: a separate window with that page |
+
+## 4. Opening documents (qa4, lead 10-23)
+
+| # | What | Live | Ours | Status |
+|---|---|---|---|---|
+| OD1 | A document next to the -wal/-shm of an earlier file of the same name | (Onshape has no local files; the rule is: never crash, show an error) | panic in main.rs ("could not open document: unknown branch …") | ✅ the store probes the document read-only with and without the log; a log it can't be read with but can be read without is foreign and moved aside (kept as `*-wal.stale`). `create` moves leftovers aside too. Tests: `foreign_side_files_are_moved_aside_on_open`, `a_log_that_belongs_to_the_document_is_kept`, `creating_over_leftover_side_files_moves_them_aside` |
+| OD2 | Any document named on the command line that can't be opened | — | `expect()` panic | ✅ the Documents page opens with the error bubble "Could not open document: …" (as for a failed open from the page) |
+
+## 5. Assembly dialogs (qa4)
+
+| # | What | Live | Ours | Status |
+|---|---|---|---|---|
+| AD1 | Assembly linear/circular pattern: Esc on a focused, unedited field | cancels the dialog (feature-dialog keys) | nothing (the dialog had no "FeatureDialog" key context) | ✅ key context + Esc ✕, Enter ✓, Tab / Shift+Tab through the fields |
+
+## 6. Measure with planes (qa4 R1)
+
+| # | What | Live | Ours | Status |
+|---|---|---|---|---|
+| R1 | Two default planes (or a plane and an edge) selected | parts unchanged (part-studio/81: "Perp planes angle: 90.000 deg" in the status bar only) | parts see-through with dark outlines | ✅ cause: the measure treats a default plane as a 2 000 000 mm face, so its Min/Max dist lines end ±1e6 mm out; those lines counted in the scene bounds, the fitted depth range grew, and the faces' depth bias let edges and silhouettes show through. Measure lines are now left out of the bounds (`Instance::no_bounds`) |
+| MS1 | Measurements of default planes | ? (asked: REQUESTS "ui (10-23 a)") | Top + Front: Perp planes angle 90°, **Area 8e12 mm², Max dist 2 449 490 mm, Min dist 0** | ? |
