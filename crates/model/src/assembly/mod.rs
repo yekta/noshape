@@ -1016,8 +1016,10 @@ impl Assembly {
             _ => name,
         }
     }
-    /// Next default feature name ("Fastened 1", "Group 2"...).
+    /// Next default feature name ("Fastened 1", "Group 2"...), in the UI
+    /// language ([`crate::default_names`]).
     pub fn next_feature_name(&self, base: &str) -> String {
+        let base = crate::default_names::base(base);
         let mut n = 1;
         loop {
             let name = format!("{base} {n}");

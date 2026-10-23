@@ -366,7 +366,7 @@ impl AssemblyView {
                     cell(name_w)
                         .relative()
                         .when(applied, |d| d.text_color(rgb(0x1651b0)).child(div().absolute().left_0().top_0().bottom_0().w(px(2.)).bg(rgb(0x1651b0))))
-                        .child(div().truncate().child(name.clone()))
+                        .child(div().truncate().child(crate::ui::user_text(name.clone())))
                         .id(SharedString::from(format!("np-name-{r}")))
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_np_cell(r, 0, n2.clone(), window, cx)))
                         .into_any_element()
@@ -533,7 +533,7 @@ impl AssemblyView {
                     .cursor_pointer()
                     .tooltip(crate::ui::tooltip(format!("{name} (click to {})", if open { "collapse" } else { "expand" })))
                     .child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 10., rgb(0x666666)))
-                    .child(div().pl(px(4.)).flex_1().truncate().child(name.clone()))
+                    .child(div().pl(px(4.)).flex_1().truncate().child(crate::ui::user_text(name.clone())))
                     .child(
                         div()
                             .id(SharedString::from(format!("npd-x-{}", m.0)))

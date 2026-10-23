@@ -33,3 +33,11 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 | 10 Jog dialog | … Bounding type ▾ Blind \| Up to entity \| Thickness · **Jog offset 5 mm** · Jog offset anchor ▾ Inside \| Nominal \| Outside · ☑ Preserve material | Jog offset **10 mm** (jd-jog; CLI default bendOffset 10 mm) | ✗ **JOG1** (fs) |
 | 10b Jog result (defaults) | 4825.132741228719 mm³, 22 faces; raised flange z 7..9, x 33.72..55.889 | **4825.132741, 22 faces** ✅; bbox z 0..14 (10 mm offset) and min x 9.11 (the x<30 side is raised, as in BEND1) | ✗ JOG1 + BEND1 |
 | Tab result (rect (60,10)–(75,30) on the top face) | — | OK, 5400 mm³ (4800 + 600), 12 faces | ? (live volume not given) |
+
+## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
+| Row | Ours | Status |
+|---|---|---|
+| SML1 loft Add | OK, one body **9805.524423, 14 faces** (= live 9805.524422649518) | ✅ **fixed** |
+| BEND1 | 4812.566371, 14 faces, bbox x 0..31.72 (x<30 flat, wall x≈29.7..31.7) | ✅ **fixed** |
+| JOG1 | 4825.132741, 22 faces, bbox max x 55.889, z 9 | ✅ **fixed** |
+| RIP1 | (fixed in cc84d44: tool search lists only tools) | ✅ |

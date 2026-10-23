@@ -615,7 +615,19 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                     let bb = b.shape.bounding_box(true).map(|x| format!("[{:.3} {:.3} {:.3} .. {:.3} {:.3} {:.3}]", x.min.x * 1e3, x.min.y * 1e3, x.min.z * 1e3, x.max.x * 1e3, x.max.y * 1e3, x.max.z * 1e3)).unwrap_or_default();
                     // A small sheet: each face's box too.
                     let fb = if b.kind == crate::display::BodyKind::Surface && b.faces.len() <= 8 {
-                        b.shape.faces().iter().filter_map(|f| f.bounding_box(true).ok()).map(|x| format!(" f[{:.3} {:.3} {:.3} .. {:.3} {:.3} {:.3}]", x.min.x * 1e3, x.min.y * 1e3, x.min.z * 1e3, x.max.x * 1e3, x.max.y * 1e3, x.max.z * 1e3)).collect::<String>()
+                        b.shape
+                            .faces()
+                            .iter()
+                            .filter_map(|f| {
+                                let x = f.bounding_box(true).ok()?;
+                                // A planar face's outward normal (orientation matters to std).
+                                let n = f.face_plane().ok().flatten().map(|_| {
+                                    let [u0, u1, v0, v1] = f.uv_bounds().unwrap_or_default();
+                                    f.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map(|n| format!(" n({:.2} {:.2} {:.2})", n.x, n.y, n.z)).unwrap_or_default()
+                                });
+                                Some(format!(" f[{:.3} {:.3} {:.3} .. {:.3} {:.3} {:.3}]{}", x.min.x * 1e3, x.min.y * 1e3, x.min.z * 1e3, x.max.x * 1e3, x.max.y * 1e3, x.max.z * 1e3, n.unwrap_or_default()))
+                            })
+                            .collect::<String>()
                     } else {
                         String::new()
                     };

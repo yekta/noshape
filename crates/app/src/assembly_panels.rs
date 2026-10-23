@@ -626,7 +626,7 @@ impl AssemblyView {
                     .truncate()
                     .when(mc_error.is_some(), |d| d.text_color(pal.text_invalid))
                     .when_some(mc_error.as_ref().map(|e| format!("{title} did not regenerate properly: {e}")), |d, t| d.tooltip(crate::ui::tooltip(t)))
-                    .child(title),
+                    .map(|d| if implicit { d.child(title) } else { d.child(crate::ui::user_text(title)) }),
             );
         let header = if implicit {
             // Live 578: a Bootstrap close button at opacity 0.5.
@@ -697,7 +697,7 @@ impl AssemblyView {
             .text_color(pal.text)
             .hover(|d| d.bg(pal.row_hover))
             .child(crate::ui::tree_icon("origin", self.ui.origin_hidden, cx))
-            .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child("Origin"))
+            .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child(crate::ui::user_text("Origin")))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 if this.ui.ps_in_context.is_some() {
                     this.ui.ps_in_context = Some(None);
@@ -764,7 +764,7 @@ impl AssemblyView {
             .when(selected, |d| d.bg(pal.accent_soft))
             .hover(|d| d.bg(pal.panel_hover))
             .child(svg().path(icon_path("mate-connector-assembly")).size_3p5().text_color(if failed { pal.error } else { pal.text_muted }))
-            .child(div().flex_1().truncate().child(c.name.clone()))
+            .child(div().flex_1().truncate().child(crate::ui::user_text(c.name.clone())))
             // Live E15: "Mate connector 2 has error: Failed to resolve mate connector origin."
             .when_some(message.map(|m| format!("{} has error: {m}", c.name)), |d, m| d.child(div().size(px(6.)).rounded_full().bg(pal.error)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
             .child(
@@ -839,7 +839,7 @@ impl AssemblyView {
                 .bg(pal.accent_soft)
                 .child(div().w(px(12.)))
                 .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
-                .child(div().flex_1().truncate().child(s.name.clone()))
+                .child(div().flex_1().truncate().child(crate::ui::user_text(s.name.clone())))
                 .child(div().id("pat-pending-err").size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx)))
                 .into_any_element(),
         )
@@ -884,7 +884,7 @@ impl AssemblyView {
                     })),
             )
             .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
-            .child(div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(pat.name.clone()))
+            .child(div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(crate::ui::user_text(pat.name.clone())))
             .when_some(error, |d, e| d.child(div().id(SharedString::from(format!("pat-err-{}", id.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(id) } else { None };
@@ -1315,8 +1315,9 @@ impl AssemblyView {
                 })
                 .unwrap_or_default();
             let active = this.pattern.as_ref().is_some_and(|p| p.active == Some(field));
+            // Live: the field ends where the button starts, both top-aligned.
             h_flex()
-                .gap(px(3.))
+                .items_start()
                 .child(div().flex_1().min_w_0().child(os::query_box(id, label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
                         p.active = Some(field);
@@ -1325,8 +1326,10 @@ impl AssemblyView {
                     this.refresh_scene(false, cx);
                     cx.notify();
                 }))))
-                // The query takes mate connectors: Onshape's mate connector button.
-                .child(div().id(SharedString::from(format!("{id}-mc"))).flex_none().size(px(24.)).flex().items_center().justify_center().tooltip(crate::ui::tooltip("Select mate connector (ctrl+m)")).child(crate::assets::icon("mate-connector", 18., cx)))
+                // The query takes mate connectors: Onshape's 26 px "Select mate
+                // connector" button, the 20 px mate-connector-button sprite
+                // (live dom/dialog-asm-*-pattern-*, -mirror-*).
+                .child(div().id(SharedString::from(format!("{id}-mc"))).flex_none().size(px(26.)).flex().items_center().justify_center().rounded(px(3.)).hover(|d| d.bg(pal.panel_hover)).tooltip(crate::ui::tooltip("Select mate connector (ctrl+m)")).child(crate::assets::icon("mc-select", 20., cx)))
         };
         let regen_error = self.pattern_regen_error(s, cx);
         // Live E13: a bad count leaves the title black (the field is pink).
@@ -1344,13 +1347,14 @@ impl AssemblyView {
             div()
                 .id(id)
                 .flex_none()
-                .size(px(24.))
+                .size(px(26.))
                 .flex()
                 .items_center()
                 .justify_center()
                 .cursor_pointer()
                 .when(on, |d| d.bg(pal.panel_active))
-                .child(crate::assets::icon(icon, 18., cx))
+                // Live (dom/dialog-asm-*-pattern-*): 20 x 19 flip svgs in a 26 px cell.
+                .child(crate::assets::icon(icon, 19., cx))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     f(this);
                     this.update_pattern_preview(cx);
@@ -1433,18 +1437,20 @@ impl AssemblyView {
                             .id("mir-strategy")
                             .mx(px(3.))
                             .mt(px(5.))
-                            .h(px(28.))
-                            .px(px(6.))
-                            .gap(px(6.))
+                            // Live dom/dialog-asm-mirror-filled: 27 px, 2 px padding,
+                            // the 20 px mirror-button sprite, 14 px text 4 px after it.
+                            .h(px(27.))
+                            .px(px(2.))
+                            .gap(px(4.))
                             .border_1()
                             .border_color(if pending { pal.error } else if open { pal.accent } else { pal.border })
                             .when(pending, |d| d.bg(pal.error_fill).text_color(pal.text_invalid))
                             .rounded(px(2.))
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
-                            .child(crate::assets::icon("mirror", 18., cx))
                             .tooltip(crate::ui::tooltip("Select how instances are mirrored."))
-                            .child(div().text_size(px(13.33)).child("Mirror strategy…"))
+                            .child(crate::assets::icon("mirror", 20., cx))
+                            .child(div().text_size(px(14.)).child("Mirror strategy…"))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 if let Some(p) = &mut this.pattern {
                                     p.strategy_open = !p.strategy_open;
@@ -1466,24 +1472,9 @@ impl AssemblyView {
                     use noshape_model::assembly::ReplicateScope;
                     let scope = self.replicate_scope(s, cx);
                     let options: &[ReplicateScope] = if self.replicate_on_edge(s, cx) { &ReplicateScope::EDGE } else { &ReplicateScope::FACE };
-                    let current = options.iter().position(|o| *o == scope).unwrap_or(0);
-                    let opts = options.to_vec();
-                    let view = cx.entity().downgrade();
-                    body = body.child(div().id("rep-scope-field").px(px(3.)).pt(px(5.)).tooltip(crate::ui::tooltip("Face match scope")).child(os::select_field("rep-scope", opts.iter().map(|o| o.label().to_string()).collect(), current, move |i, _, cx| {
-                        let Some(o) = opts.get(i).copied() else { return };
-                        if let Some(v) = view.upgrade() {
-                            v.update(cx, |this, cx| {
-                                if let Some(p) = &mut this.pattern {
-                                    if p.scope != Some(o) {
-                                        p.scope_refs.clear();
-                                    }
-                                    p.scope = Some(o);
-                                }
-                                this.update_pattern_preview(cx);
-                                cx.notify();
-                            });
-                        }
-                    })));
+                    let items = options.iter().map(|o| (SharedString::from(o.label()), SharedString::from(o.label()))).collect();
+                    self.replicate_select.update(cx, |sel, _| sel.set_items(items, scope.label()));
+                    body = body.child(div().id("rep-scope-field").pt(px(6.)).tooltip(crate::ui::tooltip("Face match scope")).child(div().w(px(194.)).h(px(28.)).child(self.replicate_select.clone())));
                     let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
                     let rows: Vec<AnyElement> = s
                         .scope_refs
@@ -1516,8 +1507,11 @@ impl AssemblyView {
                 // incomplete pattern only greys the ✓ and reddens the fields.
             }
         }
-        // The help ? at the bottom right.
-        body = body.child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
+        // The help ? 4 px from the dialog's bottom right (live
+        // dom/dialog-asm-*): over the last row when that is a checkbox,
+        // else under an os-help-button-row-spacer (22 px with our 2 px pb).
+        let help_over_last = matches!(kind, PatternDialogKind::Circular) || (kind == PatternDialogKind::Linear && !s.second);
+        body = body.relative().when(!help_over_last, |d| d.child(div().h(px(20.)))).child(div().absolute().right(px(4.)).bottom(px(4.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
         let close = |this: &mut Self, cx: &mut Context<Self>| {
             this.pattern = None;
             // Drop the preview.
@@ -1561,9 +1555,12 @@ impl AssemblyView {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(if valid || count_error { pal.text } else { pal.text_invalid })
                             .truncate()
-                            .child(s.name.clone())
+                            .child(crate::ui::user_text(s.name.clone()))
                             // Live: the name, or the regeneration error.
-                            .tooltip(crate::ui::tooltip(title_tip.unwrap_or_else(|| s.name.clone()))),
+                            .map(|d| match title_tip {
+                                Some(t) => d.tooltip(crate::ui::tooltip(t)),
+                                None => d.tooltip(crate::ui::user_tooltip(s.name.clone())),
+                            }),
                     )
                     .child(
                         div()
@@ -1572,7 +1569,7 @@ impl AssemblyView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(pal.accept).when(!valid, |d| d.opacity(0.2))
+                            .bg(pal.accept).when(!valid, crate::ui::disabled_accept)
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
                             .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -2112,10 +2109,11 @@ impl AssemblyView {
                     .flex_1()
                     .items_center()
                     .child(h_flex().mt(px(2.)).w_full().h(px(34.)).justify_center().bg(rgb(0xeaeaea)).border_l_1().border_b_1().border_color(rgb(0xaaaaaa)).child(add_button("ex-add-top", cx)))
-                    .child(div().mt(px(98.)).child(crate::assets::icon("exploded-views-empty", 152., cx)))
+                    // Live assembly/800: the illustration is 148x149 px of ink at 1489,243.
+                    .child(div().mt(px(92.)).child(crate::assets::icon("exploded-views-empty", 170., cx)))
                     .child(
                         v_flex()
-                            .mt(px(22.))
+                            .mt(px(9.))
                             .w(px(420.))
                             .items_center()
                             .text_size(px(13.33))
@@ -2133,7 +2131,7 @@ impl AssemblyView {
                 let row_sel = sel == Some((i, None));
                 let name_el: AnyElement = match self.rename_input(RenameTarget::Explode(i), cx) {
                     Some(inp) => inp,
-                    None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if active { blue } else { pal.text }).when(active, |d| d.font_weight(FontWeight::MEDIUM)).child(v.name.clone()).into_any_element(),
+                    None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if active { blue } else { pal.text }).when(active, |d| d.font_weight(FontWeight::MEDIUM)).child(crate::ui::user_text(v.name.clone())).into_any_element(),
                 };
                 let name = v.name.clone();
                 tree = tree.child(
@@ -2551,7 +2549,7 @@ impl AssemblyView {
                     let at = opts.iter().position(|o| o.id == cur).unwrap_or(0);
                     let (v, ids) = (view.clone(), opts.iter().map(|o| o.id.clone()).collect::<Vec<_>>());
                     let focus = select_focus.get(&inp.id).cloned().unwrap_or_else(|| cx.focus_handle());
-                    let select = os::select_field_focusable(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, &focus, move |i, _, cx| {
+                    let select = os::user_select_field_focusable(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, &focus, move |i, _, cx| {
                         let (id, oid) = (id.clone(), ids.get(i).cloned().unwrap_or_default());
                         v.update(cx, |this, cx| {
                             if let Some(s) = &mut this.config_panel {
@@ -2561,7 +2559,7 @@ impl AssemblyView {
                             cx.notify();
                         })
                     });
-                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(inp.name.clone())).child(div().flex_1().min_w_0().child(select)));
+                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().flex_1().min_w_0().child(select)));
                 }
                 ConfigInputKind::Checkbox { .. } => {
                     let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");
@@ -2615,7 +2613,7 @@ impl AssemblyView {
                     v_flex()
                         .flex_1()
                         .min_w_0()
-                        .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(doc_name))
+                        .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(crate::ui::user_text(doc_name)))
                         .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child("Main")),
                 ),
         );
@@ -2968,7 +2966,7 @@ pub(crate) struct ExplodeStepDrag {
 impl Render for ExplodeStepDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(self.label.clone())
+        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(crate::ui::user_text(self.label.clone()))
     }
 }
 
@@ -3709,7 +3707,7 @@ impl AssemblyView {
                     .bg(rgb(0xffffff))
                     .border_b_1()
                     .border_color(rgb(0xd7d7d7))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red } else { pal.text }).child(title))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red } else { pal.text }).map(|d| if s.created { d.child(title) } else { d.child(crate::ui::user_text(title)) }))
                     .child(
                         div()
                             .id("se-ok")
@@ -4018,8 +4016,8 @@ impl AssemblyView {
                         v_flex()
                             .flex_1()
                             .min_w_0()
-                            .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(d.name.clone()))
-                            .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child(version)),
+                            .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(crate::ui::user_text(d.name.clone())))
+                            .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child(crate::ui::user_text(version))),
                     )
                     .child(square("ins-other-create-version", "version", "Create version…", false, cx).on_click({
                         let path = d.path.clone();
@@ -4075,7 +4073,7 @@ impl AssemblyView {
                             .when(on, |r| r.bg(rgb(0xb2ddf6)))
                             .when(!on, |r| r.hover(|r| r.bg(pal.panel_hover)))
                             .child(node(false, i + 1 == n))
-                            .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(v.label.clone()))
+                            .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(crate::ui::user_text(v.label.clone())))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.ui.insert_other_doc {
                                     d.version = i;
@@ -4170,7 +4168,7 @@ impl AssemblyView {
                         Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
                         None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
                     }))
-                    .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(name))
+                    .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(crate::ui::user_text(name)))
             };
             for (t, name, is_asm) in tabs {
                 let key = d.key(&t);
@@ -4343,7 +4341,7 @@ impl AssemblyView {
                         .cursor_pointer()
                         .hover(|d| d.bg(pal.panel_hover))
                         .child(div().w(px(74.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("folder", 28., rgb(0x999999))))
-                        .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(name))
+                        .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(name)))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.ui.insert_other_dir = Some(dir.clone());
                             cx.notify();
@@ -4363,11 +4361,11 @@ impl AssemblyView {
             // Search results: the matched text in blue (live 615).
             let name_el = match q.as_ref().and_then(|q| d.name.to_lowercase().find(q.as_str()).map(|at| (at, q.len()))) {
                 Some((at, len)) if d.name.is_char_boundary(at) && d.name.is_char_boundary(at + len) => h_flex()
-                    .child(d.name[..at].to_string())
-                    .child(div().text_color(blue).child(d.name[at..at + len].to_string()))
-                    .child(d.name[at + len..].to_string())
+                    .child(crate::ui::user_text(d.name[..at].to_string()))
+                    .child(div().text_color(blue).child(crate::ui::user_text(d.name[at..at + len].to_string())))
+                    .child(crate::ui::user_text(d.name[at + len..].to_string()))
                     .into_any_element(),
-                _ => div().child(d.name.clone()).into_any_element(),
+                _ => div().child(crate::ui::user_text(d.name.clone())).into_any_element(),
             };
             let version = self.ui.insert_other_versions.get(&d.path).cloned();
             col = col.child(

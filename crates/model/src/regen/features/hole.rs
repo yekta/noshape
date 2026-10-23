@@ -296,6 +296,9 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     let mut fit_unused = false;
     // Depth of an Up to next / Up to entity hole, shown read-only.
     let mut up_to_depth_found: Option<f64> = None;
+    // Each hole's start, direction and length (to the tip): the parts it
+    // reaches, inside the scope or not, are the dialog's default scope.
+    let mut spans: Vec<(DVec3, DVec3, f64)> = Vec::new();
     for loc in &locs {
         let dir = if flip { loc.normal } else { -loc.normal }.normalize();
         // Ray from far behind the location so bodies around it are seen.
@@ -354,6 +357,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         // Live L61: with an offset the Depth field shows the shaft depth less
         // the offset (4.092 for a 6.092 shaft and a 2 mm offset).
         up_to_depth_found.get_or_insert(h - tip_offset);
+        spans.push((s, dir, h + tip));
         // Overshoot above the start when that is outside every part.
         let over = {
             let o = r_main * 0.25;
@@ -434,8 +438,25 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
+    // Live L57: the parts the holes reach (Blind 5 into the top of two
+    // stacked parts: the top one; 15: both), whatever the scope.
+    let mut reached: Vec<usize> = groups.keys().flatten().filter_map(|id| index_of_body(ev, id)).collect();
+    for bi in (0..ev.ctx.bodies.len()).filter(|i| ev.ctx.bodies[*i].kind == BodyKind::Solid && !candidates.contains(i)) {
+        let shape = &ev.ctx.bodies[bi].shape;
+        if spans.iter().any(|(s, dir, len)| ray_intervals(shape, *s, *dir, *len).iter().any(|(a, b)| *b > 1e-9 && *a < *len)) {
+            reached.push(bi);
+        }
+    }
+    reached.sort_unstable();
+    reached.dedup();
+    ev.touched = reached.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
     if !any_hit {
         return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
+    }
+    // Live L56: an empty Merge scope is an error (the dialog fills it with
+    // the parts reached). Holes saved before that cut every part.
+    if explicit_scope.is_empty() && !ev.params.bool("legacyAllParts") {
+        return crate::regen::eval::err_at(&["scope"], "No target parts selected for hole.");
     }
     // Live L53: a location that makes no hole fails the whole feature.
     if missed > 0 {

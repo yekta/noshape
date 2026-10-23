@@ -296,6 +296,7 @@ impl Regenerator {
                                 state.status = if e.warning { FeatureStatus::Warning } else { FeatureStatus::Error };
                                 state.message = Some(e.message);
                                 state.faulty = e.faulty.iter().map(|s| s.to_string()).collect();
+                                state.touched = std::mem::take(&mut ev.touched);
                                 if !ev.error_shapes.is_empty() {
                                     state.error_mesh = Some(display::tessellate_error(&noshape_kernel::Shape::compound(&ev.error_shapes), opts));
                                 }

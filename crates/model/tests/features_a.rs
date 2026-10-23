@@ -43,7 +43,16 @@ impl T {
         self.reg.regenerate(&self.ps, &ConfigValues::default(), &self.units, &RegenOptions::default())
     }
     fn add(&mut self, ty: &str, params: &[(&str, ParamValue)]) -> FeatureId {
+        // A Hole needs a Merge scope (live L56): the parts so far, as the
+        // dialog fills it, unless the test gives one.
+        let scope = (ty == "hole" && !params.iter().any(|(k, _)| *k == "scope")).then(|| {
+            let r = self.regen();
+            r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect::<Vec<_>>()
+        });
         let mut f = self.ps.new_feature(ty, &self.units).unwrap_or_else(|| panic!("no feature type {ty}"));
+        if let Some(scope) = scope {
+            f.params.set("scope", ParamValue::Query(scope));
+        }
         for (k, v) in params {
             f.params.set(k, v.clone());
         }
@@ -996,8 +1005,9 @@ fn failed_feature_pattern_shows_its_instances() {
     let st = res.display.features.last().unwrap();
     assert_eq!(st.status, FeatureStatus::Error);
     let m = st.error_mesh.as_ref().expect("error geometry");
-    // 4 ghosts × (the wall's 6 faces + the floor and end face it merged into).
-    assert_eq!(m.face_ranges.len(), 32);
+    // 4 ghosts × (the wall's 6 faces + the floor it merged into; the end
+    // face it merged into is just the wall's own end face).
+    assert_eq!(m.face_ranges.len(), 28);
     let xs: Vec<f32> = m.positions.iter().map(|p| p[0]).collect();
     let (lo, hi) = xs.iter().fold((f32::MAX, f32::MIN), |(a, b), x| (a.min(*x), b.max(*x)));
     // 2 to 8 mm along the edge (its direction either way), the floor's
@@ -1010,4 +1020,47 @@ fn failed_feature_pattern_shows_its_instances() {
     t.set(lp, "fullFeaturePattern", b(true));
     let res = t.regen();
     assert!(res.display.features.last().unwrap().error_mesh.is_none());
+}
+
+/// Live L56/L57: two stacked parts and a point on the top one. A hole with
+/// no Merge scope fails "No target parts selected for hole." on the scope
+/// and reports the parts it reaches (the dialog's default): Blind 5 the top
+/// part, 15 both. Holes saved before that rule cut every part.
+#[test]
+fn hole_merge_scope_as_live() {
+    let mut t = T::new();
+    let (_, a) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let top = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let s = t.sketch(Reference::FeaturePlane(top), rect(0.0, 0.0, 0.04, 0.02));
+    let r = t.regions(s)[0].clone();
+    let bx = t.extrude(r, "10 mm", "NEW");
+    let top2 = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("20 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.02, 0.01));
+    let ps = t.sketch(Reference::FeaturePlane(top2), sk);
+    let h = t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: ps, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("scope", q(vec![])), ("holeDiameterV3", e("5 mm")), ("holeDepthV3", e("5 mm"))]);
+    let reached = |t: &mut T| {
+        let r = t.regen();
+        let st = r.display.features.last().unwrap().clone();
+        assert_eq!(st.message.as_deref(), Some("No target parts selected for hole."));
+        assert_eq!(st.faulty, vec!["scope".to_string()]);
+        st.touched.iter().map(|b| b.feature).collect::<Vec<_>>()
+    };
+    assert_eq!(reached(&mut t), vec![bx]);
+    t.set(h, "holeDepthV3", e("15 mm"));
+    let mut both = reached(&mut t);
+    both.sort();
+    let mut want = vec![a, bx];
+    want.sort();
+    assert_eq!(both, want);
+    // With the scope the dialog fills in, the hole cuts both parts.
+    t.set(h, "scope", q(vec![Reference::Body(BodyId { feature: a, index: 0 }), Reference::Body(BodyId { feature: bx, index: 0 })]));
+    let res = t.ok();
+    assert!(res.display.features.last().unwrap().touched.len() == 2);
+    // A hole saved before the rule (no scope) is upgraded on load and cuts as before.
+    t.set(h, "scope", q(vec![]));
+    t.ps.scope_rule = noshape_model::partstudio::ScopeRule(3);
+    t.ps.upgrade_saved_params();
+    assert!(t.ps.features.iter().find(|f| f.id == h).unwrap().params.bool("legacyAllParts"));
+    t.ok();
 }
