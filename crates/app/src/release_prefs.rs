@@ -274,7 +274,7 @@ impl Render for ReleasePrefsView {
                 .pb(px(2.))
                 .text_size(px(14.))
                 .cursor_pointer()
-                .when(active, |d| d.font_weight(FontWeight::SEMIBOLD).text_color(pal.accent).border_b_2().border_color(pal.accent))
+                .when(active, |d| d.font_weight(FontWeight::SEMIBOLD).text_color(pal.emphasis).border_b_2().border_color(pal.accent))
                 .when(!active, |d| d.text_color(pal.text_muted))
                 .child(t)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

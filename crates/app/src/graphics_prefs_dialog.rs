@@ -397,7 +397,7 @@ impl Render for GraphicsPrefsDialog {
                 .justify_center()
                 .text_size(px(13.33))
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                .when(on, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
                 .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(pal.border))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

@@ -78,6 +78,9 @@ fn ev_line(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let info = s.edge_info().ok()?;
         match info.curve {
             k::Curve::Line { direction, .. } => Some((info.start, direction.normalize_or_zero())),
+            // A degree-1 B-spline through two poles is a straight segment
+            // (what some operations leave instead of a line).
+            k::Curve::BSpline { degree: 1, nb_poles: 2, .. } => Some((info.start, (info.end - info.start).normalize_or_zero())),
             _ => None,
         }
     })?;

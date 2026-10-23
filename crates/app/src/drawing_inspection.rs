@@ -236,7 +236,7 @@ impl DrawingEditor {
                 .text_size(px(13.33))
                 .cursor_pointer()
                 .border_b_1()
-                .when(on, |e| e.border_b_2().border_color(pal.accent).text_color(pal.accent).font_weight(FontWeight::MEDIUM))
+                .when(on, |e| e.border_b_2().border_color(pal.accent).text_color(pal.emphasis).font_weight(FontWeight::MEDIUM))
                 .when(!on, |e| e.border_color(gpui_kit::rgb(0xdddddd)).text_color(pal.text))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

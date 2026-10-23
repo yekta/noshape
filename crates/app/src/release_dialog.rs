@@ -679,7 +679,7 @@ impl Render for AddItemsDialog {
                 .text_size(px(13.))
                 .text_center()
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).border_b_2().border_color(pal.accent))
+                .when(on, |d| d.text_color(pal.emphasis).border_b_2().border_color(pal.accent))
                 .when(!on, |d| d.text_color(pal.text))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
@@ -706,7 +706,7 @@ impl Render for AddItemsDialog {
                 .text_size(px(13.))
                 .text_center()
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                .when(on, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
                 .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xdddddd)))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -725,7 +725,7 @@ impl Render for AddItemsDialog {
         if !self.obsolete && release_settings().allow_other_documents {
             left = left.child(h_flex().child(doc_tab("add-current-doc", "Current document", !self.other, false, cx)).child(doc_tab("add-other-docs", "Other documents", self.other, true, cx)));
         } else {
-            left = left.child(h_flex().child(div().w(px(200.)).py(px(6.)).text_size(px(13.)).text_center().text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent).child("Current document")));
+            left = left.child(h_flex().child(div().w(px(200.)).py(px(6.)).text_size(px(13.)).text_center().text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent).child("Current document")));
         }
         if self.other && self.source.is_none() {
             left = left.child(div().id("add-browser").flex_1().overflow_y_scroll().child(self.render_browser(cx)));

@@ -3025,7 +3025,8 @@ impl AssemblyView {
                 .hover(|d| d.bg(pal.panel_hover))
                 .cursor_pointer()
                 .border_1()
-                .border_color(pal.border_strong)
+                // Live keeps the #aaa outline in dark (dk-929).
+                .border_color(gpui_kit::rgb_static(0xaaaaaa))
                 .child(crate::assets::icon(icon, 20., cx))
                 .when(on, |d| d.child(div().absolute().right_0().top_0().bottom_0().w(px(3.)).bg(pal.accent)))
                 .tooltip(crate::ui::tooltip(tip))
@@ -4635,7 +4636,7 @@ impl AssemblyView {
                         .border_color(pal.accent)
                         .text_size(px(13.33))
                         .font_weight(FontWeight::MEDIUM)
-                        .text_color(pal.accent)
+                        .text_color(pal.emphasis)
                         .child("Variable table"),
                 ),
             )

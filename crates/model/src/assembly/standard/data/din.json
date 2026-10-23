@@ -2847,6 +2847,446 @@
    },
    {
     "category": "Bolts & screws",
+    "class": "Eye bolts",
+    "name": "Lifting eye bolt DIN 580",
+    "shape": "screw",
+    "form": {
+     "head": 8,
+     "drive": 0,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M6",
+      "label": "Lifting eye bolt M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dk": 36.0,
+       "e1": 20.0,
+       "dc": 20.0,
+       "c": 6.0,
+       "k": 30.0,
+       "dp": 4.773131
+      },
+      "lengths": [
+       "13"
+      ]
+     },
+     {
+      "name": "M8",
+      "label": "Lifting eye bolt M8x1.25",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dk": 36.0,
+       "e1": 20.0,
+       "dc": 20.0,
+       "c": 6.0,
+       "k": 30.0,
+       "dp": 6.466414
+      },
+      "lengths": [
+       "13"
+      ]
+     },
+     {
+      "name": "M10",
+      "label": "Lifting eye bolt M10x1.50",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dk": 45.0,
+       "e1": 25.0,
+       "dc": 25.0,
+       "c": 8.0,
+       "k": 37.0,
+       "dp": 8.159696
+      },
+      "lengths": [
+       "17"
+      ]
+     },
+     {
+      "name": "M12",
+      "label": "Lifting eye bolt M12x1.75",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "dk": 54.0,
+       "e1": 30.0,
+       "dc": 30.0,
+       "c": 10.0,
+       "k": 43.0,
+       "dp": 9.852979
+      },
+      "lengths": [
+       "20.5"
+      ]
+     },
+     {
+      "name": "M14",
+      "label": "Lifting eye bolt M14x2.00",
+      "d": 14.0,
+      "dims": {
+       "d": 14.0,
+       "dk": 63.0,
+       "e1": 35.0,
+       "dc": 35.0,
+       "c": 12.0,
+       "k": 50.0,
+       "dp": 11.546262
+      },
+      "lengths": [
+       "27"
+      ]
+     },
+     {
+      "name": "M16",
+      "label": "Lifting eye bolt M16x2.00",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "dk": 63.0,
+       "e1": 35.0,
+       "dc": 35.0,
+       "c": 12.0,
+       "k": 50.0,
+       "dp": 13.546262
+      },
+      "lengths": [
+       "27"
+      ]
+     },
+     {
+      "name": "M18",
+      "label": "Lifting eye bolt M18x2.50",
+      "d": 18.0,
+      "dims": {
+       "d": 18.0,
+       "dk": 72.0,
+       "e1": 40.0,
+       "dc": 40.0,
+       "c": 14.0,
+       "k": 57.0,
+       "dp": 14.932828
+      },
+      "lengths": [
+       "30"
+      ]
+     },
+     {
+      "name": "M20",
+      "label": "Lifting eye bolt M20x2.50",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "dk": 72.0,
+       "e1": 40.0,
+       "dc": 40.0,
+       "c": 14.0,
+       "k": 57.0,
+       "dp": 16.932828
+      },
+      "lengths": [
+       "30"
+      ]
+     },
+     {
+      "name": "M22",
+      "label": "Lifting eye bolt M22x2.50",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "dk": 90.0,
+       "e1": 50.0,
+       "dc": 50.0,
+       "c": 18.0,
+       "k": 72.0,
+       "dp": 18.932828
+      },
+      "lengths": [
+       "36"
+      ]
+     },
+     {
+      "name": "M24",
+      "label": "Lifting eye bolt M24x3.00",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "dk": 90.0,
+       "e1": 50.0,
+       "dc": 50.0,
+       "c": 18.0,
+       "k": 72.0,
+       "dp": 20.319393
+      },
+      "lengths": [
+       "36"
+      ]
+     },
+     {
+      "name": "M27",
+      "label": "Lifting eye bolt M27x3.00",
+      "d": 27.0,
+      "dims": {
+       "d": 27.0,
+       "dk": 108.0,
+       "e1": 60.0,
+       "dc": 65.0,
+       "c": 22.0,
+       "k": 87.0,
+       "dp": 23.319393
+      },
+      "lengths": [
+       "45"
+      ]
+     },
+     {
+      "name": "M30",
+      "label": "Lifting eye bolt M30x3.50",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "dk": 108.0,
+       "e1": 60.0,
+       "dc": 65.0,
+       "c": 22.0,
+       "k": 87.0,
+       "dp": 25.705959
+      },
+      "lengths": [
+       "45"
+      ]
+     },
+     {
+      "name": "M33",
+      "label": "Lifting eye bolt M33x3.50",
+      "d": 33.0,
+      "dims": {
+       "d": 33.0,
+       "dk": 126.0,
+       "e1": 70.0,
+       "dc": 75.0,
+       "c": 26.0,
+       "k": 102.0,
+       "dp": 28.705959
+      },
+      "lengths": [
+       "54"
+      ]
+     },
+     {
+      "name": "M36",
+      "label": "Lifting eye bolt M36x4.00",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "dk": 126.0,
+       "e1": 70.0,
+       "dc": 75.0,
+       "c": 26.0,
+       "k": 102.0,
+       "dp": 31.092524
+      },
+      "lengths": [
+       "54"
+      ]
+     },
+     {
+      "name": "M39",
+      "label": "Lifting eye bolt M39x4.00",
+      "d": 39.0,
+      "dims": {
+       "d": 39.0,
+       "dk": 144.0,
+       "e1": 80.0,
+       "dc": 85.0,
+       "c": 30.0,
+       "k": 117.0,
+       "dp": 34.092524
+      },
+      "lengths": [
+       "63"
+      ]
+     },
+     {
+      "name": "M42",
+      "label": "Lifting eye bolt M42x4.50",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "dk": 144.0,
+       "e1": 80.0,
+       "dc": 85.0,
+       "c": 30.0,
+       "k": 117.0,
+       "dp": 36.47909
+      },
+      "lengths": [
+       "63"
+      ]
+     },
+     {
+      "name": "M45",
+      "label": "Lifting eye bolt M45x4.50",
+      "d": 45.0,
+      "dims": {
+       "d": 45.0,
+       "dk": 166.0,
+       "e1": 90.0,
+       "dc": 100.0,
+       "c": 35.0,
+       "k": 133.0,
+       "dp": 39.47909
+      },
+      "lengths": [
+       "68"
+      ]
+     },
+     {
+      "name": "M48",
+      "label": "Lifting eye bolt M48x5.00",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "dk": 166.0,
+       "e1": 90.0,
+       "dc": 100.0,
+       "c": 35.0,
+       "k": 133.0,
+       "dp": 41.865655
+      },
+      "lengths": [
+       "68"
+      ]
+     },
+     {
+      "name": "M52",
+      "label": "Lifting eye bolt M52x5.00",
+      "d": 52.0,
+      "dims": {
+       "d": 52.0,
+       "dk": 184.0,
+       "e1": 100.0,
+       "dc": 110.0,
+       "c": 38.0,
+       "k": 149.0,
+       "dp": 45.865655
+      },
+      "lengths": [
+       "78"
+      ]
+     },
+     {
+      "name": "M56",
+      "label": "Lifting eye bolt M56x5.50",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "dk": 184.0,
+       "e1": 100.0,
+       "dc": 110.0,
+       "c": 38.0,
+       "k": 149.0,
+       "dp": 49.25222
+      },
+      "lengths": [
+       "78"
+      ]
+     },
+     {
+      "name": "M60",
+      "label": "Lifting eye bolt M60x5.50",
+      "d": 60.0,
+      "dims": {
+       "d": 60.0,
+       "dk": 206.0,
+       "e1": 110.0,
+       "dc": 120.0,
+       "c": 42.0,
+       "k": 166.0,
+       "dp": 53.25222
+      },
+      "lengths": [
+       "90"
+      ]
+     },
+     {
+      "name": "M64",
+      "label": "Lifting eye bolt M64x6.00",
+      "d": 64.0,
+      "dims": {
+       "d": 64.0,
+       "dk": 206.0,
+       "e1": 110.0,
+       "dc": 120.0,
+       "c": 42.0,
+       "k": 166.0,
+       "dp": 56.638786
+      },
+      "lengths": [
+       "90"
+      ]
+     },
+     {
+      "name": "M72",
+      "label": "Lifting eye bolt M72x6.00",
+      "d": 72.0,
+      "dims": {
+       "d": 72.0,
+       "dk": 260.0,
+       "e1": 140.0,
+       "dc": 150.0,
+       "c": 50.0,
+       "k": 210.0,
+       "dp": 64.638786
+      },
+      "lengths": [
+       "100"
+      ]
+     },
+     {
+      "name": "M80",
+      "label": "Lifting eye bolt M80x6.00",
+      "d": 80.0,
+      "dims": {
+       "d": 80.0,
+       "dk": 296.0,
+       "e1": 160.0,
+       "dc": 170.0,
+       "c": 55.0,
+       "k": 243.0,
+       "dp": 72.638786
+      },
+      "lengths": [
+       "112"
+      ]
+     },
+     {
+      "name": "M100",
+      "label": "Lifting eye bolt M100x6.00",
+      "d": 100.0,
+      "dims": {
+       "d": 100.0,
+       "dk": 330.0,
+       "e1": 180.0,
+       "dc": 190.0,
+       "c": 60.0,
+       "k": 270.0,
+       "dp": 92.638786
+      },
+      "lengths": [
+       "130"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_580_LIFTING_EYE_BOLT_MAIN (document 7d788c5bd4ff5148f899cdd9, version making names consistent)"
+   },
+   {
+    "category": "Bolts & screws",
     "class": "Hex head bolts & screws",
     "name": "Hex bolt structural short grade C DIN 6914",
     "shape": "screw",
@@ -3800,6 +4240,447 @@
     "thread": {
      "rule": "iso"
     }
+   },
+   {
+    "category": "Bolts & screws",
+    "class": "Hex head bolts & screws",
+    "name": "Hex head bolt grade A & B fine pitch DIN EN 28765",
+    "shape": "screw",
+    "form": {
+     "head": 1,
+     "drive": 0,
+     "point": 0,
+     "neck": 0
+    },
+    "sizes": [
+     {
+      "name": "M8x1.00",
+      "label": "Hex head bolt grade A & B M8x1.00",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "s": 13.0,
+       "k": 5.3,
+       "dp": 6.773131
+      },
+      "lengths": [
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80"
+      ],
+      "threads": {
+       "40": [
+        "40",
+        "22"
+       ],
+       "80": [
+        "80",
+        "22"
+       ]
+      }
+     },
+     {
+      "name": "M10x1.00",
+      "label": "Hex head bolt grade A & B M10x1.00",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "s": 16.0,
+       "k": 6.4,
+       "dp": 8.773131
+      },
+      "lengths": [
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90",
+       "100"
+      ],
+      "threads": {
+       "45": [
+        "45",
+        "26"
+       ],
+       "100": [
+        "100",
+        "26"
+       ]
+      }
+     },
+     {
+      "name": "M12x1.50",
+      "label": "Hex head bolt grade A & B M12x1.50",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "s": 18.0,
+       "k": 7.5,
+       "dp": 10.159696
+      },
+      "lengths": [
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120"
+      ],
+      "threads": {
+       "50": [
+        "50",
+        "30"
+       ],
+       "120": [
+        "120",
+        "30"
+       ]
+      }
+     },
+     {
+      "name": "M16x1.50",
+      "label": "Hex head bolt grade A & B M16x1.50",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "s": 24.0,
+       "k": 10.0,
+       "dp": 14.159696
+      },
+      "lengths": [
+       "65",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160"
+      ],
+      "threads": {
+       "65": [
+        "65",
+        "38"
+       ],
+       "160": [
+        "160",
+        "44"
+       ]
+      }
+     },
+     {
+      "name": "M20x1.50",
+      "label": "Hex head bolt grade A & B M20x1.50",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "s": 30.0,
+       "k": 12.5,
+       "dp": 18.159696
+      },
+      "lengths": [
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200"
+      ],
+      "threads": {
+       "80": [
+        "80",
+        "46"
+       ],
+       "200": [
+        "200",
+        "52"
+       ]
+      }
+     },
+     {
+      "name": "M24x2.00",
+      "label": "Hex head bolt grade A & B M24x2.00",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "s": 36.0,
+       "k": 15.0,
+       "dp": 21.546262
+      },
+      "lengths": [
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240"
+      ],
+      "threads": {
+       "90": [
+        "90",
+        "54"
+       ],
+       "240": [
+        "240",
+        "73"
+       ]
+      }
+     },
+     {
+      "name": "M30x2.00",
+      "label": "Hex head bolt grade A & B M30x2.00",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "s": 46.0,
+       "k": 18.7,
+       "dp": 27.546262
+      },
+      "lengths": [
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300"
+      ],
+      "threads": {
+       "110": [
+        "110",
+        "66"
+       ],
+       "300": [
+        "300",
+        "85"
+       ]
+      }
+     },
+     {
+      "name": "M36x3.00",
+      "label": "Hex head bolt grade A & B M36x3.00",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "s": 55.0,
+       "k": 22.5,
+       "dp": 32.319393
+      },
+      "lengths": [
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360"
+      ],
+      "threads": {
+       "140": [
+        "140",
+        "84"
+       ],
+       "360": [
+        "360",
+        "97"
+       ]
+      }
+     },
+     {
+      "name": "M42x3.00",
+      "label": "Hex head bolt grade A & B M42x3.00",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "s": 65.0,
+       "k": 26.0,
+       "dp": 38.319393
+      },
+      "lengths": [
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440"
+      ],
+      "threads": {
+       "160": [
+        "160",
+        "96"
+       ],
+       "440": [
+        "440",
+        "109"
+       ]
+      }
+     },
+     {
+      "name": "M48x3.00",
+      "label": "Hex head bolt grade A & B M48x3.00",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "s": 75.0,
+       "k": 30.0,
+       "dp": 44.319393
+      },
+      "lengths": [
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480"
+      ],
+      "threads": {
+       "180": [
+        "180",
+        "108"
+       ],
+       "480": [
+        "480",
+        "121"
+       ]
+      }
+     },
+     {
+      "name": "M56x4.00",
+      "label": "Hex head bolt grade A & B M56x4.00",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "s": 85.0,
+       "k": 35.0,
+       "dp": 51.092524
+      },
+      "lengths": [
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480",
+       "500"
+      ],
+      "threads": {
+       "220": [
+        "220",
+        "137"
+       ],
+       "500": [
+        "500",
+        "137"
+       ]
+      }
+     },
+     {
+      "name": "M64x4.00",
+      "label": "Hex head bolt grade A & B M64x4.00",
+      "d": 64.0,
+      "dims": {
+       "d": 64.0,
+       "s": 95.0,
+       "k": 40.0,
+       "dp": 59.092524
+      },
+      "lengths": [
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480",
+       "500"
+      ],
+      "threads": {
+       "260": [
+        "260",
+        "153"
+       ],
+       "500": [
+        "500",
+        "153"
+       ]
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_28765_HEX_BOLT_MAIN (document 25a146db8c73ff81e79008a7, version do not filter changes)",
+    "thread": {
+     "rule": "iso"
+    },
+    "defaultSize": "M24x2.00"
    },
    {
     "category": "Bolts & screws",
@@ -5519,9 +6400,241 @@
        "180",
        "200"
       ]
+     },
+     {
+      "name": "M24x2.0",
+      "label": "Hex head screw grade A & B M24x2.0",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "s": 36.0,
+       "k": 15.0,
+       "dp": 21.546262
+      },
+      "lengths": [
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200"
+      ]
+     },
+     {
+      "name": "M30x2.0",
+      "label": "Hex head screw grade A & B M30x2.0",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "s": 46.0,
+       "k": 18.7,
+       "dp": 27.546262
+      },
+      "lengths": [
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200"
+      ]
+     },
+     {
+      "name": "M36x3.0",
+      "label": "Hex head screw grade A & B M36x3.0",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "s": 55.0,
+       "k": 22.5,
+       "dp": 32.319393
+      },
+      "lengths": [
+       "40",
+       "45",
+       "50",
+       "55",
+       "60",
+       "65",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200"
+      ]
+     },
+     {
+      "name": "M42x3.0",
+      "label": "Hex head screw grade A & B M42x3.0",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "s": 65.0,
+       "k": 26.0,
+       "dp": 38.319393
+      },
+      "lengths": [
+       "90",
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420"
+      ]
+     },
+     {
+      "name": "M48x3.0",
+      "label": "Hex head screw grade A & B M48x3.0",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "s": 75.0,
+       "k": 30.0,
+       "dp": 44.319393
+      },
+      "lengths": [
+       "100",
+       "110",
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480"
+      ]
+     },
+     {
+      "name": "M56x4.0",
+      "label": "Hex head screw grade A & B M56x4.0",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "s": 85.0,
+       "k": 35.0,
+       "dp": 51.092524
+      },
+      "lengths": [
+       "120",
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480",
+       "500"
+      ]
+     },
+     {
+      "name": "M64x4.0",
+      "label": "Hex head screw grade A & B M64x4.0",
+      "d": 64.0,
+      "dims": {
+       "d": 64.0,
+       "s": 95.0,
+       "k": 40.0,
+       "dp": 59.092524
+      },
+      "lengths": [
+       "130",
+       "140",
+       "150",
+       "160",
+       "180",
+       "200",
+       "220",
+       "240",
+       "260",
+       "280",
+       "300",
+       "320",
+       "340",
+       "360",
+       "380",
+       "400",
+       "420",
+       "440",
+       "460",
+       "480",
+       "500"
+      ]
      }
     ],
-    "source": "ISO 8676:2022 (M8-M42 tables; M45-M64 (Table 5) and grade B M8-M14 (Annex A) not in preview - from ISO 8676:2011 / ISO 8765 / ISO 4017, see notes) (Fasteners - Hexagon head screws with metric fine pitch thread - Product grades A and B); https://cdn.standards.iteh.ai/samples/72582/9af12aac9a1b40e1a203f3f4c4a7bb89/ISO-8676-2022.pdf (ISO 8676:2022 preview, Tables 1-4 incl. length staircases from rendered pages - primary); https://cdn.standards.iteh.ai/samples/56453/b7625772fd5e42b59e24dff062f935d8/ISO-8676-2011.pdf (ISO 8676:2011 preview, Table 1 preferred threads, grades A/B); https://fasten.it/Norms/Norm/DIN_EN_ISO_8676 (DIN EN ISO 8676:2022: s, e, k all sizes - match); https://www.fasteners.eu/standards/ISO/8676/ (old-edition table, DIN 961 s values - context only); https://cdn.standards.iteh.ai/samples/72583/7f0b086055884c2d8a087755135b7622/ISO-8765-2022.pdf (identical head dimensions)",
+    "source": "Onshape standard content table DATA_DIN_28676_HEX_SCREW_MAIN (document ab8b04a7ef4460dcfd1093ae, version do not filter change)",
     "thread": {
      "rule": "iso"
     }
@@ -7553,12 +8666,13 @@
       "label": "Hex socket set screw with cone point M1.6x0.35",
       "d": 1.6,
       "dims": {
+       "dp": 0.4,
+       "z": 0.6,
        "d": 1.6,
        "sd": 0.7,
        "t": 1.5,
        "ts": 0.7,
-       "lts": 2.51,
-       "z": 0.8
+       "lts": 2.51
       },
       "lengths": [
        "2",
@@ -7575,12 +8689,13 @@
       "label": "Hex socket set screw with cone point M2x0.4",
       "d": 2.0,
       "dims": {
+       "dp": 0.5,
+       "z": 0.75,
        "d": 2.0,
        "sd": 0.9,
        "t": 1.7,
        "ts": 0.8,
-       "lts": 2.51,
-       "z": 1.0
+       "lts": 3.01
       },
       "lengths": [
        "2",
@@ -7598,12 +8713,13 @@
       "label": "Hex socket set screw with cone point M2.5x0.45",
       "d": 2.5,
       "dims": {
+       "dp": 0.65,
+       "z": 0.925,
        "d": 2.5,
        "sd": 1.3,
        "t": 2.0,
        "ts": 1.2,
-       "lts": 3.01,
-       "z": 1.25
+       "lts": 4.01
       },
       "lengths": [
        "2.5",
@@ -7621,12 +8737,13 @@
       "label": "Hex socket set screw with cone point M3x0.5",
       "d": 3.0,
       "dims": {
+       "dp": 0.75,
+       "z": 1.125,
        "d": 3.0,
        "sd": 1.5,
        "t": 2.0,
        "ts": 1.2,
-       "lts": 3.01,
-       "z": 1.5
+       "lts": 5.01
       },
       "lengths": [
        "3",
@@ -7644,12 +8761,13 @@
       "label": "Hex socket set screw with cone point M4x0.7",
       "d": 4.0,
       "dims": {
+       "dp": 1.0,
+       "z": 1.5,
        "d": 4.0,
        "sd": 2.0,
        "t": 2.5,
        "ts": 1.5,
-       "lts": 4.01,
-       "z": 2.0
+       "lts": 6.01
       },
       "lengths": [
        "4",
@@ -7667,12 +8785,13 @@
       "label": "Hex socket set screw with cone point M5x0.8",
       "d": 5.0,
       "dims": {
+       "dp": 1.25,
+       "z": 1.875,
        "d": 5.0,
        "sd": 2.5,
        "t": 3.0,
        "ts": 2.0,
-       "lts": 5.01,
-       "z": 2.5
+       "lts": 6.01
       },
       "lengths": [
        "5",
@@ -7690,13 +8809,13 @@
       "label": "Hex socket set screw with cone point M6x1",
       "d": 6.0,
       "dims": {
+       "dp": 1.5,
+       "z": 2.25,
        "d": 6.0,
        "sd": 3.0,
        "t": 3.5,
        "ts": 2.0,
-       "lts": 6.01,
-       "dp": 1.5,
-       "z": 2.25
+       "lts": 8.01
       },
       "lengths": [
        "6",
@@ -7714,13 +8833,13 @@
       "label": "Hex socket set screw with cone point M8x1.25",
       "d": 8.0,
       "dims": {
+       "dp": 2.0,
+       "z": 3.0,
        "d": 8.0,
        "sd": 4.0,
        "t": 5.0,
        "ts": 3.0,
-       "lts": 8.01,
-       "dp": 2.0,
-       "z": 3.0
+       "lts": 10.01
       },
       "lengths": [
        "8",
@@ -7739,13 +8858,13 @@
       "label": "Hex socket set screw with cone point M10x1.5",
       "d": 10.0,
       "dims": {
+       "dp": 2.5,
+       "z": 3.75,
        "d": 10.0,
        "sd": 5.0,
        "t": 6.0,
        "ts": 4.0,
-       "lts": 10.01,
-       "dp": 2.5,
-       "z": 3.75
+       "lts": 12.01
       },
       "lengths": [
        "10",
@@ -7765,13 +8884,13 @@
       "label": "Hex socket set screw with cone point M12x1.75",
       "d": 12.0,
       "dims": {
+       "dp": 3.0,
+       "z": 4.5,
        "d": 12.0,
        "sd": 6.0,
        "t": 8.0,
-       "ts": 4.5,
-       "lts": 12.01,
-       "dp": 3.0,
-       "z": 4.5
+       "ts": 4.8,
+       "lts": 16.01
       },
       "lengths": [
        "12",
@@ -7792,13 +8911,13 @@
       "label": "Hex socket set screw with cone point M16x2",
       "d": 16.0,
       "dims": {
+       "dp": 4.0,
+       "z": 6.0,
        "d": 16.0,
        "sd": 8.0,
        "t": 10.0,
        "ts": 6.4,
-       "lts": 16.01,
-       "dp": 4.0,
-       "z": 6.0
+       "lts": 20.01
       },
       "lengths": [
        "16",
@@ -7818,13 +8937,13 @@
       "label": "Hex socket set screw with cone point M20x2.5",
       "d": 20.0,
       "dims": {
+       "dp": 5.0,
+       "z": 7.5,
        "d": 20.0,
        "sd": 10.0,
        "t": 12.0,
        "ts": 8.0,
-       "lts": 18.01,
-       "dp": 5.0,
-       "z": 7.5
+       "lts": 25.01
       },
       "lengths": [
        "20",
@@ -7843,13 +8962,13 @@
       "label": "Hex socket set screw with cone point M24x3",
       "d": 24.0,
       "dims": {
+       "dp": 6.0,
+       "z": 9.0,
        "d": 24.0,
        "sd": 12.0,
        "t": 15.0,
        "ts": 10.0,
-       "lts": 25.01,
-       "dp": 6.0,
-       "z": 9.0
+       "lts": 30.01
       },
       "lengths": [
        "25",
@@ -7863,7 +8982,7 @@
       ]
      }
     ],
-    "source": "DIN 914:1980-12 (Hexagon socket set screws with cone point (Gewindestifte mit Innensechskant und Spitze; ISO 4027 modified)); https://bolt.msk.ru/standards/DIN%20914.pdf (scan of DIN 914:1980-12 \"Gewindestifte mit Innensechskant ... ISO 4027 modifiziert\", pages 2-3 - primary source; read from rendered page images); https://www.fasteners.eu/standards/DIN/914/ (local copy /root/skb-scratch/dl/fe/din914.html; same values and weight table); https://www.birkhofer-shop.com/WebRoot/Sage/Shops/BirkhoferVerbindungselemente/MediaGallery/TechData/DIN_914.pdf (s); https://www.ottoroth.de/media/docs/download/web_handbuch_din_en_iso.pdf (Otto Roth changeover handbook: differences DIN -> ISO); https://media.wuerth.com/stmedia/wuerth/documents/documents/LANG_de/18902376.pdf (Wuerth Normteile 2018: \"ISO 40xx ersetzt DIN 91x ... M1,4, M1,8, M14, M18, M22 entfallen\"); https://www.haberkorn.com/kataloge/umstellung-din-auf-iso-uebersicht-verbindungselemente/files/assets/common/downloads/publication.pdf (edition 1980-12)"
+    "source": "Onshape standard content table DATA_DIN_914_SOCKET_SET_SCREW_CONE_POINT_MAIN (document fcb3dd77a143848e721d27e4, version do not filter changes)"
    },
    {
     "category": "Bolts & screws",
@@ -12249,15 +13368,85 @@
     },
     "sizes": [
      {
+      "name": "M2",
+      "label": "Hex socket head countersunk screw grade C M2x0.4",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "dk": 4.0,
+       "k": 1.2,
+       "sd": 1.3,
+       "t": 0.84,
+       "dp": 1.509252
+      },
+      "lengths": [
+       "2",
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "20",
+       "22"
+      ],
+      "threads": {
+       "2": [
+        "2"
+       ],
+       "22": [
+        "22"
+       ]
+      }
+     },
+     {
+      "name": "M2.5",
+      "label": "Hex socket head countersunk screw grade C M2.5x0.45",
+      "d": 2.5,
+      "dims": {
+       "d": 2.5,
+       "dk": 5.0,
+       "k": 1.5,
+       "sd": 1.5,
+       "t": 1.05,
+       "dp": 1.947909
+      },
+      "lengths": [
+       "2",
+       "3",
+       "4",
+       "5",
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "20",
+       "22"
+      ],
+      "threads": {
+       "2": [
+        "2"
+       ],
+       "22": [
+        "22"
+       ]
+      }
+     },
+     {
       "name": "M3",
       "label": "Hex socket head countersunk screw grade C M3x0.5",
       "d": 3.0,
       "dims": {
        "d": 3.0,
-       "dk": 6.0,
-       "k": 1.7,
+       "dk": 5.54,
+       "k": 1.86,
        "sd": 2.0,
-       "t": 0.95,
+       "t": 1.1,
        "dp": 2.386566
       },
       "lengths": [
@@ -12290,8 +13479,8 @@
       "d": 4.0,
       "dims": {
        "d": 4.0,
-       "dk": 8.0,
-       "k": 2.3,
+       "dk": 7.53,
+       "k": 2.48,
        "sd": 2.5,
        "t": 1.5,
        "dp": 3.141192
@@ -12328,10 +13517,10 @@
       "d": 5.0,
       "dims": {
        "d": 5.0,
-       "dk": 10.0,
-       "k": 2.8,
+       "dk": 9.43,
+       "k": 3.1,
        "sd": 3.0,
-       "t": 2.05,
+       "t": 1.9,
        "dp": 4.018505
       },
       "lengths": [
@@ -12368,10 +13557,10 @@
       "d": 6.0,
       "dims": {
        "d": 6.0,
-       "dk": 12.0,
-       "k": 3.3,
+       "dk": 11.34,
+       "k": 3.72,
        "sd": 4.0,
-       "t": 2.25,
+       "t": 2.2,
        "dp": 4.773131
       },
       "lengths": [
@@ -12412,10 +13601,10 @@
       "d": 8.0,
       "dims": {
        "d": 8.0,
-       "dk": 16.0,
-       "k": 4.4,
+       "dk": 15.24,
+       "k": 4.96,
        "sd": 5.0,
-       "t": 3.2,
+       "t": 3.0,
        "dp": 6.466414
       },
       "lengths": [
@@ -12455,10 +13644,10 @@
       "d": 10.0,
       "dims": {
        "d": 10.0,
-       "dk": 20.0,
-       "k": 5.5,
+       "dk": 19.22,
+       "k": 6.2,
        "sd": 6.0,
-       "t": 4.1,
+       "t": 3.6,
        "dp": 8.159696
       },
       "lengths": [
@@ -12496,8 +13685,8 @@
       "d": 12.0,
       "dims": {
        "d": 12.0,
-       "dk": 24.0,
-       "k": 6.5,
+       "dk": 23.12,
+       "k": 7.44,
        "sd": 8.0,
        "t": 4.3,
        "dp": 9.852979
@@ -12535,10 +13724,10 @@
       "d": 16.0,
       "dims": {
        "d": 16.0,
-       "dk": 30.0,
-       "k": 7.5,
+       "dk": 29.01,
+       "k": 8.8,
        "sd": 10.0,
-       "t": 5.0,
+       "t": 4.8,
        "dp": 13.546262
       },
       "lengths": [
@@ -12571,8 +13760,8 @@
       "d": 20.0,
       "dims": {
        "d": 20.0,
-       "dk": 36.0,
-       "k": 8.5,
+       "dk": 36.05,
+       "k": 10.16,
        "sd": 12.0,
        "t": 5.6,
        "dp": 16.932828
@@ -12601,7 +13790,7 @@
       }
      }
     ],
-    "source": "DIN 7991:1986 (Haberkorn lists 1986-01; table values as reproduced by fasteners.eu) (Hexagon socket countersunk head screws (Senkschrauben mit Innensechskant)); https://www.fasteners.eu/standards/DIN/7991/ (local copy /root/skb-scratch/dl/fe/din7991.html; full min/max table and ls/lg length table - only full-tolerance source); https://www.birkhofer-shop.com/WebRoot/Sage/Shops/BirkhoferVerbindungselemente/MediaGallery/TechData/DIN_7991.pdf (nominal dk, k, s, b for M3-M20 without M14/M18 - all agree); https://www.schrauben-lexikon.de/norm/DIN_7991.asp (Wegertseder: s, e, dk, t for M3-M20 without M14/M18 - all agree); https://media.wuerth.com/stmedia/wuerth/documents/documents/LANG_de/18902376.pdf (Wuerth Normteile 2018 catalogue: DIN 7991 M22 dk 36 / k 13.1 / s 14 and M24 dk 39 / k 14 / s 14; its M3-M20 rows are ISO 10642 values; note text on DIN->ISO change); https://www.ottoroth.de/media/docs/download/web_handbuch_din_en_iso.pdf (Otto Roth DIN->EN/ISO changeover handbook); https://www.haberkorn.com/kataloge/umstellung-din-auf-iso-uebersicht-verbindungselemente/files/assets/common/downloads/publication.pdf (edition dates, changes: nominal range, head diameter, head height changed)",
+    "source": "Onshape standard content table DATA_DIN_7991_HEX_SOCKET_CTSK_HEAD_SCREW_MAIN (document c6f2bd5eba8853eca1ecbf6f, version adding sizes for migration)",
     "thread": {
      "rule": "iso"
     }
@@ -13261,6 +14450,1364 @@
     "source": "DIN 479:2016-08 (current; fasten.it shows the 2016-08 table identical to 1985-02) (Square head bolts with short dog point, product grade A, metric coarse thread M5 to M24); https://www.fasteners.eu/standards/DIN/479/; https://fasten.it/norms/norm/din_479 (1985 and 2016 tables); https://www.schrauben-lexikon.de/norm/DIN_479.asp (M6-M20 e, s, dp(d2), k: matches)"
    },
    {
+    "category": "Keys",
+    "class": "Parallel keys",
+    "name": "DIN 6885-1 Parallel keys",
+    "shape": "key",
+    "form": {
+     "form": 0
+    },
+    "sizes": [
+     {
+      "name": "6mm - 8mm",
+      "label": "Parallel key A x 2 x 2",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "b": 2.0,
+       "h": 2.0
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20"
+      ]
+     },
+     {
+      "name": "8mm - 10mm",
+      "label": "Parallel key A x 3 x 3",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "b": 3.0,
+       "h": 3.0
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36"
+      ]
+     },
+     {
+      "name": "10mm - 12mm",
+      "label": "Parallel key A x 4 x 4",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "b": 4.0,
+       "h": 4.0
+      },
+      "lengths": [
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45"
+      ]
+     },
+     {
+      "name": "12mm - 17mm",
+      "label": "Parallel key A x 5 x 5",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "b": 5.0,
+       "h": 5.0
+      },
+      "lengths": [
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56"
+      ]
+     },
+     {
+      "name": "17mm - 22mm",
+      "label": "Parallel key A x 6 x 6",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "b": 6.0,
+       "h": 6.0
+      },
+      "lengths": [
+       "14",
+       "16",
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70"
+      ]
+     },
+     {
+      "name": "22mm - 30mm",
+      "label": "Parallel key A x 8 x 7",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "b": 8.0,
+       "h": 7.0
+      },
+      "lengths": [
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90"
+      ]
+     },
+     {
+      "name": "30mm - 38mm",
+      "label": "Parallel key A x 10 x 8",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "b": 10.0,
+       "h": 8.0
+      },
+      "lengths": [
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110"
+      ]
+     },
+     {
+      "name": "38mm - 44mm",
+      "label": "Parallel key A x 12 x 8",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "b": 12.0,
+       "h": 8.0
+      },
+      "lengths": [
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140"
+      ]
+     },
+     {
+      "name": "44mm - 50mm",
+      "label": "Parallel key A x 14 x 9",
+      "d": 14.0,
+      "dims": {
+       "d": 14.0,
+       "b": 14.0,
+       "h": 9.0
+      },
+      "lengths": [
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160"
+      ]
+     },
+     {
+      "name": "50mm - 58mm",
+      "label": "Parallel key A x 16 x 10",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "b": 16.0,
+       "h": 10.0
+      },
+      "lengths": [
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180"
+      ]
+     },
+     {
+      "name": "58mm - 65mm",
+      "label": "Parallel key A x 18 x 11",
+      "d": 18.0,
+      "dims": {
+       "d": 18.0,
+       "b": 18.0,
+       "h": 11.0
+      },
+      "lengths": [
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200"
+      ]
+     },
+     {
+      "name": "65mm - 75mm",
+      "label": "Parallel key A x 20 x 12",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "b": 20.0,
+       "h": 12.0
+      },
+      "lengths": [
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220"
+      ]
+     },
+     {
+      "name": "75mm - 85mm",
+      "label": "Parallel key A x 22 x 14",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "b": 22.0,
+       "h": 14.0
+      },
+      "lengths": [
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250"
+      ]
+     },
+     {
+      "name": "85mm - 95mm",
+      "label": "Parallel key A x 25 x 14",
+      "d": 25.0,
+      "dims": {
+       "d": 25.0,
+       "b": 25.0,
+       "h": 14.0
+      },
+      "lengths": [
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280"
+      ]
+     },
+     {
+      "name": "95mm - 110mm",
+      "label": "Parallel key A x 28 x 16",
+      "d": 28.0,
+      "dims": {
+       "d": 28.0,
+       "b": 28.0,
+       "h": 16.0
+      },
+      "lengths": [
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "320"
+      ]
+     },
+     {
+      "name": "110mm - 130mm",
+      "label": "Parallel key A x 32 x 18",
+      "d": 32.0,
+      "dims": {
+       "d": 32.0,
+       "b": 32.0,
+       "h": 18.0
+      },
+      "lengths": [
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "320",
+       "360"
+      ]
+     },
+     {
+      "name": "130mm - 150mm",
+      "label": "Parallel key A x 36 x 20",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "b": 36.0,
+       "h": 20.0
+      },
+      "lengths": [
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     },
+     {
+      "name": "150mm - 170mm",
+      "label": "Parallel key A x 40 x 22",
+      "d": 40.0,
+      "dims": {
+       "d": 40.0,
+       "b": 40.0,
+       "h": 22.0
+      },
+      "lengths": [
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     },
+     {
+      "name": "170mm - 200mm",
+      "label": "Parallel key A x 45 x 25",
+      "d": 45.0,
+      "dims": {
+       "d": 45.0,
+       "b": 45.0,
+       "h": 25.0
+      },
+      "lengths": [
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     },
+     {
+      "name": "200mm - 230mm",
+      "label": "Parallel key A x 50 x 28",
+      "d": 50.0,
+      "dims": {
+       "d": 50.0,
+       "b": 50.0,
+       "h": 28.0
+      },
+      "lengths": [
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     },
+     {
+      "name": "230mm - 260mm",
+      "label": "Parallel key A x 56 x 32",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "b": 56.0,
+       "h": 32.0
+      },
+      "lengths": [
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     },
+     {
+      "name": "260mm - 290mm",
+      "label": "Parallel key A x 63 x 32",
+      "d": 63.0,
+      "dims": {
+       "d": 63.0,
+       "b": 63.0,
+       "h": 32.0
+      },
+      "lengths": [
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     },
+     {
+      "name": "290mm - 330mm",
+      "label": "Parallel key A x 70 x 36",
+      "d": 70.0,
+      "dims": {
+       "d": 70.0,
+       "b": 70.0,
+       "h": 36.0
+      },
+      "lengths": [
+       "200",
+       "220",
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     },
+     {
+      "name": "330mm - 380mm",
+      "label": "Parallel key A x 80 x 40",
+      "d": 80.0,
+      "dims": {
+       "d": 80.0,
+       "b": 80.0,
+       "h": 40.0
+      },
+      "lengths": [
+       "220",
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     },
+     {
+      "name": "380mm - 440mm",
+      "label": "Parallel key A x 90 x 45",
+      "d": 90.0,
+      "dims": {
+       "d": 90.0,
+       "b": 90.0,
+       "h": 45.0
+      },
+      "lengths": [
+       "250",
+       "280",
+       "320",
+       "360",
+       "400"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_6885-1_PARALLEL_KEY_MAIN (document None, version None)",
+    "sizeLabel": "Shaft diameter",
+    "params": [
+     {
+      "label": "Type",
+      "options": [
+       "A",
+       "B",
+       "AB"
+      ],
+      "default": "A",
+      "forms": {
+       "A": {
+        "form": 0
+       },
+       "B": {
+        "form": 1
+       },
+       "AB": {
+        "form": 6
+       }
+      }
+     }
+    ]
+   },
+   {
+    "category": "Keys",
+    "class": "Tapered keys",
+    "name": "DIN 6883 Tapered key",
+    "shape": "key",
+    "form": {
+     "form": 3
+    },
+    "sizes": [
+     {
+      "name": "22mm - 30mm",
+      "label": "Tapered key 8 x 5",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "b": 8.0,
+       "h": 5.0
+      },
+      "lengths": [
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70"
+      ]
+     },
+     {
+      "name": "30mm - 38mm",
+      "label": "Tapered key 10 x 6",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "b": 10.0,
+       "h": 6.0
+      },
+      "lengths": [
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90"
+      ]
+     },
+     {
+      "name": "38mm - 44mm",
+      "label": "Tapered key 12 x 6",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "b": 12.0,
+       "h": 6.0
+      },
+      "lengths": [
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125"
+      ]
+     },
+     {
+      "name": "44mm - 50mm",
+      "label": "Tapered key 14 x 6",
+      "d": 14.0,
+      "dims": {
+       "d": 14.0,
+       "b": 14.0,
+       "h": 6.0
+      },
+      "lengths": [
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140"
+      ]
+     },
+     {
+      "name": "50mm - 58mm",
+      "label": "Tapered key 16 x 7",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "b": 16.0,
+       "h": 7.0
+      },
+      "lengths": [
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160"
+      ]
+     },
+     {
+      "name": "58mm - 65mm",
+      "label": "Tapered key 18 x 7",
+      "d": 18.0,
+      "dims": {
+       "d": 18.0,
+       "b": 18.0,
+       "h": 7.0
+      },
+      "lengths": [
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180"
+      ]
+     },
+     {
+      "name": "65mm - 75mm",
+      "label": "Tapered key 20 x 8",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "b": 20.0,
+       "h": 8.0
+      },
+      "lengths": [
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220"
+      ]
+     },
+     {
+      "name": "75mm - 85mm",
+      "label": "Tapered key 22 x 9",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "b": 22.0,
+       "h": 9.0
+      },
+      "lengths": [
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250"
+      ]
+     },
+     {
+      "name": "85mm - 95mm",
+      "label": "Tapered key 25 x 9",
+      "d": 25.0,
+      "dims": {
+       "d": 25.0,
+       "b": 25.0,
+       "h": 9.0
+      },
+      "lengths": [
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280"
+      ]
+     },
+     {
+      "name": "95mm - 110mm",
+      "label": "Tapered key 28 x 10",
+      "d": 28.0,
+      "dims": {
+       "d": 28.0,
+       "b": 28.0,
+       "h": 10.0
+      },
+      "lengths": [
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "315"
+      ]
+     },
+     {
+      "name": "110mm - 130mm",
+      "label": "Tapered key 32 x 11",
+      "d": 32.0,
+      "dims": {
+       "d": 32.0,
+       "b": 32.0,
+       "h": 11.0
+      },
+      "lengths": [
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "315",
+       "355"
+      ]
+     },
+     {
+      "name": "130mm - 150mm",
+      "label": "Tapered key 36 x 12",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "b": 36.0,
+       "h": 12.0
+      },
+      "lengths": [
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "315",
+       "355",
+       "400"
+      ]
+     },
+     {
+      "name": "150mm - 170mm",
+      "label": "Tapered key 40 x 14",
+      "d": 40.0,
+      "dims": {
+       "d": 40.0,
+       "b": 40.0,
+       "h": 14.0
+      },
+      "lengths": [
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "315",
+       "355",
+       "400"
+      ]
+     },
+     {
+      "name": "170mm - 200mm",
+      "label": "Tapered key 45 x 16",
+      "d": 45.0,
+      "dims": {
+       "d": 45.0,
+       "b": 45.0,
+       "h": 16.0
+      },
+      "lengths": [
+       "160",
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "315",
+       "355",
+       "400"
+      ]
+     },
+     {
+      "name": "200mm - 230mm",
+      "label": "Tapered key 50 x 18",
+      "d": 50.0,
+      "dims": {
+       "d": 50.0,
+       "b": 50.0,
+       "h": 18.0
+      },
+      "lengths": [
+       "180",
+       "200",
+       "220",
+       "250",
+       "280",
+       "315",
+       "355",
+       "400"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_6883_TAPERED_KEY_MAIN (document 888c9e24f710ec57662184d0, version Removing standard)",
+    "sizeLabel": "Shaft diameter"
+   },
+   {
+    "category": "Keys",
+    "class": "Tapered keys",
+    "name": "DIN 6886 Stressed tapered key",
+    "shape": "key",
+    "form": {
+     "form": 5
+    },
+    "sizes": [
+     {
+      "name": "6mm - 8mm",
+      "label": "Stressed tapered key A x 2 x 2",
+      "d": 2.0,
+      "dims": {
+       "d": 2.0,
+       "b": 2.0,
+       "h": 2.0
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20"
+      ]
+     },
+     {
+      "name": "8mm - 10mm",
+      "label": "Stressed tapered key A x 3 x 3",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "b": 3.0,
+       "h": 3.0
+      },
+      "lengths": [
+       "6",
+       "8",
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36"
+      ]
+     },
+     {
+      "name": "10mm - 12mm",
+      "label": "Stressed tapered key A x 4 x 4",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "b": 4.0,
+       "h": 4.0
+      },
+      "lengths": [
+       "10",
+       "12",
+       "14",
+       "16",
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45"
+      ]
+     },
+     {
+      "name": "12mm - 17mm",
+      "label": "Stressed tapered key A x 5 x 5",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "b": 5.0,
+       "h": 5.0
+      },
+      "lengths": [
+       "12",
+       "14",
+       "16",
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56"
+      ]
+     },
+     {
+      "name": "17mm - 22mm",
+      "label": "Stressed tapered key A x 6 x 6",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "b": 6.0,
+       "h": 6.0
+      },
+      "lengths": [
+       "16",
+       "18",
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70"
+      ]
+     },
+     {
+      "name": "22mm - 30mm",
+      "label": "Stressed tapered key A x 8 x 7",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "b": 8.0,
+       "h": 7.0
+      },
+      "lengths": [
+       "20",
+       "22",
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90"
+      ]
+     },
+     {
+      "name": "30mm - 38mm",
+      "label": "Stressed tapered key A x 10 x 8",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "b": 10.0,
+       "h": 8.0
+      },
+      "lengths": [
+       "25",
+       "28",
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110"
+      ]
+     },
+     {
+      "name": "38mm - 44mm",
+      "label": "Stressed tapered key A x 12 x 8",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "b": 12.0,
+       "h": 8.0
+      },
+      "lengths": [
+       "32",
+       "36",
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125"
+      ]
+     },
+     {
+      "name": "44mm - 50mm",
+      "label": "Stressed tapered key A x 14 x 9",
+      "d": 14.0,
+      "dims": {
+       "d": 14.0,
+       "b": 14.0,
+       "h": 9.0
+      },
+      "lengths": [
+       "40",
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160"
+      ]
+     },
+     {
+      "name": "50mm - 58mm",
+      "label": "Stressed tapered key A x 16 x 10",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "b": 16.0,
+       "h": 10.0
+      },
+      "lengths": [
+       "45",
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180"
+      ]
+     },
+     {
+      "name": "58mm - 65mm",
+      "label": "Stressed tapered key A x 18 x 11",
+      "d": 18.0,
+      "dims": {
+       "d": 18.0,
+       "b": 18.0,
+       "h": 11.0
+      },
+      "lengths": [
+       "50",
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200"
+      ]
+     },
+     {
+      "name": "65mm - 75mm",
+      "label": "Stressed tapered key A x 20 x 12",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "b": 20.0,
+       "h": 12.0
+      },
+      "lengths": [
+       "56",
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220"
+      ]
+     },
+     {
+      "name": "75mm - 85mm",
+      "label": "Stressed tapered key A x 22 x 14",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "b": 22.0,
+       "h": 14.0
+      },
+      "lengths": [
+       "63",
+       "70",
+       "80",
+       "90",
+       "100",
+       "110",
+       "125",
+       "140",
+       "160",
+       "180",
+       "200",
+       "220",
+       "250"
+      ]
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_6886_STRESSED_TAPERED_KEY_MAIN (document f97efa5d65f36d4660e0cd32, version Removing standard)",
+    "sizeLabel": "Shaft diameter",
+    "params": [
+     {
+      "label": "Type",
+      "options": [
+       "A",
+       "B"
+      ],
+      "default": "A",
+      "forms": {
+       "A": {
+        "form": 5
+       },
+       "B": {
+        "form": 3
+       }
+      }
+     }
+    ]
+   },
+   {
     "category": "Nuts",
     "class": "Hex nuts",
     "name": "Hex nut style 1 grade A & B DIN EN 24032",
@@ -13461,6 +16008,148 @@
      }
     ],
     "source": "ISO 4032:2023 (fifth edition, 2023-08); annex sizes from ISO 4032:2012 (Fasteners — Hexagon regular nuts (style 1)); https://cdn.standards.iteh.ai/samples/75016/5b1f83bd2dc44fc199973e9957a75086/ISO-4032-2023.pdf (official ISO preview, Tables 1-2, M5-M39); https://standards.iteh.ai/catalog/standards/iso/1d8f87aa-0388-4a7c-a4a5-802a81b2555a/iso-4032-2023; https://cdn.standards.iteh.ai/samples/61668/93b89b8502a943499386155c44018aaa/ISO-4032-2012.pdf (official ISO 4032:2012 preview, Tables 1-2, used for annex sizes and cross-check); https://www.fasteners.eu/standards/ISO/4032/ (cross-check: matches ISO 4032:2012 values for all 29 sizes)",
+    "params": [
+     {
+      "label": "Bearing face",
+      "options": [
+       "Washer face",
+       "Chamfered"
+      ],
+      "default": "Washer face"
+     }
+    ]
+   },
+   {
+    "category": "Nuts",
+    "class": "Hex nuts",
+    "name": "Hex nut style 1 grade A & B fine pitch DIN EN 28673",
+    "shape": "nut",
+    "form": {
+     "form": 0
+    },
+    "sizes": [
+     {
+      "name": "M8",
+      "label": "Hex nut style 1 grade A & B M8x1.0",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "s": 13.0,
+       "m": 6.8
+      }
+     },
+     {
+      "name": "M10",
+      "label": "Hex nut style 1 grade A & B M10x1.0",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "s": 16.0,
+       "m": 8.4
+      }
+     },
+     {
+      "name": "M12",
+      "label": "Hex nut style 1 grade A & B M12x1.5",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "s": 18.0,
+       "m": 10.8
+      }
+     },
+     {
+      "name": "M16",
+      "label": "Hex nut style 1 grade A & B M16x1.5",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "s": 24.0,
+       "m": 14.8
+      }
+     },
+     {
+      "name": "M20",
+      "label": "Hex nut style 1 grade A & B M20x1.5",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "s": 30.0,
+       "m": 18.0
+      }
+     },
+     {
+      "name": "M24",
+      "label": "Hex nut style 1 grade A & B M24x2.0",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "s": 36.0,
+       "m": 21.5
+      }
+     },
+     {
+      "name": "M30",
+      "label": "Hex nut style 1 grade A & B M30x2.0",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "s": 46.0,
+       "m": 25.6
+      }
+     },
+     {
+      "name": "M36",
+      "label": "Hex nut style 1 grade A & B M36x3.0",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "s": 55.0,
+       "m": 31.0
+      }
+     },
+     {
+      "name": "M42",
+      "label": "Hex nut style 1 grade A & B M42x3.0",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "s": 65.0,
+       "m": 34.0
+      }
+     },
+     {
+      "name": "M48",
+      "label": "Hex nut style 1 grade A & B M48x3.0",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "s": 75.0,
+       "m": 38.0
+      }
+     },
+     {
+      "name": "M56",
+      "label": "Hex nut style 1 grade A & B M56x4.0",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "s": 85.0,
+       "m": 45.0
+      }
+     },
+     {
+      "name": "M64",
+      "label": "Hex nut style 1 grade A & B M64x4.0",
+      "d": 64.0,
+      "dims": {
+       "d": 64.0,
+       "s": 95.0,
+       "m": 51.0
+      }
+     }
+    ],
+    "source": "Onshape standard content table table (document 77427012b30d39c4043b9e78, version Adding smart names)",
     "params": [
      {
       "label": "Bearing face",
@@ -13745,6 +16434,240 @@
       "default": "Washer face"
      }
     ]
+   },
+   {
+    "category": "Nuts",
+    "class": "Hex nuts",
+    "name": "Hex nut style 2 grade A & B fine pitch DIN EN 28674",
+    "shape": "nut",
+    "form": {
+     "form": 0
+    },
+    "sizes": [
+     {
+      "name": "M8",
+      "label": "Hex nut style 2 grade A & B M8x1.0",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "s": 13.0,
+       "m": 7.5
+      }
+     },
+     {
+      "name": "M10",
+      "label": "Hex nut style 2 grade A & B M10x1.0",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "s": 16.0,
+       "m": 9.3
+      }
+     },
+     {
+      "name": "M12",
+      "label": "Hex nut style 2 grade A & B M12x1.5",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "s": 18.0,
+       "m": 12.0
+      }
+     },
+     {
+      "name": "M16",
+      "label": "Hex nut style 2 grade A & B M16x1.5",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "s": 24.0,
+       "m": 16.4
+      }
+     },
+     {
+      "name": "M20",
+      "label": "Hex nut style 2 grade A & B M20x1.5",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "s": 30.0,
+       "m": 20.3
+      }
+     },
+     {
+      "name": "M24",
+      "label": "Hex nut style 2 grade A & B M24x2.0",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "s": 36.0,
+       "m": 23.9
+      }
+     },
+     {
+      "name": "M30",
+      "label": "Hex nut style 2 grade A & B M30x2.0",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "s": 46.0,
+       "m": 28.6
+      }
+     },
+     {
+      "name": "M36",
+      "label": "Hex nut style 2 grade A & B M36x3.0",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "s": 55.0,
+       "m": 34.7
+      }
+     }
+    ],
+    "source": "Onshape standard content table table (document bbc8d3b64fcfd543314ade54, version Adding smart names)",
+    "params": [
+     {
+      "label": "Bearing face",
+      "options": [
+       "Washer face",
+       "Chamfered"
+      ],
+      "default": "Washer face"
+     }
+    ]
+   },
+   {
+    "category": "Nuts",
+    "class": "Hex nuts",
+    "name": "Hex thin nut fine pitch grade A & B DIN EN 28675",
+    "shape": "nut",
+    "form": {
+     "form": 0
+    },
+    "sizes": [
+     {
+      "name": "M8",
+      "label": "Hex thin nut grade A & B M8x1.0",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "s": 13.0,
+       "m": 4.0
+      }
+     },
+     {
+      "name": "M10",
+      "label": "Hex thin nut grade A & B M10x1.0",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "s": 16.0,
+       "m": 5.0
+      }
+     },
+     {
+      "name": "M12",
+      "label": "Hex thin nut grade A & B M12x1.5",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "s": 18.0,
+       "m": 6.0
+      }
+     },
+     {
+      "name": "M16",
+      "label": "Hex thin nut grade A & B M16x1.5",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "s": 24.0,
+       "m": 8.0
+      }
+     },
+     {
+      "name": "M20",
+      "label": "Hex thin nut grade A & B M20x1.5",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "s": 30.0,
+       "m": 10.0
+      }
+     },
+     {
+      "name": "M24",
+      "label": "Hex thin nut grade A & B M24x2.0",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "s": 36.0,
+       "m": 12.0
+      }
+     },
+     {
+      "name": "M30",
+      "label": "Hex thin nut grade A & B M30x2.0",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "s": 46.0,
+       "m": 15.0
+      }
+     },
+     {
+      "name": "M36",
+      "label": "Hex thin nut grade A & B M36x3.0",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "s": 55.0,
+       "m": 18.0
+      }
+     },
+     {
+      "name": "M42",
+      "label": "Hex thin nut grade A & B M42x3.0",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "s": 65.0,
+       "m": 21.0
+      }
+     },
+     {
+      "name": "M48",
+      "label": "Hex thin nut grade A & B M48x3.0",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "s": 75.0,
+       "m": 24.0
+      }
+     },
+     {
+      "name": "M56",
+      "label": "Hex thin nut grade A & B M56x4.0",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "s": 85.0,
+       "m": 28.0
+      }
+     },
+     {
+      "name": "M64",
+      "label": "Hex thin nut grade A & B M64x4.0",
+      "d": 64.0,
+      "dims": {
+       "d": 64.0,
+       "s": 95.0,
+       "m": 32.0
+      }
+     }
+    ],
+    "source": "Onshape standard content table table (document cf9cd2e4e996381f845a42c7, version Adding smart names)"
    },
    {
     "category": "Nuts",
@@ -14310,6 +17233,66 @@
     },
     "sizes": [
      {
+      "name": "M4",
+      "label": "Hex slotted nut grade C M4x0.70",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "s": 7.0,
+       "m": 5.0,
+       "w": 2.5,
+       "n": 1.2
+      }
+     },
+     {
+      "name": "M5",
+      "label": "Hex slotted nut grade C M5x0.80",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "s": 8.0,
+       "m": 4.0,
+       "w": 2.5,
+       "n": 1.4
+      }
+     },
+     {
+      "name": "M6",
+      "label": "Hex slotted nut grade C M6x1.00",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "s": 10.0,
+       "m": 5.0,
+       "w": 3.5,
+       "n": 1.6
+      }
+     },
+     {
+      "name": "M8",
+      "label": "Hex slotted nut grade C M8x1.00",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "s": 13.0,
+       "m": 6.5,
+       "w": 4.0,
+       "n": 2.0
+      }
+     },
+     {
+      "name": "M10",
+      "label": "Hex slotted nut grade C M10x1.25",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "s": 17.0,
+       "m": 8.0,
+       "w": 5.0,
+       "n": 2.5
+      }
+     },
+     {
       "name": "M12",
       "label": "Hex slotted nut grade C M12x1.75",
       "d": 12.0,
@@ -14317,8 +17300,20 @@
        "d": 12.0,
        "s": 18.0,
        "m": 15.0,
-       "w": 9.0,
-       "n": 3.5
+       "w": 10.0,
+       "n": 3.98
+      }
+     },
+     {
+      "name": "M14",
+      "label": "Hex slotted nut grade C M14x1.5",
+      "d": 14.0,
+      "dims": {
+       "d": 14.0,
+       "s": 21.0,
+       "m": 17.0,
+       "w": 11.5,
+       "n": 4.48
       }
      },
      {
@@ -14329,8 +17324,20 @@
        "d": 16.0,
        "s": 24.0,
        "m": 19.0,
-       "w": 11.4,
-       "n": 4.5
+       "w": 13.0,
+       "n": 4.98
+      }
+     },
+     {
+      "name": "M18",
+      "label": "Hex slotted nut grade C M18x1.5",
+      "d": 18.0,
+      "dims": {
+       "d": 18.0,
+       "s": 27.0,
+       "m": 20.5,
+       "w": 14.5,
+       "n": 4.98
       }
      },
      {
@@ -14341,8 +17348,8 @@
        "d": 20.0,
        "s": 30.0,
        "m": 22.0,
-       "w": 13.2,
-       "n": 4.5
+       "w": 16.0,
+       "n": 4.98
       }
      },
      {
@@ -14353,8 +17360,8 @@
        "d": 24.0,
        "s": 36.0,
        "m": 27.0,
-       "w": 16.2,
-       "n": 5.5
+       "w": 19.0,
+       "n": 5.98
       }
      },
      {
@@ -14365,8 +17372,8 @@
        "d": 27.0,
        "s": 41.0,
        "m": 30.0,
-       "w": 18.0,
-       "n": 5.5
+       "w": 22.0,
+       "n": 5.98
       }
      },
      {
@@ -14377,8 +17384,8 @@
        "d": 30.0,
        "s": 46.0,
        "m": 33.0,
-       "w": 19.8,
-       "n": 7.0
+       "w": 24.0,
+       "n": 7.58
       }
      },
      {
@@ -14389,12 +17396,12 @@
        "d": 33.0,
        "s": 50.0,
        "m": 35.0,
-       "w": 21.0,
-       "n": 7.0
+       "w": 26.0,
+       "n": 7.58
       }
      }
     ],
-    "source": "DIN 935-3:2000-10 (values); current edition DIN 935-3:2013-08 (Hexagon castle nuts - Part 3: Metric coarse pitch thread, product grade C); https://fasten.it/en/norms/norm/din_935_3; https://www.dinmedia.de/de/norm/din-935-3/179684536 (scope: castle nuts M12..M33, product grade C; replaces DIN 935-3:2000-10) - via search result summary only"
+    "source": "Onshape standard content table table (document f9e1536505f131ee090a0df7, version adding M14)"
    },
    {
     "category": "Nuts",
@@ -15202,6 +18209,745 @@
    },
    {
     "category": "Washers",
+    "class": "Lock washers",
+    "name": "Spring lock washer DIN 127 Type A",
+    "shape": "washer",
+    "form": {
+     "form": 2
+    },
+    "sizes": [
+     {
+      "name": "3",
+      "label": "Spring lock washer A3",
+      "d": 3.0,
+      "dims": {
+       "d1": 3.4,
+       "d2": 6.2,
+       "h": 0.8,
+       "d": 3.0
+      }
+     },
+     {
+      "name": "3.5",
+      "label": "Spring lock washer A3.5",
+      "d": 3.5,
+      "dims": {
+       "d1": 3.9,
+       "d2": 6.7,
+       "h": 0.8,
+       "d": 3.5
+      }
+     },
+     {
+      "name": "4",
+      "label": "Spring lock washer A4",
+      "d": 4.0,
+      "dims": {
+       "d1": 4.4,
+       "d2": 7.6,
+       "h": 0.9,
+       "d": 4.0
+      }
+     },
+     {
+      "name": "5",
+      "label": "Spring lock washer A5",
+      "d": 5.0,
+      "dims": {
+       "d1": 5.4,
+       "d2": 9.2,
+       "h": 1.2,
+       "d": 5.0
+      }
+     },
+     {
+      "name": "6",
+      "label": "Spring lock washer A6",
+      "d": 6.0,
+      "dims": {
+       "d1": 6.5,
+       "d2": 11.8,
+       "h": 1.6,
+       "d": 6.0
+      }
+     },
+     {
+      "name": "7",
+      "label": "Spring lock washer A7",
+      "d": 7.0,
+      "dims": {
+       "d1": 7.5,
+       "d2": 12.8,
+       "h": 1.6,
+       "d": 7.0
+      }
+     },
+     {
+      "name": "8",
+      "label": "Spring lock washer A8",
+      "d": 8.0,
+      "dims": {
+       "d1": 8.5,
+       "d2": 14.8,
+       "h": 2.0,
+       "d": 8.0
+      }
+     },
+     {
+      "name": "10",
+      "label": "Spring lock washer A10",
+      "d": 10.0,
+      "dims": {
+       "d1": 10.7,
+       "d2": 18.1,
+       "h": 2.2,
+       "d": 10.0
+      }
+     },
+     {
+      "name": "12",
+      "label": "Spring lock washer A12",
+      "d": 12.0,
+      "dims": {
+       "d1": 12.7,
+       "d2": 21.1,
+       "h": 2.5,
+       "d": 12.0
+      }
+     },
+     {
+      "name": "14",
+      "label": "Spring lock washer A14",
+      "d": 14.0,
+      "dims": {
+       "d1": 14.7,
+       "d2": 24.1,
+       "h": 3.0,
+       "d": 14.0
+      }
+     },
+     {
+      "name": "16",
+      "label": "Spring lock washer A16",
+      "d": 16.0,
+      "dims": {
+       "d1": 17.0,
+       "d2": 27.4,
+       "h": 3.5,
+       "d": 16.0
+      }
+     },
+     {
+      "name": "18",
+      "label": "Spring lock washer A18",
+      "d": 18.0,
+      "dims": {
+       "d1": 19.0,
+       "d2": 29.4,
+       "h": 3.5,
+       "d": 18.0
+      }
+     },
+     {
+      "name": "20",
+      "label": "Spring lock washer A20",
+      "d": 20.0,
+      "dims": {
+       "d1": 21.2,
+       "d2": 33.6,
+       "h": 4.0,
+       "d": 20.0
+      }
+     },
+     {
+      "name": "22",
+      "label": "Spring lock washer A22",
+      "d": 22.0,
+      "dims": {
+       "d1": 23.5,
+       "d2": 35.9,
+       "h": 4.0,
+       "d": 22.0
+      }
+     },
+     {
+      "name": "24",
+      "label": "Spring lock washer A24",
+      "d": 24.0,
+      "dims": {
+       "d1": 25.5,
+       "d2": 40.0,
+       "h": 5.0,
+       "d": 24.0
+      }
+     },
+     {
+      "name": "27",
+      "label": "Spring lock washer A27",
+      "d": 27.0,
+      "dims": {
+       "d1": 28.5,
+       "d2": 43.0,
+       "h": 5.0,
+       "d": 27.0
+      }
+     },
+     {
+      "name": "30",
+      "label": "Spring lock washer A30",
+      "d": 30.0,
+      "dims": {
+       "d1": 31.7,
+       "d2": 48.2,
+       "h": 6.0,
+       "d": 30.0
+      }
+     },
+     {
+      "name": "36",
+      "label": "Spring lock washer A36",
+      "d": 36.0,
+      "dims": {
+       "d1": 37.7,
+       "d2": 58.2,
+       "h": 6.0,
+       "d": 36.0
+      }
+     },
+     {
+      "name": "39",
+      "label": "Spring lock washer A39",
+      "d": 39.0,
+      "dims": {
+       "d1": 40.7,
+       "d2": 61.2,
+       "h": 6.0,
+       "d": 39.0
+      }
+     },
+     {
+      "name": "42",
+      "label": "Spring lock washer A42",
+      "d": 42.0,
+      "dims": {
+       "d1": 43.7,
+       "d2": 68.2,
+       "h": 7.0,
+       "d": 42.0
+      }
+     },
+     {
+      "name": "45",
+      "label": "Spring lock washer A45",
+      "d": 45.0,
+      "dims": {
+       "d1": 46.7,
+       "d2": 71.2,
+       "h": 7.0,
+       "d": 45.0
+      }
+     },
+     {
+      "name": "48",
+      "label": "Spring lock washer A48",
+      "d": 48.0,
+      "dims": {
+       "d1": 50.5,
+       "d2": 75.0,
+       "h": 7.0,
+       "d": 48.0
+      }
+     },
+     {
+      "name": "52",
+      "label": "Spring lock washer A52",
+      "d": 52.0,
+      "dims": {
+       "d1": 54.5,
+       "d2": 83.0,
+       "h": 8.0,
+       "d": 52.0
+      }
+     },
+     {
+      "name": "56",
+      "label": "Spring lock washer A56",
+      "d": 56.0,
+      "dims": {
+       "d1": 58.5,
+       "d2": 87.0,
+       "h": 8.0,
+       "d": 56.0
+      }
+     },
+     {
+      "name": "60",
+      "label": "Spring lock washer A60",
+      "d": 60.0,
+      "dims": {
+       "d1": 62.5,
+       "d2": 91.0,
+       "h": 8.0,
+       "d": 60.0
+      }
+     },
+     {
+      "name": "64",
+      "label": "Spring lock washer A64",
+      "d": 64.0,
+      "dims": {
+       "d1": 66.5,
+       "d2": 95.0,
+       "h": 8.0,
+       "d": 64.0
+      }
+     },
+     {
+      "name": "68",
+      "label": "Spring lock washer A68",
+      "d": 68.0,
+      "dims": {
+       "d1": 70.5,
+       "d2": 99.0,
+       "h": 8.0,
+       "d": 68.0
+      }
+     },
+     {
+      "name": "72",
+      "label": "Spring lock washer A72",
+      "d": 72.0,
+      "dims": {
+       "d1": 74.5,
+       "d2": 103.0,
+       "h": 8.0,
+       "d": 72.0
+      }
+     },
+     {
+      "name": "80",
+      "label": "Spring lock washer A80",
+      "d": 80.0,
+      "dims": {
+       "d1": 82.5,
+       "d2": 111.0,
+       "h": 8.0,
+       "d": 80.0
+      }
+     },
+     {
+      "name": "90",
+      "label": "Spring lock washer A90",
+      "d": 90.0,
+      "dims": {
+       "d1": 92.5,
+       "d2": 121.0,
+       "h": 8.0,
+       "d": 90.0
+      }
+     },
+     {
+      "name": "100",
+      "label": "Spring lock washer A100",
+      "d": 100.0,
+      "dims": {
+       "d1": 102.5,
+       "d2": 131.0,
+       "h": 8.0,
+       "d": 100.0
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_127_TYPE_A_SPRING_LOCK_WASHER_MAIN (document 23642c34d1d1f94182e24c45, version Tang profile issue fixed)"
+   },
+   {
+    "category": "Washers",
+    "class": "Lock washers",
+    "name": "Spring lock washer DIN 127 Type B",
+    "shape": "washer",
+    "form": {
+     "form": 2
+    },
+    "sizes": [
+     {
+      "name": "2",
+      "label": "Spring lock washer B20",
+      "d": 2.0,
+      "dims": {
+       "d1": 2.4,
+       "d2": 4.4,
+       "h": 0.5,
+       "d": 2.0
+      }
+     },
+     {
+      "name": "2.2",
+      "label": "Spring lock washer B20",
+      "d": 2.2,
+      "dims": {
+       "d1": 2.6,
+       "d2": 4.8,
+       "h": 0.6,
+       "d": 2.2
+      }
+     },
+     {
+      "name": "2.5",
+      "label": "Spring lock washer B20",
+      "d": 2.5,
+      "dims": {
+       "d1": 2.9,
+       "d2": 5.1,
+       "h": 0.6,
+       "d": 2.5
+      }
+     },
+     {
+      "name": "3",
+      "label": "Spring lock washer B20",
+      "d": 3.0,
+      "dims": {
+       "d1": 3.4,
+       "d2": 6.2,
+       "h": 0.8,
+       "d": 3.0
+      }
+     },
+     {
+      "name": "3.5",
+      "label": "Spring lock washer B20",
+      "d": 3.5,
+      "dims": {
+       "d1": 3.9,
+       "d2": 6.7,
+       "h": 0.8,
+       "d": 3.5
+      }
+     },
+     {
+      "name": "4",
+      "label": "Spring lock washer B20",
+      "d": 4.0,
+      "dims": {
+       "d1": 4.4,
+       "d2": 7.6,
+       "h": 0.9,
+       "d": 4.0
+      }
+     },
+     {
+      "name": "5",
+      "label": "Spring lock washer B20",
+      "d": 5.0,
+      "dims": {
+       "d1": 5.4,
+       "d2": 9.2,
+       "h": 1.2,
+       "d": 5.0
+      }
+     },
+     {
+      "name": "6",
+      "label": "Spring lock washer B20",
+      "d": 6.0,
+      "dims": {
+       "d1": 6.5,
+       "d2": 11.8,
+       "h": 1.6,
+       "d": 6.0
+      }
+     },
+     {
+      "name": "7",
+      "label": "Spring lock washer B20",
+      "d": 7.0,
+      "dims": {
+       "d1": 7.5,
+       "d2": 12.8,
+       "h": 1.6,
+       "d": 7.0
+      }
+     },
+     {
+      "name": "8",
+      "label": "Spring lock washer B20",
+      "d": 8.0,
+      "dims": {
+       "d1": 8.5,
+       "d2": 14.8,
+       "h": 2.0,
+       "d": 8.0
+      }
+     },
+     {
+      "name": "10",
+      "label": "Spring lock washer B20",
+      "d": 10.0,
+      "dims": {
+       "d1": 10.7,
+       "d2": 18.1,
+       "h": 2.2,
+       "d": 10.0
+      }
+     },
+     {
+      "name": "12",
+      "label": "Spring lock washer B20",
+      "d": 12.0,
+      "dims": {
+       "d1": 12.7,
+       "d2": 21.1,
+       "h": 2.5,
+       "d": 12.0
+      }
+     },
+     {
+      "name": "14",
+      "label": "Spring lock washer B20",
+      "d": 14.0,
+      "dims": {
+       "d1": 14.7,
+       "d2": 24.1,
+       "h": 3.0,
+       "d": 14.0
+      }
+     },
+     {
+      "name": "16",
+      "label": "Spring lock washer B20",
+      "d": 16.0,
+      "dims": {
+       "d1": 17.0,
+       "d2": 27.4,
+       "h": 3.5,
+       "d": 16.0
+      }
+     },
+     {
+      "name": "18",
+      "label": "Spring lock washer B20",
+      "d": 18.0,
+      "dims": {
+       "d1": 19.0,
+       "d2": 29.4,
+       "h": 3.5,
+       "d": 18.0
+      }
+     },
+     {
+      "name": "20",
+      "label": "Spring lock washer B20",
+      "d": 20.0,
+      "dims": {
+       "d1": 21.2,
+       "d2": 33.6,
+       "h": 4.0,
+       "d": 20.0
+      }
+     },
+     {
+      "name": "22",
+      "label": "Spring lock washer B20",
+      "d": 22.0,
+      "dims": {
+       "d1": 23.5,
+       "d2": 35.9,
+       "h": 4.0,
+       "d": 22.0
+      }
+     },
+     {
+      "name": "24",
+      "label": "Spring lock washer B20",
+      "d": 24.0,
+      "dims": {
+       "d1": 25.5,
+       "d2": 40.0,
+       "h": 5.0,
+       "d": 24.0
+      }
+     },
+     {
+      "name": "27",
+      "label": "Spring lock washer B20",
+      "d": 27.0,
+      "dims": {
+       "d1": 28.5,
+       "d2": 43.0,
+       "h": 5.0,
+       "d": 27.0
+      }
+     },
+     {
+      "name": "30",
+      "label": "Spring lock washer B20",
+      "d": 30.0,
+      "dims": {
+       "d1": 31.7,
+       "d2": 48.2,
+       "h": 6.0,
+       "d": 30.0
+      }
+     },
+     {
+      "name": "36",
+      "label": "Spring lock washer B20",
+      "d": 36.0,
+      "dims": {
+       "d1": 37.7,
+       "d2": 58.2,
+       "h": 6.0,
+       "d": 36.0
+      }
+     },
+     {
+      "name": "39",
+      "label": "Spring lock washer B20",
+      "d": 39.0,
+      "dims": {
+       "d1": 40.7,
+       "d2": 61.2,
+       "h": 6.0,
+       "d": 39.0
+      }
+     },
+     {
+      "name": "42",
+      "label": "Spring lock washer B20",
+      "d": 42.0,
+      "dims": {
+       "d1": 43.7,
+       "d2": 68.2,
+       "h": 7.0,
+       "d": 42.0
+      }
+     },
+     {
+      "name": "45",
+      "label": "Spring lock washer B20",
+      "d": 45.0,
+      "dims": {
+       "d1": 46.7,
+       "d2": 71.2,
+       "h": 7.0,
+       "d": 45.0
+      }
+     },
+     {
+      "name": "48",
+      "label": "Spring lock washer B20",
+      "d": 48.0,
+      "dims": {
+       "d1": 50.5,
+       "d2": 75.0,
+       "h": 7.0,
+       "d": 48.0
+      }
+     },
+     {
+      "name": "52",
+      "label": "Spring lock washer B20",
+      "d": 52.0,
+      "dims": {
+       "d1": 54.5,
+       "d2": 83.0,
+       "h": 8.0,
+       "d": 52.0
+      }
+     },
+     {
+      "name": "56",
+      "label": "Spring lock washer B20",
+      "d": 56.0,
+      "dims": {
+       "d1": 58.5,
+       "d2": 87.0,
+       "h": 8.0,
+       "d": 56.0
+      }
+     },
+     {
+      "name": "60",
+      "label": "Spring lock washer B20",
+      "d": 60.0,
+      "dims": {
+       "d1": 62.5,
+       "d2": 91.0,
+       "h": 8.0,
+       "d": 60.0
+      }
+     },
+     {
+      "name": "64",
+      "label": "Spring lock washer B20",
+      "d": 64.0,
+      "dims": {
+       "d1": 66.5,
+       "d2": 95.0,
+       "h": 8.0,
+       "d": 64.0
+      }
+     },
+     {
+      "name": "68",
+      "label": "Spring lock washer B20",
+      "d": 68.0,
+      "dims": {
+       "d1": 70.5,
+       "d2": 99.0,
+       "h": 8.0,
+       "d": 68.0
+      }
+     },
+     {
+      "name": "72",
+      "label": "Spring lock washer B20",
+      "d": 72.0,
+      "dims": {
+       "d1": 74.5,
+       "d2": 103.0,
+       "h": 8.0,
+       "d": 72.0
+      }
+     },
+     {
+      "name": "80",
+      "label": "Spring lock washer B20",
+      "d": 80.0,
+      "dims": {
+       "d1": 82.5,
+       "d2": 111.0,
+       "h": 8.0,
+       "d": 80.0
+      }
+     },
+     {
+      "name": "90",
+      "label": "Spring lock washer B20",
+      "d": 90.0,
+      "dims": {
+       "d1": 92.5,
+       "d2": 121.0,
+       "h": 8.0,
+       "d": 90.0
+      }
+     },
+     {
+      "name": "100",
+      "label": "Spring lock washer B20",
+      "d": 100.0,
+      "dims": {
+       "d1": 102.5,
+       "d2": 131.0,
+       "h": 8.0,
+       "d": 100.0
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_127_TYPE_B_SPRING_LOCK_WASHER_MAIN (document e45b9e41670c61042e233eb5, version Initial marking)"
+   },
+   {
+    "category": "Washers",
     "class": "Plain washers",
     "name": "Plain washer grade A DIN 125-1",
     "shape": "washer",
@@ -15216,7 +18962,8 @@
       "dims": {
        "d1": 1.7,
        "d2": 4.0,
-       "h": 0.3
+       "h": 0.3,
+       "d": 1.6
       }
      },
      {
@@ -15226,7 +18973,8 @@
       "dims": {
        "d1": 1.8,
        "d2": 4.5,
-       "h": 0.3
+       "h": 0.3,
+       "d": 1.7
       }
      },
      {
@@ -15236,7 +18984,8 @@
       "dims": {
        "d1": 2.2,
        "d2": 5.0,
-       "h": 0.3
+       "h": 0.3,
+       "d": 2.0
       }
      },
      {
@@ -15246,7 +18995,8 @@
       "dims": {
        "d1": 2.5,
        "d2": 6.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 2.3
       }
      },
      {
@@ -15256,7 +19006,8 @@
       "dims": {
        "d1": 2.7,
        "d2": 6.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 2.5
       }
      },
      {
@@ -15266,7 +19017,8 @@
       "dims": {
        "d1": 2.8,
        "d2": 7.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 2.6
       }
      },
      {
@@ -15276,7 +19028,8 @@
       "dims": {
        "d1": 3.2,
        "d2": 7.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 3.0
       }
      },
      {
@@ -15286,7 +19039,8 @@
       "dims": {
        "d1": 3.7,
        "d2": 8.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 3.5
       }
      },
      {
@@ -15296,7 +19050,8 @@
       "dims": {
        "d1": 4.3,
        "d2": 9.0,
-       "h": 0.8
+       "h": 0.8,
+       "d": 4.0
       }
      },
      {
@@ -15306,7 +19061,8 @@
       "dims": {
        "d1": 5.3,
        "d2": 10.0,
-       "h": 1.0
+       "h": 1.0,
+       "d": 5.0
       }
      },
      {
@@ -15316,7 +19072,8 @@
       "dims": {
        "d1": 6.4,
        "d2": 12.0,
-       "h": 1.6
+       "h": 1.6,
+       "d": 6.0
       }
      },
      {
@@ -15326,7 +19083,8 @@
       "dims": {
        "d1": 7.4,
        "d2": 14.0,
-       "h": 1.6
+       "h": 1.6,
+       "d": 7.0
       }
      },
      {
@@ -15336,7 +19094,19 @@
       "dims": {
        "d1": 8.4,
        "d2": 16.0,
-       "h": 1.6
+       "h": 1.6,
+       "d": 8.0
+      }
+     },
+     {
+      "name": "M9",
+      "label": "Plain washer grade A HV200 M9",
+      "d": 9.0,
+      "dims": {
+       "d1": 9.9,
+       "d2": 17.0,
+       "h": 1.6,
+       "d": 9.0
       }
      },
      {
@@ -15346,7 +19116,8 @@
       "dims": {
        "d1": 10.5,
        "d2": 20.0,
-       "h": 2.0
+       "h": 2.0,
+       "d": 10.0
       }
      },
      {
@@ -15356,7 +19127,8 @@
       "dims": {
        "d1": 13.0,
        "d2": 24.0,
-       "h": 2.5
+       "h": 2.5,
+       "d": 12.0
       }
      },
      {
@@ -15366,7 +19138,8 @@
       "dims": {
        "d1": 15.0,
        "d2": 28.0,
-       "h": 2.5
+       "h": 2.5,
+       "d": 14.0
       }
      },
      {
@@ -15376,7 +19149,8 @@
       "dims": {
        "d1": 17.0,
        "d2": 30.0,
-       "h": 3.0
+       "h": 3.0,
+       "d": 16.0
       }
      },
      {
@@ -15386,7 +19160,8 @@
       "dims": {
        "d1": 19.0,
        "d2": 34.0,
-       "h": 3.0
+       "h": 3.0,
+       "d": 18.0
       }
      },
      {
@@ -15396,7 +19171,8 @@
       "dims": {
        "d1": 21.0,
        "d2": 37.0,
-       "h": 3.0
+       "h": 3.0,
+       "d": 20.0
       }
      },
      {
@@ -15406,7 +19182,8 @@
       "dims": {
        "d1": 23.0,
        "d2": 39.0,
-       "h": 3.0
+       "h": 3.0,
+       "d": 22.0
       }
      },
      {
@@ -15416,7 +19193,8 @@
       "dims": {
        "d1": 25.0,
        "d2": 44.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 24.0
       }
      },
      {
@@ -15426,7 +19204,8 @@
       "dims": {
        "d1": 27.0,
        "d2": 50.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 26.0
       }
      },
      {
@@ -15436,7 +19215,8 @@
       "dims": {
        "d1": 28.0,
        "d2": 50.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 27.0
       }
      },
      {
@@ -15446,7 +19226,8 @@
       "dims": {
        "d1": 29.0,
        "d2": 50.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 28.0
       }
      },
      {
@@ -15456,7 +19237,8 @@
       "dims": {
        "d1": 31.0,
        "d2": 56.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 30.0
       }
      },
      {
@@ -15466,7 +19248,8 @@
       "dims": {
        "d1": 33.0,
        "d2": 60.0,
-       "h": 5.0
+       "h": 5.0,
+       "d": 32.0
       }
      },
      {
@@ -15476,7 +19259,8 @@
       "dims": {
        "d1": 34.0,
        "d2": 60.0,
-       "h": 5.0
+       "h": 5.0,
+       "d": 33.0
       }
      },
      {
@@ -15486,7 +19270,8 @@
       "dims": {
        "d1": 36.0,
        "d2": 66.0,
-       "h": 5.0
+       "h": 5.0,
+       "d": 35.0
       }
      },
      {
@@ -15496,7 +19281,8 @@
       "dims": {
        "d1": 37.0,
        "d2": 66.0,
-       "h": 5.0
+       "h": 5.0,
+       "d": 36.0
       }
      },
      {
@@ -15506,7 +19292,8 @@
       "dims": {
        "d1": 39.0,
        "d2": 72.0,
-       "h": 6.0
+       "h": 6.0,
+       "d": 38.0
       }
      },
      {
@@ -15516,7 +19303,8 @@
       "dims": {
        "d1": 40.0,
        "d2": 72.0,
-       "h": 6.0
+       "h": 6.0,
+       "d": 39.0
       }
      },
      {
@@ -15526,7 +19314,8 @@
       "dims": {
        "d1": 41.0,
        "d2": 72.0,
-       "h": 6.0
+       "h": 6.0,
+       "d": 40.0
       }
      },
      {
@@ -15536,7 +19325,8 @@
       "dims": {
        "d1": 43.0,
        "d2": 78.0,
-       "h": 7.0
+       "h": 7.0,
+       "d": 42.0
       }
      },
      {
@@ -15546,7 +19336,8 @@
       "dims": {
        "d1": 46.0,
        "d2": 85.0,
-       "h": 7.0
+       "h": 7.0,
+       "d": 45.0
       }
      },
      {
@@ -15556,7 +19347,8 @@
       "dims": {
        "d1": 50.0,
        "d2": 92.0,
-       "h": 8.0
+       "h": 8.0,
+       "d": 48.0
       }
      },
      {
@@ -15566,7 +19358,8 @@
       "dims": {
        "d1": 52.0,
        "d2": 92.0,
-       "h": 8.0
+       "h": 8.0,
+       "d": 50.0
       }
      },
      {
@@ -15576,7 +19369,8 @@
       "dims": {
        "d1": 54.0,
        "d2": 98.0,
-       "h": 8.0
+       "h": 8.0,
+       "d": 52.0
       }
      },
      {
@@ -15586,7 +19380,8 @@
       "dims": {
        "d1": 57.0,
        "d2": 105.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 55.0
       }
      },
      {
@@ -15596,7 +19391,8 @@
       "dims": {
        "d1": 58.0,
        "d2": 105.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 56.0
       }
      },
      {
@@ -15606,7 +19402,8 @@
       "dims": {
        "d1": 60.0,
        "d2": 110.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 58.0
       }
      },
      {
@@ -15616,7 +19413,8 @@
       "dims": {
        "d1": 62.0,
        "d2": 110.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 60.0
       }
      },
      {
@@ -15626,7 +19424,8 @@
       "dims": {
        "d1": 66.0,
        "d2": 115.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 64.0
       }
      },
      {
@@ -15636,7 +19435,8 @@
       "dims": {
        "d1": 70.0,
        "d2": 120.0,
-       "h": 10.0
+       "h": 10.0,
+       "d": 68.0
       }
      },
      {
@@ -15646,7 +19446,8 @@
       "dims": {
        "d1": 74.0,
        "d2": 125.0,
-       "h": 10.0
+       "h": 10.0,
+       "d": 72.0
       }
      },
      {
@@ -15656,7 +19457,8 @@
       "dims": {
        "d1": 78.0,
        "d2": 135.0,
-       "h": 10.0
+       "h": 10.0,
+       "d": 76.0
       }
      },
      {
@@ -15666,7 +19468,8 @@
       "dims": {
        "d1": 82.0,
        "d2": 140.0,
-       "h": 12.0
+       "h": 12.0,
+       "d": 80.0
       }
      },
      {
@@ -15676,7 +19479,8 @@
       "dims": {
        "d1": 87.0,
        "d2": 145.0,
-       "h": 12.0
+       "h": 12.0,
+       "d": 85.0
       }
      },
      {
@@ -15686,7 +19490,8 @@
       "dims": {
        "d1": 93.0,
        "d2": 160.0,
-       "h": 12.0
+       "h": 12.0,
+       "d": 90.0
       }
      },
      {
@@ -15696,7 +19501,8 @@
       "dims": {
        "d1": 98.0,
        "d2": 165.0,
-       "h": 12.0
+       "h": 12.0,
+       "d": 95.0
       }
      },
      {
@@ -15706,7 +19512,8 @@
       "dims": {
        "d1": 104.0,
        "d2": 175.0,
-       "h": 14.0
+       "h": 14.0,
+       "d": 100.0
       }
      },
      {
@@ -15716,7 +19523,8 @@
       "dims": {
        "d1": 109.0,
        "d2": 180.0,
-       "h": 14.0
+       "h": 14.0,
+       "d": 105.0
       }
      },
      {
@@ -15726,7 +19534,8 @@
       "dims": {
        "d1": 114.0,
        "d2": 185.0,
-       "h": 14.0
+       "h": 14.0,
+       "d": 110.0
       }
      },
      {
@@ -15736,7 +19545,8 @@
       "dims": {
        "d1": 119.0,
        "d2": 200.0,
-       "h": 14.0
+       "h": 14.0,
+       "d": 115.0
       }
      },
      {
@@ -15746,7 +19556,8 @@
       "dims": {
        "d1": 124.0,
        "d2": 210.0,
-       "h": 16.0
+       "h": 16.0,
+       "d": 120.0
       }
      },
      {
@@ -15756,7 +19567,8 @@
       "dims": {
        "d1": 129.0,
        "d2": 220.0,
-       "h": 16.0
+       "h": 16.0,
+       "d": 125.0
       }
      },
      {
@@ -15766,7 +19578,8 @@
       "dims": {
        "d1": 134.0,
        "d2": 220.0,
-       "h": 16.0
+       "h": 16.0,
+       "d": 130.0
       }
      },
      {
@@ -15776,7 +19589,8 @@
       "dims": {
        "d1": 139.0,
        "d2": 230.0,
-       "h": 16.0
+       "h": 16.0,
+       "d": 135.0
       }
      },
      {
@@ -15786,7 +19600,8 @@
       "dims": {
        "d1": 144.0,
        "d2": 240.0,
-       "h": 18.0
+       "h": 18.0,
+       "d": 140.0
       }
      },
      {
@@ -15796,7 +19611,8 @@
       "dims": {
        "d1": 149.0,
        "d2": 250.0,
-       "h": 18.0
+       "h": 18.0,
+       "d": 145.0
       }
      },
      {
@@ -15806,7 +19622,8 @@
       "dims": {
        "d1": 155.0,
        "d2": 250.0,
-       "h": 18.0
+       "h": 18.0,
+       "d": 150.0
       }
      },
      {
@@ -15816,11 +19633,12 @@
       "dims": {
        "d1": 165.0,
        "d2": 250.0,
-       "h": 18.0
+       "h": 18.0,
+       "d": 160.0
       }
      }
     ],
-    "source": "DIN 125-1:1990-03 (withdrawn; replaced by DIN EN ISO 7089 / 7090) (Washers - Product grade A, hardness up to 250 HV, preferably for hexagon bolts and nuts (Form A without chamfer, Form B with chamfer)); https://fullerfasteners.com/tech/din-125-specifications-flat-washer-normal-series/ (1.7..165, d min/max, dc min/max, h nom/min/max); https://www.fasteners.eu/standards/DIN/125-A/ and /125-B/ (local copies /root/skb-scratch/dl/fe/din125-A.html, din125-B.html); https://fasten.it/en/norms/norm/din_125 (DIN 125 1990-03 table, nominal values; page covers DIN 125-1 and DIN 125-2); https://www.schrauben-lexikon.de/norm/DIN_125A.asp and DIN_125B.asp (dealer tables, nominal values)",
+    "source": "Onshape standard content table DATA_DIN_125_1_GRADE_A_WASHER_MAIN (document 4a067527589a8d8ecdb07106, version adding M9)",
     "params": [
      {
       "label": "Chamfer",
@@ -15849,7 +19667,8 @@
       "dims": {
        "d1": 1.7,
        "d2": 4.0,
-       "h": 0.3
+       "h": 0.3,
+       "d": 1.6
       }
      },
      {
@@ -15859,7 +19678,8 @@
       "dims": {
        "d1": 1.8,
        "d2": 4.5,
-       "h": 0.3
+       "h": 0.3,
+       "d": 1.7
       }
      },
      {
@@ -15869,7 +19689,8 @@
       "dims": {
        "d1": 2.2,
        "d2": 5.0,
-       "h": 0.3
+       "h": 0.3,
+       "d": 2.0
       }
      },
      {
@@ -15879,7 +19700,8 @@
       "dims": {
        "d1": 2.5,
        "d2": 6.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 2.3
       }
      },
      {
@@ -15889,7 +19711,8 @@
       "dims": {
        "d1": 2.7,
        "d2": 6.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 2.5
       }
      },
      {
@@ -15899,7 +19722,8 @@
       "dims": {
        "d1": 2.8,
        "d2": 7.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 2.6
       }
      },
      {
@@ -15909,7 +19733,8 @@
       "dims": {
        "d1": 3.2,
        "d2": 7.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 3.0
       }
      },
      {
@@ -15919,7 +19744,8 @@
       "dims": {
        "d1": 3.7,
        "d2": 8.0,
-       "h": 0.5
+       "h": 0.5,
+       "d": 3.5
       }
      },
      {
@@ -15929,7 +19755,8 @@
       "dims": {
        "d1": 4.3,
        "d2": 9.0,
-       "h": 0.8
+       "h": 0.8,
+       "d": 4.0
       }
      },
      {
@@ -15939,7 +19766,8 @@
       "dims": {
        "d1": 5.3,
        "d2": 10.0,
-       "h": 1.0
+       "h": 1.0,
+       "d": 5.0
       }
      },
      {
@@ -15949,7 +19777,8 @@
       "dims": {
        "d1": 6.4,
        "d2": 12.0,
-       "h": 1.6
+       "h": 1.6,
+       "d": 6.0
       }
      },
      {
@@ -15959,7 +19788,8 @@
       "dims": {
        "d1": 7.4,
        "d2": 14.0,
-       "h": 1.6
+       "h": 1.6,
+       "d": 7.0
       }
      },
      {
@@ -15969,7 +19799,19 @@
       "dims": {
        "d1": 8.4,
        "d2": 16.0,
-       "h": 1.6
+       "h": 1.6,
+       "d": 8.0
+      }
+     },
+     {
+      "name": "M9",
+      "label": "Plain washer grade A HV300 M9",
+      "d": 9.0,
+      "dims": {
+       "d1": 9.9,
+       "d2": 17.0,
+       "h": 1.6,
+       "d": 9.0
       }
      },
      {
@@ -15979,7 +19821,8 @@
       "dims": {
        "d1": 10.5,
        "d2": 20.0,
-       "h": 2.0
+       "h": 2.0,
+       "d": 10.0
       }
      },
      {
@@ -15989,7 +19832,8 @@
       "dims": {
        "d1": 13.0,
        "d2": 24.0,
-       "h": 2.5
+       "h": 2.5,
+       "d": 12.0
       }
      },
      {
@@ -15999,7 +19843,8 @@
       "dims": {
        "d1": 15.0,
        "d2": 28.0,
-       "h": 2.5
+       "h": 2.5,
+       "d": 14.0
       }
      },
      {
@@ -16009,7 +19854,8 @@
       "dims": {
        "d1": 17.0,
        "d2": 30.0,
-       "h": 3.0
+       "h": 3.0,
+       "d": 16.0
       }
      },
      {
@@ -16019,7 +19865,8 @@
       "dims": {
        "d1": 19.0,
        "d2": 34.0,
-       "h": 3.0
+       "h": 3.0,
+       "d": 18.0
       }
      },
      {
@@ -16029,7 +19876,8 @@
       "dims": {
        "d1": 21.0,
        "d2": 37.0,
-       "h": 3.0
+       "h": 3.0,
+       "d": 20.0
       }
      },
      {
@@ -16039,7 +19887,8 @@
       "dims": {
        "d1": 23.0,
        "d2": 39.0,
-       "h": 3.0
+       "h": 3.0,
+       "d": 22.0
       }
      },
      {
@@ -16049,7 +19898,8 @@
       "dims": {
        "d1": 25.0,
        "d2": 44.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 24.0
       }
      },
      {
@@ -16059,7 +19909,8 @@
       "dims": {
        "d1": 27.0,
        "d2": 50.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 26.0
       }
      },
      {
@@ -16069,7 +19920,8 @@
       "dims": {
        "d1": 28.0,
        "d2": 50.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 27.0
       }
      },
      {
@@ -16079,7 +19931,8 @@
       "dims": {
        "d1": 29.0,
        "d2": 50.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 28.0
       }
      },
      {
@@ -16089,7 +19942,8 @@
       "dims": {
        "d1": 31.0,
        "d2": 56.0,
-       "h": 4.0
+       "h": 4.0,
+       "d": 30.0
       }
      },
      {
@@ -16099,7 +19953,8 @@
       "dims": {
        "d1": 33.0,
        "d2": 60.0,
-       "h": 5.0
+       "h": 5.0,
+       "d": 32.0
       }
      },
      {
@@ -16109,7 +19964,8 @@
       "dims": {
        "d1": 34.0,
        "d2": 60.0,
-       "h": 5.0
+       "h": 5.0,
+       "d": 33.0
       }
      },
      {
@@ -16119,7 +19975,8 @@
       "dims": {
        "d1": 36.0,
        "d2": 66.0,
-       "h": 5.0
+       "h": 5.0,
+       "d": 35.0
       }
      },
      {
@@ -16129,7 +19986,8 @@
       "dims": {
        "d1": 37.0,
        "d2": 66.0,
-       "h": 5.0
+       "h": 5.0,
+       "d": 36.0
       }
      },
      {
@@ -16139,7 +19997,8 @@
       "dims": {
        "d1": 39.0,
        "d2": 72.0,
-       "h": 6.0
+       "h": 6.0,
+       "d": 38.0
       }
      },
      {
@@ -16149,7 +20008,8 @@
       "dims": {
        "d1": 40.0,
        "d2": 72.0,
-       "h": 6.0
+       "h": 6.0,
+       "d": 39.0
       }
      },
      {
@@ -16159,7 +20019,8 @@
       "dims": {
        "d1": 41.0,
        "d2": 72.0,
-       "h": 6.0
+       "h": 6.0,
+       "d": 40.0
       }
      },
      {
@@ -16169,7 +20030,8 @@
       "dims": {
        "d1": 43.0,
        "d2": 78.0,
-       "h": 7.0
+       "h": 7.0,
+       "d": 42.0
       }
      },
      {
@@ -16179,7 +20041,8 @@
       "dims": {
        "d1": 46.0,
        "d2": 85.0,
-       "h": 7.0
+       "h": 7.0,
+       "d": 45.0
       }
      },
      {
@@ -16189,7 +20052,8 @@
       "dims": {
        "d1": 50.0,
        "d2": 92.0,
-       "h": 8.0
+       "h": 8.0,
+       "d": 48.0
       }
      },
      {
@@ -16199,7 +20063,8 @@
       "dims": {
        "d1": 52.0,
        "d2": 92.0,
-       "h": 8.0
+       "h": 8.0,
+       "d": 50.0
       }
      },
      {
@@ -16209,7 +20074,8 @@
       "dims": {
        "d1": 54.0,
        "d2": 98.0,
-       "h": 8.0
+       "h": 8.0,
+       "d": 52.0
       }
      },
      {
@@ -16219,7 +20085,8 @@
       "dims": {
        "d1": 57.0,
        "d2": 105.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 55.0
       }
      },
      {
@@ -16229,7 +20096,8 @@
       "dims": {
        "d1": 58.0,
        "d2": 105.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 56.0
       }
      },
      {
@@ -16239,7 +20107,8 @@
       "dims": {
        "d1": 60.0,
        "d2": 110.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 58.0
       }
      },
      {
@@ -16249,7 +20118,8 @@
       "dims": {
        "d1": 62.0,
        "d2": 110.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 60.0
       }
      },
      {
@@ -16259,7 +20129,8 @@
       "dims": {
        "d1": 66.0,
        "d2": 115.0,
-       "h": 9.0
+       "h": 9.0,
+       "d": 64.0
       }
      },
      {
@@ -16269,7 +20140,8 @@
       "dims": {
        "d1": 70.0,
        "d2": 120.0,
-       "h": 10.0
+       "h": 10.0,
+       "d": 68.0
       }
      },
      {
@@ -16279,7 +20151,8 @@
       "dims": {
        "d1": 74.0,
        "d2": 125.0,
-       "h": 10.0
+       "h": 10.0,
+       "d": 72.0
       }
      },
      {
@@ -16289,7 +20162,8 @@
       "dims": {
        "d1": 78.0,
        "d2": 135.0,
-       "h": 10.0
+       "h": 10.0,
+       "d": 76.0
       }
      },
      {
@@ -16299,7 +20173,8 @@
       "dims": {
        "d1": 82.0,
        "d2": 140.0,
-       "h": 12.0
+       "h": 12.0,
+       "d": 80.0
       }
      },
      {
@@ -16309,7 +20184,8 @@
       "dims": {
        "d1": 87.0,
        "d2": 145.0,
-       "h": 12.0
+       "h": 12.0,
+       "d": 85.0
       }
      },
      {
@@ -16319,7 +20195,8 @@
       "dims": {
        "d1": 93.0,
        "d2": 160.0,
-       "h": 12.0
+       "h": 12.0,
+       "d": 90.0
       }
      },
      {
@@ -16329,7 +20206,8 @@
       "dims": {
        "d1": 98.0,
        "d2": 165.0,
-       "h": 12.0
+       "h": 12.0,
+       "d": 95.0
       }
      },
      {
@@ -16339,7 +20217,8 @@
       "dims": {
        "d1": 104.0,
        "d2": 175.0,
-       "h": 14.0
+       "h": 14.0,
+       "d": 100.0
       }
      },
      {
@@ -16349,7 +20228,8 @@
       "dims": {
        "d1": 109.0,
        "d2": 180.0,
-       "h": 14.0
+       "h": 14.0,
+       "d": 105.0
       }
      },
      {
@@ -16359,7 +20239,8 @@
       "dims": {
        "d1": 114.0,
        "d2": 185.0,
-       "h": 14.0
+       "h": 14.0,
+       "d": 110.0
       }
      },
      {
@@ -16369,7 +20250,8 @@
       "dims": {
        "d1": 119.0,
        "d2": 200.0,
-       "h": 14.0
+       "h": 14.0,
+       "d": 115.0
       }
      },
      {
@@ -16379,7 +20261,8 @@
       "dims": {
        "d1": 124.0,
        "d2": 210.0,
-       "h": 16.0
+       "h": 16.0,
+       "d": 120.0
       }
      },
      {
@@ -16389,7 +20272,8 @@
       "dims": {
        "d1": 129.0,
        "d2": 220.0,
-       "h": 16.0
+       "h": 16.0,
+       "d": 125.0
       }
      },
      {
@@ -16399,7 +20283,8 @@
       "dims": {
        "d1": 134.0,
        "d2": 220.0,
-       "h": 16.0
+       "h": 16.0,
+       "d": 130.0
       }
      },
      {
@@ -16409,7 +20294,8 @@
       "dims": {
        "d1": 139.0,
        "d2": 230.0,
-       "h": 16.0
+       "h": 16.0,
+       "d": 135.0
       }
      },
      {
@@ -16419,7 +20305,8 @@
       "dims": {
        "d1": 144.0,
        "d2": 240.0,
-       "h": 18.0
+       "h": 18.0,
+       "d": 140.0
       }
      },
      {
@@ -16429,7 +20316,8 @@
       "dims": {
        "d1": 149.0,
        "d2": 250.0,
-       "h": 18.0
+       "h": 18.0,
+       "d": 145.0
       }
      },
      {
@@ -16439,7 +20327,8 @@
       "dims": {
        "d1": 155.0,
        "d2": 250.0,
-       "h": 18.0
+       "h": 18.0,
+       "d": 150.0
       }
      },
      {
@@ -16449,11 +20338,12 @@
       "dims": {
        "d1": 165.0,
        "d2": 250.0,
-       "h": 18.0
+       "h": 18.0,
+       "d": 160.0
       }
      }
     ],
-    "source": "DIN 125-2:1990-03 (withdrawn; replaced by DIN EN ISO 7089:2000-11 and DIN EN ISO 7090:2000-11) (Washers - Product grade A, hardness from 300 HV, preferably for hexagon bolts and nuts); https://fullerfasteners.com/tech/din-125-specifications-flat-washer-normal-series/ (1.7..165, d min/max, dc min/max, h nom/min/max); https://www.fasteners.eu/standards/DIN/125-A/ and /125-B/ (local copies /root/skb-scratch/dl/fe/din125-A.html, din125-B.html); https://fasten.it/en/norms/norm/din_125 (DIN 125 1990-03 table, nominal values; page covers DIN 125-1 and DIN 125-2); https://www.schrauben-lexikon.de/norm/DIN_125A.asp and DIN_125B.asp (dealer tables, nominal values); https://www.dinmedia.de/en/standard/din-125-2/1517174 (title, edition, withdrawal, replacement); https://www.din.de/en/getting-involved/standards-committees/fmv/publications/wdc-beuth:din21:1517069 (DIN 125-1 title: up to 250 HV)",
+    "source": "Onshape standard content table DATA_DIN_125_2_GRADE_A_WASHER_MAIN (document bd906b859dc8174fee4c9d50, version changing m9 name)",
     "params": [
      {
       "label": "Outside chamfer",
