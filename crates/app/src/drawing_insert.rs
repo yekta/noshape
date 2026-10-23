@@ -277,10 +277,14 @@ impl DrawingEditor {
         let ed = cx.entity();
         let sheet_scale = self.current_sheet().scale;
         let label = |text: &'static str| div().w(px(105.)).flex_none().text_size(px(12.)).text_color(pal.text).child(text);
-        let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>| {
+        // Items from `user_from` on are user content (parts, named views,
+        // positions, display states): never translated.
+        let select = |id: &'static str, current: String, items: Vec<(String, bool, Act)>, user_from: usize| {
             let ed = ed.clone();
+            let user = items.iter().position(|i| i.1).is_some_and(|i| i >= user_from);
             Button::new(id)
-                .label(current)
+                .when(!user, |b| b.label(current.clone()))
+                .when(user, |b| b.child(div().min_w_0().whitespace_nowrap().text_ellipsis().child(crate::ui::user_text(current))))
                 .ghost()
                 .xsmall()
                 .w_full()
@@ -289,9 +293,11 @@ impl DrawingEditor {
                 .border_color(gpui_kit::rgb(0xd7d7d7))
                 .rounded(px(0.))
                 .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
-                    for (label, checked, f) in &items {
+                    for (i, (label, checked, f)) in items.iter().enumerate() {
                         let (e, f) = (ed.clone(), f.clone());
-                        menu = menu.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(*checked).on_click(move |_, _, cx| e.update(cx, |this, cx| f(this, cx))));
+                        let item = crate::os_menu::OsMenuItem::new(label.clone());
+                        let item = if i >= user_from { item.user() } else { item };
+                        menu = menu.item(item.checked(*checked).on_click(move |_, _, cx| e.update(cx, |this, cx| f(this, cx))));
                     }
                     menu
                 })
@@ -380,8 +386,8 @@ impl DrawingEditor {
                 }
                 let pos_label = asm_position_name(asm, cur);
                 vec![
-                    row("Explode/Position", select("div-explode", pos_label, pos_items)).into_any_element(),
-                    row("Display state", select("div-display", cur_d.unwrap_or_else(|| "Show all".into()), ds_items)).into_any_element(),
+                    row("Explode/Position", select("div-explode", pos_label, pos_items, 1)).into_any_element(),
+                    row("Display state", select("div-display", cur_d.unwrap_or_else(|| "Show all".into()), ds_items, 1)).into_any_element(),
                 ]
             }
             _ => Vec::new(),
@@ -415,12 +421,12 @@ impl DrawingEditor {
                         .px(px(4.))
                         .gap(px(3.))
                         .child(Button::new("div-insert").label("Insert").icon(gpui_kit::component::Icon::empty().path(crate::assets::icon_path("insert"))).outline().small().w(px(104.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_chooser(cx))))
-                        .child(div().flex_1().min_w_0().child(if src_items.is_empty() { div().px_1().truncate().text_size(px(13.33)).child(source_label).into_any_element() } else { select("div-source", source_label, src_items) })),
+                        .child(div().flex_1().min_w_0().child(if src_items.is_empty() { div().px_1().truncate().text_size(px(13.33)).child(crate::ui::user_text(source_label)).into_any_element() } else { select("div-source", source_label, src_items, 0) })),
                 )
-                .child(row("View orientation", select("div-orient", orient_label, orient_items)))
+                .child(row("View orientation", select("div-orient", orient_label, orient_items, ORIENTATIONS.len())))
                 .children(asm_rows)
-                .child(row("View scale", select("div-scale", format_scale(cur_scale.unwrap_or(sheet_scale)), scale_items)))
-                .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items)))
+                .child(row("View scale", select("div-scale", format_scale(cur_scale.unwrap_or(sheet_scale)), scale_items, usize::MAX)))
+                .child(row("View simplification", select("div-simp", simp.name().to_string(), simp_items, usize::MAX)))
                 .children(self.insert.simp_value.as_ref().filter(|_| !simplification_text(simp, true).is_empty()).map(|(st, _)| row("", Input::new(st).small().into_any_element())))
                 .child(
                     div().px(px(6.)).py(px(3.)).child(Checkbox::new("div-sketch-app").label("Show sketch appearances").small().checked(self.insert.sketch_appearances).on_click(cx.listener(|this, on: &bool, _, cx| {

@@ -453,6 +453,20 @@ PlaneQ find_plane(const OcShape& s, double tolerance)
   gp_Ax3 ax = pl->Position();
   if (!fs.Location().IsIdentity())
     ax.Transform(fs.Location().Transformation());
+  // A planar face on another surface (a B-spline after a non-uniform scale):
+  // the plane's normal along the face's outward normal, as for a Geom_Plane.
+  if (s.shape.ShapeType() == TopAbs_FACE)
+  {
+    const TopoDS_Face& F = TopoDS::Face(s.shape);
+    double         u0, u1, v0, v1;
+    BRepTools::UVBounds(F, u0, u1, v0, v1);
+    BRepGProp_Face gf(F);
+    gp_Pnt         p;
+    gp_Vec         n;
+    gf.Normal(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, n);
+    if (n.Magnitude() > 1e-12 && n.Dot(gp_Vec(ax.Direction())) < 0)
+      ax.ZReverse();
+  }
   q.found = true;
   q.plane = from_ax3(ax);
   return q;

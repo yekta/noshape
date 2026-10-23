@@ -432,7 +432,7 @@ impl DrawingEditor {
                 this.chooser.other_graph = false;
                 cx.notify();
             })))
-            .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(d.name.clone())).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(label)))
+            .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(d.name.clone()))).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(label)))
             .child(chooser_square("dr-ch-other-version", "version", "Create version…", false, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.create_version_in_other(window, cx))))
             .child(chooser_square("dr-ch-other-graph", "version-graph", "Version graph", self.chooser.other_graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.chooser.other_graph = !this.chooser.other_graph;
@@ -479,7 +479,7 @@ impl DrawingEditor {
                     .when(i == d.version, |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
                     .hover(|d| d.bg(pal.row_hover))
                     .child(crate::assets::icon("version", 14., cx))
-                    .child(v.label.clone())
+                    .child(crate::ui::user_text(v.label.clone()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(o) = this.chooser.other_doc.as_mut() {
                             o.version = i;
@@ -556,7 +556,7 @@ impl DrawingEditor {
                 row(SharedString::from(format!("dr-ch-doc-{i}")))
                     .h(px(40.))
                     .child(crate::assets::icon("document", 18., cx))
-                    .child(v_flex().min_w_0().child(div().truncate().child(d.name)).child(h_flex().gap(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("version", 11., cx)).child(version)))
+                    .child(v_flex().min_w_0().child(div().truncate().child(crate::ui::user_text(d.name))).child(h_flex().gap(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("version", 11., cx)).child(version)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.open_other(&path, cx))),
             );
         }
@@ -664,7 +664,7 @@ impl DrawingEditor {
                     continue;
                 }
                 any = true;
-                list = list.child(row_base(SharedString::from(format!("dr-ch-asm-{id}")), 20.).child(div().truncate().child(name)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
+                list = list.child(row_base(SharedString::from(format!("dr-ch-asm-{id}")), 20.).child(div().truncate().child(crate::ui::user_text(name))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
                 continue;
             }
             // Part Studios on and nothing else: the studio rows themselves.
@@ -674,7 +674,7 @@ impl DrawingEditor {
                 }
                 any = true;
                 let pic = pic_of(id, ThumbOf::Part(None));
-                list = list.child(row_base(SharedString::from(format!("dr-ch-ps-{id}")), 20.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(name)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
+                list = list.child(row_base(SharedString::from(format!("dr-ch-ps-{id}")), 20.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(crate::ui::user_text(name))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
                 continue;
             }
             // The studio's rows the filters show, in body order: its flat
@@ -714,7 +714,7 @@ impl DrawingEditor {
             list = list.child(
                 row_base(SharedString::from(format!("dr-ch-ps-{id}")), 0.)
                     .child(crate::assets::icon(if open { "chevron-down" } else { "chevron-right" }, 14., cx))
-                    .child(div().truncate().child(name))
+                    .child(div().truncate().child(crate::ui::user_text(name)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(i) = this.chooser.open.iter().position(|t| *t == id) {
                             this.chooser.open.remove(i);
@@ -886,7 +886,7 @@ impl DrawingEditor {
                 .px(px(6.))
                 .py(px(4.))
                 .gap(px(4.))
-                .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(doc_name)).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(place)))
+                .child(v_flex().flex_1().min_w_0().child(div().truncate().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(doc_name))).child(h_flex().gap(px(4.)).text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(crate::assets::icon("branch", 12., cx)).child(place)))
                 .child(chooser_square("dr-ch-version", "version", "Create version…", false, cx).on_click(move |_, window, cx| crate::history_panel::open_create_version_in(doc.clone(), window, cx)))
                 .child(chooser_square("dr-ch-graph", "version-graph", "Version graph", self.chooser.graph, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.chooser.graph = !this.chooser.graph;

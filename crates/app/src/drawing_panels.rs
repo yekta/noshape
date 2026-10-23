@@ -329,7 +329,7 @@ impl DrawingEditor {
         }
         let current = self.mbd_model.min(models.len() - 1);
         let entity = cx.entity().downgrade();
-        let model = crate::os_ui::select_field("mbd-model", models, current, move |i, _, cx| {
+        let model = crate::os_ui::select_field_user_from("mbd-model", models, 2, current, move |i, _, cx| {
             let _ = entity.update(cx, |t: &mut Self, cx| {
                 t.mbd_model = i;
                 cx.notify();
@@ -359,7 +359,7 @@ impl DrawingEditor {
                     .text_size(px(13.))
                     .text_color(gpui_kit::rgb(0x999999))
                     .hover(|d| d.bg(gpui_kit::rgb(0xf0f0f0)))
-                    .child(r.name.clone())
+                    .child(crate::ui::user_text(r.name.clone()))
                     .on_mouse_down(
                         MouseButton::Right,
                         cx.listener(move |_, e: &MouseDownEvent, window, cx| {

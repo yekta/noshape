@@ -45,7 +45,7 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
             .border_b_1()
             .border_color(rgb(os::MODAL_DIVIDER))
             .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Workspace protection for"))
-            .child(div().px(px(4.)).rounded(px(3.)).border_1().border_color(rgb(0xfab601)).bg(rgb(0xfff4d6)).text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(name.clone()))
+            .child(div().px(px(4.)).rounded(px(3.)).border_1().border_color(rgb(0xfab601)).bg(rgb(0xfff4d6)).text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(name.clone())))
             .child(div().flex_1())
             .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("modal-close").size(px(22.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CLOSE).size(px(16.))))));
         os::modal(dialog, "", 600.)

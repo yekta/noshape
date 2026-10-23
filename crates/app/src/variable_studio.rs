@@ -820,7 +820,7 @@ impl Render for VariableStudioView {
                             .when(auto_ref, |r| r.child(div().id("vs-auto-ref").pl(px(4.)).tooltip(crate::ui::tooltip("Automatically referenced Variable Studio")).child(crate::assets::icon("auto-variable-reference", 20., cx))))
                             .child(match &self.renaming {
                                 Some(st) => div().w(px(260.)).text_size(px(16.)).border_b_1().border_color(pal.accent).child(Input::new(st).h(px(26.)).appearance(false).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).pl(px(3.))).into_any_element(),
-                                None => div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title).into_any_element(),
+                                None => div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(title)).into_any_element(),
                             })
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.collapsed = !this.collapsed;

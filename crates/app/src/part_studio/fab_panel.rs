@@ -66,7 +66,7 @@ impl PartStudioView {
         let mut out: Vec<AnyElement> = Vec::new();
         for (id, flat) in &cache.parts {
             let name = self.display.body(id).map(|b| b.name.clone()).unwrap_or_else(|| "Part".into());
-            out.push(div().pt_1().text_sm().font_weight(FontWeight::SEMIBOLD).child(name).into_any_element());
+            out.push(div().pt_1().text_sm().font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(name)).into_any_element());
             let flat = match flat {
                 Ok(f) => f.clone(),
                 Err(e) => {

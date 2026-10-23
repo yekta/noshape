@@ -370,7 +370,7 @@ impl Render for PropagationDialog {
                     .font_weight(FontWeight::BOLD)
                     .relative()
                     .child(div().absolute().left(px(8.)).child(crate::ui::os_checkbox(("prop-col", k), "", self.all(&*column)).on_click(Self::toggler(column.clone(), cx))))
-                    .child(name.clone()),
+                    .child(crate::ui::user_text(name.clone())),
             );
         }
         let mut table = v_flex().mx(px(10.)).border_l_1().border_t_1().border_color(grid).child(head);

@@ -2911,7 +2911,7 @@ impl PartStudioView {
                                         .justify_center()
                                         .rounded(px(4.))
                                         // Live: pale green (disabled) while the field is invalid.
-                                        .bg(pal.accept).when(dim_invalid, |d| d.opacity(0.2))
+                                        .bg(pal.accept).when(dim_invalid, crate::ui::disabled_accept)
                                         .cursor_pointer()
                                         .when(!dim_invalid, |d| d.hover(|d| d.bg(rgb(0x74ce3a))))
                                         .child(Icon::new(gpui_kit::component::IconName::Check).with_size(px(16.)).text_color(gpui_kit::rgb_static(0xffffff)))
