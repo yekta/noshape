@@ -473,8 +473,9 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
             let body = ev.ctx.bodies[bi].clone();
             let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
             let res = match (chamfer, spec) {
-                (false, k::ChamferSpec::Equal(r)) => k::fillet(&body.shape, &shapes, r),
-                (_, s) => k::chamfer(&body.shape, &shapes, s, &[]),
+                // The same blends as the Fillet and Chamfer features (with their fallbacks).
+                (false, k::ChamferSpec::Equal(r)) => k::fillet_checked(&body.shape, &shapes, &[r]),
+                (_, s) => k::chamfer_checked(&body.shape, &shapes, s, &[]),
             }
             .map_err(|e| fe(e.to_string()))?;
             let names = body.shape_names();
@@ -1541,12 +1542,15 @@ struct WrapSurface {
     surface: Option<k::Developable>,
     anchor: DVec3,
     direction: DVec3,
+    /// A cylinder's `allowanceRadius`: flat lengths are arcs at this radius
+    /// (std sheet metal Bend wraps the bend allowance onto the bend radius).
+    allowance: Option<f64>,
 }
 
 fn wrap_surface(i: &mut Interp, cx: &FsContext, v: &Value) -> R<WrapSurface> {
     let anchor = vec3_of(v.get("anchorPoint")).unwrap_or(DVec3::ZERO);
     let direction = vec3_of(v.get("anchorDirection")).unwrap_or(DVec3::X);
-    let mut out = WrapSurface { face: Vec::new(), surface: None, anchor, direction };
+    let mut out = WrapSurface { face: Vec::new(), surface: None, anchor, direction, allowance: None };
     if !v.get("face").is_undefined() {
         out.face = evaluate_refs(i, cx, v.get("face"))?;
     } else if let Some(p) = plane_of(v.get("plane")) {
@@ -1554,6 +1558,7 @@ fn wrap_surface(i: &mut Interp, cx: &FsContext, v: &Value) -> R<WrapSurface> {
     } else if let Some((origin, x, z)) = coord_system_of(v.get("cylinder").get("coordSystem")) {
         let radius = length_of(v.get("cylinder").get("radius")).unwrap_or(0.0);
         out.surface = Some(k::Developable::Cylinder { origin, axis: z, x_dir: x, radius });
+        out.allowance = length_of(v.get("allowanceRadius")).filter(|a| *a > 0.0);
     } else if let Some((origin, x, z)) = coord_system_of(v.get("cone").get("coordSystem")) {
         let half_angle = angle_of(v.get("cone").get("halfAngle")).unwrap_or(0.0);
         out.surface = Some(k::Developable::Cone { origin, axis: z, x_dir: x, radius: 0.0, half_angle });
@@ -1602,7 +1607,15 @@ fn op_wrap(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if d_src.length() < 0.5 || d_dst.length() < 0.5 {
             return err("The wrap anchor directions are invalid");
         }
-        let placement = k::Placement2d::align(f_src, d_src, f_dst, d_dst, false);
+        let mut placement = k::Placement2d::align(f_src, d_src, f_dst, d_dst, false);
+        // Flat lengths around the destination cylinder measured at its
+        // allowance radius: scale them by radius / allowance about the anchor.
+        if let (Some(a), k::Developable::Cylinder { radius, .. }) = (dst.allowance, &d)
+            && !unwrap
+        {
+            let s = glam::DMat2::from_diagonal(glam::DVec2::new(radius / a, 1.0));
+            placement = k::Placement2d { m: s * placement.m, t: f_dst + s * (placement.t - f_dst) };
+        }
         let res = k::wrap_faces(&faces, &s, src_ref, &d, dst_ref, &placement, 1e-7).map_err(|e| FeatureError::new(format!("Wrap failed: {e}")))?;
         let names: Vec<Name> = (0..res.shape.faces().len()).map(|n| Arc::new(TopoName::face(ev.feature, Role::New(n as u32)))).collect();
         let mut wrapped = NamedShape::new(res.shape.clone(), names);

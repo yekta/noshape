@@ -4,7 +4,7 @@
 //! tables with them.
 
 use super::geom::*;
-use super::{DimTool, EdgeRef, Pick, PickedPoint, SheetPick, TableTool};
+use super::{DimTool, EdgeRef, Pick, PickedPoint, Profile, SheetPick, TableTool};
 use noshape_model::drawing::build::ViewPlacement;
 use noshape_model::drawing::views;
 use noshape_model::drawing::*;
@@ -465,6 +465,21 @@ impl SheetPick<'_> {
     }
 }
 
+/// A general table cell typed (✓ of the cell editor): the cell grid grows
+/// to hold `row`, `col`.
+pub fn set_general_cell(t: &mut Table, row: usize, col: usize, text: &str) {
+    if let TableKind::General { cells, .. } = &mut t.kind {
+        while cells.len() <= row {
+            cells.push(vec![]);
+        }
+        let n = cells.iter().map(|r| r.len()).max().unwrap_or(0).max(col + 1);
+        for r in cells.iter_mut() {
+            r.resize(n, String::new());
+        }
+        cells[row][col] = text.to_string();
+    }
+}
+
 /// The Break view dialog's default gap: 6 mm, or 0.25 in in inch drawings.
 pub fn default_break_gap_mm(units_mm: bool) -> f64 {
     if units_mm { 6.0 } else { 0.25 * 25.4 }
@@ -484,4 +499,399 @@ pub fn view_table(id: u64, kind: TableTool, view: ViewId, origin: Option<PickedP
         _ => "Hole table",
     };
     (Table::new(id, tk, position), name)
+}
+
+impl SheetPick<'_> {
+    /// The Broken-out section dialog's default depth: half the model's
+    /// depth along the line of sight (10 mm when the view isn't built).
+    pub fn broken_out_default_depth(&self, view: ViewId) -> f64 {
+        (|| {
+            let g = self.geoms.get(&view)?;
+            let (key, part) = views::view_source(self.drawing.sheets.get(self.sheet)?, view)?;
+            let src = self.sources.get(&key)?;
+            Some(views::model_depth(&src.context, part.as_ref(), g.frame.as_ref()?) / 2.0)
+        })()
+        .unwrap_or(0.01)
+    }
+}
+
+/// The Broken-out section dialog's ✓: a blind depth (meters, > 0) or up to
+/// a model point. `None`: invalid depth. New profiles are splines.
+pub fn broken_out(profile: Vec<[f64; 2]>, spline: bool, depth: Option<f64>, depth_ref: Option<PointRef>) -> Option<BrokenOut> {
+    let depth = depth.filter(|d| d.is_finite() && *d > 0.0).or(depth_ref.as_ref().map(|_| 0.0))?;
+    Some(BrokenOut { profile, spline, depth, depth_ref })
+}
+
+/// Add broken-out section `b` to a view, or replace its `edit`th one.
+pub fn set_broken_out(v: &mut DrawingView, edit: Option<usize>, b: BrokenOut) {
+    match edit {
+        Some(i) if i < v.broken_out.len() => v.broken_out[i] = b,
+        _ => v.broken_out.push(b),
+    }
+}
+
+impl SheetPick<'_> {
+    /// The Hatch region dialog's click: the smallest closed sheet-sketch
+    /// profile containing sheet point `s`, else the smallest closed region
+    /// of the visible edges of the view there (view coordinates). Detail and
+    /// break views take no hatches.
+    pub fn hatch_profile_at(&self, s: [f64; 2]) -> Option<(Profile, Option<ViewId>)> {
+        use noshape_sketch::DVec2;
+        let sheet = self.drawing.sheets.get(self.sheet)?;
+        let c = DVec2::new(s[0], s[1]);
+        let regions = sheet.sketch.sketch.regions();
+        let pts = |l: &noshape_sketch::ProfileLoop, tol: f64| l.tessellate(tol).into_iter().map(|p| [p.x, p.y]).collect::<Vec<_>>();
+        if let Some(r) = regions.iter().filter(|r| r.contains(c)).min_by(|a, b| a.area().abs().total_cmp(&b.area().abs())) {
+            return Some(((pts(&r.outer, 0.05), r.holes.iter().map(|h| pts(h, 0.05)).collect()), None));
+        }
+        let v = self.view_at(s)?;
+        let view = sheet.view(v)?;
+        if matches!(view.kind, ViewKind::Detail { .. }) || !view.breaks.is_empty() {
+            return None;
+        }
+        let pl = self.placement(v)?;
+        let g = self.geoms.get(&v)?;
+        let mut sk = noshape_sketch::Sketch::new();
+        let mut n = 0;
+        for e in g.edges.iter().filter(|e| e.visible) {
+            for w in e.points.windows(2) {
+                if ((w[1][0] - w[0][0]).powi(2) + (w[1][1] - w[0][1]).powi(2)).sqrt() > 1e-9 {
+                    sk.add_line(DVec2::new(w[0][0], w[0][1]), DVec2::new(w[1][0], w[1][1]));
+                    n += 1;
+                }
+            }
+            if n > 6000 {
+                break;
+            }
+        }
+        let p = pl.to_view(s);
+        let c = DVec2::new(p[0], p[1]);
+        let regions = sk.regions();
+        let r = regions.iter().filter(|r| r.contains(c)).min_by(|a, b| a.area().abs().total_cmp(&b.area().abs()))?;
+        Some(((pts(&r.outer, 1e-5), r.holes.iter().map(|h| pts(h, 1e-5)).collect()), Some(v)))
+    }
+}
+
+/// The Hatch region dialog's profile list after a click picked `picked`: a
+/// profile already listed toggles off; editing a hatch, it replaces the one.
+pub fn hatch_toggle(profiles: &mut Vec<(Profile, Option<ViewId>)>, picked: (Profile, Option<ViewId>), editing: bool) {
+    match profiles.iter().position(|p| *p == picked) {
+        Some(i) => {
+            profiles.remove(i);
+        }
+        None if editing => *profiles = vec![picked],
+        None => profiles.push(picked),
+    }
+}
+
+/// The Hatch region dialog's ✓ on the sheet sketch: replace hatch `edit`
+/// (if any) and add `regions`.
+pub fn apply_hatches(sketch: &mut noshape_model::drawing::sheet_sketch::SheetSketch, edit: Option<u64>, regions: Vec<noshape_model::drawing::sheet_sketch::HatchRegion>) {
+    if let Some(id) = edit {
+        sketch.hatches.retain(|x| x.id != id);
+    }
+    sketch.hatches.extend(regions);
+}
+
+/// The Custom table dialog's table kind: Part Studio `studio`, custom table
+/// `name` of Feature Studio `fs` (at `fs_version`, another document's
+/// version, or this workspace); editing keeps the pinned Part Studio
+/// version of `old`.
+pub fn custom_table_kind(studio: noshape_model::document::TabId, fs: noshape_model::document::TabId, name: String, fs_version: Option<String>, bottom_to_top: bool, old: Option<&TableKind>) -> TableKind {
+    let version = match old {
+        Some(TableKind::Custom { version, .. }) => version.clone(),
+        _ => None,
+    };
+    TableKind::Custom { studio, version, fs, name, fs_version, bottom_to_top }
+}
+
+/// A custom table placed by the Custom table dialog's click.
+pub fn custom_table(id: u64, kind: TableKind, corner: TableCorner, position: [f64; 2]) -> Table {
+    let mut t = Table::new(id, kind, position);
+    t.corner = corner;
+    t
+}
+
+impl SheetPick<'_> {
+    /// Insert image: the box from the drag start to the pointer, the image's
+    /// aspect kept; a plain click places it 30 mm high at the click.
+    pub fn image_box(&self, start: [f64; 2], aspect: f64) -> ([f64; 2], [f64; 2]) {
+        let c = self.cursor;
+        let (dx, dy) = ((c[0] - start[0]).abs(), (c[1] - start[1]).abs());
+        if dx.max(dy) < self.tol_mm(4.0) {
+            return (start, [30.0 * aspect, 30.0]);
+        }
+        let h = (dx / aspect).max(dy);
+        let w = h * aspect;
+        let x = if c[0] < start[0] { start[0] - w } else { start[0] };
+        let y = if c[1] < start[1] { start[1] - h } else { start[1] };
+        ([x, y], [w, h])
+    }
+}
+
+/// An image file's width / height (Insert image keeps it).
+pub fn image_aspect(bytes: &[u8]) -> Result<f64, String> {
+    let img = image::load_from_memory(bytes).map_err(|e| e.to_string())?;
+    Ok(img.width() as f64 / img.height().max(1) as f64)
+}
+
+/// Insert image: the image goes on the sheet; its id.
+pub fn add_sheet_image(s: &mut Sheet, name: String, data_base64: std::sync::Arc<str>, pos: [f64; 2], size: [f64; 2]) -> u64 {
+    let id = s.images.iter().map(|i| i.id).max().unwrap_or(0) + 1;
+    s.images.push(SheetImage { id, name, data_base64, pos, size });
+    id
+}
+
+/// Insert DXF or DWG: the file's model-space wireframe as sheet sketch
+/// geometry at its own coordinates, in the file's unit (else the
+/// drawing's); the entities created (the caller solves the sketch).
+pub fn insert_cad(sketch: &mut noshape_model::drawing::sheet_sketch::SheetSketch, d: &noshape_sketch::dxf::DxfDrawing, units_mm: bool) -> usize {
+    let scale = d.unit_scale.map(|m| m * 1000.0).unwrap_or(if units_mm { 1.0 } else { 25.4 });
+    sketch.sketch.insert_drawing(d, scale, noshape_sketch::DVec2::ZERO).len()
+}
+
+// ------------------------------------------------------------ drawing sketch
+
+impl SheetPick<'_> {
+    /// The sheet sketch point nearest `c` (within 6 px), if any.
+    pub fn sketch_point_at(&self, c: [f64; 2]) -> Option<(noshape_sketch::EntityId, [f64; 2])> {
+        let tol = self.tol_mm(6.0);
+        let sk = &self.drawing.sheets.get(self.sheet)?.sketch.sketch;
+        sk.entities()
+            .filter(|e| matches!(e.geometry, noshape_sketch::Geometry::Point { .. }) && !e.external)
+            .filter_map(|e| sk.point(e.id).map(|p| (e.id, [p.x, p.y])))
+            .filter(|(_, p)| ((p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2)).sqrt() < tol)
+            .min_by(|a, b| {
+                let d = |p: [f64; 2]| (p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2);
+                d(a.1).total_cmp(&d(b.1))
+            })
+    }
+
+    /// The hovered sheet sketch entity (curves via their pick id).
+    pub fn sketch_entity_at(&self) -> Option<noshape_sketch::EntityId> {
+        match self.built?.picks.get(self.hover? as usize)? {
+            noshape_model::drawing::build::PickTarget::SketchEntity(id) => Some(noshape_sketch::EntityId(*id)),
+            _ => None,
+        }
+    }
+
+    /// Where a sketch click lands: an existing sketch point, a view snap
+    /// point, or the pointer (with horizontal / vertical inference from
+    /// `from`, within 1.5°), else `aligned` (the pointer aligned with woken
+    /// end points). Returns (point, existing point id, inferred H/V).
+    pub fn sketch_target(&self, from: Option<[f64; 2]>, aligned: [f64; 2]) -> ([f64; 2], Option<noshape_sketch::EntityId>, Option<super::SkCon>) {
+        let c = self.cursor;
+        if let Some((id, p)) = self.sketch_point_at(c) {
+            return (p, Some(id), None);
+        }
+        if let Some(p) = self.snap_at(c).and_then(|s| self.pick_sheet(&s)) {
+            return (p, None, None);
+        }
+        if let Some(f) = from {
+            let d = [c[0] - f[0], c[1] - f[1]];
+            let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+            if l > 1e-6 {
+                let a = d[1].atan2(d[0]).to_degrees().rem_euclid(180.0);
+                if !(1.5..=178.5).contains(&a) {
+                    return ([c[0], f[1]], None, Some(super::SkCon::Horizontal));
+                }
+                if (a - 90.0).abs() < 1.5 {
+                    return ([f[0], c[1]], None, Some(super::SkCon::Vertical));
+                }
+            }
+        }
+        (aligned, None, None)
+    }
+}
+
+fn v2(p: [f64; 2]) -> noshape_sketch::DVec2 {
+    noshape_sketch::DVec2::new(p[0], p[1])
+}
+
+/// Line tool: a line from `a` (or existing point `from`) to `p` (or existing
+/// point `end`), Horizontal / Vertical when inferred; its end point.
+pub fn sketch_line(sk: &mut noshape_sketch::Sketch, from: Option<noshape_sketch::EntityId>, a: [f64; 2], end: Option<noshape_sketch::EntityId>, p: [f64; 2], infer: Option<super::SkCon>) -> noshape_sketch::EntityId {
+    use noshape_sketch::ConstraintKind;
+    let start = from.unwrap_or_else(|| sk.add_point(v2(a)));
+    let end = end.unwrap_or_else(|| sk.add_point(v2(p)));
+    if let Ok(line) = sk.add_line_between(start, end) {
+        match infer {
+            Some(super::SkCon::Horizontal) => {
+                let _ = sk.add_constraint(ConstraintKind::Horizontal { a: line, b: None });
+            }
+            Some(super::SkCon::Vertical) => {
+                let _ = sk.add_constraint(ConstraintKind::Vertical { a: line, b: None });
+            }
+            _ => {}
+        }
+    }
+    end
+}
+
+/// Center point circle (on existing center point `from`, else at `a`)
+/// through `p`, or a corner / center point rectangle from `a` to `p`.
+pub fn sketch_two_click(sk: &mut noshape_sketch::Sketch, tool: super::SkTool, from: Option<noshape_sketch::EntityId>, a: [f64; 2], p: [f64; 2]) {
+    match tool {
+        super::SkTool::Circle => {
+            let r = ((p[0] - a[0]).powi(2) + (p[1] - a[1]).powi(2)).sqrt();
+            if r > 1e-6 {
+                match from {
+                    Some(c) => {
+                        let _ = sk.add_circle_at(c, r);
+                    }
+                    None => {
+                        sk.center_circle(v2(a), r);
+                    }
+                }
+            }
+        }
+        super::SkTool::CornerRect => {
+            sk.corner_rectangle(v2(a), v2(p));
+        }
+        _ => {
+            sk.center_rectangle(v2(a), v2(p));
+        }
+    }
+}
+
+/// The spline through the clicked points (repeats dropped); false with
+/// fewer than two.
+pub fn sketch_spline(sk: &mut noshape_sketch::Sketch, pts: &[[f64; 2]]) -> bool {
+    let mut pts = pts.to_vec();
+    pts.dedup_by(|a, b| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt() < 1e-6);
+    if pts.len() < 2 {
+        return false;
+    }
+    let p: Vec<noshape_sketch::DVec2> = pts.iter().map(|p| v2(*p)).collect();
+    let _ = sk.add_fit_spline(&p);
+    true
+}
+
+/// Trim: a point is deleted, a curve trimmed at `c`.
+pub fn sketch_trim(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::EntityId, c: [f64; 2]) {
+    if matches!(sk.entity(id).map(|e| &e.geometry), Some(noshape_sketch::Geometry::Point { .. })) {
+        sk.remove_entity(id);
+    } else {
+        let _ = sk.trim(id, v2(c));
+    }
+}
+
+// ------------------------------------------------------------ inspection items
+
+/// Inspection item: annotation `id`'s number (None removes it).
+pub fn set_inspection(s: &mut Sheet, id: u64, n: Option<u32>) {
+    if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
+        a.inspection = n;
+    }
+}
+
+/// Drag an inspection item onto another annotation: the number moves.
+pub fn move_inspection(s: &mut Sheet, from: u64, to: u64) {
+    let n = s.annotations.iter_mut().find(|a| a.id == from).and_then(|a| a.inspection.take());
+    set_inspection(s, to, n);
+}
+
+/// A Drawing properties panel edit: with ☑ Lock drawing properties on
+/// before and after, nothing but the lock changes; the drawing's metric flag
+/// follows the chosen units.
+pub fn set_drawing_props(d: &mut Drawing, f: impl FnOnce(&mut DrawingProps)) {
+    let before = d.props.clone();
+    f(&mut d.props);
+    if before.locked && d.props.locked {
+        d.props = before;
+        return;
+    }
+    if let Some(u) = d.props.units {
+        d.units_mm = !u.imperial();
+    }
+}
+
+impl SheetPick<'_> {
+    /// Auxiliary view: the fold line under the pointer for the dialog's
+    /// mode (0 Normal: a straight model edge; 1 In line: a sheet sketch line
+    /// or a centerline annotation; 2 Axis: a hole's axis seen side-on, the
+    /// view looking down it): (view, edge direction on the sheet, anchor in
+    /// view coordinates).
+    pub fn aux_pick(&self, mode: u8) -> Option<(ViewId, [f64; 2], [f64; 2])> {
+        let c = self.cursor;
+        let sheet = self.drawing.sheets.get(self.sheet)?;
+        match mode {
+            1 => {
+                let tol = self.tol_mm(6.0);
+                let sk = &sheet.sketch.sketch;
+                let sketch_line = sk.entities().find_map(|e| {
+                    let noshape_sketch::Geometry::Line { start, end } = e.geometry else { return None };
+                    let (a, b) = (sk.point(start)?, sk.point(end)?);
+                    let (a, b) = ([a.x, a.y], [b.x, b.y]);
+                    (views::dist_to_segment(c, a, b) < tol).then_some((a, b))
+                });
+                let (sa, sb) = sketch_line.or_else(|| {
+                    sheet.annotations.iter().find_map(|a| {
+                        let AnnotationKind::Centerline { view, a: pa, b: pb } = &a.kind else { return None };
+                        let pl = self.placement(*view)?;
+                        let (sa, sb) = (pl.to_sheet(*pa), pl.to_sheet(*pb));
+                        (views::dist_to_segment(c, sa, sb) < tol).then_some((sa, sb))
+                    })
+                })?;
+                let mid = [(sa[0] + sb[0]) / 2.0, (sa[1] + sb[1]) / 2.0];
+                let v = self.view_at(mid)?;
+                let pl = self.placement(v)?;
+                Some((v, norm(sub(sb, sa)), pl.to_view(mid)))
+            }
+            2 => {
+                let v = self.view_at(c)?;
+                let pl = self.placement(v)?;
+                let g = self.geoms.get(&v)?;
+                let vp = pl.to_view(c);
+                let tol = self.tol_mm(8.0) / (pl.scale * 1000.0);
+                let axis = g
+                    .axes
+                    .iter()
+                    .copied()
+                    .filter(|a| views::dist_to_segment(vp, a[0], a[1]) < tol)
+                    .min_by(|a, b| views::dist_to_segment(vp, a[0], a[1]).total_cmp(&views::dist_to_segment(vp, b[0], b[1])))
+                    .or_else(|| match self.line_pick() {
+                        Some(Pick::Line { a, b }) => Some([a.p, b.p]),
+                        _ => None,
+                    })?;
+                let (sa, sb) = (pl.to_sheet(axis[0]), pl.to_sheet(axis[1]));
+                let d = norm(sub(sb, sa));
+                Some((v, [-d[1], d[0]], [(axis[0][0] + axis[1][0]) / 2.0, (axis[0][1] + axis[1][1]) / 2.0]))
+            }
+            _ => self.aux_edge(),
+        }
+    }
+}
+
+impl SheetPick<'_> {
+    /// Datum tool's first click on a GD&T frame edge or a dimension's lines
+    /// (the red crosshair): the point on the line and where it is.
+    pub fn datum_attach_at(&self, c: [f64; 2]) -> Option<([f64; 2], DatumOn)> {
+        let b = self.built?;
+        let sheet = self.drawing.sheets.get(self.sheet)?;
+        let tol = self.tol_mm(5.0);
+        let mut best: Option<(f64, [f64; 2], DatumOn)> = None;
+        let mut count: std::collections::HashMap<u64, u32> = Default::default();
+        for l in &b.geometry.lines {
+            let Some(noshape_model::drawing::build::PickTarget::Annotation(id)) = b.picks.get(l.pick as usize) else { continue };
+            let line = *count.entry(*id).and_modify(|n| *n += 1).or_insert(0);
+            let ok = sheet.annotations.iter().find(|a| a.id == *id).is_some_and(|a| matches!(a.kind, AnnotationKind::Gdt { .. }) || a.kind.is_dimension());
+            if !ok {
+                continue;
+            }
+            let n = l.points.len();
+            for seg in 0..if l.closed && n > 2 { n } else { n.saturating_sub(1) } {
+                let (w0, w1) = (l.points[seg], l.points[(seg + 1) % n]);
+                let d = sub(w1, w0);
+                let dd = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
+                let t = (((c[0] - w0[0]) * d[0] + (c[1] - w0[1]) * d[1]) / dd).clamp(0.0, 1.0);
+                let q = [w0[0] + d[0] * t, w0[1] + d[1] * t];
+                let dist = len(sub(c, q));
+                if dist < tol && best.as_ref().is_none_or(|b| dist < b.0) {
+                    best = Some((dist, q, DatumOn { ann: *id, line, seg: seg as u32, t }));
+                }
+            }
+        }
+        best.map(|(_, q, o)| (q, o))
+    }
 }

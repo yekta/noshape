@@ -2361,9 +2361,9 @@ pub(crate) struct AnimState {
     pub mate: MateId,
     /// Driven free value (0 = Rz, 1..3 = Tx/Ty/Tz).
     pub dof: usize,
-    pub start: Entity<InputState>,
-    pub end: Entity<InputState>,
-    pub steps: Entity<InputState>,
+    pub start: Entity<crate::quantity_field::QuantityInput>,
+    pub end: Entity<crate::quantity_field::QuantityInput>,
+    pub steps: Entity<crate::quantity_field::QuantityInput>,
     /// Position along start..end (0..1) and direction.
     pub t: f64,
     pub dir: f64,
@@ -2493,10 +2493,8 @@ impl AssemblyView {
         self.stop_animation(window, cx);
         let dof = noshape_model::assembly::eval::mate_dofs(m.mate_type)[0].0;
         let (a, b) = self.anim_defaults(&m, dof, cx);
-        let mk = |t: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| InputState::new(window, cx).default_value(t));
-        let start = mk(a, window, cx);
-        let end = mk(b, window, cx);
-        let steps = mk("300".into(), window, cx);
+        let [start, end] = self.anim_value_inputs(dof == 0, a, b, window, cx);
+        let steps = self.anim_steps_input("300".into(), window, cx);
         let current = self.result.solved.mate_values.get(&m.id).map(|v| v[dof]).unwrap_or(0.0);
         self.selected_mate = Some(m.id);
         self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: false, playback: Playback::Reciprocate, busy: false, current, task: None, preview: false });
@@ -2530,10 +2528,8 @@ impl AssemblyView {
             let (a, b) = self.anim_defaults(&m, dof, cx);
             (a, b, 360.0)
         };
-        let mk = |t: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| InputState::new(window, cx).default_value(t));
-        let start = mk(a, window, cx);
-        let end = mk(b, window, cx);
-        let steps = mk(format!("{steps}"), window, cx);
+        let [start, end] = self.anim_value_inputs(dof == 0, a, b, window, cx);
+        let steps = self.anim_steps_input(format!("{steps}"), window, cx);
         self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: true, playback: Playback::Single, busy: false, current: now, task: None, preview: true });
         self.play_animation(cx);
     }
@@ -2554,22 +2550,53 @@ impl AssemblyView {
         let Some(mid) = self.anim.as_ref().map(|a| a.mate) else { return };
         let Some(m) = self.assembly(cx).and_then(|a| a.mate(mid).cloned()) else { return };
         let (a, b) = self.anim_defaults(&m, dof, cx);
+        // The fields take the new degree of freedom's unit (deg / mm).
+        let [start, end] = self.anim_value_inputs(dof == 0, a, b, window, cx);
         if let Some(an) = &mut self.anim {
             an.dof = dof;
             an.t = 0.0;
-            an.start.update(cx, |s, cx| s.set_value(a, window, cx));
-            an.end.update(cx, |s, cx| s.set_value(b, window, cx));
+            an.start = start;
+            an.end = end;
         }
         cx.notify();
+    }
+
+    /// The Animate dialog's Start / End value fields: Onshape's number
+    /// field (live "Input behaviour outside feature dialogs"), in degrees for
+    /// a rotation and lengths for a translation.
+    fn anim_value_inputs(&self, angular: bool, start: String, end: String, window: &mut Window, cx: &mut Context<Self>) -> [Entity<crate::quantity_field::QuantityInput>; 2] {
+        use crate::quantity_field::{QuantityInput, QuantitySpec};
+        let units = self.units(cx);
+        let variables = self.variable_scope(cx);
+        let dim = if angular { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
+        let mut mk = |text: String, label: &'static str| {
+            let vars = variables.clone();
+            cx.new(|cx| {
+                let mut q = QuantityInput::new(text, QuantitySpec::quantity(dim).label(label), units, window, cx);
+                q.set_variables(vars, cx);
+                q
+            })
+        };
+        [mk(start, "Start value"), mk(end, "End value")]
+    }
+
+    /// The Animate dialog's Steps field (a count).
+    fn anim_steps_input(&self, text: String, window: &mut Window, cx: &mut Context<Self>) -> Entity<crate::quantity_field::QuantityInput> {
+        use crate::quantity_field::{QuantityInput, QuantitySpec};
+        let units = self.units(cx);
+        let variables = self.variable_scope(cx);
+        cx.new(|cx| {
+            let mut q = QuantityInput::new(text, QuantitySpec::count().label("Steps"), units, window, cx);
+            q.set_variables(variables, cx);
+            q
+        })
     }
 
     /// Start / end values and step count from the dialog fields.
     fn anim_range(&self, cx: &App) -> Option<(f64, f64, u32)> {
         let a = self.anim.as_ref()?;
-        let units = self.units(cx);
-        let dim = if a.angular() { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
-        let ev = |st: &Entity<InputState>| noshape_units::evaluate_as(&st.read(cx).value(), dim, &units, &noshape_units::EmptyScope).ok().map(|q| q.value);
-        let steps = a.steps.read(cx).value().trim().parse::<u32>().ok().unwrap_or(60).max(2);
+        let ev = |st: &Entity<crate::quantity_field::QuantityInput>| st.read(cx).value();
+        let steps = a.steps.read(cx).value().map(|v| v.round().max(0.) as u32).unwrap_or(60).max(2);
         // Up to 100 revolutions.
         let lim = |v: f64| if a.angular() { v.clamp(-100.0 * std::f64::consts::TAU, 100.0 * std::f64::consts::TAU) } else { v };
         Some((lim(ev(&a.start)?), lim(ev(&a.end)?), steps))
@@ -2684,7 +2711,7 @@ impl AssemblyView {
         // Onshape's "Animate mate" dialog: the DOF chip box, right-aligned
         // fields, Playback type ▾ + reverse, Current value, ▶ ■ and ?.
         use crate::os_ui as os;
-        let field = |label: &'static str, st: &Entity<InputState>| os::param_row(label, crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)).into_any_element();
+        let field = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| os::param_row_plain(label, st.clone()).into_any_element();
         let axis_of = |ix: usize| match ix {
             0 => ("⟳", "z"),
             1 => ("↔", "x"),

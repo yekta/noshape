@@ -640,3 +640,29 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   drawing_revision_table, drawing_revision_callout (+ app switch of drawing_revision.rs, checked in the app).
   Remaining drawing: aligned/jogged section, broken-out section, crop polygon/spline, aux In line/Axis, hatch,
   general/custom tables, insert image / DXF, drawing sketch tools, format painter, inspection items, Update.
+- 2026-10-22 ~19:40 (api): drawing out-of-date parity. The app stamps `Drawing.sources_at` with the head on every
+  drawing edit while up to date; after a model change the views keep their geometry until Update (qa5 D17). The API
+  now does the same: ops::drawing::{old_state, stamp_sources} (old_state compares the stored states at sources_at and
+  head, so documents never written back from memory compare like with like); SheetModel builds stale sources from
+  the old state and reports `out_of_date` (drawing_get); ops commit stamps; new op drawing_update ("Update").
+  App: load_old_state calls the shared old_state; reload() remakes the views when sources_at changes outside the
+  editor (Update / its undo / the agent API). e2e drawing_out_of_date_until_update. In-app: out-of-date after a
+  model change (live), kept on reopen, cleared by drawing_update through live mode.
+  Also landed: drawing_table, drawing_table_cell (+ shared set_general_cell), jogged / aligned section views.
+- 2026-10-22 ~22:00 (api): more drawing ops on shared builders (app switched, see drawing-behaviour.md):
+  drawing_broken_out_section (default depth = half the model depth, `depth` / `depth_to` up to a point, `index`
+  edits), drawing_crop_view shapes polygon / spline, drawing_hatch_region (sheet-sketch or view-region profiles,
+  ANSI / ISO / General patterns, edit by id), drawing_custom_table (this document's Feature Studio tables; edit =
+  "Custom table properties"), drawing_insert_image / drawing_insert_cad (file tab, or a local path imported as a
+  file tab first: "Import <name>"), drawing_sketch (line, circle, 3 point circle, tangent arc, rectangles, spline,
+  spline point, point, trim; one edit per call), drawing_format_painter, drawing_inspection (add / reorder /
+  automatic / edit / move / remove / hide / show / shape), drawing_properties (read all; `set` any DrawingProps
+  fields), drawing_auxiliary_view `mode` normal / in_line / axis, drawing_datum on GD&T frames / dimension lines.
+  drawing_get now lists crop / breaks / broken_out per view, table
+  rows (header, title; custom tables evaluated in SheetModel), hatches, images and sketch_entities.
+  Checked in the app (Xvfb, demo drawing): broken-out (default depth 6 = half the plate), hatch pick / toggle / ✓,
+  insert image (click = 30 mm) and DXF from file tabs the API imported, line chain closing on its first point,
+  spline, spline point, sketch point, trim, circle, rectangle, inspection add / remove, Drawing properties edit +
+  lock, aux In line on a centerline, datum on a dimension line, custom table placed and evaluated (same rows in
+  drawing_get through live mode).
+  Remaining drawing: custom tables from other documents' versions. Planned ceiling now 23 (none in drawing).
