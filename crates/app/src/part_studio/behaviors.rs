@@ -229,6 +229,8 @@ pub struct UiState {
     /// A feature drag's drop slot: the hovered row and whether the cursor is
     /// in its lower half (lands after it; live F33).
     pub feature_drop: std::rc::Rc<std::cell::Cell<Option<(usize, bool)>>>,
+    /// The open Hole dialog's parameters last time (its linked depths).
+    pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
     pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
@@ -426,6 +428,7 @@ impl UiState {
             preview_task: None,
             preview_tool: None,
             feature_drop: Default::default(),
+            hole_prev: None,
             preview_tool_task: None,
             measure_lines: None,
             dyn_suppression: None,
@@ -2955,6 +2958,31 @@ impl PartStudioView {
     /// merge scope), and choosing Remove/Intersect points the feature into
     /// the part. Fields the user set are left alone.
     pub(super) fn auto_operation(&mut self, cx: &mut Context<Self>) {
+        let Some(e) = &self.edit else { return };
+        // Live L49/L50: a tapped hole's Depth, Tapped depth and Tap
+        // clearance stay linked, new or edited.
+        if e.dialog.read(cx).feature.type_id == "hole" {
+            let dialog = e.dialog.clone();
+            let (id, now) = {
+                let d = dialog.read(cx);
+                (d.feature.id, d.feature.params.clone())
+            };
+            let units = self.doc.read(cx).session.doc.settings.units;
+            if let Some((pid, prev)) = self.ui.hole_prev.take()
+                && pid == id
+            {
+                let changes = noshape_model::features::hole_tables::link_tapped_depths(&prev, &now, &units);
+                if !changes.is_empty() {
+                    dialog.update(cx, |d, cx| {
+                        for (k, v) in changes {
+                            d.set_value_auto(k, v, cx);
+                        }
+                    });
+                }
+            }
+            let now = dialog.read(cx).feature.params.clone();
+            self.ui.hole_prev = Some((id, now));
+        }
         let Some(e) = &self.edit else { return };
         // Std's editing logic runs on edits of existing features too.
         let ty = e.dialog.read(cx).feature.type_id.clone();
