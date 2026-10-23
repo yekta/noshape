@@ -4276,6 +4276,8 @@ impl AssemblyView {
                 // "Insert entire Part Studio as rigid" at the right.
                 let has_surfaces = self.catalog.studios.iter().any(|s| s.parts.iter().any(|p| p.3));
                 let has_sketches = self.catalog.studios.iter().any(|s| !s.sketches.is_empty());
+                // Live (assembly/01 vs 320): the Composite parts toggle only when a Part Studio has one.
+                let has_composites = self.catalog.studios.iter().any(|s| !s.composites.is_empty());
                 let fk = self.ui.insert_sketches;
                 let fc = self.ui.insert_composites;
                 let (fp, fs) = self.ui.insert_filter;
@@ -4340,10 +4342,12 @@ impl AssemblyView {
                             cx.notify();
                         })))
                         // Live 320: Parts, Composite parts (off), Sketches (off).
-                        .child(toggle("ins-f-composite", "composite-part", "Composite parts", fc, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.ui.insert_composites = !this.ui.insert_composites;
-                            cx.notify();
-                        })))
+                        .when(has_composites, |d| {
+                            d.child(toggle("ins-f-composite", "composite-part", "Composite parts", fc, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.insert_composites = !this.ui.insert_composites;
+                                cx.notify();
+                            })))
+                        })
                         .when(has_sketches, |d| {
                             d.child(toggle("ins-f-sketch", "insert-sketches", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.ui.insert_sketches = !this.ui.insert_sketches;

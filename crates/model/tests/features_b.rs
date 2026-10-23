@@ -51,7 +51,8 @@ impl Studio {
     fn ok(&mut self) -> RegenResult {
         let r = self.regen();
         for (f, s) in self.ps.features.iter().zip(&r.display.features) {
-            assert_eq!(s.status, FeatureStatus::Ok, "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
+            // Info: a note that is not a failure (std Finish sheet metal model).
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
         }
         r
     }
@@ -328,7 +329,9 @@ fn sheet_metal_thicken_region() {
         p.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
         p.set("thickness", expr("1.5 mm"));
     });
-    s.add("sheetMetalEnd", |_| {});
+    // Finish needs its parts (live: "Select one or more sheet metal parts.").
+    let part = Reference::Body(s.ok().context.bodies[0].id.clone());
+    s.add("sheetMetalEnd", move |p| p.set("sheetMetalParts", ParamValue::Query(vec![part])));
     let r = s.ok();
     let v = r.context.bodies[0].shape.volume().unwrap();
     assert!(near(v, 0.06 * 0.04 * 0.0015, 1e-12), "volume {v}");

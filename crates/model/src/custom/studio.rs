@@ -59,6 +59,10 @@ pub enum ParamKindFs {
     Reference { kind: crate::params::ReferenceKind },
     /// `isAnything(definition.x)` and other parameters without a UI.
     Anything,
+    /// A parameter group (`annotation { "Group Name" : "Position" } { ... }`):
+    /// its title, unfolded unless "Collapsed By Default". Not in the
+    /// definition; the group's parameters show only while it is unfolded.
+    Group { open: bool },
 }
 
 /// A feature parameter.
@@ -433,6 +437,42 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
         }
         StmtKind::Annotated { annotation, stmt } => {
             let a = annot::eval(module, annotation);
+            // A group titled on its own (a "Driving Parameter" group's title
+            // is that boolean, already a parameter).
+            if let Some(title) = a.str("Group Name")
+                && a.get("Driving Parameter").is_none()
+                && matches!(stmt.kind, StmtKind::Block(_))
+            {
+                // Its id as the built-in schemas name groups ("generalGroup",
+                // "edgeProjectionOptionsGroup").
+                let mut id = String::new();
+                for (k, w) in title.split_whitespace().enumerate() {
+                    let mut c = w.chars();
+                    if let Some(f) = c.next() {
+                        id.extend(if k == 0 { f.to_lowercase().collect::<Vec<_>>() } else { f.to_uppercase().collect() });
+                        id.push_str(c.as_str());
+                    }
+                }
+                id.push_str("Group");
+                let open = !a.get("Collapsed By Default").and_then(|v| v.as_bool()).unwrap_or(false);
+                out.push(ParamDecl {
+                    id: id.clone(),
+                    label: title.to_string(),
+                    kind: ParamKindFs::Group { open },
+                    hints: Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE,
+                    description: String::new(),
+                    conditions: conds.to_vec(),
+                });
+                let r = roots.first().copied().unwrap_or(root);
+                let gate = ast::Expr::new(
+                    stmt.pos,
+                    ExprKind::Member(ast::Expr::new(stmt.pos, ExprKind::Ident(ast::QualName { ns: None, name: r.into() })), id.as_str().into(), false),
+                );
+                let mut with = conds.to_vec();
+                with.extend(compile_condition(module, &gate, r));
+                collect_in(module, stmt, &with, None, roots, out);
+                return;
+            }
             collect_in(module, stmt, conds, Some(&a), roots, out);
         }
         StmtKind::If { cond, then, otherwise } => {
@@ -750,7 +790,7 @@ fn condition_definition(decls: &[ParamDecl], v: &ParamValues) -> Value {
     let mut m = Map::new();
     for d in decls {
         let val = match (&d.kind, v.get(&d.id)) {
-            (ParamKindFs::Bool { default }, p) => Value::bool(match p {
+            (ParamKindFs::Bool { default } | ParamKindFs::Group { open: default }, p) => Value::bool(match p {
                 Some(ParamValue::Bool(b)) => *b,
                 _ => *default,
             }),
@@ -817,6 +857,7 @@ fn param_spec(d: &ParamDecl, siblings: Arc<Vec<ParamDecl>>) -> ParamSpec {
         ParamKindFs::Lookup { table } => ParamSpec::lookup(id, label, table),
         ParamKindFs::Reference { kind } => ParamSpec::reference(id, label, *kind),
         ParamKindFs::Anything => ParamSpec::text(id, label, "").hints(Hints::ALWAYS_HIDDEN),
+        ParamKindFs::Group { open } => ParamSpec::bool(id, label, *open),
     };
     let h = spec.hints | d.hints;
     spec = spec.hints(h);
