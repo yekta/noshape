@@ -660,4 +660,9 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
   fields), drawing_auxiliary_view `mode` normal / in_line / axis, drawing_datum on GD&T frames / dimension lines.
   drawing_get now lists crop / breaks / broken_out per view, table
   rows (header, title; custom tables evaluated in SheetModel), hatches, images and sketch_entities.
+  Checked in the app (Xvfb, demo drawing): broken-out (default depth 6 = half the plate), hatch pick / toggle / ✓,
+  insert image (click = 30 mm) and DXF from file tabs the API imported, line chain closing on its first point,
+  spline, spline point, sketch point, trim, circle, rectangle, inspection add / remove, Drawing properties edit +
+  lock, aux In line on a centerline, datum on a dimension line, custom table placed and evaluated (same rows in
+  drawing_get through live mode).
   Remaining drawing: custom tables from other documents' versions. Planned ceiling now 23 (none in drawing).

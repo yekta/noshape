@@ -1000,3 +1000,7 @@ these rules, change it in commit.rs (the app and the API both use it). Backups: 
   Normal / In line / Axis pick (drawing_aux.rs: `SheetPick::aux_pick`) and the Datum tool's attach to GD&T frames /
   dimension lines (drawing_extra.rs: `SheetPick::datum_attach_at`). Behaviour unchanged. model/drawing/build.rs: `field_value` is now `pub` (the API reports table
   text as drawn).
+- (api, 2026-10-23 00:40) Seen while checking the switches in the app (also on main a061cb3, so not from them):
+  Auxiliary view › Axis on the demo drawing's right view (the holes' hidden silhouettes highlight on hover) answers
+  "Select a hole axis" on click (not investigated; probably no `axes` in that view and `line_pick` not taking the
+  hidden edges). In line on a 2 point centerline works.
