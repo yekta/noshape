@@ -272,7 +272,8 @@ fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
         if n > 1 && have - need < -1e-9 {
             return crate::regen::eval::err_at(&["distance"], "Cannot create a curve pattern when the entered distance is larger than the path length.");
         }
-        d
+        // Live L45: on a closed path the instances are spread equally.
+        if closed { len / n as f64 } else { d }
     } else if closed {
         len / n as f64
     } else if n > 1 {
@@ -401,12 +402,16 @@ fn run_pattern(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> {
             if instances.is_empty() {
                 return Ok(());
             }
+            // Live L43: faces from two parts.
+            if groups.len() > 1 {
+                return err("Failed to create pattern, check input.");
+            }
             let groups: Vec<(BodyId, Vec<usize>)> = groups.into_iter().map(|(bi, fs)| (ev.ctx.bodies[bi].id.clone(), fs)).collect();
             // Onshape's PATTERN_FACE_FAILED / MIRROR_FACE_FAILED: the reason isn't shown.
             let failed = if verb(ev) == "mirror" { "Failed to create face mirror, check input." } else { "Failed to create pattern, check input." };
             for (id, fs) in groups {
-                pattern_faces(ev, &id, &fs, &instances).map_err(|e| {
-                    if e.message == "Cancelled" {
+                pattern_faces(ev, &id, &fs, &instances, true).map_err(|e| {
+                    if e.message == "Cancelled" || e.message == NOT_ON_BODY {
                         return e;
                     }
                     log::debug!("face pattern: {}", e.message);
@@ -563,7 +568,9 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
     Ok(FaceTool { shape: solid, names, add })
 }
 
-fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances: &[Instance]) -> FResult<()> {
+/// `strict` (Face pattern / mirror): an instance off the part fails (live
+/// L42/L43); a Feature pattern leaves such instances out.
+fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances: &[Instance], strict: bool) -> FResult<()> {
     let Some(bi) = index_of_body(ev, body_id) else { return Ok(()) };
     let body = ev.ctx.bodies[bi].clone();
     let t0 = std::time::Instant::now();
@@ -580,7 +587,7 @@ fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances:
         tools.push(NamedShape::new(res.shape, names));
     }
     let t_copies = t0.elapsed();
-    let r = apply_tools(ev, body_id, tools, tool.add, body.kind);
+    let r = apply_tools(ev, body_id, tools, tool.add, body.kind, strict);
     if crate::regen::display::perf_enabled() {
         log::info!(target: "perf", "pattern_faces × {}: tool {:.1} ms, copies + names {:.1} ms, apply {:.1} ms", instances.len(), t_tool.as_secs_f64() * 1e3, (t_copies - t_tool).as_secs_f64() * 1e3, (t0.elapsed() - t_copies).as_secs_f64() * 1e3);
     }
@@ -588,7 +595,17 @@ fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances:
 }
 
 /// Fuse (boss) or cut (pocket) instance tools into the parts they touch.
-fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: bool, kind: BodyKind) -> FResult<()> {
+fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: bool, kind: BodyKind, strict: bool) -> FResult<()> {
+    if strict && let Some(bi) = index_of_body(ev, seed) {
+        let seed_box = ev.ctx.bodies[bi].shape.bounding_box(false).ok();
+        let off = tools.iter().any(|t| match (&seed_box, t.shape.bounding_box(false)) {
+            (Some(a), Ok(b)) => !boxes_meet(a, &b, 1e-7),
+            _ => false,
+        });
+        if off {
+            return err(NOT_ON_BODY);
+        }
+    }
     if add {
         let Some(bi) = index_of_body(ev, seed) else { return Ok(()) };
         let seed_shape = ev.ctx.bodies[bi].shape.clone();
@@ -636,6 +653,14 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     }
     let before = ev.ctx.clone();
     let warnings_before = ev.warnings.len();
+    let sketches = feats.iter().filter(|f| ev.features.iter().any(|x| x.id == **f && x.type_id == "sketch")).count();
+    if ev.bool("fullFeaturePattern") && sketches > 0 {
+        ev.infos.push(SKETCH_REAPPLY_INFO.into());
+        // Only sketches: their copies (wire / sheet bodies) aren't made here.
+        if sketches == feats.len() {
+            return Ok(());
+        }
+    }
     if ev.bool("fullFeaturePattern") {
         match reapply_features(ev, &feats, instances) {
             Ok(()) => return Ok(()),
@@ -702,7 +727,7 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             {
                 return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
             }
-            pattern_faces(ev, &id, &fs, instances)?;
+            pattern_faces(ev, &id, &fs, instances, false)?;
         }
         if !found {
             return crate::regen::eval::err_at(&["instanceFunction"], NO_GEOMETRY_FROM_FEATURES);
@@ -714,6 +739,10 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
 /// Onshape's PATTERN_SWITCH_TO_PER_INSTANCE: a feature pattern whose face
 /// pattern can't make the instances (patternUtils.fs).
 const SWITCH_TO_PER_INSTANCE: &str = "Could not create all instances as entered. Try selecting \"Reapply features\" option.";
+/// Onshape's PATTERN_NOT_ON_BODY (live L42/L43).
+const NOT_ON_BODY: &str = "Pattern could not be created on the same part.";
+/// Onshape's info when a Feature pattern reapplies a sketch (live L40/L41).
+const SKETCH_REAPPLY_INFO: &str = "Sketch dimensions and constraints using the Origin or the default planes as reference will not be reapplied. Learn more";
 /// Onshape's PATTERN_NO_GEOM_FROM_FEATURES.
 const NO_GEOMETRY_FROM_FEATURES: &str = "Selected features do not create any geometry that may be patterned.";
 
