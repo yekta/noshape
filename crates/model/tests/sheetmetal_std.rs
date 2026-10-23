@@ -48,7 +48,7 @@ impl Studio {
         let r = Regenerator::new().regenerate(&self.ps, &ConfigValues::default(), &self.units, &RegenOptions::default());
         for (f, s) in self.ps.features.iter().zip(&r.display.features) {
             // With std's FeatureScript notices (the failing call's stack).
-            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning), "{} ({}) failed: {:?} {:?}", f.name, f.type_id, s.message, noshape_model::custom::run::output_of(f.id).map(|o| o.notices));
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info | FeatureStatus::Warning), "{} ({}) failed: {:?} {:?}", f.name, f.type_id, s.message, noshape_model::custom::run::output_of(f.id).map(|o| o.notices));
         }
         r
     }

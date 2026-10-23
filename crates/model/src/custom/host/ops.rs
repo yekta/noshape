@@ -370,6 +370,9 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let target_refs = evaluate_refs(i, &cx, def.get("targets"))?;
     let kind = def_enum(&def, "operationType").unwrap_or_else(|| "UNION".into());
     let keep = def_bool(&def, "keepTools", false);
+    // false: a sheet union keeps the edges imprinted on its faces (std Jog
+    // splits its faces up front, then unions the stretched pieces).
+    let erase = def_bool(&def, "eraseImprintedEdges", true);
     let failure = match &*kind {
         "SUBTRACTION" => "BOOLEAN_SUBTRACT_NO_OP",
         "INTERSECTION" => "BOOLEAN_INTERSECT_FAIL",
@@ -396,9 +399,20 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let remove: Vec<BodyId> = all[1..].to_vec();
                 ev.ctx.bodies.retain(|b| !remove.contains(&b.id));
                 let first = index(ev, &all[0]).unwrap_or(first);
-                ev.boolean_into(&[first], others, k::BooleanOp::Fuse)?;
+                if erase {
+                    ev.boolean_into(&[first], others, k::BooleanOp::Fuse)?;
+                } else {
+                    // Imprinted edges kept: a plain fuse, no face merging.
+                    let target = body_named(ev, first);
+                    let shapes: Vec<Shape> = others.iter().map(|o| o.shape.clone()).collect();
+                    let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&target.shape), &shapes, &k::BooleanOptions::default())?;
+                    let mut args: Vec<&crate::naming::ShapeNames> = vec![&target.names];
+                    args.extend(others.iter().map(|o| &o.names));
+                    let names = ev.name_result(&args, &res.history, &res.shape, &BTreeMap::new(), None);
+                    ev.replace_body(first, res.shape, names);
+                }
                 stitch_sheet_pieces(ev, &all[0])?;
-                if let Some(bi) = index(ev, &all[0]) {
+                if erase && let Some(bi) = index(ev, &all[0]) {
                     merge_sheet_faces(ev, bi)?;
                 }
                 Ok(Some(all))
@@ -1100,6 +1114,7 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("projectionType", ParamValue::Enum("NORMAL_TO_TARGET".into()));
     p.set("keepToolSurfaces", ParamValue::Bool(def_bool(&def, "keepToolSurfaces", false)));
     p.set("extendToCompletion", ParamValue::Bool(def_bool(&def, "extendToCompletion", false)));
+    let own_existing = def_bool(&def, "ownExistingImprints", false);
     if super::trace_ops() {
         eprintln!("[fs op] splitFace targets {:?} tools {:?}", p.query("faceTargets"), p.query("faceTools"));
     }
@@ -1141,12 +1156,28 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
             }
         }
+        // `ownExistingImprints` (std Jog): the targets' edges already on a
+        // tool count as its cut too (the face ends where the tool lies).
+        let mut existing = Vec::new();
+        if own_existing {
+            for (bid, _) in &before {
+                let Some(b) = ev.ctx.bodies.iter().find(|b| &b.id == bid) else { continue };
+                for edge in b.shape.edges() {
+                    let (Ok(info), Ok((a, z))) = (edge.edge_info(), edge.endpoints()) else { continue };
+                    if let Ok(m) = edge.point_at((info.first_param + info.last_param) * 0.5) {
+                        existing.push((a, m, z));
+                    }
+                }
+            }
+        }
         // Which planar tool cut which of them.
         let mut tools = Vec::new();
         for (bi, fi) in ev.resolve_faces(ev.query("faceTools")) {
             let Ok(Some(pl)) = ev.face_shape(bi, fi).and_then(|f| f.face_plane().map_err(|e| crate::regen::eval::FeatureError::new(e.to_string()))) else { continue };
             let n = pl.unit_normal();
-            let on: Vec<DVec3> = mids.iter().copied().filter(|m| (*m - pl.origin).dot(n).abs() < 1e-7).collect();
+            let in_plane = |m: DVec3| (m - pl.origin).dot(n).abs() < 1e-7;
+            let mut on: Vec<DVec3> = mids.iter().copied().filter(|m| in_plane(*m)).collect();
+            on.extend(existing.iter().filter(|(a, m, z)| in_plane(*a) && in_plane(*m) && in_plane(*z)).map(|e| e.1));
             tools.push((pl.origin, n, on));
         }
         Ok((made, tools, pieces))

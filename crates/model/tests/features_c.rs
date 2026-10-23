@@ -60,7 +60,7 @@ impl Studio {
     fn ok(&mut self) -> RegenResult {
         let r = self.regen();
         for (f, s) in self.ps.features.iter().zip(&r.display.features) {
-            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info | FeatureStatus::Warning), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
         }
         r
     }
