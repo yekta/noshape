@@ -73,6 +73,9 @@ pub struct PartOccurrence {
     /// Linear RGBA.
     pub color: [f32; 4],
     pub mesh: Arc<MeshBuffers>,
+    /// The body's coarser display levels ([`crate::display::BodyDisplay::coarser`]);
+    /// none with "Use best available tessellation".
+    pub coarser: Vec<Arc<MeshBuffers>>,
     /// Body coordinates (Part Studio) -> leaf's top-level instance coordinates.
     pub inner: DMat4,
     /// Body coordinates -> assembly world (after solving / explode).
@@ -993,6 +996,7 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
         color: [0.7230, 0.7605, 0.7913, 0.8],
         hidden: false,
         mesh: Arc::new(mesh),
+        coarser: Vec::new(),
         face_refs: region_refs,
         edge_refs: body.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
         vertex_refs: body.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),
@@ -1806,6 +1810,7 @@ impl AssemblyEvaluator {
                         }
                         None => b.mesh.clone(),
                     },
+                    coarser: if leaf.path.first().is_some_and(|p| best.contains(p) || open_composite) { Vec::new() } else { b.coarser.clone() },
                     inner: leaf.inner,
                     transform: leaf.inner,
                     face_refs: b.face_refs.clone(),

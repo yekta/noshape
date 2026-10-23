@@ -260,6 +260,11 @@ pub struct Instance {
     /// ([`Detail`], `performAggressiveCulling`) all its instances give way
     /// to its [`Instance::lod_box`].
     pub body: u32,
+    /// The body's display level this instance belongs to: 0 every level;
+    /// k ≥ 1 drawn only while the body shows level k − 1 (0 Coarse … 3
+    /// Very fine, [`mesh_lod_level`]): its mesh, edges, silhouettes and
+    /// picks at that tessellation.
+    pub mesh_lod: u8,
     /// Edge lines with levels of detail: 0 none (always drawn); k ≥ 1 the
     /// body's edges simplified to [`LINE_LOD_TOLERANCES`]`[k - 1]` of its
     /// size, drawn only when the renderer picks level k for the body
@@ -339,6 +344,7 @@ impl Instance {
             body: 0,
             lod_box: false,
             line_lod: 0,
+            mesh_lod: 0,
         }
     }
     /// The version this instance draws in compare mode ([`compare`]).
@@ -527,6 +533,34 @@ pub struct Detail {
     /// their box (`extentCullingThresholdPx`: 2 at full detail, 10 while
     /// the camera moves).
     pub extent_culling_px: f32,
+    /// A body shows its next finer display level while its chordal error
+    /// on screen is at least this (CSS px, [`mesh_lod_level`]):
+    /// [`MESH_ERROR_PX`], viewing in high quality 0.1 in a Part Studio and
+    /// 1 in an assembly.
+    pub mesh_error_px: f32,
+}
+
+/// `BODY_SCREENSPACE_ERROR_REFINEMENT_THRESHOLD`, and View in high
+/// quality's `VIEWING_PART_STUDIO_` / `VIEWING_ASSEMBLY_AGGRESSIVE_ERROR_REFINEMENT_THRESHOLD`.
+pub const MESH_ERROR_PX: f32 = 3.0;
+pub const MESH_ERROR_PX_HIGH_QUALITY_STUDIO: f32 = 0.1;
+pub const MESH_ERROR_PX_HIGH_QUALITY_ASSEMBLY: f32 = 1.0;
+
+/// Each display level's chordal tolerance as a share of the body's
+/// bounding radius (`CHORDAL_TOLERANCE_RATIO_COARSE` … `_VERY_FINE`: the
+/// sagitta of 12, 24, 72 and 300 segments per circle).
+pub const MESH_LOD_CHORD_RATIOS: [f32; 4] = [0.03407418, 0.00855514, 0.00095178, 5.4831e-5];
+
+/// Onshape's `getTessellationIndexToGoUnderThreshold`: a body
+/// `radius_px` CSS px in bounding radius on screen steps up from Coarse
+/// while its chordal error there is at least `threshold_px`, up to
+/// `max_level` (its finest).
+pub fn mesh_lod_level(radius_px: f32, threshold_px: f32, max_level: u8) -> u8 {
+    let mut level = 0;
+    while level < max_level && (level as usize) < MESH_LOD_CHORD_RATIOS.len() && radius_px * MESH_LOD_CHORD_RATIOS[level as usize] >= threshold_px {
+        level += 1;
+    }
+    level
 }
 
 /// `DEFAULT_EXTENT_CULLING_THRESHOLD_IN_PIXELS` /
@@ -536,7 +570,7 @@ pub const INTERACTIVE_EXTENT_CULLING_PX: f32 = 10.0;
 
 impl Default for Detail {
     fn default() -> Self {
-        Self { edge_silhouettes: true, backface_silhouettes: true, section_edges: true, low_level_body_proportion: 0.0, extent_culling_px: EXTENT_CULLING_PX }
+        Self { edge_silhouettes: true, backface_silhouettes: true, section_edges: true, low_level_body_proportion: 0.0, extent_culling_px: EXTENT_CULLING_PX, mesh_error_px: MESH_ERROR_PX }
     }
 }
 

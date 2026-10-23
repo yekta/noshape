@@ -276,16 +276,6 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         // drawn placed by their transforms, so the renderer draws all the
         // copies with one instanced call.
         let shared = SharedMesh::of(display, b).filter(|_| colors.is_none() && replaced.is_none() && !noshape_render::renderer::instancing_disabled());
-        let gmesh = shared.map_or(&b.mesh, |s| &s.mesh);
-        let key = Arc::as_ptr(gmesh) as usize;
-        let cached = match cache.bodies.get(&key) {
-            Some((_, c)) => c.clone(),
-            None => {
-                let c = Arc::new(upload_body(gmesh, up));
-                cache.bodies.insert(key, (Arc::downgrade(gmesh), c.clone()));
-                c
-            }
-        };
         let display_only = opts.display_only.contains(&b.id);
         let first_instance = scene.instances.len();
         // Display-only bodies get pick ids past the highlight states (so no
@@ -312,144 +302,174 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         if opts.transparent_bodies || b.kind == BodyKind::Surface {
             color[3] = color[3].min(if b.kind == BodyKind::Surface { 0.85 } else { 0.35 });
         }
-        if b.kind != BodyKind::Wire {
-            let mesh = match colors {
-                _ if replaced.is_some() => Instance::new(Drawable::Mesh(replaced.cloned().expect("checked"))).pick_base(face_base).per_primitive_color(),
-                Some(c) => {
-                    let ckey = (Arc::as_ptr(&b.mesh) as usize, Arc::as_ptr(c) as usize);
-                    let handle = match cache.colored.get(&ckey) {
-                        Some((_, h)) => h.clone(),
-                        None => {
-                            let pick_ids = face_pick_ids(&b.mesh);
-                            let h = up.upload_mesh_colored(&b.mesh.positions, &b.mesh.normals, &pick_ids, c, &b.mesh.indices);
-                            cache.colored.insert(ckey, (Arc::downgrade(c), h.clone()));
-                            h
-                        }
-                    };
-                    Instance::new(Drawable::Mesh(handle)).pick_base(face_base).per_primitive_color()
-                }
-                None => Instance::new(Drawable::Mesh(cached.mesh.clone())).pick_base(face_base),
-            };
-            let mesh = match opts.display_mode {
-                DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color).zebra(opts.zebra.filter(|_| replaced.is_none())).reflection(opts.reflection.clone().filter(|_| replaced.is_none())),
-                // Onshape (part-studio/62): the shaded part at ~35% in sRGB,
-                // which is ~0.48 in the renderer's linear blending.
-                DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
-                // Faces drawn flat in the background color hide what is behind
-                // them (live part-studio/61: white, unlit, only the edges show).
-                DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
-            };
-            let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
-            let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(ISOLATE_GHOST) } else { mesh };
-            // Parts excluded from the section view are not cut.
-            scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
-        }
-        let edge_color = match (b.kind, opts.display_mode) {
-            (BodyKind::Wire, _) => theme::lin(theme::viewport::EDGE),
-            (_, DisplayMode::HiddenLine) => theme::lin(theme::viewport::EDGE_UNSHADED),
-            _ => theme::lin(EDGE_COLOR),
-        };
-        let edge_color = if opts.ghost_bodies.contains(&b.id) { ghost_color(edge_color, ISOLATE_GHOST) } else { edge_color };
-        // A mesh part's triangle sides: thin dark-grey lines at every zoom
-        // (live G35, part-studio/551: #464646, 1 px), like edges hidden in
-        // plain Shaded mode.
-        if let Some(lines) = cached.mesh_lines.clone().filter(|_| opts.display_mode != DisplayMode::Shaded) {
-            let l = Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).unpickable().line_scale(opts.graphics.line_width).layer(1);
-            scene.instances.push(if opts.section_skip.contains(&b.id) { l.ignore_clip() } else { l });
-        }
-        // Onshape's backface silhouettes: the outline band of opaque solids
-        // (with edges and in hidden line).
-        if b.kind == BodyKind::Solid && color[3] >= 0.999 && matches!(opts.display_mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine) && replaced.is_none() {
-            let s = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).back_silhouette();
-            scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
-        }
-        // Silhouettes of curved faces, like the edges (not in plain Shaded).
-        if let Some(sil) = cached.silhouettes.clone().filter(|_| opts.display_mode != DisplayMode::Shaded && b.kind != BodyKind::Wire) {
-            let s = Instance::new(Drawable::Lines(sil)).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).layer(1);
-            scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
-        }
-        let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1);
-        let edges = if opts.section_skip.contains(&b.id) { edges.ignore_clip() } else { edges };
-        // Shaded mode hides edges visually but keeps them pickable.
-        let tangent = (opts.tangent_edges != TangentEdges::Visible && b.kind != BodyKind::Wire && opts.display_mode != DisplayMode::Shaded).then(|| {
-            match cache.tangent.get(&key) {
-                Some((_, t)) => t.clone(),
+        // Onshape's display levels, coarsest first (`BodyDisplay::coarser`):
+        // each level's instances draw only when the renderer picks that
+        // level for the body (`Instance::mesh_lod`).
+        let finest = shared.map_or(&b.mesh, |s| &s.mesh);
+        let coarser: &[Arc<noshape_model::display::MeshBuffers>] = if colors.is_some() || replaced.is_some() { &[] } else { shared.map_or(&b.coarser[..], |s| &s.coarser[..]) };
+        let levels: Vec<&Arc<noshape_model::display::MeshBuffers>> = coarser.iter().chain(std::iter::once(finest)).collect();
+        let mut finest_cached = None;
+        for (li, &gmesh) in levels.iter().enumerate() {
+            let is_finest = li + 1 == levels.len();
+            let level_first = scene.instances.len();
+            let key = Arc::as_ptr(gmesh) as usize;
+            let cached = match cache.bodies.get(&key) {
+                Some((_, c)) => c.clone(),
                 None => {
-                    let smooth = gmesh.smooth_edges();
-                    let (mut sharp, mut phantom) = (LineData::default(), LineData::default());
-                    for (ei, pl) in gmesh.edges.iter().enumerate() {
-                        if smooth.get(ei).copied().unwrap_or(false) {
-                            phantom.push_polyline(pl, [0, 0, 0, 255], 0, 1.0, LineSegment::DASH_DOT);
-                        } else {
-                            sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, 0);
-                        }
+                    let c = Arc::new(upload_body(gmesh, up));
+                    cache.bodies.insert(key, (Arc::downgrade(gmesh), c.clone()));
+                    c
+                }
+            };
+            if b.kind != BodyKind::Wire {
+                let mesh = match colors {
+                    _ if replaced.is_some() => Instance::new(Drawable::Mesh(replaced.cloned().expect("checked"))).pick_base(face_base).per_primitive_color(),
+                    Some(c) => {
+                        let ckey = (Arc::as_ptr(&b.mesh) as usize, Arc::as_ptr(c) as usize);
+                        let handle = match cache.colored.get(&ckey) {
+                            Some((_, h)) => h.clone(),
+                            None => {
+                                let pick_ids = face_pick_ids(&b.mesh);
+                                let h = up.upload_mesh_colored(&b.mesh.positions, &b.mesh.normals, &pick_ids, c, &b.mesh.indices);
+                                cache.colored.insert(ckey, (Arc::downgrade(c), h.clone()));
+                                h
+                            }
+                        };
+                        Instance::new(Drawable::Mesh(handle)).pick_base(face_base).per_primitive_color()
                     }
-                    let t = TangentLines { sharp: up.upload_lines(&sharp), phantom: up.upload_lines(&phantom) };
-                    cache.tangent.insert(key, (Arc::downgrade(gmesh), t.clone()));
-                    t
+                    None => Instance::new(Drawable::Mesh(cached.mesh.clone())).pick_base(face_base),
+                };
+                let mesh = match opts.display_mode {
+                    DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color).zebra(opts.zebra.filter(|_| replaced.is_none())).reflection(opts.reflection.clone().filter(|_| replaced.is_none())),
+                    // Onshape (part-studio/62): the shaded part at ~35% in sRGB,
+                    // which is ~0.48 in the renderer's linear blending.
+                    DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
+                    // Faces drawn flat in the background color hide what is behind
+                    // them (live part-studio/61: white, unlit, only the edges show).
+                    DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
+                };
+                let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh };
+                let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(ISOLATE_GHOST) } else { mesh };
+                // Parts excluded from the section view are not cut.
+                scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
+            }
+            let edge_color = match (b.kind, opts.display_mode) {
+                (BodyKind::Wire, _) => theme::lin(theme::viewport::EDGE),
+                (_, DisplayMode::HiddenLine) => theme::lin(theme::viewport::EDGE_UNSHADED),
+                _ => theme::lin(EDGE_COLOR),
+            };
+            let edge_color = if opts.ghost_bodies.contains(&b.id) { ghost_color(edge_color, ISOLATE_GHOST) } else { edge_color };
+            // A mesh part's triangle sides: thin dark-grey lines at every zoom
+            // (live G35, part-studio/551: #464646, 1 px), like edges hidden in
+            // plain Shaded mode.
+            if let Some(lines) = cached.mesh_lines.clone().filter(|_| opts.display_mode != DisplayMode::Shaded) {
+                let l = Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).unpickable().line_scale(opts.graphics.line_width).layer(1);
+                scene.instances.push(if opts.section_skip.contains(&b.id) { l.ignore_clip() } else { l });
+            }
+            // Onshape's backface silhouettes: the outline band of opaque solids
+            // (with edges and in hidden line).
+            if b.kind == BodyKind::Solid && color[3] >= 0.999 && matches!(opts.display_mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine) && replaced.is_none() {
+                let s = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).back_silhouette();
+                scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
+            }
+            // Silhouettes of curved faces, like the edges (not in plain Shaded).
+            if let Some(sil) = cached.silhouettes.clone().filter(|_| opts.display_mode != DisplayMode::Shaded && b.kind != BodyKind::Wire) {
+                let s = Instance::new(Drawable::Lines(sil)).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).layer(1);
+                scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
+            }
+            let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1);
+            let edges = if opts.section_skip.contains(&b.id) { edges.ignore_clip() } else { edges };
+            // Shaded mode hides edges visually but keeps them pickable.
+            let tangent = (opts.tangent_edges != TangentEdges::Visible && b.kind != BodyKind::Wire && opts.display_mode != DisplayMode::Shaded).then(|| {
+                match cache.tangent.get(&key) {
+                    Some((_, t)) => t.clone(),
+                    None => {
+                        let smooth = gmesh.smooth_edges();
+                        let (mut sharp, mut phantom) = (LineData::default(), LineData::default());
+                        for (ei, pl) in gmesh.edges.iter().enumerate() {
+                            if smooth.get(ei).copied().unwrap_or(false) {
+                                phantom.push_polyline(pl, [0, 0, 0, 255], 0, 1.0, LineSegment::DASH_DOT);
+                            } else {
+                                sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, 0);
+                            }
+                        }
+                        let t = TangentLines { sharp: up.upload_lines(&sharp), phantom: up.upload_lines(&phantom) };
+                        cache.tangent.insert(key, (Arc::downgrade(gmesh), t.clone()));
+                        t
+                    }
+                }
+            });
+            match tangent {
+                // Tangent edges phantom/removed: draw the sharp ones (and the
+                // tangent ones dash-dot); all of them stay pickable.
+                Some(t) => {
+                    scene.instances.push(edges.pick_only());
+                    scene.instances.push(Instance::new(Drawable::Lines(t.sharp)).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1));
+                    if opts.tangent_edges == TangentEdges::Phantom {
+                        // Phantom edges: Graphics preferences width (0.5 px default) and color.
+                        let c = theme::lin(opts.graphics.phantom_color);
+                        scene.instances.push(Instance::new(Drawable::Lines(t.phantom)).with_color(c).unpickable().line_scale(opts.graphics.phantom_width / 0.5).layer(1));
+                    }
+                }
+                None if opts.display_mode == DisplayMode::Shaded => scene.instances.push(edges.pick_only()),
+                // The full edges (also the pick) and each coarser line level.
+                None => {
+                    for (k, l) in cached.edge_lods.iter().enumerate().filter(|_| is_finest) {
+                        let mut e = edges.clone().line_lod(k as u8 + 2);
+                        e.drawable = Drawable::Lines(l.clone());
+                        scene.instances.push(e);
+                    }
+                    scene.instances.push(edges.line_lod(1));
                 }
             }
-        });
-        match tangent {
-            // Tangent edges phantom/removed: draw the sharp ones (and the
-            // tangent ones dash-dot); all of them stay pickable.
-            Some(t) => {
-                scene.instances.push(edges.pick_only());
-                scene.instances.push(Instance::new(Drawable::Lines(t.sharp)).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1));
-                if opts.tangent_edges == TangentEdges::Phantom {
-                    // Phantom edges: Graphics preferences width (0.5 px default) and color.
-                    let c = theme::lin(opts.graphics.phantom_color);
-                    scene.instances.push(Instance::new(Drawable::Lines(t.phantom)).with_color(c).unpickable().line_scale(opts.graphics.phantom_width / 0.5).layer(1));
+            if opts.hidden_edges_visible && b.kind != BodyKind::Wire {
+                let handle = match cache.hidden_edges.get(&key) {
+                    Some((_, h)) => h.clone(),
+                    None => {
+                        let mut l = LineData::default();
+                        for pl in &gmesh.edges {
+                            l.push_polyline(pl, [90, 90, 90, 140], 0, 1.0, LineSegment::DASHED | LineSegment::ON_TOP);
+                        }
+                        let h = up.upload_lines(&l);
+                        cache.hidden_edges.insert(key, (Arc::downgrade(gmesh), h.clone()));
+                        h
+                    }
+                };
+                scene.instances.push(Instance::new(Drawable::Lines(handle)).per_primitive_color().unpickable().layer(1));
+            }
+            if opts.highlight_boundary && b.kind != BodyKind::Wire {
+                let lines = match cache.boundary.get(&key) {
+                    Some((_, l)) => l.clone(),
+                    None => {
+                        let laminar = laminar_edges(gmesh);
+                        let (mut solid, mut dashed) = (LineData::default(), LineData::default());
+                        for (pl, _) in gmesh.edges.iter().zip(&laminar).filter(|(_, l)| **l) {
+                            solid.push_polyline(pl, [0, 0, 0, 255], 0, 2.0, 0);
+                            dashed.push_polyline(pl, [0, 0, 0, 255], 0, 1.5, LineSegment::DASHED | LineSegment::ON_TOP);
+                        }
+                        let l = (!solid.segments.is_empty()).then(|| (up.upload_lines(&solid), up.upload_lines(&dashed)));
+                        cache.boundary.insert(key, (Arc::downgrade(gmesh), l.clone()));
+                        l
+                    }
+                };
+                if let Some((solid, dashed)) = lines {
+                    let red = theme::lin(theme::viewport::BOUNDARY_EDGE);
+                    scene.instances.push(Instance::new(Drawable::Lines(solid)).with_color(red).unpickable().layer(3));
+                    scene.instances.push(Instance::new(Drawable::Lines(dashed)).with_color(red).unpickable().layer(3));
                 }
             }
-            None if opts.display_mode == DisplayMode::Shaded => scene.instances.push(edges.pick_only()),
-            // The full edges (also the pick) and each coarser line level.
-            None => {
-                for (k, l) in cached.edge_lods.iter().enumerate() {
-                    let mut e = edges.clone().line_lod(k as u8 + 2);
-                    e.drawable = Drawable::Lines(l.clone());
-                    scene.instances.push(e);
+            if levels.len() > 1 {
+                for i in &mut scene.instances[level_first..] {
+                    i.mesh_lod = li as u8 + 1;
                 }
-                scene.instances.push(edges.line_lod(1));
+            }
+            if is_finest {
+                finest_cached = Some(cached);
             }
         }
+        let cached = finest_cached.expect("a body has its finest level");
+        // B-rep vertices are the same at every level.
         scene.instances.push(Instance::new(Drawable::Points(cached.vertices.clone())).pick_base(vert_base).pick_only().layer(2));
-        if opts.hidden_edges_visible && b.kind != BodyKind::Wire {
-            let handle = match cache.hidden_edges.get(&key) {
-                Some((_, h)) => h.clone(),
-                None => {
-                    let mut l = LineData::default();
-                    for pl in &gmesh.edges {
-                        l.push_polyline(pl, [90, 90, 90, 140], 0, 1.0, LineSegment::DASHED | LineSegment::ON_TOP);
-                    }
-                    let h = up.upload_lines(&l);
-                    cache.hidden_edges.insert(key, (Arc::downgrade(gmesh), h.clone()));
-                    h
-                }
-            };
-            scene.instances.push(Instance::new(Drawable::Lines(handle)).per_primitive_color().unpickable().layer(1));
-        }
-        if opts.highlight_boundary && b.kind != BodyKind::Wire {
-            let lines = match cache.boundary.get(&key) {
-                Some((_, l)) => l.clone(),
-                None => {
-                    let laminar = laminar_edges(gmesh);
-                    let (mut solid, mut dashed) = (LineData::default(), LineData::default());
-                    for (pl, _) in gmesh.edges.iter().zip(&laminar).filter(|(_, l)| **l) {
-                        solid.push_polyline(pl, [0, 0, 0, 255], 0, 2.0, 0);
-                        dashed.push_polyline(pl, [0, 0, 0, 255], 0, 1.5, LineSegment::DASHED | LineSegment::ON_TOP);
-                    }
-                    let l = (!solid.segments.is_empty()).then(|| (up.upload_lines(&solid), up.upload_lines(&dashed)));
-                    cache.boundary.insert(key, (Arc::downgrade(gmesh), l.clone()));
-                    l
-                }
-            };
-            if let Some((solid, dashed)) = lines {
-                let red = theme::lin(theme::viewport::BOUNDARY_EDGE);
-                scene.instances.push(Instance::new(Drawable::Lines(solid)).with_color(red).unpickable().layer(3));
-                scene.instances.push(Instance::new(Drawable::Lines(dashed)).with_color(red).unpickable().layer(3));
-            }
-        }
         // Onshape's lowest level of detail of the body: its bounding box.
         let body = bodies + 1;
         bodies = body;

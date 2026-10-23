@@ -581,6 +581,11 @@ struct DrawLists {
     /// By body id − 1: its edge line level ([`Instance::line_lod`]).
     line_levels: Vec<u8>,
     diagonal_px: Vec<f32>,
+    /// By body id − 1: its display level ([`Instance::mesh_lod`] − 1).
+    mesh_levels: Vec<u8>,
+    /// The frame's [`Detail::mesh_error_px`] (every pass: picks follow the
+    /// levels shown).
+    mesh_error_px: f32,
 }
 
 /// A body for [`lod_boxes`]: its [`Instance::lod_box`]'s transform (the
@@ -591,39 +596,64 @@ pub struct LodBody {
     pub triangles: u32,
     /// Has a box (wire bodies have none and are never boxed).
     pub has_box: bool,
+    /// Its finest display level ([`Instance::mesh_lod`] − 1; 0 without
+    /// levels) and its Coarse mesh (the key of the finest level it has
+    /// shown, [`MeshLodMemory`]; 0 without levels).
+    pub max_level: u8,
+    pub coarse_mesh: usize,
 }
+
+/// The finest display level each body has shown, by (its Coarse mesh,
+/// body id): Onshape keeps a body's finest tessellation once loaded, so a
+/// body doesn't go coarser when the camera zooms out.
+pub type MeshLodMemory = std::collections::HashMap<(usize, u32), u8>;
 
 /// `MAXIMUM_BODY_CULL_DIAMETER_PROPORTION`: only bodies smaller than this
 /// share of the viewport diagonal are ever drawn as their box.
 const MAX_BOX_DIAMETER_PROPORTION: f32 = 0.01;
 
-/// Onshape's `performAggressiveCulling` (webgl BodyManager): which bodies
-/// to draw as their box (`boxes[id - 1]`). Those under
-/// `extent_culling_px` on screen and, with `low_level_body_proportion`
-/// above 0, that share of all bodies taken by most triangles per squared
-/// radius first (`getBenefitToCull`), the ones outside the view counting
-/// against it; either only while under 1% of the viewport diagonal. The
-/// viewport is `width` × `height` device pixels, `dpr` per CSS px. Also
-/// each body's bounding-box diagonal on screen (CSS px; infinite when
-/// unknown), for its edge line level ([`line_lod_level`]).
-pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), detail: &Detail, order: &mut Vec<u32>, boxes: &mut Vec<bool>, diagonal_px: &mut Vec<f32>) {
-    boxes.clear();
-    boxes.resize(bodies.len(), false);
-    diagonal_px.clear();
-    diagonal_px.resize(bodies.len(), f32::INFINITY);
+/// A body's bounding radius in world units (its box's half diagonal).
+fn box_radius(b: &LodBody) -> f32 {
+    0.5 * (b.box_transform.x_axis + b.box_transform.y_axis + b.box_transform.z_axis).truncate().length()
+}
+
+/// Each body's bounding-box diagonal on screen (CSS px; infinite for one
+/// without a box): its size for [`lod_boxes`], [`line_lod_level`] and
+/// [`mesh_lod_level`]. The viewport is `width` × `height` device pixels,
+/// `dpr` per CSS px.
+pub fn body_diagonals_px(bodies: &[LodBody], view_proj: &Mat4, (_, height, dpr): (u32, u32, f32), out: &mut Vec<f32>) {
     let dpr = dpr.max(1e-3);
     // Clip-space y per world unit: row 1 of the view-projection's 3x3 (a
     // rotation times the projection's y scale).
     let y_scale = Vec3::new(view_proj.x_axis.y, view_proj.y_axis.y, view_proj.z_axis.y).length();
-    let max_px = MAX_BOX_DIAMETER_PROPORTION * (width as f32).hypot(height as f32) / dpr;
-    let radius = |b: &LodBody| 0.5 * (b.box_transform.x_axis + b.box_transform.y_axis + b.box_transform.z_axis).truncate().length();
+    out.clear();
+    out.extend(bodies.iter().map(|b| {
+        if !b.has_box {
+            return f32::INFINITY;
+        }
+        let w = (*view_proj * b.box_transform.w_axis).w.max(1e-9);
+        2.0 * box_radius(b) * y_scale / w * height as f32 * 0.5 / dpr
+    }));
+}
+
+/// Onshape's `performAggressiveCulling` (webgl BodyManager): which bodies
+/// to draw as their box (`boxes[id - 1]`). Those under
+/// `extent_culling_px` on screen and, with `low_level_body_proportion`
+/// above 0, that share of all bodies taken by most (coarse) triangles per
+/// squared radius first (`getBenefitToCull`), the ones outside the view
+/// counting against it; either only while under 1% of the viewport
+/// diagonal. `diagonal_px`: [`body_diagonals_px`].
+pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), detail: &Detail, diagonal_px: &[f32], order: &mut Vec<u32>, boxes: &mut Vec<bool>) {
+    boxes.clear();
+    boxes.resize(bodies.len(), false);
+    let max_px = MAX_BOX_DIAMETER_PROPORTION * (width as f32).hypot(height as f32) / dpr.max(1e-3);
     order.clear();
     order.extend((0..bodies.len() as u32).filter(|&i| bodies[i as usize].has_box));
     let mut budget = (detail.low_level_body_proportion.clamp(0.0, 1.0) * bodies.len() as f32).floor() as i64;
     if budget > 0 {
         let benefit = |i: u32| {
             let b = &bodies[i as usize];
-            b.triangles as f32 / radius(b).powi(2).max(1e-30)
+            b.triangles as f32 / box_radius(b).powi(2).max(1e-30)
         };
         order.sort_by(|&a, &b| benefit(b).total_cmp(&benefit(a)).then(a.cmp(&b)));
     }
@@ -633,9 +663,7 @@ pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u3
             budget -= 1;
             continue;
         }
-        let w = (*view_proj * b.box_transform.w_axis).w.max(1e-9);
-        let px = 2.0 * radius(b) * y_scale / w * height as f32 * 0.5 / dpr;
-        diagonal_px[i as usize] = px;
+        let px = diagonal_px[i as usize];
         if ((a as i64) < budget || px < detail.extent_culling_px) && px < max_px {
             boxes[i as usize] = true;
         }
@@ -649,6 +677,14 @@ impl DrawLists {
             return 1;
         }
         self.line_levels.get(id as usize - 1).copied().unwrap_or(1)
+    }
+
+    /// The display level body `id` shows this pass.
+    fn mesh_level(&self, id: u32) -> u8 {
+        if id == 0 {
+            return 0;
+        }
+        self.mesh_levels.get(id as usize - 1).copied().unwrap_or(0)
     }
 
     /// Whether body `id`'s box replaces it this pass.
@@ -668,7 +704,7 @@ impl DrawLists {
     }
 
     /// Partition the scene's visible instances by pass, sorted by layer.
-    fn build(&mut self, scene: &Scene, view_proj: &Mat4, width: u32, height: u32, dpr: f32, pick: bool) {
+    fn build(&mut self, scene: &Scene, view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), pick: bool, memory: &mut MeshLodMemory) {
         self.opaque.clear();
         self.transparent.clear();
         self.pick_priority.clear();
@@ -685,27 +721,54 @@ impl DrawLists {
         self.culled = 0;
         self.boxes.clear();
         self.line_levels.clear();
-        if let Some(detail) = self.lod.filter(|_| !pick) {
-            self.lod_bodies.clear();
-            for inst in scene.instances.iter().filter(|i| i.body > 0) {
-                let k = inst.body as usize - 1;
-                if k >= self.lod_bodies.len() {
-                    self.lod_bodies.resize(k + 1, LodBody::default());
-                }
-                let b = &mut self.lod_bodies[k];
-                match &inst.drawable {
-                    _ if inst.lod_box => {
-                        b.box_transform = inst.transform;
-                        b.has_box = true;
-                    }
-                    Drawable::Mesh(m) if !inst.back_silhouette => b.triangles += m.0.index_count / 3,
-                    _ => {}
-                }
+        self.mesh_levels.clear();
+        self.lod_bodies.clear();
+        for inst in scene.instances.iter().filter(|i| i.body > 0) {
+            let k = inst.body as usize - 1;
+            if k >= self.lod_bodies.len() {
+                self.lod_bodies.resize(k + 1, LodBody::default());
             }
-            lod_boxes(&self.lod_bodies, view_proj, (width, height, dpr), &detail, &mut self.lod_order, &mut self.boxes, &mut self.diagonal_px);
-            self.line_levels.extend(self.diagonal_px.iter().map(|&px| line_lod_level(px)));
-            if perf::enabled() {
-                perf::record_ms("r.lod_boxes", self.boxes.iter().filter(|b| **b).count() as f32);
+            let b = &mut self.lod_bodies[k];
+            b.max_level = b.max_level.max(inst.mesh_lod.saturating_sub(1));
+            match &inst.drawable {
+                _ if inst.lod_box => {
+                    b.box_transform = inst.transform;
+                    b.has_box = true;
+                }
+                // Onshape ranks by the coarse triangle count.
+                Drawable::Mesh(m) if !inst.back_silhouette && inst.mesh_lod <= 1 => {
+                    b.triangles += m.0.index_count / 3;
+                    if inst.mesh_lod == 1 && b.coarse_mesh == 0 {
+                        b.coarse_mesh = Arc::as_ptr(&m.0) as usize;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !self.lod_bodies.is_empty() {
+            body_diagonals_px(&self.lod_bodies, view_proj, (width, height, dpr), &mut self.diagonal_px);
+            // Each body's display level (Onshape refines a body while its
+            // chordal error is over the threshold, and keeps the finest).
+            if memory.len() > 200_000 {
+                memory.clear();
+            }
+            for (i, b) in self.lod_bodies.iter().enumerate() {
+                let mut level = mesh_lod_level(self.diagonal_px[i] * 0.5, self.mesh_error_px, b.max_level);
+                if b.coarse_mesh != 0 {
+                    let shown = memory.entry((b.coarse_mesh, i as u32 + 1)).or_insert(0);
+                    level = level.max(*shown).min(b.max_level);
+                    *shown = level;
+                }
+                self.mesh_levels.push(level);
+            }
+            if let Some(detail) = self.lod.filter(|_| !pick) {
+                lod_boxes(&self.lod_bodies, view_proj, (width, height, dpr), &detail, &self.diagonal_px, &mut self.lod_order, &mut self.boxes);
+                self.line_levels.extend(self.diagonal_px.iter().map(|&px| line_lod_level(px)));
+                if perf::enabled() {
+                    perf::record_ms("r.lod_boxes", self.boxes.iter().filter(|b| **b).count() as f32);
+                    let n = self.mesh_levels.len().max(1) as f32;
+                    perf::record_ms("r.mesh_level_mean", self.mesh_levels.iter().map(|&l| l as f32).sum::<f32>() / n);
+                }
             }
         }
         // Screen-space margin for wide lines, points and the pick widening.
@@ -718,7 +781,7 @@ impl DrawLists {
             }
             // A body's box instead of the body, never both; one level of
             // its edges (the full ones when picking).
-            if inst.lod_box != self.boxed(inst.body) || (inst.line_lod > 0 && inst.line_lod != self.line_level(inst.body)) {
+            if inst.lod_box != self.boxed(inst.body) || (inst.line_lod > 0 && inst.line_lod != self.line_level(inst.body)) || (inst.mesh_lod > 0 && inst.mesh_lod - 1 != self.mesh_level(inst.body)) {
                 continue;
             }
             if pick {
@@ -1332,6 +1395,8 @@ pub struct Renderer {
     last_inst: Vec<u8>,
     inst_scratch: Vec<u8>,
     lists: DrawLists,
+    /// The finest display level each body has shown ([`MeshLodMemory`]).
+    mesh_lod_memory: MeshLodMemory,
     /// Compare mode: both versions' draw lists.
     lists_over: DrawLists,
     targets: HashMap<u64, TargetState>,
@@ -1678,6 +1743,7 @@ impl Renderer {
             last_inst: Vec::new(),
             inst_scratch: Vec::new(),
             lists: DrawLists::default(),
+            mesh_lod_memory: MeshLodMemory::default(),
             lists_over: DrawLists::default(),
             targets: HashMap::new(),
             pending: VecDeque::new(),
@@ -2114,7 +2180,8 @@ impl Renderer {
             None => 0,
         };
         lists.lod = Some(req.style.detail);
-        lists.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, false);
+        lists.mesh_error_px = req.style.detail.mesh_error_px;
+        lists.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
         lists.apply_detail(&req.style.detail);
         let bind_inst = self.prepare_slots(SLOTS_COLOR, &lists.slots);
         // ...then both versions together, and each version's opaque faces
@@ -2123,7 +2190,8 @@ impl Renderer {
             let mut over = std::mem::take(&mut self.lists_over);
             over.skip_compare = 0;
             over.lod = Some(req.style.detail);
-            over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, false);
+            over.mesh_error_px = req.style.detail.mesh_error_px;
+            over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
             over.apply_detail(&req.style.detail);
             let bind_over = self.prepare_slots(SLOTS_COMPARE_OVER, &over.slots);
             let faces = [crate::scene::compare::BASE, crate::scene::compare::TARGET]
@@ -2412,7 +2480,8 @@ impl Renderer {
             globals.viewport[3] = 8.0 * last.device_pixel_ratio;
             self.queue.write_buffer(&self.globals_pick, 0, bytemuck::bytes_of(&globals));
             let mut lists = std::mem::take(&mut self.lists);
-            lists.build(&last.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, last.device_pixel_ratio, true);
+            lists.mesh_error_px = last.style.detail.mesh_error_px;
+            lists.build(&last.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, last.device_pixel_ratio), true, &mut self.mesh_lod_memory);
             let bind_inst = self.prepare_slots(SLOTS_PICK, &lists.slots);
             let tex = self.targets[&target].tex.as_ref().expect("textures");
             {
@@ -2532,8 +2601,8 @@ impl Renderer {
         globals.viewport[3] = 8.0 * dpr;
         self.queue.write_buffer(&self.globals_sample, 0, bytemuck::bytes_of(&globals));
         let view_proj = Mat4::from_cols_array_2d(&globals.view_proj);
-        let mut lists = DrawLists::default();
-        lists.build(&last.scene, &view_proj, sw, sh, dpr, true);
+        let mut lists = DrawLists { mesh_error_px: last.style.detail.mesh_error_px, ..Default::default() };
+        lists.build(&last.scene, &view_proj, (sw, sh, dpr), true, &mut self.mesh_lod_memory);
         let bind_inst = self.prepare_slots(SLOTS_SAMPLE, &lists.slots);
         let tex = |label, format| {
             self.device.create_texture(&wgpu::TextureDescriptor {
@@ -3100,7 +3169,7 @@ mod tests {
     /// A cube body `diag` px across at `x` (1 world unit = 1 px in a
     /// 1000 × 800 viewport, so boxes stay under 12.8 px).
     fn cube(x: f32, diag: f32, triangles: u32) -> LodBody {
-        LodBody { box_transform: Mat4::from_translation(Vec3::new(x, 0.0, 0.0)) * Mat4::from_scale(Vec3::splat(diag / 3f32.sqrt())), triangles, has_box: true }
+        LodBody { box_transform: Mat4::from_translation(Vec3::new(x, 0.0, 0.0)) * Mat4::from_scale(Vec3::splat(diag / 3f32.sqrt())), triangles, has_box: true, ..Default::default() }
     }
 
     fn boxed(bodies: &[LodBody], proportion: f32, extent_px: f32) -> Vec<bool> {
@@ -3108,7 +3177,9 @@ mod tests {
         let vp = Mat4::from_scale(Vec3::new(1.0 / 500.0, 1.0 / 400.0, 1.0 / 1000.0));
         let detail = Detail { low_level_body_proportion: proportion, extent_culling_px: extent_px, ..Default::default() };
         let (mut order, mut boxes) = (Vec::new(), Vec::new());
-        lod_boxes(bodies, &vp, (1000, 800, 1.0), &detail, &mut order, &mut boxes, &mut Vec::new());
+        let mut diagonals = Vec::new();
+        body_diagonals_px(bodies, &vp, (1000, 800, 1.0), &mut diagonals);
+        lod_boxes(bodies, &vp, (1000, 800, 1.0), &detail, &diagonals, &mut order, &mut boxes);
         boxes
     }
 
@@ -3135,6 +3206,22 @@ mod tests {
         assert_eq!(lods.len(), LINE_LOD_TOLERANCES.len() - 1);
         assert!(lods.windows(2).all(|w| w[1].segments.len() <= w[0].segments.len()));
         assert_eq!(lods[2].segments.last().map(|s| s.pick_id), Some(2));
+    }
+
+    #[test]
+    fn mesh_lod_levels_refine_like_onshape() {
+        // Coarse until the chordal error reaches 3 px: Medium from a ~88 px
+        // bounding radius (0.03407418 × r ≥ 3), Fine from ~351 px, never
+        // past the body's finest.
+        assert_eq!(mesh_lod_level(25.0, MESH_ERROR_PX, 2), 0);
+        assert_eq!(mesh_lod_level(87.0, MESH_ERROR_PX, 2), 0);
+        assert_eq!(mesh_lod_level(89.0, MESH_ERROR_PX, 2), 1);
+        assert_eq!(mesh_lod_level(400.0, MESH_ERROR_PX, 2), 2);
+        assert_eq!(mesh_lod_level(1e6, MESH_ERROR_PX, 2), 2);
+        assert_eq!(mesh_lod_level(1e6, MESH_ERROR_PX, 0), 0);
+        // View in high quality (Part Studio): 0.1 px, up to Very fine.
+        assert_eq!(mesh_lod_level(25.0, MESH_ERROR_PX_HIGH_QUALITY_STUDIO, 3), 2);
+        assert_eq!(mesh_lod_level(200.0, MESH_ERROR_PX_HIGH_QUALITY_STUDIO, 3), 3);
     }
 
     #[test]

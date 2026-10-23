@@ -167,6 +167,19 @@ impl TessQuality {
             TessQuality::VeryFine => 600,
         }
     }
+    /// Onshape's display levels, coarsest first (webgl tessellation
+    /// settings 0..3): a body is drawn at the coarsest one whose chordal
+    /// error stays under a few pixels, up to its best ([`TessQuality::level`]).
+    pub const LEVELS: [TessQuality; 4] = [TessQuality::Coarse, TessQuality::Medium, TessQuality::Fine, TessQuality::VeryFine];
+    /// Index in [`TessQuality::LEVELS`] (Auto is Fine).
+    pub fn level(self) -> usize {
+        match self {
+            TessQuality::Coarse => 0,
+            TessQuality::Medium => 1,
+            TessQuality::Auto | TessQuality::Fine => 2,
+            TessQuality::VeryFine => 3,
+        }
+    }
     /// Multiplier of Auto's angular deflection (smaller = finer).
     pub fn factor(self) -> f64 {
         f64::from(TessQuality::Auto.segments_per_circle()) / f64::from(self.segments_per_circle())

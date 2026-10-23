@@ -134,15 +134,6 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         if o.hidden {
             continue;
         }
-        let key = Arc::as_ptr(&o.mesh) as usize;
-        let cached = match cache.bodies.get(&key) {
-            Some((_, c)) => c.clone(),
-            None => {
-                let c = Arc::new(upload_body(&o.mesh, up));
-                cache.bodies.insert(key, (Arc::downgrade(&o.mesh), c.clone()));
-                c
-            }
-        };
         let mk = |r: &Reference, kind, anchor| AsmPickTarget { path: o.path.clone(), reference: r.clone(), kind, occ: oi, anchor };
         let face_base = picks.targets.len() as u32;
         for r in &o.face_refs {
@@ -175,20 +166,36 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         // Sketch instances (wire bodies) are drawn as their translucent
         // region fill under thin gray curves (live assembly/123).
         let sketch = o.kind == BodyKind::Wire;
-        if !sketch || !o.mesh.indices.is_empty() {
-            let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base).zebra(opts.zebra.filter(|_| !dimmed && !sketch)).reflection(opts.reflection.clone().filter(|_| !dimmed && !sketch));
-            // Sketch regions are pickable faces (live 601).
-            if dimmed && !opts.pick_dimmed {
-                inst = inst.unpickable();
+        // Onshape's display levels, coarsest first (`PartOccurrence::coarser`):
+        // each level's instances draw only when the renderer picks that level
+        // for the occurrence (`Instance::mesh_lod`).
+        let levels: Vec<&Arc<MeshBuffers>> = o.coarser.iter().chain(std::iter::once(&o.mesh)).collect();
+        let edge_color = if sketch { theme::lin(0x999999) } else { theme::lin(theme::viewport::EDGE) };
+        let mut finest_cached = None;
+        for (li, &mesh) in levels.iter().enumerate() {
+            let is_finest = li + 1 == levels.len();
+            let level_first = scene.instances.len();
+            let key = Arc::as_ptr(mesh) as usize;
+            let cached = match cache.bodies.get(&key) {
+                Some((_, c)) => c.clone(),
+                None => {
+                    let c = Arc::new(upload_body(mesh, up));
+                    cache.bodies.insert(key, (Arc::downgrade(mesh), c.clone()));
+                    c
+                }
+            };
+            if !sketch || !mesh.indices.is_empty() {
+                let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base).zebra(opts.zebra.filter(|_| !dimmed && !sketch)).reflection(opts.reflection.clone().filter(|_| !dimmed && !sketch));
+                // Sketch regions are pickable faces (live 601).
+                if dimmed && !opts.pick_dimmed {
+                    inst = inst.unpickable();
+                }
+                scene.instances.push(inst);
             }
-            scene.instances.push(inst);
-        }
-        if !dimmed {
-            let edge_color = if sketch { theme::lin(0x999999) } else { theme::lin(theme::viewport::EDGE) };
-            if !opts.hide_edges || sketch {
+            if !dimmed && (!opts.hide_edges || sketch) {
                 let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1);
                 // Each coarser line level, then the full edges (also the pick).
-                for (k, l) in cached.edge_lods.iter().enumerate() {
+                for (k, l) in cached.edge_lods.iter().enumerate().filter(|_| is_finest) {
                     let mut e = edges.clone().line_lod(k as u8 + 2);
                     e.drawable = Drawable::Lines(l.clone());
                     scene.instances.push(e);
@@ -199,6 +206,18 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                     scene.instances.push(Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).with_transform(t).unpickable().layer(1));
                 }
             }
+            if levels.len() > 1 {
+                for i in &mut scene.instances[level_first..] {
+                    i.mesh_lod = li as u8 + 1;
+                }
+            }
+            if is_finest {
+                finest_cached = Some(cached);
+            }
+        }
+        let cached = finest_cached.expect("an occurrence has its finest level");
+        if !dimmed {
+            // B-rep vertices are the same at every level.
             scene.instances.push(Instance::new(Drawable::Points(cached.vertices.clone())).with_transform(t).pick_base(vert_base).pick_only().layer(2));
             if sketch {
                 // The sketch's points as small gray dots.

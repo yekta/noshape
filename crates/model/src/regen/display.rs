@@ -137,10 +137,42 @@ fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts
     }
 }
 
-/// A body's tessellation quality: its part property and the view-wide
-/// quality (Shift+R) scale the chord tolerance.
-fn body_quality(studio: &PartStudio, b: &super::context::Body, opts: &RegenOptions) -> f64 {
-    studio.part_properties.get(&b.id).and_then(|p| p.tessellation).map(|q| q.factor()).unwrap_or(1.0) * (opts.relative_deflection / RegenOptions::default().relative_deflection)
+/// The quality ([`TessQuality::factor`]) of each display level a body
+/// gets, coarsest first: Onshape's Coarse up to the body's best (its
+/// Tessellation quality, Auto = Fine; Very fine viewing in high quality,
+/// Shift+R = a finer `relative_deflection`). Preview meshes: Coarse only.
+/// The chord-based mesh ([`angle_display_mesh`] off) has one level, as
+/// before.
+///
+/// [`TessQuality::factor`]: crate::partstudio::TessQuality::factor
+fn body_levels(studio: &PartStudio, b: &super::context::Body, opts: &RegenOptions) -> Vec<f64> {
+    use crate::partstudio::TessQuality;
+    let setting = studio.part_properties.get(&b.id).and_then(|p| p.tessellation);
+    let view_scale = opts.relative_deflection / RegenOptions::default().relative_deflection;
+    if !angle_display_mesh() {
+        return vec![setting.map(|q| q.factor()).unwrap_or(1.0) * view_scale];
+    }
+    let best = if view_scale < 1.0 { TessQuality::VeryFine } else { setting.unwrap_or(TessQuality::Auto) };
+    let n = if opts.preview_meshes { 1 } else { best.level() + 1 };
+    TessQuality::LEVELS[..n].iter().map(|q| q.factor()).collect()
+}
+
+/// Meshes `shape` at `qualities` (missing levels, coarsest first;
+/// `with_finest`: the last one is the body's finest). BRepMesh keeps a
+/// shape's stored triangulation unless the new tolerance is smaller, and
+/// the shape may hold a finer one (from an earlier regen), so the coarser
+/// levels are meshed, coarsest first, on a copy without triangulations;
+/// the finest on the shape itself, as always.
+fn tessellate_levels(shape: &noshape_kernel::Shape, name: &str, qualities: &[f64], with_finest: bool, opts: &RegenOptions) -> Vec<Arc<MeshBuffers>> {
+    let (coarse, finest) = if with_finest { qualities.split_at(qualities.len().saturating_sub(1)) } else { (qualities, &[][..]) };
+    let mut out = Vec::with_capacity(qualities.len());
+    if !coarse.is_empty() {
+        let copy = shape.transformed(&noshape_kernel::Transform::Translate(DVec3::ZERO)).ok();
+        let s = copy.as_ref().unwrap_or(shape);
+        out.extend(coarse.iter().map(|&q| tessellate_body(s, name, q, opts)));
+    }
+    out.extend(finest.iter().map(|&q| tessellate_body(shape, name, q, opts)));
+    out
 }
 
 /// The mesh cache key of a body's world mesh (finer meshes are cached
@@ -165,27 +197,33 @@ fn local_key(partner: u64, quality: f64) -> u64 {
 fn mesh_in_parallel(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, partners: &HashMap<u64, usize>, meshes: &mut HashMap<u64, (u64, bool, Arc<MeshBuffers>)>) -> std::collections::HashSet<u64> {
     use rayon::prelude::*;
     struct Job {
-        key: u64,
+        /// The missing levels (cache key, quality), coarsest first.
+        levels: Vec<(u64, f64)>,
+        /// The last missing level is the body's finest.
+        with_finest: bool,
         nfaces: u64,
         shape: noshape_kernel::Shape,
         name: String,
-        quality: f64,
     }
     let mut jobs: Vec<Job> = Vec::new();
     let mut queued = std::collections::HashSet::new();
     let fresh = |m: &HashMap<u64, (u64, bool, Arc<MeshBuffers>)>, key: u64, nfaces: u64| m.get(&key).is_some_and(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes));
     for b in ctx.bodies.iter().filter(|b| b.composite.is_none()) {
-        let quality = body_quality(studio, b, opts);
+        let qualities = body_levels(studio, b, opts);
         let nfaces = b.faces.len() as u64;
         let partner = b.shape.partner_hash();
-        let (key, shape) = if partner != 0 && partners.get(&partner).is_some_and(|&n| n > 1) {
-            (local_key(partner, quality), b.shape.unlocated().unwrap_or_else(|_| b.shape.clone()))
+        let (keys, shape): (Vec<u64>, _) = if partner != 0 && partners.get(&partner).is_some_and(|&n| n > 1) {
+            (qualities.iter().map(|&q| local_key(partner, q)).collect(), b.shape.unlocated().unwrap_or_else(|_| b.shape.clone()))
         } else {
-            (world_key(&b.shape, quality), b.shape.clone())
+            (qualities.iter().map(|&q| world_key(&b.shape, q)).collect(), b.shape.clone())
         };
-        if !fresh(meshes, key, nfaces) && queued.insert(key) {
-            jobs.push(Job { key, nfaces, shape, name: b.name.clone(), quality });
+        let have: Vec<bool> = keys.iter().map(|&k| fresh(meshes, k, nfaces)).collect();
+        let Some(first) = have.iter().position(|h| !h) else { continue };
+        if !queued.insert(keys[first]) {
+            continue;
         }
+        let levels = (first..keys.len()).filter(|&i| !have[i]).map(|i| (keys[i], qualities[i])).collect();
+        jobs.push(Job { levels, with_finest: !have[keys.len() - 1], nfaces, shape, name: b.name.clone() });
     }
     if jobs.len() < 2 {
         return Default::default();
@@ -222,7 +260,15 @@ fn mesh_in_parallel(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, par
         .collect::<Vec<_>>()
         .into_par_iter()
         .flat_map_iter(|group| {
-            group.into_iter().filter(|_| !opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted)).map(|j| (j.key, j.nfaces, tessellate_body(&j.shape, &j.name, j.quality, opts))).collect::<Vec<_>>()
+            group
+                .into_iter()
+                .filter(|_| !opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted))
+                .flat_map(|j| {
+                    let qualities: Vec<f64> = j.levels.iter().map(|l| l.1).collect();
+                    let made = tessellate_levels(&j.shape, &j.name, &qualities, j.with_finest, opts);
+                    j.levels.into_iter().zip(made).map(move |((key, _), m)| (key, j.nfaces, m))
+                })
+                .collect::<Vec<_>>()
         })
         .collect();
     let mut keys = std::collections::HashSet::new();
@@ -231,6 +277,12 @@ fn mesh_in_parallel(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, par
         meshes.insert(key, (nfaces, opts.preview_meshes, m));
     }
     keys
+}
+
+/// A body's levels (coarsest first) as its finest and the coarser ones.
+fn split_levels(mut levels: Vec<Arc<MeshBuffers>>) -> (Arc<MeshBuffers>, Vec<Arc<MeshBuffers>>) {
+    let finest = levels.pop().unwrap_or_default();
+    (finest, levels)
 }
 
 /// Build the display; returns whether any body only has a preview mesh.
@@ -250,57 +302,68 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         if opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted) {
             return (d, needs_refine);
         }
-        // Part tessellation quality and the view-wide quality (Shift+R)
-        // scale the chord tolerance; finer meshes are cached separately.
-        let quality = body_quality(studio, b, opts);
-        let key = world_key(&b.shape, quality);
+        // The body's display levels (coarsest first); each level is cached
+        // by its quality.
+        let qualities = body_levels(studio, b, opts);
+        let keys: Vec<u64> = qualities.iter().map(|&q| world_key(&b.shape, q)).collect();
         let nfaces = b.faces.len() as u64;
-        used.insert(key);
+        used.extend(keys.iter().copied());
+        let valid = |m: &HashMap<u64, (u64, bool, Arc<MeshBuffers>)>, key: u64| m.get(&key).is_some_and(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes));
         // An open composite's members are drawn themselves.
         let open_composite = b.composite.as_ref().is_some_and(|c| !c.closed);
-        // Rigidly moved pattern instances (one TShape): its unlocated mesh,
-        // made once for all of them; their world meshes are made from it.
+        // Rigidly moved pattern instances (one TShape): their unlocated
+        // meshes, made once for all of them; their world meshes are made
+        // from them. Whether each level was made just now.
         let partner = b.shape.partner_hash();
-        let mut fresh_partner_mesh = false;
-        let partner_mesh = (partner != 0 && !open_composite && partners.get(&partner).is_some_and(|&n| n > 1)).then(|| {
-            let local_key = local_key(partner, quality);
-            used.insert(local_key);
-            if let Some((_, _, m)) = meshes.get(&local_key).filter(|(n, preview, _)| *n == nfaces && (!*preview || opts.preview_meshes)) {
-                // Made just now (in parallel): the copies' world meshes follow.
-                fresh_partner_mesh = meshed_here.contains(&local_key);
-                return m.clone();
+        let partner_levels = (partner != 0 && !open_composite && partners.get(&partner).is_some_and(|&n| n > 1)).then(|| {
+            let lkeys: Vec<u64> = qualities.iter().map(|&q| local_key(partner, q)).collect();
+            used.extend(lkeys.iter().copied());
+            // Made just now (in parallel): the copies' world meshes follow.
+            let mut fresh: Vec<bool> = lkeys.iter().map(|k| meshed_here.contains(k)).collect();
+            let have: Vec<bool> = lkeys.iter().map(|&k| valid(meshes, k)).collect();
+            if let Some(first) = have.iter().position(|h| !h) {
+                let missing: Vec<usize> = (first..lkeys.len()).filter(|&i| !have[i]).collect();
+                let shape = b.shape.unlocated().unwrap_or_else(|_| b.shape.clone());
+                let made = tessellate_levels(&shape, &b.name, &missing.iter().map(|&i| qualities[i]).collect::<Vec<_>>(), !have[lkeys.len() - 1], opts);
+                for (&i, m) in missing.iter().zip(made) {
+                    meshes.insert(lkeys[i], (nfaces, opts.preview_meshes, m));
+                    fresh[i] = true;
+                }
             }
-            let m = match b.shape.unlocated() {
-                Ok(shape) => tessellate_body(&shape, &b.name, quality, opts),
-                Err(_) => tessellate_body(&b.shape, &b.name, quality, opts),
-            };
-            meshes.insert(local_key, (nfaces, opts.preview_meshes, m.clone()));
-            fresh_partner_mesh = true;
-            m
+            let local: Vec<Arc<MeshBuffers>> = lkeys.iter().map(|k| meshes[k].2.clone()).collect();
+            (local, fresh)
         });
-        // A new shared mesh replaces world meshes made without it, so every
-        // copy's world mesh matches what the GPU draws.
-        let cached = meshes.get(&key).filter(|(n, preview, _)| !fresh_partner_mesh && *n == nfaces && (!*preview || opts.preview_meshes)).map(|(_, p, m)| (*p, m.clone()));
-        let mesh = match cached {
-            _ if open_composite => Arc::new(MeshBuffers::default()),
-            Some((preview, m)) => {
-                needs_refine |= preview;
-                m
+        let levels: Vec<Arc<MeshBuffers>> = if open_composite {
+            vec![Arc::new(MeshBuffers::default())]
+        } else {
+            // A new shared mesh replaces world meshes made without it, so
+            // every copy's world mesh matches what the GPU draws.
+            let have: Vec<bool> = keys.iter().enumerate().map(|(i, &k)| !partner_levels.as_ref().is_some_and(|(_, fresh)| fresh[i]) && valid(meshes, k)).collect();
+            match &partner_levels {
+                // Pattern partners share the unlocated meshes, placed by
+                // each copy's location.
+                Some((local, _)) => {
+                    for i in (0..keys.len()).filter(|&i| !have[i]) {
+                        meshes.insert(keys[i], (nfaces, opts.preview_meshes, Arc::new(local[i].transformed(&b.shape.location()))));
+                    }
+                }
+                None => {
+                    if let Some(first) = have.iter().position(|h| !h) {
+                        let missing: Vec<usize> = (first..keys.len()).filter(|&i| !have[i]).collect();
+                        let made = tessellate_levels(&b.shape, &b.name, &missing.iter().map(|&i| qualities[i]).collect::<Vec<_>>(), !have[keys.len() - 1], opts);
+                        for (&i, m) in missing.iter().zip(made) {
+                            meshes.insert(keys[i], (nfaces, opts.preview_meshes, m));
+                        }
+                    }
+                }
             }
-            _ => {
-                // Pattern partners share one mesh of the unlocated shape,
-                // placed by each copy's location.
-                let m = match &partner_mesh {
-                    Some(local) => Arc::new(local.transformed(&b.shape.location())),
-                    None => tessellate_body(&b.shape, &b.name, quality, opts),
-                };
-                meshes.insert(key, (nfaces, opts.preview_meshes, m.clone()));
-                needs_refine |= opts.preview_meshes;
-                m
-            }
+            needs_refine |= keys.iter().any(|k| meshes[k].1);
+            keys.iter().map(|k| meshes[k].2.clone()).collect()
         };
-        if let Some(local) = partner_mesh {
-            d.shared_meshes.insert(b.id.clone(), SharedMesh { mesh: local, transform: b.shape.location(), world: mesh.clone() });
+        let (mesh, coarser) = split_levels(levels);
+        if let Some((local, _)) = partner_levels {
+            let (local, local_coarser) = split_levels(local);
+            d.shared_meshes.insert(b.id.clone(), SharedMesh { mesh: local, coarser: local_coarser, transform: b.shape.location(), world: mesh.clone() });
         }
         let props = studio.part_properties.get(&b.id);
         let color = props
@@ -323,6 +386,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             color,
             hidden: props.is_some_and(|p| p.hidden),
             mesh,
+            coarser,
             face_refs: b.faces.iter().map(|n| Reference::Face((**n).clone())).collect(),
             edge_refs: b.edges.iter().map(|n| Reference::Edge((**n).clone())).collect(),
             vertex_refs: b.vertices.iter().map(|n| Reference::Vertex((**n).clone())).collect(),

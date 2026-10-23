@@ -224,6 +224,7 @@ impl Job {
                 color,
                 hidden: false,
                 mesh: Arc::new(mesh),
+                coarser: Vec::new(),
                 face_refs: vec![],
                 edge_refs: vec![],
                 vertex_refs: vec![],

@@ -36,8 +36,22 @@ fn regen(ps: &PartStudio) -> RegenResult {
 }
 
 /// Segments of the longest edge polyline (a circle: one closed edge).
+fn segments(m: &noshape_model::display::MeshBuffers) -> usize {
+    m.edges.iter().map(|e| e.len().saturating_sub(1)).max().unwrap()
+}
+
 fn circle_segments(r: &RegenResult) -> usize {
-    r.display.bodies[0].mesh.edges.iter().map(|e| e.len().saturating_sub(1)).max().unwrap()
+    segments(&r.display.bodies[0].mesh)
+}
+
+/// Segments per circle at each display level, coarsest first; every
+/// level has the finest's faces and edges (the same pick ids).
+fn level_segments(r: &RegenResult) -> Vec<usize> {
+    let b = &r.display.bodies[0];
+    for m in &b.coarser {
+        assert_eq!((m.face_ranges.len(), m.edges.len(), m.vertices.len()), (b.mesh.face_ranges.len(), b.mesh.edges.len(), b.mesh.vertices.len()));
+    }
+    b.coarser.iter().chain(std::iter::once(&b.mesh)).map(|m| segments(m)).collect()
 }
 
 #[test]
@@ -47,11 +61,35 @@ fn circles_get_onshapes_segments_at_every_size() {
     for diameter in [0.02, 0.2, 2.0] {
         let r = regen(&cylinder(diameter));
         assert_eq!(circle_segments(&r), 144, "Ø{} mm in Auto", diameter * 1000.0);
+        // Onshape's levels below it (the viewport picks one by its error on
+        // screen): Coarse and Medium.
+        assert_eq!(level_segments(&r), [24, 48, 144], "Ø{} mm", diameter * 1000.0);
     }
     let mut ps = cylinder(0.02);
     let body = regen(&ps).display.bodies[0].id.clone();
     for (q, n) in [(TessQuality::Coarse, 24), (TessQuality::Medium, 48), (TessQuality::Fine, 144), (TessQuality::VeryFine, 600)] {
         ps.part_properties.insert(body.clone(), PartProperties { tessellation: Some(q), ..Default::default() });
-        assert_eq!(circle_segments(&regen(&ps)), n, "{q:?}");
+        let r = regen(&ps);
+        assert_eq!(circle_segments(&r), n, "{q:?}");
+        // Its levels: Coarse up to its setting.
+        let want: Vec<usize> = [24, 48, 144, 600].into_iter().take(q.level() + 1).collect();
+        assert_eq!(level_segments(&r), want, "{q:?}");
+    }
+}
+
+#[test]
+fn coarser_levels_stay_coarse_after_finer_meshing() {
+    // The shape keeps the finest triangulation it was meshed with; a later
+    // regen that needs a coarser level again (evicted from the cache) must
+    // not get the finest back. (Lowering the part's own setting, e.g. Very
+    // fine to Fine, still reuses the finer one, as before levels.)
+    noshape_model::regen::set_angle_display_mesh(true);
+    let mut ps = cylinder(0.02);
+    let mut regen = Regenerator::new();
+    let mut run = |ps: &PartStudio| regen.regenerate(ps, &ConfigValues::default(), &UnitPrefs::default(), &RegenOptions::default());
+    let body = run(&ps).display.bodies[0].id.clone();
+    for (q, want) in [(TessQuality::Fine, vec![24, 48, 144]), (TessQuality::Coarse, vec![24]), (TessQuality::Auto, vec![24, 48, 144])] {
+        ps.part_properties.insert(body.clone(), PartProperties { tessellation: Some(q), ..Default::default() });
+        assert_eq!(level_segments(&run(&ps)), want, "{q:?}");
     }
 }
