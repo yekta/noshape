@@ -50,3 +50,8 @@ Status: ✅ matches live, ✗ differs (finding #), ? live data missing.
 
 ## Re-run pass 9 (10-22 00:05, /tmp/qa5/noshape-2330 = target-shared 23:30)
 - DOC3 ✅ fixed: part right-click › Copy Block, Ctrl+V in another Part Studio opens "Derived 2" with the Part Studio field filled ("qa5 src") (workflow-derived.md row 17, shot d52). Ctrl+C after a plain parts-list click copied nothing (d50); whether live copies on Ctrl+C there is not checked.
+
+## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
+- DOC4 (Main row Delete), merge cards (row 9), DOC3 (paste of a copied part: Derived Part Studio field), C5/SM10 toast: fixes
+  cited in code (history_panel.rs, merge_dialog.rs, part_studio); C5 toast auto-dismiss seen. Not all re-run in the app.
+- DOC5 ✅ (workflow-tabs.md). DOC1 (IGES header) / I5 (Parasolid header): export, routed to **api** (qa5-routing.md EXP1).
