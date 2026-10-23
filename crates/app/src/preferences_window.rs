@@ -477,7 +477,7 @@ impl PreferencesView {
                     .border_1()
                     .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
                     .bg(if on { rgb(0x0075ff) } else { rgb(0xffffff) })
-                    .when(on, |d| d.child(Icon::new(IconName::Check).size(px(11.)).text_color(rgb(0xffffff)))),
+                    .when(on, |d| d.child(Icon::new(IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
             )
             .child(label)
     }
@@ -683,7 +683,7 @@ impl PreferencesView {
             .bg(rgb(0x009400))
             .when(!changed, |d| d.opacity(0.2))
             .when(changed, |d| d.cursor_pointer())
-            .child(Icon::new(IconName::Check).size(px(18.)).text_color(rgb(0xffffff)))
+            .child(Icon::new(IconName::Check).size(px(18.)).text_color(gpui_kit::rgb_static(0xffffff)))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.confirm_edit(cx)));
         let close = div()
             .id("kb-edit-cancel")
@@ -942,7 +942,7 @@ impl PreferencesView {
             .border_1()
             .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
             .bg(if on { rgb(0x0075ff) } else { rgb(0xffffff) })
-            .when(on, |d| d.child(Icon::new(IconName::Check).size(px(11.)).text_color(rgb(0xffffff))))
+            .when(on, |d| d.child(Icon::new(IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff))))
     }
 
     fn render_profile(&self, cx: &mut Context<Self>) -> AnyElement {

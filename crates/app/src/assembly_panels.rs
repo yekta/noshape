@@ -2953,7 +2953,7 @@ impl Render for ExplodeRollbackDrag {
             .bg(rgb(0x1651b0))
             .text_size(px(13.33))
             .font_weight(FontWeight::SEMIBOLD)
-            .text_color(rgb(0xffffff))
+            .text_color(gpui_kit::rgb_static(0xffffff))
             .child("Rollback bar"))
     }
 }

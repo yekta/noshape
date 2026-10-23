@@ -238,7 +238,7 @@ fn button(id: &'static str, label: &'static str, primary: bool, enabled: bool) -
         .items_center()
         .rounded(px(3.))
         .text_size(px(14.67))
-        .when(primary, |d| d.bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb(0xffffff)))
+        .when(primary, |d| d.bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb_static(0xffffff)))
         .when(!primary, |d| d.bg(gpui_kit::rgb(0xffffff)).border_1().border_color(gpui_kit::rgb(0xaaaaaa)).text_color(gpui_kit::rgb(0x333333)))
         .when(!enabled, |d| d.opacity(0.25))
         .when(enabled, |d| d.cursor_pointer())

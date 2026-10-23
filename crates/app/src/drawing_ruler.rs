@@ -150,7 +150,7 @@ impl DrawingEditor {
             Some((Handle::Tab(i), _)) => Some(i),
             _ => None,
         };
-        let mut ruler = div().id("note-ruler").relative().w(px(ruler_w)).h(px(22.)).bg(gpui_kit::white()).border_1().border_color(gpui_kit::rgb(0xbbbbbb)).overflow_hidden();
+        let mut ruler = div().id("note-ruler").relative().w(px(ruler_w)).h(px(22.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xbbbbbb)).overflow_hidden();
         // Outside the box: grey.
         ruler = ruler.child(div().absolute().top_0().bottom_0().left(px_of(w)).right_0().bg(gpui_kit::rgb(0xe6e6e6)));
         // Ticks: every mm, longer every 5 and 10.

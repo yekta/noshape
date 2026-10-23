@@ -1989,7 +1989,7 @@ impl PartStudioView {
                 .child(
                     h_flex()
                         .h(px(29.))
-                        .bg(gpui_kit::white())
+                        .bg(crate::theme::p().panel)
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Text"))
@@ -2046,7 +2046,7 @@ impl PartStudioView {
                                 .h(px(93.))
                                 .border_1()
                                 .border_color(gpui_kit::rgb(0x1651b0))
-                                .bg(gpui_kit::white())
+                                .bg(crate::theme::p().panel)
                                 .when_some(family, |d, f| d.font_family(f))
                                 .when(bold, |d| d.font_weight(FontWeight::BOLD))
                                 .when(italic, |d| d.italic())
@@ -2914,7 +2914,7 @@ impl PartStudioView {
                                         .bg(pal.accept).when(dim_invalid, |d| d.opacity(0.2))
                                         .cursor_pointer()
                                         .when(!dim_invalid, |d| d.hover(|d| d.bg(rgb(0x74ce3a))))
-                                        .child(Icon::new(gpui_kit::component::IconName::Check).with_size(px(16.)).text_color(rgb(0xffffff)))
+                                        .child(Icon::new(gpui_kit::component::IconName::Check).with_size(px(16.)).text_color(gpui_kit::rgb_static(0xffffff)))
                                         .on_click(cx.listener({
                                             let st = st.clone();
                                             move |this, _: &ClickEvent, window, cx| {

@@ -658,6 +658,17 @@ pub struct AssemblyResult {
 }
 
 impl AssemblyResult {
+    /// Whether the instance list shows an error (the root row's badge, live
+    /// qa5 A19): a failed mate, relation or pattern, an instance in error, or
+    /// a mate connector that couldn't be placed.
+    pub fn has_errors(&self) -> bool {
+        self.mates.iter().any(|m| !m.ok)
+            || self.nodes.iter().any(|n| n.error.is_some())
+            || self.connectors.iter().any(|c| c.message.is_some() && c.frame.is_none())
+            || !self.pattern_errors.is_empty()
+            || self.relations.iter().any(|r| !r.ok)
+    }
+
     /// Recompute occurrence world transforms from solved placements and an
     /// optional exploded view (display only).
     pub fn apply_placements(&mut self, solved: Solved, explode: Option<&ExplodedView>) {
