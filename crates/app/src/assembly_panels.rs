@@ -450,6 +450,10 @@ impl AssemblyView {
             }
             labeler(&r).into()
         };
+        // The connector's regeneration error (live E16: the title and only
+        // the secondary axis chip turn red).
+        let mc_error = self.result.connectors.iter().find(|c| c.id == s.id).and_then(|c| c.message.clone());
+        let secondary_conflict = mc_error.as_deref().is_some_and(|m| m.contains("Secondary axis conflicts"));
         let field = |this: &Self, slot: usize, id: &'static str, label: &'static str, cx: &mut Context<Self>| -> AnyElement {
             let Some(s) = this.mc.as_ref() else { return div().into_any_element() };
             let value = if slot == 0 { s.on.as_ref() } else { s.extra[slot - 1].as_ref() };
@@ -458,6 +462,7 @@ impl AssemblyView {
                 .map(|v| {
                     let text = entity(v);
                     os::query_row(SharedString::from(format!("{id}-row")), text.clone())
+                        .when(slot == 3 && secondary_conflict, |d| d.text_color(pal.text_invalid))
                         .child(
                             div()
                                 .id(SharedString::from(format!("{id}-del")))
@@ -597,7 +602,18 @@ impl AssemblyView {
             .bg(rgb(0xffffff))
             .border_b_1()
             .border_color(rgb(0xd7d7d7))
-            .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title));
+            .child(
+                div()
+                    .id("mcd-title")
+                    .flex_1()
+                    .pl(px(6.))
+                    .text_size(px(13.))
+                    .font_weight(FontWeight::MEDIUM)
+                    .truncate()
+                    .when(mc_error.is_some(), |d| d.text_color(pal.text_invalid))
+                    .when_some(mc_error.as_ref().map(|e| format!("{title} did not regenerate properly: {e}")), |d, t| d.tooltip(crate::ui::tooltip(t)))
+                    .child(title),
+            );
         let header = if implicit {
             // Live 578: a Bootstrap close button at opacity 0.5.
             header.child(
@@ -735,7 +751,8 @@ impl AssemblyView {
             .hover(|d| d.bg(pal.panel_hover))
             .child(svg().path(icon_path("mate-connector-assembly")).size_3p5().text_color(if failed { pal.error } else { pal.text_muted }))
             .child(div().flex_1().truncate().child(c.name.clone()))
-            .when_some(message, |d, m| d.child(div().size(px(6.)).rounded_full().bg(pal.error)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
+            // Live E15: "Mate connector 2 has error: Failed to resolve mate connector origin."
+            .when_some(message.map(|m| format!("{} has error: {m}", c.name)), |d, m| d.child(div().size(px(6.)).rounded_full().bg(pal.error)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
             .child(
                 Button::new(SharedString::from(format!("amc-eye-{}", id.0)))
                     .icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" })))
@@ -1078,6 +1095,38 @@ impl AssemblyView {
         Ok(InstancePattern { id, name: s.name.clone(), kind, seeds, generated, suppressed: false })
     }
 
+    /// Live's regeneration error of the open pattern dialog (E12 / E13), the
+    /// text after "<name> did not regenerate properly: ".
+    pub(super) fn pattern_regen_error(&self, s: &PatternSession, cx: &App) -> Option<String> {
+        const BAD: &str = "A parameter value is not valid.";
+        let value = |st: &Entity<crate::quantity_field::QuantityInput>| st.read(cx).value();
+        match s.kind {
+            PatternDialogKind::Replicate if s.scope_refs.is_empty() => return Some("A target scope must be selected.".into()),
+            PatternDialogKind::Replicate if s.mate.is_none() => return Some("Missing mate to be matched.".into()),
+            _ if s.seeds.is_empty() => return Some("Select one or more instances.".into()),
+            _ => {}
+        }
+        let counts: &[&Entity<crate::quantity_field::QuantityInput>] = match s.kind {
+            PatternDialogKind::Linear if s.second => &[&s.count, &s.count2],
+            PatternDialogKind::Linear | PatternDialogKind::Circular => &[&s.count],
+            _ => &[],
+        };
+        // A count outside 1–2500 is pink; the message is empty (live: two spaces).
+        if counts.iter().any(|c| value(c).is_none()) {
+            return Some(format!(" {BAD}"));
+        }
+        let distances: &[&Entity<crate::quantity_field::QuantityInput>] = match s.kind {
+            PatternDialogKind::Linear if s.second => &[&s.distance, &s.distance2],
+            PatternDialogKind::Linear | PatternDialogKind::Circular => &[&s.distance],
+            _ => &[],
+        };
+        if distances.iter().any(|d| value(d).is_some_and(|v| v <= 0.0)) {
+            let what = if s.kind == PatternDialogKind::Circular { "Circular pattern angle" } else { "Linear pattern distance" };
+            return Some(format!("{what} must be positive. {BAD}"));
+        }
+        None
+    }
+
     /// Matches for part pattern / replicate dialogs (shown before accepting).
     pub(super) fn update_pattern_preview(&mut self, cx: &mut Context<Self>) {
         let Some(s) = &self.pattern else { return };
@@ -1186,7 +1235,12 @@ impl AssemblyView {
                 // The query takes mate connectors: Onshape's mate connector button.
                 .child(div().flex_none().size(px(24.)).flex().items_center().justify_center().child(crate::assets::icon("mate-connector", 18., cx)))
         };
-        let valid = !s.seeds.is_empty()
+        let regen_error = self.pattern_regen_error(s, cx);
+        // Live E13: a bad count leaves the title black (the field is pink).
+        let count_error = regen_error.as_deref().is_some_and(|e| e.starts_with(' '));
+        let title_tip = regen_error.as_ref().map(|e| format!("{} did not regenerate properly: {e}", s.name));
+        let valid = regen_error.is_none()
+            && !s.seeds.is_empty()
             && match kind {
                 PatternDialogKind::Linear | PatternDialogKind::Circular | PatternDialogKind::Mirror => s.axis.is_some(),
                 PatternDialogKind::PartPattern => s.mate.is_some(),
@@ -1395,7 +1449,18 @@ impl AssemblyView {
                     .bg(pal.panel)
                     .border_b_1()
                     .border_color(pal.border)
-                    .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if valid { pal.text } else { pal.text_invalid }).truncate().child(s.name.clone()))
+                    .child(
+                        div()
+                            .id("pat-title")
+                            .flex_1()
+                            .pl(px(6.))
+                            .text_size(px(13.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(if valid || count_error { pal.text } else { pal.text_invalid })
+                            .truncate()
+                            .child(s.name.clone())
+                            .when_some(title_tip, |d, t| d.tooltip(crate::ui::tooltip(t))),
+                    )
                     .child(
                         div()
                             .id("pat-ok")

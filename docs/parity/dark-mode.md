@@ -42,9 +42,9 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-928-configurations | | | ☐ |
 | dk-929-face-selected-measure | dk3 | bg, planes 1/2 stacked, plane edges, origin, cube = live within a few levels | ☑ |
 | dk-930-face-hover | | | ☐ |
-| dk-931-sketch-line | | | ☐ |
-| dk-932-sketch-dimension | | | ☐ |
-| dk-933-sketch-after | | | ☐ |
+| dk-931-sketch-line | dksk2 | under-defined #3e94ff, sketch box #90cef1, white origin; regions #f2f2f2 at 20% (#616161 on a plane) | ☑ |
+| dk-932-sketch-dimension |  | dimension lines white (scene); edit box follows the palette | ◐ box not compared |
+| dk-933-sketch-after |  | dimension values white, driven #ccc, conflicts #ff6b6b | ☑ |
 | dk-940-assembly | dkasm | chrome, list and viewport match; static icons outlined (icons2) | ◐ icons |
 | dk-941-mate-dialog | | | ☐ |
 | dk-942-bom | | | ☐ |

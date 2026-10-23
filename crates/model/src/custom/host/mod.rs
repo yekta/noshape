@@ -622,7 +622,11 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                 .collect::<Vec<_>>()
                 .join(" ")
         };
-        eprintln!("[fs op] {} {failure} {} -> {} | {}", id.join("."), faces(&snapshot), if r.is_ok() { "ok" } else { "ERR" }, faces(&ev.ctx));
+        let outcome = match &r {
+            Ok(_) => "ok".to_string(),
+            Err(e) => format!("ERR ({})", e.message),
+        };
+        eprintln!("[fs op] {} {failure} {} -> {outcome} | {}", id.join("."), faces(&snapshot), faces(&ev.ctx));
     }
     let warnings = std::mem::take(&mut ev.warnings);
     let mut ctx = ev.ctx;
