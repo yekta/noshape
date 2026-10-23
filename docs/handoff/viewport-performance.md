@@ -559,3 +559,25 @@ changes. I write the renderer part first (my files) and show crops before touchi
   the meshes is not the cost: the B-rep edge lines are (each segment a 6-vertex quad; 144-segment circles have ~4x
   the segments of the chord mesh, sub-pixel at the 1000-pin fit view). Fix in progress: edge-line LOD (Douglas–Peucker
   levels relative to the body's size, chosen per body per frame under 0.25 px error; pick pass full).
+- **2026-10-23 10:00 (perf): edge-line LOD, first macOS round** (perf-dev 9f7448f8, runs 39926459540 pins /
+  39926473216 plate, full detail; `w.gpu_wait` mean vs chord in the same run): pins angle +31% (macOS 14) / +18% (15),
+  angle without lines +11% / +2%; plate angle +72% / +74%, without lines +9% / −2%. Chord also got cheaper (its edges
+  are simplified too: pins 15.8 → 11.9 ms on macOS 14). The plate keeps full edges with body-level levels down to
+  1/1000 (it is ~1100 px across while its 800 hole circles are ~16 px), so 02414b1c adds levels from 1/16000 of the
+  diagonal. Kern's planar CDT is in: the plate's fine mesh takes 450–485 ms on the runner. Gate stays on; next round
+  (runs 39934157991 / 39934172005) breaks angle's remainder down (silhouettes, backface silhouettes, meshes, lines).
+- **2026-10-23 12:30 (perf): Onshape's display mesh is refined by screen-space error** (webgl BodyManager
+  `getVisibleOccurrencesForRetrieval` / `getTessellationIndexDesired` / `getTessellationIndexToGoUnderThreshold`).
+  Levels Coarse/Medium/Fine/Very fine: chordal tolerance = body radius × CHORDAL_TOLERANCE_RATIO (0.03407418 /
+  0.00855514 / 0.00095178 / 5.4831e-5 = the sagitta of 12/24/72/300 segments) and ANGULAR_TOLERANCE 30°/15°/5°/1.2°
+  (the browser draws 2× the segments: 24/48/144/600, live 459). A body starts Coarse and steps up while
+  `unitSizeAtCenter × chordalTolerance(level) ≥ threshold`, up to its best available (Auto: Fine). Threshold
+  BODY_SCREENSPACE_ERROR_REFINEMENT_THRESHOLD 3 px; "View in high quality" (aggressive): 0.1 px Part Studio / 1 px
+  assembly, up to Very fine (selected bodies FINER 0.5 / SELECTED_AGGRESSIVE 0.1). Only bodies at least threshold px
+  across are considered; refinement is lazy (batches, BODY_REFINEMENT_FRAMERATE_THRESHOLD 8, memory limits) and the
+  finest mesh in memory is drawn (no coarsening on zoom-out). So Fine (144/circle) only from a ~350 px bounding radius
+  (Medium from ~88 px); the 1000 pins at fit (~25 px radius) are Coarse in Onshape. Live 459 measured cylinders that
+  filled the screen. The CI breakdown after the edge-line LOD with finer levels (runs 39934157991 / 39934172005,
+  macOS 14 / 15, vs chord): pins angle +36% / +14%, plate +34% / +19%; edge silhouettes then the largest share
+  (−2.9 ms on macOS 14 without them); Onshape's edge silhouettes are a per-frame GPU pass over candidates too
+  (primitiveType SILHOUETTES), so their cost follows the mesh level. Next: per-body levels chosen like Onshape.
