@@ -246,6 +246,11 @@ fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
     for &(_, ei) in &edges {
         let e = body.shape.sub_shape(ShapeType::Edge, ei)?;
         let info = e.edge_info()?;
+        // draft.fs getOrderedFaceData: DRAFT_PARALLEL_PARTING_EDGE.
+        let t = e.tangent_at(0.5 * (info.first_param + info.last_param))?;
+        if t.normalize().cross(pull).length() < 1e-9 {
+            return crate::regen::eval::err_at(&["partingEdges"], "Parting edge cannot be parallel to pull direction.");
+        }
         for t in 0..=4 {
             pts.push(e.point_at(info.first_param + (info.last_param - info.first_param) * t as f64 / 4.0)?);
         }
