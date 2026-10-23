@@ -8,6 +8,10 @@ use super::sheetmetal_form::frame_matrix;
 use glam::{DMat4, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::ShapeType;
+use crate::reference::FeatureId;
+
+/// std ErrorStringEnum.DERIVED_NO_INSTANCING (live text, ui 10-22 b).
+pub const DERIVED_NO_INSTANCING: &str = "Using derived feature to make instances is not recommended. Consider using an Assembly instead.";
 
 // TODO(app): Derived needs another Part Studio's regenerated context. The app
 // should resolve `partStudio` and hand the imported bodies to regeneration.
@@ -79,6 +83,11 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     if frames.is_empty() {
         frames.push(DMat4::IDENTITY);
     }
+    // std importDerived reports DERIVED_NO_INSTANCING for 2+ locations; live
+    // (ui 10-22 b) shows it as the info bubble while the dialog is open.
+    if frames.len() > 1 {
+        ev.infos.push(DERIVED_NO_INSTANCING.into());
+    }
     let base = if ev.is("placement", "AT_MATE_CONNECTOR") {
         let id = ev.params.text("mateConnectorId").trim().to_string();
         let found = if id.is_empty() {
@@ -116,9 +125,10 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
                 b.faces.iter().map(|f| std::sync::Arc::new(crate::reference::TopoName::face(ev.feature, crate::reference::Role::Copy { instance: inst as u32, of: f.clone() }))).collect()
             };
             let base_name = provider.part_name(&tab, &b.id).unwrap_or_else(|| b.name.clone());
-            let name = if inst == 0 { base_name } else { format!("{base_name} ({})", inst + 1) };
+            // Live (ui 10-22 b): every instance keeps the source name ("Part 1"
+            // twice, no suffix).
             ev.ctx.own_names.insert(id.clone());
-            let body = crate::regen::context::Body::new(id, name, b.kind, shape, faces, color, ev.feature);
+            let body = crate::regen::context::Body::new(id, base_name, b.kind, shape, faces, color, ev.feature);
             ev.ctx.bodies.push(std::sync::Arc::new(body));
         }
         if ev.bool("includeMateConnectors") {
@@ -142,13 +152,15 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     }
     // A whole studio brings its sketches too (live "qa5 derived" (1)/(4): the
     // Derived row's ▸ lists them; deriving chosen parts brings none). They
-    // keep their source ids, so they can be picked and referenced here, and
-    // follow the first location.
-    if wanted.is_empty() {
-        let m = frames[0] * inv;
+    // keep their source ids, so they can be picked and referenced here. Each
+    // location gets a copy (live ui 10-22 b: drawn at both, the ▸ lists
+    // "Sketch 1" twice); picks and references resolve to the first copy.
+    let already: Vec<FeatureId> = ev.ctx.sketches.iter().map(|x| x.feature).collect();
+    for frame in frames.iter().filter(|_| wanted.is_empty()) {
+        let m = *frame * inv;
         let moved = !m.abs_diff_eq(DMat4::IDENTITY, 1e-15);
         for s in &src.sketches {
-            if ev.ctx.sketches.iter().any(|x| x.feature == s.feature) {
+            if already.contains(&s.feature) {
                 continue;
             }
             let s = if moved {

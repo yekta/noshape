@@ -75,6 +75,8 @@ pub struct UiState {
     pub select_other: Option<SelectOther>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
+    /// The open Camera and render options menu (its button shows pressed).
+    pub camera_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
     /// Feature list search box.
     pub filter: Option<(Entity<InputState>, Subscription)>,
     pub filter_query: String,
@@ -344,6 +346,7 @@ impl UiState {
             pointer: None,
             select_other: None,
             mini_toolbar: None,
+            camera_menu: None,
             filter: None,
             filter_query: String::new(),
             list_hover: None,
@@ -2462,7 +2465,10 @@ impl PartStudioView {
                 }
             }
         }
-        let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().layer(21));
+        // Out of the scene bounds (qa4 R1): a distance to a default plane ends
+        // far out on it, and the depth range fitted to that let edges show
+        // through the parts.
+        let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().no_bounds().layer(21));
         self.ui.measure_lines = Some((self.selection.clone(), inst.clone()));
         inst.into_iter().collect()
     }

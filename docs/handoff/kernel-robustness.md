@@ -99,6 +99,13 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   `shell_after_chamfer_patch_matches_onshape` (inner offset of the blend patch, 1.19 mm³).
 - **F12 kernel half (10-22): fixed by the F8 chamfer** (psb's BREPs had OCCT's corrupt corner); engine F12 test
   tightened (must succeed).
+- **PERF1 display mesh of large planar faces (10-23):** the 400-hole plate's two faces (~56k boundary nodes each) cost
+  1.4 s in BRepMesh's Delaunay bookkeeping (not the triangulation itself). `mesh.cpp::PlanarCdtAlgo` (planar faces with
+  >= 1000 boundary nodes) triangulates BRepMesh's own boundary nodes with `planar_cdt.hpp` (constrained Delaunay: BRIO
+  insertion, Sloan segment recovery, flood fill, Shewchuk-bounded in-circle test), ~0.1 s a face; same triangles
+  (Delaunay, no inner nodes), node indices written back to the pcurves (watertight). Anything it can't take falls
+  back to BRepMesh's own algorithm (Delabella is gone: it crashed on macOS arm64, v0.4.6). Test
+  `kernel/tests/planar_mesh.rs` (watertight, orientation, Delaunay within f32 noise).
 - **PERF1 chamfer/fillet of many edges:** `boolean.cpp::blend_in_slabs` (declared in internal.hpp): ≥ 48 edges →
   split the part by planes in gaps between the edges' reach (2 × size), blend each slab in parallel, join on the
   shared cut faces, unify. Probe `/root/kern-scratch/plate/slabs.cpp`: 400 rims 4.3 s → ~1.1 s with glue + USD

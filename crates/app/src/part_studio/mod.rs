@@ -2328,8 +2328,9 @@ impl PartStudioView {
             // Live (qa5 derived, part-studio/1582): an open Derived row lists
             // the sketches it brought in.
             if self.ui.derived_open.contains(&f.id) {
-                for (_, sk) in self.display.derived_sketches.iter().filter(|(d, _)| *d == f.id) {
-                    items.push(ListItem::DerivedSketch(12.0 * chain.len() as f32, *sk));
+                // Live (ui 10-22 b): one row per location's copy ("Sketch 1" twice).
+                for (k, (_, sk)) in self.display.derived_sketches.iter().filter(|(d, _)| *d == f.id).enumerate() {
+                    items.push(ListItem::DerivedSketch(12.0 * chain.len() as f32, *sk, k));
                 }
             }
             if prompt_anchor == Some(Some(f.id)) {
@@ -2587,7 +2588,7 @@ impl PartStudioView {
                 ListItem::Ellipsis => ellipsis(),
                 ListItem::Folder(x, fd) => indent(x, self.render_folder_row(&fd, cx)),
                 ListItem::Feature(x, id) => indent(x, self.render_feature_row_view(id, slot, cx)),
-                ListItem::DerivedSketch(x, id) => indent(x, self.render_derived_sketch_row(id, cx)),
+                ListItem::DerivedSketch(x, id, k) => indent(x, self.render_derived_sketch_row(id, k, cx)),
                 ListItem::Prompt => self.render_folder_prompt(cx),
             });
         }
@@ -3170,11 +3171,11 @@ impl PartStudioView {
 
     /// A sketch listed under its Derived row (live part-studio/1582): the
     /// sketch icon and name, 12 px in; a click selects the sketch.
-    fn render_derived_sketch_row(&self, id: FeatureId, cx: &mut Context<Self>) -> AnyElement {
+    fn render_derived_sketch_row(&self, id: FeatureId, copy: usize, cx: &mut Context<Self>) -> AnyElement {
         let Some(sk) = self.display.sketches.iter().find(|s| s.feature == id) else { return div().h(px(crate::ui::ROW_H)).into_any_element() };
         let r = Reference::Sketch(id);
         let selected = self.selection.contains(&r);
-        crate::ui::tree_row(SharedString::from(format!("dsk-{id}")), selected)
+        crate::ui::tree_row(SharedString::from(format!("dsk-{id}-{copy}")), selected)
             // Live 1582: the sketch icon at x 66, the name at 86.
             .pl(px(23.))
             .mr(px(5.))
@@ -3399,44 +3400,57 @@ impl PartStudioView {
         // name, in a box beside the row. Worked out when it opens (the
         // dependencies scan the features above).
         let tip = {
-            // Live (qa5 ADV3, fs sm6e): errors and warnings read "<Feature>
-            // did not regenerate properly: <message>". Infos stay out of it
-            // (live qa5 BOOL1: "Boolean 1" only; they are the graphics bubble).
+            // Live (ui 10-22 d, behaviours "Feature-row hover tooltips"): the
+            // row tooltip reads `<name>[ [Type]][ (Hidden)][ is not fully
+            // defined | did not regenerate properly: <msg>]`, or `<head> <-
+            // <inputs>`. The [Type] tag shows when the name doesn't start with
+            // the type's name ("MC to hide [Mate connector]", a Hole's callout
+            // "… [Hole]"). Infos stay out of it (qa5 BOOL1: the graphics bubble).
+            fn typed(name: &str, type_name: &str) -> String {
+                if type_name.is_empty() || name.starts_with(type_name) { name.to_string() } else { format!("{name} [{type_name}]") }
+            }
+            let head = format!("{}{}", typed(&name, f.feature_type().map(|t| t.name).unwrap_or("")), if f.hidden { " (Hidden)" } else { "" });
             let msg = state.and_then(|s| {
                 let m = s.message.clone()?;
                 match s.status {
-                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{} did not regenerate properly: {m}", typed_name(f))),
+                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{head} did not regenerate properly: {m}")),
                     FeatureStatus::Info => None,
                     _ => Some(m),
                 }
             });
-            let (view, name, feature_name) = (cx.entity().downgrade(), name.clone(), typed_name(f));
-            // Live (qa5 ADV12): a name made from Onshape's "Feature Name
-            // Template" (a Hole's callout) reads "<callout> [Hole]".
-            let templated = (f.type_id == "hole" && name != f.name).then(|| f.feature_type().map(|t| format!("{name} [{}]", t.name))).flatten();
+            // A sketch lists no inputs; an under-defined one says so.
+            let sketch_tip = (f.type_id == "sketch").then(|| format!("{head}{}", if underdefined { " is not fully defined" } else { "" }));
+            // Live (ui 10-22 b): a Derived reads "Derived 1 <- <source studio>".
+            let derived_source = (f.type_id == "importDerived")
+                .then(|| {
+                    let key = f.params.text("partStudio").trim().to_string();
+                    self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| t.name.clone())
+                })
+                .flatten();
+            let view = cx.entity().downgrade();
             move |cx: &App| -> SharedString {
                 if let Some(m) = &msg {
                     return m.clone().into();
                 }
-                let parents: Vec<String> = view
-                    .upgrade()
-                    .and_then(|v| {
-                        let studio = v.read(cx).studio(cx)?;
-                        let i = studio.features.iter().position(|g| g.id == id)?;
-                        // Live lists only the sketches a feature uses ("Extrude 1 <-
-                        // Sketch 1", "[Hole] <- Sketch 2"); parts picked in a Boolean
-                        // or a merge scope aren't named (qa5 BOOL1b, behaviours B4).
-                        Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(typed_name)).collect())
-                    })
-                    .unwrap_or_default();
-                // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2"; a custom
-                // name gets its type ("Sweep L13 … <- Path [Sketch]").
-                let head = templated.clone().unwrap_or_else(|| feature_name.clone());
-                match (parents.is_empty(), &templated) {
-                    (true, Some(t)) => t.clone().into(),
-                    (true, None) => name.clone().into(),
-                    (false, _) => format!("{head} <- {}", parents.join(", ")).into(),
+                if let Some(t) = &sketch_tip {
+                    return t.clone().into();
                 }
+                let parents: Vec<String> = if let Some(src) = &derived_source {
+                    vec![src.clone()]
+                } else {
+                    view.upgrade()
+                        .and_then(|v| {
+                            let studio = v.read(cx).studio(cx)?;
+                            let i = studio.features.iter().position(|g| g.id == id)?;
+                            // Live lists only the sketches a feature uses ("Extrude 1 <-
+                            // Sketch 1", "[Hole] <- Sketch 2", "<- Path [Sketch]"); parts
+                            // picked in a Boolean or a merge scope aren't named (qa5 BOOL1b,
+                            // behaviours B4; Fillet / Chamfer / Shell: the name alone).
+                            Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(typed_name)).collect())
+                        })
+                        .unwrap_or_default()
+                };
+                if parents.is_empty() { head.clone().into() } else { format!("{head} <- {}", parents.join(", ")).into() }
             }
         };
         let manually_suppressed = f.suppressed;
@@ -4001,10 +4015,11 @@ impl PartStudioView {
     }
 
     fn render_view_controls(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        // Onshape: the view cube sits 15 px from the viewport's top-right
-        // corner; view and render options live in its dropdown menu (§3.7).
+        // Onshape: the view cube sits 14 px below the viewport's top and 15 px
+        // from its right (live part-studio/53, pixel-matched); view and render
+        // options live in its dropdown menu (§3.7).
         let cube = self.render_view_cube(cx);
-        div().absolute().top(px(15.)).right(px(15.)).child(cube).into_any_element()
+        div().absolute().top(px(14.)).right(px(15.)).child(cube).into_any_element()
     }
 }
 
@@ -4245,7 +4260,8 @@ enum ListItem {
     /// Indent, feature.
     Feature(f32, FeatureId),
     /// Indent, a sketch a Derived feature brought in (its source id).
-    DerivedSketch(f32, FeatureId),
+    /// Indent, sketch, which location's copy.
+    DerivedSketch(f32, FeatureId, usize),
     Prompt,
 }
 

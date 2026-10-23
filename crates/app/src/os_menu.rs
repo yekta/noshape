@@ -301,7 +301,13 @@ impl OsMenu {
     pub fn submenu_with_icon(mut self, icon: Option<&str>, label: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Self {
         let menu = Self::build(window, cx, f);
         let me = cx.weak_entity();
-        menu.update(cx, |m, _| m.parent = Some(me));
+        // The camera menu's submenus share its rows and insets (live
+        // part-studio/54: check +14, text +29 from the border).
+        let camera = self.camera;
+        menu.update(cx, |m, _| {
+            m.parent = Some(me);
+            m.camera |= camera;
+        });
         // A click in the submenu closes the whole menu.
         self._subs.push(cx.subscribe(&menu, |_, _, _: &DismissEvent, cx| cx.emit(DismissEvent)));
         self.items.push(OsMenuItem::Submenu { label: label.into(), icon: icon.map(|n| MenuIcon::Named(SharedString::from(n.to_string()))), menu });
@@ -586,10 +592,12 @@ impl Render for OsMenu {
             .when(!plain_menu, |d| d.p(px(1.)))
             .when(plain_menu, |d| d.min_w(px(120.)))
             .when(plain_menu && !camera, |d| d.max_w(px(250.)))
-            .when(camera, |d| d.w(px(224.)))
+            .when(camera && self.parent.is_none(), |d| d.w(px(224.)))
             .bg(gpui_kit::rgb(0xffffff))
             .border_1()
-            .border_color(gpui_kit::rgb(if dropdown { 0xd7d7d7 } else { 0xcccccc }))
+            // Live (part-studio/53): the camera menu's border is #d7d7d7 like
+            // a dropdown's; right-click menus use #ccc.
+            .border_color(gpui_kit::rgb(if dropdown || camera { 0xd7d7d7 } else { 0xcccccc }))
             .rounded(px(if dropdown { 5.25 } else { 4. }))
             .when(dropdown, |d| d.py(px(4.)).min_w(px(253.)).text_color(gpui_kit::rgb(0x555555)))
             .when_some(self.min_width, |d, w| d.min_w(px(w)))
@@ -636,6 +644,11 @@ pub fn open_anchored(position: Point<Pixels>, anchor: Anchor, menu: Entity<OsMen
         cx.refresh_windows();
     }
     window.refresh();
+}
+
+/// `menu` is the open menu (a dropdown button shows its pressed state).
+pub fn is_open_menu(menu: &WeakEntity<OsMenu>, cx: &App) -> bool {
+    cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).is_some_and(|(_, _, _, m, _)| m.downgrade() == *menu)
 }
 
 /// A right-click menu is open (hover tooltips under it should not show).

@@ -1,12 +1,24 @@
 // Tessellation: one BRepMesh call, then flat buffers filled in a single pass.
 #include "internal.hpp"
+#include "planar_cdt.hpp"
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepLib_ToolTriangulatedShape.hxx>
 #include <BRepMesh_Context.hxx>
+#include <BRepMesh_FaceDiscret.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepMesh_MeshAlgoFactory.hxx>
+#include <BRepMesh_ShapeTool.hxx>
+#include <IMeshData_Curve.hxx>
+#include <IMeshData_Edge.hxx>
+#include <IMeshData_Face.hxx>
+#include <IMeshData_PCurve.hxx>
+#include <IMeshData_Wire.hxx>
+#include <IMeshTools_MeshAlgo.hxx>
+#include <IMeshTools_MeshAlgoFactory.hxx>
 #include <IMeshTools_Parameters.hxx>
 #include <Precision.hxx>
+#include <Standard_Failure.hxx>
 
 #include <BRep_Tool.hxx>
 #include <GCPnts_TangentialDeflection.hxx>
@@ -21,6 +33,145 @@
 namespace noshape {
 
 namespace {
+// A planar face with many boundary nodes (400 hole rims: ~56k) through our
+// constrained Delaunay triangulation (planar_cdt.hpp) of BRepMesh's own
+// boundary nodes: the same triangles as BRepMesh's (Delaunay, no inner
+// nodes on a plane) without BRepMesh's per-link bookkeeping (the 400-hole
+// plate's faces 1.4 s → 0.1 s). Smaller faces, and any face it can't take
+// (self-intersecting or seam wires, a ring it refuses), go to `fallback`
+// (BRepMesh's own planar algorithm).
+class PlanarCdtAlgo : public IMeshTools_MeshAlgo
+{
+public:
+  explicit PlanarCdtAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback) : myFallback(fallback) {}
+
+  void Perform(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm, const Message_ProgressRange& range) override
+  {
+    bool done = false;
+    try
+    {
+      done = triangulate(f);
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+    if (!done)
+      myFallback->Perform(f, prm, range);
+  }
+
+private:
+  static constexpr size_t MIN_NODES = 1000;
+
+  static bool triangulate(const IMeshData::IFaceHandle& f)
+  {
+    size_t total = 0;
+    for (int w = 0; w < f->WiresNb(); ++w)
+    {
+      const IMeshData::IWireHandle& W = f->GetWire(w);
+      for (int e = 0; e < W->EdgesNb(); ++e)
+        total += (size_t)W->GetEdge(e)->GetPCurve(f.get(), W->GetEdgeOrientation(e))->ParametersNb();
+    }
+    if (total < MIN_NODES)
+      return false;
+    std::vector<cdt::Pt>          uv;
+    std::vector<gp_Pnt>           xyz;
+    std::vector<std::vector<int>> rings;
+    uv.reserve(total);
+    xyz.reserve(total);
+    auto same = [&](int node, const gp_Pnt2d& q) { return std::abs(uv[(size_t)node].x - q.X()) + std::abs(uv[(size_t)node].y - q.Y()) < 1e-12; };
+    for (int w = 0; w < f->WiresNb(); ++w)
+    {
+      const IMeshData::IWireHandle& W = f->GetWire(w);
+      if (W->IsSet(IMeshData_SelfIntersectingWire))
+        return false;
+      std::vector<int> ring;
+      int              first = -1;
+      for (int e = 0; e < W->EdgesNb(); ++e)
+      {
+        const IMeshData::IEdgeHandle E = W->GetEdge(e);
+        const TopAbs_Orientation     o = W->GetEdgeOrientation(e);
+        // One pcurve on this face (no seams), run one way.
+        if ((o != TopAbs_FORWARD && o != TopAbs_REVERSED) || E->GetDegenerated() || E->GetPCurves(f.get()).Extent() != 1)
+          return false;
+        const IMeshData::IPCurveHandle& P = E->GetPCurve(f.get(), o);
+        const IMeshData::ICurveHandle&  C = E->GetCurve();
+        const int                       n = P->ParametersNb();
+        if (n < 2 || C->ParametersNb() != n)
+          return false;
+        for (int k = 0; k < n; ++k)
+        {
+          // The points run along the edge; a reversed edge runs the wire backwards.
+          const int      idx = o == TopAbs_REVERSED ? n - 1 - k : k;
+          const gp_Pnt2d q   = P->GetPoint(idx);
+          int            node;
+          if (k == 0 && !ring.empty() && same(ring.back(), q))
+            node = ring.back(); // the vertex shared with the edge before
+          else if (k == n - 1 && e == W->EdgesNb() - 1 && first >= 0 && same(first, q))
+            node = first; // back at the wire's start
+          else
+          {
+            node = (int)uv.size();
+            uv.push_back({q.X(), q.Y()});
+            xyz.push_back(C->GetPoint(idx));
+            ring.push_back(node);
+            if (first < 0)
+              first = node;
+          }
+          // Poly_PolygonOnTriangulation of the edge: its nodes in the face's triangulation.
+          P->GetIndex(idx) = node + 1;
+        }
+      }
+      rings.push_back(std::move(ring));
+    }
+    if (rings.empty())
+      return false;
+    // The outer ring first: the largest.
+    auto area = [&](const std::vector<int>& r) {
+      double s = 0;
+      for (size_t k = 0, j = r.size() - 1; k < r.size(); j = k++)
+        s += uv[(size_t)r[j]].x * uv[(size_t)r[k]].y - uv[(size_t)r[k]].x * uv[(size_t)r[j]].y;
+      return std::abs(s);
+    };
+    size_t outer = 0;
+    for (size_t k = 1; k < rings.size(); ++k)
+      if (area(rings[k]) > area(rings[outer]))
+        outer = k;
+    std::swap(rings[0], rings[outer]);
+    std::vector<int> tris;
+    if (!cdt::triangulate(uv, rings, tris))
+      return false;
+    occ::handle<Poly_Triangulation> T = new Poly_Triangulation((int)uv.size(), (int)(tris.size() / 3), true);
+    for (size_t i = 0; i < uv.size(); ++i)
+    {
+      T->SetNode((int)i + 1, xyz[i]);
+      T->SetUVNode((int)i + 1, gp_Pnt2d(uv[i].x, uv[i].y));
+    }
+    for (size_t t = 0; t < tris.size(); t += 3)
+      T->SetTriangle((int)(t / 3) + 1, Poly_Triangle(tris[t] + 1, tris[t + 1] + 1, tris[t + 2] + 1));
+    BRepMesh_ShapeTool::AddInFace(f->GetFace(), T);
+    return true;
+  }
+
+  occ::handle<IMeshTools_MeshAlgo> myFallback;
+};
+
+// Planar faces through PlanarCdtAlgo (BRepMesh's own algorithm below its
+// threshold and as its fallback; not Delabella, which crashed on macOS arm64),
+// every other surface through BRepMesh's own.
+class PlanarCdtAlgoFactory : public IMeshTools_MeshAlgoFactory
+{
+public:
+  occ::handle<IMeshTools_MeshAlgo> GetAlgo(const GeomAbs_SurfaceType type, const IMeshTools_Parameters& prm) const override
+  {
+    if (type == GeomAbs_Plane)
+      return new PlanarCdtAlgo(myDefault->GetAlgo(type, prm));
+    return myDefault->GetAlgo(type, prm);
+  }
+
+private:
+  occ::handle<IMeshTools_MeshAlgoFactory> myDefault = new BRepMesh_MeshAlgoFactory();
+};
+
 struct FaceTri
 {
   occ::handle<Poly_Triangulation> tri;
@@ -63,11 +214,11 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     prm.MinSize                  = Precision::Confusion();
     // Faces whose stored triangulation already satisfies the deflection are
     // skipped by BRepMesh (triangulations are reused).
-    // Every surface through BRepMesh's own algorithms. Not Delabella for
-    // planar faces: it dereferences null on some of them on macOS arm64
-    // (features_a pattern_instance_references_survive_upstream_edit,
+    // Not Delabella for planar faces: it dereferences null on some of them
+    // on macOS arm64 (features_a pattern_instance_references_survive_upstream_edit,
     // v0.4.6 CI run 39827462890).
     occ::handle<BRepMesh_Context> ctx = new BRepMesh_Context();
+    ctx->SetFaceDiscret(new BRepMesh_FaceDiscret(new PlanarCdtAlgoFactory()));
     BRepMesh_IncrementalMesh mesher;
     mesher.SetShape(s.shape);
     mesher.ChangeParameters() = prm;
