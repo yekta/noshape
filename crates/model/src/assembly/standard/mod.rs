@@ -309,7 +309,18 @@ impl StandardSpec {
     /// head cap screw M6x1.00", "Type A flat washer 3/8 Narrow") and
     /// " x <length>".
     pub fn part_name(&self) -> String {
-        let label = self.size_row().map(|s| s.label.clone()).unwrap_or_else(|| format!("{} {}", self.component, self.size));
+        let mut label = self.size_row().map(|s| s.label.clone()).unwrap_or_else(|| format!("{} {}", self.component, self.size));
+        // Live names the chosen option where the label carries the default
+        // ("Parallel key A x 2 x 2" -> "Parallel key B x 2 x 2").
+        if let Some(c) = component(self) {
+            for p in &c.params {
+                let chosen = self.param(&p.label);
+                let token = format!(" {} x ", p.default);
+                if chosen != p.default && !p.default.is_empty() && label.contains(&token) {
+                    label = label.replacen(&token, &format!(" {chosen} x "), 1);
+                }
+            }
+        }
         match &self.length {
             Some(l) => format!("{label} x {l}"),
             None => label,

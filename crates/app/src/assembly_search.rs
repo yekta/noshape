@@ -8,35 +8,36 @@ use gpui_kit::component::input::InputEvent;
 
 type Run = fn(&mut AssemblyView, &mut Window, &mut Context<AssemblyView>);
 
-/// (icon, name, shortcut, description, action)
-struct AsmTool(&'static str, &'static str, Option<&'static str>, &'static str, Run);
+/// (icon, name, shortcut, action); the description is live's, by name
+/// (`tool_text::ASSEMBLY`).
+struct AsmTool(&'static str, &'static str, Option<&'static str>, Run);
 
 const TOOLS: &[AsmTool] = &[
-    AsmTool("update-all-button", "Update all references to latest versions", None, "Update all unpinned references to the latest versions or revisions.", |t, _, cx| t.open_reference_manager(None, cx)),
-    AsmTool("insert", "Insert", Some("i"), "Insert parts, assemblies, sketches, or surfaces into this Assembly. Insert from this document, other documents, or standard content.", |t, w, cx| t.toggle_insert(w, cx)),
-    AsmTool("mate-connector-assembly", "Mate connector", Some("ctrl+m"), "Create a mate connector on or between parts, surfaces, or sketches. Mate connectors are used to locate and orient entities within an assembly mate.", |t, w, cx| t.open_mc(None, w, cx)),
-    AsmTool("fastened", "Fastened mate", Some("m"), "Remove all degrees of freedom between 2 entities.", |t, w, cx| t.start_mate(MateType::Fastened, w, cx)),
-    AsmTool("revolute", "Revolute mate", Some("m"), "Allow rotation about the Z axis. The 1st selection serves as the rotational point, and the 2nd as the stationary point.", |t, w, cx| t.start_mate(MateType::Revolute, w, cx)),
-    AsmTool("slider", "Slider mate", Some("m"), "Allow translation along the Z axis. The 1st selection serves as the sliding point, and the 2nd as the stationary point.", |t, w, cx| t.start_mate(MateType::Slider, w, cx)),
-    AsmTool("planar", "Planar mate", Some("m"), "Allow translation along the X and Y axes, and rotation about the Z axis. The 1st selection serves as the movement point, and the 2nd as the stationary point.", |t, w, cx| t.start_mate(MateType::Planar, w, cx)),
-    AsmTool("cylindrical", "Cylindrical mate", Some("m"), "Allow translation and rotation about the Z axis. The 1st selection serves as the translational and rotational point, and the 2nd as the stationary point.", |t, w, cx| t.start_mate(MateType::Cylindrical, w, cx)),
-    AsmTool("pin-slot", "Pin slot mate", Some("m"), "Allow rotation about the Z axis and translation along the X axis. The 1st selection serves as the pin and the rotational movement point, and the 2nd selection serves as the translational movement.", |t, w, cx| t.start_mate(MateType::PinSlot, w, cx)),
-    AsmTool("ball", "Ball mate", Some("m"), "Allow rotation about the X, Y, and Z axes. The 1st selection serves as the rotational movement point, and the 2nd selection serves as the stationary point.", |t, w, cx| t.start_mate(MateType::Ball, w, cx)),
-    AsmTool("parallel-mate", "Parallel mate", Some("m"), "Allow 2 entities to rotate parallel to each other and translate freely.", |t, w, cx| t.start_mate(MateType::Parallel, w, cx)),
-    AsmTool("group", "Group", None, "Lock the position of selected entities relative to one another.", |t, _, cx| t.create_group(cx)),
-    AsmTool("snap-mode", "Snap mode", Some("shift+s"), "Drag an entity to snap to a Mate connector on another entity. Specify the mate type and orientation.", |t, w, cx| t.toggle_snap(w, cx)),
-    AsmTool("show-mates", "Show mates mode", Some("h"), "Hover over or select an instance to show its mates.", |t, _, cx| t.toggle_show_mates_mode(cx)),
-    AsmTool("replicate", "Replicate", None, "Using a seed instance as input, locate geometry identical to that which the seed is mated and replicate the seed on matching geometry.", |t, w, cx| t.open_pattern(PatternDialogKind::Replicate, w, cx)),
-    AsmTool("replace-part", "Replace instance", None, "Replace instances with a selected part, surface, sketch, or subassembly.", |t, _, cx| t.replace_selected(cx)),
-    AsmTool("linear-pattern", "Assembly linear pattern", None, "Create multiple instances of a part, surface, sketch, or subassembly. Specify up to 3 directions, distances, and number of instances.", |t, w, cx| t.open_pattern(PatternDialogKind::Linear, w, cx)),
-    AsmTool("circular-pattern", "Assembly circular pattern", None, "Create multiple instances of a part, surface, sketch, or subassembly. Specify the axis, angle, and number of instances.", |t, w, cx| t.open_pattern(PatternDialogKind::Circular, w, cx)),
-    AsmTool("mirror", "Assembly mirror", None, "Create mirrored instances of a part, surface or subassembly. Specify the mirror plane and select instances to mirror. Use mirror strategy table to control how instances are mirrored.", |t, w, cx| t.open_pattern(PatternDialogKind::Mirror, w, cx)),
-    AsmTool("gear-relation", "Gear relation", None, "Create a constant ratio of angular rotation between 2 mates with rotational degrees of freedom.", |t, w, cx| t.open_relation(RelationType::Gear, None, w, cx)),
-    AsmTool("rack-pinion", "Rack and pinion relation", None, "Relate a mate with a rotational degree of freedom to a mate with a linear degree of freedom.", |t, w, cx| t.open_relation(RelationType::RackAndPinion, None, w, cx)),
-    AsmTool("screw-relation", "Screw relation", None, "Relate the rotational and translational degrees of freedom of a Cylindrical Mate.", |t, w, cx| t.open_relation(RelationType::Screw, None, w, cx)),
-    AsmTool("linear-relation", "Linear relation", None, "Create a constant ratio of motion between 2 mates with linear degrees of freedom.", |t, w, cx| t.open_relation(RelationType::Linear, None, w, cx)),
-    AsmTool("display-states", "Display states", None, "Assign a name to a specific display state of an assembly. Specify which parts, subassemblies, and mates are hidden or in view.", |t, w, cx| t.toggle_display_states(w, cx)),
-    AsmTool("create-partstudio-incontext", "Create Part Studio in context", None, "Create a new Part Studio in the context of this assembly. The assembly appears in the Part Studio as context graphics that can be used for reference.", |t, _, cx| t.open_ps_in_context(cx)),
+    AsmTool("update-all-button", "Update all references to latest versions", None, |t, _, cx| t.open_reference_manager(None, cx)),
+    AsmTool("insert", "Insert", Some("i"), |t, w, cx| t.toggle_insert(w, cx)),
+    AsmTool("mate-connector-assembly", "Mate connector", Some("ctrl+m"), |t, w, cx| t.open_mc(None, w, cx)),
+    AsmTool("fastened", "Fastened mate", Some("m"), |t, w, cx| t.start_mate(MateType::Fastened, w, cx)),
+    AsmTool("revolute", "Revolute mate", Some("m"), |t, w, cx| t.start_mate(MateType::Revolute, w, cx)),
+    AsmTool("slider", "Slider mate", Some("m"), |t, w, cx| t.start_mate(MateType::Slider, w, cx)),
+    AsmTool("planar", "Planar mate", Some("m"), |t, w, cx| t.start_mate(MateType::Planar, w, cx)),
+    AsmTool("cylindrical", "Cylindrical mate", Some("m"), |t, w, cx| t.start_mate(MateType::Cylindrical, w, cx)),
+    AsmTool("pin-slot", "Pin slot mate", Some("m"), |t, w, cx| t.start_mate(MateType::PinSlot, w, cx)),
+    AsmTool("ball", "Ball mate", Some("m"), |t, w, cx| t.start_mate(MateType::Ball, w, cx)),
+    AsmTool("parallel-mate", "Parallel mate", Some("m"), |t, w, cx| t.start_mate(MateType::Parallel, w, cx)),
+    AsmTool("group", "Group", None, |t, _, cx| t.create_group(cx)),
+    AsmTool("snap-mode", "Snap mode", Some("shift+s"), |t, w, cx| t.toggle_snap(w, cx)),
+    AsmTool("show-mates", "Show mates mode", Some("h"), |t, _, cx| t.toggle_show_mates_mode(cx)),
+    AsmTool("replicate", "Replicate", None, |t, w, cx| t.open_pattern(PatternDialogKind::Replicate, w, cx)),
+    AsmTool("replace-part", "Replace instance", None, |t, _, cx| t.replace_selected(cx)),
+    AsmTool("linear-pattern", "Assembly linear pattern", None, |t, w, cx| t.open_pattern(PatternDialogKind::Linear, w, cx)),
+    AsmTool("circular-pattern", "Assembly circular pattern", None, |t, w, cx| t.open_pattern(PatternDialogKind::Circular, w, cx)),
+    AsmTool("mirror", "Assembly mirror", None, |t, w, cx| t.open_pattern(PatternDialogKind::Mirror, w, cx)),
+    AsmTool("gear-relation", "Gear relation", None, |t, w, cx| t.open_relation(RelationType::Gear, None, w, cx)),
+    AsmTool("rack-pinion", "Rack and pinion relation", None, |t, w, cx| t.open_relation(RelationType::RackAndPinion, None, w, cx)),
+    AsmTool("screw-relation", "Screw relation", None, |t, w, cx| t.open_relation(RelationType::Screw, None, w, cx)),
+    AsmTool("linear-relation", "Linear relation", None, |t, w, cx| t.open_relation(RelationType::Linear, None, w, cx)),
+    AsmTool("display-states", "Display states", None, |t, w, cx| t.toggle_display_states(w, cx)),
+    AsmTool("create-partstudio-incontext", "Create Part Studio in context", None, |t, _, cx| t.open_ps_in_context(cx)),
 ];
 
 /// Onshape's tool search ranking (live dom/assembly-tool-search.txt): names
@@ -45,11 +46,12 @@ const TOOLS: &[AsmTool] = &[
 /// toolbar order; at most 10 results.
 /// A toolbar tool's description (its tooltip's second line), by icon.
 pub(super) fn tool_description(icon: &str) -> &'static str {
-    TOOLS.iter().find(|t| t.0 == icon).map(|t| t.3).unwrap_or_else(|| match icon {
-        "tangent-mate" => "Mate 2 entities tangentially, based on the selected faces, edges, or vertices.",
-        "width-mate" => "Allow translation on a slot’s center plane and rotation about an axis perpendicular to that plane. The 1st selection defines the item to be centered. The 2nd selection defines the center plane.",
+    let title = TOOLS.iter().find(|t| t.0 == icon).map(|t| t.1).unwrap_or(match icon {
+        "tangent-mate" => "Tangent mate",
+        "width-mate" => "Width mate",
         _ => "",
-    })
+    });
+    crate::tool_text::assembly_description(title).unwrap_or_default()
 }
 
 fn matching(query: &str) -> Vec<usize> {
@@ -129,7 +131,7 @@ impl AssemblyView {
 
     fn run_tool(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.close_tool_search(window, cx);
-        (TOOLS[i].4)(self, window, cx);
+        (TOOLS[i].3)(self, window, cx);
     }
 
     pub(super) fn render_tool_search(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -176,7 +178,7 @@ impl AssemblyView {
                 .pt(px(4.))
                 .gap(px(10.))
                 .child(h_flex().gap(px(6.)).child(crate::assets::icon(&icon_path(t.0), 28., cx)).child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(t.1)))
-                .child(div().text_size(px(14.)).line_height(px(21.)).text_color(pal.text).child(t.3))
+                .child(div().text_size(px(14.)).line_height(px(21.)).text_color(pal.text).child(crate::ui::tool_description(crate::tool_text::assembly_description(t.1).unwrap_or_default())))
         });
         let n = items.len();
         // "Did you mean:" + a pill per tool the search stands for (as in the
@@ -288,6 +290,15 @@ impl AssemblyView {
 
 #[cfg(test)]
 mod tests {
+    /// Every assembly tool shows live's description.
+    #[test]
+    fn every_tool_has_its_live_description() {
+        for t in super::TOOLS {
+            assert!(crate::tool_text::assembly_description(t.1).is_some(), "{}", t.1);
+        }
+        assert!(!super::tool_description("tangent-mate").is_empty() && !super::tool_description("width-mate").is_empty());
+    }
+
     use super::matching;
 
     #[test]
@@ -304,3 +315,4 @@ mod tests {
         assert_eq!(names("display"), vec!["Display states"]);
     }
 }
+

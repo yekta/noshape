@@ -208,7 +208,7 @@ impl PartStudioView {
     }
 
     /// One table: the grey header bar (⌄ title, ⋯ Copy table), then the grid.
-    fn table_section(&self, index: usize, t: &noshape_model::custom::table::CustomTable, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn table_section(&self, index: usize, t: &noshape_model::custom::table::CustomTable, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let open = !self.ui.ct.collapsed.contains(&t.title);
         let title = t.title.clone();
@@ -261,9 +261,10 @@ impl PartStudioView {
         section = section.child(h_flex().child(head));
         for (ri, row) in t.rows.iter().enumerate() {
             let entities = row.entities.clone();
+            // Multi-line cells (the Hole table's callouts) make the row taller.
             let mut r = h_flex()
                 .id(SharedString::from(format!("ct-row-{index}-{ri}")))
-                .h(px(35.))
+                .min_h(px(35.))
                 .border_l_1()
                 .border_color(grid)
                 .on_hover(cx.listener(move |this, h: &bool, _, cx| {
@@ -290,7 +291,8 @@ impl PartStudioView {
                     .when(center, |d| d.justify_center())
                     .text_size(px(13.33))
                     .text_color(pal.text)
-                    .child(div().truncate().child(text))
+                    .when(text.contains('\n'), |d| d.py(px(6.)).child(v_flex().children(text.lines().map(|l| div().child(l.to_string())).collect::<Vec<_>>())))
+                    .when(!text.contains('\n'), |d| d.child(div().truncate().child(text.clone())))
                     .when_some(info, |d, tip| d.child(div().id(SharedString::from(format!("ct-info-{index}-{ri}-{ci}"))).pl(px(3.)).tooltip(crate::ui::tooltip(tip)).child(crate::ui::glyph("info", 14., gpui_kit::rgb(0x888888)))))
                     .when_some(error, |d, tip| d.tooltip(crate::ui::tooltip(tip)));
                 r = r.child(cell(widths[ci], content.into_any_element()));
@@ -316,7 +318,7 @@ impl PartStudioView {
             .px(px(10.))
             .gap(px(3.))
             .rounded(px(5.25))
-            .bg(gpui_kit::white())
+            .bg(crate::theme::p().panel)
             .border_1()
             .border_color(gpui_kit::rgb(GRID))
             .cursor_pointer()
@@ -420,7 +422,7 @@ impl PartStudioView {
                     h_flex()
                         .h(px(29.))
                         .flex_none()
-                        .bg(gpui_kit::white())
+                        .bg(crate::theme::p().panel)
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().pl(px(4.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Add custom tables"))
@@ -583,7 +585,7 @@ impl PartStudioView {
         if graph {
             // Legend, then Main (italic grey, hollow, not selectable) and the versions.
             col = col.child(h_flex().h(px(30.)).px(px(6.)).gap(px(10.)).text_size(px(12.)).child("○ Workspace").child("● Version"));
-            col = col.child(h_flex().h(px(36.)).child(div().w(px(140.)).flex().justify_center().child(div().size(px(13.)).rounded_full().border_2().border_color(blue).bg(gpui_kit::white()))).child(div().text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x888888)).child("Main")));
+            col = col.child(h_flex().h(px(36.)).child(div().w(px(140.)).flex().justify_center().child(div().size(px(13.)).rounded_full().border_2().border_color(blue).bg(crate::theme::p().panel))).child(div().text_size(px(13.33)).italic().text_color(gpui_kit::rgb(0x888888)).child("Main")));
             for (i, v) in d.versions.iter().enumerate() {
                 let on = d.version == Some(i);
                 col = col.child(

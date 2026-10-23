@@ -119,7 +119,7 @@ pub fn init(cx: &mut App) {
     cx.on_window_closed(|cx, id| {
         cx.global_mut::<OpenDocs>().0.retain(|_, h| h.window_id() != id);
         // The Preferences page closes like the start window (last window: quit).
-        let was_start = crate::start_window::forget_if(id, cx) | crate::preferences_window::forget_if(id, cx);
+        let was_start = crate::start_window::forget_if(id, cx) | crate::preferences_window::forget_if(id, cx) | crate::company_settings::forget_if(id, cx);
         if !cx.windows().is_empty() {
             crate::start_window::refresh(cx);
             return;

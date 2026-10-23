@@ -320,7 +320,7 @@ impl PartStudioView {
                         .border_1()
                         .border_color(if on { rgb(0x1651b0) } else { rgb(0x888888) })
                         .bg(if on { rgb(0x1651b0) } else { rgb(0xffffff) })
-                        .when(on, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(rgb(0xffffff)))),
+                        .when(on, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                 )
                 .child(div().text_size(px(13.33)).text_color(rgb(0x666666)).child(label))
         };
@@ -693,7 +693,7 @@ impl PartStudioView {
                 );
             }
         }
-        let help = div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?");
+        let help = div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x888888)));
         Some(
             v_flex()
                 .id("insert-go")

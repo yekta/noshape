@@ -108,6 +108,13 @@ pub fn tessellate_shape(shape: &noshape_kernel::Shape, quality: f64) -> Option<M
 
 /// Tessellates a body's `shape` for the display (`quality` scales Auto's
 /// angle; preview meshes are Coarse).
+/// Mesh of a failed feature's error geometry ([`FeatureState::error_mesh`]).
+///
+/// [`FeatureState::error_mesh`]: crate::display::FeatureState::error_mesh
+pub(super) fn tessellate_error(shape: &noshape_kernel::Shape, opts: &RegenOptions) -> Arc<MeshBuffers> {
+    tessellate_body(shape, "error geometry", 1.0, opts)
+}
+
 fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts: &RegenOptions) -> Arc<MeshBuffers> {
     let (lin, ang) = display_deflection(shape, quality, opts.preview_meshes);
     let tt = std::time::Instant::now();
@@ -412,7 +419,8 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
     let t_sk = std::time::Instant::now();
     for s in &ctx.sketches {
         let mut sd = sketch_display(s, opts.editing_sketch == Some(s.feature));
-        sd.hidden = studio.feature(s.feature).is_some_and(|f| f.hidden);
+        let owner = ctx.sketch_copies.iter().find(|(_, c)| *c == s.feature).map_or(s.feature, |(p, _)| *p);
+        sd.hidden = studio.feature(owner).is_some_and(|f| f.hidden);
         sd.color = studio.appearances.iter().rev().find(|a| a.target == crate::partstudio::AppearanceTarget::Feature(s.feature)).map(|a| a.color);
         d.sketches.push(sd);
     }

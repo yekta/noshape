@@ -161,7 +161,10 @@ impl PartStudioView {
                     let t = features::get(id);
                     (feature_icon(id), t.map(|t| t.name.to_string()).unwrap_or_default(), t.and_then(|t| t.shortcut), crate::tool_text::description(id).or(t.map(|t| t.description)).unwrap_or_default().to_string())
                 }
-                PaletteItem::SketchTool(t) => (t.icon().into(), sketch_tool_name(*t).to_string(), None, String::new()),
+                PaletteItem::SketchTool(t) => {
+                    let name = sketch_tool_name(*t);
+                    (t.icon().into(), name.to_string(), None, crate::tool_text::sketch_description(name).unwrap_or_default().to_string())
+                }
             }
         };
         let chip = |t: &str| div().px(px(3.)).h(px(18.)).flex().items_center().border_1().border_color(gpui_kit::rgb(0xaaaaaa)).rounded(px(2.)).bg(gpui_kit::rgb(0xf5f5f5)).text_size(px(11.)).text_color(pal.text).child(t.to_string());
@@ -203,7 +206,7 @@ impl PartStudioView {
                 .pt(px(4.))
                 .gap(px(10.))
                 .child(h_flex().gap(px(6.)).child(crate::assets::icon(&icon, 28., cx)).child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name)))
-                .child(div().text_size(px(14.)).line_height(px(21.)).text_color(pal.text).child(desc))
+                .child(div().text_size(px(14.)).line_height(px(21.)).text_color(pal.text).child(crate::ui::tool_description(&desc)))
         });
         // Live (menus/tool-search-export.png, bundle CommandSuggestions):
         // "Did you mean:" + pill buttons for the synonyms of the search (the
@@ -318,7 +321,7 @@ impl PartStudioView {
                             this.ui.palette_no_highlight = !this.ui.palette_no_highlight;
                             cx.notify();
                         })))
-                        .child(div().size(px(14.)).ml(px(6.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+                        .child(div().size(px(14.)).ml(px(6.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
                 );
         Some(
             div()
@@ -773,7 +776,7 @@ impl PartStudioView {
                             }))),
                     )
                 })
-                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")))
+                .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))))
                 .into_any_element(),
         )
     }

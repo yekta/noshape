@@ -228,6 +228,13 @@ impl PartStudioView {
                 let d = self.display.clone();
                 self.apply_display(d, window, cx);
             }
+            "Perspective view" => self.viewport.update(cx, |vp, cx| {
+                let p = match vp.camera.projection {
+                    noshape_render::Projection::Orthographic => noshape_render::Projection::Perspective,
+                    noshape_render::Projection::Perspective => noshape_render::Projection::Orthographic,
+                };
+                vp.set_projection(p, cx);
+            }),
             _ => {}
         }
     }

@@ -403,7 +403,7 @@ pub fn render_bar(doc: &Entity<DocModel>, cx: &App) -> Option<AnyElement> {
                     .rounded(px(3.5))
                     .bg(rgb(BASE_BLUE))
                     .text_size(px(13.))
-                    .text_color(rgb(0xffffff))
+                    .text_color(gpui_kit::rgb_static(0xffffff))
                     .cursor_pointer()
                     .hover(|d| d.bg(rgb(0x2b65c4)))
                     .child("Reverse compare")
@@ -653,7 +653,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
                             .border_1()
                             .border_color(if only { rgb(0x0075ff) } else { rgb(0x767676) })
                             .bg(if only { rgb(0x0075ff) } else { rgb(0xffffff) })
-                            .when(only, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(rgb(0xffffff)))),
+                            .when(only, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                     )
                     .child("Only show differences")
                     .on_click(move |_, _, cx| update(&d, cx, |s| s.only_differences = !s.only_differences)),

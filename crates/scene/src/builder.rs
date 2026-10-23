@@ -637,9 +637,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // The sketch being edited shows its closed regions filled
                 // (`#9aa5af`; live sketch/17: rgb(221,226,230) over the plane's
                 // rgb(245,248,250), which our linear blending reaches at 0.34).
+                // Dark: `#f2f2f2` at 20% (`--os-sketch-face-color`), #616161
+                // over one plane's #3d3d3d: 0.09 in linear light.
                 let fill = if editing {
                     let c = theme::lin(theme::pick(theme::viewport::SKETCH_REGION, theme::viewport_dark::SKETCH_REGION));
-                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], 0.34])
+                    Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([c[0], c[1], c[2], theme::pick(0.34, 0.09)])
                 } else {
                     Instance::new(Drawable::Mesh(up.upload_mesh(&mesh))).with_color([0.0, 0.0, 0.0, 0.0]).pick_only()
                 };
@@ -683,11 +685,12 @@ fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState,
         match st {
             SketchEntityState::Under => g.sketch_under,
             SketchEntityState::Full => g.sketch_constrained,
-            SketchEntityState::Over => v::SKETCH_OVER,
+            SketchEntityState::Over => theme::pick(v::SKETCH_OVER, theme::viewport_dark::SKETCH_OVER),
             SketchEntityState::Inactive => g.inactive_color,
         }
     };
     let a = if construction { 200 } else { 255 };
+    let hex = theme::sketch_color_for_theme(hex);
     [((hex >> 16) & 0xff) as u8, ((hex >> 8) & 0xff) as u8, (hex & 0xff) as u8, a]
 }
 
@@ -830,8 +833,16 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             // (the underconstrained-occluded pass drew them #4040ff).
             let down = (sk.frame.normal * 1e-6).as_vec3();
             let flat = |p: [f32; 3]| -> [f32; 3] { (glam::Vec3::from(p) - down).into() };
-            for (a, b) in region_outline(&reg.positions, &reg.indices) {
+            let outline = region_outline(&reg.positions, &reg.indices);
+            for &(a, b) in &outline {
                 overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 2.0, style: 0 });
+            }
+            // Live part-studio/2028: a picked region shows its corners as
+            // small grey dots.
+            if !hovered {
+                for p in outline_corners(&outline) {
+                    overlay_pts.points.push(PointSprite { position: flat(p), color: [155, 155, 155, 255], pick_id: 0, size: 3.5, style: LineSegment::ON_TOP, _pad: 0 });
+                }
             }
             if !hovered {
                 let n: [f32; 3] = sk.frame.normal.as_vec3().into();
@@ -906,11 +917,69 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     scene
 }
 
+/// A failed feature's error geometry while its dialog is open (live "lp
+/// wall over" 2256–2262: a Feature pattern's ghost instances). Faces are
+/// translucent red (flat, as live's top and front faces read alike), and
+/// depth-tested (the parts inside the block
+/// don't show); edges are red, 3–4 px, and drawn through everything.
+pub fn error_geometry(mesh: &noshape_model::display::MeshBuffers, up: &Uploader) -> Vec<Instance> {
+    let mut out = Vec::new();
+    if !mesh.indices.is_empty() {
+        // 1 µm off the face, like sketch regions: a ghost face lying on a
+        // part face shows over it.
+        let positions = mesh.positions.iter().zip(&mesh.normals).map(|(p, n)| std::array::from_fn(|i| p[i] + n[i] * 1e-6)).collect();
+        let m = MeshData { positions, normals: mesh.normals.clone(), pick_ids: vec![0; mesh.positions.len()], indices: mesh.indices.clone() };
+        let mut fill = theme::lin(theme::viewport::ERROR_FILL);
+        fill[3] = theme::viewport::ERROR_FILL_ALPHA;
+        out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(fill).unlit().unpickable().ignore_clip().layer(8));
+    }
+    let color = lin_to_u8(theme::lin(theme::viewport::ERROR));
+    let mut lines = LineData::default();
+    for pl in &mesh.edges {
+        for w in pl.windows(2) {
+            lines.segments.push(LineSegment { a: w[0], b: w[1], color, pick_id: 0, width: 3.5, style: LineSegment::ON_TOP });
+        }
+    }
+    if !lines.segments.is_empty() {
+        out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(12));
+    }
+    out
+}
+
+/// The boundary edges of `faces` where other geometry hides them, dashed in
+/// the selection color (live "lp wall over" 2258: the seed of a failed
+/// Feature pattern behind the block).
+pub fn hidden_edges_dashed(display: &StudioDisplay, faces: &[Reference], up: &Uploader) -> Option<Instance> {
+    let edges: std::collections::HashSet<Reference> = faces.iter().flat_map(|f| face_edges(display, f)).collect();
+    let color = lin_to_u8(theme::lin(theme::viewport::SELECTION));
+    let mut lines = LineData::default();
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
+        for (pl, r) in b.mesh.edges.iter().zip(&b.edge_refs) {
+            if edges.contains(r) {
+                lines.push_polyline(pl, color, 0, 1.5, LineSegment::DASHED);
+            }
+        }
+    }
+    (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().hidden_only().layer(12))
+}
+
 /// An edge by its quantized end points.
 type EdgeKey = ([i64; 3], [i64; 3]);
 
 /// The boundary of a triangulated region: the triangle edges used once
 /// (vertices matched by position, so split meshes work too).
+/// Points of an outline where it turns (not along a straight run).
+fn outline_corners(segs: &[([f32; 3], [f32; 3])]) -> Vec<[f32; 3]> {
+    let key = |p: &[f32; 3]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64, (p[2] * 1e6).round() as i64];
+    let mut dirs: HashMap<[i64; 3], ([f32; 3], Vec<glam::Vec3>)> = HashMap::new();
+    for (a, b) in segs {
+        let d = (glam::Vec3::from(*b) - glam::Vec3::from(*a)).normalize_or_zero();
+        dirs.entry(key(a)).or_insert((*a, Vec::new())).1.push(d);
+        dirs.entry(key(b)).or_insert((*b, Vec::new())).1.push(-d);
+    }
+    dirs.into_values().filter(|(_, ds)| ds.len() == 2 && ds[0].dot(-ds[1]) < 0.999).map(|(p, _)| p).collect()
+}
+
 fn region_outline(positions: &[[f32; 3]], indices: &[u32]) -> Vec<([f32; 3], [f32; 3])> {
     let q = |p: &[f32; 3]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64, (p[2] * 1e6).round() as i64];
     // Edge (quantized ends) -> (uses, ends).

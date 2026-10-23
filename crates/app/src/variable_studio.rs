@@ -256,7 +256,6 @@ impl VariableStudioView {
 const COL_W: f32 = 140.;
 const ROW_H: f32 = 34.;
 const RULE: u32 = 0xaaaaaa;
-const HEAD_BG: u32 = 0xeaeaea;
 
 /// Whether a value is an expression (references a variable or computes),
 /// rather than a plain number with an optional unit ("4 in").
@@ -299,7 +298,7 @@ fn cell_input(st: &Entity<InputState>) -> Div {
 }
 
 fn cell_div() -> Div {
-    div().w(px(COL_W)).h(px(ROW_H)).flex_none().flex().items_center().border_r_1().border_b_1().border_color(rgb(RULE))
+    div().w(px(COL_W)).h(px(ROW_H)).flex_none().flex().items_center().bg(p().bg_senary).border_r_1().border_b_1().border_color(rgb(RULE))
 }
 
 /// A variable table's "Variable type" cell: the type 7 px in, a black ▾ at
@@ -805,7 +804,7 @@ impl Render for VariableStudioView {
                 h_flex()
                     .h(px(35.))
                     .px(px(6.))
-                    .bg(rgb(HEAD_BG))
+                    .bg(pal.table_header)
                     .border_1()
                     .border_color(rgb(RULE))
                     .child(
@@ -877,7 +876,7 @@ impl Render for VariableStudioView {
                     h_flex()
                         .border_l_1()
                         .border_color(rgb(RULE))
-                        .bg(rgb(HEAD_BG))
+                        .bg(pal.table_header)
                         .text_size(px(14.))
                         .font_weight(FontWeight::BOLD)
                         .text_color(pal.text)

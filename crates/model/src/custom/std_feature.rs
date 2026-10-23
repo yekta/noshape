@@ -21,6 +21,8 @@ struct StdFeature {
     cell: Arc<GlobalCell>,
     params: Vec<ParamDecl>,
     specs: Vec<crate::params::ParamSpec>,
+    /// Its "Editing Logic Function" (e.g. sheetMetalTabEditingLogic).
+    editing: Option<Arc<noshape_featurescript::ir::OverloadSet>>,
 }
 
 /// Loaded std features by name (`None`: not found).
@@ -34,6 +36,12 @@ fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
     let DeclKind::Const(cell) = &decl.kind else { return None };
     let item = m.ast.items.iter().find(|it| matches!(&it.kind, TopKind::Const { name: n, .. } if &**n == name))?;
     let TopKind::Const { init, .. } = &item.kind else { return None };
+    let editing = item
+        .annotation
+        .as_ref()
+        .map(|a| noshape_featurescript::annot::eval(&m, a))
+        .and_then(|ann| ann.str("Editing Logic Function").map(str::to_string))
+        .and_then(|f| m.functions(&f));
     let lambda = defined_lambda(init, "defineSheetMetalFeature").or_else(|| defined_lambda(init, "defineFeature"))?;
     let mut params = Vec::new();
     if let Some(p) = &lambda.precondition {
@@ -42,7 +50,7 @@ fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
     let mut specs = crate::features::get(name).map(|t| t.params.clone()).unwrap_or_default();
     let extra: Vec<_> = super::studio::param_specs(&params).into_iter().filter(|s| !specs.iter().any(|b| b.id == s.id)).collect();
     specs.extend(extra);
-    Some(Arc::new(StdFeature { cell: cell.clone(), params, specs }))
+    Some(Arc::new(StdFeature { cell: cell.clone(), params, specs, editing }))
 }
 
 /// Evaluate the current feature with std's `name` from `module` (e.g.
@@ -68,6 +76,14 @@ macro_rules! std_features {
         $(fn $f(ev: &mut EvalCtx) -> FResult<()> {
             evaluate(ev, $module, $name)
         })*
+
+        /// The std module and feature of a built-in feature type.
+        fn std_name(type_id: &str) -> Option<(&'static str, &'static str)> {
+            Some(match type_id {
+                $($name => ($module, $name),)*
+                _ => return None,
+            })
+        }
 
         /// The std evaluator of a built-in feature type, if std runs it.
         pub fn evaluator(type_id: &str) -> Option<crate::regen::features::EvalFn> {
@@ -100,4 +116,50 @@ std_features! {
     rip => "sheetMetalRip.fs", "sheetMetalRip";
     pcb_start => "pcbStart.fs", "pcbStart";
     pcb_end => "pcbEnd.fs", "pcbEnd";
+}
+
+/// Std's editing logic for feature `index` of `studio` (a built-in feature
+/// std runs, e.g. Tab: picking the profile fills "Flange to merge" and the
+/// subtraction offset, live qa5 4.2), run on the Part Studio just before it:
+/// the parameters it changes when `old` becomes `new`. `specified`: the
+/// parameters the user has set. `None`: no editing logic, or it failed.
+#[allow(clippy::too_many_arguments)]
+pub fn editing_logic(
+    studio: &crate::partstudio::PartStudio,
+    index: usize,
+    config: &crate::configuration::ConfigValues,
+    units: &noshape_units::UnitPrefs,
+    opts: &crate::regen::RegenOptions,
+    old: &crate::params::ParamValues,
+    new: &crate::params::ParamValues,
+    specified: &[String],
+) -> Option<crate::params::ParamValues> {
+    let feature = studio.features.get(index)?;
+    let before = crate::regen::RegenOptions { upto: Some(index), ..opts.clone() };
+    let ctx = crate::regen::Regenerator::new().regenerate(studio, config, units, &before).context;
+    editing_logic_in((*ctx).clone(), &feature.type_id, feature.id, &feature.name, units, old, new, specified)
+}
+
+/// Whether std runs built-in feature `type_id` and has editing logic for it.
+pub fn has_editing_logic(type_id: &str) -> bool {
+    evaluator(type_id).is_some() && std_name(type_id).and_then(|(module, name)| FEATURES.lock().entry(name).or_insert_with(|| load(module, name)).clone()).is_some_and(|f| f.editing.is_some())
+}
+
+/// [`editing_logic`] in `ctx`, the Part Studio just before the feature (a
+/// dialog's regeneration context).
+#[allow(clippy::too_many_arguments)]
+pub fn editing_logic_in(
+    ctx: crate::regen::context::Context,
+    type_id: &str,
+    feature: crate::reference::FeatureId,
+    name: &str,
+    units: &noshape_units::UnitPrefs,
+    old: &crate::params::ParamValues,
+    new: &crate::params::ParamValues,
+    specified: &[String],
+) -> Option<crate::params::ParamValues> {
+    let (module, std) = std_name(type_id)?;
+    let f = FEATURES.lock().entry(std).or_insert_with(|| load(module, std)).clone()?;
+    let editing = f.editing.as_ref()?;
+    super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified)
 }

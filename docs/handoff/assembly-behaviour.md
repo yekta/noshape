@@ -966,3 +966,67 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   (L·1.25 Pan, ·1.125 Oval, ·1 Flat): V-grooves (live's extrude to plane 1 + healed delete face = a tetrahedron
   per wing, sides cut by rotated boxes) or blind HeadHeight/2 on flat heads; RFILLET_IA on the 8 arm-side/core
   edges. Pan #8 with kern's checked fillet = live's 43 faces, every area to 7 digits; without it 35 (no fillets).
+
+## Assembly sweep (skb 10-23, docs/parity/workflow-assembly-sweep.md rows 14–31)
+* Model (`eval.rs`): `RelationStatus.inactive`; relations on inactive/suppressed mates are Inactive ("One or more
+  mates is inactive or suppressed"), relations that fight each other show no error (live E8); a mate on a suppressed
+  instance carries the reason "One or more instances is suppressed" (tooltip "<name> (Inactive: …)"). New failures:
+  "Mate is between fixed instances." (both bodies fixed), limits min > max (E11). A part gone from its Part Studio:
+  node "Failed to resolve instance.", mates "Failed to resolve the instance for mate." (Tangent: "Selection is
+  invalid."), assembly mate connectors "Failed to resolve mate connector origin." (`Prepared.inactive_instances`).
+* App: every assembly feature dialog (mate, relation, pattern / replicate, mate connector, group) has live's red
+  title with the tooltip "<name> did not regenerate properly: <text>"; the mate dialog's old yellow alert box is gone
+  (E1: a same-instance pick is silently refused). Pattern count errors keep the title black (live). Lost parts:
+  red chips, Tangent chips "Missing entity of <instance>" (`MateDialog.lost`). Root badge "Assembly contains
+  error", Mate features folder badge "Mate error", ⚠ on the fix icons when 2+ are fixed.
+* Animate: no Animate… for Ball; translations 0 → 25 mm; one DOF auto-fills, several open empty and the mate row /
+  chip box opens "Select degree of freedom" (rotation first: `anim_dofs`). Chips use ↹ like the relation dialog.
+* Group dialog: live's 220 px feature dialog ("Group 1", Instances field, ✓ at 0.2 while empty, "Nothing selected.").
+* Open: the named-position DOF columns still use "↔" (no live capture of that glyph).
+
+## Standard content from Onshape's own tables (skb 10-23)
+* Live's captures dom/skb-sc-comp/<key>.json (every component's *_MAIN table, all rows) are read by
+  `/root/skb-scratch/gen/live_tables.py`; a mapping entry may name live columns with `live(names, **specs)` in
+  mapping.py. Live's table is then tried before the published ones (its values win), rows keyed by every
+  designation the Size option can take ("1-1/8-7", "M8x1.00", "M8 x 1"). `length_col` gives a one-length component
+  (DIN 580) its Length. `published(table, col)` pulls a value live has no column for (B18.3's short-screw socket
+  depth T_S under live's NOMINAL_LENGTH).
+* Done with live's tables: ASME socket set / cap / button / countersunk / shoulder screws, ISO 4026–4029 + DIN 914,
+  ISO 7379, DIN 923, DIN 7991, fine pitch hex bolts / screws / nuts (ISO 8765/8676/8673–8675 + DIN EN), ISO 7413,
+  7719, 10513, 12125, 12126, DIN 935-3, DIN 580, DIN 125-1/-2, DIN 127 A/B, ISO 7090/7416/8738, ISO 2338.
+  New: ANSI hex / heavy hex flat (+ jam) nuts, hex machine screw nut, square / heavy square / square machine
+  screw nut, hex / thick / heavy hex slotted nuts, hex lock nut, nylon insert lock nut, acorn high / low crown
+  nuts, hardened structural washer, regular / heavy-duty / extra-duty / high collar spring lock washers.
+  Catalogue 205 → 243 components; report 159 → 95 problems.
+* Geometry from live's B-rep (dom/skb-sc-geom; `gen/brep.py <pattern>` dumps one): ANSI nuts have the hole at the
+  minor diameter (`dh`) with 90° countersinks to the major on both faces; 30° corner chamfers (`ca` 25 on square
+  nuts, 0 on the square machine screw nut; flat nuts the top only); slotted nuts' slots end in half cylinders
+  (`roundSlot`), the heavy one stands on a 1/64 in washer face; acorn crown = BODY_DIAMETER cylinder, an arc of
+  BODY_RADIUS tangent into the NOSE_RADIUS sphere, hole drilled DRILL_DEPTH with a 118° tip (`rn`, `rb`, `dd`).
+  Spring lock washers (form 8): faces sloping 2.5°, rounds (MEAN_WIDTH − BEARING_WIDTH)/2 as profile arcs
+  (`roundedProfile`: exact tori; opFillet gave B-spline patches), split THICKNESS/2. Test
+  `ansi_nuts_and_lock_washers_match_live` pins face types and total areas (live's to 0.1 %).
+* Lock nuts (live's real-size captures; their "default" bodies are config placeholders): Hex lock nut = a 30°
+  conical top from the major diameter (`dt`), countersunk below only (`cskTop` 0); nylon insert nuts = the hex to
+  HEIGHT, a collar as wide as the flats to OVERALL_HEIGHT rounded 0.2 of its height, bored 0.75 s to the hex top
+  (thin: 0.7 s, 0.345 of the collar deep; `cb`, `cd`). Both sizes of each pinned in the test.
+* Flat countersunk tapping screw (live Type VI file, 14 faces): the cone runs at 41° from the head edge and an arc
+  tangent to it and the shank ends at the head height on the shank (`cskFillet`; radius from the tangencies,
+  0.0398 in at #8). Its Type VI mouth fillet still fails in OCCT on the Ø0.132 recess (13 faces, test allows it).
+* DIN keys (6885-1, 6883, 6886) from live's FSRules tables (dom/skb-sc-fsrules-tables.json, loaded by
+  live_tables.py for components skb-sc-comp lacks): the key along Y on the XY plane, Type A round ends, B square,
+  AB one round end (+Y: UNCONFIRMED, flagged in parity row LA53; confirm with PART 2), tapers 1:100 falling towards +Y from h at -Y (`key` forms 0/1/3/5/6).
+  Part names swap the chosen option for the default's " A x " token. 6885-1's 440–550 size has no length list in
+  live's data (left out until live reports what the Insert dialog shows, REQUESTS "skb (10-23 14:00)"; then
+  match it). `din_keys_match_live` pins faces, areas and orientation. B17.1 keys wait for PART 2.
+* ANSI T-slot nut (nut form 7, live B-rep 5/16 + 1-1/2): the section extruded along Y (`tl`), tongue root fillets
+  `tr` (live's FaceFillet ← CORNER_FILLET), 45° corner chamfers `tc` (CornerFillet ← CORNER_CHAMFER), the hole at
+  major − pitch, countersunk both faces.
+* AS568 O-rings now read live's table (inch; the old rows were ISO 3601 metric values, wrong) and live's four
+  materials (Butyl default; generator `MATERIAL_NAMES`).
+* Deviations left: our kernel reports the acorn's spindle torus (negative major radius) as a surface of revolution
+  (kern); live's acorn 1/4 hex measures 0.438 where its table says 0.4375 (0.1 % area). ISO 7380's head uses HEAD_TOP_DIA (no rule yet).
+* Waiting on live (REQUESTS "skb (10-23 06:30)"): toothed lock washers, retaining rings, PEM® (44), NAS (6),
+  askew head bolt, B17.1 keys (PART 2 with every /features expression after 16:52 UTC); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
+  slotted spring pins (no live table). The face-type/area diagnostic is /root/skb-scratch/zz_live_face_types.rs
+  (paste into assembly/tests.rs to run; reads the live captures directly).

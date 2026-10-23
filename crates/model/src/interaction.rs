@@ -651,6 +651,76 @@ pub fn region_for_curve(regions: &[crate::display::SketchRegionDisplay], entity:
         .min_by(|a, b| a.area.total_cmp(&b.area))
 }
 
+/// The Part Studio's Hole table (live L59, part-studio/2181): one table per
+/// part ("Part 1"), columns Tag | Size | Drill angle | Qty, one row per
+/// distinct hole (A, B, … in feature order) counting the identical ones;
+/// Size is the callout, one line per part of it ("⌀5 mm ↧ 2 mm",
+/// "⌵⌀20 mm X 90 deg", "M6x1.00 ↧ 1 mm"); Drill angle only when the tip
+/// stays in the part.
+pub fn hole_table(ctx: &crate::regen::context::Context, units: &noshape_units::UnitPrefs) -> Vec<crate::custom::table::CustomTable> {
+    use crate::custom::table::{CustomTable, TableCell, TableColumn, TableRow};
+    let factor = units.si_factor(noshape_units::Dim::LENGTH);
+    let unit = if units.length == noshape_units::LengthUnit::Inch { "in" } else { "mm" };
+    let len = |m: f64| format!("{} {unit}", noshape_units::format_number(m / factor, units.length_precision));
+    let deg = |a: f64| format!("{} deg", noshape_units::format_number(a.to_degrees(), 3));
+    let size = |h: &crate::regen::context::HoleRecord| -> String {
+        let through = h.through || h.exits;
+        let depth = |d: Option<f64>| if through { " THRU".to_string() } else { d.map(|d| format!(" ↧ {}", len(d))).unwrap_or_default() };
+        let mut lines = vec![format!("⌀{}{}", len(h.diameter), depth(h.depth))];
+        if let Some((d, depth)) = h.cbore {
+            lines.push(format!("⌴⌀{} ↧ {}", len(d), len(depth)));
+        }
+        if let Some((d, a)) = h.csink {
+            lines.push(format!("⌵⌀{} X {}", len(d), deg(a)));
+        }
+        if let Some(t) = &h.thread {
+            let t = t.trim_end_matches(" mm");
+            let tapped = match h.tapped_depth {
+                Some(d) if !h.through => format!(" ↧ {}", len(d)),
+                _ => " THRU".into(),
+            };
+            lines.push(format!("{t}{tapped}"));
+        }
+        lines.join("\n")
+    };
+    let mut out = Vec::new();
+    for body in &ctx.bodies {
+        let mine: Vec<&crate::regen::context::HoleRecord> = ctx.holes.iter().filter(|h| h.parts.contains(&body.id)).collect();
+        if mine.is_empty() {
+            continue;
+        }
+        let mut rows: Vec<(String, String, usize)> = Vec::new();
+        for h in mine {
+            let angle = match h.tip_angle {
+                Some(a) if !(h.through || h.exits) => deg(a),
+                _ => String::new(),
+            };
+            let s = size(h);
+            match rows.iter_mut().find(|r| r.0 == s && r.1 == angle) {
+                Some(r) => r.2 += 1,
+                None => rows.push((s, angle, 1)),
+            }
+        }
+        let col = |id: &str, name: &str| TableColumn { id: id.into(), name: name.into(), alignment: None };
+        let cell = |t: String| TableCell { text: t, error: None, info: None };
+        out.push(CustomTable {
+            title: body.name.clone(),
+            title_suffix: None,
+            columns: vec![col("tag", "Tag"), col("size", "Size"), col("angle", "Drill angle"), col("qty", "Qty")],
+            rows: rows
+                .into_iter()
+                .enumerate()
+                .map(|(i, (s, a, n))| TableRow {
+                    cells: vec![("tag".into(), cell(((b'A' + (i % 26) as u8) as char).to_string())), ("size".into(), cell(s)), ("angle".into(), cell(a)), ("qty".into(), cell(n.to_string()))],
+                    entities: Vec::new(),
+                })
+                .collect(),
+            entities: Vec::new(),
+        });
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -653,13 +653,15 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     }
     let before = ev.ctx.clone();
     let warnings_before = ev.warnings.len();
-    let sketches = feats.iter().filter(|f| ev.features.iter().any(|x| x.id == **f && x.type_id == "sketch")).count();
-    if ev.bool("fullFeaturePattern") && sketches > 0 {
+    let (sketches, feats): (Vec<FeatureId>, Vec<FeatureId>) = feats.into_iter().partition(|f| ev.features.iter().any(|x| x.id == *f && x.type_id == "sketch"));
+    if ev.bool("fullFeaturePattern") && !sketches.is_empty() {
         ev.infos.push(SKETCH_REAPPLY_INFO.into());
-        // Only sketches: their copies (wire / sheet bodies) aren't made here.
-        if sketches == feats.len() {
-            return Ok(());
-        }
+    }
+    // Live L41: a patterned sketch is copied to every instance (its wire /
+    // sheet bodies), with or without Reapply; no part is made.
+    copy_sketches(ev, &sketches, instances);
+    if feats.is_empty() {
+        return Ok(());
     }
     if ev.bool("fullFeaturePattern") {
         match reapply_features(ev, &feats, instances) {
@@ -669,6 +671,7 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
                 ev.warnings.truncate(warnings_before);
                 let r = geometric_feature_pattern(ev, &feats, instances);
                 if r.is_err() {
+                    ev.error_shapes.clear();
                     return Err(e);
                 }
                 ev.warnings.push(format!("Reapply features failed ({}); the features' geometry was patterned instead", e.message));
@@ -689,6 +692,19 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
                 Ok(()) => Ok(()),
                 Err(_) => Err(e),
             }
+        }
+    }
+}
+
+/// Copies of `sketches` moved to each instance, under ids of their own.
+fn copy_sketches(ev: &mut EvalCtx, sketches: &[FeatureId], instances: &[Instance]) {
+    for inst in instances {
+        let m = inst.t.matrix();
+        for f in sketches {
+            let Some(src) = ev.ctx.sketches.iter().find(|s| s.feature == *f).cloned() else { continue };
+            let id = FeatureId(mix(&[ev.feature.0, f.0, inst.code as u64]) | (1 << 62));
+            ev.ctx.sketches.push(Arc::new(SketchResult { feature: id, ..transformed_sketch(&src, &m) }));
+            ev.ctx.sketch_copies.push((ev.feature, id));
         }
     }
 }
@@ -722,9 +738,11 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             .collect();
         for (id, fs) in groups {
             found = true;
-            if let Some(b) = index_of_body(ev, &id).map(|bi| &ev.ctx.bodies[bi])
-                && face_pattern_fails(b, &fs, instances)
+            if let Some(bi) = index_of_body(ev, &id)
+                && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances)
             {
+                let body = ev.ctx.bodies[bi].clone();
+                ev.error_shapes = failed_instances(ev, f, &body, &fs, instances);
                 return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
             }
             pattern_faces(ev, &id, &fs, instances, false)?;
@@ -734,6 +752,60 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
         }
     }
     Ok(())
+}
+
+/// What Onshape shows for a face pattern it can't make (live "lp wall over"
+/// 2256–2262, the user's shot of 2026-10-23): a ghost of every instance, the
+/// seed's whole tool body moved there, plus the part's faces the seed merged
+/// into (a coplanar face of the part running on into the tool is the
+/// feature's face too in Parasolid: the user's flush side) moved likewise.
+fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], instances: &[Instance]) -> Vec<Shape> {
+    let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
+    let mut ghost: Vec<Shape> = Vec::new();
+    match seed_tool(ev, f) {
+        Some(tool) => {
+            let tool_planes: Vec<(k::Plane, DVec3)> = tool
+                .faces()
+                .iter()
+                .filter_map(|t| match (t.face_surface(), t.centroid()) {
+                    (Ok(k::Surface::Plane(pl)), Ok(c)) => Some((pl, c)),
+                    _ => None,
+                })
+                .collect();
+            for i in (0..body.faces.len()).filter(|i| !fs.contains(i)) {
+                let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { continue };
+                let Ok(k::Surface::Plane(pl)) = face.face_surface() else { continue };
+                let n = pl.normal.normalize_or_zero();
+                let merged = tool_planes.iter().any(|(tp, c)| {
+                    tp.normal.normalize_or_zero().dot(n).abs() > 1.0 - 1e-9 && (tp.origin - pl.origin).dot(n).abs() < tol && k::make_vertex(*c).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
+                });
+                if merged {
+                    ghost.push(face);
+                }
+            }
+            ghost.push(tool);
+        }
+        None => ghost.extend(fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok())),
+    }
+    let seed = Shape::compound(&ghost);
+    instances.iter().filter_map(|inst| k::transform(&seed, &inst.t, true).ok().map(|r| r.shape)).collect()
+}
+
+/// The solid a feature adds or removes, evaluated as New where it stands.
+fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
+    let seed = ev.features.iter().find(|x| x.id == f)?;
+    if crate::custom::is_custom(&seed.type_id) {
+        return None;
+    }
+    let eval_fn = super::evaluator(&seed.type_id)?;
+    let tmp = FeatureId(mix(&[ev.feature.0, f.0, u64::from(u32::MAX)]) | (1 << 62));
+    let mut params = crate::regen::eval::expand_query_variables(&seed.params, &ev.ctx).unwrap_or_else(|| seed.params.clone());
+    params.set("operationType", crate::params::ParamValue::Enum("NEW".into()));
+    let mut sub = EvalCtx::new(tmp, &seed.name, &params, ev.units, ev.ctx.clone(), ev.outer_vars);
+    sub.features = ev.features;
+    eval_fn(&mut sub).ok()?;
+    let made: Vec<Shape> = sub.ctx.bodies.iter().filter(|b| b.id.feature == tmp).map(|b| b.shape.clone()).collect();
+    (!made.is_empty()).then(|| Shape::compound(&made))
 }
 
 /// Onshape's PATTERN_SWITCH_TO_PER_INSTANCE: a feature pattern whose face

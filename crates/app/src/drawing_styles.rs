@@ -388,7 +388,7 @@ impl DrawingEditor {
                     .border_t_1()
                     .border_color(gpui_kit::rgb(0xdcdcdc))
                     .bg(gpui_kit::rgb(0xf9f9f9))
-                    .child(div().id(id).size(px(28.)).flex().items_center().justify_center().rounded(px(3.)).bg(gpui_kit::white()).cursor_pointer().child(crate::assets::icon("refresh", 20., cx)).on_click(revert))
+                    .child(div().id(id).size(px(28.)).flex().items_center().justify_center().rounded(px(3.)).bg(crate::theme::light().panel).cursor_pointer().child(crate::assets::icon("refresh", 20., cx)).on_click(revert))
                     .child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child("Revert to drawing properties"))
                     .child(div().size(px(14.)).child(crate::assets::icon("help-filled", 14., cx))),
             )

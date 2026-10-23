@@ -1149,7 +1149,7 @@ impl Workspace {
                         // clipboard): point every view at a version of the document.
                         let menu = if kind == "drawing" {
                             let v12 = view.clone();
-                            menu.item(I::new("Change to version…").icon_name("legend-version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
+                            menu.item(I::new("Change to version…").icon_name("change-version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
                         } else {
                             menu
                         };
@@ -1340,7 +1340,7 @@ impl Workspace {
             .child(
                 crate::ui::rail_button("rail-performance", "performance", perf_open, true, cx).pl(px(1.))
                     // A software renderer is a performance error (live: a red badge).
-                    .when(perf_error, |d| d.child(div().absolute().left(px(22.)).top(px(16.)).size(px(11.)).rounded_full().bg(gpui_kit::white()).child(crate::assets::icon("error", 11., cx))))
+                    .when(perf_error, |d| d.child(div().absolute().left(px(22.)).top(px(16.)).size(px(11.)).rounded_full().bg(gpui_kit::rgb_static(0xffffff)).child(crate::assets::icon("error", 11., cx))))
                     .tip(if perf_error { "Performance errors detected" } else { "Performance" }, TipSide::Right)
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_doc_panel(false, cx))),
             )
@@ -1604,12 +1604,12 @@ impl Render for Workspace {
                                 // Compare mode: the toolbar row becomes white with the
                                 // centred "Comparing Main and V3" bar (live 953).
                                 .children(crate::compare_mode::render_bar(&self.doc, cx).map(|bar| {
-                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(gpui_kit::white()).occlude().flex().justify_center().child(bar)
+                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(crate::theme::p().panel).occlude().flex().justify_center().child(bar)
                                 }))
                                 // A protected workspace (workspace_protection.rs): its banner
                                 // at the top centre (not over the compare bar).
                                 .children(crate::workspace_protection::render_banner(&self.doc, matches!(self.active.and_then(|a| self.views.get(&a)), Some(TabView::PartStudio(_))), cx).filter(|_| crate::compare_mode::rows(&self.doc, cx).is_none()).map(|banner| {
-                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(gpui_kit::white()).occlude().flex().justify_center().child(banner)
+                                    div().absolute().top_0().left_0().right_0().h(px(crate::ui::TOOLBAR_H)).bg(crate::theme::p().panel).occlude().flex().justify_center().child(banner)
                                 }))
                                 .children(self.render_toast(cx))
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
@@ -1958,6 +1958,11 @@ impl Workspace {
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 let mut new_id = None;
                 this.doc.update(cx, |doc, cx| {
+                    // The views are made from the document as it is now: a
+                    // later change to a source puts the drawing out of date,
+                    // edited or not.
+                    let mut drawing = drawing;
+                    drawing.sources_at = doc.session.head().ok().map(|m| m.to_string());
                     doc.edit_document(&format!("Insert tab : {name}"), cx, |d| {
                         new_id = Some(docedit::insert_drawing_tab(d, &name, drawing, source.as_ref().map(|s| s.tab)));
                     });

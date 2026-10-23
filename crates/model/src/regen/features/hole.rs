@@ -389,6 +389,12 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
                 inch: !iso,
                 diameter_fit: diameter_fit.clone(),
                 exits: end == "THROUGH" || h + 1e-9 >= hit_bodies.iter().map(|x| x.2).fold(0.0, f64::max),
+                parts: {
+                    let mut v: Vec<(usize, f64, f64)> = hit_bodies.iter().filter(|x| x.1 < h + tip).cloned().collect();
+                    v.sort_by(|a, b| a.1.total_cmp(&b.1));
+                    v.iter().map(|x| ev.ctx.bodies[x.0].id.clone()).collect()
+                },
+                tip_angle,
             });
         }
         let frame = k::Plane::new(s, -dir, perp(dir));
@@ -437,6 +443,18 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     }
     if fit_unused {
         ev.infos.push(FIT_INFO.into());
+    }
+    // Live L52/L61: a Diameter (or tap drill) other than the standard's.
+    // Counterbore / countersink values don't count.
+    if ev.params.bool(ht::TABLE_SYNCED_PARAM) {
+        let (pid, table) = ht::hole_table_param(ev.params);
+        if let Some(spec) = ht::table_values(table, &ht::complete_path(table, ev.params.lookup(pid))) {
+            let off = |a: f64, b: f64| (a - b).abs() > 1e-9;
+            let tap = matches!((dims.tap_drill, spec.tap_drill_diameter), (Some(a), Some(b)) if off(a, b));
+            if off(dims.diameter, spec.hole_diameter) || tap {
+                ev.infos.push("Parameters have been overridden. Check input.".into());
+            }
+        }
     }
     for (ids, tools) in groups {
         let targets: Vec<usize> = ids.iter().filter_map(|id| index_of_body(ev, id)).collect();

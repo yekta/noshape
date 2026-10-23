@@ -18,6 +18,7 @@ mod evaluate;
 pub mod hole;
 mod sheetmetal;
 mod sm_flat;
+mod loft;
 mod edge_change;
 mod offsets;
 mod packed;
@@ -548,6 +549,7 @@ pub fn register() {
         all.extend_from_slice(hole::NATIVES);
         all.extend_from_slice(sheetmetal::NATIVES);
         all.extend_from_slice(sm_flat::NATIVES);
+        all.extend_from_slice(loft::NATIVES);
         all.extend_from_slice(edge_change::NATIVES);
         all.extend_from_slice(offsets::NATIVES);
         all.extend_from_slice(packed::NATIVES);
@@ -622,7 +624,11 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                 .collect::<Vec<_>>()
                 .join(" ")
         };
-        eprintln!("[fs op] {} {failure} {} -> {} | {}", id.join("."), faces(&snapshot), if r.is_ok() { "ok" } else { "ERR" }, faces(&ev.ctx));
+        let outcome = match &r {
+            Ok(_) => "ok".to_string(),
+            Err(e) => format!("ERR ({})", e.message),
+        };
+        eprintln!("[fs op] {} {failure} {} -> {outcome} | {}", id.join("."), faces(&snapshot), faces(&ev.ctx));
     }
     let warnings = std::mem::take(&mut ev.warnings);
     let mut ctx = ev.ctx;
