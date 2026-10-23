@@ -468,7 +468,7 @@ impl Default for ZebraSettings {
 /// The open Zebra stripes dialog.
 pub(crate) struct ZebraDialog {
     pub settings: ZebraSettings,
-    stripes: Entity<InputState>,
+    stripes: Entity<crate::quantity_field::QuantityInput>,
     _sub: Subscription,
 }
 
@@ -477,19 +477,22 @@ impl AssemblyView {
     /// stripes on, ✕ / Esc turns them off).
     fn open_zebra(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let settings = self.ui.zebra.unwrap_or_default();
-        let stripes = cx.new(|cx| InputState::new(window, cx).default_value(settings.stripes.to_string()));
-        let sub = cx.subscribe_in(&stripes, window, |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
-            InputEvent::Change => {
-                if let Ok(n) = st.read(cx).value().trim().parse::<u32>()
-                    && let Some(d) = &mut this.ui.zebra_dialog
-                    && (1..=500).contains(&n)
-                {
-                    d.settings.stripes = n;
-                    this.rebuild_scene(false, cx);
-                }
+        // Onshape's number field, as the Part Studio's (live "Input
+        // behaviour outside feature dialogs", Zebra stripes › Stripe count):
+        // a count of 1–100, no expressions (hover "Enter an integer."); a
+        // commit applies, Enter keeps the panel open.
+        use crate::quantity_field::{QuantityEvent, QuantityInput, QuantitySpec};
+        let units = self.units(cx);
+        let spec = QuantitySpec::count().no_expressions().range(Some(1.), Some(100.)).label("Stripe count");
+        let stripes = cx.new(|cx| QuantityInput::new(settings.stripes.to_string(), spec, units, window, cx));
+        let sub = cx.subscribe(&stripes, |this: &mut Self, st, ev: &QuantityEvent, cx| {
+            if let QuantityEvent::Committed(_) = ev
+                && let Some(n) = st.read(cx).value()
+                && let Some(d) = &mut this.ui.zebra_dialog
+            {
+                d.settings.stripes = n.round() as u32;
+                this.rebuild_scene(false, cx);
             }
-            InputEvent::PressEnter { .. } => this.close_zebra(true, cx),
-            _ => {}
         });
         self.ui.zebra_dialog = Some(ZebraDialog { settings, stripes, _sub: sub });
         self.rebuild_scene(false, cx);
@@ -563,7 +566,7 @@ impl AssemblyView {
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_zebra(false, cx))),
                         ),
                 )
-                .child(crate::os_ui::param_row("Stripe count", crate::os_ui::input_h(Input::new(&d.stripes).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)))
+                .child(crate::os_ui::param_row_plain("Stripe count", d.stripes.clone()))
                 .child(check("azebra-flip", "Flip stripes", flip, |s| s.flip = !s.flip, cx))
                 .child(check("azebra-edges", "Show edges", edges, |s| s.show_edges = !s.show_edges, cx))
                 .child(h_flex().h(px(22.)).px(px(4.)).justify_end().child(super::props::help_dot()))
