@@ -263,7 +263,8 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("ctrl-shift-right", PanRight, view),
         KeyBinding::new("ctrl-shift-up", PanUp, view),
         KeyBinding::new("ctrl-shift-down", PanDown, view),
-        KeyBinding::new("o", ToggleProjection, view),
+        // Perspective view has no key in Onshape (camera menu only; a stray
+        // key must not flip the projection).
         // Sketch (each key toggles its tool)
         KeyBinding::new("l", SketchLine, sk),
         KeyBinding::new("a", SketchArc3, sk),

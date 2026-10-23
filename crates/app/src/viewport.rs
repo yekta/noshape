@@ -372,7 +372,9 @@ impl Viewport {
         Self {
             gpu,
             target_id,
-            camera: Camera::default(),
+            // Orthographic unless Perspective view was set as default
+            // (camera menu right-click › Set as default; Onshape: off).
+            camera: Camera { projection: crate::view_defaults::get(cx).projection(), ..Camera::default() },
             scene: Arc::new(Scene::default()),
             scene_bounds: None,
             style: Style::default(),
