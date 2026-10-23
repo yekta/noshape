@@ -427,5 +427,6 @@ Models: /root/qa4-scratch/mk-models.py CLI DIR (lpwall.noshape, failext.noshape)
 
 **R1 (new, render):** select two default planes (Top + Right, or Front + Right; feature list or viewport) → every part is drawn
 with black jagged halos and see-through holes (hole cylinders visible through the top faces), plus the green dashed
-intersection line; one plane selected draws normally; clearing the selection restores it. Reproduced 3×. Not compared
-with v0.4.5 (binary no longer on disk).
+intersection line; one plane selected draws normally; clearing the selection restores it. Reproduced 3×. **Not a
+regression:** /tmp/lead/noshape-v045 shows the same with Top + Right on the demo plate (black halos, see-through holes,
+banding on the side faces).

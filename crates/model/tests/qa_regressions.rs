@@ -110,20 +110,21 @@ fn out_of_range_values_fail_with_message() {
     let t0 = std::time::Instant::now();
     let (st, msg) = t.status(pat);
     assert_eq!(st, FeatureStatus::Error);
-    assert!(msg.as_deref().unwrap_or("").contains("Instance count: must be at most 2500"), "{msg:?}");
+    assert!(msg.as_deref().unwrap_or("").contains("A parameter value is not valid."), "{msg:?}");
     assert!(t0.elapsed().as_secs() < 30);
     t.set(pat, "instanceCount", e("0"));
     let (st, msg) = t.status(pat);
     assert_eq!(st, FeatureStatus::Error);
-    assert!(msg.as_deref().unwrap_or("").contains("must be at least 1"), "{msg:?}");
+    assert!(msg.as_deref().unwrap_or("").contains("A parameter value is not valid."), "{msg:?}");
     t.set(pat, "instanceCount", e("3"));
     assert_eq!(t.status(pat).0, FeatureStatus::Ok);
     t.set(pat, "distance", e("-5 mm"));
     let (st, msg) = t.status(pat);
     assert_eq!(st, FeatureStatus::Error);
-    assert!(msg.as_deref().unwrap_or("").contains("Distance: must not be negative"), "{msg:?}");
+    assert!(msg.as_deref().unwrap_or("").contains("A parameter value is not valid."), "{msg:?}");
 
-    // Negative fillet radius: a field error, not a kernel failure.
+    // Negative fillet radius: a field error, not a kernel failure (Onshape's
+    // "A parameter value is not valid." for any value out of its range).
     let mut t = T::new();
     t.block();
     let r = t.regen();
@@ -132,14 +133,14 @@ fn out_of_range_values_fail_with_message() {
     let fil = t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("-2 mm"))]);
     let (st, msg) = t.status(fil);
     assert_eq!(st, FeatureStatus::Error);
-    assert!(msg.as_deref().unwrap_or("").contains("Radius: must not be negative"), "{msg:?}");
+    assert!(msg.as_deref().unwrap_or("").contains("A parameter value is not valid."), "{msg:?}");
     t.set(fil, "radius", e("1 mm"));
     assert_eq!(t.status(fil).0, FeatureStatus::Ok);
-    // Imperial documents format the bound in inches.
+    // The same in imperial documents.
     t.units.length = LengthUnit::Inch;
     t.set(fil, "radius", e("30000 in"));
     let (_, msg) = t.status(fil);
-    assert!(msg.as_deref().unwrap_or("").contains("must be at most") && msg.as_deref().unwrap_or("").contains("in"), "{msg:?}");
+    assert_eq!(msg.as_deref(), Some("A parameter value is not valid."));
 }
 
 /// QA: a new Hole's Diameter field disagreed with its drill size (the
