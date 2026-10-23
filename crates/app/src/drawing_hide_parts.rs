@@ -89,7 +89,7 @@ impl DrawingEditor {
                 h_flex()
                     .h(px(20.))
                     .text_size(px(12.))
-                    .child(div().flex_1().child(name.clone()))
+                    .child(div().flex_1().child(crate::ui::user_text(name.clone())))
                     .child(div().id(("hp-remove", i)).cursor_pointer().child(crate::ui::glyph("close", 10., pal.text_muted)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(d) = &mut this.hide_parts
                             && i < d.parts.len()

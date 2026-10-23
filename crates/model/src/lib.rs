@@ -18,6 +18,7 @@ pub mod compare;
 pub mod configuration;
 pub mod custom;
 pub mod demo;
+pub mod default_names;
 pub mod demo_fab;
 pub mod display;
 pub mod document;

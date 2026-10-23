@@ -100,7 +100,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | Creation type Solid / Surface / Split (Surface), operations for Solid, flip, Trim to target, anchors, Thickness 2.5 | same | ✅ |
-| 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✗ |
+| 2 | Position group | Angle / U shift / V shift in a collapsed "Position" group | always shown, no group | ✅ (fs: the std group, collapsed) |
 | 3 | Filters | Tools planar only; Target cylindrical or conical only; no unwrap | wider, plus unwrap | 🔧 L20 (no unwrap; forced picks fail with live's texts) |
 | 4 | Errors | "Select planar faces or sketch regions to wrap." (source), "Select a cylindrical or conical face to wrap around." (destination), "Source entities must all lie on the same plane.", "Select anchor points.", auto-anchor text, "Failed to imprint edges onto destination face.", ambiguous anchor | own texts, no fields | 🔧 (unwrap keeps its own texts) |
 | 5 | Dialog dump | — | — | 🔧 L21 Position group collapsed (FS compiler lacks the group, dialog comparison excludes wrap) |
@@ -160,7 +160,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Axis empty | "Select an object with an axis." on axis | own text, no field | 🔧 |
 | 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | 🔧 |
 | 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | 🔧 L32 "A parameter value is not valid." (any out-of-range value, all features) |
-| 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | ✗ ? L33 |
+| 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | 🔧 L33 start 0 with an end radius makes the conical spiral; both 0 fails |
 | 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | ✗ |
 | 7 | Computed revolutions / pitch | filled | never | ✗ |
 | 8 | Show start and end profiles | magenta circles | nothing | ✗ |
@@ -171,7 +171,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 |---|---|---|---|---|
 | 1 | Fields | Entities, Closed ☐; closed consumes members | same | ✅ |
 | 2 | Empty | "Select entities to create a composite part." (likely) | own text, no field | 🔧 L36 Entities marked |
-| 3 | Overlapping composites | "Cannot create a closed composite part that partially overlaps another composite part." (and open) | no check | ✗ ? L36 |
+| 3 | Overlapping composites | "Cannot create a closed composite part that partially overlaps another composite part." (and open) | no check | 🔧 L36 a part of a closed composite in another closed one fails with live's text; a whole composite nests |
 
 ## Mate connector (Part Studio)
 | # | Area | Onshape | Ours | Status |
@@ -208,7 +208,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 4 | Check order | counterbore, countersink, tolerances, tap drill, end, start, then "No hole points selected." | points first | 🔧 |
 | 5 | Counterbore / countersink errors | "The counterbore diameter must be larger than the hole diameter." (marks both), "The counterbore depth must be smaller than the hole depth.", "The countersink diameter must be larger than the hole diameter."; no countersink-depth error | own texts, no fields; countersink depth error | 🔧 texts and fields; the countersink-depth error stays ? L47 |
 | 6 | Up to entity / selected plane empty | "Select an entity or mate connector to terminate the hole." / "Select a start entity." on the field | own texts, late | 🔧 |
-| 7 | Merge scope | auto-filled with the parts the hole reaches, direction flipped toward them; empty: "No target parts selected for hole." | empty = every solid | ✗ ? L56, L57 |
+| 7 | Merge scope | auto-filled with the parts the hole reaches, direction flipped toward them; empty: "No target parts selected for hole." | empty = every solid | 🔧 L56 empty scope: "No target parts selected for hole." on the scope; L57 a new Hole's scope is the parts it reaches and follows the depth until set by hand; holes saved before (ScopeRule 4) keep cutting every part. Direction auto-flip and the flip clearing the scope ✗ |
 | 8 | Misses | "None of the holes intersected a part." (scope); warning "Some selections did not produce holes."; blind hole that misses must fail | own texts; silent; blind miss succeeds | 🔧 |
 | 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | 🔧 L51 (+ fit info bubble) |
 | 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | 🔧 L61 apex at the offset, Depth shows 4.092 |

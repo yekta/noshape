@@ -43,7 +43,16 @@ impl T {
         self.reg.regenerate(&self.ps, &ConfigValues::default(), &self.units, &RegenOptions::default())
     }
     fn add(&mut self, ty: &str, params: &[(&str, ParamValue)]) -> FeatureId {
+        // A Hole needs a Merge scope (live L56): the parts so far, as the
+        // dialog fills it, unless the test gives one.
+        let scope = (ty == "hole" && !params.iter().any(|(k, _)| *k == "scope")).then(|| {
+            let r = self.regen();
+            r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect::<Vec<_>>()
+        });
         let mut f = self.ps.new_feature(ty, &self.units).unwrap_or_else(|| panic!("no feature type {ty}"));
+        if let Some(scope) = scope {
+            f.params.set("scope", ParamValue::Query(scope));
+        }
         for (k, v) in params {
             f.params.set(k, v.clone());
         }

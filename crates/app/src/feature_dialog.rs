@@ -2175,7 +2175,8 @@ impl FeatureDialog {
                         h_flex()
                             .id(SharedString::from(format!("chip-{path}-{row}")))
                             .on_hover(cx.listener(move |_, h: &bool, _, cx| cx.emit(DialogEvent::HoverRef(h.then(|| hover_ref.clone())))))
-                            .tooltip(crate::ui::tooltip(tip))
+                            // Chips name entities: user text in every language.
+                            .tooltip(crate::ui::user_tooltip(tip))
                             .w_full()
                             .h(px(24.))
                             .pl(px(6.))
@@ -2183,7 +2184,7 @@ impl FeatureDialog {
                             .hover(|d| d.bg(with_alpha(gpui_kit::rgb(0xffffff), 0.35)))
                             .text_size(px(13.33))
                             .text_color(if missing { pal.error } else if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
-                            .child(div().flex_1().truncate().child(label))
+                            .child(div().flex_1().truncate().child(crate::ui::user_text(label)))
                             .when(reorder_on && single, |d| d.child(self.reorder_grip(path, k, &label_for_drag, false)))
                             .when(!reorder_on, |d| d.child(
                                 div()
@@ -3101,7 +3102,7 @@ impl Render for FeatureDialog {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(title_color)
                             .truncate()
-                            .child(name)
+                            .child(crate::ui::user_text(name))
                             .when_some(error_tip, |d, m| d.tooltip(crate::ui::tooltip(m)))
                             .on_click(cx.listener(|this, ev: &ClickEvent, window, cx| {
                                 if ev.click_count() >= 2 {

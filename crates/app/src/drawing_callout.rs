@@ -363,7 +363,7 @@ impl DrawingEditor {
             .child(h_flex().child(div().flex_1().text_size(px(10.)).text_color(pal.text_muted).child("Stacked instances")).child(div().text_size(px(11.)).text_color(pal.text_muted).child("⇅")));
         for (i, (name, _)) in d.picks.iter().enumerate() {
             list = list.child(
-                h_flex().h(px(20.)).child(div().flex_1().text_size(px(12.)).child(name.clone())).child(
+                h_flex().h(px(20.)).child(div().flex_1().text_size(px(12.)).child(crate::ui::user_text(name.clone()))).child(
                     div().id(("stack-x", i)).px(px(4.)).cursor_pointer().text_color(pal.text_muted).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(d) = &mut this.stack_dlg
                             && i < d.picks.len()
