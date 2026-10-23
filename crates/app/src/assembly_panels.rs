@@ -1899,10 +1899,10 @@ impl AssemblyView {
                     .items_center()
                     .child(h_flex().mt(px(2.)).w_full().h(px(34.)).justify_center().bg(rgb(0xeaeaea)).border_l_1().border_b_1().border_color(rgb(0xaaaaaa)).child(add_button("ex-add-top", cx)))
                     // Live assembly/800: the illustration is 148x149 px of ink at 1489,243.
-                    .child(div().mt(px(81.)).child(crate::assets::icon("exploded-views-empty", 170., cx)))
+                    .child(div().mt(px(92.)).child(crate::assets::icon("exploded-views-empty", 170., cx)))
                     .child(
                         v_flex()
-                            .mt(px(22.))
+                            .mt(px(9.))
                             .w(px(420.))
                             .items_center()
                             .text_size(px(13.33))
