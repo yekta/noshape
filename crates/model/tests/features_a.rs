@@ -1179,3 +1179,78 @@ fn hole_tapped_depth_readjusted_info() {
     assert_eq!(msg("6 mm"), None);
     assert_eq!(msg("9 mm").as_deref(), Some("Tapped depth readjusted. Tapped depth input is greater than minimum computed Hole depth. Learn more"));
 }
+
+/// draft.fs: a parting edge along the pull direction fails on the field.
+#[test]
+fn draft_parting_edge_parallel_to_pull() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let res = t.ok();
+    // A vertical edge of the block, pull along +Z.
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.0, 0.0, 0.005));
+    t.add("draft", &[("draftFeatureType", en("PARTING_LINE")), ("pullDirectionEntity", q(vec![Reference::Plane(DatumPlane::Top)])), ("partingEdges", q(vec![edge]))]);
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert_eq!(st.message.as_deref(), Some("Parting edge cannot be parallel to pull direction."));
+    assert_eq!(st.faulty, vec!["partingEdges".to_string()]);
+    let _ = x;
+}
+
+/// helix.fs: a start point must be level with the axis start (error on the
+/// field); an end point sets the revolutions and pitch shown read-only.
+#[test]
+fn helix_points_as_fs() {
+    let point_at = |t: &mut T, z: &str, xy: (f64, f64)| {
+        let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e(z))]);
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = sk.add_point(DVec2::new(xy.0, xy.1));
+        let s = t.sketch(Reference::FeaturePlane(pl), sk);
+        Reference::SketchEntity { sketch: s, entity: p.0 }
+    };
+    let mut t = T::new();
+    let off = point_at(&mut t, "5 mm", (0.01, 0.0));
+    t.add("helix", &[("axisType", en("AXIS")), ("axis", q(vec![edge_axis_z()])), ("startType", en("START_POINT")), ("startPoint", q(vec![off])), ("height", e("20 mm"))]);
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert_eq!(st.message.as_deref(), Some("Start point and axis start should be coplanar normal to helix direction."));
+    assert_eq!(st.faulty, vec!["startPoint".to_string()]);
+    // End point 20 mm up, a quarter turn round: 3.25 or 4.25 revolutions.
+    let mut t = T::new();
+    let end = point_at(&mut t, "20 mm", (0.0, 0.01));
+    t.add("helix", &[("axisType", en("AXIS")), ("axis", q(vec![edge_axis_z()])), ("startRadius", e("10 mm")), ("endType", en("END_POINT")), ("endPoint", q(vec![end])), ("revolutions", e("4"))]);
+    let r = t.ok();
+    let st = r.display.features.last().unwrap();
+    let revs = st.computed.iter().find(|(k, _)| k == "actualRevolutions").map(|(_, v)| v.clone());
+    let pitch = st.computed.iter().find(|(k, _)| k == "actualPitch").map(|(_, v)| v.clone());
+    let Some(noshape_model::display::ComputedValue::Text(n)) = revs else { panic!("{revs:?}") };
+    let n: f64 = n.parse().unwrap();
+    assert!((n.fract() - 0.25).abs() < 1e-6 || (n.fract() - 0.75).abs() < 1e-6, "{n}");
+    let Some(noshape_model::display::ComputedValue::Length(p)) = pitch else { panic!("{pitch:?}") };
+    assert!((p - 0.02 / n).abs() < 1e-9);
+}
+
+/// hole.fs holeScopeFlipHeuristics input: a point under a part, the hole
+/// pointing away from it, reports that part behind it.
+#[test]
+fn hole_reports_parts_behind() {
+    let mut t = T::new();
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let s0 = t.sketch(Reference::FeaturePlane(pl), rect(0.0, 0.0, 0.04, 0.02));
+    let r = t.regions(s0)[0].clone();
+    let x = t.extrude(r, "10 mm", "NEW");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.02, 0.01));
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("scope", q(vec![]))]);
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert!(st.touched.is_empty(), "{:?}", st.touched);
+    assert_eq!(st.touched_behind.iter().map(|b| b.feature).collect::<Vec<_>>(), vec![x]);
+    // Flipped, it reaches the part.
+    let h = t.ps.features.last().unwrap().id;
+    t.set(h, "oppositeDirection", b(true));
+    let r = t.regen();
+    let st = r.display.features.last().unwrap();
+    assert_eq!(st.touched.iter().map(|b| b.feature).collect::<Vec<_>>(), vec![x]);
+    assert!(st.touched_behind.is_empty());
+}

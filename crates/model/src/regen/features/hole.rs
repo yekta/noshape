@@ -306,6 +306,9 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     // Each hole's start, direction and length (to the tip): the parts it
     // reaches, inside the scope or not, are the dialog's default scope.
     let mut spans: Vec<(DVec3, DVec3, f64)> = Vec::new();
+    // Each location's start and direction, also for those that reach
+    // nothing (the parts behind them may flip the hole).
+    let mut probes: Vec<(DVec3, DVec3)> = Vec::new();
     for loc in &locs {
         let dir = if flip { loc.normal } else { -loc.normal }.normalize();
         // Ray from far behind the location so bodies around it are seen.
@@ -331,6 +334,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             _ => 0.0,
         };
         let s = loc.point + dir * t_start;
+        probes.push((s, dir));
         // Intervals after the start, relative to it.
         let rel: Vec<(usize, Vec<(f64, f64)>)> = hits
             .iter()
@@ -460,6 +464,13 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     reached.sort_unstable();
     reached.dedup();
     ev.touched = reached.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
+    // The parts behind the locations (hole.fs probes both ways).
+    let back = extent * 2.0;
+    ev.touched_behind = (0..ev.ctx.bodies.len())
+        .filter(|i| ev.ctx.bodies[*i].kind == BodyKind::Solid && !reached.contains(i))
+        .filter(|&bi| probes.iter().any(|(s, dir)| ray_intervals(&ev.ctx.bodies[bi].shape, *s, -*dir, back).iter().any(|(a, b)| *b > 1e-9 && *a < back)))
+        .map(|i| ev.ctx.bodies[i].id.clone())
+        .collect();
     if !any_hit {
         return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
     }

@@ -19,7 +19,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 4 | Parting line, no pull direction | "Select pull direction." on Pull direction | "Select the pull direction", no field | 🔧 |
 | 5 | Parting line, no edges | "Select parting edges." on Parting edges | "Select the parting edges", no field | 🔧 |
 | 6 | Kernel failure | "Selected faces could not be drafted." | "Draft failed: <kernel>" | 🔧 |
-| 7 | Parting edge parallel to pull | "Parting edge cannot be parallel to pull direction." on Parting edges | no check | ✗ |
+| 7 | Parting edge parallel to pull | "Parting edge cannot be parallel to pull direction." on Parting edges | no check | 🔧 checked per edge before the planarity check, on Parting edges |
 | 8 | Parting line scope | any parting line (non-planar, several parts), each edge's faces drafted about the edge | planar lines perpendicular to the pull, one part ("Parting lines must lie in a plane…", "…must belong to one part") | ✗ |
 | 9 | Two sided | first angle on the faces "away" from the pull, second on "along"; Opposite direction doesn't change which side One sided drafts | angle on the +pull side; sides follow the flipped pull | 🔧 live L1/L2: first angle below the parting line, second above, both narrowing toward it; each Opposite flips its side's taper only (test with live's 5 volumes) |
 | 10 | Edit logic | hint faces, focus on Entities to draft / Parting edges when editing | none; focus on Neutral plane | ✗ |
@@ -31,7 +31,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields | order, labels, visibility, Distance 5 mm, Angle 0, Offset 0, Opposite offset ☑, Reapply fillet ☑ | same | ✅ |
 | 2 | Check order | faces first: "Select faces to move." | direction / axis first | 🔧 |
 | 3 | No translation direction | "Cannot determine translation direction." on Direction | "Select a direction", no field | 🔧 |
-| 4 | Translate direction auto-fill | Direction = the first planar face picked (moveFaceEditingLogic) | stays empty | ✗ |
+| 4 | Translate direction auto-fill | Direction = the first planar face picked (moveFaceEditingLogic) | stays empty | 🔧 a new Move face (Translate) takes the first planar moved face, until the user sets Direction |
 | 5 | Rotate, no axis | text from evAxis | "Select a rotation axis" | 🔧 L5 "Cannot determine rotation axis." on Axis |
 | 6 | Up to entity, nothing / unresolvable | "Cannot resolve entities." on limitEntity | "Select the entity to move up to" | 🔧 |
 | 7 | Translate up to a plane | first face must be planar ("When moving up to a plane, first selected face must be planar.") and parallel ("Limit face must be parallel to face being moved.") | any plane, distance computed | 🔧 ✅ L6 (no field) |
@@ -93,7 +93,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Empty | "Select surfaces or faces to thicken." on entities | same | ✅ |
 | 3 | Keep tools off, some faces of a surface | the surface is kept unless all its faces are picked | deleted when any face is picked | 🔧 L16 |
 | 4 | Adjacent faces | one operation: one body | each face separately | ✗ L17: one L-shaped part of 2560 mm³ (square corner); ours 2 slabs — needs the kernel's intersection join (kern); overlapping slabs of one body are fused |
-| 5 | Auto Add from a surface face | only faces of solids count (thicken.fs) | surface faces count (opens on Add) | 🔧 L18 (surface face stays New); the flip-arrow toggle on Add↔Remove ✗ |
+| 5 | Auto Add from a surface face | only faces of solids count (thicken.fs) | surface faces count (opens on Add) | 🔧 L18 (surface face stays New); a user-picked Add / Remove sets the flip (canSetBooleanFlip) |
 | 6 | Errors | "Failed to thicken all selections." (likely) | "Thickness must be positive", "Thicken failed: …" | 🔧 L19 "Invalid input selections." (no field) |
 
 ## Wrap
@@ -129,7 +129,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 |---|---|---|---|---|
 | 1 | Fields | order, Guides group, Sample size 5, isocurves 10, Merge with all ☑ | same | ✅ |
 | 2 | Empty edges | "Select laminar edges or curves as fill surface boundary." on edges | own text, no field | 🔧 |
-| 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | ✗ |
+| 3 | Continuity label | "Continuity [Position]" label shown (SHOW_LABEL) | no label | 🔧 SHOW_LABEL |
 | 4 | Loop errors | "A boundary edge can have only one type of continuity constraint.", "Cannot create fill surface between multiple loops.", "Boundary edges selected do not form a closed loop.", "Cannot create tangency or curvature constraint for a curve selection." | own texts | 🔧 ? L27 (internal-edge variant) |
 | 5 | Guides | errors and warnings ("Select guide entities." …); exact curves in Precise mode | not checked; always sampled | ✗ |
 | 6 | Add when the edges are surface edges | automatic (SF7) | no | ✗ (SF7) |
@@ -139,7 +139,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 |---|---|---|---|---|
 | 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ |
 | 2 | Profile arrays | driven-query rows "[None] Edge of Sketch 1", max 2 picks each | "Add Profile" UI, no cap | ✗ |
-| 3 | Boundary condition label | SHOW_LABEL | no label | ✗ |
+| 3 | Boundary condition label | SHOW_LABEL | no label | 🔧 SHOW_LABEL |
 | 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 L28; a third profile / mid-span crossing fail with live's texts 🔧; 1U+1V 🔧 builds the sheet the U sweeps along the V (the other two sides are the profiles moved to each other's far end; live 2099) |
 | 5 | Boundary conditions | applied, with their errors | warning only | ✗ |
 | 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | 🔧 |
@@ -161,8 +161,8 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 3 | Circle empty | "Select a circle or arc." on edge | own text, no field | 🔧 |
 | 4 | Height | 1e-5–500 m (0 out of range) | 0 allowed, flat spiral | 🔧 L32 "A parameter value is not valid." (any out-of-range value, all features) |
 | 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | 🔧 L33 start 0 with an end radius makes the conical spiral; both 0 fails |
-| 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | ✗ |
-| 7 | Computed revolutions / pitch | filled | never | ✗ |
+| 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | 🔧 helix.fs texts on startPoint / endPoint (end point only checked on a face: on an axis it sets the height); a point on a face or circle is moved onto the radius |
+| 7 | Computed revolutions / pitch | filled | never | 🔧 filled when the end type is End point (helix.fs) |
 | 8 | Show start and end profiles | magenta circles | nothing | ✗ |
 | 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | 🔧 L34 the preselection picks the tab (face → Surface, line edge / connector / sketch line → Axis, circle → Circle). L35 won't be matched: live's start angle follows Parasolid's own surface frames (a Z or X cylinder starts at the extrude's end, a tilted one at its base), which OCCT doesn't share |
 
@@ -179,7 +179,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields, empty origin | order, labels; "Cannot resolve entities." on Origin entity | same | ✅ |
 | 2 | Empty owner | "Cannot determine owner of mate connector." on Select owner entity | no error | 🔧 L37 (owner inferred from the origin's part or the only part, as the dialog does) |
 | 3 | Owner / attachment auto-fill | from the origin entity or the only part (connectorEditLogic) | none | 🔧 L37 |
-| 4 | To selection, empty | "Select an entity for the mate connector attachment." on Attach to | no check | ✗ |
+| 4 | To selection, empty | "Select an entity for the mate connector attachment." on Attach to | no check | ✅ (already in refgeom.rs; the doc was stale) |
 | 5 | Owner / attachment at regen | the connector follows them | not stored | ✗ |
 | 6 | Move vs Reorient secondary axis | translation in the reoriented frame (likely) | translated first | 🔧 L38 order: flip/reorient, move, rotate; "+Y" = X to −Y |
 | 7 | Between entities / Realign errors | built-in texts | own texts | 🔧 L39 "Failed to resolve mate connector coordinate system."; empty Realign axis = OK |
@@ -208,7 +208,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 4 | Check order | counterbore, countersink, tolerances, tap drill, end, start, then "No hole points selected." | points first | 🔧 |
 | 5 | Counterbore / countersink errors | "The counterbore diameter must be larger than the hole diameter." (marks both), "The counterbore depth must be smaller than the hole depth.", "The countersink diameter must be larger than the hole diameter."; no countersink-depth error | own texts, no fields; countersink depth error | 🔧 texts and fields; the countersink-depth error stays ? L47 |
 | 6 | Up to entity / selected plane empty | "Select an entity or mate connector to terminate the hole." / "Select a start entity." on the field | own texts, late | 🔧 |
-| 7 | Merge scope | auto-filled with the parts the hole reaches, direction flipped toward them; empty: "No target parts selected for hole." | empty = every solid | 🔧 L56 empty scope: "No target parts selected for hole." on the scope; L57 a new Hole's scope is the parts it reaches and follows the depth until set by hand; holes saved before (ScopeRule 4) keep cutting every part. Direction auto-flip and the flip clearing the scope ✗ |
+| 7 | Merge scope | auto-filled with the parts the hole reaches, direction flipped toward them; empty: "No target parts selected for hole." | empty = every solid | 🔧 L56 empty scope: "No target parts selected for hole." on the scope; L57 a new Hole's scope is the parts it reaches and follows the depth until set by hand; holes saved before (ScopeRule 4) keep cutting every part. holeScopeFlipHeuristics: more parts behind the locations than in front flips a new hole (until the flip is set by hand), and a flip that reaches nothing clears the scope (live L57) |
 | 8 | Misses | "None of the holes intersected a part." (scope); warning "Some selections did not produce holes."; blind hole that misses must fail | own texts; silent; blind miss succeeds | 🔧 |
 | 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | 🔧 L51 (+ fit info bubble) |
 | 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | 🔧 L61 apex at the offset, Depth shows 4.092 |

@@ -2995,7 +2995,7 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector") {
+        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace") {
             self.direct_edit_logic(&dialog, cx);
             return;
         }
@@ -3052,6 +3052,14 @@ impl PartStudioView {
         // picked the operation (live, qa5 EXT1: Remove fills "Part 1").
         if ty == "thicken" && !hosts.is_empty() && !scope_user && dialog.read(cx).feature.params.query("booleanScope").is_empty() {
             changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
+        }
+        // thickenEditLogic's canSetBooleanFlip: a user-picked Remove points
+        // the wall into the part, Add out of it.
+        if ty == "thicken" && op_user && !flip_user && !hosts.is_empty() && matches!(op.as_str(), "ADD" | "REMOVE") {
+            let into = op == "REMOVE";
+            if flipped != into {
+                changes.push(("oppositeDirection", ParamValue::Bool(into)));
+            }
         }
         if ty == "extrude" && !flip_user && !hosts.is_empty() {
             let into = matches!(op.as_str(), "REMOVE" | "INTERSECT");
@@ -3123,6 +3131,16 @@ impl PartStudioView {
                     changes.push(("healType", ParamValue::Enum("VOID".into())));
                 }
             }
+            // moveFaceEditingLogic: Translate moves along the first planar
+            // face moved.
+            "moveFace" if params.is("moveFaceType", "TRANSLATE") && !user_set.contains("direction") => {
+                let planar = params.query("moveFaces").iter().find(|r| ctx.is_some_and(|c| noshape_model::regen::measure::resolve_shapes(c, r).first().is_some_and(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_)))))).cloned();
+                if let Some(f) = planar
+                    && params.query("direction").first() != Some(&f)
+                {
+                    changes.push(("direction", ParamValue::Query(vec![f])));
+                }
+            }
             // Live L22: a new Rib's Parts holds the studio's parts.
             "rib" if !user_set.contains("parts") && params.query("parts").is_empty() => {
                 let solids: Vec<Reference> = ctx.map(|c| c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect()).unwrap_or_default();
@@ -3181,16 +3199,27 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        let (ty, id, user, scope) = {
+        let (ty, id, user, scope, flip_user, flipped, located) = {
             let d = dialog.read(cx);
-            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), d.feature.params.query("scope").to_vec())
+            let p = &d.feature.params;
+            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), p.query("scope").to_vec(), d.user_set.contains("oppositeDirection"), p.bool("oppositeDirection"), !p.query("locations").is_empty())
         };
-        if ty != "hole" || user {
+        if ty != "hole" || !located {
             return;
         }
-        let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
+        let Some((touched, behind)) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| (s.touched.clone(), s.touched_behind.clone())) else { return };
+        // holeScopeFlipHeuristics: more parts behind the locations than in
+        // front flips the hole (until the user sets the flip).
+        if !flip_user && !user && behind.len() > touched.len() {
+            dialog.update(cx, |d, cx| d.set_value_auto("oppositeDirection", ParamValue::Bool(!flipped), cx));
+            return;
+        }
+        if user {
+            return;
+        }
+        // The scope follows; a flip that reaches nothing clears it (live L57).
         let want: Vec<Reference> = touched.into_iter().map(Reference::Body).collect();
-        if want.is_empty() || want == scope {
+        if want == scope {
             return;
         }
         dialog.update(cx, |d, cx| d.set_value_auto("scope", ParamValue::Query(want), cx));
