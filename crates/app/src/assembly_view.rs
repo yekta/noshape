@@ -3470,11 +3470,7 @@ impl AssemblyView {
         let grounded = self.assembly(cx).is_some_and(|a| !a.fixed_instances().is_empty());
         // Live (qa5 A19): the root row carries an error badge while a feature
         // (or the pattern being defined) is in error.
-        let has_error = self.result.mates.iter().any(|m| !m.ok)
-            || self.result.nodes.iter().any(|n| n.error.is_some())
-            || self.result.connectors.iter().any(|c| c.message.is_some() && c.frame.is_none())
-            || !self.result.pattern_errors.is_empty()
-            || self.result.relations.iter().any(|r| !r.ok)
+        let has_error = self.result.has_errors()
             || self.pattern.as_ref().is_some_and(|s| s.editing.is_none() && self.pattern_from_session(s, cx).is_err());
         let view = cx.entity();
         h_flex()

@@ -1030,42 +1030,6 @@ pub struct ReleaseDialog {
     _subs: Vec<Subscription>,
 }
 
-/// Company settings › Release management › Release conditions that hold for
-/// each item (Help: "Selected conditions will prevent a Release from being
-/// created"): a Part Studio whose feature list has errors or isn't rolled to
-/// the end.
-fn condition_issues(doc: &DocModel, items: &[ReleaseItem]) -> Vec<Vec<Issue>> {
-    use noshape_model::display::FeatureStatus;
-    use noshape_model::document::TabContent;
-    let on = release_settings().conditions;
-    let mut errors: std::collections::HashMap<(TabId, noshape_model::configuration::ConfigValues), bool> = Default::default();
-    items
-        .iter()
-        .map(|it| {
-            let mut v = Vec::new();
-            if it.document.is_some() || it.reverted {
-                return v;
-            }
-            let Some(TabContent::PartStudio(ps)) = doc.session.doc.tab(it.tab).map(|t| &t.content) else { return v };
-            if on[0] {
-                let failed = *errors.entry((it.tab, it.config.clone())).or_insert_with(|| {
-                    let mut values = ps.configuration.defaults();
-                    values.0.extend(it.config.0.clone());
-                    let result = noshape_model::regen::Regenerator::new().regenerate(ps, &values, &doc.session.doc.settings.units, &noshape_model::regen::RegenOptions::default());
-                    result.display.features.iter().any(|f| f.status == FeatureStatus::Error)
-                });
-                if failed {
-                    v.push(Issue::Prevented("The Part Studio feature list contains errors.".into()));
-                }
-            }
-            if on[1] && ps.rollback.is_some_and(|r| r < ps.features.len()) {
-                v.push(Issue::Prevented("The Part Studio feature list is not rolled to the end.".into()));
-            }
-            v
-        })
-        .collect()
-}
-
 impl ReleaseDialog {
     fn new(doc: Entity<DocModel>, mode: Mode, items: Vec<ReleaseItem>, name: String, notes: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut subs = Vec::new();
@@ -1112,7 +1076,7 @@ impl ReleaseDialog {
             }
         }));
         let numbering = numbering_schemes();
-        let conditions = if mode == Mode::Release { condition_issues(doc.read(cx), &rows.iter().map(|r| r.item.clone()).collect::<Vec<_>>()) } else { Vec::new() };
+        let conditions = if mode == Mode::Release { crate::release_conditions::condition_issues(doc.read(cx), &rows.iter().map(|r| r.item.clone()).collect::<Vec<_>>()) } else { Vec::new() };
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search"));
         subs.push(cx.subscribe_in(&search, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
@@ -1359,7 +1323,7 @@ impl ReleaseDialog {
             row.item = it;
         }
         if self.mode == Mode::Release {
-            self.conditions = condition_issues(self.doc.read(cx), &self.items(cx));
+            self.conditions = crate::release_conditions::condition_issues(self.doc.read(cx), &self.items(cx));
         }
         // The pictures show the refreshed items.
         self.thumbs.clear();
