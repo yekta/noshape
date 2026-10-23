@@ -251,7 +251,8 @@ pub const ENTRIES: &[Entry] = entries! {
         ("Make isolate", Some("shift-i"), Some("IsolateSelected")),
         ("Make transparent", Some("shift-t"), Some("TransparentSelected")),
         ("Named view", Some("shift-v"), Some("NamedViews")),
-        ("Perspective view", N, Some("ToggleProjection")),
+        // No key in Onshape: only a customized key runs it (RunShortcut).
+        ("Perspective view", N, N),
         ("Previous view", N, N),
         ("Right view", Some("shift-4"), Some("ViewRight")),
         ("Section view", Some("shift-x"), Some("SectionView")),
@@ -1043,6 +1044,19 @@ mod tests {
         assert_eq!(n, 114);
         let general: Vec<&str> = sheet_rows(&s, Tab::General).iter().map(|r| r.name).collect();
         assert_eq!(&general[..6], &["Accept & repeat command", "Accept command", "Cancel", "Clear selection", "Copy", "Curve/surface analysis"]);
+    }
+
+    #[test]
+    fn o_does_not_toggle_perspective() {
+        // Onshape has no key for Perspective view (A-partstudio-ui 6.3): a
+        // stray O must not flip the projection. O is the sketch's Offset.
+        let defaults = crate::actions::default_key_bindings();
+        for (keys, action, ctx) in summary(&managed_bindings(&defaults, &Shortcuts::default())) {
+            assert!(!action.ends_with("ToggleProjection"), "{keys} ({ctx}) toggles the projection");
+            if keys == "o" {
+                assert!(action.ends_with("SketchOffset") && ctx.contains("Sketch"), "o runs {action} in {ctx}");
+            }
+        }
     }
 
     #[test]
