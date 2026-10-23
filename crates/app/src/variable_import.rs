@@ -196,7 +196,7 @@ pub fn open(doc: Entity<DocModel>, tab: TabId, i: usize, window: &mut Window, cx
                     .pl(px(8.))
                     .gap(px(4.))
                     .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(title))
-                    .child(os::modal_ok(div().id("imp-ok").size(px(36.)).flex().items_center().justify_center().bg(rgb(0x45b649)).cursor_pointer().child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(20.)).text_color(rgb(0xffffff)))))
+                    .child(os::modal_ok(div().id("imp-ok").size(px(36.)).flex().items_center().justify_center().bg(rgb(0x45b649)).cursor_pointer().child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(20.)).text_color(gpui_kit::rgb_static(0xffffff)))))
                     .child(os::modal_cancel(div().id("imp-cancel").size(px(36.)).flex().items_center().justify_center().cursor_pointer().child(os::glyph(os::GLYPH_CLOSE, 18., rgb(0xd0021b))))),
             )
             .child(tabs)

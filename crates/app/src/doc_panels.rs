@@ -165,7 +165,7 @@ impl Render for NotesPanel {
                 .pt(px(30.))
                 .items_center()
                 .gap(px(20.))
-                .child(svg().path(crate::assets::icon_path("notes-empty")).size(px(140.)).text_color(gpui_kit::rgb(0xebebeb)))
+                .child(svg().path(crate::assets::icon_path("notes-empty")).size(px(140.)).text_color(if gpui_kit::hex_theme_active() { crate::theme::p().illustration } else { gpui_kit::rgb(0xebebeb) }))
                 .child(div().text_size(px(14.67)).line_height(px(22.)).text_color(pal.text_muted).child("Instructions, description, or notes for this document"))
                 .into_any_element(),
             None => markdown(&self.notes).into_any_element(),

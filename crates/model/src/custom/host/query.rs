@@ -113,6 +113,8 @@ pub struct Snapshot {
     pub body_type: &'static str,
     /// Taken from a sketch entity.
     pub sketch: bool,
+    /// A face's whole shape: its split pieces (and copies of them) lie on it.
+    pub face: Option<k::Shape>,
 }
 
 pub struct QueryCx<'a> {
@@ -543,7 +545,8 @@ impl<'a> QueryCx<'a> {
                 vec![shape.project_point(p).ok()?.point]
             }
         };
-        Some(Snapshot { etype, points, body_type: self.body_type(e), sketch: self.is_sketch(e) })
+        let face = (etype == EType::Face).then(|| shape.clone());
+        Some(Snapshot { etype, points, body_type: self.body_type(e), sketch: self.is_sketch(e), face })
     }
 
     /// What a transient id stands for now. Operations rename entities, and
@@ -559,6 +562,12 @@ impl<'a> QueryCx<'a> {
         let tracked = self.tracked(snap, false);
         if tracked.is_empty() {
             return found;
+        }
+        // A face's name lineage holds (only edges take each other's names):
+        // its pieces by name, moved ones too (std Jog's rotated moving face),
+        // with what lies where it was.
+        if snap.etype == EType::Face && !found.is_empty() {
+            return uniq(found.into_iter().chain(tracked).collect());
         }
         let kept: Vec<Ent> = found.into_iter().filter(|e| tracked.contains(e)).collect();
         if kept.is_empty() { tracked } else { kept }
@@ -612,6 +621,14 @@ impl<'a> QueryCx<'a> {
             })
             .filter(|e| {
                 if snap.points.iter().all(|p| on(e, *p)) {
+                    return true;
+                }
+                // A piece of a split face (std Jog clips its face away from the
+                // old face's middle): an inner point on the old face.
+                if let Some(old) = &snap.face
+                    && let Some(m) = self.snapshot(e).and_then(|s| s.points.first().copied())
+                    && k::make_vertex(m).ok().and_then(|v| k::distance(&v, old).ok()).is_some_and(|d| d.distance < TOL)
+                {
                     return true;
                 }
                 // A piece of a split straight edge: its middle on the old segment.
@@ -939,7 +956,17 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 Ent::Body(b) => q.st.merged_creators.get(&q.st.ctx.bodies[*b].id).is_some_and(|cs| cs.iter().any(|c| has_prefix(c, &id))),
                 _ => false,
             };
-            filter(q.all(None).into_iter().filter(|e| q.created_by(e).is_some_and(|c| has_prefix(&c, &id)) || merged(e)).collect())
+            let visible = filter(q.all(None).into_iter().filter(|e| q.created_by(e).is_some_and(|c| has_prefix(&c, &id)) || merged(e)).collect());
+            if !visible.is_empty() {
+                visible
+            } else {
+                // Nothing visible: the faces / edges it made may now be part of
+                // a (hidden) sheet metal definition (std loft Add joins its sheet
+                // to the definition, then finds the new joint by qCreatedBy).
+                // Not the definition body itself (std flange's merge checks that
+                // its boolean created no body).
+                filter(q.all_with(None, true).into_iter().filter(|e| !matches!(e, Ent::Body(_)) && q.created_by(e).is_some_and(|c| has_prefix(&c, &id))).collect())
+            }
         }
         "SKETCH_REGION" => {
             let Some(id) = id_of(query.get("featureId")) else { return Ok(Vec::new()) };

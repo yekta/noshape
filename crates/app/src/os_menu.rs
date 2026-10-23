@@ -479,7 +479,7 @@ impl Render for OsMenu {
                     match label.split_once('\t') {
                         Some((text, badge)) => h_flex()
                             .child(text.to_string())
-                            .child(div().ml(px(15.)).px(px(6.)).h(px(20.)).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb(0xffffff)).text_size(px(12.)).child(badge.to_string()))
+                            .child(div().ml(px(15.)).px(px(6.)).h(px(20.)).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb_static(0xffffff)).text_size(px(12.)).child(badge.to_string()))
                             .into_any_element(),
                         None => label.clone().into_any_element(),
                     }
@@ -511,7 +511,7 @@ impl Render for OsMenu {
                     OsMenuItem::Item { label, icon, checked, disabled, keys, .. } => row(ix)
                         .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
-                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1967d2 } else { 0x1651b0 })).text_color(gpui_kit::rgb(0xffffff)))
+                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1967d2 } else { 0x1651b0 })).text_color(gpui_kit::rgb_static(0xffffff)))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
                             d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(crate::assets::icon("menu-check", 16., cx)))
@@ -597,7 +597,8 @@ impl Render for OsMenu {
             .border_1()
             // Live (part-studio/53): the camera menu's border is #d7d7d7 like
             // a dropdown's; right-click menus use #ccc.
-            .border_color(gpui_kit::rgb(if dropdown || camera { 0xd7d7d7 } else { 0xcccccc }))
+            // Static: dark mode keeps the light outline (live dk-924: #ccc).
+            .border_color(gpui_kit::rgb_static(if dropdown || camera { 0xd7d7d7 } else { 0xcccccc }))
             .rounded(px(if dropdown { 5.25 } else { 4. }))
             .when(dropdown, |d| d.py(px(4.)).min_w(px(253.)).text_color(gpui_kit::rgb(0x555555)))
             .when_some(self.min_width, |d, w| d.min_w(px(w)))

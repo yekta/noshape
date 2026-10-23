@@ -19,7 +19,7 @@ use noshape_model::assembly::BomBehavior;
 
 /// The dialogs' gray "?" help button (14 px, `#888`).
 pub(super) fn help_dot() -> Div {
-    div().size(px(14.)).rounded_full().bg(rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")
+    div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x888888)))
 }
 
 use crate::properties_dialog::parse_mass;
@@ -765,7 +765,7 @@ impl AssemblyView {
                                     .border_1()
                                     .border_color(rgb(0x767676))
                                     .bg(if checked { rgb(0x1651b0) } else { rgb(0xffffff) })
-                                    .when(checked, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(rgb(0xffffff))))
+                                    .when(checked, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff))))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         if let Some(m) = &mut this.ui.ref_manager
                                             && !m.checked.remove(&i)
@@ -908,7 +908,7 @@ impl AssemblyView {
                             .rounded(px(5.25))
                             .bg(rgb(0x1651b0))
                             .text_size(px(14.))
-                            .text_color(rgb(0xffffff))
+                            .text_color(gpui_kit::rgb_static(0xffffff))
                             .when(!enabled, |d| d.opacity(0.4))
                             .when(enabled, |d| d.cursor_pointer())
                             .child(if tab == 0 { "Update all" } else { "Update selected" })

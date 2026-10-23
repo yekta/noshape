@@ -408,7 +408,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
                 .rounded(px(3.))
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
-                .bg(gpui_kit::white())
+                .bg(crate::theme::p().panel)
                 // Greyed while a protected target refuses the merge (live wp-937).
                 .when(plan.protected_with_changes, |d| d.opacity(0.5))
                 .when(differs, |d| {
@@ -562,7 +562,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
             .children(same_rows)
             .children(notice);
         let merge_button = os::primary_button("merge-ok", "Merge").when(!can_merge, |b| b.disabled(true).opacity(0.4));
-        let help = div().size(px(18.)).rounded_full().bg(rgb(0x999999)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?");
+        let help = div().size(px(18.)).rounded_full().flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 20.0, crate::theme::help_dot(0x999999)));
         let (doc, plan2, state2) = (doc.clone(), plan.clone(), state.clone());
         os::modal(dialog, "", W)
             .title(title)

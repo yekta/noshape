@@ -219,6 +219,9 @@ pub struct UiState {
     pub preview_before: Option<Arc<StudioDisplay>>,
     /// Regeneration context before the edited feature.
     pub before_context: Option<Arc<noshape_model::regen::context::Context>>,
+    /// The edited feature's parameters when std's editing logic last ran
+    /// (its `oldDefinition`; empty for a new feature's first change).
+    pub std_edit_old: Option<noshape_model::params::ParamValues>,
     pub preview_task: Option<Task<()>>,
     /// Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
@@ -226,6 +229,8 @@ pub struct UiState {
     /// A feature drag's drop slot: the hovered row and whether the cursor is
     /// in its lower half (lands after it; live F33).
     pub feature_drop: std::rc::Rc<std::cell::Cell<Option<(usize, bool)>>>,
+    /// The open Hole dialog's parameters last time (its linked depths).
+    pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
     pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
@@ -419,9 +424,11 @@ impl UiState {
             preview_opacity: 1.0,
             preview_before: None,
             before_context: None,
+            std_edit_old: None,
             preview_task: None,
             preview_tool: None,
             feature_drop: Default::default(),
+            hole_prev: None,
             preview_tool_task: None,
             measure_lines: None,
             dyn_suppression: None,
@@ -1212,7 +1219,7 @@ impl PartStudioView {
         let (_, st, _) = self.ui.dyn_suppression.as_ref()?;
         let pal = p();
         let field = gpui_kit::component::input::Input::new(st).appearance(false).text_size(px(13.33)).h(px(25.));
-        let help = div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x888888)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?");
+        let help = div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x888888)));
         Some(
             v_flex()
                 .id("dyn-suppression")
@@ -2952,11 +2959,42 @@ impl PartStudioView {
     /// the part. Fields the user set are left alone.
     pub(super) fn auto_operation(&mut self, cx: &mut Context<Self>) {
         let Some(e) = &self.edit else { return };
+        // Live L49/L50: a tapped hole's Depth, Tapped depth and Tap
+        // clearance stay linked, new or edited.
+        if e.dialog.read(cx).feature.type_id == "hole" {
+            let dialog = e.dialog.clone();
+            let (id, now) = {
+                let d = dialog.read(cx);
+                (d.feature.id, d.feature.params.clone())
+            };
+            let units = self.doc.read(cx).session.doc.settings.units;
+            if let Some((pid, prev)) = self.ui.hole_prev.take()
+                && pid == id
+            {
+                let changes = noshape_model::features::hole_tables::link_tapped_depths(&prev, &now, &units);
+                if !changes.is_empty() {
+                    dialog.update(cx, |d, cx| {
+                        for (k, v) in changes {
+                            d.set_value_auto(k, v, cx);
+                        }
+                    });
+                }
+            }
+            let now = dialog.read(cx).feature.params.clone();
+            self.ui.hole_prev = Some((id, now));
+        }
+        let Some(e) = &self.edit else { return };
+        // Std's editing logic runs on edits of existing features too.
+        let ty = e.dialog.read(cx).feature.type_id.clone();
+        if noshape_model::custom::std_feature::has_editing_logic(&ty) {
+            let dialog = e.dialog.clone();
+            self.std_edit_logic(&dialog, cx);
+            return;
+        }
         if !e.is_new {
             return;
         }
         let dialog = e.dialog.clone();
-        let ty = dialog.read(cx).feature.type_id.clone();
         if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector") {
             self.direct_edit_logic(&dialog, cx);
             return;
@@ -3033,6 +3071,38 @@ impl PartStudioView {
 }
 
 impl PartStudioView {
+    /// The std "Editing Logic Function" of a feature std runs (Tab: picking
+    /// the profile fills "Flange to merge" and the subtraction offset, live
+    /// qa5 4.2), on the model before the feature; fields the user set are
+    /// `specifiedParameters`.
+    fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
+        let Some(ctx) = self.ui.before_context.clone() else { return };
+        let (ty, id, name, params, user_set) = {
+            let d = dialog.read(cx);
+            (d.feature.type_id.clone(), d.feature.id, d.feature.name.clone(), d.feature.params.clone(), d.user_set.iter().cloned().collect::<Vec<String>>())
+        };
+        let old = self.ui.std_edit_old.replace(params.clone()).unwrap_or_default();
+        if old == params {
+            return;
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let Some(changed) = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &params, &user_set) else { return };
+        let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
+        if changes.is_empty() {
+            return;
+        }
+        let mut next = params;
+        for (k, v) in &changes {
+            next.set(k, v.clone());
+        }
+        self.ui.std_edit_old = Some(next);
+        dialog.update(cx, |d, cx| {
+            for (k, v) in changes {
+                d.set_value_auto(&k, v, cx);
+            }
+        });
+    }
+
     /// Onshape's deleteFaceEditLogic / replaceFaceEditLogic for a new
     /// feature, leaving fields the user set alone: Delete face of surface
     /// faces switches to Leave open (live L10); Replace face ticks Flip

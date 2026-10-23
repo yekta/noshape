@@ -566,8 +566,10 @@ fn zebra_stripes_replace_shading() {
     assert!(b > 500 && wh > 500 && o < 200, "not striped: {b} black, {wh} white, {o} other");
     let (_, _, _, many) = shot(Some(Zebra { stripes: 40, flip: false }));
     assert!(many > few && few > 0, "stripe count ignored: {few} vs {many} changes");
-    let (b, wh, _, _) = shot(None);
-    assert!(b < 50 && wh < 50, "shading not restored: {b} black, {wh} white");
+    // Shaded again: no black stripes; Onshape's specular highlight may clip
+    // to white (#999 on top of the lit color) but the shaded rest dominates.
+    let (b, wh, o, _) = shot(None);
+    assert!(b < 50 && o > 4 * wh, "shading not restored: {b} black, {wh} white, {o} other");
 }
 
 /// Reflection analysis: a box mirrors a two-tone environment (white sky,
@@ -810,6 +812,60 @@ fn feature_preview_shading_matches_onshape() {
     assert!(near(top, front, 6), "top {top:?} and front {front:?} should read alike");
     assert!(near(top, [132, 148, 158], 6), "top {top:?}");
     assert!(near(right, [160, 186, 202], 6), "right {right:?}");
+}
+
+/// Onshape's part lighting (woolsthorpe `lightFragment`), in sRGB: 0.5 ×
+/// the color, plus 0.5 × the color × max(N·L, 0) for one light along
+/// eye-space (1, 1, 1), plus Blinn-Phong specular #999999 with exponent 30.
+/// Every face normal of the default-blue cube, from Isometric and from
+/// below; live (psb, part-studio/2258): its top #8cb9d4, its front #4e6876.
+#[test]
+fn part_faces_are_lit_like_onshape() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (400u32, 300u32);
+    let base = [0x9d, 0xcf, 0xed];
+    let color = [srgb_lin(base[0]), srgb_lin(base[1]), srgb_lin(base[2]), 1.0];
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1)))).with_color(color));
+    let mut iso = Camera::default();
+    iso.set_view(StandardView::Isometric);
+    let below = Camera { rotation: Camera::look_rotation(glam::DVec3::new(1.0, -1.0, 1.0).normalize(), glam::DVec3::Z), ..Camera::default() };
+    let mut samples = Vec::new();
+    for mut cam in [iso, below] {
+        cam.fit_box(glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05), w as f64 / h as f64);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        let (fwd, up) = (cam.forward(), cam.up());
+        let light = (fwd.cross(up) + up - fwd).normalize();
+        for n in [glam::DVec3::X, -glam::DVec3::X, glam::DVec3::Y, -glam::DVec3::Y, glam::DVec3::Z, -glam::DVec3::Z] {
+            let p = n * 0.05;
+            if n.dot(cam.eye() - p) <= 0.0 {
+                continue;
+            }
+            let q = cam.project(p, glam::DVec2::new(w as f64, h as f64), 0.2).expect("on screen");
+            let px = &f.bgra[((q.y as u32 * w + q.x as u32) * 4) as usize..][..3];
+            let got = [px[2] as f64, px[1] as f64, px[0] as f64];
+            let half = (light + (cam.eye() - p).normalize()).normalize();
+            let spec = n.dot(half).max(0.0).powf(30.0) * 0.6;
+            let want: Vec<f64> = base.iter().map(|&c| ((c as f64 / 255.0) * (0.5 + 0.5 * n.dot(light).max(0.0)) + spec).min(1.0) * 255.0).collect();
+            eprintln!("normal {n:?}: got {got:?}, Onshape's model {want:?}");
+            assert!(got.iter().zip(&want).all(|(g, w)| (g - w).abs() <= 2.0), "normal {n:?}: {got:?} vs {want:?}");
+            samples.push((n, got));
+        }
+    }
+    assert_eq!(samples.len(), 6, "every face normal sampled");
+    let live = |n: glam::DVec3, want: [f64; 3]| {
+        let got = samples.iter().find(|(m, _)| *m == n).expect("sampled").1;
+        assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() <= 4.0), "{n:?}: {got:?} vs live {want:?}");
+    };
+    live(glam::DVec3::Z, [140.0, 185.0, 212.0]);
+    live(-glam::DVec3::Y, [78.0, 104.0, 118.0]);
 }
 
 fn srgb_lin(c: u8) -> f32 {

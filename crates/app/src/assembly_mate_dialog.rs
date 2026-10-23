@@ -102,7 +102,13 @@ pub struct MateDialog {
     offsets: [Entity<crate::quantity_field::QuantityInput>; 4],
     limits: HashMap<&'static str, (Entity<InputState>, Entity<InputState>)>,
     labeler: ConnectorLabeler,
+    /// The mate's regeneration error (the red title's tooltip).
     pub status: Option<String>,
+    /// Slots on an instance whose part is gone, with the instance's name
+    /// (live E15: red chips; Tangent's read "Missing entity of <instance>").
+    pub lost: HashMap<usize, String>,
+    units: noshape_units::UnitPrefs,
+    variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
     focus: FocusHandle,
     _subs: Vec<Subscription>,
     /// The mate type select (Onshape's os-select, live assembly/36).
@@ -243,6 +249,9 @@ impl MateDialog {
             limits,
             labeler,
             status: None,
+            lost: HashMap::new(),
+            units,
+            variables,
             focus: cx.focus_handle(),
             _subs: subs,
             type_select,
@@ -320,21 +329,17 @@ impl MateDialog {
             // Tab and width connectors must not share instances.
             let others: &[usize] = if field == 0 || field == 3 { &[1, 2] } else { &[0, 3] };
             if others.iter().any(|i| same(self.slot(*i))) {
-                self.status = Some("Tab and width mate connectors must be on different instances".into());
-                cx.notify();
                 return false;
             }
         } else {
-            // Both connectors must be on different instances.
+            // Live (E1): a second pick on the same instance is not accepted;
+            // the title keeps "Mate needs two mate connectors.".
             let other = if field == 0 { &self.b } else { &self.a };
             if same(other) {
-                self.status = Some("Select a mate connector on a different instance".into());
-                cx.notify();
                 return false;
             }
         }
         *self.slot_mut(field) = Some(c);
-        self.status = None;
         self.active = self.next_active();
         cx.emit(MateDialogEvent::Changed);
         cx.notify();
@@ -345,6 +350,38 @@ impl MateDialog {
         let t = state.read(cx).value().to_string();
         let unset = t.trim().is_empty() || NO_LIMIT.contains(&t.trim());
         (!unset).then(|| ExprValue::new(t))
+    }
+
+    /// Limit keys whose minimum is above the maximum (live E11: both inputs pink).
+    fn crossed_limits(&self, cx: &App) -> Vec<&'static str> {
+        if !self.use_limits {
+            return Vec::new();
+        }
+        limit_keys(self.mate_type)
+            .iter()
+            .copied()
+            .filter(|key| {
+                let dim = if matches!(*key, "rz" | "cone") { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
+                let (lo, hi) = &self.limits[key];
+                let v = |st: &Entity<InputState>| Self::expr(st, cx).and_then(|e| noshape_units::evaluate_as(&e.text, dim, &self.units, &self.variables).ok()).map(|q| q.value);
+                matches!((v(lo), v(hi)), (Some(a), Some(b)) if a > b)
+            })
+            .collect()
+    }
+
+    /// Live's title tooltip text: "<name> did not regenerate properly: <message>".
+    fn regen_error(&self, cx: &App) -> Option<String> {
+        let incomplete = match self.mate_type {
+            // Live: "Nothing selected." while empty, then "Tangent mate needs two entities.".
+            MateType::Tangent if self.a.is_none() && self.b.is_none() => Some("Nothing selected."),
+            MateType::Tangent if self.a.is_none() || self.b.is_none() => Some("Tangent mate needs two entities."),
+            MateType::Width if self.a.is_none() || self.b.is_none() || self.c.is_none() => Some("Two width mate connectors are required."),
+            MateType::Tangent | MateType::Width => None,
+            _ if self.a.is_none() || self.b.is_none() => Some("Mate needs two mate connectors."),
+            _ => None,
+        };
+        let msg = incomplete.map(str::to_string).or_else(|| (!self.crossed_limits(cx).is_empty()).then(|| "Minimum mate limit should be smaller than maximum limit. A parameter value is not valid.".to_string())).or_else(|| self.status.clone())?;
+        Some(format!("{} did not regenerate properly: {msg}", self.name))
     }
 
     /// The mate as currently defined (None until both connectors are set).
@@ -433,14 +470,22 @@ impl MateDialog {
         let mut rows = Vec::new();
         for &field in fields {
             let Some(c) = self.slot(field) else { continue };
-            let text: SharedString = (self.labeler)(c).into();
+            let lost = self.lost.get(&field);
+            let text: SharedString = match lost {
+                Some(inst) if self.mate_type == MateType::Tangent => format!("Missing entity of {inst}").into(),
+                _ => (self.labeler)(c).into(),
+            };
             let text_del = text.clone();
             // Live (qa5 MT3): "Mate connector of Part 1 <3> (Click to edit)".
             let edit_tip = format!("{text} (Click to edit)");
             let bold = self.editing_field == Some(field);
             rows.push(
-                os::query_row(SharedString::from(format!("mc-field-{field}")), text)
+                os::query_row(SharedString::from(format!("mc-field-{field}")), text.clone())
+                    // Live: the chip's tooltip ("Mate connector of Part 1 <2>
+                    // (Click to edit)"; Tangent's faces: the label).
+                    .tooltip(crate::ui::tooltip(if self.mate_type == MateType::Tangent { text.to_string() } else { format!("{text} (Click to edit)") }))
                     .when(bold, |d| d.font_weight(FontWeight::BOLD))
+                    .when(lost.is_some(), |d| d.text_color(pal.text_invalid))
                     .hover(|d| d.bg(pal.row_hover))
                     // The connector glyph opens the connector for editing.
                     .when(self.mate_type != MateType::Tangent, |d| {
@@ -523,7 +568,7 @@ impl Render for MateDialog {
         // hangs under the emptied field, plain rows, the current type blue.
         let types: Vec<MateType> = if MATE_TYPE_ORDER.contains(&t) { MATE_TYPE_ORDER.to_vec() } else { vec![t] };
         self.type_select.update(cx, |sel, _| sel.set_items(types.iter().map(|mt| (SharedString::from(mt.name()), SharedString::from(mt.name()))).collect(), t.name()));
-        let type_field = div().w(px(194.)).child(self.type_select.clone());
+        let type_field = div().id("mate-type-field").w(px(194.)).tooltip(crate::ui::tooltip("Mate type")).child(self.type_select.clone());
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;
         let lkeys = limit_keys(t);
@@ -593,6 +638,7 @@ impl Render for MateDialog {
             // icon (axis letter + min / max glyph in the axis colour: X red,
             // Y green, Z blue), the right-aligned field ("No minimum" /
             // "No maximum") right after it.
+            let crossed = self.crossed_limits(cx);
             let limit_field = |key: &'static str, max: bool, st: &Entity<InputState>, cx: &App| {
                 let icon = match (key, max) {
                     ("cone", _) => "mate-limit-cone",
@@ -612,7 +658,15 @@ impl Render for MateDialog {
                     .h(px(29.))
                     .tooltip(crate::ui::tooltip(format!("{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key))))
                     .child(crate::assets::icon(&icon_path(icon), 26., cx))
-                    .child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(pal.border).child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.))))
+                    .child(gpui_kit::base::input::input_frame(
+                        div()
+                            .flex_1()
+                            .border_b_1()
+                            .border_color(pal.border)
+                            // Live E11: min above max turns both pink (#f9ebec, 2 px #bd3039).
+                            .when(crossed.contains(&key), |d| d.bg(gpui_kit::rgb(0xf9ebec)).border_b_2().border_color(gpui_kit::rgb(0xbd3039)))
+                            .child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)),
+                    ))
             };
             for key in lkeys {
                 let (lo, hi) = &self.limits[key];
@@ -623,10 +677,12 @@ impl Render for MateDialog {
                 limit_rows = limit_rows.child(limit_field(key, true, hi, cx));
             }
         }
+        let regen_error = self.regen_error(cx);
         let invalid = self.to_mate(cx).is_none();
         let query_boxes = match t {
-            MateType::Tangent => vec![self.query_box("mate-q-ent", "Entities", &[0, 1], cx)],
-            MateType::Width => vec![self.query_box("mate-q-tab", "Tab mate connectors", &[0, 3], cx), self.query_box("mate-q-width", "Width mate connectors", &[1, 2], cx)],
+            // Live (dom/dialog-mate-tangent-*): one "Face, edge or vertex" field per entity.
+            MateType::Tangent => vec![self.query_box("mate-q-ent-a", "Face, edge or vertex", &[0], cx), self.query_box("mate-q-ent-b", "Face, edge or vertex", &[1], cx)],
+            MateType::Width => vec![self.query_box("mate-q-tab", "Tab mate connector(s)", &[0, 3], cx), self.query_box("mate-q-width", "Width mate connectors", &[1, 2], cx)],
             _ => vec![self.query_box("mate-q-mc", "Mate connectors", &[0, 1], cx)],
         };
         // Live dialog-mate-revolute: flip-direction-opposite, realign-mate-dialog.
@@ -672,7 +728,19 @@ impl Render for MateDialog {
                     .bg(pal.panel)
                     .border_b_1()
                     .border_color(pal.border)
-                    .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { pal.text_invalid } else { pal.text }).truncate().child(self.name.clone()))
+                    .child(
+                        div()
+                            .id("mate-title")
+                            .flex_1()
+                            .pl(px(6.))
+                            .text_size(px(13.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(if regen_error.is_some() { pal.text_invalid } else { pal.text })
+                            .truncate()
+                            .child(self.name.clone())
+                            // Live: the title's tooltip is the name, or the regeneration error.
+                            .tooltip(crate::ui::tooltip(regen_error.unwrap_or_else(|| self.name.clone()))),
+                    )
                     // Configure mode: only ✕ (live 194).
                     .when(self.configuring.is_none(), |d| d.child(
                         div()
@@ -681,7 +749,7 @@ impl Render for MateDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
+                            .bg(pal.accept).when(invalid, |d| d.opacity(0.2))
                             .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
                             .child(crate::assets::icon("dialog-ok", 24., cx))
@@ -733,20 +801,22 @@ impl Render for MateDialog {
                         .when(self.use_limits, |d| d.child(limit_rows))
                     })
                     // Onshape's bottom row: flip primary axis, reorient secondary
-                    // axis, animate, Solve; the help ? at the right.
+                    // axis, animate, Solve; the help ? at the right. Live
+                    // (dom/dialog-mate-*-filled): Tangent has the flip only,
+                    // Width none of them (a 22 px row with the ?).
                     .child(
                         h_flex()
-                            .h(px(30.))
+                            .h(px(if t == MateType::Width { 22. } else { 30. }))
                             .px(px(3.))
                             .gap(px(4.))
-                            .child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx))))
-                            .child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .when(t != MateType::Width, |d| d.child(small_tool("mate-flip", flip_icon, "Flip primary axis (a)", false).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.flip(cx)))))
+                            .when(!matches!(t, MateType::Tangent | MateType::Width), |d| d.child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.reorient = (this.reorient + 1) % 4;
                                 cx.emit(MateDialogEvent::Changed);
                                 cx.notify();
-                            })))
+                            }))))
                             // Animate: preview the mate's motion (mates with degrees of freedom).
-                            .map(|d| {
+                            .when(!matches!(t, MateType::Tangent | MateType::Width), |d| {
                                 let can = !noshape_model::assembly::eval::mate_dofs(t).is_empty();
                                 d.child(
                                     div()
@@ -771,7 +841,7 @@ impl Render for MateDialog {
                                         })),
                                 )
                             })
-                            .child(
+                            .when(!matches!(t, MateType::Tangent | MateType::Width), |d| d.child(
                                 // Live dom dialog-mate-fastened-filled: 52 x 21, 1 px
                                 // `#aaa`, radius 3.5, 12.25 px.
                                 div()
@@ -780,39 +850,39 @@ impl Render for MateDialog {
                                     .px(px(10.))
                                     .flex()
                                     .items_center()
-                                    .bg(gpui_kit::white())
+                                    .bg(gpui_kit::rgb(0xffffff))
                                     .border_1()
                                     .border_color(gpui_kit::rgb(0xaaaaaa))
                                     .rounded(px(3.5))
                                     .text_size(px(12.25))
+                                    .text_color(crate::theme::p().text)
                                     .cursor_pointer()
                                     .hover(|d| d.bg(gpui_kit::rgb(0xe6e6e6)))
                                     .child("Solve")
-                                    .tooltip(crate::ui::tooltip("Solve all mates including this one"))
+                                    .tooltip(crate::ui::tooltip("Solve full assembly"))
                                     .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Solve))),
-                            )
+                            ))
                             .child(div().flex_1())
                             .child(
                                 div()
                                     .size(px(14.))
                                     .mr(px(4.))
                                     .rounded_full()
-                                    .bg(gpui_kit::rgb(0x999999))
+                                    
                                     .flex()
                                     .items_center()
                                     .justify_center()
                                     .text_size(px(10.))
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(gpui_kit::rgb(0xffffff))
-                                    .child("?"),
+                                    
+                                    .child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999))),
                             ),
                     )
                     // Configure mode: the mate's suppression as a checkbox (live 195).
                     .when(self.configuring.is_some(), |d| {
                         let unsup = os::checkbox("mate-unsuppressed", "Unsuppressed", !self.suppressed);
                         d.child(self.cfg_param(noshape_model::assembly::config::param::UNSUPPRESSED, unsup, cx))
-                    })
-                    .when_some(self.status.clone(), |d, s| d.child(div().p(px(4.)).child(crate::ui::alert(crate::ui::AlertKind::Warning).text_size(px(12.)).child(s)))),
+                    }),
             )
     }
 }

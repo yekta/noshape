@@ -1989,7 +1989,7 @@ impl PartStudioView {
                 .child(
                     h_flex()
                         .h(px(29.))
-                        .bg(gpui_kit::white())
+                        .bg(crate::theme::p().panel)
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Text"))
@@ -2046,7 +2046,7 @@ impl PartStudioView {
                                 .h(px(93.))
                                 .border_1()
                                 .border_color(gpui_kit::rgb(0x1651b0))
-                                .bg(gpui_kit::white())
+                                .bg(crate::theme::p().panel)
                                 .when_some(family, |d, f| d.font_family(f))
                                 .when(bold, |d| d.font_weight(FontWeight::BOLD))
                                 .when(italic, |d| d.italic())
@@ -2070,7 +2070,7 @@ impl PartStudioView {
                                 .pr(px(4.))
                                 .text_size(px(12.))
                                 .child(div().flex_1().text_color(if count > 250 { gpui_kit::rgb(0xaa252d) } else { gpui_kit::rgb(0x333333) }).child(format!("{count}/250 characters")))
-                                .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
+                                .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))),
                         )
                         .when_some(error, |this, error| this.child(div().px(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xaa252d)).child(error))),
                 )
@@ -2911,10 +2911,10 @@ impl PartStudioView {
                                         .justify_center()
                                         .rounded(px(4.))
                                         // Live: pale green (disabled) while the field is invalid.
-                                        .bg(if dim_invalid { rgb(0xcce9cc) } else { pal.accept })
+                                        .bg(pal.accept).when(dim_invalid, |d| d.opacity(0.2))
                                         .cursor_pointer()
                                         .when(!dim_invalid, |d| d.hover(|d| d.bg(rgb(0x74ce3a))))
-                                        .child(Icon::new(gpui_kit::component::IconName::Check).with_size(px(16.)).text_color(rgb(0xffffff)))
+                                        .child(Icon::new(gpui_kit::component::IconName::Check).with_size(px(16.)).text_color(gpui_kit::rgb_static(0xffffff)))
                                         .on_click(cx.listener({
                                             let st = st.clone();
                                             move |this, _: &ClickEvent, window, cx| {
@@ -4140,10 +4140,17 @@ fn dimension_label_colors(ed: &SketchEditor, cid: noshape_sketch::ConstraintId, 
         (Some(rgb(0xd9a566)), rgb(0x000000))
     } else if ed.hover_constraint == Some(cid) {
         (Some(rgb(0xd9bfa0)), rgb(0x000000))
-    } else if ed.show_errors && ed.conflicting.contains(&cid) {
-        (None, rgb(crate::theme::viewport::SKETCH_OVER))
     } else {
-        (None, if driving { rgb(0x000000) } else { rgb(crate::theme::viewport::DIM_DRIVEN) })
+        // Dark (live dk-933): white values, driven #ccc, conflicts #ff6b6b.
+        use crate::theme::{pick, viewport as l, viewport_dark as d};
+        let hex = if ed.show_errors && ed.conflicting.contains(&cid) {
+            pick(l::SKETCH_OVER, d::SKETCH_OVER)
+        } else if driving {
+            pick(l::SKETCH_FULL, d::SKETCH_FULL)
+        } else {
+            pick(l::DIM_DRIVEN, d::DIM_DRIVEN)
+        };
+        (None, gpui_kit::rgb_static(hex))
     }
 }
 

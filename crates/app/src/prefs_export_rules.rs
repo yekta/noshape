@@ -48,7 +48,7 @@ impl Render for ExportRulesPrefsView {
         } else {
             // Live 1877: Scope | Format | Convention | [Edit] [Remove], creation order.
             let cell = |w: f32, t: SharedString, bold: bool| div().w(px(w)).flex_none().px(px(10.)).truncate().when(bold, |d| d.font_weight(FontWeight::BOLD)).child(t);
-            let small = |id: SharedString, label: SharedString| div().id(id).h(px(24.)).px(px(8.)).flex().items_center().rounded(px(3.)).bg(rgb(BLUE)).text_size(px(12.)).text_color(rgb(0xffffff)).cursor_pointer().child(label);
+            let small = |id: SharedString, label: SharedString| div().id(id).h(px(24.)).px(px(8.)).flex().items_center().rounded(px(3.)).bg(rgb(BLUE)).text_size(px(12.)).text_color(gpui_kit::rgb_static(0xffffff)).cursor_pointer().child(label);
             let mut table = v_flex().mr(px(15.)).text_size(px(14.)).text_color(pal.text).child(h_flex().h(px(44.)).border_b_1().border_color(rgb(0xdee2e6)).child(cell(180., tr("Scope"), true)).child(cell(220., tr("Format"), true)).child(div().flex_1().px(px(10.)).font_weight(FontWeight::BOLD).child(tr("Convention"))));
             for (i, r) in rules.iter().enumerate() {
                 let (v1, v2) = (view.clone(), view.clone());
