@@ -1021,6 +1021,8 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 * ANSI T-slot nut (nut form 7, live B-rep 5/16 + 1-1/2): the section extruded along Y (`tl`), tongue root fillets
   `tr` (live's FaceFillet ← CORNER_FILLET), 45° corner chamfers `tc` (CornerFillet ← CORNER_CHAMFER), the hole at
   major − pitch, countersunk both faces.
+* AS568 O-rings now read live's table (inch; the old rows were ISO 3601 metric values, wrong) and live's four
+  materials (Butyl default; generator `MATERIAL_NAMES`).
 * Deviations left: our kernel reports the acorn's spindle torus (negative major radius) as a surface of revolution
   (kern); live's acorn 1/4 hex measures 0.438 where its table says 0.4375 (0.1 % area). ISO 7380's head uses HEAD_TOP_DIA (no rule yet).
 * Waiting on live (REQUESTS "skb (10-23 06:30)"): toothed lock washers, retaining rings, PEM® (44), NAS (6),
