@@ -1094,7 +1094,7 @@ fn full_round_fillet_parting_draft_swept_blend() {
 
 #[test]
 fn flat_spiral_planes_and_ruled_overrides() {
-    // Flat spiral: radius 10 -> 30 mm over 3 turns in the Top plane.
+    // Height 0 (a flat spiral) is out of Onshape's range (live L32).
     let mut s = Studio::new();
     s.add("helix", |p| {
         p.set("axisType", en("AXIS"));
@@ -1105,16 +1105,7 @@ fn flat_spiral_planes_and_ruled_overrides() {
         p.set("endRadius", expr("30 mm"));
         p.set("revolutions", expr("3"));
     });
-    let r = s.ok();
-    let b = &r.context.bodies[0];
-    let bb = b.shape.bounding_box(true).unwrap();
-    assert!(bb.max.z - bb.min.z < 1e-6, "flat: {bb:?}");
-    let len: f64 = b.shape.edges().iter().map(|e| e.length().unwrap()).sum();
-    let approx = 2.0 * PI * 3.0 * mm(20.0);
-    assert!(near(len, approx, approx * 0.01), "spiral length {len} vs {approx}");
-    let (a, e) = b.shape.edges()[0].endpoints().unwrap();
-    let (ra, re) = (DVec2::new(a.x, a.y).length(), DVec2::new(e.x, e.y).length());
-    assert!(near(ra.min(re), mm(10.0), 1e-6) && near(ra.max(re), mm(30.0), 1e-6), "radii {ra} {re}");
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "A parameter value is not valid.".to_string()));
 
     // Mid plane between two intersecting planes (Top and Right): the bisector.
     let mut s = Studio::new();
@@ -1567,4 +1558,54 @@ fn fill_tangency_on_curves_is_a_warning() {
     let st = r.display.features.last().unwrap();
     assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Warning, Some("Could not meet tangency constraints at highlighted points.")));
     assert_eq!(r.context.bodies.len(), 1);
+}
+
+/// Live L38 ("psb L37-39 mate connector"): on a block's top face, reorient
+/// "+Y" turns X to −Y; a move goes along the reoriented/flipped frame; the
+/// rotation comes last and doesn't change the move. L37: no owner fails.
+#[test]
+fn mate_connector_frame_order_as_live() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    let block = s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let top = face_at(&r, 0, DVec3::new(mm(20.0), mm(10.0), mm(10.0)));
+    let owner = Reference::Body(noshape_model::reference::BodyId { feature: block, index: 0 });
+    let run = |set: &dyn Fn(&mut ParamValues)| -> (DVec3, DVec3, DVec3) {
+        let mut t = Studio { ps: s.ps.clone(), ..Studio::new() };
+        let (top, owner) = (top.clone(), owner.clone());
+        t.add("mateConnector", move |p| {
+            p.set("originQuery", q(top));
+            p.set("ownerPart", q(owner));
+            set(p);
+        });
+        let c = t.ok().context.connectors[0].clone();
+        (c.origin * 1e3, c.x, c.z)
+    };
+    let close = |a: DVec3, b: DVec3| (a - b).length() < 1e-6;
+    let (o, x, _) = run(&|p| p.set("secondaryAxisType", en("PLUS_Y")));
+    assert!(close(o, DVec3::new(20.0, 10.0, 10.0)) && close(x, DVec3::new(0.0, -1.0, 0.0)), "{o} {x}");
+    let (o, x, _) = run(&|p| {
+        p.set("secondaryAxisType", en("PLUS_Y"));
+        p.set("transform", ParamValue::Bool(true));
+        p.set("translationX", expr("10 mm"));
+        p.set("rotation", expr("90 deg"));
+    });
+    assert!(close(o, DVec3::new(20.0, 0.0, 10.0)) && close(x, DVec3::new(1.0, 0.0, 0.0)), "{o} {x}");
+    let (o, _, z) = run(&|p| {
+        p.set("flipPrimary", ParamValue::Bool(true));
+        p.set("transform", ParamValue::Bool(true));
+        p.set("translationZ", expr("10 mm"));
+    });
+    assert!(close(o, DVec3::new(20.0, 10.0, 0.0)) && close(z, DVec3::new(0.0, 0.0, -1.0)), "{o} {z}");
+    // No owner and nothing to own it (live L37: an empty studio).
+    let mut e = Studio::new();
+    e.add("mateConnector", |p| p.set("originQuery", q(Reference::Origin)));
+    assert_eq!(e.last_status(), (FeatureStatus::Error, "Cannot determine owner of mate connector.".to_string()));
 }

@@ -81,7 +81,8 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     let left_handed = ev.is("handedness", "CCW");
     // Start condition.
     if ev.is("startType", "START_POINT") {
-        let Some(p) = ev.query("startPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Select a start point") };
+        // Live L34: no start point reads "Cannot resolve entities.", no field.
+        let Some(p) = ev.query("startPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Cannot resolve entities.") };
         base += z * (p - base).dot(z);
         let radial = p - base;
         if radial.length() < 1e-9 {
@@ -159,8 +160,21 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     if revs < 1e-9 {
         return err("Revolutions must be positive");
     }
+    // helix.fs: a zero start radius with an end radius swaps the ends (live
+    // L33: a conical spiral out from the axis); both zero fails.
     if r0 < 1e-9 {
-        return err("The helix start radius must be greater than zero");
+        let r_end = height * taper.tan();
+        if r_end.abs() < 1e-9 {
+            return err("Start or end radius should be greater than 0.");
+        }
+        let turn = std::f64::consts::TAU * revs * if left_handed { -1.0 } else { 1.0 };
+        let x_end = DQuat::from_axis_angle(z, turn) * x;
+        let (b2, z2, x2) = (base + z * height, -z, x_end);
+        base = b2;
+        z = z2;
+        x = x2;
+        r0 = r_end;
+        taper = -taper;
     }
     let pitch = height / revs;
     let frame = k::Plane::new(base, z, x);
