@@ -908,3 +908,22 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
     documents); notes keep their measured #ebebeb in light.
   * In app (dark): feature list planes = live dk-924; feature menu icons = live; documents nav = live dk-910.
     Not icons, for ui2: our Create button is #3e94ff, live's dark Create is the darker #1651b0-ish blue.
+- Block 2, part 2 (in-app dark vs live dk-9xx):
+  * Sketch toolbar = live dk-932 except sketch linear pattern (top-left square outline-secondary #bababa, was white):
+    fixed. scratch tools/autotry.py tries var-based recolourings (accent red/green flips, outline-secondary grey)
+    against the live dark symbol and keeps the best: +13 (check, cancel, mate limits, offset, chevrons, ...);
+    tailconv.py (--themed-secondary) for the mate icons (outline-tertiary #888 -> #ccc: revolute, slider, ...),
+    link/select-box (fill-secondary themed #d7d7d7); inspection/config illustrations #555 (fill-quinary).
+  * Toolbar split-tool caret: the `expanded` sprite is 10x6 and live draws it 1:1; ours was the glyph at 12 px
+    (12x8, thicker). Now 10 px = live's 10x6 (light and dark), ui.rs tool_caret + custom features button.
+  * Tree expanders: Palette.icon_tertiary (#666 / #999 = --os-icon-fill-tertiary). ui::caret used rgb(0x666666),
+    which DARK_HEX sends to #ccc; live dark is #999 (dk-940). Assembly instance/mate row chevrons were the 11 px
+    ui-chevron in pal.text (white, 5x10); live = the same 8x12 expander as the headers in #999: now expander-* 14.
+  * Selection-list/chip × (ui-clear #666) -> icon_tertiary: live dark #999 (dk-926), was #ccc.
+  * Mate dialog / assembly "Solve" buttons were bg(gpui_kit::white()) with inherited text: white-on-white in dark.
+    Now rgb(0xffffff) (themed) + pal.text. 51 other bg(white()) remain app-wide (ui2's call; reported).
+  * Feature dialog (dk-926): flip arrow, tolerance, ✓/✗ match; live's ± "+" is crisp where ours (and the sprite at
+    1:1) is split over two columns: a sub-pixel placement difference, not art.
+  * Open for live (REQUESTS icons2 10-23 07:30): sheet metal, more context menus/dialogs, tab manager, history,
+    properties panels in dark; glyphs tinted rgb(0x666666) (ui-dropdown-arrow, ui-caret-down, close, info, pin,
+    folder, undo, import-file) wait for those captures (sprite vars differ per glyph).

@@ -2174,7 +2174,7 @@ impl FeatureDialog {
                                     .group("field-x")
                                     .cursor_pointer()
                                     // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                    .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
+                                    .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         cx.stop_propagation();
                                         cx.emit(DialogEvent::HoverRef(None));
@@ -2422,7 +2422,7 @@ impl FeatureDialog {
                                         .cursor_pointer()
                                         .group("field-x")
                                         // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                        .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
+                                        .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                         .on_click(cx.listener(remove(k))),
                                 )
                             });
@@ -2501,7 +2501,7 @@ impl FeatureDialog {
                                             .cursor_pointer()
                                             .group("field-x")
                                             // Live (dialogs/extrude-03): Onshape's × glyph, 7 px ink, #666.
-                                            .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)).group_hover("field-x", |s| s.text_color(pal.error)))
+                                            .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary).group_hover("field-x", |s| s.text_color(pal.error)))
                                             .on_click(cx.listener(remove(k))),
                                     ),
                             )

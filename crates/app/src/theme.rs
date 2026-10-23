@@ -96,6 +96,8 @@ pub struct Palette {
     pub info: Rgba,
     /// Empty-state illustrations: notes, documents (`--os-icon-fill-quinary`, #eee; #555 in dark).
     pub illustration: Rgba,
+    /// Tree expanders and other grey glyphs (`--os-icon-fill-tertiary`, #666; #999 in dark).
+    pub icon_tertiary: Rgba,
     pub overlay_shadow: Rgba,
 }
 
@@ -148,6 +150,7 @@ pub const PALETTE: Palette = Palette {
     error: rgb_const(0xbd3039),
     info: rgb_const(0x1651b0),
     illustration: rgb_const(0xeeeeee),
+    icon_tertiary: rgb_const(0x666666),
     overlay_shadow: rgba_const(0x00000033),
 };
 
@@ -223,6 +226,7 @@ pub const PALETTE_DARK: Palette = Palette {
     error: rgb_const(0xbd3039),
     info: rgb_const(0x90cef1),
     illustration: rgb_const(0x555555),
+    icon_tertiary: rgb_const(0x999999),
     overlay_shadow: rgba_const(0x00000066),
 };
 

@@ -2224,7 +2224,7 @@ impl PartStudioView {
             .child(
                 crate::ui::tool_button("tb-custom-features", "custom-feature", false, cx)
                     .w(px(crate::ui::TOOL_CELL + crate::ui::TOOL_CARET_W))
-                    .child(crate::ui::glyph("tool-caret", 12., p().text))
+                    .child(crate::ui::glyph("tool-caret", 10., p().text))
                     .tooltip("Custom features in this workspace")
                     // Live (part-studio/1251–1252, qa5 FS4): no heading; each
                     // entry has its initials icon ("Qc") and the name, with

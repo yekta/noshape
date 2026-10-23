@@ -3139,7 +3139,7 @@ impl AssemblyView {
                     .id(SharedString::from(format!("exp-{}", path.iter().map(|i| i.0.to_string()).collect::<Vec<_>>().join("-"))))
                     .w(px(12.))
                     .when(has_children, |d| {
-                        d.child(crate::ui::glyph(if expanded { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        d.child(crate::ui::glyph(if expanded { "expander-down" } else { "expander-right" }, 14., pal.icon_tertiary)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if !this.expanded.remove(&p2) {
                                 this.expanded.insert(p2.clone());
                             }
@@ -3320,7 +3320,7 @@ impl AssemblyView {
             .when(selected, |d| d.bg(pal.accent_soft))
             .when(!selected, |d| d.hover(|d| d.bg(pal.row_hover)))
             .child(div().id(SharedString::from(format!("mexp-{}", id.0))).w(px(if flat { 0. } else { 12. })).when(can_expand, |d| {
-                d.child(crate::ui::glyph(if expanded { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                d.child(crate::ui::glyph(if expanded { "expander-down" } else { "expander-right" }, 14., pal.icon_tertiary)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if !this.ui.expanded_mates.remove(&id) {
                         this.ui.expanded_mates.insert(id);
                     }
@@ -3957,10 +3957,11 @@ impl AssemblyView {
                             .rounded(px(4.))
                             .border_1()
                             .border_color(gpui_kit::rgb(0xaaaaaa))
-                            .bg(gpui_kit::white())
+                            .bg(gpui_kit::rgb(0xffffff))
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .text_size(px(14.))
+                            .text_color(pal.text)
                             .tooltip(crate::ui::tooltip("Solve full assembly"))
                             .child("Solve")
                             .on_click(move |_, _, cx| d4.update(cx, |_, cx| cx.emit(MateDialogEvent::Solve))),

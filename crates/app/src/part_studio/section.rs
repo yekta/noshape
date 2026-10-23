@@ -295,7 +295,7 @@ impl PartStudioView {
                         .id(SharedString::from(format!("{id}-x")))
                         // Live (part-studio/71): the × is always shown.
                         .cursor_pointer()
-                        .child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666)))
+                        .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary))
                         .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
                             cx.stop_propagation();
                             on_x(this, w, cx)

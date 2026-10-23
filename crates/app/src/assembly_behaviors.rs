@@ -2724,7 +2724,7 @@ impl AssemblyView {
         };
         let chip_row = os::query_row("anim-dof-chip", chip(dof)).child(
             // Live (dom/dialog-animate): a 20 x 24 "×" span (5 px left pad), 8 x 7 px ink, #666.
-            div().id("anim-dof-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 10., gpui_kit::rgb(0x666666))),
+            div().id("anim-dof-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 10., crate::theme::p().icon_tertiary)),
         ).into_any_element();
         // Live dom dialog-animate: the chip box, 5 px, then 26 px rows.
         let mut body = v_flex().px(px(3.)).pt(px(3.)).pb(px(2.)).child(os::query_box("anim-dof", "Mate DOF to animate", true, vec![chip_row])).child(div().h(px(5.)));
@@ -3040,7 +3040,7 @@ impl AssemblyView {
                     .gap_1()
                     .text_sm()
                     .child(div().flex_1().truncate().child(names.get(&id).cloned().unwrap_or_default()))
-                    .child(div().id(SharedString::from(format!("grp-x-{}", id.0))).cursor_pointer().child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_group_member(id, cx)))),
+                    .child(div().id(SharedString::from(format!("grp-x-{}", id.0))).cursor_pointer().child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_group_member(id, cx)))),
             );
         }
         let body = v_flex()
