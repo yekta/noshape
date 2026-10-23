@@ -306,9 +306,12 @@ fn form_adds_and_cuts_and_shows_in_flat() {
     let sid = s.sketch(Reference::FeaturePlane(pl), sk);
     let r = s.ok();
     let v0 = volume(&r, 0);
+    // The face the dialog's editing logic fills in for these locations (std formedEditLogic).
+    let top = face_at(&r, 0, DVec3::new(mm(50.0), mm(20.0), mm(2.0)));
     s.add("sheetMetalFormed", move |p| {
         p.set("formPartStudio", ParamValue::Text("form".into()));
         p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: p1.0 }, Reference::SketchEntity { sketch: sid, entity: p2.0 }]));
+        p.set("targetFaces", q(top));
     });
     let r = s.ok();
     let t = mm(2.0);

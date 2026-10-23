@@ -480,7 +480,10 @@ impl MateDialog {
             let edit_tip = format!("{text} (Click to edit)");
             let bold = self.editing_field == Some(field);
             rows.push(
-                os::query_row(SharedString::from(format!("mc-field-{field}")), text)
+                os::query_row(SharedString::from(format!("mc-field-{field}")), text.clone())
+                    // Live: the chip's tooltip ("Mate connector of Part 1 <2>
+                    // (Click to edit)"; Tangent's faces: the label).
+                    .tooltip(crate::ui::tooltip(if self.mate_type == MateType::Tangent { text.to_string() } else { format!("{text} (Click to edit)") }))
                     .when(bold, |d| d.font_weight(FontWeight::BOLD))
                     .when(lost.is_some(), |d| d.text_color(pal.text_invalid))
                     .hover(|d| d.bg(pal.row_hover))

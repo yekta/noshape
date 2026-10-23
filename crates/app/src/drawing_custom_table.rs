@@ -460,7 +460,7 @@ impl DrawingEditor {
                 .gap(px(4.))
                 .border_1()
                 .border_color(gpui_kit::rgb(0xcccccc))
-                .bg(gpui_kit::white())
+                .bg(crate::theme::light().panel)
                 .text_size(px(14.))
                 .when(!enabled, |b| b.opacity(0.4))
                 .when(enabled, |b| b.cursor_pointer().hover(|b| b.bg(p().panel_hover)))

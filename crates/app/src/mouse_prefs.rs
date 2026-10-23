@@ -80,7 +80,7 @@ impl MousePrefsView {
                     .border_1()
                     .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
                     .bg(if on { rgb(0x0075ff) } else { rgb(0xffffff) })
-                    .when(on, |d| d.child(Icon::new(IconName::Check).size(px(11.)).text_color(rgb(0xffffff)))),
+                    .when(on, |d| d.child(Icon::new(IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
             )
             .child(label)
     }

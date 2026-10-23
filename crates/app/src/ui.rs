@@ -701,7 +701,7 @@ pub fn os_checkbox_focused(id: impl Into<ElementId>, label: impl Into<SharedStri
                 .border_color(if on || focused { pal.accent } else { gpui_kit::rgb(0x888888) })
                 .when(focused, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x769fcc).into(), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]))
                 .bg(if on { pal.accent } else { gpui_kit::rgb(0xffffff) })
-                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb(0xffffff)))),
+                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
         )
         .child(label.into())
 }
@@ -1182,7 +1182,7 @@ pub fn name_pill(name: SharedString, offset: Point<Pixels>) -> Div {
                 .bg(gpui_kit::rgb(0x1651b0))
                 .text_size(px(14.))
                 .font_weight(FontWeight::BOLD)
-                .text_color(gpui_kit::rgb(0xffffff))
+                .text_color(gpui_kit::rgb_static(0xffffff))
                 .child(name),
         )
         .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())

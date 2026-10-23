@@ -395,7 +395,7 @@ impl PartStudioView {
                         .items_center()
                         .justify_center()
                         .bg(rgb_u32(hex))
-                        .when(on, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(1.), spread_radius: px(0.), inset: false }]).child(crate::ui::glyph("check", 12., gpui_kit::rgb(0xffffff)))),
+                        .when(on, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(0.)), blur_radius: px(1.), spread_radius: px(0.), inset: false }]).child(crate::ui::glyph("check", 12., gpui_kit::rgb_static(0xffffff)))),
                 )
                 .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| this.set_edit_color(c, w, cx)))
                 .into_any_element()

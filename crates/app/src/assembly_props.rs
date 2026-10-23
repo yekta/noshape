@@ -765,7 +765,7 @@ impl AssemblyView {
                                     .border_1()
                                     .border_color(rgb(0x767676))
                                     .bg(if checked { rgb(0x1651b0) } else { rgb(0xffffff) })
-                                    .when(checked, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(rgb(0xffffff))))
+                                    .when(checked, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff))))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                         if let Some(m) = &mut this.ui.ref_manager
                                             && !m.checked.remove(&i)
@@ -908,7 +908,7 @@ impl AssemblyView {
                             .rounded(px(5.25))
                             .bg(rgb(0x1651b0))
                             .text_size(px(14.))
-                            .text_color(rgb(0xffffff))
+                            .text_color(gpui_kit::rgb_static(0xffffff))
                             .when(!enabled, |d| d.opacity(0.4))
                             .when(enabled, |d| d.cursor_pointer())
                             .child(if tab == 0 { "Update all" } else { "Update selected" })
