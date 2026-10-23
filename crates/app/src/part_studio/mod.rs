@@ -2488,6 +2488,11 @@ impl PartStudioView {
                             this.section_pick(&r3, window, cx);
                             return;
                         }
+                        // So does an open analysis tool (Draft analysis's Mold
+                        // split direction, qa5 ADV1).
+                        if this.edit.is_none() && this.ui.analysis_tool.is_some() && this.analysis_pick(&r3, cx) {
+                            return;
+                        }
                         let t = this.list_target(&r3);
                         this.pick(t, cx);
                     }))
@@ -3660,6 +3665,18 @@ impl PartStudioView {
                 if ev.click_count() >= 2 {
                     this.edit_feature(id, window, cx);
                     return;
+                }
+                // A Plane feature's row feeds the section view dialog and an
+                // open analysis tool like the default planes' rows (qa5 ADV1).
+                let plane = this.display.planes.iter().find(|p| p.reference == Reference::FeaturePlane(id)).map(|p| p.reference.clone());
+                if let Some(r) = &plane {
+                    if this.ui.section_dialog.is_some() {
+                        this.section_pick(r, window, cx);
+                        return;
+                    }
+                    if this.edit.is_none() && this.ui.analysis_tool.is_some() && this.analysis_pick(r, cx) {
+                        return;
+                    }
                 }
                 if this.pick_feature_into_dialog(id, cx) {
                     return;
