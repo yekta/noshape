@@ -37,3 +37,6 @@ Format: `## <id> — <owner> — <one-line summary>` then repro, expected (live)
   Actual: nothing; Esc with the focus outside the fields closes it.
 - Cause: the pattern dialog root has no `key_context("FeatureDialog")`, so the "FeatureDialog > Input" Esc → Cancel binding
   doesn't apply. Adding the context also binds Tab → DialogTab, which the pattern dialog doesn't handle yet.
+
+STATUS R1: fixed on main (833bfb0b, in 88fbf8f5); re-checked in the app 2026-10-23 17:50 (qa4): Top + Right selected, parts draw normally. Closed.
+STATUS ASM-ESC: fixed on main (833bfb0b); re-checked 2026-10-23 17:52 (qa4): unedited Instance count, Esc → dialog cancels. Closed.

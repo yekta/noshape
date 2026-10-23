@@ -477,6 +477,6 @@ under the Hole row, lands under it), F8/F9/F18 closed earlier. Still open, route
   lights the cube + two G48 faces). `importing.rs import_foreign` names each body with `new_face_names` → `Role::New(ordinal)`
   per body under one feature, so body 0 and body 1 both have New(0…5).
 - IMP2 (live request): Parts list after importing g48-two reads Part 2 above Part 1; live order not captured.
-- R1 (render): two default planes selected → black halos / see-through parts (also v0.4.5).
+- R1: fixed on main (833bfb0b), re-checked in the app: closed.
 - PAT-DIR (psb, v0.4.7 gate): failed Feature pattern's Direction drawn orange (selection) instead of red.
-- ASM-ESC (ui/asb): Esc in an unedited focused field of the assembly pattern dialog does nothing (no "FeatureDialog" context).
+- ASM-ESC: fixed on main (833bfb0b), re-checked in the app: closed.
