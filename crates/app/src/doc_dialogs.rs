@@ -126,7 +126,7 @@ pub fn restore_deleted_workspaces(doc: Entity<DocModel>, window: &mut Window, cx
                     h_flex()
                         .h(px(36.))
                         .gap(px(8.))
-                        .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(b.name.clone()))
+                        .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(b.name.clone())))
                         .child(div().text_size(px(13.)).text_color(pal.text_muted).child(crate::start_library::format_onshape_time(b.created)))
                         .child(os::secondary_button(SharedString::from(format!("restore-{}", id.0)), "Restore", cx).on_click(move |_, window, cx| {
                             let r = doc.update(cx, |d, _| d.session.store.restore_branch(id).map_err(Into::into));
@@ -616,7 +616,7 @@ pub fn move_to_document(doc: Entity<DocModel>, tabs: Vec<noshape_model::document
                         .cursor_pointer()
                         .hover(|d| d.bg(rgb(0xdef1fb)))
                         .child(os::glyph(os::GLYPH_DOCUMENT, 18., pal.text_muted))
-                        .child(div().flex_1().truncate().child(name))
+                        .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
                         .on_click(move |_, window, cx| {
                             let r = tabs.iter().try_for_each(|t| move_tab_into(&doc, *t, &target, cx));
                             if report(&doc, r, cx) {

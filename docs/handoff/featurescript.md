@@ -722,10 +722,10 @@ against live numbers). Fixed today: Finish (tests now select parts as live requi
 std Jog default case (= live 4825.132741228719 / 22 faces: tracking keeps what ops after lastOperationId changed,
 split pieces and moved pieces of tracked faces, opSplitFace ownExistingImprints, opBoolean eraseImprintedEdges,
 opFitSpline 2 points → line, straight degree-1 B-splines count as lines).
-- Jog with Preserve material off: after bend 1 the model is inconsistent (bend strip wrapped down to z −1, moving
-  wall rotated up to z 47, pieces not composed into one sheet, the fixed edge found twice → two fit wires); bend 2
-  then fails checkSplitResults. Look at the clip path (clipping planes / copyClipped) and transformMovingSurface's
-  rotation sign for this case.
+- Jog with Preserve material off: builds on std now (kernel find_plane orients a planar B-spline face's plane by
+  the face, so evPlane of the stretched bend face points the right way). The test's last case expects the native
+  "too small" error for a 3 mm offset; std (= Onshape) computes a smaller bend angle instead, so the native jog
+  deviates there: make the native jog follow std, then fix the test.
 - Sheet metal loft: host natives @evTessellatedLoftMatches / @opTessellatedLoft are in (host/loft.rs, the native
   loft's faceting). The hopper now passes on std except its last case (4-gon to triangle: the native route says
   "same number of segments"; what live does with unequal corner counts is unknown, asked live). Loft Add on std

@@ -537,7 +537,7 @@ impl PartStudioView {
                         .cursor_pointer()
                         .hover(|d| d.bg(rgb(0xf0f0f0)))
                         .child(crate::ui::glyph(if hidden { "eye-off" } else { "eye" }, 14., rgb(0x666666)))
-                        .child(div().text_size(px(13.)).text_color(if hidden { rgb(0x999999) } else { rgb(0x333333) }).child(o.name.clone()))
+                        .child(div().text_size(px(13.)).text_color(if hidden { rgb(0x999999) } else { rgb(0x333333) }).child(crate::ui::user_text(o.name.clone())))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if let Some(c) = &mut this.ui.in_context
                                 && !c.hidden.remove(&top)
@@ -914,7 +914,7 @@ impl PartStudioView {
                 .flex_1()
                 .min_w_0()
                 .gap(px(10.))
-                .child(div().truncate().when(editing, |d| d.text_color(rgb(0xaaaaaa))).child(name.clone()))
+                .child(div().truncate().when(editing, |d| d.text_color(rgb(0xaaaaaa))).child(crate::ui::user_text(name.clone())))
                 .child(div().italic().text_color(rgb(if editing { 0xcccccc } else { 0x999999 })).truncate().child(asm.clone()))
                 .into_any_element(),
             (_, None) => div().flex_1().italic().child("None").into_any_element(),

@@ -3201,7 +3201,7 @@ impl AssemblyView {
             .child(match self.rename_field(behaviors::RenameRow::Instance(top)).filter(|_| is_top) {
                 Some(field) => field,
                 // The state glyphs follow the name (Onshape), not the row's right edge.
-                None => div().min_w_0().truncate().mr(px(2.)).when(suppressed, |d| d.line_through()).when(dyn_suppressed, |d| d.italic()).child(name.clone()).into_any_element(),
+                None => div().min_w_0().truncate().mr(px(2.)).when(suppressed, |d| d.line_through()).when(dyn_suppressed, |d| d.italic()).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
             .when_some(state, |d, s| d.child(Self::state_pill(s)))
             // Live (assembly/530, E3): with two or more fixed, the fix icon
@@ -3394,7 +3394,7 @@ impl AssemblyView {
             .child(div().flex_none().when(dim, |d| d.opacity(0.5)).child(crate::assets::icon(&icon, 14., cx)))
             .child(match self.rename_field(behaviors::RenameRow::Feature(id)) {
                 Some(field) => field,
-                None => div().flex_1().truncate().when(inactive, |d| d.line_through()).child(name.clone()).into_any_element(),
+                None => div().flex_1().truncate().when(inactive, |d| d.line_through()).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
             .when(has_limits, |d| {
                 let n = name.clone();
@@ -3484,7 +3484,7 @@ impl AssemblyView {
                     .text_color(pal.text_muted)
                     .hover(|d| d.bg(pal.panel_hover))
                     .child(crate::assets::icon(&icon_path("mate-connector"), 12., cx))
-                    .child(div().flex_1().truncate().child(label))
+                    .child(div().flex_1().truncate().child(crate::ui::user_text(label)))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         let new = if *h { Some(id) } else { None };
                         if this.list_hover_mate != new {
@@ -3524,7 +3524,7 @@ impl AssemblyView {
             .child(div().w(px(16.)).flex_none().flex().justify_center().child(crate::assets::icon(&icon_path("assembly"), 16., cx)))
             .child(match self.rename_field(behaviors::RenameRow::Instance(InstanceId::ORIGIN)) {
                 Some(field) => field,
-                None => div().min_w_0().truncate().child(name).into_any_element(),
+                None => div().min_w_0().truncate().child(crate::ui::user_text(name)).into_any_element(),
             })
             // Live E15: the badge's tooltip.
             .when(has_error, |d| d.child(div().id("asm-error").flex_none().size(px(6.)).rounded_full().bg(pal.error).tooltip(crate::ui::tooltip("Assembly contains error"))))
@@ -3768,7 +3768,7 @@ impl AssemblyView {
                 crate::ui::tree_row("rel-new", true)
                     .child(div().w(px(12.)))
                     .child(crate::assets::icon(&icon_path(relation_icon(kind)), 14., cx))
-                    .child(div().flex_1().truncate().font_weight(FontWeight::BOLD).child(name))
+                    .child(div().flex_1().truncate().font_weight(FontWeight::BOLD).child(crate::ui::user_text(name)))
                     .into_any_element(),
             );
             mate_ids.push(MateId(u64::MAX));
@@ -4090,7 +4090,7 @@ impl AssemblyView {
                     Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
                     None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
                 }))
-                .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(name))
+                .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(crate::ui::user_text(name)))
         };
         let mut body = v_flex().id("insert-body").size_full().overflow_y_scroll();
         if source == 2 {
@@ -4284,7 +4284,7 @@ impl AssemblyView {
                             v_flex()
                                 .flex_1()
                                 .min_w_0()
-                                .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(doc_name))
+                                .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(crate::ui::user_text(doc_name)))
                                 .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child("Main")),
                         )
                         .child(square("ins-create-version", "version", "Create version…", cx).on_click({
@@ -4597,8 +4597,11 @@ impl AssemblyView {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(if valid { pal.text } else { pal.text_invalid })
                             .truncate()
-                            .tooltip(crate::ui::tooltip(title_tip.unwrap_or_else(|| name.clone())))
-                            .child(name),
+                            .map(|d| match title_tip {
+                                Some(t) => d.tooltip(crate::ui::tooltip(t)),
+                                None => d.tooltip(crate::ui::user_tooltip(name.clone())),
+                            })
+                            .child(crate::ui::user_text(name)),
                     )
                     .child(
                         div()

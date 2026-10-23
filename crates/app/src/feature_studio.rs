@@ -1572,7 +1572,7 @@ impl FeatureStudioView {
                     .border_color(rgb(0xaaaaaa))
                     .rounded(px(3.))
                     .cursor_pointer()
-                    .tooltip(crate::ui::tooltip(monitor_name.clone()))
+                    .tooltip(crate::ui::user_tooltip(monitor_name.clone()))
                     .child(os::glyph(os::GLYPH_PULSE, 18., pal.text))
                     .child(div().min_w_0().pr(px(4.)).truncate().text_size(px(14.)).text_color(pal.text).child(monitor_name))
                     .child(div().w(px(14.)).flex_none().h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
