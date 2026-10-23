@@ -41,6 +41,14 @@ Format: `## <id> — <owner> — <one-line summary>` then repro, expected (live)
 STATUS R1: fixed on main (833bfb0b, in 88fbf8f5); re-checked in the app 2026-10-23 17:50 (qa4): Top + Right selected, parts draw normally. Closed.
 STATUS ASM-ESC: fixed on main (833bfb0b); re-checked 2026-10-23 17:52 (qa4): unedited Instance count, Esc → dialog cancels. Closed.
 
+STATUS IMP1: owner now **api** (owns import/export, lead 2026-10-23).
+STATUS PAT-DIR: fixed on release/v0.4.7 (lead 2026-10-23); qa4 re-checks it in the v0.4.7 re-gate.
+
+## EXP1 — api — export headers still name Open CASCADE / noshape
+- Source: qa5 workflow-document DOC1 / I5; re-checked 2026-10-23 with noshape-cli v0.4.7 (export_parts iges / parasolid).
+- IGES global section "Open CASCADE IGES processor 8.0", file name "Filename.iges", author "root"; Parasolid header
+  `APPL=noshape`, `SCH_1200000_12006`. Expected: as live's exports (header fields as Onshape writes them).
+
 ## SF2 — kern — Extrude of two adjacent sketch regions makes a seam
 - Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
 - Repro: Sketch on Top: corner rectangles (0,0)–(20,20) and (20,0)–(40,20); Extrude both regions 10 mm (/root/qa5-scratch/pass3/sf2.py)
@@ -101,7 +109,7 @@ STATUS ASM-ESC: fixed on main (833bfb0b); re-checked 2026-10-23 17:52 (qa4): une
 - Expected (live): `**PART1;` MC/MC_MODEL/MC_ID/OS/OS_RELEASE=unknown, `FRU=Parasolid 38.1.231`, `APPL=Onshape`, SITE/USER=unknown, FORMAT=text, GUISE=transmit, KEY/FILE=BTGapi::writeModels_.xmt, DATE=…; `**PART2; SCH=SCH_3801231_38101` (samples/g25-a.x_t)
 - Actual: `MC=unknown;APPL=noshape;FORMAT=text;GUISE=transmit;` and `SCH=SCH_1200000_12006` (needs a decision: product/schema strings)
 
-## EXP1 — kern — Rhino export
+## RHINO1 — kern — Rhino export (qa5 EXP1)
 - Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
 - Repro: Part › Export… › Rhino (or `export_parts` format RHINO)
 - Expected (live): .3dm written
