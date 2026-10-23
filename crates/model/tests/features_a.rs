@@ -759,3 +759,72 @@ fn hole_misses_and_order_as_onshape() {
     let st = t.regen().display.features.last().cloned().unwrap();
     assert_eq!(st.message.as_deref(), Some("The counterbore diameter must be larger than the hole diameter."));
 }
+
+/// Block 40×20×10 with a sketch point at (20, 10) on its top.
+fn hole_block(t: &mut T) -> (FeatureId, u32) {
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.02, 0.01));
+    (t.sketch(Reference::FeaturePlane(pl), sk), p.0)
+}
+
+/// Live L47, L61 ("psb L46-61 hole"): a countersink deeper than its blind
+/// hole is allowed (6969.1508 mm³ left); Up to next with a 2 mm offset puts
+/// the tip's apex 2 mm before the bottom (shaft 6.0923 deep) and the Depth
+/// field reads 4.092.
+#[test]
+fn hole_countersink_and_offset_as_live() {
+    let mut t = T::new();
+    let (s, p) = hole_block(&mut t);
+    t.add("hole", &[
+        ("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p }])),
+        ("unitsSystem", en("METRIC")),
+        ("tableSynced", b(true)),
+        ("styleV2", en("C_SINK")),
+        ("holeDiameterV3", e("5 mm")),
+        ("cSinkDiameterV3", e("20 mm")),
+        ("cSinkAngleV3", e("90 deg")),
+        ("holeDepthV3", e("2 mm")),
+    ]);
+    let r = t.ok();
+    // The frustum Ø20 → Ø5 over 7.5 mm leaves 6969.165; live reports
+    // 6969.1508 (0.014 mm³ apart).
+    let v = total_volume(&r.context) * 1e9;
+    assert!((v - 6969.1508).abs() < 0.02, "{v}");
+
+    let mut t = T::new();
+    let (s, p) = hole_block(&mut t);
+    t.add("hole", &[
+        ("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p }])),
+        ("unitsSystem", en("METRIC")),
+        ("tableSynced", b(true)),
+        ("holeDiameterV3", e("6.35 mm")),
+        ("endStyleV2", en("UP_TO_NEXT")),
+        ("offset", b(true)),
+        ("offsetDistance", e("2 mm")),
+    ]);
+    let r = t.ok();
+    let shown = r.display.features.last().unwrap().computed.iter().find(|(k, _)| k == "holeDepthComputedV3").map(|(_, v)| v.clone());
+    match shown {
+        Some(noshape_model::display::ComputedValue::Length(d)) => assert!((d * 1e3 - 4.0923).abs() < 1e-3, "{d}"),
+        other => panic!("{other:?}"),
+    }
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(bb.min.z.abs() < 1e-9);
+}
+
+/// Live L53: a location off the part fails the whole hole.
+#[test]
+fn hole_point_off_the_part_fails_the_hole() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_point(DVec2::new(0.01, 0.01));
+    let off = sk.add_point(DVec2::new(0.08, 0.01));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: a.0 }, Reference::SketchEntity { sketch: s, entity: off.0 }])), ("unitsSystem", en("METRIC")), ("tableSynced", b(true))]);
+    let st = t.regen().display.features.last().cloned().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Hole creates invalid geometry.")));
+}
