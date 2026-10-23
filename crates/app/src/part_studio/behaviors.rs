@@ -2995,7 +2995,7 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector") {
+        if matches!(ty.as_str(), "deleteFace" | "moveFace" | "replaceFace" | "rib" | "mateConnector") {
             self.direct_edit_logic(&dialog, cx);
             return;
         }
@@ -3121,6 +3121,21 @@ impl PartStudioView {
                 let surface = |r: &Reference| self.body_of(r).and_then(|b| ctx?.body(&b).map(|b| b.kind == noshape_model::display::BodyKind::Surface)).unwrap_or(false);
                 if !faces.is_empty() && faces.iter().all(surface) && !params.is("healType", "VOID") {
                     changes.push(("healType", ParamValue::Enum("VOID".into())));
+                }
+            }
+            // moveFaceEditingLogic: Translate's Direction is the first planar
+            // face to move until the user picks one.
+            "moveFace" if params.is("moveFaceType", "TRANSLATE") && !user_set.contains("direction") => {
+                // Planar in the studio before the feature (the preview has
+                // already moved the face and renamed it).
+                let planar = |r: &Reference| {
+                    let Reference::Face(n) = r else { return false };
+                    ctx.is_some_and(|c| c.bodies.iter().any(|b| b.find_faces(n).first().and_then(|&fi| b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?.face_plane().ok()?).is_some()))
+                };
+                if let Some(f) = params.query("moveFaces").iter().find(|r| planar(r))
+                    && params.query("direction") != std::slice::from_ref(f)
+                {
+                    changes.push(("direction", ParamValue::Query(vec![f.clone()])));
                 }
             }
             // Live L22: a new Rib's Parts holds the studio's parts.
