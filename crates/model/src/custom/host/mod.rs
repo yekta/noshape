@@ -31,6 +31,7 @@ pub(crate) use status::quantity_of;
 
 pub use convert::*;
 pub use query::{Ent, entity_type_of};
+pub use status::{feature_list_refs, feature_list_value};
 
 use crate::reference::{BodyId, FeatureId, Reference, Role, TopoName};
 use crate::regen::context::{Body, Context};

@@ -1054,7 +1054,17 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             if yes { Vec::new() } else { sub(i, "subquery")? }
         }
         "SM_DEFINITION_ENTITY_FILTER" | "CORRESPONDING_IN_FLAT" | "PARTS_ATTACHED_TO" | "SM_APPLICATION_TYPE_FILTER" => Vec::new(),
-        "COMPOSITE_PART_TYPE_FITLER" | "CONSUMED" | "TOLERANCE_FILTER" => sub(i, "subquery")?,
+        // Consumed: a member of a closed composite part.
+        "CONSUMED" => {
+            let yes = enum_str(query.get("consumed")).is_some_and(|s| &*s == "YES");
+            let bodies = &q.st.ctx.bodies;
+            let consumed = |e: &Ent| match q.owner(e).unwrap_or_else(|| e.clone()) {
+                Ent::Body(b) => bodies.iter().filter_map(|c| c.composite.as_ref()).any(|c| c.closed && c.members.contains(&bodies[b].id)),
+                _ => false,
+            };
+            sub(i, "subquery")?.into_iter().filter(|e| consumed(e) == yes).collect()
+        }
+        "COMPOSITE_PART_TYPE_FITLER" | "TOLERANCE_FILTER" => sub(i, "subquery")?,
         "OP_HOLE_FACE" | "OP_HOLE_PROFILE" => filter(super::hole::op_hole_query(i, q, query, &*kind == "OP_HOLE_FACE")?),
         "PATTERN_INSTANCES" => {
             let Some(id) = id_of(query.get("featureId")) else { return Ok(Vec::new()) };

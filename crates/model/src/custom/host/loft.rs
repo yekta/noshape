@@ -113,7 +113,7 @@ fn matched(def: &Value, i: &mut Interp, cx: &FsContext) -> R<(Vec<(ProfilePoint,
         return Err(i.error("Both profiles must be open, or both closed"));
     }
     if p1.len() != p2.len() {
-        return Err(i.error(format!("The profiles have {} and {} corners; the tessellated loft needs the same number in both", p1.len(), p2.len())));
+        return Ok((walk(&p1, &p2, c1), c1));
     }
     let n = p1.len();
     let cost = |q: &[ProfilePoint]| p1.iter().zip(q).map(|(a, b)| (a.pos - b.pos).length_squared()).sum::<f64>();
@@ -131,6 +131,49 @@ fn matched(def: &Value, i: &mut Interp, cx: &FsContext) -> R<(Vec<(ProfilePoint,
     }
     let best = cands.into_iter().min_by(|a, b| cost(a).total_cmp(&cost(b))).unwrap_or(p2);
     Ok((p1.into_iter().zip(best).collect(), c1))
+}
+
+/// Profiles with different corner counts (live "fs (10-23 10:30)": a rectangle
+/// to a triangle gives a trapezoid and five triangles): the second turned the
+/// first's way round and started at the corner nearest the first's start,
+/// then both walked together, each step advancing the profile whose next
+/// corner makes the shorter diagonal, or both along parallel edges (a planar
+/// quad). Rows may repeat a point (triangles).
+fn walk(p1: &[ProfilePoint], p2: &[ProfilePoint], closed: bool) -> Vec<(ProfilePoint, ProfilePoint)> {
+    let newell = |p: &[ProfilePoint]| (0..p.len()).fold(DVec3::ZERO, |acc, i| acc + p[i].pos.cross(p[(i + 1) % p.len()].pos));
+    let mut q: Vec<ProfilePoint> = p2.to_vec();
+    if closed {
+        if newell(p1).dot(newell(&q)) < 0.0 {
+            q.reverse();
+        }
+        let start = (0..q.len()).min_by(|&a, &b| (q[a].pos - p1[0].pos).length_squared().total_cmp(&(q[b].pos - p1[0].pos).length_squared())).unwrap_or(0);
+        q.rotate_left(start);
+    } else if (q[0].pos - p1[0].pos).length_squared() > (q[q.len() - 1].pos - p1[0].pos).length_squared() {
+        q.reverse();
+    }
+    let (n1, n2) = if closed { (p1.len(), q.len()) } else { (p1.len() - 1, q.len() - 1) };
+    let at = |p: &[ProfilePoint], k: usize| p[k % p.len()].pos;
+    let (mut a, mut b) = (0usize, 0usize);
+    let mut rows = vec![(p1[0].clone(), q[0].clone())];
+    while a < n1 || b < n2 {
+        let parallel = a < n1 && b < n2 && {
+            let (e1, e2) = (at(p1, a + 1) - at(p1, a), at(&q, b + 1) - at(&q, b));
+            e1.cross(e2).length() <= 1e-9 * e1.length() * e2.length() && e1.dot(e2) > 0.0
+        };
+        if parallel {
+            a += 1;
+            b += 1;
+        } else if b == n2 || (a < n1 && (at(p1, a + 1) - at(&q, b)).length() <= (at(p1, a) - at(&q, b + 1)).length()) {
+            a += 1;
+        } else {
+            b += 1;
+        }
+        if closed && a == n1 && b == n2 {
+            break;
+        }
+        rows.push((p1[a % p1.len()].clone(), q[b % q.len()].clone()));
+    }
+    rows
 }
 
 fn ev_tessellated_loft_matches(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -213,7 +256,8 @@ fn op_tessellated_loft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let mut faces = Vec::new();
         for f in 0..facets {
             let (a, b) = (rows[f], rows[(f + 1) % n]);
-            let quad = [a[0], b[0], b[1], a[1]];
+            // A row sharing a point with the next (profiles with different corner counts): a triangle.
+            let quad: Vec<DVec3> = [a[0], b[0], b[1], a[1]].into_iter().enumerate().filter(|&(k, p)| !(k == 1 && (p - a[0]).length() < 1e-9 || k == 2 && (p - a[1]).length() < 1e-9)).map(|x| x.1).collect();
             let wire = k::make_polyline(&quad, true).map_err(|e| FeatureError::new(e.to_string()))?;
             match k::make_face_from_wire(&wire, true) {
                 Ok(face) => faces.push(face),
