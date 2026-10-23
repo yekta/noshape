@@ -682,7 +682,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .flex()
                     .items_center()
                     .justify_center()
-                    .bg(if changed { pal.accept } else { rgb(0xcce9cc) })
+                    .bg(pal.accept).when(!changed, |d| d.opacity(0.2))
                     .child(crate::assets::icon("dialog-ok", 24., cx))
                     .on_click(move |_, window, cx| {
                         let _ = (&doc_ok, &st_ok);

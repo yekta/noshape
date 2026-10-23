@@ -3151,7 +3151,7 @@ impl AssemblyView {
                     .id(SharedString::from(format!("exp-{}", path.iter().map(|i| i.0.to_string()).collect::<Vec<_>>().join("-"))))
                     .w(px(12.))
                     .when(has_children, |d| {
-                        d.child(crate::ui::glyph(if expanded { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        d.child(crate::ui::glyph(if expanded { "expander-down" } else { "expander-right" }, 14., pal.icon_tertiary)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if !this.expanded.remove(&p2) {
                                 this.expanded.insert(p2.clone());
                             }
@@ -3346,7 +3346,7 @@ impl AssemblyView {
             .when(selected, |d| d.bg(pal.accent_soft))
             .when(!selected, |d| d.hover(|d| d.bg(pal.row_hover)))
             .child(div().id(SharedString::from(format!("mexp-{}", id.0))).w(px(if flat { 0. } else { 12. })).when(can_expand, |d| {
-                d.child(crate::ui::glyph(if expanded { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                d.child(crate::ui::glyph(if expanded { "expander-down" } else { "expander-right" }, 14., pal.icon_tertiary)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if !this.ui.expanded_mates.remove(&id) {
                         this.ui.expanded_mates.insert(id);
                     }
@@ -3989,10 +3989,11 @@ impl AssemblyView {
                             .rounded(px(4.))
                             .border_1()
                             .border_color(gpui_kit::rgb(0xaaaaaa))
-                            .bg(crate::theme::p().panel)
+                            .bg(gpui_kit::rgb(0xffffff))
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .text_size(px(14.))
+                            .text_color(pal.text)
                             .tooltip(crate::ui::tooltip("Solve full assembly"))
                             .child("Solve")
                             .on_click(move |_, _, cx| d4.update(cx, |_, cx| cx.emit(MateDialogEvent::Solve))),
@@ -4512,7 +4513,7 @@ impl AssemblyView {
                 }
                 cx.notify();
             })))
-            .child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")));
+            .child(h_flex().justify_end().px(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
         v_flex()
             .id("relation-dialog")
             .w(px(220.))
@@ -4544,7 +4545,7 @@ impl AssemblyView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(if valid { pal.accept } else { gpui_kit::rgb(0xcce9cc) })
+                            .bg(pal.accept).when(!valid, |d| d.opacity(0.2))
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
                             .child(crate::assets::icon("dialog-ok", 24., cx))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_relation(cx))),
@@ -4663,7 +4664,7 @@ impl AssemblyView {
                     .border_t_1()
                     .border_color(gpui_kit::rgb(0xcccccc))
                     .child(div().flex_1().flex().justify_center().child(crate::variable_insert::panel_footer(self.doc.clone(), self.tab, cx)))
-                    .child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")),
+                    .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
             )
             .into_any_element()
     }

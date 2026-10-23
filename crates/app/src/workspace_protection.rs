@@ -132,7 +132,7 @@ pub fn render_banner(doc: &Entity<DocModel>, part_studio: bool, cx: &App) -> Opt
         return None;
     }
     let pal = p();
-    let help = div().size(px(18.)).flex_none().rounded_full().bg(rgb(0x999999)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?");
+    let help = div().size(px(18.)).flex_none().rounded_full().flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 20.0, crate::theme::help_dot(0x999999)));
     let bar = h_flex().id("protected-banner").h(px(32.)).px(px(20.)).gap(px(10.)).bg(rgb(0xffffff)).border_1().border_t_0().border_color(rgb(0xcccccc)).rounded_b(px(6.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(rgb(0x333333));
     Some(if part_studio {
         let d = doc.clone();

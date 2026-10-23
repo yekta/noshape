@@ -562,7 +562,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
             .children(same_rows)
             .children(notice);
         let merge_button = os::primary_button("merge-ok", "Merge").when(!can_merge, |b| b.disabled(true).opacity(0.4));
-        let help = div().size(px(18.)).rounded_full().bg(rgb(0x999999)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?");
+        let help = div().size(px(18.)).rounded_full().flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 20.0, crate::theme::help_dot(0x999999)));
         let (doc, plan2, state2) = (doc.clone(), plan.clone(), state.clone());
         os::modal(dialog, "", W)
             .title(title)

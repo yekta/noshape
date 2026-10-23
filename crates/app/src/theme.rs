@@ -20,7 +20,7 @@ pub struct Palette {
     pub tool_hover: Rgba,
     /// Hover of a split tool group, both halves (`--os-icon-button-fill--hover-group`).
     pub tool_hover_group: Rgba,
-    /// Toolbar tool whose dialog is open (`--os-select-primary`).
+    /// Toolbar tool whose dialog is open (`--os-icon-button-fill--selected`).
     pub tool_active: Rgba,
     /// Left and right panel rails (`--os-left-panel-background`).
     pub rail: Rgba,
@@ -115,6 +115,8 @@ pub struct Palette {
     pub info: Rgba,
     /// Empty-state illustrations: notes, documents (`--os-icon-fill-quinary`, #eee; #555 in dark).
     pub illustration: Rgba,
+    /// Tree expanders and other grey glyphs (`--os-icon-fill-tertiary`, #666; #999 in dark).
+    pub icon_tertiary: Rgba,
     pub overlay_shadow: Rgba,
 }
 
@@ -126,7 +128,9 @@ pub const PALETTE: Palette = Palette {
     panel_active: rgb_const(0xeaeaea),
     tool_hover: rgb_const(0xeaeaea),
     tool_hover_group: rgb_const(0xd7d7d7),
-    tool_active: rgb_const(0xb2ddf6),
+    // Live (dialogs/*-01-open, sketch/1933, 1940): the running tool is #eaeaea
+    // (`--os-icon-button-fill--selected`), not the selection blue.
+    tool_active: rgb_const(0xeaeaea),
     rail: rgb_const(0xfafafa),
     focus: rgb_const(0x3e94ff),
     rollback: rgb_const(0xb8b8b8),
@@ -174,6 +178,7 @@ pub const PALETTE: Palette = Palette {
     error: rgb_const(0xbd3039),
     info: rgb_const(0x1651b0),
     illustration: rgb_const(0xeeeeee),
+    icon_tertiary: rgb_const(0x666666),
     overlay_shadow: rgba_const(0x00000033),
 };
 
@@ -208,7 +213,8 @@ pub const PALETTE_DARK: Palette = Palette {
     panel_active: rgb_const(0x555555),
     tool_hover: rgb_const(0x666666),
     tool_hover_group: rgb_const(0x666666),
-    tool_active: rgb_const(0x134e96),
+    // Live dark dk-978 (Fillet open): the running tool is #555 (`--os-icon-button-fill--selected`).
+    tool_active: rgb_const(0x555555),
     rail: rgb_const(0x2c2c2c),
     focus: rgb_const(0x3e94ff),
     rollback: rgb_const(0xb8b8b8),
@@ -256,6 +262,7 @@ pub const PALETTE_DARK: Palette = Palette {
     error: rgb_const(0xbd3039),
     info: rgb_const(0x90cef1),
     illustration: rgb_const(0x555555),
+    icon_tertiary: rgb_const(0x999999),
     overlay_shadow: rgba_const(0x00000066),
 };
 
@@ -336,6 +343,13 @@ pub static DARK_HEX: [(u32, u32); 50] = [
 ];
 
 
+
+/// The grey disc of the dialogs' "?" help dot: the light grey measured at each
+/// place, and live dark's #aeaeae (dk-978, dk-987) in dark. The "?" on it is
+/// the dialog background (a knockout in Onshape).
+pub fn help_dot(light: u32) -> Rgba {
+    if gpui_kit::hex_theme_active() { rgb_const(0xaeaeae) } else { rgb_const(light) }
+}
 
 pub fn with_alpha(c: Rgba, a: f32) -> Rgba {
     Rgba { a, ..c }

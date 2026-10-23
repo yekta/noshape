@@ -502,7 +502,7 @@ impl AssemblyView {
                     .border_l_1()
                     .border_color(rgb(0xcccccc))
                     .child(div().flex_1())
-                    .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?"))),
+                    .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa))))),
             )
             .text_color(pal.text)
             .into_any_element()

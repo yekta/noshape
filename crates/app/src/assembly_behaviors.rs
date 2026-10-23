@@ -1027,7 +1027,7 @@ impl AssemblyView {
         }
         if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::External { .. }) {
             let tg = targets.clone();
-            m.push(icon_item("Change to version…", "legend-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
+            m.push(icon_item("Change to version…", "change-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
         m.push(export);
         // Live qa5 CA2: Release… after Export… (the instances' parts).
@@ -2761,7 +2761,7 @@ impl AssemblyView {
                 os::query_row("anim-dof-chip", chip(dof))
                     .child(
                         // Live (dom/dialog-animate): a 20 x 24 "×" span (5 px left pad), 8 x 7 px ink, #666.
-                        div().id("anim-dof-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 10., gpui_kit::rgb(0x666666))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        div().id("anim-dof-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 10., crate::theme::p().icon_tertiary)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             cx.stop_propagation();
                             if let Some(a) = &mut this.anim {
                                 (a.playing, a.task, a.chosen) = (false, None, false);
@@ -2884,7 +2884,7 @@ impl AssemblyView {
                         }
                     })))
                     .child(div().flex_1())
-                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
+                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))),
             );
         // Live dom dialog-animate: 220 px, the plain grey ×.
         Self::panel_frame_with("Animate mate", body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close", true).w(px(220.)).into_any_element()
@@ -3123,7 +3123,7 @@ impl AssemblyView {
                             .id(SharedString::from(format!("grp-x-{}", id.0)))
                             .px(px(5.))
                             .text_size(px(16.67))
-                            .text_color(gpui_kit::rgb(0x666666))
+                            .text_color(crate::theme::p().icon_tertiary)
                             .cursor_pointer()
                             .child("×")
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_group_member(id, cx))),
@@ -3136,7 +3136,7 @@ impl AssemblyView {
             .pb(px(2.))
             // The Instances field is active while the dialog is open.
             .child(div().px(px(3.)).pt(px(5.)).child(crate::os_ui::query_box("grp-instances", "Instances", true, rows)))
-            .child(h_flex().justify_end().px(px(4.)).pt(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")));
+            .child(h_flex().justify_end().px(px(4.)).pt(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
         v_flex()
             .id("group-dialog")
             .w(px(220.))

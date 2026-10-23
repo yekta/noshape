@@ -888,7 +888,7 @@ impl VariableStudioView {
             .child(div().flex_1())
             .children(add)
             .child(div().flex_1())
-            .child(div().size(px(14.)).rounded_full().bg(rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?"));
+            .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999))));
         v_flex()
             .w(px(PANEL_W))
             .h_full()
@@ -1047,7 +1047,7 @@ impl VariableStudioView {
                         .border_color(rgb(0xd7d7d7))
                         // Red until it has a name (live vs-913).
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(!ok, |d| d.text_color(rgb(0xaa252d))).child(title))
-                        .child(div().id("vci-ok").size(px(28.)).flex().items_center().justify_center().bg(if ok { pal.accept } else { rgb(0xcce9cc) }).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
+                        .child(div().id("vci-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, |d| d.opacity(0.2)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
                         .child(div().id("vci-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.cfg_dialog = None;
                             cx.notify();

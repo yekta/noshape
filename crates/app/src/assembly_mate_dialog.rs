@@ -372,6 +372,8 @@ impl MateDialog {
     /// Live's title tooltip text: "<name> did not regenerate properly: <message>".
     fn regen_error(&self, cx: &App) -> Option<String> {
         let incomplete = match self.mate_type {
+            // Live: "Nothing selected." while empty, then "Tangent mate needs two entities.".
+            MateType::Tangent if self.a.is_none() && self.b.is_none() => Some("Nothing selected."),
             MateType::Tangent if self.a.is_none() || self.b.is_none() => Some("Tangent mate needs two entities."),
             MateType::Width if self.a.is_none() || self.b.is_none() || self.c.is_none() => Some("Two width mate connectors are required."),
             MateType::Tangent | MateType::Width => None,
@@ -563,7 +565,7 @@ impl Render for MateDialog {
         // hangs under the emptied field, plain rows, the current type blue.
         let types: Vec<MateType> = if MATE_TYPE_ORDER.contains(&t) { MATE_TYPE_ORDER.to_vec() } else { vec![t] };
         self.type_select.update(cx, |sel, _| sel.set_items(types.iter().map(|mt| (SharedString::from(mt.name()), SharedString::from(mt.name()))).collect(), t.name()));
-        let type_field = div().w(px(194.)).child(self.type_select.clone());
+        let type_field = div().id("mate-type-field").w(px(194.)).tooltip(crate::ui::tooltip("Mate type")).child(self.type_select.clone());
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;
         let lkeys = limit_keys(t);
@@ -733,7 +735,8 @@ impl Render for MateDialog {
                             .text_color(if regen_error.is_some() { pal.text_invalid } else { pal.text })
                             .truncate()
                             .child(self.name.clone())
-                            .when_some(regen_error, |d, t| d.tooltip(crate::ui::tooltip(t))),
+                            // Live: the title's tooltip is the name, or the regeneration error.
+                            .tooltip(crate::ui::tooltip(regen_error.unwrap_or_else(|| self.name.clone()))),
                     )
                     // Configure mode: only ✕ (live 194).
                     .when(self.configuring.is_none(), |d| d.child(
@@ -743,7 +746,7 @@ impl Render for MateDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(if invalid { gpui_kit::rgb(0xcce9cc) } else { pal.accept })
+                            .bg(pal.accept).when(invalid, |d| d.opacity(0.2))
                             .when(!invalid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
                             .child(crate::assets::icon("dialog-ok", 24., cx))
@@ -842,15 +845,16 @@ impl Render for MateDialog {
                                     .px(px(10.))
                                     .flex()
                                     .items_center()
-                                    .bg(crate::theme::p().panel)
+                                    .bg(gpui_kit::rgb(0xffffff))
                                     .border_1()
                                     .border_color(gpui_kit::rgb(0xaaaaaa))
                                     .rounded(px(3.5))
                                     .text_size(px(12.25))
+                                    .text_color(crate::theme::p().text)
                                     .cursor_pointer()
                                     .hover(|d| d.bg(gpui_kit::rgb(0xe6e6e6)))
                                     .child("Solve")
-                                    .tooltip(crate::ui::tooltip("Solve all mates including this one"))
+                                    .tooltip(crate::ui::tooltip("Solve full assembly"))
                                     .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Solve))),
                             )
                             .child(div().flex_1())
@@ -859,14 +863,14 @@ impl Render for MateDialog {
                                     .size(px(14.))
                                     .mr(px(4.))
                                     .rounded_full()
-                                    .bg(gpui_kit::rgb(0x999999))
+                                    
                                     .flex()
                                     .items_center()
                                     .justify_center()
                                     .text_size(px(10.))
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(gpui_kit::rgb_static(0xffffff))
-                                    .child("?"),
+                                    
+                                    .child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999))),
                             ),
                     )
                     // Configure mode: the mate's suppression as a checkbox (live 195).

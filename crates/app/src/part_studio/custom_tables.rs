@@ -208,7 +208,7 @@ impl PartStudioView {
     }
 
     /// One table: the grey header bar (⌄ title, ⋯ Copy table), then the grid.
-    fn table_section(&self, index: usize, t: &noshape_model::custom::table::CustomTable, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn table_section(&self, index: usize, t: &noshape_model::custom::table::CustomTable, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let open = !self.ui.ct.collapsed.contains(&t.title);
         let title = t.title.clone();
@@ -261,9 +261,10 @@ impl PartStudioView {
         section = section.child(h_flex().child(head));
         for (ri, row) in t.rows.iter().enumerate() {
             let entities = row.entities.clone();
+            // Multi-line cells (the Hole table's callouts) make the row taller.
             let mut r = h_flex()
                 .id(SharedString::from(format!("ct-row-{index}-{ri}")))
-                .h(px(35.))
+                .min_h(px(35.))
                 .border_l_1()
                 .border_color(grid)
                 .on_hover(cx.listener(move |this, h: &bool, _, cx| {
@@ -290,7 +291,8 @@ impl PartStudioView {
                     .when(center, |d| d.justify_center())
                     .text_size(px(13.33))
                     .text_color(pal.text)
-                    .child(div().truncate().child(text))
+                    .when(text.contains('\n'), |d| d.py(px(6.)).child(v_flex().children(text.lines().map(|l| div().child(l.to_string())).collect::<Vec<_>>())))
+                    .when(!text.contains('\n'), |d| d.child(div().truncate().child(text.clone())))
                     .when_some(info, |d, tip| d.child(div().id(SharedString::from(format!("ct-info-{index}-{ri}-{ci}"))).pl(px(3.)).tooltip(crate::ui::tooltip(tip)).child(crate::ui::glyph("info", 14., gpui_kit::rgb(0x888888)))))
                     .when_some(error, |d, tip| d.tooltip(crate::ui::tooltip(tip)));
                 r = r.child(cell(widths[ci], content.into_any_element()));
