@@ -3479,7 +3479,7 @@ impl PartStudioView {
             .text_color(color)
             // Onshape (part-studio/31, 92): rolled back and suppressed rows are italic.
             .when(rolled_back || suppressed, |d| d.italic())
-            .when(related && !selected && !editing, |d| d.bg(gpui_kit::rgb(0xecf0f4)))
+            .when(related && !selected && !editing, |d| d.bg(pal.row_related))
             .when(editing, |d| d.font_weight(FontWeight::SEMIBOLD))
             // Live (qa5 derived, 1580–1582): a Derived feature that brought
             // sketches has a ▸ before its icon; it lists them.
