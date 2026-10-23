@@ -18,7 +18,7 @@ use noshape_model::document::TabId;
 use noshape_model::reference::BodyId;
 use noshape_model::release::{Issue, ItemKind, NumberingSchemes, Package, PackageKind, ReleaseItem, ReleaseLog};
 
-const META_KEY: &str = "releases";
+pub(crate) const META_KEY: &str = "releases";
 
 /// The configuration each Part Studio was last shown in (Add Items ›
 /// "Set to last viewed configuration").
@@ -32,44 +32,14 @@ pub(crate) fn last_viewed_config(tab: TabId) -> Option<noshape_model::configurat
     LAST_VIEWED.lock().as_ref().and_then(|m| m.get(&tab).cloned())
 }
 
-/// Release management settings (Onshape's Company settings › Release
-/// management; here the account preferences): the revision scheme and the
-/// unreleased revision suffix.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ReleaseSettings {
-    #[serde(default)]
-    pub scheme: noshape_model::release::RevisionScheme,
-    #[serde(default = "default_suffix")]
-    pub unreleased_suffix: String,
-}
-
-fn default_suffix() -> String {
-    "*".into()
-}
-
-impl Default for ReleaseSettings {
-    fn default() -> Self {
-        Self { scheme: Default::default(), unreleased_suffix: default_suffix() }
-    }
-}
-
-fn settings_path() -> std::path::PathBuf {
-    crate::files::config_dir().join("release_settings.json")
-}
-
-pub fn release_settings() -> ReleaseSettings {
-    std::fs::read(settings_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
-}
-
-pub fn set_release_settings(s: &ReleaseSettings) {
-    let _ = std::fs::write(settings_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
-}
+/// Company settings › Release management (release_settings.rs).
+pub use crate::release_settings::release_settings;
 
 fn numbering_path() -> std::path::PathBuf {
     crate::files::config_dir().join("numbering_schemes.json")
 }
 
-/// Company settings › Numbering schemes (here the account preferences).
+/// Company settings › Numbering schemes.
 pub fn numbering_schemes() -> NumberingSchemes {
     std::fs::read(numbering_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
@@ -93,6 +63,7 @@ pub fn release_log(doc: &DocModel) -> ReleaseLog {
     let mut log: ReleaseLog = doc.session.store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
     log.scheme = release_settings().scheme;
     log.drawing_reuse = numbering_schemes().drawing_reuse;
+    log.auto_obsolete = release_settings().auto_obsolete;
     log
 }
 
@@ -146,6 +117,12 @@ fn studio_parts(doc: &DocModel, studio: TabId, config: &noshape_model::configura
     let ctx = if config.is_empty() { provider.context(&studio.to_string()) } else { provider.context_in(&studio.to_string(), config) };
     let Some(ctx) = ctx else { return (Vec::new(), Vec::new()) };
     ctx.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| (b.id.clone(), b.name.clone())).unzip()
+}
+
+/// A tab's Properties › "Not revision managed" (drawings, Variable
+/// Studios, files: store meta "tab_not_revision_managed:<id>").
+pub fn tab_not_revision_managed(doc: &DocModel, tab: TabId) -> bool {
+    doc.session.store.get_meta(&format!("tab_not_revision_managed:{}", tab.0)).ok().flatten().is_some_and(|b| b == b"1")
 }
 
 /// Release items for a tab (tab menu Release…; Release__typical_release_workflow):
@@ -477,7 +454,7 @@ enum Entry {
 #[path = "release_add_source.rs"]
 mod add_source;
 #[path = "release_workflow.rs"]
-mod workflow;
+pub(crate) mod workflow;
 
 impl Render for AddItemsDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -702,7 +679,7 @@ impl Render for AddItemsDialog {
                 .text_size(px(13.))
                 .text_center()
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).border_b_2().border_color(pal.accent))
+                .when(on, |d| d.text_color(pal.emphasis).border_b_2().border_color(pal.accent))
                 .when(!on, |d| d.text_color(pal.text))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
@@ -729,7 +706,7 @@ impl Render for AddItemsDialog {
                 .text_size(px(13.))
                 .text_center()
                 .cursor_pointer()
-                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
+                .when(on, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent))
                 .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(gpui_kit::rgb(0xdddddd)))
                 .child(label)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -744,10 +721,11 @@ impl Render for AddItemsDialog {
         };
         let kind_tabs = h_flex().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).children(ADD_KINDS.iter().enumerate().map(|(i, (l, _))| tab_button(i, l, cx)).collect::<Vec<_>>());
         let mut left = v_flex().w(px(404.)).h_full().border_r_1().border_color(gpui_kit::rgb(0xdddddd));
-        if !self.obsolete {
+        // Release management › "Allow adding items from other documents".
+        if !self.obsolete && release_settings().allow_other_documents {
             left = left.child(h_flex().child(doc_tab("add-current-doc", "Current document", !self.other, false, cx)).child(doc_tab("add-other-docs", "Other documents", self.other, true, cx)));
         } else {
-            left = left.child(h_flex().child(div().w(px(200.)).py(px(6.)).text_size(px(13.)).text_center().text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent).child("Current document")));
+            left = left.child(h_flex().child(div().w(px(200.)).py(px(6.)).text_size(px(13.)).text_center().text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent).child("Current document")));
         }
         if self.other && self.source.is_none() {
             left = left.child(div().id("add-browser").flex_1().overflow_y_scroll().child(self.render_browser(cx)));
@@ -830,7 +808,8 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
                 ItemKind::VariableStudio => "Onshape Variable Studio",
                 _ => "Onshape File",
             };
-            (category, MetaValues { name: item.name.clone(), description: desc, part_number: tab_part_number(d, tab), ..MetaValues::default() })
+            let meta = noshape_model::partstudio::ItemMeta { not_revision_managed: tab_not_revision_managed(d, tab), ..Default::default() };
+            (category, MetaValues { name: item.name.clone(), description: desc, part_number: tab_part_number(d, tab), meta, ..MetaValues::default() })
         }
     };
     let spec = MetaSpec { category, material, computed_mass, bom_options: None, values };
@@ -870,6 +849,8 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
                     _ => {
                         let _ = d.session.store.set_meta(&format!("tab_description:{}", item.tab.0), Some(v.description.as_bytes()));
                         let _ = d.session.store.set_meta(&format!("tab_part_number:{}", item.tab.0), Some(v.part_number.as_bytes()));
+                        let nrm: &[u8] = if v.meta.not_revision_managed { b"1" } else { b"" };
+                        let _ = d.session.store.set_meta(&format!("tab_not_revision_managed:{}", item.tab.0), Some(nrm));
                     }
                 }
             });
@@ -1043,6 +1024,9 @@ pub struct ReleaseDialog {
     /// buttons).
     seq_parts: bool,
     seq_names: bool,
+    /// Release conditions that hold for each row (computed on open and on
+    /// Refresh: they regenerate Part Studios).
+    conditions: Vec<Vec<Issue>>,
     _subs: Vec<Subscription>,
 }
 
@@ -1055,7 +1039,7 @@ impl ReleaseDialog {
             let log = release_log(d);
             items.iter().map(|it| if mode == Mode::Release { since_release(d, &log, it) } else { None }).collect()
         };
-        let rows = items
+        let rows: Vec<Row> = items
             .into_iter()
             .zip(sinces)
             .map(|(item, since)| {
@@ -1092,13 +1076,14 @@ impl ReleaseDialog {
             }
         }));
         let numbering = numbering_schemes();
+        let conditions = if mode == Mode::Release { crate::release_conditions::condition_issues(doc.read(cx), &rows.iter().map(|r| r.item.clone()).collect::<Vec<_>>()) } else { Vec::new() };
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search"));
         subs.push(cx.subscribe_in(&search, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
                 cx.notify();
             }
         }));
-        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, _subs: subs }
+        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -1337,6 +1322,9 @@ impl ReleaseDialog {
             row.revision_touched = false;
             row.item = it;
         }
+        if self.mode == Mode::Release {
+            self.conditions = crate::release_conditions::condition_issues(self.doc.read(cx), &self.items(cx));
+        }
         // The pictures show the refreshed items.
         self.thumbs.clear();
         let items = self.rows.iter().map(|r| r.item.clone()).collect();
@@ -1359,7 +1347,13 @@ impl ReleaseDialog {
 
     fn issues(&self, cx: &App) -> Vec<Vec<Issue>> {
         match self.mode {
-            Mode::Release => release_log(self.doc.read(cx)).validate(&self.items(cx)),
+            Mode::Release => {
+                let mut issues = release_log(self.doc.read(cx)).validate(&self.items(cx));
+                for (row, held) in issues.iter_mut().zip(&self.conditions) {
+                    row.extend(held.iter().cloned());
+                }
+                issues
+            }
             _ => vec![Vec::new(); self.rows.len()],
         }
     }
@@ -1905,12 +1899,17 @@ impl Render for ReleaseDialog {
             .flex_none()
             .child(div().absolute().top_0().bottom_0().left(px(COL_ITEM)).w(px(1.)).bg(gpui_kit::rgb(GRID)))
             .child(v_flex().id("rel-items").size_full().overflow_y_scroll().children(rows_el));
+        // Release management: the fields' display names, and "Require a
+        // note in the Release dialog".
+        let settings = release_settings();
         let (name_label, notes_label) = match self.mode {
-            Mode::Obsolete => ("Obsoletion name", "Obsoletion notes"),
-            _ => ("Release name", "Release notes"),
+            Mode::Obsolete => (settings.display_name(2), settings.display_name(3)),
+            _ => (settings.display_name(0), settings.display_name(1)),
         };
+        let notes_required = self.mode == Mode::Obsolete || (self.mode == Mode::Release && settings.require_note);
+        let notes_empty = self.notes.read(cx).value().trim().is_empty();
         let name_empty = self.name.read(cx).value().trim().is_empty();
-        let label = |text: &'static str, required: bool, empty: bool| {
+        let label = |text: String, required: bool, empty: bool| {
             h_flex()
                 .gap_2()
                 .child(h_flex().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(text).when(required, |d| d.child(div().pl(px(3.)).text_color(red).child("*"))))
@@ -1947,7 +1946,7 @@ impl Render for ReleaseDialog {
                                 )
                             }),
                     )
-                    .child(div().pt(px(6.)).child(label(notes_label, self.mode == Mode::Obsolete, false)))
+                    .child(div().pt(px(6.)).child(label(notes_label, notes_required, notes_required && notes_empty && self.mode == Mode::Release)))
                     .child(Textarea::new(&self.notes).disabled(read_only))
                     .when(self.mode == Mode::Obsolete, |d| {
                         let on = self.re_releasable;
@@ -1957,7 +1956,7 @@ impl Render for ReleaseDialog {
                         }))))
                     }),
             );
-        let blocked = attention > 0 || name_empty;
+        let blocked = attention > 0 || name_empty || (self.mode == Mode::Release && notes_required && notes_empty);
         let status = (blocked && !read_only).then(|| div().text_size(px(12.)).text_color(pal.text_muted).child("A field required by one or more actions is empty ⓘ"));
         let button = |id: &'static str, text: &'static str, bg: u32, enabled: bool| {
             div()
@@ -1968,7 +1967,7 @@ impl Render for ReleaseDialog {
                 .px(px(11.))
                 .rounded(px(3.))
                 .text_size(px(14.))
-                .text_color(gpui_kit::rgb(0xffffff))
+                .text_color(gpui_kit::rgb_static(0xffffff))
                 .bg(gpui_kit::rgb(bg))
                 .when(!enabled, |d| d.opacity(0.5))
                 .when(enabled, |d| d.cursor_pointer())
@@ -2334,7 +2333,7 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                     })
                     .when(e.obsoleted_by.is_none(), |d| {
                         let item = item.clone();
-                        d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(10.)).py(px(4.)).rounded(px(3.)).cursor_pointer().text_size(px(13.)).text_color(gpui_kit::rgb(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").on_click(move |_, window, cx| {
+                        d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(10.)).py(px(4.)).rounded(px(3.)).cursor_pointer().text_size(px(13.)).text_color(gpui_kit::rgb_static(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").on_click(move |_, window, cx| {
                             window.close_dialog(cx);
                             if let Some(it) = item.clone() {
                                 let name = format!("Obsolete {} {}", it.part_number, it.revision);

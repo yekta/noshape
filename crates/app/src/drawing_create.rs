@@ -569,11 +569,12 @@ impl Render for CreateDrawingDialog {
                 // Live drawing/01: the chosen tile `#9ccef0` with a 2 px blue bottom edge,
                 // the other white with a 1 px `#ccc` outline.
                 .bg(if on { gpui_kit::rgb(0x9ccef0) } else { pal.panel })
-                .when(on, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::SEMIBOLD).text_color(pal.accent))
+                .when(on, |d| d.border_b_2().border_color(pal.accent).font_weight(FontWeight::SEMIBOLD).text_color(pal.emphasis))
                 .when(!on, |d| d.border_1().border_color(gpui_kit::rgb(0xcccccc)))
                 .when(!enabled, |d| d.opacity(0.5))
                 // Live drawing/01: the 55x40 tile art is drawn at 1.2x (66 px), centred on a square canvas.
-                .child(div().mb(px(-3.)).child(crate::assets::icon(&crate::assets::icon_path(icon), 66., cx)))
+                // Live dom/dialog-create-drawing: the 55x40 art at 1.15 px/unit (65x46 box).
+                .child(div().mb(px(-3.)).child(crate::assets::icon(&crate::assets::icon_path(icon), 63.25, cx)))
                 .child(label)
                 .when(enabled, |d| {
                     d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {

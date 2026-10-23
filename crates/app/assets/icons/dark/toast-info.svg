@@ -1,0 +1,1 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18"><g transform="scale(.9)"><path d="M1 10A9 9 0 1 0 19 10A9 9 0 1 0 1 10Z" fill="#ffffff" stroke="none"/><mask id="toast-info-m"><rect width="20" height="20" fill="#fff"/><path d="M9 5H11V7H9ZM8 8H11V14H12V15H8V14H9V9H8Z" fill="#000"/></mask><circle cx="10" cy="10" r="9" fill="#769FCC" mask="url(#toast-info-m)"/></g></svg>

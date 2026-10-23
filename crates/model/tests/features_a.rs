@@ -79,7 +79,9 @@ impl T {
     fn ok(&mut self) -> RegenResult {
         let r = self.regen();
         for (i, s) in r.display.features.iter().enumerate() {
-            assert!(matches!(s.status, FeatureStatus::Ok), "feature {i} ({}) {:?}: {:?}", self.ps.features[i].type_id, s.status, s.message);
+            // An info (a blue bubble, e.g. a Hole's "Parameters have been
+            // overridden.") is still a successful regeneration.
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info), "feature {i} ({}) {:?}: {:?}", self.ps.features[i].type_id, s.status, s.message);
         }
         r
     }
@@ -827,4 +829,185 @@ fn hole_point_off_the_part_fails_the_hole() {
     t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: a.0 }, Reference::SketchEntity { sketch: s, entity: off.0 }])), ("unitsSystem", en("METRIC")), ("tableSynced", b(true))]);
     let st = t.regen().display.features.last().cloned().unwrap();
     assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Hole creates invalid geometry.")));
+}
+
+/// Live L59: the Hole table lists a part's holes, one row per distinct
+/// hole (A, B) with its count.
+#[test]
+fn hole_table_groups_holes_per_part() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_point(DVec2::new(0.01, 0.01));
+    let b2 = sk.add_point(DVec2::new(0.02, 0.01));
+    let c = sk.add_point(DVec2::new(0.03, 0.01));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let pt = |e: noshape_sketch::EntityId| Reference::SketchEntity { sketch: s, entity: e.0 };
+    t.add("hole", &[("locations", q(vec![pt(a), pt(b2)])), ("unitsSystem", en("METRIC")), ("tableSynced", b(true)), ("holeDiameterV3", e("5 mm")), ("holeDepthV3", e("5 mm"))]);
+    t.add("hole", &[("locations", q(vec![pt(c)])), ("unitsSystem", en("METRIC")), ("tableSynced", b(true)), ("holeDiameterV3", e("3 mm")), ("endStyleV2", en("THROUGH"))]);
+    let r = t.ok();
+    let units = UnitPrefs::default();
+    let tables = noshape_model::interaction::hole_table(&r.context, &units);
+    assert_eq!(tables.len(), 1);
+    let rows: Vec<(String, String, String, String)> = tables[0].rows.iter().map(|r| (r.text("tag").into(), r.text("size").into(), r.text("angle").into(), r.text("qty").into())).collect();
+    assert_eq!(rows, [("A".into(), "⌀5 mm ↧ 5 mm".into(), "118 deg".into(), "2".into()), ("B".into(), "⌀3 mm THRU".into(), "".into(), "1".into())]);
+}
+
+/// Live L49/L50: Tapped M6 × 1.00, Blind. A new size gives Tap clearance 0;
+/// Depth 20 → clearance 15; clearance 2 → Tapped depth 18; Depth 25 →
+/// clearance 7; Depth 8 → Tapped depth 1.
+#[test]
+fn tapped_hole_depths_stay_linked_as_live() {
+    use noshape_model::features::hole_tables::link_tapped_depths;
+    let units = UnitPrefs::default();
+    let mut v = ParamValues::default();
+    v.set("unitsSystem", ParamValue::Enum("METRIC".into()));
+    v.set("styleV2", ParamValue::Enum("SIMPLE".into()));
+    v.set("endStyleV2", ParamValue::Enum("BLIND".into()));
+    v.set("showTappedDepth", ParamValue::Bool(true));
+    v.set("isoHoleTableEx", ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M5".into()]));
+    v.set("holeDepthV3", ParamValue::Expr(ExprValue::new("5 mm")));
+    v.set("tappedDepthV3", ParamValue::Expr(ExprValue::new("5 mm")));
+    v.set("tapClearance", ParamValue::Expr(ExprValue::new("3")));
+    let step = |v: &mut ParamValues, id: &str, text: &str| -> Vec<(String, String)> {
+        let prev = v.clone();
+        if id == "size" {
+            v.set("isoHoleTableEx", ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M6".into(), "1.00 mm".into()]));
+        } else {
+            v.set(id, ParamValue::Expr(ExprValue::new(text)));
+        }
+        let out: Vec<(String, String)> = link_tapped_depths(&prev, v, &units).into_iter().map(|(k, p)| (k.to_string(), match &p { ParamValue::Expr(e) => e.text.clone(), _ => String::new() })).collect();
+        for (k, t) in &out {
+            v.set(Box::leak(k.clone().into_boxed_str()), ParamValue::Expr(ExprValue::new(t.as_str())));
+        }
+        out
+    };
+    assert_eq!(step(&mut v, "size", ""), [("tapClearance".to_string(), "0".to_string())]);
+    assert_eq!(step(&mut v, "holeDepthV3", "20 mm"), [("tapClearance".to_string(), "15".to_string())]);
+    assert_eq!(step(&mut v, "tapClearance", "2"), [("tappedDepthV3".to_string(), "18 mm".to_string())]);
+    assert_eq!(step(&mut v, "holeDepthV3", "25 mm"), [("tapClearance".to_string(), "7".to_string())]);
+    assert_eq!(step(&mut v, "holeDepthV3", "8 mm"), [("tappedDepthV3".to_string(), "1 mm".to_string())]);
+}
+
+/// Live L52: Drilled 1/4 with Diameter 0.3 in reads "Parameters have been
+/// overridden. Check input."; changing only the counterbore doesn't.
+#[test]
+fn hole_overridden_parameters_info() {
+    let info = |extra: &[(&str, ParamValue)]| -> Option<String> {
+        let mut t = T::new();
+        let (s, p) = hole_block(&mut t);
+        let mut ps: Vec<(&str, ParamValue)> = vec![("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p }])), ("unitsSystem", en("INCH")), ("tableSynced", b(true))];
+        ps.extend(extra.iter().cloned());
+        t.add("hole", &ps);
+        let r = t.ok();
+        let st = r.display.features.last().unwrap();
+        (st.status == FeatureStatus::Info).then(|| st.message.clone().unwrap_or_default())
+    };
+    let path = |k: &str| (k.to_string(), ParamValue::Lookup(vec!["Drilled".into(), "1/4 (0.25)".into()]));
+    let (k1, p1) = path("ansiHoleTableEx");
+    assert_eq!(info(&[(Box::leak(k1.into_boxed_str()), p1), ("holeDiameterV3", e("0.3 in"))]).as_deref(), Some("Parameters have been overridden. Check input."));
+    let (k2, p2) = path("ansiHoleTable");
+    assert_eq!(info(&[(Box::leak(k2.into_boxed_str()), p2), ("styleV2", en("C_BORE")), ("holeDiameterV3", e("0.25 in")), ("cBoreDiameterV3", e("0.5 in")), ("cBoreDepthV3", e("0.1 in"))]), None);
+}
+
+/// Live L41: a Feature pattern of a sketch only copies the sketch to each
+/// instance (no part); Reapply on adds the blue info.
+#[test]
+fn feature_pattern_of_a_sketch_copies_it() {
+    for reapply in [false, true] {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.1, 0.02, "10 mm");
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::new(0.01, 0.01), 0.003));
+        let fp = t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(s)])), ("directionOne", q(vec![x_axis_dir()])), ("distance", e("20 mm")), ("instanceCount", e("3")), ("fullFeaturePattern", b(reapply))]);
+        let res = t.ok();
+        let st = res.display.features.last().unwrap();
+        assert_eq!(st.status, if reapply { FeatureStatus::Info } else { FeatureStatus::Ok }, "{:?}", st.message);
+        assert_eq!(solids(&res.context).len(), 1);
+        let src = res.context.sketches.iter().find(|k| k.feature == s).unwrap().frame.origin;
+        let copies: Vec<_> = res.context.sketches.iter().filter(|k| res.context.sketch_copies.iter().any(|(p, c)| *p == fp && *c == k.feature)).collect();
+        assert_eq!(copies.len(), 2);
+        for (i, c) in copies.iter().enumerate() {
+            assert!((c.frame.origin - src).abs_diff_eq(DVec3::X * 0.02 * (i + 1) as f64, 1e-9), "{:?}", c.frame.origin);
+            assert_eq!(c.regions.len(), 1);
+        }
+        // A copy's region can be extruded like the sketch's.
+        let r = t.regions(copies[1].feature)[0].clone();
+        t.extrude(r, "5 mm", "NEW");
+        let res = t.ok();
+        assert_eq!(solids(&res.context).len(), 2);
+    }
+}
+
+/// Live L22 ("psb L22-24 rib"): an open box 40×20×10 (walls 2) and ribs on
+/// its mid plane, 2.5 mm, parallel to the sketch plane, with and without
+/// "Extend profiles to part".
+#[test]
+fn rib_extend_profiles_as_live() {
+    let run = |a: (f64, f64), b2: (f64, f64), extend: bool| -> Result<f64, String> {
+        let mut t = T::new();
+        let (_, x) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+        let top = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+        let ps = t.sketch(Reference::FeaturePlane(top), rect(0.002, 0.002, 0.038, 0.018));
+        let r = t.regions(ps)[0].clone();
+        let cut = t.extrude(r, "8 mm", "REMOVE");
+        t.set(cut, "oppositeDirection", b(true));
+        let v0 = total_volume(&t.ok().context);
+        assert!((v0 * 1e9 - 3392.0).abs() < 1e-6, "{}", v0 * 1e9);
+        let mid = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Front)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm")), ("oppositeDirection", b(true))]);
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(a.0, a.1), DVec2::new(b2.0, b2.1));
+        let s = t.sketch(Reference::FeaturePlane(mid), sk);
+        t.add("rib", &[("profiles", q(vec![Reference::SketchEntity { sketch: s, entity: l.0 }])), ("parts", q(vec![Reference::Body(BodyId { feature: x, index: 0 })])), ("thickness", e("2.5 mm")), ("extendProfilesUpToPart", b(extend))]);
+        let res = t.regen();
+        let st = res.display.features.last().unwrap();
+        match st.status {
+            FeatureStatus::Ok => Ok(total_volume(&res.context) * 1e9),
+            _ => Err(st.message.clone().unwrap_or_default()),
+        }
+    };
+    let ok = |r: Result<f64, String>, v: f64| {
+        let got = r.unwrap();
+        assert!((got - v).abs() < 1e-3, "{got} vs {v}");
+    };
+    ok(run((0.01, 0.008), (0.03, 0.008), false), 3692.0);
+    ok(run((0.01, 0.008), (0.03, 0.008), true), 3932.0);
+    ok(run((0.002, 0.01), (0.038, 0.01), false), 4112.0);
+    ok(run((0.002, 0.015), (0.038, 0.015), false), 4562.0);
+    assert_eq!(run((0.002, 0.015), (0.038, 0.015), true), Err("Failed to create a rib from a selected profile.".into()));
+}
+
+/// Live "lp wall over" (behaviours "URGENT (10-22)") with 5 instances, as
+/// the user's shot of 2026-10-23 and live 2256–2262: the failing Feature
+/// pattern carries a ghost of every instance it couldn't make (the wall's
+/// tool body and the floor and end face it merged into, moved there).
+#[test]
+fn failed_feature_pattern_shows_its_instances() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.1, 0.02, "10 mm");
+    // Right plane: sketch x = world Y, y = Z.
+    let s = t.sketch(Reference::Plane(DatumPlane::Right), rect(-0.001, 0.0, 0.021, 0.011));
+    let r = t.regions(s)[0].clone();
+    let w = t.extrude(r, "0.5 mm", "ADD");
+    let res = t.regen();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.05, 0.0, 0.0));
+    t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(w)])), ("directionOne", q(vec![edge])), ("distance", e("2 mm")), ("instanceCount", e("5"))]);
+    let res = t.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!(st.status, FeatureStatus::Error);
+    let m = st.error_mesh.as_ref().expect("error geometry");
+    // 4 ghosts × (the wall's 6 faces + the floor and end face it merged into).
+    assert_eq!(m.face_ranges.len(), 32);
+    let xs: Vec<f32> = m.positions.iter().map(|p| p[0]).collect();
+    let (lo, hi) = xs.iter().fold((f32::MAX, f32::MIN), |(a, b), x| (a.min(*x), b.max(*x)));
+    // 2 to 8 mm along the edge (its direction either way), the floor's
+    // copies running the block's length.
+    let fwd = (lo - 0.002).abs() < 1e-6 && (hi - 0.108).abs() < 1e-6;
+    let back = (lo + 0.008).abs() < 1e-6 && (hi - 0.098).abs() < 1e-6;
+    assert!(fwd || back, "{lo} {hi}");
+    // Reapply on: no error, no error geometry.
+    let lp = t.ps.features.last().unwrap().id;
+    t.set(lp, "fullFeaturePattern", b(true));
+    let res = t.regen();
+    assert!(res.display.features.last().unwrap().error_mesh.is_none());
 }

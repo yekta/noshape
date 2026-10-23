@@ -65,7 +65,7 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
                             .h(px(26.))
                             .gap(px(6.))
                             .cursor_pointer()
-                            .child(div().size(px(13.)).flex_none().flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(if on.get() { rgb(0x0075ff) } else { rgb(0x767676) }).bg(if on.get() { rgb(0x0075ff) } else { rgb(0xffffff) }).when(on.get(), |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(rgb(0xffffff)))))
+                            .child(div().size(px(13.)).flex_none().flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(if on.get() { rgb(0x0075ff) } else { rgb(0x767676) }).bg(if on.get() { rgb(0x0075ff) } else { rgb(0xffffff) }).when(on.get(), |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))))
                             .child(div().font_weight(FontWeight::SEMIBOLD).child("Enable workspace protection"))
                             .on_click(move |_, window, _| {
                                 on.set(!on.get());
@@ -132,7 +132,7 @@ pub fn render_banner(doc: &Entity<DocModel>, part_studio: bool, cx: &App) -> Opt
         return None;
     }
     let pal = p();
-    let help = div().size(px(18.)).flex_none().rounded_full().bg(rgb(0x999999)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?");
+    let help = div().size(px(18.)).flex_none().rounded_full().flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 20.0, crate::theme::help_dot(0x999999)));
     let bar = h_flex().id("protected-banner").h(px(32.)).px(px(20.)).gap(px(10.)).bg(rgb(0xffffff)).border_1().border_t_0().border_color(rgb(0xcccccc)).rounded_b(px(6.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(rgb(0x333333));
     Some(if part_studio {
         let d = doc.clone();
@@ -149,7 +149,7 @@ pub fn render_banner(doc: &Entity<DocModel>, part_studio: bool, cx: &App) -> Opt
                     .cursor_pointer()
                     .text_size(px(12.))
                     .font_weight(FontWeight::NORMAL)
-                    .text_color(rgb(0xffffff))
+                    .text_color(gpui_kit::rgb_static(0xffffff))
                     .child("Make a copy to edit")
                     .on_click(move |_, window, cx| crate::doc_dialogs::copy_workspace(d.clone(), window, cx)),
             )

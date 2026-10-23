@@ -79,6 +79,16 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   sphere with its pole sideways (seam underneath) leaves the crown face without a seam (probe
   /root/kern-scratch/recess/r3b.cpp: mouth 4 edges, no split); aligning the seam with a mouth vertex works for
   Type VI (spline start at 0 deg) but not Type III (OCCT adds a corner patch at the seam corner).
+- **Shell, qa3's real bracket vs Onshape (10-23, live "kern (10-23 09:00) Shell bracket"):** 100x40x12, R5 on three
+  vertical edges, Ø10 hole at (50,10). Plain bracket 1/2/2.499/3/4 mm match Onshape (1e-3 mm³; offset path exact,
+  slabs within 2e-4). Two fixes in shell.cpp: (1) `by_offset` rejects an offset whose result lost one of the part's
+  own kept faces (a point inside each must lie on the result, by distance; BRepCheck and the volume sum accept the
+  wrong one): with a 1 mm chamfer round the top OCCT's offset gave 4285 mm³ / 12 faces, now slabs give Onshape's
+  7385.784 / 34. (2) `offsets_touch`: Onshape FAILS every case at exactly 2.5 mm (the hole's offset wall r + t
+  touches the front wall's, axis at r + 2t); we fail the same (kept concave cylinder ∥ kept plane, to 1e-8 m, the
+  touching line on both faces). Open: at 2.501 mm our offset is 0.0029 mm³ above the exact (= Onshape's)
+  16999.92174 (slabs 7.6e-4); not from the offset tolerance; needs a dump of the model's input to reproduce.
+  Test `kernel_robustness::shell_bracket_matches_onshape`.
 - **IM4 / IM5 (qa5 pass 12-13), fixed 10-22:** g50-g46-shell1.x_t's real fault was ours: an edge on a TRIMMED_CURVE
   (133) whose basis is an intersection (38) took parm_1/parm_2, which are Parasolid's parameters of that curve, not
   of our rebuilt B-spline: the range ran off the curve and healing made it 42 km long. Edges on a rebuilt basis
@@ -99,6 +109,13 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   `shell_after_chamfer_patch_matches_onshape` (inner offset of the blend patch, 1.19 mm³).
 - **F12 kernel half (10-22): fixed by the F8 chamfer** (psb's BREPs had OCCT's corrupt corner); engine F12 test
   tightened (must succeed).
+- **PERF1 display mesh of large planar faces (10-23):** the 400-hole plate's two faces (~56k boundary nodes each) cost
+  1.4 s in BRepMesh's Delaunay bookkeeping (not the triangulation itself). `mesh.cpp::PlanarCdtAlgo` (planar faces with
+  >= 1000 boundary nodes) triangulates BRepMesh's own boundary nodes with `planar_cdt.hpp` (constrained Delaunay: BRIO
+  insertion, Sloan segment recovery, flood fill, Shewchuk-bounded in-circle test), ~0.1 s a face; same triangles
+  (Delaunay, no inner nodes), node indices written back to the pcurves (watertight). Anything it can't take falls
+  back to BRepMesh's own algorithm (Delabella is gone: it crashed on macOS arm64, v0.4.6). Test
+  `kernel/tests/planar_mesh.rs` (watertight, orientation, Delaunay within f32 noise).
 - **PERF1 chamfer/fillet of many edges:** `boolean.cpp::blend_in_slabs` (declared in internal.hpp): ≥ 48 edges →
   split the part by planes in gaps between the edges' reach (2 × size), blend each slab in parallel, join on the
   shared cut faces, unify. Probe `/root/kern-scratch/plate/slabs.cpp`: 400 rims 4.3 s → ~1.1 s with glue + USD

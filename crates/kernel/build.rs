@@ -103,6 +103,7 @@ fn main() {
     println!("cargo:rerun-if-changed=cpp/jt_writer.hpp");
     println!("cargo:rerun-if-changed=cpp/pvz_writer.hpp");
     println!("cargo:rerun-if-changed=cpp/pvz_reader.hpp");
+    println!("cargo:rerun-if-changed=cpp/planar_cdt.hpp");
     println!("cargo:rerun-if-changed=cpp/xt_schema.inc");
     for s in BRIDGE_SOURCES {
         println!("cargo:rerun-if-changed={s}");

@@ -136,13 +136,20 @@ impl PartStudioView {
     fn current_arrow(&self, cx: &App) -> Option<Arrow> {
         let e = self.edit.as_ref()?;
         let d = e.dialog.read(cx);
-        if d.feature.type_id != "extrude" || !d.feature.params.is("endBound", "BLIND") || d.feature.params.is("bodyType", "SURFACE") {
+        if d.feature.type_id != "extrude" || d.feature.params.is("bodyType", "SURFACE") {
             return None;
         }
-        let depth = d.feature.params.expr("depth").and_then(|x| x.cached.map(|q| q.value)).or_else(|| {
-            let units = self.doc.read(cx).session.doc.settings.units;
-            d.feature.params.expr("depth").and_then(|x| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok()).map(|q| q.value)
-        })?;
+        // Live part-studio/2028: the other end types show the direction
+        // arrow on the region (flip only, nothing to drag).
+        let blind = d.feature.params.is("endBound", "BLIND");
+        let depth = if !blind {
+            0.0
+        } else {
+            d.feature.params.expr("depth").and_then(|x| x.cached.map(|q| q.value)).or_else(|| {
+                let units = self.doc.read(cx).session.doc.settings.units;
+                d.feature.params.expr("depth").and_then(|x| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok()).map(|q| q.value)
+            })?
+        };
         // Profile center and normal from the first selected region, or a
         // picked planar face (it only exists before the feature).
         let ctx = self.ui.before_context.as_ref().or(self.context.as_ref());
@@ -159,7 +166,7 @@ impl PartStudioView {
             dir = -dir;
         }
         let symmetric = d.feature.params.bool("symmetric");
-        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: "depth", flip: Some("oppositeDirection") })
+        Some(Arrow { base, dir, length: if symmetric { depth * 0.5 } else { depth }, param: if blind { "depth" } else { "" }, flip: Some("oppositeDirection") })
     }
 
     /// Drag handles of other features (Onshape): plane offset, shell
@@ -269,6 +276,10 @@ impl PartStudioView {
             }
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(m) = self.manip_drag else { return false };
+                // A direction-only arrow (Up to …) has nothing to drag.
+                if a.param.is_empty() {
+                    return true;
+                }
                 let (o, d) = ray(self, *position, cx);
                 let Some(t) = Self::axis_param(&a, o, d) else { return true };
                 if a.param == super::section::SECTION_PARAM {
@@ -300,6 +311,10 @@ impl PartStudioView {
                     // Keep grabbing the same point after the flip.
                     self.manip_drag = Some(ManipDrag { grab_offset: -m.grab_offset });
                 }
+                true
+            }
+            ViewportEvent::ToolUp { .. } if a.param.is_empty() => {
+                self.manip_drag = None;
                 true
             }
             ViewportEvent::ToolUp { .. } => self.end_manip_drag(a.param, window, cx),

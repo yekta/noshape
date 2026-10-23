@@ -765,7 +765,7 @@ remove-selection, snap-mate, zoom-in).
   * Selection-list × (kit Close 11/12) -> ui-clear 9 px #666 in create_selection.rs (red on group hover),
     draft_tool.rs, section.rs, flatten_tool.rs. Animate dialog chip × -> ui-clear 10 px #666 in a 20x24 span.
   * Assign material panel: verified in app = live (context/r13-am2.png).
-- Open (not done): Section view chip × is hover-only in ours (section.rs `.opacity(0.)` + group_hover), live always
+- (DONE 10-23, verified in app = live part-studio/71: × always shown, plane 20 px = 17x18 ink) Was open: Section view chip × is hover-only in ours (section.rs `.opacity(0.)` + group_hover), live always
   shows it; its add-plane icon is `plane` 16 px, live ~18x18 ink (part-studio/71). Remaining kit icons: Close in
   release_dialog (x2), isolate_ui, reflection, view_tools, behaviors dep-close (x2), assembly_behaviors (shortcuts,
   group x, measure x), assembly_panels mv-x, analysis hq-off; Check ticks in checkboxes (ours ≈ live glyph);
@@ -844,3 +844,157 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   from sketch/1956, the slot OFFSET's centre line + end (`constraint_masters(kind, sk)`). Pierce / pattern glyph:
   live capture still pending.
   Test a_hovered_glyph_highlights_its_entities_orange_and_its_master_yellow; verified in app (context/r19-ghover).
+- Assembly dialogs vs live (r21/r22): Insert dialog icons = live 01; the Composite parts filter now only when a Part
+  Studio has a composite (live 01 vs 320; was always shown). Properties modal: ƒ, calculator glyph, undo/redo = live
+  132/133; for ui2: live joins the read-only (grey) Mass field and the calculator button into one input group (shared
+  border, no gap), ours draws two separate boxes. Named positions panel: no own icons beyond "?".
+
+## Round 16 (2026-10-23) — dark-mode art for Onshape's static-colour icons (lead, from ui2's dark mode)
+- Live: one sprite for both themes; `--static` vars keep light values in dark (behaviours "Dark theme icon sources").
+  The 74 icons in /root/ui2-scratch/dark-icon-categories.json "static" now have `crates/app/assets/icons/dark/<name>.svg`
+  (assets.rs loads them as-is in dark; other icons get the themed #333->#fff flip).
+- Recipe (scratch tools/mkdark.py NAME WHITE_D): our light art with #333-at-opacity greys made solid, plus white
+  faces under everything (`--os-icon-fill-primary--static` #fff) from OUR outline geometry (one path per subpath:
+  overlapping subpaths cancel by winding). Badges (error/warning/info/toasts, update-all, regen) get a white copy of
+  their own silhouette so the knocked-out glyph reads white. Hand-drawn: mate-connector-qlv-item (#666 rings + white
+  ring/quarter), wire-body (white strokes), hole (#333 bore crescent), the stroked warning triangles.
+- Reference: tools/darkref.py renders the LIVE sprite symbol (dark/icons2-dark-sprite.svg) with varsDark substituted
+  (the ui-ref copies have vars resolved); tools/darkiter.py NAME [SVG] scores on #333 through the 2x raster path;
+  tools/dv.py OUT NAMES shows ref|ours. Scores (d20): median 1.10, worst standard-content 4.1, menu-delete 5.6 (same
+  look, slight size), mate-connector-qlv-item 4.4, plus a dozen 2-3.5. guard.py 0/74, guard test 2 passed.
+- In-app check: run with XDG_CONFIG_HOME=/tmp/icons2/cfgdark (preferences.json {"dark_mode": true}) so the shared
+  ~/.config/noshape isn't touched; compare with live/dark/dk-920-partstudio, dk-940-assembly.
+- (fix) the preferences key is camelCase: `{"darkMode": true}`.
+
+## Round 17 (2026-10-23) — dark art for the "mixed" icons (static parts + themed parts), lead: worst-visible first
+- 82 more `icons/dark/<name>.svg` (156 total): the mixed list /tmp/icons2/mixed-base.txt (base = our light art through
+  the app's themed flip), worst first. Per element, map the live symbol's var to its dark value
+  (scratch tools/roles.py OUT NAMES paints each var a colour beside the dark ref and ours): `--static` stays light,
+  themed flips (outline-primary/accent-tertiary #333->#fff, outline-secondary ->#bababa, fill-secondary #999->#d7d7d7,
+  fill-tertiary #666->#999, fill-primary #fff->#333, accent-primary ->#3e94ff, cancel ->#ff6b6b, success ->#35bc35).
+- White faces go on the stroke CENTRE (or the inner edge of a filled outline), not the outer edge: an outer-edge face
+  leaves an anti-aliased white halo around the dark outline on #333.
+- Helpers: tools/sketchdark.py (sketch tools: curve ->#bababa, point rings ->#3e94ff with white centres, rings r<=2.5
+  only), tools/tailconv.py (only static part = #999 fill-secondary), tools/lv.py (live light|dark|ours light|ours dark).
+- Not needed: edit-curve, boolean, flip*, curvature, paste, xyz-along-z — the themed flip already gives the live
+  colours (#333 at .5 flipped to #fff at .5 on #333 = #999).
+- Scores (d20) all <= 3.3 except snap-mode 4.8, stack-closest 2.9; was 9-47. Worst three static: standard-content
+  4.1 -> 0.5 (washer face moved to the washer), menu-delete 5.4 (white X instead of a white disc; the rest is our
+  light art's size, matched to the live menu), mate-connector-qlv-item stays 4.4 (sub-pixel ring placement).
+
+## Round 18 (2026-10-23) — leftovers, dark sweep of the whole app (lead)
+- Block 1: menu-delete redrawn on the sprite's geometry (disc r7 centred, X arms ±3.5 width 2): live's menu disc
+  is 11 px at 16 = the sprite's size (live menus/rmb-asm-list-instance.png), ours was 12.2 and 0.5 px off. light 0.07.
+  Inspection empty-state illustration 130 -> 172 px (live part-studio/77). Section chip ×/plane were already done.
+  anim-reverse = 16x18 ink at 20 (live ~16x17): done. importDerived/importForeign icons: done.
+- Kit icons left WITHOUT a live reference: release_dialog Close x2 (Release is "Upgrade" on our live account),
+  analysis hq-off, thickness Loader/ChevronDown, start_window TriangleAlert (broken document). Assembly triad value
+  box (assembly_panels mv-ok/mv-x): live 2306-2309 is a bare input box with no ✓/× and no label: a layout change
+  for the assembly owner, not an icon swap (reported to the lead).
+- Block 2 (dark sweep), part 1:
+  * assets.rs flip_themed_colors no longer touches `<mask>` contents: it turned the masks' black (cut-out) into
+    white, so every masked gap (help "?", gaps around arrows/badges, sketch point holes) vanished in dark. Test
+    flip_themed_colors_keeps_mask_cutouts.
+  * scratch tools/darksweep.py: every mapped icon AS THE APP DRAWS IT in dark (dark file, else the light art through
+    the same flip) vs its live symbol with varsDark; lists "excess" = dark score minus light score. 74 -> 20 left,
+    all context-coloured (currentColor: documents-page nav, history, chevrons, tab manager; tinted illustrations;
+    tm-detailed's literal #333) — checked in the app / requested live (REQUESTS "icons2 10-23 07:30").
+  * 49 more dark files: symbols with LITERAL colours (cube, sphere, plane #d2d2d2 faces, file, mbd-status) or
+    static vars that ui2's lists missed (feature-folder, hole-*, import-foreign/derived, show-mates, insert-rigid,
+    file-image/cad/dwg/pdf with themed page fill, fill-tertiary #666->#999 icons: settings, chevron-down, home,
+    open-*, fs-info; accent-cancel -> #ff6b6b: fs-error, dialog-cancel; ...).
+  * delete (assembly/sketch menus) = menu-delete's sprite geometry.
+  * Palette.illustration (#eee / #555 = --os-icon-fill-quinary) for the tinted empty-state illustrations (notes,
+    documents); notes keep their measured #ebebeb in light.
+  * In app (dark): feature list planes = live dk-924; feature menu icons = live; documents nav = live dk-910.
+    Not icons, for ui2: our Create button is #3e94ff, live's dark Create is the darker #1651b0-ish blue.
+- Block 2, part 2 (in-app dark vs live dk-9xx):
+  * Sketch toolbar = live dk-932 except sketch linear pattern (top-left square outline-secondary #bababa, was white):
+    fixed. scratch tools/autotry.py tries var-based recolourings (accent red/green flips, outline-secondary grey)
+    against the live dark symbol and keeps the best: +13 (check, cancel, mate limits, offset, chevrons, ...);
+    tailconv.py (--themed-secondary) for the mate icons (outline-tertiary #888 -> #ccc: revolute, slider, ...),
+    link/select-box (fill-secondary themed #d7d7d7); inspection/config illustrations #555 (fill-quinary).
+  * Toolbar split-tool caret: the `expanded` sprite is 10x6 and live draws it 1:1; ours was the glyph at 12 px
+    (12x8, thicker). Now 10 px = live's 10x6 (light and dark), ui.rs tool_caret + custom features button.
+  * Tree expanders: Palette.icon_tertiary (#666 / #999 = --os-icon-fill-tertiary). ui::caret used rgb(0x666666),
+    which DARK_HEX sends to #ccc; live dark is #999 (dk-940). Assembly instance/mate row chevrons were the 11 px
+    ui-chevron in pal.text (white, 5x10); live = the same 8x12 expander as the headers in #999: now expander-* 14.
+  * Selection-list/chip × (ui-clear #666) -> icon_tertiary: live dark #999 (dk-926), was #ccc.
+  * Mate dialog / assembly "Solve" buttons were bg(gpui_kit::white()) with inherited text: white-on-white in dark.
+    Now rgb(0xffffff) (themed) + pal.text. 51 other bg(white()) remain app-wide (ui2's call; reported).
+  * Feature dialog (dk-926): flip arrow, tolerance, ✓/✗ match; live's ± "+" is crisp where ours (and the sprite at
+    1:1) is split over two columns: a sub-pixel placement difference, not art.
+  * Open for live (REQUESTS icons2 10-23 07:30): sheet metal, more context menus/dialogs, tab manager, history,
+    properties panels in dark; glyphs tinted rgb(0x666666) (ui-dropdown-arrow, ui-caret-down, close, info, pin,
+    folder, undo, import-file) wait for those captures (sprite vars differ per glyph).
+- Block 2, part 3 (live answered dk-971…dk-9a2):
+  * Sheet metal dropdown = live dk-972 except Flex PCB model / Finish flex PCB model: pcb-start / pcb-end redrawn
+    on the pcb-*-button sprites (curved bend, chip box; 6.4/7.7 -> 2.3/3.4 light); pcb-end's ✓ is white in dark.
+  * Context menus (dk-974/975/983/984) = live except "Change to version…": live uses the inserted-version symbol
+    (dashed line + dot): new icon change-version (assembly + drawing tab menus). com-indicator ring 0.8 -> 1 (live).
+  * Disabled dialog ✓ (15 places): was #cce9cc (light-only colour); live = the whole button at 20% opacity, which
+    gives #cce9cc on white and (41,70,41) with a (92,92,92) ✓ on #333 (dk-978). Now bg(accept) + opacity(0.2).
+  * Running toolbar tool: live #eaeaea light (dialogs/*-01-open, sketch/1933/1940) and #555 dark (dk-978/932):
+    --os-icon-button-fill--selected; was #b2ddf6 / #134e96.
+  * Assembly linear/circular pattern flip: showed the flipped art when not flipped (dk-987): now like the Part
+    Studio dialogs (*-opposite art when unflipped).
+  * "?" help dots (30 places; ui2 reported them darker than live in dark): live = the help-button sprite, a disc
+    with the "?" cut out. Now glyph("help-dot") (opaque copy of help-filled: a glyph tint keeps the art's alpha)
+    in theme::help_dot(light) = each place's measured light grey, #aeaeae in dark. Measured after: disc 160 light /
+    174 dark = live (fillet-01, dk-978); was a bold text "?" on a disc DARK_HEX mapped (#aaa -> #888, darker).
+  * Not fixed (ui2's, reported): Insert dialog header is a white bar in dark; mate-type flyout white in dark;
+    51 bg(gpui_kit::white()) app-wide; Create button blue on the documents page.
+  * Dialogs hole, fillet, linear pattern, mirror, sweep, flange, fastened, revolute, asm linear pattern, replicate:
+    icons = live dark.
+
+## Round 18 block 3 (2026-10-23, new icons2 after the approval-prompt hang; predecessor 234b2118)
+- Scratch: everything under /root/icons2-scratch (no /tmp: approval prompts hang the agent). App: tools/app3.sh
+  start|shot NAME|stop (binary copy /root/icons2-scratch/bin/noshape, state in run/, shots in v/, window by PID);
+  tools/sbs3.py OURS LIVE OUT x0 y0 x1 y1 k = live | ours crops.
+- Light disabled dialog ✓: `crate::ui::disabled_accept` (light = #cce9cc fill, so the white ✓ stays white;
+  dark = opacity 0.2 as live dk-978). 15 sites + Insert dialog (which also drew an 18 px `check` glyph instead of
+  the 24 px ok sprite, live dom/dialog-assembly-insert).
+- Mate dialog vs live asw-* / dom/dialog-mate-*: Tangent = flip only (26 px row, icon follows the flag alone:
+  -opposite empty and filled), Width = no tools (22 px help row); neither has the mate-type select.
+  Other types: flip/realign/play/Solve = live (Simulation connection row is simulation, excluded).
+- Relations (gear/rack/screw/linear): type select is now the OsSelect (`os-select-bootstrap`, 8x4 caret) like the
+  mate select, flush at the dialog edge; help ? on the Reverse direction row (live dom/dialog-relation-*).
+- Assembly linear/circular pattern, mirror: connector button = mc-select 20 px in a 26 px button flush against the
+  field (was mate-connector 18/24 with a gap); flips 19 px in 26 (was 18/24); Mirror strategy… = mirror icon 20 px,
+  27 px row, 2 px pad, 14 px text (was part-studio 18). Replicate scope select = OsSelect. Pattern help ? 4 px from
+  the bottom right: over the last checkbox row (linear w/o second direction, circular), else after a 22 px spacer.
+- Sheet metal Bend / Sheet metal model: icons = live (no change).
+- Not icons, for the assembly owner: our Mirror shows "Create mirrored (opposite-handed) parts" which live's
+  dialog doesn't (dom/dialog-asm-mirror-*); Replicate's empty "Parts to find match in" lacks live's pink fill.
+- dialog-ok (every dialog ✓) redrawn by hand as a 2.5-unit stroked polyline with a round joint (20-grid
+  4.4,8.9 8.9,13.5 15.7,5.7), read off the sprite at 200 px on a grid: alpha diff 0.025 -> 0.009. The old flat polygon's
+  arms were ~1 px thinner than live's (assembly/2215, 2262 at 1x). Rule 7: a parameter-search fitter was used first
+  and deleted; the values here are hand-picked. resvg draws the sprite's short arm 1 px lower than Chrome does.
+
+## Round 19 (2026-10-23) — whole-app sweep, cursors, feature/parts-list icons (lead)
+- Tools (scratch): b4/inuse.json = icons the code uses (string literals + format! prefixes: 677 of 737 files;
+  feature-list icons are built from type ids, see b4/feature-icons.txt), tools/dv3.py (ref | ours | diff at 40 px),
+  tools/sc.py NAME FILE... (rank.py's score for candidate files), tools/nat4.py (png refs at the crop's native size +
+  floor), b4/floor*.json. app3.sh: `CFG=/root/icons2-scratch/run/cfgdark` starts the app in dark with a PRIVATE
+  config dir (darkMode in preferences.json; never flip the shared ~/.config/noshape).
+- **Metric floor:** rank.py's 20/40 px score of Onshape's own sprite moved 1/4 px. 77 of the 80 sprite-ref icons
+  above 3 already beat their own floor (e.g. composite-part 5.7 vs floor 14.2): the rest is sub-quarter-pixel.
+  PNG refs scored at native size (nat4.py): all within floor except transparency (blurry ref, CAM-only) and
+  tab-card-empty-assembly (+2.1 grey levels, 100 px hover card, line weight).
+- Fixed: parallel 4.44 -> 2.85 (bar lengths, blue 1.0); part-configured redrawn to the sprite's design (dark-blue
+  table badge top-left, 22.2 -> 1.5; dark file = static colours + white face); dark sheet-metal-end face no longer
+  fills the open box top (excess 2.1 -> 1.1); 12 hatch swatches' tone (median |d| 2.3 -> 1.1 of 255);
+  drawing-suggested-views inner outlines 1 unit; Create drawing tiles drawn at 63.25 (= live's 1.15 px/unit, ink
+  62 px = live); exploded-views-empty 152 -> 170 px, mt 98 -> 81 (live 800: 148x149 ink, ours was 132x131).
+- Map: override-b4.txt (in-use icons that had no ref: part-configured, tab-*, list-underdefined-overlay, ...);
+  projection-first-angle -> sprite:first-angle (was a 400 px png; 6.57 vs floor 10.1).
+- Not fixable / by design: file-pdf, document (rule 6 / third-party marks), calendar, transparency and the
+  view-orientation icons (blurry refs), onshape-labs-blue (noshape cube in the flask, rule 6), hatch textures
+  (moiré in the live crops: matched in tone), ui-dropdown-arrow / expander-* / ui-chevron-down (tinted glyphs or
+  blurry refs; carets match live's collapsed/expanded sprites at 4x to 0.25 px), weld-arrow (+1.5 grey, variants worse).
+- Cursors: docs/parity/cursors.md + live dom/cursors.txt already cover every state; the feature-dialog count
+  cursor row is stale (implemented: part_studio/mod.rs counts the dialog's picks). Live requests filed for the
+  snap-mate drag, fixed-instance drag, busy regen and the Mate connector tool before its first pick.
+- Feature list: 88 feature types; all resolve to icons except hidden copyPart / nameEntity / sheetMetalRecognize
+  (no file: imported docs only). Light: all at or under the floor; dark: every one within 2 of its light score (sheet-metal-end fixed).
+  No live ref for point, refold, unfold, sheet-metal-rip (request filed, with a dark Finish-sheet-metal row).

@@ -59,6 +59,28 @@ function revolveProfile(context is Context, id is Id, segments is array) returns
     return qCreatedBy(id + "revolve", EntityType.BODY);
 }
 
+/**
+ * A closed profile (2D points) with every corner rounded `rho`: segments for
+ * `revolveProfile` (revolved arcs make exact tori).
+ */
+function roundedProfile(points is array, rho is ValueWithUnits) returns array
+{
+    var out = [];
+    const n = size(points);
+    for (var i = 0; i < n; i += 1)
+    {
+        const p = points[i];
+        const u = normalize(points[(i + n - 1) % n] - p);
+        const v = normalize(points[(i + 1) % n] - p);
+        const half = acos(dot(u, v)) / 2;
+        const t = rho / tan(half);
+        const bis = normalize(u + v);
+        out = append(out, { "p" : p + u * t });
+        out = append(out, { "p" : p + v * t, "mid" : p + bis * (rho / sin(half) - rho) });
+    }
+    return out;
+}
+
 /** A polygon (2D points in XY) extruded from z0 by h. */
 function prismZ(context is Context, id is Id, z0 is ValueWithUnits, h is ValueWithUnits, points is array) returns Query
 {
@@ -137,12 +159,21 @@ function uniteAll(context is Context, id is Id)
  */
 function cornerChamfer(context is Context, id is Id, body is Query, z0 is ValueWithUnits, h is ValueWithUnits, dw is ValueWithUnits, top is boolean, bottom is boolean)
 {
+    cornerChamferAngle(context, id, body, z0, h, dw, dw, top, bottom, 30 * degree);
+}
+
+/**
+ * `cornerChamfer` at `angle` from the face (30 degrees hex, 25 square),
+ * starting on the circle dwTop on the top face (a conical top when small).
+ */
+function cornerChamferAngle(context is Context, id is Id, body is Query, z0 is ValueWithUnits, h is ValueWithUnits, dw is ValueWithUnits, dwTop is ValueWithUnits, top is boolean, bottom is boolean, angle is ValueWithUnits)
+{
     if (!top && !bottom)
         return;
-    const slope = 1 / tan(30 * degree);
+    const slope = 1 / tan(angle);
     const big = dw * 10 + h * 10;
     const r0 = bottom ? dw / 2 : big;
-    const r1 = top ? dw / 2 : big;
+    const r1 = top ? dwTop / 2 : big;
     const z1 = z0 + h;
     // Where the two cones cross, inside the prism's height.
     const zc = min(max((r1 - r0 + (z1 + z0) * slope) / (2 * slope), z0), z1);
@@ -330,6 +361,19 @@ function screwHead(context is Context, id is Id, def is map) returns array
         var pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : rz(def.dk / 2, -def.c) }, { "p" : rz(def.dk / 2, Z) }];
         if (def.undercut == 1)
             pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : rz(def.dk / 2 - def.k * tan(41 * degree), -def.k) }, { "p" : rz(def.dk / 2, Z) }];
+        // Live's flat countersunk tapping screw (Sketch 1): the 82 degree
+        // cone from the head's edge, an arc tangent to it and to the shank,
+        // k measured to the arc's end on the shank.
+        const ca = cos(41 * degree);
+        const sa = sin(41 * degree);
+        const rfc = (ca * (def.d - def.dk) / 2 + sa * def.k) / (1 - ca);
+        if (def.cskFillet == 1 && def.undercut != 1 && rfc > EPS)
+        {
+            const cx = def.d / 2 + rfc;
+            const tangent = rz(cx - rfc * ca, -def.k + rfc * sa);
+            const mid = normalize(vector(-1 - ca, sa));
+            pts = [{ "p" : rz(Z, -def.k) }, { "p" : rz(def.d / 2, -def.k) }, { "p" : tangent, "mid" : rz(cx + rfc * mid[0], -def.k + rfc * mid[1]) }, { "p" : rz(def.dk / 2, Z) }];
+        }
         if (kind == HEAD_RAISED_COUNTERSUNK && def.f > EPS)
         {
             const big = (def.dk * def.dk / 4 + def.f * def.f) / (2 * def.f);
@@ -852,6 +896,8 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isLength(definition.re, LENGTH_0);
         annotation { "Name" : "Undercut head" }
         isInteger(definition.undercut, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Countersink fillet" }
+        isInteger(definition.cskFillet, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "Indented head" }
         isInteger(definition.indent, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "Type I corner distance" }
@@ -1030,6 +1076,7 @@ const NUT_CASTLE = 3;
 const NUT_CAP = 4;
 const NUT_INSERT = 5;
 const NUT_WELD = 6;
+const NUT_T_SLOT = 7;
 
 annotation { "Feature Type Name" : "Nut" }
 export const nut = defineFeature(function(context is Context, id is Id, definition is map)
@@ -1059,6 +1106,32 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         isLength(definition.w, LENGTH_0);
         annotation { "Name" : "de" }
         isLength(definition.de, LENGTH_0);
+        annotation { "Name" : "Chamfer angle" }
+        isReal(definition.ca, { (unitless) : [0, 30, 90] } as RealBoundSpec);
+        annotation { "Name" : "dh" }
+        isLength(definition.dh, LENGTH_0);
+        annotation { "Name" : "Round slot bottoms" }
+        isInteger(definition.roundSlot, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Nose radius" }
+        isLength(definition.rn, LENGTH_0);
+        annotation { "Name" : "Body radius" }
+        isLength(definition.rb, LENGTH_0);
+        annotation { "Name" : "Drill depth" }
+        isLength(definition.dd, LENGTH_0);
+        annotation { "Name" : "Top chamfer diameter" }
+        isLength(definition.dt, LENGTH_0);
+        annotation { "Name" : "Countersink on top" }
+        isInteger(definition.cskTop, { (unitless) : [0, 1, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Collar bore" }
+        isLength(definition.cb, LENGTH_0);
+        annotation { "Name" : "Collar bore depth" }
+        isLength(definition.cd, LENGTH_0);
+        annotation { "Name" : "T-slot nut length" }
+        isLength(definition.tl, LENGTH_0);
+        annotation { "Name" : "Tongue fillet" }
+        isLength(definition.tr, LENGTH_0);
+        annotation { "Name" : "Corner chamfer" }
+        isLength(definition.tc, LENGTH_0);
     }
     {
         const form = definition.form;
@@ -1067,17 +1140,73 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         const z0 = definition.c;
         // A castle nut's hex ends at w and its crown (de) goes up to m.
         const bodyTop = (form == NUT_CASTLE || form == NUT_CAP || form == NUT_INSERT) && definition.w > EPS ? definition.w : definition.m;
-        const body = prismZ(context, id + "body", z0, bodyTop - z0, polygonPoints(sides, definition.s, 0));
-        const dw = definition.dw > EPS ? definition.dw : definition.s;
-        cornerChamfer(context, id + "chamfer", body, z0, bodyTop - z0, dw, true, definition.both == 1 && z0 <= EPS);
+        if (form == NUT_T_SLOT)
+        {
+            // Live's ANSI T-slot nut: the section (width s to height w, the
+            // tongue n wide up to m, 45 degree corner chamfers tc, the
+            // tongue's root filleted tr) extruded tl along Y, centred.
+            const hs = definition.s / 2;
+            const hn = definition.n / 2;
+            const w = definition.w;
+            const ch = definition.tc;
+            const rf = definition.tr;
+            const sketch = newSketchOnPlane(context, id + "tSketch", { "sketchPlane" : plane(vector(Z, definition.tl / 2, Z), vector(0, -1, 0), vector(1, 0, 0)) });
+            var pts = [vector(-hs + ch, Z), vector(hs - ch, Z), vector(hs, ch), vector(hs, w - ch), vector(hs - ch, w), vector(hn + rf, w)];
+            skPolyline(sketch, "right", { "points" : pts });
+            skArc(sketch, "rightRoot", { "start" : vector(hn + rf, w), "mid" : vector(hn + rf - rf * cos(45 * degree), w + rf - rf * sin(45 * degree)), "end" : vector(hn, w + rf) });
+            skPolyline(sketch, "tongue", { "points" : [vector(hn, w + rf), vector(hn, definition.m), vector(-hn, definition.m), vector(-hn, w + rf)] });
+            skArc(sketch, "leftRoot", { "start" : vector(-hn, w + rf), "mid" : vector(-hn - rf + rf * cos(45 * degree), w + rf - rf * sin(45 * degree)), "end" : vector(-hn - rf, w) });
+            skPolyline(sketch, "left", { "points" : [vector(-hn - rf, w), vector(-hs + ch, w), vector(-hs, w - ch), vector(-hs, ch), vector(-hs + ch, Z)] });
+            skSolve(sketch);
+            opExtrude(context, id + "tNut", { "entities" : qSketchRegion(id + "tSketch"), "direction" : vector(0, -1, 0), "endBound" : BoundingType.BLIND, "endDepth" : definition.tl });
+            opDeleteBodies(context, id + "deleteTSketch", { "entities" : qCreatedBy(id + "tSketch", EntityType.BODY) });
+        }
+        else
+        {
+            const body = prismZ(context, id + "body", z0, bodyTop - z0, polygonPoints(sides, definition.s, 0));
+            const dw = definition.dw > EPS ? definition.dw : definition.s;
+            // (Live's ANSI square machine screw nut has none: angle 0.)
+            if (definition.ca > 0)
+                cornerChamferAngle(context, id + "chamfer", body, z0, bodyTop - z0, dw, definition.dt > EPS ? definition.dt : dw, true, definition.both == 1 && z0 <= EPS, definition.ca * degree);
+        }
         if (z0 > EPS)
             cylinderZ(context, id + "flange", Z, z0 + EPS, definition.dc / 2);
         if (form == NUT_CASTLE)
             cylinderZ(context, id + "crown", bodyTop - EPS, definition.m, definition.de / 2);
-        if (form == NUT_CAP)
+        if (form == NUT_CAP && definition.rn > EPS)
+        {
+            // Live's ANSI acorn nuts: the crown (diameter de) rises straight
+            // from w, then an arc of radius rb (centred de / 2 - rb off the
+            // axis) runs tangent into the nose, a sphere of radius rn
+            // topping out at m.
+            const rd = definition.de / 2;
+            const rb = definition.rb;
+            const rn = definition.rn;
+            const rc = rd - rb;
+            const zs = definition.m - rn;
+            const z1 = zs - sqrt((rb - rn) * (rb - rn) - rc * rc);
+            const ux = -rc / (rb - rn);
+            const uz = (zs - z1) / (rb - rn);
+            const tangent = rz(rc + ux * rb, z1 + uz * rb);
+            const a1 = atan2(uz, ux) / 2;
+            const a2 = (atan2(z1 + uz * rb - zs, rc + ux * rb) + 90 * degree) / 2;
+            revolveProfile(context, id + "cap", [{ "p" : rz(Z, bodyTop - EPS) }, { "p" : rz(rd, bodyTop - EPS) }, { "p" : rz(rd, z1) },
+                        { "p" : tangent, "mid" : rz(rc + rb * cos(a1), z1 + rb * sin(a1)) }, { "p" : rz(Z, definition.m), "mid" : rz(rn * cos(a2), zs + rn * sin(a2)) }]);
+        }
+        else if (form == NUT_CAP)
             // The domed cap (diameter de) from w up to the overall height m.
             revolveProfile(context, id + "cap", roundHead(definition.de / 2, definition.m - bodyTop + EPS, definition.de / 2, bodyTop - EPS));
-        if (form == NUT_INSERT)
+        if (form == NUT_INSERT && definition.cb > EPS)
+        {
+            // Live's ANSI nylon insert lock nuts: the collar (diameter de)
+            // from w to m, its top outer edge rounded 0.2 (m - w); the
+            // hole cut below bores it out (cb, cd deep).
+            const rc = definition.de / 2;
+            const rr = (definition.m - bodyTop) * 0.2;
+            revolveProfile(context, id + "collar", [{ "p" : rz(Z, bodyTop - EPS) }, { "p" : rz(rc, bodyTop - EPS) }, { "p" : rz(rc, definition.m - rr) },
+                        { "p" : rz(rc - rr, definition.m), "mid" : rz(rc - rr + rr * cos(45 * degree), definition.m - rr + rr * sin(45 * degree)) }, { "p" : rz(Z, definition.m) }]);
+        }
+        else if (form == NUT_INSERT)
             // The collar holding the insert (diameter de) up to h... m.
             cylinderZ(context, id + "collar", bodyTop - EPS, definition.m, definition.de / 2);
         if (form == NUT_WELD && definition.h > EPS)
@@ -1087,12 +1216,48 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         // The hole (blind under a cap nut).
         const holeTop = form == NUT_CAP ? definition.m - (definition.m - bodyTop) / 2 : definition.m + definition.m;
         var nutBody = solidsOf(context, id);
-        subtract(context, id + "holeCut", nutBody, cylinderZ(context, id + "hole", -definition.m - definition.h, holeTop, definition.d / 2));
+        if (definition.dh > EPS)
+        {
+            // Live's ANSI nuts: the hole at the thread's minor diameter dh,
+            // 90 degree countersinks out to d on both faces.
+            const rh = definition.dh / 2;
+            const rd = definition.d / 2;
+            const cut = rd - rh;
+            // A cap nut's hole is drilled dd deep with a 118 degree tip.
+            var top = [{ "p" : rz(rh, definition.m - cut) }, { "p" : rz(rd + EPS, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
+            if (form == NUT_CAP && definition.dd > EPS)
+                top = [{ "p" : rz(rh, definition.dd) }, { "p" : rz(Z, definition.dd + rh / tan(59 * degree)) }];
+            else if (form == NUT_INSERT && definition.cb > EPS)
+            {
+                // The collar's bore (cb) down to its floor (cd deep, else
+                // the hex top), the countersink on the floor; a bore
+                // narrower than d cuts the countersink short.
+                const zf = definition.cd > EPS ? definition.m - definition.cd : bodyTop;
+                const rb = definition.cb / 2;
+                top = rd < rb ? [{ "p" : rz(rh, zf - cut) }, { "p" : rz(rd, zf) }, { "p" : rz(rb, zf) }, { "p" : rz(rb, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }] :
+                    [{ "p" : rz(rh, zf - cut) }, { "p" : rz(rb, zf - cut + rb - rh) }, { "p" : rz(rb, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
+            }
+            else if (definition.cskTop == 0)
+                top = [{ "p" : rz(rh, definition.m + EPS) }, { "p" : rz(Z, definition.m + EPS) }];
+            subtract(context, id + "holeCut", nutBody, revolveProfile(context, id + "hole", concatenateArrays([[{ "p" : rz(Z, -definition.h - EPS) }, { "p" : rz(rd + EPS, -definition.h - EPS) }, { "p" : rz(rh, -definition.h + cut) }], top])));
+        }
+        else
+            subtract(context, id + "holeCut", nutBody, cylinderZ(context, id + "hole", -definition.m - definition.h, holeTop, definition.d / 2));
         if ((form == NUT_SLOTTED || form == NUT_CASTLE) && definition.n > EPS)
         {
             nutBody = solidsOf(context, id);
             const reach = definition.s * 2;
-            const a = cuboid(context, id + "slotA", vector(-reach, -definition.n / 2, definition.w), vector(reach, definition.n / 2, definition.m + reach));
+            // Live's ANSI slotted nuts (roundSlot): half-cylinder slot
+            // bottoms, lowest at w.
+            const r = definition.n / 2;
+            const roundBottom = definition.roundSlot == 1;
+            cuboid(context, id + "slotA", vector(-reach, -r, roundBottom ? definition.w + r : definition.w), vector(reach, r, definition.m + reach));
+            if (roundBottom)
+            {
+                fCylinder(context, id + "slotRound", { "bottomCenter" : vector(-reach, Z, definition.w + r), "topCenter" : vector(reach, Z, definition.w + r), "radius" : r });
+                opBoolean(context, id + "slotJoin", { "tools" : qUnion([qCreatedBy(id + "slotA", EntityType.BODY), qCreatedBy(id + "slotRound", EntityType.BODY)]), "operationType" : BooleanOperationType.UNION });
+            }
+            const a = qUnion([qCreatedBy(id + "slotA", EntityType.BODY), qCreatedBy(id + "slotRound", EntityType.BODY)]);
             opPattern(context, id + "slots", { "entities" : a, "transforms" : [rotationAround(line(vector(Z, Z, Z), vector(0, 0, 1)), 60 * degree), rotationAround(line(vector(Z, Z, Z), vector(0, 0, 1)), 120 * degree)], "instanceNames" : ["b", "c"] });
             subtract(context, id + "slotCut", nutBody, qUnion([a, qCreatedBy(id + "slots", EntityType.BODY)]));
         }
@@ -1107,6 +1272,7 @@ const WASHER_INTERNAL_TEETH = 4;
 const WASHER_COUNTERSUNK_TEETH = 5;
 const WASHER_CONICAL = 6;
 const WASHER_SQUARE = 7;
+const WASHER_SPRING = 8;
 
 annotation { "Feature Type Name" : "Washer" }
 export const washer = defineFeature(function(context is Context, id is Id, definition is map)
@@ -1135,6 +1301,21 @@ export const washer = defineFeature(function(context is Context, id is Id, defin
             // A cone frustum of material thickness s, overall height h.
             const s = definition.s;
             revolveProfile(context, id + "washer", [{ "p" : rz(r1, h - s) }, { "p" : rz(r2, Z) }, { "p" : rz(r2, s) }, { "p" : rz(r1, h) }]);
+            return;
+        }
+        if (form == WASHER_SPRING)
+        {
+            // Live's ANSI spring lock washers: a section W = (d2 - d1) / 2
+            // wide whose faces slope 2.5 degrees (thicker inside, h at the
+            // middle, the bottom inner corner on the XY plane), its four
+            // edges rounded (W - s) / 2 (s the bearing width), split
+            // straight across +X by a gap h / 2 wide.
+            const w = r2 - r1;
+            const slope = tan(2.5 * degree);
+            const topIn = h + w * slope;
+            const corners = [rz(r1, Z), rz(r2, w * slope), rz(r2, topIn - w * slope), rz(r1, topIn)];
+            const washer = revolveProfile(context, id + "washer", definition.s > EPS && definition.s < w - EPS ? roundedProfile(corners, (w - definition.s) / 2) : mapArray(corners, function(c) { return { "p" : c }; }));
+            subtract(context, id + "split", washer, cuboid(context, id + "gap", vector(r1 - h, -h / 4, -h), vector(r2 + h, h / 4, 2 * h)));
             return;
         }
         var body;
@@ -1299,6 +1480,8 @@ const KEY_SQUARE_ENDS = 1;
 const KEY_WOODRUFF = 2;
 const KEY_TAPER = 3;
 const KEY_GIB_HEAD = 4;
+const KEY_ROUND_TAPER = 5;
+const KEY_ONE_ROUND_END = 6;
 
 annotation { "Feature Type Name" : "Key" }
 export const key = defineFeature(function(context is Context, id is Id, definition is map)
@@ -1335,31 +1518,40 @@ export const key = defineFeature(function(context is Context, id is Id, definiti
             opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
             return;
         }
+        // Live (DIN 6885-1 / 6883 / 6886): the key along Y, width b along X,
+        // bottom on the XY plane; round ends of radius b / 2 (A), square (B),
+        // one round end (AB, at +Y); tapered keys fall 1:100 towards +Y from
+        // h at the -Y end.
+        const roundLow = form == KEY_ROUND_ENDS || form == KEY_ROUND_TAPER;
+        const roundHigh = roundLow || form == KEY_ONE_ROUND_END;
+        const r = b / 2;
+        const y0 = roundLow ? -l / 2 + r : -l / 2;
+        const y1 = roundHigh ? l / 2 - r : l / 2;
         const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : XY_PLANE });
-        if (form == KEY_ROUND_ENDS)
-        {
-            skLineSegment(sketch, "s1", { "start" : vector(-l / 2 + b / 2, -b / 2), "end" : vector(l / 2 - b / 2, -b / 2) });
-            skArc(sketch, "e1", { "start" : vector(l / 2 - b / 2, -b / 2), "mid" : vector(l / 2, Z), "end" : vector(l / 2 - b / 2, b / 2) });
-            skLineSegment(sketch, "s2", { "start" : vector(l / 2 - b / 2, b / 2), "end" : vector(-l / 2 + b / 2, b / 2) });
-            skArc(sketch, "e2", { "start" : vector(-l / 2 + b / 2, b / 2), "mid" : vector(-l / 2, Z), "end" : vector(-l / 2 + b / 2, -b / 2) });
-        }
+        skLineSegment(sketch, "s1", { "start" : vector(r, y0), "end" : vector(r, y1) });
+        if (roundHigh)
+            skArc(sketch, "e1", { "start" : vector(r, y1), "mid" : vector(Z, l / 2), "end" : vector(-r, y1) });
         else
-            skPolyline(sketch, "outline", { "points" : [vector(-l / 2, -b / 2), vector(l / 2, -b / 2), vector(l / 2, b / 2), vector(-l / 2, b / 2), vector(-l / 2, -b / 2)] });
+            skLineSegment(sketch, "e1", { "start" : vector(r, y1), "end" : vector(-r, y1) });
+        skLineSegment(sketch, "s2", { "start" : vector(-r, y1), "end" : vector(-r, y0) });
+        if (roundLow)
+            skArc(sketch, "e2", { "start" : vector(-r, y0), "mid" : vector(Z, -l / 2), "end" : vector(r, y0) });
+        else
+            skLineSegment(sketch, "e2", { "start" : vector(-r, y0), "end" : vector(r, y0) });
         skSolve(sketch);
         opExtrude(context, id + "key", { "entities" : qSketchRegion(id + "sketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : h });
         opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
         const body = qCreatedBy(id + "key", EntityType.BODY);
-        if (form == KEY_TAPER || form == KEY_GIB_HEAD)
+        if (form == KEY_TAPER || form == KEY_ROUND_TAPER || form == KEY_GIB_HEAD)
         {
-            // Taper 1:100 on the top face, h at the thick (head) end (-X).
-            const cut = cuboid(context, id + "taperTool", vector(-l, -b, h), vector(l, b, h + b));
-            opTransform(context, id + "tilt", { "bodies" : cut, "transform" : rotationAround(line(vector(-l / 2, Z, h), vector(0, 1, 0)), atan(0.01)) });
+            const cut = cuboid(context, id + "taperTool", vector(-b, -l, h), vector(b, l, h + l));
+            opTransform(context, id + "tilt", { "bodies" : cut, "transform" : rotationAround(line(vector(Z, -l / 2, h), vector(1, 0, 0)), -atan(0.01)) });
             subtract(context, id + "taperCut", body, cut);
         }
         if (form == KEY_GIB_HEAD && definition.h1 > EPS)
         {
             // The gib head (height h1, as long as it is high) at the thick end.
-            cuboid(context, id + "head", vector(-l / 2 - definition.h1, -b / 2, Z), vector(-l / 2 + EPS, b / 2, definition.h1));
+            cuboid(context, id + "head", vector(-b / 2, -l / 2 - definition.h1, Z), vector(b / 2, -l / 2 + EPS, definition.h1));
             uniteAll(context, id);
         }
     });

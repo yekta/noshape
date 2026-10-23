@@ -18,6 +18,7 @@ mod evaluate;
 pub mod hole;
 mod sheetmetal;
 mod sm_flat;
+mod loft;
 mod edge_change;
 mod offsets;
 mod packed;
@@ -548,6 +549,7 @@ pub fn register() {
         all.extend_from_slice(hole::NATIVES);
         all.extend_from_slice(sheetmetal::NATIVES);
         all.extend_from_slice(sm_flat::NATIVES);
+        all.extend_from_slice(loft::NATIVES);
         all.extend_from_slice(edge_change::NATIVES);
         all.extend_from_slice(offsets::NATIVES);
         all.extend_from_slice(packed::NATIVES);
@@ -613,7 +615,19 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                     let bb = b.shape.bounding_box(true).map(|x| format!("[{:.3} {:.3} {:.3} .. {:.3} {:.3} {:.3}]", x.min.x * 1e3, x.min.y * 1e3, x.min.z * 1e3, x.max.x * 1e3, x.max.y * 1e3, x.max.z * 1e3)).unwrap_or_default();
                     // A small sheet: each face's box too.
                     let fb = if b.kind == crate::display::BodyKind::Surface && b.faces.len() <= 8 {
-                        b.shape.faces().iter().filter_map(|f| f.bounding_box(true).ok()).map(|x| format!(" f[{:.3} {:.3} {:.3} .. {:.3} {:.3} {:.3}]", x.min.x * 1e3, x.min.y * 1e3, x.min.z * 1e3, x.max.x * 1e3, x.max.y * 1e3, x.max.z * 1e3)).collect::<String>()
+                        b.shape
+                            .faces()
+                            .iter()
+                            .filter_map(|f| {
+                                let x = f.bounding_box(true).ok()?;
+                                // A planar face's outward normal (orientation matters to std).
+                                let n = f.face_plane().ok().flatten().map(|_| {
+                                    let [u0, u1, v0, v1] = f.uv_bounds().unwrap_or_default();
+                                    f.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map(|n| format!(" n({:.2} {:.2} {:.2})", n.x, n.y, n.z)).unwrap_or_default()
+                                });
+                                Some(format!(" f[{:.3} {:.3} {:.3} .. {:.3} {:.3} {:.3}]{}", x.min.x * 1e3, x.min.y * 1e3, x.min.z * 1e3, x.max.x * 1e3, x.max.y * 1e3, x.max.z * 1e3, n.unwrap_or_default()))
+                            })
+                            .collect::<String>()
                     } else {
                         String::new()
                     };
@@ -622,7 +636,11 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
                 .collect::<Vec<_>>()
                 .join(" ")
         };
-        eprintln!("[fs op] {} {failure} {} -> {} | {}", id.join("."), faces(&snapshot), if r.is_ok() { "ok" } else { "ERR" }, faces(&ev.ctx));
+        let outcome = match &r {
+            Ok(_) => "ok".to_string(),
+            Err(e) => format!("ERR ({})", e.message),
+        };
+        eprintln!("[fs op] {} {failure} {} -> {outcome} | {}", id.join("."), faces(&snapshot), faces(&ev.ctx));
     }
     let warnings = std::mem::take(&mut ev.warnings);
     let mut ctx = ev.ctx;

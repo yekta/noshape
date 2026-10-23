@@ -116,7 +116,7 @@ pub(crate) fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyEle
                 .mt(px(5.))
                 .mb(px(5.))
                 .child(div().flex_1().child(slider(Slider { key: d.key, name: "expand", t: d.expand, tip: d.expand_tip, track: Track::Line }, d.drag, d.set_expand, cx)))
-                .child(div().mr(px(4.)).size(px(14.)).rounded_full().bg(rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(rgb(0xffffff)).child("?")),
+                .child(div().mr(px(4.)).size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))),
         )
         .into_any_element()
 }

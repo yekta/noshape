@@ -165,7 +165,7 @@ impl Render for FileTabView {
                     .px(px(20.))
                     .gap(px(10.))
                     .items_center()
-                    .bg(gpui_kit::white())
+                    .bg(crate::theme::p().panel)
                     .rounded(px(5.))
                     .border_1()
                     .border_color(gpui_kit::rgb(0xd3d7d9))

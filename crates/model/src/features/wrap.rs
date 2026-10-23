@@ -17,26 +17,29 @@ pub fn wrap() -> FeatureType {
             .default_enum("SURFACE")
             .hints(Hints::HORIZONTAL_ENUM),
         operation_type(solid),
-        ParamSpec::query("source", "Tools", QueryFilter::PLANAR_FACE | QueryFilter::SKETCH_REGION | QueryFilter::CYLINDRICAL_FACE | QueryFilter::FACE)
-            .hints(Hints::INITIAL_FOCUS),
-        ParamSpec::query1("destination", "Target", QueryFilter::CYLINDRICAL_FACE | QueryFilter::FACE | QueryFilter::PLANAR_FACE | QueryFilter::PLANE),
+        // wrap.fs / live L20: Tools planar only, Target a cylinder or cone.
+        ParamSpec::query("source", "Tools", QueryFilter::PLANAR_FACE | QueryFilter::SKETCH_REGION).hints(Hints::INITIAL_FOCUS),
+        ParamSpec::query1("destination", "Target", QueryFilter::CYLINDRICAL_FACE | QueryFilter::FACE),
         ParamSpec::flip("flipAlignment", "Flip alignment"),
         ParamSpec::bool("trim", "Trim to target", false).visible(|v| !v.is("resultType", "IMPRINT")),
         ParamSpec::bool("customAnchors", "Specify anchor points", false),
         ParamSpec::query1("sourceAnchor", "Tools anchor point", QueryFilter::POINT_LIKE).visible(anchors),
         ParamSpec::query1("destinationAnchor", "Target anchor point", QueryFilter::POINT_LIKE).visible(anchors),
-        // Group "Position" (collapsed by default).
+    ];
+    p.extend(group("positionGroup", "Position", false, vec![
         ParamSpec::num("angle", "Angle", angle_360(0.0)),
         ParamSpec::bool("angleOppositeDirection", "Angle opposite direction", false).hints(Hints::OPPOSITE_DIRECTION_CIRCULAR),
         ParamSpec::num("uShift", "U shift", ZERO_DEFAULT_LENGTH),
         ParamSpec::flip("uShiftOppositeDirection", "U shift opposite direction"),
         ParamSpec::num("vShift", "V shift", ZERO_DEFAULT_LENGTH),
         ParamSpec::flip("vShiftOppositeDirection", "V shift opposite direction"),
+    ]));
+    p.extend([
         ParamSpec::num("thickness", "Thickness", SHELL_OFFSET).visible(solid),
         ParamSpec::flip("oppositeDirection", "Thickness opposite direction").visible(solid),
-    ];
+    ]);
     p.extend(solid_merge_scope(solid, QueryFilter::SOLID_BODY));
-    FeatureType::new("wrap", "Wrap", Category::Solid, p).describe("Wrap planar faces or sketch regions onto a cylinder or cone, or unwrap cylindrical / conical faces onto a plane")
+    FeatureType::new("wrap", "Wrap", Category::Solid, p).describe("Wrap planar faces or sketch regions onto a cylinder or cone")
 }
 
 pub fn decal() -> FeatureType {

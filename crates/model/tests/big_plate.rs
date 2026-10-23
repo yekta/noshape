@@ -77,7 +77,7 @@ impl log::Log for PerfLog {
 }
 
 #[test]
-#[ignore = "PERF1 in progress (kern): 2.4 / 2.1 / 4.0 s against 2 s"]
+#[ignore = "timed: run in release builds by perf.yml (jobs=model); under 2 s on macOS, Linux and Windows (10-23)"]
 fn plate_with_400_holes_regenerates_like_onshape() {
     if std::env::var_os("NOSHAPE_PERF").is_some() && log::set_logger(&PerfLog).is_ok() {
         log::set_max_level(log::LevelFilter::Info);

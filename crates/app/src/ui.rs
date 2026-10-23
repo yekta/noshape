@@ -219,7 +219,7 @@ impl Render for RichTooltip {
                 .w(px(RICH_TOOLTIP_W))
                 .bg(gpui_kit::rgb(0xffffff))
                 .child(title)
-                .child(div().p(px(4.)).line_height(px(18.)).child(self.description.clone()))
+                .child(div().p(px(4.)).line_height(px(18.)).child(tool_description(&self.description)))
                 .into_any_element()
         } else {
             title.into_any_element()
@@ -232,6 +232,15 @@ impl Render for RichTooltip {
         // Never drawn over an open context menu (QA3: a stale tooltip covered its items).
         div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(div().w(px(RICH_TOOLTIP_W)).flex().justify_center().child(content))))
     }
+}
+
+/// A tool description ([`crate::tool_text::blocks`]): its paragraphs, and
+/// list items numbered at the right of the browser's 40 px list indent.
+pub fn tool_description(text: &str) -> Div {
+    v_flex().children(crate::tool_text::blocks(text).into_iter().map(|(n, t)| match n {
+        None => div().child(t),
+        Some(n) => h_flex().items_start().child(div().w(px(40.)).flex_none().pr(px(4.)).flex().justify_end().child(format!("{n}."))).child(div().flex_1().min_w_0().child(t)),
+    }))
 }
 
 /// Tooltip closure for a toolbar tool (see [`RichTooltip`]); `anchor` holds
@@ -496,8 +505,8 @@ pub fn tool_caret(id: impl Into<ElementId>, cx: &App) -> Button {
     let pal = p();
     Button::new(id)
         .custom(tool_variant(cx, false, true))
-        // Live: a 10 x 5 px caret, about 2 px thick.
-        .child(glyph("tool-caret", 12., pal.text))
+        // Live: the 10 x 6 `expanded` sprite at 1:1, about 2 px thick.
+        .child(glyph("tool-caret", 10., pal.text))
         .w(px(TOOL_CARET_W))
         .h(px(TOOL_CELL))
         .p_0()
@@ -692,7 +701,7 @@ pub fn os_checkbox_focused(id: impl Into<ElementId>, label: impl Into<SharedStri
                 .border_color(if on || focused { pal.accent } else { gpui_kit::rgb(0x888888) })
                 .when(focused, |d| d.shadow(vec![BoxShadow { color: gpui_kit::rgb(0x769fcc).into(), offset: point(px(0.), px(0.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }]))
                 .bg(if on { pal.accent } else { gpui_kit::rgb(0xffffff) })
-                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb(0xffffff)))),
+                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).with_size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
         )
         .child(label.into())
 }
@@ -749,7 +758,8 @@ pub fn input_with_placeholder(st: &Entity<gpui_kit::component::input::InputState
 }
 
 pub fn caret(open: bool) -> Div {
-    // Live (Parts / Default geometry headers): a thin 12 x 6 `#666` chevron.
+    // Live (Parts / Default geometry headers): a thin 12 x 6 chevron,
+    // `--os-icon-fill-tertiary` (#666, #999 in dark: live dark/dk-940).
     div()
         .w(px(16.))
         .ml(px(-3.))
@@ -760,7 +770,15 @@ pub fn caret(open: bool) -> Div {
         .justify_center()
         // Live: the expander (`.node-expander`) shows the pointer.
         .cursor_pointer()
-        .child(glyph(if open { "expander-down" } else { "expander-right" }, 14., gpui_kit::rgb(0x666666)))
+        .child(glyph(if open { "expander-down" } else { "expander-right" }, 14., p().icon_tertiary))
+}
+
+/// A dialog's disabled green ✓ button (after `.bg(accept)`). Live: the button at
+/// 20% opacity: #cce9cc with a white ✓ in light, (41,70,41) with a grey ✓ in dark
+/// (dialogs/*-01-open, dark/dk-978). GPUI applies opacity per primitive, which
+/// would tint the light ✓, so light uses the blended colour instead.
+pub fn disabled_accept<E: Styled>(e: E) -> E {
+    if gpui_kit::hex_theme_active() { e.opacity(0.2) } else { e.bg(gpui_kit::rgb(0xcce9cc)) }
 }
 
 /// A single-color glyph (chevrons, carets): an app icon drawn as a mask
@@ -1164,7 +1182,7 @@ pub fn name_pill(name: SharedString, offset: Point<Pixels>) -> Div {
                 .bg(gpui_kit::rgb(0x1651b0))
                 .text_size(px(14.))
                 .font_weight(FontWeight::BOLD)
-                .text_color(gpui_kit::rgb(0xffffff))
+                .text_color(gpui_kit::rgb_static(0xffffff))
                 .child(name),
         )
         .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())

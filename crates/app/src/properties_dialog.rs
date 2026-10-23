@@ -349,7 +349,7 @@ fn check_row(id: &'static str, text: &'static str, on: bool) -> Stateful<Div> {
                 .border_1()
                 .border_color(if on { rgb(0x1651b0) } else { rgb(0xaaaaaa) })
                 .bg(if on { rgb(0x1651b0) } else { rgb(0xffffff) })
-                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(rgb(0xffffff)))),
+                .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
         )
         .child(text)
 }
@@ -364,7 +364,7 @@ pub(crate) fn footer_button(id: &'static str, text: &'static str, primary: bool,
         .items_center()
         .rounded(px(5.25))
         .text_size(px(14.))
-        .when(primary, |d| d.bg(rgb(0x1651b0)).text_color(rgb(0xffffff)))
+        .when(primary, |d| d.bg(rgb(0x1651b0)).text_color(gpui_kit::rgb_static(0xffffff)))
         .when(!primary, |d| d.bg(rgb(0xd7d7d7)).text_color(rgb(0x333333)))
         .when(!enabled, |d| d.opacity(0.4))
         .when(enabled, |d| d.cursor_pointer())
@@ -472,13 +472,26 @@ impl Render for MetaForm {
                                 })),
                             ),
                     )
+                    // Live (assembly/132): one 34 px group, the grey field
+                    // (#ccc outline, square right corners) running into the
+                    // 36 px calculator button, whose #aaa outline divides them;
+                    // not overridden, the field is #eee with a #ccc outline.
                     .child(
                         h_flex()
                             .p(px(1.))
-                            .child(div().flex_1().when(!mass_on, |d| d.bg(rgb(0xeeeeee))).child(text_field(&self.mass)))
+                            .child({
+                                let joined = !self.mass_computed;
+                                let input = Input::new(&self.mass)
+                                    .h(px(34.))
+                                    .text_size(px(14.))
+                                    .when(joined, |i| i.rounded_r(px(0.)))
+                                    .when(!mass_on, |i| i.bg(rgb(0xeeeeee)).border_color(rgb(0xcccccc)));
+                                div().flex_1().child(input)
+                            })
                             .when(!self.mass_computed, |d| d.child(
                                 div()
                                     .id("meta-calc")
+                                    .ml(px(-1.))
                                     .w(px(36.))
                                     .h(px(34.))
                                     .flex()

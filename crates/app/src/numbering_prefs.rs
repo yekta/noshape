@@ -1,5 +1,4 @@
-//! "Numbering scheme settings" (Onshape's Company settings › Numbering
-//! schemes; here in the account preferences under Release management).
+//! Company settings › Numbering schemes: "Numbering scheme settings".
 //! Help Plans/numbering_schemes and its image accounts/co-numschemes-03.png:
 //! tabs Release objects | Standard content | Items | Release names; a
 //! "Number generation" select (Manual entry / Sequential part number
@@ -148,7 +147,7 @@ fn select(id: &'static str, value: &str, open: bool, width: f32, options: Vec<St
 }
 
 fn option(id: SharedString, text: &'static str) -> Stateful<Div> {
-    div().id(id).px(px(10.)).py(px(4.)).text_size(px(14.)).cursor_pointer().hover(|d| d.bg(rgb(0x1e90ff)).text_color(rgb(0xffffff))).child(text)
+    div().id(id).px(px(10.)).py(px(4.)).text_size(px(14.)).cursor_pointer().hover(|d| d.bg(rgb(0x1e90ff)).text_color(gpui_kit::rgb_static(0xffffff))).child(text)
 }
 
 /// A 34 px bordered box of the flow chart (inputs and previews).
@@ -276,7 +275,6 @@ impl Render for NumberingPrefsView {
         // `#333` rule, the content 15 px in.
         v_flex()
             .w_full()
-            .mt(px(38.))
             .pl(px(15.))
             .child(h_flex().ml(px(-15.)).h(px(32.)).pl(px(15.)).gap(px(6.)).border_b_1().border_color(pal.text).child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Numbering scheme settings")).child(crate::assets::icon("help-gray", 20., cx)))
             .child(div().pt(px(10.)).child(tabs))
@@ -321,8 +319,8 @@ impl Render for NumberingPrefsView {
                                 .py(px(7.))
                                 .rounded(px(4.))
                                 .text_size(px(14.))
-                                .text_color(rgb(0xffffff))
-                                .bg(rgb(0x1651b0))
+                                .text_color(gpui_kit::rgb_static(0xffffff))
+                                .bg(gpui_kit::rgb_static(0x1651b0))
                                 .when(!changed, |d| d.opacity(0.4))
                                 .when(changed, |d| d.cursor_pointer())
                                 .child("Save changes")

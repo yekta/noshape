@@ -1027,7 +1027,7 @@ impl AssemblyView {
         }
         if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::External { .. }) {
             let tg = targets.clone();
-            m.push(icon_item("Change to version…", "legend-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
+            m.push(icon_item("Change to version…", "change-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
         m.push(export);
         // Live qa5 CA2: Release… after Export… (the instances' parts).
@@ -1790,7 +1790,8 @@ impl AssemblyView {
                 }
             }
         }
-        if movable && !np_editing {
+        // Live: no Animate… for Ball (or Fastened).
+        if movable && !np_editing && mate.as_ref().is_some_and(|mt| mt.mate_type != MateType::Ball) {
             m.push(MenuEntry::Sep);
             m.push(item("Animate…", move |t, w, cx| {
                 t.selected_mate = Some(id);
@@ -2376,12 +2377,25 @@ pub(crate) struct AnimState {
     pub task: Option<Task<()>>,
     /// Preview from the mate dialog's Animate button (no Animate dialog).
     pub preview: bool,
+    /// The DOF chip is filled (live: auto-filled for one DOF, empty for
+    /// several until picked in "Select degree of freedom").
+    pub chosen: bool,
+    /// The "Select degree of freedom" chooser is open.
+    pub chooser: bool,
 }
 
 impl AnimState {
     pub fn angular(&self) -> bool {
         self.dof == 0
     }
+}
+
+/// A mate's degrees of freedom in live's Animate chooser order: the
+/// rotation first, then X, Y, Z translations ("⟳ - z", "↹ - x", …).
+pub(super) fn anim_dofs(t: MateType) -> Vec<usize> {
+    let mut v: Vec<usize> = noshape_model::assembly::eval::mate_dofs(t).iter().map(|(ix, _)| *ix).collect();
+    v.sort_by_key(|ix| (*ix != 0, *ix));
+    v
 }
 
 /// Full turns of the mate dialog's Animate preview (one degree per frame).
@@ -2474,8 +2488,8 @@ impl AssemblyView {
         if dof == 0 {
             (fmt(0.0), fmt(std::f64::consts::TAU))
         } else {
-            let size = self.result.bounds().map(|(a, b)| (b - a).length()).unwrap_or(0.1);
-            (fmt(0.0), fmt(size * 0.5))
+            // Live (2287/2288): 0 mm → 25 mm.
+            (fmt(0.0), fmt(0.025))
         }
     }
 
@@ -2491,13 +2505,15 @@ impl AssemblyView {
             return;
         };
         self.stop_animation(window, cx);
-        let dof = noshape_model::assembly::eval::mate_dofs(m.mate_type)[0].0;
-        let (a, b) = self.anim_defaults(&m, dof, cx);
+        let dofs = anim_dofs(m.mate_type);
+        let dof = dofs[0];
+        let chosen = dofs.len() == 1;
+        let (a, b) = if chosen { self.anim_defaults(&m, dof, cx) } else { (String::new(), String::new()) };
         let [start, end] = self.anim_value_inputs(dof == 0, a, b, window, cx);
         let steps = self.anim_steps_input("300".into(), window, cx);
         let current = self.result.solved.mate_values.get(&m.id).map(|v| v[dof]).unwrap_or(0.0);
         self.selected_mate = Some(m.id);
-        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: false, playback: Playback::Reciprocate, busy: false, current, task: None, preview: false });
+        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: false, playback: Playback::Reciprocate, busy: false, current, task: None, preview: false, chosen, chooser: false });
         cx.notify();
     }
 
@@ -2530,7 +2546,7 @@ impl AssemblyView {
         };
         let [start, end] = self.anim_value_inputs(dof == 0, a, b, window, cx);
         let steps = self.anim_steps_input(format!("{steps}"), window, cx);
-        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: true, playback: Playback::Single, busy: false, current: now, task: None, preview: true });
+        self.anim = Some(AnimState { mate: m.id, dof, start, end, steps, t: 0.0, dir: 1.0, playing: false, played: true, playback: Playback::Single, busy: false, current: now, task: None, preview: true, chosen: true, chooser: false });
         self.play_animation(cx);
     }
 
@@ -2546,6 +2562,17 @@ impl AssemblyView {
         self.schedule_eval(window, cx);
     }
 
+    /// Open the "Select degree of freedom" chooser (multi-DOF mates).
+    pub(super) fn open_dof_chooser(&mut self, cx: &mut Context<Self>) {
+        let Some(t) = self.anim.as_ref().filter(|a| !a.preview).and_then(|a| self.assembly(cx).and_then(|asm| asm.mate(a.mate)).map(|m| m.mate_type)) else { return };
+        if anim_dofs(t).len() > 1
+            && let Some(a) = &mut self.anim
+        {
+            a.chooser = true;
+        }
+        cx.notify();
+    }
+
     fn set_anim_dof(&mut self, dof: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(mid) = self.anim.as_ref().map(|a| a.mate) else { return };
         let Some(m) = self.assembly(cx).and_then(|a| a.mate(mid).cloned()) else { return };
@@ -2555,6 +2582,8 @@ impl AssemblyView {
         if let Some(an) = &mut self.anim {
             an.dof = dof;
             an.t = 0.0;
+            an.chosen = true;
+            an.chooser = false;
             an.start = start;
             an.end = end;
         }
@@ -2603,6 +2632,9 @@ impl AssemblyView {
     }
 
     pub(super) fn play_animation(&mut self, cx: &mut Context<Self>) {
+        if self.anim.as_ref().is_some_and(|a| !a.chosen) {
+            return;
+        }
         let Some((start, end, steps)) = self.anim_range(cx) else {
             self.message = Some((true, "Enter valid start and end values.".into()));
             cx.notify();
@@ -2707,35 +2739,73 @@ impl AssemblyView {
             format!("{} {}", trim_number(a.current / f), units.length.symbol())
         };
         let (playing, pb, dof, reversed) = (a.playing, a.playback, a.dof, a.dir < 0.0);
-        let dofs = noshape_model::assembly::eval::mate_dofs(m.mate_type);
+        let dofs = anim_dofs(m.mate_type);
+        let chosen = a.chosen;
+        let chooser_open = a.chooser;
         // Onshape's "Animate mate" dialog: the DOF chip box, right-aligned
         // fields, Playback type ▾ + reverse, Current value, ▶ ■ and ?.
         use crate::os_ui as os;
         let field = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| os::param_row_plain(label, st.clone()).into_any_element();
         let axis_of = |ix: usize| match ix {
             0 => ("⟳", "z"),
-            1 => ("↔", "x"),
-            2 => ("↔", "y"),
-            _ => ("↔", "z"),
+            1 => ("↹", "x"),
+            2 => ("↹", "y"),
+            _ => ("↹", "z"),
         };
         let chip = |ix: usize| {
             let (g, ax) = axis_of(ix);
             format!("{g} - {ax} - {}", m.name)
         };
-        let chip_row = os::query_row("anim-dof-chip", chip(dof)).child(
-            // Live (dom/dialog-animate): a 20 x 24 "×" span (5 px left pad), 8 x 7 px ink, #666.
-            div().id("anim-dof-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 10., gpui_kit::rgb(0x666666))),
-        ).into_any_element();
+        let chip_rows: Vec<AnyElement> = chosen
+            .then(|| {
+                os::query_row("anim-dof-chip", chip(dof))
+                    .child(
+                        // Live (dom/dialog-animate): a 20 x 24 "×" span (5 px left pad), 8 x 7 px ink, #666.
+                        div().id("anim-dof-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 10., crate::theme::p().icon_tertiary)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            if let Some(a) = &mut this.anim {
+                                (a.playing, a.task, a.chosen) = (false, None, false);
+                            }
+                            cx.notify();
+                        })),
+                    )
+                    .into_any_element()
+            })
+            .into_iter()
+            .collect();
         // Live dom dialog-animate: the chip box, 5 px, then 26 px rows.
-        let mut body = v_flex().px(px(3.)).pt(px(3.)).pb(px(2.)).child(os::query_box("anim-dof", "Mate DOF to animate", true, vec![chip_row])).child(div().h(px(5.)));
-        if dofs.len() > 1 {
-            // Several degrees of freedom: pick the one to animate.
-            let mut sel = h_flex().gap_1().flex_wrap().px(px(3.));
-            for (ix, _) in dofs {
-                let ix = *ix;
-                sel = sel.child(Button::new(SharedString::from(format!("anim-dof-{ix}"))).label(chip(ix)).ghost().xsmall().selected(dof == ix).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_anim_dof(ix, window, cx))));
+        // Clicking it (or the mate's row) opens "Select degree of freedom".
+        let dof_box = os::query_box("anim-dof", "Mate DOF to animate", true, chip_rows).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_dof_chooser(cx)));
+        let mut body = v_flex().px(px(3.)).pt(px(3.)).pb(px(2.)).child(dof_box).child(div().h(px(5.)));
+        if chooser_open && dofs.len() > 1 {
+            // Live (dom/animate-dof-chooser-cylindrical.txt): `div.mate-dof-chooser`,
+            // one row per DOF.
+            let mut list = v_flex()
+                .id("anim-dof-chooser")
+                .mx(px(3.))
+                .mb(px(5.))
+                .bg(crate::theme::p().panel)
+                .border_1()
+                .border_color(gpui_kit::rgb(0xd7d7d7))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(3.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }])
+                .child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Select degree of freedom"));
+            for ix in dofs {
+                list = list.child(
+                    div()
+                        .id(SharedString::from(format!("anim-dof-{ix}")))
+                        .h(px(24.))
+                        .px(px(6.))
+                        .flex()
+                        .items_center()
+                        .text_size(px(13.33))
+                        .text_color(pal.text)
+                        .cursor_pointer()
+                        .hover(|d| d.bg(pal.row_hover))
+                        .child(chip(ix))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_anim_dof(ix, window, cx))),
+                );
             }
-            body = body.child(sel);
+            body = body.child(list);
         }
         let view = cx.entity();
         let pb_label = match pb {
@@ -2814,7 +2884,7 @@ impl AssemblyView {
                         }
                     })))
                     .child(div().flex_1())
-                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
+                    .child(div().size(px(14.)).mr(px(4.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))),
             );
         // Live dom dialog-animate: 220 px, the plain grey ×.
         Self::panel_frame_with("Animate mate", body, cx.listener(|this, _: &ClickEvent, window, cx| this.close_animation(window, cx)), "anim-close", true).w(px(220.)).into_any_element()
@@ -3028,33 +3098,106 @@ impl AssemblyView {
         let pal = p();
         let Some((editing, ids)) = self.ui.group.clone() else { return div().into_any_element() };
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let title = editing.and_then(|g| self.assembly(cx).and_then(|a| a.groups.iter().find(|x| x.id == g).map(|x| x.name.clone()))).unwrap_or_else(|| "Group".into());
-        let mut field = v_flex().gap_px().p_1().rounded_md().border_1().border_color(pal.accent).bg(with_alpha(pal.accent, 0.06)).min_h(px(28.));
-        if ids.is_empty() {
-            field = field.child(div().px_1().text_sm().text_color(pal.text_faint).child("Instances"));
-        }
-        for id in ids {
-            field = field.child(
-                h_flex()
-                    .px_1()
-                    .gap_1()
-                    .text_sm()
-                    .child(div().flex_1().truncate().child(names.get(&id).cloned().unwrap_or_default()))
-                    .child(div().id(SharedString::from(format!("grp-x-{}", id.0))).cursor_pointer().child(crate::ui::glyph("ui-clear", 9., gpui_kit::rgb(0x666666))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_group_member(id, cx)))),
-            );
-        }
+        let asm = self.assembly(cx);
+        // Live (dom/dialog-assembly-group.txt): a new group is titled "Group 1".
+        let title = match editing {
+            Some(g) => asm.and_then(|a| a.groups.iter().find(|x| x.id == g).map(|x| x.name.clone())).unwrap_or_else(|| "Group".into()),
+            None => asm.map(|a| a.next_feature_name("Group")).unwrap_or_else(|| "Group 1".into()),
+        };
+        // Live: empty → "Nothing selected."; members already mated together (E2) →
+        // "Mate cannot be added between member of same group.".
+        let mated = asm.is_some_and(|a| a.mates.iter().any(|m| !m.suppressed && ids.contains(&m.a.instance) && ids.contains(&m.b.instance)));
+        let error = if ids.is_empty() {
+            Some("Nothing selected.")
+        } else if mated {
+            Some("Mate cannot be added between member of same group.")
+        } else {
+            None
+        };
+        let rows: Vec<AnyElement> = ids
+            .iter()
+            .map(|&id| {
+                crate::os_ui::query_row(SharedString::from(format!("grp-row-{}", id.0)), names.get(&id).cloned().unwrap_or_default())
+                    .child(
+                        div()
+                            .id(SharedString::from(format!("grp-x-{}", id.0)))
+                            .px(px(5.))
+                            .text_size(px(16.67))
+                            .text_color(crate::theme::p().icon_tertiary)
+                            .cursor_pointer()
+                            .child("×")
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_group_member(id, cx))),
+                    )
+                    .into_any_element()
+            })
+            .collect();
+        let ok = !ids.is_empty();
         let body = v_flex()
-            .p_3()
-            .gap_2()
-            .child(field)
-            .child(div().text_xs().text_color(pal.text_faint).child("Select instances in the graphics area or the instance list."))
-            .child(h_flex().justify_end().child(Button::new("grp-ok").icon(Icon::empty().path(icon_path("check"))).primary().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_group(cx)))));
-        Self::panel_frame(&title, body, cx.listener(|this, _: &ClickEvent, _, cx| {
-            this.ui.group = None;
-            this.update_capture(cx);
-            cx.notify();
-        }), "grp-close")
-        .into_any_element()
+            .pb(px(2.))
+            // The Instances field is active while the dialog is open.
+            .child(div().px(px(3.)).pt(px(5.)).child(crate::os_ui::query_box("grp-instances", "Instances", true, rows)))
+            .child(h_flex().justify_end().px(px(4.)).pt(px(4.)).pb(px(2.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))));
+        v_flex()
+            .id("group-dialog")
+            .w(px(220.))
+            .bg(pal.dialog_bg)
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .text_color(pal.text)
+            .child(
+                h_flex()
+                    .h(px(29.))
+                    .bg(crate::theme::p().panel)
+                    .border_b_1()
+                    .border_color(gpui_kit::rgb(0xd7d7d7))
+                    .child(
+                        div()
+                            .id("grp-title")
+                            .flex_1()
+                            .pl(px(6.))
+                            .text_size(px(13.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(if error.is_some() { pal.text_invalid } else { pal.text })
+                            .truncate()
+                            .when_some(error.map(|e| format!("{title} did not regenerate properly: {e}")), |d, t| d.tooltip(crate::ui::tooltip(t)))
+                            .child(title.clone()),
+                    )
+                    .child(
+                        // Live: the ✓ at opacity 0.2 while nothing is selected.
+                        div()
+                            .id("grp-ok")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(pal.accept)
+                            .when(!ok, |d| d.opacity(0.2))
+                            .when(ok, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
+                            .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                if ok {
+                                    this.accept_group(cx);
+                                }
+                            })),
+                    )
+                    .child(
+                        div()
+                            .id("grp-close")
+                            .size(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .hover(|d| d.bg(pal.panel_hover))
+                            .child(crate::assets::icon("dialog-cancel", 24., cx))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.group = None;
+                                this.update_capture(cx);
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(body)
+            .into_any_element()
     }
 }
 

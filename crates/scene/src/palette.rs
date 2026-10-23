@@ -26,6 +26,15 @@ pub mod viewport {
     pub const BOUNDARY_EDGE: u32 = 0xe00000;
     /// Errors (`ERROR_HIGHLIGHT_COLOR1`).
     pub const ERROR: u32 = 0xbd3039;
+    /// Faces of a failed feature's error geometry (a Feature pattern's
+    /// ghost instances). Live "lp wall over" 2258, solved over two
+    /// backgrounds: rgb(123,30,36) at α 0.60 on both the top and the front
+    /// faces (so drawn flat here; the browser blends in sRGB). Our renderer
+    /// blends in linear light, where [`ERROR_FILL_ALPHA`] gives the live
+    /// results (#825d6b over the top, #693c45 over the front) within a few
+    /// levels.
+    pub const ERROR_FILL: u32 = 0x7b1e24;
+    pub const ERROR_FILL_ALPHA: f32 = 0.75;
     /// Construction plane fill (`--os-construction-plane-ambient-color`),
     /// drawn unlit at 20%: one plane reads `#f5f8fa`, three stacked `#e7edf2`.
     pub const PLANE_FILL: u32 = 0xcedbe5;
@@ -75,6 +84,8 @@ pub mod viewport_dark {
     pub const ORIGIN: u32 = 0xffffff;
     pub const SKETCH_FULL: u32 = 0xffffff;
     pub const SKETCH_OVER: u32 = 0xff6b6b;
+    /// `--os-sketch-underconstrained-line-point-color`.
+    pub const SKETCH_UNDER: u32 = 0x3e94ff;
     pub const SKETCH_REGION: u32 = 0xf2f2f2;
     pub const DIM_DRIVEN: u32 = 0xcccccc;
     pub const AXIS_X: u32 = 0xdd979b;
@@ -97,6 +108,18 @@ pub fn is_dark() -> bool {
 /// `light`, or `dark` in the dark theme: `pick(viewport::ORIGIN, viewport_dark::ORIGIN)`.
 pub fn pick<T>(light: T, dark: T) -> T {
     if is_dark() { dark } else { light }
+}
+
+/// A sketch color from the Graphics preferences as drawn in the theme: in
+/// dark, the light defaults become Onshape's dark ones (fully defined
+/// `#000` → `#fff`, underdefined `#0000d0` → `#3e94ff`; live dk-931–933);
+/// colors the user picked stay as they are.
+pub fn sketch_color_for_theme(hex: u32) -> u32 {
+    match hex {
+        0x000000 if is_dark() => viewport_dark::SKETCH_FULL,
+        0x0000d0 if is_dark() => viewport_dark::SKETCH_UNDER,
+        _ => hex,
+    }
 }
 
 /// Viewport background: white, `#333` in the dark theme.

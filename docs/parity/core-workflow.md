@@ -430,3 +430,41 @@ with black jagged halos and see-through holes (hole cylinders visible through th
 intersection line; one plane selected draws normally; clearing the selection restores it. Reproduced 3×. **Not a
 regression:** /tmp/lead/noshape-v045 shows the same with Top + Right on the demo plate (black halos, see-through holes,
 banding on the side faces).
+
+## v0.4.6 final candidate /tmp/lead/noshape-v046b + noshape-cli-v046b (release/v0.4.6 751df66 = 8da7e78 + version, toolchain pin, CI fix, BRepMesh planar meshing), FRESH=1, 2026-10-23 01:38–02:40, qa4
+**Result: FAIL on (b) only** (unchanged from 8da7e78; the fix isn't on the release branch). Everything else passes.
+
+| Row | Result |
+|---|---|
+| Display (new planar meshing) | ✅ demo plate shaded with edges / shaded without edges, zoomed on holes + fillets; Flange (annular planar faces with bolt-circle holes); tests/perf/big-plate (one planar face, hundreds of holes): no cracks, slivers or stray triangles; edges right |
+| (a) lp wall over | ✅ red row + title, tooltip exact, ✓ green, seed wall + Right plane red; Reapply on: two walls, 20042 mm³ |
+| (b) failed Extrude | ✗ as before: red title / row, tooltip exact, ✓ enabled, up-to face edge red; input region not drawn |
+| (e) CLI live mode | ✅ sketch_create / sketch_draw / feature_add on the open failext.noshape appear at once; Ctrl+Z removes Extrude 3 |
+| Section 8 (73 items) | ✅ all ALIVE; screenshots as the 8da7e78 run (montage /tmp/qa4/cm/mont46c.png) |
+
+Note: opening a .noshape whose stale `-wal` / `-shm` (from an older file of the same name) sit beside it panics at start
+("could not open document: unknown branch …", main.rs:348 `expect`) instead of an error dialog; same code on main.
+
+## v0.4.6 candidate c /tmp/lead/noshape-v046c (release/v0.4.6 + psb 9b27922), 2026-10-23 02:50–03:10, qa4
+**PASS** on the two rows asked for.
+- (b) failed Extrude (Up to face, failext.noshape): the input region (10×10 square at x 50–60) is drawn with a red outline
+  and a light red fill, as live part-studio/2028; title / row red, tooltip exact, ✓ enabled. Still different from 2028:
+  live draws the region's **4 vertices as grey dots** and the **extrude direction arrow** on the region; noshape shows
+  neither in the failed state (open, psb).
+- (a) lp wall over (fresh CLI model): Reapply off red with the exact tooltip, seed wall + Right plane red; Reapply on two
+  walls, 20042 mm³.
+- Test note: a model accepted with Reapply on in an earlier run keeps it (file saved); rebuild the models for each run.
+
+## v0.4.7 gate: release/v0.4.7 dd1ca034 (built in /root/wt/release, target-lead, 0 warnings; footer 0.4.7.dd1ca0347f4c), FRESH=1, 2026-10-23 13:55–15:30, qa4
+**Result: FAIL on (a)** (Direction not red). (b) PASS to the lead's spec (one deviation from live noted), (c) PASS.
+Screenshots: /root/qa4-scratch/gate-v047/.
+
+| Row | Result |
+|---|---|
+| (a) failed Feature pattern, lp wall over, Reapply off, counts 2 / 5 / 10 | ✓ 1 / 4 / 9 ghosts; ghost edges #bd3039 drawn through the block; translucent red ghost fill (#7e2d32 on the overhang strips, live #904348 there); seed keeps its shading, orange outline. **✗ the Direction (block long edge) is drawn orange (#e8962a-ish, selection colour), not red; a Right-plane Direction is orange-tinted too.** Side by side with live 2259/2258/2260: a1-…png |
+| (a) flush wall (wall flush with the block's long sides, 1 mm over the top; mk-flush.py) | ✓ fails "Could not create all instances…"; the long side face fills red from the stacked ghosts of the merged side face, red edges, ghost stack at the wall end, as the user's Onshape shot. Exact camera of the user's shot not reproduced (orbit too coarse). A wall flush with the *end* face pattern OK in noshape (not failing). |
+| (b) projection | ✓ fresh Part Studio and reopened document (quit with perspective on) orthographic, Perspective view unticked; O in the graphics area: 0 px change; O in a sketch = Offset; camera menu Perspective view toggles with ✓; right-click › Set as default → new Part Studio opens perspective. **Deviation from live (lead's decision):** live has no Set as default and no persistence (behaviours.md "Projection"). Our perspective looks stronger than live's 45° (2268); not compared on equal geometry. |
+| (c) failed Extrude (v0.4.6 b) | ✓ red region + light fill, tooltip exact, ✓ enabled; the direction arrow is now drawn (missing on v046c) |
+| (c) smoke | ✓ new doc, rectangle sketch, Extrude, Fillet; quit / reopen; section 8: 73/73 ALIVE, screenshots as before |
+
+Notes: Enter in Instance count accepts the dialog (Tab used); Xvfb :110 died once during the run (restarted).

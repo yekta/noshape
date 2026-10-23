@@ -134,7 +134,7 @@ pub fn badge(name: &str) -> Div {
 pub fn table_list(id: &'static str, mine: &[TableRef], workspace: &[TableRef], chosen: Option<&TableRef>, width: f32, pick: impl Fn(TableRef, &mut Window, &mut App) + 'static) -> AnyElement {
     let pal = p();
     let pick = std::rc::Rc::new(pick);
-    let mut list = v_flex().id(id).w(px(width)).max_h(px(400.)).overflow_y_scroll().py(px(2.)).bg(gpui_kit::white()).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(3.)), blur_radius: px(6.), spread_radius: px(0.), inset: false }]);
+    let mut list = v_flex().id(id).w(px(width)).max_h(px(400.)).overflow_y_scroll().py(px(2.)).bg(crate::theme::p().panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(3.)), blur_radius: px(6.), spread_radius: px(0.), inset: false }]);
     for (heading, items) in [("My custom tables", mine), ("Workspace custom tables", workspace)] {
         if items.is_empty() {
             continue;

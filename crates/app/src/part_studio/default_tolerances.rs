@@ -204,7 +204,7 @@ impl PartStudioView {
             .text_color(pal.text)
             .child("Types")
             .when(!ticked.is_empty(), |d| {
-                d.child(div().min_w(px(16.)).h(px(16.)).px(px(4.)).rounded(px(8.)).bg(pal.accent).text_color(rgb(0xffffff)).text_size(px(11.)).flex().items_center().justify_center().child(ticked.len().to_string()))
+                d.child(div().min_w(px(16.)).h(px(16.)).px(px(4.)).rounded(px(8.)).bg(pal.accent).text_color(gpui_kit::rgb_static(0xffffff)).text_size(px(11.)).flex().items_center().justify_center().child(ticked.len().to_string()))
             })
             .child(crate::ui::glyph("ui-caret-down", 6., rgb(0x666666)))
             .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())

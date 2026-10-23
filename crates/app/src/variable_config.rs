@@ -130,7 +130,7 @@ impl VariableStudioView {
             .flex()
             .items_center()
             .justify_center()
-            .bg(gpui_kit::white())
+            .bg(crate::theme::p().panel)
             .border_1()
             .border_r_0()
             .border_color(rgb(0xaaaaaa))
@@ -763,7 +763,7 @@ impl VariableStudioView {
             v_flex()
                 .items_center()
                 .pt(px(8.))
-                .child(h_flex().rounded(px(5.25)).border_1().border_color(border).bg(gpui_kit::white()).child(main).child(caret))
+                .child(h_flex().rounded(px(5.25)).border_1().border_color(border).bg(crate::theme::p().panel).child(main).child(caret))
                 .child(empty_art)
                 .into_any_element()
         } else {
@@ -888,12 +888,12 @@ impl VariableStudioView {
             .child(div().flex_1())
             .children(add)
             .child(div().flex_1())
-            .child(div().size(px(14.)).rounded_full().bg(rgb(0x999999)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?"));
+            .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999))));
         v_flex()
             .w(px(PANEL_W))
             .h_full()
             .flex_none()
-            .bg(gpui_kit::white())
+            .bg(crate::theme::p().panel)
             .border_l_1()
             .border_color(rgb(0xcccccc))
             .child(header)
@@ -1031,7 +1031,7 @@ impl VariableStudioView {
                 .top(px(3.))
                 .right(px(10.))
                 .w(px(220.))
-                .bg(gpui_kit::white())
+                .bg(crate::theme::p().panel)
                 .shadow_md()
                 .text_color(pal.text)
                 .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
@@ -1047,7 +1047,7 @@ impl VariableStudioView {
                         .border_color(rgb(0xd7d7d7))
                         // Red until it has a name (live vs-913).
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(!ok, |d| d.text_color(rgb(0xaa252d))).child(title))
-                        .child(div().id("vci-ok").size(px(28.)).flex().items_center().justify_center().bg(if ok { pal.accept } else { rgb(0xcce9cc) }).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
+                        .child(div().id("vci-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
                         .child(div().id("vci-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.cfg_dialog = None;
                             cx.notify();
@@ -1149,7 +1149,7 @@ impl VariableStudioView {
                 .w(px(205.))
                 .h_full()
                 .flex_none()
-                .bg(gpui_kit::white())
+                .bg(crate::theme::p().panel)
                 .border_r_1()
                 .border_color(rgb(0xd7d7d7))
                 .child(h_flex().h(px(36.)).px(px(4.)).child(div().flex_1().text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Configurations")).child(tab))

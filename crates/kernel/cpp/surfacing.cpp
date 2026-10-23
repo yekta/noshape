@@ -329,10 +329,19 @@ OpOut op_wrap_faces(const OcShapeList& faces, const DevSurf& src_d, const DevSur
           basis = occ::down_cast<Geom2d_TrimmedCurve>(basis)->BasisCurve();
         const gp_Pnt2d a2 = c2->Value(f), b2 = c2->Value(l);
         const gp_Pnt2d p0(A[0] * a2.X() + A[1] * a2.Y() + A[4], A[2] * a2.X() + A[3] * a2.Y() + A[5]);
-        const gp_Pnt2d p1(A[0] * b2.X() + A[1] * b2.Y() + A[4], A[2] * b2.X() + A[3] * b2.Y() + A[5]);
-        const bool     along = std::abs(p1.X() - p0.X()) < 1e-12 && std::abs(p1.Y() - p0.Y()) > 1e-12;
-        const bool     around = std::abs(p1.Y() - p0.Y()) < 1e-12 && std::abs(p1.X() - p0.X()) > 1e-12;
-        if (affine && dst.kind == 1 && basis->IsKind(STANDARD_TYPE(Geom2d_Line)) && (along || around))
+        gp_Pnt2d       p1(A[0] * b2.X() + A[1] * b2.Y() + A[4], A[2] * b2.X() + A[3] * b2.Y() + A[5]);
+        // Within 1 nm (u is an angle: its length is u × radius).
+        const double du = std::abs(p1.X() - p0.X()) * dst.r, dv = std::abs(p1.Y() - p0.Y());
+        const bool   along = du < 1e-9 && dv > 1e-9;
+        const bool   around = dv < 1e-9 && du > 1e-9;
+        if (along)
+          p1.SetX(p0.X());
+        if (around)
+          p1.SetY(p0.Y());
+        // A straight source edge: a line, or a degree-1 B-spline through two poles.
+        occ::handle<Geom2d_BSplineCurve> bs1 = occ::down_cast<Geom2d_BSplineCurve>(basis);
+        const bool straight = basis->IsKind(STANDARD_TYPE(Geom2d_Line)) || (!bs1.IsNull() && bs1->Degree() == 1 && bs1->NbPoles() == 2);
+        if (affine && dst.kind == 1 && straight && (along || around))
         {
           // A straight side onto the cylinder along its axis is a line, around
           // it an arc, as in Onshape (std sheet metal Bend calls evLine on the

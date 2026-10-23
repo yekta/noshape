@@ -166,25 +166,8 @@ fn shell_plate_with_hole_near_the_edge() {
     let cavity = 95.0 * 35.0 * 9.5 - (std::f64::consts::PI * rr * rr - segment) * 9.5;
     let want = 100.0 * 40.0 * 12.0 - std::f64::consts::PI * 25.0 * 12.0 - cavity;
     assert!((volume(&r) - want).abs() < 1e-3, "{} vs {want}", volume(&r));
-    // The real QA3 bracket: rounded corners too, hole 10 mm from the front.
-    let mut t = T::new();
-    t.block(100.0, 40.0, 12.0);
-    let v = t.edges_where(vertical);
-    t.fillet(v[..3].to_vec(), "5 mm");
-    t.holes(&[((50.0, 10.0), 5.0)]);
-    let top = t.faces_where(|c| c.z > 11.999);
-    let before = {
-        let r = t.regen();
-        r.context.bodies[0].shape.clone()
-    };
-    let s = t.shell(top, "2.5 mm");
-    let r = t.ok(s);
-    assert!(r.context.bodies[0].shape.is_valid());
-    // Same solid as the slab construction on its own.
-    let top_face = before.faces().into_iter().find(|f| f.centroid().unwrap().z > 0.011999).unwrap();
-    let slabs = noshape_kernel::shell_solid(&before, &[top_face], 0.0025, noshape_kernel::ShellSide::Inside, noshape_kernel::ShellMethod::Slabs).unwrap();
-    let want = noshape_kernel::volume_properties(&slabs.shape).unwrap().mass / MM3;
-    assert!((volume(&r) - want).abs() < 1e-3, "{} vs {want}", volume(&r));
+    // The real QA3 bracket (rounded corners, hole 10 mm from the front):
+    // shell_bracket_matches_onshape (at exactly 2.5 mm Onshape fails).
 }
 
 /// Shell variants Onshape completes: outward, hollow (no faces removed),
@@ -1176,5 +1159,85 @@ fn shell_thickness_sweep() {
         let st = r.display.features.iter().find(|x| x.id == s).unwrap();
         let b = &r.context.bodies[0].shape;
         eprintln!("{th:.2} mm: {:?} {:?} {} faces, {:.6} mm³", st.status, st.message, b.count(noshape_kernel::ShapeType::Face), volume(&r));
+    }
+}
+
+/// QA3's real bracket against Onshape (live "kern (10-23 09:00) Shell
+/// bracket", behaviours.md): 100 x 40 x 12 plate, R5 on the vertical edges at
+/// (0,0), (100,0), (100,40), a Ø10 through hole at (50,10); Shell the top
+/// face (1), and the same after a 1 mm chamfer round the top's outer loop (2)
+/// or round both loops (3). At exactly 2.5 mm the hole's offset wall touches
+/// the front wall's: Onshape fails every case there (2.499 and 2.501 work).
+#[test]
+fn shell_bracket_matches_onshape() {
+    fn bracket() -> T {
+        let mut t = T::new();
+        t.block(100.0, 40.0, 12.0);
+        let at = |x: f64, y: f64| move |i: &noshape_kernel::EdgeInfo| vertical(i) && (i.start.x - x).abs() < 1e-9 && (i.start.y - y).abs() < 1e-9;
+        let mut corners = Vec::new();
+        for (x, y) in [(0.0, 0.0), (0.1, 0.0), (0.1, 0.04)] {
+            corners.extend(t.edges_where(at(x, y)));
+        }
+        assert_eq!(corners.len(), 3);
+        t.fillet(corners, "5 mm");
+        t.holes(&[((50.0, 10.0), 5.0)]);
+        t
+    }
+    let front_top = |t: &mut T| t.edges_where(|i| i.start.z > 0.011999 && i.end.z > 0.011999 && matches!(i.curve, noshape_kernel::Curve::Line { .. }) && i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9);
+    let rim = |t: &mut T| t.edges_where(|i| i.start.z > 0.011999 && matches!(i.curve, noshape_kernel::Curve::Circle { radius, .. } if (radius - 0.005).abs() < 1e-9));
+    let faces = |r: &RegenResult| r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face);
+    // Onshape: the input (volume, faces), then per thickness Ok((volume, faces)) or its error.
+    type Want = Result<(f64, Option<usize>), &'static str>;
+    type Case = ((f64, usize), Vec<(&'static str, Want)>);
+    const FAILS: &str = "Could not shell part with selections.";
+    let cases: [Case; 3] = [
+        (
+            (46864.38055098077, 10),
+            vec![
+                ("1 mm", Ok((7257.761011528471, Some(20)))),
+                ("2 mm", Ok((13901.70344712245, None))),
+                ("2.499 mm", Ok((16987.86341362363, None))),
+                ("2.5 mm", Err(FAILS)),
+                ("3 mm", Ok((19886.02521468895, None))),
+                ("4 mm", Ok((25130.26432481737, Some(20)))),
+            ],
+        ),
+        ((46728.71831002654, 17), vec![("1 mm", Ok((7385.784075985124, Some(34)))), ("2.5 mm", Err(FAILS))]),
+        ((46711.96314920739, 18), vec![("2.5 mm", Err(FAILS))]),
+    ];
+    for (case, ((v_in, f_in), checks)) in cases.into_iter().enumerate() {
+        let mut t = bracket();
+        if case >= 1 {
+            let mut edges = front_top(&mut t);
+            assert_eq!(edges.len(), 1, "the front top edge");
+            if case == 2 {
+                edges.extend(rim(&mut t));
+            }
+            t.chamfer(edges, "1 mm");
+        }
+        let r = t.regen();
+        assert!((volume(&r) - v_in).abs() < 1e-3 && faces(&r) == f_in, "case {}: input {} mm³, {} faces vs Onshape {v_in}, {f_in}", case + 1, volume(&r), faces(&r));
+        let top = t.faces_where(|c| c.z > 11.999);
+        assert_eq!(top.len(), 1);
+        let s = t.shell(top, "1 mm");
+        for (th, want) in checks {
+            t.set(s, "thickness", e(th));
+            let (st, msg, v) = status(&mut t, s);
+            let what = format!("case {} {th}", case + 1);
+            match want {
+                Ok((wv, wf)) => {
+                    assert_eq!(st, FeatureStatus::Ok, "{what}: {msg:?}");
+                    assert!((v - wv).abs() < 1e-3, "{what}: {v} mm³ vs Onshape {wv}");
+                    if let Some(wf) = wf {
+                        let n = faces(&t.regen());
+                        assert_eq!(n, wf, "{what}: faces");
+                    }
+                }
+                Err(m) => {
+                    assert_eq!(st, FeatureStatus::Error, "{what}: Onshape fails ({v} mm³)");
+                    assert_eq!(msg.as_deref(), Some(m), "{what}");
+                }
+            }
+        }
     }
 }
