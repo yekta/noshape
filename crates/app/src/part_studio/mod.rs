@@ -521,8 +521,9 @@ impl PartStudioView {
         self.regen_inflight = Some(pending::InFlight { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
         self.begin_pending(seq, window, cx);
         let cancel2 = cancel.clone();
-        // View in high quality (Shift+R): a 4x finer chord tolerance.
-        let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality { 0.25 } else { 1.0 };
+        // View in high quality (Shift+R, kept for the session once used):
+        // the Very fine level, refined to view by view.
+        let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality_seen { 0.25 } else { 1.0 };
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
             // Coalesce bursts of edits (typing in a field).
             cx.background_executor().timer(Duration::from_millis(12)).await;

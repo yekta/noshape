@@ -202,6 +202,12 @@ impl PartStudioView {
     /// Shift+R: view in high quality (finer tessellation for every part).
     pub(super) fn toggle_high_quality(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.ui.high_quality = !self.ui.high_quality;
+        self.ui.high_quality_seen |= self.ui.high_quality;
+        // Onshape's aggressive refinement: bodies refine down to a 0.1 px
+        // chordal error (Very fine meshes come with the regen); off, the
+        // ones refined stay so (Onshape, until reload).
+        let error_px = if self.ui.high_quality { noshape_render::scene::MESH_ERROR_PX_HIGH_QUALITY_STUDIO } else { noshape_render::scene::MESH_ERROR_PX };
+        self.viewport.update(cx, |vp, _| vp.style.detail.mesh_error_px = error_px);
         self.schedule_regen(window, cx);
     }
 
