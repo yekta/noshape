@@ -63,6 +63,7 @@ pub fn release_log(doc: &DocModel) -> ReleaseLog {
     let mut log: ReleaseLog = doc.session.store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
     log.scheme = release_settings().scheme;
     log.drawing_reuse = numbering_schemes().drawing_reuse;
+    log.auto_obsolete = release_settings().auto_obsolete;
     log
 }
 
@@ -714,7 +715,8 @@ impl Render for AddItemsDialog {
         };
         let kind_tabs = h_flex().border_b_1().border_color(gpui_kit::rgb(0xdddddd)).children(ADD_KINDS.iter().enumerate().map(|(i, (l, _))| tab_button(i, l, cx)).collect::<Vec<_>>());
         let mut left = v_flex().w(px(404.)).h_full().border_r_1().border_color(gpui_kit::rgb(0xdddddd));
-        if !self.obsolete {
+        // Release management › "Allow adding items from other documents".
+        if !self.obsolete && release_settings().allow_other_documents {
             left = left.child(h_flex().child(doc_tab("add-current-doc", "Current document", !self.other, false, cx)).child(doc_tab("add-other-docs", "Other documents", self.other, true, cx)));
         } else {
             left = left.child(h_flex().child(div().w(px(200.)).py(px(6.)).text_size(px(13.)).text_center().text_color(pal.accent).font_weight(FontWeight::MEDIUM).border_b_2().border_color(pal.accent).child("Current document")));
@@ -1013,7 +1015,46 @@ pub struct ReleaseDialog {
     /// buttons).
     seq_parts: bool,
     seq_names: bool,
+    /// Release conditions that hold for each row (computed on open and on
+    /// Refresh: they regenerate Part Studios).
+    conditions: Vec<Vec<Issue>>,
     _subs: Vec<Subscription>,
+}
+
+/// Company settings › Release management › Release conditions that hold for
+/// each item (Help: "Selected conditions will prevent a Release from being
+/// created"): a Part Studio whose feature list has errors or isn't rolled to
+/// the end.
+fn condition_issues(doc: &DocModel, items: &[ReleaseItem]) -> Vec<Vec<Issue>> {
+    use noshape_model::display::FeatureStatus;
+    use noshape_model::document::TabContent;
+    let on = release_settings().conditions;
+    let mut errors: std::collections::HashMap<(TabId, noshape_model::configuration::ConfigValues), bool> = Default::default();
+    items
+        .iter()
+        .map(|it| {
+            let mut v = Vec::new();
+            if it.document.is_some() || it.reverted {
+                return v;
+            }
+            let Some(TabContent::PartStudio(ps)) = doc.session.doc.tab(it.tab).map(|t| &t.content) else { return v };
+            if on[0] {
+                let failed = *errors.entry((it.tab, it.config.clone())).or_insert_with(|| {
+                    let mut values = ps.configuration.defaults();
+                    values.0.extend(it.config.0.clone());
+                    let result = noshape_model::regen::Regenerator::new().regenerate(ps, &values, &doc.session.doc.settings.units, &noshape_model::regen::RegenOptions::default());
+                    result.display.features.iter().any(|f| f.status == FeatureStatus::Error)
+                });
+                if failed {
+                    v.push(Issue::Prevented("The Part Studio feature list contains errors.".into()));
+                }
+            }
+            if on[1] && ps.rollback.is_some_and(|r| r < ps.features.len()) {
+                v.push(Issue::Prevented("The Part Studio feature list is not rolled to the end.".into()));
+            }
+            v
+        })
+        .collect()
 }
 
 impl ReleaseDialog {
@@ -1025,7 +1066,7 @@ impl ReleaseDialog {
             let log = release_log(d);
             items.iter().map(|it| if mode == Mode::Release { since_release(d, &log, it) } else { None }).collect()
         };
-        let rows = items
+        let rows: Vec<Row> = items
             .into_iter()
             .zip(sinces)
             .map(|(item, since)| {
@@ -1062,13 +1103,14 @@ impl ReleaseDialog {
             }
         }));
         let numbering = numbering_schemes();
+        let conditions = if mode == Mode::Release { condition_issues(doc.read(cx), &rows.iter().map(|r| r.item.clone()).collect::<Vec<_>>()) } else { Vec::new() };
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search"));
         subs.push(cx.subscribe_in(&search, window, |_: &mut Self, _, ev: &InputEvent, _, cx| {
             if matches!(ev, InputEvent::Change) {
                 cx.notify();
             }
         }));
-        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, _subs: subs }
+        Self { doc, mode, applied: false, rows, name, notes, re_releasable: false, problems_only: false, draft: None, draft_menu: false, search, filter_open: false, kinds: Vec::new(), history: Vec::new(), at: 0, restoring: false, typing: None, thumbs: Default::default(), thumbs_started: false, package: None, opened: chrono::Utc::now().timestamp_millis(), overflow_open: false, workflow: None, workflow_return: None, seq_parts: numbering.release_objects.sequential, seq_names: numbering.release_names.sequential, conditions, _subs: subs }
     }
 
     /// A new part number suggests its next revision (unless one was typed).
@@ -1307,6 +1349,9 @@ impl ReleaseDialog {
             row.revision_touched = false;
             row.item = it;
         }
+        if self.mode == Mode::Release {
+            self.conditions = condition_issues(self.doc.read(cx), &self.items(cx));
+        }
         // The pictures show the refreshed items.
         self.thumbs.clear();
         let items = self.rows.iter().map(|r| r.item.clone()).collect();
@@ -1329,7 +1374,13 @@ impl ReleaseDialog {
 
     fn issues(&self, cx: &App) -> Vec<Vec<Issue>> {
         match self.mode {
-            Mode::Release => release_log(self.doc.read(cx)).validate(&self.items(cx)),
+            Mode::Release => {
+                let mut issues = release_log(self.doc.read(cx)).validate(&self.items(cx));
+                for (row, held) in issues.iter_mut().zip(&self.conditions) {
+                    row.extend(held.iter().cloned());
+                }
+                issues
+            }
             _ => vec![Vec::new(); self.rows.len()],
         }
     }
@@ -1875,12 +1926,17 @@ impl Render for ReleaseDialog {
             .flex_none()
             .child(div().absolute().top_0().bottom_0().left(px(COL_ITEM)).w(px(1.)).bg(gpui_kit::rgb(GRID)))
             .child(v_flex().id("rel-items").size_full().overflow_y_scroll().children(rows_el));
+        // Release management: the fields' display names, and "Require a
+        // note in the Release dialog".
+        let settings = release_settings();
         let (name_label, notes_label) = match self.mode {
-            Mode::Obsolete => ("Obsoletion name", "Obsoletion notes"),
-            _ => ("Release name", "Release notes"),
+            Mode::Obsolete => (settings.display_name(2), settings.display_name(3)),
+            _ => (settings.display_name(0), settings.display_name(1)),
         };
+        let notes_required = self.mode == Mode::Obsolete || (self.mode == Mode::Release && settings.require_note);
+        let notes_empty = self.notes.read(cx).value().trim().is_empty();
         let name_empty = self.name.read(cx).value().trim().is_empty();
-        let label = |text: &'static str, required: bool, empty: bool| {
+        let label = |text: String, required: bool, empty: bool| {
             h_flex()
                 .gap_2()
                 .child(h_flex().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(text).when(required, |d| d.child(div().pl(px(3.)).text_color(red).child("*"))))
@@ -1917,7 +1973,7 @@ impl Render for ReleaseDialog {
                                 )
                             }),
                     )
-                    .child(div().pt(px(6.)).child(label(notes_label, self.mode == Mode::Obsolete, false)))
+                    .child(div().pt(px(6.)).child(label(notes_label, notes_required, notes_required && notes_empty && self.mode == Mode::Release)))
                     .child(Textarea::new(&self.notes).disabled(read_only))
                     .when(self.mode == Mode::Obsolete, |d| {
                         let on = self.re_releasable;
@@ -1927,7 +1983,7 @@ impl Render for ReleaseDialog {
                         }))))
                     }),
             );
-        let blocked = attention > 0 || name_empty;
+        let blocked = attention > 0 || name_empty || (self.mode == Mode::Release && notes_required && notes_empty);
         let status = (blocked && !read_only).then(|| div().text_size(px(12.)).text_color(pal.text_muted).child("A field required by one or more actions is empty ⓘ"));
         let button = |id: &'static str, text: &'static str, bg: u32, enabled: bool| {
             div()

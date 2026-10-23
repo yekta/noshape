@@ -265,6 +265,11 @@ pub struct ReleaseLog {
     /// number from an assembly or part in the release" (set by the app).
     #[serde(skip)]
     pub drawing_reuse: bool,
+    /// Release management › Obsoletion › "Automatically obsolete previous
+    /// released revisions" (set by the app): a new revision obsoletes the
+    /// earlier ones.
+    #[serde(skip)]
+    pub auto_obsolete: bool,
 }
 
 /// A problem with an item of a candidate ("N item(s) needs attention").
@@ -278,6 +283,8 @@ pub enum Issue {
     RevisionTooLow { latest: String },
     /// The same part number appears twice in the candidate.
     DuplicatePartNumber,
+    /// A Release management › Release condition holds (its message).
+    Prevented(String),
 }
 
 impl Issue {
@@ -287,6 +294,7 @@ impl Issue {
             Issue::InvalidRevision => "Revision does not follow the revision scheme.".into(),
             Issue::RevisionTooLow { latest } => format!("Revision must be later than {latest}, the latest released revision."),
             Issue::DuplicatePartNumber => "Part number is used by another item of this release.".into(),
+            Issue::Prevented(message) => message.clone(),
         }
     }
 }
@@ -307,9 +315,12 @@ impl ReleaseLog {
             for it in p.items.iter().filter(|it| it.part_number == part_number && !it.not_revision_managed && !it.reverted) {
                 match p.kind {
                     PackageKind::Release => {
-                        // A newer revision obsoletes the earlier ones.
-                        for e in out.iter_mut().filter(|e| e.obsoleted_by.is_none() && !e.auto_obsolete) {
-                            e.auto_obsolete = true;
+                        // A newer revision obsoletes the earlier ones (when the
+                        // company settings say so).
+                        if self.auto_obsolete {
+                            for e in out.iter_mut().filter(|e| e.obsoleted_by.is_none() && !e.auto_obsolete) {
+                                e.auto_obsolete = true;
+                            }
                         }
                         out.push(RevisionEntry { revision: it.revision.clone(), release: pi, obsoleted_by: None, auto_obsolete: false, re_releasable: false });
                     }
@@ -634,8 +645,10 @@ mod tests {
         assert_eq!(log.validate(&[item("", "A")]), vec![vec![Issue::MissingPartNumber]]);
         assert_eq!(log.validate(&[item("P-1", "I")]), vec![vec![Issue::InvalidRevision]]);
         assert_eq!(log.validate(&[item("Q", "A"), item("Q", "A")])[0], vec![Issue::DuplicatePartNumber]);
-        // B auto-obsoletes A.
+        // B leaves A released, or auto-obsoletes it when the settings say so.
         log.record(package(PackageKind::Release, "R2", vec![item("P-1", "B")]));
+        assert!(!log.revisions("P-1")[0].auto_obsolete);
+        log.auto_obsolete = true;
         let h = log.revisions("P-1");
         assert!(h[0].auto_obsolete && !h[1].auto_obsolete);
         // Obsoleting B (re-releasable) makes B available again.
@@ -647,6 +660,8 @@ mod tests {
         assert!(log.validate(&[item("P-1", "B")])[0].is_empty());
         // JSON round trip; drafts are replaced by name and cleared on release.
         let mut log2 = ReleaseLog::from_json(&log.to_json());
+        // The settings' flags aren't stored with the log.
+        log2.auto_obsolete = log.auto_obsolete;
         assert_eq!(log2, log);
         log2.save_draft(package(PackageKind::Release, "R3", vec![item("P-2", "A")]));
         log2.save_draft(package(PackageKind::Release, "R3", vec![item("P-2", "B")]));

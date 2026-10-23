@@ -162,6 +162,17 @@ impl Default for ReleaseSettings {
     }
 }
 
+impl ReleaseSettings {
+    /// A release-dialog field's label ([`DISPLAY_NAME_FIELDS`]): its display
+    /// name when they're on.
+    pub fn display_name(&self, field: usize) -> String {
+        match self.display_names.get(field).filter(|n| self.custom_display_names && !n.trim().is_empty()) {
+            Some(n) => n.clone(),
+            None => DISPLAY_NAME_FIELDS[field.min(3)].to_string(),
+        }
+    }
+}
+
 /// The revision scheme's id ("Revision scheme id", used by custom release
 /// workflows): 24 hex digits, stable for a scheme.
 pub fn scheme_id(scheme: &RevisionScheme) -> String {
@@ -197,7 +208,9 @@ mod tests {
         assert_eq!(s.unreleased_suffix, "-");
         assert!(s.managed_workflows && s.allow_other_documents && !s.require_note);
         assert_eq!(s.watermarks.get(0), "In progress");
-        assert_eq!(s.display_names[1], "Release notes");
+        assert_eq!(s.display_name(1), "Release notes");
+        let named = ReleaseSettings { custom_display_names: true, display_names: ["ECO".into(), String::new(), String::new(), String::new()], ..s };
+        assert_eq!((named.display_name(0), named.display_name(1)), ("ECO".to_string(), "Release notes".to_string()));
     }
 
     #[test]
