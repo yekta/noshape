@@ -32,38 +32,8 @@ pub(crate) fn last_viewed_config(tab: TabId) -> Option<noshape_model::configurat
     LAST_VIEWED.lock().as_ref().and_then(|m| m.get(&tab).cloned())
 }
 
-/// Release management settings (Onshape's Company settings › Release
-/// management): the revision scheme and the
-/// unreleased revision suffix.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ReleaseSettings {
-    #[serde(default)]
-    pub scheme: noshape_model::release::RevisionScheme,
-    #[serde(default = "default_suffix")]
-    pub unreleased_suffix: String,
-}
-
-fn default_suffix() -> String {
-    "*".into()
-}
-
-impl Default for ReleaseSettings {
-    fn default() -> Self {
-        Self { scheme: Default::default(), unreleased_suffix: default_suffix() }
-    }
-}
-
-fn settings_path() -> std::path::PathBuf {
-    crate::files::config_dir().join("release_settings.json")
-}
-
-pub fn release_settings() -> ReleaseSettings {
-    std::fs::read(settings_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
-}
-
-pub fn set_release_settings(s: &ReleaseSettings) {
-    let _ = std::fs::write(settings_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
-}
+/// Company settings › Release management (release_settings.rs).
+pub use crate::release_settings::release_settings;
 
 fn numbering_path() -> std::path::PathBuf {
     crate::files::config_dir().join("numbering_schemes.json")
@@ -477,7 +447,7 @@ enum Entry {
 #[path = "release_add_source.rs"]
 mod add_source;
 #[path = "release_workflow.rs"]
-mod workflow;
+pub(crate) mod workflow;
 
 impl Render for AddItemsDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {

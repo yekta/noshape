@@ -167,8 +167,11 @@ impl Render for RevisionToolsView {
                 .when(rows.is_empty(), |d| d.child(div().py(px(8.)).px(px(6.)).text_color(pal.text_muted).child("No revisions found.")))
                 .child(
                     h_flex().mt(px(14.)).child(
+                        // Nothing left to reset: Bootstrap's disabled button, 65%
+                        // opacity (the danger style's own red would stay full).
                         os::danger_button("revtools-reset", "Reset part number type", cx)
                             .disabled(!can_reset)
+                            .when(!can_reset, |b| b.opacity(0.65))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.confirm_reset(window, cx))),
                     ),
                 )
