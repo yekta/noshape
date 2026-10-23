@@ -250,6 +250,83 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     Ok(())
 }
 
+/// Run an "Editing Logic Function" (std's `sheetMetalTabEditingLogic`, a
+/// custom feature's) as Onshape does while a dialog is edited:
+/// `f(context, id, oldDefinition, definition, specifiedParameters,
+/// hiddenBodies)` in `ctx`, the Part Studio just before the feature.
+/// `specified`: the parameters the user has set. Returns the parameters the
+/// function changed (queries as references, numbers as literals in
+/// `units`); `None` if it failed.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_editing_logic(
+    ctx: crate::regen::context::Context,
+    feature: FeatureId,
+    name: &str,
+    units: &noshape_units::UnitPrefs,
+    f: &Arc<noshape_featurescript::ir::OverloadSet>,
+    decls: &[ParamDecl],
+    specs: &[crate::params::ParamSpec],
+    old: &ParamValues,
+    new: &ParamValues,
+    specified: &[String],
+) -> Option<ParamValues> {
+    host::register();
+    let (mut olds, mut news) = (old.clone(), new.clone());
+    fill_defaults(specs, &mut olds, units);
+    fill_defaults(specs, &mut news, units);
+    let hidden: Vec<crate::reference::Reference> = ctx.fs_hidden_bodies.iter().map(|b| crate::reference::Reference::Body(b.id.clone())).collect();
+    let outer = std::collections::BTreeMap::new();
+    let ev = EvalCtx::new(feature, name, &news, units, Default::default(), &outer);
+    let cx = FsContext::new(ctx, feature, name.to_string(), *units, outer.clone(), None);
+    let old_def = definition(&cx, decls, &olds, &ev, None).ok()?;
+    let new_def = definition(&cx, decls, &news, &ev, None).ok()?;
+    let mut flags = Map::new();
+    for d in decls {
+        flags.insert(Value::str(d.id.as_str()), Value::bool(specified.contains(&d.id)));
+    }
+    let args = vec![cx.value(), host::id_value(&[Arc::<str>::from(feature.to_string())]), old_def, new_def.clone(), Value::map(flags), query_of_refs(&cx, &hidden)];
+    let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())));
+    let units = *units;
+    std::thread::scope(|s| {
+        std::thread::Builder::new()
+            .stack_size(STACK_SIZE)
+            .spawn_scoped(s, || {
+                let mut i = Interp::new();
+                i.set_deadline(Some(Instant::now() + TIME_LIMIT));
+                let out = i.call_value(&func, args).ok()?;
+                let mut changed = ParamValues::default();
+                for d in decls {
+                    let (v, was) = (out.get(d.id.as_str()), new_def.get(d.id.as_str()));
+                    if v.is_undefined() || v == was {
+                        continue;
+                    }
+                    let pv = match &d.kind {
+                        ParamKindFs::Query { .. } => ParamValue::Query(host::query::evaluate_refs(&mut i, &cx, v).ok()?),
+                        ParamKindFs::Bool { .. } => ParamValue::Bool(v.as_bool()?),
+                        ParamKindFs::Num { kind, .. } => {
+                            let q = match kind {
+                                NumKind::Length => noshape_units::Quantity::new(host::length_of(v)?, noshape_units::Dim::LENGTH),
+                                NumKind::Angle => noshape_units::Quantity::new(host::angle_of(v)?, noshape_units::Dim::ANGLE),
+                                NumKind::Integer | NumKind::Real => noshape_units::Quantity::new(v.as_number()?, noshape_units::Dim::UNITLESS),
+                            };
+                            ParamValue::Expr(noshape_units::ExprValue::from_quantity(q, &units))
+                        }
+                        ParamKindFs::Enum { tag, .. } => match v {
+                            Value::Enum(t, o) if t == tag => ParamValue::Enum(type_info(*tag).members.get(*o as usize)?.to_string()),
+                            _ => continue,
+                        },
+                        _ => continue,
+                    };
+                    changed.set(&d.id, pv);
+                }
+                Some(changed)
+            })
+            .ok()?
+            .join()
+            .ok()?
+    })
+}
+
 /// One entry of the FeatureScript notices panel's Monitor (live
 /// dom/fs-probe-output.txt): the message, then stack rows of
 /// (`line:col`, `module (function)`), the last row being the Part Studio

@@ -217,6 +217,9 @@ pub struct UiState {
     pub preview_before: Option<Arc<StudioDisplay>>,
     /// Regeneration context before the edited feature.
     pub before_context: Option<Arc<noshape_model::regen::context::Context>>,
+    /// The edited feature's parameters when std's editing logic last ran
+    /// (its `oldDefinition`; empty for a new feature's first change).
+    pub std_edit_old: Option<noshape_model::params::ParamValues>,
     pub preview_task: Option<Task<()>>,
     /// Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
@@ -416,6 +419,7 @@ impl UiState {
             preview_opacity: 1.0,
             preview_before: None,
             before_context: None,
+            std_edit_old: None,
             preview_task: None,
             preview_tool: None,
             feature_drop: Default::default(),
@@ -2946,11 +2950,17 @@ impl PartStudioView {
     /// the part. Fields the user set are left alone.
     pub(super) fn auto_operation(&mut self, cx: &mut Context<Self>) {
         let Some(e) = &self.edit else { return };
+        // Std's editing logic runs on edits of existing features too.
+        let ty = e.dialog.read(cx).feature.type_id.clone();
+        if noshape_model::custom::std_feature::has_editing_logic(&ty) {
+            let dialog = e.dialog.clone();
+            self.std_edit_logic(&dialog, cx);
+            return;
+        }
         if !e.is_new {
             return;
         }
         let dialog = e.dialog.clone();
-        let ty = dialog.read(cx).feature.type_id.clone();
         if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector") {
             self.direct_edit_logic(&dialog, cx);
             return;
@@ -3027,6 +3037,38 @@ impl PartStudioView {
 }
 
 impl PartStudioView {
+    /// The std "Editing Logic Function" of a feature std runs (Tab: picking
+    /// the profile fills "Flange to merge" and the subtraction offset, live
+    /// qa5 4.2), on the model before the feature; fields the user set are
+    /// `specifiedParameters`.
+    fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
+        let Some(ctx) = self.ui.before_context.clone() else { return };
+        let (ty, id, name, params, user_set) = {
+            let d = dialog.read(cx);
+            (d.feature.type_id.clone(), d.feature.id, d.feature.name.clone(), d.feature.params.clone(), d.user_set.iter().cloned().collect::<Vec<String>>())
+        };
+        let old = self.ui.std_edit_old.replace(params.clone()).unwrap_or_default();
+        if old == params {
+            return;
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let Some(changed) = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &params, &user_set) else { return };
+        let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
+        if changes.is_empty() {
+            return;
+        }
+        let mut next = params;
+        for (k, v) in &changes {
+            next.set(k, v.clone());
+        }
+        self.ui.std_edit_old = Some(next);
+        dialog.update(cx, |d, cx| {
+            for (k, v) in changes {
+                d.set_value_auto(&k, v, cx);
+            }
+        });
+    }
+
     /// Onshape's deleteFaceEditLogic / replaceFaceEditLogic for a new
     /// feature, leaving fields the user set alone: Delete face of surface
     /// faces switches to Leave open (live L10); Replace face ticks Flip

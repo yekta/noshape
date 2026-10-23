@@ -220,7 +220,7 @@ fn vertex_at(r: &RegenResult, p: DVec3) -> Reference {
 /// (8535.0418 mm³, 23 faces: the bends run into the corner and end in
 /// ruled faces 0.02 mm apart across the diagonal).
 #[test]
-#[ignore = "in progress (fs): closed corner gives 8541.25 / 39 faces"]
+#[ignore = "in progress (fs): closed corner gives 8541.21 / 35 faces (bend cylinders r2 as live; the corner cut leaves faces at x = 0.02)"]
 fn closed_corner_matches_live() {
     let mut s = g34();
     let r = s.ok();
@@ -345,4 +345,33 @@ fn bend_matches_live() {
     // Within the box's tolerance gap (1e-7 m).
     let near = |a: f64, b: f64| (a * 1e3 - b).abs() < 2e-4;
     assert!(near(bb.min.x, 0.0) && near(bb.max.x, 31.7223453) && near(bb.max.z, 31.7223453), "{bb:?}");
+}
+
+/// SM16 (live qa5 4.2): picking a Tab's profile runs std's editing logic,
+/// which fills "Flange to merge" with the wall the profile lies on and sets
+/// the subtraction offset to the model's minimal clearance (0.02 mm).
+#[test]
+fn tab_editing_logic_fills_merge_face_and_offset() {
+    let mut s = g34();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(20.0, 40.0), (40.0, 40.0), (40.0, 50.0), (20.0, 50.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    for i in 0..4 {
+        sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    s.add("sheetMetalTab", |p| p.set("tabFaces", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }])));
+    let index = s.ps.features.len() - 1;
+    let new = s.ps.features[index].params.clone();
+    let changed = noshape_model::custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), &ParamValues::default(), &new, &["tabFaces".to_string()]).expect("editing logic");
+    assert!(matches!(changed.get("booleanUnionScope"), Some(ParamValue::Query(q)) if !q.is_empty()), "{changed:?}");
+    match changed.get("booleanOffset") {
+        Some(ParamValue::Expr(e)) => assert_eq!(e.text, "0.02 mm"),
+        v => panic!("booleanOffset {v:?} in {changed:?}"),
+    }
 }
