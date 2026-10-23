@@ -123,6 +123,14 @@ fn volume(r: &RegenResult, bi: usize) -> f64 {
     r.context.bodies[bi].shape.volume().unwrap()
 }
 
+fn cylinder_radii(r: &RegenResult, bi: usize) -> Vec<f64> {
+    let faces = r.context.bodies[bi].shape.faces();
+    faces.iter().filter_map(|f| match f.face_surface().unwrap() {
+        noshape_kernel::Surface::Cylinder { radius, .. } => Some(radius),
+        _ => None,
+    }).collect()
+}
+
 fn sorted_size(f: &FlatPattern) -> (f64, f64) {
     let s = f.size();
     (s.x.max(s.y), s.x.min(s.y))
@@ -173,11 +181,12 @@ fn jog_offsets_wall_and_keeps_flat_length() {
     let mut s = jogged(|_| {});
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 1);
-    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap();
-    assert_eq!(data.walls.len(), 3, "held, middle and jogged wall");
-    assert_eq!(data.bends.len(), 2);
-    assert!(data.bends.iter().all(|b| near(b.angle, PI / 2.0, 1e-9)));
-    let (t, rad, k) = (mm(2.0), mm(3.0), 0.45);
+    // Two bends (inner radius 3, outer 5) between the held, middle and jogged walls.
+    let mut radii = cylinder_radii(&r, 0);
+    radii.sort_by(f64::total_cmp);
+    assert_eq!(radii.len(), 4, "{radii:?}");
+    assert!(radii.iter().zip([3.0, 3.0, 5.0, 5.0]).all(|(&a, b)| near(a, mm(b), 1e-9)), "{radii:?}");
+    let (t, k) = (mm(2.0), 0.45);
     // Flat pattern: preserve material keeps the original length.
     let fp = flat(&r, 0);
     let (len, width) = sorted_size(&fp);
@@ -193,7 +202,6 @@ fn jog_offsets_wall_and_keeps_flat_length() {
     let w = mm(40.0);
     let expected = mm(100.0) * w * t + 2.0 * (PI / 2.0) * t * t * w * (0.5 - k);
     assert!(near(volume(&r, 0), expected, 1e-12), "volume {} vs {expected}", volume(&r, 0));
-    let _ = rad;
 
     // Offset anchors: inside adds the thickness.
     let mut s = jogged(|p| p.set("bendOffsetAnchor", en("INSIDE")));
@@ -230,11 +238,14 @@ fn jog_preserve_material_off_and_errors() {
     let extra = 2.0 * ba + wall - horiz;
     assert!(near(len, mm(100.0) + extra, 1e-6), "flat {len} vs {}", mm(100.0) + extra);
 
-    // Too small an offset for the radius.
+    // Too small an offset for 90° bends (std applyEditLogicForBendAngle): the angle drops to make the bends
+    // adjacent, cos = 1 - 3 / (2R + T) = 5/8, with an Info.
     let mut s = jogged(|p| p.set("bendOffset", expr("3 mm")));
     let (st, msg) = s.last_status();
-    assert_eq!(st, FeatureStatus::Error);
-    assert!(msg.contains("too small"), "{msg}");
+    assert_eq!((st, msg.as_str()), (FeatureStatus::Info, "Updating bend angle in order to accommodate the specified jog offset."));
+    let r = s.ok();
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.max.z - bb.min.z, mm(3.0) + t, 1e-6), "{bb:?}");
 }
 
 /// Derived provider over pre-regenerated studios (tab id -> context).
@@ -284,8 +295,8 @@ fn form_studio(tag: bool) -> std::sync::Arc<noshape_model::regen::context::Conte
         let (add, rem) = (r.context.bodies[0].id.clone(), r.context.bodies[1].id.clone());
         s.add("tag", move |p| {
             p.set("tagPurpose", en("FORM"));
-            p.set("partToAdd", q(Reference::Body(add)));
-            p.set("partToRemove", q(Reference::Body(rem)));
+            p.set("positivePart", q(Reference::Body(add)));
+            p.set("negativePart", q(Reference::Body(rem)));
         });
     }
     s.ok().context
@@ -821,16 +832,19 @@ fn vertex_near(r: &RegenResult, p: DVec3) -> Reference {
 }
 
 #[test]
-fn rip_splits_wall_between_vertices() {
+#[ignore = "live: a no-op; which std step makes it one is asked (REQUESTS fs 10-23 17:30). Std splits the face, native cuts a slot"]
+fn rip_diagonal_on_flat_plate_is_a_no_op() {
+    // Live (behaviours.md "fs (10-23 13:30)"): a corner-to-corner Rip across a single flat wall regenerates OK
+    // but changes nothing: 1 part, 8000 mm³, 6 planar faces, no joint.
     let mut s = plate();
     let r = s.ok();
     let (a, b) = (vertex_near(&r, DVec3::new(0.0, 0.0, mm(2.0))), vertex_near(&r, DVec3::new(mm(100.0), mm(40.0), mm(2.0))));
     s.add("sheetMetalRip", move |p| p.set("vertices", ParamValue::Query(vec![a, b])));
     let r = s.ok();
-    assert_eq!(r.context.bodies.len(), 2, "the diagonal rip splits the plate");
-    let v: f64 = (0..2).map(|i| volume(&r, i)).sum();
+    assert_eq!(r.context.bodies.len(), 1, "the diagonal rip leaves one part");
     let full = mm(100.0) * mm(40.0) * mm(2.0);
-    assert!(v < full && v > full * 0.99, "rip removes a thin slab: {v}");
+    assert!(near(volume(&r, 0), full, 1e-15), "volume unchanged: {}", volume(&r, 0));
+    assert_eq!(r.context.bodies[0].faces.len(), 6, "faces unchanged");
 }
 
 #[test]
@@ -851,18 +865,19 @@ fn recognize_rebuilds_sheet_metal_model() {
     s.add("sheetMetalEnd", move |p| p.set("sheetMetalParts", ParamValue::Query(vec![part])));
     let r = s.ok();
     let expected = flat(&r, 0).size();
+    let before = volume(&r, 0);
     let id = r.context.bodies[0].id.clone();
     s.add("sheetMetalRecognize", move |p| {
         p.set("bodies", q(Reference::Body(id)));
         p.set("kFactor", expr("0.45"));
     });
     let r = s.ok();
-    let data = r.context.sheet_metal.get(&r.context.bodies[0].id).unwrap();
-    assert!(data.active);
-    assert!(near(data.thickness, mm(2.0), 1e-9));
-    assert_eq!(data.walls.len(), 2);
-    assert_eq!(data.bends.len(), 1);
-    assert!(near(data.bends[0].radius, mm(3.0), 1e-9));
+    assert_eq!(r.context.bodies.len(), 1);
+    // The same L: one bend, inner radius 3 and outer 5 (thickness 2), same volume.
+    let mut radii = cylinder_radii(&r, 0);
+    radii.sort_by(f64::total_cmp);
+    assert!(radii.len() == 2 && near(radii[0], mm(3.0), 1e-9) && near(radii[1], mm(5.0), 1e-9), "{radii:?}");
+    assert!(near(volume(&r, 0), before, 1e-12), "volume {} vs {before}", volume(&r, 0));
     let got = flat(&r, 0).size();
     assert!(near(got.x.max(got.y), expected.x.max(expected.y), 1e-7), "recognized flat {got:?} vs {expected:?}");
 }

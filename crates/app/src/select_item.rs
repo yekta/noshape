@@ -364,8 +364,8 @@ impl SelectItemPanel {
                 .cursor_pointer()
                 .children(expander)
                 .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(picture))
-                .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).text_color(p().text).child(name.clone()))
-                .tooltip(crate::ui::tooltip(name))
+                .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).text_color(p().text).child(crate::ui::user_text(name.clone())))
+                .tooltip(crate::ui::user_tooltip(name))
         };
         let mut out = Vec::new();
         let accepted: Vec<RefSource> = list.iter().filter(|s| self.accepts(s) && (self.other_documents || self.focused.as_ref().is_none_or(|f| *f == s.tab))).cloned().collect();
@@ -643,8 +643,8 @@ impl SelectItemPanel {
                 v_flex()
                     .flex_1()
                     .min_w_0()
-                    .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(name))
-                    .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(15.6)).child(crate::ui::glyph("branch", 10., pal.text)).child(version)),
+                    .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(crate::ui::user_text(name)))
+                    .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(15.6)).child(crate::ui::glyph("branch", 10., pal.text)).child(crate::ui::user_text(version))),
             )
             .child(square("sel-create-version", "version", "Create version…", false, cx).on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(SelectItemEvent::CreateVersion(if other { path.clone() } else { None })))))
             .child(square("sel-version-graph", "version-graph", "Version graph", graph, cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -733,8 +733,8 @@ impl SelectItemPanel {
                     .when(on, |r| r.bg(gpui_kit::rgb(0xb2ddf6)))
                     .when(!on, |r| r.hover(|r| r.bg(pal.panel_hover)))
                     .child(node(false, false, i + 1 == n))
-                    .child(div().flex_1().text_size(px(14.)).child(v.label.clone()))
-                    .tooltip(crate::ui::tooltip(v.label.clone()))
+                    .child(div().flex_1().text_size(px(14.)).child(crate::ui::user_text(v.label.clone())))
+                    .tooltip(crate::ui::user_tooltip(v.label.clone()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if let Some(d) = if other { this.other.as_mut() } else { this.current.as_mut() } {
                             d.version = Some(i);
@@ -872,9 +872,9 @@ impl SelectItemPanel {
                             .flex_none()
                             .px(px(2.))
                             .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
-                            .tooltip(crate::ui::tooltip(name.clone()))
+                            .tooltip(crate::ui::user_tooltip(name.clone()))
                             .child(div().w(px(74.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("folder", 28., gpui_kit::rgb(0x666666))))
-                            .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).child(name)),
+                            .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).child(crate::ui::user_text(name))),
                     );
                 }
             }
@@ -905,8 +905,8 @@ impl SelectItemPanel {
                         v_flex()
                             .flex_1()
                             .min_w_0()
-                            .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(d.name.clone()))
-                            .when(!version.is_empty(), |c| c.child(div().opacity(0.5).text_size(px(12.)).line_height(px(15.6)).child(version))),
+                            .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(crate::ui::user_text(d.name.clone())))
+                            .when(!version.is_empty(), |c| c.child(div().opacity(0.5).text_size(px(12.)).line_height(px(15.6)).child(crate::ui::user_text(version)))),
                     )
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.open_other_document(path.clone(), cx))),
             );

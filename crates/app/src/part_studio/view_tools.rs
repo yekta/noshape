@@ -711,7 +711,7 @@ impl PartStudioView {
         let current = self.named_view_picked.as_ref().and_then(|n| names.iter().position(|x| x == n)).map_or(0, |i| i + 1);
         let view = cx.entity().downgrade();
         let pick_names = names.clone();
-        let select = crate::os_ui::select_field_flat("named-view-select", std::iter::once("Select a view".to_string()).chain(names).collect(), vec![0], current, move |i, _, cx| {
+        let select = crate::os_ui::select_field_flat("named-view-select", std::iter::once("Select a view".to_string()).chain(names).collect(), vec![0], 1, current, move |i, _, cx| {
             let (Some(name), Some(v)) = (i.checked_sub(1).and_then(|k| pick_names.get(k)).cloned(), view.upgrade()) else { return };
             v.update(cx, |this, cx| {
                 // Applied on the next render (it needs the window).

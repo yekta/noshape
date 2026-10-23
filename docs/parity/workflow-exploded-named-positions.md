@@ -30,3 +30,12 @@ Status: ✅ matches live, ✗ differs, ? live pending. Shots /tmp/qa5/shots/x01�
 | 18 | Tick + ✓ | two-level header "Revolute 1" over "⟳ - z"; each row "0 deg" (154) | same (y10) | ✅ |
 | 19 | Type 90 + Enter in the value cell | stores "90 deg"; cell has a 2 px blue frame while focused (155) | "90 deg" stored, the part turns 90° ✅; header styling differs: live "Name" header text bottom-aligned in a lighter cell, mate header cells darker; ours centred, same grey (cmp-y11) | ✗ **NP2** (ui, minor) |
 
+
+## Re-run pass 21 (2026-10-23, app = target-lead 10-23 17:10, main 88fbf8f)
+| Row | Ours | Status |
+|---|---|---|
+| EXV1 empty panel | grey band behind "Add exploded view", triad-over-cube illustration (x01) | ✅ **fixed** |
+| EXV2 editing tree | indent guide line, rollback bar indented, info text on one line (x02) | ✅ **fixed** |
+| EXV3 triad | grey-outlined arrows with rings, no planar handles (x03z) | ✅ **fixed** |
+| EXV4 / EXV5 / NP1 / NP2 / MNU2 | fixed on main (code cites the qa5 IDs; NP1 Delete gated by np_editing, MNU2 separators around the driver item) | ✅ (code-verified; UI spot-check pending) |
+| EXV6 rollback pill | not re-checked (my drag made no step this run) | – |

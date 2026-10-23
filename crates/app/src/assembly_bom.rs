@@ -390,9 +390,12 @@ impl AssemblyView {
                 el = match &content {
                     BomCell::Text(t) if frozen && structured && line.has_children => {
                         let open = expanded.contains(&item_key);
-                        el.child(div().truncate().child(format!("{} {t}", if open { "⌄" } else { "›" })))
+                        el.child(div().truncate().child(crate::ui::user_text(format!("{} {t}", if open { "⌄" } else { "›" }))))
                     }
                     BomCell::Text(t) if c.edit() == CellEdit::Choice && can_edit => el.child(h_flex().w_full().justify_between().child(div().truncate().child(t.clone())).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333)))),
+                    // Names and properties are the user's; states, units and
+                    // the "No value" placeholders are UI text.
+                    BomCell::Text(t) if user_column(*c) && ![bom::NO_VALUE, bom::NOT_APPLICABLE, bom::NO_MATERIAL].contains(&t.as_str()) => el.child(div().truncate().child(crate::ui::user_text(t.clone()))),
                     BomCell::Text(t) => el.child(div().truncate().child(t.clone())),
                     BomCell::Check(b) => el.justify_center().child(crate::os_ui::checkbox(SharedString::from(format!("bom-chk-{r}-{c:?}")), "", *b)),
                     BomCell::Color(col) => el.child(div().size(px(16.)).border_1().border_color(border).bg(gpui_kit::Rgba { r: srgb(col[0]), g: srgb(col[1]), b: srgb(col[2]), a: 1.0 })),
@@ -528,6 +531,12 @@ pub(crate) fn typed_text(k: &gpui_kit::Keystroke) -> Option<String> {
         return None;
     }
     k.key_char.clone().filter(|t| !t.is_empty() && !t.chars().any(char::is_control))
+}
+
+/// Columns whose cells hold user-authored text (names and properties).
+fn user_column(c: BomColumn) -> bool {
+    use BomColumn::*;
+    matches!(c, PartNumber | Description | Name | Revision | Vendor | Project | ProductLine | Material | Title1 | Title2 | Title3)
 }
 
 #[cfg(test)]

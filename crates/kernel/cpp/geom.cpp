@@ -130,6 +130,43 @@ SurfaceInfo surface_info(const OcShape& fs)
       gp_Ax1 ax = s.AxeOfRevolution();
       i.origin  = from_pnt(ax.Location());
       i.axis    = from_dir(ax.Direction());
+      // A circle revolved in a plane through the axis is a torus (a sphere
+      // with its centre on the axis), as Parasolid reports it; the part of a
+      // spindle torus nearer the axis than the circle's centre (the acorn
+      // nut's crown, live) has a negative major radius, Parasolid's lemon.
+      if (s.BasisCurve()->GetType() == GeomAbs_Circle)
+      {
+        const gp_Circ c  = s.BasisCurve()->Circle();
+        const gp_Dir  D  = ax.Direction();
+        const gp_Vec  N  = gp_Vec(c.Axis().Direction());
+        const gp_Vec  pc(ax.Location(), c.Location());
+        const double  R  = c.Radius();
+        if (std::abs(N.Dot(gp_Vec(D))) < 1e-9 && std::abs(pc.Dot(N)) < 1e-9 * (1 + R))
+        {
+          const gp_Pnt O = ax.Location().Translated(gp_Vec(D) * pc.Dot(gp_Vec(D)));
+          const gp_Vec r(O, c.Location());
+          const double a = r.Magnitude();
+          if (a < 1e-9 * R)
+          {
+            i.kind   = 3;
+            i.origin = from_pnt(O);
+            i.r1     = R;
+            break;
+          }
+          double u0, u1, v0, v1;
+          BRepTools::UVBounds(f, u0, u1, v0, v1);
+          const gp_Pnt q   = s.Value((u0 + u1) / 2, (v0 + v1) / 2);
+          const gp_Vec qo(O, q);
+          const double h   = qo.Dot(gp_Vec(D));
+          const double rho = (qo - gp_Vec(D) * h).Magnitude();
+          const bool lemon = std::abs((rho + a) * (rho + a) + h * h - R * R) < std::abs((rho - a) * (rho - a) + h * h - R * R);
+          i.kind   = 4;
+          i.origin = from_pnt(O);
+          i.xdir   = from_dir(gp_Dir(r));
+          i.r1     = lemon ? -a : a;
+          i.r2     = R;
+        }
+      }
       break;
     }
     case GeomAbs_SurfaceOfExtrusion: {
@@ -453,6 +490,20 @@ PlaneQ find_plane(const OcShape& s, double tolerance)
   gp_Ax3 ax = pl->Position();
   if (!fs.Location().IsIdentity())
     ax.Transform(fs.Location().Transformation());
+  // A planar face on another surface (a B-spline after a non-uniform scale):
+  // the plane's normal along the face's outward normal, as for a Geom_Plane.
+  if (s.shape.ShapeType() == TopAbs_FACE)
+  {
+    const TopoDS_Face& F = TopoDS::Face(s.shape);
+    double         u0, u1, v0, v1;
+    BRepTools::UVBounds(F, u0, u1, v0, v1);
+    BRepGProp_Face gf(F);
+    gp_Pnt         p;
+    gp_Vec         n;
+    gf.Normal(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, n);
+    if (n.Magnitude() > 1e-12 && n.Dot(gp_Vec(ax.Direction())) < 0)
+      ax.ZReverse();
+  }
   q.found = true;
   q.plane = from_ax3(ax);
   return q;

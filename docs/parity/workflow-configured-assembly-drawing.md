@@ -30,3 +30,7 @@ Live answered "qa5 pass 7" (5)–(6): BOM merges; after a change the only sign i
 |---|---|---|
 | D18 drawing BOM | 1 row Qty 3 = assembly | ✅ **fixed** (c31) |
 | D17 drawing after a new instance | Update saturated yellow, views/BOM unchanged until Ctrl+Q; Ctrl+Q → Qty 4 | ✅ **fixed** (c33, c34) |
+
+## Re-check (qa4, 2026-10-23 20:40–21:10, main a0e360a3; code and the latest qa5 passes)
+- CA5, CA6, D17, D18 fixed (rows above). CA4 ("25" + Tab loses the unit): fixed in code (assembly_panels.rs: Blur / Enter
+  commit with the workspace unit, "25" → "25 mm"), listed fixed in qa5.md. CA2: cited in code. No open rows.

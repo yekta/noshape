@@ -156,6 +156,20 @@ pub(crate) struct PatternSession {
     pub scope_refs: Vec<noshape_model::assembly::ScopeEntity>,
     /// Matches found (part pattern / replicate) or why there are none.
     pub preview: Option<Result<usize, String>>,
+    /// Mirror: live's Mirror strategy per instance (absent: Transform, Auto
+    /// position) and whether its dialog is open.
+    pub mirror_rows: HashMap<InstanceId, MirrorRow>,
+    pub strategy_open: bool,
+}
+
+/// One row of live's Mirror strategy table.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct MirrorRow {
+    /// Mirror action Derived (else Transform).
+    pub derived: bool,
+    pub placement: noshape_model::assembly::MirrorPlacement,
+    /// Update has made the Derived instance's mirrored part.
+    pub created: bool,
 }
 
 pub(crate) struct ManipValue {
@@ -612,7 +626,7 @@ impl AssemblyView {
                     .truncate()
                     .when(mc_error.is_some(), |d| d.text_color(pal.text_invalid))
                     .when_some(mc_error.as_ref().map(|e| format!("{title} did not regenerate properly: {e}")), |d, t| d.tooltip(crate::ui::tooltip(t)))
-                    .child(title),
+                    .map(|d| if implicit { d.child(title) } else { d.child(crate::ui::user_text(title)) }),
             );
         let header = if implicit {
             // Live 578: a Bootstrap close button at opacity 0.5.
@@ -683,7 +697,7 @@ impl AssemblyView {
             .text_color(pal.text)
             .hover(|d| d.bg(pal.row_hover))
             .child(crate::ui::tree_icon("origin", self.ui.origin_hidden, cx))
-            .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child("Origin"))
+            .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child(crate::ui::user_text("Origin")))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 if this.ui.ps_in_context.is_some() {
                     this.ui.ps_in_context = Some(None);
@@ -750,7 +764,7 @@ impl AssemblyView {
             .when(selected, |d| d.bg(pal.accent_soft))
             .hover(|d| d.bg(pal.panel_hover))
             .child(svg().path(icon_path("mate-connector-assembly")).size_3p5().text_color(if failed { pal.error } else { pal.text_muted }))
-            .child(div().flex_1().truncate().child(c.name.clone()))
+            .child(div().flex_1().truncate().child(crate::ui::user_text(c.name.clone())))
             // Live E15: "Mate connector 2 has error: Failed to resolve mate connector origin."
             .when_some(message.map(|m| format!("{} has error: {m}", c.name)), |d, m| d.child(div().size(px(6.)).rounded_full().bg(pal.error)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
             .child(
@@ -825,7 +839,7 @@ impl AssemblyView {
                 .bg(pal.accent_soft)
                 .child(div().w(px(12.)))
                 .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
-                .child(div().flex_1().truncate().child(s.name.clone()))
+                .child(div().flex_1().truncate().child(crate::ui::user_text(s.name.clone())))
                 .child(div().id("pat-pending-err").size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx)))
                 .into_any_element(),
         )
@@ -870,7 +884,7 @@ impl AssemblyView {
                     })),
             )
             .child(svg().path(icon_path(icon)).size_3p5().text_color(pal.text_muted))
-            .child(div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(pat.name.clone()))
+            .child(div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(crate::ui::user_text(pat.name.clone())))
             .when_some(error, |d, e| d.child(div().id(SharedString::from(format!("pat-err-{}", id.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(id) } else { None };
@@ -966,6 +980,8 @@ impl AssemblyView {
             scope: None,
             scope_refs: Vec::new(),
             preview: None,
+            mirror_rows: HashMap::new(),
+            strategy_open: false,
         }
     }
 
@@ -1036,9 +1052,16 @@ impl AssemblyView {
                 s.equal = *equal_spacing;
                 s.centered = *centered;
             }
-            PatternKind::Mirror { plane, handed } => {
+            PatternKind::Mirror { plane, handed, derived, placement } => {
                 s.axis = Some(plane.clone());
-                s.second = *handed;
+                for id in &s.seeds {
+                    let row = MirrorRow {
+                        derived: *handed || derived.contains(id),
+                        placement: placement.iter().find(|(i, _)| i == id).map(|(_, p)| *p).unwrap_or_default(),
+                        created: true,
+                    };
+                    s.mirror_rows.insert(*id, row);
+                }
             }
             PatternKind::PartPattern { mate } => s.mate = Some(*mate),
             PatternKind::Replicate { mate, all_instances, scope, scope_refs } => {
@@ -1080,7 +1103,15 @@ impl AssemblyView {
                 PatternKind::Linear { direction, distance: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, second, centered: s.centered }
             }
             PatternDialogKind::Circular => PatternKind::Circular { axis: s.axis.clone().ok_or("Select the axis of pattern")?, angle: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, centered: s.centered },
-            PatternDialogKind::Mirror => PatternKind::Mirror { plane: s.axis.clone().ok_or("Select the mirror plane (planar face or mate connector)")?, handed: s.second },
+            PatternDialogKind::Mirror => {
+                let rows: Vec<(InstanceId, MirrorRow)> = s.seeds.iter().map(|id| (*id, s.mirror_rows.get(id).copied().unwrap_or_default())).collect();
+                PatternKind::Mirror {
+                    plane: s.axis.clone().ok_or("Select the mirror plane (planar face or mate connector)")?,
+                    handed: false,
+                    derived: rows.iter().filter(|(_, r)| r.derived && r.created).map(|(id, _)| *id).collect(),
+                    placement: rows.iter().filter(|(_, r)| r.placement != noshape_model::assembly::MirrorPlacement::Auto).map(|(id, r)| (*id, r.placement)).collect(),
+                }
+            }
             PatternDialogKind::PartPattern => PatternKind::PartPattern { mate: s.mate.ok_or("The seed needs exactly one mate to follow (or select the mate in the list)")? },
             PatternDialogKind::Replicate => PatternKind::Replicate {
                 mate: s.mate.ok_or("The seed needs exactly one mate to match (or select the mate in the list)")?,
@@ -1206,6 +1237,7 @@ impl AssemblyView {
             }
             self.update_pattern_preview(cx);
         }
+        let strategy = self.render_mirror_strategy(cx);
         let pal = p();
         let Some(s) = &self.pattern else { return div().into_any_element() };
         let kind = s.kind;
@@ -1304,6 +1336,7 @@ impl AssemblyView {
         let count_error = regen_error.as_deref().is_some_and(|e| e.starts_with(' '));
         let title_tip = regen_error.as_ref().map(|e| format!("{} did not regenerate properly: {e}", s.name));
         let valid = regen_error.is_none()
+            && !mirror_pending(s)
             && !s.seeds.is_empty()
             && match kind {
                 PatternDialogKind::Linear | PatternDialogKind::Circular | PatternDialogKind::Mirror => s.axis.is_some(),
@@ -1392,11 +1425,13 @@ impl AssemblyView {
                 }
             }
             PatternDialogKind::Mirror => {
-                let handed = s.second;
+                // Live (behaviours "skb (10-23 14:30)"): the reference
+                // button opens the Mirror strategy dialog; red while a Derived
+                // instance waits for Update, blue-bordered while it is open.
+                let pending = mirror_pending(s);
+                let open = s.strategy_open;
                 body = body
                     .child(div().px(px(3.)).pt(px(5.)).child(axis_box(self, "pat-axis", &s.axis, "Mirror plane", 0, cx)))
-                    // Help assembly-mirror-01: "Mirror strategy…" (which parts get
-                    // opposite-handed copies).
                     .child(
                         h_flex()
                             .id("mir-strategy")
@@ -1408,27 +1443,29 @@ impl AssemblyView {
                             .px(px(2.))
                             .gap(px(4.))
                             .border_1()
-                            .border_color(pal.border)
+                            .border_color(if pending { pal.error } else if open { pal.accent } else { pal.border })
+                            .when(pending, |d| d.bg(pal.error_fill).text_color(pal.text_invalid))
                             .rounded(px(2.))
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .tooltip(crate::ui::tooltip("Select how instances are mirrored."))
                             .child(crate::assets::icon("mirror", 20., cx))
-                            .child(div().text_size(px(14.)).child("Mirror strategy…")),
-                    )
-                    .child(os::checkbox("mir-handed", "Create mirrored (opposite-handed) parts", handed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        if let Some(p) = &mut this.pattern {
-                            p.second = !p.second;
-                        }
-                        cx.notify();
-                    })));
+                            .child(div().text_size(px(14.)).child("Mirror strategy…"))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                if let Some(p) = &mut this.pattern {
+                                    p.strategy_open = !p.strategy_open;
+                                }
+                                cx.notify();
+                            })),
+                    );
             }
             PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {
                 let mate_rows: Vec<AnyElement> = s.mate.and_then(|m| self.assembly(cx).and_then(|a| a.mate(m).map(|x| x.name.clone()))).map(|n| vec![os::query_row("pat-mate-v", n).into_any_element()]).unwrap_or_default();
                 // Live: once the target scope is set, a missing mate is this
                 // field's error (its label's tooltip).
                 let mate_tip = (kind == PatternDialogKind::Replicate && !s.scope_refs.is_empty() && s.mate.is_none()).then(|| SharedString::from("Missing mate to be matched."));
-                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("pat-mate", "Mate to be matched", mate_tip, false, mate_rows)));
+                let mate_err = mate_tip.is_some();
+                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("pat-mate", "Mate to be matched", mate_tip, false, mate_rows).when(mate_err, os::query_box_error)));
                 if kind == PatternDialogKind::Replicate {
                     // Live ("qa5 assembly" 5, help: Replicate 6–7): the match
                     // scope, then "Parts to find match in" (red while empty).
@@ -1457,7 +1494,7 @@ impl AssemblyView {
                     let active = s.active == Some(2);
                     // Live (qa5 A19): empty, the field is red (label and border).
                     let scope_tip = s.scope_refs.is_empty().then(|| SharedString::from("A target scope must be selected."));
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", "Parts to find match in", scope_tip, active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid).border_color(pal.error)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", "Parts to find match in", scope_tip, active, rows).when(s.scope_refs.is_empty(), os::query_box_error).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }
@@ -1518,9 +1555,12 @@ impl AssemblyView {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(if valid || count_error { pal.text } else { pal.text_invalid })
                             .truncate()
-                            .child(s.name.clone())
+                            .child(crate::ui::user_text(s.name.clone()))
                             // Live: the name, or the regeneration error.
-                            .tooltip(crate::ui::tooltip(title_tip.unwrap_or_else(|| s.name.clone()))),
+                            .map(|d| match title_tip {
+                                Some(t) => d.tooltip(crate::ui::tooltip(t)),
+                                None => d.tooltip(crate::ui::user_tooltip(s.name.clone())),
+                            }),
                     )
                     .child(
                         div()
@@ -1552,6 +1592,9 @@ impl AssemblyView {
                     ),
             )
             .child(body)
+            // Live: the Mirror strategy dialog lies over the feature dialog.
+            .relative()
+            .children(strategy)
             .into_any_element()
     }
 
@@ -1693,6 +1736,174 @@ impl AssemblyView {
                         input.update(cx, |q, cx| q.commit_now(window, cx));
                     }
                 }))
+                .into_any_element(),
+        )
+    }
+
+    /// Live's "Mirror strategy" dialog (behaviours "skb (10-23 14:30)",
+    /// dom/skb1430-mirror-strategy*.html): 781 px over the feature dialog,
+    /// a table Instance | Source | Symmetry | Mirror action | Mirror
+    /// reference | Placement type (columns 140 / 80 / 80 / 160 / 180 / 140,
+    /// `#aaa` grid, header `#eaeaea`, read-only cells `#f5f5f5`, 33 px rows),
+    /// then the status and Update.
+    fn render_mirror_strategy(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        use noshape_model::assembly::MirrorPlacement;
+        let s = self.pattern.as_ref().filter(|p| p.kind == PatternDialogKind::Mirror && p.strategy_open)?;
+        let pal = p();
+        let asm = self.assembly(cx)?;
+        let doc = &self.doc.read(cx).session.doc;
+        let grid = rgb(0xaaaaaa);
+        const WIDTHS: [f32; 6] = [140., 80., 80., 160., 180., 140.];
+        let cell = |k: usize, readonly: bool| div().w(px(WIDTHS[k])).h_full().flex_none().flex().items_center().px(px(6.)).border_r_1().border_color(grid).when(readonly, |d| d.bg(rgb(0xf5f5f5))).when(!readonly, |d| d.bg(rgb(0xffffff)));
+        let header = h_flex().h(px(33.)).bg(rgb(0xeaeaea)).border_b_1().border_color(grid).children(
+            ["Instance", "Source", "Symmetry", "Mirror action", "Mirror reference", "Placement type"]
+                .iter()
+                .enumerate()
+                .map(|(k, t)| div().w(px(WIDTHS[k])).h_full().flex_none().flex().items_center().justify_center().border_r_1().border_color(grid).text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).child(*t)),
+        );
+        let mut table = v_flex().border_l_1().border_color(grid).child(header);
+        for (k, id) in s.seeds.iter().enumerate() {
+            let Some(inst) = asm.instance(*id) else { continue };
+            let row = s.mirror_rows.get(id).copied().unwrap_or_default();
+            let studio = match &inst.source {
+                InstanceSource::Part { studio, .. } | InstanceSource::MirroredPart { studio, .. } => doc.tab(*studio).map(|t| t.name.clone()),
+                _ => None,
+            }
+            .unwrap_or_default();
+            let id = *id;
+            let view = cx.entity().downgrade();
+            let action = os::select_field(SharedString::from(format!("ms-act-{k}")), vec!["Transform".into(), "Derived".into()], usize::from(row.derived), {
+                let view = view.clone();
+                move |i, _, cx| {
+                    if let Some(v) = view.upgrade() {
+                        v.update(cx, |this, cx| {
+                            if let Some(p) = &mut this.pattern {
+                                let r = p.mirror_rows.entry(id).or_default();
+                                r.derived = i == 1;
+                                r.created = false;
+                            }
+                            cx.notify();
+                        });
+                    }
+                }
+            });
+            let reference: AnyElement = match (row.derived, row.created) {
+                (true, false) => h_flex().gap(px(4.)).child(crate::assets::icon("performance-info", 16., cx)).child("Create new instance").into_any_element(),
+                (true, true) => h_flex().gap(px(4.)).text_color(pal.accent).child(crate::assets::icon("tab-part-studio", 16., cx)).child(format!("{studio}-Mirrored")).into_any_element(),
+                _ => div().into_any_element(),
+            };
+            let placement: AnyElement = if row.derived {
+                div().child(row.placement.label()).into_any_element()
+            } else {
+                let view = view.clone();
+                os::select_field(SharedString::from(format!("ms-pl-{k}")), MirrorPlacement::ALL.iter().map(|p| p.label().to_string()).collect(), MirrorPlacement::ALL.iter().position(|p| *p == row.placement).unwrap_or(0), move |i, _, cx| {
+                    if let Some(v) = view.upgrade() {
+                        v.update(cx, |this, cx| {
+                            if let Some(p) = &mut this.pattern {
+                                p.mirror_rows.entry(id).or_default().placement = MirrorPlacement::ALL[i];
+                            }
+                            cx.notify();
+                        });
+                    }
+                })
+                .into_any_element()
+            };
+            table = table.child(
+                h_flex()
+                    .h(px(33.))
+                    .border_b_1()
+                    .border_color(grid)
+                    .text_size(px(13.33))
+                    .child(cell(0, true).justify_center().gap(px(4.)).child(crate::assets::icon("part", 16., cx)).child(inst.name.clone()))
+                    // Live: the source workspace ("Main").
+                    .child(cell(1, true).justify_center().gap(px(4.)).child(crate::assets::icon("branch", 14., cx)).child("Main"))
+                    // Live: the part's detected symmetry (UNCONFIRMED for
+                    // asymmetric parts: asked, REQUESTS "skb (10-23 15:30)").
+                    .child(cell(2, true).id(SharedString::from(format!("ms-sym-{k}"))).justify_center().tooltip(crate::ui::tooltip("Symmetric")).child(crate::assets::icon("symmetric", 18., cx)))
+                    .child(cell(3, false).child(div().w_full().child(action)))
+                    .child(cell(4, true).child(reference))
+                    .child(cell(5, !row.derived).when(!row.derived, |d| d.bg(rgb(0xffffff))).child(div().w_full().child(placement))),
+            );
+        }
+        let pending = s.seeds.iter().filter(|id| s.mirror_rows.get(id).is_some_and(|r| r.derived && !r.created)).count();
+        // Live: "1 instance needs to be created." (the plural form is
+        // assumed: "2 instances need to be created.").
+        let status: AnyElement = if pending > 0 {
+            h_flex()
+                .gap(px(6.))
+                .child(crate::assets::icon("performance-info", 16., cx))
+                .child(if pending == 1 { "1 instance needs to be created.".to_string() } else { format!("{pending} instances need to be created.") })
+                .into_any_element()
+        } else {
+            div().child("All instances are updated.").into_any_element()
+        };
+        Some(
+            v_flex()
+                .id("mirror-strategy")
+                .occlude()
+                .absolute()
+                .top_0()
+                .left_0()
+                .w(px(781.))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .border_b_1()
+                        .border_color(rgb(0xd7d7d7))
+                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mirror strategy"))
+                        .child(
+                            div()
+                                .id("ms-close")
+                                .px(px(8.))
+                                .text_size(px(16.67))
+                                .text_color(rgb(0x999999))
+                                .cursor_pointer()
+                                .child("×")
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(p) = &mut this.pattern {
+                                        p.strategy_open = false;
+                                    }
+                                    cx.notify();
+                                })),
+                        ),
+                )
+                .child(table)
+                .child(
+                    h_flex()
+                        .h(px(45.))
+                        .px(px(6.))
+                        .text_size(px(13.33))
+                        .child(div().flex_1().child(status))
+                        .child(
+                            div()
+                                .id("ms-update")
+                                .h(px(33.))
+                                .px(px(12.))
+                                .flex()
+                                .items_center()
+                                .rounded(px(4.))
+                                .bg(pal.accent)
+                                .text_color(rgb(0xffffff))
+                                .text_size(px(14.))
+                                .when(pending == 0, |d| d.opacity(0.42))
+                                .when(pending > 0, |d| d.cursor_pointer())
+                                .child("Update")
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(p) = &mut this.pattern {
+                                        for r in p.mirror_rows.values_mut() {
+                                            if r.derived {
+                                                r.created = true;
+                                            }
+                                        }
+                                    }
+                                    this.update_pattern_preview(cx);
+                                    cx.notify();
+                                })),
+                        ),
+                )
                 .into_any_element(),
         )
     }
@@ -1920,7 +2131,7 @@ impl AssemblyView {
                 let row_sel = sel == Some((i, None));
                 let name_el: AnyElement = match self.rename_input(RenameTarget::Explode(i), cx) {
                     Some(inp) => inp,
-                    None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if active { blue } else { pal.text }).when(active, |d| d.font_weight(FontWeight::MEDIUM)).child(v.name.clone()).into_any_element(),
+                    None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if active { blue } else { pal.text }).when(active, |d| d.font_weight(FontWeight::MEDIUM)).child(crate::ui::user_text(v.name.clone())).into_any_element(),
                 };
                 let name = v.name.clone();
                 tree = tree.child(
@@ -2338,7 +2549,7 @@ impl AssemblyView {
                     let at = opts.iter().position(|o| o.id == cur).unwrap_or(0);
                     let (v, ids) = (view.clone(), opts.iter().map(|o| o.id.clone()).collect::<Vec<_>>());
                     let focus = select_focus.get(&inp.id).cloned().unwrap_or_else(|| cx.focus_handle());
-                    let select = os::select_field_focusable(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, &focus, move |i, _, cx| {
+                    let select = os::user_select_field_focusable(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, &focus, move |i, _, cx| {
                         let (id, oid) = (id.clone(), ids.get(i).cloned().unwrap_or_default());
                         v.update(cx, |this, cx| {
                             if let Some(s) = &mut this.config_panel {
@@ -2348,7 +2559,7 @@ impl AssemblyView {
                             cx.notify();
                         })
                     });
-                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(inp.name.clone())).child(div().flex_1().min_w_0().child(select)));
+                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().flex_1().min_w_0().child(select)));
                 }
                 ConfigInputKind::Checkbox { .. } => {
                     let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");
@@ -2402,7 +2613,7 @@ impl AssemblyView {
                     v_flex()
                         .flex_1()
                         .min_w_0()
-                        .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(doc_name))
+                        .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).child(crate::ui::user_text(doc_name)))
                         .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child("Main")),
                 ),
         );
@@ -2755,7 +2966,7 @@ pub(crate) struct ExplodeStepDrag {
 impl Render for ExplodeStepDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(self.label.clone())
+        div().px_2().py_1().rounded_md().bg(pal.panel_raised).border_1().border_color(pal.accent).text_sm().text_color(pal.text).child(crate::ui::user_text(self.label.clone()))
     }
 }
 
@@ -3496,7 +3707,7 @@ impl AssemblyView {
                     .bg(rgb(0xffffff))
                     .border_b_1()
                     .border_color(rgb(0xd7d7d7))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red } else { pal.text }).child(title))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red } else { pal.text }).map(|d| if s.created { d.child(title) } else { d.child(crate::ui::user_text(title)) }))
                     .child(
                         div()
                             .id("se-ok")
@@ -3805,8 +4016,8 @@ impl AssemblyView {
                         v_flex()
                             .flex_1()
                             .min_w_0()
-                            .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(d.name.clone()))
-                            .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child(version)),
+                            .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(crate::ui::user_text(d.name.clone())))
+                            .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(16.)).child(crate::ui::glyph("branch", 10., pal.text)).child(crate::ui::user_text(version))),
                     )
                     .child(square("ins-other-create-version", "version", "Create version…", false, cx).on_click({
                         let path = d.path.clone();
@@ -3862,7 +4073,7 @@ impl AssemblyView {
                             .when(on, |r| r.bg(rgb(0xb2ddf6)))
                             .when(!on, |r| r.hover(|r| r.bg(pal.panel_hover)))
                             .child(node(false, i + 1 == n))
-                            .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(v.label.clone()))
+                            .child(div().flex_1().text_size(px(13.33)).text_color(pal.text).child(crate::ui::user_text(v.label.clone())))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.ui.insert_other_doc {
                                     d.version = i;
@@ -3957,7 +4168,7 @@ impl AssemblyView {
                         Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
                         None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
                     }))
-                    .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(name))
+                    .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(crate::ui::user_text(name)))
             };
             for (t, name, is_asm) in tabs {
                 let key = d.key(&t);
@@ -4130,7 +4341,7 @@ impl AssemblyView {
                         .cursor_pointer()
                         .hover(|d| d.bg(pal.panel_hover))
                         .child(div().w(px(74.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(crate::ui::glyph("folder", 28., rgb(0x999999))))
-                        .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(name))
+                        .child(div().flex_1().min_w_0().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(name)))
                         .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.ui.insert_other_dir = Some(dir.clone());
                             cx.notify();
@@ -4150,11 +4361,11 @@ impl AssemblyView {
             // Search results: the matched text in blue (live 615).
             let name_el = match q.as_ref().and_then(|q| d.name.to_lowercase().find(q.as_str()).map(|at| (at, q.len()))) {
                 Some((at, len)) if d.name.is_char_boundary(at) && d.name.is_char_boundary(at + len) => h_flex()
-                    .child(d.name[..at].to_string())
-                    .child(div().text_color(blue).child(d.name[at..at + len].to_string()))
-                    .child(d.name[at + len..].to_string())
+                    .child(crate::ui::user_text(d.name[..at].to_string()))
+                    .child(div().text_color(blue).child(crate::ui::user_text(d.name[at..at + len].to_string())))
+                    .child(crate::ui::user_text(d.name[at + len..].to_string()))
                     .into_any_element(),
-                _ => div().child(d.name.clone()).into_any_element(),
+                _ => div().child(crate::ui::user_text(d.name.clone())).into_any_element(),
             };
             let version = self.ui.insert_other_versions.get(&d.path).cloned();
             col = col.child(
@@ -4271,4 +4482,10 @@ fn docs_root() -> std::path::PathBuf {
 
 fn canon_dir(p: &std::path::Path) -> std::path::PathBuf {
     p.canonicalize().unwrap_or_else(|_| p.to_path_buf())
+}
+
+/// A Derived row of live's Mirror strategy still waiting for Update (the
+/// dialog's Mirror strategy… and title are red until then).
+fn mirror_pending(s: &PatternSession) -> bool {
+    s.kind == PatternDialogKind::Mirror && s.seeds.iter().any(|id| s.mirror_rows.get(id).is_some_and(|r| r.derived && !r.created))
 }

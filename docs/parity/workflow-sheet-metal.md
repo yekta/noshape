@@ -167,3 +167,19 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 
 ## Re-run pass 18 (2026-10-22 ~10:00–11:00, CLI /tmp/qa5/noshape-cli-0811 = target-engine 08:11; main 3ce6952)
 CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS; SML1 loft Add "not supported yet". ✗ still.
+
+## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
+| Row | Ours | Status |
+|---|---|---|
+| SM1 flange (CLI rollback) | 8383.1217, 20 faces | ✗ still → routed fs (qa5-routing.md) |
+| hem (CLI rollback) | 9254.2367, 30 faces | ✗ still → routed fs |
+| SM3 Closed corner | "Closed corners are not supported yet" | ✗ still → routed fs |
+| SM4 panel design | old design (tab header, line drawing, Export DXF/SVG buttons) | ✗ still → routed ui + fs (big); **tooltip and strip position fixed by qa5** (see below) |
+| 6.1 strip tooltip / order | was "Sheet metal: flat pattern and bend table", last button | **qa5 fix**: "Sheet metal table and flat view", placed above Variable table (live "qa5 sm" (8)) |
+| SM5 Up/Down | "Down" ×3 for flanges bent up + hem (live all "Up") | ✗ still → routed fs (sign rule needs a live Down case) |
+| SM7 chip "Vertex" | Corner chip "Vertex" (live "Vertex of Flange 1") | **qa5 fix**: vertex chips read "Vertex of <latest creating feature>" |
+| SM8 Corner dialog default | "Square - Sized", Corner relief width 5 mm = live ~5854 | ✅ **withdrawn** |
+| SM9 Esc after a select list | 1st Esc closes the list, 2nd cancels the dialog | ✅ **fixed** |
+| SM10 "Exported …" notice | auto-dismisses; next dialog unobstructed | ✅ **fixed** |
+| SM11 select tooltip over its list | no tooltip while the list is open | ✅ **fixed** |
+| SM12 / SM13 | (fixed earlier) | ✅ |

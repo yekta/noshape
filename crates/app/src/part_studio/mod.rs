@@ -519,8 +519,9 @@ impl PartStudioView {
         self.regen_inflight = Some(pending::InFlight { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
         self.begin_pending(seq, window, cx);
         let cancel2 = cancel.clone();
-        // View in high quality (Shift+R): a 4x finer chord tolerance.
-        let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality { 0.25 } else { 1.0 };
+        // View in high quality (Shift+R, kept for the session once used):
+        // the Very fine level, refined to view by view.
+        let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality_seen { 0.25 } else { 1.0 };
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
             // Coalesce bursts of edits (typing in a field).
             cx.background_executor().timer(Duration::from_millis(12)).await;
@@ -743,6 +744,7 @@ impl PartStudioView {
         // A new Extrude / Revolve / Sweep / Loft: operation and merge scope
         // from what the previewed tool touches.
         self.boolean_edit_logic(cx);
+        self.hole_scope_logic(cx);
         self.orient_for_sketch(cx);
         self.refresh_scene(true, cx);
         if !self.fitted_once {
@@ -903,8 +905,13 @@ impl PartStudioView {
                         }
                         scene.instances.extend(scene_builder::hidden_edges_dashed(&self.display, &faces, self.gpu.uploader()));
                     }
+                    // Red, not selected: a selected stroke draws over the
+                    // error color (qa4 gate v0.4.7: the edge was orange).
                     r => {
                         for &id in built.picks.ids_for(&r) {
+                            if let Some(s) = scene.states.get_mut(id as usize) {
+                                *s &= !(noshape_render::state::SELECTED | noshape_render::state::ACCENT | noshape_render::state::BODY);
+                            }
                             scene.add_flag(id, noshape_render::state::ERROR);
                         }
                     }
@@ -2425,6 +2432,7 @@ impl PartStudioView {
             }
             let selected = self.selection.contains(&r);
             let hidden = hidden_defaults.contains(&r);
+            let dimmed = default_row_dimmed(hidden, self.ui.isolate.as_ref());
             let r2 = r.clone();
             let r3 = r.clone();
             let icon = if label == "Origin" { "origin" } else { "plane" };
@@ -2434,18 +2442,19 @@ impl PartStudioView {
             dg_rows.push(
                 // Live (part-studio/16): the hover band spans the list (x 40
                 // to 239); the indent is inside the row.
-                crate::ui::with_side_tooltip(crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected), name.clone())
+                crate::ui::with_user_side_tooltip(crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected), name.clone())
                     .mr(px(5.))
                     .pl(px(23.))
                     // Live: the eye's center 19 px from the row's end.
                     .pr(px(11.))
                     .group("dg-row")
-                    // Onshape: hidden default geometry is listed in gray.
-                    .when(hidden, |d| d.text_color(pal.text_faint))
-                    .child(crate::ui::tree_icon(icon, hidden, cx))
+                    // Onshape: hidden default geometry is listed in gray, and
+                    // so is all of it while parts are isolated (qa5 KB3).
+                    .when(dimmed, |d| d.text_color(pal.text_faint))
+                    .child(crate::ui::tree_icon(icon, dimmed, cx))
                     .child(match renaming {
                         Some(st) => div().flex_1().child(gpui_kit::component::input::Input::new(&st).xsmall()).into_any_element(),
-                        None => div().flex_1().truncate().child(name).into_any_element(),
+                        None => div().flex_1().truncate().child(crate::ui::user_text(name)).into_any_element(),
                     })
                     // The eye shows / hides the item (it had no click handler).
                     .child({
@@ -2979,15 +2988,15 @@ impl PartStudioView {
                     .id(SharedString::from(format!("part-name-{}", b.id)))
                     .flex_1()
                     .truncate()
-                    .child(b.name.clone())
-                    .tooltip(crate::ui::tooltip(match &b.composite {
+                    .child(crate::ui::user_text(b.name.clone()))
+                    .tooltip(crate::ui::user_tooltip(match &b.composite {
                         Some(c) => format!("{} ({}) ({} parts)", b.name, if c.closed { "closed" } else { "open" }, c.members.len()),
                         None => b.name.clone(),
                     }))
                     .into_any_element(),
             })
             // Parts list properties (part number, revision).
-            .when_some(self.ui.show_part_props.then(|| self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).map(|p| [p.part_number.clone().unwrap_or_default(), p.revision.clone().unwrap_or_default()].iter().filter(|x| !x.is_empty()).cloned().collect::<Vec<_>>().join(" · "))).flatten().filter(|t| !t.is_empty()), |d, t| d.child(div().text_xs().text_color(pal.text_faint).child(t)))
+            .when_some(self.ui.show_part_props.then(|| self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).map(|p| [p.part_number.clone().unwrap_or_default(), p.revision.clone().unwrap_or_default()].iter().filter(|x| !x.is_empty()).cloned().collect::<Vec<_>>().join(" · "))).flatten().filter(|t| !t.is_empty()), |d, t| d.child(div().text_xs().text_color(pal.text_faint).child(crate::ui::user_text(t))))
             .child(
                 div()
                     .id(SharedString::from(format!("part-eye-{}", b.id)))
@@ -3212,7 +3221,7 @@ impl PartStudioView {
             .mr(px(5.))
             .pr(px(11.))
             .child(div().flex_none().child(crate::ui::tree_icon(&feature_icon("sketch"), sk.hidden, cx)))
-            .child(div().flex_1().truncate().child(sk.name.clone()))
+            .child(div().flex_1().truncate().child(crate::ui::user_text(sk.name.clone())))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.selection = vec![r.clone()];
                 this.refresh_scene(false, cx);
@@ -3233,7 +3242,7 @@ impl PartStudioView {
             .child(match self.folder_renaming.as_ref().filter(|(fid, _, _)| *fid == id) {
                 Some((_, st, _)) => div().flex_1().child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.))).into_any_element(),
                 // Live 587, 590: "New folder (0)" — the name and its feature count.
-                None => div().flex_1().truncate().child(format!("{} ({})", fd.name, self.studio(cx).map(|s| s.folder_count(id)).unwrap_or(0))).into_any_element(),
+                None => div().flex_1().truncate().child(crate::ui::user_text(format!("{} ({})", fd.name, self.studio(cx).map(|s| s.folder_count(id)).unwrap_or(0)))).into_any_element(),
             })
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 if ev.click_count() >= 2 {
@@ -3353,7 +3362,7 @@ impl PartStudioView {
             .font_weight(FontWeight::SEMIBOLD)
             .when(self.edit_invalid(cx), |d| d.text_color(pal.text_invalid))
             .child(crate::ui::tree_icon(&icon, false, cx))
-            .child(div().flex_1().truncate().child(name))
+            .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
             .into_any_element()
     }
 
@@ -3585,7 +3594,7 @@ impl PartStudioView {
                 // Live (psb 10-21 p): a Hole's row shows its whole callout,
                 // both parts ("Ø 6.6 mm ↧ 10 mm | ⌴Ø 11 mm ↧ 6.5 mm"), cut by
                 // the ellipsis at the list's width.
-                None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(name.clone()).into_any_element(),
+                None => div().flex_1().truncate().when(suppressed, |d| d.line_through()).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
             // In-context arrow (features referencing an Assembly context).
             .children(self.context_arrow(f, cx))
@@ -4113,7 +4122,7 @@ impl Render for FeatureDragPill {
             .text_size(px(13.))
             .font_weight(FontWeight::BOLD)
             .text_color(gpui_kit::rgb_static(0xffffff))
-            .child(self.1.clone()))
+            .child(crate::ui::user_text(self.1.clone())))
     }
 }
 
@@ -4958,5 +4967,27 @@ pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
     match f.feature_type().map(|t| t.name) {
         Some(t) if !f.name.starts_with(t) => format!("{} [{t}]", f.name),
         _ => f.name.clone(),
+    }
+}
+
+/// A Default geometry row drawn gray: hidden, or any while parts are
+/// isolated (Isolate takes the planes away; live qa5 KB3, ui/pn-900).
+fn default_row_dimmed(hidden: bool, isolate: Option<&behaviors::Isolation>) -> bool {
+    hidden || isolate.is_some_and(|i| i.mode == behaviors::IsolateMode::Isolate)
+}
+
+#[cfg(test)]
+mod default_row_tests {
+    use super::*;
+    use std::prelude::v1::test;
+
+    #[test]
+    fn default_geometry_rows_gray_while_isolating() {
+        let iso = |mode| behaviors::Isolation { mode, bodies: Vec::new(), opacity: 0.0, select_transparent: false, expand: 0 };
+        assert!(!default_row_dimmed(false, None));
+        assert!(default_row_dimmed(true, None));
+        assert!(default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Isolate))));
+        // Make transparent keeps the planes, so their rows stay black.
+        assert!(!default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Transparent))));
     }
 }

@@ -330,7 +330,7 @@ impl Render for ImportPanel {
                             Some(img) => gpui_kit::img(img).w(px(64.)).h(px(36.)).object_fit(ObjectFit::Contain).into_any_element(),
                             None => crate::assets::icon("document", 24., cx),
                         }))
-                        .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(d.name.clone()))
+                        .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(crate::ui::user_text(d.name.clone())))
                         .child(div().pr(px(8.)).child(os::glyph(os::GLYPH_CHEVRON_RIGHT, 10., pal.text)))
                         .on_click(cx.listener(move |t, _: &ClickEvent, _, cx| t.open_other(path.clone(), cx))),
                 );
@@ -364,7 +364,7 @@ impl Render for ImportPanel {
                 v_flex()
                     .flex_1()
                     .min_w_0()
-                    .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(18.)).text_color(pal.text).child(name))
+                    .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(18.)).text_color(pal.text).child(crate::ui::user_text(name)))
                     .child(h_flex().gap(px(3.)).opacity(0.5).text_size(px(14.)).line_height(px(18.)).child(crate::ui::glyph("branch", 10., pal.text)).child(place)),
             )
             .when(!self.other, |d| d.child(square("fsimp-version", "version", "Create version…", false, cx).on_click(move |_, window, cx| crate::history_panel::open_create_version_in(doc.clone(), window, cx))))
@@ -440,12 +440,12 @@ impl Render for ImportPanel {
                     .mb(px(1.))
                     .cursor_pointer()
                     .hover(|r| r.bg(pal.row_hover))
-                    .tooltip(crate::ui::tooltip(name.clone()))
+                    .tooltip(crate::ui::user_tooltip(name.clone()))
                     .child(div().w(px(70.)).h(px(40.)).mx(px(2.)).flex_none().flex().items_center().justify_center().child(match self.thumbs.get(&tab_id) {
                         Some(img) => gpui_kit::img(img.clone()).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
                         None => crate::assets::icon(icon, 30., cx),
                     }))
-                    .child(div().pl(px(4.)).flex_1().min_w_0().truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(name))
+                    .child(div().pl(px(4.)).flex_1().min_w_0().truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(crate::ui::user_text(name)))
                     .on_click(cx.listener(move |t, _: &ClickEvent, _, cx| {
                         // The panel stays open for more picks (live).
                         if let Some(line) = t.import_line(tab_id, cx) {

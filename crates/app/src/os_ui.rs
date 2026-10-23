@@ -248,6 +248,15 @@ pub fn info_box(text: impl Into<SharedString>) -> Div {
 /// 3; checked `#1651b0` with a white check) and a 13.33 px `#666` label
 /// (`#333` on hover). Add `.on_click`.
 pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    checkbox_with(id, label.into().into_any_element(), on)
+}
+
+/// [`checkbox`] labelled with user-authored text (a label's name).
+pub fn user_checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    checkbox_with(id, crate::ui::user_text(label).into_any_element(), on)
+}
+
+fn checkbox_with(id: impl Into<ElementId>, label: AnyElement, on: bool) -> Stateful<Div> {
     let pal = p();
     h_flex()
         .id(id)
@@ -271,7 +280,7 @@ pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bo
                 .bg(if on { pal.accent } else { rgb(0xffffff) })
                 .when(on, |d| d.child(Icon::new(gpui_kit::component::IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
         )
-        .child(label.into())
+        .child(label)
 }
 
 /// A dialog row with a 12 px `#666` label at the left and a value field
@@ -315,6 +324,13 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
     query_box_tip(id, label, None, active, rows)
 }
 
+/// Live's query field carrying the dialog's error (dom/dialog-asm-replicate-*):
+/// filled pink `#f9ebec` with a 1 px `#bd3039` border; the label stays grey.
+pub fn query_box_error(el: Stateful<Div>) -> Stateful<Div> {
+    let pal = p();
+    el.bg(pal.error_fill).border_color(pal.error)
+}
+
 /// [`query_box`] whose label's tooltip is `tip` instead of the label (live:
 /// a field in error shows the error, "Select one or more instances.").
 pub fn query_box_tip(id: impl Into<ElementId>, label: impl Into<SharedString>, tip: Option<SharedString>, active: bool, rows: Vec<AnyElement>) -> Stateful<Div> {
@@ -347,8 +363,10 @@ pub fn query_box_tip(id: impl Into<ElementId>, label: impl Into<SharedString>, t
 }
 
 /// One entry of a [`query_box`]: 24 px, 13.33 px `#555`, a ✕ on hover.
+/// Its text names entities (instances, mates, "Face of Extrude 1"): user
+/// text, never translated.
 pub fn query_row(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Stateful<Div> {
-    h_flex().id(id).h(px(24.)).pl(px(6.)).pr(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(rgb(0x555555)).child(div().flex_1().min_w_0().truncate().child(text.into()))
+    h_flex().id(id).h(px(24.)).pl(px(6.)).pr(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(rgb(0x555555)).child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(text)))
 }
 
 /// Hover/selected styling of a plain clickable row.
@@ -463,25 +481,45 @@ pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usi
 /// [`select_field`] with `disabled` options (greyed, not pickable: an
 /// `<option disabled>`).
 pub fn select_field_with(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
-    select_field_inner(id, options, disabled, current, None, false, on_select)
+    select_field_inner(id, options, disabled, current, FieldOpts::default(), usize::MAX, on_select)
 }
 
 /// A plain `<select>` styled as an Onshape list field (`ns-enum-value`,
 /// live Named views, psb/nv-911): 26 px, a 1 px `#d7d7d7` underline only,
 /// black 14 px text 7 px in, Chrome's `#777` arrow 6 px from the end; it
-/// opens Chrome's native list like [`select_field`].
-pub fn select_field_flat(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
-    select_field_inner(id, options, disabled, current, None, true, on_select)
+/// opens Chrome's native list like [`select_field`]. Options from
+/// `user_from` on are user content.
+pub fn select_field_flat(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, user_from: usize, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, disabled, current, FieldOpts { focus: None, flat: true }, user_from, on_select)
 }
 
-/// [`select_field`] as a Tab stop (`focus`): a focused select opens with
-/// Space, Enter or ↓, as a `<select>` (live Change configuration: Tab walks
-/// Configuration, List input 1, d, ?).
-pub fn select_field_focusable(id: impl Into<ElementId>, options: Vec<String>, current: usize, focus: &FocusHandle, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
-    select_field_inner(id, options, Vec::new(), current, Some(focus.clone()), false, on_select)
+/// [`select_field`] of user content (configuration options, parts, named
+/// views…): the options are never translated.
+pub fn user_select_field(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, Vec::new(), current, FieldOpts::default(), 0, on_select)
 }
 
-fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, focus: Option<FocusHandle>, flat: bool, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+/// [`select_field`] whose options from `user_from` on are user content
+/// (after fixed choices such as "None").
+pub fn select_field_user_from(id: impl Into<ElementId>, options: Vec<String>, user_from: usize, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, Vec::new(), current, FieldOpts::default(), user_from, on_select)
+}
+
+/// [`user_select_field`] as a Tab stop (`focus`): a focused select opens
+/// with Space, Enter or ↓, as a `<select>` (live Change configuration: Tab
+/// walks Configuration, List input 1, d, ?).
+pub fn user_select_field_focusable(id: impl Into<ElementId>, options: Vec<String>, current: usize, focus: &FocusHandle, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, Vec::new(), current, FieldOpts { focus: Some(focus.clone()), flat: false }, 0, on_select)
+}
+
+/// How a [`select_field`] looks: a Tab stop (`focus`), Onshape's flat list field.
+#[derive(Default)]
+struct FieldOpts {
+    focus: Option<FocusHandle>,
+    flat: bool,
+}
+
+fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, opts: FieldOpts, user_from: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
     let pal = p();
     let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
     let on_select = Rc::new(on_select);
@@ -494,7 +532,9 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
             m = m.native_select(width).focus_ring(b);
             for (i, o) in options.iter().enumerate() {
                 let f = on_select.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).disabled(disabled.contains(&i)).on_click(move |_, window, cx| {
+                let item = crate::os_menu::OsMenuItem::new(o.clone());
+                let item = if i >= user_from { item.user() } else { item };
+                m = m.item(item.checked(i == current).disabled(disabled.contains(&i)).on_click(move |_, window, cx| {
                     f(i, window, cx);
                     window.refresh();
                 }));
@@ -506,7 +546,7 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
     let open_key = open.clone();
     div()
         .id(id)
-        .when_some(focus, |d, f| {
+        .when_some(opts.focus, |d, f| {
             d.track_focus(&f)
                 // Chrome's focus ring on a focused `<select>` (2 px #3e94ff).
                 .focus(|s| s.border_color(rgb(0x3e94ff)).shadow(vec![BoxShadow { color: rgb(0x3e94ff).into(), offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.), inset: false }]))
@@ -521,13 +561,13 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
         .w_full()
         .flex()
         .items_center()
-        .when(!flat, |d| d.h(px(34.)).pl(px(11.)).pr(px(10.)).rounded(px(5.25)).border_1().border_color(rgb(0xaaaaaa)).text_color(pal.text))
-        .when(flat, |d| d.h(px(26.)).pl(px(6.)).pr(px(6.)).border_b_1().border_color(rgb(0xd7d7d7)).text_color(rgb(0x000000)))
+        .when(!opts.flat, |d| d.h(px(34.)).pl(px(11.)).pr(px(10.)).rounded(px(5.25)).border_1().border_color(rgb(0xaaaaaa)).text_color(pal.text))
+        .when(opts.flat, |d| d.h(px(26.)).pl(px(6.)).pr(px(6.)).border_b_1().border_color(rgb(0xd7d7d7)).text_color(rgb(0x000000)))
         .bg(rgb(0xffffff))
         .cursor_pointer()
         .text_size(px(14.))
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-        .child(div().flex_1().truncate().child(label))
+        .child(div().flex_1().truncate().map(|d| if current >= user_from { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
         .child(glyph(GLYPH_CARET, 8., rgb(0x777777))) // live assembly/181-182: `#777`
         .on_click(move |_, window, cx| open(window, cx))
 }
