@@ -251,6 +251,19 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
 
 // ------------------------------------------------------------------ boundary surface
 
+/// Onshape's BSURF_PROFILE_ENDS_MISMATCH (live L28).
+const BSURF_ENDS: &str = "Could not extract boundary profiles matching at end points.";
+
+/// The two free ends of a chain of edges.
+fn chain_ends(edges: &[Shape]) -> Option<(DVec3, DVec3)> {
+    let pts: Vec<DVec3> = edges.iter().filter_map(|e| e.endpoints().ok()).flat_map(|(a, b)| [a, b]).collect();
+    let free: Vec<DVec3> = pts.iter().copied().filter(|p| pts.iter().filter(|q| q.distance(*p) < 1e-7).count() == 1).collect();
+    match free.as_slice() {
+        [a, b] => Some((*a, *b)),
+        _ => None,
+    }
+}
+
 pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     let collect = |ev: &EvalCtx, array: &str, ents: &str, cond: &str| -> FResult<(Vec<Vec<Shape>>, bool)> {
         let mut out = Vec::new();
@@ -287,14 +300,25 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
         })
     };
     if !u.is_empty() && !v.is_empty() && u.iter().any(|pu| v.iter().any(|pv| meets_mid(pu, pv) && meets_mid(pv, pu))) {
-        return err("Could not extract boundary profiles matching at end points.");
+        return err(BSURF_ENDS);
     }
     if cu || cv {
         ev.warnings.push("Boundary conditions are not applied yet; profiles are matched by position".into());
     }
     let shape = if !u.is_empty() && !v.is_empty() {
-        // Four-sided (or three-sided) patch through all boundary curves.
-        let all: Vec<Shape> = u.iter().chain(v.iter()).flatten().cloned().collect();
+        // Four-sided (or three-sided) patch through all boundary curves. Live
+        // L28: one U and one V meeting at an end give the patch the U profile
+        // sweeps along the V one; its other two sides are the profiles moved
+        // to each other's far end.
+        let mut all: Vec<Shape> = u.iter().chain(v.iter()).flatten().cloned().collect();
+        if let ([pu], [pv]) = (u.as_slice(), v.as_slice()) {
+            let (Some(eu), Some(ev_)) = (chain_ends(pu), chain_ends(pv)) else { return err(BSURF_ENDS) };
+            let Some((cu, cv)) = [eu.0, eu.1].into_iter().flat_map(|a| [(a, ev_.0), (a, ev_.1)]).find(|(a, b)| a.distance(*b) < 1e-7) else { return err(BSURF_ENDS) };
+            let far = |ends: (DVec3, DVec3), c: DVec3| if ends.0.distance(c) < 1e-7 { ends.1 } else { ends.0 };
+            let moved = |edges: &[Shape], by: DVec3| -> FResult<Vec<Shape>> { edges.iter().map(|e| Ok(k::transform(e, &k::Transform::Translate(by), true)?.shape)).collect() };
+            all.extend(moved(pu, far(ev_, cv) - cv)?);
+            all.extend(moved(pv, far(eu, cu) - cu)?);
+        }
         let boundary: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
         k::fill_surface(&boundary, &[]).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
     } else {

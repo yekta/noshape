@@ -444,6 +444,18 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     if fit_unused {
         ev.infos.push(FIT_INFO.into());
     }
+    // Live L52/L61: a Diameter (or tap drill) other than the standard's.
+    // Counterbore / countersink values don't count.
+    if ev.params.bool(ht::TABLE_SYNCED_PARAM) {
+        let (pid, table) = ht::hole_table_param(ev.params);
+        if let Some(spec) = ht::table_values(table, &ht::complete_path(table, ev.params.lookup(pid))) {
+            let off = |a: f64, b: f64| (a - b).abs() > 1e-9;
+            let tap = matches!((dims.tap_drill, spec.tap_drill_diameter), (Some(a), Some(b)) if off(a, b));
+            if off(dims.diameter, spec.hole_diameter) || tap {
+                ev.infos.push("Parameters have been overridden. Check input.".into());
+            }
+        }
+    }
     for (ids, tools) in groups {
         let targets: Vec<usize> = ids.iter().filter_map(|id| index_of_body(ev, id)).collect();
         if targets.is_empty() {

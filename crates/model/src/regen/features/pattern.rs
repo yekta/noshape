@@ -653,13 +653,15 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     }
     let before = ev.ctx.clone();
     let warnings_before = ev.warnings.len();
-    let sketches = feats.iter().filter(|f| ev.features.iter().any(|x| x.id == **f && x.type_id == "sketch")).count();
-    if ev.bool("fullFeaturePattern") && sketches > 0 {
+    let (sketches, feats): (Vec<FeatureId>, Vec<FeatureId>) = feats.into_iter().partition(|f| ev.features.iter().any(|x| x.id == *f && x.type_id == "sketch"));
+    if ev.bool("fullFeaturePattern") && !sketches.is_empty() {
         ev.infos.push(SKETCH_REAPPLY_INFO.into());
-        // Only sketches: their copies (wire / sheet bodies) aren't made here.
-        if sketches == feats.len() {
-            return Ok(());
-        }
+    }
+    // Live L41: a patterned sketch is copied to every instance (its wire /
+    // sheet bodies), with or without Reapply; no part is made.
+    copy_sketches(ev, &sketches, instances);
+    if feats.is_empty() {
+        return Ok(());
     }
     if ev.bool("fullFeaturePattern") {
         match reapply_features(ev, &feats, instances) {
@@ -689,6 +691,19 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
                 Ok(()) => Ok(()),
                 Err(_) => Err(e),
             }
+        }
+    }
+}
+
+/// Copies of `sketches` moved to each instance, under ids of their own.
+fn copy_sketches(ev: &mut EvalCtx, sketches: &[FeatureId], instances: &[Instance]) {
+    for inst in instances {
+        let m = inst.t.matrix();
+        for f in sketches {
+            let Some(src) = ev.ctx.sketches.iter().find(|s| s.feature == *f).cloned() else { continue };
+            let id = FeatureId(mix(&[ev.feature.0, f.0, inst.code as u64]) | (1 << 62));
+            ev.ctx.sketches.push(Arc::new(SketchResult { feature: id, ..transformed_sketch(&src, &m) }));
+            ev.ctx.sketch_copies.push((ev.feature, id));
         }
     }
 }

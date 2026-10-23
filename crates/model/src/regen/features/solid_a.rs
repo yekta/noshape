@@ -616,7 +616,6 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             _ => None,
         })
         .ok_or_else(|| fe("Rib profiles must be sketch curves"))?;
-    let plane = kernel_plane(&frame);
     let edges = resolve_curves(ev, refs)?;
     let wires = wires_from(&edges)?;
     if wires.is_empty() {
@@ -640,6 +639,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         return err("Select parts where the rib will be fitted into.");
     }
     let merge = ev.bool("mergeRibs");
+    let (opposite, extend) = (ev.bool("oppositeDirection"), ev.bool("extendProfilesUpToPart"));
     let mut made = 0;
     let mut last_err = None;
     let mut new_ribs: Vec<NamedShape> = Vec::new();
@@ -647,7 +647,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let mut shape = body.shape.clone();
         for w in &wires {
-            let res = if normal { rib_normal(&shape, w, dir, t) } else { k::rib(&shape, w, &plane, t).map_err(|_| fe(RIB_FAILED)) };
+            let res = if normal { rib_normal(&shape, w, dir, t) } else { rib_parallel(&shape, w, frame.normal, opposite, t, extend) };
             match res {
                 Ok(r) => {
                     shape = r.shape;
@@ -687,6 +687,63 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
 /// Onshape's RIB_PROFILE_FAILED / RIB_NO_INTERSECTIONS.
 const RIB_FAILED: &str = "Failed to create a rib from a selected profile.";
 const RIB_MISS: &str = "None of the ribs intersected a part.";
+
+/// Rib parallel to the sketch plane as rib.fs builds it (live L22): the
+/// profile, extended at an end when "Extend profiles to part" is on or when
+/// the end sits on a part face it points into, is swept along the rib
+/// direction past the part and thickened about the sketch plane; the part
+/// splits it, and the pieces that touch the profile but not the far end of
+/// the sweep or of an extension are the rib.
+fn rib_parallel(base: &Shape, wire: &Shape, normal: DVec3, opposite: bool, t: f64, extend: bool) -> FResult<k::OpResult> {
+    let edges = wire.edges();
+    let [e] = edges.as_slice() else { return err(RIB_FAILED) };
+    let info = e.edge_info()?;
+    let (p0, p1) = (e.point_at(info.first_param)?, e.point_at(info.last_param)?);
+    let ends = [(p0, -e.tangent_at(info.first_param)?.normalize_or_zero()), (p1, e.tangent_at(info.last_param)?.normalize_or_zero())];
+    let (bb, pb) = (base.bounding_box(false)?, wire.bounding_box(false)?);
+    // rib.fs calculateLength: the diagonal of the parts and profiles' box.
+    let len = (bb.max.max(pb.max) - bb.min.min(pb.min)).length();
+    let tol = 1e-7 * (1.0 + len);
+    let mut dir = normal.cross((p1 - p0).normalize_or_zero());
+    if opposite {
+        dir = -dir;
+    }
+    let near = |s: &Shape, p: DVec3| k::make_vertex(p).and_then(|v| k::distance(s, &v)).is_ok_and(|d| d.distance < tol);
+    let (faces, part_edges) = (base.faces(), base.edges());
+    // rib.fs endNeedsExtension. An end on an edge of the part (live's rim
+    // line, L24's L) isn't extended.
+    let needs = |p: DVec3, d: DVec3| !part_edges.iter().any(|pe| near(pe, p)) && faces.iter().any(|f| near(f, p) && f.normal_at_point(p).is_ok_and(|n| d.dot(n) < -1e-9));
+    let mut curves = vec![e.clone()];
+    let mut tips = Vec::new();
+    for (p, d) in ends {
+        if extend || needs(p, d) {
+            curves.push(k::make_line(p, p + d * len)?);
+            tips.push(p + d * len);
+        }
+    }
+    let mut slab: Option<Shape> = None;
+    for c in &curves {
+        let face = k::extrude(c, dir * len).map_err(|_| fe(RIB_FAILED))?.shape;
+        let s = k::extrude_symmetric(&face, normal * t).map_err(|_| fe(RIB_FAILED))?.shape;
+        slab = Some(match slab {
+            None => s,
+            Some(a) => k::boolean(k::BooleanOp::Fuse, &[a], &[s], &k::BooleanOptions::default()).map_err(|_| fe(RIB_FAILED))?.shape,
+        });
+    }
+    let Some(slab) = slab else { return err(RIB_FAILED) };
+    let pieces = k::cut(&slab, base)?.shape.solids();
+    // rib.fs applyBoolean: the part must split the sweep. Live L22: with
+    // extended ends that fails on the profile.
+    if pieces.len() < 2 {
+        return err(if tips.is_empty() { RIB_MISS } else { RIB_FAILED });
+    }
+    let far = p0 + dir * len;
+    let rib: Vec<Shape> = pieces.into_iter().filter(|s| k::distance(s, e).is_ok_and(|d| d.distance < tol) && !near(s, far) && !tips.iter().any(|q| near(s, *q))).collect();
+    if rib.is_empty() {
+        return err(RIB_FAILED);
+    }
+    Ok(k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(base), &rib, &k::BooleanOptions::default())?)
+}
 
 /// Rib normal to the sketch plane: the profile thickened in-plane, extruded
 /// along `dir` up to the part, fused with it.

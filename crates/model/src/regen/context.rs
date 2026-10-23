@@ -256,6 +256,9 @@ pub struct Context {
     /// Sketches a Derived feature brought in from its source: (the Derived
     /// feature, the source sketch's feature id, which the copy keeps).
     pub derived_sketches: Vec<(FeatureId, FeatureId)>,
+    /// Sketch copies a Feature pattern made (live L41): (the pattern, the
+    /// copy's own id). The copies follow the pattern's visibility.
+    pub sketch_copies: Vec<(FeatureId, FeatureId)>,
     pub planes: Vec<PlaneEntity>,
     pub connectors: Vec<Connector>,
     pub points: Vec<PointEntity>,

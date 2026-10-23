@@ -57,7 +57,7 @@ use crate::ui::TipExt as _;
 use noshape_model::display::{FeatureStatus, StudioDisplay};
 use noshape_model::document::TabId;
 use noshape_model::features::{self, FeatureType};
-use noshape_model::params::{ParamKind, QueryFilter};
+use noshape_model::params::{ParamKind, ParamValue, QueryFilter};
 use noshape_model::partstudio::{Feature, PartStudio};
 use noshape_model::reference::{BodyId, DatumPlane, FeatureId, Reference, TopoName};
 use noshape_model::regen::{RegenOptions, Regenerator};
@@ -1370,6 +1370,12 @@ impl PartStudioView {
             let mut sel = self.selection.clone();
             sel.extend(self.feature_preselection(&filters));
             if !sel.is_empty() {
+                // helixEditLogic (live L34): the tab follows the preselection.
+                if type_id == "helix"
+                    && let Some(t) = self.helix_type_for(&sel)
+                {
+                    feature.params.set("axisType", ParamValue::Enum(t.into()));
+                }
                 preselect(ty, &mut feature, &sel, self.built.as_ref());
                 // Plane: the type follows the preselection (Onshape's cPlaneLogic).
                 if type_id == "cPlane"
@@ -4107,6 +4113,35 @@ pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     .then_some(())
     .is_some()
         && !matches!(r, Reference::Body(_) if !want(QueryFilter::BODY))
+}
+
+impl PartStudioView {
+    /// The Helix tab for a preselection: a line, linear edge or mate
+    /// connector → Axis; a circle or arc → Circle; a face → Cylinder/Cone.
+    fn helix_type_for(&self, sel: &[Reference]) -> Option<&'static str> {
+        use noshape_sketch::Curve2;
+        let ctx = self.context.as_ref()?;
+        let sketch_kind = |c: &Curve2| match c {
+            Curve2::Line { .. } => Some("AXIS"),
+            Curve2::Circle { .. } | Curve2::Arc { .. } => Some("CIRCLE"),
+            _ => None,
+        };
+        sel.iter().find_map(|r| match r {
+            Reference::Face(_) => Some("SURFACE"),
+            Reference::MateConnector { .. } => Some("AXIS"),
+            Reference::Edge(_) => match noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next()?.edge_curve().ok()? {
+                noshape_kernel::Curve::Line { .. } => Some("AXIS"),
+                noshape_kernel::Curve::Circle { .. } => Some("CIRCLE"),
+                _ => None,
+            },
+            Reference::SketchEntity { sketch, entity } => sketch_kind(&ctx.sketch(*sketch)?.sketch.curve(noshape_sketch::EntityId(*entity))?),
+            Reference::Sketch(sketch) => {
+                let sk = &ctx.sketch(*sketch)?.sketch;
+                sk.entities().filter(|e| !e.construction).find_map(|e| sk.curve(e.id).and_then(|c| sketch_kind(&c)))
+            }
+            _ => None,
+        })
+    }
 }
 
 /// Fill the first compatible query parameter(s) with preselected references.

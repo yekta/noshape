@@ -113,9 +113,9 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 3 | Empty Parts | "Select parts where the rib will be fitted into." | all solids used | 🔧 L22 (no field); older ribs keep using every part |
 | 4 | Parts / direction auto-fill | edit logic fills Parts and picks the side | none | 🔧 L22 Parts filled with the studio's parts on open |
 | 5 | Closed profile, Parallel | "Only open sketch profiles can be used when rib direction is parallel to sketch plane." | no check | 🔧 ? L23 |
-| 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | ✗ |
+| 6 | Draft, Extend profiles to part | supported | "not supported yet" / ignored | Extend 🔧 L22: parallel ribs are built as rib.fs does (swept past the part, split by it, excess removed; ends extended with the checkbox or when they sit on a face they point into), all five live rows match (3692, 3932, 4112, 4562, error). Extend with Normal to sketch plane (L24: error) and Draft stay ✗ |
 | 7 | Errors | "Failed to create a rib from a selected profile.", "None of the ribs intersected a part.", "Failed to merge ribs into parts." | own texts | 🔧 |
-| 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✅ L24: one body per profile chain (live: the L rib is one body); parallel needs one straight edge 🔧; Extend profiles ✗ |
+| 8 | One rib per edge | yes (Merge ribs off: one body per edge) | one per chain | ✅ L24: one body per profile chain (live: the L rib is one body); parallel needs one straight edge 🔧; Extend profiles see row 6 |
 
 ## Offset surface
 | # | Area | Onshape | Ours | Status |
@@ -140,7 +140,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 1 | Fields | order, items, seven conditions (None), magnitude 1 | same | ✅ |
 | 2 | Profile arrays | driven-query rows "[None] Edge of Sketch 1", max 2 picks each | "Add Profile" UI, no cap | ✗ |
 | 3 | Boundary condition label | SHOW_LABEL | no label | ✗ |
-| 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 L28; a third profile / mid-span crossing fail with live's texts 🔧; 1U+1V should build a sheet ✗ |
+| 4 | Too few profiles | "Select edges to specify at least two profiles." on both arrays | own text, no field | 🔧 L28; a third profile / mid-span crossing fail with live's texts 🔧; 1U+1V 🔧 builds the sheet the U sweeps along the V (the other two sides are the profiles moved to each other's far end; live 2099) |
 | 5 | Boundary conditions | applied, with their errors | warning only | ✗ |
 | 6 | Failure | "Could not create boundary surface with given information. Check profile order, intersections or end conditions." | own text | 🔧 |
 
@@ -164,7 +164,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | ✗ |
 | 7 | Computed revolutions / pitch | filled | never | ✗ |
 | 8 | Show start and end profiles | magenta circles | nothing | ✗ |
-| 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | ✗ L34 preselected line → Axis tab; L35 start angle follows each surface's own frame |
+| 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | 🔧 L34 the preselection picks the tab (face → Surface, line edge / connector / sketch line → Axis, circle → Circle). L35 won't be matched: live's start angle follows Parasolid's own surface frames (a Z or X cylinder starts at the extrude's end, a tilted one at its base), which OCCT doesn't share |
 
 ## Composite part
 | # | Area | Onshape | Ours | Status |
@@ -193,7 +193,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 4 | Unresolvable plane / direction / axis | "Select a mirror plane." / "Select a pattern direction." / "Select a pattern axis." on the field | "…could not be resolved" | 🔧 |
 | 5 | Linear second direction empty | error only when its count > 1: "Select a pattern direction." on directionTwo | always, own text | 🔧 |
 | 6 | Reapply failures | "Could not pattern selected features." when all fail; partial failures silent | first failure's text; partial warning; geometric fallback | 🔧 texts and silent partial failures; the geometric fallback when a feature can't be re-run stays ✗ ? L40 |
-| 7 | Sketch in a feature pattern | re-run, info "Sketch dimensions and constraints using the Origin or the default planes as reference will not be reapplied. Learn more" | skipped | ✗ ? L41 |
+| 7 | Sketch in a feature pattern | re-run, info "Sketch dimensions and constraints using the Origin or the default planes as reference will not be reapplied. Learn more" | skipped | 🔧 L41 the sketch is copied to every instance (with or without Reapply; no part), Reapply adds the info |
 | 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | 🔧 texts; off-part instances still become parts ✗ ? L42, L43 |
 | 9 | Feature selection in Faces to pattern | a feature-list click adds its faces | not supported | ✅ L44 (live adds nothing either; Hole not verified) |
 | 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | 🔧 except the start-point info ✗ ? L45 |
@@ -203,8 +203,8 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | # | Area | Onshape | Ours | Status |
 |---|---|---|---|---|
 | 1 | Fields | order, labels, enum texts, defaults, bounds, visibility (dialog-hole.txt) | same | ✅ |
-| 2 | Standard tables | holetables.gen.fs (already in crates/featurescript/std) | our own close values; missing sizes, pipe taps, PEM; labels like "1/64 (0.0156)" | ✗ |
-| 3 | Tap drill default | 5 mm / 0.25 in | 4.2 mm / 0.201 in | ✗ |
+| 2 | Standard tables | holetables.gen.fs (already in crates/featurescript/std) | our own close values; missing sizes, pipe taps, PEM; labels like "1/64 (0.0156)" | 🔧 L58 read from holetables.gen.fs: every size, pipe tap and PEM entry, in live's order and with its keys ("1.00 mm (Coarse)", "1/4 (0.25)" before "E (0.25)"); paths saved with a bare pitch still resolve |
+| 3 | Tap drill default | 5 mm / 0.25 in | 4.2 mm / 0.201 in | 🔧 L58 values from the FS table |
 | 4 | Check order | counterbore, countersink, tolerances, tap drill, end, start, then "No hole points selected." | points first | 🔧 |
 | 5 | Counterbore / countersink errors | "The counterbore diameter must be larger than the hole diameter." (marks both), "The counterbore depth must be smaller than the hole depth.", "The countersink diameter must be larger than the hole diameter."; no countersink-depth error | own texts, no fields; countersink depth error | 🔧 texts and fields; the countersink-depth error stays ? L47 |
 | 6 | Up to entity / selected plane empty | "Select an entity or mate connector to terminate the hole." / "Select a start entity." on the field | own texts, late | 🔧 |
@@ -213,4 +213,4 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | 🔧 L51 (+ fit info bubble) |
 | 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | 🔧 L61 apex at the offset, Depth shows 4.092 |
 | 11 | Depth / Tapped depth / Tap clearance | kept consistent by edit logic; inconsistency warning | independent | 🔧 L49/L50 linked in the dialog (no mismatch warning, as live) |
-| 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; other infos ✗ |
+| 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; L52 "Parameters have been overridden. Check input." when Diameter or Tap drill differ from the standard (not for counterbore / countersink); other infos ✗ |

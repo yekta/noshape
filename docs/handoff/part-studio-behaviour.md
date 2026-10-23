@@ -1424,6 +1424,29 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   behaviours "qa5 pass 8 (2)"). The text selection after the first Enter can't be seen on Xvfb (Ctrl+A shows none
   either), so that half is unchecked.
 
+### Feature sweep, open rows (10-23): Helix L34/L35, pattern L41, Hole L52/L58
+- **Hole tables (L58):** `features/hole_tables.rs` no longer holds its own data. It parses the embedded
+  `holetables.gen.fs` once (FS parser, `LazyLock`) into levels in source order (= live's dropdown order) and reads
+  leaf values as hole.fs `updateHoleDefinitionWithStandard` does (tap drill capped at the hole diameter, the
+  tables' "-1" counterbore / countersink → hole diameter, pipe-tap depths). Pitch comes from the "pitch" key
+  (hole.fs `parsePitch`). Keys are Onshape's ("1.00 mm (Coarse)", "20 tpi (UNC)"); old paths with a bare pitch
+  resolve by prefix (`find`, `canonical_path`). Values changed to Onshape's (e.g. ISO M5 counterbore 9.75 mm).
+- **L52:** "Parameters have been overridden. Check input." (info) when a synced hole's Diameter or Tap drill differs
+  from its standard (`hole.rs`, after the cut). Tests: `features_a.rs::hole_overridden_parameters_info`.
+- **L41:** a Feature pattern copies selected sketches to every instance (`pattern.rs::copy_sketches`), with or
+  without Reapply. Copies get ids of their own (`mix(pattern, sketch, instance) | 1 << 62`) and are listed in
+  `Context::sketch_copies`, so they hide with the pattern. Their regions can be extruded.
+- **L34:** a new Helix takes its tab from the preselection (`PartStudioView::helix_type_for`).
+- **Rib Extend profiles to part (L22):** parallel ribs no longer use `k::rib` (which always extended the ends);
+  `solid_a.rs::rib_parallel` follows rib.fs (sweep along the rib direction by the parts' box diagonal, thicken about
+  the sketch plane, cut the part, keep pieces touching the profile and not the far ends). An end on a part *edge*
+  isn't auto-extended (that's what live's rim line and L24's L need). Test `features_a.rs::rib_extend_profiles_as_live`.
+  Normal-to-plane ribs still use `rib_normal` and ignore the checkbox (live L24 L + extend = error; open).
+- **Boundary 1U+1V (L28):** `surfaces.rs::boundary_surface` adds the U moved to the V's far end and the V moved to
+  the U's far end, then fills the 4 sides (live 2099: U1 + V1 give the 40×20 sheet). Profiles that don't share an end
+  give "Could not extract boundary profiles matching at end points.". Test `features_b.rs::boundary_one_u_one_v_as_live`.
+- **L35 not matched:** live's start angle follows Parasolid's surface frames; noted in the parity doc.
+
 ### For kern (10-22): Thicken of several faces with a square corner (live L17)
 - Live "psb L16-19 thicken": block 40×20×10, Thicken top + front face (adjacent, 90°), New, 2 mm → **one part, 2560 mm³**
   (1600 + 800 + a 40×2×2 square corner), 8 faces. Same with Keep tools.
