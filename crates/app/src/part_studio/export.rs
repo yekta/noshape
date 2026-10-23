@@ -192,7 +192,7 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                     .child(crate::os_ui::field_label("File name"))
                     .child(crate::os_ui::export_rules_link("ex-rules"))
                     .child(div().flex_1())
-                    .child(div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x555555)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?")),
+                    .child(div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x555555)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")),
             )
             .child(
                 div()
@@ -276,7 +276,7 @@ fn modal_checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<D
                 .border_1()
                 .border_color(if on { pal.accent } else { gpui_kit::rgb(0xadadad) })
                 .bg(if on { pal.accent } else { gpui_kit::rgb(0xffffff) })
-                .when(on, |d| d.child(crate::ui::glyph("check", 10., gpui_kit::rgb(0xffffff)))),
+                .when(on, |d| d.child(crate::ui::glyph("check", 10., gpui_kit::rgb_static(0xffffff)))),
         )
         .child(label)
 }

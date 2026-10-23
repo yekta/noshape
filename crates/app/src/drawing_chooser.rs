@@ -593,7 +593,7 @@ impl DrawingEditor {
             )
             .child(
                 div().px(px(4.)).py(px(2.)).child(
-                    h_flex().h(px(26.)).justify_center().gap(px(6.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).bg(gpui_kit::white()).text_size(px(13.33)).child(crate::assets::icon("insert", 16., cx)).child("Insert"),
+                    h_flex().h(px(26.)).justify_center().gap(px(6.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).bg(crate::theme::light().panel).text_size(px(13.33)).child(crate::assets::icon("insert", 16., cx)).child("Insert"),
                 ),
             )
             .child(row("View orientation", "Front"))

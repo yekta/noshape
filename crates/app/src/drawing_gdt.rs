@@ -277,7 +277,7 @@ impl DrawingEditor {
                 .child(Input::new(input).text_size(px(21.)).appearance(false).small().text_color(gpui_kit::rgb(0x555555)).px(px(0.)))
         };
         // A 69 x 34 cell: 1 px `#ccc`, radius 4, the slot 6 px in.
-        let cell = |row: usize, slot: usize, input: &Entity<InputState>, cx: &mut Context<Self>| div().w(px(69.)).h(px(34.)).flex_none().px(px(6.)).pt(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).child(slot_box(row, slot, input, 55., cx));
+        let cell = |row: usize, slot: usize, input: &Entity<InputState>, cx: &mut Context<Self>| div().w(px(69.)).h(px(34.)).flex_none().px(px(6.)).pt(px(2.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(crate::theme::light().panel).child(slot_box(row, slot, input, 55., cx));
         // Label columns as live: Prefix 87, Type 67, Tolerance 239, Datums 245, Suffix.
         let label_row = h_flex().h(px(20.)).mt(px(3.)).text_size(px(14.)).child(div().w(px(87.)).child("Prefix")).child(div().w(px(67.)).child("Type")).child(div().w(px(239.)).child("Tolerance")).child(div().w(px(245.)).child("Datums")).child(div().child("Suffix"));
         let sep = || div().w(px(1.)).h(px(34.)).mx(px(8.)).flex_none().bg(gpui_kit::rgb(0xdddddd));
@@ -291,7 +291,7 @@ impl DrawingEditor {
                 None => "⌖⌖".to_string(),
             };
             // Live: a 50 x 30 white button, 1 px `#ccc`, radius 4: the symbol and a caret.
-            let type_btn = Button::new(("gdt-type", ri)).child(div().text_size(px(18.)).child(label)).ghost().small().w(px(50.)).h(px(30.)).text_size(px(16.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).dropdown_caret(true).tooltip(match cur {
+            let type_btn = Button::new(("gdt-type", ri)).child(div().text_size(px(18.)).child(label)).ghost().small().w(px(50.)).h(px(30.)).text_size(px(16.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(crate::theme::light().panel).dropdown_caret(true).tooltip(match cur {
                 Some(i) => GDT_TYPES[i].1,
                 None => "Composite",
             });
@@ -368,7 +368,7 @@ impl DrawingEditor {
                             .px(px(6.))
                             .pt(px(2.))
                             .rounded(px(4.))
-                            .bg(gpui_kit::white())
+                            .bg(crate::theme::light().panel)
                             .when(active, |d| d.border_2().border_color(gpui_kit::rgb(0xabcbff)))
                             .when(!active, |d| d.border_1().border_color(gpui_kit::rgb(0xcccccc)))
                             .child(slot_box(ri, BEFORE, &inputs[BEFORE], 69., cx))
@@ -388,7 +388,7 @@ impl DrawingEditor {
             );
         }
         let ed3 = ed.clone();
-        let leader_btn = Button::new("gdt-leader").child(div().text_size(px(16.)).child("↙")).ghost().small().w(px(50.)).h(px(30.)).text_size(px(16.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(gpui_kit::white()).dropdown_caret(true).tooltip("Leader").os_dropdown_menu("gdt-leader-dd", false, move |mut m, _, _| {
+        let leader_btn = Button::new("gdt-leader").child(div().text_size(px(16.)).child("↙")).ghost().small().w(px(50.)).h(px(30.)).text_size(px(16.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).rounded(px(4.)).bg(crate::theme::light().panel).dropdown_caret(true).tooltip("Leader").os_dropdown_menu("gdt-leader-dd", false, move |mut m, _, _| {
             for (l, v) in [("Leader", GdtLeader::Leader), ("All around", GdtLeader::AllAround), ("All over", GdtLeader::AllOver)] {
                 let e = ed3.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(l).checked(leader == v).on_click(move |_, _, cx| {

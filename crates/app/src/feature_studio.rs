@@ -648,7 +648,7 @@ impl FeatureStudioView {
             .bg(pal.accent)
             .cursor_pointer()
             .text_size(px(12.))
-            .text_color(rgb(0xffffff))
+            .text_color(gpui_kit::rgb_static(0xffffff))
             .child(format!("Return to {branch}"))
             .on_click(move |_, _, cx| {
                 doc.update(cx, |d, cx| {
@@ -1119,7 +1119,7 @@ impl FeatureStudioView {
                     .p_0()
                     .rounded_r(px(5.25))
                     .rounded_l(px(0.))
-                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., rgb(0xffffff)))
+                    .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., gpui_kit::rgb_static(0xffffff)))
                     .when(clean, |b| b.opacity(0.5))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         let b = anchor.get();

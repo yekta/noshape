@@ -408,7 +408,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
                 .rounded(px(3.))
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
-                .bg(gpui_kit::white())
+                .bg(crate::theme::p().panel)
                 // Greyed while a protected target refuses the merge (live wp-937).
                 .when(plan.protected_with_changes, |d| d.opacity(0.5))
                 .when(differs, |d| {

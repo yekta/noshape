@@ -510,7 +510,7 @@ impl Render for WorkspaceUnits {
                             .justify_center()
                             .bg(rgb(0x009400))
                             .cursor_pointer()
-                            .child(crate::ui::glyph("check", 18., rgb(0xffffff)))
+                            .child(crate::ui::glyph("check", 18., gpui_kit::rgb_static(0xffffff)))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply(cx))),
                     )
                     .child(

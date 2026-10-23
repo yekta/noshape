@@ -479,6 +479,21 @@ fn block_with_hole(ctx: &mut Ctx, file: &str) {
     assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
 }
 
+/// A new drawing knows the document state its views come from, so a model
+/// change puts it out of date before it was ever edited.
+#[test]
+fn new_drawing_goes_out_of_date() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing-stale.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    assert_eq!(g["out_of_date"], false, "{g}");
+    call(&mut ctx, "feature_edit", json!({ "tab": "Part Studio 1", "feature": "Extrude 1", "params": { "depth": "30 mm" } }));
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    assert_eq!(g["out_of_date"], true, "{g}");
+}
+
 #[test]
 fn drawing_views_and_dimensions() {
     let mut ctx = Ctx::new();

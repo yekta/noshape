@@ -138,12 +138,16 @@ pub(crate) struct QuantitySpec {
     /// Whether focusing selects all (live number fields) or leaves the
     /// caret (live click-to-edit bounds: the caret at the end).
     pub select_on_focus: bool,
+    /// Live's on-canvas value box (`os-canvas-text-edit`, the assembly
+    /// triad's): a full 1 px border, blue `#1651b0` while focused, no fill;
+    /// invalid is pink without a tooltip.
+    pub canvas: bool,
 }
 
 impl QuantitySpec {
     /// A length or angle (or other dimensioned) quantity.
     pub fn quantity(dim: Dim) -> Self {
-        Self { dim, integer: false, expressions: true, range: (None, None), label: None, invalid_tip: None, text_px: 13.33, select_on_focus: true }
+        Self { dim, integer: false, expressions: true, range: (None, None), label: None, invalid_tip: None, text_px: 13.33, select_on_focus: true, canvas: false }
     }
 
     /// A count (whole number, unitless).
@@ -173,6 +177,11 @@ impl QuantitySpec {
 
     pub fn caret_on_focus(mut self) -> Self {
         self.select_on_focus = false;
+        self
+    }
+
+    pub fn canvas(mut self) -> Self {
+        self.canvas = true;
         self
     }
 }
@@ -300,6 +309,13 @@ impl QuantityInput {
         if text.trim().is_empty() {
             return self.committed.clone();
         }
+        // Live's canvas box shows the value evaluated in workspace units
+        // ("0.1 in" -> "2.54 mm", "1+1" -> "2 mm").
+        if self.spec.canvas
+            && let Ok(q) = noshape_units::evaluate_as(text, self.dim(), &self.units, &self.variables)
+        {
+            return noshape_units::format_quantity(q, &self.units).replace('°', " deg");
+        }
         commit_text(text, self.dim(), &self.units, &self.variables)
     }
 
@@ -334,6 +350,12 @@ impl QuantityInput {
         cx.emit(QuantityEvent::Committed(via));
         cx.notify();
         changed
+    }
+
+    /// Commit the text now (an owner's Tab that keeps the focus).
+    pub fn commit_now(&mut self, window: &mut gpui_kit::Window, cx: &mut gpui_kit::Context<Self>) {
+        self.commit(CommitVia::Enter, window, cx);
+        self.state.update(cx, |s, cx| s.select_all(window, cx));
     }
 
     /// One ↑ / ↓ / wheel step of a plain committed value (committed and
@@ -390,8 +412,8 @@ impl gpui_kit::Render for QuantityInput {
             .hover(|d| d.border_color(pal.accent))
             // Live: the focused field has a 2 px blue underline (a 1 px
             // border plus a 1 px line above it).
-            .when(focused && !invalid, |d| d.border_color(pal.accent).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)))
-            .child(div().when(shown.is_some(), |d| d.opacity(0.)).child(Input::new(&self.state).small().appearance(false).text_size(tsize).px(px(3.)).text_align(TextAlign::Right)))
+            .when(focused && !invalid && !self.spec.canvas, |d| d.border_color(pal.accent).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)))
+            .child(div().w_full().when(shown.is_some(), |d| d.opacity(0.)).child(Input::new(&self.state).small().appearance(false).text_size(tsize).px(px(3.)).text_align(TextAlign::Right)))
             .when_some(shown, |d, c| {
                 let tip = label.as_ref().map(|l| format!("{l}: {c}"));
                 d.child(
@@ -411,9 +433,18 @@ impl gpui_kit::Render for QuantityInput {
                         .on_mouse_down(MouseButton::Left, move |_, window, cx| st_click.update(cx, |s, cx| s.focus(window, cx))),
                 )
             });
+        let canvas = self.spec.canvas;
         let field = match invalid_tip.filter(|_| invalid) {
+            Some(_) if canvas => field.relative().bg(pal.error_fill),
             Some(tip) => field.relative().bg(pal.error_fill).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.error)).tooltip(crate::ui::tooltip(tip)),
             None => field,
+        };
+        // The canvas box: the field framed on all sides instead of underlined.
+        let field = if canvas {
+            // Live: 75 x 26 px with the border.
+            field.h(px(26.)).flex().items_center().border_1().border_color(if focused { pal.accent } else { pal.border })
+        } else {
+            field
         };
         div()
             .id("qty")
@@ -421,7 +452,14 @@ impl gpui_kit::Render for QuantityInput {
             .child(gpui_kit::base::input::input_frame(field))
             // Esc: the kit reverts (and blurs); the owner hears of it after.
             .capture_action(cx.listener(|_, _: &Escape, window, cx| {
-                cx.defer_in(window, |_, _, cx| cx.emit(QuantityEvent::Escape));
+                cx.defer_in(window, |this, window, cx| {
+                    // The canvas box reverts to its last committed value (live).
+                    if this.spec.canvas {
+                        let c = this.committed.clone();
+                        this.state.update(cx, |s, cx| s.set_value(c, window, cx));
+                    }
+                    cx.emit(QuantityEvent::Escape)
+                });
             }))
             // In a dialog that binds Esc to Cancel (feature and mate dialogs:
             // "FeatureDialog > Input"), an edited field reverts first and
