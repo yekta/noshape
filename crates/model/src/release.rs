@@ -217,6 +217,20 @@ pub struct RevisionEntry {
     pub re_releasable: bool,
 }
 
+/// One row of Revision tools' search: a revision of a part number released
+/// as one type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypedRevision {
+    pub revision: String,
+    pub release_name: String,
+    /// Milliseconds since the epoch.
+    pub created: i64,
+    pub state: ItemState,
+    /// Obsoleted as re-releasable: the part number may be released again
+    /// (and with another type: "Can change type?").
+    pub re_releasable: bool,
+}
+
 /// Release state of an item (Properties › State).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ItemState {
@@ -411,6 +425,45 @@ impl ReleaseLog {
     /// The packages released at a version.
     pub fn at_version(&self, version: &str) -> Vec<&Package> {
         self.packages.iter().filter(|p| p.version.as_deref() == Some(version)).collect()
+    }
+
+    /// Company settings › Revision tools › Find revisions: the revisions of
+    /// `part_number` released as `kind`, newest first (Help revision_tools).
+    pub fn typed_revisions(&self, part_number: &str, kind: ItemKind) -> Vec<TypedRevision> {
+        let hist = self.revisions(part_number);
+        let mut out: Vec<TypedRevision> = Vec::new();
+        for e in &hist {
+            let p = &self.packages[e.release];
+            if !p.items.iter().any(|i| i.part_number == part_number && i.kind == kind && i.revision == e.revision && !i.reverted && !i.not_revision_managed) {
+                continue;
+            }
+            out.push(TypedRevision {
+                revision: e.revision.clone(),
+                release_name: p.name.clone(),
+                created: p.created,
+                state: if e.obsoleted_by.is_some() { ItemState::Obsolete } else { ItemState::Released },
+                re_releasable: e.obsoleted_by.is_some() && e.re_releasable,
+            });
+        }
+        out.reverse();
+        out
+    }
+
+    /// Revision tools › Reset part number type: obsoletes every revision of
+    /// `part_number` released as `kind` that isn't already, as re-releasable,
+    /// so the number can be released again with another type. Returns
+    /// whether a package was recorded.
+    pub fn reset_part_number_type(&mut self, part_number: &str, kind: ItemKind, created: i64) -> bool {
+        let open: Vec<String> = self.typed_revisions(part_number, kind).into_iter().filter(|r| !r.re_releasable).map(|r| r.revision).collect();
+        let items: Vec<ReleaseItem> = open
+            .iter()
+            .filter_map(|rev| self.packages.iter().rev().filter(|p| p.kind == PackageKind::Release).flat_map(|p| &p.items).find(|i| i.part_number == part_number && i.kind == kind && &i.revision == rev).cloned())
+            .collect();
+        if items.is_empty() {
+            return false;
+        }
+        self.record(Package { id: 0, kind: PackageKind::Obsoletion, name: format!("Reset part number type {part_number}"), notes: String::new(), created, version: None, items, re_releasable: true });
+        true
     }
 
     /// A suggested name for the next release ("Release 1", "Release 2"…).
@@ -616,6 +669,26 @@ mod tests {
         assert_eq!(n.release_objects.generate(0).as_deref(), Some("PRT-063"));
         n.release_objects.min_length = 1;
         assert_eq!(n.release_objects.preview(1), "ASM-64");
+    }
+
+    #[test]
+    fn reset_part_number_type_obsoletes_that_type_only() {
+        let item = |kind, rev: &str| ReleaseItem { tab: TabId(1), part: None, name: "x".into(), kind, part_number: "PRT-002".into(), revision: rev.into(), not_revision_managed: false, reverted: false, config: Default::default(), document: None };
+        let pkg = |name: &str, items| Package { id: 0, kind: PackageKind::Release, name: name.into(), notes: String::new(), created: 1, version: None, items, re_releasable: false };
+        let mut log = ReleaseLog::default();
+        log.record(pkg("rel-1.0.2", vec![item(ItemKind::Part, "A")]));
+        log.record(pkg("rel-A", vec![item(ItemKind::Part, "B")]));
+        let found = log.typed_revisions("PRT-002", ItemKind::Part);
+        assert_eq!(found.iter().map(|r| r.revision.as_str()).collect::<Vec<_>>(), ["B", "A"], "newest first");
+        assert!(found.iter().all(|r| r.state == ItemState::Released && !r.re_releasable));
+        assert!(log.typed_revisions("PRT-002", ItemKind::Assembly).is_empty());
+        assert!(log.reset_part_number_type("PRT-002", ItemKind::Part, 2));
+        let found = log.typed_revisions("PRT-002", ItemKind::Part);
+        assert!(found.iter().all(|r| r.state == ItemState::Obsolete && r.re_releasable));
+        assert!(!log.reset_part_number_type("PRT-002", ItemKind::Part, 3), "nothing left to reset");
+        // The number can now be released again, as an assembly at A (Help
+        // revision_tools' example).
+        assert!(log.validate(&[item(ItemKind::Assembly, "A")])[0].is_empty());
     }
 
     #[test]

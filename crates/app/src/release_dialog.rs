@@ -18,7 +18,7 @@ use noshape_model::document::TabId;
 use noshape_model::reference::BodyId;
 use noshape_model::release::{Issue, ItemKind, NumberingSchemes, Package, PackageKind, ReleaseItem, ReleaseLog};
 
-const META_KEY: &str = "releases";
+pub(crate) const META_KEY: &str = "releases";
 
 /// The configuration each Part Studio was last shown in (Add Items ›
 /// "Set to last viewed configuration").
@@ -33,7 +33,7 @@ pub(crate) fn last_viewed_config(tab: TabId) -> Option<noshape_model::configurat
 }
 
 /// Release management settings (Onshape's Company settings › Release
-/// management; here the account preferences): the revision scheme and the
+/// management): the revision scheme and the
 /// unreleased revision suffix.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReleaseSettings {
@@ -69,7 +69,7 @@ fn numbering_path() -> std::path::PathBuf {
     crate::files::config_dir().join("numbering_schemes.json")
 }
 
-/// Company settings › Numbering schemes (here the account preferences).
+/// Company settings › Numbering schemes.
 pub fn numbering_schemes() -> NumberingSchemes {
     std::fs::read(numbering_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
