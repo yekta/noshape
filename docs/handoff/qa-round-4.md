@@ -930,6 +930,7 @@ step (live +0.05). Owner: drawing (asb). Sheet properties width not re-checked.
   longer closes the panel, as live) and Reflection Rotation angle, Animate mate Start / End / Steps (rebuilt on a DOF
   change). Skipped on purpose: the assembly triad value box (on-canvas box like the sketch dimension box; no live data).
 - R1 (two default planes selected → black halos / see-through parts) is also on v0.4.5: not a regression.
-- Remaining assembly InputStates are names / search / BOM cells / mass override (text, or Wt-style): not os-param-number.
+- Remaining assembly InputStates: names, search, BOM cells (text fields); the Mass properties override field
+  (assembly_mass.rs:74) is still to check against live before migrating.
 - Next: sketch fields (sketch.rs open_otf_input / open_count_edit / option_input / offset / bezier / tolerances),
   feature_dialog.rs:623 tolerances, the other assembly panels (same assembly variable scope), prefs.
