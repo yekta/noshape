@@ -321,6 +321,7 @@ jobs:
           key: model-perf-occt-V8_0_1
 
       - name: Big plate (release)
+        if: runner.os != 'Windows'
         shell: bash
         env:
           NOSHAPE_PERF: '1'
@@ -328,5 +329,19 @@ jobs:
           status=0
           cargo test --release --locked -p noshape-model --test big_plate -- --ignored --nocapture --test-threads=1 2>&1 | tee big_plate.log || status=$?
           { echo "### ${{ matrix.name }}"; grep -E "big plate:|tessellate Part 1|boolean_into Cut" big_plate.log || true; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      # PowerShell: Git Bash's /usr/bin/link would shadow MSVC's link.exe.
+      - name: Big plate (release, Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          NOSHAPE_PERF: '1'
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cargo test --release --locked -p noshape-model --test big_plate -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath big_plate.log
+          $status = $LASTEXITCODE
+          "### ${{ matrix.name }}" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path big_plate.log -Pattern 'big plate:|tessellate Part 1|boolean_into Cut' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
 
