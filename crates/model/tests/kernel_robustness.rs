@@ -1198,6 +1198,7 @@ fn shell_bracket_matches_onshape() {
                 ("2 mm", Ok((13901.70344712245, None))),
                 ("2.499 mm", Ok((16987.86341362363, None))),
                 ("2.5 mm", Err(FAILS)),
+                ("2.501 mm", Ok((16999.92174174731, None))),
                 ("3 mm", Ok((19886.02521468895, None))),
                 ("4 mm", Ok((25130.26432481737, Some(20)))),
             ],
@@ -1240,4 +1241,314 @@ fn shell_bracket_matches_onshape() {
             }
         }
     }
+}
+
+/// Robustness sweep, family 1 (live "kern (10-23 12:30) blend sweep",
+/// behaviours.md): fillets and chamfers on edges that touch other blends or
+/// run in tangent chains, against Onshape's volumes, face counts and errors.
+/// Where Onshape's displayed volume carries a wide error band ([lo–hi] from
+/// its mass properties) the check is against the exact value when we have a
+/// closed form (and Onshape's must lie in its band), else against its band.
+#[test]
+fn blend_sweep_matches_onshape() {
+    fn sketch_on(t: &mut T, plane: Reference, build: impl FnOnce(&mut noshape_sketch::Sketch)) -> Vec<Reference> {
+        let mut sk = noshape_sketch::Sketch::new();
+        build(&mut sk);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect()
+    }
+    fn result(t: &mut T, id: FeatureId) -> Result<(f64, usize), String> {
+        let (st, msg, v) = status(t, id);
+        let faces = t.regen().context.bodies[0].shape.count(noshape_kernel::ShapeType::Face);
+        match st {
+            FeatureStatus::Ok => Ok((v, faces)),
+            _ => Err(msg.unwrap_or_default()),
+        }
+    }
+    let mm = |v: f64| v * 1e-3;
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    type Got = Result<(f64, usize), String>;
+    let mut out: Vec<(String, Got)> = Vec::new();
+    // 1. R5 vertical edges, then R5 / R4 / R6 on the top loop.
+    for r in ["5 mm", "4 mm", "6 mm"] {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 20.0);
+        let v = t.edges_where(vertical);
+        t.fillet(v, "5 mm");
+        let top = t.edges_where(|i| near(i.start.z, mm(20.0)) && near(i.end.z, mm(20.0)) && near(i.start.y, 0.0) && near(i.end.y, 0.0));
+        let f = t.fillet(top, r);
+        out.push((format!("1 top loop {r}"), result(&mut t, f)));
+    }
+    // 2. R8 on the top front edge, a Ø6 hole at (30,4) cutting into it, then the hole's top rim.
+    for blend in ["fillet", "chamfer"] {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 20.0);
+        let e8 = t.edges_where(|i| near(i.start.z, mm(20.0)) && near(i.end.z, mm(20.0)) && near(i.start.y, 0.0) && near(i.end.y, 0.0));
+        t.fillet(e8, "8 mm");
+        t.holes(&[((30.0, 4.0), 3.0)]);
+        let rim = t.edges_where(|i| i.start.z > mm(12.0) && i.end.z > mm(12.0) && ((i.start.x - mm(30.0)).hypot(i.start.y - mm(4.0)) - mm(3.0)).abs() < 1e-7 && ((i.end.x - mm(30.0)).hypot(i.end.y - mm(4.0)) - mm(3.0)).abs() < 1e-7);
+        let one = vec![rim[0].clone()];
+        let f = if blend == "fillet" { t.fillet(one, "1 mm") } else { t.chamfer(one, "0.5 mm") };
+        out.push((format!("2 rim {blend} ({} rim edges)", rim.len()), result(&mut t, f)));
+    }
+    // 3. A slot pocket 5 mm deep: bottom loop R2, top rim chamfer 1, both.
+    for which in ["bottom fillet", "rim chamfer", "both"] {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 20.0);
+        let top = t.faces_where(|c| c.z > 19.999);
+        let regions = sketch_on(&mut t, top[0].clone(), |sk| {
+            let p = |x: f64, y: f64| DVec2::new(mm(x), mm(y));
+            sk.add_line(p(24.0, 14.0), p(36.0, 14.0));
+            sk.add_arc(p(36.0, 20.0), p(36.0, 14.0), p(36.0, 26.0));
+            sk.add_line(p(36.0, 26.0), p(24.0, 26.0));
+            sk.add_arc(p(24.0, 20.0), p(24.0, 26.0), p(24.0, 14.0));
+        });
+        let small: Vec<Reference> = regions.into_iter().take(1).collect();
+        let x = t.add("extrude", &[("entities", q(small)), ("depth", e("5 mm")), ("operationType", en("REMOVE")), ("oppositeDirection", ParamValue::Bool(true)), ("defaultScope", ParamValue::Bool(true))]);
+        out.push(("3 pocket".to_string(), result(&mut t, x)));
+        let mut last = x;
+        if which != "rim chamfer" {
+            let bottom = t.edges_where(|i| near(i.start.z, mm(15.0)) && near(i.end.z, mm(15.0)));
+            last = t.fillet(vec![bottom[0].clone()], "2 mm");
+        }
+        if which != "bottom fillet" {
+            let rim = t.edges_where(|i| near(i.start.z, mm(20.0)) && near(i.end.z, mm(20.0)) && i.start.x > mm(17.0) && i.start.x < mm(43.0) && i.start.y > mm(13.0) && i.start.y < mm(27.0));
+            last = t.chamfer(vec![rim[0].clone()], "1 mm");
+        }
+        out.push((format!("3 {which}"), result(&mut t, last)));
+    }
+    // 4. L bracket, R4 inner corner, then on the y=0 end face: the foot's top
+    // line (chain line + R4 arc + line) or all 7 edges, R1 / chamfer 1.
+    for (blend, all) in [("fillet", false), ("fillet", true), ("chamfer", false), ("chamfer", true)] {
+        let mut t = T::new();
+        let regions = sketch_on(&mut t, Reference::Plane(DatumPlane::Front), |sk| {
+            let pts: Vec<_> = [(0.0, 0.0), (50.0, 0.0), (50.0, 10.0), (10.0, 10.0), (10.0, 40.0), (0.0, 40.0)].iter().map(|(x, y)| sk.add_point(DVec2::new(mm(*x), mm(*y)))).collect();
+            for i in 0..pts.len() {
+                sk.add_line_between(pts[i], pts[(i + 1) % pts.len()]).unwrap();
+            }
+        });
+        let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("30 mm")), ("operationType", en("NEW"))]);
+        out.push(("4 L".to_string(), result(&mut t, x)));
+        let inner = t.edges_where(|i| near(i.start.x, mm(10.0)) && near(i.end.x, mm(10.0)) && near(i.start.z, mm(10.0)) && near(i.end.z, mm(10.0)));
+        t.fillet(inner, "4 mm");
+        let end = if all {
+            t.edges_where(|i| near(i.start.y, 0.0) && near(i.end.y, 0.0))
+        } else {
+            t.edges_where(|i| near(i.start.y, 0.0) && near(i.end.y, 0.0) && near(i.start.z, mm(10.0)) && near(i.end.z, mm(10.0)) && i.start.x > mm(20.0))
+        };
+        let n = end.len();
+        let f = if blend == "fillet" { t.fillet(end, "1 mm") } else { t.chamfer(end, "1 mm") };
+        out.push((format!("4 {blend} {} ({n} edges)", if all { "loop" } else { "pick" }), result(&mut t, f)));
+    }
+    // 5. Chamfer 2 on the vertical edges, then R3 / R1 on the top front edge.
+    for (r, prop) in [("3 mm", false), ("3 mm", true), ("1 mm", true)] {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 20.0);
+        let v = t.edges_where(vertical);
+        t.chamfer(v, "2 mm");
+        let top = t.edges_where(|i| near(i.start.z, mm(20.0)) && near(i.end.z, mm(20.0)) && near(i.start.y, 0.0) && near(i.end.y, 0.0));
+        let f = t.add("fillet", &[("entities", q(top)), ("radius", e(r)), ("tangentPropagation", ParamValue::Bool(prop))]);
+        out.push((format!("5 top {r} propagation {prop}"), result(&mut t, f)));
+    }
+    for r in ["3 mm", "1 mm"] {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 20.0);
+        let v = t.edges_where(vertical);
+        t.chamfer(v, "2 mm");
+        let top = t.edges_where(|i| near(i.start.z, mm(20.0)) && near(i.end.z, mm(20.0)));
+        let n = top.len();
+        let f = t.fillet(top, r);
+        out.push((format!("5 all {n} top edges {r}"), result(&mut t, f)));
+    }
+    // Onshape: Ok((volume, faces, tolerance)) or its error.
+    type Want = Result<(f64, usize, f64), &'static str>;
+    let want: &[(&str, Want)] = &[
+        ("1 top loop 5 mm", Ok((46581.48928648512, 18, 1e-3))),
+        ("1 top loop 4 mm", Ok((46932.820852109624, 18, 1e-3))),
+        // Spline corner patches: Onshape 46152.2029 in [46147.443, 46156.963].
+        ("1 top loop 6 mm", Ok((46152.2029118611, 18, 4.7))),
+        // Onshape's error; it shows the R8 fillet's lower boundary in red.
+        ("2 rim fillet (1 rim edges)", Err("Unfilleted edge overlapped by fillet.")),
+        // Onshape 46640.8009 in [46622.840, 46658.761].
+        ("2 rim chamfer (1 rim edges)", Ok((46640.800862188116, 9, 17.9))),
+        ("3 pocket", Ok((46714.51332235383, 11, 1e-3))),
+        ("3 bottom fillet", Ok((46765.06680878341, 15, 1e-3))),
+        ("3 rim chamfer", Ok((46682.61656888109, 15, 1e-3))),
+        ("3 both", Ok((46733.17005531068, 19, 1e-3))),
+        ("4 L", Ok((23999.999999999993, 8, 1e-3))),
+        ("4 fillet pick (1 edges)", Ok((24088.279888204368, 12, 1e-3))),
+        // Onshape 24065.1611 in [24059.694, 24070.628].
+        ("4 fillet loop (7 edges)", Ok((24065.161071524846, 16, 5.4))),
+        ("4 chamfer pick (1 edges)", Ok((24068.60548952784, 12, 1e-3))),
+        ("4 chamfer loop (7 edges)", Ok((24015.272156194504, 16, 1e-3))),
+        // Exact (the R3 / R1 fillet run straight and cut by the 45° chamfers):
+        // 47729.28029 / 47827.88643; Onshape 47729.2164 in [47726.347,
+        // 47732.086] and 47827.9454 in [47826.061, 47829.830].
+        ("5 top 3 mm propagation false", Ok((47729.2802865388, 11, 1e-3))),
+        ("5 top 3 mm propagation true", Ok((47729.2802865388, 11, 1e-3))),
+        ("5 top 1 mm propagation true", Ok((47827.886428515, 11, 1e-3))),
+        // Onshape 47471.2697 in [47467.249, 47475.290]; 47798.3760 in [47795.847, 47800.905].
+        ("5 all 8 top edges 3 mm", Ok((47471.26969041411, 18, 4.0))),
+        ("5 all 8 top edges 1 mm", Ok((47798.37602494933, 18, 2.5))),
+    ];
+    let mut bad = Vec::new();
+    for (label, w) in want {
+        let Some((_, got)) = out.iter().find(|(l, _)| l == label) else {
+            bad.push(format!("{label}: not run"));
+            continue;
+        };
+        let ok = match (w, got) {
+            (Ok((v, f, tol)), Ok((gv, gf))) => (gv - v).abs() <= *tol && gf == f,
+            (Err(m), Err(gm)) => gm == m,
+            _ => false,
+        };
+        if !ok {
+            bad.push(format!("{label}: {got:?}, Onshape {w:?}"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// Robustness sweep, families 2 and 3 (live "kern (10-23 13:30) shell+draft
+/// sweep", behaviours.md): shells and drafts Onshape builds, against its
+/// volumes and face counts (all OK there).
+#[test]
+fn shell_draft_sweep_matches_onshape() {
+    let mm = |v: f64| v * 1e-3;
+    let faces = |t: &mut T| t.regen().context.bodies[0].shape.count(noshape_kernel::ShapeType::Face);
+    type Got = Result<(f64, usize), String>;
+    let mut got: Vec<(&str, Got)> = Vec::new();
+    let mut run = |label: &'static str, t: &mut T, id: FeatureId| {
+        let (st, msg, v) = status(t, id);
+        let f = faces(t);
+        got.push((label, if st == FeatureStatus::Ok { Ok((v, f)) } else { Err(msg.unwrap_or_default()) }));
+    };
+    let block = || {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 20.0);
+        t
+    };
+    let filleted = |r: &str| {
+        let mut t = block();
+        let v = t.edges_where(vertical);
+        t.fillet(v, r);
+        t
+    };
+    let holed = || {
+        let mut t = block();
+        t.holes(&[((30.0, 20.0), 5.0)]);
+        t
+    };
+    let plate_boss = || {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 10.0);
+        let (_, regions) = t.sketch(&[], &[((30.0, 20.0), 10.0)]);
+        t.add("extrude", &[("entities", q(regions)), ("startOffset", ParamValue::Bool(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e("10 mm")), ("depth", e("15 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+        t
+    };
+    // S1: B5, top + front removed, 2 mm.
+    let mut t = filleted("5 mm");
+    let fs = t.faces_where(|c| c.z > 19.999 || (c.y.abs() < 1e-6 && c.x > 10.0 && c.x < 50.0));
+    assert_eq!(fs.len(), 2);
+    let s = t.shell(fs, "2 mm");
+    run("S1", &mut t, s);
+    // S2: B + hole, top removed, 2 mm outward and inward.
+    for (label, out) in [("S2 outward", true), ("S2 inward", false)] {
+        let mut t = holed();
+        let top = t.faces_where(|c| c.z > 19.999);
+        let s = t.shell(top, "2 mm");
+        t.set(s, "oppositeDirection", ParamValue::Bool(out));
+        run(label, &mut t, s);
+    }
+    // S3: plate + boss, boss top removed, 2 mm.
+    let mut t = plate_boss();
+    let top = t.faces_where(|c| c.z > 24.999);
+    let s = t.shell(top, "2 mm");
+    run("S3", &mut t, s);
+    // S4: B2, top removed, 3 / 2 / 1.5 mm.
+    for (label, th) in [("S4 3 mm", "3 mm"), ("S4 2 mm", "2 mm"), ("S4 1.5 mm", "1.5 mm")] {
+        let mut t = filleted("2 mm");
+        let top = t.faces_where(|c| c.z > 19.999);
+        let s = t.shell(top, th);
+        run(label, &mut t, s);
+    }
+    // S5: B + hole, hollow, 2 mm.
+    let mut t = holed();
+    let body = t.regen().context.bodies[0].id.clone();
+    let s = t.add("shell", &[("isHollow", ParamValue::Bool(true)), ("parts", q(vec![Reference::Body(body)])), ("thickness", e("2 mm"))]);
+    run("S5", &mut t, s);
+    let draft = |t: &mut T, neutral: Vec<Reference>, faces: Vec<Reference>, angle: &str, flip: bool| {
+        t.add("draft", &[("neutralPlane", q(neutral)), ("draftFaces", q(faces)), ("angle", e(angle)), ("pullDirection", ParamValue::Bool(flip))])
+    };
+    // D1: B5, 5°, neutral bottom, the 4 side planes (+ fillets by propagation).
+    for (label, flip) in [("D1 default", false), ("D1 flipped", true)] {
+        let mut t = filleted("5 mm");
+        let bottom = t.faces_where(|c| c.z < 1e-6);
+        let sides = t.faces_where(|c| c.z > 1.0 && c.z < 19.0 && (c.x.abs() < 1e-6 || (c.x - 60.0).abs() < 1e-6 || c.y.abs() < 1e-6 || (c.y - 40.0).abs() < 1e-6));
+        assert_eq!(sides.len(), 4);
+        let d = draft(&mut t, bottom, sides, "5 deg", flip);
+        run(label, &mut t, d);
+    }
+    // D2: B, 10° the front face, neutral top.
+    for (label, flip) in [("D2 default", false), ("D2 flipped", true)] {
+        let mut t = block();
+        let top = t.faces_where(|c| c.z > 19.999);
+        let front = t.faces_where(|c| c.y.abs() < 1e-6);
+        let d = draft(&mut t, top, front, "10 deg", flip);
+        run(label, &mut t, d);
+    }
+    // D3: plate + boss, 3° the boss cylinder, neutral the plate top.
+    for (label, flip) in [("D3 default", false), ("D3 flipped", true)] {
+        let mut t = plate_boss();
+        let plate_top = t.faces_where(|c| (c.z - 10.0).abs() < 1e-6);
+        let boss = t.faces_where(|c| c.z > 10.5 && c.z < 24.5);
+        assert_eq!(boss.len(), 1);
+        let d = draft(&mut t, plate_top, boss, "3 deg", flip);
+        run(label, &mut t, d);
+    }
+    // D4: B + a Ø10 hole along Y at (x 30, z 10); 5° the front face, neutral bottom.
+    for (label, flip) in [("D4 default", false), ("D4 flipped", true)] {
+        let mut t = block();
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_circle(DVec2::new(mm(30.0), mm(10.0)), mm(5.0));
+        let sid = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == sid).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: sid, key: g.key.clone() }).collect();
+        t.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("symmetric", ParamValue::Bool(true)), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
+        let bottom = t.faces_where(|c| c.z < 1e-6);
+        let front = t.faces_where(|c| c.y.abs() < 1e-6 && c.z > 1.0);
+        assert_eq!(front.len(), 1, "front face");
+        let d = draft(&mut t, bottom, front, "5 deg", flip);
+        run(label, &mut t, d);
+    }
+    let want: &[(&str, f64, usize)] = &[
+        ("S1", 9621.858316913356, 20),
+        ("S2 outward", 14900.760981384125, 14),
+        ("S2 inward", 12912.08839367129, 14),
+        ("S3", 13198.336173278994, 15),
+        ("S4 3 mm", 16719.327412287177, 15),
+        ("S4 2 mm", 11643.327412287177, 15),
+        ("S4 1.5 mm", 8918.797546264334, 19),
+        ("S5", 16636.2123136195, 14),
+        ("D1 default", 50984.26527578373, 10),
+        ("D1 flipped", 44285.57583970286, 10),
+        ("D2 default", 50115.92376850158, 6),
+        ("D2 flipped", 45884.07623149842, 6),
+        ("D3 default", 28351.647416501906, 8),
+        ("D3 flipped", 29092.544941241416, 8),
+        // Exact: ± the 5° wedge 60·20²·tan5°/2 ∓ the hole through it
+        // tan5°·π·5²·10; Onshape 45839.6688 in [45836.415, 45842.923] and
+        // 43877.3629 in [43874.230, 43880.495].
+        ("D4 default", 45839.557873, 7),
+        ("D4 flipped", 43877.256820, 7),
+    ];
+    let mut bad = Vec::new();
+    for (label, v, f) in want {
+        match got.iter().find(|(l, _)| l == label).map(|(_, g)| g) {
+            Some(Ok((gv, gf))) if (gv - v).abs() < 1e-3 && gf == f => {}
+            g => bad.push(format!("{label}: {g:?}, Onshape {v} mm³ {f} faces")),
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
 }

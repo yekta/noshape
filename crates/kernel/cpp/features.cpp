@@ -32,6 +32,8 @@
 #include <BRepFeat_MakeLinearForm.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
+#include <limits>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <BRepLib.hxx>
 #include <BRepLib_FindSurface.hxx>
 #include <BRepOffsetAPI_DraftAngle.hxx>
@@ -1918,6 +1920,94 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& 
   return std::make_pair(cut.Shape(), h);
 }
 
+// Whether a fillet that failed would have to roll past the faces it touches
+// (Parasolid's "Unfilleted edge overlapped by fillet."; live "kern blend
+// sweep" 2a: R1 round a Ø6 hole whose rim lies on an R8 fillet, where the
+// rim meets that fillet at 29° the ball can't sit). Along each edge, the ball
+// centre at distance r from both surfaces (Newton in the plane across the
+// edge): where there is none, the fillet can't stay on its faces.
+bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es, const std::vector<double>& rs)
+{
+  ShapeAncMap e2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  // Signed distance into the material from face f's surface, its foot and gradient.
+  auto dist = [](const TopoDS_Face& f, const gp_Pnt& c, gp_Pnt2d& uv, gp_Vec& grad) {
+    occ::handle<Geom_Surface>  sf = BRep_Tool::Surface(f);
+    GeomAPI_ProjectPointOnSurf pr(c, sf);
+    if (pr.NbPoints() == 0)
+      return std::numeric_limits<double>::quiet_NaN();
+    double u, v;
+    pr.LowerDistanceParameters(u, v);
+    uv = gp_Pnt2d(u, v);
+    gp_Pnt p;
+    gp_Vec du, dv;
+    sf->D1(u, v, p, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (n.Magnitude() < 1e-12)
+      return std::numeric_limits<double>::quiet_NaN();
+    n.Normalize();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    grad = -n; // into the material
+    return gp_Vec(c, p).Dot(n);
+  };
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const double     r  = rs.size() == 1 ? rs[0] : rs[i];
+    const ShapeList* fl = e2f.Seek(es[i]);
+    if (fl == nullptr || fl->Extent() != 2)
+      continue;
+    const TopoDS_Face f1 = TopoDS::Face(fl->First()), f2 = TopoDS::Face(fl->Last());
+    BRepAdaptor_Curve c(es[i]);
+    for (int k = 0; k < 16; ++k)
+    {
+      const double par = c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * (k + 0.5) / 16;
+      gp_Pnt       P;
+      gp_Vec       t;
+      c.D1(par, P, t);
+      if (t.Magnitude() < 1e-12)
+        continue;
+      gp_Pnt2d uv1, uv2;
+      gp_Vec   g1, g2;
+      if (std::isnan(dist(f1, P, uv1, g1)) || std::isnan(dist(f2, P, uv2, g2)))
+        continue;
+      // Convex edges only (the ball inside the material, between the faces).
+      const gp_Vec bis = g1 + g2;
+      if (bis.Magnitude() < 1e-9)
+        continue;
+      gp_Pnt C = P.Translated(bis.Normalized() * r);
+      const gp_Vec u = (g1 - t.Normalized() * g1.Dot(t.Normalized())).Normalized();
+      const gp_Vec v = t.Normalized().Crossed(u);
+      bool ok = false;
+      for (int it = 0; it < 40; ++it)
+      {
+        const double d1 = dist(f1, C, uv1, g1), d2 = dist(f2, C, uv2, g2);
+        if (std::isnan(d1) || std::isnan(d2))
+          break;
+        const double e1 = d1 - r, e2 = d2 - r;
+        if (std::abs(e1) < 1e-9 * (1 + r) && std::abs(e2) < 1e-9 * (1 + r))
+        {
+          ok = true;
+          break;
+        }
+        const double a = g1.Dot(u), b = g1.Dot(v), cc = g2.Dot(u), d = g2.Dot(v), det = a * d - b * cc;
+        if (std::abs(det) < 1e-12)
+          break;
+        const double su = (-e1 * d + e2 * b) / det, sv = (-a * e2 + cc * e1) / det;
+        C.Translate(u * su + v * sv);
+        if (C.Distance(P) > 100 * r)
+          break;
+      }
+      // (A contact beyond its face isn't it: Parasolid lets the fillet run
+      // over onto the next face, and fails otherwise with its general
+      // message, live F2: R12 on a 10 mm block's top edges.)
+      if (!ok)
+        return true;
+    }
+  }
+  return false;
+}
+
 OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked)
 {
@@ -1989,6 +2079,8 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
     auto past = fillet_past_end_faces(s.shape, es, rs);
     if (!past)
       past = fillet_as_cut(s.shape, es, rs);
+    if (!past && fillet_overflows(s.shape, es, rs))
+      fail_op("fillet failed: unfilleted edge overlapped by fillet");
     if (!past)
       throw;
     return make_result({s.shape}, past->first, past->second.get());

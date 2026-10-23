@@ -86,9 +86,21 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   wrong one): with a 1 mm chamfer round the top OCCT's offset gave 4285 mm³ / 12 faces, now slabs give Onshape's
   7385.784 / 34. (2) `offsets_touch`: Onshape FAILS every case at exactly 2.5 mm (the hole's offset wall r + t
   touches the front wall's, axis at r + 2t); we fail the same (kept concave cylinder ∥ kept plane, to 1e-8 m, the
-  touching line on both faces). Open: at 2.501 mm our offset is 0.0029 mm³ above the exact (= Onshape's)
-  16999.92174 (slabs 7.6e-4); not from the offset tolerance; needs a dump of the model's input to reproduce.
+  touching line on both faces). 2.501 mm (resolved): OCCT's offset keeps both walls whole and overlapping where
+  they cross by less than ~its tolerance (the inner front wall a full 90 x 9.499 rectangle, the hole wall a full
+  cylinder: a self-intersecting shell, +0.0029 mm³); within 1e-5 m of touching `op_shell_solid` skips the offset
+  and the slabs trim them (7.6e-4 of the exact). The model's input and a rebuilt one differ only in face
+  orientations, which changes OCCT's offset there (17014 vs 16999.92), hence no standalone repro at first.
   Test `kernel_robustness::shell_bracket_matches_onshape`.
+- **Robustness sweep (10-23, live "kern (10-23 12:30) blend sweep", "(13:30) shell+draft sweep", "(14:15) sweep
+  4-8"):** families 1-3 match (tests `blend_sweep_matches_onshape`, `shell_draft_sweep_matches_onshape`). Fix: a
+  fillet the ball can't roll along without leaving its faces (no centre at r from both surfaces) fails with
+  Parasolid's "Unfilleted edge overlapped by fillet." (`features.cpp::fillet_overflows`, model `fillet_failed`).
+  Onshape's displayed volumes are off by its own error band in several cases where ours are exact (closed forms in
+  the tests: R3/R1 fillets cut by chamfers, the hole into an R8 fillet, D4's drafted hole). Families 4-8 open:
+  Bo3 (tangent subtract: Onshape "Boolean operation would result in non-manifold body."), Sw2 (message "Result of
+  sweep intersects itself, adjust path or profile selections."), lofts L1 (6 faces: Onshape splits the circle to
+  match the square), L2 (shape/volume), L3 (Onshape fails oblique circles at dx >= 10 over 30 mm).
 - **IM4 / IM5 (qa5 pass 12-13), fixed 10-22:** g50-g46-shell1.x_t's real fault was ours: an edge on a TRIMMED_CURVE
   (133) whose basis is an intersection (38) took parm_1/parm_2, which are Parasolid's parameters of that curve, not
   of our rebuilt B-spline: the range ran off the curve and healing made it 42 km long. Edges on a rebuilt basis
