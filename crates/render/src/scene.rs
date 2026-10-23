@@ -143,7 +143,8 @@ impl PointSprite {
     pub const HOLLOW: u32 = 8;
 }
 
-pub(crate) fn bounds_of(it: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
+/// The axis-aligned bounds of `it` (`None` when empty).
+pub fn bounds_of(it: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
     let mut min = Vec3::splat(f32::INFINITY);
     let mut max = Vec3::splat(f32::NEG_INFINITY);
     let mut any = false;
@@ -256,6 +257,11 @@ pub struct Instance {
     /// ([`Detail`], `performAggressiveCulling`) all its instances give way
     /// to its [`Instance::lod_box`].
     pub body: u32,
+    /// Edge lines with levels of detail: 0 none (always drawn); k ≥ 1 the
+    /// body's edges simplified to [`LINE_LOD_TOLERANCES`]`[k - 1]` of its
+    /// size, drawn only when the renderer picks level k for the body
+    /// ([`line_lod_level`]). Level 1 (the full edges) is also the pick.
+    pub line_lod: u8,
     /// The [`Instance::body`]'s lowest level of detail: its bounding box
     /// (a unit cube placed by `transform`) in the body's color
     /// (`getDisplayIncrement`), drawn only in the body's place.
@@ -328,6 +334,7 @@ impl Instance {
             compare: 0,
             body: 0,
             lod_box: false,
+            line_lod: 0,
         }
     }
     /// The version this instance draws in compare mode ([`compare`]).
@@ -393,6 +400,11 @@ impl Instance {
     /// Part of body `id` ([`Instance::body`]).
     pub fn body(mut self, id: u32) -> Self {
         self.body = id;
+        self
+    }
+    /// The body's edges at line level `level` ([`Instance::line_lod`]).
+    pub fn line_lod(mut self, level: u8) -> Self {
+        self.line_lod = level;
         self
     }
     /// Body `id`'s lowest level of detail ([`Instance::lod_box`]): `mesh` a
@@ -521,6 +533,66 @@ impl Default for Detail {
 /// The unit cube (−0.5..0.5) every [`Instance::lod_box`] draws.
 pub fn lod_box_mesh() -> MeshData {
     crate::primitives::box_mesh([-0.5; 3], [0.5; 3], 0)
+}
+
+/// Edge line levels of detail ([`Instance::line_lod`]): the largest
+/// distance of a simplified edge from the full one, as a share of the
+/// body's bounding-box diagonal. 144-segment circles cost little drawn as
+/// fill but a lot as edge quads; on screen a level only shows from where
+/// its error passes [`LINE_LOD_MAX_ERROR_PX`].
+pub const LINE_LOD_TOLERANCES: [f32; 4] = [0.0, 1e-3, 4e-3, 1.6e-2];
+/// The screen error (CSS px) a simplified edge level may have.
+pub const LINE_LOD_MAX_ERROR_PX: f32 = 0.25;
+
+/// The coarsest line level (1-based, [`LINE_LOD_TOLERANCES`]) for a body
+/// whose bounding-box diagonal is `diagonal_px` CSS px on screen.
+pub fn line_lod_level(diagonal_px: f32) -> u8 {
+    LINE_LOD_TOLERANCES.iter().rposition(|&t| t * diagonal_px <= LINE_LOD_MAX_ERROR_PX).map_or(1, |i| i as u8 + 1)
+}
+
+/// Douglas–Peucker: the points of `pts` that keep every dropped point
+/// within `tol` of the simplified polyline; the ends always stay.
+pub fn simplify_polyline(pts: &[[f32; 3]], tol: f32) -> Vec<[f32; 3]> {
+    if pts.len() < 3 || tol <= 0.0 {
+        return pts.to_vec();
+    }
+    let dist = |p: Vec3, a: Vec3, b: Vec3| {
+        let ab = b - a;
+        let t = if ab.length_squared() > 0.0 { ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+        (p - (a + ab * t)).length()
+    };
+    let mut keep = vec![false; pts.len()];
+    keep[0] = true;
+    keep[pts.len() - 1] = true;
+    let mut stack = vec![(0, pts.len() - 1)];
+    while let Some((a, b)) = stack.pop() {
+        let (pa, pb) = (Vec3::from(pts[a]), Vec3::from(pts[b]));
+        let far = (a + 1..b).map(|i| (i, dist(Vec3::from(pts[i]), pa, pb))).max_by(|x, y| x.1.total_cmp(&y.1));
+        if let Some((i, d)) = far
+            && d > tol
+        {
+            keep[i] = true;
+            stack.push((a, i));
+            stack.push((i, b));
+        }
+    }
+    pts.iter().zip(&keep).filter(|(_, k)| **k).map(|(p, _)| *p).collect()
+}
+
+/// A body's edge polylines (`edges`, pick ids 1-based by edge) as line
+/// data at each of [`LINE_LOD_TOLERANCES`] after the first, for a body
+/// `diagonal` across.
+pub fn edge_line_lods(edges: &[Vec<[f32; 3]>], diagonal: f32) -> Vec<LineData> {
+    LINE_LOD_TOLERANCES[1..]
+        .iter()
+        .map(|t| {
+            let mut l = LineData::default();
+            for (ei, pl) in edges.iter().enumerate() {
+                l.push_polyline(&simplify_polyline(pl, t * diagonal), [0, 0, 0, 255], ei as u32 + 1, 1.25, 0);
+            }
+            l
+        })
+        .collect()
 }
 
 impl Default for Style {

@@ -552,3 +552,10 @@ changes. I write the renderer part first (my files) and show crops before touchi
 - Kernel side (lead, 18:00): kern is writing a fast planar-face triangulator in the kernel's mesh.cpp (the big plate's
   two planar faces: 1.65 s of its 2.7 s display mesh in BRepMesh). Display density, LOD and upload stay perf's.
   Rerun the big-plate fixture on CI when it lands.
+- **2026-10-22 21:00 (perf): where angle mode's GPU time goes** (perf.yml run 39844027399, parts-1000, macOS, every
+  variant `NOSHAPE_PERF_DETAIL=full`; `w.gpu_wait` mean, macOS 14 / 15): chord 15.8 / 12.0 ms; angle 21.2 / 19.5;
+  angle without backface silhouettes 21.6 / 19.2; without edge silhouettes 21.1 / 19.7; without AO 21.5 / 18.8;
+  without meshes 20.5 / 18.9; **without lines (edges, silhouettes, backface silhouettes) 12.6 / 9.7**. Redrawing
+  the meshes is not the cost: the B-rep edge lines are (each segment a 6-vertex quad; 144-segment circles have ~4x
+  the segments of the chord mesh, sub-pixel at the 1000-pin fit view). Fix in progress: edge-line LOD (Douglas–Peucker
+  levels relative to the body's size, chosen per body per frame under 0.25 px error; pick pass full).

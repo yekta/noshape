@@ -81,6 +81,8 @@ struct CachedBody {
     vertices: PointsHandle,
     /// Mesh parts' triangle sides (live G35), when the part has mesh faces.
     mesh_lines: Option<LinesHandle>,
+    /// The edges at each coarser line level ([`noshape_scene::builder::edge_lods`]).
+    edge_lods: Vec<LinesHandle>,
 }
 
 #[derive(Default)]
@@ -184,7 +186,14 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         if !dimmed {
             let edge_color = if sketch { theme::lin(0x999999) } else { theme::lin(theme::viewport::EDGE) };
             if !opts.hide_edges || sketch {
-                scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1));
+                let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1);
+                // Each coarser line level, then the full edges (also the pick).
+                for (k, l) in cached.edge_lods.iter().enumerate() {
+                    let mut e = edges.clone().line_lod(k as u8 + 2);
+                    e.drawable = Drawable::Lines(l.clone());
+                    scene.instances.push(e);
+                }
+                scene.instances.push(edges.line_lod(1));
                 // A mesh part's triangle lines, as in the Part Studio.
                 if let Some(lines) = cached.mesh_lines.clone() {
                     scene.instances.push(Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).with_transform(t).unpickable().layer(1));
@@ -242,7 +251,7 @@ fn upload_body(m: &MeshBuffers, up: &Uploader) -> CachedBody {
         }
         up.upload_lines(&l)
     });
-    CachedBody { mesh: up.upload_mesh(&mesh), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines }
+    CachedBody { mesh: up.upload_mesh(&mesh), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines, edge_lods: noshape_scene::builder::edge_lods(m, up) }
 }
 
 /// A coordinate triad overlay (world frame).

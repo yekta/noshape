@@ -103,6 +103,9 @@ struct CachedBody {
     mesh_lines: Option<LinesHandle>,
     /// Silhouette candidates of its curved faces ([`silhouette_edges`]).
     silhouettes: Option<LinesHandle>,
+    /// The edges simplified to each coarser line level
+    /// ([`noshape_render::scene::LINE_LOD_TOLERANCES`]).
+    edge_lods: Vec<LinesHandle>,
 }
 
 /// GPU caches that survive across rebuilds.
@@ -399,7 +402,16 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     scene.instances.push(Instance::new(Drawable::Lines(t.phantom)).with_color(c).unpickable().line_scale(opts.graphics.phantom_width / 0.5).layer(1));
                 }
             }
-            None => scene.instances.push(if opts.display_mode == DisplayMode::Shaded { edges.pick_only() } else { edges }),
+            None if opts.display_mode == DisplayMode::Shaded => scene.instances.push(edges.pick_only()),
+            // The full edges (also the pick) and each coarser line level.
+            None => {
+                for (k, l) in cached.edge_lods.iter().enumerate() {
+                    let mut e = edges.clone().line_lod(k as u8 + 2);
+                    e.drawable = Drawable::Lines(l.clone());
+                    scene.instances.push(e);
+                }
+                scene.instances.push(edges.line_lod(1));
+            }
         }
         scene.instances.push(Instance::new(Drawable::Points(cached.vertices.clone())).pick_base(vert_base).pick_only().layer(2));
         if opts.hidden_edges_visible && b.kind != BodyKind::Wire {
@@ -708,7 +720,18 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
     });
     let sil = silhouette_edges(m);
     let silhouettes = (!sil.segments.is_empty()).then(|| up.upload_silhouettes(&sil));
-    CachedBody { mesh: up.upload_mesh_parts(&m.positions, &m.normals, &pick_ids, &m.indices), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines, silhouettes }
+    let edge_lods = edge_lods(m, up);
+    CachedBody { mesh: up.upload_mesh_parts(&m.positions, &m.normals, &pick_ids, &m.indices), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines, silhouettes, edge_lods }
+}
+
+/// A mesh's edges at each coarser line level (uploaded; empty without
+/// edges).
+pub fn edge_lods(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Vec<LinesHandle> {
+    let Some((lo, hi)) = noshape_render::scene::bounds_of(m.positions.iter().copied()) else { return Vec::new() };
+    if m.edges.is_empty() {
+        return Vec::new();
+    }
+    noshape_render::scene::edge_line_lods(&m.edges, (hi - lo).length()).iter().map(|l| up.upload_lines(l)).collect()
 }
 
 /// Onshape's edge-based silhouettes: every tessellation edge inside a face

@@ -578,6 +578,9 @@ struct DrawLists {
     lod_order: Vec<u32>,
     /// By body id − 1: drawn as its [`Instance::lod_box`].
     boxes: Vec<bool>,
+    /// By body id − 1: its edge line level ([`Instance::line_lod`]).
+    line_levels: Vec<u8>,
+    diagonal_px: Vec<f32>,
 }
 
 /// A body for [`lod_boxes`]: its [`Instance::lod_box`]'s transform (the
@@ -600,10 +603,14 @@ const MAX_BOX_DIAMETER_PROPORTION: f32 = 0.01;
 /// above 0, that share of all bodies taken by most triangles per squared
 /// radius first (`getBenefitToCull`), the ones outside the view counting
 /// against it; either only while under 1% of the viewport diagonal. The
-/// viewport is `width` × `height` device pixels, `dpr` per CSS px.
-pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), detail: &Detail, order: &mut Vec<u32>, boxes: &mut Vec<bool>) {
+/// viewport is `width` × `height` device pixels, `dpr` per CSS px. Also
+/// each body's bounding-box diagonal on screen (CSS px; infinite when
+/// unknown), for its edge line level ([`line_lod_level`]).
+pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), detail: &Detail, order: &mut Vec<u32>, boxes: &mut Vec<bool>, diagonal_px: &mut Vec<f32>) {
     boxes.clear();
     boxes.resize(bodies.len(), false);
+    diagonal_px.clear();
+    diagonal_px.resize(bodies.len(), f32::INFINITY);
     let dpr = dpr.max(1e-3);
     // Clip-space y per world unit: row 1 of the view-projection's 3x3 (a
     // rotation times the projection's y scale).
@@ -628,6 +635,7 @@ pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u3
         }
         let w = (*view_proj * b.box_transform.w_axis).w.max(1e-9);
         let px = 2.0 * radius(b) * y_scale / w * height as f32 * 0.5 / dpr;
+        diagonal_px[i as usize] = px;
         if ((a as i64) < budget || px < detail.extent_culling_px) && px < max_px {
             boxes[i as usize] = true;
         }
@@ -635,6 +643,14 @@ pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u3
 }
 
 impl DrawLists {
+    /// The edge line level body `id` draws this pass (1: full edges).
+    fn line_level(&self, id: u32) -> u8 {
+        if id == 0 {
+            return 1;
+        }
+        self.line_levels.get(id as usize - 1).copied().unwrap_or(1)
+    }
+
     /// Whether body `id`'s box replaces it this pass.
     fn boxed(&self, id: u32) -> bool {
         id > 0 && self.boxes.get(id as usize - 1).copied().unwrap_or(false)
@@ -668,6 +684,7 @@ impl DrawLists {
         self.points_hidden.clear();
         self.culled = 0;
         self.boxes.clear();
+        self.line_levels.clear();
         if let Some(detail) = self.lod.filter(|_| !pick) {
             self.lod_bodies.clear();
             for inst in scene.instances.iter().filter(|i| i.body > 0) {
@@ -685,7 +702,8 @@ impl DrawLists {
                     _ => {}
                 }
             }
-            lod_boxes(&self.lod_bodies, view_proj, (width, height, dpr), &detail, &mut self.lod_order, &mut self.boxes);
+            lod_boxes(&self.lod_bodies, view_proj, (width, height, dpr), &detail, &mut self.lod_order, &mut self.boxes, &mut self.diagonal_px);
+            self.line_levels.extend(self.diagonal_px.iter().map(|&px| line_lod_level(px)));
             if perf::enabled() {
                 perf::record_ms("r.lod_boxes", self.boxes.iter().filter(|b| **b).count() as f32);
             }
@@ -698,8 +716,9 @@ impl DrawLists {
             if self.skip_compare != 0 && inst.compare == self.skip_compare {
                 continue;
             }
-            // A body's box instead of the body, never both.
-            if inst.lod_box != self.boxed(inst.body) {
+            // A body's box instead of the body, never both; one level of
+            // its edges (the full ones when picking).
+            if inst.lod_box != self.boxed(inst.body) || (inst.line_lod > 0 && inst.line_lod != self.line_level(inst.body)) {
                 continue;
             }
             if pick {
@@ -3089,8 +3108,42 @@ mod tests {
         let vp = Mat4::from_scale(Vec3::new(1.0 / 500.0, 1.0 / 400.0, 1.0 / 1000.0));
         let detail = Detail { low_level_body_proportion: proportion, extent_culling_px: extent_px, ..Default::default() };
         let (mut order, mut boxes) = (Vec::new(), Vec::new());
-        lod_boxes(bodies, &vp, (1000, 800, 1.0), &detail, &mut order, &mut boxes);
+        lod_boxes(bodies, &vp, (1000, 800, 1.0), &detail, &mut order, &mut boxes, &mut Vec::new());
         boxes
+    }
+
+    #[test]
+    fn line_lod_simplifies_within_the_tolerance() {
+        // A 144-segment circle of radius 2: dropped points stay within tol.
+        let circle: Vec<[f32; 3]> = (0..=144).map(|i| {
+            let a = i as f32 / 144.0 * std::f32::consts::TAU;
+            [2.0 * a.cos(), 2.0 * a.sin(), 0.0]
+        }).collect();
+        assert_eq!(simplify_polyline(&circle, 0.0).len(), 145);
+        let coarse = simplify_polyline(&circle, 0.04);
+        assert!(coarse.len() < 30 && coarse.len() >= 5, "{}", coarse.len());
+        assert_eq!((coarse[0], coarse[coarse.len() - 1]), (circle[0], circle[144]));
+        // Every full point within 0.04 of the coarse loop.
+        let near = |p: Vec3| coarse.windows(2).map(|w| {
+            let (a, b) = (Vec3::from(w[0]), Vec3::from(w[1]));
+            let t = ((p - a).dot(b - a) / (b - a).length_squared()).clamp(0.0, 1.0);
+            (p - (a + (b - a) * t)).length()
+        }).fold(f32::MAX, f32::min);
+        assert!(circle.iter().all(|p| near(Vec3::from(*p)) <= 0.04 + 1e-5));
+        // One line data per coarser level, pick ids kept per edge.
+        let lods = edge_line_lods(&[circle.clone(), vec![[0.0; 3], [1.0, 0.0, 0.0]]], 6.0);
+        assert_eq!(lods.len(), LINE_LOD_TOLERANCES.len() - 1);
+        assert!(lods.windows(2).all(|w| w[1].segments.len() <= w[0].segments.len()));
+        assert_eq!(lods[2].segments.last().map(|s| s.pick_id), Some(2));
+    }
+
+    #[test]
+    fn line_lod_level_keeps_the_error_under_a_quarter_pixel() {
+        assert_eq!(line_lod_level(f32::INFINITY), 1);
+        assert_eq!(line_lod_level(2000.0), 1);
+        assert_eq!(line_lod_level(240.0), 2);
+        assert_eq!(line_lod_level(50.0), 3);
+        assert_eq!(line_lod_level(10.0), 4);
     }
 
     #[test]
