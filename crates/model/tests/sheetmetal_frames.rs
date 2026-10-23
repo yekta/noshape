@@ -56,7 +56,7 @@ impl Studio {
     fn ok(&mut self) -> RegenResult {
         let r = self.regen();
         for (f, s) in self.ps.features.iter().zip(&r.display.features) {
-            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Warning), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
+            assert!(matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info | FeatureStatus::Warning), "{} ({}) failed: {:?}", f.name, f.type_id, s.message);
         }
         r
     }
@@ -558,7 +558,9 @@ fn finish_sheet_metal_deactivates() {
     let mut s = plate();
     let r = s.ok();
     let edge = edge_at(&r, 0, DVec3::new(mm(30.0), mm(40.0), mm(2.0)));
-    s.add("sheetMetalEnd", |_| {});
+    // Finish needs its parts (live: "Select one or more sheet metal parts.").
+    let part = Reference::Body(r.context.bodies[0].id.clone());
+    s.add("sheetMetalEnd", move |p| p.set("sheetMetalParts", ParamValue::Query(vec![part])));
     let r = s.ok();
     assert!(!r.context.sheet_metal.values().next().unwrap().active);
     // The flat pattern stays available.

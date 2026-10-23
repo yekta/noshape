@@ -12,11 +12,12 @@ use super::sheetmetal_util::*;
 use crate::display::BodyKind;
 use crate::naming::Name;
 use crate::reference::{Reference, Role, Source, TopoName};
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, err};
+use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, err_at};
 use crate::sheetmetal::Wall;
 use glam::DVec3;
 use noshape_kernel as k;
 use noshape_kernel::Shape;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Ordered polyline of a profile selection: (points, closed).
@@ -104,11 +105,55 @@ fn quad_face(pts: &[DVec3]) -> FResult<Shape> {
     Ok(k::make_face_from_wire(&w, true).or_else(|_| k::make_face_from_wire(&w, false))?)
 }
 
-pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
-    if !ev.is("surfaceOperationType", "NEW") {
-        return err("Adding a sheet metal loft to an existing model is not supported yet; use New");
+/// Add: the merge scope's wall that Profile 1 (one of its edges) bounds.
+struct AddJoint {
+    body: usize,
+    data: crate::sheetmetal::SheetMetalData,
+    wall: usize,
+    /// From the wall's face at the edge into its thickness.
+    material: DVec3,
+    /// The wall's end face at the edge (outward) and the faces' names.
+    end: (DVec3, DVec3),
+    end_name: Name,
+    back_name: Name,
+}
+
+fn add_joint(ev: &EvalCtx) -> FResult<AddJoint> {
+    let Some(&bi) = ev.resolve_bodies(ev.query("booleanScope")).first() else { return err_at(&["booleanScope"], "No merge scope selected.") };
+    let data = (*active_data(ev, bi)?).clone();
+    let edges = ev.resolve_edges(ev.query("profile1"));
+    let &[(eb, ei)] = edges.as_slice() else { return err_at(&["profile1"], "Profile 1 must be one edge of the merge scope") };
+    if eb != bi {
+        return err_at(&["profile1"], "Profile 1 must be one edge of the merge scope");
     }
-    let t = ev.length("thickness")?;
+    let body = ev.ctx.bodies[bi].clone();
+    let ef = body.shape.edge_faces()?;
+    let at: Vec<usize> = ef.get(ei).map(|v| v.iter().map(|f| *f as usize).collect()).unwrap_or_default();
+    let face = |f: usize| -> FResult<(DVec3, DVec3)> { plane_of(&body.shape.sub_shape(k::ShapeType::Face, f)?).ok_or_else(|| fe("Profile 1 must bound a flat wall")) };
+    let (wf, (wall, front)) = at.iter().find_map(|f| Some((*f, data.wall_of_face(body.faces.get(*f)?)?))).ok_or_else(|| fe("Profile 1 must bound a wall of the merge scope"))?;
+    let Some(&ef_end) = at.iter().find(|f| **f != wf) else { return err("Profile 1 must bound a wall of the merge scope") };
+    let (wp, wn) = face(wf)?;
+    // The wall's other side: its back (or front) faces' plane.
+    let other = if front { &data.walls[wall].back } else { &data.walls[wall].faces };
+    let op = faces_named(&body, other).into_iter().find_map(|f| face(f).ok()).ok_or_else(|| fe("The wall's other side was not found"))?.0;
+    let material = if (op - wp).dot(wn) < 0.0 { -wn } else { wn };
+    let (ep, mut en) = face(ef_end)?;
+    let c = body.shape.bounding_box(false).map(|b| b.center()).unwrap_or(ep);
+    if (ep - c).dot(en) < 0.0 {
+        en = -en;
+    }
+    let back_face = (0..body.faces.len()).find(|f| face(*f).is_ok_and(|(p, n)| n.cross(material).length() < 1e-9 && ((p - wp).dot(material) - data.thickness).abs() < 1e-7)).ok_or_else(|| fe("The wall's other side was not found"))?;
+    Ok(AddJoint { body: bi, wall, material, end: (ep, en), end_name: body.faces[ef_end].clone(), back_name: body.faces[back_face].clone(), data })
+}
+
+pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
+    // Add (live qa5 "sm loft", 9805.5244 mm³): the loft becomes a wall of the
+    // merge scope's model, joined to the wall Profile 1 bounds by a bend.
+    let add = if ev.is("surfaceOperationType", "NEW") { None } else { Some(add_joint(ev)?) };
+    let t = match &add {
+        Some(a) => a.data.thickness,
+        None => ev.length("thickness")?,
+    };
     if t <= 0.0 {
         return err("Thickness must be positive");
     }
@@ -170,7 +215,16 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         normals.push(nn);
     }
     // Material inside a closed loft (toward the center), else along the facet normals.
-    let inward = if c1 { normals.iter().enumerate().map(|(i, nn)| (center - p1[i]).dot(*nn)).sum::<f64>() > 0.0 } else { true };
+    // Added onto a wall: the material on the wall's side (Profile 2 on the
+    // new wall's outer face, as live).
+    let inward = match &add {
+        Some(a) => normals[0].dot(a.material) > 0.0,
+        None if c1 => normals.iter().enumerate().map(|(i, nn)| (center - p1[i]).dot(*nn)).sum::<f64>() > 0.0,
+        None => true,
+    };
+    if add.is_some() && (c1 || nf != 1) {
+        return err_at(&["profile2"], "Adding a sheet metal loft needs two straight profiles");
+    }
     let sign = if inward != flip { 1.0 } else { -1.0 };
     for nn in &mut normals {
         *nn *= sign;
@@ -225,7 +279,14 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         }
         Ok(out)
     };
-    let o1 = offset_corners(&p1, e1)?;
+    let o1 = match &add {
+        // Mitred against the wall's other side (a sharp corner the bend rounds).
+        Some(a) => {
+            let d = (p1[1] - p1[0]).normalize();
+            p1.iter().map(|p| three_planes([(*p + normals[0] * t, normals[0]), (*p + a.material * t, a.material), (*p, d)]).ok_or_else(|| fe("The loft is parallel to the wall it is added to"))).collect::<FResult<Vec<_>>>()?
+        }
+        None => offset_corners(&p1, e1)?,
+    };
     let o2 = offset_corners(&p2, e2)?;
     let feature = ev.feature;
     let name = |k: u32| -> Name { Arc::new(TopoName::face(feature, Role::Side(Source::Index(k)))) };
@@ -251,6 +312,9 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         let c = f.centroid()?;
         let k = (0..src_c.len()).min_by(|&a, &b| (src_c[a] - c).length().total_cmp(&(src_c[b] - c).length())).unwrap_or(0);
         names.push(faces[k].1.clone());
+    }
+    if let Some(a) = add {
+        return add_wall(ev, a, NamedShape::new(solid, names), [p1[0], p1[1]], [o1[0], o1[1]], t, name(0), name(1000));
     }
     let before = ev.ctx.bodies.len();
     ev.apply_operation(vec![NamedShape::new(solid, names)], "NEW", None, BodyKind::Solid)?;
@@ -301,6 +365,65 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     if sharp > 0 {
         ev.warnings.push(format!("{sharp} joint(s) could not be bent (radius too large for the facets) and were left sharp"));
     }
+    put_data(ev, bi, data);
+    Ok(())
+}
+
+/// Join the loft wall `wall` (front face `front`, back `back`) to the merge
+/// scope at Profile 1 (`p1`, mitre corners `o1`): fill (or cut) the wedge
+/// between the wall's end and the mitre, fuse (coplanar faces merged), then
+/// bend the sharp corner with the model's radius.
+#[allow(clippy::too_many_arguments)]
+fn add_wall(ev: &mut EvalCtx, a: AddJoint, wall: NamedShape, p1: [DVec3; 2], o1: [DVec3; 2], t: f64, front: Name, back: Name) -> FResult<()> {
+    let AddJoint { body: bi, mut data, wall: parent, material, end: (_, en), end_name, back_name } = a;
+    let q = [p1[0] + material * t, p1[1] + material * t];
+    let faces = [
+        (quad_face(&[p1[0], p1[1], q[1], q[0]])?, end_name.clone()),
+        (quad_face(&[q[0], q[1], o1[1], o1[0]])?, back_name),
+        (quad_face(&[p1[0], p1[1], o1[1], o1[0]])?, end_name.clone()),
+        (k::make_face_from_wire(&k::make_polyline(&[p1[0], q[0], o1[0]], true)?, true)?, end_name.clone()),
+        (k::make_face_from_wire(&k::make_polyline(&[p1[1], q[1], o1[1]], true)?, true)?, end_name),
+    ];
+    let reach = (o1[0] - q[0]).dot(en);
+    let body = body_named(&ev.ctx.bodies[bi]);
+    let opts = k::BooleanOptions { unify: true, ..Default::default() };
+    let (shape, names) = if reach.abs() < 1e-9 {
+        let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), std::slice::from_ref(&wall.shape), &opts)?;
+        let names = ev.name_result(&[&body.names, &wall.names], &res.history, &res.shape, &BTreeMap::new(), None);
+        (res.shape, names)
+    } else {
+        let shapes: Vec<Shape> = faces.iter().map(|f| f.0.clone()).collect();
+        let wedge = k::sew(&shapes, (t * 1e-4).min(1e-6), true).map_err(|e| fe(format!("The loft could not be joined to the wall: {e}")))?.shape;
+        let src_c: Vec<DVec3> = faces.iter().map(|f| f.0.centroid().unwrap_or_default()).collect();
+        let wnames: Vec<Name> = wedge
+            .faces()
+            .iter()
+            .map(|f| {
+                let c = f.centroid().unwrap_or_default();
+                let k = (0..src_c.len()).min_by(|&a, &b| (src_c[a] - c).length().total_cmp(&(src_c[b] - c).length())).unwrap_or(0);
+                faces[k].1.clone()
+            })
+            .collect();
+        let wedge = NamedShape::new(wedge, wnames);
+        if reach > 0.0 {
+            // The wall stops short of the mitre: the wedge fills the corner.
+            let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), &[wedge.shape.clone(), wall.shape.clone()], &opts)?;
+            let names = ev.name_result(&[&body.names, &wedge.names, &wall.names], &res.history, &res.shape, &BTreeMap::new(), None);
+            (res.shape, names)
+        } else {
+            // The wall runs past the mitre: the wedge comes off it first.
+            let cut = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&body.shape), std::slice::from_ref(&wedge.shape), &k::BooleanOptions::default())?;
+            let cut = NamedShape::new(cut.shape.clone(), ev.name_result(&[&body.names, &wedge.names], &cut.history, &cut.shape, &BTreeMap::new(), None));
+            let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&cut.shape), std::slice::from_ref(&wall.shape), &opts)?;
+            let names = ev.name_result(&[&cut.names, &wall.names], &res.history, &res.shape, &BTreeMap::new(), None);
+            (res.shape, names)
+        }
+    };
+    ev.replace_body(bi, shape, names);
+    data.walls.push(Wall { feature: ev.feature, faces: vec![front], back: vec![back] });
+    let child = data.walls.len() - 1;
+    let (r, kf) = (data.radius, data.k_factor);
+    bend_corner(ev, bi, &mut data, parent, child, r, kf)?;
     put_data(ev, bi, data);
     Ok(())
 }

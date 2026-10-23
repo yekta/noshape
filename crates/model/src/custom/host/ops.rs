@@ -370,6 +370,9 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let target_refs = evaluate_refs(i, &cx, def.get("targets"))?;
     let kind = def_enum(&def, "operationType").unwrap_or_else(|| "UNION".into());
     let keep = def_bool(&def, "keepTools", false);
+    // false: a sheet union keeps the edges imprinted on its faces (std Jog
+    // splits its faces up front, then unions the stretched pieces).
+    let erase = def_bool(&def, "eraseImprintedEdges", true);
     let failure = match &*kind {
         "SUBTRACTION" => "BOOLEAN_SUBTRACT_NO_OP",
         "INTERSECTION" => "BOOLEAN_INTERSECT_FAIL",
@@ -396,9 +399,20 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let remove: Vec<BodyId> = all[1..].to_vec();
                 ev.ctx.bodies.retain(|b| !remove.contains(&b.id));
                 let first = index(ev, &all[0]).unwrap_or(first);
-                ev.boolean_into(&[first], others, k::BooleanOp::Fuse)?;
+                if erase {
+                    ev.boolean_into(&[first], others, k::BooleanOp::Fuse)?;
+                } else {
+                    // Imprinted edges kept: a plain fuse, no face merging.
+                    let target = body_named(ev, first);
+                    let shapes: Vec<Shape> = others.iter().map(|o| o.shape.clone()).collect();
+                    let res = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&target.shape), &shapes, &k::BooleanOptions::default())?;
+                    let mut args: Vec<&crate::naming::ShapeNames> = vec![&target.names];
+                    args.extend(others.iter().map(|o| &o.names));
+                    let names = ev.name_result(&args, &res.history, &res.shape, &BTreeMap::new(), None);
+                    ev.replace_body(first, res.shape, names);
+                }
                 stitch_sheet_pieces(ev, &all[0])?;
-                if let Some(bi) = index(ev, &all[0]) {
+                if erase && let Some(bi) = index(ev, &all[0]) {
                     merge_sheet_faces(ev, bi)?;
                 }
                 Ok(Some(all))
@@ -834,6 +848,11 @@ fn op_fit_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if pts.len() < 2 {
             return err("A spline needs at least two points");
         }
+        // Through two points, nothing else: a line (std Jog reads its fitted
+        // bend reference with evLine).
+        if pts.len() == 2 && tangents.is_empty() {
+            return add_wire(ev, k::make_line(pts[0], pts[1])?);
+        }
         let closed = pts.len() > 2 && (pts[0] - pts[pts.len() - 1]).length() < 1e-9;
         let p = if closed { &pts[..pts.len() - 1] } else { &pts[..] };
         let s = k::make_interpolated_spline(p, &tangents, closed)?;
@@ -1100,6 +1119,7 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("projectionType", ParamValue::Enum("NORMAL_TO_TARGET".into()));
     p.set("keepToolSurfaces", ParamValue::Bool(def_bool(&def, "keepToolSurfaces", false)));
     p.set("extendToCompletion", ParamValue::Bool(def_bool(&def, "extendToCompletion", false)));
+    let own_existing = def_bool(&def, "ownExistingImprints", false);
     if super::trace_ops() {
         eprintln!("[fs op] splitFace targets {:?} tools {:?}", p.query("faceTargets"), p.query("faceTools"));
     }
@@ -1110,7 +1130,12 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let targets: Vec<Shape> = ev.resolve_faces(ev.query("faceTargets")).into_iter().filter_map(|(b, f)| ev.face_shape(b, f).ok()).collect();
         let n_targets = targets.len();
         let targets = Shape::compound(&targets);
-        crate::regen::features::split::split_part(ev)?;
+        match crate::regen::features::split::split_part(ev) {
+            // Owning existing imprints (std Jog splits up front): nothing new
+            // to split is fine; the edges already there are this split's.
+            Err(e) if own_existing && e.message == "The tools don't split the selected faces" => {}
+            r => r?,
+        }
         // The pieces of the target faces (their snapshot points: uv middle, on the face).
         let mut pieces = Vec::new();
         for (bid, _) in &before {
@@ -1141,18 +1166,42 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
             }
         }
+        // `ownExistingImprints` (std Jog): the targets' edges already on a
+        // tool count as its cut too (the face ends where the tool lies).
+        let mut existing = Vec::new();
+        if own_existing {
+            for (bid, _) in &before {
+                let Some(b) = ev.ctx.bodies.iter().find(|b| &b.id == bid) else { continue };
+                for edge in b.shape.edges() {
+                    let (Ok(info), Ok((a, z))) = (edge.edge_info(), edge.endpoints()) else { continue };
+                    if let Ok(m) = edge.point_at((info.first_param + info.last_param) * 0.5) {
+                        existing.push((a, m, z));
+                    }
+                }
+            }
+        }
         // Which planar tool cut which of them.
         let mut tools = Vec::new();
         for (bi, fi) in ev.resolve_faces(ev.query("faceTools")) {
             let Ok(Some(pl)) = ev.face_shape(bi, fi).and_then(|f| f.face_plane().map_err(|e| crate::regen::eval::FeatureError::new(e.to_string()))) else { continue };
             let n = pl.unit_normal();
-            let on: Vec<DVec3> = mids.iter().copied().filter(|m| (*m - pl.origin).dot(n).abs() < 1e-7).collect();
+            let in_plane = |m: DVec3| (m - pl.origin).dot(n).abs() < 1e-7;
+            let mut on: Vec<DVec3> = mids.iter().copied().filter(|m| in_plane(*m)).collect();
+            on.extend(existing.iter().filter(|(a, m, z)| in_plane(*a) && in_plane(*m) && in_plane(*z)).map(|e| e.1));
             tools.push((pl.origin, n, on));
         }
-        Ok((made, tools, pieces))
+        Ok((made, tools, pieces, owners))
     })?;
-    let (new_edges, tools, pieces) = new_edges;
+    let (new_edges, tools, pieces, owners) = new_edges;
     let mut st = cx.state.lock();
+    if own_existing {
+        // Its edges derive from this split even where it changed nothing
+        // (tracking keeps what operations since its start made or changed).
+        let seq = st.next_seq;
+        for b in owners {
+            st.touched.insert(b, seq);
+        }
+    }
     st.split_tools.extend(tools);
     st.split_face_pieces.insert(id.clone(), pieces);
     drop(st);
