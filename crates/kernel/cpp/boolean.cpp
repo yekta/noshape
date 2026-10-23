@@ -1267,7 +1267,8 @@ bool blend_in_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Edge>& 
   stages.push_back({stage_of(shared, h3)});
   HHist h = compose({target}, stages);
   const TopoDS_Shape r = unify(joined, h);
-  if (!BRepCheck_Analyzer(r).IsValid())
+  // The whole joined part (806 faces for 400 holes): checked in parallel.
+  if (!BRepCheck_Analyzer(r, true, true).IsValid())
     return false;
   out  = r;
   hist = h;
@@ -1391,7 +1392,8 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
   stages.push_back({stage_of(shared, h3)});
   HHist h = compose(concat({target}, t), stages);
   const TopoDS_Shape r = unify(joined, h);
-  if (!BRepCheck_Analyzer(r).IsValid())
+  // The whole joined part (406 faces for 400 holes): checked in parallel.
+  if (!BRepCheck_Analyzer(r, true, true).IsValid())
     return false;
   out  = r;
   hist = h;

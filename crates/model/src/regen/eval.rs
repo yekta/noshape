@@ -820,6 +820,11 @@ impl<'a> EvalCtx<'a> {
                     None => run(),
                 }
             };
+            // A cut by many tools (400 holes) unifies in the kernel: then it
+            // can cut slab by slab in parallel (boolean.cpp `cut_slabs`),
+            // whose joined slabs need the unification this function does
+            // below anyway (big plate PERF1).
+            let opts = &if op == k::BooleanOp::Cut && near_shapes.len() >= 64 { k::BooleanOptions { unify: true, ..*opts } } else { *opts };
             let mut res = run(opts)?;
             // OCCT sometimes returns an empty cut, with no error, for a valid
             // one (a hole running into a fillet, qa4 F12): never let a part
