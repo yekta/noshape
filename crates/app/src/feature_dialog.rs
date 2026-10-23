@@ -1360,7 +1360,7 @@ impl FeatureDialog {
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Create variable"))
-                    .child(div().id("cv-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(blocked, |d| d.opacity(0.2)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb_static(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.commit_create_variable(window, cx))))
+                    .child(div().id("cv-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(blocked, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb_static(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.commit_create_variable(window, cx))))
                     .child(div().id("cv-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.cancel_create_variable(window, cx)))),
             )
             .child(target)
@@ -3127,7 +3127,7 @@ impl Render for FeatureDialog {
                             .h(px(28.))
                             .p_0()
                             .rounded(px(0.))
-                            .bg(pal.accept).when(blocked, |d| d.opacity(0.2))
+                            .bg(pal.accept).when(blocked, crate::ui::disabled_accept)
                             // Live (dom/cursors.txt): ✓ and ✗ show the default arrow
                             // (`.ns-dialog-button-ok/-cancel`), enabled or not.
                             .cursor(CursorStyle::Arrow)
