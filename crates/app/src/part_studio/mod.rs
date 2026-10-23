@@ -387,7 +387,7 @@ impl PartStudioView {
             cache: GpuCache::default(),
             selection: Vec::new(),
             hover: None,
-            opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, ..Default::default() },
+            opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, highlight_boundary: crate::view_defaults::get(cx).highlight_boundary, ..Default::default() },
             edit: None,
             selected_features: Vec::new(),
             regen: Arc::new(Mutex::new(Regenerator::new())),
