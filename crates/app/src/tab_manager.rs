@@ -263,7 +263,7 @@ impl TabManager {
             .child(os::glyph(os::GLYPH_FOLDER, 24., pal.text))
             .child(match self.renaming.as_ref().filter(|r| r.0 == id) {
                 Some((_, st, _)) => div().w(px(200.)).child(Input::new(st).h(px(26.)).text_size(px(14.))).into_any_element(),
-                None => div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(name).into_any_element(),
+                None => div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(name)).into_any_element(),
             })
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                 if e.modifiers().secondary() {
@@ -411,7 +411,7 @@ impl Render for TabManager {
                     .cursor_pointer()
                     .when(sel, |d| d.bg(pal.accent_soft).border_1().border_color(pal.accent).child(div().absolute().left_0().top_0().bottom_0().w(px(if compact { 2. } else { 6. })).bg(pal.accent)))
                     .when(!sel, |d| d.hover(|d| d.bg(pal.panel_hover)))
-                    .when(compact, |d| d.gap(px(6.)).text_size(px(14.)).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().when(sel, |d| d.font_weight(FontWeight::BOLD)).child(name.clone())))
+                    .when(compact, |d| d.gap(px(6.)).text_size(px(14.)).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().when(sel, |d| d.font_weight(FontWeight::BOLD)).child(crate::ui::user_text(name.clone()))))
                     .when(!compact, |d| {
                         d.child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match self.thumbs.images.get(&id) {
                             Some(img) => gpui_kit::img(img.clone()).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
@@ -422,7 +422,7 @@ impl Render for TabManager {
                                 .pl(px(7.))
                                 .flex_1()
                                 .min_w_0()
-                                .child(h_flex().h(px(21.)).gap(px(4.)).text_size(px(14.)).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().when(sel, |d| d.font_weight(FontWeight::BOLD)).child(name.clone())))
+                                .child(h_flex().h(px(21.)).gap(px(4.)).text_size(px(14.)).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().when(sel, |d| d.font_weight(FontWeight::BOLD)).child(crate::ui::user_text(name.clone()))))
                                 .child(div().h(px(19.)).text_size(px(12.6)).line_height(px(18.9)).italic().text_color(pal.text_muted).child(label)),
                         )
                     })
@@ -486,7 +486,7 @@ impl Render for TabManager {
                 .bg(rgb(0xf5f5f5))
                 .px(px(9.))
                 .pt(px(12.))
-                .child(h_flex().gap(px(4.)).text_size(px(15.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().child(name.clone())))
+                .child(h_flex().gap(px(4.)).text_size(px(15.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::assets::icon(icon, 20., cx)).child(div().truncate().child(crate::ui::user_text(name.clone()))))
                 .child(div().flex_1().flex().items_center().justify_center().child(match picture {
                     Some(img) => gpui_kit::img(img).w(px(340.)).h(px(170.)).object_fit(ObjectFit::Contain).into_any_element(),
                     None => crate::assets::icon(icon, 130., cx),

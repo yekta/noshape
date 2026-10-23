@@ -155,7 +155,7 @@ impl FsNoticesPanel {
             .cursor_pointer()
             .child(div().opacity(if gray { 0.5 } else { 1. }).child(os::glyph(if open { os::GLYPH_CHEVRON_DOWN } else { os::GLYPH_CHEVRON_RIGHT }, 12., text)))
             .child(div().opacity(if gray { 0.5 } else { 1. }).child(crate::assets::icon(icon, 18., cx)))
-            .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(text).child(name))
+            .child(div().flex_1().text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(text).child(crate::ui::user_text(name)))
             .when(monitor, |d| {
                 d.child(
                     h_flex()
@@ -216,7 +216,7 @@ impl Render for FsNoticesPanel {
                                     .h(px(22.))
                                     .pl(px(66.))
                                     .child(div().w(px(45.)).flex_none().px(px(5.)).text_size(px(14.)).text_color(rgb(0x888888)).child(format!("{line}:{col}")))
-                                    .child(div().px(px(5.)).text_size(px(14.67)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(name.clone())),
+                                    .child(div().px(px(5.)).text_size(px(14.67)).font_weight(FontWeight::LIGHT).text_color(pal.text).child(crate::ui::user_text(name.clone()))),
                             )
                             .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(FsNoticesEvent::Goto(tab, line, col)))),
                     );

@@ -364,7 +364,7 @@ impl AddItemsDialog {
                             .when(on, |d| d.bg(pal.row_hover))
                             .text_size(px(12.))
                             .cursor_pointer()
-                            .child(o.name.clone())
+                            .child(crate::ui::user_text(o.name.clone()))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 this.pending.entry(tab).or_default().0.insert(iid.clone(), oid.clone());
                                 cx.notify();
@@ -409,7 +409,7 @@ impl AddItemsDialog {
                     gpui_kit::base::input::input_frame(div().w(px(140.)).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&st).appearance(false).xsmall()).into_any_element()).into_any_element()
                 }
             };
-            col = col.child(h_flex().gap_2().child(div().w(px(110.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(input.name.clone())).child(control));
+            col = col.child(h_flex().gap_2().child(div().w(px(110.)).text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::user_text(input.name.clone()))).child(control));
         }
         col.child(
             h_flex().child(os::secondary_button(SharedString::from(format!("cfg-generate-{}", tab.0)), "Generate", cx).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -598,7 +598,7 @@ impl Render for AddItemsDialog {
                             .cursor_pointer()
                             .child(div().w(px(16.)).flex().justify_center().child(crate::ui::glyph(if open { "ui-chevron-down" } else { "ui-chevron-right" }, 11., pal.text)))
                             .child(div().w(px(70.)).flex().justify_center().child(picture(&studio_item(tab, self.configs.get(&tab).cloned().unwrap_or_default()), 40., "part-studio", cx)))
-                            .child(div().text_size(px(14.)).text_color(pal.text).child(name))
+                            .child(div().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(name)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(i) = this.expanded.iter().position(|x| *x == tab) {
                                     this.expanded.remove(i);
@@ -625,7 +625,7 @@ impl Render for AddItemsDialog {
                                     .when(on, |d| d.bg(blue))
                                     .when(!on, |d| d.hover(|d| d.bg(pal.row_hover)))
                                     .child(picture(&it, 70., "part", cx))
-                                    .child(div().text_size(px(14.)).text_color(pal.text).child(it.name.clone()))
+                                    .child(div().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(it.name.clone())))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle(it.clone(), cx))),
                             );
                         }
@@ -644,7 +644,7 @@ impl Render for AddItemsDialog {
                             .when(on, |d| d.bg(blue))
                             .when(!on, |d| d.hover(|d| d.bg(pal.row_hover)))
                             .child(picture(&it, 70., icon, cx))
-                            .child(div().text_size(px(14.)).text_color(pal.text).child(it.name.clone()))
+                            .child(div().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(it.name.clone())))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle(it.clone(), cx))),
                     );
                 }
@@ -667,7 +667,7 @@ impl Render for AddItemsDialog {
                 .gap(px(4.))
                 .bg(blue)
                 .child(picture(it, 70., icon, cx))
-                .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(it.name.clone()))
+                .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(it.name.clone())))
                 .child(div().id(SharedString::from(format!("add-x-{k}"))).cursor_pointer().child(Icon::new(IconName::Close).with_size(px(18.)).text_color(gpui_kit::rgb(0xbd3039))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle(it2.clone(), cx))))
         }).collect::<Vec<_>>();
         let tab_button = |i: usize, label: &'static str, cx: &mut Context<Self>| {
@@ -2217,7 +2217,7 @@ impl Render for ReleaseDraftsPanel {
                     v_flex()
                         .text_size(px(14.))
                         .text_color(pal.text)
-                        .child(d.name.clone())
+                        .child(crate::ui::user_text(d.name.clone()))
                         .child(h_flex().gap_1().text_size(px(13.)).child("by").child(div().font_weight(FontWeight::SEMIBOLD).child(user.clone())).child(div().text_color(pal.text_muted).child(crate::start_library::format_onshape_time(d.created)))),
                 )
                 .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
@@ -2275,7 +2275,7 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                             .flex_1()
                             .text_size(px(12.))
                             .text_color(pal.text)
-                            .child(h_flex().gap_2().child(div().font_weight(FontWeight::BOLD).child(pkg.name.clone())).child(div().text_color(pal.text_muted).child(crate::start_library::format_onshape_time(pkg.created))))
+                            .child(h_flex().gap_2().child(div().font_weight(FontWeight::BOLD).child(crate::ui::user_text(pkg.name.clone()))).child(div().text_color(pal.text_muted).child(crate::start_library::format_onshape_time(pkg.created))))
                             .when_some(version.as_ref().map(|v| v.author.clone()).filter(|a| !a.is_empty()), |d, a| d.child(div().text_color(pal.text_muted).child(format!("User: {a}"))))
                             .child(div().text_color(pal.text_muted).child(format!("Document: {doc_name}")))
                             // Help: "Click the version name … to open that version".

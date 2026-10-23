@@ -662,7 +662,7 @@ impl VisibilityDialog {
                         cx.notify();
                     })),
             )
-            .child(div().ml(px(5.)).text_size(px(16.)).text_color(pal.text).truncate().child(input.name.clone()))
+            .child(div().ml(px(5.)).text_size(px(16.)).text_color(pal.text).truncate().child(crate::ui::user_text(input.name.clone())))
             .when(self.uncovered_options(k), |d| {
                 d.child(div().id(SharedString::from(format!("vis-warn-{id}"))).ml(px(5.)).child(crate::assets::icon("performance-warning", 15., cx)).tooltip(crate::ui::tooltip("Some options do not have an option rule. They will always be hidden.")))
             })
@@ -686,7 +686,7 @@ impl VisibilityDialog {
             );
         } else {
             body = body
-                .child(h_flex().mx(px(24.)).mt(px(10.)).mb(px(8.)).text_size(px(14.)).text_color(pal.text).child(div().mx(px(8.)).child("Show")).child(div().mx(px(8.)).truncate().child(input.name.clone())))
+                .child(h_flex().mx(px(24.)).mt(px(10.)).mb(px(8.)).text_size(px(14.)).text_color(pal.text).child(div().mx(px(8.)).child("Show")).child(div().mx(px(8.)).truncate().child(crate::ui::user_text(input.name.clone()))))
                 .children((0..v.conditions.len()).map(|c| div().ml(px(14.)).mb(px(4.)).child(self.render_condition(At { input: k, rule: None, cond: c }, false, cx))))
                 .child(h_flex().ml(px(36.)).mt(px(4.)).child(self.add_button(SharedString::from(format!("vis-addc-{id}")), "Add condition", "Add a condition to this statement", can_add, Rc::new(move |this: &mut Self| this.change(k, |v| v.conditions.push(blank()))), cx)));
         }
@@ -895,7 +895,7 @@ impl VisibilityDialog {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(if open { TITLE } else { 0xd7d7d7 }))
                         .when(!v.visible, |d| d.opacity(0.75))
-                        .child(div().truncate().child(name))
+                        .child(div().truncate().child(crate::ui::user_text(name)))
                         .child(crate::ui::glyph("ui-caret-down", 9., pal.text))
                         .when(shown, |d| {
                             d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -916,9 +916,9 @@ impl VisibilityDialog {
                             .collect();
                         wrap = wrap.child(div().absolute().top(px(28.)).left_0().child(deferred(anchored().child(self.dropdown(150., items, cx))).with_priority(POPOVER)));
                     }
-                    row.child(div().w(px(70.)).truncate().text_size(px(12.)).text_color(pal.text_muted).child(input.name.clone())).child(wrap)
+                    row.child(div().w(px(70.)).truncate().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(input.name.clone()))).child(wrap)
                 }
-                _ => row.child(div().w(px(70.)).truncate().text_size(px(12.)).text_color(pal.text_muted).child(input.name.clone())).child(div().flex_1().h(px(26.)).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(value)),
+                _ => row.child(div().w(px(70.)).truncate().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(input.name.clone()))).child(div().flex_1().h(px(26.)).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(value)),
             };
             col = col.child(row);
         }

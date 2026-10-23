@@ -201,7 +201,7 @@ impl VariableStudioView {
             .text_size(px(size))
             .font_weight(weight)
             .text_color(color)
-            .child(text.clone())
+            .child(crate::ui::user_text(text.clone()))
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                 if e.click_count() >= 2 {
                     this.start_cfg_text(key.clone(), text.clone(), commit.clone(), window, cx);
@@ -1047,7 +1047,7 @@ impl VariableStudioView {
                         .border_color(rgb(0xd7d7d7))
                         // Red until it has a name (live vs-913).
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(!ok, |d| d.text_color(rgb(0xaa252d))).child(title))
-                        .child(div().id("vci-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, |d| d.opacity(0.2)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
+                        .child(div().id("vci-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
                         .child(div().id("vci-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.cfg_dialog = None;
                             cx.notify();
@@ -1252,7 +1252,7 @@ impl Render for IdsDialog {
         let table = |title: &str, name_head: &str, rows: Vec<(String, AnyElement)>| {
             let mut t = v_flex().border_l_1().border_t_1().border_color(grid).child(h_flex().child(head(200., name_head)).child(head(366., "Internal ID")));
             for (name, editor) in rows {
-                t = t.child(h_flex().child(cell(200.).bg(rgb(0xf5f5f5)).text_color(pal.text_muted).child(name)).child(editor));
+                t = t.child(h_flex().child(cell(200.).bg(rgb(0xf5f5f5)).text_color(pal.text_muted).child(crate::ui::user_text(name))).child(editor));
             }
             v_flex().gap(px(4.)).when(multiple, |d| d.child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(rgb(0x1651b0)).child(title.to_string()))).child(t)
         };
