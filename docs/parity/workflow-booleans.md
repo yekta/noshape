@@ -85,3 +85,13 @@ Docs /tmp/qa5/d25c/b2.noshape, /tmp/qa5/d25d/s.noshape, /tmp/qa5/d25b/merge.nosh
 | BOOL1b no-change message | blue bubble at the top centre of the graphics, dialog without message (z05) ✅; committed row tooltip **"Boolean 1 <- Extrude 1, Extrude 3"** (live: just "Boolean 1") (z06) | ✅ bubble / ✗ tooltip (minor) |
 | INT2 disjoint Intersect ☑ Keep tools | Parts (3) unchanged (8000 / 1570.796327 / 4000) | ✅ **fixed** |
 | BOOL4b empty merge scope | ✓ enabled, no extra bubble; ✓ → red row "Extrude 4 did not regenerate properly: No merge scope selected.", parts unchanged (z09, z10) | ✅ **fixed** |
+
+## Re-check on main a0e360a3 (qa4, 2026-10-23 19:30–20:40, FRESH=1, /root/qa4-scratch/bin/noshape-main)
+| Finding | Result |
+|---|---|
+| NAME1 positional names | ✅ after Union Part 1 + Part 2 (CLI, mk-three.py), old Part 3 is listed as "Part 2" |
+| BOOL1b committed row tooltip | ✅ "Boolean 1" |
+| MENU1 part menu | ✅ Hide, Hide other parts, Hide all parts |
+| COPY1 Copy here colour | ✅ the copy keeps the source's colour (dark blue) |
+| INT1, SPLIT1, DEL2 | fixed in qa5's later pass |
+| BOOL3, BOOL4(b), INT2, NAME2, DEL1 | fixes cited in code (psb/ui), not re-run this pass |

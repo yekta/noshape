@@ -58,3 +58,10 @@ Status: ✅ matches live/expected, ✗ differs (finding #), ? live data missing.
 | AN1 face + Top, edge + Top | "Parallel dist: 10.000 mm" for both | ✅ **fixed** |
 | AN2 Shift+X prompt | "Select a plane, planar face, cylinder, cone, or mate connector." | ✅ **fixed** |
 | AN3 offset box | click takes focus, typed 5 + Enter moves the section 5 mm, dialog stays open | ✅ **fixed** |
+
+## Re-check on main a0e360a3 (qa4, 2026-10-23 19:30–20:40, FRESH=1, /root/qa4-scratch/bin/noshape-main)
+| Finding | Result |
+|---|---|
+| AN2 Section view prompt | ✅ "…cylinder, cone, or mate connector." (section.rs) |
+| AN4 interference tooltip | ✅ "10 mm x 10 mm x 10 mm" for a 10 mm cube overlap |
+| AN1, AN3, ADV1 | fixes cited in code; not re-run this pass |
