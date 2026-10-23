@@ -1270,13 +1270,14 @@ fn bend_and_jog_move_the_side_live_moves() {
     assert!(near(volume(&r, 0), 4812.566370614357e-9, 1e-15), "bend volume {}", volume(&r, 0));
     assert_eq!(r.context.bodies[0].faces.len(), 14);
     // x < 30 stays flat; the wall rises at x 29.7223453..31.7223453.
-    assert!(near(bb.min.x, 0.0, 1e-9) && near(bb.max.x, mm(31.7223453), 1e-9) && near(bb.max.z, mm(31.7223453), 1e-9), "{bb:?}");
+    // Within the box's tolerance gap (std-built bodies carry 1e-7 m).
+    assert!(near(bb.min.x, 0.0, 2e-7) && near(bb.max.x, mm(31.7223453), 2e-7) && near(bb.max.z, mm(31.7223453), 2e-7), "{bb:?}");
     let r = build("sheetMetalJog");
     let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!(near(volume(&r, 0), 4825.132741228719e-9, 1e-15), "jog volume {}", volume(&r, 0));
     assert_eq!(r.context.bodies[0].faces.len(), 22);
     // Inside anchor: raised plate z 7..9; preserve material pulls its end in to 55.889.
-    assert!(near(bb.min.x, 0.0, 1e-9) && near(bb.max.z, mm(9.0), 1e-9) && near(bb.max.x, mm(55.889), 1e-6), "{bb:?}");
+    assert!(near(bb.min.x, 0.0, 2e-7) && near(bb.max.z, mm(9.0), 2e-7) && near(bb.max.x, mm(55.889), 1e-6), "{bb:?}");
 }
 
 /// patternUtils.fs / curvePattern.fs: what is patterned is checked first, and
