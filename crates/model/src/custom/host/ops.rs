@@ -473,8 +473,9 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
             let body = ev.ctx.bodies[bi].clone();
             let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
             let res = match (chamfer, spec) {
-                (false, k::ChamferSpec::Equal(r)) => k::fillet(&body.shape, &shapes, r),
-                (_, s) => k::chamfer(&body.shape, &shapes, s, &[]),
+                // The same blends as the Fillet and Chamfer features (with their fallbacks).
+                (false, k::ChamferSpec::Equal(r)) => k::fillet_checked(&body.shape, &shapes, &[r]),
+                (_, s) => k::chamfer_checked(&body.shape, &shapes, s, &[]),
             }
             .map_err(|e| fe(e.to_string()))?;
             let names = body.shape_names();
