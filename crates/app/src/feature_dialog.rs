@@ -2276,7 +2276,7 @@ impl FeatureDialog {
                             .rounded(px(2.))
                             .border_1()
                             .border_color(if flashing || error.is_some() { pal.error } else if active || cs_open { pal.accent } else { pal.border })
-                            .bg(if active { pal.row_hover } else if error.is_some() { gpui_kit::rgb(0xf9ebec) } else { pal.panel })
+                            .bg(if active { pal.query_active } else if error.is_some() { gpui_kit::rgb(0xf9ebec) } else { pal.panel })
                             // A parameter with a description shows Onshape's
                             // expanding tooltip (live Derived › Locations: the
                             // label, then "Select or create mate connectors…").
@@ -2389,7 +2389,7 @@ impl FeatureDialog {
                         .rounded(px(2.))
                         .border_1()
                         .border_color(if active { pal.accent } else { pal.border })
-                        .bg(if active { pal.row_hover } else { pal.panel })
+                        .bg(if active { pal.query_active } else { pal.panel })
                         .cursor_pointer()
                         .child(div().px(px(6.)).when(items == 0, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33))).when(items > 0, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.))).text_color(pal.text_muted).child(s.label));
                     let mut details: Vec<AnyElement> = Vec::new();

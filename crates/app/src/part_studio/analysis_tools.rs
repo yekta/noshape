@@ -784,7 +784,7 @@ impl PartStudioView {
                 .rounded(px(2.))
                 .border_1()
                 .border_color(if active { pal.accent } else { gpui_kit::rgb(0xd7d7d7) })
-                .when(active, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                .when(active, |d| d.bg(crate::theme::p().query_active))
                 .cursor_pointer()
                 .child(div().pt(px(6.)).px(px(6.)).pb(px(if empty { 5. } else { 2. })).text_size(px(12.)).line_height(px(13.33)).text_color(gpui_kit::rgb(if active { 0x555555 } else { 0x666666 })).child(caption))
                 .children(rows)

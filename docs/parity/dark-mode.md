@@ -24,33 +24,33 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 ## Side by side (live capture | ours | notes | status)
 | capture | ours | notes | status |
 |---|---|---|---|
-| dk-910-documents | | | ☐ |
-| dk-911-documents-row-hover | | | ☐ |
-| dk-912-documents-row-selected | | | ☐ |
+| dk-910-documents | /tmp/ui2/dkdocs.png | page #333, navbar #1c1c1c, left nav, list, details, footer: same colours | ☑ colours |
+| dk-911-documents-row-hover | dkdocs | hover = `--os-hover-primary` #0a4780 (the capture shows no pointer on a row) | ☑ |
+| dk-912-documents-row-selected |  | selected row `accent_soft` #134e96 = live | ☑ |
 | dk-913-create-menu | | | ☐ |
 | dk-913b-create-menu-hover | | | ☐ |
 | dk-914-new-document-modal | | | ☐ |
 | dk-915-state | | | ☐ |
-| dk-920-partstudio | | | ☐ |
+| dk-920-partstudio | dk2/dk3 | viewport #333, planes, cube, navbar, toolbar, rail #2c2c2c, panel #333 = live; static icons outlined (icons2) | ◐ icons |
 | dk-921-partstudio | | | ☐ |
 | dk-922-feature-hover | | | ☐ |
 | dk-923-feature-selected | | | ☐ |
 | dk-924-feature-rmb | | | ☐ |
 | dk-925-tool-tooltip | | | ☐ |
-| dk-926-feature-dialog | | | ☐ |
+| dk-926-feature-dialog | dkext2 | dialog #333, active query box #142434 + #3e94ff border, related row #092046, selected #134e96 = live | ☑ |
 | dk-927-variable-table | | | ☐ |
 | dk-928-configurations | | | ☐ |
-| dk-929-face-selected-measure | | | ☐ |
+| dk-929-face-selected-measure | dk3 | bg, planes 1/2 stacked, plane edges, origin, cube = live within a few levels | ☑ |
 | dk-930-face-hover | | | ☐ |
 | dk-931-sketch-line | | | ☐ |
 | dk-932-sketch-dimension | | | ☐ |
 | dk-933-sketch-after | | | ☐ |
-| dk-940-assembly | | | ☐ |
+| dk-940-assembly | dkasm | chrome, list and viewport match; static icons outlined (icons2) | ◐ icons |
 | dk-941-mate-dialog | | | ☐ |
 | dk-942-bom | | | ☐ |
 | dk-950-drawing | | | ☐ |
 | dk-951-drawing-properties | | | ☐ |
-| dk-960-feature-studio | | | ☐ |
+| dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
 | dk-961-variable-studio | | | ☐ |
 | dk-990-restored-light | | | ☐ |
 
