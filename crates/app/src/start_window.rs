@@ -84,6 +84,16 @@ pub fn show(cx: &mut App) {
     }
 }
 
+/// Show the start window with an error message bubble (a document named on
+/// the command line could not be opened).
+pub fn show_with_error(message: impl Into<String>, cx: &mut App) {
+    show(cx);
+    let message = message.into();
+    if let Some(handle) = cx.try_global::<StartWindowGlobal>().map(|g| g.handle) {
+        let _ = handle.update(cx, |_, window, cx| StartView::notify(window, cx, AlertKind::Error, message));
+    }
+}
+
 /// Show the start window and ask for a new document's name (Ctrl+N from
 /// any window).
 pub fn show_and_create(cx: &mut App) {
