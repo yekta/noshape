@@ -833,7 +833,9 @@ fn recognize_rebuilds_sheet_metal_model() {
         p.set("depth", expr("20 mm"));
         set_model(p, "2 mm", "3 mm");
     });
-    s.add("sheetMetalEnd", |_| {});
+    // Finish needs its parts (live: "Select one or more sheet metal parts.").
+    let part = Reference::Body(s.ok().context.bodies[0].id.clone());
+    s.add("sheetMetalEnd", move |p| p.set("sheetMetalParts", ParamValue::Query(vec![part])));
     let r = s.ok();
     let expected = flat(&r, 0).size();
     let id = r.context.bodies[0].id.clone();

@@ -243,7 +243,9 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
         };
         match &*kind {
             "ERROR" => return err(text),
-            "WARNING" | "INFO" => ev.warnings.push(text),
+            "WARNING" => ev.warnings.push(text),
+            // reportFeatureInfo (std Finish sheet metal model): an Info status.
+            "INFO" => ev.infos.push(text),
             _ => {}
         }
     }
