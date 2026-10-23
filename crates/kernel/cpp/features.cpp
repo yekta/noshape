@@ -32,6 +32,9 @@
 #include <BRepFeat_MakeLinearForm.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
+#include <limits>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRepLib.hxx>
 #include <BRepLib_FindSurface.hxx>
 #include <BRepOffsetAPI_DraftAngle.hxx>
@@ -52,6 +55,7 @@
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
+#include <BRepTools_ReShape.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
@@ -795,7 +799,7 @@ static std::vector<std::vector<double>> natural_bezier(const std::vector<std::ve
 }
 
 // Lofts through three or more sections: Parasolid interpolates between the
-// sections with a natural cubic spline (Onshape G10: Ø20 → square 12 → Ø20,
+// sections with a natural cubic spline at chord-length parameters (Onshape G10: Ø20 → square 12 → Ø20,
 // 6125.607 mm³), OCCT with one polynomial (a parabola through three,
 // 5917.6). Each lateral face of the loft spans every section; its surface is
 // rebuilt in place from the section rows, so topology and history stay.
@@ -876,9 +880,26 @@ static bool natural_loft(const TopoDS_Shape& loft, const std::vector<TopoDS_Wire
     // Column by column: (x, y, z) or homogeneous (w x, w y, w z, w) with equal weights.
     const int  nu = rows[0]->NbPoles();
     const bool homogeneous = rows[0]->IsRational();
-    std::vector<double> t(n);
+    // Chord-length parameters: the mean distance between neighbouring
+    // sections (live L2: square 40 -> Ø40 -> square 20 turned 45°, 45412.22
+    // in Onshape's band; uniform ones give 45554).
+    std::vector<double> t(n), len(n, 0);
+    for (int k = 1; k < n; ++k)
+    {
+      double    sum = 0;
+      const int ns  = 64;
+      for (int i = 0; i <= ns; ++i)
+      {
+        const double u = u0 + (u1 - u0) * i / ns;
+        sum += rows[k]->Value(u).Distance(rows[k - 1]->Value(u));
+      }
+      len[k] = len[k - 1] + sum / (ns + 1);
+    }
     for (int k = 0; k < n; ++k)
-      t[k] = v0 + (v1 - v0) * k / (n - 1);
+      t[k] = v0 + (v1 - v0) * (len[n - 1] > 0 ? len[k] / len[n - 1] : double(k) / (n - 1));
+    for (int k = 1; k < n; ++k)
+      if (!(t[k] > t[k - 1]))
+        return false;
     const int                  nv = 3 * (n - 1) + 1;
     NCollection_Array2<gp_Pnt> poles(1, nu, 1, nv);
     NCollection_Array2<double> weights(1, nu, 1, nv);
@@ -1164,6 +1185,125 @@ static bool match_vertex_counts(std::vector<TopoDS_Wire>& wires, HHist& hist)
   return true;
 }
 
+// A closed single-curve section (a circle) lofted to polygons: Parasolid
+// splits it where the nearest polygon's corners point from its centre (live
+// L1: square 40 -> circle Ø30 split at 45°, each corner straight to the circle
+// point on its diagonal, 6 faces; OCCT also splits at the circle's own seam,
+// 7). Sections of equal vertex counts then pair start to start, each
+// polygon's start the corner nearest in angle to the previous section's,
+// clockwise about the loft's direction on a tie (live L2 bodydetails: square
+// 40 -> circle Ø40 -> square 20 turned 45°: the side edges run from each
+// corner to the top corner 45° clockwise, 6 faces). `hist` records the circles' pieces (Modified). False when there's
+// no such section (nothing changed).
+static bool split_closed_sections(std::vector<TopoDS_Wire>& wires, HHist& hist)
+{
+  auto edges_of = [](const TopoDS_Wire& w) {
+    std::vector<TopoDS_Edge> es;
+    for (BRepTools_WireExplorer ex(w); ex.More(); ex.Next())
+      es.push_back(ex.Current());
+    return es;
+  };
+  auto starts_of = [](const TopoDS_Wire& w) {
+    std::vector<gp_Pnt> ps;
+    for (BRepTools_WireExplorer ex(w); ex.More(); ex.Next())
+      ps.push_back(BRep_Tool::Pnt(ex.CurrentVertex()));
+    return ps;
+  };
+  auto centre = [](const TopoDS_Shape& w) {
+    GProp_GProps g;
+    BRepGProp::LinearProperties(w, g);
+    return g.CentreOfMass();
+  };
+  const std::vector<TopoDS_Wire> before = wires;
+  bool                           split  = false;
+  for (size_t si = 0; si < wires.size(); ++si)
+  {
+    const std::vector<TopoDS_Edge> own = edges_of(before[si]);
+    if (own.size() != 1 || own[0].Orientation() == TopAbs_REVERSED)
+      continue;
+    double                  f = 0, l = 0;
+    occ::handle<Geom_Curve> c = BRep_Tool::Curve(own[0], f, l);
+    if (c.IsNull() || !c->IsPeriodic() || !BRep_Tool::IsClosed(own[0]))
+      continue;
+    size_t ref = SIZE_MAX, gap = SIZE_MAX;
+    for (size_t r = 0; r < wires.size(); ++r)
+      if (r != si && edges_of(before[r]).size() >= 2 && (r > si ? r - si : si - r) < gap)
+        ref = r, gap = r > si ? r - si : si - r;
+    if (ref == SIZE_MAX)
+      continue;
+    const gp_Pnt        cr = centre(before[ref]), cs = centre(before[si]);
+    const double        period = l - f;
+    std::vector<double> ts;
+    for (const gp_Pnt& v : starts_of(before[ref]))
+    {
+      GeomAPI_ProjectPointOnCurve pr(cs.Translated(gp_Vec(cr, v)), c, f, l);
+      if (pr.NbPoints() == 0)
+        return false;
+      ts.push_back(pr.LowerDistanceParameter());
+    }
+    // From the first corner's point on, increasing along the curve.
+    const double t0 = ts[0];
+    for (double& t : ts)
+      t = t0 + std::fmod(std::fmod(t - t0, period) + period, period);
+    std::sort(ts.begin() + 1, ts.end());
+    ts.push_back(t0 + period);
+    BRepBuilderAPI_MakeWire mk;
+    TopoDS_Edge             key = own[0];
+    key.Orientation(TopAbs_FORWARD);
+    TopoDS_Vertex first, prev;
+    for (size_t k = 0; k + 1 < ts.size(); ++k)
+    {
+      if (!(ts[k + 1] - ts[k] > 1e-9))
+        return false;
+      TopoDS_Vertex v0 = k == 0 ? BRepBuilderAPI_MakeVertex(c->Value(ts[0])).Vertex() : prev;
+      if (k == 0)
+        first = v0;
+      TopoDS_Vertex v1 = k + 2 == ts.size() ? first : BRepBuilderAPI_MakeVertex(c->Value(ts[k + 1])).Vertex();
+      TopoDS_Edge   e  = BRepBuilderAPI_MakeEdge(c, v0, v1, ts[k], ts[k + 1]).Edge();
+      prev             = v1;
+      mk.Add(e);
+      if (hist.IsNull())
+        hist = new BRepTools_History();
+      hist->AddModified(key, e);
+    }
+    if (!mk.IsDone())
+      return false;
+    wires[si] = mk.Wire();
+    split     = true;
+  }
+  if (!split)
+    return false;
+  // Pair the starts when the counts now agree.
+  const size_t m = edges_of(wires[0]).size();
+  for (const auto& w : wires)
+    if (edges_of(w).size() != m)
+      return true;
+  for (size_t i = 1; i < wires.size(); ++i)
+  {
+    const std::vector<gp_Pnt> prev = starts_of(wires[i - 1]), mine = starts_of(wires[i]);
+    const gp_Pnt              cp = centre(wires[i - 1]), cm = centre(wires[i]);
+    const gp_Vec              axis(cp, cm);
+    if (axis.Magnitude() < Precision::Confusion())
+      continue;
+    const gp_Dir z(axis);
+    const gp_Vec a(cp, prev[0]);
+    size_t       best = 0;
+    double       bd   = 1e300;
+    for (size_t k = 0; k < mine.size(); ++k)
+    {
+      const gp_Vec b(cm, mine[k]);
+      // Signed angle from a to b about z, in (-pi, pi]; a tie goes clockwise.
+      const double ang = a.AngleWithRef(b, gp_Vec(z));
+      const double d   = std::abs(ang) - (ang < 0 ? 1e-9 : 0);
+      if (d < bd)
+        bd = d, best = k;
+    }
+    if (best != 0)
+      wires[i] = rotate_wire_start(wires[i], mine[best]);
+  }
+  return true;
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
                        rust::Slice<const double> start_points, bool allow_natural)
 {
@@ -1201,7 +1341,12 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   }
   // Vertex counts matched like Parasolid; then OCCT must keep that matching.
   HHist      split;
-  const bool matched = !points && start_points.empty() && match_vertex_counts(wires, split);
+  const bool circles = !points && start_points.empty() && split_closed_sections(wires, split);
+  HHist      more;
+  const bool counts  = !points && start_points.empty() && match_vertex_counts(wires, more);
+  if (counts)
+    split = split.IsNull() ? more : compose(compound_of(args), split, more);
+  const bool matched = circles || counts;
   ts.CheckCompatibility(!matched);
   TopoDS_Wire firstWire = wires.empty() ? TopoDS_Wire() : wires.front();
   for (size_t i = 0, w = 0; i < n; ++i)
@@ -1598,12 +1743,19 @@ struct Scaled
   {
     if (to.IsNull())
       return make_result({input}, r, h.get());
+    auto [out, all] = unscaled(r, h);
+    return make_result({input}, out, all.get());
+  }
+  // The same as a shape and history (`h` non-null).
+  std::pair<TopoDS_Shape, HHist> unscaled(const TopoDS_Shape& r, const HHist& h) const
+  {
+    if (to.IsNull())
+      return {r, h};
     gp_Trsf t;
     t.SetScale(gp_Pnt(0, 0, 0), 1.0 / factor);
     BRepBuilderAPI_Transform tr(r, t, true);
     HHist back = new BRepTools_History(to_list({r}), tr);
-    HHist all  = compose(input, compose(input, to, h), back);
-    return make_result({input}, tr.Shape(), all.get());
+    return {tr.Shape(), compose(input, compose(input, to, h), back)};
   }
   double       factor;
   TopoDS_Shape input, shape;
@@ -1918,6 +2070,233 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& 
   return std::make_pair(cut.Shape(), h);
 }
 
+// Whether a fillet that failed would have to roll past the faces it touches
+// (Parasolid's "Unfilleted edge overlapped by fillet."; live "kern blend
+// sweep" 2a: R1 round a Ø6 hole whose rim lies on an R8 fillet, where the
+// rim meets that fillet at 29° the ball can't sit). Along each edge, the ball
+// centre at distance r from both surfaces (Newton in the plane across the
+// edge): where there is none, the fillet can't stay on its faces.
+bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es, const std::vector<double>& rs)
+{
+  ShapeAncMap e2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  // Signed distance into the material from face f's surface, its foot and gradient.
+  auto dist = [](const TopoDS_Face& f, const gp_Pnt& c, gp_Pnt2d& uv, gp_Vec& grad) {
+    occ::handle<Geom_Surface>  sf = BRep_Tool::Surface(f);
+    GeomAPI_ProjectPointOnSurf pr(c, sf);
+    if (pr.NbPoints() == 0)
+      return std::numeric_limits<double>::quiet_NaN();
+    double u, v;
+    pr.LowerDistanceParameters(u, v);
+    uv = gp_Pnt2d(u, v);
+    gp_Pnt p;
+    gp_Vec du, dv;
+    sf->D1(u, v, p, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (n.Magnitude() < 1e-12)
+      return std::numeric_limits<double>::quiet_NaN();
+    n.Normalize();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    grad = -n; // into the material
+    return gp_Vec(c, p).Dot(n);
+  };
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const double     r  = rs.size() == 1 ? rs[0] : rs[i];
+    const ShapeList* fl = e2f.Seek(es[i]);
+    if (fl == nullptr || fl->Extent() != 2)
+      continue;
+    const TopoDS_Face f1 = TopoDS::Face(fl->First()), f2 = TopoDS::Face(fl->Last());
+    BRepAdaptor_Curve c(es[i]);
+    for (int k = 0; k < 16; ++k)
+    {
+      const double par = c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * (k + 0.5) / 16;
+      gp_Pnt       P;
+      gp_Vec       t;
+      c.D1(par, P, t);
+      if (t.Magnitude() < 1e-12)
+        continue;
+      gp_Pnt2d uv1, uv2;
+      gp_Vec   g1, g2;
+      if (std::isnan(dist(f1, P, uv1, g1)) || std::isnan(dist(f2, P, uv2, g2)))
+        continue;
+      // Convex edges only (the ball inside the material, between the faces).
+      const gp_Vec bis = g1 + g2;
+      if (bis.Magnitude() < 1e-9)
+        continue;
+      gp_Pnt C = P.Translated(bis.Normalized() * r);
+      const gp_Vec u = (g1 - t.Normalized() * g1.Dot(t.Normalized())).Normalized();
+      const gp_Vec v = t.Normalized().Crossed(u);
+      bool ok = false;
+      for (int it = 0; it < 40; ++it)
+      {
+        const double d1 = dist(f1, C, uv1, g1), d2 = dist(f2, C, uv2, g2);
+        if (std::isnan(d1) || std::isnan(d2))
+          break;
+        const double e1 = d1 - r, e2 = d2 - r;
+        if (std::abs(e1) < 1e-9 * (1 + r) && std::abs(e2) < 1e-9 * (1 + r))
+        {
+          ok = true;
+          break;
+        }
+        const double a = g1.Dot(u), b = g1.Dot(v), cc = g2.Dot(u), d = g2.Dot(v), det = a * d - b * cc;
+        if (std::abs(det) < 1e-12)
+          break;
+        const double su = (-e1 * d + e2 * b) / det, sv = (-a * e2 + cc * e1) / det;
+        C.Translate(u * su + v * sv);
+        if (C.Distance(P) > 100 * r)
+          break;
+      }
+      // (A contact beyond its face isn't it: Parasolid lets the fillet run
+      // over onto the next face, and fails otherwise with its general
+      // message, live F2: R12 on a 10 mm block's top edges.)
+      if (!ok)
+        return true;
+    }
+  }
+  return false;
+}
+
+// BRepFilletAPI_MakeFillet on `es` (radii `rs`) of the input scaled by `sc`.
+static BlendBuild fillet_build(const Scaled& sc, const std::vector<TopoDS_Edge>& es,
+                               const std::vector<double>& rs)
+{
+  return [&sc, &es, &rs](double scale, TopoDS_Shape& out, HHist& h) {
+    BRepFilletAPI_MakeFillet mk(sc.shape);
+    for (size_t i = 0; i < es.size(); ++i)
+      mk.Add(rs[i] * scale * sc.factor, TopoDS::Edge(sc.image(es[i])));
+    mk.Build();
+    if (!mk.IsDone())
+      return false;
+    out = mk.Shape();
+    h   = history_of({sc.shape}, mk);
+    // OCCT's patch where the loop runs over smaller corner fillets -> Parasolid's.
+    HHist corners;
+    out = exact_vertex_blends(out, corners);
+    if (!corners.IsNull())
+      h = compose(sc.shape, h, corners);
+    return true;
+  };
+}
+
+// A fillet along a closed edge that OCCT can't take all the way round (skb:
+// the 0.002 in mouth of the #8 flat countersunk Type VI recess, a closed
+// B-spline with its seam vertex on a lobe): the same fillet with the edge
+// split in two at the middle of its range, which OCCT builds as one face,
+// Parasolid's (live: 14 faces, the fillet one B-spline face). Null when no
+// edge is closed or that fails too.
+static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_split_closed(
+    const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es, const std::vector<double>& rs,
+    double rmax)
+{
+  ShapeAncMap e2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  occ::handle<BRepTools_ReShape>    reshape = new BRepTools_ReShape;
+  BRep_Builder                      B;
+  std::vector<TopoDS_Edge>          es2;
+  std::vector<double>               rs2;
+  std::vector<std::pair<TopoDS_Edge, std::vector<TopoDS_Edge>>> split;
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const TopoDS_Edge fe = TopoDS::Edge(es[i].Oriented(TopAbs_FORWARD));
+    TopoDS_Vertex     v0, v1;
+    TopExp::Vertices(fe, v0, v1);
+    double                    f = 0, l = 0;
+    occ::handle<Geom_Curve>   c  = BRep_Tool::Curve(fe, f, l);
+    const ShapeList*          fl = e2f.Seek(fe);
+    bool                      ok = !c.IsNull() && !v0.IsNull() && v0.IsSame(v1) && fl != nullptr;
+    if (ok)
+      for (ShapeList::Iterator it(*fl); it.More(); it.Next())
+        ok = ok && !BRep_Tool::IsClosed(fe, TopoDS::Face(it.Value()));
+    if (!ok)
+    {
+      es2.push_back(es[i]);
+      rs2.push_back(rs[i]);
+      continue;
+    }
+    const double  tol = BRep_Tool::Tolerance(fe), m = 0.5 * (f + l);
+    TopoDS_Vertex vm;
+    B.MakeVertex(vm, c->Value(m), tol);
+    auto piece = [&](double a, double b, const TopoDS_Vertex& va, const TopoDS_Vertex& vb) {
+      TopoDS_Edge n;
+      B.MakeEdge(n, c, tol);
+      B.Add(n, va.Oriented(TopAbs_FORWARD));
+      B.Add(n, vb.Oriented(TopAbs_REVERSED));
+      B.Range(n, a, b);
+      for (ShapeList::Iterator it(*fl); it.More(); it.Next())
+      {
+        const TopoDS_Face&        F = TopoDS::Face(it.Value());
+        double                    pf, pl;
+        occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(fe, F, pf, pl);
+        B.UpdateEdge(n, pc, F, tol);
+        B.Range(n, F, a, b);
+      }
+      B.SameRange(n, BRep_Tool::SameRange(fe));
+      B.SameParameter(n, BRep_Tool::SameParameter(fe));
+      return n;
+    };
+    const std::vector<TopoDS_Edge> two = {piece(f, m, v0, vm), piece(m, l, vm, v0)};
+    TopoDS_Compound                cc;
+    B.MakeCompound(cc);
+    for (const TopoDS_Edge& n : two)
+    {
+      B.Add(cc, n);
+      es2.push_back(n);
+      rs2.push_back(rs[i]);
+    }
+    reshape->Replace(fe, cc);
+    split.emplace_back(fe, two);
+  }
+  if (split.empty())
+    return std::nullopt;
+  try
+  {
+    const TopoDS_Shape cut = reshape->Apply(input);
+    if (!valid_shape(cut))
+      return std::nullopt;
+    // Input -> split: the closed edges to their halves, the rest as rebuilt.
+    HHist       rh = reshape->History();
+    HHist       h1 = new BRepTools_History();
+    for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap in;
+      TopExp::MapShapes(input, k, in);
+      for (int i = 1; i <= in.Extent(); ++i)
+      {
+        const TopoDS_Shape& x    = in(i);
+        bool                done = false;
+        for (const auto& [e, two] : split)
+          if (e.IsSame(x))
+          {
+            for (const TopoDS_Edge& n : two)
+              h1->AddModified(x, n);
+            done = true;
+          }
+        if (done || rh.IsNull())
+          continue;
+        const ShapeList& m = rh->Modified(x);
+        for (ShapeList::Iterator it(m); it.More(); it.Next())
+          h1->AddModified(x, it.Value());
+        if (rh->IsRemoved(x))
+          h1->Remove(x);
+      }
+    }
+    const Scaled sc(cut, working_scale());
+    auto [r, h] = checked_blend(sc.shape, fillet_build(sc, es2, rs2), true, rmax * sc.factor, "fillet");
+    auto [out, h2] = sc.unscaled(r, h.IsNull() ? HHist(new BRepTools_History()) : h);
+    return std::make_pair(out, compose(input, h1, h2));
+  }
+  catch (const Standard_Failure&)
+  {
+    return std::nullopt;
+  }
+  catch (const std::runtime_error&)
+  {
+    return std::nullopt;
+  }
+}
+
 OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked)
 {
@@ -1963,32 +2342,20 @@ OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const do
   }
   try
   {
-    return scaled_blend(s.shape, checked, rmax, "fillet", [&](const Scaled& sc) -> BlendBuild {
-    return [&sc, &es, &rs](double scale, TopoDS_Shape& out, HHist& h) {
-      BRepFilletAPI_MakeFillet mk(sc.shape);
-      for (size_t i = 0; i < es.size(); ++i)
-        mk.Add(rs[i] * scale * sc.factor, TopoDS::Edge(sc.image(es[i])));
-      mk.Build();
-      if (!mk.IsDone())
-        return false;
-      out = mk.Shape();
-      h   = history_of({sc.shape}, mk);
-      // OCCT's patch where the loop runs over smaller corner fillets -> Parasolid's.
-      HHist corners;
-      out = exact_vertex_blends(out, corners);
-      if (!corners.IsNull())
-        h = compose(sc.shape, h, corners);
-      return true;
-    };
-  });
+    return scaled_blend(s.shape, checked, rmax, "fillet",
+                        [&](const Scaled& sc) { return fillet_build(sc, es, rs); });
   }
   catch (const std::runtime_error&)
   {
     if (!checked)
       throw;
-    auto past = fillet_past_end_faces(s.shape, es, rs);
+    auto past = fillet_split_closed(s.shape, es, rs, rmax);
+    if (!past)
+      past = fillet_past_end_faces(s.shape, es, rs);
     if (!past)
       past = fillet_as_cut(s.shape, es, rs);
+    if (!past && fillet_overflows(s.shape, es, rs))
+      fail_op("fillet failed: unfilleted edge overlapped by fillet");
     if (!past)
       throw;
     return make_result({s.shape}, past->first, past->second.get());
