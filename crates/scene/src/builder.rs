@@ -903,6 +903,23 @@ pub fn error_geometry(mesh: &noshape_model::display::MeshBuffers, up: &Uploader)
     out
 }
 
+/// The boundary edges of `faces` where other geometry hides them, dashed in
+/// the selection color (live "lp wall over" 2258: the seed of a failed
+/// Feature pattern behind the block).
+pub fn hidden_edges_dashed(display: &StudioDisplay, faces: &[Reference], up: &Uploader) -> Option<Instance> {
+    let edges: std::collections::HashSet<Reference> = faces.iter().flat_map(|f| face_edges(display, f)).collect();
+    let color = lin_to_u8(theme::lin(theme::viewport::SELECTION));
+    let mut lines = LineData::default();
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
+        for (pl, r) in b.mesh.edges.iter().zip(&b.edge_refs) {
+            if edges.contains(r) {
+                lines.push_polyline(pl, color, 0, 1.5, LineSegment::DASHED);
+            }
+        }
+    }
+    (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().hidden_only().layer(12))
+}
+
 /// An edge by its quantized end points.
 type EdgeKey = ([i64; 3], [i64; 3]);
 

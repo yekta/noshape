@@ -471,6 +471,10 @@ pub mod state {
     /// selected face's; with OUTLINE its silhouette is #ffc04c, 3 px. On
     /// edges (alone): the part's edges let the amber through.
     pub const BODY: u32 = 256;
+    /// Faces: a light selection tint over their shading (20 % of the
+    /// selection color in sRGB; live "lp wall over" 2258: a feature picked
+    /// in Features to pattern, end face #4e6876 → #717560).
+    pub const TINT: u32 = 512;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
