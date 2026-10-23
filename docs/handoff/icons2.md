@@ -844,3 +844,7 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   from sketch/1956, the slot OFFSET's centre line + end (`constraint_masters(kind, sk)`). Pierce / pattern glyph:
   live capture still pending.
   Test a_hovered_glyph_highlights_its_entities_orange_and_its_master_yellow; verified in app (context/r19-ghover).
+- Assembly dialogs vs live (r21/r22): Insert dialog icons = live 01; the Composite parts filter now only when a Part
+  Studio has a composite (live 01 vs 320; was always shown). Properties modal: ƒ, calculator glyph, undo/redo = live
+  132/133; for ui2: live joins the read-only (grey) Mass field and the calculator button into one input group (shared
+  border, no gap), ours draws two separate boxes. Named positions panel: no own icons beyond "?".
