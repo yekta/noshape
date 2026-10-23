@@ -5010,6 +5010,12 @@ impl AssemblyView {
                             })
                         })
                     }))
+                    // Right-click › Set as default: new graphics areas start so.
+                    .set_default(move |_, _, cx| {
+                        let mut d = crate::view_defaults::get(cx);
+                        d.perspective = perspective;
+                        crate::view_defaults::set(d, cx);
+                    })
                     .item(crate::os_menu::OsMenuItem::new("Show mates").checked(show_mates).on_click(move |_, _, cx| {
                         v3.update(cx, |this, cx| {
                             this.show_mates = !this.show_mates;
