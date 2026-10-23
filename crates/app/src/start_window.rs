@@ -1878,7 +1878,7 @@ impl StartView {
             .w(px(150.))
             .h(px(34.))
             .rounded(px(3.))
-            .child(h_flex().gap(px(6.)).text_size(px(14.)).child("Create").child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb(0xffffff))))
+            .child(h_flex().gap(px(6.)).text_size(px(14.)).child("Create").child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb_static(0xffffff))))
             .os_dropdown_menu("create-dd", false, move |menu, _, _| {
                 // Onshape (live documents/41): Document…, Folder… | Import
                 // files…, Import from ▸ (cloud drives, not offered locally),
@@ -2495,7 +2495,7 @@ impl StartView {
                 .border_1()
                 .border_color(if checked || partial { pal.accent } else { rgb(0xadadad) })
                 .bg(if checked || partial { pal.accent } else { rgb(0xffffff) })
-                .when(checked, |d| d.child(crate::ui::glyph("check", 11., rgb(0xffffff))))
+                .when(checked, |d| d.child(crate::ui::glyph("check", 11., gpui_kit::rgb_static(0xffffff))))
                 .when(partial && !checked, |d| d.child(div().w(px(8.)).h(px(2.)).bg(rgb(0xffffff))))
         };
         let mut panel = v_flex().w(px(194.)).py(px(4.)).bg(pal.panel).border_1().border_color(rgb(0xeeeeee)).shadow_md().child(

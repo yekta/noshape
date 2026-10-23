@@ -179,7 +179,7 @@ impl DrawingEditor {
                 .left(px(p[0] as f32 + 18.0))
                 .top(px(p[1] as f32 - 34.0))
                 .px(px(2.))
-                .bg(gpui_kit::white())
+                .bg(crate::theme::light().panel)
                 .border_2()
                 .border_color(gpui_kit::rgb(0xf5a623))
                 // Live 235: 14 px, no space before "deg".

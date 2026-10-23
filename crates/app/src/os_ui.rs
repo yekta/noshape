@@ -99,7 +99,7 @@ pub fn danger_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
     Button::new(id)
         .custom(ButtonCustomVariant::new(cx).color(rgb(0xbd3039).into()).foreground(rgb(0xffffff).into()).hover(rgb(0xd27177).into()).active(rgb(0xa3272f).into()).shadow(false))
         .bg(rgb(0xbd3039))
-        .child(div().text_size(px(14.)).text_color(rgb(0xffffff)).child(label.into()))
+        .child(div().text_size(px(14.)).text_color(gpui_kit::rgb_static(0xffffff)).child(label.into()))
         .h(px(34.))
         .px(px(11.))
         .rounded(px(3.))
@@ -269,7 +269,7 @@ pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bo
                 .border_1()
                 .border_color(if on { pal.accent } else { rgb(0x888888) })
                 .bg(if on { pal.accent } else { rgb(0xffffff) })
-                .when(on, |d| d.child(Icon::new(gpui_kit::component::IconName::Check).size(px(10.)).text_color(rgb(0xffffff)))),
+                .when(on, |d| d.child(Icon::new(gpui_kit::component::IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
         )
         .child(label.into())
 }

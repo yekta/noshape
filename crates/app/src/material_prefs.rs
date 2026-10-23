@@ -47,7 +47,7 @@ impl Render for MaterialLibrariesView {
                 .rounded(px(3.5))
                 .bg(rgb(0x1651b0))
                 .text_size(px(12.))
-                .text_color(rgb(0xffffff))
+                .text_color(gpui_kit::rgb_static(0xffffff))
                 .cursor_pointer()
                 .hover(|d| d.bg(rgb(0x2b65c4)))
                 .child("Remove")

@@ -265,7 +265,7 @@ impl DrawingEditor {
         // Live dom drawing-detail-dialog: 26 px rows, the 12 px label 5 px in,
         // white fields with a `#ddd` underline at the right edge.
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(26.)).pl(px(5.)).child(div().flex_1().text_size(px(12.)).child(label)).child(body).into_any_element();
-        let field = |w: f32| div().w(px(w)).h(px(26.)).flex_none().bg(gpui_kit::white()).border_b_1().border_color(gpui_kit::rgb(0xdddddd));
+        let field = |w: f32| div().w(px(w)).h(px(26.)).flex_none().bg(crate::theme::light().panel).border_b_1().border_color(gpui_kit::rgb(0xdddddd));
         let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DetailDlg, bool), cx: &mut Context<Self>| {
             div().h(px(26.)).flex().items_center().pl(px(4.)).child(Checkbox::new(id).label(label).small().checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                 if let Some(d) = &mut this.detail_dlg {

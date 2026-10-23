@@ -470,7 +470,9 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(n) => n.trim().to_string(),
         None => od.doc().next_tab_name(&base),
     };
-    let drawing = dr::new_drawing(od.doc(), &template, source.as_ref(), a.bool_or("suggested_views", true)?);
+    let mut drawing = dr::new_drawing(od.doc(), &template, source.as_ref(), a.bool_or("suggested_views", true)?);
+    // The views are made from the document as it is now (see `old_state`).
+    drawing.sources_at = od.session.head().ok().map(|m| m.to_string());
     let mut tab = None;
     od.session.edit_document(&format!("Insert tab : {name}"), |d| tab = Some(crate::docedit::insert_drawing_tab(d, &name, drawing, source.as_ref().map(|s| s.tab))))?;
     let tab = tab.expect("inserted");

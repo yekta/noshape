@@ -2210,7 +2210,7 @@ impl PartStudioView {
             .bg(pal.accent)
             .cursor_pointer()
             .text_size(px(12.))
-            .text_color(gpui_kit::rgb(0xffffff))
+            .text_color(gpui_kit::rgb_static(0xffffff))
             .child(format!("Return to {branch}"))
             .on_click(move |_, _, cx| {
                 doc.update(cx, |d, cx| {
@@ -2818,7 +2818,7 @@ impl PartStudioView {
                                         .items_center()
                                         .justify_center()
                                         .cursor_pointer()
-                                        .child(crate::ui::glyph("ui-clear", 7., gpui_kit::rgb(0xffffff)))
+                                        .child(crate::ui::glyph("ui-clear", 7., gpui_kit::rgb_static(0xffffff)))
                                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_filter("", window, cx))),
                                 )
                             }),
@@ -3189,7 +3189,7 @@ impl PartStudioView {
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Folder name"))
-                    .child(div().id("folder-ok").size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009400)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.commit_folder_prompt(window, cx))))
+                    .child(div().id("folder-ok").size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009400)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb_static(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.commit_folder_prompt(window, cx))))
                     .child(div().id("folder-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                         this.folder_prompt = None;
                         let fh = this.focus.clone();
@@ -4088,7 +4088,7 @@ impl Render for RollbackDragPill {
             .bg(p().accent)
             .text_size(px(13.))
             .font_weight(FontWeight::BOLD)
-            .text_color(gpui_kit::rgb(0xffffff))
+            .text_color(gpui_kit::rgb_static(0xffffff))
             .child("Rollback bar"))
     }
 }
@@ -4114,7 +4114,7 @@ impl Render for FeatureDragPill {
             .bg(p().accent)
             .text_size(px(13.))
             .font_weight(FontWeight::BOLD)
-            .text_color(gpui_kit::rgb(0xffffff))
+            .text_color(gpui_kit::rgb_static(0xffffff))
             .child(self.1.clone()))
     }
 }

@@ -518,7 +518,7 @@ impl DrawingEditor {
                 })))
             };
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Units and precision"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Units and precision"))
                 .child(section("Primary"))
                 .child(row("Units", select("dp-units", unit_label, unit_items)))
                 .child(row("Decimal separator", select("dp-sep", if props.decimal_comma { "Comma".into() } else { "Period".into() }, sep_items)))
@@ -567,7 +567,7 @@ impl DrawingEditor {
             };
             let std_name = |ansi: bool| if ansi { "ANSI".to_string() } else { "ISO".to_string() };
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Dimensions"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Dimensions"))
                 .child(section("All dimensions"))
                 .child(row("Font", font_row(FontOf::Dims, props.dim_font.clone(), cx)))
                 .child(row("Text height", field(0)))
@@ -623,7 +623,7 @@ impl DrawingEditor {
                 all.iter().map(|&v| (name(v).to_string(), v == cur, std::rc::Rc::new(move |p: &mut DrawingProps| set(p, v)) as Act)).collect()
             }
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Annotations"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Annotations"))
                 .child(section("All annotations"))
                 .child(row("Arrowhead", h_flex().gap(px(4.)).child(field(1)).child(select("dp-aarrow", props.ann_arrow_type.name().into(), arrow_items)).into_any_element()));
             for (i, t) in AnnType::ALL.iter().copied().enumerate() {
@@ -722,7 +722,7 @@ impl DrawingEditor {
             ];
             let tangent_items: Vec<(String, bool, Act)> = ["Hidden", "Solid", "Phantom"].iter().enumerate().map(|(i, n)| (n.to_string(), vd.tangent == i as u8, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_defaults.tangent = i as u8) as Act)).collect();
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Views"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Views"))
                 .child(section("All views"))
                 .child(row("Projection angle", proj_btn))
                 .child(section("Insert view defaults"))
@@ -784,7 +784,7 @@ impl DrawingEditor {
                 })))
             };
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Construction geometry"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Construction geometry"))
                 // Live order: Mark size, Gap size, Color, Extended lines.
                 .child(section("Centermarks"))
                 .child(row("Mark size", field(0)))
@@ -797,7 +797,7 @@ impl DrawingEditor {
             let color_select = |id: &'static str, cur: Option<[u8; 3]>, set: fn(&mut DrawingProps, Option<[u8; 3]>)| swatch(id, cur, std::rc::Rc::new(move |p: &mut DrawingProps, c| set(p, c)));
             let locked = props.formats_locked;
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Formats"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Formats"))
                 .child(div().h(px(37.)).px(px(10.)).flex().items_center().child(Checkbox::new("dp-flock").label("Locked").checked(locked).on_click(cx.listener(|this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| p.formats_locked = v, cx);
@@ -811,7 +811,7 @@ impl DrawingEditor {
         } else if self.drawing_props.tab == 6 {
             let field = |i: usize| self.wt_field(i, &ed);
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Tables"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Tables"))
                 .child(section("All tables"))
                 .child(row("Horizontal padding", field(0)))
                 .child(row("Vertical padding", field(1)));
@@ -830,7 +830,7 @@ impl DrawingEditor {
             let border_items: Vec<(String, bool, Act)> = (0..=5u8).map(|n| (border_chars_label(n), n == props.inspection_border_chars, std::rc::Rc::new(move |p: &mut DrawingProps| p.inspection_border_chars = n) as Act)).collect();
             let field = |i: usize| self.wt_field(i, &ed);
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Inspection"))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child("Inspection"))
                 // Live: one "Inspection items" group, then "Automatic inspection items".
                 .child(section("Inspection items"))
                 .child(row("Item parsing", select("dp-iparse", if props.inspection_row_parsing { "Row".into() } else { "Parameter".into() }, parse_items)))
@@ -847,7 +847,7 @@ impl DrawingEditor {
                 .child(check("dp-iexcl", "Exclude callouts", props.inspection_exclude_callouts, |p, v| p.inspection_exclude_callouts = v, cx));
         } else {
             body = body
-                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::white()).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child(TABS[self.drawing_props.tab].0))
+                .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child(TABS[self.drawing_props.tab].0))
                 .child(div().px(px(12.)).py_2().text_size(px(12.)).text_color(pal.text_muted).child("These properties are set per item for now (select a dimension, note or table)."));
         }
         // Live drawing/341: 38 px cells flush left, `#adadad` rules, `#f4f5f6`;
@@ -866,7 +866,7 @@ impl DrawingEditor {
                     .border_r_1()
                     .border_color(gpui_kit::rgb(0xadadad))
                     .cursor_pointer()
-                    .when(on, |d| d.bg(gpui_kit::white()))
+                    .when(on, |d| d.bg(crate::theme::light().panel))
                     .when(!on, |d| d.bg(gpui_kit::rgb(0xf4f5f6)).border_b_1().hover(|d| d.bg(gpui_kit::rgb(0xe8e9ea))))
                     .tooltip(crate::ui::tooltip(*tip))
                     .child(crate::assets::icon(&crate::assets::icon_path(icon), 20., cx))

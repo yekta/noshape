@@ -2784,7 +2784,7 @@ impl AssemblyView {
                 .id("anim-dof-chooser")
                 .mx(px(3.))
                 .mb(px(5.))
-                .bg(gpui_kit::white())
+                .bg(crate::theme::p().panel)
                 .border_1()
                 .border_color(gpui_kit::rgb(0xd7d7d7))
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(3.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }])
@@ -3146,7 +3146,7 @@ impl AssemblyView {
             .child(
                 h_flex()
                     .h(px(29.))
-                    .bg(gpui_kit::white())
+                    .bg(crate::theme::p().panel)
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
                     .child(
