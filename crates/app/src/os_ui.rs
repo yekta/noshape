@@ -248,6 +248,15 @@ pub fn info_box(text: impl Into<SharedString>) -> Div {
 /// 3; checked `#1651b0` with a white check) and a 13.33 px `#666` label
 /// (`#333` on hover). Add `.on_click`.
 pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    checkbox_with(id, label.into().into_any_element(), on)
+}
+
+/// [`checkbox`] labelled with user-authored text (a label's name).
+pub fn user_checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    checkbox_with(id, crate::ui::user_text(label).into_any_element(), on)
+}
+
+fn checkbox_with(id: impl Into<ElementId>, label: AnyElement, on: bool) -> Stateful<Div> {
     let pal = p();
     h_flex()
         .id(id)
@@ -271,7 +280,7 @@ pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bo
                 .bg(if on { pal.accent } else { rgb(0xffffff) })
                 .when(on, |d| d.child(Icon::new(gpui_kit::component::IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
         )
-        .child(label.into())
+        .child(label)
 }
 
 /// A dialog row with a 12 px `#666` label at the left and a value field
@@ -340,8 +349,10 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
 }
 
 /// One entry of a [`query_box`]: 24 px, 13.33 px `#555`, a ✕ on hover.
+/// Its text names entities (instances, mates, "Face of Extrude 1"): user
+/// text, never translated.
 pub fn query_row(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Stateful<Div> {
-    h_flex().id(id).h(px(24.)).pl(px(6.)).pr(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(rgb(0x555555)).child(div().flex_1().min_w_0().truncate().child(text.into()))
+    h_flex().id(id).h(px(24.)).pl(px(6.)).pr(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(rgb(0x555555)).child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(text)))
 }
 
 /// Hover/selected styling of a plain clickable row.
@@ -456,17 +467,29 @@ pub fn select_field(id: impl Into<ElementId>, options: Vec<String>, current: usi
 /// [`select_field`] with `disabled` options (greyed, not pickable: an
 /// `<option disabled>`).
 pub fn select_field_with(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
-    select_field_inner(id, options, disabled, current, None, on_select)
+    select_field_inner(id, options, disabled, current, None, usize::MAX, on_select)
 }
 
-/// [`select_field`] as a Tab stop (`focus`): a focused select opens with
-/// Space, Enter or ↓, as a `<select>` (live Change configuration: Tab walks
-/// Configuration, List input 1, d, ?).
-pub fn select_field_focusable(id: impl Into<ElementId>, options: Vec<String>, current: usize, focus: &FocusHandle, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
-    select_field_inner(id, options, Vec::new(), current, Some(focus.clone()), on_select)
+/// [`select_field`] of user content (configuration options, parts, named
+/// views…): the options are never translated.
+pub fn user_select_field(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, Vec::new(), current, None, 0, on_select)
 }
 
-fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, focus: Option<FocusHandle>, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+/// [`select_field`] whose options from `user_from` on are user content
+/// (after fixed choices such as "None").
+pub fn select_field_user_from(id: impl Into<ElementId>, options: Vec<String>, user_from: usize, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, Vec::new(), current, None, user_from, on_select)
+}
+
+/// [`user_select_field`] as a Tab stop (`focus`): a focused select opens
+/// with Space, Enter or ↓, as a `<select>` (live Change configuration: Tab
+/// walks Configuration, List input 1, d, ?).
+pub fn user_select_field_focusable(id: impl Into<ElementId>, options: Vec<String>, current: usize, focus: &FocusHandle, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, Vec::new(), current, Some(focus.clone()), 0, on_select)
+}
+
+fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: Vec<usize>, current: usize, focus: Option<FocusHandle>, user_from: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
     let pal = p();
     let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
     let on_select = Rc::new(on_select);
@@ -479,7 +502,9 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
             m = m.native_select(width).focus_ring(b);
             for (i, o) in options.iter().enumerate() {
                 let f = on_select.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(i == current).disabled(disabled.contains(&i)).on_click(move |_, window, cx| {
+                let item = crate::os_menu::OsMenuItem::new(o.clone());
+                let item = if i >= user_from { item.user() } else { item };
+                m = m.item(item.checked(i == current).disabled(disabled.contains(&i)).on_click(move |_, window, cx| {
                     f(i, window, cx);
                     window.refresh();
                 }));
@@ -517,7 +542,7 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
         .text_size(px(14.))
         .text_color(pal.text)
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-        .child(div().flex_1().truncate().child(label))
+        .child(div().flex_1().truncate().map(|d| if current >= user_from { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
         .child(glyph(GLYPH_CARET, 8., rgb(0x777777))) // live assembly/181-182: `#777`
         .on_click(move |_, window, cx| open(window, cx))
 }

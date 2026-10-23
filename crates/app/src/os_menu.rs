@@ -62,14 +62,23 @@ pub enum MenuIcon {
 
 /// One row of an [`OsMenu`].
 pub enum OsMenuItem {
-    Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler>, keys: Vec<SharedString> },
+    Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler>, keys: Vec<SharedString>, user: bool },
     Separator,
     Submenu { label: SharedString, icon: Option<MenuIcon>, menu: Entity<OsMenu> },
 }
 
 impl OsMenuItem {
     pub fn new(label: impl Into<SharedString>) -> Self {
-        Self::Item { label: label.into(), icon: None, checked: false, disabled: false, handler: None, keys: Vec::new() }
+        Self::Item { label: label.into(), icon: None, checked: false, disabled: false, handler: None, keys: Vec::new(), user: false }
+    }
+
+    /// The label is user content (a configuration, part, view… name), drawn
+    /// with [`crate::ui::user_text`] so it's never translated.
+    pub fn user(mut self) -> Self {
+        if let Self::Item { user, .. } = &mut self {
+            *user = true;
+        }
+        self
     }
 
     /// Shortcut key chips at the right ("shift", "ctrl", "s"), as Onshape's
@@ -501,7 +510,10 @@ impl Render for OsMenu {
                 };
                 // "Label\tbeta": the label and a blue badge (live drawing/447:
                 // "Select for replication [beta]").
-                let label_el = |label: &SharedString| -> AnyElement {
+                let label_el = |label: &SharedString, user: bool| -> AnyElement {
+                    if user {
+                        return crate::ui::user_text(label.clone()).into_any_element();
+                    }
                     match label.split_once('\t') {
                         Some((text, badge)) => h_flex()
                             .child(text.to_string())
@@ -534,7 +546,7 @@ impl Render for OsMenu {
                 match item {
                     // Bootstrap dropdown dividers have 7 px margins.
                     OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
-                    OsMenuItem::Item { label, icon, checked, disabled, keys, .. } => row(ix)
+                    OsMenuItem::Item { label, icon, checked, disabled, keys, user, .. } => row(ix)
                         .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
                         .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1967d2 } else { 0x1651b0 })).text_color(gpui_kit::rgb_static(0xffffff)))
@@ -542,7 +554,7 @@ impl Render for OsMenu {
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
                             d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(crate::assets::icon("menu-check", 16., cx)))
                         })
-                        .child(div().when(wraps, |d| d.flex_1().min_w_0()).child(label_el(label)))
+                        .child(div().when(wraps, |d| d.flex_1().min_w_0()).child(label_el(label, *user)))
                         .when(!keys.is_empty(), |d| {
                             let chip = |k: &SharedString| div().px(px(3.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0x333333)).text_size(px(12.)).text_color(pal.text).child(k.clone());
                             d.child(div().flex_1().min_w(px(16.))).child(h_flex().gap(px(2.)).children(keys.iter().map(chip)))
@@ -567,7 +579,7 @@ impl Render for OsMenu {
                         .text_color(pal.text)
                         .when(hovered, |d| d.bg(hover_bg))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
-                        .child(div().flex_1().when(wraps, |d| d.min_w_0()).child(label_el(label)))
+                        .child(div().flex_1().when(wraps, |d| d.min_w_0()).child(label_el(label, false)))
                         .child({
                             let tops = self.row_tops.clone();
                             canvas(move |b, _, _| { tops.borrow_mut().insert(ix, b.top()); }, |_, _, _, _| {}).absolute().top_0().left_0().size_full()

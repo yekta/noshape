@@ -1434,7 +1434,7 @@ impl PartStudioView {
                             .gap(px(10.))
                             .when(failed, |d| d.text_color(pal.text_invalid))
                             .child(div().flex_none().opacity(0.8).child(crate::assets::icon(&feature_icon(&f.type_id), 16., cx)))
-                            .child(div().flex_1().min_w_0().truncate().child(f.name.clone())),
+                            .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(f.name.clone()))),
                     )
                     .child(cell(COLS[2]).relative().child(crate::ui::regen_time_text(t)).child(div().absolute().left_0().bottom_0().h(px(5.)).w(px(bar)).bg(pal.accent)))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
@@ -2869,7 +2869,7 @@ impl PartStudioView {
                     .into_any_element()
             })
             .collect();
-        let me = h_flex().h(px(26.)).child(div().w(px(25.)).flex().justify_center().child(crate::assets::icon(if matches!(r, Reference::Origin) { "origin" } else { "plane" }, 15., cx))).child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(name.clone()));
+        let me = h_flex().h(px(26.)).child(div().w(px(25.)).flex().justify_center().child(crate::assets::icon(if matches!(r, Reference::Origin) { "origin" } else { "plane" }, 15., cx))).child(div().px(px(6.)).text_size(px(12.)).text_color(pal.text).child(crate::ui::user_text(name.clone())));
         Some(
             v_flex()
                 .id("plane-dependencies")

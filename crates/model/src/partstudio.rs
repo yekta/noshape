@@ -322,10 +322,12 @@ impl PartStudio {
     }
 
     /// Default name for a new feature of `ty`: "Extrude 1", "Extrude 2"...
+    /// (in the UI language, [`crate::default_names`]).
     pub fn next_name(&self, ty: &FeatureType) -> String {
+        let base = crate::default_names::base(ty.name);
         let mut n = 1;
         loop {
-            let name = format!("{} {n}", ty.name);
+            let name = format!("{base} {n}");
             if !self.features.iter().any(|f| f.name == name) {
                 return name;
             }

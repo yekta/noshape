@@ -734,7 +734,7 @@ impl Render for MateDialog {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(if regen_error.is_some() { pal.text_invalid } else { pal.text })
                             .truncate()
-                            .child(self.name.clone())
+                            .child(crate::ui::user_text(self.name.clone()))
                             // Live: the title's tooltip is the name, or the regeneration error.
                             .tooltip(crate::ui::tooltip(regen_error.unwrap_or_else(|| self.name.clone()))),
                     )
