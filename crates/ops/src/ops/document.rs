@@ -233,7 +233,10 @@ fn set_units(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn tab_create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let kind = a.str("kind")?;
-    let (base, content) = docedit::new_tab_content(kind).ok_or_else(|| OpError::param("kind", "unknown tab kind"))?;
+    let (base, content) = docedit::new_tab_content(kind).ok_or_else(|| {
+        let kinds: Vec<&str> = docedit::TAB_KINDS.iter().map(|(id, _)| *id).collect();
+        OpError::param("kind", &format!("unknown tab kind `{kind}` (one of: {})", kinds.join(", ")))
+    })?;
     let after = match a.opt_str("after")? {
         Some(t) => Some(doc::find_tab(od.doc(), t).map_err(|e| e.with_param("after"))?),
         None => None,

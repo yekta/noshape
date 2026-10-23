@@ -6,7 +6,7 @@ use noshape_model::Document;
 use noshape_model::document::{TabContent, TabId};
 
 /// Source of a new Feature Studio (Onshape's template).
-pub const FS_TEMPLATE: &str = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\n\n";
+pub const FS_TEMPLATE: &str = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\n";
 
 /// Tab kinds of the "+" menu: (kind id, base name).
 pub const TAB_KINDS: [(&str, &str); 6] = [
@@ -19,8 +19,11 @@ pub const TAB_KINDS: [(&str, &str); 6] = [
 ];
 
 /// Base name and empty content of a new tab of `kind` (see [`TAB_KINDS`]).
+/// Also takes the display names `document_info` prints ("Part Studio",
+/// any case or spacing; qa5 API2).
 pub fn new_tab_content(kind: &str) -> Option<(&'static str, TabContent)> {
-    Some(match kind {
+    let kind: String = kind.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_ascii_lowercase();
+    Some(match kind.as_str() {
         "partstudio" => ("Part Studio", TabContent::PartStudio(Default::default())),
         "assembly" => ("Assembly", TabContent::Assembly(Box::default())),
         "drawing" => ("Drawing", TabContent::Drawing(Default::default())),
@@ -110,4 +113,27 @@ pub fn insert_drawing_tab(d: &mut Document, name: &str, drawing: noshape_model::
         d.settings.tab_order.insert(at + 1, id);
     }
     id
+}
+
+#[cfg(test)]
+mod tests {
+    /// Live document/70 (qa5 FS1): a new Feature Studio shows four lines,
+    /// the two template lines and two empty ones.
+    #[test]
+    fn feature_studio_template_has_four_lines() {
+        let lines: Vec<&str> = super::FS_TEMPLATE.split('\n').collect();
+        assert_eq!(lines.len(), 4);
+        assert!(lines[0].starts_with("FeatureScript ") && lines[1].starts_with("import(") && lines[2].is_empty() && lines[3].is_empty());
+    }
+
+    /// qa5 API2: the display names document_info prints work as kinds.
+    #[test]
+    fn tab_kind_accepts_display_names() {
+        for (id, name) in super::TAB_KINDS {
+            assert_eq!(super::new_tab_content(id).map(|c| c.0), Some(name));
+            assert_eq!(super::new_tab_content(name).map(|c| c.0), Some(name));
+            assert_eq!(super::new_tab_content(&name.to_uppercase()).map(|c| c.0), Some(name));
+        }
+        assert!(super::new_tab_content("sketch").is_none());
+    }
 }
