@@ -152,6 +152,13 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
             }
             None => raw,
         };
+        // helix.fs: setFeatureComputedParameter actualRevolutions /
+        // actualPitch, shown read-only with an End point.
+        if end_frac.is_some() && revs > 1e-9 {
+            let q = noshape_units::Quantity::new(revs, noshape_units::Dim::UNITLESS);
+            ev.computed.push(("actualRevolutions".into(), crate::display::ComputedValue::Text(noshape_units::format_quantity(q, ev.units))));
+            ev.computed.push(("actualPitch".into(), crate::display::ComputedValue::Length(height / revs)));
+        }
         (height, revs)
     };
     if height < 1e-9 {

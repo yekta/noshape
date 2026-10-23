@@ -244,6 +244,38 @@ fn helix_on_cylinder_face_uses_face_height() {
     assert!(near(plane.frame.normal.x.abs(), 1.0, 1e-9));
 }
 
+/// helix.fs: with an End point the dialog shows the rounded revolutions and
+/// the pitch it gives (setFeatureComputedParameter actualRevolutions /
+/// actualPitch).
+#[test]
+fn helix_to_end_point_reports_computed_revolutions_and_pitch() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.02);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.extrude_largest(sid, "40 mm");
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let side = b.faces.iter().find(|n| matches!(&***n, TopoName::Face { role: Role::Side(_), .. })).unwrap();
+    let side = Reference::Face((**side).clone());
+    let mut sk = noshape_sketch::Sketch::new();
+    let pt = sk.add_point(DVec2::new(0.02, 0.03));
+    let psk = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let helix = s.add("helix", move |p| {
+        p.set("entities", ParamValue::Query(vec![side]));
+        p.set("endType", ParamValue::Enum("END_POINT".into()));
+        p.set("endPoint", ParamValue::Query(vec![Reference::SketchEntity { sketch: psk, entity: pt.0 }]));
+        p.set("revolutions", expr("4"));
+    });
+    let r = s.ok();
+    let st = r.display.feature_state(helix).unwrap();
+    let Some(noshape_model::display::ComputedValue::Text(revs)) = st.computed("actualRevolutions") else { panic!("{:?}", st.computed) };
+    let revs: f64 = revs.parse().unwrap();
+    assert!(revs > 3.0 && revs <= 4.0, "{revs}");
+    let Some(noshape_model::display::ComputedValue::Length(pitch)) = st.computed("actualPitch") else { panic!("{:?}", st.computed) };
+    assert!(near(pitch * revs, 0.03, 1e-6), "pitch {pitch} × {revs}");
+}
+
 #[test]
 fn offset_surface_area_and_position() {
     let mut s = block();
