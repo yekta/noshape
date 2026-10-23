@@ -48,8 +48,10 @@ impl LocSource {
 fn locations(ev: &EvalCtx) -> FResult<Vec<Location>> {
     let mut out: Vec<Location> = Vec::new();
     let refs = ev.query("locations");
+    // Coincident points make one hole only when they face the same way
+    // (live L60: points on the top and front faces of a corner make two).
     let mut push = |l: Location| {
-        if !out.iter().any(|o| o.point.distance(l.point) < 1e-9) {
+        if !out.iter().any(|o| o.point.distance(l.point) < 1e-9 && o.normal.normalize().dot(l.normal.normalize()) > 1.0 - 1e-9) {
             out.push(l);
         }
     };
@@ -206,18 +208,27 @@ fn hole_profile(d: f64, dims: &HoleDims, h: f64, tip: f64, over: f64) -> FResult
             return err("Countersink angle must be between 0 and 180 degrees");
         }
         let c = (sr - r) / (sa * 0.5).tan();
-        if c >= h {
-            return err("Countersink is deeper than the hole");
+        // Live L47: a countersink deeper than the hole is allowed; the cone
+        // ends at the hole diameter with a flat bottom around the drill.
+        if c >= h + tip {
+            pts.extend([v2(sr, -over), v2(sr, 0.0), v2(r, c), v2(0.0, c)]);
+            pts.dedup_by(|a, b| a.distance(*b) < 1e-12);
+            return Ok(pts);
         }
         pts.extend([v2(sr, -over), v2(sr, 0.0), v2(r, c)]);
     } else {
         pts.push(v2(r, -over));
     }
-    pts.push(v2(r, h));
-    pts.push(v2(0.0, h + tip));
+    if h > pts.last().map_or(0.0, |p| p.y) {
+        pts.push(v2(r, h));
+    }
+    pts.push(v2(0.0, (h + tip).max(pts.last().map_or(0.0, |p| p.y))));
     pts.dedup_by(|a, b| a.distance(*b) < 1e-12);
     Ok(pts)
 }
+
+/// Live L51: a fastener fit on a hole through one part.
+const FIT_INFO: &str = "Fastener fit will not be applied if there are fewer than two parts per hole.";
 
 pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     // hole.fs order: sizes, then the end and start entities, then the points.
@@ -255,6 +266,10 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         let no_start = || crate::regen::eval::err_at(&["startBoundEntity"], "Select a start entity.");
         let Some(r) = ev.query("startBoundEntity").first() else { return no_start() };
         let Some(f) = ev.resolve_plane(r) else { return no_start() };
+        // Live L54: every hole must be perpendicular to the start plane.
+        if locs.iter().any(|l| l.normal.normalize().dot(f.normal.normalize()).abs() < 1.0 - 1e-9) {
+            return err("Some Hole directions are not perpendicular to selected inputs.");
+        }
         Some(f)
     } else {
         None
@@ -277,6 +292,8 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     let mut any_hit = false;
     // Locations that made no hole (hole.fs warns when only some miss).
     let mut missed = 0;
+    // A fastener fit on a hole through fewer than two parts (live L51).
+    let mut fit_unused = false;
     // Depth of an Up to next / Up to entity hole, shown read-only.
     let mut up_to_depth_found: Option<f64> = None;
     for loc in &locs {
@@ -320,18 +337,23 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             "THROUGH" => (hit_bodies.iter().map(|x| x.2).fold(0.0, f64::max) + r_main.max(1e-4), 0.0),
             "UP_TO_NEXT" => {
                 let next = rel.iter().flat_map(|(_, iv)| iv.iter()).map(|(_, b)| *b).fold(f64::INFINITY, f64::min);
-                (next - tip_offset, tip_len(tip_angle, r_main))
+                // Live L61: the tip's apex is at the entity minus the offset.
+                let tip = tip_len(tip_angle, r_main);
+                (next - tip_offset - if tip_offset != 0.0 { tip } else { 0.0 }, tip)
             }
             "UP_TO_ENTITY" => {
                 let Some(r) = ev.query("endBoundEntity").first() else { return crate::regen::eval::err_at(&["endBoundEntity"], "Select an entity or mate connector to terminate the hole.") };
-                (up_to_depth(ev, r, s, dir)? - tip_offset, tip_len(tip_angle, r_main))
+                let tip = tip_len(tip_angle, r_main);
+                (up_to_depth(ev, r, s, dir)? - tip_offset - if tip_offset != 0.0 { tip } else { 0.0 }, tip)
             }
             other => return err(format!("Unsupported hole termination {other}")),
         };
         if h.is_nan() || h <= 1e-9 {
             return err("The hole has zero depth (check the termination and direction)");
         }
-        up_to_depth_found.get_or_insert(h);
+        // Live L61: with an offset the Depth field shows the shaft depth less
+        // the offset (4.092 for a 6.092 shaft and a 2 mm offset).
+        up_to_depth_found.get_or_insert(h - tip_offset);
         // Overshoot above the start when that is outside every part.
         let over = {
             let o = r_main * 0.25;
@@ -387,6 +409,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         }
         any_hit = true;
         let ids = |v: &[(usize, f64, f64)]| -> Vec<BodyId> { v.iter().map(|x| ev.ctx.bodies[x.0].id.clone()).collect() };
+        fit_unused |= dims.clearance && ordered.len() < 2;
         match dims.tap_drill.filter(|_| dims.clearance) {
             Some(td) if (td - dims.diameter).abs() > 1e-9 && ordered.len() > 1 => {
                 let (front, last) = ordered.split_at(ordered.len() - 1);
@@ -408,8 +431,12 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     if !any_hit {
         return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
     }
+    // Live L53: a location that makes no hole fails the whole feature.
     if missed > 0 {
-        ev.warnings.push("Some selections did not produce holes.".into());
+        return err("Hole creates invalid geometry.");
+    }
+    if fit_unused {
+        ev.infos.push(FIT_INFO.into());
     }
     for (ids, tools) in groups {
         let targets: Vec<usize> = ids.iter().filter_map(|id| index_of_body(ev, id)).collect();

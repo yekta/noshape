@@ -924,5 +924,20 @@ step (live +0.05). Owner: drawing (asb). Sheet properties width not re-checked.
   *unedited* focused field there does nothing (the dialog has no "FeatureDialog" key context, so the kit's Escape
   propagates to nothing); with focus outside the fields Esc closes the dialog. Adding the context also binds Tab →
   DialogTab, which the pattern dialog doesn't handle yet.
+- QuantityInput batches landed / ready (10-22 night, each checked in the app against behaviours.md:5240–5246): mate
+  connector Move X/Y/Z + Rotation angle (hover names from mateConnector.fs: "X translation"…), Explode step Distance /
+  Rotation angle (field rebuilt on Translation ↔ Rotation), assembly Zebra Stripe count (1–100, no expressions; Enter no
+  longer closes the panel, as live) and Reflection Rotation angle, Animate mate Start / End / Steps (rebuilt on a DOF
+  change). Skipped on purpose: the assembly triad value box (on-canvas box like the sketch dimension box; no live data).
+- R1 (two default planes selected → black halos / see-through parts) is also on v0.4.5: not a regression.
+- Remaining assembly InputStates: names, search, BOM cells (text fields); the Mass properties override field
+  (assembly_mass.rs:74) is still to check against live before migrating.
+- Migration status (10-23): every os-param-number field outside feature dialogs / on-canvas boxes that live has data
+  for is on QuantityInput. Left, each needing a live capture first (request via the lead): (1) assembly Mass properties
+  › Override value (assembly_mass.rs:74); (2) Appearance editor R / G / B / A / hex (appearance.rs:214–216: Angular
+  quantity field or a colour-picker widget?); (3) Hole › tolerance Symmetrical / Deviation / Limits value fields
+  (feature_dialog.rs:629: noshape draws a boxed kit input; dom/dialog-hole-tolerance.txt only has the Default type);
+  (4) the assembly triad value box (assembly_panels.rs:1445). Sketch on-canvas boxes (dimension, OTF, offset, pattern
+  count, Bezier degree) stay as they are (lead: not a pure refactor). Prefs have no numeric fields.
 - Next: sketch fields (sketch.rs open_otf_input / open_count_edit / option_input / offset / bezier / tolerances),
   feature_dialog.rs:623 tolerances, the other assembly panels (same assembly variable scope), prefs.

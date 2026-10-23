@@ -311,7 +311,7 @@ function screwHead(context is Context, id is Id, def is map) returns array
         // Spherical crowns (the pan's, a dome) under a square recess: the
         // profile up to the crown's rim, the crown from a seamless sphere.
         const dome = !pan && def.rf >= def.dk / 2 - EPS && def.rf > EPS;
-        if (def.drive == DRIVE_SQUARE_III && (pan || dome))
+        if ((def.drive == DRIVE_SQUARE_III || (def.drive == DRIVE_CROSS && def.rcd > EPS) || (def.drive == DRIVE_POZI && def.rfil > EPS)) && (pan || dome))
         {
             const rim = profile[size(profile) - 2]["p"];
             seamlessCrown(context, id + "round", subArray(profile, 0, size(profile) - 1), rim[0], def.k, def.k - def.rf, def.rf);
@@ -334,7 +334,8 @@ function screwHead(context is Context, id is Id, def is map) returns array
         {
             const big = (def.dk * def.dk / 4 + def.f * def.f) / (2 * def.f);
             const midR = def.dk / 4;
-            if (def.drive == DRIVE_SQUARE_III)
+            // (Type I too: the seam would split the +x arm end's mouth edge.)
+            if (def.drive == DRIVE_SQUARE_III || (def.drive == DRIVE_CROSS && def.rcd > EPS) || (def.drive == DRIVE_POZI && def.rfil > EPS))
                 return [seamlessCrown(context, id + "csk", pts, def.dk / 2, def.f, def.f - big, big), def.f];
             pts = append(pts, { "p" : rz(Z, def.f), "mid" : rz(midR, def.f - big + sqrt(big * big - midR * midR)) });
             return [revolveProfile(context, id + "csk", pts), def.f];
@@ -389,12 +390,251 @@ function screwHead(context is Context, id is Id, def is map) returns array
     return [qNothing(), Z];
 }
 
+/**
+ * The head top's height at radius r: the crown sphere of a pan, dome or
+ * raised countersunk head, else the flat top at `top`. Live's recesses draft
+ * the arm ends about the plane through the points where they meet the head
+ * (its "THREE_POINT" plane).
+ */
+function headTopAt(def is map, r is ValueWithUnits, top is ValueWithUnits) returns ValueWithUnits
+{
+    if (def.head == HEAD_ROUND && def.rf > EPS && (def.re > EPS || def.rf >= def.dk / 2 - EPS) && r < def.dk / 2)
+        return def.k - def.rf + sqrt(max(def.rf * def.rf - r * r, Z * Z));
+    if (def.head == HEAD_RAISED_COUNTERSUNK && def.f > EPS && r < def.dk / 2)
+    {
+        const big = (def.dk * def.dk / 4 + def.f * def.f) / (2 * def.f);
+        return def.f - big + sqrt(max(big * big - r * r, Z * Z));
+    }
+    return top;
+}
+
+/**
+ * Live's Type I (Phillips) recess (behaviours.md "skb (10-22 19:40)", Hex #8
+ * Type I): the cross (arms L × W) with a kite in each inner corner (starts
+ * Cd apart, apex Fd/2 from the centre) cut from the floor plane at
+ * top − (D − T) upward; the 4 arm ends drafted 26.3 degrees about the top,
+ * the 8 arm sides and 8 kite walls by the slot angle about the floor; a cone
+ * (core diameter, thickness th) below the floor; the ceiling pieces of the
+ * cone's top ring deleted (heal); a 0.002 in fillet on the mouth edges.
+ * `top` is the head top (indent floor on indented hex heads).
+ */
+function recessTypeI(context is Context, id is Id, target is Query, def is map, top is ValueWithUnits)
+{
+    const L = def.sd;
+    const W = def.b;
+    const zf = top - (def.t - def.rth);
+    const s = W / 2 + def.rcd / sqrt(2);
+    const a = def.rfd / 2 / sqrt(2);
+    // The outline, 5 points per quadrant: arm end, arm side to the kite,
+    // kite apex, the next arm's side.
+    var pts = [];
+    for (var q = 0; q < 4; q += 1)
+    {
+        const c = cos(q * 90 * degree);
+        const sn = sin(q * 90 * degree);
+        for (var p in [vector(L / 2, -W / 2), vector(L / 2, W / 2), vector(s, W / 2), vector(a, a), vector(W / 2, s)])
+            pts = append(pts, vector(p[0] * c - p[1] * sn, p[0] * sn + p[1] * c));
+    }
+    var plane = XY_PLANE;
+    plane.origin[2] = zf;
+    const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : plane });
+    for (var i = 0; i < size(pts); i += 1)
+        skLineSegment(sketch, "l" ~ i, { "start" : pts[i], "end" : pts[(i + 1) % size(pts)] });
+    skSolve(sketch);
+    opExtrude(context, id + "cross", { "entities" : qSketchRegion(id + "sketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : (top - zf) * 1.1 });
+    // The same outline below the floor: live's healed delete face extends
+    // the walls down onto the cone, so the cone is cut only inside them.
+    opExtrude(context, id + "below", { "entities" : qSketchRegion(id + "sketch"), "direction" : vector(0, 0, -1), "endBound" : BoundingType.BLIND, "endDepth" : def.rth * 2 });
+    opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
+    // The tool's walls drafted (a tool face points out of the void, so the
+    // pull is reversed): the arm ends 26.3 degrees about the top, the arm
+    // sides and kite walls by the slot angle about the floor; then one cut.
+    var ends = [];
+    var walls = [];
+    for (var f in evaluateQuery(context, qGeometry(qOwnedByBody(qCreatedBy(id + "cross", EntityType.BODY), EntityType.FACE), GeometryType.PLANE)))
+    {
+        const pl = evPlane(context, { "face" : f });
+        if (abs(pl.normal[2]) > 0.01)
+            continue;
+        if (abs(abs(dot(pl.origin, pl.normal)) - L / 2) < EPS)
+            ends = append(ends, f);
+        else
+            walls = append(walls, f);
+    }
+    // The arm ends' neutral plane: through their corners on the head top.
+    var topPlane = XY_PLANE;
+    topPlane.origin[2] = headTopAt(def, sqrt(L * L + W * W) / 2, top);
+    opPlane(context, id + "topPlane", { "plane" : topPlane });
+    opDraft(context, id + "draftEnds", { "draftFaces" : qUnion(ends), "neutralPlane" : qCreatedBy(id + "topPlane", EntityType.FACE), "angle" : 26.3 * degree, "pullDirection" : vector(0, 0, -1), "tangentPropagation" : true });
+    opPlane(context, id + "floorPlane", { "plane" : plane });
+    opDraft(context, id + "draftWalls", { "draftFaces" : qUnion(walls), "neutralPlane" : qCreatedBy(id + "floorPlane", EntityType.FACE), "angle" : def.sa * degree, "pullDirection" : vector(0, 0, -1), "tangentPropagation" : true });
+    opDeleteBodies(context, id + "deletePlanes", { "entities" : qUnion([qCreatedBy(id + "topPlane", EntityType.BODY), qCreatedBy(id + "floorPlane", EntityType.BODY)]) });
+    subtract(context, id + "cut", target, qCreatedBy(id + "cross", EntityType.BODY));
+    // The screw: every solid but this recess's tools.
+    var screw = qUnion(evaluateQuery(context, qSubtraction(qBodyType(qEverything(EntityType.BODY), BodyType.SOLID), qCreatedBy(id, EntityType.BODY))));
+    // The tool's walls drafted onto the same planes (a tool face points
+    // out of the void, so the opposite pull).
+    var below = [];
+    for (var f in evaluateQuery(context, qGeometry(qOwnedByBody(qCreatedBy(id + "below", EntityType.BODY), EntityType.FACE), GeometryType.PLANE)))
+    {
+        const pl = evPlane(context, { "face" : f });
+        if (abs(pl.normal[2]) < 0.01 && abs(abs(dot(pl.origin, pl.normal)) - L / 2) > EPS)
+            below = append(below, f);
+    }
+    opPlane(context, id + "floorPlane2", { "plane" : plane });
+    opDraft(context, id + "draftBelow", { "draftFaces" : qUnion(below), "neutralPlane" : qCreatedBy(id + "floorPlane2", EntityType.FACE), "angle" : def.sa * degree, "pullDirection" : vector(0, 0, -1), "tangentPropagation" : true });
+    opDeleteBodies(context, id + "deletePlane2", { "entities" : qCreatedBy(id + "floorPlane2", EntityType.BODY) });
+    // The cone's height: the Type I thickness (Pan: live's part uses the
+    // Type IA one, rch).
+    const coneH = def.rch > EPS ? def.rch : def.rth;
+    revolveProfile(context, id + "core", [{ "p" : rz(Z, zf) }, { "p" : rz(def.rcore / 2, zf) }, { "p" : rz(Z, zf - coneH) }]);
+    intersect(context, id + "coreIn", qCreatedBy(id + "core", EntityType.BODY), qCreatedBy(id + "below", EntityType.BODY));
+    subtract(context, id + "coreCut", screw, qUnion(evaluateQuery(context, qUnion([qCreatedBy(id + "core", EntityType.BODY), qCreatedBy(id + "below", EntityType.BODY), qCreatedBy(id + "coreIn", EntityType.BODY)]))));
+    // The 20 mouth edges (arm sides, ends, kites) at the top: 0.002 in.
+    screw = qUnion(evaluateQuery(context, qBodyType(qEverything(EntityType.BODY), BodyType.SOLID)));
+    const reach = L / 2 * 1.01;
+    var mouth = [];
+    for (var e in evaluateQuery(context, qOwnedByBody(screw, EntityType.EDGE)))
+    {
+        const bounds = evBox3d(context, { "topology" : e });
+        if (max([abs(bounds.minCorner[0]), abs(bounds.maxCorner[0]), abs(bounds.minCorner[1]), abs(bounds.maxCorner[1])]) < reach * 1.04 && bounds.minCorner[2] > zf + (top - zf) / 2)
+            mouth = append(mouth, e);
+    }
+    if (size(mouth) > 0)
+    {
+        try silent
+        {
+            opFillet(context, id + "mouth", { "entities" : qUnion(mouth), "radius" : 0.002 * inch });
+        }
+    }
+}
+
+/**
+ * Live's Type IA (Pozidriv-like) recess (behaviours.md "skb (10-22 19:40)",
+ * Pan #8 Type IA): one arm L × W cut from the top down to the floor
+ * top − (D − T) and its ends drafted 26.3 degrees about plane 1 (where the
+ * arm corners meet the head top), patterned 90 degrees (Fillister: onto
+ * itself, one arm); a core of diameter `rcore` at the floor tapering up by the
+ * slot angle, with a 28 degree cone below; four thin wings (10 degrees, tips at
+ * wf · L / 2 on the diagonals) cut down to plane 1 with a 10 degree draft and
+ * healed into V-grooves (`wv`), or blind to half the head height on flat heads;
+ * the 8 arm-side / core edges filleted `rfil`.
+ */
+function recessTypeIA(context is Context, id is Id, target is Query, def is map, top is ValueWithUnits)
+{
+    const L = def.sd;
+    const W = def.b;
+    const zf = top - (def.t - def.rth);
+    const zn = headTopAt(def, sqrt(L * L + W * W) / 2, top);
+    const up = top + (top - zf) * 0.1;
+    var plane = XY_PLANE;
+    plane.origin[2] = zf;
+    // The arms: a rectangle at the floor up past the top, ends drafted.
+    for (var a = 0; a < (def.arms == 1 ? 1 : 2); a += 1)
+    {
+        const hx = a == 0 ? W / 2 : L / 2;
+        const hy = a == 0 ? L / 2 : W / 2;
+        const sketch = newSketchOnPlane(context, id + ("arm" ~ a ~ "Sketch"), { "sketchPlane" : plane });
+        skRectangle(sketch, "r", { "firstCorner" : vector(-hx, -hy), "secondCorner" : vector(hx, hy) });
+        skSolve(sketch);
+        opExtrude(context, id + ("arm" ~ a), { "entities" : qSketchRegion(id + ("arm" ~ a ~ "Sketch")), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : up - zf });
+        opDeleteBodies(context, id + ("arm" ~ a ~ "DeleteSketch"), { "entities" : qCreatedBy(id + ("arm" ~ a ~ "Sketch"), EntityType.BODY) });
+        var ends = [];
+        for (var f in evaluateQuery(context, qGeometry(qOwnedByBody(qCreatedBy(id + ("arm" ~ a), EntityType.BODY), EntityType.FACE), GeometryType.PLANE)))
+        {
+            const pl = evPlane(context, { "face" : f });
+            if (abs(pl.normal[2]) < 0.01 && abs(abs(dot(pl.origin, pl.normal)) - L / 2) < EPS)
+                ends = append(ends, f);
+        }
+        var np = XY_PLANE;
+        np.origin[2] = zn;
+        opPlane(context, id + ("arm" ~ a ~ "Plane"), { "plane" : np });
+        opDraft(context, id + ("arm" ~ a ~ "Draft"), { "draftFaces" : qUnion(ends), "neutralPlane" : qCreatedBy(id + ("arm" ~ a ~ "Plane"), EntityType.FACE), "angle" : 26.3 * degree, "pullDirection" : vector(0, 0, -1), "tangentPropagation" : true });
+        opDeleteBodies(context, id + ("arm" ~ a ~ "DeletePlane"), { "entities" : qCreatedBy(id + ("arm" ~ a ~ "Plane"), EntityType.BODY) });
+    }
+    // The core: Ø rcore at the floor, the slot angle up to the top, 28 degrees down.
+    const rTop = def.rcore / 2 + (up - zf) * tan(def.sa * degree);
+    revolveProfile(context, id + "core", [{ "p" : rz(Z, up) }, { "p" : rz(rTop, up) }, { "p" : rz(def.rcore / 2, zf) }, { "p" : rz(Z, zf - def.rcore / 2 * tan(28 * degree)) }]);
+    // The wings on the diagonals.
+    const R = L * def.wf / 2;
+    const half = R * tan(5 * degree);
+    for (var w = 0; w < 4; w += 1)
+    {
+        const ang = (45 + 90 * w) * degree;
+        const u = vector(cos(ang), sin(ang));
+        const n = vector(-u[1], u[0]);
+        const tip = u * R;
+        const b1 = n * half;
+        const b2 = -n * half;
+        const depth = def.wv == 1 ? R * tan(5 * degree) / tan(10 * degree) : def.k / 2;
+        var wp = XY_PLANE;
+        wp.origin[2] = def.wv == 1 ? top : top;
+        const sketch = newSketchOnPlane(context, id + ("wing" ~ w ~ "Sketch"), { "sketchPlane" : wp });
+        skLineSegment(sketch, "a", { "start" : tip, "end" : b1 });
+        skLineSegment(sketch, "b", { "start" : b1, "end" : b2 });
+        skLineSegment(sketch, "c", { "start" : b2, "end" : tip });
+        skSolve(sketch);
+        opExtrude(context, id + ("wing" ~ w), { "entities" : qSketchRegion(id + ("wing" ~ w ~ "Sketch")), "direction" : vector(0, 0, -1), "endBound" : BoundingType.BLIND, "endDepth" : depth });
+        opDeleteBodies(context, id + ("wing" ~ w ~ "DeleteSketch"), { "entities" : qCreatedBy(id + ("wing" ~ w ~ "Sketch"), EntityType.BODY) });
+        if (def.wv == 1)
+        {
+            // The two sides lean in 10 degrees going down: a V-groove.
+            for (var side = 0; side < 2; side += 1)
+            {
+                const bi = side == 0 ? b1 : b2;
+                const edge = normalize(vector(bi[0] - tip[0], bi[1] - tip[1], Z));
+                var nh = vector(-edge[1], edge[0], 0);
+                if (dot(nh, vector(-tip[0], -tip[1], Z) / meter) > 0)
+                    nh = -nh;
+                // Outward normal, tilted so the side narrows downward.
+                const nOut = normalize(nh * cos(10 * degree) - vector(0, 0, 1) * sin(10 * degree));
+                const big = R * 4;
+                const cutter = cuboid(context, id + ("wing" ~ w ~ "Cut" ~ side), vector(Z, -big, -big), vector(big, big, big));
+                opTransform(context, id + ("wing" ~ w ~ "Place" ~ side), { "bodies" : cutter, "transform" : toWorld(coordSystem(vector(tip[0], tip[1], top), nOut, edge)) });
+                subtract(context, id + ("wing" ~ w ~ "Trim" ~ side), qCreatedBy(id + ("wing" ~ w), EntityType.BODY), cutter);
+            }
+        }
+    }
+    // One cut with every tool.
+    const tools = qUnion(evaluateQuery(context, qCreatedBy(id, EntityType.BODY)));
+    subtract(context, id + "cut", target, tools);
+    // The 8 edges where the arm sides meet the core: rfil.
+    const screw = qUnion(evaluateQuery(context, qBodyType(qEverything(EntityType.BODY), BodyType.SOLID)));
+    var edges = [];
+    for (var e in evaluateQuery(context, qOwnedByBody(screw, EntityType.EDGE)))
+    {
+        const bb = evBox3d(context, { "topology" : e });
+        const flatX = abs(bb.maxCorner[0] - bb.minCorner[0]) < EPS && abs(abs(bb.minCorner[0]) - W / 2) < EPS;
+        const flatY = abs(bb.maxCorner[1] - bb.minCorner[1]) < EPS && abs(abs(bb.minCorner[1]) - W / 2) < EPS;
+        if ((flatX || flatY) && bb.maxCorner[2] - bb.minCorner[2] > (top - zf) * 0.3 && bb.minCorner[2] > zf - EPS && max([abs(bb.minCorner[0]), abs(bb.maxCorner[0]), abs(bb.minCorner[1]), abs(bb.maxCorner[1])]) < rTop + EPS)
+            edges = append(edges, e);
+    }
+    if (size(edges) > 0)
+    {
+        try silent
+        {
+            opFillet(context, id + "fillet", { "entities" : qUnion(edges), "radius" : def.rfil });
+        }
+    }
+}
+
 /** The drive recess cut into the head's top at z = top. */
 function driveCut(context is Context, id is Id, target is Query, def is map, top is ValueWithUnits)
 {
     const kind = def.drive;
     if (kind == DRIVE_NONE || def.t <= EPS)
         return;
+    if (kind == DRIVE_POZI && def.rfil > EPS)
+    {
+        recessTypeIA(context, id, target, def, top);
+        return;
+    }
+    if (kind == DRIVE_CROSS && def.rcd > EPS)
+    {
+        // Indented hex heads: the recess starts on the indent floor (live).
+        recessTypeI(context, id, target, def, (def.indent == 1 && def.head == HEAD_HEX) ? top - (def.k - def.c) / 6 : top);
+        return;
+    }
     const reach = max(def.dk, def.s) + def.d + def.sd;
     var tool = qNothing();
     if (kind == DRIVE_HEX_SOCKET)
@@ -614,6 +854,26 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isInteger(definition.undercut, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
         annotation { "Name" : "Indented head" }
         isInteger(definition.indent, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Type I corner distance" }
+        isLength(definition.rcd, LENGTH_0);
+        annotation { "Name" : "Type I face distance" }
+        isLength(definition.rfd, LENGTH_0);
+        annotation { "Name" : "Type I core diameter" }
+        isLength(definition.rcore, LENGTH_0);
+        annotation { "Name" : "Type I core thickness" }
+        isLength(definition.rth, LENGTH_0);
+        annotation { "Name" : "Type I cone height" }
+        isLength(definition.rch, LENGTH_0);
+        annotation { "Name" : "Type IA fillet" }
+        isLength(definition.rfil, LENGTH_0);
+        annotation { "Name" : "Type IA wing length factor" }
+        isReal(definition.wf, { (unitless) : [0, 1.25, 10] } as RealBoundSpec);
+        annotation { "Name" : "Type IA V-groove wings" }
+        isInteger(definition.wv, { (unitless) : [0, 1, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Type IA arms" }
+        isInteger(definition.arms, { (unitless) : [1, 2, 2] } as IntegerBoundSpec);
+        annotation { "Name" : "Slot angle" }
+        isReal(definition.sa, { (unitless) : [0, 0, 90] } as RealBoundSpec);
         annotation { "Name" : "f" }
         isLength(definition.f, LENGTH_0);
         annotation { "Name" : "e1" }

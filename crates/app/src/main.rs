@@ -204,8 +204,7 @@ fn load_fonts(cx: &mut App) {
 fn apply_theme(cx: &mut App) {
     load_fonts(cx);
     Theme::change(ThemeMode::Light, None, cx);
-    let pal = theme::p();
-    let white: Hsla = gpui_kit::rgb(0xffffff).into();
+    let white: Hsla = gpui_kit::rgb_static(0xffffff).into();
     // Live (sketch/13): text selected in a focused field is Chrome's
     // `#3367d1` with white text; code editors keep `t.selection` below
     // (patched gpui-base, vendor/gpui-base).
@@ -230,7 +229,19 @@ fn apply_theme(cx: &mut App) {
     // Ace's gutter markers (live document/fs-gutter-*): the notice icons, 13 px
     // in the 16 px cell 2 px into the gutter, with Ace's tooltip.
     cx.set_global(gpui_kit::base::input::GutterMarkerRenderer(std::rc::Rc::new(feature_studio::gutter_marker)));
-    cx.set_global(gpui_kit::base::input::CodeGutterMetrics { min_digits: 1, number_inset: px(15.), right_margin: px(0.), fold_width: px(14.), text_gap: px(4.), active_background: Some(gpui_kit::rgb(0xdcdcdc).into()) });
+    apply_kit_theme(cx);
+}
+
+/// GPUI Kit's theme from the palette in effect: at startup, and again when
+/// Preferences › Theming changes (live applies the theme without a reload).
+pub(crate) fn apply_kit_theme(cx: &mut App) {
+    let pal = theme::p();
+    let white: Hsla = gpui_kit::rgb_static(0xffffff).into();
+    let dark = gpui_kit::hex_theme_active();
+    // Feature Studio's current-line gutter cell: light #dcdcdc; dark (Ace
+    // twilight, live dom/dark-drawing-fs-vs.json) white at 3%.
+    let active_cell = if dark { gpui_kit::rgba_static(0xffffff08) } else { gpui_kit::rgb(0xdcdcdc) };
+    cx.set_global(gpui_kit::base::input::CodeGutterMetrics { min_digits: 1, number_inset: px(15.), right_margin: px(0.), fold_width: px(14.), text_gap: px(4.), active_background: Some(active_cell.into()) });
     Theme::update(cx, |t| {
         t.font_family = UI_FONT.into();
         t.font_size = px(14.);
@@ -290,12 +301,15 @@ fn apply_theme(cx: &mut App) {
         // Modal backdrop: Bootstrap's 50% black, as Onshape's modals.
         t.overlay = gpui_kit::rgba(0x00000080).into();
         // Feature Studio code editor (Onshape's Ace editor, help images):
-        // #f0f0f0 gutter, dark line numbers, #ededed current line.
+        // #f0f0f0 gutter, dark line numbers, #ededed current line. Dark: Ace
+        // twilight on #333 (live dom/dark-drawing-fs-vs.json): #232323 gutter,
+        // #e2e2e2 numbers, the current line white at 3%.
+        let (gutter, active, number) = if dark { (0x232323ff, 0xffffff08, 0xe2e2e2ff) } else { (0xf0f0f0ff, 0xedededff, 0x333333ff) };
         let mut code = (*t.highlight_theme).clone();
-        code.style.editor_gutter_background = Some(gpui_kit::rgb(0xf0f0f0).into());
-        code.style.editor_active_line = Some(gpui_kit::rgb(0xededed).into());
-        code.style.editor_line_number = Some(gpui_kit::rgb(0x333333).into());
-        code.style.editor_active_line_number = Some(gpui_kit::rgb(0x333333).into());
+        code.style.editor_gutter_background = Some(gpui_kit::rgba_static(gutter).into());
+        code.style.editor_active_line = Some(gpui_kit::rgba_static(active).into());
+        code.style.editor_line_number = Some(gpui_kit::rgba_static(number).into());
+        code.style.editor_active_line_number = Some(gpui_kit::rgba_static(number).into());
         t.highlight_theme = std::sync::Arc::new(code);
     });
 }

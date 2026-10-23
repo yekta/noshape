@@ -93,6 +93,12 @@ pub fn rgb_static(hex: u32) -> Rgba {
     Rgba { r, g, b, a: 1.0 }
 }
 
+/// NOSHAPE PATCH: [`rgba`] without the hex theme.
+pub fn rgba_static(hex: u32) -> Rgba {
+    let [r, g, b, a] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
+    Rgba { r, g, b, a }
+}
+
 /// Swap from RGBA with premultiplied alpha to BGRA
 pub fn swap_rgba_pa_to_bgra(color: &mut [u8]) {
     color.swap(0, 2);
