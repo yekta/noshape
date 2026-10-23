@@ -231,6 +231,8 @@ pub struct UiState {
     pub feature_drop: std::rc::Rc<std::cell::Cell<Option<(usize, bool)>>>,
     /// The open Hole dialog's parameters last time (its linked depths).
     pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
+    /// A new Thicken's operation at the last dialog change (canSetBooleanFlip).
+    pub thicken_prev_op: Option<(noshape_model::FeatureId, String)>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
     pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
@@ -429,6 +431,7 @@ impl UiState {
             preview_tool: None,
             feature_drop: Default::default(),
             hole_prev: None,
+            thicken_prev_op: None,
             preview_tool_task: None,
             measure_lines: None,
             dyn_suppression: None,
@@ -3034,6 +3037,26 @@ impl PartStudioView {
             profiles.iter().find_map(host_of).into_iter().collect()
         };
         let mut changes: Vec<(&'static str, ParamValue)> = Vec::new();
+        // thickenEditLogic / canSetBooleanFlip: the user switching between a
+        // positive (New, Add) and a negative (Remove, Intersect) operation
+        // flips the wall, unless the flip, Thickness 2 or the merge scope was
+        // set by hand.
+        if ty == "thicken" {
+            let (id, t2_user) = {
+                let d = dialog.read(cx);
+                (d.feature.id, d.user_set.contains("thickness2"))
+            };
+            let prev = self.ui.thicken_prev_op.replace((id, op.clone()));
+            let negative = |o: &str| matches!(o, "REMOVE" | "INTERSECT");
+            if let Some((pid, old)) = prev
+                && pid == id
+                && op_user
+                && negative(&old) != negative(&op)
+                && !(flip_user || t2_user || scope_user)
+            {
+                changes.push(("oppositeDirection", ParamValue::Bool(!flipped)));
+            }
+        }
         // Extrude, revolve and sweep take their operation and merge scope
         // from the tool's collisions once the preview has them
         // (`boolean_edit_logic`); Thicken follows thickenEditLogic here.
