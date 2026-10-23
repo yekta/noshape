@@ -1552,3 +1552,270 @@ fn shell_draft_sweep_matches_onshape() {
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
+
+
+/// Robustness sweep, families 4–8 (live "kern (10-23 14:15) sweep 4-8",
+/// behaviours.md): boolean, loft, sweep, thicken and move / delete / replace
+/// face against Onshape's volumes (all bodies), body and face counts and
+/// errors. Where Onshape's mass properties are approximate, its error band
+/// (L3 dx 5: 9424.503 in [9419.257, 9429.750]; ours is the exact 9424.779).
+#[test]
+fn sweep_4_8_matches_onshape() {
+    let mm = |v: f64| v * 1e-3;
+    fn sketch_on(t: &mut T, plane: Reference, build: impl FnOnce(&mut noshape_sketch::Sketch) -> Vec<u32>) -> (FeatureId, Vec<Reference>, Vec<u32>) {
+        let mut sk = noshape_sketch::Sketch::new();
+        let ids = build(&mut sk);
+        let s = t.add("sketch", &[("sketchPlane", q(vec![plane])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        (s, regions, ids)
+    }
+    fn plane_at(t: &mut T, z: f64) -> Reference {
+        Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e(&format!("{z} mm")))]))
+    }
+    fn poly(sk: &mut noshape_sketch::Sketch, pts: &[(f64, f64)]) -> Vec<u32> {
+        let ps: Vec<_> = pts.iter().map(|(x, y)| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3))).collect();
+        (0..ps.len()).map(|i| sk.add_line_between(ps[i], ps[(i + 1) % ps.len()]).unwrap().0).collect()
+    }
+    fn new_box(t: &mut T, a: (f64, f64), b: (f64, f64), z0: f64, h: f64) {
+        let (_, regions) = t.sketch(&[&[a, (b.0, a.1), b, (a.0, b.1)]], &[]);
+        let mut p = vec![("entities", q(regions)), ("depth", e(&format!("{h} mm"))), ("operationType", en("NEW"))];
+        if z0 > 0.0 {
+            p.extend([("startOffset", ParamValue::Bool(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e(&format!("{z0} mm")))]);
+        }
+        t.add("extrude", &p);
+    }
+    type Got = Result<(f64, Vec<usize>), String>;
+    let mut got: Vec<(&str, Got)> = Vec::new();
+    let mut run = |label: &'static str, t: &mut T, id: FeatureId| {
+        let r = t.regen();
+        let st = r.display.features.iter().find(|s| s.id == id).expect("feature state");
+        let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).collect();
+        let v: f64 = solids.iter().map(|b| noshape_kernel::volume_properties(&b.shape).unwrap().mass / MM3).sum();
+        let faces = solids.iter().map(|b| b.shape.count(noshape_kernel::ShapeType::Face)).collect();
+        got.push((label, if st.status == FeatureStatus::Ok { Ok((v, faces)) } else { Err(st.message.clone().unwrap_or_default()) }));
+        r
+    };
+    let bodies = |t: &mut T| t.regen().context.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect::<Vec<_>>();
+    let boolean = |t: &mut T, op: &str, targets: Vec<Reference>, tools: Vec<Reference>| {
+        let mut p = vec![("operationType", en(op)), ("tools", q(tools))];
+        if !targets.is_empty() {
+            p.push(("targets", q(targets)));
+        }
+        t.add("booleanBodies", &p)
+    };
+    // Bo1 / Bo2: two boxes sharing a face / overlapping, union.
+    for (label, b) in [("Bo1", ((30.0, 0.0), (60.0, 20.0))), ("Bo2", ((20.0, 10.0), (60.0, 30.0)))] {
+        let mut t = T::new();
+        new_box(&mut t, (0.0, 0.0), if label == "Bo1" { (30.0, 20.0) } else { (40.0, 20.0) }, 0.0, 10.0);
+        new_box(&mut t, b.0, b.1, 0.0, 10.0);
+        let all = bodies(&mut t);
+        let u = boolean(&mut t, "UNION", vec![], all);
+        run(label, &mut t, u);
+    }
+    // Bo3: a cylinder tangent to the block's front face along a line, subtract.
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let (_, regions) = t.sketch(&[], &[((30.0, 5.0), 5.0)]);
+    t.add("extrude", &[("entities", q(regions)), ("depth", e("20 mm")), ("operationType", en("NEW"))]);
+    let all = bodies(&mut t);
+    let s = boolean(&mut t, "SUBTRACTION", vec![all[0].clone()], vec![all[1].clone()]);
+    run("Bo3", &mut t, s);
+    // The same cylinder as an Extrude Remove (live 10-23 18:00): the same error.
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let h = t.holes(&[((30.0, 5.0), 5.0)]);
+    run("Bo3 extrude", &mut t, h);
+    // Bo4: a sphere R20 at the block's top back-right corner, intersect.
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let r = t.regen();
+    let b = &r.context.bodies[0];
+    let vi = b.shape.vertices().iter().position(|v| v.vertex_point().map(|p| p.distance(glam::DVec3::new(0.06, 0.04, 0.02)) < 1e-9).unwrap_or(false)).expect("corner");
+    t.add("fSphere", &[("center", q(vec![Reference::Vertex((*b.vertices[vi]).clone())])), ("radius", e("20 mm"))]);
+    let all = bodies(&mut t);
+    let s = boolean(&mut t, "INTERSECTION", vec![], all);
+    run("Bo4", &mut t, s);
+    // Bo5: a box whose top is the block's top, subtract.
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    new_box(&mut t, (20.0, 10.0), (40.0, 30.0), 15.0, 5.0);
+    let all = bodies(&mut t);
+    let s = boolean(&mut t, "SUBTRACTION", vec![all[0].clone()], vec![all[1].clone()]);
+    run("Bo5", &mut t, s);
+    // Lofts.
+    let item = |r: Reference| {
+        let mut v = noshape_model::params::ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    let square = |s: f64| [(-s / 2.0, -s / 2.0), (s / 2.0, -s / 2.0), (s / 2.0, s / 2.0), (-s / 2.0, s / 2.0)];
+    {
+        let mut t = T::new();
+        let (_, r1, _) = sketch_on(&mut t, Reference::Plane(DatumPlane::Top), |sk| poly(sk, &square(40.0)));
+        let p = plane_at(&mut t, 30.0);
+        let (_, r2, _) = sketch_on(&mut t, p, |sk| vec![sk.add_circle(DVec2::ZERO, mm(15.0)).0]);
+        let l = t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1[0].clone()), item(r2[0].clone())]))]);
+        run("L1", &mut t, l);
+    }
+    {
+        let mut t = T::new();
+        let (_, r1, _) = sketch_on(&mut t, Reference::Plane(DatumPlane::Top), |sk| poly(sk, &square(40.0)));
+        let p2 = plane_at(&mut t, 20.0);
+        let (_, r2, _) = sketch_on(&mut t, p2, |sk| vec![sk.add_circle(DVec2::ZERO, mm(20.0)).0]);
+        let p3 = plane_at(&mut t, 40.0);
+        let d = 10.0 * std::f64::consts::SQRT_2;
+        let (_, r3, _) = sketch_on(&mut t, p3, |sk| poly(sk, &[(d, 0.0), (0.0, d), (-d, 0.0), (0.0, -d)]));
+        let l = t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1[0].clone()), item(r2[0].clone()), item(r3[0].clone())]))]);
+        let r = run("L2", &mut t, l);
+        // Live (dom/kern-loft-L2.bodydetails.json): each side edge runs from a
+        // bottom corner to the top corner 45° clockwise, e.g. (20, 20, 0) to
+        // (14.142, 0, 40).
+        if let Some(b) = r.context.bodies.first() {
+            let mm = |p: glam::DVec3| p * 1e3;
+            let found = b.shape.edges().iter().any(|e| {
+                let vs: Vec<glam::DVec3> = e.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(mm).collect();
+                let near = |p: glam::DVec3, q: (f64, f64, f64)| p.distance(glam::DVec3::new(q.0, q.1, q.2)) < 1e-6;
+                vs.len() == 2 && vs.iter().any(|&p| near(p, (20.0, 20.0, 0.0))) && vs.iter().any(|&p| near(p, (10.0 * std::f64::consts::SQRT_2, 0.0, 40.0)))
+            });
+            assert!(found, "L2: no side edge (20, 20, 0) -> (14.142, 0, 40)");
+            // Live's tight box (evBox3d tight): x, y ±20.943282309315897; ours
+            // 20.94668 (Parasolid fits the faces, 34 x 5 poles; its middle
+            // section sits at 0.45226 of the way, our mean chord at 0.45255).
+            let bb = b.shape.bounding_box(true).unwrap();
+            assert!((bb.max.x * 1e3 - 20.943282309315897).abs() < 5e-3 && (bb.min.y * 1e3 + 20.943282309315897).abs() < 5e-3, "L2 box {bb:?}");
+        }
+    }
+    for (label, dx) in [("L3", 30.0), ("L3 dx 5", 5.0)] {
+        let mut t = T::new();
+        let (_, r1, _) = sketch_on(&mut t, Reference::Plane(DatumPlane::Top), |sk| vec![sk.add_circle(DVec2::ZERO, mm(10.0)).0]);
+        let p = plane_at(&mut t, 30.0);
+        let (_, r2, _) = sketch_on(&mut t, p, |sk| vec![sk.add_circle(DVec2::new(mm(dx), 0.0), mm(10.0)).0]);
+        let l = t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1[0].clone()), item(r2[0].clone())]))]);
+        run(label, &mut t, l);
+    }
+    // Sweeps: path on Front, profile on Right at the origin.
+    for (label, r, square_profile) in [("Sw1", 20.0, false), ("Sw2", 4.0, false), ("Sw3", 30.0, true)] {
+        let mut t = T::new();
+        let (_, prof, _) = sketch_on(&mut t, Reference::Plane(DatumPlane::Right), |sk| if square_profile { poly(sk, &square(10.0)) } else { vec![sk.add_circle(DVec2::ZERO, mm(5.0)).0] });
+        let (pid, _, ids) = sketch_on(&mut t, Reference::Plane(DatumPlane::Front), |sk| {
+            let p = |x: f64, y: f64| DVec2::new(mm(x), mm(y));
+            if square_profile {
+                vec![sk.add_arc(p(0.0, 30.0), p(0.0, 0.0), p(30.0, 30.0)).0]
+            } else {
+                vec![sk.add_line(p(0.0, 0.0), p(50.0, 0.0)).0, sk.add_arc(p(50.0, r), p(50.0, 0.0), p(50.0 + r, r)).0, sk.add_line(p(50.0 + r, r), p(50.0 + r, r + 30.0)).0]
+            }
+        });
+        let path: Vec<Reference> = ids.iter().map(|&i| Reference::SketchEntity { sketch: pid, entity: i }).collect();
+        let s = t.add("sweep", &[("profiles", q(vec![prof[0].clone()])), ("path", q(path))]);
+        run(label, &mut t, s);
+    }
+    // Thicken: the top face 3 mm (outward: z 20..23) and 3 mm symmetric (z 18.5..21.5).
+    for (label, sym) in [("Th1", false), ("Th1 sym", true)] {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 20.0);
+        let top = t.faces_where(|c| c.z > 19.999);
+        let mut p = vec![("entities", q(top)), ("operationType", en("NEW"))];
+        if sym {
+            p.extend([("midplane", ParamValue::Bool(true)), ("thickness", e("3 mm"))]);
+        } else {
+            p.push(("thickness1", e("3 mm")));
+        }
+        let th = t.add("thicken", &p);
+        let r = run(label, &mut t, th);
+        if let Some(slab) = r.context.bodies.get(1) {
+            let bb = slab.shape.bounding_box(false).unwrap();
+            let want = if sym { (18.5, 21.5) } else { (20.0, 23.0) };
+            assert!((bb.min.z * 1e3 - want.0).abs() < 1e-3 && (bb.max.z * 1e3 - want.1).abs() < 1e-3, "{label}: slab z {}..{}", bb.min.z * 1e3, bb.max.z * 1e3);
+        }
+    }
+    // Th2: the R5 fillet face at (0,0), 2 mm.
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let corner = t.edges_where(|i| vertical(i) && i.start.x.abs() < 1e-9 && i.start.y.abs() < 1e-9);
+    t.fillet(corner, "5 mm");
+    let fillet_face: Vec<Reference> = {
+        let r = t.regen();
+        let b = &r.context.bodies[0];
+        b.shape.faces().iter().enumerate().filter(|(_, f)| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).map(|(i, _)| Reference::Face((*b.faces[i]).clone())).collect()
+    };
+    assert_eq!(fillet_face.len(), 1);
+    let th = t.add("thicken", &[("entities", q(fillet_face)), ("thickness1", e("2 mm")), ("operationType", en("NEW"))]);
+    run("Th2", &mut t, th);
+    // Face operations.
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let top = t.faces_where(|c| c.z > 19.999);
+    let m = t.add("moveFace", &[("moveFaces", q(top)), ("offsetDistance", e("5 mm"))]);
+    run("Fo1", &mut t, m);
+    for (label, flip) in [("Fo2 default", false), ("Fo2 flipped", true)] {
+        let mut t = T::new();
+        t.block(60.0, 40.0, 20.0);
+        t.holes(&[((30.0, 20.0), 5.0)]);
+        let wall = t.faces_where(|c| (c.x - 30.0).abs() < 1e-6 && (c.y - 20.0).abs() < 1e-6 && c.z > 1.0 && c.z < 19.0);
+        assert_eq!(wall.len(), 1);
+        let m = t.add("moveFace", &[("moveFaces", q(wall)), ("offsetDistance", e("2 mm")), ("oppositeDirection", ParamValue::Bool(flip))]);
+        run(label, &mut t, m);
+    }
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let v = t.edges_where(vertical);
+    t.fillet(v, "5 mm");
+    let fillets = t.faces_where(|c| c.z > 1.0 && c.z < 19.0 && (c.x < 5.0 || c.x > 55.0) && (c.y < 5.0 || c.y > 35.0));
+    assert_eq!(fillets.len(), 4);
+    let d = t.add("deleteFace", &[("deleteFaces", q(fillets))]);
+    run("Fo3", &mut t, d);
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    t.holes(&[((30.0, 20.0), 5.0)]);
+    let wall = t.faces_where(|c| (c.x - 30.0).abs() < 1e-6 && (c.y - 20.0).abs() < 1e-6 && c.z > 1.0 && c.z < 19.0);
+    let d = t.add("deleteFace", &[("deleteFaces", q(wall))]);
+    run("Fo4", &mut t, d);
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let top = t.faces_where(|c| c.z > 19.999);
+    let p = plane_at(&mut t, 25.0);
+    let rf = t.add("replaceFace", &[("replaceFaces", q(top)), ("templateFace", q(vec![p]))]);
+    run("Fo5", &mut t, rf);
+    // Onshape: Ok((volume, faces per body, tolerance)) or its error.
+    type Want = Result<(f64, &'static [usize], f64), &'static str>;
+    let want: &[(&str, Want)] = &[
+        ("Bo1", Ok((12000.0, &[6], 1e-3))),
+        ("Bo2", Ok((14000.0, &[10], 1e-3))),
+        ("Bo3", Err("Boolean operation would result in non-manifold body.")),
+        ("Bo3 extrude", Err("Boolean operation would result in non-manifold body.")),
+        ("Bo4", Ok((4188.790204786391, &[4], 1e-3))),
+        ("Bo5", Ok((46000.0, &[11], 1e-3))),
+        // Onshape 33872.2611 in [33840.890, 33903.633].
+        ("L1", Ok((33872.261061945035, &[6], 31.4))),
+        // Onshape 45412.2225 in [45358.320, 45466.125].
+        ("L2", Ok((45412.22249042802, &[6], 53.9))),
+        ("L3", Err("Current selections would create a self-intersecting body.")),
+        ("L3 dx 5", Ok((9424.5030322638, &[3], 5.24))),
+        ("Sw1", Ok((8750.586407451927, &[5], 1e-3))),
+        ("Sw2", Err("Result of sweep intersects itself, adjust path or profile selections.")),
+        ("Sw3", Ok((4712.388980384688, &[6], 1e-3))),
+        ("Th1", Ok((55200.0, &[6, 6], 1e-3))),
+        ("Th1 sym", Ok((55200.0, &[6, 6], 1e-3))),
+        ("Th2", Ok((48269.6902001295, &[7, 6], 1e-3))),
+        ("Fo1", Ok((60000.0, &[6], 1e-3))),
+        ("Fo2 default", Ok((47434.51332235384, &[7], 1e-3))),
+        ("Fo2 flipped", Ok((44921.23919948201, &[7], 1e-3))),
+        ("Fo3", Ok((48000.0, &[6], 1e-3))),
+        ("Fo4", Ok((48000.0, &[6], 1e-3))),
+        ("Fo5", Ok((60000.0, &[6], 1e-3))),
+    ];
+    let mut bad = Vec::new();
+    for (label, w) in want {
+        let g = got.iter().find(|(l, _)| l == label).map(|(_, g)| g);
+        let ok = match (w, g) {
+            (Ok((v, f, tol)), Some(Ok((gv, gf)))) => (gv - v).abs() <= *tol && gf.as_slice() == *f,
+            (Err(m), Some(Err(gm))) => gm == m,
+            _ => false,
+        };
+        if !ok {
+            bad.push(format!("{label}: {g:?}, Onshape {w:?}"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}

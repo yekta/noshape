@@ -22,6 +22,28 @@ use std::collections::BTreeMap;
 /// Onshape's SWEEP_FAILED.
 const SWEEP_FAILED: &str = "Could not create valid swept body, check input.";
 
+/// Onshape's message for a circle swept round a bend tighter than itself
+/// (live "kern (10-23 18:40)"): it depends on where the circle's start (its
+/// x direction) points. In the bend's plane: SWEEP_FAILED (G1: Ø6 on Front,
+/// R2 bend on Top); across it: "Result of sweep intersects itself" (Sw2: Ø10
+/// on Right, R4 bend on Front); turning the circle's start 90° swaps them.
+fn tight_bend_message(profile: &Shape, path: &Shape) -> &'static str {
+    const SELF_INTERSECTS: &str = "Result of sweep intersects itself, adjust path or profile selections.";
+    let circle = match profile.edges().as_slice() {
+        [e] => match e.edge_curve() {
+            Ok(k::Curve::Circle { x_dir, radius, .. }) => Some((x_dir.normalize(), radius)),
+            _ => None,
+        },
+        _ => None,
+    };
+    let Some((x_dir, r)) = circle else { return SWEEP_FAILED };
+    let across = path.edges().iter().any(|e| match e.edge_curve() {
+        Ok(k::Curve::Circle { axis, radius, .. }) => radius < r && x_dir.dot(axis.normalize()).abs() > 0.5,
+        _ => false,
+    });
+    if across { SELF_INTERSECTS } else { SWEEP_FAILED }
+}
+
 /// The part of the sweep path a profile in its middle sweeps along (live
 /// L12): the piece from the profile toward the path's start, or toward its
 /// end with the path's Opposite direction. Unchanged when the profile's
@@ -161,7 +183,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         // OCCT sweeps a profile round a bend tighter than the profile into a
         // self-intersecting solid; Onshape refuses it.
         if !res.shape.is_valid() || res.shape.self_intersects() {
-            return err("Could not create valid swept body, check input.");
+            return err(tight_bend_message(&p.shape, &path));
         }
         let names = sweep_names(ev, p, &res, true, true);
         tools.push(NamedShape::new(res.shape, names));
@@ -251,6 +273,28 @@ fn loft_sections(ev: &EvalCtx, items: &[ParamValues], query_id: &str, wire: bool
     Ok(out)
 }
 
+/// Two circles in parallel planes whose centres are apart sideways by at least
+/// the larger radius: Parasolid's loft between them twists through itself
+/// (live L3: Ø20 circles 30 apart OK up to dx 9.999, failing from dx 10; a Ø10
+/// top at dx 30 fails too).
+fn oblique_circles(shapes: &[Shape]) -> bool {
+    let circle = |s: &Shape| match s.edges().as_slice() {
+        [e] => match e.edge_curve() {
+            Ok(k::Curve::Circle { center, axis, radius, .. }) => Some((center, axis.normalize(), radius)),
+            _ => None,
+        },
+        _ => None,
+    };
+    let [a, b] = shapes else { return false };
+    let (Some((c1, n1, r1)), Some((c2, n2, r2))) = (circle(a), circle(b)) else { return false };
+    if n1.cross(n2).length() > 1e-9 {
+        return false;
+    }
+    let d = c2 - c1;
+    let side = (d - n1 * d.dot(n1)).length();
+    side >= r1.max(r2) * (1.0 - 1e-9)
+}
+
 fn loft_names(ev: &EvalCtx, sections: &[Section], res: &k::OpResult, caps: bool) -> Vec<Name> {
     let mut roles = BTreeMap::new();
     if caps {
@@ -325,6 +369,9 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             }
             opts.start_points = Some(starts);
         }
+    }
+    if oblique_circles(&shapes) {
+        return err("Current selections would create a self-intersecting body.");
     }
     let res = k::loft(&shapes, &opts).map_err(|_| fe(LOFT_FAILED))?;
     if solid && res.shape.count(ShapeType::Solid) == 0 {
