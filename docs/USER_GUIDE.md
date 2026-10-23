@@ -61,7 +61,6 @@ including the keyboard shortcuts. This page covers what is specific to a local a
 | F | Zoom to fit |
 | Z / Shift+Z | Zoom out / in |
 | Arrows | Rotate 15° (Ctrl 5°, Shift 90°); Ctrl+Shift+arrows pan |
-| O | Orthographic / perspective |
 | P / Shift+P | Show/hide planes / construction |
 | Y / Shift+Y / Shift+I / Shift+T | Hide / show all / isolate / transparent |
 | Shift+X | Section view |

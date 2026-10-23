@@ -184,6 +184,13 @@ pub struct OsMenu {
     /// with a 2 px `#3e94ff` focus ring (live assembly/182, navigation/62).
     /// Drawn by the menu host, so it shows exactly while the list is open.
     ring: Option<Bounds<Pixels>>,
+    /// Items with Onshape's right-click › "Set as default" (camera menu
+    /// Perspective view, Highlight boundary edges), by item index.
+    defaults: std::collections::HashMap<usize, Handler>,
+    /// The open "Set as default" popup: its item and where the right-click
+    /// was (window coordinates), and its painted bounds.
+    default_popup: Option<(usize, Point<Pixels>)>,
+    popup_bounds: Rc<Cell<Bounds<Pixels>>>,
 }
 
 /// An `OsMenu`'s one-shot Esc handler.
@@ -200,7 +207,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, camera: false, on_escape: None, ring: None }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, camera: false, on_escape: None, ring: None, defaults: Default::default(), default_popup: None, popup_bounds: Rc::new(Cell::new(Bounds::default())) }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -327,7 +334,26 @@ impl OsMenu {
 
     /// Whether `pos` is over this menu or its open submenus.
     fn contains(&self, pos: Point<Pixels>, cx: &App) -> bool {
-        self.bounds.get().contains(&pos) || self.open_submenu().is_some_and(|m| m.read(cx).contains(pos, cx))
+        self.bounds.get().contains(&pos) || (self.default_popup.is_some() && self.popup_bounds.get().contains(&pos)) || self.open_submenu().is_some_and(|m| m.read(cx).contains(pos, cx))
+    }
+
+    /// Onshape's right-click › "Set as default" on the item added last: `f`
+    /// runs when it is chosen (the menu then closes).
+    pub fn set_default(mut self, f: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
+        if let Some(ix) = self.items.len().checked_sub(1) {
+            self.defaults.insert(ix, Rc::new(f));
+        }
+        self
+    }
+
+    /// The "Set as default" popup's choice: run it and close the menu.
+    fn set_as_default(&mut self, ix: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(f) = self.defaults.get(&ix).cloned() else { return };
+        let ret = self.dismiss(window, cx);
+        if let Some(ret) = ret {
+            window.focus(&ret, cx);
+        }
+        f(&ClickEvent::default(), window, cx);
     }
 
     /// Close the menu (and its parents). Afterwards, unless something else
@@ -524,6 +550,18 @@ impl Render for OsMenu {
                         .when(!*disabled, |d| {
                             d.cursor_pointer().on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate(ix, window, cx)))
                         })
+                        // Right-click › "Set as default" (A-partstudio-ui 6.4,
+                        // ui-ref view-cube/concepts__view-cube-menu-set-default-02).
+                        .when(self.defaults.contains_key(&ix), |d| {
+                            d.on_mouse_down(
+                                MouseButton::Right,
+                                cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                                    this.default_popup = Some((ix, e.position));
+                                    cx.stop_propagation();
+                                    cx.notify();
+                                }),
+                            )
+                        })
                         .into_any_element(),
                     OsMenuItem::Submenu { label, icon, menu } => row(ix)
                         .text_color(pal.text)
@@ -608,6 +646,32 @@ impl Render for OsMenu {
             .text_color(pal.text)
             .children(rows)
             .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+            .when_some(self.default_popup, |d, (ix, at)| {
+                // Live (ui-ref view-cube/concepts__view-cube-menu-set-default-02):
+                // a one-row white box right of the pointer, the menu still open.
+                let pb = self.popup_bounds.clone();
+                let popup = div()
+                    .id("os-menu-set-default")
+                    .occlude()
+                    .relative()
+                    .min_w(px(130.))
+                    .h(px(24.))
+                    .px(px(28.))
+                    .flex()
+                    .items_center()
+                    .bg(gpui_kit::rgb(0xffffff))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xcccccc))
+                    .text_size(px(12.))
+                    .text_color(gpui_kit::rgb(0x555555))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(hover_bg))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_as_default(ix, window, cx)))
+                    .child("Set as default")
+                    .child(canvas(move |b, _, _| pb.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full());
+                d.child(deferred(anchored().position(at + point(px(12.), px(-6.))).snap_to_window_with_margin(px(4.)).child(popup)).with_priority(POPUP_PRIORITY + 2))
+            })
     }
 }
 
