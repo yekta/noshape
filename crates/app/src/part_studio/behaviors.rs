@@ -168,6 +168,10 @@ pub struct UiState {
     pub vcolor_cache: Option<((usize, String), Option<super::appearance::VertexColors>)>,
     /// View in high quality (Shift+R).
     pub high_quality: bool,
+    /// View in high quality was on in this session: Onshape keeps the Very
+    /// fine meshes it refined until reload (live 10-23 a3), so the regen
+    /// keeps the level after Shift+R goes off.
+    pub high_quality_seen: bool,
     /// Parts list › Assign material…: the Material panel.
     pub material_panel: Option<super::material_panel::MaterialPanel>,
     /// Where panel dialogs were moved by their title.
@@ -395,6 +399,7 @@ impl UiState {
             analysis: None,
             vcolor_cache: None,
             high_quality: false,
+            high_quality_seen: false,
             create_selection: None,
             material_panel: None,
             panels: Default::default(),

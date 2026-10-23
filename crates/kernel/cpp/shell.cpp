@@ -33,6 +33,7 @@
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
+#include <limits>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <ElCLib.hxx>
@@ -419,14 +420,16 @@ bool in_onshape_mitre_band(const TopoDS_Shape& solid, const std::vector<TopoDS_S
   return false;
 }
 
-// Live "kern (10-23 09:00) Shell bracket": Parasolid can't shell inward when
-// a hole's wall, offset to r + t, exactly touches a plane's offset (moved t
-// into the material): the Ø10 hole 10 mm from the bracket's front fails at
-// exactly 2.5 mm (2.499 and 2.501 work). A kept concave cylinder whose axis is
-// parallel to a kept plane on its material side at r + 2 t (to 1e-8 m), the
-// line where they'd touch on both faces.
-bool offsets_touch(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
+// How close an inward shell's offset walls come to touching: a kept concave
+// cylinder (a hole's wall, offset to r + t) and a kept plane (offset t into
+// the material) with the axis parallel to it on its material side at about
+// r + 2 t, the line where they'd touch on both faces; the smallest
+// |distance - (r + 2 t)|, or infinity. Live "kern (10-23 09:00) Shell
+// bracket": Parasolid fails when they touch exactly (the Ø10 hole 10 mm from
+// the bracket's front at 2.5 mm; 2.499 and 2.501 work).
+double offsets_touch_gap(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
 {
+  double gap = std::numeric_limits<double>::infinity();
   ShapeIMap rm;
   for (const TopoDS_Shape& f : removed)
     rm.Add(f);
@@ -472,15 +475,16 @@ bool offsets_touch(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& r
         continue;
       // Signed: the axis on the material side (inside the plane) is negative.
       const double s = gp_Vec(pl.Location(), c).Dot(gp_Vec(n));
-      if (s >= 0 || std::abs(-s - (cyl.Radius() + 2 * t)) > 1e-8)
+      const double g = std::abs(-s - (cyl.Radius() + 2 * t));
+      if (s >= 0 || g >= gap)
         continue;
       const gp_Pnt on_hole = c.Translated(gp_Vec(n) * cyl.Radius());
       const gp_Pnt on_plane = c.Translated(gp_Vec(n) * -s);
       if (inside(cf, on_hole) && inside(pf, on_plane))
-        return true;
+        gap = g;
     }
   }
-  return false;
+  return gap;
 }
 
 // ------------------------------------------------------------------ regions
@@ -1400,12 +1404,17 @@ OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thic
   const double sign = outward ? 1.0 : -1.0;
   if (!outward && in_onshape_mitre_band(solid.shape, removed, thickness))
     fail_op("shell failed (Parasolid can't build this wall: live G51)");
-  if (!outward && offsets_touch(solid.shape, removed, thickness))
+  const double gap = outward ? std::numeric_limits<double>::infinity() : offsets_touch_gap(solid.shape, removed, thickness);
+  if (gap <= 1e-8)
     fail_op("shell failed (Parasolid can't build walls whose offsets touch)");
-  Built        b;
+  // Walls that nearly touch (within ten times OCCT's offset tolerance) merge
+  // or part by less than it sees: its offset keeps both faces whole and
+  // overlapping (2.501 mm: 0.003 mm³ off). The slab construction trims them.
+  const bool offset_ok = gap > 1e-5;
+  Built      b;
   // method: 0 = automatic, 1 = offset only, 2 = slabs only (tests).
   const bool done = (method == 0 && by_regions(solid.shape, removed, thickness, sign, b)) ||
-                    (method != 2 && by_offset(solid.shape, removed, thickness, sign, b)) ||
+                    (method != 2 && (offset_ok || method == 1) && by_offset(solid.shape, removed, thickness, sign, b)) ||
                     (method != 1 && by_slabs(solid.shape, removed, thickness, sign, b));
   if (!done)
     fail_op("shell failed");

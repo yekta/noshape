@@ -809,6 +809,28 @@ fn ev_raycast(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::array(out))
 }
 
+fn face_pair(a: &k::Shape, b: &k::Shape) -> bool {
+    a.shape_type() == k::ShapeType::Face && b.shape_type() == k::ShapeType::Face
+}
+
+/// Two touching faces cross (interfere) when they meet along a curve inside
+/// both, not where they only touch along a boundary or lie on each other (abut).
+fn faces_cross(a: &k::Shape, b: &k::Shape) -> bool {
+    if k::common(a, b).ok().and_then(|c| c.shape.area().ok()).is_some_and(|x| x > 1e-12) {
+        return false;
+    }
+    let Ok(sec) = k::section(a, b) else { return false };
+    let interior = |f: &k::Shape, p: DVec3| {
+        let Ok(v) = k::make_vertex(p) else { return false };
+        f.edges().iter().all(|e| k::distance(&v, e).is_ok_and(|d| d.distance > 1e-7))
+    };
+    sec.shape.edges().iter().any(|e| {
+        let Ok(info) = e.edge_info() else { return false };
+        let Ok(m) = e.point_at(0.5 * (info.first_param + info.last_param)) else { return false };
+        interior(a, m) && interior(b, m)
+    })
+}
+
 fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let tools = super::query::evaluate_refs(i, &cx, &field(&a, "tools"))?;
@@ -851,9 +873,11 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if d.distance > 1e-8 {
                 continue;
             }
-            let kind = match k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) {
-                Some(v) if v > 1e-15 => "INTERFERE",
-                _ => "ABUT_NO_CLASS",
+            let kind = if face_pair(t, g) { if faces_cross(t, g) { "INTERFERE" } else { "ABUT_NO_CLASS" } } else {
+                match k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) {
+                    Some(v) if v > 1e-15 => "INTERFERE",
+                    _ => "ABUT_NO_CLASS",
+                }
             };
             let ty = std_enum("clashtype.gen.fs", "ClashType", kind).unwrap_or_else(|| Value::str(kind));
             let mut m = vec![("type", ty), ("tool", one(tr)), ("target", one(gr))];

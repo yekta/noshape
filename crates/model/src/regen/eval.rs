@@ -561,6 +561,8 @@ impl<'a> EvalCtx<'a> {
                     k::Surface::Cylinder { origin, axis, .. } => Some((origin, axis.normalize())),
                     k::Surface::Cone { origin, axis, .. } => Some((origin, axis.normalize())),
                     k::Surface::Revolution { axis_origin, axis_dir } => Some((axis_origin, axis_dir.normalize())),
+                    // Revolved circles report as tori or spheres (the kernel recognises them).
+                    k::Surface::Torus { center, axis, .. } | k::Surface::Sphere { center, axis, .. } => Some((center, axis.normalize())),
                     k::Surface::Plane(p) => Some((p.origin, p.unit_normal())),
                     _ => None,
                 }
@@ -865,6 +867,12 @@ impl<'a> EvalCtx<'a> {
             } else {
                 (res, face_names)
             };
+            // Parasolid refuses a cut leaving faces that meet along an edge
+            // from both sides (live Bo3: a cylinder tangent to the block's
+            // face, by Boolean or Extrude Remove); the parts stay as they were.
+            if op != k::BooleanOp::Fuse && target.kind == BodyKind::Solid && non_manifold(&res.shape) && !non_manifold(&target.shape) {
+                return Err(FeatureError::new("Boolean operation would result in non-manifold body.".to_string()));
+            }
             let t_named = t0.elapsed();
             let pieces = split_solids(&res.shape, &face_names);
             if perf {
@@ -1241,4 +1249,16 @@ fn tools_engulf(target: &Shape, tools: &[Shape]) -> bool {
     let Ok(v) = target.volume() else { return true };
     let t: f64 = tools.iter().filter_map(|t| t.volume().ok()).map(f64::abs).sum();
     t >= v.abs() * (1.0 - 1e-6)
+}
+
+/// An edge of `shape` bounding more than two faces.
+fn non_manifold(shape: &Shape) -> bool {
+    shape.edge_faces().is_ok_and(|ef| {
+        ef.iter().any(|f| {
+            let mut f = f.clone();
+            f.sort_unstable();
+            f.dedup();
+            f.len() > 2
+        })
+    })
 }

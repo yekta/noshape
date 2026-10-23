@@ -521,8 +521,9 @@ impl PartStudioView {
         self.regen_inflight = Some(pending::InFlight { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
         self.begin_pending(seq, window, cx);
         let cancel2 = cancel.clone();
-        // View in high quality (Shift+R): a 4x finer chord tolerance.
-        let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality { 0.25 } else { 1.0 };
+        // View in high quality (Shift+R, kept for the session once used):
+        // the Very fine level, refined to view by view.
+        let deflection = RegenOptions::default().relative_deflection * if self.ui.high_quality_seen { 0.25 } else { 1.0 };
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
             // Coalesce bursts of edits (typing in a field).
             cx.background_executor().timer(Duration::from_millis(12)).await;
@@ -2433,6 +2434,7 @@ impl PartStudioView {
             }
             let selected = self.selection.contains(&r);
             let hidden = hidden_defaults.contains(&r);
+            let dimmed = default_row_dimmed(hidden, self.ui.isolate.as_ref());
             let r2 = r.clone();
             let r3 = r.clone();
             let icon = if label == "Origin" { "origin" } else { "plane" };
@@ -2448,9 +2450,10 @@ impl PartStudioView {
                     // Live: the eye's center 19 px from the row's end.
                     .pr(px(11.))
                     .group("dg-row")
-                    // Onshape: hidden default geometry is listed in gray.
-                    .when(hidden, |d| d.text_color(pal.text_faint))
-                    .child(crate::ui::tree_icon(icon, hidden, cx))
+                    // Onshape: hidden default geometry is listed in gray, and
+                    // so is all of it while parts are isolated (qa5 KB3).
+                    .when(dimmed, |d| d.text_color(pal.text_faint))
+                    .child(crate::ui::tree_icon(icon, dimmed, cx))
                     .child(match renaming {
                         Some(st) => div().flex_1().child(gpui_kit::component::input::Input::new(&st).xsmall()).into_any_element(),
                         None => div().flex_1().truncate().child(crate::ui::user_text(name)).into_any_element(),
@@ -4966,5 +4969,27 @@ pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
     match f.feature_type().map(|t| t.name) {
         Some(t) if !f.name.starts_with(t) => format!("{} [{t}]", f.name),
         _ => f.name.clone(),
+    }
+}
+
+/// A Default geometry row drawn gray: hidden, or any while parts are
+/// isolated (Isolate takes the planes away; live qa5 KB3, ui/pn-900).
+fn default_row_dimmed(hidden: bool, isolate: Option<&behaviors::Isolation>) -> bool {
+    hidden || isolate.is_some_and(|i| i.mode == behaviors::IsolateMode::Isolate)
+}
+
+#[cfg(test)]
+mod default_row_tests {
+    use super::*;
+    use std::prelude::v1::test;
+
+    #[test]
+    fn default_geometry_rows_gray_while_isolating() {
+        let iso = |mode| behaviors::Isolation { mode, bodies: Vec::new(), opacity: 0.0, select_transparent: false, expand: 0 };
+        assert!(!default_row_dimmed(false, None));
+        assert!(default_row_dimmed(true, None));
+        assert!(default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Isolate))));
+        // Make transparent keeps the planes, so their rows stay black.
+        assert!(!default_row_dimmed(false, Some(&iso(behaviors::IsolateMode::Transparent))));
     }
 }

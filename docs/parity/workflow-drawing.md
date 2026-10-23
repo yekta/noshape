@@ -111,3 +111,8 @@ Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 
 | Row | Ours | Status |
 |---|---|---|
 | D8 Callout on an assembly part in the iso view with a BOM table (Create Drawing › ANSI_A_MM, Suggested views; BOM table top right) | balloon shows the BOM item number "2" (p08, p09) | ✅ **fixed** |
+
+## Re-check (qa4, 2026-10-23 20:40–21:10, main a0e360a3; code and the latest qa5 passes)
+- Fixed in qa5's later passes (rows marked ✅ above): D2, D3, D5, D7, D8, D9, D11, D14, D15, D16; D1, D4 fixes cited in code.
+- Still open, not re-run since pass 3: **D10** (PDF: iso view shaded, Detail circle/clip lost) and **D12** (DXF explodes circles,
+  arcs, hatches, dimensions, tables into lines) → qa5-routing D10 / D12 (**api**, owns export).
