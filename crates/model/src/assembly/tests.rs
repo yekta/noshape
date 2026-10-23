@@ -3200,8 +3200,8 @@ fn pan_head_tapping_screw_mouth_fillets() {
 /// The remaining ANSI tapping screws (live, behaviours.md "skb (10-22 07:45)"):
 /// #8 tip A face counts as live's geometry files (the 0.002 in mouth fillet
 /// of Type III / VI included: FeatureScript's opFillet is the checked kernel
-/// fillet). Flat countersunk has
-/// no live file: counted as its siblings. Undercut heads stop the 41° cone at the head height with a flat
+/// fillet). Flat countersunk: live's Type VI file (14 faces, its under-head
+/// arc a torus); Slot / Type III counted the same way. Undercut heads stop the 41° cone at the head height with a flat
 /// step; hex heads with a 30° top chamfer, the indent a Ø0.9 s dish; the hex
 /// washer's disc under the hex.
 #[test]
@@ -3210,7 +3210,7 @@ fn remaining_tapping_screws_match_live() {
     // (head type, live's faces).
     type Heads = &'static [(&'static str, usize)];
     let cases: [(&str, Heads); 5] = [
-        ("Flat countersunk head tapping screw", &[("Slot", 8), ("Type III", 17), ("Type VI", 13)]),
+        ("Flat countersunk head tapping screw", &[("Slot", 9), ("Type III", 18), ("Type VI", 14)]),
         ("Flat undercut countersunk head tapping screw", &[("Slot", 9), ("Type III", 18)]),
         ("Oval undercut countersunk head tapping screw", &[("Slot", 9), ("Type III", 18)]),
         ("Hex head tapping screw", &[("Plain", 16), ("Indent", 18), ("Slot", 20), ("Slot and indent", 24), ("Type VI", 27)]),
@@ -3230,9 +3230,10 @@ fn remaining_tapping_screws_match_live() {
             let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
             assert!(failed.is_empty(), "{name} {head}: {failed:?}");
             let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
-            // Flat countersunk has no live file; its smaller Type VI (Ø0.132 in)
-            // has lobes too tight for OCCT's 0.002 in mouth fillet: 12 or 13.
-            let unproven = name == "Flat countersunk head tapping screw" && *head == "Type VI" && body.faces.len() == 12;
+            // Flat countersunk Type VI: live's 14 (behaviours "skb (10-23
+            // 03:30)") has the mouth fillet, which OCCT can't make on this
+            // smaller Ø0.132 in recess yet: 13.
+            let unproven = name == "Flat countersunk head tapping screw" && *head == "Type VI" && body.faces.len() == 13;
             if body.faces.len() != *faces && !unproven {
                 wrong.push(format!("{name} {head}: {} faces, live {faces}", body.faces.len()));
             }
@@ -3377,3 +3378,117 @@ fn type_ia_recipe_regenerates_on_every_head() {
     }
 }
 
+
+
+/// ANSI nuts and spring lock washers built from Onshape's own tables
+/// (dom/skb-sc-comp) as live's B-rep (dom/skb-sc-geom, default size): face
+/// types and total area (m²); lock nuts at live's smallest and largest size.
+#[test]
+fn ansi_nuts_and_lock_washers_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    type Case = (&'static str, &'static [(&'static str, usize)], f64);
+    let cases: [Case; 7] = [
+        ("Hex flat nut", &[("Cone", 8), ("Cylinder", 1), ("Plane", 8)], 7.898129e-3),
+        ("Hex machine screw nut", &[("Cone", 14), ("Cylinder", 1), ("Plane", 8)], 4.520420e-5),
+        ("Square nut", &[("Cone", 10), ("Cylinder", 1), ("Plane", 6)], 5.276197e-4),
+        ("Hex slotted nut", &[("Cone", 19), ("Cylinder", 7), ("Plane", 25)], 4.755728e-4),
+        ("Heavy hex slotted nut", &[("Cone", 13), ("Cylinder", 8), ("Plane", 31)], 6.322624e-4),
+        ("Regular spring lock washer", &[("Cone", 2), ("Cylinder", 2), ("Plane", 2), ("Torus", 4)], 2.515125e-5),
+        ("High collar spring lock washer", &[("Cone", 2), ("Cylinder", 2), ("Plane", 2), ("Torus", 4)], 2.258067e-5),
+    ];
+    // Lock nuts at the sizes live captured (their default bodies are placeholders).
+    let sized: [(&str, &str, Case); 8] = [
+        ("T-slot nut", "5/16", ("", &[("Cone", 2), ("Cylinder", 3), ("Plane", 14)], 8.159743e-4)),
+        ("T-slot nut", "1-1/2", ("", &[("Cone", 2), ("Cylinder", 3), ("Plane", 14)], 1.994554e-2)),
+        ("Hex lock nut", "#4-40", ("", &[("Cone", 8), ("Cylinder", 1), ("Plane", 8)], 1.082215e-4)),
+        ("Hex lock nut", "4-4", ("", &[("Cone", 8), ("Cylinder", 1), ("Plane", 8)], 9.182168e-2)),
+        ("Hex lock nut with nylon insert", "#2-56", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 9), ("Torus", 1)], 1.379852e-4)),
+        ("Hex lock nut with nylon insert", "1-1/2-6", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 8), ("Torus", 1)], 1.237012e-2)),
+        ("Hex thin lock nut with nylon insert", "#4-40", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 9), ("Torus", 1)], 1.659259e-4)),
+        ("Hex thin lock nut with nylon insert", "1-1/2-12", ("", &[("Cone", 14), ("Cylinder", 3), ("Plane", 9), ("Torus", 1)], 1.464824e-2)),
+    ];
+    let all = cases.iter().map(|(n, k, a)| (*n, None, *k, *a)).chain(sized.iter().map(|(n, size, (_, k, a))| (*n, Some(*size), *k, *a)));
+    for (name, size, kinds, live_area) in all {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        if let Some(size) = size {
+            spec.set_size(size);
+        }
+        let name = format!("{name} {}", spec.size);
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let mut got: std::collections::BTreeMap<String, usize> = Default::default();
+        let mut area = 0.0;
+        for i in 0..b.faces.len() {
+            let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+            area += f.area().unwrap();
+            *got.entry(format!("{:?}", f.face_surface().unwrap()).split([' ', '(']).next().unwrap().to_string()).or_default() += 1;
+        }
+        let want: std::collections::BTreeMap<String, usize> = kinds.iter().map(|(k, n)| (k.to_string(), *n)).collect();
+        assert_eq!(got, want, "{name}");
+        assert!((area / live_area - 1.0).abs() < 1e-3, "{name}: area {area} live {live_area}");
+    }
+}
+
+/// DIN keys as live's B-rep (dom/skb-sc-geom, smallest and largest sizes):
+/// along Y on the XY plane, round ends (Type A), tapered 1:100 from the -Y end.
+#[test]
+fn din_keys_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    // (DIN 6885-1's largest size, 440mm - 550mm, has no length list in live's
+    // tables: its LENGTHS rows say "440mm - 500mm"; it is left out.)
+    let cases: [(&str, &str, &str, usize, usize, f64); 5] = [
+        ("DIN 6885-1 Parallel keys", "6mm - 8mm", "6", 2, 4, 5.084956e-5),
+        ("DIN 6883 Tapered key", "22mm - 30mm", "20", 0, 6, 5.944080e-4),
+        ("DIN 6883 Tapered key", "200mm - 230mm", "400", 0, 6, 5.440100e-2),
+        ("DIN 6886 Stressed tapered key", "6mm - 8mm", "6", 2, 4, 5.042161e-5),
+        ("DIN 6886 Stressed tapered key", "75mm - 85mm", "250", 2, 4, 1.748775e-2),
+    ];
+    for (name, size, length, cylinders, planes, live_area) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        spec.length = Some(length.into());
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {size}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let (mut cyl, mut pl, mut area) = (0, 0, 0.0);
+        for i in 0..b.faces.len() {
+            let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+            area += f.area().unwrap();
+            match f.face_surface().unwrap() {
+                noshape_kernel::Surface::Cylinder { .. } => cyl += 1,
+                noshape_kernel::Surface::Plane(_) => pl += 1,
+                s => panic!("{name} {size}: {s:?}"),
+            }
+        }
+        assert_eq!((cyl, pl), (cylinders, planes), "{name} {size}");
+        assert!((area / live_area - 1.0).abs() < 1e-4, "{name} {size}: area {area} live {live_area}");
+        // The thick end at -Y (live's taper falls towards +Y).
+        let bb = b.shape.bounding_box(true).unwrap();
+        assert!(bb.min.z.abs() < 1e-9 && (bb.max.y + bb.min.y).abs() < 1e-9, "{name} {size}: {bb:?}");
+    }
+    // The chosen Type names the part as live ("Parallel key B x 2 x 2 x 6").
+    let c = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.length = Some("6".into());
+    spec.params.insert("Type".into(), "B".into());
+    assert_eq!(spec.part_name(), "Parallel key B x 2 x 2 x 6");
+}
+
+/// AS568 O-rings from live's table (inch: −001 is 0.029 in inside, 0.037 in
+/// section) with live's four materials, Butyl first.
+#[test]
+fn as568_o_rings_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "AS568 D O-rings").unwrap();
+    assert_eq!(c.materials(), ["Butyl", "Nitrile", "Silicone Rubber", "Teflon"]);
+    let spec = StandardSpec::new(c);
+    assert_eq!(spec.part_name(), "O-ring -001 (0.029 x 0.04)");
+    assert!(spec.description().starts_with("O-ring -001 (0.029 x 0.04) Butyl"), "{}", spec.description());
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let bb = b.shape.bounding_box(true).unwrap();
+    // Outside diameter = inside + 2 sections; height = the section.
+    assert!(((bb.max.x - bb.min.x) / 0.0254 - (0.029 + 2.0 * 0.037)).abs() < 1e-4, "{bb:?}");
+    assert!(((bb.max.z - bb.min.z) / 0.0254 - 0.037).abs() < 1e-4, "{bb:?}");
+}

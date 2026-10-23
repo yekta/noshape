@@ -219,7 +219,7 @@ impl Render for RichTooltip {
                 .w(px(RICH_TOOLTIP_W))
                 .bg(gpui_kit::rgb(0xffffff))
                 .child(title)
-                .child(div().p(px(4.)).line_height(px(18.)).child(self.description.clone()))
+                .child(div().p(px(4.)).line_height(px(18.)).child(tool_description(&self.description)))
                 .into_any_element()
         } else {
             title.into_any_element()
@@ -232,6 +232,15 @@ impl Render for RichTooltip {
         // Never drawn over an open context menu (QA3: a stale tooltip covered its items).
         div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(div().w(px(RICH_TOOLTIP_W)).flex().justify_center().child(content))))
     }
+}
+
+/// A tool description ([`crate::tool_text::blocks`]): its paragraphs, and
+/// list items numbered at the right of the browser's 40 px list indent.
+pub fn tool_description(text: &str) -> Div {
+    v_flex().children(crate::tool_text::blocks(text).into_iter().map(|(n, t)| match n {
+        None => div().child(t),
+        Some(n) => h_flex().items_start().child(div().w(px(40.)).flex_none().pr(px(4.)).flex().justify_end().child(format!("{n}."))).child(div().flex_1().min_w_0().child(t)),
+    }))
 }
 
 /// Tooltip closure for a toolbar tool (see [`RichTooltip`]); `anchor` holds

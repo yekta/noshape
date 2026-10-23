@@ -405,7 +405,7 @@ impl PreferencesView {
             .border_b_1()
             .border_color(rgb(RULE))
             .text_size(px(24.))
-            .child(div().font_weight(FontWeight::MEDIUM).text_color(pal.accent).child("My account"))
+            .child(div().font_weight(FontWeight::MEDIUM).text_color(pal.emphasis).child("My account"))
             .child(div().text_color(pal.text_muted).child(if self.page == Page::Profile { "Profile" } else { "Preferences" }))
             .into_any_element()
     }
@@ -492,9 +492,9 @@ impl PreferencesView {
             .flex()
             .items_center()
             .rounded(px(3.))
-            .bg(if enabled { pal.accent } else { rgb(0xc6d5ec) })
+            .bg(if enabled { gpui_kit::rgb_static(0x1651b0) } else { pal.button_disabled })
             .text_size(px(14.))
-            .text_color(rgb(0xffffff))
+            .text_color(if enabled { gpui_kit::rgb_static(0xffffff) } else { pal.button_disabled_text })
             .when(enabled, |d| d.cursor_pointer().hover(|d| d.bg(pal.accent_hover)))
             .child(label.into())
     }

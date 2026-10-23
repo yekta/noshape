@@ -19,72 +19,78 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
     if refs.is_empty() {
         return crate::regen::eval::err_at(&["surfacesAndFaces"], "Select faces, surfaces, or sketch regions to offset from.");
     }
-    // (face, source name) pairs.
-    let mut faces: Vec<(Shape, Name)> = Vec::new();
+    // (face, source name) per group: each picked face or region is its own
+    // surface (live L26: even two adjacent faces give two), a picked surface
+    // stays one.
+    let mut groups: Vec<Vec<(Shape, Name)>> = Vec::new();
     for r in refs {
         let one = std::slice::from_ref(r);
         match r {
             Reference::Face(_) => {
                 // Faces that no longer resolve are left out (offsetSurface.fs).
                 for (bi, fi) in ev.resolve_faces(one) {
-                    faces.push((ev.face_shape(bi, fi)?, ev.ctx.bodies[bi].faces[fi].clone()));
+                    groups.push(vec![(ev.face_shape(bi, fi)?, ev.ctx.bodies[bi].faces[fi].clone())]);
                 }
             }
             Reference::Body(_) => {
                 for bi in ev.resolve_bodies(one) {
                     let b = &ev.ctx.bodies[bi];
-                    for (fi, f) in b.shape.faces().into_iter().enumerate() {
-                        faces.push((f, b.faces[fi].clone()));
-                    }
+                    groups.push(b.shape.faces().into_iter().enumerate().map(|(fi, f)| (f, b.faces[fi].clone())).collect());
                 }
             }
             Reference::SketchRegion { .. } => {
                 for p in ev.profiles(one)? {
-                    faces.push((p.shape, face_name(ev, Role::Profile(p.key))));
+                    let name = face_name(ev, Role::Profile(p.key));
+                    groups.push(vec![(p.shape, name)]);
                 }
             }
             _ => {}
         }
     }
-    if faces.is_empty() {
+    groups.retain(|g| !g.is_empty());
+    if groups.is_empty() {
         return crate::regen::eval::err_at(&["surfacesAndFaces"], "Select faces, surfaces, or sketch regions to offset from.");
     }
     let d = ev.length("offset")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
-    let shapes: Vec<Shape> = faces.iter().map(|f| f.0.clone()).collect();
-    let sources: Vec<Name> = faces.iter().map(|f| f.1.clone()).collect();
-    // Connected faces become one surface.
-    let base = if shapes.len() > 1 { k::sew(&shapes, 1e-6, false).map(|r| r.shape).unwrap_or_else(|_| Shape::compound(&shapes)) } else { shapes[0].clone() };
-    // Source name of each face of `base` (by geometric identity with the inputs).
-    let base_sources: Vec<Name> = base
-        .faces()
-        .iter()
-        .enumerate()
-        .map(|(i, f)| {
-            shapes
-                .iter()
-                .position(|s| s.is_same(f))
-                .or_else(|| {
-                    let c = f.centroid().ok()?;
-                    shapes.iter().position(|s| s.centroid().map(|d| (d - c).length() < 1e-7).unwrap_or(false))
-                })
-                .and_then(|j| sources.get(j).cloned())
-                .unwrap_or_else(|| face_name(ev, Role::New(i as u32)))
-        })
-        .collect();
-    let (shape, names) = if d.abs() < 1e-12 {
-        let copy = base.transformed(&k::Transform::Translate(DVec3::ZERO))?;
-        let names: Vec<Name> = base_sources.iter().map(|s| face_name(ev, Role::Offset(s.clone()))).collect();
-        (copy, names)
-    } else {
-        let res = k::offset_shape(&base, d, k::JoinType::Arc)?;
-        let mut names = names_from_sources(ev, &res.history, &res.shape, 0, &base_sources, |s| Role::Offset(s.clone()));
-        // Without usable history, faces correspond in order when counts match.
-        if res.history.records.is_empty() && res.shape.count(ShapeType::Face) == base_sources.len() {
-            names = base_sources.iter().map(|s| face_name(ev, Role::Offset(s.clone()))).collect();
-        }
-        (res.shape, names)
-    };
-    ev.apply_operation(vec![NamedShape::new(shape, names)], "NEW", None, BodyKind::Surface)
+    let mut tools = Vec::new();
+    for faces in groups {
+        let shapes: Vec<Shape> = faces.iter().map(|f| f.0.clone()).collect();
+        let sources: Vec<Name> = faces.iter().map(|f| f.1.clone()).collect();
+        let base = if shapes.len() > 1 { k::sew(&shapes, 1e-6, false).map(|r| r.shape).unwrap_or_else(|_| Shape::compound(&shapes)) } else { shapes[0].clone() };
+        // Source name of each face of `base` (by geometric identity with the inputs).
+        let base_sources: Vec<Name> = base
+            .faces()
+            .iter()
+            .enumerate()
+            .map(|(i, f)| {
+                shapes
+                    .iter()
+                    .position(|s| s.is_same(f))
+                    .or_else(|| {
+                        let c = f.centroid().ok()?;
+                        shapes.iter().position(|s| s.centroid().map(|d| (d - c).length() < 1e-7).unwrap_or(false))
+                    })
+                    .and_then(|j| sources.get(j).cloned())
+                    .unwrap_or_else(|| face_name(ev, Role::New(i as u32)))
+            })
+            .collect();
+        let (shape, names) = if d.abs() < 1e-12 {
+            let copy = base.transformed(&k::Transform::Translate(DVec3::ZERO))?;
+            let names: Vec<Name> = base_sources.iter().map(|s| face_name(ev, Role::Offset(s.clone()))).collect();
+            (copy, names)
+        } else {
+            // Live L25: e.g. a concave fillet offset by more than its radius.
+            let res = k::offset_shape(&base, d, k::JoinType::Arc).map_err(|_| FeatureError::new("Could not offset selected faces as requested."))?;
+            let mut names = names_from_sources(ev, &res.history, &res.shape, 0, &base_sources, |s| Role::Offset(s.clone()));
+            // Without usable history, faces correspond in order when counts match.
+            if res.history.records.is_empty() && res.shape.count(ShapeType::Face) == base_sources.len() {
+                names = base_sources.iter().map(|s| face_name(ev, Role::Offset(s.clone()))).collect();
+            }
+            (res.shape, names)
+        };
+        tools.push(NamedShape::new(shape, names));
+    }
+    ev.apply_operation(tools, "NEW", None, BodyKind::Surface)
 }
 
 // ------------------------------------------------------------------ fill
@@ -245,6 +251,19 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
 
 // ------------------------------------------------------------------ boundary surface
 
+/// Onshape's BSURF_PROFILE_ENDS_MISMATCH (live L28).
+const BSURF_ENDS: &str = "Could not extract boundary profiles matching at end points.";
+
+/// The two free ends of a chain of edges.
+fn chain_ends(edges: &[Shape]) -> Option<(DVec3, DVec3)> {
+    let pts: Vec<DVec3> = edges.iter().filter_map(|e| e.endpoints().ok()).flat_map(|(a, b)| [a, b]).collect();
+    let free: Vec<DVec3> = pts.iter().copied().filter(|p| pts.iter().filter(|q| q.distance(*p) < 1e-7).count() == 1).collect();
+    match free.as_slice() {
+        [a, b] => Some((*a, *b)),
+        _ => None,
+    }
+}
+
 pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     let collect = |ev: &EvalCtx, array: &str, ents: &str, cond: &str| -> FResult<(Vec<Vec<Shape>>, bool)> {
         let mut out = Vec::new();
@@ -264,15 +283,42 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     if u.len() + v.len() < 2 {
         return crate::regen::eval::err_at(&["uProfilesArray", "vProfilesArray"], "Select edges to specify at least two profiles.");
     }
+    // Live L28: a third profile in a direction is accepted by the list but
+    // can't make the network.
     if u.len() > 2 || v.len() > 2 {
-        return err("Select at most two profiles in each direction");
+        return err("Could not create valid profiles from selections.");
+    }
+    // Live L28: a V profile must meet the U profiles at their ends (one
+    // crossing a U profile in its middle fails), and the other way round.
+    let meets_mid = |a: &[Shape], b: &[Shape]| -> bool {
+        a.iter().any(|ea| {
+            let ends: Vec<DVec3> = ea.endpoints().map(|(p, q)| vec![p, q]).unwrap_or_default();
+            b.iter().any(|eb| match k::distance(ea, eb) {
+                Ok(d) if d.distance < 1e-7 => ends.iter().all(|e| e.distance(d.point_a) > 1e-6),
+                _ => false,
+            })
+        })
+    };
+    if !u.is_empty() && !v.is_empty() && u.iter().any(|pu| v.iter().any(|pv| meets_mid(pu, pv) && meets_mid(pv, pu))) {
+        return err(BSURF_ENDS);
     }
     if cu || cv {
         ev.warnings.push("Boundary conditions are not applied yet; profiles are matched by position".into());
     }
     let shape = if !u.is_empty() && !v.is_empty() {
-        // Four-sided (or three-sided) patch through all boundary curves.
-        let all: Vec<Shape> = u.iter().chain(v.iter()).flatten().cloned().collect();
+        // Four-sided (or three-sided) patch through all boundary curves. Live
+        // L28: one U and one V meeting at an end give the patch the U profile
+        // sweeps along the V one; its other two sides are the profiles moved
+        // to each other's far end.
+        let mut all: Vec<Shape> = u.iter().chain(v.iter()).flatten().cloned().collect();
+        if let ([pu], [pv]) = (u.as_slice(), v.as_slice()) {
+            let (Some(eu), Some(ev_)) = (chain_ends(pu), chain_ends(pv)) else { return err(BSURF_ENDS) };
+            let Some((cu, cv)) = [eu.0, eu.1].into_iter().flat_map(|a| [(a, ev_.0), (a, ev_.1)]).find(|(a, b)| a.distance(*b) < 1e-7) else { return err(BSURF_ENDS) };
+            let far = |ends: (DVec3, DVec3), c: DVec3| if ends.0.distance(c) < 1e-7 { ends.1 } else { ends.0 };
+            let moved = |edges: &[Shape], by: DVec3| -> FResult<Vec<Shape>> { edges.iter().map(|e| Ok(k::transform(e, &k::Transform::Translate(by), true)?.shape)).collect() };
+            all.extend(moved(pu, far(ev_, cv) - cv)?);
+            all.extend(moved(pv, far(eu, cu) - cu)?);
+        }
         let boundary: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
         k::fill_surface(&boundary, &[]).map_err(|_| FeatureError::new(BSURF_FAILED))?.shape
     } else {
