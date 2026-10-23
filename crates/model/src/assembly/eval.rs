@@ -178,6 +178,9 @@ pub struct ConnectorStatus {
 pub struct RelationStatus {
     pub id: MateId,
     pub ok: bool,
+    /// Inactive (live: "Inactive: One or more mates is inactive or
+    /// suppressed"), not an error; `message` holds the reason.
+    pub inactive: bool,
     pub message: Option<String>,
 }
 
@@ -280,6 +283,8 @@ pub struct Prepared {
     /// Mates that could not be resolved, with messages.
     pub failed_mates: Vec<(MateId, String)>,
     pub inactive_mates: HashSet<MateId>,
+    /// Suppressed instances (and copies of a suppressed pattern or seed).
+    pub inactive_instances: HashSet<InstanceId>,
     pub failed_relations: Vec<(MateId, String)>,
     /// Assembly mate connectors: (id, owner top-level instance or ORIGIN,
     /// frame in the owner's instance coordinates).
@@ -1215,6 +1220,20 @@ pub fn offset_axes(t: MateType) -> (bool, bool, bool, bool) {
     }
 }
 
+/// Live E15 (part deleted in its Part Studio): the instance row's error.
+const INSTANCE_LOST: &str = "Failed to resolve instance.";
+/// Live E15: a mate (or connector) on an instance whose part is gone.
+const MATE_INSTANCE_LOST: &str = "Failed to resolve the instance for mate.";
+
+/// A limit of the mate (that applies to its type) whose minimum is above its maximum.
+fn limits_crossed(m: &super::Mate, units: &UnitPrefs) -> bool {
+    m.limits.iter().any(|(key, l)| {
+        let Some(ix) = limit_index(key) else { return false };
+        let dim = if ix == 0 || ix == 4 { Dim::ANGLE } else { Dim::LENGTH };
+        limit_keys(m.mate_type).contains(&key.as_str()) && matches!((eval_opt(&l.min, dim, units), eval_opt(&l.max, dim, units)), (Some(a), Some(b)) if a > b)
+    })
+}
+
 /// Limits, offsets, rotation offset and alignment of a mate on its solver mate.
 fn fill_solver_mate(m: &super::Mate, sm: &mut SolverMate, units: &UnitPrefs) {
     let mut limits = Vec::new();
@@ -1825,8 +1844,10 @@ impl AssemblyEvaluator {
             let failed = prepared.failed_mates.iter().find(|(id, _)| *id == m.id).map(|(_, s)| s.clone());
             let inactive = prepared.inactive_mates.contains(&m.id);
             let ok = !inactive && failed.is_none() && solved.mate_ok.get(&m.id).copied().unwrap_or(false);
+            let instance_off = m.connectors().any(|c| c.instance != InstanceId::ORIGIN && prepared.inactive_instances.contains(&c.instance));
             let message = if inactive {
-                None
+                // Live (E4): "Revolute 2 (Inactive: One or more instances is suppressed)".
+                (!m.suppressed && instance_off).then(|| "One or more instances is suppressed".to_string())
             } else if let Some(f) = failed {
                 Some(f)
             } else if !ok {
@@ -1841,11 +1862,17 @@ impl AssemblyEvaluator {
             .relations
             .iter()
             .map(|r| {
-                if let Some((_, msg)) = prepared.failed_relations.iter().find(|(id, _)| *id == r.id) {
-                    return RelationStatus { id: r.id, ok: false, message: Some(msg.clone()) };
+                // Live (E4 / E5): a relation on an inactive or suppressed
+                // mate is itself inactive, not an error.
+                if !r.suppressed && r.mates.iter().any(|id| prepared.inactive_mates.contains(id)) {
+                    return RelationStatus { id: r.id, ok: true, inactive: true, message: Some("One or more mates is inactive or suppressed".into()) };
                 }
-                let ok = r.suppressed || solved.relation_ok.get(&r.id).copied().unwrap_or(false);
-                RelationStatus { id: r.id, ok, message: (!ok).then(|| "Relation could not be solved (conflicts with other mates or relations)".into()) }
+                if let Some((_, msg)) = prepared.failed_relations.iter().find(|(id, _)| *id == r.id) {
+                    return RelationStatus { id: r.id, ok: false, inactive: false, message: Some(msg.clone()) };
+                }
+                // Live (E8): relations that fight each other (two gears with
+                // different ratios on one pair) show no error.
+                RelationStatus { id: r.id, ok: true, inactive: false, message: None }
             })
             .collect();
         let connectors = assembly
@@ -1995,7 +2022,7 @@ impl AssemblyEvaluator {
                     match self.studio(doc, *studio, config) {
                         Some(r) => {
                             if r.context.body(body).is_none() {
-                                node.error = Some("Part no longer exists in its Part Studio (or in this configuration)".into());
+                                node.error = Some(INSTANCE_LOST.into());
                             } else if !suppressed {
                                 leaves.push(LeafInstance {
                                     path: vec![inst.id],
@@ -2020,7 +2047,7 @@ impl AssemblyEvaluator {
                     match self.studio(doc, *studio, config) {
                         Some(r) => {
                             if r.context.body(body).is_none() {
-                                node.error = Some("Part no longer exists in its Part Studio (or in this configuration)".into());
+                                node.error = Some(INSTANCE_LOST.into());
                             } else if !suppressed {
                                 match self.mirrored_studio(*studio, config, body, &r, DVec3::from(*point), DVec3::from(*normal)) {
                                     Some(m) => leaves.push(LeafInstance {
@@ -2263,7 +2290,8 @@ impl AssemblyEvaluator {
             }
             let mut full = vec![c.instance];
             full.extend(c.path.iter().copied());
-            let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
+            // Live E15: the instance is there but its part is gone.
+            let leaf = leaves.iter().find(|l| l.path == full).ok_or(if asm.instance(c.instance).is_some() { MATE_INSTANCE_LOST } else { "Instance no longer exists" })?;
             let f = resolve_connector_aligned(&leaf.regen.context, leaf.body.as_ref(), &c.reference, c.align.as_deref(), &units).ok_or("Mate cannot resolve mate connectors.")?;
             Ok(match leaf.flex {
                 Some((child, rest)) => (Owner::Nested(c.instance, child), matrix_frame(&rest).mul(&f)),
@@ -2323,6 +2351,8 @@ impl AssemblyEvaluator {
                     };
                     prepared.connectors.push((mc.id, top, f.mul(&asm_connector_offset(mc, &units))));
                 }
+                // Live E15: "Mate connector 2 has error: Failed to resolve mate connector origin."
+                Err(e) if e == MATE_INSTANCE_LOST => prepared.failed_connectors.push((mc.id, "Failed to resolve mate connector origin.".into())),
                 Err(e) => prepared.failed_connectors.push((mc.id, e)),
             }
         }
@@ -2331,7 +2361,7 @@ impl AssemblyEvaluator {
             let (owner, mut f) = match c.connector {
                 Some(id) => {
                     if let Some((_, msg)) = prepared.failed_connectors.iter().find(|(x, _)| *x == id) {
-                        return Err(msg.clone());
+                        return Err(if msg == "Failed to resolve mate connector origin." { MATE_INSTANCE_LOST.into() } else { msg.clone() });
                     }
                     let (_, owner, f) = prepared.connectors.iter().find(|(x, _, _)| *x == id).ok_or("Mate connector was deleted or is suppressed")?;
                     match prepared.connector_child.get(&id) {
@@ -2353,6 +2383,7 @@ impl AssemblyEvaluator {
         };
 
         // ---------------------------------------------------- mates
+        prepared.inactive_instances = inactive.clone();
         for m in &asm.mates {
             if m.suppressed {
                 prepared.inactive_mates.insert(m.id);
@@ -2409,6 +2440,16 @@ impl AssemblyEvaluator {
                 // Onshape's texts: one instance, or members of one group.
                 let text = if m.a.instance == m.b.instance { "Mate connectors are on same instance." } else { "Mate cannot be added between member of same group." };
                 prepared.failed_mates.push((m.id, text.into()));
+                continue;
+            }
+            // Live (E11): a minimum limit above its maximum.
+            if limits_crossed(m, &units) {
+                prepared.failed_mates.push((m.id, "Minimum mate limit should be smaller than maximum limit. A parameter value is not valid.".into()));
+                continue;
+            }
+            // Live (E3): a mate between two fixed instances fails.
+            if sm.a != sm.b && prepared.fixed[sm.a] && prepared.fixed[sm.b] && m.connectors().all(|c| c.instance != InstanceId::ORIGIN) {
+                prepared.failed_mates.push((m.id, "Mate is between fixed instances.".into()));
                 continue;
             }
             fill_solver_mate(m, &mut sm, &units);
@@ -2644,14 +2685,15 @@ impl AssemblyEvaluator {
     }
 
     /// Contact geometry for a tangent mate: (body a, body b, geometry in body coordinates).
-    fn tangent_pair(&self, _asm: &Assembly, leaves: &[LeafInstance], prepared: &Prepared, stored: &HashMap<InstanceId, Frame>, m: &super::Mate, units: &UnitPrefs) -> Result<(usize, usize, TangentPair), String> {
+    fn tangent_pair(&self, asm: &Assembly, leaves: &[LeafInstance], prepared: &Prepared, stored: &HashMap<InstanceId, Frame>, m: &super::Mate, units: &UnitPrefs) -> Result<(usize, usize, TangentPair), String> {
         let geom = |c: &MateConnectorRef| -> Result<(usize, TangentGeom, Vec<TangentFace>), String> {
             if c.connector.is_some() || c.instance == InstanceId::ORIGIN {
                 return Err("Geometry is not supported for tangent mate.".into());
             }
             let mut full = vec![c.instance];
             full.extend(c.path.iter().copied());
-            let leaf = leaves.iter().find(|l| l.path == full).ok_or("Instance no longer exists")?;
+            // Live E15: a face of a lost part: "Selection is invalid."
+            let leaf = leaves.iter().find(|l| l.path == full).ok_or(if asm.instance(c.instance).is_some() { "Selection is invalid." } else { "Instance no longer exists" })?;
             let entity = match &c.reference {
                 Reference::Implicit { on, .. } => (**on).clone(),
                 r => r.clone(),

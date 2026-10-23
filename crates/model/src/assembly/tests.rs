@@ -722,6 +722,37 @@ fn relation_measured_from_stored_reference() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(!res.relations[0].ok);
     assert!(res.relations[0].message.as_deref().unwrap_or("").contains("translational"));
+    // Live E8: a second gear with another ratio on the same pair: no error.
+    asm.relations[0].relation_type = RelationType::Gear;
+    let mut g2 = asm.relations[0].clone();
+    (g2.id, g2.name, g2.ratio) = (MateId(41), "Gear 2".into(), ExprValue::new("1"));
+    asm.relations.push(g2);
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.relations.iter().all(|r| r.ok && r.message.is_none()), "{:?}", res.relations);
+    // Live E4: a suppressed mated instance makes the mate and its relations inactive.
+    asm.instance_mut(InstanceId(3)).unwrap().suppressed = true;
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m11 = res.mates.iter().find(|m| m.id == MateId(11)).unwrap();
+    assert!(m11.inactive && m11.message.as_deref() == Some("One or more instances is suppressed"), "{m11:?}");
+    assert!(res.relations.iter().all(|r| r.inactive && r.message.as_deref() == Some("One or more mates is inactive or suppressed")), "{:?}", res.relations);
+    // Live E5: a suppressed mate: the relations are inactive, the mate has no reason.
+    asm.instance_mut(InstanceId(3)).unwrap().suppressed = false;
+    asm.mates[1].suppressed = true;
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates.iter().find(|m| m.id == MateId(11)).unwrap().message.is_none());
+    assert!(res.relations.iter().all(|r| r.inactive), "{:?}", res.relations);
+    // Live E3: both instances fixed.
+    asm.mates[1].suppressed = false;
+    asm.instance_mut(InstanceId(3)).unwrap().fixed = true;
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m11 = res.mates.iter().find(|m| m.id == MateId(11)).unwrap();
+    assert!(!m11.ok && m11.message.as_deref() == Some("Mate is between fixed instances."), "{m11:?}");
+    // Live E11: minimum limit 30 deg above the maximum 10 deg.
+    asm.instance_mut(InstanceId(3)).unwrap().fixed = false;
+    asm.mates[1].limits = vec![("rz".into(), Limits { min: Some(ExprValue::new("30 deg")), max: Some(ExprValue::new("10 deg")) })];
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m11 = res.mates.iter().find(|m| m.id == MateId(11)).unwrap();
+    assert_eq!(m11.message.as_deref(), Some("Minimum mate limit should be smaller than maximum limit. A parameter value is not valid."));
 }
 
 fn x_axis_connector(id: u64) -> AsmMateConnector {
