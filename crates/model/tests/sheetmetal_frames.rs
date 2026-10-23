@@ -626,8 +626,10 @@ fn frame_rectangle_mitered_cut_list() {
         assert!(row.description.contains("SHS 40x40x3"));
     }
     s.add("cutlist", |p| p.set("selectAllFrames", ParamValue::Bool(true)));
-    s.add("tag", |_| {});
     s.ok();
+    // A Tag with no sketch (std doTagProfile).
+    s.add("tag", |_| {});
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a single sketch feature. The selected feature must create sketch regions.".to_string()));
 }
 
 #[test]
