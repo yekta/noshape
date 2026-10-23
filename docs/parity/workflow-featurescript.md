@@ -29,3 +29,15 @@ open points requested ("qa5 featurescript"). Status: ✅ matches live/expected, 
 | 9 | Volume after the part disappears | Onshape has **no bottom-right volume readout**; the Mass properties panel empties within 2 s | our status bar shows "Volume: 15625.000 mm³" and keeps it | ✗ **RD1** (readout doesn't exist in Onshape + goes stale) |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app; doc built by /root/qa5-scratch/pass21/mkfs.py: QA cube committed, then `fCuboid` → `fCuboidX` + Ctrl+S in the app)
+| Row | Ours now | Status |
+|---|---|---|
+| FS1 | new Feature Studio: four lines, caret on 4 | 🔧 fixed on agent/qa5 |
+| FS2 | ⚠ on line 1, orange wavy underline under the whole call on line 12; tooltip "⚠ Function fCuboidX with 3 argument(s) not found" on the gutter and on the underline | ✅ fixed |
+| FS2 (navbar icon) | stays {✓} while only a Part Studio's Monitor shows the runtime {!} error (Feature Studio parse errors turn it red) | ? live (runtime errors) |
+| FS4 | toolbar ends with the dashed "Add custom features" button + "Custom features in this workspace" ▾; entry "Qc" initials box + QA cube; tooltip "QA cube" / italic "Feature from current workspace" | ✅ fixed |
+| ADV3 | row red; tooltip "QA cube 1 did not regenerate properly: Error regenerating." | ✅ fixed |
+| ADV3 (icon) | the "Qc" box stayed grey on a failed feature (live: outlined red) | 🔧 fixed on agent/qa5 (outline in the error red) |
+| FS3 / RD1 | Parts (0), no stale volume readout | ✅ fixed |
+| FS5 | Notices panel: Feature Studio 1 ⚠ 12:9; Part Studio 1 ⚠ + {!} with the stack 12:91 / 61:17 feature.fs / Part Studio 1 (QA cube 1); "Result: Regeneration complete" | ✅ fixed |

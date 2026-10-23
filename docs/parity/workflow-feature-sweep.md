@@ -214,3 +214,27 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | 🔧 L61 apex at the offset, Depth shows 4.092 |
 | 11 | Depth / Tapped depth / Tap clearance | kept consistent by edit logic; inconsistency warning | independent | 🔧 L49/L50 linked in the dialog (no mismatch warning, as live) |
 | 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; L52 "Parameters have been overridden. Check input." when Diameter or Tap drill differ from the standard (not for counterbore / countersink); other infos ✗ |
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871; source and app checks)
+
+Fixed on main since the sweep: Wrap's collapsed "Position" group (row Wrap 2), Helix zero start radius swaps the ends (L33),
+"Cannot create a closed composite part that partially overlaps another composite part." (L36), Mate connector "Select an entity
+for the mate connector attachment." on Attach to (MC 4), pattern texts and the 2500-instance limit (🔧 rows).
+
+Fixed by qa5 on agent/qa5 (each with a test):
+
+| Row | Fix |
+|---|---|
+| Draft 7 | "Parting edge cannot be parallel to pull direction." on Parting edges (draft.fs getOrderedFaceData), checked before the plane test |
+| Draft 10 (focus) | UIHint INITIAL_FOCUS_ON_EDIT: editing a Draft activates Entities to draft / Parting edges (also read from custom FeatureScript) |
+| Move face 4 | Translate's Direction is filled with the first planar face to move until the user picks one (moveFaceEditingLogic) |
+| Thicken 5 (flip) | switching the operation between New/Add and Remove/Intersect flips the wall unless flip / Thickness 2 / merge scope were set (canSetBooleanFlip) |
+| Fill 3 | "Continuity" label shown (SHOW_LABEL) |
+| Boundary surface 3 | "Boundary condition" label shown (SHOW_LABEL) |
+| Helix 7 | Computed revolutions / Computed pitch filled with an End point (setFeatureComputedParameter) |
+
+Still open, routed in docs/handoff/qa5-routing.md (psb): Draft 8 (parting line scope) and the hint faces, Move face 11
+(Reapply fillet), Replace face 5 (several faces), Sweep 7/9 (thin method and texts), Loft 3/4/5/8 (guides, path, end
+conditions, connections, trims), Thicken 4 (L17, kern), Fill 5/6 (guides, SF7), Boundary surface 2/5 (driven-query profile
+arrays, boundary conditions), Helix 6/8 (start/end point rules, start/end profiles), Mate connector 5 (owner/attachment at
+regen), pattern L40/L42/L43/L45 and skip-instance infos, Hole L56/L57 and the remaining infos.

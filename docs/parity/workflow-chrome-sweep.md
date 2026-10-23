@@ -62,3 +62,10 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 |---|---|---|---|---|
 | R1 | Two default planes (or a plane and an edge) selected | parts unchanged (part-studio/81: "Perp planes angle: 90.000 deg" in the status bar only) | parts see-through with dark outlines | ✅ cause: the measure treats a default plane as a 2 000 000 mm face, so its Min/Max dist lines end ±1e6 mm out; those lines counted in the scene bounds, the fitted depth range grew, and the faces' depth bias let edges and silhouettes show through. Measure lines are now left out of the bounds (`Instance::no_bounds`) |
 | MS1 | Measurements of default planes | ? (asked: REQUESTS "ui (10-23 a)") | Top + Front: Perp planes angle 90°, **Area 8e12 mm², Max dist 2 449 490 mm, Min dist 0** | ? |
+
+## qa5 re-run pass 21 (2026-10-23, app = target-lead 17:10, main 88fbf8f)
+| Row | Ours | Status |
+|---|---|---|
+| VC8 Assembly camera menu | Isometric, Dimetric, Trimetric \| Zoom to fit \| Perspective view, Show mates; larger rows, chevron caret; the Part Studio menu (v01) has the full live list | ? live capture requested ("qa5 (10-23 pass 21, ui VC8)") |
+| VC7 menu font, KS1 shortcuts pop-out page | not local (app-wide font / new window) | ✗ → ui (qa5-routing.md) |
+| VC8 (live answered, behaviours "qa5 assembly camera menu") | live = Part Studio menu minus "Orient normal to sketch on edit" / "Highlight boundary edges", no "Show mates". qa5: "Show mates" removed, "Section view…" added; the rest needs assembly features (render modes, named / previous views, graphics prefs, zoom to window, high quality) → qa5-routing ui | 🔧 partly / ✗ ui |
