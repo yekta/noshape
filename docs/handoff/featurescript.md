@@ -714,5 +714,20 @@ Still to do:
 4. Part names stable across rebuilds (Flange after Finish finds its edge): the DefNames attempt (part faces named from
    definition entities) is in /root/fs-scratch/sheetmetal.rs.defnames; it changed sm2's flange areas (a 38 mm² face became
    80), so it was backed out. Find out why (std's flange relief tracking by name?) before retrying.
-5. SM16: run std editing logic (Tab's auto-fill of Flange to merge + 0.02 mm offset).
+5. SM16: done (std editing logic runs in dialogs; `std_feature::editing_logic_in`).
+
+### What still fails with the std route forced on (NOSHAPE_STD_SHEET_METAL=1, 23 Oct, 19 tests)
+Gate for switching it on: every one of these passes (or is shown to test native-only internals and is rewritten
+against live numbers).
+- Finish sheet metal model: "Select one or more sheet metal parts." (sheetmetal_frames finish_sheet_metal_deactivates,
+  features_c recognize_rebuilds_sheet_metal_model, features_b sheet_metal_thicken_region).
+- EXTRUDE process: flat lengths +4 mm per bend (l_bracket 80.13 vs 76.13, u_channel 110.25 vs 102.25) and
+  features_b sheet_metal_extrude_l_bracket_volume 3211.3 vs 3051.3 mm³.
+- hem_straight_and_rolled (bbox z to 4.02), bend_feature_keeps_flat_length (count 3), flange_outer_alignment (bend line
+  up flag), convert_rips_and_bends_like_onshape (BUTT geometry), corner_break_and_relief_and_tab (relief 6.2046 vs
+  6.1027 mm³).
+- Jog: "Could not imprint the bend line on the face." (two features_c tests); Form: "Select location on selected
+  active sheet metal faces."; Sheet metal loft: "Error regenerating." (both loft tests); Rip doesn't split the plate.
+- bend_and_jog_move_the_side_live_moves: only the bbox tolerance (std bodies carry a 1e-7 gap).
+- drawing::tests::flat_pattern_view_shows_bend_lines_and_notes.
 Not mine but seen: drawing::tests::flat_pattern_view_shows_bend_lines_and_notes fails on "DOWN 90.0° R3" (format.rs angle).
