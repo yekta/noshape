@@ -315,6 +315,13 @@ pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, activ
     query_box_tip(id, label, None, active, rows)
 }
 
+/// Live's query field carrying the dialog's error (dom/dialog-asm-replicate-*):
+/// filled pink `#f9ebec` with a 1 px `#bd3039` border; the label stays grey.
+pub fn query_box_error(el: Stateful<Div>) -> Stateful<Div> {
+    let pal = p();
+    el.bg(pal.error_fill).border_color(pal.error)
+}
+
 /// [`query_box`] whose label's tooltip is `tip` instead of the label (live:
 /// a field in error shows the error, "Select one or more instances.").
 pub fn query_box_tip(id: impl Into<ElementId>, label: impl Into<SharedString>, tip: Option<SharedString>, active: bool, rows: Vec<AnyElement>) -> Stateful<Div> {

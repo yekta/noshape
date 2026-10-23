@@ -974,7 +974,7 @@ fn mirror_instances_across_connector_plane() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Mirror 1".into(),
-        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false },
+        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: false, derived: vec![], placement: vec![] },
         seeds: vec![InstanceId(1)],
         generated: vec![],
         suppressed: false,
@@ -1438,7 +1438,7 @@ fn handed_mirror_creates_mirrored_part() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Mirror 1".into(),
-        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: true },
+        kind: PatternKind::Mirror { plane: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), handed: true, derived: vec![], placement: vec![] },
         seeds: vec![InstanceId(1)],
         generated: vec![],
         suppressed: false,
@@ -1473,6 +1473,12 @@ fn handed_mirror_creates_mirrored_part() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let w = res.connector_world(&conn(created[0].0, small, Inference::Centroid), &units).unwrap();
     assert!((w.origin.y + 0.09).abs() < 1e-6, "rigid copy: {:?}", w.origin);
+    // Live's Mirror strategy: Mirror action Derived for this seed alone.
+    if let PatternKind::Mirror { derived, .. } = &mut asm.patterns[0].kind {
+        derived.push(InstanceId(1));
+    }
+    asm.sync_pattern(MateId(70));
+    assert!(matches!(asm.instance(created[0]).unwrap().source, InstanceSource::MirroredPart { .. }));
 }
 
 #[test]

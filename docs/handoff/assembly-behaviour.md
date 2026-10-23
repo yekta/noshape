@@ -1030,3 +1030,12 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   askew head bolt, B17.1 keys (PART 2 with every /features expression after 16:52 UTC); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
   slotted spring pins (no live table). The face-type/area diagnostic is /root/skb-scratch/zz_live_face_types.rs
   (paste into assembly/tests.rs to run; reads the live captures directly).
+
+## Mirror strategy (skb 10-23, live "skb (10-23 14:30)")
+* `PatternKind::Mirror { derived, placement }` per seed (Derived → `MirroredPart`; `handed` kept for older
+  documents = every seed Derived). App: `MirrorRow` per seed in `PatternSession`, `render_mirror_strategy`
+  (781 px table over the dialog), `mirror_pending` (button + title red until Update). Open: live's Update makes a
+  "<Part Studio>-Mirrored" tab (derived mirrored part): recipe asked ("skb (10-23 15:30)"); Placement type stored,
+  not applied; Symmetry always "Symmetric". GUI-checked on :103 (/root/skb-scratch/m45.png).
+* Replicate / pattern fields carrying the error: `os::query_box_error` (pink, red border, grey label) and the
+  error as the label tooltip (`os::query_box_tip`).
