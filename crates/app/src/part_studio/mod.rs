@@ -1050,6 +1050,13 @@ impl PartStudioView {
                 Reference::Plane(DatumPlane::Right) => "Right plane".into(),
                 Reference::Face(n) => format!("Face of {}", owner(n.creator()).map(fname).unwrap_or_else(|| "part".into())),
                 Reference::Edge(n) => format!("Edge of {}", owner(edge_creator(n)).map(fname).unwrap_or_else(|| "part".into())),
+                // A vertex reads "Vertex of <feature>", named by the latest
+                // feature among its faces' creators (live "qa5 sm" (7): the
+                // inner bend corner of two flanges is "Vertex of Flange 1").
+                Reference::Vertex(TopoName::Vertex { faces, .. }) => {
+                    let latest = faces.iter().filter_map(|f| owner(f.creator())).max_by_key(|id| names.iter().position(|(i, _)| i == id));
+                    latest.map(|id| format!("Vertex of {}", fname(id))).unwrap_or_else(|| "Vertex".into())
+                }
                 Reference::Vertex(_) => "Vertex".into(),
                 Reference::Body(b) => bodies.iter().find(|(i, _)| i == b).map(|(_, n)| n.clone()).unwrap_or_else(|| "Part".into()),
                 Reference::SketchEntity { sketch, entity } => format!("{} {}", fname(*sketch), entity_kinds.get(&(*sketch, *entity)).copied().unwrap_or("entity")),
