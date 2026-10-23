@@ -4530,7 +4530,7 @@ impl SketchEditor {
         // radius manipulator of the session's first fillet.
         if self.tool == Tool::Fillet {
             if let Some((arc, ok)) = self.fillet_preview(&data.sketch) {
-                poly(&arc, if ok { preview_color } else { crate::palette::rgb8(crate::palette::viewport::SKETCH_OVER) }, false);
+                poly(&arc, if ok { preview_color } else { crate::palette::rgb8(crate::palette::pick(crate::palette::viewport::SKETCH_OVER, crate::palette::viewport_dark::SKETCH_OVER)) }, false);
             }
             // Live (sketch/1934): the radius manipulator is the hollow drag
             // arrow from the arc's midpoint toward its centre; the "R" label
@@ -4878,7 +4878,7 @@ impl SketchEditor {
             lines.push_polyline(&pts3, crate::palette::rgb8(SKETCH_BOX_COLOR), 0, 1.0, 0);
         }
         for sg in &dim_preview {
-            lines.segments.push(LineSegment { a: w(sg[0]), b: w(sg[1]), color: crate::palette::rgb8(crate::palette::viewport::SKETCH_FULL), pick_id: 0, width: 1.0, style: on_top });
+            lines.segments.push(LineSegment { a: w(sg[0]), b: w(sg[1]), color: crate::palette::rgb8(crate::palette::pick(crate::palette::viewport::SKETCH_FULL, crate::palette::viewport_dark::SKETCH_FULL)), pick_id: 0, width: 1.0, style: on_top });
         }
         // Dimension graphics. The dimension line is broken around its value
         // (Onshape draws no box behind the text).

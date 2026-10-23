@@ -11,6 +11,12 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
   with the hook, same binary, alternating: light 5.10 / 5.85 / 5.60 / 5.30 / 6.00 / 6.50 (mean 5.73),
   dark 5.60 / 5.15 / 4.60 (mean 5.12). Run-to-run noise (±0.7 ms, shared machine) is larger than any hook cost;
   dark is not slower than light, and light pays only one relaxed load per colour.
+- Step 2 (viewport): `noshape_scene::palette::{set_dark, is_dark, pick, viewport_dark, background}`; the
+  scene builder picks dark plane fill/outline, origin, sketch full/over/driven, sketch regions, connector axes;
+  the viewport background is #333 and the view cube dark (faces #333, frames/arrows #999, labels #fff); plane
+  labels white. Measured vs dk-929: bg #333 = #333; one plane #3d = #3d; two #44 vs #46; plane edge peak
+  #86–#8a vs #84. Saving the theme in Preferences re-sets the graphics global, so part studios and assemblies
+  rebuild their scenes at once (no reload, as live).
 - Step 1 state (dk0 shot): chrome, panels, tabs, filter and toolbar background go dark; still open: icons
   (dark glyphs, need the dark asset path from icons2), viewport background and plane colours, then per-capture
   side by side below.
@@ -92,6 +98,20 @@ theme in dom/icons2-dark-icon-fills.json). Ours: literal fills/strokes (#333 ×9
 ×149 …). → `AppAssets::load("icons/dark/<name>.svg")` = the light SVG with colours rewritten by that var map
 (per-icon exceptions from icons2-dark-icon-fills.json where an icon uses a --static var); `assets::icon()` /
 `icon_path()` return the dark path while dark (separate paths keep GPUI's raster cache per theme). Tell icons2.
+
+### Step 3 (built): how dark icons load — for icons2
+- `assets::icon()` in dark mode (not inside the drawing editor) rasterises `crates/app/assets/icons/dark/<name>.svg`
+  when it exists, else the light SVG with the themed colours flipped (#333/#000 → #fff, #1651b0 → #3e94ff);
+  the raster cache is keyed per theme. `svg()` mask icons are tinted by the palette and need nothing.
+- The flip is right for icons whose Onshape symbol uses only themed vars. Where a symbol uses `--static` vars
+  Onshape keeps the light art in dark (white faces, #333 outline, #999 secondary: dark/icons2-dark-*-2x.png),
+  and our art has no white faces, so those need drawn `icons/dark/` art. From icons2's work/map.json and the
+  live sprite's var names (scratch /root/ui2-scratch/dark-icon-categories.json):
+  - all `--static` (74): appearance, bend-relief, body-draft, bom, chamfer, composite-part, constrained-surface, corner-relief, cut-list, decal, draft, drawing, drawing-no-views, drawing-update, enclose, end-cap, error, external-thread, extrude, face-blend, fillet, flange, flat-pattern, folder, form, frame, gusset, hem, hole, inserted-version-update, instance, intersection-curve, isolate, isoparametric, joint, linear-pattern, list-error-filter, loft, mate-connector, mate-connector-assembly, mate-connector-qlv-item, mc-select, menu-delete, mirror, msg-error, msg-warning, offset-surface, part-mesh, performance-info, performance-warning, regen-error, remove-circle, replace-face, rib, sheet, sheet-metal, sheet-metal-loft, sheet-metal-make-joint, sheet-metal-table, shell, split, standard-content, sub-assembly, sweep, tab, thicken, toast-error, toast-info, toast-success, toast-warning, update-all-button, view-cube, warning, wire-body.
+  - mixed static + themed (92): add-appearance, aligned-rectangle, assembly, bezier, boolean, boundary-surface, center-point-arc, center-rectangle, cfg-last-viewed, cfg-reset-default, circle, circular-pattern, config-show, configuration, configuration-visibiliity, conic, corner-rectangle, create-partstudio-incontext, create-variable, curvature, curve-pattern, delete-face, delete-part, derived, derived-mirror, edit-curve, ellipse, elliptical-arc, explode, fastened, featurescript-table, fill, flip, flip-circular, flip-circular-opposite, flip-direction, flip-direction-opposite, frame-trim, fs-snip-op, hole-depth, hole-diameter, hole-drill-angle, hole-table, insert-variable, insp-default-tol, inspection-table, intersection, jog, line, menu-create-drawing, midpoint-line, modify-fillet, move-boundary, move-face, mutual-trim, named-position, part, part-studio, paste, point-sketch, polygon-circumscribed, polygon-inscribed, realign-mate-dialog, replace-part, replicate, revolve, ruled-surface, sheet-insert, sheet-metal-bend, sheet-metal-end, snap-mode, spline, split-sketch, stack-closest, stack-furthest, sub-assembly-rigid, surface-body, tangent-arc, text, three-point-arc, three-point-circle, transform, under-defined, use, user-avatar, variable-studio, variable-table, variables-panel, wrap, xyz-along-x, xyz-along-y, xyz-along-z.
+  - literal colours, no vars (27): branch, chevron-right, connectivity-analysis-g0, connectivity-analysis-g1, connectivity-analysis-g2, connectivity-analysis-g3, connectivity-analysis-no-connection, corner-break, cube, f-sphere, history, mbd-status, note, performance, plane, properties, recent, release-drafts, src-created, src-owned, src-public, src-recent, src-shared, tab-search, tm-detailed, tm-sort, tool-caret.
+  - no sprite reference (99): check against live dark crops.
+  - themed only (256): the flip should match; spot-check.
 
 ## Lead conditions (10-22)
 - Light mode: one relaxed atomic load in rgb()/rgba() (drafts/color_hook.rs: `HEX_THEME_ON` + `#[cold]` slow path).

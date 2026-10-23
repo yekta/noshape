@@ -836,6 +836,10 @@ impl Viewport {
             self.interactive_until = Some(now + nav::INTERACTIVE_WINDOW);
         }
         let interactive = self.interactive_until.is_some_and(|t| now < t);
+        // Theming › Dark mode: Onshape's dark viewport is a flat #333.
+        let bg = noshape_scene::palette::background();
+        self.style.background_top = bg;
+        self.style.background_bottom = bg;
         // Interactive frames draw what the detail manager leaves in.
         let style = if interactive {
             self.detail.update(&mut self.frame_timer);
@@ -1061,9 +1065,15 @@ impl Viewport {
         use noshape_render::overlay::{CubeColors, Overlay, ViewCube};
         // Onshape (tokens): faces and corners white, frames and arrows
         // #cedbe5 at 60%, the hovered piece #90cef1 at 60%, black labels at
-        // 85%; axes #cd0000, #009400, #0000d0.
+        // 85%; axes #cd0000, #009400, #0000d0. Dark theme: faces #333, frames
+        // and arrows #999, white labels, axes #dd979b, #a2db7d, #90cef1.
         let rgb = |c: u32, a: f32| [((c >> 16) & 0xff) as f32 / 255.0, ((c >> 8) & 0xff) as f32 / 255.0, (c & 0xff) as f32 / 255.0, a];
-        let colors = CubeColors { face: rgb(0xffffff, 1.0), frame: rgb(0xcedbe5, 0.6), highlight: rgb(0x90cef1, 0.6), label: rgb(0x000000, 0.85), axes: [rgb(0xcd0000, 1.0), rgb(0x009400, 1.0), rgb(0x0000d0, 1.0)] };
+        let colors = if noshape_scene::palette::is_dark() {
+            use crate::theme::viewport_dark as d;
+            CubeColors { face: rgb(0x333333, 1.0), frame: rgb(0x999999, 1.0), highlight: rgb(0x90cef1, 0.6), label: rgb(0xffffff, 0.85), axes: [rgb(d::AXIS_X, 1.0), rgb(d::AXIS_Y, 1.0), rgb(d::AXIS_Z, 1.0)] }
+        } else {
+            CubeColors { face: rgb(0xffffff, 1.0), frame: rgb(0xcedbe5, 0.6), highlight: rgb(0x90cef1, 0.6), label: rgb(0x000000, 0.85), axes: [rgb(0xcd0000, 1.0), rgb(0x009400, 1.0), rgb(0x0000d0, 1.0)] }
+        };
         // Where GPUI laid the widget out (Onshape: 15 px from the viewport's
         // top-right corner), in frame pixels: the frame is drawn at the
         // viewport's origin snapped like GPUI does (half toward zero).

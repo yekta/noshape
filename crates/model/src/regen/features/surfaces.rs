@@ -90,6 +90,14 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
 // ------------------------------------------------------------------ fill
 
 /// The face adjacent to `edge` in the body that owns it (for G1/G2 boundaries).
+/// How many faces of its body an edge borders (0 for a sketch curve).
+fn edge_face_count(ev: &EvalCtx, edge: &Shape) -> usize {
+    ev.ctx.bodies.iter().filter(|b| b.kind != BodyKind::Wire).find_map(|b| {
+        let ei = b.shape.index_of(edge, ShapeType::Edge)?;
+        Some(b.shape.edge_faces().ok()?.get(ei)?.len())
+    }).unwrap_or(0)
+}
+
 fn adjacent_face(ev: &EvalCtx, edge: &Shape) -> Option<Shape> {
     for b in &ev.ctx.bodies {
         if b.kind == BodyKind::Wire {
@@ -103,6 +111,9 @@ fn adjacent_face(ev: &EvalCtx, edge: &Shape) -> Option<Shape> {
     }
     None
 }
+
+/// Live L27: a tangency row on a sketch curve.
+const FILL_TANGENCY: &str = "Could not meet tangency constraints at highlighted points.";
 
 /// Onshape's BSURF_FAILED.
 const BSURF_FAILED: &str = "Could not create boundary surface with given information. Check profile order, intersections or end conditions.";
@@ -133,10 +144,21 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
             if boundary.iter().any(|b: &k::FillEdge| b.edge.is_same(&e)) {
                 return err("A boundary edge can have only one type of continuity constraint.");
             }
-            let support = if continuity == k::Continuity::Position { None } else { adj.clone().or_else(|| adjacent_face(ev, &e)) };
-            if continuity != k::Continuity::Position && support.is_none() {
-                return err("Cannot create tangency or curvature constraint for a curve selection.");
+            // Live L27: an internal edge (two faces) can't take tangency; a
+            // sketch curve has nothing to be tangent to, so the fill is built
+            // at position with a warning.
+            if continuity != k::Continuity::Position && adj.is_none() && edge_face_count(ev, &e) >= 2 {
+                return err("Cannot create tangency or curvature constraint for an internal edge.");
             }
+            let support = if continuity == k::Continuity::Position { None } else { adj.clone().or_else(|| adjacent_face(ev, &e)) };
+            let continuity = if continuity != k::Continuity::Position && support.is_none() {
+                if !ev.warnings.iter().any(|w| w == FILL_TANGENCY) {
+                    ev.warnings.push(FILL_TANGENCY.into());
+                }
+                k::Continuity::Position
+            } else {
+                continuity
+            };
             boundary.push(k::FillEdge { edge: e, support, continuity });
         }
     }

@@ -1550,3 +1550,21 @@ fn delete_face_removes_fillets_by_geometry_as_live() {
     let v = volume(&t.ok(), 0) * 1e9;
     assert!((v - filleted_block).abs() < 1e-3, "imported: {v} vs {filleted_block}");
 }
+
+/// Live L27: Tangency on a row of sketch curves builds the fill anyway, as
+/// a WARNING "Could not meet tangency constraints at highlighted points.".
+#[test]
+fn fill_tangency_on_curves_is_a_warning() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ids = polyline(&mut sk, &[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let mut row = ParamValues::default();
+    row.set("entities", ParamValue::Query(ids.iter().map(|&e| Reference::SketchEntity { sketch: sid, entity: e }).collect()));
+    row.set("continuity", en("G1"));
+    s.add("fill", move |p| p.set("edges", ParamValue::Array(vec![row])));
+    let r = s.regen();
+    let st = r.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Warning, Some("Could not meet tangency constraints at highlighted points.")));
+    assert_eq!(r.context.bodies.len(), 1);
+}
