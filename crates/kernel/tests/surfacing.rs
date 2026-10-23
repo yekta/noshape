@@ -278,3 +278,32 @@ fn bspline_surface_from_featurescript_definition() {
     assert!(v > 0.6 * exact && v < exact, "{v} vs {exact}");
     assert_eq!(make_bspline_surface(&torus, &[], false).unwrap().count(ShapeType::Solid), 0);
 }
+
+/// Wrapped onto a cylinder, the plate's sides along the axis are lines and
+/// the sides around it are arcs, as in Onshape (std sheet metal Bend calls
+/// evLine on the wrapped bend's edges).
+#[test]
+fn wrapped_straight_sides_are_lines_and_arcs() {
+    let (face, plane) = holed_plate();
+    let src = Developable::Plane { origin: plane.origin, x_dir: DVec3::X, normal: DVec3::Z };
+    let dst = cylinder_x();
+    let a_s = src.flat(DVec3::new(0.0, 0.0, 10.0), 0.0);
+    let a_d = dst.flat(DVec3::new(0.0, 0.0, 10.0), 0.0);
+    let (_, _, sn) = src.flat_axes(a_s, 0.0);
+    let (_, _, dn) = dst.flat_axes(a_d, 0.0);
+    let mirror = (sn.dot(DVec3::Z) > 0.0) != (dn.dot(DVec3::Z) > 0.0);
+    let pl = Placement2d::align(a_s, DVec2::X, a_d, DVec2::Y, mirror);
+    let out = wrap_faces(std::slice::from_ref(&face), &src, 0.0, &dst, 0.0, &pl, 1e-7).unwrap().shape;
+    let kinds: Vec<String> = out.edges().iter().map(|e| format!("{:?}", e.edge_info().unwrap().curve).split([' ', '{', '(']).next().unwrap_or_default().to_string()).collect();
+    let (mut lines, mut arcs) = (0, 0);
+    for e in out.edges() {
+        let i = e.edge_info().unwrap();
+        let along = (i.end - i.start).normalize_or_zero().dot(DVec3::X).abs() > 1.0 - 1e-9;
+        match i.curve {
+            Curve::Line { .. } if along => lines += 1,
+            Curve::Circle { radius, .. } if (radius - 10.0).abs() < 1e-7 => arcs += 1,
+            _ => {}
+        }
+    }
+    assert_eq!((lines, arcs), (2, 2), "{kinds:?}");
+}

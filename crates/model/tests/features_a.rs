@@ -228,7 +228,11 @@ fn rib_in_l_bracket() {
     let mut rs = noshape_sketch::Sketch::new();
     let l = rs.add_line(DVec2::new(0.01, 0.06), DVec2::new(0.06, 0.01));
     let rsk = t.sketch(Reference::Plane(DatumPlane::Front), rs);
-    t.add("rib", &[("profiles", q(vec![Reference::SketchEntity { sketch: rsk, entity: l.0 }])), ("thickness", e("5 mm"))]);
+    // Live L22: no Parts is an error (the dialog fills them).
+    let rib = t.add("rib", &[("profiles", q(vec![Reference::SketchEntity { sketch: rsk, entity: l.0 }])), ("thickness", e("5 mm"))]);
+    let st = t.regen().display.features.last().cloned().unwrap();
+    assert_eq!(st.message.as_deref(), Some("Select parts where the rib will be fitted into."));
+    t.set(rib, "parts", q(vec![Reference::Body(BodyId { feature: x, index: 0 })]));
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 1);
     let v = total_volume(&res.context);
