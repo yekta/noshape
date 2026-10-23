@@ -9,7 +9,6 @@
 
 use crate::drawing_view::*;
 use gpui_kit::*;
-use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::Drawing;
 use noshape_model::drawing::sheet_sketch::SheetSketch;
 use noshape_sketch::{ConstraintKind, Curve2, DVec2, EntityId, Geometry};
@@ -44,52 +43,19 @@ impl DrawingEditor {
 
     /// The sketch point nearest the cursor (within 6 px), if any.
     pub(crate) fn sketch_point_at(&self, c: [f64; 2]) -> Option<(EntityId, [f64; 2])> {
-        let tol = self.tol_mm(6.0);
-        let sk = &self.sketch().sketch;
-        sk.entities()
-            .filter(|e| matches!(e.geometry, Geometry::Point { .. }) && !e.external)
-            .filter_map(|e| sk.point(e.id).map(|p| (e.id, [p.x, p.y])))
-            .filter(|(_, p)| ((p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2)).sqrt() < tol)
-            .min_by(|a, b| {
-                let d = |p: [f64; 2]| (p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2);
-                d(a.1).total_cmp(&d(b.1))
-            })
+        self.pk().sketch_point_at(c)
     }
 
     /// The hovered sketch entity (curves via their pick id).
     pub(crate) fn sketch_entity_at(&self) -> Option<EntityId> {
-        let b = self.built.as_ref()?;
-        match b.picks.get(self.hover? as usize)? {
-            PickTarget::SketchEntity(id) => Some(EntityId(*id)),
-            _ => None,
-        }
+        self.pk().sketch_entity_at()
     }
 
     /// Where a sketch click lands: an existing sketch point, a view snap
     /// point, or the cursor (with horizontal / vertical inference from
     /// `from`, within 1.5°). Returns (point, existing point id, inferred H/V).
     fn sketch_target(&self, from: Option<[f64; 2]>) -> ([f64; 2], Option<EntityId>, Option<SkCon>) {
-        let c = self.cursor;
-        if let Some((id, p)) = self.sketch_point_at(c) {
-            return (p, Some(id), None);
-        }
-        if let Some(p) = self.snap_at(c).and_then(|s| self.pick_sheet(&s)) {
-            return (p, None, None);
-        }
-        if let Some(f) = from {
-            let d = [c[0] - f[0], c[1] - f[1]];
-            let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
-            if l > 1e-6 {
-                let a = d[1].atan2(d[0]).to_degrees().rem_euclid(180.0);
-                if a < 1.5 || a > 178.5 {
-                    return ([c[0], f[1]], None, Some(SkCon::Horizontal));
-                }
-                if (a - 90.0).abs() < 1.5 {
-                    return ([f[0], c[1]], None, Some(SkCon::Vertical));
-                }
-            }
-        }
-        (self.sketch_aligned(c).0, None, None)
+        self.pk().sketch_target(from, self.sketch_aligned(self.cursor).0)
     }
 
     /// The cursor aligned with woken endpoints (SK8, live: hovering an
@@ -138,23 +104,7 @@ impl DrawingEditor {
                         return true;
                     }
                     let mut end_id = None;
-                    self.edit_sketch("Line", cx, |s| {
-                        let sk = &mut s.sketch;
-                        let start = from.map(EntityId).unwrap_or_else(|| sk.add_point(v2(a)));
-                        let end = existing.unwrap_or_else(|| sk.add_point(v2(p)));
-                        if let Ok(line) = sk.add_line_between(start, end) {
-                            match infer {
-                                Some(SkCon::Horizontal) => {
-                                    let _ = sk.add_constraint(ConstraintKind::Horizontal { a: line, b: None });
-                                }
-                                Some(SkCon::Vertical) => {
-                                    let _ = sk.add_constraint(ConstraintKind::Vertical { a: line, b: None });
-                                }
-                                _ => {}
-                            }
-                        }
-                        end_id = Some(end);
-                    });
+                    self.edit_sketch("Line", cx, |s| end_id = Some(noshape_scene::drawing_tools::sketch_line(&mut s.sketch, from.map(EntityId), a, existing, p, infer)));
                     // The chain continues from the new end point.
                     self.tool = Tool::Sketch { tool, pts: vec![p], from: end_id.map(|e| e.0) };
                 } else {
@@ -164,30 +114,7 @@ impl DrawingEditor {
             SkTool::Circle | SkTool::CornerRect | SkTool::CenterRect => {
                 if let Some(a) = last {
                     let name = tool.name();
-                    self.edit_sketch(name, cx, |s| {
-                        let sk = &mut s.sketch;
-                        match tool {
-                            SkTool::Circle => {
-                                let r = ((p[0] - a[0]).powi(2) + (p[1] - a[1]).powi(2)).sqrt();
-                                if r > 1e-6 {
-                                    match from {
-                                        Some(c) => {
-                                            let _ = sk.add_circle_at(EntityId(c), r);
-                                        }
-                                        None => {
-                                            sk.center_circle(v2(a), r);
-                                        }
-                                    }
-                                }
-                            }
-                            SkTool::CornerRect => {
-                                sk.corner_rectangle(v2(a), v2(p));
-                            }
-                            _ => {
-                                sk.center_rectangle(v2(a), v2(p));
-                            }
-                        }
-                    });
+                    self.edit_sketch(name, cx, |s| noshape_scene::drawing_tools::sketch_two_click(&mut s.sketch, tool, from.map(EntityId), a, p));
                     self.tool = Tool::Sketch { tool, pts: vec![], from: None };
                 } else {
                     self.tool = Tool::Sketch { tool, pts: vec![p], from: existing.map(|e| e.0) };
@@ -234,14 +161,7 @@ impl DrawingEditor {
                 let target = self.sketch_entity_at().or_else(|| self.sketch_point_at(self.cursor).map(|x| x.0));
                 if let Some(id) = target {
                     let c = self.cursor;
-                    self.edit_sketch("Trim", cx, |s| {
-                        let point = matches!(s.sketch.entity(id).map(|e| &e.geometry), Some(Geometry::Point { .. }));
-                        if point {
-                            s.sketch.remove_entity(id);
-                        } else {
-                            let _ = s.sketch.trim(id, v2(c));
-                        }
-                    });
+                    self.edit_sketch("Trim", cx, |s| noshape_scene::drawing_tools::sketch_trim(&mut s.sketch, id, c));
                 }
             }
         }
@@ -252,14 +172,13 @@ impl DrawingEditor {
     /// Spline: double-click or Esc ends it (two or more points). True when committed.
     pub fn finish_sketch(&mut self, cx: &mut Context<Self>) -> bool {
         let Tool::Sketch { tool: SkTool::Spline, pts, .. } = self.tool.clone() else { return false };
-        let mut pts = pts;
-        pts.dedup_by(|a, b| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt() < 1e-6);
-        if pts.len() < 2 {
+        let mut dd = pts.clone();
+        dd.dedup_by(|a, b| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt() < 1e-6);
+        if dd.len() < 2 {
             return false;
         }
         self.edit_sketch("Spline", cx, |s| {
-            let p: Vec<DVec2> = pts.iter().map(|p| v2(*p)).collect();
-            let _ = s.sketch.add_fit_spline(&p);
+            noshape_scene::drawing_tools::sketch_spline(&mut s.sketch, &pts);
         });
         self.tool = Tool::Sketch { tool: SkTool::Spline, pts: vec![], from: None };
         self.update_preview(cx);
@@ -471,9 +390,9 @@ impl DrawingEditor {
             this.update(cx, |this, cx| match parsed {
                 Ok(d) => {
                     // To sheet mm: the file's unit, else the drawing's.
-                    let scale = d.unit_scale.map(|m| m * 1000.0).unwrap_or(if this.drawing.units_mm { 1.0 } else { 25.4 });
+                    let units_mm = this.drawing.units_mm;
                     let mut n = 0;
-                    this.edit_sketch("Insert DXF or DWG", cx, |s| n = s.sketch.insert_drawing(&d, scale, DVec2::ZERO).len());
+                    this.edit_sketch("Insert DXF or DWG", cx, |s| n = noshape_scene::drawing_tools::insert_cad(s, &d, units_mm));
                     this.status = Some(format!("Inserted {n} entities from {}", file.file_name).into());
                     cx.notify();
                 }
