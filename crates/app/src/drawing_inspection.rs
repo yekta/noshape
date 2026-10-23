@@ -75,12 +75,7 @@ impl DrawingEditor {
         if to == from {
             return;
         }
-        self.edit_sheet("Move inspection item", cx, |s| {
-            let n = s.annotations.iter_mut().find(|a| a.id == from).and_then(|a| a.inspection.take());
-            if let Some(a) = s.annotations.iter_mut().find(|a| a.id == to) {
-                a.inspection = n;
-            }
-        });
+        self.edit_sheet("Move inspection item", cx, |s| noshape_scene::drawing_tools::move_inspection(s, from, to));
         self.selection = vec![Sel::Annotation(to)];
     }
 
@@ -127,11 +122,7 @@ impl DrawingEditor {
         if let Some(InspectionDlg { edit: Some((id, st)), .. }) = self.inspection.take()
             && let Ok(n) = st.read(cx).value().trim().parse::<u32>()
         {
-            self.edit_sheet("Edit inspection item", cx, |s| {
-                if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
-                    a.inspection = Some(n);
-                }
-            });
+            self.edit_sheet("Edit inspection item", cx, |s| noshape_scene::drawing_tools::set_inspection(s, id, Some(n)));
         }
         self.status = None;
         self.set_preview(None, cx);
@@ -155,11 +146,7 @@ impl DrawingEditor {
         if let Some(d) = &mut self.inspection {
             d.hover = None;
         }
-        self.edit_sheet("Inspection item", cx, |s| {
-            if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
-                a.inspection = Some(number);
-            }
-        });
+        self.edit_sheet("Inspection item", cx, |s| noshape_scene::drawing_tools::set_inspection(s, id, Some(number)));
         if let Some(st) = reorder {
             // The Number field increments after each item (Onshape).
             st.update(cx, |s, cx| s.set_value((number + 1).to_string(), window, cx));
@@ -200,11 +187,7 @@ impl DrawingEditor {
             MenuEntry::item("Edit", move |t, w, cx| t.edit_inspection(id, w, cx)),
             MenuEntry::item("Reorder inspection items", move |t, w, cx| t.start_reorder_inspection(n, w, cx)),
             MenuEntry::item("Remove inspection item", move |t, _, cx| {
-                t.edit_sheet("Remove inspection item", cx, |s| {
-                    if let Some(x) = s.annotations.iter_mut().find(|x| x.id == id) {
-                        x.inspection = None;
-                    }
-                })
+                t.edit_sheet("Remove inspection item", cx, |s| noshape_scene::drawing_tools::set_inspection(s, id, None))
             }),
             MenuEntry::item("Remove all inspection items", |t, _, cx| t.edit("Remove all inspection items", cx, |d| d.remove_all_inspection())),
             MenuEntry::Separator,
