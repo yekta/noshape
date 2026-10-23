@@ -772,7 +772,7 @@ fn version_dialog_title_w(lead: &str, name: &str, width: f32) -> AnyElement {
         .border_b_1()
         .border_color(rgb(os::MODAL_DIVIDER))
         .child(div().text_size(px(18.)).font_weight(FontWeight::NORMAL).text_color(pal.text_muted).child(lead.to_string()))
-        .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(name.to_string()))
+        .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::ui::user_text(name.to_string())))
         .child(div().flex_1())
         .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("modal-close").size(px(22.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CLOSE).size(px(16.))))))
         .into_any_element()
@@ -791,8 +791,8 @@ fn version_dialog_title_in(doc_name: &str, workspace: &str) -> AnyElement {
         .border_b_1()
         .border_color(rgb(os::MODAL_DIVIDER))
         .child(div().text_size(px(18.)).font_weight(FontWeight::NORMAL).text_color(pal.text_muted).child("Create version in"))
-        .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(doc_name.to_string()))
-        .child(div().text_size(px(16.)).font_weight(FontWeight::NORMAL).text_color(pal.text_muted).child(workspace.to_string()))
+        .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(crate::ui::user_text(doc_name.to_string())))
+        .child(div().text_size(px(16.)).font_weight(FontWeight::NORMAL).text_color(pal.text_muted).child(crate::ui::user_text(workspace.to_string())))
         .child(div().flex_1())
         .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("modal-close").size(px(22.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CLOSE).size(px(16.))))))
         .into_any_element()
@@ -1191,7 +1191,7 @@ impl Render for HistoryPanel {
                     .when(picked, |d| d.bg(rgb(crate::compare_mode::BASE_ROW)))
                     .when(!selected && compare_side.is_none(), |d| d.hover(|d| d.bg(pal.panel_hover)))
                     .child(div().w(px(GRAPH_W + 5.)).flex_none())
-                    .child(div().w(px(115.)).flex_none().truncate().child(r.name.clone()))
+                    .child(div().w(px(115.)).flex_none().truncate().child(crate::ui::user_text(r.name.clone())))
                     .child(div().pl(px(3.)).flex_1().min_w_0().truncate().child(history_time(r.time)))
             } else {
                 let changes = r.changes.len();
@@ -1211,9 +1211,9 @@ impl Render for HistoryPanel {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(pal.text)
                             .when(self.doc.read(cx).session.branch_protected(b), |d| d.child(crate::assets::icon("lock", 12., cx)))
-                            .child(r.name.clone()),
+                            .child(crate::ui::user_text(r.name.clone())),
                     ),
-                    _ => div().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(r.name.clone()),
+                    _ => div().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(r.name.clone())),
                 };
                 h_flex()
                     .id(SharedString::from(format!("hist-{}", r.key)))

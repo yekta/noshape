@@ -552,6 +552,45 @@ changes. I write the renderer part first (my files) and show crops before touchi
 - Kernel side (lead, 18:00): kern is writing a fast planar-face triangulator in the kernel's mesh.cpp (the big plate's
   two planar faces: 1.65 s of its 2.7 s display mesh in BRepMesh). Display density, LOD and upload stay perf's.
   Rerun the big-plate fixture on CI when it lands.
+- **2026-10-22 21:00 (perf): where angle mode's GPU time goes** (perf.yml run 39844027399, parts-1000, macOS, every
+  variant `NOSHAPE_PERF_DETAIL=full`; `w.gpu_wait` mean, macOS 14 / 15): chord 15.8 / 12.0 ms; angle 21.2 / 19.5;
+  angle without backface silhouettes 21.6 / 19.2; without edge silhouettes 21.1 / 19.7; without AO 21.5 / 18.8;
+  without meshes 20.5 / 18.9; **without lines (edges, silhouettes, backface silhouettes) 12.6 / 9.7**. Redrawing
+  the meshes is not the cost: the B-rep edge lines are (each segment a 6-vertex quad; 144-segment circles have ~4x
+  the segments of the chord mesh, sub-pixel at the 1000-pin fit view). Fix in progress: edge-line LOD (Douglas–Peucker
+  levels relative to the body's size, chosen per body per frame under 0.25 px error; pick pass full).
+- **2026-10-23 10:00 (perf): edge-line LOD, first macOS round** (perf-dev 9f7448f8, runs 39926459540 pins /
+  39926473216 plate, full detail; `w.gpu_wait` mean vs chord in the same run): pins angle +31% (macOS 14) / +18% (15),
+  angle without lines +11% / +2%; plate angle +72% / +74%, without lines +9% / −2%. Chord also got cheaper (its edges
+  are simplified too: pins 15.8 → 11.9 ms on macOS 14). The plate keeps full edges with body-level levels down to
+  1/1000 (it is ~1100 px across while its 800 hole circles are ~16 px), so 02414b1c adds levels from 1/16000 of the
+  diagonal. Kern's planar CDT is in: the plate's fine mesh takes 450–485 ms on the runner. Gate stays on; next round
+  (runs 39934157991 / 39934172005) breaks angle's remainder down (silhouettes, backface silhouettes, meshes, lines).
+- **2026-10-23 12:30 (perf): Onshape's display mesh is refined by screen-space error** (webgl BodyManager
+  `getVisibleOccurrencesForRetrieval` / `getTessellationIndexDesired` / `getTessellationIndexToGoUnderThreshold`).
+  Levels Coarse/Medium/Fine/Very fine: chordal tolerance = body radius × CHORDAL_TOLERANCE_RATIO (0.03407418 /
+  0.00855514 / 0.00095178 / 5.4831e-5 = the sagitta of 12/24/72/300 segments) and ANGULAR_TOLERANCE 30°/15°/5°/1.2°
+  (the browser draws 2× the segments: 24/48/144/600, live 459). A body starts Coarse and steps up while
+  `unitSizeAtCenter × chordalTolerance(level) ≥ threshold`, up to its best available (Auto: Fine). Threshold
+  BODY_SCREENSPACE_ERROR_REFINEMENT_THRESHOLD 3 px; "View in high quality" (aggressive): 0.1 px Part Studio / 1 px
+  assembly, up to Very fine (selected bodies FINER 0.5 / SELECTED_AGGRESSIVE 0.1). Only bodies at least threshold px
+  across are considered; refinement is lazy (batches, BODY_REFINEMENT_FRAMERATE_THRESHOLD 8, memory limits) and the
+  finest mesh in memory is drawn (no coarsening on zoom-out). So Fine (144/circle) only from a ~350 px bounding radius
+  (Medium from ~88 px); the 1000 pins at fit (~25 px radius) are Coarse in Onshape. Live 459 measured cylinders that
+  filled the screen. The CI breakdown after the edge-line LOD with finer levels (runs 39934157991 / 39934172005,
+  macOS 14 / 15, vs chord): pins angle +36% / +14%, plate +34% / +19%; edge silhouettes then the largest share
+  (−2.9 ms on macOS 14 without them); Onshape's edge silhouettes are a per-frame GPU pass over candidates too
+  (primitiveType SILHOUETTES), so their cost follows the mesh level. Next: per-body levels chosen like Onshape.
+- **2026-10-23 16:30 (perf): live 10-23 a3 corrects the LOD: no screen-space LOD outside high quality.** An Auto Ø20
+  cylinder is 144 segments at every size (~36 px to ~900 px), no refinement over time, no drop (behaviours.md "Mesh
+  LOD"). The bundle agrees: for an Auto part `getBestAvailableTessellationSettingIndex` is null unless aggressive, so
+  only View in high quality refines (0.1 px Part Studio, up to Very fine; live: 144 at ~70 px, 600 from ~550 px; the
+  600 mesh stays after zooming out and after Shift+R off, until reload). So 3d22994f's Coarse-when-small (the
+  −8…−11 % on the pins, runs 39951849983 / 39951863224) was a deviation and is undone: bodies have one level (their
+  Tessellation quality) and, once Shift+R was used in the session, their level up to Very fine
+  (`BodyDisplay::levels_from` / `coarser`), the viewport picking by the 0.1 px rule (3 px with Shift+R off: refined
+  bodies keep their level, others stay put) and never dropping one it showed. The angle mesh stays gated; the next
+  lever is the edge silhouette candidates (largest share at 144/circle).
 - **2026-10-23 (perf): part shading = Onshape's lighting model** (woolsthorpe bundle `lightFragment` and the solid-face
   vertex shader; COLOR_AMBIENT_FACTOR 0.5, COLOR_DIFFUSE_FACTOR 1, DEFAULT_SHININESS 30 = Shininess 3 % × 1000,
   DEFAULT_SPECULAR #999999): in sRGB, 0.5·C + max(N·L, 0)·0.5·C + pow(max(N·H, 0), 30)·#999, one light along eye-space
@@ -559,3 +598,15 @@ changes. I write the renderer part first (my files) and show crops before touchi
   `shade()`; offscreen `part_faces_are_lit_like_onshape` checks all six normals against it and psb's live samples
   (part-studio/2258: top #8cb9d4, front #4e6876 = 0.5 × #9dcfed). The old fit (one key light in linear space, 0.212
   ambient) drew faces lighter (front #788a96).
+  Checked (ac087cc5 + this): clippy; display_tessellation (one level per part normally; Shift+R levels up to Very
+  fine; coarse levels stay coarse after a finer meshing), shared meshes, render 10 + offscreen 24, scene, app 107.
+  Assemblies: Onshape's assembly camera menu has "View in high quality" (live qa5 VC8) and ours has none yet; when it is
+  added, its studios need the Shift+R regen levels (`relative_deflection` × 0.25) for the occurrences' meshes
+  (`PartOccurrence::coarser` / `levels_from` carry them) and `MESH_ERROR_PX_HIGH_QUALITY_ASSEMBLY` (1 px) as the
+  viewport's `detail.mesh_error_px`.
+- **2026-10-23 (perf): perspective (live 10-23 a2, "perf 16:30").** Onshape's camera is 45° vertical
+  (`perspective(angle, aspect)`); turning perspective on keeps the scale at the scene centre (eye 308 mm from the fins 25
+  centre after an orthographic half-height of 127.5 mm); Zoom to fit in perspective puts the eye at padded half-height /
+  tan 22.5° + padded half-depth (live: near 136.2, far 284.5) — all as ours. A "stronger" look comes from the
+  orthographic zoom at the moment of switching, not the field of view. No Set as default, per tab for the session
+  (c3a5d65b); assemblies now follow the 45° preference too.

@@ -453,7 +453,7 @@ impl DrawingEditor {
                     .cursor_pointer()
                     .when(active, |d| d.bg(rgb(0xc7c7c7)))
                     .when(!active, |d| d.hover(|d| d.bg(rgb(0xd0d0d0))))
-                    .child(s.name.clone())
+                    .child(crate::ui::user_text(s.name.clone()))
                     .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                         if this.drawing.sheets.get(i).and_then(|s| s.imported.as_ref()).is_some_and(|m| m.locked) {
                             return;
@@ -614,7 +614,7 @@ impl DrawingEditor {
                 .text_color(rgb(0x666666))
                 .child(crate::ui::caret(true))
                 .child(sheets_icon("part", cx))
-                .child(div().min_w_0().truncate().child(name))
+                .child(div().min_w_0().truncate().child(crate::ui::user_text(name)))
                 // Pinned: a pin and the version name; else Onshape's "In progress" badge.
                 .child(match version {
                     Some(v) => div().ml(px(8.)).flex().items_center().gap(px(3.)).child(crate::ui::glyph("pin", 11., rgb(0x666666))).child(div().text_size(px(11.)).child(v)),
@@ -662,7 +662,7 @@ impl DrawingEditor {
                                 .pl(px(24.))
                                 .text_color(rgb(0x666666))
                                 .child(div().w(px(20.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon("sheet-page", 18., cx)))
-                                .child(div().flex_1().truncate().child(s.name.clone())),
+                                .child(div().flex_1().truncate().child(crate::ui::user_text(s.name.clone()))),
                         );
                     }
                     list = list.child(self.sheet_view_row(&self.drawing.sheets[*sheet_i], v, 44., cx));

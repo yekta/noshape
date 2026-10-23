@@ -90,3 +90,12 @@ impmatrix15 vs impmatrix14: 109 identical.
 | IM4 g50-g46-shell1.x_t | imports again (no refusal) but still **corrupt**: 21 faces, volume 4550.392098, area 11830.50, bbox 0..38955.54 × 0..16845.92 × 0..320.42 mm (live 6052.69679568, a ~50×30×30 part) | ✗ still |
 | IM5 g38d curves | 8 wires | ✅ (stays fixed) |
 | IM1, IM2, I1 | unchanged | ✗ still |
+
+## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
+impmatrix16 (117 samples incl. the new psb-L11-boss-fillet.step: Part 1 8179.76547, 10 faces) vs impmatrix15: 115 identical.
+| Row | Ours | Status |
+|---|---|---|
+| IM4 g50-g46-shell1.x_t | 21 faces, bbox 0..50 × 0..30 × 0..30, area 12258.695 (live 12258.75), volume **6053.320139** (live 6052.69679568, +0.62) | ✅ geometry **fixed**; volume offset joins IM2 |
+| IM1 PVZ names / tabs | unchanged | ✗ still → routed kern/fs |
+| IM2 Parasolid volumes (ktane, Bell Crank, McMaster, fluxpad, g26, g48, g49, g50) | unchanged | ✗ still → routed kern |
+| I1 g25-b SAT/STEP/X_T | unchanged | ✗ still → routed kern |

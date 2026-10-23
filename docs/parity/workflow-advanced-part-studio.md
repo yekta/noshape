@@ -156,3 +156,11 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 
 ## Re-run pass 18 (2026-10-22 ~10:00–11:00, CLI /tmp/qa5/noshape-cli-0811 = target-engine 08:11; main 3ce6952)
 CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 8383.1217/20, hem 9254.2367/30, SM3 "Closed corners are not supported yet"; ADV2 5927.754632; EXP1 openNURBS; SML1 loft Add "not supported yet". ✗ still.
+
+## Re-run pass 21 (2026-10-23 ~17:30–18:30, app = /root/target-lead/debug/noshape 10-23 17:10 (main 88fbf8f), CLI = target-lead noshape-cli 10-23 13:45)
+| Row | Ours | Status |
+|---|---|---|
+| ADV2 loft | 5927.754632 | ✗ still → routed kern |
+| ADV4 Hole countersink rows | icon rows, values readable ("12.878 mm", "82 deg") (a12) | ✅ **fixed** |
+| Hole Tapped defaults | Straight tap, 1/4, **20 tpi (UNC)**, Fastener fit None, ☐ Thread class (live ~8515 ☐) (a15); an old doc's stored Threads/inch shows blank (legacy value) | ✅ |
+| ADV1, ADV3, ADV6, ADV7, ADV8, TAB1 | fixed in earlier passes; ADV5, ADV12 withdrawn | ✅ |

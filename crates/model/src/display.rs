@@ -130,7 +130,16 @@ pub struct BodyDisplay {
     /// Linear RGBA.
     pub color: [f32; 4],
     pub hidden: bool,
+    /// The finest display level the body gets (its Tessellation quality,
+    /// Auto = Fine; Very fine viewing in high quality).
     pub mesh: Arc<MeshBuffers>,
+    /// Its coarser display levels, coarsest first (`TessQuality::LEVELS`
+    /// from [`BodyDisplay::levels_from`]): only viewing in high quality,
+    /// where the viewport refines a body once its chordal error on screen
+    /// is large enough (Onshape); empty otherwise.
+    pub coarser: Vec<Arc<MeshBuffers>>,
+    /// The index in `TessQuality::LEVELS` of its coarsest level.
+    pub levels_from: u8,
     pub face_refs: Vec<Reference>,
     pub edge_refs: Vec<Reference>,
     pub vertex_refs: Vec<Reference>,
@@ -371,6 +380,8 @@ pub struct StudioDisplay {
 pub struct SharedMesh {
     /// The shape's mesh at its identity location (`Shape::unlocated`).
     pub mesh: Arc<MeshBuffers>,
+    /// Its coarser levels ([`BodyDisplay::coarser`]), also unlocated.
+    pub coarser: Vec<Arc<MeshBuffers>>,
     /// Placement: rigid 3x4 row-major matrix (`Shape::location`).
     pub transform: [f64; 12],
     /// The body's world mesh this stands for ([`BodyDisplay::mesh`]); a

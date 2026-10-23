@@ -67,7 +67,7 @@ impl DrawingEditor {
         for (i, (keys, name, stale)) in self.references(cx).into_iter().enumerate() {
             let state = h_flex()
                 .gap(px(6.))
-                .child(div().flex_1().truncate().child(name))
+                .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
                 .child(div().px(px(4.)).rounded(px(3.)).bg(if stale { gpui_kit::rgb(0xffe0a3) } else { gpui_kit::rgb(0x9ccef0) }).text_size(px(11.)).child(if stale { "Out of date" } else { "Up to date" }));
             rows = rows.child(if selective {
                 let on = keys.iter().all(|k| picked.contains(k));

@@ -19,6 +19,13 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// `NOSHAPE_PERF_DETAIL=full`: interactive frames keep full detail (to
+/// measure what each part of a frame costs).
+fn perf_full_detail() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("NOSHAPE_PERF_DETAIL").is_ok_and(|v| v == "full"))
+}
+
 /// `style` with what Onshape's interactive detail settings leave out.
 fn interactive_style(style: noshape_render::Style, d: &nav::DetailSettings) -> noshape_render::Style {
     let mut s = style;
@@ -843,9 +850,13 @@ impl Viewport {
         let bg = noshape_scene::palette::background();
         self.style.background_top = bg;
         self.style.background_bottom = bg;
-        // Interactive frames draw what the detail manager leaves in.
-        let style = if interactive {
+        // Interactive frames draw what the detail manager leaves in
+        // (benchmarks can keep full detail: `NOSHAPE_PERF_DETAIL=full`).
+        let style = if interactive && !perf_full_detail() {
             self.detail.update(&mut self.frame_timer);
+            if noshape_render::perf::enabled() {
+                noshape_render::perf::record_ms("v.detail_steps", self.detail.interactive.steps() as f32);
+            }
             interactive_style(self.style, &self.detail.interactive)
         } else {
             self.style
@@ -1871,17 +1882,30 @@ fn box_ids(buf: &PickBuffer, a: DVec2, b: DVec2, s: f64, crossing: bool) -> Vec<
     v
 }
 
-/// The view cube's face labels: glyph contours in cube space (laid out once).
+/// The view cube's face labels: glyph contours in cube space, in the UI
+/// language (live German "Oben", "Vorn", "Rechts"; laid out once per language).
 fn cube_face_labels() -> &'static Vec<([i8; 3], noshape_render::overlay::Contours)> {
-    static LABELS: std::sync::OnceLock<Vec<([i8; 3], noshape_render::overlay::Contours)>> = std::sync::OnceLock::new();
-    LABELS.get_or_init(|| {
-        noshape_render::overlay::view_cube::FACES
+    type Labels = Vec<([i8; 3], noshape_render::overlay::Contours)>;
+    static LABELS: std::sync::OnceLock<std::sync::Mutex<HashMap<&'static str, &'static Labels>>> = std::sync::OnceLock::new();
+    let code = crate::i18n::current();
+    let mut cache = LABELS.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    cache.entry(code).or_insert_with(|| {
+        // The CJK languages need their Noto face (Liberation Sans has no CJK glyphs).
+        let font = match code {
+            "ja" => "Noto Sans Japanese",
+            "ko" => "Noto Sans Korean",
+            "zh-CN" => "Noto Sans Chinese Simplified",
+            "zh-TW" => "Noto Sans Chinese Traditional",
+            _ => noshape_sketch::text::DEFAULT_FONT,
+        };
+        let labels: Labels = noshape_render::overlay::view_cube::FACES
             .iter()
             .map(|(n, name)| {
-                let layout = noshape_sketch::text::layout_text(name, noshape_sketch::text::DEFAULT_FONT, false, false);
+                let layout = noshape_sketch::text::layout_text(&crate::i18n::tr(name), font, false, false);
                 (*n, Arc::new(noshape_render::overlay::view_cube::face_label(*n, layout.width, &layout.polylines(5))))
             })
-            .collect()
+            .collect();
+        Box::leak(Box::new(labels))
     })
 }
 
