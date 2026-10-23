@@ -1,6 +1,8 @@
 //! The 3D viewport's colors (Onshape's viewport CSS tokens and sampled live
 //! values), shared by the app's theme and the headless scene builder.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 /// Viewport colors (sRGB hex; convert with [`lin`] for the renderer).
 pub mod viewport {
     /// B-rep edges on shaded parts (`LINE_POINT_COLOR`).
@@ -54,6 +56,52 @@ pub mod viewport {
     pub const AXIS_X: u32 = 0xcd0000;
     pub const AXIS_Y: u32 = 0x009400;
     pub const AXIS_Z: u32 = 0x0000d0;
+}
+
+/// The dark theme's viewport colors where they differ from [`viewport`]
+/// (the dark `--os-*` values; live dark/dk-929, dk-931).
+pub mod viewport_dark {
+    /// Viewport background (`--os-background-primary`).
+    pub const BACKGROUND: u32 = 0x333333;
+    /// Construction plane fill: `#666` at 20%, which the browser blends in
+    /// sRGB; fitted for our linear blending, one plane reads `#3d3d3d` and
+    /// three stacked `#4c4c4c` like live.
+    pub const PLANE_FILL: u32 = 0x595959;
+    /// Construction plane outline: `#fff` at 35% in sRGB; an edge peaks at
+    /// `#848484` on the plane like live.
+    pub const PLANE_OUTLINE: u32 = 0xffffff;
+    pub const PLANE_OUTLINE_ALPHA: f32 = 0.2;
+    pub const PLANE_TEXT: u32 = 0xffffff;
+    pub const ORIGIN: u32 = 0xffffff;
+    pub const SKETCH_FULL: u32 = 0xffffff;
+    pub const SKETCH_OVER: u32 = 0xff6b6b;
+    pub const SKETCH_REGION: u32 = 0xf2f2f2;
+    pub const DIM_DRIVEN: u32 = 0xcccccc;
+    pub const AXIS_X: u32 = 0xdd979b;
+    pub const AXIS_Y: u32 = 0xa2db7d;
+    pub const AXIS_Z: u32 = 0x90cef1;
+}
+
+static DARK: AtomicBool = AtomicBool::new(false);
+
+/// Preferences › Theming › Dark mode, for the viewport (the app's theme sets it).
+pub fn set_dark(on: bool) {
+    DARK.store(on, Ordering::Relaxed);
+}
+
+/// Whether the viewport draws in Onshape's dark theme.
+pub fn is_dark() -> bool {
+    DARK.load(Ordering::Relaxed)
+}
+
+/// `light`, or `dark` in the dark theme: `pick(viewport::ORIGIN, viewport_dark::ORIGIN)`.
+pub fn pick<T>(light: T, dark: T) -> T {
+    if is_dark() { dark } else { light }
+}
+
+/// Viewport background: white, `#333` in the dark theme.
+pub fn background() -> [f32; 4] {
+    lin(pick(0xffffff, viewport_dark::BACKGROUND))
 }
 
 /// Linear RGBA from sRGB hex (renderer colors).
