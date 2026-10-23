@@ -27,7 +27,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-910-documents | /tmp/ui2/dkdocs.png | page #333, navbar #1c1c1c, left nav, list, details, footer: same colours | ☑ colours |
 | dk-911-documents-row-hover | dkdocs | hover = `--os-hover-primary` #0a4780 (the capture shows no pointer on a row) | ☑ |
 | dk-912-documents-row-selected |  | selected row `accent_soft` #134e96 = live | ☑ |
-| dk-913-create-menu | | | ☐ |
+| dk-913-create-menu | dkcreate | open Create #769fcc, menu #333 with #d7d7d7 outline; icons are icons2 dark art; "Import from" is cloud | ☑ colours |
 | dk-913b-create-menu-hover | | | ☐ |
 | dk-914-new-document-modal | | | ☐ |
 | dk-915-state | | | ☐ |
@@ -48,7 +48,7 @@ dark/dk-9xx (1:1 captures). **Done = every studio and dialog pixel-close to thes
 | dk-940-assembly | dkasm | chrome, list and viewport match; static icons outlined (icons2) | ◐ icons |
 | dk-941-mate-dialog | | | ☐ |
 | dk-942-bom | | | ☐ |
-| dk-950-drawing | | | ☐ |
+| dk-950-drawing | dkdraw | shell dark (navbar, rail, tab bar), toolbar, sheet surround and sheet light | ☑ |
 | dk-951-drawing-properties | | | ☐ |
 | dk-960-feature-studio | dkfs2 | Ace twilight on #333: tokens, gutter #232323, numbers #e2e2e2 = live computed | ☑ |
 | dk-961-variable-studio |  | title bar and headers #555, cells #1c1c1c (shared cell code) | ◐ not captured |
@@ -112,6 +112,12 @@ theme in dom/icons2-dark-icon-fills.json). Ours: literal fills/strokes (#333 ×9
   - literal colours, no vars (27): branch, chevron-right, connectivity-analysis-g0, connectivity-analysis-g1, connectivity-analysis-g2, connectivity-analysis-g3, connectivity-analysis-no-connection, corner-break, cube, f-sphere, history, mbd-status, note, performance, plane, properties, recent, release-drafts, src-created, src-owned, src-public, src-recent, src-shared, tab-search, tm-detailed, tm-sort, tool-caret.
   - no sprite reference (99): check against live dark crops.
   - themed only (256): the flip should match; spot-check.
+
+### Preferences (prefs/dk-904)
+Primary buttons stay #1651b0 in dark (kit theme pinned; live Create, Share, Try Professional); a disabled one is
+#1651b0 at 40% (#283f65, text #858585: button_disabled roles for the solid ones, static colours under the 40%
+opacity ones); "My account" in emphasis #90cef1; links #b2ddf6 (link role); the beta pill static #1651b0.
+Open: the (?) help icon reads darker than live's #d6d6d6 (icons2: help-gray dark art).
 
 ## Lead conditions (10-22)
 - Light mode: one relaxed atomic load in rgb()/rgba() (drafts/color_hook.rs: `HEX_THEME_ON` + `#[cold]` slow path).

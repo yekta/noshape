@@ -257,13 +257,16 @@ pub(crate) fn apply_kit_theme(cx: &mut App) {
         t.foreground = pal.text.into();
         t.border = pal.border.into();
         t.window_border = pal.border_strong.into();
-        t.primary = pal.accent.into();
+        // Primary buttons stay #1651b0 in dark (live dk-910/920: Create,
+        // Share, Try Professional).
+        let button_blue: Hsla = gpui_kit::rgb_static(0x1651b0).into();
+        t.primary = button_blue;
         t.primary_hover = pal.accent_hover.into();
-        t.primary_active = pal.accent.into();
+        t.primary_active = button_blue;
         t.primary_foreground = white;
-        t.button_primary = pal.accent.into();
+        t.button_primary = button_blue;
         t.button_primary_hover = pal.accent_hover.into();
-        t.button_primary_active = pal.accent.into();
+        t.button_primary_active = button_blue;
         t.button_primary_foreground = white;
         t.secondary = pal.panel.into();
         t.secondary_hover = pal.panel_hover.into();
