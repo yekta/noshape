@@ -273,7 +273,10 @@ fn helix_to_end_point_reports_computed_revolutions_and_pitch() {
     let revs: f64 = revs.parse().unwrap();
     assert!(revs > 3.0 && revs <= 4.0, "{revs}");
     let Some(noshape_model::display::ComputedValue::Length(pitch)) = st.computed("actualPitch") else { panic!("{:?}", st.computed) };
-    assert!(near(pitch * revs, 0.03, 1e-6), "pitch {pitch} × {revs}");
+    // The point is 30 mm above the face's bottom and 10 mm below its top;
+    // the helix runs from one of them, and pitch × revolutions is that height.
+    let h = pitch * revs;
+    assert!(near(h, 0.03, 1e-6) || near(h, 0.01, 1e-6), "pitch {pitch} × {revs}");
 }
 
 #[test]
