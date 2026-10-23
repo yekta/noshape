@@ -2954,6 +2954,10 @@ impl PartStudioView {
         }
         let dialog = e.dialog.clone();
         let ty = dialog.read(cx).feature.type_id.clone();
+        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib") {
+            self.direct_edit_logic(&dialog, cx);
+            return;
+        }
         if !matches!(ty.as_str(), "extrude" | "revolve" | "sweep" | "thicken") {
             return;
         }
@@ -2966,8 +2970,11 @@ impl PartStudioView {
         // Parts the profiles lie on: a picked face, or the face a sketch was
         // drawn on. Thicken (thickenEditLogic) takes the owners of every
         // picked solid face.
+        // thickenEditLogic counts only faces of solids (live L18: a surface's
+        // face leaves the operation on New).
+        let solid = |b: &BodyId| ty != "thicken" || self.context.as_ref().and_then(|c| c.body(b)).is_some_and(|b| b.kind == noshape_model::display::BodyKind::Solid);
         let host_of = |r: &Reference| match r {
-            Reference::Face(_) => self.body_of(r),
+            Reference::Face(_) => self.body_of(r).filter(|b| solid(b)),
             Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) if ty != "thicken" => {
                 let plane = self.studio(cx)?.feature(*sketch)?.params.query("sketchPlane").first().cloned()?;
                 self.body_of(&plane)
@@ -3023,6 +3030,54 @@ impl PartStudioView {
 }
 
 impl PartStudioView {
+    /// Onshape's deleteFaceEditLogic / replaceFaceEditLogic for a new
+    /// feature, leaving fields the user set alone: Delete face of surface
+    /// faces switches to Leave open (live L10); Replace face ticks Flip
+    /// alignment when the replace-with face points against the replaced one
+    /// (live L8).
+    fn direct_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
+        let (ty, params, user_set) = {
+            let d = dialog.read(cx);
+            (d.feature.type_id.clone(), d.feature.params.clone(), d.user_set.clone())
+        };
+        let ctx = self.ui.before_context.as_ref().or(self.context.as_ref());
+        let mut changes: Vec<(&'static str, ParamValue)> = Vec::new();
+        match ty.as_str() {
+            "deleteFace" if !user_set.contains("healType") => {
+                let faces = params.query("deleteFaces");
+                let surface = |r: &Reference| self.body_of(r).and_then(|b| ctx?.body(&b).map(|b| b.kind == noshape_model::display::BodyKind::Surface)).unwrap_or(false);
+                if !faces.is_empty() && faces.iter().all(surface) && !params.is("healType", "VOID") {
+                    changes.push(("healType", ParamValue::Enum("VOID".into())));
+                }
+            }
+            // Live L22: a new Rib's Parts holds the studio's parts.
+            "rib" if !user_set.contains("parts") && params.query("parts").is_empty() => {
+                let solids: Vec<Reference> = ctx.map(|c| c.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone())).collect()).unwrap_or_default();
+                if !solids.is_empty() {
+                    changes.push(("parts", ParamValue::Query(solids)));
+                }
+            }
+            "replaceFace" if !user_set.contains("oppositeSense") => {
+                let normal = |r: &Reference| ctx.and_then(|c| noshape_model::select::face_anchor(c, r)).map(|x| x.1).or_else(|| self.frame_of_ref(r).map(|f| f.normal));
+                if let (Some(a), Some(b)) = (params.query("replaceFaces").first().and_then(normal), params.query("templateFace").first().and_then(normal)) {
+                    let want = a.dot(b) < 0.0;
+                    if params.bool("oppositeSense") != want {
+                        changes.push(("oppositeSense", ParamValue::Bool(want)));
+                    }
+                }
+            }
+            _ => {}
+        }
+        if changes.is_empty() {
+            return;
+        }
+        dialog.update(cx, |d, cx| {
+            for (k, v) in changes {
+                d.set_value_auto(k, v, cx);
+            }
+        });
+    }
+
     /// Onshape's booleanStepEditLogic (booleanHeuristics.fs) for a new
     /// Extrude / Revolve / Sweep / Loft, from the parts its tool touches in
     /// the preview (`FeatureState::touched`): one part → Add into it; none

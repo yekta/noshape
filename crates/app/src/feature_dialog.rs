@@ -2986,7 +2986,8 @@ impl Render for FeatureDialog {
         let sketch = self.feature.type_id == "sketch";
         let status = self.status.clone();
         // Onshape: the title turns red while the feature is invalid.
-        let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error));
+        // Live L27: a warning turns the title red too (has-regen-error).
+        let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
         // Live: ✓ is disabled while a field shows the error (pink: an empty
         // required selection), and stays the normal green for an error of
         // the regeneration itself ("has-regen-error", lp-over-failure-capture
@@ -2998,9 +2999,9 @@ impl Render for FeatureDialog {
         // Live (dom/dialog-hole.txt, dialog-variable.txt): a name built from
         // the parameters ("Ø 0.25 in ↧ 0.5 in", "#? = 0 in") is followed
         // by the feature type in brackets.
-        let tip_name = if name == self.feature.name { name.clone() } else { format!("{name} [{}]", self.ty.name) };
+        let tip_name = if name == self.feature.name { crate::part_studio::typed_name(&self.feature) } else { format!("{name} [{}]", self.ty.name) };
         // The sketch's red title has no tooltip: the bubble asks for a plane.
-        let error_tip: Option<String> = status.as_ref().filter(|s| s.0 == FeatureStatus::Error && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
+        let error_tip: Option<String> = status.as_ref().filter(|s| matches!(s.0, FeatureStatus::Error | FeatureStatus::Warning) && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
         let ref_panel = self.render_reference_panel(window, cx);
         let renaming = self.renaming.clone();
         v_flex()
@@ -3242,7 +3243,8 @@ impl Render for FeatureDialog {
             })
             // Onshape shows regeneration errors as the red title (with the
             // message as its tooltip), not as an inline alert; warnings get the alert.
-            .when_some(status.filter(|s| !matches!(s.0, FeatureStatus::Ok | FeatureStatus::Error)), |d, (st, msg)| {
+            // Warnings are a yellow bubble over the graphics (live L27).
+            .when_some(status.filter(|s| !matches!(s.0, FeatureStatus::Ok | FeatureStatus::Error | FeatureStatus::Warning)), |d, (st, msg)| {
                 let kind = match st {
                     FeatureStatus::Error => crate::ui::AlertKind::Error,
                     FeatureStatus::Warning => crate::ui::AlertKind::Warning,

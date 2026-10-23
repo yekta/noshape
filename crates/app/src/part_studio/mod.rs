@@ -719,12 +719,15 @@ impl PartStudioView {
             // Live (qa5 BOOL1): a feature's info ("Boolean resulted in no
             // geometry change…") is a blue bubble at the top centre of the
             // graphics while the dialog is open; the dialog shows nothing.
-            let info = st.as_ref().filter(|(k, _)| *k == FeatureStatus::Info).map(|(_, m)| m.clone());
+            // A warning (live L27, Fill) is a yellow bubble there, with the
+            // title red.
+            let bubble = st.as_ref().filter(|(k, _)| matches!(k, FeatureStatus::Info | FeatureStatus::Warning)).cloned();
+            let info = bubble.as_ref().map(|(_, m)| m.clone());
             let st = st.filter(|(k, _)| *k != FeatureStatus::Info);
             if no_plane {
                 self.message = Some((FeatureStatus::Info, NO_PLANE.into()));
-            } else if let Some(m) = &info {
-                self.message = Some((FeatureStatus::Info, m.clone()));
+            } else if let Some(b) = &bubble {
+                self.message = Some(b.clone());
             } else if self.message.as_ref().is_some_and(|(_, m)| m == NO_PLANE || self.ui.dialog_info.as_ref() == Some(m)) {
                 self.message = None;
             }
@@ -3371,8 +3374,9 @@ impl PartStudioView {
         } else if suppressed || f.hidden {
             pal.text_faint
         } else {
+            // Live L27: a warning's row is red like an error's.
             match status {
-                FeatureStatus::Error => pal.text_invalid,
+                FeatureStatus::Error | FeatureStatus::Warning => pal.text_invalid,
                 _ => pal.text,
             }
         };
@@ -3429,7 +3433,7 @@ impl PartStudioView {
                             // Sketch 1", "[Hole] <- Sketch 2", "<- Path [Sketch]"); parts
                             // picked in a Boolean or a merge scope aren't named (qa5 BOOL1b,
                             // behaviours B4; Fillet / Chamfer / Shell: the name alone).
-                            Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(|g| typed(&g.name, "Sketch"))).collect())
+                            Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(typed_name)).collect())
                         })
                         .unwrap_or_default()
                 };
@@ -3849,7 +3853,8 @@ impl PartStudioView {
                 in_plane_contours(&pl.name, top_left, f.x, f.y, asc, &mut contours);
             }
         }
-        let c = Rgba::from(Hsla::from(pal.accent));
+        // Light: the accent blue; dark: white (`--os-construction-plane-text-color`).
+        let c = if noshape_scene::palette::is_dark() { gpui_kit::rgb_static(crate::theme::viewport_dark::PLANE_TEXT) } else { Rgba::from(Hsla::from(pal.accent)) };
         let mut fills = if contours.is_empty() { Vec::new() } else { vec![noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] }] };
         // Inspection datums: black, the selected one in the selection
         // color.
@@ -4870,4 +4875,15 @@ fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
             _ => 0,
         })
         .sum()
+}
+
+/// A feature's name for tooltips: a custom name that doesn't start with the
+/// feature's type gets the type in brackets (live behaviours "psb … feature
+/// sweep": "Move L5 rotate no axis [Move face] did not regenerate properly:
+/// …", "<- Path [Sketch]"); default names ("Draft 1") stay as they are.
+pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
+    match f.feature_type().map(|t| t.name) {
+        Some(t) if !f.name.starts_with(t) => format!("{} [{t}]", f.name),
+        _ => f.name.clone(),
+    }
 }
