@@ -20,10 +20,25 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | VC6 | Submenus (Shaded…, Hidden edges…, Tangent edges…) | ✓ at +14, text at +29 from the border, like the main menu | ✓ +17, text +36 (right-click menu insets) | ✅ submenus inherit the camera menu's insets |
 | VC7 | Menu font | Flama 12 px `#555` | our UI font 12 px | ✗ app-wide font (Open Sans / Flama not bundled; see theme-layout.md) |
 | VC8 | Assembly camera menu | (not compared yet) | a shorter dropdown (`assembly_view::render_camera_menu`, chevron caret) | ✗ to compare (assembly) |
+| VC9 | Esc with the camera menu open | closes it | did nothing: the viewport under the ▾ button took the click and the focus back from the menu | ✅ the button's container occludes the viewport |
 
 ## Feature-row tooltips (lead 10-22; live behaviours "Feature-row hover tooltips: Fillet / Chamfer / Shell")
 
 | # | What | Live | Ours | Status |
 |---|---|---|---|---|
 | RT1 | Parents after "<-" | only feature-level inputs: sketches; a Derived's source studio. Fillet, Chamfer, Shell, Boolean: the name alone | parents through part references too ("Boolean 1 <- Extrude 1", "Fillet 1 <- Extrude 1") | ✅ sketches only, plus "Derived 1 <- <source studio>" |
-| RT2 | Sketch row | "Sketch 1 (Hidden) is not fully defined" (hidden + under-defined) | "Sketch 1" | ✅ name + " (Hidden)" + " is not fully defined"; ? the other combinations (REQUESTS "ui (10-22 d)") |
+| RT2 | Sketch, plane and mate connector rows (live ui 10-22 d) | `<name>[ [Type]][ (Hidden)][ is not fully defined \| did not regenerate properly: <msg>]`; e.g. "Sketch a underdefined is not fully defined", "Sketch 2 (Hidden)", "Plane to hide (Hidden)", "MC to hide [Mate connector] (Hidden)", "Sketch d overdefined did not regenerate properly: Sketch could not be solved." | "Sketch 1" for every sketch; no (Hidden); no [Type] tag | ✅ one rule for every row: [Type] when the name doesn't start with the type's name (also gives "<callout> [Hole]"), " (Hidden)", the sketch's " is not fully defined", errors after the head; inputs typed too ("<- Path [Sketch]") |
+
+## 2. Tool search (live ui 10-22 c; menus/600–615)
+
+| # | What | Live | Ours | Status |
+|---|---|---|---|---|
+| TS1 | "Section", "Reflection", "analysis", "Zebra", "Measure", "Mass" | Part Studio: only "Section" finds anything ("Intersection curve", fuzzy); the rest say "No items match your search". Assembly: nothing for all six | the same (checked in the app 10-22) | ✅ matches (icons2's Round 14 note was wrong) |
+| TS2 | Tool descriptions (right pane; also the expanded toolbar tooltip) | e.g. Intersection curve: "Create a curve at the intersection of 2 or more surfaces or faces. The selections must intersect." | `tool_text.rs`, partly paraphrased from the help glossary ("Create a curve where two or more surfaces or faces intersect.") | ? exact texts for every tool asked (REQUESTS "ui (10-22 e)"); then replace them all |
+
+
+## 3. Keyboard shortcuts modal (Shift+/; live ui 10-22 c, menus/616–619)
+
+| # | What | Live | Ours | Status |
+|---|---|---|---|---|
+| KS1 | ↗ pop-out next to × | `a.osx-popout-link` (14 px arrow-up-right, no tooltip) opens a full-size "Keyboard shortcuts" page: no tabs or search, every category at once in two columns, the legend bar, a footer; the modal stays open | missing | ✗ next: a separate window with that page |

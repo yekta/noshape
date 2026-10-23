@@ -3383,24 +3383,26 @@ impl PartStudioView {
         // name, in a box beside the row. Worked out when it opens (the
         // dependencies scan the features above).
         let tip = {
-            // Live (qa5 ADV3, fs sm6e): errors and warnings read "<Feature>
-            // did not regenerate properly: <message>". Infos stay out of it
-            // (live qa5 BOOL1: "Boolean 1" only; they are the graphics bubble).
+            // Live (ui 10-22 d, behaviours "Feature-row hover tooltips"): the
+            // row tooltip reads `<name>[ [Type]][ (Hidden)][ is not fully
+            // defined | did not regenerate properly: <msg>]`, or `<head> <-
+            // <inputs>`. The [Type] tag shows when the name doesn't start with
+            // the type's name ("MC to hide [Mate connector]", a Hole's callout
+            // "… [Hole]"). Infos stay out of it (qa5 BOOL1: the graphics bubble).
+            fn typed(name: &str, type_name: &str) -> String {
+                if type_name.is_empty() || name.starts_with(type_name) { name.to_string() } else { format!("{name} [{type_name}]") }
+            }
+            let head = format!("{}{}", typed(&name, f.feature_type().map(|t| t.name).unwrap_or("")), if f.hidden { " (Hidden)" } else { "" });
             let msg = state.and_then(|s| {
                 let m = s.message.clone()?;
                 match s.status {
-                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{} did not regenerate properly: {m}", f.name)),
+                    FeatureStatus::Error | FeatureStatus::Warning => Some(format!("{head} did not regenerate properly: {m}")),
                     FeatureStatus::Info => None,
                     _ => Some(m),
                 }
             });
-            let (view, name, feature_name) = (cx.entity().downgrade(), name.clone(), f.name.clone());
-            // Live (qa5 ADV12): a name made from Onshape's "Feature Name
-            // Template" (a Hole's callout) reads "<callout> [Hole]".
-            let templated = (f.type_id == "hole" && name != f.name).then(|| f.feature_type().map(|t| format!("{name} [{}]", t.name))).flatten();
-            // Live (behaviours "Feature-row hover tooltips"): a sketch reads
-            // "Sketch 1 (Hidden) is not fully defined".
-            let sketch_tip = (f.type_id == "sketch").then(|| format!("{name}{}{}", if f.hidden { " (Hidden)" } else { "" }, if underdefined { " is not fully defined" } else { "" }));
+            // A sketch lists no inputs; an under-defined one says so.
+            let sketch_tip = (f.type_id == "sketch").then(|| format!("{head}{}", if underdefined { " is not fully defined" } else { "" }));
             // Live (ui 10-22 b): a Derived reads "Derived 1 <- <source studio>".
             let derived_source = (f.type_id == "importDerived")
                 .then(|| {
@@ -3408,6 +3410,7 @@ impl PartStudioView {
                     self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| t.name.clone())
                 })
                 .flatten();
+            let view = cx.entity().downgrade();
             move |cx: &App| -> SharedString {
                 if let Some(m) = &msg {
                     return m.clone().into();
@@ -3423,20 +3426,14 @@ impl PartStudioView {
                             let studio = v.read(cx).studio(cx)?;
                             let i = studio.features.iter().position(|g| g.id == id)?;
                             // Live lists only the sketches a feature uses ("Extrude 1 <-
-                            // Sketch 1", "[Hole] <- Sketch 2"); parts picked in a Boolean
-                            // or a merge scope aren't named (qa5 BOOL1b, behaviours B4;
-                            // Fillet / Chamfer / Shell: the name alone).
-                            Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(|g| g.name.clone())).collect())
+                            // Sketch 1", "[Hole] <- Sketch 2", "<- Path [Sketch]"); parts
+                            // picked in a Boolean or a merge scope aren't named (qa5 BOOL1b,
+                            // behaviours B4; Fillet / Chamfer / Shell: the name alone).
+                            Some(noshape_model::interaction::feature_dependencies(&studio.features, i).into_iter().filter_map(|p| studio.feature(p).filter(|g| g.type_id == "sketch").map(|g| typed(&g.name, "Sketch"))).collect())
                         })
                         .unwrap_or_default()
                 };
-                // Live (psb 10-21 p): "<callout> [Hole] <- Sketch 2".
-                let head = templated.clone().unwrap_or_else(|| feature_name.clone());
-                match (parents.is_empty(), &templated) {
-                    (true, Some(t)) => t.clone().into(),
-                    (true, None) => name.clone().into(),
-                    (false, _) => format!("{head} <- {}", parents.join(", ")).into(),
-                }
+                if parents.is_empty() { head.clone().into() } else { format!("{head} <- {}", parents.join(", ")).into() }
             }
         };
         let manually_suppressed = f.suppressed;
