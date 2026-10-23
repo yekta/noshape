@@ -764,11 +764,11 @@ fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], insta
     let mut ghost: Vec<Shape> = Vec::new();
     match seed_tool(ev, f) {
         Some(tool) => {
-            let tool_planes: Vec<(k::Plane, DVec3)> = tool
+            let tool_planes: Vec<(k::Plane, DVec3, f64)> = tool
                 .faces()
                 .iter()
-                .filter_map(|t| match (t.face_surface(), t.centroid()) {
-                    (Ok(k::Surface::Plane(pl)), Ok(c)) => Some((pl, c)),
+                .filter_map(|t| match (t.face_surface(), t.centroid(), t.area()) {
+                    (Ok(k::Surface::Plane(pl)), Ok(c), Ok(a)) => Some((pl, c, a)),
                     _ => None,
                 })
                 .collect();
@@ -776,8 +776,16 @@ fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], insta
                 let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { continue };
                 let Ok(k::Surface::Plane(pl)) = face.face_surface() else { continue };
                 let n = pl.normal.normalize_or_zero();
-                let merged = tool_planes.iter().any(|(tp, c)| {
-                    tp.normal.normalize_or_zero().dot(n).abs() > 1.0 - 1e-9 && (tp.origin - pl.origin).dot(n).abs() < tol && k::make_vertex(*c).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
+                // Only a face reaching past the tool's own face: one that is
+                // just the tool face (the wall's end, merged with the block's
+                // smaller end) is already in the ghost, and a second layer
+                // made the ghost too dark (qa4 gate v0.4.7).
+                let area = face.area().unwrap_or(0.0);
+                let merged = tool_planes.iter().any(|(tp, c, ta)| {
+                    tp.normal.normalize_or_zero().dot(n).abs() > 1.0 - 1e-9
+                        && (tp.origin - pl.origin).dot(n).abs() < tol
+                        && area > ta * (1.0 + 1e-6)
+                        && k::make_vertex(*c).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
                 });
                 if merged {
                     ghost.push(face);
