@@ -3474,3 +3474,21 @@ fn din_keys_match_live() {
     spec.params.insert("Type".into(), "B".into());
     assert_eq!(spec.part_name(), "Parallel key B x 2 x 2 x 6");
 }
+
+/// AS568 O-rings from live's table (inch: −001 is 0.029 in inside, 0.037 in
+/// section) with live's four materials, Butyl first.
+#[test]
+fn as568_o_rings_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let c = CATALOGUE.iter().find(|c| c.name == "AS568 D O-rings").unwrap();
+    assert_eq!(c.materials(), ["Butyl", "Nitrile", "Silicone Rubber", "Teflon"]);
+    let spec = StandardSpec::new(c);
+    assert_eq!(spec.part_name(), "O-ring -001 (0.029 x 0.04)");
+    assert!(spec.description().starts_with("O-ring -001 (0.029 x 0.04) Butyl"), "{}", spec.description());
+    let r = standard::regenerate(&spec).unwrap();
+    let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+    let bb = b.shape.bounding_box(true).unwrap();
+    // Outside diameter = inside + 2 sections; height = the section.
+    assert!(((bb.max.x - bb.min.x) / 0.0254 - (0.029 + 2.0 * 0.037)).abs() < 1e-4, "{bb:?}");
+    assert!(((bb.max.z - bb.min.z) / 0.0254 - 0.037).abs() < 1e-4, "{bb:?}");
+}

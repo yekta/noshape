@@ -43,6 +43,15 @@ pub fn geometry(text: &str, width: f64, height: f64) -> Text2 {
     Text2 { pos: [width / 2.0, height / 2.0], height: height * 0.06, text: text.to_string(), angle: height.atan2(width), anchor: Anchor::Center, pick: u32::MAX }
 }
 
+/// The watermark for an export (PDF, raster formats, print): its glyphs as
+/// filled triangles in the watermark gray, put first among the sheet's
+/// backdrops so everything else draws over them, as in the editor.
+pub fn backdrops(text: &str, width: f64, height: f64) -> Vec<(Vec<[f64; 2]>, [u8; 3])> {
+    let (pts, idx) = noshape_model::drawing::font::text_fill_font(&geometry(text, width, height), None);
+    let rgb = [(COLOR >> 16) as u8, (COLOR >> 8) as u8, COLOR as u8];
+    idx.as_chunks::<3>().0.iter().map(|t| (t.iter().map(|&i| pts[i as usize]).collect(), rgb)).collect()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -50,5 +59,7 @@ mod tests {
         let t = super::geometry("In progress", 279.4, 215.9);
         assert_eq!(t.pos, [139.7, 107.95]);
         assert!((t.angle.to_degrees() - 37.7).abs() < 0.1);
+        let tris = super::backdrops("In progress", 279.4, 215.9);
+        assert!(!tris.is_empty() && tris.iter().all(|(p, c)| p.len() == 3 && *c == [0xef; 3]));
     }
 }

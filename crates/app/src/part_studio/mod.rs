@@ -57,7 +57,7 @@ use crate::ui::TipExt as _;
 use noshape_model::display::{FeatureStatus, StudioDisplay};
 use noshape_model::document::TabId;
 use noshape_model::features::{self, FeatureType};
-use noshape_model::params::{ParamKind, QueryFilter};
+use noshape_model::params::{ParamKind, ParamValue, QueryFilter};
 use noshape_model::partstudio::{Feature, PartStudio};
 use noshape_model::reference::{BodyId, DatumPlane, FeatureId, Reference, TopoName};
 use noshape_model::regen::{RegenOptions, Regenerator};
@@ -875,7 +875,44 @@ impl PartStudioView {
         // Live (behaviours "URGENT (10-22)"): a failing feature's inputs are
         // drawn red while its dialog is open.
         let failing = self.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).status, Some((noshape_model::display::FeatureStatus::Error, _))));
-        let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing, self.gpu.uploader());
+        // A failed Feature pattern shows the instances it couldn't make, and
+        // its inputs keep the usual selection colors (the user's live shot
+        // 2026-10-23: the seed wall orange, the instances red).
+        let error_mesh = self.edit.as_ref().filter(|_| failing).and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id)).and_then(|s| s.error_mesh.clone());
+        if let Some(m) = &error_mesh {
+            extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
+        }
+        let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        // Live (lp wall over 2258): the pattern's other inputs (its
+        // Direction) are drawn red; the seed keeps the selection colors.
+        if error_mesh.is_some()
+            && let Some(e) = &self.edit
+        {
+            let d = e.dialog.read(cx);
+            for r in d.active_refs().into_iter().chain(d.selected_refs()) {
+                match r {
+                    // The seed keeps its shading with a light selection
+                    // tint, outlined orange, its hidden edges dashed (live
+                    // #717560 end face, #ffa90a edges).
+                    Reference::Feature(f) => {
+                        let faces: Vec<Reference> = self.feature_geometry(f).into_iter().filter(|g| matches!(g, Reference::Face(_))).collect();
+                        for g in &faces {
+                            for &id in built.picks.ids_for(g) {
+                                if let Some(s) = scene.states.get_mut(id as usize) {
+                                    *s = (*s & !(noshape_render::state::SELECTED | noshape_render::state::ACCENT)) | noshape_render::state::TINT;
+                                }
+                            }
+                        }
+                        scene.instances.extend(scene_builder::hidden_edges_dashed(&self.display, &faces, self.gpu.uploader()));
+                    }
+                    r => {
+                        for &id in built.picks.ids_for(&r) {
+                            scene.add_flag(id, noshape_render::state::ERROR);
+                        }
+                    }
+                }
+            }
+        }
         // Parts picked in a dialog field: outlined, not filled (live part-studio/440).
         if self.edit.is_some() {
             for r in selection.iter().chain(&accent) {
@@ -1370,6 +1407,12 @@ impl PartStudioView {
             let mut sel = self.selection.clone();
             sel.extend(self.feature_preselection(&filters));
             if !sel.is_empty() {
+                // helixEditLogic (live L34): the tab follows the preselection.
+                if type_id == "helix"
+                    && let Some(t) = self.helix_type_for(&sel)
+                {
+                    feature.params.set("axisType", ParamValue::Enum(t.into()));
+                }
                 preselect(ty, &mut feature, &sel, self.built.as_ref());
                 // Plane: the type follows the preselection (Onshape's cPlaneLogic).
                 if type_id == "cPlane"
@@ -2176,7 +2219,7 @@ impl PartStudioView {
                     }
                 })
             });
-        let help = div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x999999)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?");
+        let help = div().size(px(16.)).rounded_full().flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 17.8, crate::theme::help_dot(0x999999)));
         let text = format!("Versions are view only. Viewing {version}.");
         crate::ui::toolbar()
             .id("part-studio-version-bar")
@@ -2227,7 +2270,7 @@ impl PartStudioView {
             .child(
                 crate::ui::tool_button("tb-custom-features", "custom-feature", false, cx)
                     .w(px(crate::ui::TOOL_CELL + crate::ui::TOOL_CARET_W))
-                    .child(crate::ui::glyph("tool-caret", 12., p().text))
+                    .child(crate::ui::glyph("tool-caret", 10., p().text))
                     .tooltip("Custom features in this workspace")
                     // Live (part-studio/1251–1252, qa5 FS4): no heading; each
                     // entry has its initials icon ("Qc") and the name, with
@@ -4125,6 +4168,35 @@ pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     .then_some(())
     .is_some()
         && !matches!(r, Reference::Body(_) if !want(QueryFilter::BODY))
+}
+
+impl PartStudioView {
+    /// The Helix tab for a preselection: a line, linear edge or mate
+    /// connector → Axis; a circle or arc → Circle; a face → Cylinder/Cone.
+    fn helix_type_for(&self, sel: &[Reference]) -> Option<&'static str> {
+        use noshape_sketch::Curve2;
+        let ctx = self.context.as_ref()?;
+        let sketch_kind = |c: &Curve2| match c {
+            Curve2::Line { .. } => Some("AXIS"),
+            Curve2::Circle { .. } | Curve2::Arc { .. } => Some("CIRCLE"),
+            _ => None,
+        };
+        sel.iter().find_map(|r| match r {
+            Reference::Face(_) => Some("SURFACE"),
+            Reference::MateConnector { .. } => Some("AXIS"),
+            Reference::Edge(_) => match noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next()?.edge_curve().ok()? {
+                noshape_kernel::Curve::Line { .. } => Some("AXIS"),
+                noshape_kernel::Curve::Circle { .. } => Some("CIRCLE"),
+                _ => None,
+            },
+            Reference::SketchEntity { sketch, entity } => sketch_kind(&ctx.sketch(*sketch)?.sketch.curve(noshape_sketch::EntityId(*entity))?),
+            Reference::Sketch(sketch) => {
+                let sk = &ctx.sketch(*sketch)?.sketch;
+                sk.entities().filter(|e| !e.construction).find_map(|e| sk.curve(e.id).and_then(|c| sketch_kind(&c)))
+            }
+            _ => None,
+        })
+    }
 }
 
 /// Fill the first compatible query parameter(s) with preselected references.

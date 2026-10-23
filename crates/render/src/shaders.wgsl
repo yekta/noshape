@@ -56,6 +56,7 @@ const ERROR: u32 = 16u;
 const DIM: u32 = 32u;
 const QUERY: u32 = 64u;
 const OUTLINE: u32 = 128u;
+const TINT: u32 = 512u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -320,6 +321,8 @@ fn mesh_color(i: MeshOut, front: bool) -> vec4<f32> {
             c = shade(i.world, i.normal, front, c);
         }
     }
+    // A light selection tint over the shading, mixed in sRGB (state TINT).
+    if ((st & TINT) != 0u) { c = srgb_to_linear(mix(linear_to_srgb(c), linear_to_srgb(g.select.rgb), 0.2)); }
     // Back faces revealed by a section cut are tinted so cut solids read well.
     if (!front && g.flags.x != 0u) { c = mix(c, g.accent.rgb * 0.5, 0.5); }
     // params.y bit 7: Isolate ghost, mixed toward white in sRGB (extra.y).

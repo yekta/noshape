@@ -364,6 +364,7 @@ impl DrawingEditor {
         };
         // Shaded views (live: PDF embeds their picture, DXF keeps the edges).
         let (shaded, shaded_sheet) = (self.shaded_exports(), self.sheet);
+        let watermark = crate::drawing_watermark::text(self.doc.read(cx), self.tab);
         let sources = self.sources.clone();
         let cache = self.cache.clone();
         let info = self.info.clone();
@@ -412,6 +413,12 @@ impl DrawingEditor {
                             }
                         }
                         let mut geo = export::prepare(&g, &opts);
+                        // Release management › Watermarks: under everything,
+                        // after the colour mode (it stays gray), on PDF, the
+                        // raster formats and print; model spaces have none.
+                        if let Some(text) = watermark.as_deref().filter(|_| (f == DrawingFormat::Pdf || f.raster()) && !sheet.imported.as_ref().is_some_and(|m| m.model)) {
+                            geo.backdrops.splice(0..0, crate::drawing_watermark::backdrops(text, geo.width, geo.height));
+                        }
                         if pictures {
                             for (_, pos, size, png) in &shaded {
                                 geo.images.insert(0, noshape_model::drawing::sheet::GeomImage { pos: *pos, size: *size, data_base64: noshape_model::sketch_feature::base64_encode(png).into(), rgb: None });

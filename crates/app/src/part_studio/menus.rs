@@ -948,7 +948,7 @@ impl PartStudioView {
                     cx.notify();
                 }))
         };
-        let help = || div().size(px(14.)).rounded_full().bg(gpui_kit::rgb(0xaaaaaa)).flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0xffffff)).child("?");
+        let help = || div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)));
         // Onshape's selection box: `#def1fb` with a 1 px `#1651b0` border when
         // active, the caption small on top once something is listed.
         // `invalid`: entries in red (live: parts without a material).
@@ -1061,7 +1061,7 @@ impl PartStudioView {
                             .border_b_1()
                             .border_color(pal.border)
                             .child(crate::ui::panel_title("ps-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties")))
-                            .child(div().size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0xcce9cc)).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)))
+                            .child(div().size(px(28.)).flex().items_center().justify_center().bg(crate::theme::p().accept).opacity(0.2).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)))
                             .child(close("mass-close", cx)),
                     )
                     // Live: 46 px from the last inertia row to the dialog's

@@ -1,24 +1,18 @@
-//! Hole and thread standard tables (compact port of the main entries of
-//! FeatureScript's `holetables.gen.fs`).
+//! Hole and thread standard tables: FeatureScript's `holetables.gen.fs`
+//! (the embedded standard library), read once with the FS parser. Options
+//! keep the source order, which is the order of Onshape's dropdowns (live
+//! L58), and leaf values are Onshape's own.
 //!
 //! A table is a cascade of levels; a *path* is the list of option ids chosen
 //! so far (one per level) and is what a [`ParamValue::Lookup`] stores. The
 //! leaf of a complete path yields a [`HoleSpec`].
 //!
-//! Covered: ANSI (#0 .. 1", UNC + UNF) and ISO (M1.6 .. M24, coarse + fine)
-//! for Drilled / Clearance / Tapped (straight tap) holes, thread classes and
-//! external threads. Not covered yet: pipe taps (NPT, G/RP, R/BSPT), PEM
-//! fasteners, sizes outside the ranges above, UNEF/extra-fine pitches.
-//!
-//! Values follow the usual references (ASME B18.2.8 / Machinery's Handbook
-//! close and free fits, 75% tap drills, ISO 273 fine/medium/coarse clearance,
-//! socket-head counterbores, flat-head countersinks). They are close to
-//! Onshape's table but were not copied from it verbatim.
-//!
 //! [`ParamValue::Lookup`]: crate::params::ParamValue::Lookup
 
 use crate::params::{ParamValue, ParamValues};
 use noshape_units::ExprValue;
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock};
 
 /// Dimensions resolved from a complete table path. Lengths in meters, angles
 /// in radians.
@@ -40,22 +34,12 @@ pub struct HoleSpec {
     pub cbore_depth: Option<f64>,
     pub csink_diameter: Option<f64>,
     pub csink_angle: Option<f64>,
+    /// Tapered pipe taps: the table's tapped depth and hole depth.
+    pub tapped_depth: Option<f64>,
+    pub hole_depth: Option<f64>,
 }
 
 impl HoleSpec {
-    fn plain(d: f64) -> Self {
-        Self {
-            hole_diameter: d,
-            tap_drill_diameter: None,
-            major_diameter: None,
-            minor_diameter: None,
-            pitch: None,
-            cbore_diameter: None,
-            cbore_depth: None,
-            csink_diameter: None,
-            csink_angle: None,
-        }
-    }
     /// Whether the entry describes a threaded hole (FS `showTappedDepth`).
     pub fn is_threaded(&self) -> bool {
         self.pitch.is_some()
@@ -88,396 +72,206 @@ pub const ALL_TABLES: &[&str] = &[
 ];
 
 // ---------------------------------------------------------------------------
-// Raw data
+// Tables: FeatureScript's holetables.gen.fs, parsed once
 // ---------------------------------------------------------------------------
 
 const IN: f64 = 0.0254;
 const MM: f64 = 0.001;
 
-/// One thread of a size: ANSI (threads per inch, series, tap drill [in]) or
-/// ISO (pitch [mm], series, tap drill [mm]).
-struct Thread {
-    per: f64,
-    series: &'static str,
-    tap_drill: f64,
+/// A lookup-table level: `{ "name", "displayName", "default", "entries" }`.
+struct Level {
+    /// The level's key in a path map ("size", "pitch", "fit", ...).
+    key: String,
+    /// Shown name ("Size", "Threads/inch", ...).
+    name: String,
+    default: Option<String>,
+    /// (option, what it leads to), in source order (the dropdown's order).
+    entries: Vec<(String, Arc<Entry>)>,
 }
 
-struct Size {
-    name: &'static str,
-    /// Major (nominal) diameter in the table's native unit.
-    major: f64,
-    threads: &'static [Thread],
-    /// Clearance diameters, one per fit of the standard.
-    clearance: &'static [f64],
-    cbore: (f64, f64),
-    csink: f64,
+enum Entry {
+    Level(Level),
+    /// Leaf values (`"holeDiameter" : "0.25 in"`).
+    Values(Vec<(String, String)>),
+    /// A plain string leaf (thread classes) or an empty map ("Custom").
+    Leaf,
 }
 
-struct Standard {
-    id: &'static str,
-    unit: f64,
-    sizes: &'static [Size],
-    fits: &'static [&'static str],
-    pitch_level: &'static str,
-    default_size: &'static str,
-    csink_angle_deg: f64,
-    imperial: bool,
-}
+/// Every table constant of `holetables.gen.fs` by name, plus the
+/// [`TABLE_EXTERNAL_THREAD`] / [`TABLE_HOLE`] standard levels.
+static TABLES: LazyLock<HashMap<String, Arc<Entry>>> = LazyLock::new(load_tables);
 
-const fn t(per: f64, series: &'static str, tap_drill: f64) -> Thread {
-    Thread { per, series, tap_drill }
-}
-
-static ANSI_SIZES: &[Size] = &[
-    Size {
-        name: "#0",
-        major: 0.060,
-        threads: &[t(80.0, "UNF", 0.0469)],
-        clearance: &[0.0635, 0.0700, 0.064, 0.070, 0.076],
-        cbore: (0.125, 0.060),
-        csink: 0.119,
-    },
-    Size {
-        name: "#1",
-        major: 0.073,
-        threads: &[t(64.0, "UNC", 0.0595), t(72.0, "UNF", 0.0595)],
-        clearance: &[0.0760, 0.0810, 0.076, 0.081, 0.089],
-        cbore: (0.156, 0.073),
-        csink: 0.146,
-    },
-    Size {
-        name: "#2",
-        major: 0.086,
-        threads: &[t(56.0, "UNC", 0.0700), t(64.0, "UNF", 0.0700)],
-        clearance: &[0.0890, 0.0960, 0.089, 0.094, 0.104],
-        cbore: (0.188, 0.086),
-        csink: 0.172,
-    },
-    Size {
-        name: "#3",
-        major: 0.099,
-        threads: &[t(48.0, "UNC", 0.0785), t(56.0, "UNF", 0.0820)],
-        clearance: &[0.1040, 0.1100, 0.104, 0.110, 0.120],
-        cbore: (0.219, 0.099),
-        csink: 0.199,
-    },
-    Size {
-        name: "#4",
-        major: 0.112,
-        threads: &[t(40.0, "UNC", 0.0890), t(48.0, "UNF", 0.0935)],
-        clearance: &[0.1160, 0.1285, 0.116, 0.120, 0.128],
-        cbore: (0.219, 0.112),
-        csink: 0.225,
-    },
-    Size {
-        name: "#5",
-        major: 0.125,
-        threads: &[t(40.0, "UNC", 0.1015), t(44.0, "UNF", 0.1040)],
-        clearance: &[0.1285, 0.1360, 0.128, 0.136, 0.147],
-        cbore: (0.250, 0.125),
-        csink: 0.252,
-    },
-    Size {
-        name: "#6",
-        major: 0.138,
-        threads: &[t(32.0, "UNC", 0.1065), t(40.0, "UNF", 0.1130)],
-        clearance: &[0.1440, 0.1495, 0.144, 0.150, 0.161],
-        cbore: (0.281, 0.138),
-        csink: 0.279,
-    },
-    Size {
-        name: "#8",
-        major: 0.164,
-        threads: &[t(32.0, "UNC", 0.1360), t(36.0, "UNF", 0.1360)],
-        clearance: &[0.1695, 0.1770, 0.170, 0.177, 0.191],
-        cbore: (0.312, 0.164),
-        csink: 0.332,
-    },
-    Size {
-        name: "#10",
-        major: 0.190,
-        threads: &[t(24.0, "UNC", 0.1495), t(32.0, "UNF", 0.1590)],
-        clearance: &[0.1960, 0.2010, 0.196, 0.201, 0.221],
-        cbore: (0.375, 0.190),
-        csink: 0.385,
-    },
-    Size {
-        name: "#12",
-        major: 0.216,
-        threads: &[t(24.0, "UNC", 0.1770), t(28.0, "UNF", 0.1820)],
-        clearance: &[0.2210, 0.2280, 0.221, 0.228, 0.250],
-        cbore: (0.406, 0.216),
-        csink: 0.438,
-    },
-    Size {
-        name: "1/4",
-        major: 0.2500,
-        threads: &[t(20.0, "UNC", 0.2010), t(28.0, "UNF", 0.2130)],
-        clearance: &[0.2570, 0.2660, 0.257, 0.266, 0.281],
-        cbore: (0.438, 0.250),
-        csink: 0.507,
-    },
-    Size {
-        name: "5/16",
-        major: 0.3125,
-        threads: &[t(18.0, "UNC", 0.2570), t(24.0, "UNF", 0.2720)],
-        clearance: &[0.3230, 0.3320, 0.323, 0.332, 0.344],
-        cbore: (0.531, 0.312),
-        csink: 0.635,
-    },
-    Size {
-        name: "3/8",
-        major: 0.3750,
-        threads: &[t(16.0, "UNC", 0.3125), t(24.0, "UNF", 0.3320)],
-        clearance: &[0.3860, 0.3970, 0.386, 0.397, 0.406],
-        cbore: (0.625, 0.375),
-        csink: 0.762,
-    },
-    Size {
-        name: "7/16",
-        major: 0.4375,
-        threads: &[t(14.0, "UNC", 0.3680), t(20.0, "UNF", 0.3906)],
-        clearance: &[0.4531, 0.4688, 0.453, 0.469, 0.484],
-        cbore: (0.719, 0.438),
-        csink: 0.812,
-    },
-    Size {
-        name: "1/2",
-        major: 0.5000,
-        threads: &[t(13.0, "UNC", 0.4219), t(20.0, "UNF", 0.4531)],
-        clearance: &[0.5156, 0.5312, 0.516, 0.531, 0.562],
-        cbore: (0.812, 0.500),
-        csink: 0.875,
-    },
-    Size {
-        name: "5/8",
-        major: 0.6250,
-        threads: &[t(11.0, "UNC", 0.5312), t(18.0, "UNF", 0.5781)],
-        clearance: &[0.6406, 0.6562, 0.641, 0.656, 0.688],
-        cbore: (1.000, 0.625),
-        csink: 1.125,
-    },
-    Size {
-        name: "3/4",
-        major: 0.7500,
-        threads: &[t(10.0, "UNC", 0.6562), t(16.0, "UNF", 0.6875)],
-        clearance: &[0.7656, 0.7812, 0.766, 0.781, 0.812],
-        cbore: (1.188, 0.750),
-        csink: 1.375,
-    },
-    Size {
-        name: "7/8",
-        major: 0.8750,
-        threads: &[t(9.0, "UNC", 0.7656), t(14.0, "UNF", 0.8125)],
-        clearance: &[0.8906, 0.9062, 0.891, 0.906, 0.938],
-        cbore: (1.375, 0.875),
-        csink: 1.625,
-    },
-    Size {
-        name: "1",
-        major: 1.0000,
-        threads: &[t(8.0, "UNC", 0.8750), t(12.0, "UNF", 0.9219)],
-        clearance: &[1.0156, 1.0312, 1.016, 1.031, 1.062],
-        cbore: (1.625, 1.000),
-        csink: 1.875,
-    },
-];
-
-/// ISO metric: tap drill = major - pitch (75% engagement rule).
-static ISO_SIZES: &[Size] = &[
-    Size { name: "M1.6", major: 1.6, threads: &[t(0.35, "Coarse", 1.25), t(0.2, "Fine", 1.4)], clearance: &[1.7, 1.8, 2.0], cbore: (3.5, 1.6), csink: 3.5 },
-    Size { name: "M2", major: 2.0, threads: &[t(0.4, "Coarse", 1.6), t(0.25, "Fine", 1.75)], clearance: &[2.2, 2.4, 2.6], cbore: (4.4, 2.0), csink: 4.4 },
-    Size { name: "M2.5", major: 2.5, threads: &[t(0.45, "Coarse", 2.05), t(0.35, "Fine", 2.15)], clearance: &[2.7, 2.9, 3.1], cbore: (5.5, 2.5), csink: 5.5 },
-    Size { name: "M3", major: 3.0, threads: &[t(0.5, "Coarse", 2.5), t(0.35, "Fine", 2.65)], clearance: &[3.2, 3.4, 3.6], cbore: (6.5, 3.0), csink: 6.94 },
-    Size { name: "M3.5", major: 3.5, threads: &[t(0.6, "Coarse", 2.9), t(0.35, "Fine", 3.15)], clearance: &[3.7, 3.9, 4.2], cbore: (7.0, 3.5), csink: 8.0 },
-    Size { name: "M4", major: 4.0, threads: &[t(0.7, "Coarse", 3.3), t(0.5, "Fine", 3.5)], clearance: &[4.3, 4.5, 4.8], cbore: (8.0, 4.0), csink: 9.18 },
-    Size { name: "M5", major: 5.0, threads: &[t(0.8, "Coarse", 4.2), t(0.5, "Fine", 4.5)], clearance: &[5.3, 5.5, 5.8], cbore: (10.0, 5.0), csink: 11.47 },
-    Size { name: "M6", major: 6.0, threads: &[t(1.0, "Coarse", 5.0), t(0.75, "Fine", 5.25)], clearance: &[6.4, 6.6, 7.0], cbore: (11.0, 6.0), csink: 13.7 },
-    Size {
-        name: "M8",
-        major: 8.0,
-        threads: &[t(1.25, "Coarse", 6.8), t(1.0, "Fine", 7.0), t(0.75, "Fine", 7.25)],
-        clearance: &[8.4, 9.0, 10.0],
-        cbore: (15.0, 8.0),
-        csink: 18.3,
-    },
-    Size {
-        name: "M10",
-        major: 10.0,
-        threads: &[t(1.5, "Coarse", 8.5), t(1.25, "Fine", 8.75), t(1.0, "Fine", 9.0), t(0.75, "Fine", 9.25)],
-        clearance: &[10.5, 11.0, 12.0],
-        cbore: (18.0, 10.0),
-        csink: 22.8,
-    },
-    Size {
-        name: "M12",
-        major: 12.0,
-        threads: &[t(1.75, "Coarse", 10.25), t(1.5, "Fine", 10.5), t(1.25, "Fine", 10.75), t(1.0, "Fine", 11.0)],
-        clearance: &[13.0, 13.5, 14.5],
-        cbore: (20.0, 12.0),
-        csink: 27.3,
-    },
-    Size {
-        name: "M14",
-        major: 14.0,
-        threads: &[t(2.0, "Coarse", 12.0), t(1.5, "Fine", 12.5), t(1.25, "Fine", 12.75)],
-        clearance: &[15.0, 15.5, 16.5],
-        cbore: (24.0, 14.0),
-        csink: 31.3,
-    },
-    Size {
-        name: "M16",
-        major: 16.0,
-        threads: &[t(2.0, "Coarse", 14.0), t(1.5, "Fine", 14.5), t(1.0, "Fine", 15.0)],
-        clearance: &[17.0, 17.5, 18.5],
-        cbore: (26.0, 16.0),
-        csink: 34.2,
-    },
-    Size {
-        name: "M20",
-        major: 20.0,
-        threads: &[t(2.5, "Coarse", 17.5), t(2.0, "Fine", 18.0), t(1.5, "Fine", 18.5), t(1.0, "Fine", 19.0)],
-        clearance: &[21.0, 22.0, 24.0],
-        cbore: (33.0, 20.0),
-        csink: 41.0,
-    },
-    Size {
-        name: "M24",
-        major: 24.0,
-        threads: &[t(3.0, "Coarse", 21.0), t(2.0, "Fine", 22.0), t(1.5, "Fine", 22.5), t(1.0, "Fine", 23.0)],
-        clearance: &[25.0, 26.0, 28.0],
-        cbore: (40.0, 24.0),
-        csink: 48.5,
-    },
-];
-
-static ANSI: Standard = Standard {
-    id: "ANSI",
-    unit: IN,
-    sizes: ANSI_SIZES,
-    fits: &["Close", "Free", "Close (ASME)", "Normal (ASME)", "Loose (ASME)"],
-    pitch_level: "Threads/inch",
-    default_size: "1/4",
-    csink_angle_deg: 82.0,
-    imperial: true,
-};
-
-static ISO: Standard = Standard {
-    id: "ISO",
-    unit: MM,
-    sizes: ISO_SIZES,
-    fits: &["Close", "Normal", "Loose"],
-    pitch_level: "Pitch",
-    default_size: "M5",
-    csink_angle_deg: 90.0,
-    imperial: false,
-};
-
-const ANSI_THREAD_CLASSES: &[&str] = &["1B", "2B", "3B"];
-const ISO_THREAD_CLASSES: &[&str] = &["4H", "5G", "5H", "6G", "6H", "7G", "7H", "8G", "8H"];
-
-const HOLE_TYPES: &[&str] = &["Drilled", "Clearance", "Tapped"];
-const TAP_TYPES: &[&str] = &["Straight tap"];
-const FIT_NONE: &str = "None";
-
-// ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
-
-fn trim_num(x: f64, decimals: usize) -> String {
-    let s = format!("{x:.decimals$}");
-    if s.contains('.') { s.trim_end_matches('0').trim_end_matches('.').to_string() } else { s }
-}
-
-fn thread_id(std: &Standard, th: &Thread) -> String {
-    if std.imperial { format!("{} tpi", trim_num(th.per, 0)) } else { format!("{:.2} mm", th.per) }
-}
-
-fn thread_label(std: &Standard, th: &Thread) -> String {
-    format!("{} ({})", thread_id(std, th), th.series)
-}
-
-fn thread_pitch(std: &Standard, th: &Thread) -> f64 {
-    if std.imperial { IN / th.per } else { th.per * MM }
-}
-
-fn gcd(a: u32, b: u32) -> u32 {
-    if b == 0 { a } else { gcd(b, a % b) }
-}
-
-/// Drill sizes of a standard as (id/label, diameter in m), ascending.
-fn drills(std: &Standard) -> Vec<(String, f64)> {
-    let mut out = Vec::new();
-    if std.imperial {
-        const LETTERS: [(char, f64); 26] = [
-            ('A', 0.234),
-            ('B', 0.238),
-            ('C', 0.242),
-            ('D', 0.246),
-            ('E', 0.250),
-            ('F', 0.257),
-            ('G', 0.261),
-            ('H', 0.266),
-            ('I', 0.272),
-            ('J', 0.277),
-            ('K', 0.281),
-            ('L', 0.290),
-            ('M', 0.295),
-            ('N', 0.302),
-            ('O', 0.316),
-            ('P', 0.323),
-            ('Q', 0.332),
-            ('R', 0.339),
-            ('S', 0.348),
-            ('T', 0.358),
-            ('U', 0.368),
-            ('V', 0.377),
-            ('W', 0.386),
-            ('X', 0.397),
-            ('Y', 0.404),
-            ('Z', 0.413),
-        ];
-        for (c, d) in LETTERS {
-            out.push((format!("{c} ({})", trim_num(d, 4)), d));
+fn load_tables() -> HashMap<String, Arc<Entry>> {
+    use noshape_featurescript::ast::{Expr, ExprKind, MapKey, TopKind};
+    fn text(e: &Expr) -> Option<&str> {
+        if let ExprKind::Str(s) = &*e.kind { Some(s) } else { None }
+    }
+    fn key(k: &MapKey) -> Option<&str> {
+        match k {
+            MapKey::Str(s) => Some(s),
+            MapKey::Expr(e) => text(e),
         }
-        for n in 1..=64u32 {
-            let g = gcd(n, 64);
-            let frac = if n == 64 { "1".to_string() } else { format!("{}/{}", n / g, 64 / g) };
-            let d = n as f64 / 64.0;
-            out.push((format!("{frac} ({})", trim_num(d, 4)), d));
+    }
+    fn resolve(name: &str, consts: &HashMap<&str, &Expr>, memo: &mut HashMap<String, Arc<Entry>>) -> Option<Arc<Entry>> {
+        if let Some(e) = memo.get(name) {
+            return Some(e.clone());
         }
-        out.sort_by(|a, b| a.1.total_cmp(&b.1));
-        out.into_iter().map(|(s, d)| (s, d * IN)).collect()
-    } else {
-        // 0.5 .. 10 mm by 0.1, 10.5 .. 20 by 0.5, 21 .. 38 by 1 (tenths of mm).
-        let tenths = (5..=100).chain((105..=200).step_by(5)).chain((210..=380).step_by(10));
-        for t in tenths {
-            let d = t as f64 / 10.0;
-            out.push((trim_num(d, 1), d * MM));
+        let e = convert(consts.get(name)?, consts, memo)?;
+        memo.insert(name.to_string(), e.clone());
+        Some(e)
+    }
+    fn convert(e: &Expr, consts: &HashMap<&str, &Expr>, memo: &mut HashMap<String, Arc<Entry>>) -> Option<Arc<Entry>> {
+        match &*e.kind {
+            ExprKind::Ident(q) => resolve(&q.name, consts, memo),
+            ExprKind::Str(_) => Some(Arc::new(Entry::Leaf)),
+            ExprKind::Map(items) => {
+                let field = |f: &str| items.iter().find(|(k, _)| key(k) == Some(f)).map(|(_, v)| v);
+                let Some(entries) = field("entries") else {
+                    let values: Vec<(String, String)> = items.iter().filter_map(|(k, v)| Some((key(k)?.to_string(), text(v)?.to_string()))).collect();
+                    return Some(Arc::new(if values.is_empty() { Entry::Leaf } else { Entry::Values(values) }));
+                };
+                let ExprKind::Map(list) = &*entries.kind else { return None };
+                let s = |f: &str| field(f).and_then(|v| text(v)).map(str::to_string);
+                Some(Arc::new(Entry::Level(Level {
+                    key: s("name").unwrap_or_default(),
+                    name: s("displayName").unwrap_or_default(),
+                    default: s("default"),
+                    entries: list.iter().filter_map(|(k, v)| Some((key(k)?.to_string(), convert(v, consts, memo)?))).collect(),
+                })))
+            }
+            _ => None,
         }
-        out
+    }
+    let src = noshape_featurescript::std_source("holetables.gen.fs").unwrap_or_default();
+    let module = match noshape_featurescript::parser::parse(src) {
+        Ok(m) => m,
+        Err(e) => {
+            log::error!("holetables.gen.fs: {e:?}");
+            return HashMap::new();
+        }
+    };
+    let consts: HashMap<&str, &Expr> = module
+        .items
+        .iter()
+        .filter_map(|it| match &it.kind {
+            TopKind::Const { name, init, .. } => Some((&**name, init)),
+            _ => None,
+        })
+        .collect();
+    let mut memo = HashMap::new();
+    for name in consts.keys() {
+        resolve(name, &consts, &mut memo);
+    }
+    // externalThread.fs's localExternalThreadTable; the generic hole table.
+    let standards = |memo: &HashMap<String, Arc<Entry>>, ansi: &str, iso: &str| {
+        Arc::new(Entry::Level(Level {
+            key: "standard".into(),
+            name: "Standard".into(),
+            default: None,
+            entries: [("ANSI", ansi), ("ISO", iso)].iter().filter_map(|(k, t)| Some((k.to_string(), memo.get(*t)?.clone()))).collect(),
+        }))
+    };
+    let ext = standards(&memo, "ANSI_ExternalThreadTable", "ISO_ExternalThreadTable");
+    let hole = standards(&memo, "ANSI_HoleTable", "ISO_HoleTable");
+    memo.insert(TABLE_EXTERNAL_THREAD.into(), ext);
+    memo.insert(TABLE_HOLE.into(), hole);
+    memo
+}
+
+fn root(table: &str) -> Option<&'static Entry> {
+    let name = match table {
+        TABLE_ANSI_HOLE => "ANSI_HoleTable",
+        TABLE_ANSI_HOLE_EX => "ANSI_HoleTableEx",
+        TABLE_ISO_HOLE => "ISO_HoleTable",
+        TABLE_ISO_HOLE_EX => "ISO_HoleTableEx",
+        TABLE_ANSI_THREAD_CLASS => "ANSI_ThreadClassHoleTable",
+        TABLE_ISO_THREAD_CLASS => "ISO_ThreadClassHoleTable",
+        TABLE_EXTERNAL_THREAD | TABLE_HOLE => table,
+        _ => return None,
+    };
+    TABLES.get(name).map(|e| &**e)
+}
+
+/// The option of `level` a path element names. Paths saved before the full
+/// tables keep the bare pitch ("20 tpi" for "20 tpi (UNC)").
+fn find<'a>(level: &'a Level, key: &str) -> Option<&'a (String, Arc<Entry>)> {
+    level.entries.iter().find(|(k, _)| k == key).or_else(|| level.entries.iter().find(|(k, _)| k.strip_prefix(key).is_some_and(|r| r.starts_with(" ("))))
+}
+
+/// Follow `path` from a table's root: the entry reached and, per step, the
+/// level and the option taken.
+fn walk(table: &str, path: &[String]) -> Option<(&'static Entry, Vec<(&'static Level, &'static str)>)> {
+    let mut e = root(table)?;
+    let mut steps = Vec::new();
+    for p in path {
+        let Entry::Level(l) = e else { return None };
+        let (k, next) = find(l, p)?;
+        steps.push((l, k.as_str()));
+        e = next;
+    }
+    Some((e, steps))
+}
+
+/// A table quantity ("0.0469 in", "1/64 in", "2 3/4 in", "82 degree") in
+/// meters / radians.
+fn quantity(s: &str) -> Option<f64> {
+    let (num, unit) = s.trim().rsplit_once(' ')?;
+    let scale = match unit {
+        "in" => IN,
+        "mm" => MM,
+        "degree" => std::f64::consts::PI / 180.0,
+        _ => return None,
+    };
+    Some(number(num)? * scale)
+}
+
+/// "0.25", "1/64", "2 3/4", "-1".
+fn number(s: &str) -> Option<f64> {
+    let frac = |f: &str| match f.split_once('/') {
+        Some((a, b)) => Some(a.trim().parse::<f64>().ok()? / b.trim().parse::<f64>().ok()?),
+        None => f.trim().parse::<f64>().ok(),
+    };
+    match s.trim().split_once(' ') {
+        Some((whole, f)) => Some(whole.parse::<f64>().ok()? + frac(f)?),
+        None => frac(s),
     }
 }
 
-fn default_drill(std: &Standard) -> String {
-    if std.imperial { "1/4 (0.25)".into() } else { "5".into() }
+/// Thread pitch of a pitch option (hole.fs `parsePitch`): "20 tpi (UNC)",
+/// "1.00 mm (Coarse)", "11 1/2 tpi".
+fn pitch(option: &str) -> Option<f64> {
+    let words: Vec<&str> = option.split_whitespace().collect();
+    let at = words.iter().position(|w| *w == "tpi" || *w == "mm")?;
+    let n = number(&words[..at].join(" "))?;
+    match words[at] {
+        "tpi" if n > 0.0 => Some(IN / n),
+        "mm" => Some(n * MM),
+        _ => None,
+    }
 }
 
-fn opts(ids: &[&str]) -> Vec<Opt> {
-    ids.iter().map(|s| (s.to_string(), s.to_string())).collect()
+/// Leaf values as hole.fs `updateHoleDefinitionWithStandard` applies them: a
+/// tap drill above the hole diameter, or a counterbore / countersink below
+/// it (the tables' "-1"), becomes the hole diameter.
+fn spec(values: &[(String, String)], steps: &[(&Level, &str)]) -> Option<HoleSpec> {
+    let get = |k: &str| values.iter().find(|(n, _)| n == k).and_then(|(_, v)| quantity(v));
+    let hole = get("holeDiameter")?;
+    let pitch = steps.iter().find(|(l, _)| l.key == "pitch").and_then(|(_, k)| pitch(k));
+    let at_least = |v: Option<f64>| v.map(|v| v.max(hole));
+    Some(HoleSpec {
+        hole_diameter: hole,
+        tap_drill_diameter: get("tapDrillDiameter").map(|t| t.min(hole)).or(pitch.map(|_| hole)),
+        major_diameter: get("majorDiameter"),
+        minor_diameter: get("minorDiameter"),
+        pitch,
+        cbore_diameter: at_least(get("cBoreDiameter")),
+        cbore_depth: get("cBoreDepth"),
+        csink_diameter: at_least(get("cSinkDiameter")),
+        csink_angle: get("cSinkAngle"),
+        tapped_depth: get("tappedDepth"),
+        hole_depth: get("holeDepth"),
+    })
 }
-
-fn find_size<'a>(std: &'a Standard, name: &str) -> Option<&'a Size> {
-    std.sizes.iter().find(|s| s.name == name)
-}
-
-fn find_thread<'a>(std: &Standard, size: &'a Size, id: &str) -> Option<&'a Thread> {
-    size.threads.iter().find(|th| thread_id(std, th) == id)
-}
-
-// ---------------------------------------------------------------------------
-// Cascade of one standard's hole table (path excludes the standard)
-// ---------------------------------------------------------------------------
 
 struct LevelInfo {
     name: &'static str,
@@ -485,135 +279,9 @@ struct LevelInfo {
     default: String,
 }
 
-fn hole_level(std: &Standard, path: &[String]) -> Option<LevelInfo> {
-    let p: Vec<&str> = path.iter().map(String::as_str).collect();
-    let sizes = || std.sizes.iter().map(|s| (s.name.to_string(), s.name.to_string())).collect::<Vec<_>>();
-    let fits = |with_none: bool| {
-        let mut o = if with_none { opts(&[FIT_NONE]) } else { Vec::new() };
-        o.extend(opts(std.fits));
-        o
-    };
-    Some(match p.as_slice() {
-        [] => LevelInfo { name: "Hole type", options: opts(HOLE_TYPES), default: HOLE_TYPES[0].into() },
-        ["Drilled"] => LevelInfo { name: "Drill size", options: drills(std).into_iter().map(|(s, _)| (s.clone(), s)).collect(), default: default_drill(std) },
-        ["Clearance"] => LevelInfo { name: "Size", options: sizes(), default: std.default_size.into() },
-        ["Clearance", size] if find_size(std, size).is_some() => LevelInfo { name: "Fastener fit", options: fits(false), default: std.fits[0].into() },
-        ["Tapped"] => LevelInfo { name: "Tap type", options: opts(TAP_TYPES), default: TAP_TYPES[0].into() },
-        ["Tapped", "Straight tap"] => LevelInfo { name: "Size", options: sizes(), default: std.default_size.into() },
-        ["Tapped", "Straight tap", size] => {
-            let s = find_size(std, size)?;
-            LevelInfo {
-                name: std.pitch_level,
-                options: s.threads.iter().map(|th| (thread_id(std, th), thread_label(std, th))).collect(),
-                default: thread_id(std, &s.threads[0]),
-            }
-        }
-        ["Tapped", "Straight tap", size, pitch] => {
-            let s = find_size(std, size)?;
-            find_thread(std, s, pitch)?;
-            LevelInfo { name: "Fastener fit", options: fits(true), default: FIT_NONE.into() }
-        }
-        _ => return None,
-    })
-}
-
-fn hole_values(std: &Standard, path: &[String]) -> Option<HoleSpec> {
-    let p: Vec<&str> = path.iter().map(String::as_str).collect();
-    let u = std.unit;
-    let with_heads = |mut h: HoleSpec, s: &Size| {
-        h.cbore_diameter = Some(s.cbore.0 * u);
-        h.cbore_depth = Some(s.cbore.1 * u);
-        h.csink_diameter = Some(s.csink * u);
-        h.csink_angle = Some(std.csink_angle_deg.to_radians());
-        h
-    };
-    let fit_index = |fit: &str| std.fits.iter().position(|f| *f == fit);
-    match p.as_slice() {
-        ["Drilled", drill] => drills(std).into_iter().find(|(s, _)| s == drill).map(|(_, d)| HoleSpec::plain(d)),
-        ["Clearance", size, fit] => {
-            let s = find_size(std, size)?;
-            let d = s.clearance[fit_index(fit)?];
-            Some(with_heads(HoleSpec::plain(d * u), s))
-        }
-        ["Tapped", "Straight tap", size, pitch, fit] => {
-            let s = find_size(std, size)?;
-            let th = find_thread(std, s, pitch)?;
-            let tap = th.tap_drill * u;
-            let hole = if *fit == FIT_NONE { tap } else { s.clearance[fit_index(fit)?] * u };
-            let mut h = with_heads(HoleSpec::plain(hole), s);
-            h.tap_drill_diameter = Some(tap);
-            h.major_diameter = Some(s.major * u);
-            h.pitch = Some(thread_pitch(std, th));
-            Some(h)
-        }
-        _ => None,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// External threads: [standard, size, pitch]
-// ---------------------------------------------------------------------------
-
-fn standard(id: &str) -> Option<&'static Standard> {
-    match id {
-        "ANSI" => Some(&ANSI),
-        "ISO" => Some(&ISO),
-        _ => None,
-    }
-}
-
-fn standards_level(default: &str) -> LevelInfo {
-    LevelInfo { name: "Standard", options: opts(&["ANSI", "ISO"]), default: default.into() }
-}
-
-fn thread_level(path: &[String]) -> Option<LevelInfo> {
-    let Some(std_id) = path.first() else { return Some(standards_level("ANSI")) };
-    let std = standard(std_id)?;
-    match &path[1..] {
-        [] => Some(LevelInfo {
-            name: "Size",
-            options: std.sizes.iter().map(|s| (s.name.to_string(), s.name.to_string())).collect(),
-            default: std.default_size.into(),
-        }),
-        [size] => {
-            let s = find_size(std, size)?;
-            Some(LevelInfo {
-                name: std.pitch_level,
-                // std externalThread tables list the bare pitch ("20 tpi",
-                // live qa5 ADV8); tapped holes add the series.
-                options: s.threads.iter().map(|th| (thread_id(std, th), thread_id(std, th))).collect(),
-                default: thread_id(std, &s.threads[0]),
-            })
-        }
-        _ => None,
-    }
-}
-
-fn thread_values(path: &[String]) -> Option<HoleSpec> {
-    let [std_id, size, pitch] = path else { return None };
-    let std = standard(std_id)?;
-    let s = find_size(std, size)?;
-    let th = find_thread(std, s, pitch)?;
-    let p = thread_pitch(std, th);
-    let major = s.major * std.unit;
-    // External minor diameter: UNR d - 1.19078 P, ISO d3 = d - 1.22687 P.
-    let k = if std.imperial { 1.19078 } else { 1.22687 };
-    let mut h = HoleSpec::plain(major);
-    h.major_diameter = Some(major);
-    h.minor_diameter = Some(major - k * p);
-    h.pitch = Some(p);
-    Some(h)
-}
-
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-
-fn split_std(path: &[String]) -> Option<(&'static Standard, &[String])> {
-    let (first, rest) = path.split_first()?;
-    Some((standard(first)?, rest))
-}
-
 /// A lookup table registered at run time (a FeatureScript "Lookup Table"
 /// annotation): one level per node.
 #[derive(Clone, Debug, PartialEq)]
@@ -648,19 +316,11 @@ fn level_info(table: &str, path: &[String]) -> Option<LevelInfo> {
     if let Some(l) = dynamic_level(table, path) {
         return Some(LevelInfo { name: l.name, options: l.entries.iter().map(|(k, _)| (k.clone(), k.clone())).collect(), default: l.default.clone() });
     }
-    match table {
-        TABLE_HOLE => match split_std(path) {
-            Some((std, rest)) => hole_level(std, rest),
-            None if path.is_empty() => Some(standards_level("ANSI")),
-            None => None,
-        },
-        TABLE_ANSI_HOLE | TABLE_ANSI_HOLE_EX => hole_level(&ANSI, path),
-        TABLE_ISO_HOLE | TABLE_ISO_HOLE_EX => hole_level(&ISO, path),
-        TABLE_ANSI_THREAD_CLASS if path.is_empty() => Some(LevelInfo { name: "Thread class", options: opts(ANSI_THREAD_CLASSES), default: "2B".into() }),
-        TABLE_ISO_THREAD_CLASS if path.is_empty() => Some(LevelInfo { name: "Thread class", options: opts(ISO_THREAD_CLASSES), default: "6H".into() }),
-        TABLE_EXTERNAL_THREAD => thread_level(path),
-        _ => None,
-    }
+    let (Entry::Level(l), _) = walk(table, path)? else { return None };
+    let options: Vec<Opt> = l.entries.iter().map(|(k, _)| (k.clone(), k.clone())).collect();
+    // A level without a default (Hole type, Standard) starts on its first option.
+    let default = l.default.clone().or_else(|| options.first().map(|o| o.0.clone()))?;
+    Some(LevelInfo { name: &l.name, options, default })
 }
 
 /// Options of the level that follows `path` in the generic hole table
@@ -693,14 +353,8 @@ pub fn table_level_default(table: &str, path: &[String]) -> Option<String> {
 /// Leaf values of a complete path in the named table. Thread-class tables
 /// have no dimensional values and always return `None`.
 pub fn table_values(table: &str, path: &[String]) -> Option<HoleSpec> {
-    match table {
-        TABLE_HOLE => {
-            let (std, rest) = split_std(path)?;
-            hole_values(std, rest)
-        }
-        TABLE_ANSI_HOLE | TABLE_ANSI_HOLE_EX => hole_values(&ANSI, path),
-        TABLE_ISO_HOLE | TABLE_ISO_HOLE_EX => hole_values(&ISO, path),
-        TABLE_EXTERNAL_THREAD => thread_values(path),
+    match walk(table, path)? {
+        (Entry::Values(v), steps) => spec(v, &steps),
         _ => None,
     }
 }
@@ -744,7 +398,7 @@ pub fn default_path(table: &str) -> Vec<String> {
 /// Whether `path` is a complete, valid path of `table`.
 pub fn is_complete(table: &str, path: &[String]) -> bool {
     match table {
-        TABLE_ANSI_THREAD_CLASS | TABLE_ISO_THREAD_CLASS => path.len() == 1 && level_info(table, &[]).is_some_and(|l| l.options.iter().any(|o| o.0 == path[0])),
+        TABLE_ANSI_THREAD_CLASS | TABLE_ISO_THREAD_CLASS => path.len() == 1 && matches!(walk(table, path), Some((Entry::Leaf, _))),
         _ => table_values(table, path).is_some(),
     }
 }
@@ -791,9 +445,18 @@ pub fn hole_table_param(params: &ParamValues) -> (&'static str, &'static str) {
     }
 }
 
+/// `path` with each element as the table's option it names (see [`find`]);
+/// unknown elements are kept as they are.
+pub fn canonical_path(table: &str, path: &[String]) -> Vec<String> {
+    match walk(table, path) {
+        Some((_, steps)) => steps.iter().map(|(_, k)| k.to_string()).collect(),
+        None => path.to_vec(),
+    }
+}
+
 /// Complete a (possibly partial) table path with each level's default.
 pub fn complete_path(table: &str, path: &[String]) -> Vec<String> {
-    let mut p = path.to_vec();
+    let mut p = canonical_path(table, path);
     while let Some(d) = table_level_default(table, &p) {
         p.push(d);
         if p.len() > 16 {
@@ -851,6 +514,13 @@ pub fn apply_table_to_params(params: &mut ParamValues) -> bool {
     if let Some(v) = spec.major_diameter {
         params.set("majorDiameter", len(v));
     }
+    // Tapered pipe taps carry their depths.
+    if let Some(v) = spec.tapped_depth {
+        params.set("tappedDepthV3", len(v));
+    }
+    if let Some(v) = spec.hole_depth {
+        params.set("holeDepthV3", len(v));
+    }
     params.set("threadStandard", ParamValue::Enum(thread_standard(table, &path).into()));
     params.set("showTappedDepth", ParamValue::Bool(spec.is_threaded()));
     params.set("hasClearance", ParamValue::Bool(spec.tap_drill_diameter.is_some_and(|t| (t - spec.hole_diameter).abs() > 1e-12)));
@@ -860,10 +530,62 @@ pub fn apply_table_to_params(params: &mut ParamValues) -> bool {
 
 /// Size whose major diameter matches `diameter` (m) within `tol` (external
 /// thread auto-sizing). Returns the default path for that size.
+/// Onshape's hole edit logic for a blind tapped hole (live L49/L50): Depth,
+/// Tapped depth and Tap clearance stay linked, Depth = Tapped depth + Tap
+/// clearance × pitch. A new size sets the clearance to 0 (Depth = Tapped
+/// depth); a new Depth moves the clearance (or the tapped depth when the
+/// Depth is less than it); a new clearance moves the tapped depth; a new
+/// tapped depth moves the Depth. Returns the parameters to change.
+pub fn link_tapped_depths(prev: &ParamValues, now: &ParamValues, units: &noshape_units::UnitPrefs) -> Vec<(&'static str, ParamValue)> {
+    use noshape_units::{Dim, Quantity};
+    if !now.bool("showTappedDepth") || !now.is("endStyleV2", "BLIND") {
+        return Vec::new();
+    }
+    let (pid, table) = hole_table_param(now);
+    let Some(pitch) = table_values(table, &complete_path(table, now.lookup(pid))).and_then(|s| s.pitch).filter(|p| *p > 0.0) else { return Vec::new() };
+    let empty = std::collections::BTreeMap::<String, Quantity>::new();
+    let val = |v: &ParamValues, id: &str, dim: Dim| -> Option<f64> {
+        let e = v.expr(id)?;
+        e.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&e.text, dim, units, &empty).ok().map(|q| q.value))
+    };
+    let (Some(depth), Some(tapped), Some(clear)) = (val(now, "holeDepthV3", Dim::LENGTH), val(now, "tappedDepthV3", Dim::LENGTH), val(now, "tapClearance", Dim::UNITLESS)) else { return Vec::new() };
+    let changed = |id: &str, dim: Dim| match (val(prev, id, dim), val(now, id, dim)) {
+        (Some(a), Some(b)) => (a - b).abs() > 1e-12,
+        _ => false,
+    };
+    let len = |m: f64| ParamValue::Expr(ExprValue::new(noshape_units::format_quantity(Quantity::new(m.max(0.0), Dim::LENGTH), units)));
+    let count = |c: f64| ParamValue::Expr(ExprValue::new(noshape_units::format_number(c.max(0.0), 6)));
+    let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    if prev.lookup(pid) != now.lookup(pid) {
+        let mut out = Vec::new();
+        if !close(clear, 0.0) {
+            out.push(("tapClearance", count(0.0)));
+        }
+        if !close(depth, tapped) {
+            out.push(("holeDepthV3", len(tapped)));
+        }
+        return out;
+    }
+    if changed("holeDepthV3", Dim::LENGTH) {
+        return if depth >= tapped { vec![("tapClearance", count((depth - tapped) / pitch))] } else { vec![("tappedDepthV3", len(depth - clear * pitch))] };
+    }
+    if changed("tapClearance", Dim::UNITLESS) {
+        return vec![("tappedDepthV3", len(depth - clear * pitch))];
+    }
+    if changed("tappedDepthV3", Dim::LENGTH) {
+        return vec![("holeDepthV3", len(tapped + clear * pitch))];
+    }
+    Vec::new()
+}
+
 pub fn external_thread_for_diameter(standard_id: &str, diameter: f64, tol: f64) -> Option<Vec<String>> {
-    let std = standard(standard_id)?;
-    let s = std.sizes.iter().find(|s| (s.major * std.unit - diameter).abs() <= tol)?;
-    Some(vec![std.id.to_string(), s.name.to_string(), thread_id(std, &s.threads[0])])
+    let std = vec![standard_id.to_string()];
+    let (Entry::Level(sizes), _) = walk(TABLE_EXTERNAL_THREAD, &std)? else { return None };
+    sizes.entries.iter().find_map(|(size, _)| {
+        let path = complete_path(TABLE_EXTERNAL_THREAD, &[standard_id.to_string(), size.clone()]);
+        let major = table_values(TABLE_EXTERNAL_THREAD, &path)?.major_diameter?;
+        ((major - diameter).abs() <= tol).then_some(path)
+    })
 }
 
 #[cfg(test)]
@@ -920,7 +642,7 @@ mod tests {
         assert!(apply_table_to_params(&mut v));
         assert_eq!(v.expr("holeDiameterV3").unwrap().text, "4.2 mm");
         assert_eq!(v.expr("tapDrillDiameterV3").unwrap().text, "4.2 mm");
-        assert_eq!(v.expr("cBoreDiameterV3").unwrap().text, "10 mm");
+        assert_eq!(v.expr("cBoreDiameterV3").unwrap().text, "9.75 mm");
         assert_eq!(v.enum_("threadStandard"), "ISO");
         assert!(v.bool("showTappedDepth") && !v.bool("hasClearance") && v.bool(TABLE_SYNCED_PARAM));
         // Inch clearance hole with a fit.
@@ -939,7 +661,7 @@ mod tests {
         let m5 = values(&p(&["ISO", "Tapped", "Straight tap", "M5", "0.80 mm", "None"])).unwrap();
         assert!((m5.hole_diameter - 4.2e-3).abs() < 1e-9);
         assert!((m5.pitch.unwrap() - 0.8e-3).abs() < 1e-12);
-        assert!((m5.cbore_diameter.unwrap() - 10e-3).abs() < 1e-9);
+        assert!((m5.cbore_diameter.unwrap() - 9.75e-3).abs() < 1e-9);
         let q = values(&p(&["ANSI", "Tapped", "Straight tap", "1/4", "20 tpi", "Close"])).unwrap();
         assert!((q.hole_diameter - 0.257 * IN).abs() < 1e-9);
         assert!((q.tap_drill_diameter.unwrap() - 0.201 * IN).abs() < 1e-9);
@@ -948,5 +670,39 @@ mod tests {
         let ext = external_thread_for_diameter("ISO", 8e-3, 1e-6).unwrap();
         assert_eq!(ext, p(&["ISO", "M8", "1.25 mm"]));
         assert!(table_values(TABLE_EXTERNAL_THREAD, &ext).unwrap().minor_diameter.unwrap() < 8e-3);
+    }
+
+    /// Live L58: the dropdowns list the whole standard in Onshape's order.
+    #[test]
+    fn lists_in_live_order() {
+        let ids = |t: &str, path: &[&str]| table_levels(t, &p(path)).into_iter().map(|o| o.0).collect::<Vec<_>>();
+        assert_eq!(ids(TABLE_ANSI_HOLE_EX, &[]), p(&["Drilled", "Clearance", "Tapped", "PEM®"]));
+        assert_eq!(ids(TABLE_ANSI_HOLE, &[]), p(&["Drilled", "Clearance", "Tapped"]));
+        let sizes = ids(TABLE_ISO_HOLE, &["Tapped", "Straight tap"]);
+        assert_eq!(sizes[..8], p(&["M1", "M1.1", "M1.2", "M1.4", "M1.6", "M1.8", "M2", "M2.2"]));
+        assert_eq!(sizes.len(), 42);
+        assert_eq!(sizes.last().unwrap(), "M68");
+        assert_eq!(ids(TABLE_ISO_HOLE, &["Tapped", "Straight tap", "M6"]), p(&["0.75 mm (Fine)", "1.00 mm (Coarse)"]));
+        assert_eq!(default_path(TABLE_ISO_HOLE_EX).len(), 2);
+        assert_eq!(complete_path(TABLE_ISO_HOLE, &p(&["Tapped", "Straight tap", "M6"]))[3], "1.00 mm (Coarse)");
+        let ansi = ids(TABLE_ANSI_HOLE, &["Tapped", "Straight tap"]);
+        assert_eq!(ansi[..12], p(&["#0", "#1", "#2", "#3", "#4", "#5", "#6", "#8", "#10", "#12", "1/4", "5/16"]));
+        assert!(ansi.contains(&"1 1/16".to_string()) && ansi.last().unwrap() == "6");
+        assert_eq!(ids(TABLE_ANSI_HOLE, &["Tapped", "Straight tap", "1/4"]), p(&["20 tpi (UNC)", "24 tpi", "27 tpi", "28 tpi (UNF)", "32 tpi (UNEF)", "36 tpi", "40 tpi", "48 tpi", "56 tpi"]));
+        let drills = ids(TABLE_ANSI_HOLE, &["Drilled"]);
+        assert_eq!(drills[..3], p(&["#80 (0.0135)", "#79 (0.0145)", "1/64 (0.015625)"]));
+        let at = drills.iter().position(|d| d == "1/4 (0.25)").unwrap();
+        assert_eq!(drills[at - 1..at + 3], p(&["D (0.246)", "1/4 (0.25)", "E (0.25)", "F (0.257)"]));
+        assert_eq!(drills.last().unwrap(), "1 (1.0)");
+        let metric = ids(TABLE_ISO_HOLE, &["Drilled"]);
+        assert_eq!(metric[..3], p(&["0.05", "0.1", "0.2"]));
+        let ten = metric.iter().position(|d| d == "10").unwrap();
+        assert_eq!(metric[ten + 1], "10.5");
+        // Paths saved with the bare pitch still resolve.
+        assert_eq!(table_values(TABLE_ISO_HOLE, &p(&["Tapped", "Straight tap", "M6", "1.00 mm", "None"])), table_values(TABLE_ISO_HOLE, &p(&["Tapped", "Straight tap", "M6", "1.00 mm (Coarse)", "None"])));
+        let m6 = table_values(TABLE_ISO_HOLE, &p(&["Tapped", "Straight tap", "M6", "0.75 mm (Fine)", "None"])).unwrap();
+        assert!((m6.pitch.unwrap() - 0.75e-3).abs() < 1e-12 && (m6.tap_drill_diameter.unwrap() - 5.25e-3).abs() < 1e-9);
+        let d = table_values(TABLE_ANSI_HOLE, &p(&["Drilled", "1/64 (0.015625)"])).unwrap();
+        assert!((d.hole_diameter - IN / 64.0).abs() < 1e-12 && d.pitch.is_none());
     }
 }

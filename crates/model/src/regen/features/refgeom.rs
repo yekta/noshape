@@ -325,11 +325,18 @@ pub fn point(ev: &mut EvalCtx) -> FResult<()> {
 /// Composite part: groups the selected bodies into one compound body that
 /// keeps every constituent's face, edge and vertex names.
 pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
+    // Live L36: the empty field is marked.
     let idx = ev.resolve_bodies(ev.query("bodies"));
     if idx.is_empty() {
-        return err("Select entities to create a composite part.");
+        return crate::regen::eval::err_at(&["bodies"], "Select entities to create a composite part.");
     }
     let closed = ev.bool("closed");
+    // Live L36: a part inside a closed composite (not the whole composite)
+    // can't go into another closed composite.
+    let in_closed = |id: &BodyId| ev.ctx.bodies.iter().any(|b| b.composite.as_ref().is_some_and(|c| c.closed && c.members.contains(id)));
+    if closed && ev.query("bodies").iter().any(|r| matches!(r, Reference::Body(id) if in_closed(id))) {
+        return err("Cannot create a closed composite part that partially overlaps another composite part.");
+    }
     make_composite(ev, &idx, closed, 0)
 }
 

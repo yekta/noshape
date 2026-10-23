@@ -417,9 +417,19 @@ impl Render for ReleasePrefsView {
             v_flex()
                 .pl(px(15.))
                 .pt(px(8.))
-                .child(toggle("rm-watermark", "Show watermark for drawings", e.show_watermark, |s| s.show_watermark = !s.show_watermark, cx))
-                .child(toggle("rm-watermark-unmanaged", "Hide watermark for drawings that are not revision managed", e.hide_watermark_unmanaged, |s| s.hide_watermark_unmanaged = !s.hide_watermark_unmanaged, cx))
-                .child(h_flex().pt(px(8.)).child(os::primary_button("rm-edit-watermarks", "Edit watermarks").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.edit_watermarks(window, cx))))),
+                // Turning watermarks off also clears the second option (live).
+                .child(toggle("rm-watermark", "Show watermark for drawings", e.show_watermark, |s| {
+                    s.show_watermark = !s.show_watermark;
+                    if !s.show_watermark {
+                        s.hide_watermark_unmanaged = false;
+                    }
+                }, cx))
+                // Live (bundle): the second option only shows while watermarks
+                // are on, and Edit watermarks is disabled without them.
+                .when(e.show_watermark, |d| {
+                    d.child(toggle("rm-watermark-unmanaged", "Hide watermark for drawings that are not revision managed", e.hide_watermark_unmanaged, |s| s.hide_watermark_unmanaged = !s.hide_watermark_unmanaged, cx))
+                })
+                .child(h_flex().pt(px(8.)).child(os::primary_button("rm-edit-watermarks", "Edit watermarks").disabled(!e.show_watermark).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.edit_watermarks(window, cx))))),
         );
 
         // ---- Release conditions

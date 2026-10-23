@@ -260,11 +260,7 @@ fn shell_is_valid_and_real_or_fails() {
             let mut t2 = T { ps: t.ps.clone(), units: t.units, reg: Regenerator::new() };
             let s = t2.add("shell", &[("entities", q(vec![top_face.clone()])), ("thickness", e(th))]);
             let (st, msg) = t2.status(s);
-            if chamfer && st == FeatureStatus::Error {
-                // OCCT can't shell this one (Onshape can); never a silent wrong result.
-                assert_eq!(msg.as_deref(), Some("Could not shell part with selections."));
-                continue;
-            }
+            // Onshape shells both (kernel_robustness::shell_matches_onshape_volumes S2).
             assert_eq!(st, FeatureStatus::Ok, "chamfer={chamfer} {th}: {msg:?}");
             let r = t2.regen();
             let shape = &r.context.bodies[0].shape;
