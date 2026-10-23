@@ -220,7 +220,7 @@ fn vertex_at(r: &RegenResult, p: DVec3) -> Reference {
 /// (8535.0418 mm³, 23 faces: the bends run into the corner and end in
 /// ruled faces 0.02 mm apart across the diagonal).
 #[test]
-#[ignore = "in progress (fs): closed corner gives 8541.25 / 39 faces"]
+#[ignore = "in progress (fs): closed corner gives 8541.21 / 35 faces (bend cylinders r2 as live; the corner cut leaves faces at x = 0.02)"]
 fn closed_corner_matches_live() {
     let mut s = g34();
     let r = s.ok();

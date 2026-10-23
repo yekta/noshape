@@ -467,9 +467,11 @@ struct WrappedCut {
 enum CutShape {
     /// A round relief: the circle centred `along` from the vertex, mid-allowance.
     Round { along: f64, radius: f64 },
-    /// A closed corner (live G34a): the bend runs to the square's diagonal,
-    /// from `plate_end` at the plate's side to `flange_end` at the flange's.
-    Closed { plate_end: f64, flange_end: f64 },
+    /// A closed corner (live G34a): the bend of `angle` runs to the
+    /// square's diagonal, from `plate_end` at the plate's side to
+    /// `flange_end` at the flange's, by the sine of the angle bent so far
+    /// (live's bend cylinder areas: 186.1572 / 372.3144 mm²).
+    Closed { plate_end: f64, flange_end: f64, angle: f64 },
 }
 
 impl WrappedCut {
@@ -479,7 +481,11 @@ impl WrappedCut {
                 let half = (radius * radius - (w - self.ba * 0.5).powi(2)).max(0.0).sqrt();
                 (along - half, along + half)
             }
-            CutShape::Closed { plate_end, flange_end } => (-reach, plate_end + (flange_end - plate_end) * (w / self.ba)),
+            CutShape::Closed { plate_end, flange_end, angle } => {
+                let t = (w / self.ba).clamp(0.0, 1.0);
+                let f = if angle <= std::f64::consts::FRAC_PI_2 + 1e-9 { (t * angle).sin() / angle.sin() } else { t };
+                (-reach, plate_end + (flange_end - plate_end) * f)
+            }
         }
     }
 }
@@ -543,8 +549,9 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
                 let gap = def.clearance * std::f64::consts::FRAC_1_SQRT_2;
                 extends.push((e1, v, def.clearance));
                 extends.push((e2, v, def.clearance));
-                wraps.push(WrappedCut { edge: e1, v, plate: p, ba: b1, shape: CutShape::Closed { plate_end: s2 + gap, flange_end: def.clearance } });
-                wraps.push(WrappedCut { edge: e2, v, plate: p, ba: b2, shape: CutShape::Closed { plate_end: s1 + gap, flange_end: def.clearance } });
+                let angle = |e: usize| bend_of(e).map_or(std::f64::consts::FRAC_PI_2, |b| b.3.angle);
+                wraps.push(WrappedCut { edge: e1, v, plate: p, ba: b1, shape: CutShape::Closed { plate_end: s2 + gap, flange_end: def.clearance, angle: angle(e1) } });
+                wraps.push(WrappedCut { edge: e2, v, plate: p, ba: b2, shape: CutShape::Closed { plate_end: s1 + gap, flange_end: def.clearance, angle: angle(e2) } });
                 let reach = s1 + s2 + gap;
                 prism(&mut cuts, p, &[v - (d1 + d2) * reach, v + d1 * (2.0 * reach) - d2 * reach, v - d1 * reach + d2 * (2.0 * reach)], vi)?;
                 continue;
