@@ -810,15 +810,37 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let tools = super::query::evaluate_refs(i, &cx, &field(&a, "tools"))?;
     let targets = super::query::evaluate_refs(i, &cx, &field(&a, "targets"))?;
-    let shapes = |refs: &[crate::reference::Reference]| -> Vec<(crate::reference::Reference, k::Shape)> {
+    // Per face, as live: a body's faces, each with its body (std Tab's
+    // editing logic reads `tool`'s plane).
+    let shapes = |refs: &[crate::reference::Reference]| -> Vec<(crate::reference::Reference, Option<crate::reference::Reference>, k::Shape)> {
         let st = cx.state.lock();
         let q = QueryCx::new(&st);
-        refs.iter().flat_map(|r| q.from_ref(r).into_iter().filter_map(|e| q.shape(&e)).map(move |s| (r.clone(), s))).collect()
+        let mut out = Vec::new();
+        for r in refs {
+            for e in q.from_ref(r) {
+                match e {
+                    Ent::Body(b) => {
+                        let body = &st.ctx.bodies[b];
+                        for (fi, f) in body.shape.faces().into_iter().enumerate() {
+                            out.push((q.to_ref(&Ent::Face(b, fi)), Some(r.clone()), f));
+                        }
+                    }
+                    _ => {
+                        let owner = q.owner(&e).map(|o| q.to_ref(&o));
+                        if let Some(s) = q.shape(&e) {
+                            out.push((r.clone(), owner, s));
+                        }
+                    }
+                }
+            }
+        }
+        out
     };
     let (ts, gs) = (shapes(&tools), shapes(&targets));
+    let one = |r: &crate::reference::Reference| super::query::query_of_refs(&cx, std::slice::from_ref(r));
     let mut out = Vec::new();
-    for (tr, t) in &ts {
-        for (gr, g) in &gs {
+    for (tr, tb, t) in &ts {
+        for (gr, gb, g) in &gs {
             if t.is_same(g) {
                 continue;
             }
@@ -831,7 +853,14 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 _ => "ABUT_NO_CLASS",
             };
             let ty = std_enum("clashtype.gen.fs", "ClashType", kind).unwrap_or_else(|| Value::str(kind));
-            out.push(Value::map_from([("type", ty), ("tool", super::query::query_of_refs(&cx, std::slice::from_ref(tr))), ("target", super::query::query_of_refs(&cx, std::slice::from_ref(gr)))]));
+            let mut m = vec![("type", ty), ("tool", one(tr)), ("target", one(gr))];
+            if let Some(b) = tb {
+                m.push(("toolBody", one(b)));
+            }
+            if let Some(b) = gb {
+                m.push(("targetBody", one(b)));
+            }
+            out.push(Value::map_from(m));
         }
     }
     Ok(Value::array(out))

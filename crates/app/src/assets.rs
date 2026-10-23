@@ -102,8 +102,7 @@ fn dark_icon(name: &str, light: Cow<'static, [u8]>) -> Cow<'static, [u8]> {
 }
 
 /// `svg` with the hex colours Onshape themes replaced by their dark values.
-/// Masks (`<mask>…</mask>`) keep their colours: their black and white are
-/// coverage, not paint.
+/// `<mask>` contents keep theirs: their black is "cut out", not ink.
 fn flip_themed_colors(svg: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(svg.len());
     let mut i = 0;
@@ -150,9 +149,12 @@ mod tests {
         let svg = br##"<path fill="#333" stroke="#333333"/><path fill="#1651B0" stroke="#3333aa"/><g fill="#999"/>"##;
         let out = String::from_utf8(super::flip_themed_colors(svg)).unwrap();
         assert_eq!(out, r##"<path fill="#ffffff" stroke="#ffffff"/><path fill="#3e94ff" stroke="#3333aa"/><g fill="#999"/>"##);
-        // A mask's black cuts, it isn't ink.
-        let masked = br##"<mask id="m"><circle fill="#fff"/><path stroke="#000"/></mask><rect fill="#333333" mask="url(#m)"/>"##;
-        let out = String::from_utf8(super::flip_themed_colors(masked)).unwrap();
-        assert_eq!(out, r##"<mask id="m"><circle fill="#fff"/><path stroke="#000"/></mask><rect fill="#ffffff" mask="url(#m)"/>"##);
+    }
+
+    #[test]
+    fn flip_themed_colors_keeps_mask_cutouts() {
+        let svg = br##"<mask id="m"><rect fill="#fff"/><path fill="#000"/></mask><circle fill="#333" mask="url(#m)"/>"##;
+        let out = String::from_utf8(super::flip_themed_colors(svg)).unwrap();
+        assert_eq!(out, r##"<mask id="m"><rect fill="#fff"/><path fill="#000"/></mask><circle fill="#ffffff" mask="url(#m)"/>"##);
     }
 }
