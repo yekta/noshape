@@ -156,6 +156,20 @@ pub(crate) struct PatternSession {
     pub scope_refs: Vec<noshape_model::assembly::ScopeEntity>,
     /// Matches found (part pattern / replicate) or why there are none.
     pub preview: Option<Result<usize, String>>,
+    /// Mirror: live's Mirror strategy per instance (absent: Transform, Auto
+    /// position) and whether its dialog is open.
+    pub mirror_rows: HashMap<InstanceId, MirrorRow>,
+    pub strategy_open: bool,
+}
+
+/// One row of live's Mirror strategy table.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct MirrorRow {
+    /// Mirror action Derived (else Transform).
+    pub derived: bool,
+    pub placement: noshape_model::assembly::MirrorPlacement,
+    /// Update has made the Derived instance's mirrored part.
+    pub created: bool,
 }
 
 pub(crate) struct ManipValue {
@@ -966,6 +980,8 @@ impl AssemblyView {
             scope: None,
             scope_refs: Vec::new(),
             preview: None,
+            mirror_rows: HashMap::new(),
+            strategy_open: false,
         }
     }
 
@@ -1036,9 +1052,16 @@ impl AssemblyView {
                 s.equal = *equal_spacing;
                 s.centered = *centered;
             }
-            PatternKind::Mirror { plane, handed } => {
+            PatternKind::Mirror { plane, handed, derived, placement } => {
                 s.axis = Some(plane.clone());
-                s.second = *handed;
+                for id in &s.seeds {
+                    let row = MirrorRow {
+                        derived: *handed || derived.contains(id),
+                        placement: placement.iter().find(|(i, _)| i == id).map(|(_, p)| *p).unwrap_or_default(),
+                        created: true,
+                    };
+                    s.mirror_rows.insert(*id, row);
+                }
             }
             PatternKind::PartPattern { mate } => s.mate = Some(*mate),
             PatternKind::Replicate { mate, all_instances, scope, scope_refs } => {
@@ -1080,7 +1103,15 @@ impl AssemblyView {
                 PatternKind::Linear { direction, distance: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, second, centered: s.centered }
             }
             PatternDialogKind::Circular => PatternKind::Circular { axis: s.axis.clone().ok_or("Select the axis of pattern")?, angle: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, centered: s.centered },
-            PatternDialogKind::Mirror => PatternKind::Mirror { plane: s.axis.clone().ok_or("Select the mirror plane (planar face or mate connector)")?, handed: s.second },
+            PatternDialogKind::Mirror => {
+                let rows: Vec<(InstanceId, MirrorRow)> = s.seeds.iter().map(|id| (*id, s.mirror_rows.get(id).copied().unwrap_or_default())).collect();
+                PatternKind::Mirror {
+                    plane: s.axis.clone().ok_or("Select the mirror plane (planar face or mate connector)")?,
+                    handed: false,
+                    derived: rows.iter().filter(|(_, r)| r.derived && r.created).map(|(id, _)| *id).collect(),
+                    placement: rows.iter().filter(|(_, r)| r.placement != noshape_model::assembly::MirrorPlacement::Auto).map(|(id, r)| (*id, r.placement)).collect(),
+                }
+            }
             PatternDialogKind::PartPattern => PatternKind::PartPattern { mate: s.mate.ok_or("The seed needs exactly one mate to follow (or select the mate in the list)")? },
             PatternDialogKind::Replicate => PatternKind::Replicate {
                 mate: s.mate.ok_or("The seed needs exactly one mate to match (or select the mate in the list)")?,
@@ -1206,6 +1237,7 @@ impl AssemblyView {
             }
             self.update_pattern_preview(cx);
         }
+        let strategy = self.render_mirror_strategy(cx);
         let pal = p();
         let Some(s) = &self.pattern else { return div().into_any_element() };
         let kind = s.kind;
@@ -1304,6 +1336,7 @@ impl AssemblyView {
         let count_error = regen_error.as_deref().is_some_and(|e| e.starts_with(' '));
         let title_tip = regen_error.as_ref().map(|e| format!("{} did not regenerate properly: {e}", s.name));
         let valid = regen_error.is_none()
+            && !mirror_pending(s)
             && !s.seeds.is_empty()
             && match kind {
                 PatternDialogKind::Linear | PatternDialogKind::Circular | PatternDialogKind::Mirror => s.axis.is_some(),
@@ -1392,11 +1425,13 @@ impl AssemblyView {
                 }
             }
             PatternDialogKind::Mirror => {
-                let handed = s.second;
+                // Live (behaviours "skb (10-23 14:30)"): the reference
+                // button opens the Mirror strategy dialog; red while a Derived
+                // instance waits for Update, blue-bordered while it is open.
+                let pending = mirror_pending(s);
+                let open = s.strategy_open;
                 body = body
                     .child(div().px(px(3.)).pt(px(5.)).child(axis_box(self, "pat-axis", &s.axis, "Mirror plane", 0, cx)))
-                    // Help assembly-mirror-01: "Mirror strategy…" (which parts get
-                    // opposite-handed copies).
                     .child(
                         h_flex()
                             .id("mir-strategy")
@@ -1408,27 +1443,29 @@ impl AssemblyView {
                             .px(px(2.))
                             .gap(px(4.))
                             .border_1()
-                            .border_color(pal.border)
+                            .border_color(if pending { pal.error } else if open { pal.accent } else { pal.border })
+                            .when(pending, |d| d.bg(pal.error_fill).text_color(pal.text_invalid))
                             .rounded(px(2.))
                             .cursor_pointer()
                             .hover(|d| d.bg(pal.panel_hover))
                             .tooltip(crate::ui::tooltip("Select how instances are mirrored."))
                             .child(crate::assets::icon("mirror", 20., cx))
-                            .child(div().text_size(px(14.)).child("Mirror strategy…")),
-                    )
-                    .child(os::checkbox("mir-handed", "Create mirrored (opposite-handed) parts", handed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        if let Some(p) = &mut this.pattern {
-                            p.second = !p.second;
-                        }
-                        cx.notify();
-                    })));
+                            .child(div().text_size(px(14.)).child("Mirror strategy…"))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                if let Some(p) = &mut this.pattern {
+                                    p.strategy_open = !p.strategy_open;
+                                }
+                                cx.notify();
+                            })),
+                    );
             }
             PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {
                 let mate_rows: Vec<AnyElement> = s.mate.and_then(|m| self.assembly(cx).and_then(|a| a.mate(m).map(|x| x.name.clone()))).map(|n| vec![os::query_row("pat-mate-v", n).into_any_element()]).unwrap_or_default();
                 // Live: once the target scope is set, a missing mate is this
                 // field's error (its label's tooltip).
                 let mate_tip = (kind == PatternDialogKind::Replicate && !s.scope_refs.is_empty() && s.mate.is_none()).then(|| SharedString::from("Missing mate to be matched."));
-                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("pat-mate", "Mate to be matched", mate_tip, false, mate_rows)));
+                let mate_err = mate_tip.is_some();
+                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("pat-mate", "Mate to be matched", mate_tip, false, mate_rows).when(mate_err, os::query_box_error)));
                 if kind == PatternDialogKind::Replicate {
                     // Live ("qa5 assembly" 5, help: Replicate 6–7): the match
                     // scope, then "Parts to find match in" (red while empty).
@@ -1457,7 +1494,7 @@ impl AssemblyView {
                     let active = s.active == Some(2);
                     // Live (qa5 A19): empty, the field is red (label and border).
                     let scope_tip = s.scope_refs.is_empty().then(|| SharedString::from("A target scope must be selected."));
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", "Parts to find match in", scope_tip, active, rows).when(s.scope_refs.is_empty(), |d| d.text_color(pal.text_invalid).border_color(pal.error)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", "Parts to find match in", scope_tip, active, rows).when(s.scope_refs.is_empty(), os::query_box_error).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }
@@ -1555,6 +1592,9 @@ impl AssemblyView {
                     ),
             )
             .child(body)
+            // Live: the Mirror strategy dialog lies over the feature dialog.
+            .relative()
+            .children(strategy)
             .into_any_element()
     }
 
@@ -1696,6 +1736,174 @@ impl AssemblyView {
                         input.update(cx, |q, cx| q.commit_now(window, cx));
                     }
                 }))
+                .into_any_element(),
+        )
+    }
+
+    /// Live's "Mirror strategy" dialog (behaviours "skb (10-23 14:30)",
+    /// dom/skb1430-mirror-strategy*.html): 781 px over the feature dialog,
+    /// a table Instance | Source | Symmetry | Mirror action | Mirror
+    /// reference | Placement type (columns 140 / 80 / 80 / 160 / 180 / 140,
+    /// `#aaa` grid, header `#eaeaea`, read-only cells `#f5f5f5`, 33 px rows),
+    /// then the status and Update.
+    fn render_mirror_strategy(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        use noshape_model::assembly::MirrorPlacement;
+        let s = self.pattern.as_ref().filter(|p| p.kind == PatternDialogKind::Mirror && p.strategy_open)?;
+        let pal = p();
+        let asm = self.assembly(cx)?;
+        let doc = &self.doc.read(cx).session.doc;
+        let grid = rgb(0xaaaaaa);
+        const WIDTHS: [f32; 6] = [140., 80., 80., 160., 180., 140.];
+        let cell = |k: usize, readonly: bool| div().w(px(WIDTHS[k])).h_full().flex_none().flex().items_center().px(px(6.)).border_r_1().border_color(grid).when(readonly, |d| d.bg(rgb(0xf5f5f5))).when(!readonly, |d| d.bg(rgb(0xffffff)));
+        let header = h_flex().h(px(33.)).bg(rgb(0xeaeaea)).border_b_1().border_color(grid).children(
+            ["Instance", "Source", "Symmetry", "Mirror action", "Mirror reference", "Placement type"]
+                .iter()
+                .enumerate()
+                .map(|(k, t)| div().w(px(WIDTHS[k])).h_full().flex_none().flex().items_center().justify_center().border_r_1().border_color(grid).text_size(px(12.)).font_weight(FontWeight::SEMIBOLD).child(*t)),
+        );
+        let mut table = v_flex().border_l_1().border_color(grid).child(header);
+        for (k, id) in s.seeds.iter().enumerate() {
+            let Some(inst) = asm.instance(*id) else { continue };
+            let row = s.mirror_rows.get(id).copied().unwrap_or_default();
+            let studio = match &inst.source {
+                InstanceSource::Part { studio, .. } | InstanceSource::MirroredPart { studio, .. } => doc.tab(*studio).map(|t| t.name.clone()),
+                _ => None,
+            }
+            .unwrap_or_default();
+            let id = *id;
+            let view = cx.entity().downgrade();
+            let action = os::select_field(SharedString::from(format!("ms-act-{k}")), vec!["Transform".into(), "Derived".into()], usize::from(row.derived), {
+                let view = view.clone();
+                move |i, _, cx| {
+                    if let Some(v) = view.upgrade() {
+                        v.update(cx, |this, cx| {
+                            if let Some(p) = &mut this.pattern {
+                                let r = p.mirror_rows.entry(id).or_default();
+                                r.derived = i == 1;
+                                r.created = false;
+                            }
+                            cx.notify();
+                        });
+                    }
+                }
+            });
+            let reference: AnyElement = match (row.derived, row.created) {
+                (true, false) => h_flex().gap(px(4.)).child(crate::assets::icon("performance-info", 16., cx)).child("Create new instance").into_any_element(),
+                (true, true) => h_flex().gap(px(4.)).text_color(pal.accent).child(crate::assets::icon("tab-part-studio", 16., cx)).child(format!("{studio}-Mirrored")).into_any_element(),
+                _ => div().into_any_element(),
+            };
+            let placement: AnyElement = if row.derived {
+                div().child(row.placement.label()).into_any_element()
+            } else {
+                let view = view.clone();
+                os::select_field(SharedString::from(format!("ms-pl-{k}")), MirrorPlacement::ALL.iter().map(|p| p.label().to_string()).collect(), MirrorPlacement::ALL.iter().position(|p| *p == row.placement).unwrap_or(0), move |i, _, cx| {
+                    if let Some(v) = view.upgrade() {
+                        v.update(cx, |this, cx| {
+                            if let Some(p) = &mut this.pattern {
+                                p.mirror_rows.entry(id).or_default().placement = MirrorPlacement::ALL[i];
+                            }
+                            cx.notify();
+                        });
+                    }
+                })
+                .into_any_element()
+            };
+            table = table.child(
+                h_flex()
+                    .h(px(33.))
+                    .border_b_1()
+                    .border_color(grid)
+                    .text_size(px(13.33))
+                    .child(cell(0, true).justify_center().gap(px(4.)).child(crate::assets::icon("part", 16., cx)).child(inst.name.clone()))
+                    // Live: the source workspace ("Main").
+                    .child(cell(1, true).justify_center().gap(px(4.)).child(crate::assets::icon("branch", 14., cx)).child("Main"))
+                    // Live: the part's detected symmetry (UNCONFIRMED for
+                    // asymmetric parts: asked, REQUESTS "skb (10-23 15:30)").
+                    .child(cell(2, true).id(SharedString::from(format!("ms-sym-{k}"))).justify_center().tooltip(crate::ui::tooltip("Symmetric")).child(crate::assets::icon("symmetric", 18., cx)))
+                    .child(cell(3, false).child(div().w_full().child(action)))
+                    .child(cell(4, true).child(reference))
+                    .child(cell(5, !row.derived).when(!row.derived, |d| d.bg(rgb(0xffffff))).child(div().w_full().child(placement))),
+            );
+        }
+        let pending = s.seeds.iter().filter(|id| s.mirror_rows.get(id).is_some_and(|r| r.derived && !r.created)).count();
+        // Live: "1 instance needs to be created." (the plural form is
+        // assumed: "2 instances need to be created.").
+        let status: AnyElement = if pending > 0 {
+            h_flex()
+                .gap(px(6.))
+                .child(crate::assets::icon("performance-info", 16., cx))
+                .child(if pending == 1 { "1 instance needs to be created.".to_string() } else { format!("{pending} instances need to be created.") })
+                .into_any_element()
+        } else {
+            div().child("All instances are updated.").into_any_element()
+        };
+        Some(
+            v_flex()
+                .id("mirror-strategy")
+                .occlude()
+                .absolute()
+                .top_0()
+                .left_0()
+                .w(px(781.))
+                .bg(pal.dialog_bg)
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .text_color(pal.text)
+                .child(
+                    h_flex()
+                        .h(px(29.))
+                        .border_b_1()
+                        .border_color(rgb(0xd7d7d7))
+                        .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mirror strategy"))
+                        .child(
+                            div()
+                                .id("ms-close")
+                                .px(px(8.))
+                                .text_size(px(16.67))
+                                .text_color(rgb(0x999999))
+                                .cursor_pointer()
+                                .child("×")
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(p) = &mut this.pattern {
+                                        p.strategy_open = false;
+                                    }
+                                    cx.notify();
+                                })),
+                        ),
+                )
+                .child(table)
+                .child(
+                    h_flex()
+                        .h(px(45.))
+                        .px(px(6.))
+                        .text_size(px(13.33))
+                        .child(div().flex_1().child(status))
+                        .child(
+                            div()
+                                .id("ms-update")
+                                .h(px(33.))
+                                .px(px(12.))
+                                .flex()
+                                .items_center()
+                                .rounded(px(4.))
+                                .bg(pal.accent)
+                                .text_color(rgb(0xffffff))
+                                .text_size(px(14.))
+                                .when(pending == 0, |d| d.opacity(0.42))
+                                .when(pending > 0, |d| d.cursor_pointer())
+                                .child("Update")
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(p) = &mut this.pattern {
+                                        for r in p.mirror_rows.values_mut() {
+                                            if r.derived {
+                                                r.created = true;
+                                            }
+                                        }
+                                    }
+                                    this.update_pattern_preview(cx);
+                                    cx.notify();
+                                })),
+                        ),
+                )
                 .into_any_element(),
         )
     }
@@ -4274,4 +4482,10 @@ fn docs_root() -> std::path::PathBuf {
 
 fn canon_dir(p: &std::path::Path) -> std::path::PathBuf {
     p.canonicalize().unwrap_or_else(|_| p.to_path_buf())
+}
+
+/// A Derived row of live's Mirror strategy still waiting for Update (the
+/// dialog's Mirror strategy… and title are red until then).
+fn mirror_pending(s: &PatternSession) -> bool {
+    s.kind == PatternDialogKind::Mirror && s.seeds.iter().any(|id| s.mirror_rows.get(id).is_some_and(|r| r.derived && !r.created))
 }

@@ -575,6 +575,36 @@ impl ExplodeStep {
     }
 }
 
+/// Live's Mirror strategy › Placement type (dom/skb1430-mirror-strategy).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirrorPlacement {
+    #[default]
+    Auto,
+    BoxXY,
+    BoxYZ,
+    BoxZX,
+    OriginXY,
+    OriginYZ,
+    OriginZX,
+}
+
+impl MirrorPlacement {
+    /// Live's dropdown order.
+    pub const ALL: [MirrorPlacement; 7] = [Self::Auto, Self::BoxXY, Self::BoxYZ, Self::BoxZX, Self::OriginXY, Self::OriginYZ, Self::OriginZX];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "Auto position",
+            Self::BoxXY => "Bounding box XY",
+            Self::BoxYZ => "Bounding box YZ",
+            Self::BoxZX => "Bounding box ZX",
+            Self::OriginXY => "Origin XY",
+            Self::OriginYZ => "Origin YZ",
+            Self::OriginZX => "Origin ZX",
+        }
+    }
+}
+
 /// Instance pattern kinds.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PatternKind {
@@ -602,13 +632,21 @@ pub enum PatternKind {
         #[serde(default)]
         centered: bool,
     },
-    /// Mirror across the XY plane of a mate connector. By default copies are
-    /// placed with a rigid transform (symmetric parts); with `handed`, part
-    /// copies use a mirrored version of the part ([`InstanceSource::MirroredPart`]).
+    /// Mirror across the XY plane of a mate connector. Live's Mirror
+    /// strategy, per instance to mirror: Mirror action Transform (a rigid
+    /// copy of the same part; symmetric parts) or Derived (a mirrored
+    /// version of the part, [`InstanceSource::MirroredPart`]), and a
+    /// Placement type. `handed`: older documents' "every instance Derived".
     Mirror {
         plane: MateConnectorRef,
         #[serde(default)]
         handed: bool,
+        /// Seeds whose Mirror action is Derived.
+        #[serde(default)]
+        derived: Vec<InstanceId>,
+        /// Seeds whose Placement type isn't Auto position.
+        #[serde(default)]
+        placement: Vec<(InstanceId, MirrorPlacement)>,
     },
     /// Follow a Part Studio pattern: the seed's mate is re-created on every
     /// patterned copy of its target geometry.
@@ -1121,12 +1159,12 @@ impl Assembly {
         let wanted: Vec<(InstanceId, u32)> = p.seeds.iter().flat_map(|s| p.grid_indices().into_iter().map(move |i| (*s, i))).collect();
         let created = self.apply_generated(id, wanted.into_iter().map(|(s, i)| (s, i, None, None)).collect());
         // Mirror copies of handed parts use the mirrored part (and back).
-        if let PatternKind::Mirror { handed, .. } = p.kind
+        if let PatternKind::Mirror { handed, derived, .. } = &p.kind
             && let Some(p) = self.pattern(id).cloned()
         {
             for g in &p.generated {
                 let Some(seed) = self.instance(g.seed).map(|i| i.source.clone()) else { continue };
-                let want = if handed { seed.mirrored().unwrap_or(seed) } else { seed };
+                let want = if *handed || derived.contains(&g.seed) { seed.mirrored().unwrap_or(seed) } else { seed };
                 if let Some(inst) = self.instance_mut(g.instance) {
                     inst.source = want;
                 }

@@ -79,6 +79,16 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   sphere with its pole sideways (seam underneath) leaves the crown face without a seam (probe
   /root/kern-scratch/recess/r3b.cpp: mouth 4 edges, no split); aligning the seam with a mouth vertex works for
   Type VI (spline start at 0 deg) but not Type III (OCCT adds a corner patch at the seam corner).
+- **Closed mouth edge (skb, 10-23, live "skb (10-23 03:30)"):** the #8 flat countersunk Type VI recess mouth (a
+  closed B-spline, seam vertex on a lobe, tightest bend 0.063 mm) fails OCCT's 0.0508 mm fillet at x1 and x1000.
+  `features.cpp::fillet_split_closed` (first fallback of checked fillets): split each closed selected edge at the
+  middle of its range (same curve and pcurves, BRepTools_ReShape) and fillet the halves at the working scale. OCCT
+  makes ONE fillet face of it: 14 faces, the mouth one B-spline like live's OTHER (0.00134 in²). Test
+  `assembly::tests::remaining_tapping_screws_match_live` (no 13 allowance; checks the B-spline face's area).
+- **Toroidal revolutions (skb acorn crown, 10-23):** OCCT revolves an off-axis arc into a SurfaceOfRevolution;
+  `geom.cpp::surface_info` reports a revolved circle in a plane through the axis as Parasolid does: SPHERE when
+  its centre is on the axis, else TORUS with major = distance to the axis, negative for the lemon (inner) part of a
+  spindle torus (the UV-centre point decides). Test `assembly::tests::acorn_nut_crown_is_a_torus_like_live`.
 - **Shell, qa3's real bracket vs Onshape (10-23, live "kern (10-23 09:00) Shell bracket"):** 100x40x12, R5 on three
   vertical edges, Ø10 hole at (50,10). Plain bracket 1/2/2.499/3/4 mm match Onshape (1e-3 mm³; offset path exact,
   slabs within 2e-4). Two fixes in shell.cpp: (1) `by_offset` rejects an offset whose result lost one of the part's
@@ -86,9 +96,35 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   wrong one): with a 1 mm chamfer round the top OCCT's offset gave 4285 mm³ / 12 faces, now slabs give Onshape's
   7385.784 / 34. (2) `offsets_touch`: Onshape FAILS every case at exactly 2.5 mm (the hole's offset wall r + t
   touches the front wall's, axis at r + 2t); we fail the same (kept concave cylinder ∥ kept plane, to 1e-8 m, the
-  touching line on both faces). Open: at 2.501 mm our offset is 0.0029 mm³ above the exact (= Onshape's)
-  16999.92174 (slabs 7.6e-4); not from the offset tolerance; needs a dump of the model's input to reproduce.
+  touching line on both faces). 2.501 mm (resolved): OCCT's offset keeps both walls whole and overlapping where
+  they cross by less than ~its tolerance (the inner front wall a full 90 x 9.499 rectangle, the hole wall a full
+  cylinder: a self-intersecting shell, +0.0029 mm³); within 1e-5 m of touching `op_shell_solid` skips the offset
+  and the slabs trim them (7.6e-4 of the exact). The model's input and a rebuilt one differ only in face
+  orientations, which changes OCCT's offset there (17014 vs 16999.92), hence no standalone repro at first.
   Test `kernel_robustness::shell_bracket_matches_onshape`.
+- **Robustness sweep (10-23, live "kern (10-23 12:30) blend sweep", "(13:30) shell+draft sweep", "(14:15) sweep
+  4-8"):** families 1-3 match (tests `blend_sweep_matches_onshape`, `shell_draft_sweep_matches_onshape`). Fix: a
+  fillet the ball can't roll along without leaving its faces (no centre at r from both surfaces) fails with
+  Parasolid's "Unfilleted edge overlapped by fillet." (`features.cpp::fillet_overflows`, model `fillet_failed`).
+  Onshape's displayed volumes are off by its own error band in several cases where ours are exact (closed forms in
+  the tests: R3/R1 fillets cut by chamfers, the hole into an R8 fillet, D4's drafted hole). Families 4-8 open:
+  Bo3 (tangent subtract: Onshape "Boolean operation would result in non-manifold body."), Sw2 (message "Result of
+  sweep intersects itself, adjust path or profile selections."), lofts L1 (6 faces: Onshape splits the circle to
+  match the square), L2 (shape/volume), L3 (Onshape fails oblique circles at dx >= 10 over 30 mm).
+  Families 4-8 (10-23 evening, live "kern (10-23 18:00) sweep follow-up"; test
+  `kernel_robustness::sweep_4_8_matches_onshape`): Bo3 fixed in `eval.rs::boolean_into_with` (a cut / common whose
+  result has an edge on more than two faces fails, the parts stay; live: Boolean and Extrude Remove alike). Lofts:
+  `features.cpp::split_closed_sections` splits a circle section where the nearest polygon's corners point from its
+  centre (L1 45°) and pairs equal-count sections start to start, nearest corner in angle, clockwise about the loft
+  direction on a tie (L2 bodydetails: corner -> the top corner 45° clockwise; the circle keeps no vertex in Onshape,
+  ours are interior to the side faces); `natural_loft` now takes chord-length parameters (mean distance between
+  sections): L2 45413 against Onshape's 45412.22 (uniform: 45554, outside its ±54 band; G10 is symmetric, so
+  unchanged). Onshape's REST boxes (±22.653) are loose bounds; its tight box (evBox3d tight) is ±20.9433, ours ±20.9467 (live's fits a middle-section parameter of 0.45226, our mean chord gives 0.45255; Parasolid's faces are fitted, 34 x 5 poles), checked to 5e-3 mm; `solid_a.rs::oblique_circles`: two circles in parallel planes apart sideways by >= the larger radius
+  fail (L3: dx 9.999 OK, 10 fails; Ø10 top at dx 30 fails). L3 dx 5: ours the exact 9424.779, Onshape 9424.503
+  in its band [9419.257, 9429.750]. Sweep round a bend tighter than the circle (live "kern (10-23 18:40)"): the
+  message depends on the circle's start: in the bend plane "Could not create valid swept body, check input." (G1),
+  across it "Result of sweep intersects itself, adjust path or profile selections." (Sw2); turning the circle's
+  xDir 90° swaps them (`solid_a.rs::tight_bend_message`).
 - **IM4 / IM5 (qa5 pass 12-13), fixed 10-22:** g50-g46-shell1.x_t's real fault was ours: an edge on a TRIMMED_CURVE
   (133) whose basis is an intersection (38) took parm_1/parm_2, which are Parasolid's parameters of that curve, not
   of our rebuilt B-spline: the range ran off the curve and healing made it 42 km long. Edges on a rebuilt basis
