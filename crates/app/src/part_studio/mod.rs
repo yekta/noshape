@@ -3590,7 +3590,8 @@ impl PartStudioView {
                     .flex_none()
                     // A custom feature's row shows its initials box (live qa5 FS4).
                     .child(match features::get(&f.type_id).filter(|_| noshape_model::custom::is_custom(&f.type_id)) {
-                        Some(t) => crate::ui::initials_icon(t.name).when(rolled_back || suppressed || hidden, |d| d.opacity(0.5)),
+                        // A failed one's box is outlined red (live "qa5 featurescript" (6)).
+                        Some(t) => crate::ui::initials_icon(t.name).when(status == FeatureStatus::Error && !rolled_back, |d| d.border_color(pal.text_invalid)).when(rolled_back || suppressed || hidden, |d| d.opacity(0.5)),
                         None => crate::ui::tree_icon(&feature_icon(&f.type_id), rolled_back || suppressed || hidden, cx),
                     })
                     // Onshape list badges: under-defined sketch (12 px blue circle,
