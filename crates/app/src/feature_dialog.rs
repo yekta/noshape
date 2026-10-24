@@ -2358,7 +2358,13 @@ impl FeatureDialog {
                             .flex_1()
                             .min_w_0()
                             // Live: empty = 13.33 px label line + 6/5 px padding + border.
-                            .min_h(px(if empty { self.live_h(LIVE_EMPTY_FIELD) } else { 26. }))
+                            // A filled field (its caption line) carries the same
+                            // fraction (extrude-03: the rows after it step as
+                            // after an empty one).
+                            .min_h(px({
+                                let h = self.live_h(LIVE_EMPTY_FIELD);
+                                if empty { h } else { 26. }
+                            }))
                             .max_h(px(160.))
                             .overflow_y_scroll()
                             .rounded(px(2.))
@@ -2473,7 +2479,10 @@ impl FeatureDialog {
                     let mut field = v_flex()
                         .id(SharedString::from(format!("q-{path}")))
                         .flex_1()
-                        .min_h(px(if items == 0 { self.live_h(LIVE_EMPTY_FIELD) } else { 26. }))
+                        .min_h(px({
+                            let h = self.live_h(LIVE_EMPTY_FIELD);
+                            if items == 0 { h } else { 26. }
+                        }))
                         .rounded(px(2.))
                         .border_1()
                         .border_color(if active { pal.accent } else { pal.border })
