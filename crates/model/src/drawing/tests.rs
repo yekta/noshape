@@ -2379,6 +2379,51 @@ fn hole_callout_dual_block_like_onshape() {
 /// Live samples/asb-dual-2018: with dual dimensions each DIMENSION's text
 /// override is "[]\P<>" (the alternate units, then the value) and its block
 /// holds one MTEXT "\A1;[…]\P…"; angular dimensions have no dual.
+/// Gate v0.4.8 (f), live asbdd-20: a linear dual dimension's line breaks
+/// around the two-line text block (DIMGAP from the ink, ANSI and ISO, Top
+/// and Bottom, horizontal and vertical); a single value keeps it whole.
+#[test]
+fn dual_dimension_line_breaks_around_the_text() {
+    use super::format::DimText;
+    for iso in [false, true] {
+        for below in [false, true] {
+            for vertical in [false, true] {
+                let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+                g.style.iso = iso;
+                let h = g.style.dim_text;
+                let text = DimText { main: "60".into(), dual: Some("[2.36 in]".into()), dual_below: below, ..Default::default() };
+                let (p, q, o) = if vertical { ([100.0, 50.0], [100.0, 110.0], DimOrientation::Vertical) } else { ([50.0, 100.0], [110.0, 100.0], DimOrientation::Horizontal) };
+                g.linear_dimension_text(p, q, -20.0, o, &text, 1);
+                // The dimension line's pieces: along the dimension direction.
+                let ax = if vertical { 1 } else { 0 };
+                let pieces: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1 - ax] - l.points[1][1 - ax]).abs() < 1e-9 && (l.points[0][ax] - l.points[1][ax]).abs() > 1e-6).map(|l| {
+                    let (a, b) = (l.points[0][ax], l.points[1][ax]);
+                    [a.min(b), a.max(b)]
+                }).collect();
+                assert_eq!(pieces.len(), 2, "iso {iso} below {below} vertical {vertical}: {pieces:?}");
+                let mut pieces = pieces;
+                pieces.sort_by(|a, b| a[0].total_cmp(&b[0]));
+                let (gap0, gap1) = (pieces[0][1], pieces[1][0]);
+                // Centred on the value; half the block plus 0.65 h each side.
+                assert!(((gap0 + gap1) / 2.0 - 80.0).abs() < 1e-9);
+                let half = font::text_width("[2.36 in]", h) / 2.0 + 0.65 * h;
+                assert!(((gap1 - gap0) / 2.0 - half).abs() < 1e-9, "{gap0} {gap1}");
+                // The line reaches the arrows.
+                assert!((pieces[0][0] - if vertical { 50.0 } else { 50.0 }).abs() < 1e-9 && (pieces[1][1] - 110.0).abs() < 1e-9);
+                // Both texts sit inside the gap.
+                for t in g.texts.iter().filter(|t| t.text == "60" || t.text == "[2.36 in]") {
+                    let w = font::text_width(&t.text, h);
+                    assert!(t.pos[ax] - w / 2.0 > gap0 && t.pos[ax] + w / 2.0 < gap1);
+                }
+            }
+        }
+    }
+    // A single value: one unbroken line.
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.linear_dimension_text([50.0, 100.0], [110.0, 100.0], -20.0, DimOrientation::Horizontal, &DimText::plain("60"), 1);
+    assert_eq!(g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9 && (l.points[0][0] - l.points[1][0]).abs() > 1e-6).count(), 1);
+}
+
 #[test]
 fn cad_export_dual_dimensions_like_onshape() {
     use super::cad_export::to_dxf_version;
