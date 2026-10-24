@@ -168,6 +168,11 @@ pub struct Component {
     /// shows the message; see [`Component::failure`].
     #[serde(default)]
     pub failing: Vec<FailingSize>,
+    /// Live's only mate connector is "Near" at the origin (NAS clinch nuts):
+    /// `true` with its Z flipped (into the part), `false` along +Z. `None`:
+    /// the shape's usual connectors.
+    #[serde(default)]
+    pub near_only: Option<bool>,
     /// The size it opens on when not the first (live: the ANSI Type A
     /// washer opens on 3/8).
     #[serde(default)]
