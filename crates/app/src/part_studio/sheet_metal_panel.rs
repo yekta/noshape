@@ -165,11 +165,7 @@ impl PartStudioView {
         self.ui.sm_context.filter(|m| models.iter().any(|(f, _)| f == m)).or_else(|| models.first().map(|(f, _)| *f))
     }
 
-    /// Right-click in the flat view (live "qa5 sm" (9)).
-    /// TODO(SM4 phase 2): the rest of live's items (Edit <sketch>…, Show
-    /// dimensions, Show dependencies…, New sketch…, Copy Flat pattern…,
-    /// Create Drawing of Flat pattern…, Select other…, Add comment, Zoom to
-    /// selection, View normal to, Delete <model>).
+    /// Right-click in the flat view (live "qa5 sm" (9), "ui (10-24 a)" (4e)).
     fn open_flat_menu(&mut self, position: Point<Pixels>, on_part: bool, window: &mut Window, cx: &mut Context<Self>) {
         if !on_part {
             // Live (4e): empty flat space offers only these.
@@ -199,7 +195,17 @@ impl PartStudioView {
         let model_name = models.iter().find(|(f, _)| *f == model).map(|(_, n)| n.clone()).unwrap_or_default();
         let Some(body) = self.context.as_ref().and_then(|c| c.sheet_metal.iter().find(|(_, d)| d.model == model).map(|(b, _)| b.clone())) else { return };
         let part = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
+        let sketch = self.studio(cx).and_then(|s| s.feature(model).and_then(|f| noshape_model::interaction::source_sketch(&s.features, f)).and_then(|id| s.feature(id).map(|f| (id, f.name.clone()))));
         let (view, fv) = (cx.entity(), self.flat_view.clone());
+        // Live (sm-111), in groups: Edit <model>…, Edit <sketch>…, Show
+        // dimensions, Show dependencies of <model>… | New sketch… | Copy Flat
+        // pattern of <part> | Create Drawing of Flat pattern of <part>…, Export
+        // DXF/DWG of Flat pattern of <part>… | Select other… | Add comment |
+        // Zoom to fit, Zoom to selection, View normal to | Delete <model>.
+        // "Add comment" is cloud (not built, as in the other menus).
+        // TODO(SM4): New sketch…, Copy Flat pattern…, Create Drawing of Flat
+        // pattern…, Select other… and Zoom to selection need the flat face's
+        // model face (the flat pattern doesn't keep it yet).
         let menu = OsMenu::build(window, cx, move |m, _, _| {
             type Action = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
             let item = |label: String, f: Action| {
@@ -211,17 +217,32 @@ impl PartStudioView {
                     })
                 })
             };
+            let mut m = m.truncate_labels().item(item(format!("Edit {model_name}…"), Box::new(move |this, w, cx| this.edit_feature(model, w, cx))));
+            if let Some((sid, sname)) = sketch.clone() {
+                m = m.item(item(format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx)))).item(item("Show dimensions".into(), Box::new(move |this, w, cx| this.show_dimensions(sid, w, cx))));
+            }
             let b = body.clone();
-            let fv = fv.clone();
-            m.item(item(format!("Edit {model_name}…"), Box::new(move |this, w, cx| this.edit_feature(model, w, cx))))
-                .separator()
-                .item(item(format!("Export DXF/DWG of Flat pattern of {part}…"), Box::new(move |this, w, cx| this.export_flat(b.clone(), "dxf", w, cx))))
-                .separator()
-                .item(item("Zoom to fit".into(), Box::new(move |_, _, cx| {
-                    if let Some(fv) = &fv {
-                        fv.update(cx, |f, cx| f.zoom_to_fit(cx));
-                    }
-                })))
+            let (f1, f2) = (fv.clone(), fv.clone());
+            m.item(item(format!("Show dependencies of {model_name}…"), Box::new(move |this, _, cx| {
+                this.ui.dependencies = Some(model);
+                cx.notify();
+            })))
+            .separator()
+            .item(item(format!("Export DXF/DWG of Flat pattern of {part}…"), Box::new(move |this, w, cx| this.export_flat(b.clone(), "dxf", w, cx))))
+            .separator()
+            .item(item("Zoom to fit".into(), Box::new(move |_, _, cx| {
+                if let Some(fv) = &f1 {
+                    fv.update(cx, |f, cx| f.zoom_to_fit(cx));
+                }
+            })))
+            // The flat lies in XY: normal to any of its faces is Top.
+            .item(item("View normal to".into(), Box::new(move |_, _, cx| {
+                if let Some(fv) = &f2 {
+                    fv.update(cx, |f, cx| f.top(cx));
+                }
+            })))
+            .separator()
+            .item(item(format!("Delete {model_name}"), Box::new(move |this, _, cx| this.delete_features(vec![model], cx))).icon_name("menu-delete"))
         });
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
         menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));

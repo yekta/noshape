@@ -113,7 +113,11 @@ impl PartStudioView {
                     _ => &[],
                 };
                 let mut m = m;
-                if !criteria.is_empty() {
+                // Live (bundle quickSelect): Select ▸ is there whatever was
+                // clicked; its items each check the entity (faces, edges) and
+                // Create selection… is always offered (a plane or a vertex
+                // gets only that, rmb-ps-edge / rmb-ps-vertex).
+                if !matches!(k, PickKind::Origin | PickKind::Connector) {
                     let (vs, rs) = (v.clone(), r.clone());
                     m = m.submenu("Select", window, cx, move |mut sm, _, _| {
                         for c in criteria {

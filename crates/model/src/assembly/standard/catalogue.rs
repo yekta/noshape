@@ -173,6 +173,11 @@ pub struct Component {
     /// the shape's usual connectors.
     #[serde(default)]
     pub near_only: Option<bool>,
+    /// Live's Length is a free text box (FSRules `EDIT`: B17.1 keys; behaviours
+    /// "skb (10-24) B17.1 length"): any positive number of the component's
+    /// unit; the size's lengths hold its default.
+    #[serde(default)]
+    pub length_edit: bool,
     /// The size it opens on when not the first (live: the ANSI Type A
     /// washer opens on 3/8).
     #[serde(default)]

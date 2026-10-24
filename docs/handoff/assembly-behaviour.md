@@ -1051,11 +1051,21 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   A, which is what we build — the rule is unconfirmed (REQUESTS "skb (10-24)"). Internal heavy DIN 472 is left
   out: its default B-rep has a different lug (lug circle + an r 8.49 arc + 0.25 rounds), only one size captured.
   Test `retaining_rings_match_live` (faces + areas at 11 live sizes).
+* Internal rings by live's FSRules configuration (behaviours "skb (10-24) rings / washers"; counts `ringConfig`):
+  DIN 472 < 25 A, < 170 B, else C; heavy DIN 472 ≤ 24 A, else B (now in the catalogue); ANSI internal groove >
+  1.962 in B, else A. B: the lug's inner edge on the lug circle, a blend arc (through the A-arc's centre, tangent
+  in the inner circle; meeting the lug circle square for DIN 472, 0.96 D off the hole for heavy / ANSI: form
+  `blendRule`, solved in `ringBlend`) and its 4 corners rounded `rc` (0.5 mm / 0.25 mm / 0.02 in), as profile
+  arcs. C: the inner circle concentric at rg − lug, holes on rg − lug/2 1.5 D from the end planes. The test now
+  pins 19 live sizes (A 12 faces, B 16, C 8; the earlier #300 / ANSI 10 captures were config A, wrong).
 * B17.1 keys (FSRules + raw /features): Type per size by WIDTH (< 1/8 Square only, < 4 Square / Rectangle, else
   Rectangle; HEIGHT_SQR / HEIGHT_REC) as size rows with `when` {Type} (generator `variants`); parallel = the box
   (key form 1), tapered = key form 7 (`flat` = the width for Taper type Plain, 0 for Alternate, 1/8 in per foot
-  falling to −Y, extruded symmetric). Live's Length is a free-entry field (FSRules `EDIT`, default 1): we list
-  "1" only until live's capture of that field arrives (REQUESTS "skb (10-24) B17.1 length"). The tapered key's
+  falling to −Y, extruded symmetric). Live's Length is a free text box (behaviours "skb (10-24) B17.1 length";
+  catalogue `lengthEdit`, app `std_length_box`): default "1", the component's unit, blur commits (Enter does
+  nothing), a positive number names the part ("Parallel key B17.1 7 x 5 x 2.5"); otherwise live's red toast
+  ("…@stringToNumber: String is not a number <text>" / "Not found." for 0 and negatives), the text stays and
+  the part keeps the last good length. `fix_length` keeps a typed length. The tapered key's
   sizes from 4-1/2 - 5-1/2 up answer "Not found." on live's insert endpoint (crawl), listed as failing sizes.
   Test `b17_keys_match_live`.
 * Askew head bolt (screw head form 10, `askewBolt`): live's order — square head with its bearing face skewed
@@ -1106,19 +1116,41 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 * Replicate / pattern fields carrying the error: `os::query_box_error` (pink, red border, grey label) and the
   error as the label tooltip (`os::query_box_tip`).
 
-## Assembly section view manipulator (skb 10-24, lead's priority; on icons2's shared Section view dialog)
-* While the dialog is open, the active plane's arrow (assembly_behaviors.rs `section_arrow`, the Part Studio's
-  placement: on the plane where it passes the assembly's centre, along the normal, 12 % of the bounds' diagonal)
-  is drawn like the Part Studio's (assembly_scene.rs: screen-sized, white shaft, hollow head outlined grey /
-  blue when hovered) and pickable (`OverlayPick::SectionArrow`). Dragging it moves the plane along its normal
-  (`start_section_drag` / `drag_section` / `end_section_drag` from the viewport's ToolDown / Drag / Up); the
-  offset box at the tip (`render_section_value`) shows the offset and, clicked, becomes a field (text selected,
-  Enter / blur moves the plane, like live's "-0.91 in" box).
-* Right-click empty space with a section on: Edit section view… (`edit_section`: the dialog over the current
-  section, ✕ keeps it as it was) and Turn off section view — placed at the top of the menu (their place in the
-  assembly menu is UNCONFIRMED).
-* Open (REQUESTS "skb (10-24) assembly section"): the rotate handles (live's "sun-like" glyph and ring at the
-  arrow's base) and any flip; whether the arrow shows after ✓.
-* GUI-checked on :103 (/root/skb-scratch/s1–s10.png: arrow + "0 mm", drag to -12.565 mm, typed -2 mm, menu,
-  Edit keeps -2 mm, Turn off).
+## Assembly section view manipulator (skb 10-24, lead's priority; live "skb (10-24) assembly section")
+* On icons2's shared Section view dialog. While the dialog is open the active plane has live's manipulator
+  (assembly_scene.rs `SectionGlyph` / `push_section_glyph`, handles `SectionHandle`, picks `OverlayPick::Section`):
+  a base circle at the plane's base (face centroid / connector origin + offset), the shaft and hollow head, and
+  two small rings with their axis lines at the tip (ring 0 turns the plane about its in-plane Y, ring 1 about X;
+  `AsmSectionPlane::x` keeps the in-plane axes). Idle strokes light grey (230,232,233 on 194,199,203), the
+  hovered handle blue (70,123,177), the dragged one 40,97,182; no tooltips.
+* Drags (assembly_behaviors.rs `start_section_drag` / `drag_section` / `end_section_drag`): the arrow moves the
+  plane, the value being the distance from the drag's start ("⊥" mark at the start with a leader); a ring turns
+  the plane about its axis through the base ("⊢" mark at the start direction), snapping to 5° multiples within
+  2° (the window is UNCONFIRMED; live left 92.111 / 97.206 free); the base circle slides the manipulator over the
+  plane (live also snaps it to edges: not done). The value box (upper right of the tip, 75 × 26): the dragged
+  value while dragging (1 decimal mm, up to 3 decimals "deg"), then Onshape's canvas box focused and selected;
+  Enter puts the plane at the typed value from the drag's start and keeps the box; Esc closes the box only.
+* Chips "Section plane N (Top)" named by the arrow's standard direction (Top / Bottom / Front / Back / Right /
+  Left), no suffix once rotated off them (`direction_name`; the dialog drops an empty suffix).
+* Right-click empty space with a section on: Show all | Edit section view… (section icon) | Turn off section
+  view | — | Create Drawing of … ; Edit reopens over the section (offset / rotation kept) and ✕ there turns the
+  section off.
+* Not done here (for icons2 / the lead): Flip lives in the "Select default plane" popup (icons2's dialog); the
+  red overlap fill in caps where instances overlap (renderer). GUI-checked on :103 (/root/skb-scratch/t1–t9.png).
 
+## P1 mates audit (skb 10-24, PRIORITIES.md item 1)
+- **Solver**: `solver::tests::core_mates_leave_their_degrees_of_freedom` checks the six everyday mates against live's DOF
+  table (behaviours "skb (10-22 20:30)" › DOF per mate type): Fastened 0, Revolute 1, Slider 1, Cylindrical 2, Planar 3,
+  Ball 3. A drag of the moving part's origin follows only the free translations, and a Ball drag turns the part about
+  its centre.
+- **GUI pass on :103** (/root/skb-scratch/mates: `mk.py` builds a 60×40×5 plate with a Ø10 hole plus a Ø10×30 pin;
+  `retype.sh` retypes through Edit… and drags): Revolute from the hole edge to the pin's bottom edge stands the pin on
+  the hole (z 5). The drag turns it about Z only. Retyping to Slider snaps the rotation back, and the drag then slides
+  along Z only. Cylindrical slides and turns (2 DOF). Planar keeps z 5 and moves in XY plus Z rotation. Ball snaps the
+  centre back to the hole and tilts freely. The dialog rows per type match live (Cylindrical and Ball have no Offset).
+  Inference on the pin's side face puts the connector mid-axis, with a dot at the end centre (live assembly/31).
+- **Fixed: where the mate heads-up toolbar opens.** It used to open +14/+14 px below-right of the second pick, with no
+  clamp, so near the right edge its ✓/✕ fell off-screen. Live (assembly/35 + dom/mate-hud.txt: pick ≈ (1419, 362),
+  panel [1264, 311, 310×51]) centres the panel on the pick with its bottom edge on it. Assembly/93 shows it pushed in from
+  the right edge. Ours now does both (`render_mate_hud`). The note "just below-right" in behaviours.md is not what the
+  coordinates show.

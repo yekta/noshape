@@ -1139,7 +1139,7 @@ impl AssemblyView {
             h.cursor_mark = Some((p, size * 0.4));
         }
         h.manipulator = self.manipulator(cx).map(|f| (f, size * 1.6, self.manip_hover.or(self.ui.manip_selected)));
-        h.section_arrow = self.section_arrow_glyph(cx);
+        h.section = self.section_glyph(cx);
         h.explode_triad = self.explode_edit;
         // An explode step being made / edited: one arrow along the move
         // instead of the triad (live 805, 810).
@@ -1164,8 +1164,8 @@ impl AssemblyView {
         if let Some((f, s, _)) = &h.manipulator {
             sig.extend([f.origin.x, f.origin.y, f.origin.z, *s]);
         }
-        if let Some((t, d, w, _, _)) = &h.section_arrow {
-            sig.extend([t.x, t.y, t.z, d.x, d.y, d.z, *w]);
+        if let Some(g) = &h.section {
+            sig.extend([g.base.x, g.base.y, g.base.z, g.dir.x, g.dir.y, g.dir.z, g.x.x, g.x.y, g.x.z, g.wpp]);
         }
         if let Some((s, _)) = h.origin {
             sig.push(s);
@@ -2074,7 +2074,7 @@ impl AssemblyView {
         let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none() && self.step_edit.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
-        let capture = snapping || self.hover_overlay == Some(OverlayPick::SectionArrow) || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
+        let capture = snapping || matches!(self.hover_overlay, Some(OverlayPick::Section(_))) || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = capture);
     }
 
@@ -2087,7 +2087,7 @@ impl AssemblyView {
                 let c = self.result.connectors.iter().find(|c| c.id == id)?;
                 return Some(MateConnectorRef::assembly_connector(c.id, c.owner));
             }
-            Some(OverlayPick::Manip(_)) | Some(OverlayPick::Mate(_)) | Some(OverlayPick::SectionArrow) => return None,
+            Some(OverlayPick::Manip(_)) | Some(OverlayPick::Mate(_)) | Some(OverlayPick::Section(_)) => return None,
             None => {}
         }
         if self.pick_mode(cx) == Some(PickMode::Inference) && self.infer_locked {
@@ -2591,7 +2591,7 @@ impl AssemblyView {
                 }
             }
             ViewportEvent::ToolUp { modifiers, .. } => {
-                if self.end_section_drag(cx) {
+                if self.end_section_drag(window, cx) {
                     return;
                 }
                 if self.ui.fixed_drag.take().is_some() {
@@ -3976,11 +3976,19 @@ impl AssemblyView {
             });
         let grab = self.ui.hud_grab.clone();
         let (d2, d3, d4) = (dialog.clone(), dialog.clone(), dialog);
+        // Live (assembly/35, 93; dom/mate-hud.txt): the 310×51 panel is
+        // centred over the second pick with its bottom edge on it, kept
+        // inside the graphics area (pushed in from the right edge in 93).
+        let (o, size) = { let vp = self.viewport.read(cx); (vp.origin(), vp.size()) };
+        let (bx, by) = (f64::from(f32::from(o.x)), f64::from(f32::from(o.y)));
+        let (bw, bh) = (size.x, size.y);
+        let x = (at.x - 155.).min(bx + bw - 310. - 10.).max(bx + 4.);
+        let y = (at.y - 51.).min(by + bh - 51. - 4.).max(by + 4.);
         div()
             .id("mate-hud")
             .absolute()
-            .left(px(at.x as f32 + 14.))
-            .top(px(at.y as f32 + 14.))
+            .left(px(x as f32))
+            .top(px(y as f32))
             .w(px(310.))
             .bg(pal.dialog_bg)
             .border_1()
@@ -5218,7 +5226,7 @@ impl AssemblyView {
                     // Named views restore the section state too (Onshape).
                     if !v.section.is_empty() || self.ui.section.is_some() {
                         self.ui.section = (!v.section.is_empty()).then(|| AsmSection {
-                            planes: v.section.iter().map(|q| AsmSectionPlane { label: "Section plane".into(), origin: DVec3::new(q[0], q[1], q[2]) * q[3], normal: DVec3::new(q[0], q[1], q[2]), offset: 0.0, flipped: false }).collect(),
+                            planes: v.section.iter().map(|q| AsmSectionPlane::new(DVec3::new(q[0], q[1], q[2]) * q[3], DVec3::new(q[0], q[1], q[2]), DVec3::new(q[0], q[1], q[2]).any_orthonormal_vector())).collect(),
                             ..Default::default()
                         });
                         self.rebuild_scene(false, cx);
