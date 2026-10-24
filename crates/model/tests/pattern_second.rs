@@ -3,6 +3,10 @@
 //! settings (Linear pattern 2) took far longer than the first, and deleting
 //! it while it ran didn't stop it. Both patterns must cost about the same, and
 //! an aborted regeneration must return at once.
+//!
+//! ci.yml runs the behaviour (which runs stop, what the next run reuses);
+//! the `timed_` tests (ignored) are the wall-clock checks, run in release by
+//! perf.yml's model job.
 
 use glam::DVec2;
 use noshape_model::configuration::ConfigValues;
@@ -94,14 +98,22 @@ fn count() -> usize {
 }
 
 #[test]
-fn second_pattern_costs_about_the_same_as_the_first() {
-    log();
+fn second_pattern_regenerates_like_the_first() {
     for reapply in [false, true] {
-        second_pattern_case(reapply);
+        second_pattern_case(reapply, false);
     }
 }
 
-fn second_pattern_case(reapply: bool) {
+#[test]
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_second_pattern_costs_about_the_same_as_the_first() {
+    log();
+    for reapply in [false, true] {
+        second_pattern_case(reapply, true);
+    }
+}
+
+fn second_pattern_case(reapply: bool, timed: bool) {
     let n = count();
     let (s, lp1, lp2) = model(n, reapply);
     let t0 = Instant::now();
@@ -124,11 +136,14 @@ fn second_pattern_case(reapply: bool) {
     assert!((v - want).abs() < 1e-6 * want, "volume {v} mm³, want {want}");
     eprintln!("×{n} reapply {reapply}: LP1 {a:.0} ms, LP2 {c:.0} ms, whole regeneration {:.0} ms", total.as_secs_f64() * 1e3);
     // CI release ×400: 1.9-2.7× (runner noise); it was 40×.
-    assert!(c < 3.0 * a + 300.0, "reapply {reapply}: LP2 {c:.0} ms against LP1 {a:.0} ms");
+    if timed {
+        assert!(c < 3.0 * a + 300.0, "reapply {reapply}: LP2 {c:.0} ms against LP1 {a:.0} ms");
+    }
 }
 
 #[test]
-fn deleting_the_running_second_pattern_stops_it_at_once() {
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_deleting_the_running_second_pattern_stops_it_at_once() {
     let n = count();
     let (s, _, lp2) = model(n, true);
     // Where LP2 runs in a regeneration: after the features before it (a
@@ -175,7 +190,8 @@ fn deleting_the_running_second_pattern_stops_it_at_once() {
 /// the model without LP2 shows at once (v0.4.8 gate: it waited 7-9 s for
 /// the superseded preview).
 #[test]
-fn deleting_the_running_second_pattern_in_the_app_shows_the_first_at_once() {
+#[ignore = "timed: perf.yml model job (wall clock; ci.yml tests are deterministic)"]
+fn timed_deleting_the_running_second_pattern_in_the_app_shows_the_first_at_once() {
     use noshape_model::regen::runs::{Run, Runs};
     use std::sync::{Arc, Mutex};
     log();
@@ -218,9 +234,87 @@ fn deleting_the_running_second_pattern_in_the_app_shows_the_first_at_once() {
         let (r, shown) = start(edited, None).join().unwrap();
         let (preview, accepted) = (preview.join().unwrap().0, accepted.join().unwrap().0);
         eprintln!("×{n} {how}: open {open:.0} ms; preview cancelled {}, ✓ run cancelled {}; shown {shown:.0} ms after the {how}; features {:?}", preview.cancelled, accepted.cancelled, r.display.features.iter().map(|f| (f.status, f.time_ms as u32)).collect::<Vec<_>>());
-        assert!(preview.cancelled && accepted.cancelled && !r.cancelled);
+        // The ✓ run may finish before the delete on a fast machine; the
+        // preview never shows (superseded or aborted).
+        assert!(preview.cancelled && !r.cancelled);
         assert_eq!(runs.running(), 0);
         let budget = if cfg!(debug_assertions) { 1000.0 } else { 300.0 };
         assert!(shown < budget, "{how}: the model without LP2 showed {shown:.0} ms after the {how}");
     }
+}
+
+/// The behaviour behind the timed tests, deterministic (no clock, no race):
+/// the app's run bookkeeping (model regen::runs) aborts the LP2 preview and
+/// the ✓ run when LP2 is deleted or suppressed, also after ✓ superseded the
+/// preview; an aborted run returns `cancelled` and caches nothing of LP2, and
+/// its kernel booleans stop; the next run takes LP1 and everything before it
+/// from the cache (no feature evaluated).
+#[test]
+fn deleting_the_running_second_pattern_aborts_it_and_reuses_the_first() {
+    use noshape_model::regen::runs::{Run, Runs};
+    use std::sync::Arc;
+    let (s, lp1, lp2) = model(20, true);
+    let index = s.ps.index_of(lp2).unwrap();
+    let mut without = s.ps.clone();
+    without.remove(lp2);
+    let mut suppressed = s.ps.clone();
+    suppressed.feature_mut(lp2).unwrap().suppressed = true;
+    let run = |ps: &PartStudio, upto: Option<usize>| {
+        let cancel = RegenCancel::default();
+        (Run { cancel: cancel.clone(), studio: Arc::new(ps.clone()), upto, config: ConfigValues::default(), doc_vars: Default::default(), editing_sketch: None }, cancel)
+    };
+    for edited in [&without, &suppressed] {
+        let mut runs = Runs::default();
+        // Each `held` clone stands for the regeneration still running it.
+        let (preview, held_preview) = run(&s.ps, Some(index + 1));
+        runs.start(preview);
+        let (accepted, held_accepted) = run(&s.ps, None);
+        runs.start(accepted);
+        // ✓ only extends the preview: it finishes its features into the cache.
+        assert!(held_preview.superseded() && !held_preview.aborted());
+        assert_eq!(runs.running(), 2);
+        let (edit, held_edit) = run(edited, None);
+        runs.start(edit);
+        // The edit changes LP2: both stop, also the superseded preview.
+        assert!(held_preview.aborted() && held_accepted.aborted() && !held_edit.superseded());
+        drop((held_preview, held_accepted));
+        assert_eq!(runs.running(), 1);
+    }
+    // An aborted run's kernel booleans stop (the flag reaches OCCT).
+    let cancel = RegenCancel::default();
+    cancel.abort();
+    let a = noshape_kernel::make_box_corners(glam::DVec3::ZERO, glam::DVec3::splat(0.01)).unwrap();
+    let b = noshape_kernel::make_box_corners(glam::DVec3::splat(0.005), glam::DVec3::splat(0.015)).unwrap();
+    let fused = cancel.scope(|| noshape_kernel::boolean(noshape_kernel::BooleanOp::Fuse, &[a], &[b], &Default::default()));
+    assert!(fused.is_err(), "a boolean ran to the end under an aborted run");
+    // One Regenerator, as the app's: the model without LP2 shown, then LP2's
+    // run aborted (by the delete) returns cancelled and evaluates nothing.
+    let mut g = Regenerator::new();
+    let regen = |g: &mut Regenerator, ps: &PartStudio, cancel: Option<RegenCancel>| g.regenerate(ps, &ConfigValues::default(), &s.units, &RegenOptions { preview_meshes: true, cancel, ..Default::default() });
+    let shown = regen(&mut g, &without, None);
+    assert!(!shown.cancelled);
+    let volume = |r: &RegenResult| r.context.bodies.iter().filter_map(|b| b.shape.volume().ok()).sum::<f64>();
+    let aborted = RegenCancel::default();
+    aborted.abort();
+    let before = g.evaluations();
+    assert!(regen(&mut g, &s.ps, Some(aborted)).cancelled);
+    assert_eq!(g.evaluations(), before, "an aborted run evaluated features");
+    // ✓ after the preview (superseded): LP2 is evaluated into the cache, no
+    // display.
+    let superseded = RegenCancel::default();
+    superseded.supersede();
+    assert!(regen(&mut g, &s.ps, Some(superseded)).cancelled);
+    assert_eq!(g.evaluations(), before + 1, "only LP2 is evaluated");
+    // Delete LP2: LP1 and everything before it come from the cache.
+    let before = g.evaluations();
+    let deleted = regen(&mut g, &without, None);
+    assert!(!deleted.cancelled);
+    assert_eq!(g.evaluations(), before, "the model without LP2 recomputed features");
+    assert!(deleted.display.features.iter().any(|f| f.id == lp1 && f.status == FeatureStatus::Ok));
+    assert!((volume(&deleted) - volume(&shown)).abs() < 1e-12);
+    // Suppress LP2 instead: also nothing to evaluate.
+    let r = regen(&mut g, &suppressed, None);
+    assert_eq!(g.evaluations(), before, "suppressing LP2 recomputed features");
+    assert!(r.display.features.iter().any(|f| f.id == lp2 && f.status == FeatureStatus::Suppressed));
+    assert!((volume(&r) - volume(&shown)).abs() < 1e-12);
 }

@@ -130,6 +130,8 @@ pub struct Regenerator {
     entries: HashMap<FeatureId, CacheEntry>,
     meshes: HashMap<u64, (u64, bool, Arc<MeshBuffers>)>,
     contexts: ContextCache,
+    /// Features evaluated so far (not taken from the cache).
+    evaluations: u64,
 }
 
 fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
@@ -142,6 +144,12 @@ fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
 impl Regenerator {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// How many features this Regenerator has evaluated rather than taken
+    /// from its cache (tests: a run reuses what it should).
+    pub fn evaluations(&self) -> u64 {
+        self.evaluations
     }
 
     pub fn regenerate(&mut self, studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opts: &RegenOptions) -> RegenResult {
@@ -241,6 +249,7 @@ impl Regenerator {
                         state.message = Some(format!("{} is not available in this build yet", f.feature_type().map(|t| t.name).unwrap_or(&f.type_id)));
                     }
                     Some(eval_fn) => {
+                        self.evaluations += 1;
                         // Query variables (`#name` selections) expand against the upstream context.
                         let expanded = eval::expand_query_variables(params, &ctx);
                         let params = expanded.as_ref().unwrap_or(params);

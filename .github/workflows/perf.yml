@@ -345,6 +345,35 @@ jobs:
           Select-String -Path big_plate.log -Pattern 'big plate:|tessellate Part 1|boolean_into Cut' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
 
+      # Wall-clock checks of the ci.yml tests (their `timed_` twins, ignored
+      # there: ci.yml tests are deterministic): patterns linear in their
+      # instance count, an abort stopping a 1000-instance pattern, a
+      # million-instance pattern failing at once, a 1 MB commit.
+      - name: Timed checks (release)
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          status=0
+          cargo test --release --locked -p noshape-model --test pattern_perf --test pattern_fins --test engine --test qa_regressions -- --ignored --nocapture --test-threads=1 timed_ 2>&1 | tee timed.log || status=$?
+          cargo test --release --locked -p noshape-store --lib -- --ignored --nocapture timed_ 2>&1 | tee -a timed.log || status=$?
+          { echo "### ${{ matrix.name }}: timed checks"; echo '```'; grep -E "^test timed_|×[0-9]+|1 MB commit|after the abort|panicked" timed.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Timed checks (release, Windows)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cargo test --release --locked -p noshape-model --test pattern_perf --test pattern_fins --test engine --test qa_regressions -- --ignored --nocapture --test-threads=1 timed_ 2>&1 | Tee-Object -FilePath timed.log
+          $status = $LASTEXITCODE
+          cargo test --release --locked -p noshape-store --lib -- --ignored --nocapture timed_ 2>&1 | Tee-Object -FilePath timed_store.log
+          if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
+          "### ${{ matrix.name }}: timed checks" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path timed.log, timed_store.log -Pattern '^test timed_|×[0-9]+|1 MB commit|after the abort|panicked' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $status
+
       # User bug 10-24 (crates/model/tests/pattern_second.rs): ×400 fins on top
       # (LP1) and the same pattern under the plate (LP2), with and without
       # Reapply; LP2 must cost about LP1, and an abort must return at once.
@@ -358,7 +387,7 @@ jobs:
           RUST_LOG: 'perf=info'
         run: |
           status=0
-          cargo test --release --locked -p noshape-model --test pattern_second -- --nocapture --test-threads=1 2>&1 | tee pattern_second.log || status=$?
+          cargo test --release --locked -p noshape-model --test pattern_second -- --include-ignored --nocapture --test-threads=1 2>&1 | tee pattern_second.log || status=$?
           { echo "### ${{ matrix.name }}: second pattern"; echo '```'; grep -E "×[0-9]+|panicked|assert" pattern_second.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
@@ -370,7 +399,7 @@ jobs:
           NOSHAPE_PATTERN_N: '400'
         run: |
           $ErrorActionPreference = 'Continue'
-          cargo test --release --locked -p noshape-model --test pattern_second -- --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath pattern_second.log
+          cargo test --release --locked -p noshape-model --test pattern_second -- --include-ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath pattern_second.log
           $status = $LASTEXITCODE
           "### ${{ matrix.name }}: second pattern" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
