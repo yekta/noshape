@@ -46,6 +46,9 @@ impl std::fmt::Display for Diagnostic {
 #[derive(Clone, Debug)]
 pub enum ParamKindFs {
     Query { filter: QueryFilter, max_picks: Option<usize> },
+    /// `definition.x is FeatureList`: picked features, passed as a map from
+    /// feature Id to feature function.
+    FeatureList { max_picks: Option<usize> },
     Num { kind: NumKind, spec: NumSpec },
     Bool { default: bool },
     Enum { tag: Tag, options: Vec<(String, String)>, default: String },
@@ -660,7 +663,7 @@ fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, roots: &[&st
             let kind = match &*q.name {
                 "Query" => ParamKindFs::Query { filter: filter_of(a.get("Filter")), max_picks: a.get("MaxNumberOfPicks").and_then(|v| v.as_num()).map(|n| n as usize) },
                 // Feature pattern's "Features to pattern".
-                "FeatureList" => ParamKindFs::Query { filter: QueryFilter::FEATURE, max_picks: None },
+                "FeatureList" => ParamKindFs::FeatureList { max_picks: a.get("MaxNumberOfPicks").and_then(|v| v.as_num()).map(|n| n as usize) },
                 "TableData" | "ImageData" | "JSONData" | "TextData" | "PartStudioData" | "VariableStudioData" | "CADImportData" => {
                     use crate::params::ReferenceKind as K;
                     let kind = match &*q.name {
@@ -837,6 +840,13 @@ fn param_spec(d: &ParamDecl, siblings: Arc<Vec<ParamDecl>>) -> ParamSpec {
     let mut spec = match &d.kind {
         ParamKindFs::Query { filter, max_picks } => {
             let mut s = ParamSpec::query(id, label, *filter);
+            if let ParamKind::Query { max_picks: m, .. } = &mut s.kind {
+                *m = *max_picks;
+            }
+            s
+        }
+        ParamKindFs::FeatureList { max_picks } => {
+            let mut s = ParamSpec::query(id, label, QueryFilter::FEATURE);
             if let ParamKind::Query { max_picks: m, .. } = &mut s.kind {
                 *m = *max_picks;
             }

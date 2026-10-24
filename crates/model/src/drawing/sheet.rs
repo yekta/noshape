@@ -137,6 +137,8 @@ pub struct SheetGeometry {
     /// What the elements are, for the DXF / DWG layers (`cad_layers`; last
     /// span wins, untagged ones by style).
     pub cad: Vec<super::cad_layers::CadSpan>,
+    /// Text styles of the DXF / DWG export by kind of text (`cad_layers`).
+    pub cad_text_styles: Vec<super::cad_layers::CadTextStyleSpan>,
     /// Hatched sections, written as HATCH entities by the DXF / DWG export.
     pub hatches: Vec<super::cad_layers::HatchRegion>,
     /// Element groups the DXF / DWG export writes as one object

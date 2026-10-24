@@ -134,3 +134,11 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 | Row | Ours | Status |
 |---|---|---|
 | KB3 Isolate | other parts and planes go translucent | ✅ **fixed** (k02); default-geometry rows stay black (live pn-900 greys Top/Front/Right, but its planes may have been hidden beforehand: not counted) |
+
+## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
+| Finding | Result |
+|---|---|
+| KB1 Shift+N on a part row | ✅ inline rename, name selected |
+| KB3 Isolate | other parts translucent ✅, planes hidden ✅; **Default geometry rows not grey** ✗ → fixed by qa4 (part_studio/mod.rs `default_row_dimmed`, test `default_geometry_rows_gray_while_isolating`), lands with this batch |
+| KB4 right-drag rate | ✅ consistent with live's formula (navigation.rs test: 75.3° per 100 px in a 1440×900 window; 55.8° was a 1919×1079 window) |
+| DOC3 (Ctrl+C / Ctrl+V of a part) | see workflow-document.md |

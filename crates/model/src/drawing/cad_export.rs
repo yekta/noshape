@@ -10,7 +10,7 @@
 
 use super::export::aci;
 use super::cad_fit::{FitCurve, fit_curve};
-use super::cad_layers::CadLayer;
+use super::cad_layers::{CadLayer, CadTextStyle};
 use super::cad_objects::{CadDim, CadDimKind, CadObject};
 use acadrust::entities::table::Table as AcadTable;
 use acadrust::entities::{Dimension, DimensionAngular3Pt, DimensionDiameter, DimensionLinear, DimensionOrdinate, DimensionRadius, Insert, Tolerance};
@@ -103,6 +103,46 @@ const TEXT_STYLES: [(&str, &str); 2] = [("Onshape-Standard", "NotoSans-Regular.t
 const DIM_TEXT_STYLE: (&str, &str) = ("Onshape-Standard-Dimension", "");
 /// Hole callout texts' style.
 const HOLE_CALLOUT_STYLE: (&str, &str) = ("Onshape-Standard-Hole-Callout", "NotoSans-Regular.ttf");
+/// Live's text style table after "Standard" (drw2-en-ansi-a / drw2-a-iso-a3,
+/// the same in every English template): name, font file, font family (the
+/// ACAD xdata), and whether the style has the text height (0.12 in / 3.5 mm).
+const STYLE_TABLE: [(&str, &str, &str, bool); 35] = [
+    ("Onshape-Standard", "NotoSans-Regular.ttf", "Noto Sans", false),
+    ("Onshape-Standard-Dimension", "", "Noto Sans", false),
+    ("Onshape-Standard-Fields", "", "Noto Sans", false),
+    ("Onshape-Standard-tcFields", "NotoSansTC-Regular.otf", "Noto Sans TC", false),
+    ("Onshape-Standard-scFields", "NotoSansSC-Regular.otf", "Noto Sans SC", false),
+    ("Onshape-Standard-KoreanFields", "NotoSansKR-Regular.otf", "Noto Sans KR", false),
+    ("Onshape-Standard-JapaneseFields", "NotoSansJP-Regular.otf", "Noto Sans JP", false),
+    ("Onshape-Standard-Bold", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("TtfStyle", "", "Verdana", false),
+    ("Onshape-Standard-GTolerance-TextStyle", "", "Noto Sans", false),
+    ("Onshape-Standard-Table-DataRow", "NotoSans-Regular.ttf", "Noto Sans", false),
+    ("Onshape-Standard-Table-TitleRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-Table-HeaderRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-BomTable-DataRow", "NotoSans-Regular.ttf", "Noto Sans", false),
+    ("Onshape-Standard-BomTable-TitleRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-BomTable-HeaderRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-NoteStyle", "NotoSans-Regular.ttf", "Noto Sans", true),
+    ("Onshape-Standard-Datum-Dimension", "NotoSans-Regular.ttf", "Noto Sans", true),
+    ("Onshape-Standard-View-Label", "NotoSans-Regular.ttf", "Noto Sans", true),
+    ("Onshape-Detail-View-Leader", "NotoSans-Regular.ttf", "Noto Sans", true),
+    ("Onshape-Standard-Hole-Callout", "NotoSans-Regular.ttf", "Noto Sans", true),
+    ("Onshape-Standard-HoleTable-DataRow", "NotoSans-Regular.ttf", "Noto Sans", false),
+    ("Onshape-Standard-HoleTable-TitleRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-HoleTable-HeaderRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-Hole-Tag", "NotoSans-Regular.ttf", "Noto Sans", true),
+    ("Onshape-Standard-RevisionTable-DataRow", "NotoSans-Regular.ttf", "Noto Sans", false),
+    ("Onshape-Standard-RevisionTable-TitleRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-RevisionTable-HeaderRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-Revision-Marker", "NotoSans-Regular.ttf", "Noto Sans", true),
+    ("Onshape-Standard-CutlistTable-DataRow", "NotoSans-Regular.ttf", "Noto Sans", false),
+    ("Onshape-Standard-CutlistTable-TitleRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-CutlistTable-HeaderRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-CustomTable-DataRow", "NotoSans-Regular.ttf", "Noto Sans", false),
+    ("Onshape-Standard-CustomTable-TitleRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+    ("Onshape-Standard-CustomTable-HeaderRow", "NotoSans-Bold.ttf", "Noto Sans", false),
+];
 /// Feature control frames' dimension style.
 const GTOLERANCE_STYLE: &str = "Onshape-Standard-GTolerance";
 /// Dimension styles (live drw2-k-dxf2018): the parent, then per type.
@@ -383,9 +423,16 @@ fn document_tables(pages: &[&SheetGeometry], insunits: u8, version: DxfVersion) 
         lt.pattern_length = pattern.iter().map(|p| to_units(p.abs())).sum();
         let _ = doc.line_types.add(lt);
     }
-    for (name, font) in TEXT_STYLES.into_iter().chain([DIM_TEXT_STYLE, HOLE_CALLOUT_STYLE]) {
+    // The text height of the fixed-height styles: the dimension text height
+    // (live 0.12 in ANSI, 3.5 mm ISO).
+    let text_h = pages.first().map(|g| g.style.dim_text).unwrap_or(3.048) * k;
+    for (name, font, family, sized) in STYLE_TABLE {
         let mut st = TextStyle::new(name);
         st.font_file = font.to_string();
+        st.true_type_font = family.to_string();
+        if sized {
+            (st.height, st.last_height) = (text_h, text_h);
+        }
         let _ = doc.text_styles.add(st);
     }
     // R12–R14 write layer names in capitals (live drw2-k-dxfR14).
@@ -467,6 +514,17 @@ enum TextIn {
     Space,
     Dimension,
     Symbol([f64; 2]),
+    /// A table cell in its row's text style (`aligned`: with its paragraph
+    /// alignment).
+    Cell { style: &'static str, aligned: bool },
+}
+
+/// The MTEXT paragraph alignment code of an anchor (`\pxq?;`).
+fn paragraph_align(a: Anchor) -> char {
+    match a {
+        Anchor::BottomCenter | Anchor::Center => 'c',
+        Anchor::BottomLeft | Anchor::TopLeft => 'l',
+    }
 }
 
 /// Where entities go: model space or a layout, or a block's definition.
@@ -506,7 +564,7 @@ fn anonymous_block(doc: &mut CadDocument, prefix: char) -> Result<(String, Handl
 /// An object's lines, texts and fills (indices).
 type Members<'a> = (&'a [usize], &'a [usize], &'a [usize]);
 /// A table's top-left corner, column widths, row heights and cell texts.
-type TableGrid<'a> = ([f64; 2], &'a [f64], &'a [f64], &'a [Vec<String>]);
+type TableGrid<'a> = ([f64; 2], &'a [f64], &'a [f64], &'a [Vec<String>], &'a [&'static str], bool);
 
 /// One sheet's writing context.
 struct Sheet<'a> {
@@ -620,7 +678,11 @@ impl Sheet<'_> {
         e.value = match kind {
             TextIn::Dimension => format!("\\A1;{}", mtext_value(t.text.trim()).replace('Ø', "%%c").replace('°', "%%d").replace('±', "%%p")),
             TextIn::Symbol(_) => format!("\\A1;{}", mtext_value(&t.text).replace('Ø', "%%c")),
+            // Live notes: `{\pxql;…}` (the paragraph's alignment).
+            TextIn::Space if self.g.cad_text_style(ti) == Some(CadTextStyle::Note) => format!("{{\\pxq{};{}}}", paragraph_align(t.anchor), mtext_value(&t.text)),
             TextIn::Space => mtext_value(&t.text),
+            TextIn::Cell { aligned: true, .. } => format!("{{\\pxq{};{}}}", paragraph_align(t.anchor), mtext_value(&t.text)),
+            TextIn::Cell { .. } => format!("{{{}}}", mtext_value(&t.text)),
         };
         e.height = t.height * self.k;
         e.rotation = t.angle;
@@ -638,8 +700,12 @@ impl Sheet<'_> {
         e.style = match kind {
             TextIn::Dimension => DIM_TEXT_STYLE.0,
             TextIn::Symbol(_) => HOLE_CALLOUT_STYLE.0,
-            TextIn::Space if self.g.text_font(ti).is_some_and(|f| f.bold) => TEXT_STYLES[1].0,
-            TextIn::Space => TEXT_STYLES[0].0,
+            TextIn::Cell { style, .. } => style,
+            TextIn::Space => match self.g.cad_text_style(ti) {
+                Some(st) => st.name(),
+                None if self.g.text_font(ti).is_some_and(|f| f.bold) => TEXT_STYLES[1].0,
+                None => TEXT_STYLES[0].0,
+            },
         }
         .to_string();
         e.common.layer = layer.into();
@@ -671,7 +737,7 @@ impl Sheet<'_> {
 
     /// A table: its elements in a new *T block, and over it an ACAD_TABLE
     /// (live 2018) or, before 2004, the block's INSERT (live R14).
-    fn table(&self, doc: &mut CadDocument, (corner, widths, heights, cells): TableGrid, members: Members, owner: Owner) -> Result<(), String> {
+    fn table(&self, doc: &mut CadDocument, (corner, widths, heights, cells, rows, aligned): TableGrid, members: Members, owner: Owner) -> Result<(), String> {
         let (name, block) = anonymous_block(doc, 'T')?;
         for &i in members.0 {
             self.line(doc, i, Owner::Block(block), false)?;
@@ -679,8 +745,20 @@ impl Sheet<'_> {
         for &i in members.2 {
             self.fill(doc, i, Owner::Block(block), false)?;
         }
+        // Each cell text in its row's style (rows top to bottom from `corner`).
+        let row_of = |y: f64| {
+            let mut top = corner[1];
+            for (r, h) in heights.iter().enumerate() {
+                if y >= top - h - 1e-6 {
+                    return r;
+                }
+                top -= h;
+            }
+            heights.len().saturating_sub(1)
+        };
         for &i in members.1 {
-            self.text(doc, i, Owner::Block(block), TextIn::Space)?;
+            let style = rows.get(row_of(self.g.texts[i].pos[1])).copied().unwrap_or(TEXT_STYLES[0].0);
+            self.text(doc, i, Owner::Block(block), TextIn::Cell { style, aligned })?;
         }
         let layer = CadLayer::Tables.name(self.upper);
         if self.version < DxfVersion::AC1018 {
@@ -888,7 +966,7 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
             CadObject::Tolerance { at, rows, height } => sh.tolerance(doc, *at, rows, *height, owner)?,
             CadObject::Symbol { at } => sh.symbol(doc, *at, &t, owner)?,
             CadObject::Spline { poles } => sh.spline(doc, poles, l[0], owner)?,
-            CadObject::Table { corner, widths, heights, cells } => sh.table(doc, (*corner, widths, heights, cells), (&l, &t, &f), owner)?,
+            CadObject::Table { corner, widths, heights, cells, rows, aligned } => sh.table(doc, (*corner, widths, heights, cells, rows, *aligned), (&l, &t, &f), owner)?,
         }
     }
     for im in &g.images {
@@ -1273,7 +1351,7 @@ mod tests {
         }
         g.texts.push(crate::drawing::sheet::Text2 { pos: [12.0, 94.0], height: 3.0, text: "Item".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick: 0 });
         g.cad_since(m, CadLayer::Tables);
-        g.cad_objects.push(CadObject::Table { corner: [10.0, 100.0], widths: vec![50.0], heights: vec![8.0, 8.0], cells: vec![vec!["Item".into()], vec!["1".into()]] });
+        g.cad_objects.push(CadObject::Table { corner: [10.0, 100.0], widths: vec![50.0], heights: vec![8.0, 8.0], cells: vec![vec!["Item".into()], vec!["1".into()]], rows: vec!["Onshape-Standard-BomTable-HeaderRow", "Onshape-Standard-BomTable-DataRow"], aligned: false });
         g.cad_members.push(CadMember { lines: m.0..g.lines.len(), texts: m.1..g.texts.len(), fills: 0..0, obj: 0 });
         let l = g.lines.len();
         g.lines.push(crate::drawing::sheet::Polyline2 { points: vec![[100.0, 100.0], [110.0, 100.0], [110.0, 107.0], [100.0, 107.0]], style: LineStyle::Thin, closed: true, pick: 0 });

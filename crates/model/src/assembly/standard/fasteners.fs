@@ -1520,10 +1520,10 @@ export const key = defineFeature(function(context is Context, id is Id, definiti
         }
         // Live (DIN 6885-1 / 6883 / 6886): the key along Y, width b along X,
         // bottom on the XY plane; round ends of radius b / 2 (A), square (B),
-        // one round end (AB, at +Y); tapered keys fall 1:100 towards +Y from
-        // h at the -Y end.
-        const roundLow = form == KEY_ROUND_ENDS || form == KEY_ROUND_TAPER;
-        const roundHigh = roundLow || form == KEY_ONE_ROUND_END;
+        // one round end (AB: round at -Y, square at +Y; live's Extrude 1
+        // regions); tapered keys fall 1:100 towards +Y from h at the -Y end.
+        const roundHigh = form == KEY_ROUND_ENDS || form == KEY_ROUND_TAPER;
+        const roundLow = roundHigh || form == KEY_ONE_ROUND_END;
         const r = b / 2;
         const y0 = roundLow ? -l / 2 + r : -l / 2;
         const y1 = roundHigh ? l / 2 - r : l / 2;
