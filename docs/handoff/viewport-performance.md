@@ -635,3 +635,37 @@ changes. I write the renderer part first (my files) and show crops before touchi
   - Next levers: `fs_mesh` has a `discard` (hidden faces, section clipping), which turns off hidden-surface removal on
     tile-based GPUs (Apple) for every face; a variant without it when nothing is hidden or clipped, or a depth
     pre-pass, should cut face overdraw (the "no backface pass" column shows how much overdraw costs on macOS 14).
+- **2026-10-24 (perf): discard-free faces, depth pre-pass, a real assembly.**
+  - `fs_mesh` discards hidden faces and section-clipped fragments; a shader that can discard (or a blending pipeline)
+    turns off hidden-surface removal on tile-based GPUs. `DrawLists::solid` (alpha 1, no section plane on it, no
+    hidden or dimmed face; prefix counts of the masked states by pick id) puts those meshes first in their layer,
+    drawn by `mesh-solid` (`fs_mesh_solid`, no blending). Same pixels (offscreen
+    `faces_without_discard_match_the_discarding_pipeline`). `NOSHAPE_PERF_SKIP=solid` turns it off.
+    Interleaved ×3 medians (ms; vs chord), run of the solid commit (+ a bench-only `backsilafter` switch):
+
+    | | chord | angle | angle, solid off | angle, backface pass after faces |
+    |---|---|---|---|---|
+    | pins macOS 14 | 11.28 | 12.53 (+11%) | 13.60 (+21%) | 12.40 (+10%) |
+    | pins macOS 15 | 10.63 | 11.49 (+8%) | 11.99 (+13%) | 11.46 (+8%) |
+    | plate macOS 14 | 11.50 | 13.77 (+20%) | 14.79 (+29%) | 13.45 (+17%) |
+    | plate macOS 15 | 10.17 | 12.20 (+20%) | 12.62 (+24%) | 12.34 (+21%) |
+
+    The backface pass order is neutral now; it stays first.
+  - Assembly fixture `tests/perf/pins-assembly-1000.noshape` (1000 pin instances, 9002 draw instances), run 40089974747:
+    macOS 14 chord 9.82, angle 10.96 (+12%), solid off 13.63 (+39%); macOS 15 chord 10.69, angle 10.99 (+3%), solid
+    off 11.62 (+9%). UI-thread CPU per frame 1.1 ms mean (p95 2.0): GPU-bound like the Part Studios.
+  - Depth pre-pass for the meshes that still discard (tried, not landed; on branch perf-hsr): `mesh-depth` (the
+    discarding test alone, no color writes) then `mesh-equal` (depth Equal, no discard, `@invariant` position).
+    Pins in a horizontal section (bench hook `NOSHAPE_PERF_SECTION=1`): section +44% / +26% GPU vs no section, with
+    the pre-pass 17.55 / 14.29 ms, without 17.20 / 14.07 (macOS 14 / 15): no gain.
+  - **Presented fps on the macOS runners (v0.4.8 gate d).** Only a job's first orbit is reliable: a few minutes into
+    a job (or after building on the runner) the app's window is slowed down, the orbit's 8 ms timer firing every
+    ~62 ms (`v.bench_tick`), 33-34 fps then 19 fps for any build (v0.4.7 DMG and v0.4.8 alike, runs 40130121241 /
+    40130111896; per-frame CPU ~3 ms and GPU ~12 ms unchanged). Not App Nap (a latency-critical NSProcessInfo
+    activity changed nothing) and not display sleep (pmset / screensaver off / caffeinate -u changed nothing).
+    Like for like v0.4.8 = v0.4.7 (34.3 / 33.6 first orbit). perf.yml now builds a ref on macos-latest (the
+    release's image) so the first orbit comes a minute into the job; `env` / `modes` inputs to compare settings in
+    separate jobs. A ref built on the macOS 14 / 15 runners also measured 19 fps (benched after ~40 min compiling).
+  - Found on the way (not fixed): with a section plane on, anti-aliased silhouette pixels of parts seen through
+    the plane change (41 px in the offscreen two-box scene, plane cutting nothing): the cap quad, drawn on the plane,
+    takes colour from the 1-sample cap mask, which disagrees with the MSAA frame at silhouettes.
