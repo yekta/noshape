@@ -123,7 +123,8 @@ fn second_pattern_case(reapply: bool) {
     let want = (2 * n + 10) as f64 * 20.0 * 10.0 + 2.0 * (n as f64) * 100.0;
     assert!((v - want).abs() < 1e-6 * want, "volume {v} mm³, want {want}");
     eprintln!("×{n} reapply {reapply}: LP1 {a:.0} ms, LP2 {c:.0} ms, whole regeneration {:.0} ms", total.as_secs_f64() * 1e3);
-    assert!(c < 2.0 * a + 300.0, "reapply {reapply}: LP2 {c:.0} ms against LP1 {a:.0} ms");
+    // CI release ×400: 1.9-2.7× (runner noise); it was 40×.
+    assert!(c < 3.0 * a + 300.0, "reapply {reapply}: LP2 {c:.0} ms against LP1 {a:.0} ms");
 }
 
 #[test]
