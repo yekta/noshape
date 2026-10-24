@@ -371,6 +371,33 @@ fn thin_extrude_closed_and_open_profiles() {
     assert!(near(total_volume(&res.context), area * 0.01, 1e-6), "{}", total_volume(&res.context));
 }
 
+/// A Thin wall that is one sketch circle edge: OCCT's 2D wire offset
+/// (BRepOffsetAPI_MakeOffset) segfaulted on it, so the circle is offset
+/// directly. Outward, inward (Flip wall), both sides, and too thick inward
+/// (an error, not a crash).
+#[test]
+fn thin_wall_of_a_lone_circle_edge() {
+    let run = |params: &[(&str, ParamValue)]| {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let c = sk.add_circle(DVec2::ZERO, 0.01);
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        thin_extrude(&mut t, vec![Reference::SketchEntity { sketch: s, entity: c.0 }], params);
+        let res = t.regen();
+        let st = res.display.features.last().unwrap().clone();
+        (st.status, total_volume(&res.context))
+    };
+    let ring = |r1: f64, r2: f64| PI * (r2 * r2 - r1 * r1) * 0.01;
+    let (st, v) = run(&[("thickness1", e("2 mm"))]);
+    assert!(st == FeatureStatus::Ok && near(v, ring(0.01, 0.012), 1e-7), "{st:?} {v}");
+    let (st, v) = run(&[("thickness1", e("2 mm")), ("flipWall", b(true))]);
+    assert!(st == FeatureStatus::Ok && near(v, ring(0.008, 0.01), 1e-7), "{st:?} {v}");
+    let (st, v) = run(&[("midplane", b(true)), ("thickness", e("4 mm"))]);
+    assert!(st == FeatureStatus::Ok && near(v, ring(0.008, 0.012), 1e-7), "{st:?} {v}");
+    let (st, _) = run(&[("thickness1", e("15 mm")), ("flipWall", b(true))]);
+    assert_eq!(st, FeatureStatus::Error);
+}
+
 #[test]
 fn thin_revolve_sweep_and_loft() {
     // Revolve: a line at x = 10 mm on the Front plane, full turn about Z.

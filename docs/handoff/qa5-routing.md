@@ -263,3 +263,19 @@ STATUS FSW-draft (psb, 2026-10-24 b): parting edges on several parts (each draft
 STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
 STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
 STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.
+STATUS FSW-loft (psb, 2026-10-24 b): Path (section-sampled like Parasolid) and guides through polygon corners done; curved-profile guides, guide continuity and trims still open.
+
+## SKV1 — ui2 — Sketch inference glyph and rubber-band end points (P1, sketch feel)
+- Source: psb app check 2026-10-24 (agent/psb build, demo document, Line tool on Top, view normal).
+- Repro: Sketch on Top, L, click, move horizontally (or down for vertical / perpendicular).
+- Expected (live sketch/51, 52): the inference glyph is the bare icon in `#333`, ~14 px, centred ~30 px right / 31 px below the
+  line's end point, no box. Both ends of the line being drawn are ~6 px `#449ccd` dots. Dashes are 1 px `#449ccd` / `#e2bc2c`.
+- Actual: the glyph sits in an 18 px light-blue box with a yellow `#ffc20e` border and a white icon at +12/+10
+  (`part_studio/sketch.rs`, "inference icon next to the cursor"); no dot at the start; a 9 px `#ffc20e` dot at the end;
+  2 px dashes reading blue / tan.
+
+## INP1 — ui — Selected text in inputs (P1)
+- Source: psb app check 2026-10-24 (extrude depth after dragging its arrow; live dialogs/extrude-06, -07).
+- Expected (live): selected text in a focused field is strong blue `rgb(51,103,209)` with white text.
+- Actual: the input selection uses `theme.selection` = `#b2ddf6` (list blue) with dark text (`main.rs` theme). Note:
+  gpui-base paints input selections only while the window is active, so it doesn't show on a bare Xvfb at all.

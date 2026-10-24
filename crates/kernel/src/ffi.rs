@@ -443,6 +443,8 @@ pub(crate) mod ffi {
             closed: bool,
             start_points: &[f64],
             conditions: &[f64],
+            path: &OcShape,
+            path_count: i32,
         ) -> Result<OpOut>;
         fn set_working_scale(k: f64) -> Result<()>;
         fn op_thicken(s: &OcShape, t1: f64, t2: f64) -> Result<OpOut>;

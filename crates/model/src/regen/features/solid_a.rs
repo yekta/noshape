@@ -101,6 +101,103 @@ pub(super) fn loft_end(ev: &mut EvalCtx, vals: &ParamValues, ids: [&str; 3], pro
     })
 }
 
+/// Onshape's LOFT_GUIDE_INTERSECT ("All guides should intersect each
+/// profile boundary.", live: no field marked).
+const LOFT_GUIDE_MISS: &str = "All guides should intersect each profile boundary.";
+
+/// A polygon's corners in loop order (None if an edge isn't straight).
+fn polygon(s: &Shape) -> Option<Vec<DVec3>> {
+    let wire = if s.shape_type() == ShapeType::Face { s.wires().into_iter().next()? } else { s.clone() };
+    let mut edges: Vec<(DVec3, DVec3)> = Vec::new();
+    for e in wire.edges() {
+        if !matches!(e.edge_curve(), Ok(k::Curve::Line { .. })) {
+            return None;
+        }
+        edges.push(e.endpoints().ok()?);
+    }
+    let first = edges.first().copied()?;
+    let mut out = vec![first.0];
+    let mut at = first.1;
+    let mut used = vec![false; edges.len()];
+    used[0] = true;
+    while out.len() < edges.len() {
+        let i = (0..edges.len()).find(|&i| !used[i] && (edges[i].0.distance(at) < 1e-9 || edges[i].1.distance(at) < 1e-9))?;
+        used[i] = true;
+        out.push(at);
+        at = if edges[i].0.distance(at) < 1e-9 { edges[i].1 } else { edges[i].0 };
+    }
+    Some(out)
+}
+
+/// A loft of two polygon profiles along guides through their corners (live
+/// "psb (10-24 f)": the guided corner's side edge is the guide): each side
+/// face is ruled between its two corner columns, the guide or the straight
+/// line between matching corners, and the faces are sewn with the profiles.
+/// Live's guided faces bulge a little more (one guide on □20 → □10: 5634.73
+/// vs 5628.83 here; all four corners 9511.27 vs 9511.44).
+fn loft_guided(shapes: &[Shape], guides: &[Shape], solid: bool) -> FResult<Shape> {
+    let [a, b] = shapes else { return err("Loft guides with more than two profiles are not supported yet") };
+    let (Some(pa), Some(mut pb)) = (polygon(a), polygon(b)) else { return err("Loft guides are only supported between straight-edged profiles yet") };
+    if pa.len() != pb.len() {
+        return err("Loft guides need profiles with as many corners yet");
+    }
+    let n = pa.len();
+    // Turn the second loop the way the first runs (about the loft's axis).
+    let newell = |p: &[DVec3]| (0..p.len()).map(|i| p[i].cross(p[(i + 1) % p.len()])).sum::<DVec3>();
+    let ca = pa.iter().copied().sum::<DVec3>() / n as f64;
+    let cb = pb.iter().copied().sum::<DVec3>() / n as f64;
+    let axis = cb - ca;
+    if newell(&pa).dot(axis).signum() != newell(&pb).dot(axis).signum() {
+        pb.reverse();
+    }
+    // Each guide: one edge from a corner of each profile.
+    let near = |pts: &[DVec3], q: DVec3| pts.iter().position(|p| p.distance(q) < 1e-7);
+    let mut shift: Option<usize> = None;
+    let mut columns: Vec<Option<Shape>> = vec![None; n];
+    for g in guides {
+        let edges = g.edges();
+        let [e] = edges.as_slice() else { return err("Loft guides of several curves are not supported yet") };
+        let (s0, s1) = e.endpoints()?;
+        let (ia, ib, edge) = match (near(&pa, s0), near(&pb, s1), near(&pa, s1), near(&pb, s0)) {
+            (Some(i), Some(j), _, _) => (i, j, e.clone()),
+            (_, _, Some(i), Some(j)) => (i, j, e.reversed()?),
+            _ => return err(LOFT_GUIDE_MISS),
+        };
+        let k = (ib + n - ia) % n;
+        if shift.is_some_and(|s| s != k) {
+            return err(LOFT_GUIDE_MISS);
+        }
+        shift = Some(k);
+        columns[ia] = Some(k::make_wire(&[edge])?);
+    }
+    let shift = shift.unwrap_or(0);
+    let mut columns: Vec<Shape> = columns
+        .into_iter()
+        .enumerate()
+        .map(|(i, c)| match c {
+            Some(c) => Ok(c),
+            None => Ok(k::make_wire(&[k::make_line(pa[i], pb[(i + shift) % n])?])?),
+        })
+        .collect::<FResult<_>>()?;
+    columns.push(columns[0].clone());
+    let ruled = k::LoftOptions { ruled: true, ..Default::default() };
+    let mut faces: Vec<Shape> = Vec::new();
+    for i in 0..n {
+        let side = k::loft(&[columns[i].clone(), columns[i + 1].clone()], &ruled).map_err(|_| fe(LOFT_FAILED))?.shape;
+        faces.extend(side.faces());
+    }
+    if solid {
+        faces.push(a.clone());
+        faces.push(b.clone());
+    }
+    let size = (pa.iter().chain(&pb).fold(DVec3::splat(f64::MAX), |m, p| m.min(*p)) - pa.iter().chain(&pb).fold(DVec3::splat(f64::MIN), |m, p| m.max(*p))).length();
+    let sewn = k::sew(&faces, 1e-6 * (1.0 + size), solid).map_err(|_| fe(LOFT_FAILED))?.shape;
+    if solid && sewn.count(ShapeType::Solid) == 0 {
+        return err(LOFT_FAILED);
+    }
+    Ok(sewn)
+}
+
 /// Onshape's LOFT_FAILED.
 const LOFT_FAILED: &str = "Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.";
 
@@ -581,12 +678,6 @@ fn loft_names(ev: &EvalCtx, sections: &[Section], res: &k::OpResult, caps: bool)
 
 pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     let body_type = ev.enum_("bodyType").to_string();
-    if ev.bool("addGuides") && ev.params.array("guidesArray").iter().any(|g| !g.query("guideEntities").is_empty()) {
-        return err("Loft guides are not supported yet");
-    }
-    if ev.bool("addSections") && !ev.query("spine").is_empty() {
-        return err("Loft path is not supported yet");
-    }
     let solid = body_type == "SOLID";
     let sections = if solid {
         loft_sections(ev, ev.params.array("sheetProfilesArray"), "sheetProfileEntities", false)?
@@ -604,6 +695,17 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         return err("Point profiles can only exist as first or last profiles.");
     }
     let shapes: Vec<Shape> = sections.iter().map(|s| s.shape.clone()).collect();
+    // loft.fs guides (live "psb (10-24 f)").
+    let guide_refs: Vec<Reference> = if ev.bool("addGuides") { ev.params.array("guidesArray").iter().flat_map(|g| g.query("guideEntities").to_vec()).collect() } else { Vec::new() };
+    if !guide_refs.is_empty() {
+        let guides = wires_from(&resolve_curves(ev, &guide_refs)?)?;
+        let shape = loft_guided(&shapes, &guides, solid)?;
+        let names = name_new(ev, &shape);
+        let kind = if solid { BodyKind::Solid } else { BodyKind::Surface };
+        let op = ev.enum_(if solid { "operationType" } else { "surfaceOperationType" }).to_string();
+        let scope = if solid { super::extrude::scope(ev) } else { None };
+        return ev.apply_operation(vec![NamedShape::new(shape, names)], &op, scope, kind);
+    }
     let mut opts = k::LoftOptions { solid, closed: ev.bool("makePeriodic"), ..Default::default() };
     // loft.fs createProfileConditions ("End conditions" is only a group
     // header: the conditions apply whether it's open or not).
@@ -612,6 +714,17 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     let (first, last) = (&sections[0], &sections[sections.len() - 1]);
     opts.start = loft_end(ev, vals, ["startCondition", "startMagnitude", "startDirection"], &first.shape, normal(first), "start")?;
     opts.end = loft_end(ev, vals, ["endCondition", "endMagnitude", "endDirection"], &last.shape, normal(last), "end")?;
+    // loft.fs Path (live "psb (10-24 f)"): the loft runs through Section
+    // count sections taken along the path; it needn't touch the profiles.
+    if ev.bool("addSections") && !ev.query("spine").is_empty() {
+        let edges = resolve_curves(ev, ev.query("spine"))?;
+        let wires = wires_from(&edges)?;
+        let [spine] = wires.as_slice() else { return crate::regen::eval::err_at(&["spine"], "Loft path must be a contiguous set of curves.") };
+        if shapes.len() != 2 {
+            return err("Loft path with more than two profiles is not supported yet");
+        }
+        opts.path = Some((spine.clone(), ev.integer("sectionCount")?.max(1) as usize));
+    }
     // Onshape's LOFT_CONNECTION_MATCHING: every connection needs a point on
     // each profile (point profiles excepted).
     if ev.bool("matchConnections") {
@@ -1190,4 +1303,39 @@ pub fn sphere(ev: &mut EvalCtx) -> FResult<()> {
     let shape = k::make_sphere(&k::Plane::new(c, DVec3::Z, DVec3::X), r, std::f64::consts::TAU)?;
     let names = name_new(ev, &shape);
     ev.apply_operation(vec![NamedShape::new(shape, names)], "NEW", None, BodyKind::Solid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A square of half-width `h` at height `z` (mm), as a face.
+    fn square(h: f64, z: f64) -> Shape {
+        let c = [(-h, -h), (h, -h), (h, h), (-h, h)].map(|(x, y)| DVec3::new(x, y, z) * 1e-3);
+        let edges: Vec<Shape> = (0..4).map(|i| k::make_line(c[i], c[(i + 1) % 4]).unwrap()).collect();
+        k::make_face_from_wire(&k::make_wire(&edges).unwrap(), true).unwrap()
+    }
+
+    /// The live guide arc at corner (sx, sy): through (−10,−10,0),
+    /// (−12,−12,10), (−5,−5,end) mirrored by the signs.
+    fn guide(sx: f64, sy: f64, end: f64) -> Shape {
+        let p = |x: f64, y: f64, z: f64| DVec3::new(sx * x, sy * y, z) * 1e-3;
+        k::make_wire(&[k::make_arc_3pts(p(-10.0, -10.0, 0.0), p(-12.0, -12.0, 10.0), p(-5.0, -5.0, end)).unwrap()]).unwrap()
+    }
+
+    /// Live "psb (10-24 f) loft and guides" case 4/5: □20 → □10 20 up.
+    #[test]
+    fn guided_loft_as_live() {
+        let shapes = [square(10.0, 0.0), square(5.0, 20.0)];
+        let vol = |g: Vec<Shape>| loft_guided(&shapes, &g, true).unwrap().volume().unwrap() * 1e9;
+        // Ruled guided faces: live's bulge a little more (−0.1 % per guide).
+        let one = vol(vec![guide(1.0, 1.0, 20.0)]);
+        assert!((one - 5634.73412077918).abs() < 8.0, "{one}");
+        let two = vol(vec![guide(1.0, 1.0, 20.0), guide(-1.0, -1.0, 20.0)]);
+        assert!((two - 6602.796189766023).abs() < 16.0, "{two}");
+        let four = vol(vec![guide(1.0, 1.0, 20.0), guide(-1.0, -1.0, 20.0), guide(1.0, -1.0, 20.0), guide(-1.0, 1.0, 20.0)]);
+        assert!((four - 9511.270069510634).abs() < 1.0, "{four}");
+        let miss = loft_guided(&shapes, &[guide(1.0, 1.0, 18.0)], true).unwrap_err();
+        assert_eq!(miss.message, LOFT_GUIDE_MISS);
+    }
 }

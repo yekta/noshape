@@ -249,6 +249,9 @@ pub struct LoftOptions {
     /// Start / end profile conditions (smooth lofts of wire or face sections).
     pub start: LoftEnd,
     pub end: LoftEnd,
+    /// Onshape's Path: the path and its section count (two profiles).
+    #[serde(skip)]
+    pub path: Option<(Shape, usize)>,
 }
 
 /// A loft end condition (Onshape's start / end profile condition) with its
@@ -303,7 +306,11 @@ pub fn loft(sections: &[Shape], opts: &LoftOptions) -> Result<OpResult> {
     };
     let l = vec_to_list(sections);
     let conditions: Vec<f64> = opts.start.ffi().into_iter().chain(opts.end.ffi()).collect();
-    op(ffi::op_loft(&l, opts.solid, opts.ruled, opts.closed, &pts, &conditions))
+    let (path, count) = match &opts.path {
+        Some((p, n)) => (p.clone(), *n as i32),
+        None => (Shape::default(), 0),
+    };
+    op(ffi::op_loft(&l, opts.solid, opts.ruled, opts.closed, &pts, &conditions, path.raw(), count))
 }
 
 // ---------------------------------------------------------------- thicken / shell

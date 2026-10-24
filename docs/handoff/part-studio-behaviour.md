@@ -1528,3 +1528,12 @@ DerivedSketch`). TAB1, ADV12 and F32 are done by ui too (see theme-layout.md).
   the part at the parting plane, drafts each side toward it and fuses. Plane corners: `bevel_corners` cuts each
   straight corner along the pull with the plane through its far vertex and the drafted faces' feet. Names survive a
   plain draft (draft history); symmetric / plane corners get new names.
+- **Loft path** (live "psb (10-24 f)"): kernel `path_sections` carries the matched profiles along the path
+  (MakePipeShell), cuts Section count sections at even arc-length steps between the profiles' places on the path,
+  aligns each to the previous one (direction, start vertex) and the loft runs through all of them. Parasolid's 5 / 10
+  section volumes fit a natural cubic through those sections; ours still falls back from `natural_loft` for path lofts
+  (rows don't sit at the iso-parametric v even with Approx_IsoParametric) and comes out at the exact sweep (P3, open).
+  `LoftOptions.path`; two profiles only.
+- **Loft guides** (live "psb (10-24 f)"): `solid_a::loft_guided` for two polygon profiles and one-curve guides through
+  corners: side faces ruled between corner columns (guide or straight line, arc-length pairing), sewn with the caps.
+  Unit test `solid_a::tests::guided_loft_as_live` (kernel shapes; the live guide arcs lie in x = ±y planes).

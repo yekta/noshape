@@ -42,6 +42,10 @@
 #include <BRepOffsetAPI_MakeOffsetShape.hxx>
 #include <BRepOffsetAPI_MakePipe.hxx>
 #include <BRepOffsetAPI_MakePipeShell.hxx>
+#include <gp_Pln.hxx>
+#include <TopTools_HSequenceOfShape.hxx>
+#include <ShapeAnalysis_FreeBounds.hxx>
+#include <BRepAlgoAPI_Section.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -1647,8 +1651,116 @@ static bool connect_sections(std::vector<TopoDS_Wire>& wires, const std::vector<
   return true;
 }
 
+// Loft along a path (Onshape's Path): the matched section wires carried
+// along `spine` (MakePipeShell), and `count` sections cut from that at even
+// steps of the path between the first and last profile, so the loft runs
+// through them all (live "psb (10-24 f)": a □20 along a quarter arc gives
+// 25100.80 with 5 sections, 25128.64 with 10, the exact sweep 25132.74).
+// False when the sections can't be made (the wires are left as they were).
+static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& spine, int count)
+{
+  // (Profiles in between aren't placed yet.)
+  if (wires.size() != 2 || count < 1)
+    return false;
+  BRepOffsetAPI_MakePipeShell ps(spine);
+  for (const auto& w : wires)
+    ps.Add(w, false, false);
+  ps.Build();
+  if (!ps.IsDone())
+    return false;
+  const TopoDS_Shape    carried = ps.Shape();
+  BRepAdaptor_CompCurve cc(spine);
+  const double          total = GCPnts_AbscissaPoint::Length(cc);
+  // Each end profile's place on the path: the arc length of the path point
+  // nearest its centre (sampled, then narrowed).
+  auto place = [&](const TopoDS_Wire& w) {
+    GProp_GProps g;
+    BRepGProp::LinearProperties(w, g);
+    const gp_Pnt c  = g.CentreOfMass();
+    const double u0 = cc.FirstParameter(), u1 = cc.LastParameter();
+    const int    N  = 2000;
+    int          bi = 0;
+    for (int i = 1; i <= N; ++i)
+      if (cc.Value(u0 + (u1 - u0) * i / N).Distance(c) < cc.Value(u0 + (u1 - u0) * bi / N).Distance(c))
+        bi = i;
+    double lo = u0 + (u1 - u0) * std::max(0, bi - 1) / N, hi = u0 + (u1 - u0) * std::min(N, bi + 1) / N;
+    for (int i = 0; i < 80; ++i)
+    {
+      const double a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3;
+      if (cc.Value(a).Distance(c) < cc.Value(b).Distance(c))
+        hi = b;
+      else
+        lo = a;
+    }
+    return GCPnts_AbscissaPoint::Length(cc, u0, 0.5 * (lo + hi));
+  };
+  const double s0 = place(wires.front()), s1 = place(wires.back());
+  if (std::abs(s1 - s0) < 1e-9 * (1 + total))
+    return false;
+  std::vector<TopoDS_Wire> out{wires.front()};
+  // Each section runs like the one before and starts where it does.
+  auto normal_of = [](const TopoDS_Wire& w) {
+    BRepAdaptor_CompCurve c(w);
+    gp_Vec                nrm;
+    const int             m = 64;
+    for (int k = 0; k < m; ++k)
+    {
+      const gp_Pnt a = c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / m);
+      const gp_Pnt b = c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * (k + 1) / m);
+      nrm += gp_Vec(a.XYZ()).Crossed(gp_Vec(b.XYZ()));
+    }
+    return nrm;
+  };
+  auto align = [&](TopoDS_Wire w) {
+    const TopoDS_Wire& prev = out.back();
+    if (normal_of(w).Dot(normal_of(prev)) < 0)
+      w = TopoDS::Wire(w.Reversed());
+    BRepTools_WireExplorer first(prev);
+    return rotate_wire_start(w, BRep_Tool::Pnt(first.CurrentVertex()));
+  };
+  for (int i = 1; i <= count; ++i)
+  {
+    const double         s = s0 + (s1 - s0) * i / (count + 1);
+    GCPnts_AbscissaPoint ap(cc, s, cc.FirstParameter());
+    if (!ap.IsDone())
+      return false;
+    gp_Pnt P;
+    gp_Vec T;
+    cc.D1(ap.Parameter(), P, T);
+    if (T.Magnitude() < 1e-12)
+      return false;
+    BRepAlgoAPI_Section sec(carried, gp_Pln(P, gp_Dir(T)), false);
+    sec.Approximation(true);
+    sec.Build();
+    if (!sec.IsDone())
+      return false;
+    occ::handle<TopTools_HSequenceOfShape> edges = new TopTools_HSequenceOfShape;
+    for (TopExp_Explorer ex(sec.Shape(), TopAbs_EDGE); ex.More(); ex.Next())
+      edges->Append(ex.Current());
+    occ::handle<TopTools_HSequenceOfShape> found;
+    ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, 1e-6, false, found);
+    if (found.IsNull() || found->Length() == 0)
+      return false;
+    // The loop nearest the path point.
+    TopoDS_Wire best;
+    double      bd = 1e300;
+    for (int k = 1; k <= found->Length(); ++k)
+    {
+      BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(P).Vertex(), found->Value(k));
+      if (d.IsDone() && d.Value() < bd)
+        bd = d.Value(), best = TopoDS::Wire(found->Value(k));
+    }
+    out.push_back(align(best));
+  }
+  // The end profile too (same edges, so its history is untouched).
+  out.push_back(align(wires.back()));
+  wires = out;
+  return true;
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
-                       rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural)
+                       rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural,
+                       const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0)
 {
   const size_t n = sections.items.size();
   if (n < 2)
@@ -1715,7 +1827,18 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   const bool counts  = !points && start_points.empty() && match_vertex_counts(wires, more);
   if (counts)
     split = split.IsNull() ? more : compose(compound_of(args), split, more);
-  const bool matched = circles || counts || connected;
+  // Along a path: the sections cut from the profiles carried along it.
+  bool along = false;
+  if (!path.IsNull() && !points)
+  {
+    if (!path_sections(wires, as_wire(path, "loft path"), path_count))
+      fail_op("the loft can't follow the path");
+    along   = true;
+    natural = allow_natural && !ruled && !closed;
+    if (natural)
+      ts.SetParType(Approx_IsoParametric);
+  }
+  const bool matched = circles || counts || connected || along;
   ts.CheckCompatibility(!matched);
   TopoDS_Wire firstWire = wires.empty() ? TopoDS_Wire() : wires.front();
   // OCCT lofts two sections ruled; an end condition needs the smooth
@@ -1733,15 +1856,19 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     smooth.insert(smooth.begin() + 1, TopoDS::Wire(BRepBuilderAPI_Transform(wires[0], half, true).Shape()));
     drop = 1;
   }
-  for (size_t i = 0, w = 0; i < n; ++i)
-    if (sections.items[i].ShapeType() == TopAbs_VERTEX)
-      ts.AddVertex(TopoDS::Vertex(sections.items[i]));
-    else
-    {
-      ts.AddWire(wires[w++]);
-      if (drop >= 0 && i == 0)
-        ts.AddWire(smooth[1]);
-    }
+  if (along)
+    for (const auto& w : wires)
+      ts.AddWire(w);
+  else
+    for (size_t i = 0, w = 0; i < n; ++i)
+      if (sections.items[i].ShapeType() == TopAbs_VERTEX)
+        ts.AddVertex(TopoDS::Vertex(sections.items[i]));
+      else
+      {
+        ts.AddWire(wires[w++]);
+        if (drop >= 0 && i == 0)
+          ts.AddWire(smooth[1]);
+      }
   if (closed)
   {
     if (firstWire.IsNull())
@@ -1752,7 +1879,7 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   if (!ts.IsDone())
     fail_op("loft failed (incompatible sections?)");
   if (natural && (!natural_loft(ts.Shape(), smooth, ends, drop) || !BRepCheck_Analyzer(ts.Shape()).IsValid()))
-    return loft_impl(sections, solid, ruled, closed, start_points, ends, false);
+    return loft_impl(sections, solid, ruled, closed, start_points, ends, false, path, path_count);
   HHist h = history_of(args, ts);
   if (matched)
   {
@@ -1771,7 +1898,8 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
 }
 
 OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
-              rust::Slice<const double> start_points, rust::Slice<const double> conditions)
+              rust::Slice<const double> start_points, rust::Slice<const double> conditions, const OcShape& path,
+              int32_t path_count)
 {
   LoftEnds ends;
   if (conditions.size() == 10)
@@ -1779,7 +1907,7 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
     const auto& c = conditions;
     ends = {(int)c[0], c[1], gp_Vec(c[2], c[3], c[4]), (int)c[5], c[6], gp_Vec(c[7], c[8], c[9])};
   }
-  return loft_impl(sections, solid, ruled, closed, start_points, ends, true);
+  return loft_impl(sections, solid, ruled, closed, start_points, ends, true, path.shape, path_count);
 }
 
 // ---------------------------------------------------------------- thicken / shell

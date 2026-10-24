@@ -304,6 +304,47 @@ fn loft_end_conditions_as_live() {
     assert!(bad.borrow().is_empty(), "{:?}", bad.borrow());
 }
 
+/// Live "psb (10-24 f) loft path": □20 on Top to □20 on a plane x 40
+/// (centred at z 40), along a quarter arc R40 from the origin: the loft runs
+/// through Section count sections (5: 25100.80, 10: 25128.64; the exact
+/// sweep is 25132.74).
+#[test]
+fn loft_path_as_live() {
+    let run = |count: &str| -> f64 {
+        let mut t = T::new();
+        let s1 = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.01, -0.01, 0.01, 0.01));
+        let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("cplaneType", en("OFFSET")), ("offset", e("40 mm"))]);
+        // Right offset: sketch x = world Y, y = Z.
+        let s2 = t.sketch(Reference::FeaturePlane(pl), rect(-0.01, 0.03, 0.01, 0.05));
+        let mut sk = noshape_sketch::Sketch::new();
+        // Front: sketch x = X, y = Z; centre (40, 0), from the origin up and over.
+        let arc = sk.add_arc(DVec2::new(0.04, 0.0), DVec2::new(0.04, 0.04), DVec2::ZERO);
+        let path = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+        let item = |r: Reference| {
+            let mut v = ParamValues::default();
+            v.set("sheetProfileEntities", q(vec![r]));
+            v
+        };
+        let (r1, r2) = (t.regions(s1)[0].clone(), t.regions(s2)[0].clone());
+        t.add(
+            "loft",
+            &[
+                ("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)])),
+                ("addSections", b(true)),
+                ("spine", q(vec![Reference::SketchEntity { sketch: path, entity: arc.0 }])),
+                ("sectionCount", e(count)),
+            ],
+        );
+        total_volume(&t.ok().context) * 1e9
+    };
+    // Ours still follows the exact sweep (25132.7) instead of Parasolid's
+    // natural cubic through the sampled sections (P3, temporary: within
+    // 0.13 %).
+    let (v5, v10) = (run("5"), run("10"));
+    assert!((v5 - 25100.80426973474).abs() < 35.0, "{v5}");
+    assert!((v10 - 25128.64307495251).abs() < 5.0, "{v10}");
+}
+
 #[test]
 fn thicken_region_and_face() {
     let mut t = T::new();

@@ -256,7 +256,8 @@ OpOut op_pipe(const OcShape& profile, const OcShape& spine);
 OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const SweepOpts& opts,
                     const OcShape& aux);
 OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
-              rust::Slice<const double> start_points, rust::Slice<const double> conditions);
+              rust::Slice<const double> start_points, rust::Slice<const double> conditions, const OcShape& path,
+              int32_t path_count);
 void  set_working_scale(double k);
 OpOut op_thicken(const OcShape& s, double t1, double t2);
 OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness, uint8_t join);
