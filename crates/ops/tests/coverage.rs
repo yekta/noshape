@@ -87,6 +87,8 @@ fn menu_labels() -> BTreeSet<String> {
             "document"
         } else if name == "feature_dialog.rs" {
             "partStudio"
+        } else if name == "camera_menu.rs" {
+            "view"
         } else {
             continue;
         };
