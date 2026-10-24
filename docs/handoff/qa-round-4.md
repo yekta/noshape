@@ -989,3 +989,24 @@ Differences:
 - **S2-b (api)** `drawing_get` lists no silhouette edges of curved faces, so a script can't aim a callout at the pin; a
   `drawing_callout` anchor on the pin's centre line attached to the plate (balloon "1"). The app picks the silhouette (balloon
   "2"). → qa5-routing DRW-SIL.
+
+### Session 3: surfaced handle (r4/s3.py, CLI; mass panel in the app)
+Recipe: Ø20 circle on Top; Plane 1 offset 80; rectangle 30×16 on it; Loft (surface, from the two sketches); Fill on each
+open end; Enclose; Fillet 1 mm on the start boundary.
+
+| Step | noshape v0.4.7 | Live |
+|---|---|---|
+| Loft (surface) | OK, Surface 1, area 6058.8169 mm², **5 faces** | pending (follow-up request) |
+| Fill 1 (Ø20 end) | OK, 314.212 mm² (exact disc 314.159265) | pending |
+| Fill 2 (rectangle end) | OK, 480.000 mm² | pending |
+| Enclose | OK, Part 1, 31807.0934 mm³, 7 faces | pending |
+| Fillet 1 mm (start boundary, tangent chain) | OK, 31805.0156 mm³, 11 faces | pending |
+
+Differences:
+- **S3-a** the Mass properties panel (and `query_mass_properties`) show a **Volume 21217.66 mm³ for the open loft surface**;
+  an open surface encloses nothing. Fill 2 / Fill 1 report 0. Live's panel for a lone surface: follow-up request; owner
+  then psb/kern (model mass properties). r4/s3-surface-mass-volume.png.
+- **S3-b** loft face count 5 (the circle's own seam stays as a fifth edge) and the planar fill's area 314.212 vs the exact
+  disc: pending live.
+- CLI note (not a defect): a surface loft takes `wireProfilesArray` (sketch curves), regions give "Select profiles in order
+  from start to finish."; Fill `edges` are objects `{"entities":[…]}`.
