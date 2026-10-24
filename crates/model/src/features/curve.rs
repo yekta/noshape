@@ -158,7 +158,7 @@ pub fn bridging_curve() -> FeatureType {
         ParamSpec::flip("flip2", "Opposite direction").visible(move |v| non_pos(v, "match2")),
         ParamSpec::enum_("method", "Method", &[("MAGNITUDE_BIAS", "Magnitude/bias"), ("CONTROL_POINTS", "Control points")])
             .default_enum("CONTROL_POINTS")
-            .hints(rem)
+            .hints(rem | Hints::SHOW_LABEL)
             .visible(move |v| any_non_pos(v) && !any_g3(v)),
         ParamSpec::bool("editControlPoints", "Edit control points", false).hints(rem | Hints::GROUP_HEADER).visible(move |v| cp_method(v) && any_non_pos(v)),
     ];
@@ -236,9 +236,9 @@ pub fn offset_curve() -> FeatureType {
     let mut p = vec![
         ParamSpec::query("edges", "Edges", QueryFilter::EDGE).hints(Hints::INITIAL_FOCUS),
         ParamSpec::num("distance", "Distance", NONNEGATIVE_LENGTH),
-        ParamSpec::enum_("offsetType", "Offset type", &[("GEODESIC", "Geodesic"), ("EUCLIDEAN", "Euclidean")]),
+        ParamSpec::enum_("offsetType", "Offset type", &[("GEODESIC", "Geodesic"), ("EUCLIDEAN", "Euclidean")]).hints(Hints::SHOW_LABEL),
         ParamSpec::flip("oppositeDirection", "Flip"),
-        ParamSpec::enum_("gapFill", "Gap fill", &[("LINEAR", "Linear"), ("ROUND", "Round")]),
+        ParamSpec::enum_("gapFill", "Gap fill", &[("LINEAR", "Linear"), ("ROUND", "Round")]).hints(Hints::SHOW_LABEL),
         ParamSpec::enum_(
             "scope",
             "Scope",
@@ -257,7 +257,7 @@ pub fn offset_curve() -> FeatureType {
 pub fn isoparametric_curve() -> FeatureType {
     let p = vec![
         ParamSpec::query1("face", "Select face", QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS),
-        ParamSpec::enum_("directionType", "Direction", &[("U", "U direction"), ("V", "V direction")]),
+        ParamSpec::enum_("directionType", "Direction", &[("U", "U direction"), ("V", "V direction")]).hints(Hints::SHOW_LABEL),
         ParamSpec::bool("equalSpacing", "Equal spacing", false),
         ParamSpec::num("nCurves", "Instance count", NumSpec::integer(10, 2, 50)).visible(|v| v.bool("equalSpacing")),
         ParamSpec::array(
@@ -387,7 +387,7 @@ pub fn routing_curve() -> FeatureType {
             "Points",
             "Point",
             vec![
-                ParamSpec::enum_("referenceType", "Reference", &[("ORIGIN", "Origin"), ("VERTEX", "Vertex"), ("CURVE", "Curve"), ("RELATIVE", "Relative")]),
+                ParamSpec::enum_("referenceType", "Reference", &[("ORIGIN", "Origin"), ("VERTEX", "Vertex"), ("CURVE", "Curve"), ("RELATIVE", "Relative")]).hints(Hints::SHOW_LABEL),
                 ParamSpec::query1("vertex", "Vertex", QueryFilter::POINT_LIKE).visible(move |v| reference(v, "VERTEX")),
                 ParamSpec::query("curve", "Edges", CURVES).visible(move |v| reference(v, "CURVE")),
                 ParamSpec::num("curveParameter", "Parameter", EDGE_PARAMETER).visible(move |v| reference(v, "CURVE")),
@@ -420,7 +420,7 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::enum_("segmentEditType", "Segment edit type", &[("ADD_POINTS", "Add points"), ("ORTHOGONAL_PATH", "Orthogonal path")]).visible(segments),
         ParamSpec::num("numPointsToAdd", "Number of points to add", NumSpec::integer(1, 0, 10_000))
             .visible(move |v| segments(v) && v.is("segmentEditType", "ADD_POINTS")),
-        ParamSpec::enum_("orthoCsys", "Coordinate system", &[("WORLD", "World"), ("CURVE", "Curve"), ("OTHER", "Other")]).visible(ortho),
+        ParamSpec::enum_("orthoCsys", "Coordinate system", &[("WORLD", "World"), ("CURVE", "Curve"), ("OTHER", "Other")]).hints(Hints::SHOW_LABEL).visible(ortho),
         ParamSpec::query1("orthoCsysMate", "Orthogonal path coordinate system", QueryFilter::POINT_LIKE)
             .visible(move |v| ortho(v) && v.is("orthoCsys", "OTHER")),
         hidden(ParamSpec::num("solutionIndex", "Solution index", NumSpec::integer(0, 0, 5))),
