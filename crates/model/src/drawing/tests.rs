@@ -2292,3 +2292,21 @@ fn cad_export_text_styles_per_kind_like_onshape() {
     assert!(mtexts.iter().any(|(s, v)| s == "Onshape-Standard-Table-TitleRow" && v.contains("REVISIONS")), "{mtexts:?}");
     assert!(mtexts.iter().filter(|(s, _)| s.starts_with("Onshape-Standard-Table-")).all(|(_, v)| v.starts_with("{\\pxq")));
 }
+
+/// Help H:views: a child view's scale links to its parent's (default) or,
+/// with "Sheet scale", to the sheet's.
+#[test]
+fn child_view_scale_follows_parent_or_sheet() {
+    let (_, mut drawing) = demo();
+    let sheet = &mut drawing.sheets[0];
+    let child = sheet.views.iter().find(|v| matches!(v.kind, ViewKind::Projected { .. }) && v.scale.is_none()).map(|v| v.id).unwrap();
+    let parent = sheet.parent_of(child).unwrap();
+    sheet.scale = 1.0;
+    sheet.view_mut(parent).unwrap().scale = Some(2.0);
+    assert_eq!(views::view_scale(sheet, child), 2.0);
+    sheet.view_mut(child).unwrap().sheet_scale = true;
+    assert_eq!(views::view_scale(sheet, child), 1.0);
+    // Its own scale still wins.
+    sheet.view_mut(child).unwrap().scale = Some(0.5);
+    assert_eq!(views::view_scale(sheet, child), 0.5);
+}
