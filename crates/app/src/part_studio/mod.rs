@@ -303,7 +303,6 @@ pub struct PartStudioView {
     folder_prompt: Option<(Entity<gpui_kit::component::input::InputState>, Vec<FeatureId>, Subscription)>,
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// The Named views dialog's "Select a view" list and the view picked in it.
-    named_view_select: Option<(Entity<crate::os_select::OsSelect>, Subscription)>,
     named_view_picked: Option<String>,
     pending_named_view: Option<noshape_model::partstudio::NamedView>,
     flat_cache: Option<fab_panel::FlatCache>,
@@ -428,7 +427,6 @@ impl PartStudioView {
             folder_renaming: None,
             folder_prompt: None,
             named_views: None,
-            named_view_select: None,
             named_view_picked: None,
             pending_named_view: None,
             flat_cache: None,
@@ -4454,7 +4452,7 @@ impl PartStudioView {
             self.viewport.update(cx, |vp, cx| vp.set_overlay_labels(labels, cx));
         }
         overlay.extend(self.render_palette(window, cx));
-        overlay.extend(self.render_shortcut_sheet(cx));
+        overlay.extend(self.render_shortcut_sheet(window, cx));
         overlay.extend(self.render_create_selection(cx));
         overlay.extend(self.render_material_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-material"))));
         overlay.extend(self.render_variable_input(cx));

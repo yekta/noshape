@@ -245,6 +245,8 @@ pub struct UiState {
     pub shortcut_query: String,
     /// Shortcut sheet tab (General, Part Studio, …).
     pub shortcut_tab: usize,
+    /// The shortcut map's rows (Chrome's scrollbar, live menus/616).
+    pub shortcut_scroll: gpui_kit::ScrollHandle,
     /// Recently started tools, newest first (Search tools with no query).
     pub recent_tools: Vec<&'static str>,
     /// Camera menu "Orient normal to sketch on edit" and its state: an
@@ -440,6 +442,7 @@ impl UiState {
             shortcut_filter: None,
             shortcut_query: String::new(),
             shortcut_tab: 0,
+            shortcut_scroll: gpui_kit::ScrollHandle::new(),
             recent_tools: Vec::new(),
             orient_on_edit: false,
             orient_pending: false,
