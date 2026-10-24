@@ -63,6 +63,7 @@ Format: `## <id> — <owner> — <one-line summary>` then repro, expected (live)
 
 ## IMP2 — live request — Parts list order after a two-part STEP import
 - Source: qa4, v0.4.6 (d). noshape lists Part 2 above Part 1 after importing g48-two.step; live's order not captured.
+- Closed (api, 10-24): live lists "Part 2, Part 1" too, in the file's order (behaviours.md "api (10-24) IMP2 parts order"). No change.
 
 ## R1 — render (lead to assign) — two default planes selected: parts drawn with black halos and see-through holes
 - Source: qa4, v0.4.6 gate 2026-10-22; also on v0.4.5 (not a regression).
