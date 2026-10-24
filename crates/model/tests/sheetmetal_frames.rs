@@ -405,7 +405,8 @@ fn hem_straight_and_rolled() {
     let r = s.ok();
     let fp = flat(&r, 0);
     let (len, _) = across_along(&fp);
-    let expected = (mm(40.0) - mm(5.0)) + ba(1.5 * PI, mm(3.0), 0.5, mm(2.0));
+    // A rolled hem is a bend: the bend K factor (the Rolled K factor is for rolled walls).
+    let expected = (mm(40.0) - mm(5.0)) + ba(1.5 * PI, mm(3.0), 0.45, mm(2.0));
     assert!(near(len, expected, 1e-7), "rolled flat {len} vs {expected}");
 
     let mut s = plate();
