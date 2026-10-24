@@ -2545,3 +2545,45 @@ fn hole_and_rib_match_onshape() {
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
+
+/// qa5 SF2: two adjacent sketch regions extruded together are one part
+/// without a seam (live: 8000 mm³, 6 faces).
+#[test]
+fn adjacent_regions_extrude_without_a_seam() {
+    let mut t = T::new();
+    let (_, regions) = t.sketch(&[&[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)], &[(20.0, 0.0), (40.0, 0.0), (40.0, 20.0), (20.0, 20.0)]], &[]);
+    assert_eq!(regions.len(), 2);
+    let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    assert_eq!(r.context.bodies.len(), 1);
+    assert!((volume(&r) - 8000.0).abs() < 1e-6, "{}", volume(&r));
+    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 6);
+}
+
+/// qa5 ADV2: loft of a 20 × 20 square (z 0) to a Ø16 circle (z 20). Live: side
+/// faces 324.6214685 mm² each (ours the same), volume 5927.728022 mm³, which
+/// is Onshape's approximation: the exact ruled solid (the circle split at the
+/// square's corner directions, rows by arc length) is 5927.75434.
+#[test]
+fn loft_square_to_circle_matches_onshape() {
+    let mut t = T::new();
+    let (_, r1) = t.sketch(&[&[(-10.0, -10.0), (10.0, -10.0), (10.0, 10.0), (-10.0, 10.0)]], &[]);
+    let p = Reference::FeaturePlane(t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("20 mm"))]));
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.008);
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![p])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let r2: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s2).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s2, key: g.key.clone() }).collect();
+    let item = |r: Reference| {
+        let mut v = noshape_model::params::ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    let l = t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1[0].clone()), item(r2[0].clone())]))]);
+    let r = t.ok(l);
+    assert!((volume(&r) - 5927.75434).abs() < 2e-3, "{}", volume(&r));
+    let b = &r.context.bodies[0];
+    let sides: Vec<f64> = b.shape.faces().iter().filter(|f| !matches!(f.face_surface(), Ok(noshape_kernel::Surface::Plane(_)))).map(|f| f.area().unwrap() * 1e6).collect();
+    assert_eq!(sides.len(), 4, "{sides:?}");
+    assert!(sides.iter().all(|a| (a - 324.6214685).abs() < 1e-3), "{sides:?}");
+}

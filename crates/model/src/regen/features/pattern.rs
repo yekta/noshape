@@ -1019,9 +1019,37 @@ fn copies_fail(ev: &EvalCtx, f: FeatureId, targets: &[usize], instances: &[Insta
         }
     }
     // Off the part: boxes apart (an exact distance per copy costs seconds
-    // for ×1000, see apply_tools).
+    // for ×1000, see apply_tools). Not where the seed's faces merged into the
+    // part's (psb's flush wall, live "psb (10-23) flush wall pattern": a wall
+    // covering the block's end face, its sides one face with the block's,
+    // patterned ×2 is OK).
     let target_boxes: Vec<k::BoundingBox> = targets.iter().filter_map(|&bi| ev.ctx.bodies[bi].shape.bounding_box(false).ok()).collect();
-    (add || mirror) && boxes[1..].iter().flatten().any(|b| !target_boxes.iter().any(|a| boxes_meet(a, b, 1e-7)))
+    (mirror || (add && !merged_into(ev, f, &tool, targets))) && boxes[1..].iter().flatten().any(|b| !target_boxes.iter().any(|a| boxes_meet(a, b, 1e-7)))
+}
+
+/// Whether a planar face of `tool` lies on a face of the target parts facing
+/// the same way and touching it (the two merged into one face; a face resting
+/// on the part faces the other way). The feature `f`'s own faces on the part
+/// (the seed itself) don't count.
+fn merged_into(ev: &EvalCtx, f: FeatureId, tool: &Shape, targets: &[usize]) -> bool {
+    let tol = 1e-9;
+    tool.faces().iter().any(|tf| {
+        let Ok(Some(tp)) = tf.face_plane() else { return false };
+        let Some(c) = point_on_face(tf) else { return false };
+        let Some((_, tn)) = face_normal_near(tf, c) else { return false };
+        targets.iter().any(|&bi| {
+            let body = &ev.ctx.bodies[bi];
+            body.shape.faces().iter().enumerate().filter(|(i, _)| body.faces.get(*i).is_none_or(|n| n.creator() != Some(f))).any(|(_, bf)| {
+                let Ok(Some(bp)) = bf.face_plane() else { return false };
+                if tp.normal.normalize().cross(bp.normal.normalize()).length() > 1e-9 || (tp.origin - bp.origin).dot(bp.normal.normalize()).abs() > tol {
+                    return false;
+                }
+                let Some(bc) = point_on_face(bf) else { return false };
+                let Some((_, bn)) = face_normal_near(bf, bc) else { return false };
+                tn.dot(bn) > 0.0 && k::distance(tf, bf).is_ok_and(|d| d.distance < tol)
+            })
+        })
+    })
 }
 
 /// Whether `p` lies on the (unbounded) surface of `face`.
