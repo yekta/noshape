@@ -306,7 +306,6 @@ pub struct PartStudioView {
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// The Named views dialog's "Select a view" list and the view picked in it.
     named_view_picked: Option<String>,
-    pending_named_view: Option<noshape_model::partstudio::NamedView>,
     flat_cache: Option<fab_panel::FlatCache>,
     flat_task: Option<(usize, Task<()>)>,
     /// The Sheet metal table and flat view panel's graphics area.
@@ -432,7 +431,6 @@ impl PartStudioView {
             folder_prompt: None,
             named_views: None,
             named_view_picked: None,
-            pending_named_view: None,
             flat_cache: None,
             flat_task: None,
             flat_view: None,
@@ -3439,7 +3437,10 @@ impl PartStudioView {
         // The feature being edited shows its draft's name (live: a Hole's
         // row reads "Ø 6.35 mm ↧ 12 mm" while its dialog is open).
         let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.clone()).filter(|d| d.id == f.id);
-        let f = draft.as_ref().unwrap_or(f);
+        // The name shows the active configuration's values (a configured
+        // Variable reads "#w = 80 mm" under L; qa4 round 4 S4-a).
+        let configured = draft.is_none().then(|| self.studio(cx).filter(|s| s.configuration.configured.iter().any(|c| c.feature == f.id)).map(|s| s.configuration.for_editing(f, &self.current_config(s)))).flatten();
+        let f = draft.as_ref().or(configured.as_ref()).unwrap_or(f);
         let name = {
             let computed = self.computed_values(f.id, cx);
             let units = self.doc.read(cx).session.doc.settings.units;
@@ -4539,9 +4540,6 @@ impl Render for PartStudioView {
         self.viewport.update(cx, |vp, _| vp.set_ui_follows_camera(follows));
         if self.compare_gfx.changed(&self.doc, cx) {
             self.refresh_scene(false, cx);
-        }
-        if let Some(v) = self.pending_named_view.take() {
-            self.apply_named_view(&v, window, cx);
         }
         self.ensure_filter_input(window, cx);
         self.ensure_config_box_inputs(window, cx);

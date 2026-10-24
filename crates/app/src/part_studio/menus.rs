@@ -420,7 +420,7 @@ impl PartStudioView {
                 })));
             }
             if section && target_ref.is_none() {
-                exits.push(item("Edit section view…", Box::new(|this, w, cx| this.open_section_dialog(w, cx))));
+                exits.push(item("Edit section view…", Box::new(|this, w, cx| this.edit_section(w, cx))));
             }
             if section {
                 exits.push(item("Turn off section view", Box::new(|this, w, cx| this.toggle_section(w, cx))));
@@ -867,7 +867,7 @@ impl PartStudioView {
             }
         } else if self.show_mass {
             title = "Mass properties";
-            let bodies: Vec<BodyId> = self.selection.iter().filter_map(|r| self.owning_body(r)).collect();
+            let bodies = mass_parts(&self.display, self.selection.iter().filter_map(|r| self.owning_body(r)));
             // Inertia about a selected mate connector (reference coordinate system).
             let reference = self.selection.iter().find_map(|r| self.display.connectors.iter().find(|c| &c.reference == r)).cloned();
             let studio = self.studio(cx).cloned().unwrap_or_default();
@@ -897,6 +897,12 @@ impl PartStudioView {
                     parts: if bodies.is_empty() { Vec::new() } else { bodies.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect() },
                     reference,
                 });
+            } else {
+                // Nothing measurable (no solid, e.g. a lone surface): live
+                // (qa4 round 4 S3, part-studio/2382) keeps the whole dialog
+                // with "Parts to measure" empty and every value blank.
+                let sym = self.doc.read(cx).session.doc.settings.units.length.symbol();
+                mass_view = Some(MassView::blank(sym, reference.map(|c| c.name)));
             }
         } else {
             // Live (part-studio/81-82): a selection only gets the one-line
@@ -1075,7 +1081,8 @@ impl PartStudioView {
                         // 27 / 26 / 29 px tall, 2 px apart (3 px above X): X, Y and Z
                         // sit 31 px apart, the inertia rows 28.
                         .child(div().mt(px(9.)).h(px(27.)).child(crate::ui::os_checkbox("mass-variance", "Show calculation variance", false)))
-                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(crate::ui::os_checkbox("mass-override", "Override", false)).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(m.mass.clone().unwrap_or_default())))
+                        // Nothing measured: Mass's Override is greyed like the others (live part-studio/2382).
+                        .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Mass")).child(if !m.mass_override_enabled() { disabled_check("mass-override").into_any_element() } else { crate::ui::os_checkbox("mass-override", "Override", false).into_any_element() }).child(div().flex_1().mr(px(5.)).h(px(24.)).flex().items_center().justify_end().border_b_1().border_color(pal.border).text_size(px(13.33)).text_color(pal.text).child(m.mass.clone().unwrap_or_default())))
                         .child(value_row("Volume".into(), m.volume.clone()).mt(px(2.)).h(px(26.)))
                         .child(value_row("Surface area".into(), m.area.clone()).mt(px(2.)).h(px(26.)))
                         .child(h_flex().mt(px(2.)).h(px(27.)).child(div().pl(px(5.)).text_size(px(12.)).text_color(pal.text_muted).child("Center of mass")).child(disabled_check("com-override")))
@@ -1331,6 +1338,27 @@ struct MassView {
     reference: Option<String>,
 }
 
+impl MassView {
+    /// The dialog with nothing to measure: every row kept, every value blank.
+    fn blank(length_symbol: &str, reference: Option<String>) -> Self {
+        MassView {
+            volume: String::new(),
+            area: String::new(),
+            mass: None,
+            center: Default::default(),
+            inertia_unit: format!("{length_symbol}² kg"),
+            inertia: None,
+            parts: Vec::new(),
+            reference,
+        }
+    }
+
+    /// Mass's Override can only be ticked once something is measured.
+    fn mass_override_enabled(&self) -> bool {
+        !self.volume.is_empty()
+    }
+}
+
 /// Kind of a measurement for the measure type selector.
 /// A Measure panel row: label, value, X/Y/Z sub-row axis, and the (x)
 /// variable it creates.
@@ -1434,4 +1462,61 @@ impl PartStudioView {
 /// RD1: the volume only shows in Mass properties; the readout's went stale).
 pub(super) fn studio_measure(ctx: &noshape_model::regen::context::Context, sel: &[noshape_model::reference::Reference]) -> Vec<(String, measure::Measurement)> {
     measure::measure(ctx, sel).into_iter().filter(|(_, m)| !matches!(m, measure::Measurement::Volume(_))).collect()
+}
+
+/// The parts Mass properties' Part tab measures: the solids owning the
+/// selection, each once. Live (qa4 round 4 S3): a surface pick never enters
+/// "Parts to measure", which stays empty with every value blank.
+fn mass_parts(display: &noshape_model::display::StudioDisplay, owners: impl Iterator<Item = BodyId>) -> Vec<BodyId> {
+    let mut out: Vec<BodyId> = Vec::new();
+    for b in owners {
+        if !out.contains(&b) && display.body(&b).is_some_and(|d| d.kind == noshape_model::display::BodyKind::Solid) {
+            out.push(b);
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod mass_parts_tests {
+    use super::mass_parts;
+    use noshape_model::display::{BodyDisplay, BodyKind, StudioDisplay};
+    use noshape_model::reference::{BodyId, FeatureId};
+
+    #[::core::prelude::v1::test]
+    fn surfaces_never_enter_parts_to_measure() {
+        let id = |index: u32| BodyId { feature: FeatureId(1), index };
+        let body = |index: u32, kind: BodyKind| BodyDisplay {
+            id: id(index),
+            name: format!("Body {index}"),
+            kind,
+            color: [1.0; 4],
+            hidden: false,
+            mesh: Default::default(),
+            coarser: Vec::new(),
+            levels_from: 0,
+            face_refs: Vec::new(),
+            edge_refs: Vec::new(),
+            vertex_refs: Vec::new(),
+            bounds: None,
+            composite: None,
+            is_mesh: false,
+            face_colors: Vec::new(),
+        };
+        let d = StudioDisplay { bodies: vec![body(0, BodyKind::Solid), body(1, BodyKind::Surface), body(2, BodyKind::Wire)], ..Default::default() };
+        // A surface (or wire) alone leaves the field empty.
+        assert!(mass_parts(&d, [id(1), id(2)].into_iter()).is_empty());
+        // Two faces of one part list it once, beside a surface pick.
+        assert_eq!(mass_parts(&d, [id(0), id(1), id(0)].into_iter()), vec![id(0)]);
+    }
+
+    #[::core::prelude::v1::test]
+    fn nothing_to_measure_keeps_every_row_blank() {
+        let m = super::MassView::blank("mm", None);
+        assert!(m.parts.is_empty() && m.volume.is_empty() && m.area.is_empty() && m.mass.is_none() && m.inertia.is_none());
+        assert!(m.center.iter().all(String::is_empty));
+        assert_eq!(m.inertia_unit, "mm² kg");
+        assert!(!m.mass_override_enabled());
+        assert!(super::MassView { volume: "48 mm³".into(), ..m }.mass_override_enabled());
+    }
 }
