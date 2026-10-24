@@ -50,10 +50,3 @@ Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 
 ## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
 - MT3 tooltip "… (Click to edit)" ✅ in code; MT5 offset values now regular text (QuantityInput, qa4 10-22) ✅; MT5 limit fields,
   MT6 default axis, MT7 label, MT9: fixes cited in code, not re-run (the demo's mates are drawn grey here: checked separately).
-
-## Re-run pass 23 (qa5, 2026-10-24, agent/qa5 on main c703b0d0, qa5 assembly doc)
-| Row | Ours now | Status |
-|---|---|---|
-| MT5 offset values | Fastened ☑ Offset: X / Y / Z "0 mm", Rotation angle "0 deg" in regular black | ✅ |
-| MT6 default axis | Fastened ☑ Offset: **Rotate about X** | ✅ fixed |
-| MT5 limit fields | Revolute ☑ Limits: Z "No minimum" / "No maximum" in regular text | ✅ fixed |
