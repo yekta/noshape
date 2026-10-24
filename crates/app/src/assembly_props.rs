@@ -7,14 +7,7 @@ use crate::properties_dialog::{MetaSpec, MetaValues};
 use gpui_kit::component::input::InputEvent;
 use std::rc::Rc;
 
-/// What a Dynamic suppression expression belongs to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum DynTarget {
-    Instance(InstanceId),
-    Mate(MateId),
-    /// An instance folder (its instances).
-    Folder(MateId),
-}
+pub(crate) use noshape_ops::assembly::DynTarget;
 use noshape_model::assembly::BomBehavior;
 
 /// The dialogs' gray "?" help button (14 px, `#888`).
@@ -151,11 +144,7 @@ impl AssemblyView {
             inst.reference_designator.clone().unwrap_or_default(),
             move |v, _, cx| {
                 view.update(cx, |this, cx| {
-                    this.edit("Instance properties", cx, |a| {
-                        if let Some(i) = a.instance_mut(top) {
-                            i.reference_designator = Some(v.clone()).filter(|s| !s.is_empty());
-                        }
-                    });
+                    this.edit(noshape_ops::assembly::INSTANCE_PROPERTIES_DESCRIPTION, cx, |a| noshape_ops::assembly::set_reference_designator(a, top, &v));
                 })
             },
             window,
@@ -233,23 +222,7 @@ impl AssemblyView {
 
     /// Set (or remove, `None`) the "Unsuppressed if" expression.
     pub(super) fn set_dynamic_suppression(&mut self, target: DynTarget, text: Option<String>, cx: &mut Context<Self>) {
-        self.edit("Dynamic suppression", cx, |a| match target {
-            DynTarget::Instance(id) => {
-                if let Some(i) = a.instance_mut(id) {
-                    i.unsuppressed_if = text.clone();
-                }
-            }
-            DynTarget::Mate(id) => {
-                if let Some(m) = a.mates.iter_mut().find(|m| m.id == id) {
-                    m.unsuppressed_if = text.clone();
-                }
-            }
-            DynTarget::Folder(id) => {
-                if let Some(f) = a.folders.iter_mut().find(|f| f.id == id) {
-                    f.unsuppressed_if = text.clone();
-                }
-            }
-        });
+        self.edit(noshape_ops::assembly::DYNAMIC_SUPPRESSION_DESCRIPTION, cx, |a| noshape_ops::assembly::set_unsuppressed_if(a, target, text));
         self.refresh_scene(true, cx);
         cx.notify();
     }

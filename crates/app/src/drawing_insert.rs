@@ -59,75 +59,16 @@ impl Default for InsertViewState {
     }
 }
 
-/// The five View simplification choices, with Onshape-like default values.
-pub fn simplification_choices(cur: Simplification) -> [Simplification; 5] {
-    let keep = |d: Simplification| if std::mem::discriminant(&d) == std::mem::discriminant(&cur) { cur } else { d };
-    [Simplification::None, Simplification::Auto, keep(Simplification::Absolute(0.001)), keep(Simplification::RatioToStudio(0.01)), keep(Simplification::RatioToPart(0.01))]
-}
 
-/// The value field text of a simplification ("1 mm", "1 %").
-pub fn simplification_text(s: Simplification, mm: bool) -> String {
-    let trim = |v: f64| {
-        let t = format!("{v:.4}");
-        t.trim_end_matches('0').trim_end_matches('.').to_string()
-    };
-    match s {
-        Simplification::Absolute(m) if mm => format!("{} mm", trim(m * 1000.0)),
-        Simplification::Absolute(m) => format!("{} in", trim(m / 0.0254)),
-        Simplification::RatioToStudio(r) | Simplification::RatioToPart(r) => format!("{} %", trim(r * 100.0)),
-        _ => String::new(),
-    }
-}
 
-/// Parse the value field into `kind` (lengths in the drawing units by default).
-pub fn parse_simplification(kind: Simplification, text: &str, mm: bool) -> Option<Simplification> {
-    match kind {
-        Simplification::Absolute(_) => {
-            let prefs = noshape_units::UnitPrefs { length: if mm { noshape_units::LengthUnit::Millimeter } else { noshape_units::LengthUnit::Inch }, ..Default::default() };
-            let q = noshape_units::evaluate_as(text.trim(), noshape_units::Dim::LENGTH, &prefs, &noshape_units::EmptyScope).ok()?;
-            (q.value > 0.0).then_some(Simplification::Absolute(q.value))
-        }
-        Simplification::RatioToStudio(_) | Simplification::RatioToPart(_) => {
-            let v: f64 = text.trim().trim_end_matches('%').trim().parse().ok()?;
-            let r = (v / 100.0).max(0.0);
-            Some(if matches!(kind, Simplification::RatioToStudio(_)) { Simplification::RatioToStudio(r) } else { Simplification::RatioToPart(r) })
-        }
-        other => Some(other),
-    }
-}
+
+pub use noshape_ops::drawing::{asm_position_name, asm_positions, named_view_frame, named_views, parse_simplification, simplification_choices, simplification_text};
 
 type Act = std::rc::Rc<dyn Fn(&mut DrawingEditor, &mut Context<DrawingEditor>)>;
 
-/// An assembly's Explode/Position choices in Onshape's order: Default, the
-/// exploded views, then the named positions.
-pub fn asm_positions(asm: &noshape_model::assembly::Assembly) -> Vec<(String, AsmPosition)> {
-    let mut out = vec![("Default".to_string(), AsmPosition::Default)];
-    out.extend(asm.exploded_views.iter().enumerate().map(|(i, e)| (e.name.clone(), AsmPosition::Explode(i))));
-    out.extend(asm.named_positions.iter().enumerate().map(|(i, n)| (n.name.clone(), AsmPosition::Position(i))));
-    out
-}
 
-/// The name shown for an Explode/Position choice.
-pub fn asm_position_name(asm: &noshape_model::assembly::Assembly, p: AsmPosition) -> String {
-    match p {
-        AsmPosition::Default => "Default".into(),
-        AsmPosition::Explode(i) => asm.exploded_views.get(i).map(|e| e.name.clone()).unwrap_or_default(),
-        AsmPosition::Position(i) => asm.named_positions.get(i).map(|n| n.name.clone()).unwrap_or_default(),
-    }
-}
 
-/// The named views a source offers in View orientation (Part Studios).
-pub fn named_views(doc: &noshape_model::document::Document, source: TabId) -> &[noshape_model::partstudio::NamedView] {
-    match doc.tab(source).map(|t| &t.content) {
-        Some(TabContent::PartStudio(ps)) => &ps.named_views,
-        _ => &[],
-    }
-}
 
-/// The frame of the source's named view `name`, if it still exists.
-pub fn named_view_frame(doc: &noshape_model::document::Document, source: TabId, name: &str) -> Option<[[f64; 3]; 2]> {
-    named_views(doc, source).iter().find(|v| v.name == name).map(views::named_view_frame)
-}
 
 const ORIENTATIONS: [ViewOrientation; 7] = [ViewOrientation::Top, ViewOrientation::Left, ViewOrientation::Right, ViewOrientation::Front, ViewOrientation::Back, ViewOrientation::Bottom, ViewOrientation::Isometric];
 const SCALES: [f64; 12] = [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05, 0.02, 0.01];

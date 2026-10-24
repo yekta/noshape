@@ -248,6 +248,23 @@ impl Render for RichTooltip {
     }
 }
 
+/// A text naming stored entities ("Face of Extrude 1", a selection chip):
+/// its wording translated by template, the name kept ([`crate::i18n::filled`]).
+pub fn entity_text(text: impl Into<SharedString>) -> StyledText {
+    let text: SharedString = text.into();
+    match crate::i18n::filled(&text) {
+        Some(t) => StyledText::new(t),
+        None => StyledText::new(text),
+    }
+}
+
+/// A feature dialog's string (parameter label, enum option) in the UI
+/// language as the feature specs have it ([`crate::i18n::spec`]); drawn
+/// as-is like [`user_text`].
+pub fn spec_text(english: &str) -> StyledText {
+    StyledText::new(crate::i18n::spec(english))
+}
+
 /// User-authored text (names of documents, tabs, parts, features, sketches,
 /// variables, configurations, mates, instances, folders, views, sheets,
 /// layers; notes, properties, comments): drawn as is in every UI language

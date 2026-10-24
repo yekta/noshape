@@ -1313,8 +1313,8 @@ fn flat_pattern_view_shows_bend_lines_and_notes() {
     let g = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &ViewCache::new(), false);
     assert!(g.error.is_none(), "{:?}", g.error);
     assert_eq!(g.bends.len(), 1);
-    // The developed length: (50 - 5) + (30 - 5) + 90° × (3 + 0.45 × 2) mm.
-    let expected = 0.045 + 0.025 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
+    // The developed length, material outside the L (live's default): (50 - 3) + (30 - 3) + 90° × (3 + 0.45 × 2) mm.
+    let expected = 0.047 + 0.027 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
     let (w, h) = (g.max[0] - g.min[0], g.max[1] - g.min[1]);
     assert!((w.max(h) - expected).abs() < 1e-6 && (w.min(h) - 0.02).abs() < 1e-9, "{w} x {h}");
     let built = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;
@@ -2356,4 +2356,22 @@ fn drawing_fonts_are_lives_and_old_families_migrate() {
         let f: TextFont = serde_json::from_str(&format!("{{\"family\":\"{old}\",\"bold\":true}}")).unwrap();
         assert_eq!((f.family.as_str(), f.bold), (new, true));
     }
+}
+
+/// Live asb 10-24 dual dimensions (3): a hole callout's dual block in one
+/// pair of brackets above (Top) or below (Bottom) the primary lines; each
+/// length's dual with its unit, at the dual precision.
+#[test]
+fn hole_callout_dual_block_like_onshape() {
+    use super::build::dual_block;
+    let prim = vec!["⌀.250 ↧ .472".to_string(), "⌴ ⌀.394 ↧ .197".to_string()];
+    let dual = vec!["⌀6.35 mm ↧ 12.00 mm".to_string(), "⌴ ⌀10.00 mm ↧ 5.00 mm".to_string()];
+    assert_eq!(dual_block(prim.clone(), dual.clone(), true), vec!["[⌀6.35 mm ↧ 12.00 mm", "⌴ ⌀10.00 mm ↧ 5.00 mm]", "⌀.250 ↧ .472", "⌴ ⌀.394 ↧ .197"]);
+    assert_eq!(dual_block(prim, dual, false)[2], "[⌀6.35 mm ↧ 12.00 mm");
+    let mut d = Drawing { units_mm: false, ..Default::default() };
+    d.props.trailing_zeros = true;
+    d.props.dual = DualDims { show: true, show_unit: true, precision: Some(2), ..Default::default() };
+    assert_eq!(super::format::dual_len(&d, &DimFormat::default(), 0.00635).as_deref(), Some("6.35 mm"));
+    assert_eq!(super::format::dual_len(&d, &DimFormat::default(), 0.012).as_deref(), Some("12.00 mm"));
+    assert_eq!(super::format::dual_len(&d, &DimFormat { dual: Some(false), ..Default::default() }, 0.012), None);
 }

@@ -35,6 +35,7 @@
 "__value__" is not a valid standard library version.	"__value__"은(는) 올바른 표준 라이브러리 버전이 아닙니다.
 #__queryName__ not found, is suppressed or evaluates to nothing in the current selection.	__queryName__이(가) 현재 선택에서 발견되지 않았거나, 제외되어 표시되었거나, 아무 것도 반환하지 않습니다.
 $__amountOff__ off	$__amountOff__ 할인
+% diametric engagement	% 지름 관여
 (Enterprise is Inactive. Please contact the administrator to activate.)	(엔터프라이즈가 가 비활성 상태입니다. 활성화하려면 관리자에게 문의하십시오.)
 (External)	(외부)
 (Maximum of 10000 characters)	(최대 10000자)
@@ -87,7 +88,9 @@ $__amountOff__ off	$__amountOff__ 할인
 1 uppercase	1개의 대문자
 1 user	1명의 사용자
 1. Install the app	1. 앱을 설치합니다.
+118 deg	118도
 12 hour	12시간
+135 deg	135도
 2 additional months free	2개월 추가로 무료
 2 point circle centerline	2점 원 중심선
 2 point linear centerline	2점 선형 중심선
@@ -170,6 +173,7 @@ Access to this document has been restricted with the message '__message__'.	'__m
 Access to this document has been restricted.	이 통합문서의 액세스가 제한되었습니다.
 Access to this document has been temporarily restricted by an Onshape administrator. You may	Onshape 관리자가 이 통합문서의 액세스를 일시적으로 제한했습니다. 사용자는 다음을 할 수 있습니다.
 Access token URL	액세스 토큰 URL
+Access type	액세스 유형
 Access your Altium 365 workspaces from Onshape. Import and export between Altium 365 and PCB Studio.	Onshape에서 Altium 365 작업공간에 액세스할 수 있습니다.  Altium 365과 PCB Studio 간에 가져오기와 내보내기가 가능합니다.
 Account	계정
 Account Balance:	계정 잔고:
@@ -229,6 +233,7 @@ Add a reply	답글 추가
 Add a tab to a sheet metal flange, remove interfering material, or bridge 2 flanges from the same sheet metal model.	금속 판재 플랜지에 탭을 추가하고, 방해되는 재질을 제거하거나, 동일한 금속 판재 모델에서 2개의 플랜지를 브리지로 연결합니다.
 Add a visibility condition for this configuration input	이 구성 입력에 대한 표시 유형 조건 추가
 Add a visibility rule for the options of this configuration input	이 구성 입력에 대한 옵션의 표시 유형 규칙 추가
+Add additional queries	쿼리를 더 추가
 Add an external thread to cylindrical parts by selecting a leading edge or edges. Specify the standard, size, pitch, length, end type, and optionally add a chamfer or undercut.	선행 모서리(들)를 선택해서 원통형 파트에 외부 나사산을 추가합니다. 표준, 크기, 피치, 길이, 마침 조건을 지정하고 선택적으로 챔퍼 또는 언더컷을 추가하십시오.
 Add appearance to __numberBiggerThanOne__ faces…	__numberBiggerThanOne__ 면에 모양 추가…
 Add appearance to __numberBiggerThanOne__ features…	__numberBiggerThanOne__ 피처에 모양 추가…
@@ -239,6 +244,7 @@ Add appearance to feature…	피처에 모양 추가…
 Add appearance to selection…	선택 항목에 모양 추가…
 Add appearance to sketch…	스케치에 모양 추가…
 Add category to rule…	규칙에 범주 추가…
+Add chamfer	챔퍼 추가
 Add column	열 추가
 Add columns to the BOM table	BOM 표에 열 추가
 Add columns to the template	템플릿에 열 추가
@@ -298,6 +304,8 @@ Add option rule	옵션 규칙 추가
 Add parts and assemblies to build a bill of materials where you can view and edit metadata, as well as viewing instance counts and assembly structure.	메타데이터를 보고 편집할 수 있을 뿐 아니라 부품 개수와 어셈블리 구조를 확인할 수 있는 자재명세서(BOM)를 구성하려면 파트와 어셈블리를 추가하십시오.
 Add payment information	결제 정보 추가
 Add payment information to make purchases in Onshape	Onshape에서 구매에 사용할 결제 정보 추가
+Add point on axis drag	축방향 드래그에 점 추가
+Add points	점 추가
 Add points to a spline or to a Bezier curve control polygon by clicking anywhere along it.	스플라인에 점을 추가하거나 다각형을 따라 아무 곳이나 클릭해서 베지어 곡선 제어 다각형에 점을 추가합니다.
 Add project role	프로젝트 역할 추가
 Add project role and permissions	프로젝트 역할 및 권한 추가
@@ -335,6 +343,7 @@ Add to team…	팀에 추가…
 Add to toolbar	툴바에 추가
 Add tolerance type	공차 유형 추가
 Add tolerances to sketch dimensions and feature parameters, or add annotations and dimensions with the Inspection panel tools to see data on any part in the Part Studio.	스케치 치수와 특성 매개변수에 공차를 추가하거나, 검사 패널 도구를 사용하여 주석과 치수를 추가하여 Part Studio에서 모든 파트의 데이터를 확인하십시오.
+Add undercut	언더컷 추가
 Add users	사용자 추가
 Add users / teams	사용자 / 팀 추가
 Add users from your enterprise	엔터프라이즈에서 사용자 추가
@@ -364,9 +373,14 @@ Adding row, __name__	행 추가, __name__
 Adding selection to Obsolete candidate…	선택 항목을 사용되지 않는 후보자에 추가하는 중…
 Adding selection to Release candidate…	선택 항목을 릴리스 후보자에 추가하는 중…
 Adding to a company will make the library available to all users of the company.	회사에 추가하면 회사의 모든 사용자가 해당 라이브러리를 사용할 수 있습니다.
+Additional alignment points	추가 정렬 점
+Additional columns	추가 열
+Additional queries	추가 쿼리
 Additionally, the following users must leave the document:	또한 다음의 사용자가 통합문서에서 나가야 합니다.
 Address	주소
 Address:	주소:
+Adjacent	인접
+Adjacent faces	인접 면
 Adjacent surfaces with overlapping edges will be joined upon import.	가져올 때 모서리가 겹친 인접 면이 합쳐집니다.
 Adjust the location, orientation and scale of a sketch entity using a manipulator.	매니퓰레이터를 사용하여 스케치 요소의 위치, 방향 및 축척을 조정합니다.
 Adjust the whitespace of this Feature Studio to match a common style.	이 Feature Studio의 여백을 조정하여 공통된 스타일에 맞춥니다.
@@ -401,10 +415,15 @@ Alias name must be at least 1 and no more than __maxNameLimit__ characters in le
 Alias name must not contain HTML.	별칭 이름에 HTML이 포함될 수 없습니다.
 Alias saved.	별칭을 저장했습니다.
 Aliases	별칭
+Align coordinate system	좌표계 정렬
+Align to geometry	형상에 맞춤
 Align view with vertical axis	수직 축에 뷰 맞춤
 Align with Z	Z로 정렬
+Aligned	정렬
 Aligned rectangle	정렬된 직사각형
 Aligned section view	정렬된 단면도
+Aligned with direction	방향과 정렬됨
+Alignment entity	정렬 요소
 All	모두
 All Feature Studios are committed.	모든 Feature Studio가 커밋됩니다.
 All Onshape users	모든 Onshape 사용자
@@ -417,6 +436,7 @@ All companies	모든 회사
 All company categories	모든 Company 범주
 All custom features are used in at least one Part Studio	적어도 하나의 Part Studio에 모든 사용자 지정 피처가 사용됩니다.
 All custom features have descriptions	모든 사용자 지정 피처에 설명이 있습니다.
+All deviations	모든 파생
 All document and publication names containing only numbers must be unique	숫자만 포함한 모든 통합문서 및 게시물 이름은 중복되지 않아야 합니다.
 All document and publication names must be unique	모든 통합문서 및 게시물 이름은 중복되지 않아야 합니다.
 All document and publication names must be unique unless they start with "test"	"test"로 시작하지 않는 한, 모든 통합문서 및 게시물 이름은 중복되지 않아야 합니다.
@@ -428,6 +448,7 @@ All existing documents will remain private and all new documents created on the 
 All file formats	모든 파일 형식
 All flat pattern parts in the Part Studio	Part Studio의 모든 플랫 패턴 파트
 All flat pattern parts in the current model	현재 모델의 모든 플랫 패턴 파트
+All frames	모든 프레임
 All inputs	모든 입력
 All instances are updated.	모든 부품이 업데이트됩니다.
 All items are already in the toolbar	모든 항목이 이미 도구 모음에 있습니다.
@@ -441,10 +462,12 @@ All permissions	모든 권한
 All published classes	모든 게시된 클래스
 All revisions	모든 리비전
 All sheets	모든 시트
+All solid bodies	모든 솔리드 바디
 All statuses	모든 상태
 All tabs	모든 탭
 All uppercase in Drawings	도면에서 모두 대문자
 All users	모든 사용자
+All values	모든 값
 All versions	모든 버전
 All workspaces	모든 작업공간
 Allow	허용
@@ -453,6 +476,8 @@ Allow access to public documents	공개 통합문서의 액세스를 허용
 Allow adding items from other documents	다른 통합문서에서 항목 추가 허용
 Allow administrators to add custom features to the enterprise toolset and enterprise custom tables to the custom tables panel. These features and tables will only appear for users with link permission to the source document.	관리자가 엔터프라이즈 도구 세트에 사용자 지정 피처를 추가하고 사용자 지정 테이블 패널에 엔터프라이즈 사용자 지정 테이블을 추가하도록 허용합니다. 이러한 피처와 테이블은 소스 통합문서에 대한 연결 권한을 가진 사용자에 대해서만 나타납니다.
 Allow all integrations	모든 통합 허용
+Allow edge overflow	모서리 오버플로 허용
+Allow faulty parts	결함 있는 파트 허용
 Allow rotation about the X, Y, and Z axes. The 1st selection serves as the rotational movement point, and the 2nd selection serves as the stationary point.	X, Y, Z축을 중심을 회전을 허용합니다. 첫 번째 선택 항목은 회전 이동점으로 사용되고, 두 번째 선택 항목을 고정점으로 사용됩니다.
 Allow rotation about the Z axis and translation along the X axis. The 1st selection serves as the pin and the rotational movement point, and the 2nd selection serves as the translational movement.	Z축을 중심으로 회전과 X축에 따른 선형 이동을 허용합니다. 첫 번째 선택 항목은 핀 및 회전 이동점으로 사용되고, 두 번째 선택 항목은 선형 이동으로 사용됩니다.
 Allow rotation about the Z axis. The 1st selection serves as the rotational point, and the 2nd as the stationary point.	Z축을 중심으로 회전을 허용합니다. 첫 번째 선택 항목은 회전점으로 사용되고, 두 번째 선택 항목을 고정점으로 사용됩니다.
@@ -465,6 +490,10 @@ Allow translation along the X and Y axes, and rotation about the Z axis. The 1st
 Allow translation along the Z axis. The 1st selection serves as the sliding point, and the 2nd as the stationary point.	Z축에 따른 선형 이동을 허용합니다. 첫 번째 선택 항목은 슬라이딩 점으로 사용되고, 두 번째 선택 항목은 고정점으로 사용됩니다.
 Allow translation and rotation about the Z axis. The 1st selection serves as the translational and rotational point, and the 2nd as the stationary point.	Z축을 중심으로 선형 이동 및 회전을 허용합니다. 첫 번째 선택 항목은 선형 이동 및 회전점으로 사용되고, 두 번째 선택 항목은 고정점으로 사용됩니다.
 Allow translation on a slot’s center plane and rotation about an axis perpendicular to that plane. The 1st selection defines the item to be centered. The 2nd selection defines the center plane.	슬롯의 중심면에서 선형 이동을 허용하고 해당 중심면에 수직인 축을 중심으로 회전을 허용합니다. 첫 번째 선택 항목은 중심에 맞출 항목을 정의합니다. 두 번째 선택 항목은 중심면을 정의합니다.
+Along X	X를 따라
+Along Y	Y를 따라
+Along Z	Z를 따라
+Along custom	사용자 지정을 따라
 Always	항상
 Always open documents in view-only mode for all Editors, except document creators	통합문서 작성자를 제외한 모든 편집자에게 문서를 항상 보기 전용 모드로 엽니다
 Always shown	항상 표시
@@ -495,12 +524,18 @@ Analytics are only available for In progress and Submitted documents	분석은 �
 Analyze input tessellation…	입력 테셀레이션 분석…
 And	및
 Angle	각도
+Angle Tolerance	각도 공차
+Angle control type	각도 제어 유형
+Angle from direction	방향의 각도
+Angle opposite direction	반대 방향의 각도
+Angle reference	각도 참조
 Angle unit:  	각도 단위:  
 Angle: __angleUnit__	각도: __angleUnit__
 Angular deviation	각도 편차
 Angular tolerance	각도 공차
 Angular tolerances	각도 공차
 Angular velocity	각속도
+Animate Mate	메이트 애니메이트
 Animate __mateName__…	__mateName__ 애니메이트…
 Animate mate	메이트 애니메이트
 Animate mate degree of freedom	메이트 자유도 애니메이트
@@ -559,6 +594,10 @@ Approved by	승인자
 Approved by __name__	__name__ 승인
 Approver	승인자
 Approvers	승인자
+Approximate	근사치
+Approximation parameters	근사치 매개변수
+Approximation target degree	근사치 목표 각도
+Approximation type	근사치 유형
 Arc	호
 Arc length	호 길이
 Arc length dimension	호 길이 치수
@@ -568,6 +607,7 @@ Archived	보관됨
 Archived classes	보관된 클래스
 Archived classes can be cloned. Cloning an archived class will create a new unpublished class without members containing all the existing content.	보관된 클래스를 복제할 수 있습니다. 보관된 클래스를 복제하면 기존의 모든 내용을 포함하는 구성원 없이 게시되지 않은 새로운 클래스가 만들어집니다.
 Archiving a class will:	클래스를 보관하면 다음과 같은 일이 발생합니다:
+Arcs to extrude as bends	벤드로 돌출시킬 호
 Are you a student or an educator?	귀하는 학생입니까, 아니면 교육자입니까?
 Are you student or an educator?	귀하는 학생입니까, 아니면 교육자입니까?
 Are you sure you want to cancel your Education subscription?	에듀케이션 회원 계정을 취소하시겠습니까?
@@ -604,6 +644,7 @@ Arena connection settings failed to save.	Arena 연결 설정을 저장하지 �
 Arena connection settings updated.	Arena 연결 설정이 업데이트되었습니다.
 Arena release management sync is disabled in __companyName__.	Arena 릴리스 관리 동기화가 __companyName__에서 비활성화되었습니다.
 Arena release management sync is enabled in __companyName__.	Arena 릴리스 관리 동기화가 __companyName__에서 활성화되었습니다.
+Array	어레이
 Array parameters cannot be configured.	어레이 매개변수를 구성할 수 없습니다.
 Arrow	화살표
 As a __companyType__ administrator you can override all other approvers and __transition__ this Release candidate immediately.	__companyType__ 관리자는 다른 모든 승인자를 재정의하고 이 릴리스 후보자를 즉시 __transition__할 수 있습니다.
@@ -611,6 +652,7 @@ As a __companyType__ administrator you can override other users and __transition
 As a company administrator, you can complete the task on behalf of the assignee.	Company 관리자로서 작업 관리자를 대신해서 작업을 완료할 수 있습니다.
 As a light user you can view, comment on and export from documents, publications that have been shared with you. For more information about using Onshape as a light user, 	라이트 사용자는 본인과 공유된 통합문서, 게시물을 보고, 댓글을 달거나, 내보내기를 수행할 수 있습니다. 라이트 사용자로 Onshape 사용에 관한 자세한 내용은 
 As creator of this release you can override all other approvers and reject this Release candidate immediately.	이 릴리스의 작성자는 다른 모든 승인자를 재지정하고 이 릴리스 후보자를 즉시 거부할 수 있습니다.
+Aspect ratio constraint	가로 세로 비율 구속 조건
 Assemblies	조립품
 Assemblies…	어셈블리…
 Assembly	어셈블리
@@ -631,6 +673,7 @@ Assembly locked to __positionName__.	어셈블리가 __positionName__에 잠겼�
 Assembly mirror	어셈블리 대칭 복사
 Assembly settings	어셈블리 설정
 Assembly settings updated.	어셈블리 설정이 업데이트되었습니다.
+Assembly to mirror	대칭 복사할 어셈블리
 Assign	할당
 Assign a FeatureScript function to run and compute values for the part property.	FeatureScript 기능을 할당하여 파트 속성에 대한 값을 실행하고 계산하십시오.
 Assign a name to a specific display state of an assembly. Specify which parts, subassemblies, and mates are hidden or in view.	어셈블리의 특정 표시 상태에 이름을 지정합니다. 숨기거나 뷰에 표시할 파트, 서브 어셈블리 및 메이트를 지정합니다.
@@ -639,6 +682,7 @@ Assign material for __name__…	__name__에 대한 재질 지정…
 Assign material for __numberBiggerThanOne__ parts…	__numberBiggerThanOne__ 파트에 대한 재질 지정…
 Assign material…	재질 지정…
 Assign to __assignee__	__assignee__에게 할당
+Assigned	할당됨
 Assigned seats:	지정된 시트:
 Assigned to	할당 대상
 Assigned to me	나에게 할당됨
@@ -663,7 +707,11 @@ Assignment submission type failed to load.	과제 제출 유형을 로드하지 
 Assignment submissions failed to download.	과제 제출을 다운로드하지 못했습니다.
 Assignments	할당
 Assignments failed to load.	과제를 로드하지 못했습니다.
+Associated component instance	연관된 구성 요소 부품
+Asymmetric	비대칭
 At least one workflow must be selected	최소 하나의 워크플로를 선택해야 합니다.
+Attach to	부착 대상
+Attachment	첨부
 Attachment cannot exceed 20MB	첨부파일은 20MB보다 클 수 없습니다.
 Attachment exceeds 20MB limit.	첨부파일이 20MB 제한을 초과합니다.
 Attachment failed to upload.	첨부파일을 업로드하지 못했습니다
@@ -683,10 +731,12 @@ Authoring permissions updated.	권한 승인이 업데이트되었습니다.
 Authorization completed successfully!	인증이 성공적으로 완료되었습니다.
 Authorization failed!	인증 실패!
 Auto	자동
+Auto position	자동 위치
 Auto-size fastener	패스너 자동 크기 조정
 Automated part numbering	자동 파트 번호 매기기
 Automatic	자동
 Automatic (default)	자동(기본값)
+Automatic miter	자동 결합
 Automatic obsoletion	자동 사용 안 함
 Automatic references enable you to insert this Variable Studio into multiple tabs. References to this Variable Studio will be placed in every new and existing Part Studio and Assembly in this workspace.	자동 참조를 통해 이 Variable Studio를 여러 탭에 삽입할 수 있습니다. 이 Variable Studio의 참조가 이 작업공간에 있는 기존 및 새로운 Part Studio 및 어셈블리에 배치됩니다.
 Automatic version	자동 버전
@@ -697,6 +747,9 @@ Automatically select constraints	자동으로 구속 조건 선택
 Auxiliary view	보조도
 Average	평균
 Awaiting approval	승인 대기 중
+Axis	축
+Axis measurements	축 측정
+Axis of pattern	패턴축
 Axis perpendicular distance	축 수직 거리
 BOM Table	BOM 테이블
 BOM URL failed to load.	자재명세서(BOM) URL을 로드하지 못했습니다.
@@ -708,6 +761,7 @@ BOM sync to __plmName__ has started…	__plmName__에 자재명세서(BOM) 동�
 BOM synced to Arena.	자재명세서(BOM)가 Arena에 동기화되었습니다.
 BOM type	BOM 유형
 BOM type:	BOM 유형:
+BSO™/BSOS™/BSOA™/BSO4™ blind threaded standoffs	BSO™/BSOS™/BSOA™/BSO4™ 단방향 나사산 스탠드오프
 Back	뒷면
 Back reference (Ctrl-a)	후방 참조(Ctrl-a)
 Back to Release properties	릴리스 속성으로 이동
@@ -720,14 +774,34 @@ Ball	볼
 Ball mate	볼 메이트
 Ball mate (m)	볼 메이트
 Base URL	기준 URL
+Base mate connector	기준 메이트 커넥터
+Base origin	기준 원점
+Base plane	기준 면
+Basic	기본
 Be confident in the security of your data	데이터의 보안을 확신하세요
 Bearing	베어링
 Before	이전
 Bend	벤드
 Bend a sheet metal model along a reference line, with additional bend control options.	추가적인 굽힘 컨트롤 옵션을 사용해 기준선을 따라 금속 판재 모델을 굽힘 처리합니다.
+Bend alignment	굽힘 맞춤
+Bend allowance	굽힘 허용
+Bend angle	벤드 각도
+Bend calculation	굽힘 계산
+Bend deduction	굽힘 추정
+Bend line	굽힘 선
+Bend or non-planar faces	굽힘 또는 비평면 면
+Bend or non-planar faces to unfold	전개할 굽힘 면 또는 비평면 면
+Bend radius	벤드 반지름
 Bend relief	벤드 릴리프
+Bend relief depth	벤드 릴리프 깊이
+Bend relief depth scale	벤드 릴리프 깊이 축척
+Bend relief type	벤드 릴리프 유형
+Bend relief width scale	벤드 릴리프 너비 축척
+Best fit	가장 잘 맞음
 Best for Individuals	개인에게 최상의 솔루션
 Between	사이
+Between entities	선택 요소 사이
+Between entity	선택 요소 사이
 Bezier	베지어
 Bezier degree	베지어 차수
 Bias	바이어스
@@ -739,25 +813,38 @@ Bio	자기 소개
 Black	검은색
 Black and white	흑백
 Blend 2 or more faces. Specify propagation, cross section type, measurement type, symmetry, control type, and trim type.	2개 이상의 면을 블렌드합니다. 확장, 단면 유형, 측정 유형, 대칭, 제어 유형, 잘라내기 유형을 지정하십시오.
+Blind	단방향
+Blind in last	마지막 단방향
 Blob	블롭
 Blue	파란색
 Blue sky	푸른 하늘
 Blue → Red	블루 → 레드
 Blur environment	주변 환경을 흐리게 표시
+Bodies	바디
 Body	바디
 Body Type	본문 유형
 Body draft	바디 구배
+Body type	바디 유형
 Bold	굵게
 Bond all touching faces	모든 접촉면 결합
 Boolean	합치기
 Boolean filter property	합치기 필터 속성
+Boolean operation	합치기 연산
 Border	경계
 Bottom	아랫면
+Bottom edges	아래 모서리
 Bottom right	오른쪽 아래
 Bottom view	아랫면 뷰
+Bound type	경계 유형
 Boundary condition	경계 조건
+Boundary condition direction	경계 조건 방향
 Boundary surface	경계면
 Bounded faces	경계면
+Bounding box XY	경계 상자 XY
+Bounding box YZ	경계 상자 YZ
+Bounding box ZX	경계 상자 ZX
+Bounding type	바인딩 유형
+Bounds	경계(B)
 Branch to create workspace	작업공간을 생성할 브랜치
 Branch to create workspace…	작업공간을 생성할 브랜치…
 Branched from __versionName__	__versionName__에서 분기됨
@@ -779,6 +866,9 @@ Browser looks good!	브라우저가 양호합니다!
 Build steps by dragging components	구성요소를 드래그하여 단계 구성
 Built for teams	팀을 위한 구성
 Business - For designing products for my company.	비즈니스 - 내 회사를 위한 제품을 디자인할 경우.
+Butt	맞대기형
+Butt joint - Direction 1	벗 조인트 - 방향 1
+Butt joint - Direction 2	벗 조인트 - 방향 2
 Button parameters cannot be configured.	버튼 매개변수를 구성할 수 없습니다.
 Buy	구매하기
 Buy Onshape now or contact our sales team	지금 Onshape 구입 또는 영업팀에 문의
@@ -786,6 +876,9 @@ Buy __appName__ __planDescription__	__appName__ __planDescription__ 구매
 Buy now	지금 구입
 By adding or using this library, the user acknowledges and accepts full responsibility for its installation, configuration, use, and any resulting effects on their systems or applications.	이 라이브러리를 추가하거나 사용함으로써 사용자는 해당 라이브러리의 설치, 구성, 사용 및 이로 인해 시스템이나 응용 프로그램에 발생하는 모든 결과에 대한 전적인 책임을 인정하고 수락합니다.
 By checking this box, I agree to the	이 상자를 선택함으로써 다음에 동의합니다
+By index	인덱스 기준
+By index range	인덱스 범위 기준
+By label	라벨 기준
 By leaving a classroom, you will:	클래스룸을 나가면 다음과 같은 변경이 발생합니다:
 CAD Import	CAD 가져오기
 CAD files	CAD 파일
@@ -794,6 +887,7 @@ CAM Studio Tool Holders	CAM Studio 도구 홀더
 CAM Studio Tools	CAM Studio 도구
 CAM, Simulation, Rendering and more	CAM, 시뮬레이션, 렌더링 등
 CATIA part file	CATIA 파트 파일
+CLA™ free-running locknuts	CLA™ 프리-러닝 잠금 너트
 CLEAR	지우기
 COLLADA file	COLLADA 파일
 COMMENT	설명
@@ -876,6 +970,9 @@ Cannot send to trash	휴지통으로 보낼 수 없습니다.
 Cannot show versions and history of a document in the trash.	휴지통에 있는 통합 문서의 버전과 히스토리를 표시할 수 없습니다.
 Cannot update an element with file type "__currentType__" with a different file type "__newType__".	파일 유형 "__currentType__"을(를) 가진 요소를 다른 파일 유형 "__newType__"(으)로 업데이트할 수 없습니다.
 Cannot update external references	외부 참조를 업데이트할 수 없습니다.
+Cap	캡
+Cap entity	캡 요소
+Caps	캡
 Capture & annotate screen	캡처 및 주석 화면
 Capture variants of the assembly as named positions	어셈블리 종류를 명명 위치로 캡처
 Card ending in	카드 끝자리 번호
@@ -897,25 +994,35 @@ Category parameters will be editable once the category is created.	범주가 생
 Category:	범주:
 Ceiling hexagonal	육각형 천장
 Ceiling square	정사각형 천장
+Center	중심
 Center axis distance	중심 축 거리
 Center distance	중심 거리
 Center line	중심선
 Center of mass	질량 중심
+Center of mass x coordinate	질량 중심 x 좌표
+Center of mass y coordinate	질량 중심 y 좌표
+Center of mass z coordinate	질량 중심 z 좌표
 Center point arc	중심점 호
 Center point circle	중심점 원
 Center point circle (c)	중심점 원
 Center point rectangle	중심점 사각형
 Center point rectangle (r)	중심점 직사각형
 Center position	중심 위치
+Centered	중심 위치
 Centerline	중심선
 Centermark	센터마크
 Chain 1	체인 1
 Chain 2	체인 2
+Chain type	체인 유형
 Chamfer	챔퍼
+Chamfer angle	챔퍼 각도
 Chamfer angles	챔퍼 각도
 Chamfer callout	챔퍼 설명선
 Chamfer dimension	챔퍼 치수
 Chamfer distances	챔퍼 거리
+Chamfer length	챔퍼 길이
+Chamfer size	챔퍼 크기
+Chamfer type	챔퍼 유형
 Chamfer…	챔퍼…
 Change	변경
 Change Onshape Server	Onshape 서버 변경
@@ -931,6 +1038,7 @@ Change part transparency	파트 투명도 변경
 Change password	비밀번호 변경
 Change perspective camera field of view	원근 카메라 시야각 변경
 Change publish state to Active?	게시 상태를 활성으로 변경하시겠습니까?
+Change radius	반지름 변경
 Change scale of dihedral combs	이면체 조합의 축척 변경
 Change scale of min/max deviation	최소/최대 편차 축척 변경
 Change size of curvature combs	곡률 조합의 크기 변경
@@ -946,6 +1054,7 @@ Change the line width of surfaces and edges	표면과 모서리의 선 두께 �
 Change the second dash length of construction lines	보조선의 두 번째 점선 길이 변경
 Change the second gap length of construction lines	보조선의 두 번째 간격 길이 변경
 Change the shininess of shaded surfaces	음영 처리된 표면의 광택도 변경
+Change thickness	두께 변경
 Change to Free	무료 플랜으로 변경
 Change to a version reference to maintain the link.	링크를 유지하려면 버전 참조로 변경하십시오.
 Change to driven dimension	구동 치수로 변경
@@ -974,6 +1083,7 @@ Check interference…	간섭 확인…
 Check part	파트 검사
 Check system compatibility in a new tab	새 탭에서 시스템 호환성 확인
 Check the configuration and try again.	구성을 확인하고 다시 시도하십시오.
+Check to include the clearance for bends	벤드에 대한 여유 값을 포함시키려면 선택합니다.
 Checkbox	확인란
 Checkbox input	확인란 입력
 Checked __versionCount__ recent document history moments - no healthy state found.	최근 __versionCount__개의 문서 기록 순간을 확인했지만, 정상 상태를 찾지 못했습니다.
@@ -986,11 +1096,14 @@ Choose a publication	게시물 선택
 Choose instances and mate parameters to be driven by this configuration input	이 구성 입력으로 구동되는 부품 및 메이트 매개변수를 선택하십시오.
 Choose sketch dimensions and feature parameters to be driven by this configuration input	이 구성 입력으로 구동되는 스케치 치수 및 피처 매개변수를 선택하십시오.
 Choose the integrations that are available in your enterprise.	엔터프라이즈에서 사용 가능한 통합을 선택하십시오.
+Choose to measure minimum or maximum distance between entities	요소 사이의 최소 또는 최대 거리를 측정하려면 선택
 Choose who can access the integration. All users allows all members of the enterprise to access the integrations. Otherwise you can select the users or teams who can access integrations.	통합에 액세스할 수 있는 대상을 선택하십시오. 모든 사용자는 엔터프라이즈의 전체 구성원이 통합에 액세스하도록 허용할 수 있습니다. 그렇지 않으면 통합에 액세스할 수 있는 사용자 또는 팀을 선택할 수 있습니다.
 Choose your role:	역할 선택:
 Chordal tolerance	현 공차
 Chromatic	색채
 Circle	원
+Circular	원형
+Circular edge	원형 모서리
 Circular pattern	원형 패턴
 Circumscribed polygon	외접 다각형
 City	시/군
@@ -1027,6 +1140,9 @@ Clear property function	속성 기능 삭제
 Clear scheduling applied to assignments.	과제에 설정된 스케줄이 초기화되었습니다.
 Clear search	검색 지우기
 Clear selection	선택 취소
+Clearance	공차
+Clearance & tapped	여유 값 및 탭 가공됨
+Clearance from input	입력의 여유 값
 Click here for more information.	자세한 내용은 여기를 클릭하여 주십시오.
 Click here to go to release management part number generation settings	릴리스 관리 파트 번호 생성 설정으로 이동하려면 여기를 클릭하십시오.
 Click here to learn more about the system requirements.	시스템 요구 사항을 자세히 살펴보려면 여기를 클릭하여 주십시오.
@@ -1059,6 +1175,8 @@ Click to select one or more files to import	가져올 하나 이상의 파일을
 Clicking confirm will try to stop extraction of document if one is running. You will receive a notification if/when the document extraction has stopped.	확인을 클릭하면 진행 중인 통합문서 추출이 있을 경우 이를 중지하려고 시도합니다. 통합문서 추출이 중지되면(또는 중지될 경우) 알림을 받게 됩니다.
 Client id	클라이언트 ID
 Client secret	클라이언트 비밀 키
+Cliff edges	클리프 모서리
+Clockwise	시계방향
 Clone	복제
 Clone __currentClassname__	__currentClassname__ 복제
 Clone __projectName__	__projectName__ 복제
@@ -1079,6 +1197,7 @@ Cloned to __successCount__ classes.	__successCount__개 클래스에 복제되�
 Cloned, failed to publish	복제됨, 게시 실패
 Cloning assignment…	과제 복제 중…
 Close	닫기
+Close (ASME)	닫기(ASME)
 Close assignment	과제 할당 닫기
 Close assignment now?	지금 과제를 마감하시겠습니까?
 Close date	마감일
@@ -1089,6 +1208,7 @@ Close now	지금 마감
 Close publication	게시물 닫기
 Close search	검색 닫기
 Closed	닫힘
+Closed spline	닫힌 스플라인
 Cloud Storage	클라우드 저장소
 Cloud storage failed to load.	클라우드 스토리지를 로드하지 못했습니다.
 Cloud storage integration settings	클라우드 스토리지 통합 설정
@@ -1117,9 +1237,17 @@ College or University	전문대 또는 대학교
 Color	색상
 Color map may exceed browser memory limits. Try hiding unnecessary parts or surfaces.	컬러 맵이 브라우저 메모리 제한을 초과할 수 있습니다. 불필요한 파트 또는 면을 숨겨 보십시오.
 Colors	색상
+Column	열(C)
 Column 	열 
+Column access type	열 액세스 유형
+Column index (0-based)	열 인덱스(0 기준)
+Column max index (0-based)	열 최대 인덱스(0 기준)
+Column min index (0-based)	열 최소 인덱스(0 기준)
 Column name cannot be longer than 256 characters.	열 이름은 256자 이하여야 합니다.
 Column name cannot contain HTML.	열 이름에 HTML이 포함될 수 없습니다.
+Column regular expression	열 정규식
+Column result type	열 결과 유형
+Column value	열 값
 Columns	열
 Columns added while viewing this bill of materials are for reference only and will not be saved.	이 BOM을 확인하는 동안 추가된 열은 참조용으로만 제공되며 저장되지 않습니다.
 Comb size	조합 크기
@@ -1198,6 +1326,7 @@ Composite	합성
 Composite Part	합성 파트
 Composite curve	합성 곡선
 Composite part	합성 파트
+Composite part options	합성 파트 옵션
 Composite parts	합성 파트
 Composite parts (__numberOfCompositeParts__)	합성 파트(__numberOfCompositeParts__)
 Compress	압축
@@ -1212,11 +1341,15 @@ Computed part properties	계산된 파트 속성
 Computed part property document/version/element not found.	계산된 파트 속성 통합문서/버전/요소를 찾을 수 없습니다.
 Computed part property functions	계산된 파트 속성 기능
 Computed part property tables	계산된 파트 속성 테이블
+Computed pitch	계산된 피치
 Computed property overridden by Feature	피처로 재정의된 계산된 속성
 Computed property overridden in configuration.	구성에서 재정의된 속성을 계산했습니다.
+Computed revolutions	계산된 회전
 Computed value	계산된 값
 Computing center of mass…	질량 중심 계산 중…
 Computing…	계산 중…
+Concave	오목
+Concave repair	오목 복구
 Concentric	동심
 Cone	원추
 Confidence in data security	데이터 보안 분야에서의 확신
@@ -1307,6 +1440,9 @@ Confirm your Onshape password	Onshape 비밀번호 확인
 Confirm your password:	비밀번호 확인:
 Confirmation failed: __error__	확인 실패: __error__
 Conic	원추형
+Conic edges	원추형 모서리
+Conic hold lines	원추형 유지선
+Conical or cylindrical face	원추형 또는 원통형 면
 Conjugate angle	공액 각도
 Connect	연결(C)
 Connect service…	서비스 연결…
@@ -1345,6 +1481,8 @@ Constrained rotate	구속 회전
 Constrained surface	구속된 면
 Constraint manager	구속 조건 관리자
 Constraint manager…	구속 조건 관리자…
+Constraints	구속
+Constraints and limits	구속 조건 및 제한
 Construction	보조선
 Construction (q)	보조선
 Construction lines	보조선
@@ -1371,9 +1509,15 @@ Continue	계속
 Continue to	계속
 Continue to payment	결제로 진행
 Continue to wait	계속 대기
+Continuity	연속성
 Continuous feature	연속 피처
 Contour	윤곽
+Control	컨트롤(C)
+Control how the load is transferred between the instances	부품 사이에 하중이 전달되는 방법을 제어합니다.
 Control point grids	제어점 그리드
+Control point index	제어점 인덱스
+Control point indices	제어점 인덱스
+Control points	제어점
 Controlled radius	조절된 반지름
 Controls the default color of constrained lines and points.	구속된 선과 점의 기본 색상을 제어합니다.
 Controls the default color of lines and points in inactive sketches.	비활성 스케치에서 선과 점의 기본 색상을 제어합니다.
@@ -1398,11 +1542,16 @@ Convention	표기 규칙
 Convention contains unknown or inactive properties.	표기 규칙에 알 수 없거나 비활성 속성이 포함되어 있습니다.
 Convention exceeds __max__ characters in length.	표기 규칙이 __max__자를 초과합니다.
 Convention is blank.	표기 규칙이 비어 있습니다.
+Conversion factor	변환 계수
+Convert	변환
 Convert __jointName__ to __jointType__	__jointName__을(를) __jointType__(으)로 변환
 Convert to checkbox	확인란으로 변환
 Convert to expression	식으로 변환
 Convert to text	텍스트로 변환
 Convert to toggle button	토글 버튼으로 변환
+Convex	볼록
+Coordinate system	좌표계
+Coped butt	코프 버트
 Copied generative design recipe to clipboard	제너레이티브 디자인 레시피를 클립보드에 복사했습니다
 Copied link to job __jobId__.	__jobId__ 작업에 링크를 복사했습니다
 Copied to clipboard.	클립보드로 복사되었습니다.
@@ -1421,6 +1570,7 @@ Copy document to	문서 복사 위치
 Copy filtered inputs	필터링된 입력 복사
 Copy here	여기에 복사
 Copy here…	여기에 복사…
+Copy in place	제자리에 복사
 Copy input	입력 복사
 Copy is created in the top level of your __company__.	__company__의 최상위 레벨에 사본이 생성됩니다.
 Copy is created in the top level.	최상위 레벨에 사본이 생성됩니다.
@@ -1431,6 +1581,7 @@ Copy link to the document, including the active configuration, render mode, expl
 Copy link to this publication at this tab, including the active configuration, render mode, exploded view, panel states, and view orientation.	활성 구성, 음영처리 모드, 분해도, 패널 상태, 뷰 방향을 포함하여 이 탭에 있는 게시물의 링크를 복사합니다.
 Copy obsoletion candidate URL	사용되지 않는 후보자 URL 복사
 Copy of __configurationName__	__configurationName__ 사본
+Copy part	파트 복사
 Copy publication to	게시물 복사 위치
 Copy publication…	게시물 복사…
 Copy release candidate URL	릴리스 후보자 URL 복사
@@ -1449,8 +1600,17 @@ Core	코어
 Core WebGL	핵심 WebGL
 Corner	코너
 Corner break	코너 분리
+Corner break style	코너 분리 스타일
+Corner overrides	코너 재정의
 Corner rectangle	모서리 직사각형
 Corner rectangle (g)	코너 직사각형
+Corner relief diameter	코너 릴리프 지름
+Corner relief scale	코너 릴리프 축척
+Corner relief type	코너 릴리프 유형
+Corner relief width	코너 릴리프 너비
+Corner type	코너 유형
+Corners to break	분리할 코너
+Corners to exclude	제외할 코너
 Cost:	비용:
 Could not create a dimension with the selections.	선택 항목으로 치수를 생성할 수 없습니다.
 Could not create an annotation with the selections.	선택 항목으로 주석을 생성할 수 없습니다.
@@ -1470,7 +1630,44 @@ Count: __count__ __itemName__	카운트: __count__ __itemName__
 Count: __count__ user	카운트: __count__명 사용자
 Count: __count__ users	카운트: __count__명 사용자
 Counterbore	카운터보어
+Counterbore depth	카운터보어 깊이
+Counterbore depth deviation	카운터보어 깊이 편차
+Counterbore depth lower deviation	카운터보어 깊이 하한 편차
+Counterbore depth lower limit	카운터보어 깊이 하한
+Counterbore depth precision	카운터보어 깊이 정밀도
+Counterbore depth tolerance controls	카운터보어 깊이 공차 제어
+Counterbore depth tolerance type	카운터보어 깊이 공차 유형
+Counterbore depth upper deviation	카운터보어 깊이 상한 편차
+Counterbore depth upper limit	카운터보어 깊이 상한
+Counterbore diameter	카운터보어 지름
+Counterbore diameter deviation	카운터보어 지름 편차
+Counterbore diameter lower deviation	카운터보어 지름 하한 편차
+Counterbore diameter lower limit	카운터보어 지름 하한
+Counterbore diameter precision	카운터보어 지름 정밀도
+Counterbore diameter tolerance controls	카운터보어 지름 공차 제어
+Counterbore diameter tolerance type	카운터보어 지름 공차 유형
+Counterbore diameter upper deviation	카운터보어 지름 상한 편차
+Counterbore diameter upper limit	카운터보어 지름 상한
+Counterclockwise	반시계방향
 Countersink	카운터싱크
+Countersink angle	카운터싱크 각도
+Countersink angle deviation	카운터싱크 각도 편차
+Countersink angle lower deviation	카운터싱크 각도 하한 편차
+Countersink angle lower limit	카운터싱크 각도 하한
+Countersink angle precision	카운터싱크 각도 정밀도
+Countersink angle tolerance controls	카운터싱크 각도 공차 제어
+Countersink angle tolerance type	카운터싱크 각도 공차 유형
+Countersink angle upper deviation	카운터싱크 각도 상한 편차
+Countersink angle upper limit	카운터싱크 각도 상한
+Countersink diameter	카운터싱크 지름
+Countersink diameter deviation	카운터싱크 지름 편차
+Countersink diameter lower deviation	카운터싱크 지름 하한 편차
+Countersink diameter lower limit	카운터싱크 지름 하한
+Countersink diameter precision	카운터싱크 지름 정밀도
+Countersink diameter tolerance controls	카운터싱크 지름 공차 제어
+Countersink diameter tolerance type	카운터싱크 지름 공차 유형
+Countersink diameter upper deviation	카운터싱크 지름 상한 편차
+Countersink diameter upper limit	카운터싱크 지름 상한
 Country	국가
 Create	생성
 Create Assembly	어셈블리 생성
@@ -1550,6 +1747,7 @@ Create assignment	과제 할당 생성
 Create beveled edges or faces. Specify measurement type (offset or tangent) and chamfer type (equal, two distances or distance/angle). Individual edges can be overridden to change the direction.	베벨 모서리 또는 면을 생성합니다. 측정 유형(오프셋 또는 접선)과 챔퍼 유형(같음, 2거리, 거리/각도)을 지정하십시오. 개별 모서리를 재지정하여 방향을 변경할 수 있습니다.
 Create category	범주 생성
 Create class failed: 	클래스 생성 실패: 
+Create composite	합성 생성
 Create connection	연결 생성
 Create constant, variable, partial, or asymmetric edge fillets, or create full round fillets. Specify measurement type (radius or width) and control type (distance, conic, or curvature).	일정, 가변, 부분 또는 비대칭 모서리 필렛이나 완전 둥근 필렛을 만듭니다. 측정 유형(변경 또는 폭) 및 제어 유형(거리, 원추형 또는 곡률)을 지정합니다.
 Create curvature continuous transitions between sketch splines or conics and surrounding geometry.	스케치 스플라인이나 원추형 및 주변 형상 간에 곡률 연속 전환을 생성합니다.
@@ -1599,6 +1797,7 @@ Create or add a surface specified by its boundary profiles.	경계 프로파일�
 Create or add to a surface by selecting a set of curves or edges to form a closed boundary. Specify the continuity condition for each selection.	일련의 곡선 또는 모서리를 선택해 면을 생성하거나 추가해서 닫힌 경계를 형성합니다. 각 선택 항목에 대한 연속 조건을 지정하십시오.
 Create or add to existing sheet metal parts by selecting two profiles to loft. Adjust chordal tolerance to change loft resolution. Rips are automatically added to closed profiles. Operations on sheet metal models are automatically represented as a flat pattern, and joints and bends are listed in a table.	두 개의 프로파일을 선택하여 금속 판재 파트를 새로 만들거나 기존 파트에 추가합니다. 현 공차를 조정하여 로프트 분해능을 변경할 수 있습니다. 닫힌 프로파일에는 자동으로 절립이 추가됩니다. 금속 판재 모델에서의 작업은 플랫 패턴, 조인트 및 벤드가 테이블에 나열될 때 자동으로 표현됩니다.
 Create permission scheme	권한 구성 생성
+Create points in addition to the curve.	곡선 이외에 점을 생성합니다.
 Create profile	프로필 생성
 Create project role	프로젝트 역할 생성
 Create public document	공개 통합 문서 생성
@@ -1644,6 +1843,7 @@ Created	작성됨
 Created by	만든 사람
 Created by 	만든 사람 
 Created by __name__	__name__이(가) 작성
+Created by features	피처에서 생성됨
 Created by me	내가 생성한 문서
 Created link to __documentNameWithLink__	__documentNameWithLink__에 대한 링크가 생성됨
 Created on	생성일
@@ -1658,6 +1858,7 @@ Creating tutorial…	튜토리얼 생성 중…
 Creating version…	버전 생성 중…
 Creating workspace…	작업공간 생성 중…
 Creation of linked document reference failed.	연계된 통합 문서 참조를 생성하지 못했습니다.
+Creation type	생성 유형
 Creator	작성자
 Credi card failed to be added.	신용 카드를 추가하지 못했습니다.
 Credit card	신용카드
@@ -1669,9 +1870,13 @@ Credits	크레딧
 Creo part / NX file	Creo 파트 / NX 파일
 Creo part file	Creo 파트 파일
 Crop view	뷰 자르기
+Cross section	단면
+Cross sectional control	단면 제어
 Ctrl + Middle mouse button drag	Ctrl + 가운데 마우스 버튼 드래그
+Ctrl + Right mouse button drag or	Ctrl + 오른쪽 마우스 버튼 드래그 또는
 Ctrl + Right mouse button drag or \nMiddle mouse button drag	Ctrl + 오른쪽 마우스 버튼 드래그 또는\n가운데 마우스 버튼 드래그
 Ctrl + Right mouse button drag or \nMiddle mouse button drag or \nRight mouse button drag or \nCtrl + Middle mouse button drag	Ctrl + 오른쪽 마우스 버튼 드래그 또는\n가운데 마우스 버튼 드래그 또는\n오른쪽 마우스 버튼 드래그 또는\nCtrl + 가운데 마우스 버튼 드래그
+Cube	정육면체
 Current Onshape account email	현재 Onshape 계정 이메일
 Current assembly position	현재 어셈블리 위치
 Current category is not mapped to an Arena category. Change category or configure mapping to generate part number.	현재 범주가 Arena 범주에 매핑되지 않습니다. 범주를 변경하거나 매핑을 구성하여 파트 번호를 생성하십시오.
@@ -1682,6 +1887,7 @@ Current password	현재 비밀번호
 Current publication	현재 게시물
 Current sheet	현재 시트
 Current state:	현재 상태:
+Current value	현재 값
 Curvature	곡률
 Curvature color map	곡률 컬러 맵
 Curvature color map is not currently supported during interference detection.	현재 간섭 감지 중에는 곡률 컬러 맵이 지원되지 않습니다.
@@ -1690,11 +1896,17 @@ Curvature combs	곡률 조합
 Curvature deviation	곡률 편차
 Curve	곡선
 Curve pattern	곡선 패턴
+Curve point	곡선 점
+Curve projection type	곡선 투상 유형
+Curve reference	곡선 참조
+Curve to face	면까지 곡선
+Curve type	곡선 유형
 Curve/surface analysis	곡선/면 분석
 Curve/surface analysis…	곡선/면 분석…
 Curved Text	곡선 텍스트
 Curves	곡선
 Curves (__numberOfCurves__)	곡선(__numberOfCurves__)
+Curves to adjust	조정할 곡선
 Custom	사용자 정의
 Custom Feature Class ID	사용자 지정 피처 클래스 ID
 Custom Parameters	사용자 지정 매개변수
@@ -1703,6 +1915,7 @@ Custom boundary condition	사용자 지정 경계 조건
 Custom class	사용자 지정 클래스
 Custom class variable names must be unique for each unit type	사용자 지정 클래스 변수 이름은 각 유닛 유형에 대해 고유해야 합니다.
 Custom colors	사용자 지정 색상
+Custom direction	사용자 지정 방향
 Custom feature __featureName__ could not be updated because it does not exist in the update version.	사용자 지정 피처 __featureName__이(가) 업데이트 버전에 존재하지 않아 업데이트할 수 없습니다.
 Custom feature __featureName__ failed to be added to your toolbar.	사용자 지정 피처 __featureName__을(를) 툴바에 추가하지못했습니다.
 Custom feature __featureName__ was updated.	사용자 지정 피처 __featureName__이(가) 업데이트되었습니다.
@@ -1755,11 +1968,15 @@ Cut	잘라내기
 Cut list	절단 목록
 Cut list panel	절단 목록 패널
 Cut list table	절단 목록 테이블
+Cutouts	컷아웃
 Cylinder	원통
+Cylinder edges	원통형 모서리
+Cylinder/Cone	원통형/원추형
 Cylindrical	원통형
 Cylindrical mate	원통형 메이트
 Cylindrical mate (m)	원통형 메이트
 DONE	완료
+DSO™/DSOS™ threaded standoffs	DSO™/DSOS™ 나사산 스탠드오프
 DXF or DWG files	DXF 또는 DWG 파일
 Daily	매일
 Daily at __time__	매일 __time__
@@ -1783,6 +2000,7 @@ Data from CAM Studio (beta) is saved outside Onshape. Changes may not be visible
 Data from PCB Studios (beta) is saved outside Onshape and can be accessed from any workspace.	PCB Studio(베타)의 데이터는 Onshape 바깥에 저장되며 모든 작업공간에서 액세스할 수 있습니다.
 Data from Render Studios is saved outside Onshape and can be accessed from any workspace.	Render Studio의 데이터는 Onshape 바깥에 저장되며 모든 작업공간에서 액세스할 수 있습니다.
 Data from application tabs may be saved outside Onshape. Changes may not be visible here.	애플리케이션 탭의 데이터는 Onshape 바깥에 저장될 수 있습니다. 여기서 변경 내용이 보이지 않을 수도 있습니다.
+Data start column (0,1,2,.)	데이터 시작 열(0,1,2,.)
 Data to be pasted has too many columns and rows to fit in the table and will be truncated.	붙여 넣을 데이터에 열과 행이 너무 많아 표에 맞출 수 없으며 잘리게 됩니다.
 Data to be pasted has too many columns to fit in the table and will be truncated.	붙여 넣을 데이터에 열이 너무 많아 표에 맞출 수 없으며 잘리게 됩니다.
 Data to be pasted has too many rows to fit in the table and will be truncated.	붙여 넣을 데이터에 행이 너무 많아 표에 맞출 수 없으며 잘리게 됩니다.
@@ -1823,7 +2041,9 @@ Default Windchill attribute with html content cannot be created in Onshape	HTML 
 Default Windchill library - Non-geometric items	기본 Windchill 라이브러리 - 비기하 아이템
 Default Windchill library - Standard Content	기본 Windchill 라이브러리 - 표준 콘텐츠
 Default assembly BOM table template failed to update.	기본 어셈블리 BOM 표 템플릿을 업데이트하지 못했습니다.
+Default bend K Factor	기본 굽힘 K 지수
 Default color scheme for Onshape featuring dark elements on light backgrounds.	Onshape의 기본 색구성표로, 밝은 배경에 짙은 요소가 나타납니다.
+Default corner type	기본 코너 유형
 Default drawing BOM table template failed to update.	기본 도면 BOM 표 템플릿을 업데이트하지 못했습니다.
 Default feature selected	기본 피처 선택함
 Default geometry	기본 형상
@@ -1862,6 +2082,7 @@ Delete category	범주 삭제
 Delete category mapping.	범주 매핑을 삭제합니다.
 Delete column	열 삭제
 Delete comment?	설명을 삭제하시겠습니까?
+Delete composite parts	합성 파트 삭제
 Delete constraint	구속 조건 삭제
 Delete degree of freedom	자유도 삭제
 Delete dimension__ctxt__sketch-delete-action	치수 삭제
@@ -1869,6 +2090,8 @@ Delete draft	구배 삭제
 Delete draft release	구배 릴리스 삭제
 Delete entity	요소 삭제
 Delete face	면 삭제
+Delete faces	면 삭제
+Delete fillet faces	필렛 면 삭제
 Delete forever	영구 삭제
 Delete forever?	영구적으로 삭제하시겠습니까?
 Delete label __labelName__?	__labelName__ 라벨을 삭제하시겠습니까?
@@ -1932,8 +2155,20 @@ Dependencies	종속성
 Dependencies of __featureName__	__featureName__ 종속성
 Deprecated	사용되지 않음
 Depth	깊이
+Depth deviation	깊이 편차
+Depth lower deviation	깊이 하한 편차
+Depth lower limit	깊이 하한
+Depth precision	깊이 정밀도
+Depth tolerance controls	깊이 공차 제어
+Depth tolerance type	깊이 공차 유형
+Depth upper deviation	깊이 상한 편차
+Depth upper limit	깊이 상한
+Derivative	파생
+Derivative alignment	파생 정렬
+Derivative direction	파생 방향
 Derive failed. The source tab may have been deleted.	파생 작업이 실패했습니다. 소스 탭이 삭제되었을 수 있습니다.
 Derived	파생
+Derived mirror	파생된 대칭 복사
 Describe your feedback in detail	피드백을 자세히 설명해 주십시오.
 Description	설명
 Description (optional)	설명(선택 사항)
@@ -1960,20 +2195,34 @@ Deselect project	프로젝트 선택 취소
 Deselect publication	게시물 선택 취소
 Deselect variable studio	Variable Studio 선택 취소
 Design it together with a document	통합문서를 사용해 디자인
+Designator	지정자
+Detached	분리됨
 Detail view	상세도
 Detailed description	세부 설명
 Detailed description cannot exceed __maxLength__ characters.	세부 설명은 __maxLength__자를 초과할 수 없습니다.
 Details	세부사항
 Details are only available for In progress and Submitted documents	세부사항은 진행 중 및 제출된 통합문서에 대해서만 사용할 수 있습니다.
+Deviation	편차
 Deviation analysis	편차 분석
 Deviation analysis failed. If the problem persists, please contact support.	편차 분석이 실패했습니다. 이 문제가 지속되면 지원팀으로 문의하십시오.
 Deviation analysis…	편차 분석…
+Deviation type	파생 유형
 Device failed to be removed.	장치를 제거하지 못했습니다.
 Device type	장치 유형
 Devices	장치
 Devices failed to load.	장치를 로드하지 못했습니다.
 Diameter	지름
+Diameter Tolerance	지름 공차
+Diameter deviation	지름 편차
 Diameter dimension	지름 치수
+Diameter fit tolerance table	지름 맞춤 공차 테이블
+Diameter lower deviation	지름 하한 편차
+Diameter lower limit	지름 하한
+Diameter precision	지름 정밀도
+Diameter tolerance controls	지름 공차 제어
+Diameter tolerance type	지름 공차 유형
+Diameter upper deviation	지름 상한 편차
+Diameter upper limit	지름 상한
 Did not update any IDs: No IDs were modified	ID가 업데이트되지 않음: 수정된 ID가 없습니다.
 Did you mean:	다음과 같은 의미였습니까?
 Differences for this type of tab cannot be displayed.	이 탭 유형에 대한 차이를 표시할 수 없습니다.
@@ -1987,11 +2236,15 @@ Dimetric	이등각 투상
 Direct	직접
 Direct shares, mentions and marked documents	직접 공유, 언급 및 표시된 통합문서
 Direct, in product support	직접, 제품 지원 내
+Direction	방향
+Direction overrides	방향 재지정
+Direction to lock	고정할 방향
 Disable	사용하지 않음
 Disable Onshape password sign in	Onshape 비밀번호 로그인 비활성화
 Disable auto provisioning of users	사용자의 자동 프로비저닝 비활성화
 Disable high quality	고품질 비활성화
 Disable imported appearances	가져온 모양 비활성화
+Disable imprinting	임프린팅 비활성화
 Disable shortcut	단축키 비활성화
 Disable sync	동기화 비활성화
 Disabled	비활성화됨
@@ -2023,8 +2276,13 @@ Display state updated.	표시 상태를 업데이트했습니다.
 Display states	표시 상태
 Dissolve __parametricPartStudioName__	__parametricPartStudioName__ 분해
 Dissolve __replicateName__	__replicateName__ 해체
+Dissolve composite parts	합성 파트 해체
 Dissolve subassembly	서브 어셈블리 해체
 Distance	거리
+Distance 1	거리 1
+Distance 2	거리 2
+Distance and angle	거리 및 각도
+Distance per revolution	축 회전 당 거리
 Distance tolerance	거리 공차
 Distortion scale	왜곡 스케일
 Do not allow creator as approver	작성자를 승인자로 허용 안 함
@@ -2136,7 +2394,12 @@ Download users list	사용자 목록 다운로드
 Draft	구배
 Draft analysis	구배 분석
 Draft analysis…	구배 분석…
+Draft angle	구배 각도
 Draft failed to save.	구배를 저장하지 못했습니다.
+Draft on self	자체 구배
+Draft opposite direction	구배 반대 방향
+Draft scope	구배 범위
+Draft type	구배 유형
 Drafts	구배
 Drag an entity to snap to a Mate connector on another entity. Specify the mate type and orientation.	요소를 드래그해서 다른 요소의 메이트 커넥터에 스냅합니다. 메이트 유형 및 방향을 지정합니다.
 Drag sketch text by its text box.	텍스트 상자로 스케치 텍스트를 드래그하십시오.
@@ -2163,8 +2426,11 @@ Drawings were unable to be added from workspaces: 	작업공간에서 도면을 
 Drawings…	도면…
 Drawing…	도면…
 Drawn by	도면 작성자
+Drill size	드릴 크기
+Drilled	드릴됨
 Drive failed to load.	드라이브를 로드하지 못했습니다.
 Driven	순응
+Driving mate selector	구동 메이트 선택기
 Drop items here to remove them from the toolbar	도구 모음에서 제거하려면 항목을 여기로 드래그하십시오.
 Drop to import file to __containerNameForDrop__	파일을 가져오려면 __containerNameForDrop__에 끌어다 놓으십시오.
 Duplicate	복제
@@ -2186,11 +2452,36 @@ Each part and assembly is given its own document. For large assemblies, this opt
 Edge	모서리
 Edge __edgeNumber__ from __partName__	__partName__의 모서리 __edgeNumber__
 Edge condition symbol	모서리 조건 기호
+Edge convexity	모서리 볼록성
+Edge convexity type	모서리 볼록성 유형
+Edge joint	모서리 조인트
+Edge limit	모서리 제한
+Edge limits	모서리 제한
+Edge match scope	모서리 일치 범위
+Edge or face	모서리 또는 면
+Edge overflow	모서리 오버플로
 Edge point	모서리 점
+Edge positions	모서리 위치
+Edge projection options	모서리 투사 옵션
 Edge to edge centerline	모서리간 중심선
 Edges	모서리
+Edges and curves for ruled surface path	측정된 면 경로의 모서리와 곡선
+Edges and faces	모서리 및 면
 Edges and faces to analyze	분석할 모서리 및 면
+Edges and sketch curves to revolve	회전할 모서리와 스케치 곡선
+Edges and sketch curves to sweep	스윕할 모서리와 스케치 곡선
+Edges or cylinders to bend	벤드할 모서리 또는 실린더
+Edges or faces	모서리 또는 면
+Edges or side faces to flange	플랜지할 모서리 또는 측면
+Edges or side faces to hem	둘러쌀 모서리 또는 측면
+Edges or side faces to join	결합할 모서리 또는 측면
+Edges that define the bases of the gussets	거싯의 베이스를 정의하는 모서리
+Edges to hold	유지할 모서리
+Edges to keep	유지할 모서리
 Edges to show dihedral	이면체를 표시할 모서리
+Edges, curves and sketches	모서리, 곡선 및 스케치
+Edges, faces, and vertices	모서리, 면 및 꼭지점
+Edges, vertices, or faces	모서리, 꼭지점 또는 면
 Edit	편집
 Edit BOM template	BOM 템플릿 편집
 Edit Exclusions	제외 편집
@@ -2213,6 +2504,7 @@ Edit __roleName__	__roleName__ 편집
 Edit __teamName__	__teamName__ 편집
 Edit alias details	별칭 세부사항 편집
 Edit an existing curve or create a new curve by selecting sketch entities, edges, and/or curves to apply a simplified approximation, elevate the degree, reposition control curve vertices, and/or planarize into any 2D plane.	스케치 요소, 모서리 및/또는 곡선을 선택해 기존 곡선을 편집하거나 새로운 곡선을 생성하여 간소화된 근사치를 적용하고, 각도를 높이며, 제어 곡선 꼭지점을 재배치하거나 2D 면으로 평탄화합니다.
+Edit angles	각도 편집
 Edit appearance for __name__…	__name__의 모양 편집…
 Edit appearance for __numberBiggerThanOne__ curves…	__numberBiggerThanOne__곡선의 모양 편집…
 Edit appearance for __numberBiggerThanOne__ parts…	__numberBiggerThanOne__ 파트의 모양 편집…
@@ -2224,6 +2516,7 @@ Edit appearance…	모양 편집…
 Edit class properties…	클래스 속성 편집…
 Edit close date	마감일 편집
 Edit connection details	연결 세부사항 편집
+Edit control points	제어점 편집
 Edit curve	곡선 편집
 Edit dashboard	대시보드 편집
 Edit dashboard…	대시보드 편집…
@@ -2233,6 +2526,7 @@ Edit details…	세부사항 편집…
 Edit dialog failed to open.	편집 대화상자를 열지 못했습니다.
 Edit draft analysis…	구배 분석 편집…
 Edit dynamic suppression	동적 제외하고 보기 편집
+Edit edge positions	모서리 위치 편집
 Edit export rule	내보내기 규칙 편집
 Edit expression…	식 편집…
 Edit face appearances…	면 모양 편집…
@@ -2252,6 +2546,7 @@ Edit material for __name__…	__name__의 재질 편집…
 Edit material for __numberBiggerThanOne__ parts…	__numberBiggerThanOne__개 파트의 재질 편집…
 Edit material…	재질 편집…
 Edit mates	메이트 편집
+Edit mode	편집 모드
 Edit named position	명명 위치 편집
 Edit named position driver mate…	명명된 위치 구동 메이트 편집…
 Edit notes	노트 편집
@@ -2264,6 +2559,7 @@ Edit project role and permissions	프로젝트 역할 및 권한 편집
 Edit project…	프로젝트 편집…
 Edit properties	속성 편집
 Edit publish and close dates	게시일 및 마감일 편집
+Edit reference	참조 편집
 Edit reference…	참조 편집…
 Edit reflection analysis…	반사 분석 편집…
 Edit revision table template	리비전 테이블 템플릿 편집
@@ -2280,6 +2576,7 @@ Edit sketch appearance…	스케치 모양 편집…
 Edit sketches	스케치 편집
 Edit standard content	표준 콘텐츠 편집
 Edit standard content instance…	표준 콘텐츠 인스턴스 편집…
+Edit tangency angles	탄젠시 각도 편집
 Edit task	작업 편집
 Edit team details	팀 세부사항 편집
 Edit text	텍스트 편집
@@ -2316,6 +2613,9 @@ Element change URL dialog failed to open.	요소 변경 URL 대화상자를 열�
 Element libraries	요소 라이브러리
 Element not found	요소를 찾을 수 없습니다
 Element properties dialog failed to open.	요소 속성 대화상자를 열지 못했습니다.
+Elevate	올리기
+Elevation parameters	고도 매개변수
+Elevation target degree	고도 목표 각도
 Ellipse	타원
 Elliptical arc	타원형 호
 Email	이메일
@@ -2362,9 +2662,27 @@ Enables users to use AI Advisor in documents.	사용자가 통합문서에서 AI
 Enabling sync	동기화 활성화
 Enclose	둘러싸기
 Encrypting your data with your own AWS KMS key changes how some Onshape features behave. Before you continue, please review how the following will be affected:	사용자 고유의 AWS KMS 키로 데이터를 암호화하면 일부 Onshape 기능의 동작 방식이 변경됩니다. 계속하기 전에 다음 항목에 미치는 영향을 검토하십시오:
+End	끝
+End angle	끝 각도
 End cap	엔드 캡
+End condition	끝 조건
+End conditions	끝 상태
+End curvature offset	끝 곡률 오프셋
 End date	종료일
 End date is before start date	종료일이 시작일보다 이전입니다.
+End direction	끝 방향
+End edge position	끝 모서리 위치
+End flow offset	흐름 오프셋 종료
+End magnitude	끝 규모
+End offset	끝 오프셋
+End point	끝점
+End position	끝 위치
+End profile adjacent faces	끝 프로파일 인접 면
+End profile condition	끝 프로파일 상태
+End radius	끝 반경
+End trim	잘라내기 끝
+End type	끝 유형
+End value	끝 값
 Energy	에너지
 Enforce unique document and publication name enterprise wide for matching regular expression	정규식 매칭을 위해 엔터프라이즈 전체에서 고유 통합문서 및 게시물 이름 실시
 Enjoy a 14-day trial of Onshape Professional at no cost.	무료로 14일간 Onshape 프로페셔널을 시험사용해 보세요.
@@ -2427,20 +2745,37 @@ Enterprise:	엔터프라이즈:
 Entire document	전체 통합문서
 Entities	요소
 Entities and constraints	요소 및 구속 조건
+Entities to chamfer	챔퍼할 요소
 Entities to check	확인할 요소
+Entities to copy	복사 요소
+Entities to delete	삭제할 요소
+Entities to draft	구배할 요소
+Entities to fillet	필렛할 요소
+Entities to fillet or chamfer	필렛 또는 챔퍼할 요소
+Entities to measure between	측정할 요소
+Entities to mirror	대칭 복사할 요소
+Entities to pattern	패턴을 만들 요소
+Entities to split with	분할 요소
+Entities to transform or copy	변형하거나 복사할 요소
 Entity	요소
 Entity Type	요소 유형
+Entity or mate connector	요소 또는 메이트 커넥터
+Entity to split with	분할 요소
+Entity type	요소 유형
 Environment	환경
 Environment profile	환경 프로파일
 Environment profile settings	환경 프로파일 설정
 Environment profiles failed to load.	환경 프로파일을 로드하지 못했습니다.
 Equal	같음
 Equal (e)	동일
+Equal distance	동일 거리
 Equal length/radius	동일한 길이/반지름
 Equal length/radius edges	동일한 길이/반지름 모서리
 Equal or greater radius	크거나 같은 반지름
 Equal or smaller radius	작거나 같은 반지름
 Equal radius	동일한 반지름
+Equal spacing	동일 간격
+Equal trim	동일하게 잘라내기
 Equals	같음
 Error accessing cloud drive.	클라우드 드라이브에 액세스하는 중 오류가 발생했습니다.
 Error accessing drive.	드라이브에 액세스하는 중 오류가 발생했습니다.
@@ -2485,7 +2820,9 @@ Error while taking screenshot.	스크린샷을 촬영하는 중 오류가 발생
 Errors	오류
 Errors must be resolved before a parameter can be configured: __parameterError__	매개변수를 구성하기 전에 오류를 해결해야 합니다: __parameterError__
 Escape __command__	__command__ 나가기
+Euclidean	유클리드
 Evaluate functions	기능 평가
+Evaluate on use	사용 시 평가
 Evaluating…	평가 중…
 Every __weekDay__ at __time__	매 __weekDay__ __time__
 Everything in Free, plus:	무료 회원계정의 모든 기능과 추가 기능:
@@ -2543,6 +2880,9 @@ Explode	분해
 Explode all into polylines	모두 폴리선으로 분해
 Explode into polylines	폴리선으로 분해
 Explode into polylines (notes)	폴리선으로 분해(노트)
+Explode lines	선 분해
+Explode step	분해 단계
+Explode step type	분해 단계 유형
 Exploded view failed to be activated.	분해도를 활성화하지 못했습니다.
 Exploded views	분해도
 Exploded views help visualize how components fit together in an assembly.	분해도는 어셈블리 내에서 구성요소가 어떻게 맞춰지는지를 시각화하는 데 도움이 됩니다.
@@ -2585,9 +2925,15 @@ Extend (x)	연장
 Extend Trial	시험사용 연장
 Extend a line or curve to the first intersecting point or bounding geometry. If no intersection or bounding geometry is found, the line or curve ends at the release point.	첫 번째 교차점이나 경계 형상까지 선 또는 곡선을 연장합니다. 교차점 또는 경계 형상을 찾을 수 없는 겨우, 선 또는 곡선이 해제점에서 끝납니다.
 Extend across face	면 전체로 확장
+Extend bend relief	벤드 릴리프 확장
+Extend entities	요소 확장
 Extend or trim the boundary edges of a surface.	표면의 경계 모서리를 확장하거나 잘라냅니다.
+Extend profiles to part	프로파일을 파트까지 연장
 Extend surface	경계 이동
+Extend to full path	전체 경로로 확장
 Extended access to Onshape's Professional features	Onshape의 프로페셔널 피처에 대한 액세스 확장
+Extended corner	확장 코너
+Extension shape	연장점 모양
 External	외부
 External access	외부 액세스
 External thread	외부 나사산
@@ -2596,19 +2942,58 @@ Extract document	통합문서 추출
 Extract document…	통합문서 추출…
 Extrude	돌출
 Extrude (Shift-e)	돌출
+Extrude direction	돌출 방향
 Extruded	돌출
 Extrude…	돌출…
 FGS version information	FGS 버전 정보
+FH4™/FHP™ flush-head studs for stainless steel sheets	스테인리스 스틸 시트용 FH4™/FHP™ 플러시 헤드 스터드
+FHL™/FHLS™ flush, low-displacement head studs	FHL™/FHLS™ 낮은 치환 플러시 헤드 스터드
+FHX™ flush-head studs with X-Press™ thread	FHX™ 플러시 헤드 스터드, X-Press™ 나사산 포함
+FH™/FHS™/FHA™ flush-head pins	FH™/FHS™/FHA™ 플러시 헤드 핀
+FH™/FHS™/FHA™ flush-head studs	FH™/FHS™/FHA™ 플러시 헤드 스터드
 Face	면
 Face appearance	면 모양
 Face blend	면 블렌드
+Face limits	면 제한
+Face match scope	면 일치 범위
+Face mirror	면 대칭 복사
 Face of __featureName__	__featureName__의 면
+Face pattern	면 패턴
 Face selections are not coplanar	면 선택 항목이 동일평면상에 있지 않습니다.
 Face tangent angle	면 접선 각도:
+Face to trim to	잘라낼 면
+Face, edge or vertex	면, 모서리 또는 꼭지점
+Face, plane, mate connector, or planar face to use as trim tool	잘라내기 도구로 사용할 면(Face), 면(Plane), 메이트 커넥터 또는 평면
 Faces	면
+Faces and sketch regions	면과 스케치 영역
+Faces and sketch regions to extrude	돌출할 면과 스케치 영역
+Faces and sketch regions to revolve	회전할 면과 스케치 영역
+Faces and sketch regions to sweep	스윕할 면과 스케치 영역
+Faces and surfaces to thicken	두껍게 할 면과 표면
 Faces of __featureName__	__featureName__의 면
 Faces or features	면 또는 피처
+Faces or sketch regions to thicken	두께를 줄 면 또는 스케치 영역
+Faces to be normal to	수직을 이룰 면
+Faces to connect	연결할 면
+Faces to draft	구배할 면
+Faces to exclude	돌출시킬 면
+Faces to find match in	일치를 찾을 면
 Faces to flatten	펼칠 면
+Faces to load	로드할 면
+Faces to lock	고정할 면
+Faces to measure	측정할 면
+Faces to mirror	대칭 복사할 면
+Faces to move	이동할 면
+Faces to offset	오프셋할 면
+Faces to pattern	패턴을 만들 면
+Faces to remove	제거할 면
+Faces to replace	교체할 면
+Faces to replace with	교체되는 면
+Faces to round	둥글게 만들 면
+Faces to split	분할할 면
+Faces to trim to	잘라낼 면
+Faces, edges, and vertices that define sweep paths	스윕 경로를 정의하는 면, 모서리, 꼭지점
+Faces, surfaces, and sketch regions to offset	오프셋할 면, 표면 또는 스케치 영역
 Failed	실패함
 Failed captures	캡처 실패
 Failed to accept terms.	조건을 수락하지 못했습니다.
@@ -2848,6 +3233,9 @@ False	거짓
 Fastened	고정
 Fastened mate	고정 메이트
 Fastened mate (m)	고정 메이트
+Fastener	패스너
+Fastener fit	패스너 맞춤
+Fastener type	패스너 유형
 Feature	피처
 Feature Studio __name__ has errors	Feature Studio __name__에 오류가 있습니다.
 Feature Studio __name__ has errors and warnings	Feature Studio __name__에 오류와 경고가 있습니다.
@@ -2863,8 +3251,10 @@ Feature does not exist in target.	피처가 대상 버전에 존재하지 않습
 Feature from __locationName__	__locationName__의 피처
 Feature from current workspace	현재 작업공간의 피처
 Feature has no dependencies.	피처에 종속성이 없습니다.
+Feature mirror	피처 대칭 복사
 Feature name	피처 이름
 Feature parameters	피처 매개변수
+Feature pattern	피처 패턴
 Feature-linked custom tables	피처 연결 사용자 지정 테이블
 FeatureScript documentation	FeatureScript 설명서
 FeatureScript execution produced table errors. See the FeatureScript notices pane for more information.	FeatureScript 실행에서 테이블 오류가 발생했습니다. 자세한 내용은 FeatureScript 안내 창을 참조하십시오.
@@ -2879,6 +3269,9 @@ Features (__numberOfFeatures__)	피처(__numberOfFeatures__)
 Features (__shownCount__ of __featureCount__)	피처(__shownCount__ / __featureCount__)
 Features and parts	피처 및 파트
 Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Onshape Labs의 기능은 실험적이며, 오류가 발생할 수 있고 언제든지 변경되거나 제거될 수 있습니다. Onshape Labs 기능은 테스트 및 평가 목적으로만 제공되며, 실제 운영 환경에서는 사용해서는 안 됩니다. 사용 여부는 사용자의 판단에 따릅니다.
+Features to find match in	일치를 찾을 피처
+Features to mirror	대칭 복사할 피처
+Features to pattern	패턴을 만들 피처
 Features used by __featureName__	__featureName__에서 사용된 피처
 Features using __featureName__	__featureName__을(를) 사용하는 피처
 Feedback/Report a bug	피드백/버그 신고
@@ -2905,9 +3298,13 @@ Files	파일
 Fill	채우기
 Fillet	필렛
 Fillet (Shift-f)	필렛
+Fillet compare type	필렛 비교 유형
 Fillet dimension	필렛 치수
 Fillet faces	필렛 면
+Fillet faces to modify	수정할 필렛면
 Fillet radii	필렛 반지름
+Fillet radius	필렛 반지름
+Fillet type	필렛 유형
 Fillets	필렛
 Fillet…	필렛…
 Filter	필터
@@ -2921,6 +3318,7 @@ Filter bodies by name and features by bodies directly affected	이름별로 바�
 Filter branches	브랜치 필터링
 Filter by __label__	__label__별로 필터링
 Filter by assembly folders	어셈블리 폴더별로 필터링
+Filter by body type	바디 유형별로 필터링
 Filter by contents with errors	오류가 있는 내용별로 필터링
 Filter by contents with warnings	경고가 있는 콘텐츠로 필터링
 Filter by current tab	현재 탭별로 필터링
@@ -2956,6 +3354,7 @@ Filter by type	유형별로 필터링
 Filter by user role	사용자 역할별로 필터링
 Filter comments	필터 설명
 Filter configuration inputs	구성 입력값 필터링
+Filter construction entities	필터 형상 요소
 Filter feature list	피처 리스트 필터링
 Filter features and bodies by name	이름별로 피처 및 바디 필터링
 Filter features and bodies by type	유형별로 피처 및 바디 필터링
@@ -2997,14 +3396,24 @@ Finishing	완료
 First	처음
 First angle (ISO)	첫 번째 각도(ISO)
 First dash	첫 번째 점선
+First direction	첫 번째 방향
 First gap	첫 번째 간격
 First name	이름
 First name must be less than 64 characters in length	이름의 길이는 64자 미만이어야 합니다.
+First set of surfaces	첫 번째 면 세트
 First sheet	첫 번째 시트
+First side face	첫 번째 면
+First sketch	첫 번째 스케치
 First used on	최초 사용일
+Fit	맞춤
+Fit (tolerance only)	맞춤(공차만 해당)
 Fit spline	3D 스플라인 맞춤
+Fit type	맞춤 유형
+Fit with tolerance	공차에 맞춤
 Fix	고정
 Flange	플랜지
+Flange alignment	플랜지 정렬
+Flange to merge	병합할 플랜지
 Flat	평면
 Flat patterns	플랫 패턴
 Flatten	펼치기
@@ -3014,11 +3423,31 @@ Flattened	병합된 항목
 Flattened angle	펼친 각도
 Flattened offset	펼쳐진 항목 오프셋
 Flattened position (mate connector)	펼쳐진 위치(메이트 커넥터)
+Flex PCB model	플렉시블 PCB 모델
+Flip	뒤집기
+Flip alignment	정렬 뒤집기
+Flip asymmetric	비대칭 뒤집기
+Flip base sides	기준 변 대칭
+Flip cap	캡 대칭
+Flip coordinate system	좌표계 뒤집기
+Flip corner	코너 뒤집기
+Flip direction	방향 뒤집기
+Flip direction up	위로 방향 뒤집기
+Flip first plane	첫 번째 면 대칭
 Flip horizontal	수평 대칭
+Flip normal	수직 대칭
+Flip offset	오프셋 뒤집기
 Flip plane	면 뒤집기
 Flip primary axis	주축 뒤집기
+Flip pull direction	당기는 방향 뒤집기
+Flip rounding	라운딩 뒤집기
+Flip second plane	두 번째 면 대칭
+Flip side 1	변 1 대칭
+Flip side 2	변 2 대칭
+Flip sides	변 대칭
 Flip stripes	스트립 대칭
 Flip vertical	수직 대칭
+Flip wall	벽 대칭
 Float buffer blending	가상 버퍼 블렌딩
 Float buffer blending is used for rendering section planes endcaps. Without this extension, this functionality will be disabled. 	가상 버퍼 블렌딩은 단면 엔드캡을 렌더링하는 데 사용됩니다. 이 확장 없이는 해당 기능이 비활성화됩니다. 
 Float framebuffer rendering	부동소수점 프레임버퍼 렌더링
@@ -3068,6 +3497,8 @@ Forget	분실
 Forgot password?	비밀번호를 잊으셨습니까?
 Forgot your password?	비밀번호를 잊으셨습니까?
 Form	형태
+Form Part Studio	Part Studio 성형
+Form origin mate connector	형상 원점 메이트 커넥터
 Format	형식
 Format Feature Studio	Feature Studio 포맷
 Format Studio	포맷 스튜디오
@@ -3087,12 +3518,19 @@ Found no items that match:  	일치하는 항목이 없습니다.
 Found no properties that match: 	일치하는 속성이 없습니다. 
 Four views	4방향 뷰
 Frame	프레임
+Frame groups	프레임 그룹
 Frame profile library	프레임 프로파일 라이브러리
+Frame segments are trimmed against preceding groups and are used as tools for later groups	프레임 세그먼트가 이전 그룹에 대해 잘려지고 이후 그룹의 도구로 사용됩니다.
+Frame segments in earlier groups are used as tools for later groups	이전 그룹의 프레임 세그먼트가 이후 그룹의 도구로 사용됩니다.
 Frame trim	프레임 다듬기
+Frames	프레임
+Free	자유
 Free state	자유 상태
 Frequency	빈도
 Frequency:	빈도:
 Friday	금요일
+From import	가져오기에서
+From mate connector	시작 메이트 커넥터
 From to	시작-끝
 Front	정면
 Front view	정면 뷰
@@ -3100,6 +3538,8 @@ Full	정식
 Full access	전체 액세스
 Full access to Onshape's Professional features	Onshape의 프로페셔널 피처에 대한 전체 액세스
 Full performance check	전체 성능 확인
+Full revolve	전체 회전
+Full round	전체 원
 Full user	정식 사용자
 Full users: __fullUsers__ / __totalFullUserSeats__	정식 사용자: __fullUsers__ / __totalFullUserSeats__
 Fun - For designing personal projects as a hobby.	재미 - 취미로 개인 프로젝트를 디자인할 경우.
@@ -3109,7 +3549,10 @@ G3 tolerance	G3 공차
 GENERAL	일반
 GL renderer	GL 렌더러
 GL vendor	GL 공급업체
+Gap	간격
+Gap fill	간격 채우기
 Gaussian (1/__unit__\\u00B2)	가우스(1/__unit__\\u00B2)
+Gear	기어
 Gear relation	기어 릴레이션
 General	일반
 General sync settings	일반 동기화 설정
@@ -3132,6 +3575,7 @@ Generative	생성
 Generative returned an error: __errorText__	생성 오류 반환: __errorText__
 Generatives (__generativeDesignItemCount__)	생성(__generativeDesignItemCount__)
 Generic thumbnail image for a document without a preview image.	미리보기 이미지가 없는 통합문서의 일반 썸네일 이미지.
+Geodesic	측지선
 Geographical data	지리적 데이터
 Geometric tolerance	기하 공차
 Geometric tolerance symbol	기하 공차 기호
@@ -3188,10 +3632,13 @@ Graphics preferences saved successfully.	그래픽 기본 설정이 성공적으
 Graphics preferences…	그래픽 기본 설정…
 Graphics rendering mode	그래픽 음영처리 모드
 Grayscale	그레이스케일
+Greater or equal	크거나 같음
 Green	초록색
 Grid view	눈금 보기
 Groove	홈
 Group	그룹
+Group 1	그룹 1
+Group 2	그룹 2
 Group composite parts into a single part file	합성 파트를 하나의 파트 파일로 그룹화
 Groups subassemblies with their parts in the same document	동일 통합문서에서 서브어셈블리를 파트와 그룹화
 Guest	게스트
@@ -3200,18 +3647,39 @@ Guest user	게스트 사용자
 Guest users	게스트 사용자
 Guests failed to be invited. Number of guests (__guestsnumber__) exceeds the remaining subscriptions (__availableseats__).	게스트를 초대하지 못했습니다. 게스트 수(__guestsnumber__)가 남은 회원 계정 수(__availableseats__)를 초과합니다.
 Guests only have access to data that is shared with them.	게스트는 공유된 데이터에만 액세스할 수 있습니다.
+Guides	가이드
+Guides and continuity	가이드 및 연속
 Gusset	거싯
+Gusset position	거싯 위치
+Gusset type	거싯 유형
+HF109™ heavy-duty, high tensile strength studs	HF109™ 헤비 듀티 고인장 강도 스터드
+HFE™/THFE™ heavy-duty studs for thin sheets	박막용 HFE™/THFE™ 헤비 듀티 스터드
+HFG8™ heavy-duty, high tensile strength studs	HFG8™ 헤비 듀티 고인장 강도 스터드
+HFH™/HFHS™/HFHB™ heavy-duty studs	HFH™/HFHS™/HFHB™ 헤비 듀티 스터드
+HFLH™ hard panel studs	HFLH™ 하드 패널 스터드
 HTML content is not supported in document notes	HTML 콘텐츠는 통합문서 노트에서 지원되지 않습니다
 HTML content is not supported in publication notes	HTML 콘텐츠는 게시물 노트에서 지원되지 않습니다.
+Handedness	손 쓰임
 Has configured parameters	구성된 파라미터 있음
 Has conflict	충돌 있음
 Has degrees of freedom	자유도 있음
+Has offset	오프셋 포함
+Has second direction	두 번째 방향 포함
+Has third direction	세 번째 방향 포함
 Hatch region	해치 영역
+Header	머리글
 Headers without properties:	헤더(속성 불포함):
+Heal	복구
+Height	높이
 Helix	나선
+Helix axis	나선 축
+Helix axis type	나선 축 유형
 Help	도움말
 Help menu	도움말 메뉴
+Help point	도움 점
 Hem	둘러싸기
+Hem alignment	둘러싸기 맞춤
+Hem type	둘러싸기 유형
 Hencky strain	Hencky 변형률
 Here is a summary of what will happen next:	다음에 발생하는 상황에 대한 요약 내용입니다.
 Hidden edges removed	은선 숨기기
@@ -3290,19 +3758,30 @@ Highlight boundary edges enabled	경계 모서리 강조 표시 활성화됨
 Highlight tool in toolbar	툴바에서 도구 강조 표시
 History changes are view only. Viewing __momentName__	히스토리 변경은 보기 전용입니다. __momentName__ 보기
 Hobbyist - I use CAD for personal projects.	취미 애호가 - CAD를 개인 프로젝트에 이용합니다.
+Hold adjacent edges	인접 모서리 유지
+Hold line	유지 선
+Hold opposite side	반대면 숨기기
+Hold other line	다른 선 유지
 Hole	홀
 Hole callout	홀 설명선
+Hole class	홀 클래스
 Hole faces	홀 면
+Hole start plane or mate connector	홀 시작면 또는 메이트 커넥터
 Hole table	홀 테이블
 Hole table panel	홀 테이블 패널
+Hole type	홀 유형
 Hole/thread callout	홀/나사산 설명선
+Holes	홀
+Hollow	비우기
 Home	홈
 Horizontal	수평
 Horizontal (h)	수평
+Horizontal reference	수평 기준
 Horizontal stripe	수평 줄무늬
 Horizontal zones	수평 영역
 Hover over or select an instance to show its mates.	메이트를 표시하려면 부품 위로 마우스를 가져가거나 해당 부품을 선택합니다.
 How Onshape Labs features use your data	Onshape Labs 기능이 사용자의 데이터를 사용하는 방식
+H™ nuts/HNL™ prevailing torque locknuts	H™ nuts/HNL™ 프리베일링 토크 잠금 너트
 I agree to the	동의 사항:
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use	본인은 수업, 개인 학습 프로젝트, 학교 클럽/조직, 학문 연구에 이 플랜의 사용에 동의합니다. 본인은 이 플랜을 정부, 상업적 또는 기타 조직을 위한 용도로 사용하지 않을 것입니다.
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use.	본인은 수업, 개인 학습 프로젝트, 학교 클럽/조직, 학문 연구에 이 플랜의 사용에 동의합니다. 본인은 이 플랜을 정부, 상업적 또는 기타 조직을 위한 용도로 사용하지 않을 것입니다.
@@ -3317,11 +3796,13 @@ IGES file	IGES 파일
 IGES postprocessing	IGES 후처리
 Id	ID
 Identical references	동일 참조
+If none selected, this feature will create one at Origin	아무 것도 선택하지 않을 경우, 이 피처는 원점에서 하나를 생성합니다.
 If you are no longer an educator, please update the following:	더 이상 교육 담당자가 아닐 경우, 다음을 업데이트하십시오.
 If you continue, you will be signed out and redirected to the sign in page.	계속하면 로그아웃되고 로그인 페이지로 다시 연결됩니다.
 If you lose access to the authentication app and the recovery codes, Onshape Support will not be able to unlock your account.	인증 앱 및 복구 코드에 대한 액세스 권한을 잃은 경우, Onshape 지원팀에서 계정의 잠금을 해제할 수 없습니다.
 If your KMS key is ever deleted, your encrypted documents become permanently unrecoverable - including by Onshape.	KMS 키가 삭제되는 경우, 암호화된 통합문서는 Onshape를 포함하여 누구도 영구적으로 복구할 수 없게 됩니다.
 Ignore	무시
+Ignore composite parts	합성 파트 무시
 Ignore faulty part warning for __numberBiggerThanOne__ parts	__numberBiggerThanOne__개 파트에 대해 결함 있는 파트 경고 무시
 Ignore faulty part warning for __partName__	__partName__에 대해 결함 있는 파트 경고 무시
 Ignored invalid selections. Select a plane, planar face, cylinder, cone, or mate connector in main view.	부적합한 선택이 무시되었습니다. 메인 뷰에서 면, 평면, 원통형, 원추형 또는 메이트 커넥터를 선택하십시오.
@@ -3354,6 +3835,7 @@ Import…	가져오기…
 In context	컨텍스트 내
 In order to re-join this classroom, the classroom's administrator must add you.	이 클래스룸에 다시 참여하려면 클래스룸 관리자가 귀하를 다시 추가해야 합니다.
 In pan mode, click and drag to move the viewport.	초점이동 모드에서 클릭해서 드래그하여 뷰포트를 이동하십시오.
+In place	제자리
 In progress	진행 중
 In property __propertyId__: __message__	__propertyId__ 속성에서: __message__
 In state __stateName__: __message__	__stateName__ 상태에서: __message__
@@ -3373,6 +3855,7 @@ Include a personal message	개인 메시지 포함
 Include associated drawings	관련 도면 포함
 Include bend centerlines	벤드 중심선 포함
 Include bend tangent lines	벤드 접선 포함
+Include bends	벤드 포함
 Include configuration parameter in properties	속성에 구성 매개변수 포함
 Include counterbore and countersink lines	카운터보어 및 카운터싱크 라인 포함
 Include derived tolerances in export	내보내기에 파생된 공차 포함
@@ -3381,6 +3864,8 @@ Include form feature outlines	형상 피처 윤곽선 포함
 Include hidden instances in export	내보내기에 숨겨진 부품 포함
 Include in all BOMs	모든 자재명세서(BOM)에 포함
 Include in properties	속성에 포함
+Include mate connectors	메이트 커넥터 포함
+Include properties	속성 포함
 Include standard content	표준 콘텐츠 포함
 Include visible sketches	보이는 스케치 포함
 Include when true	참일 때 포함
@@ -3390,9 +3875,15 @@ Incompatible data for boolean type: __dataValue__	합치기 유형에 대해 호
 Incompatible data for list box type: __dataValue__	목록 상자 유형에 대해 호환되지 않는 데이터: __dataValue__
 Incorrect password	잘못된 비밀번호
 Independency	독립성
+Index	인덱스
+Index (0-based)	인덱스(0 기준)
 Individual	개인
+Individual edges to match	일치시킬 개별 모서리
+Individual faces to match	일치시킬 개별 면
 Individuals	개인
 Inherited properties	상속된 속성
+Inner	내부
+Inner radius	안쪽 반지름
 Input ID	ID 입력
 Input email	이메일 입력
 Input is invalid: Enter text and check for unsupported entries, for example end of line markers.	잘못된 입력: 텍스트를 입력하고 지원되지 않는 항목이 있는지 확인해 보십시오(예: 선 마커의 끝).
@@ -3401,6 +3892,8 @@ Input must match the pattern "__regexp__".	입력이 "__regexp__" 패턴과 일�
 Input name	입력 이름
 Input propagation for 	입력값 전파 대상: 
 Input propagation…	입력값 전파...
+Input type	입력 유형
+Inputs	입력
 Inputs copied.	입력을 복사했습니다.
 Inputs pasted into Assemblies will not be excluded from properties.	어셈블리에 붙여넣은 입력값은 속성에서 제외되지 않습니다.
 Inputs pasted into Variable Studios will not be excluded from properties.	Variable Studio에 붙여넣은 입력값은 속성에서 제외되지 않습니다.
@@ -3447,16 +3940,21 @@ Inserted: 	삽입됨:
 Inserting __name__	__name__ 삽입 중
 Inserting parts or data from public documents into your encrypted documents will be blocked.	공개 통합문서의 파트 또는 데이터를 암호화된 통합문서에 삽입하는 작업이 차단됩니다.
 Inserting…	삽입 중…
+Inset	삽도
+Inside	내부
 Inspection count	검사 카운트
 Inspection item	검사 아이템
 Inspection list	검사 목록
 Inspection table	검사 테이블
 Inspection table template	검사 테이블 템플릿
+Instance	부품
 Instance contains error	부품에 오류 포함
+Instance count	인스턴스 수
 Instance is not primary instance of context.	부품이 컨텍스트의 기본 부품이 아닙니다.
 Instance properties	부품 속성
 Instance properties updated.	부품 속성을 업데이트했습니다.
 Instance properties…	부품 속성…
+Instances	인스턴스
 Instances (0)	부품(0)
 Instances (__instanceCount__)	부품(__instanceCount__)
 Instances and mates	부품 및 메이트
@@ -3468,7 +3966,12 @@ Instances in folder have newer versions	폴더의 부품에 최신 버전이 있
 Instances in folder have newer versions and contexts	폴더의 부품에 최신 버전과 컨텍스트가 포함되어 있습니다.
 Instances in some documents could not be updated. Edit permissions are needed.	일부 통합문서의 부품을 업데이트할 수 없습니다. 편집 권한이 필요합니다.
 Instances inside will update	내부의 부품이 업데이트됩니다.
+Instances or faces to constrain	구속할 부품 또는 면
 Instances to analyze	분석할 부품
+Instances to measure	측정할 부품
+Instances to mirror	대칭 복사할 부품
+Instances to replace	교체할 부품
+Instances to skip	건너뛸 부품
 Instant access	즉시 액세스
 Instructions	지침
 Instructions, description, or notes for this document	이 통합문서의 지침, 설명 또는 노트
@@ -3484,18 +3987,22 @@ Integrations are not allowed for all users	통합은 모든 사용자에게 허�
 Integrations failed to load.	통합을 로드하지 못했습니다.
 Intended use	용도
 Interactive framerate:	양방향 프레임 속도:
+Interference	간섭
 Interference __index__ between __parentPart1Name__ and __parentPart2Name__	__parentPart1Name__ 및 __parentPart2Name__ 사이의 __index__ 간섭
 Interference between __parentPart1Name__ and __parentPart2Name__	__parentPart1Name__ 및 __parentPart2Name__ 사이의 간섭
 Interference detection	간섭 감지
 Interference detection not accurate, instances have moved.	간섭 감지가 정확하지 않습니다. 부품이 이동되었습니다.
 Interference detection…	간섭 감지…
 Interferences	간섭
+Interior faces	내부 면
 Internal	내부
 Internal FeatureScript ID	내부 FeatureScript ID
 Internal ID	내부 ID
 Internal feature	내부 피처
 Internal geometry for assembly context not shown in current graphics mode	현재 그래픽 모드에서는 어셈블리 컨텍스트의 내부 형상이 표시되지 않습니다.
 Internal geometry not shown in current graphics mode	현재 그래픽 모드에서는 내부 형상이 표시되지 않습니다.
+Interpolated spline	보간 스플라인
+Intersect	교집합
 Intersection	교차점
 Intersection angle	교차점 각도
 Intersection curve	교차점 곡선
@@ -3522,6 +4029,8 @@ Invalid text entry. HTML is not supported.	부적합한 텍스트 항목. HTML�
 Invalid text or symbols.	부적합한 텍스트 또는 기호입니다.
 Invalid tutorial URL.	부적합한 튜토리얼 URL입니다.
 Inventor part file	Inventor 파트 파일
+Inverse conic edges	원추형 모서리 반전
+Inverse tangent edges	접선 모서리 반전
 Investigate	조사
 Invitation failed to load.	초대를 로드하지 못했습니다.
 Invitation failed to load. Contact Onshape Support for further assistance.	초대를 로드하지 못했습니다. Onshape 지원팀에 연락하여 추가 도움을 요청해 주십시오.
@@ -3593,20 +4102,39 @@ Job not found.	작업을 찾을 수 없습니다.
 Job queue	작업 대기열
 Job run started successfully.	작업 실행을 성공적으로 시작했습니다.
 Jog	조그
+Jog offset	조그 오프셋
+Jog offset anchor	조그 오프셋 앵커
 Join adjacent surfaces	인접 면 결합
 Joint	조인트
+Joint style	결합 스타일
+Joint type	결합 유형
+K Factor	K 지수
 Keep __targetname__	__targetname__ 유지
 Keep access	액세스 유지
+Keep both sides	양면 유지
+Keep end derivative	끝 파생 유지
+Keep input parts	입력 파트 유지
+Keep material	재질 유지
+Keep opposite side	반대면 유지
+Keep points	점 유지
+Keep profile orientation	프로파일 방향 유지
+Keep start derivative	시작 파생 유지
+Keep tool surfaces and curves	도구 표면 및 곡선 유지
+Keep tools	도구 유지
 Key size must be 32 characters or empty.	키 크기는 32자이거나 비어 있어야 합니다.
 Keyboard shortcut failed to be restored to default.	키보드 단축키를 기본값으로 복원하지 못했습니다.
 Keyboard shortcuts	키보드 단축키
 Keyboard shortcuts failed to be restored to default.	키보드 단축키를 기본값으로 복원하지 못했습니다.
 Keyboard shortcuts failed to load.	키보드 단축키를 로드하지 못했습니다.
 Knot points	매듭 점
+LRA or Length, Rotation, and Angle table shows coordinates for CNC tube bending machines.	LRA(길이, 회전, 각도) 테이블은 CNC 튜브 벤딩 머신을 위한 좌표를 나타냅니다.
+LRA table	LRA 테이블
 Label already exists. Please choose another name.	라벨이 이미 있습니다. 다른 이름을 선택하십시오.
+Label column index	라벨 열 인덱스
 Label must be between 1 and 255 characters with no forward slashes '/'.	라벨은 슬래시 '/' 없이 1 ~ 255자 길이여야 합니다.
 Label name	라벨 이름
 Label name cannot contain HTML.	라벨 이름에 HTML이 포함될 수 없습니다.
+Label row index	라벨 행 인덱스
 Labels	라벨
 Labels…	라벨…
 Label…	라벨…
@@ -3672,6 +4200,7 @@ Leave all classroom-owned teams	클래스룸 소유의 모든 팀 나가기
 Leave classroom	클래스룸 나가기
 Leave classroom?	클래스룸에서 나가시겠습니까?
 Leave now	지금 나가기
+Leave open	열어두기
 Leave organization	기관 나가기
 Leave team	팀 나가기
 Leave team?	팀을 나가시겠습니까?
@@ -3680,10 +4209,13 @@ Left	좌측면
 Left view	좌측면 뷰
 Legend	범례
 Length	길이
+Length Tolerance	길이 공차
+Length control	길이 컨트롤
 Length must be at least __minLength__ characters.	길이는 최소 __minLength__자여야 합니다.
 Length must not exceed __maxLength__ characters.	길이는 __maxLength__자를 초과할 수 없습니다.
 Length unit:  	길이 단위:  
 Length: __lengthUnit__	길이: __lengthUnit__
+Less or equal	적거나 같음
 Let others know who you are and collaborate together in real time	다른 사용자들이 귀하가 누군지 확인하고 실시간으로 공동작업을 수행할 수 있습니다.
 Libraries	라이브러리
 Library	라이브러리
@@ -3696,18 +4228,36 @@ Light users: __lightUsers__ / __totalLightUserSeats__	라이트 사용자: __lig
 Light view	라이트 뷰
 Like	추천
 Likes	추천
+Limit	한계
+Limit X maximum distance	X 최대 거리 한계
+Limit X minimum distance	X 최소 거리 한계
+Limit Y maximum distance	Y 최대 거리 한계
+Limit Y minimum distance	Y 최소 거리 한계
+Limit Z maximum distance	Z 최대 거리 한계
+Limit Z minimum distance	Z 최소 거리 한계
 Limit application access per document through the Share dialog	공유 대화상자를 통해 통합문서당 애플리케이션 액세스를 제한
+Limit axial X maximum angle	X 최대 각도 축 한계
+Limit axial X minimum angle	X 최소 각도 축 한계
+Limit axial Y maximum angle	Y 최대 각도 축 한계
+Limit axial Y minimum angle	Y 최소 각도 축 한계
+Limit axial Z maximum angle	Z 최대 각도 축 한계
+Limit axial Z minimum angle	Z 최소 각도 축 한계
+Limit frame ends	프레임 끝 제한
 Limitations of experimental AI features	실험적 AI 피처 사용 제한
 Limited permissions reduce the risk of 3rd parties copying or exporting your documents.	권한을 제한하면 제3자가 통합 문서를 복사하거나 내보낼 위험이 줄어듭니다.
 Limited permissions reduce the risk of 3rd parties copying or exporting your publications.	권한을 제한하면 제3자가 게시물을 복사하거나 내보낼 위험이 줄어듭니다.
+Limits	한계
 Line	선
 Line 	선 
 Line (l)	선
+Line angle	선 각도
 Line length can't be tolerant. Use a distance between entities.	선 길이는 공차를 적용할 수 없습니다. 요소 간 거리를 사용하십시오.
+Line or points	선 또는 점
 Line to line angular dimension	선간 각도 치수
 Line to line linear dimension	선간 선형 치수
 Line width	선 폭
 Line/tangent arc switch	선/접 원호 전환
+Linear	선형
 Linear acceleration	선형 가속
 Linear pattern	선형 패턴
 Linear relation	선형 릴레이션
@@ -3727,8 +4277,10 @@ List of categories this property belongs to	이 속성이 속하는 범주 목�
 List values	목록 값
 List values copied.	목록 값을 복사했습니다.
 List view	목록 보기
+Load direction	로드 방향
 Load more	더 로드
 Load more changes…	추가 변경 내용 로드…
+Load region	로드 영역
 Loading	로드 중
 Loading Action items…	작업 항목 로드 중…
 Loading CAM Studio…	CAM Studio 로드 중…
@@ -3797,36 +4349,51 @@ Loads	로드
 Loads (__loadItemCount__)	로드(__loadItemCount__)
 Local storage	로컬 저장소
 Location	위치
+Location(s)	위치
+Locations	위치
 Lock __itemName__ at current position	현재 위치에서 __itemName__ 잠금
 Lock a sketch entity onto the sketch plane so it does not move.	스케치 요소가 움직이지 않도록 스케치 면에 고정시킵니다.
 Lock current position	현재 위치 잠금
+Lock ends	끝 잠금
 Lock environment	환경 잠금
 Lock mate inference	메이트 구속 제한 잠금
+Lock profile direction	프로파일 방향 잠금
+Lock profile faces	프로파일 면 잠금
 Lock the position of selected entities relative to one another.	서로에 대해 선택한 요소의 위치를 잠급니다.
 Lock to named position	명명된 위치에 잠금
 Lock/follow position to…	다음에 위치 잠금/따라가기…
+Locked	잠김
 Locked at current position	현재 위치에 잠김
 Locked at named position __positionName__	명명된 위치 __positionName__에 잠김
 Locked at subassembly tab position	서브 어셈블리 탭 위치에 잠김
 Loft	로프트
+Lofted corner	로프트 코너
 Login Failed. Please solve recaptcha puzzle to continue.	로그인 실패. 계속하려면 recaptcha 퍼즐을 해결하십시오.
 Login Failed. Please try again.	로그인 실패. 다시 시도하십시오.
 Logo removed.	로고를 제거했습니다.
+Long	길게
 Longest execution steps in this Feature Studio:	이 Feature Studio에서 가장 긴 실행 단계:
 Loop/chain connected	루프/체인 연결됨
 Loop/chain connected edges	루프/체인 연결 모서리
+Loose	풀기
+Loose (ASME)	풀기(ASME)
 Loose end	루즈엔드
 Loose ends	루즈엔드
 Loose ends (__looseEndCount__)	루즈엔드(__looseEndCount__)
 Lose access to all directly shared classroom-owned documents, publications, and folders	직접 공유된 클래스룸 소유 통합문서, 게시물 및 폴더에 대한 액세스 권한 상실
 Low luminance color scheme mainly featuring light elements on dark backgrounds.	주로 어두운 배경에 밝은 요소를 표시하는 저휘도 색구성표.
 Low threshold	낮은 한도
+Lower	하한
 Lower flag symbol	하단 플래그 기호
 Lower text	하단 텍스트
 Lower tolerance	하한 공차
 MBD data is not exported for closed composite parts.	닫힌 합성 파트에 대해서는 MBD 데이터가 내보내지지 않습니다.
 MTL file	MTL 파일
 Machine model and post processor	기계 모델 및 포스트 프로세서
+Magnitude	규모
+Magnitude/bias	규모/바이어스
+Maintain aspect ratio	가로 세로 비율 유지
+Maintain curvature	곡률 유지
 Major diameter	바깥지름
 Make 2 entities of the same type symmetric, relative to a line, plane, or linear edge.	선, 면 또는 선형 모서리에 대해 같은 유형의 대칭하는 2개 요소를 만듭니다.
 Make 2 lines perpendicular.	2개 선이 직교하게 만듭니다.
@@ -3864,6 +4431,10 @@ Manage users	사용자 관리
 Manage users…	사용자 관리…
 Manage via CSV	CSV를 통해 관리
 Manage your Onshape subscription	Onshape 회원계정 관리
+Manipulator X axis	매니퓰레이터 X축
+Manipulator Y axis	매니퓰레이터 Y축
+Manipulator Z axis	매니퓰레이터 Z축
+Map	맵
 Mapping	매핑
 Mapping failed to refresh.	매핑을 새로 고침하지 못했습니다.
 Mapping is no longer valid and should be deleted.	매핑이 더 이상 적합하지 않으며 삭제해야 합니다.
@@ -3886,22 +4457,47 @@ Mass and section properties…	질량 및 단면 속성…
 Mass calculation skipped items excluded/suppressed from BOM	질량 계산 시 자재명세서(BOM)에서 제외된 아이템/제외되어 표시된 아이템을 건너뜀
 Mass moments of inertia (__units__)	질량 관성 모멘트(__units__)
 Mass properties failed to calculate for the current selections.	현재 선택 항목에 대해 물성치 정보를 계산하지 못했습니다.
+Match	매치
 Match case	대/소문자 구분
+Match connections	연결 일치
+Match curvature	곡률 맞추기
+Match curvature at end	끝의 곡률 맞춤
+Match curvature at start	시작의 곡률 맞춤
+Match edges on face	면에서 모서리 일치
+Match edges on plane	평면에서 모서리 일치
+Match face options	면 일치 옵션
+Match faces at parting	파팅에서 면 일치
+Match faces in features	피처에서 면 일치
+Match faces in parts	파트에서 면 일치
+Match flow (G3)	일치 흐름(G3)
+Match individual edges	개별 모서리 일치
+Match individual faces	개별 면 일치
 Match pixel density on high resolution displays (can affect performance)	고해상도 디스플레이에서 픽셀 밀도 일치(성능에 영향을 줄 수 있습니다)
+Match position	위치 일치
+Match profile	프로파일 일치
 Match release candidate name with Arena change	Arena 변경과 릴리스 후보자 이름 일치
 Match release candidate name with Windchill change	Windchill 변경과 릴리스 후보자 이름 일치
+Match tangent	접선 일치
+Match type	일치 유형
+Matching	매칭
 Matching parameters successfully configured.	일치하는 매개변수가 성공적으로 구성되었습니다.
 Mate	메이트
 Mate 2 entities tangentially, based on the selected faces, edges, or vertices.	선택한 면, 모서리 또는 꼭지점을 기준으로 2개 요소가 접하게 연결합니다.
+Mate DOF to animate	애니메이트할 메이트 자유도
 Mate connector	메이트 커넥터
 Mate connector (Ctrl-m)	메이트 커넥터
 Mate connector Z axis is not normal to face selections	메이트 커넥터 Z축이 면 선택 항목과 수직이 아닙니다.
 Mate connector for reference coordinate system	참조 좌표계의 메이트 커넥터
+Mate connector for reference frame	참조 프레임의 메이트 커넥터
+Mate connectors	메이트 커넥터
 Mate error	메이트 오류
 Mate features	메이트 피처
 Mate indicator	메이트 표시기호
 Mate limits	메이트 한계
 Mate solve time : __solveTimeInSeconds__	메이트 해결 시간: __solveTimeInSeconds__
+Mate to be matched	일치시킬 메이트
+Mate type	메이트 유형
+Mate(s)	메이트
 Material	재질
 Material Library	재질 라이브러리
 Material __materialName__ is specified more than once. 	__materialName__ 재질이 두 번 이상 지정되었습니다. 
@@ -3912,6 +4508,7 @@ Material library __libraryName__ is already added.	__libraryName__ 재질 라이
 Material library __libraryName__ is removed.	__libraryName__ 재질 라이브러리가 제거됩니다.
 Mates	메이트
 Mates and touching faces	메이트 및 접촉면
+Mates to drive positions	위치를 유도하기 위한 메이트
 Mates with errors cannot be applied.	오류가 있는 메이트를 적용할 수 없습니다.
 Mates with errors cannot be locked.	오류가 있는 메이트는 잠글 수 없습니다.
 Math functions	수학 기능
@@ -3930,7 +4527,9 @@ Max cone angle has been applied to 	다음에 최대 원뿔 각도가 적용되�
 Max count	최대 개수
 Max date	최대 날짜
 Max date must not be earlier than __date__.	최대 날짜는 __date__ 이전일 수 없습니다.
+Max deviation	최대 파생
 Max distance	최대 거리
+Max index (0-based)	최대 인덱스(0 기준)
 Max length	최대 길이
 Max principal stress (__unit__)	최대 주응력(__unit__)
 Max radius	최대 반지름
@@ -3940,7 +4539,10 @@ Max value must be an integer.	최대값은 정수여야 합니다.
 Max: __max__	최대: __max__
 Max: __value__	최대: __value__
 Maximum	최대
+Maximum angle	최대 각도
 Maximum chord length	최대 현 길이
+Maximum control points	최대 제어점
+Maximum deviation	최대 편차
 Maximum dimension	최대 치수
 Maximum length of 64 is reached.	최대 길이 64에 도달했습니다.
 Maximum length of __maxLength__ exceeded.	__maxLength__ 최대 길이를 초과합니다.
@@ -3953,9 +4555,13 @@ Maximum of __limit__ characters	최대 __limit__자
 Maximum/minimum dimension	최대/최소 치수
 Mean (1/__unit__)	평균(1/__unit__)
 Measure	측정
+Measure to axis of cylinders, circles, arcs, or revolved surfaces	원통형의 축, 원, 호 또는 회전 표면을 측정
+Measure to infinitely extended lines, arcs, cylinders, etc.	무한대로 확장하는 선, 호, 원통형 등을 측정
 Measure type:	측정 유형:
+Measured	측정됨
 Measured lines per second	초당 선 측정
 Measured triangles per second	초당 삼각형 측정
+Measurement	측정
 Measure…	측정…
 Measuring performance	성능 측정 중
 Measuring performance. For best results: keep tab in focus until performance check is complete.	성능을 측정하는 중입니다. 최상의 관리를 위해서 성능 점검이 완료될 때까지 탭에 초점을 유지하십시오.
@@ -3980,6 +4586,10 @@ Merge changes from both	둘 모두에서 변경 내용 병합
 Merge into __targetname__	__targetname__에 병합
 Merge into current workspace…	현재 작업공간에 병합…
 Merge into: __targetBranchName__, from: __sourceBranchName__	__sourceBranchName__에서 __targetBranchName__(으)로 병합
+Merge ribs	리브 합치기
+Merge scope	병합 파트 선택
+Merge tangent segments	접선 세그먼트 병합
+Merge with all	모든 파트 병합
 Merged __sourcename__ into __targetname__.	__sourcename__을(를) __targetname__에 병합했습니다.
 Merging changes into __targetname__ from __sourcename__	__sourcename__에서 __targetname__(으)로 변경 내용 병합
 Merging feature changes is only supported for Part Studio and Assembly tabs	피처 변경 내용 병합은 Part Studio 및 어셈블리 탭에서만 지원됩니다.
@@ -3987,6 +4597,7 @@ Merging…	병합 중…
 Mesh	메쉬
 Mesh Part	메쉬 파트
 Mesh bodies	메시 바디
+Mesh bodies or faces	메쉬 바디 또는 면
 Mesh line width	메쉬 선 두께
 Mesh point	메쉬 점
 Meshes (__numberOfMeshes__)	메쉬(__numberOfMeshes__)
@@ -3999,9 +4610,13 @@ Metadata failed to update.	메타데이터를 로드하지 못했습니다.
 Metadata updates failed to apply.	메타데이터 업데이트를 적용하지 못했습니다.
 Method	방법
 Method:	방법:
+Metric	미터법
 Metro station	지하철역
 Microsoft Edge (Version 17 and above)	Microsoft Edge(버전 17 이상)
+Mid plane	가운데 면
+Middle	중간
 Middle mouse button drag	마우스 가운데 버튼 끌기
+Middle mouse button drag or	가운데 마우스 버튼 드래그 또는
 Middle mouse button drag or \nCtrl + Middle mouse button drag	가운데 마우스 버튼 드래그 또는\nCtrl + 가운데 마우스 버튼 드래그
 Midpoint	중심점
 Midpoint line	중심점 선
@@ -4019,6 +4634,7 @@ Min date	최소 날짜
 Min date must be before or equal to max date.	최소 날짜는 최대 날짜와 같거나 그 이전이어야 합니다.
 Min date must not be earlier than __date__.	최소 날짜는 __date__ 이전일 수 없습니다.
 Min distance	최소 거리
+Min index (0-based)	최소 인덱스(0 기준)
 Min length	최소 길이
 Min radius	최소 반지름
 Min radius (__unit__)	최소 반지름(__unit__)
@@ -4026,6 +4642,7 @@ Min value	최소 값
 Min value must be an integer.	최소값은 정수여야 합니다.
 Min: __min__	최소: __min__
 Min: __value__	최소: __value__
+Minimal gap	최소 간격
 Minimum	최소
 Minimum count must be less than or equal to max count.	최소 개수는 최대 개수보다 작거나 같아야 합니다.
 Minimum dimension	최소 치수
@@ -4036,8 +4653,14 @@ Minimum length of __minLength__ for __propertyName__ not met. 	__propertyName__�
 Minimum length of __minLength__ not met.	__minLength__ 최소 길이를 충족하지 않습니다.
 Minimum radius	최소 반지름
 Minimum value must be less than or equal to max value.	최소값은 최대값보다 작거나 같아야 합니다.
+Minimum/Maximum	최소/최대
 Minor diameter	안지름
 Mirror	대칭 복사
+Mirror across Y axis	Y축을 교차해서 대칭 복사
+Mirror plane	대칭 복사면
+Mirror reference	대칭 복사 참조
+Mirror strategy	대칭 복사 전략
+Mirror type	대칭 복사 유형
 Missing	누락
 Missing Variable Studio	누락된 Variable Studio
 Missing __category__	__category__ 누락
@@ -4055,6 +4678,9 @@ Missing selection	선택 누락
 Missing sketch dimension data	스케치 치수 데이터 누락
 Missing tab	누락된 탭
 Missing value handling	누락된 값 처리
+Miter	마이터
+Miter angle	수직 결합 각도
+Mix	혼합
 Mixer	믹서
 Mobile notification setting saved.	모바일 알림 설정을 저장했습니다.
 Mobile notifications for shares and comments	공유 및 설명에 대한 모바일 알림
@@ -4068,12 +4694,14 @@ Model definitions	모델 정의
 Model space only	모델 공간만
 Modeling	모델링
 Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.	SOLIDWORKS, Creo 또는 Inventor와 같이 Y-축이 위로 설정된 환경에서 작성된 모델은 가져올 때 원래 방향이 유지됩니다.
+Modification type	수정 유형
 Modified	수정됨
 Modified at	수정 일시
 Modified by	수정한 사람
 Modify an individual sheet metal bend relief. Specify bend relief type and scale.	개별 금속 판재 벤드 릴리프를 수정합니다. 벤드 릴리프 유형 및 축척을 지정하십시오.
 Modify an individual sheet metal corner by selecting an edge, vertex, or face of the existing corner. Specify corner relief type and scale.	기존 코너의 모서리, 꼭지점 또는 면을 선택해서 개별 금속 판재 코너를 수정합니다. 코너 릴리프 유형 및 축척을 지정하십시오.
 Modify fillet	필렛 수정
+Modify joint	조인트 수정
 Modify visibility conditions	표시 유형 조건 수정
 Module outline	모듈 개요
 Module outline (cmd+shift+O / ctrl+shift+O)	모듈 개요(cmd+shift+O / ctrl+shift+O)
@@ -4093,6 +4721,7 @@ More than __changeCount__ changes	__changeCount__개 이상 변경
 More than one part inside is fixed	안에서 둘 이상의 파트가 고정됨
 More than one part is fixed	둘 이상의 파트가 고정됨
 Most Popular	가장 인기
+Mounting	마운팅
 Mouse controls	마우스 컨트롤
 Mouse controls updated.	마우스 컨트롤이 업데이트되었습니다.
 Move	이동
@@ -4104,10 +4733,13 @@ Move column to right	열을 오른쪽으로 이동
 Move column to start	열을 시작으로 이동
 Move copied instances here	여기로 복사한 부품 이동
 Move copied mates here	여기로 복사한 메이트 이동
+Move curve boundary type	곡선 경계 이동 유형
 Move documents and folders to	통합문서 및 폴더 이동 위치
 Move documents, publications, and folders to	통합문서, 게시물 및 폴더 이동 위치
 Move down	아래로 이동
+Move end condition	끝 조건 이동
 Move face	면 이동
+Move face type	면 이동 유형
 Move here	여기로 이동
 Move left	왼쪽 이동
 Move right	오른쪽 이동
@@ -4168,10 +4800,12 @@ My standard content	내 표준 콘텐츠
 N/A	해당없음
 NOT COMPARABLE	비교 불가
 Name	이름
+Name #entityName	#entityName 이름 지정
 Name cannot be empty.	이름은 비워둘 수 없습니다.
 Name cannot contain HTML.	이름에 HTML이 포함될 수 없습니다.
 Name cannot exceed 256 characters.	이름은 256자를 초과할 수 없습니다.
 Name could not be generated.	이름을 생성할 수 없습니다.
+Name entity	요소 이름 지정
 Name is required	이름이 필요합니다.
 Name is required and cannot exceed __maxInputLengthForName__ characters.	이름을 입력해야 하며 __maxInputLengthForName__ 자를 초과할 수 없습니다.
 Name is required.	이름이 필요합니다.
@@ -4194,7 +4828,9 @@ Need help formatting? Click one of the buttons below to download a template.	서
 Need to sign into an enterprise?	엔터프라이즈에 로그인이 필요합니까?
 Needs revision	리비전 필요
 Network and region	네트워크 및 영역
+Neutral plane	중립 평면
 Never	없음
+New	신규
 New Part Studios and Assemblies in this workspace will automatically reference this Variable Studio at its default configuration.	이 작업공간의 새로운 Part Studio 및 어셈블리가 이 Variable Studio를 기본 구성으로 자동 참조합니다.
 New Part Studios and Assemblies in this workspace will automatically reference this Variable Studio.	이 작업공간의 새로운 Part Studio 및 어셈블리가 이 Variable Studio를 자동으로 참조합니다.
 New Standard Content Custom Parameter	새로운 표준 콘텐츠 사용자 지정 매개변수
@@ -4278,6 +4914,7 @@ No configurable properties	구성 가능한 속성 없음
 No connection	연결 없음
 No connections found.	연결을 찾을 수 없습니다.
 No contents found in __fileName__	__fileName__에 내용이 없습니다.
+No corner	코너 없음
 No created connections.	생성된 연결이 없습니다.
 No credit card	신용카드 없음
 No credit card needed	신용카드 필요 없음
@@ -4348,10 +4985,12 @@ No matching company found.	일치하는 회사가 없습니다.
 No matching parameters selected to configure.	구성할 일치하는 매개변수가 선택되지 않았습니다.
 No material assigned	지정된 재질 없음
 No material library linked with your account.	계정과 연결된 재질 라이브러리가 없습니다.
+No maximum	최대값 없음
 No measurements available for current selection.	현재 선택 항목에 사용 가능한 측정이 없습니다.
 No measurements of this type available for current selection.	현재 선택 항목에 사용 가능한 이 유형의 측정이 없습니다.
 No members are added to this alias yet.	아직 이 별칭에 추가된 구성원이 없습니다.
 No members found	구성원을 찾을 수 없습니다.
+No minimum	최소값 없음
 No models.	모델이 없습니다.
 No non-manifold edges found	매니폴드가 아닌 모서리를 찾을 수 없음
 No notes available	사용 가능한 노트 없음
@@ -4397,9 +5036,11 @@ No teams defined.	정의된 팀이 없습니다.
 No teams found.	팀이 없습니다.
 No templates created	생성된 템플릿 없음
 No templates found	템플릿을 찾을 수 없음
+No tolerance	공차 없음
 No tools added	추가된 도구 없음
 No top-level symbols found	최상위 기호를 찾을 수 없습니다.
 No translation	선형 이동 없음
+No trim	자르지 않기(N)
 No unpublished classes.	게시되지 않은 클래스가 없습니다.
 No updates available.	사용 가능한 업데이트가 없습니다.
 No users are added to this connection yet.	아직 이 연결에 추가된 사용자가 없습니다.
@@ -4412,12 +5053,20 @@ No variables are configured	구성된 변수 없음
 No views	뷰 없음
 No views created	생성된 뷰 없음
 No, I'm no longer a student	아니요, 더 이상 학생이 아닙니다
+Nominal	명목
 Non-geometric item authoring:	비기하학 아이템 승인:
 Non-manifold tessellation edges	매니폴드가 아닌 테셀레이션 모서리
 Non-numeric value for __propertyName__ on row # __rowNumber__. 	__rowNumber__ 행에 __propertyName__에 대해 숫자가 아닌 값이 있습니다. 
 None	없음
 None of the selected entities could be deleted.	선택한 요소 중에 삭제할 수 있는 요소가 없습니다.
 Normal	수직
+Normal (ASME)	수직(ASME)
+Normal direction	수직 방향
+Normal to face	면에 수직
+Normal to guide	가이드에 수직
+Normal to profile	프로파일에 수직
+Normal to sketch plane	스케치 평면에 수직
+Normal to target	대상에 수직
 Not Mapped	매핑되지 않음
 Not Started	시작하지 않음
 Not a member of this enterprise?	이 엔터프라이즈의 회원이 아니십니까?
@@ -4462,6 +5111,7 @@ Number generation	번호 생성
 Number of dashboards	대시보드 수
 Number of members for this trial: 	이 시험사용에 참여하는 회원 수: 
 Number of non-rigid modes	비강체 모드의 수
+Number of points to add	추가할 점 개수
 Number of samples	샘플 수
 Number of seats used:	사용된 시트 수:
 Number of subscriptions should not be less than the number of users in a company. There are __numusers__ users in your company.	회원 계정 수가 회사의 사용자 수보다 작을 수 없습니다. 회사에 __numusers__명의 사용자가 있습니다.
@@ -4487,6 +5137,8 @@ OR	또는
 Object	개체
 Object property	개체 속성
 Object type:	개체 유형:
+Obround - Scaled	장박형 - 확대됨
+Obround - Sized	장박형 - 크기 조정
 Obsolete	사용되지 않음
 Obsolete all previous revisions related to the previous object type and part number	이전 개체 유형 및 파트 번호와 관련된 모든 이전 리비전을 사용하지 않음
 Obsolete revision	사용되지 않는 리비전
@@ -4503,13 +5155,25 @@ Occurrences to affect	영향을 미칠 수 있는 횟수
 Off	끄기
 Offset	오프셋
 Offset (o)	오프셋
+Offset X distance	오프셋 X 거리
+Offset Y distance	오프셋 Y 거리
+Offset Z distance	오프셋 Z 거리
 Offset a sheet metal model at a reference line with two bends in opposite directions with additional jog controls.	추가 조그 제어를 사용하여 두 개의 굽힘이 서로 반대 방향으로 이루어진 기준선에서 금속 판재 모델을 오프셋합니다.
+Offset all	모두 오프셋하기
+Offset and extend	오프셋 및 확장
+Offset angle	오프셋 각도
 Offset curve	오프셋 곡선
+Offset distance	오프셋 거리
+Offset from tip	팁에서 오프셋
+Offset opposite direction	오프셋 반대 방향
 Offset plane…	면 오프셋…
 Offset surface	오프셋 면
+Offset type	오프셋 유형
+Offset, extend, and split	오프셋, 확장 및 분할
 Ok	확인
 Oldest first	가장 오래된 항목 먼저
 On	켜기
+On entity	선택 요소 위
 Once a class is selected, you may choose to publish the cloned assignment automatically or create a draft.	클래스를 선택하면, 복제된 과제를 자동으로 게시하거나 구배를 생성하는 작업 중에서 선택할 수 있습니다.
 Once a connection is created, an admin from the enterprise will receive an email to approve the request. No data is ever shared until the connection is approved, a user is added, and that data is shared with the user via the share dialog.	연결이 생성되면, 엔터프라이즈의 관리자가 요청을 승인하기 위한 이메일을 받게 됩니다. 연결이 승인되고, 사용자가 추가되며, 그 후 공유 대화상자를 통해 해당 데이터가 사용자와 공유될 때까지 어떤 데이터도 공유되지 않습니다.
 Once set, the KMS key cannot be swapped out or replaced with a different key.	설정한 후에는 KMS 키를 다른 키로 교체하거나 변경할 수 없습니다.
@@ -4524,6 +5188,7 @@ One or more recipients do not have view access to the scheduled report. Verify t
 One or more students have started this assignment. The submission option is no longer editable.	한 명 이상의 학생이 이 과제 할당을 시작했습니다. 제출 옵션을 더 이상 편집할 수 없습니다.
 One or more tabs being moved contain workspace references. All referenced tabs will be moved as part of this operation.	이동 중인 하나 이상의 탭에 작업공간 참조가 포함되어 있습니다. 참조된 모든 탭은 이 작업의 일부로 이동됩니다.
 One or more values is invalid.	하나 이상의 값이 부적합합니다.
+One sided	한쪽 면
 One time	일회성
 One workspace	하나의 작업공간
 Only active and compatible Onshape properties in the mapped Onshape category can be selected.	매핑된 Onshape 범주에서 활성 및 호환되는 Onshape 속성만 선택할 수 있습니다.
@@ -4531,6 +5196,8 @@ Only administrators can delete documents containing released objects	관리자�
 Only administrators can edit the properties of released objects	관리자만 릴리스된 개체의 속성을 편집할 수 있습니다.
 Only administrators can mark objects as not revision-managed	관리자만 개체를 리비전 관리형이 아닌 것으로 표시할 수 있습니다.
 Only data created after configuration is encrypted. Existing documents are not encrypted retroactively, so configure your key as the first step after setting up your company.	구성 후 생성된 데이터만 암호화됩니다. 기존 통합문서는 소급하여 암호화되지 않으므로, Company를 설정한 후 첫 번째 단계로 키를 구성하십시오.
+Only edges	모서리만
+Only faces	면만
 Only items with status "Pending" can be deleted.	상태가 "보류 중"인 항목만 삭제할 수 있습니다.
 Only me	본인만
 Only numbers are allowed	숫자만 사용할 수 있습니다.
@@ -4539,6 +5206,7 @@ Only show differences	차이만 표시
 Only show mappings with errors	오류가 있는 매핑만 표시
 Only show unread	읽지 않은 내용만 표시
 Only some instances will be highlighted.	일부 부품만 강조 표시됩니다.
+Only vertices	꼭지점만
 Onshape (default)	Onshape(기본값)
 Onshape AI Advisor cannot see your data.	Onshape AI Advisor는 사용자의 데이터를 볼 수 없습니다.
 Onshape API Keys Connection	Onshape API 키 연결
@@ -4634,27 +5302,47 @@ Opening __name__	__name__ 열기
 Opening configuration inputs references dialog	구성 입력 참조 대화상자 여는 중
 Operation failed because it would create cyclical references.	순환 참조를 생성하게 되어 작업에 실패했습니다.
 Operation functions	연산 기능
+Operation type	작업 유형
+Opposite alignment	반대 정렬
+Opposite angle	반대쪽 각도
 Opposite direction	반대 방향
+Opposite direction angle	반대 방향 각도
+Opposite offset direction	반대 오프셋 방향
+Opposite origin	반대 원점
+Opposite side	반대쪽
+Optimize	최적화
 Option "__name__" not found. Select a valid value.	"__name__" 옵션을 찾을 수 없습니다. 유효한 값을 선택하십시오.
 Option has been disabled by administrator	관리자가 옵션을 비활성화했습니다.
 Optional: include a personal message	선택 사항: 개인 메시지 포함
 Options	옵션
+Ordered groups	정렬된 그룹
 Ordinate dimension	세로좌표 치수
 Orient imported models with Y Axis Up	가져온 모델을 Y축 위로 맞추기
 Orient normal to sketch on edit	편집 시 스케치에 수직 방향으로 정렬
+Orientation	방향
 Origin	원점
+Origin XY	원점 XY
+Origin YZ	원점 YZ
+Origin ZX	원점 ZX
+Origin entity	원점 요소
 Origin of new Part Studio	새 Part Studio 출처
+Origin type	원점 유형
+Orthogonal path	직각 경로
+Orthogonal path coordinate system	직각 경로 좌표계
 Other	기타
 Other Onshape account email	기타 Onshape 계정 이메일
 Other documents	다른 통합문서
 Other part(s) fastened to origin	원점에 고정된 다른 파트
 Other tabs	기타 탭
 Out-of-date drawings failed to update.	미갱신 도면을 업데이트하지 못했습니다.
+Outer	외부
 Output units	출력 단위
+Outside	외부
 Over	이상
 Over __limit__	__limit__ 이상
 Overage	초과분
 Overall merge strategy	전체 병합 전략
+Overall parameters	전체 매개변수
 Overall performance*	전체 성능*
 Overall restore strategy	전체 복원 전략
 Overridden by administrator __name__	__name__ 관리자에 의해 재정의됨
@@ -4663,19 +5351,27 @@ Overridden by creator __name__	__name__ 작성자에 의해 재지정됨
 Overridden computed property	재지정된 계산 속성
 Overridden dimensions	재지정된 치수
 Override	재정의
+Override bend radius	굽힘 반지름 재지정
 Override parameter library value	매개변수 라이브러리 값 재지정
 Override task	작업 재정의
+Overrides	재정의
 Overwrite	덮어쓰기
+Overwrite points	점 덮어쓰기
 Overwriting the existing dashboard might break any saved copies of the dashboard	기존 대시보드를 덮어쓰면 저장된 대시보드 사본이 손상될 수 있습니다.
 Own properties	자체 속성
 Owned by	소유자
+Owned by me	내 소유 항목
 Owned by:	소유자:
 Owner	소유자
 Owner ID	권한 소유자 ID
+Owner entity	소유자 요소
 Owner not found	권한 소유자를 찾을 수 없음
 Owner type not found	권한 소유자 유형을 찾을 수 없음
 Ownership transfer not available. Not a member of any other enterprise.	소유권 양도를 사용할 수 없습니다. 다른 엔터프라이즈의 구성원이 아닙니다.
+PCB entity type	PCB 요소 유형
 PCB flex model	PCB 플렉시블 모델
+PCB holes	PCB 홀
+PCB part to finish	마감 작업할 PCB 파트
 PLM Integration	PLM 통합
 PLM Integrations	PLM 통합
 PTC Terms & Privacy Policy	PTC 약관 및 개인정보 보호정책
@@ -4692,6 +5388,9 @@ Parallel axis distance	평행 축 거리
 Parallel distance	평행 거리
 Parallel edges	평행 모서리
 Parallel mate	평행 메이트
+Parallel to	평행
+Parallel to sketch plane	스케치 평면에 평행
+Parameter	매개변수
 Parameter Name	매개변수 이름
 Parameter drives configuration	매개변수 드라이브 구성
 Parameter library	매개변수 라이브러리
@@ -4716,6 +5415,7 @@ Part Studios	Part Studio
 Part Studios will be updated to the latest FeatureScript version upon import	가져올 때 Part Studio가 최신 FeatureScript 버전으로 업데이트됩니다.
 Part Studios…	Part Studio…
 Part is fixed	파트가 고정됩니다.
+Part mirror	파트 대칭 복사
 Part number	파트 번호
 Part number must be unique.	파트 번호는 중복되지 않아야 합니다.
 Part number propagation	파트 번호 처리
@@ -4729,19 +5429,39 @@ Part numbers are tied to the type of released object. Resetting the released obj
 Part numbers will be applied in all workspaces associated with the version being released.	파트 번호가 릴리스 중인 버전과 관련된 모든 작업공간에 적용됩니다.
 Part numbers will be applied only if the version being released has exactly one associated workspace.	릴리스 중인 버전에 정확히 하나의 작업공간이 연결된 경우에만 파트 번호가 적용됩니다.
 Part numbers will only be applied in the version being released.	파트 번호가 릴리스 중인 버전에만 적용됩니다.
+Part pattern	파트 패턴
 Part properties dialog failed to open.	파트 속성 대화상자를 열지 못했습니다.
+Part to add	추가할 파트
+Part to remove	제거할 파트
 Part(s) inside are fixed	내부의 파트가 고정됩니다.
 Part/Surface	파트/면
 Partial Success	부분적으로 성공
 Partial Variable Studio	부분 Variable Studio
+Partial fillet	부분 필렛
+Partial flange	부분 플랜지
 Partially suppressed from this BOM	이 자재명세서(BOM)에서 부분적으로 제외하고 표시됨
+Parting edges	파팅 모서리
+Parting entity	파팅 요소
+Parting line	파팅 선
+Parting line propagation	파팅 선 처리
 Partner	파트너
 Parts	파트
 Parts (__numberOfParts__)	파트(__numberOfParts__)
 Parts and Surfaces to affect	영향을 받는 파트와 면
 Parts and surfaces	파트 및 면
+Parts and surfaces to convert	변환할 파트와 면
+Parts or bends	파트 또는 벤드
 Parts to analyze	분석할 파트
+Parts to draft	구매할 파트
+Parts to find match in	일치를 찾을 파트
+Parts to hollow	비울 부품
+Parts to measure	측정할 파트
+Parts to trim	잘라낼 파트
+Parts to trim to	잘라낼 파트
+Parts to trim using trim tool	잘라내기 도구를 사용해 잘라낼 파트
+Parts to use as trim tools	잘라내기 도구로 사용할 파트
 Parts within a single Part Studio will become a composite part upon import	가져올 때 단일 Part Studio 내의 파트가 합성 파트가 됩니다.
+Parts, surfaces, or curves to split	분할할 파트, 면 또는 곡선
 Password	비밀번호
 Password and confirm password do not match.	비밀번호 및 비밀번호 확인이 일치하지 않습니다.
 Password and password confirmation must match	비밀번호 및 비밀번호 확인란이 일치해야 합니다.
@@ -4773,9 +5493,12 @@ Paste permission denied by browser. Use Ctrl-V or ⌘-V to paste text.	붙여넣
 Paste sketch	스케치 붙여넣기
 Paste sketch entities	스케치 요소 붙여넣기
 Paste tab	붙여넣기 탭
+Path	경로
 Path failed to load.	경로를 로드하지 못했습니다.
+Path to pattern along	패턴을 지정할 경로
 Pattern	패턴
 Pattern must match __pattern__.	패턴이 __pattern__과(와) 일치해야 합니다.
+Pattern type	패턴 유형
 Pause	일시 중지
 Paused regeneration	일시 중지된 재생성
 Pausing…	일시 중지하는 중…
@@ -4793,12 +5516,15 @@ Pending cancellation	취소 진행 중
 Pending edits have been discarded.	보류 중인 편집 내용이 취소되었습니다.
 Pending owner	권한 소유자 지정 대기 중
 Pending…	진행 중…
+Per chain	체인당
+Per edge	모서리당
 Perform a union, subtraction, or intersection on two or more parts or surfaces.	둘 이상의 파트 또는 면에 합집합, 차집합 또는 교집합을 수행합니다,
 Perform actions within Onshape on your behalf during an active session.	활성 세션 중 사용자를 대신하여 Onshape 내에서 작업 수행합니다.
 Performance	성능
 Performance check	성능 확인
 Performance errors detected	성능 오류 발견
 Performance warning detected	성능 경고 발견
+Perimeter	둘레
 Period (12.34)	기간(12.34)
 Permanently delete all items in Trash	휴지통의 모든 아이템을 영구히 삭제
 Permission inherited	권한 상속됨
@@ -4838,7 +5564,9 @@ Photo failed to be deleted.	사진을 삭제하지 못했습니다.
 Pick the default template used for the BOM table created in a Drawing owned by the __companyType__.	__companyType__이(가) 소유한 도면에서 생성된 BOM 테이블에 사용되는 기본 템플릿을 선택하십시오.
 Pick the default template used for the BOM table created in an Assembly owned by the __companyType__.	__companyType__이(가) 소유한 어셈블리에서 생성된 BOM 테이블에 사용되는 기본 템플릿을 선택하십시오.
 Pierce	관통
+Pin	핀
 Pin reference	참조 고정
+Pin slot	핀 슬롯
 Pin slot mate	핀 슬롯 메이트
 Pin slot mate (m)	핀 슬롯 메이트
 Ping time:	핑 시간:
@@ -4856,15 +5584,27 @@ Pinned versioned reference from current document	현재 통합문서에서 버�
 Pinned versioned reference from current document with newer version	최신 리비전과 현재 통합문서에서 버전이 작성된 참조 고정
 Pinned versioned reference from other document	다른 통합문서에서 버전이 작성된 참조 고정
 Pinned versioned reference from other document with newer version	최신 리비전과 다른 통합문서에서 버전이 작성된 참조 고정
+Pitch	피치
+Pitch length	피치 길이
+Placement	배치
+Placement origin	배치 원점
 Plan	플랜
 Plan details	플랜 세부사항
 Planar	평면
 Planar mate	평면 메이트
 Planar mate (m)	평면 메이트
+Planarization parameters	평탄화 매개변수
+Planarize	평탄화
 Plane	면
+Plane limit	평면 제한
+Plane point	면 점
+Plane type	면 유형
+Planes and planar faces to use as trim tools	잘라내기 도구로 사용할 면 및 평면
+Planes to find match in	일치를 찾을 평면
 Plans & Pricing	플랜 및 가격정보
 Plans and pricing	플랜 및 가격 정보
 Plasma	플라즈마
+Plated	도금됨
 Platform	플랫폼
 Play	재생
 Plus/minus	플러스/마이너스
@@ -4872,10 +5612,19 @@ Pocket	포켓
 Pocket faces	포켓 면
 Point	점
 Point (Shift-s)	점
+Point edit type	점 편집 유형
+Point normal	점 수직
+Point or mate connector	점 또는 메이트 커넥터
+Point or mate connector used as reference for the curve. Defaults to origin.	곡선에 대한 참조로 사용된 점 또는 메이트 커넥터. 기본적으로 원점으로 설정됩니다.
 Point to line linear dimension	점대선 선형 치수
 Point to point linear dimension	점대점 선형 치수
+Point type	점 유형
+Points	점
+Points on edges	모서리의 점
+Points overrides	점 재지정
 Poisson's ratio	푸아송비
 Polar moment of inertia (__units__)	극관성 모멘트(__units__)
+Polyline	폴리선
 Poor connection…	연결 불량…
 Populating Configurations to Current Configuration	구성을 현재 구성에 채우는 중
 Popup blocked or failed to open	팝업이 차단되었거나 열리지 않았습니다.
@@ -4891,6 +5640,7 @@ Postal code exceeded maximum length.	우편번호가 최대 길이를 초과했�
 Postprocessing thickness analysis...	두께 분석 후처리 중...
 Pre-select planar faces that contains holes or standard content and click 'Insert closest to selection'	홀 또는 표준 콘텐츠를 포함하는 평면을 미리 선택하고 '선택 항목에 가장 가까이에 삽입'을 클릭합니다.
 Pre-select planar faces that contains holes or standard content and click 'Insert furthest from selection'	홀 또는 표준 콘텐츠를 포함하는 평면을 미리 선택하고 '선택 항목에서 가장 멀리 삽입'을 클릭합니다.
+Precise	정밀도
 Precision	정밀도
 Precision rotate	정밀도 회전
 Preference changes failed to update.	기본 설정 변경을 업데이트하지 못했습니다.
@@ -4908,6 +5658,8 @@ Preparing thickness analysis...	두께 분석 준비 중...
 Preprocessing	전처리
 Present	현재
 Presentation view	프레젠테이션 보기
+Preserve active sheet metal models	활성 금속 판재 모델 보존
+Preserve material	재질 유지
 Preserve source IDs	소스 ID 유지
 Press desired key combination and confirm	원하는 키 조합을 누르고 확인하십시오.
 Pressure	압력
@@ -4932,6 +5684,7 @@ Price:	가격:
 Prices are in $ USD	가격 단위는 $ USD입니다.
 Prices in $ USD	$ USD 단위의 가격
 Primary	기본
+Primary axis entity	주축 요소
 Primary key	기본 키
 Primary key copied.	기본 키를 복사했습니다.
 Primary template is the first sheet.	기본 템플릿은 첫 번째 시트입니다.
@@ -4963,12 +5716,15 @@ Production version:	생산 버전:
 Professional	프로페셔널
 Professional CAD for commercial use with built-in data management delivered with 24/7 reliability.	24/7 신뢰성과 함께 내장 데이터 관리 기능을 이용하는 상업적 용도를 위한 프로페셔널 CAD.
 Profile	프로파일
+Profile 1	프로파일 1
+Profile 2	프로파일 2
 Profile __partStudioName__	프로파일 __partStudioName__
 Profile __profileName__ could not be selected. Use a browser that supports localStorage.	프로파일 __profileName__을(를) 선택할 수 없습니다. 로컬 스토리지를 지원하는 브라우저를 사용하십시오.
 Profile __profileName__ is created.	__profileName__ 프로파일이 생성됩니다.
 Profile __profileName__ is deleted.	__profileName__ 프로파일이 삭제됩니다.
 Profile __profileName__ is selected.	__profileName__ 프로파일이 선택됩니다.
 Profile __profileName__ is updated.	__profileName__ 프로파일이 업데이트됩니다.
+Profile control	프로파일 컨트롤
 Profile data currently displayed is from the latest profiled Part Studio you started across all Onshape documents. It can be cleared from the FeatureScript notices panel, or by profiling another Part Studio.	현재 표시된 프로파일 데이터는 모든 Onshape 통합문서에서 시작한 최신 프로파일 Part Studio입니다. 이 데이터는 FeatureScript 알림 패널에서, 또는 다른 Part Studio의 프로파일을 작성해서 삭제될 수 있습니다.
 Profile failed to be created.	프로파일을 생성하지 못했습니다.
 Profile inspector	프로파일 검사자
@@ -4977,6 +5733,8 @@ Profile link copied to clipboard.	프로파일 링크를 클립보드에 복사�
 Profile name contains invalid characters. Characters such as &"<> are not allowed.	프로필 이름에 잘못된 문자가 포함되어 있습니다. &"<>와 같은 문자는 허용되지 않습니다.
 Profile name must be less than 64 characters in length.	프로파일 이름의 길이는 64자 미만이어야 합니다.
 Profile of __elementName__	__elementName__의 프로파일
+Profile type	프로파일 유형
+Profiles	프로파일
 Profiling	프로파일링
 Profiling __partStudioName__	__partStudioName__ 프로파일링
 Program number	프로그램 번호
@@ -5010,6 +5768,7 @@ Projected curve	투사된 곡선
 Projected tolerance zone	투영 공차 영역
 Projected view	투영도
 Projection	투사
+Projection direction type	투사 방향 유형
 Projects	프로젝트
 Projects and Folders	프로젝트 및 폴더
 Propagate	전파
@@ -5017,6 +5776,8 @@ Propagate changes	변경 내용 전파
 Propagate error	처리 오류
 Propagated	전파됨
 Propagating changes to features	변경 내용을 피처로 전파하는 중
+Propagation	전파
+Propagation type	확장 유형
 Properties	속성
 Properties date format updated.	날짜 형식 속성이 업데이트되었습니다.
 Properties failed to be reordered.	속성의 순서를 재지정하지 못했습니다.
@@ -5095,6 +5856,7 @@ Published FeatureScript	게시된 FeatureScript
 Published by	게시자
 Published date	게시일
 Publish…	게시…
+Pull direction	당기는 방향
 Purchase Onshape	Onshape 구매
 Purchase record not found.	구매 기록을 찾을 수 없습니다.
 Purchase type:	구매 유형:
@@ -5115,6 +5877,7 @@ Queuing…	대기열에 추가 중...
 Quick tab switching - backward	빠른 탭 전환 - 뒤로
 Quick tab switching - forward	빠른 탭 전환 - 앞으로
 RELEASE	릴리스
+Rack and pinion	랙과 피니언
 Rack and pinion relation	랙과 피니언 릴레이션
 Radial dimension	반지름 치수
 Radius	반지름
@@ -5123,6 +5886,7 @@ Range	범위
 Range end cannot appear before range start	범위 시작 전에 범위 끝이 나타날 수 없습니다.
 Range start and range end cannot be same	범위 시작과 범위 끝이 같을 수 없습니다.
 Range start cannot appear after range end	범위 끝 다음에 범위 시작이 나타날 수 없습니다.
+Ratio	비율
 Ray (__unit__)	광선(__unit__)
 Ray gradient (%)	광선 경사도(%)
 Re-invite	다시 초대
@@ -5131,6 +5895,9 @@ Reactivate your subscription	회원 계정 재활성화
 Read or write data within your Onshape documents, only in response to your actions.	사용자의 작업에 대한 응답으로만 Onshape 통합문서 내 데이터를 읽거나 쓸 수 있습니다.
 Read-only access	읽기 전용 액세스
 Real	실제
+Realign	다시 정렬
+Reapply features	피처 재적용
+Reapply fillet	필렛 다시 적용
 Receipt Id: 	영수증 ID: 
 Receipt failed to load.	영수증을 로드하지 못했습니다.
 Receive email notifications for all new shares, including to your teams, classrooms or companies, and comments in documents or publications you have access to.	팀, 강의실 또는 Company를 포함해 모든 새로운 공유에 대한 이메일 알림과 액세스 권한이 있는 통합문서 또는 게시물의 설명을 수신합니다.
@@ -5148,12 +5915,14 @@ Recent activity	최근 작업
 Recent activity failed to load.	최근 활동을 로드하지 못했습니다.
 Recently opened	최근 연 항목
 Recently used	최근 사용
+Recognize	인식하기
 Reconfigure	재구성
 Recover Document	통합문서 복구
 Recover Part Studio	Part Studio 복구
 Recovery codes	복구 코드
 Recreate Release from the current workspace	현재 작업공간에서 릴리스 다시 생성
 Rectangle	직사각형
+Rectangle - Scaled	직사각형 - 확대됨
 Red	빨간색
 Redo	재실행
 Redo (Ctrl-y)	재실행
@@ -5164,7 +5933,10 @@ Refer a friend	친구 추천
 Reference	참조
 Reference coordinate system	참조 좌표계
 Reference designator	참조 지정자
+Reference edge	참조 모서리
+Reference faces	참조 면
 Reference manager	참조 관리자
+Reference plane	기준면
 References	참조
 References from seed assembly are updated	시드 어셈블리의 참조가 업데이트됩니다.
 References:	참조:
@@ -5195,6 +5967,7 @@ Regenerating the Slack integration token will require you to transfer the new to
 Regeneration times	재생성 횟수
 Regex	정규 표현식
 Region	영역
+Regular expression	정규식
 Regular expression search	일반 표현식 검색
 Reject	거부
 Reject connection?	연결을 거부하시겠습니까?
@@ -5203,6 +5976,10 @@ Rejected by __name__	__name__이(가) 거부
 Rejected by: 	거부한 사람: 
 Relate a mate with a rotational degree of freedom to a mate with a linear degree of freedom.	회전 자유도를 가진 메이트를 선형 자유도를 가진 메이트와 관련시킵니다.
 Relate the rotational and translational degrees of freedom of a Cylindrical Mate.	원통형 메이트의 회전 및 선형 이동 자유도를 관계시킵니다.
+Relation	릴레이션
+Relation ratio	릴레이션 비율
+Relation type	릴레이션 유형
+Relative	상대
 Release	릴리스
 Release all configurations…	모든 구성 릴리스…
 Release candidate	릴리스 후보자
@@ -5235,6 +6012,7 @@ Released reference with newer revision	최신 리비전과 참조 릴리즈
 Releases	릴리스
 Releases failed to be displayed in versions and history.	릴리스를 버전 및 히스토리에 표시하지 못했습니다.
 Release…	릴리스…
+Relief	릴리프
 Reload and disable graphics	그래픽 다시 로드 및 비활성화
 Reload and enable graphics	그래픽 다시 로드 및 활성화
 Remapped headers:	다시 매핑된 헤더:
@@ -5255,6 +6033,7 @@ Remove display state	표시 상태 제거
 Remove document	통합문서 제거
 Remove existing fillets and rounds, or change their radius. Useful for imported parts.	기존의 필렛 또는 원형을 제거하거나 반경을 변경합니다. 가져온 파트에 유용합니다.
 Remove expression	식 제거
+Remove fillet	필렛 제거
 Remove from category	범주에서 제거
 Remove from obsoletion	사용되지 않는 항목에서 제거
 Remove from recently opened	최근에 연 항목에서 제거
@@ -5341,6 +6120,7 @@ Replace __items__	__items__ 교체
 Replace __name__…	__name__ 교체…
 Replace __numberBiggerThanOne__ instances…	__numberBiggerThanOne__개 부품 교체…
 Replace all	모두 바꾸기
+Replace all instances	모든 부품 교체
 Replace face	면 교체
 Replace instance	부품 교체
 Replace instances with a selected part, surface, sketch, or subassembly.	부품을 선택한 파트, 면, 스케치 또는 서브 어셈블리로 교체합니다.
@@ -5350,6 +6130,8 @@ Replace reference	참조 바꾸기
 Replace with	바꿀 내용
 Replace with __sourcename__	__sourcename__(으)로 바꾸기
 Replace workflow	워크플로 바꾸기
+Replacement component	교체 구성 요소
+Replacement part	교체 파트
 Replace…	바꾸기…
 Replacing…	바꾸는 중…
 Replicate	복제
@@ -5416,6 +6198,7 @@ Reset to default	기본값으로 재설정
 Reset to defaults	기본값으로 재설정
 Reset to parameter library value	매개변수 라이브러리 값으로 재설정
 Reset to the default __parameterName__	기본 __parameterName__(으)로 재설정
+Reset triad	3축 재설정
 Resetting the part number type of a releasable object will mark all previous revisions as obsolete and re-releasable. Revision history will still be visible for any previous revisions.	릴리스 가능한 개체의 파트 번호 유형을 재설정하면 이전의 모든 리비전이 사용되지 않고 재릴리스 가능한 것으로 표시됩니다. 이전의 모든 리비전에 대해 여전히 리비전 히스토리를 볼 수 있습니다.
 Resolution	해결
 Resolve	해결
@@ -5452,7 +6235,9 @@ Restrict geometry changes to merges only	병합으로만 기하 변경 제한
 Restrict metadata changes to merges only	병합으로만 메타데이터 변경 제한
 Restrict students to only editing their assignment document	학생들이 과제 통합문서를 편집만하도록 제한
 Resubmit	다시 제출
+Result body operation type	결과 바디 작업 유형
 Result mode	결과 모드
+Result type	결과 유형
 Results	결과
 Results and history	결과 및 히스토리
 Results from	다음에서 요청
@@ -5469,6 +6254,7 @@ Return to document	통합문서로 돌아가기
 Return to documents	통합문서로 돌아가기
 Return to this dialog at any time by pressing 	언제든지 다음을 눌러 이 대화상자로 돌아갈 수 있습니다. 
 Reverse compare	역방향 비교
+Reverse direction	역방향
 Reverse scroll wheel zoom direction	스크롤휠 줌 방향을 반대로
 Revert item to last revision	아이템을 최신 리비전으로 되돌리기
 Revert to before this merge	이 병합 전으로 되돌리기
@@ -5503,12 +6289,17 @@ Revoking the Slack integration token will prevent notifications to Slack and dis
 Revolute	축회전하기
 Revolute mate	회전축 메이트
 Revolute mate (m)	회전축 메이트
+Revolutions	회전
 Revolve	회전
 Revolve (Shift-w)	회전
+Revolve angle	회전 각도
+Revolve axis	회전축
 Revolved	회전됨
 Revolve…	회전…
 Rhino file	Rhino 파일
+Rho	Rho값
 Rib	리브
+Rib extrusion direction	돌출 방향 리브
 Right	우측면
 Right click a variable value or description to configure them.	변수 값 또는 설명을 마우스 오른쪽 버튼으로 클릭하여 구성하십시오.
 Right click on the tab and click Export to download a CSV file, or download a sample.	탭을 마우스 오른쪽 버튼으로 클릭하고 내보내기를 클릭해서 CSV 파일을 다운로드하거나 샘플을 다운로드하십시오.
@@ -5516,6 +6307,7 @@ Right click on this tab and click Update, then choose your saved CSV file.	이 �
 Right click patterns, mates, or instances to configure them.	패턴, 메이트 또는 부품을 마우스 오른쪽 버튼으로 클릭하여 구성하십시오.
 Right click sketch dimensions, features, or feature parameters to configure them.	스케치 치수, 피처 또는 피처 매개변수를 구성하려면 마우스 오른쪽 버튼으로 클릭하십시오.
 Right mouse button drag	오른쪽 마우스 버튼 드래그
+Right mouse button drag or	오른쪽 마우스 버튼 드래그 또는
 Right view	우측면 뷰
 Right-click on a row to perform actions	작업을 수행하려면 행을 마우스 오른쪽 버튼으로 클릭합니다.
 Rigid body	강체 바디
@@ -5537,22 +6329,46 @@ Rollback	롤백
 Rollback bar	롤백 바
 Rollback failed.  Consider opening a previous version instead.	롤백에 실패했습니다. 이전 버전을 여는 것을 고려해 보십시오.
 Rollback to the top of feature list	피처 리스트의 맨 위로 롤백
+Rolled	롤링
+Rolled K Factor	롤링 K 지수
+Rolling ball	롤링 볼
 Rolling ball (__unit__)	롤링 볼(__unit__)
 Rolling ball gradient (%)	롤링 볼 경사도(%)
 Root opening	루트 입구
 Rotate	회전
 Rotate 180 deg	180도 회전
 Rotate 90 deg	90도 회전
+Rotate about X	X에 대해 회전
+Rotate about Y	Y에 대해 회전
+Rotate about Z	Z에 대해 회전
 Rotate pi rad	pi rad 회전
 Rotate pi/2 rad	pi/2 rad 회전
+Rotation	회전
+Rotation about Y'	Y'를 기준으로 회전
+Rotation about Z	Z를 기준으로 회전
+Rotation about Z'	Z'를 기준으로 회전
 Rotation angle	회전 각도
+Rotation axis	회전축
+Round	원형
+Round - Scaled	원형 - 확대됨
+Round - Sized	원형 - 확대됨
 Routing curve	경로 곡선
+Routing curve (#curveLength)	경로 곡선(#curveLength)
 Routing curve table	배선 경로 곡선 테이블
 Routing curve table panel	경로 곡선 테이블 패널
+Row	행(R)
 Row IDs	행 ID
+Row access type	행 액세스 유형
+Row index (0-based)	행 인덱스(0 기준)
+Row max index (0-based)	행 최대 인덱스(0 기준)
+Row min index (0-based)	행 최소 인덱스(0 기준)
 Row name	행 이름
+Row regular expression	행 정규식
+Row result type	행 결과 유형
+Row value	행 값
 Rule: __RuleType__	규칙: __RuleType__
 Ruled surface	측정된 면
+Ruled surface type	측정된 면 유형
 Run History	실행 기록
 Run Logs	실행 로그
 Run active simulation	활성 시뮬레이션 실행
@@ -5567,8 +6383,12 @@ Run restarted successfully.	실행을 성공적으로 다시 시작했습니다.
 Run started successfully.	실행을 성공적으로 시작했습니다.
 Running (__progressPercentage__% complete)	실행 중(__progressPercentage__% 완료)
 Runtime	런타임
+S-RT™ free-running locknuts	S-RT™ 프리-러닝 잠금 너트
 SAML2 Metadata XML	SAML2 메타데이터 XML
 SAML2 metadata XML	SAML2 메타데이터 XML
+SGPC™ swaging collar studs	SGPC™ 스웨이징 칼라 스터드
+SH™ hard panel nuts	SH™ 하드 패널 너트
+SL™ TRI-DENT® prevailing torque locknuts	SL™ TRI-DENT® 프리베일링 토크 잠금 너트
 SMBend	벤드
 SMBendRelief	벤드 릴리프
 SMCorner	코너
@@ -5579,15 +6399,22 @@ SMHem	둘러싸기
 SMJoint	결합
 SMLoft	금속 판재 로프트
 SMMakeJoint	조인트 만들기
+SMPS™/SMPP™ nuts	SMPS™/SMPP™ 너트
 SMRip	립
 SMStartSheetMetal	금속 판재 모델
 SMTab	탭
 SOLIDWORKS part file	SOLIDWORKS 파트 파일
+SOSG™/SOAG™ threaded standoffs	SOSG™/SOAG™ 나사산 스탠드오프
+SO™/SOS™/SOA™/SO4™ through threaded standoffs	SO™/SOS™/SOA™/SO4™ 스루 나사산 스탠드오프
+SO™/SOS™/SOA™/SO4™ through unthreaded standoffs	SO™/SOS™/SOA™/SO4™ 스루 비나사산 스탠드오프
 STEP file	STEP 파일
 STL Format	STL 형식
 STL file	STL 파일
 Safari (Version 6 and above)	Safari(버전 6 이상)
 Safety factor	안전 계수
+Same frames as previous	이전과 동일한 프레임
+Sample size	샘플 크기
+Sampled	샘플링
 Saturday	토요일
 Save	저장
 Save Arena settings	Arena 설정 저장
@@ -5631,6 +6458,8 @@ Saving settings…	설정 저장 중…
 Saving…	저장 중…
 Scalable, configurable solutions	확장 가능, 구성 가능한 솔루션
 Scale	축척
+Scale factor	배율
+Scale uniformly	균일하게 축척
 Schedule a date to remove user(s) from your enterprise.	엔터프라이즈에서 사용자(들)를 제거할 날짜를 예약하십시오.
 Schedule assignment	과제 예약
 Schedule deleted.	예약을 삭제했습니다.
@@ -5653,6 +6482,7 @@ Scheduling update…	업데이트 예약 중…
 School level	학교 레벨
 School level is required.	학교 레벨은 필수항목입니다.
 Scope	범위
+Screw	스크류
 Screw relation	스크류 릴레이션
 Scroll left (RMB: to first)	왼쪽으로 스크롤(RMB: 처음으로)
 Scroll right (RMB: to last)	오른쪽으로 스크롤(RMB: 끝으로)
@@ -5661,6 +6491,7 @@ Scroll to branch top	브랜치 상단으로 스크롤
 Scroll to merge source	병합 소스로 스크롤
 Scroll to merge target	병합 대상으로 스크롤
 Scroll wheel in/out	스크롤휠 확대/축소
+Scroll wheel in/out or	스크롤휠 확대/축소 또는
 Scroll wheel in/out or \nCtrl + Middle mouse button drag	스크롤휠 확대/축소 또는\nCtrl + 가운데 마우스 버튼 드래그
 Scroll wheel in/out or \nShift + Middle mouse button drag	스크롤휠 확대/축소 또는\nShift + 가운데 마우스 버튼 드래그
 Search	검색
@@ -5721,10 +6552,39 @@ Searches in name, description, and part number. Use "*" for wildcard matching	�
 Searching…	검색 중…
 Seats	시트
 Seats:	좌석:
+Second bound	두 번째 경계
+Second bound type	두 번째 경계 유형
+Second centered	두 번째 중심 맞춤
 Second dash	두 번째 점선
+Second depth	두 번째 깊이
+Second direction	두 번째 방향
+Second direction has offset	두 번째 방향에 오프셋이 있습니다.
+Second distance	두 번째 거리
+Second draft	두 번째 구배
+Second draft angle	두 번째 구배 각도
+Second draft opposite direction	두 번째 구배 반대 방향
+Second end position	두 번째 방향
+Second end type	두 번째 마침 조건
+Second equal spacing	두 번째 동일 간격
 Second gap	두 번째 간격
+Second instance count	두 번째 부품 수
+Second match	두 번째 일치
+Second offset distance	두 번째 오프셋 거리
+Second offset opposite direction	두 번째 오프셋 반대 방향
+Second opposite direction	두 번째 반대 방향
+Second plane limit	이차 평면 제한
+Second radius	두 번째 반경
+Second set of surfaces	두 번째 면 세트
+Second side face	두 번째 면
+Second sketch	두 번째 스케치
+Second trim to face boundaries	면 경계로 두 번째 자르기
+Second up to face	면까지(이차)
+Second up to surface or part	면 또는 부품까지(이차)
+Second up to vertex or mate connector	꼭지점 또는 메이트 커넥터까지(이차)
+Secondary axis entity	보조축 요소
 Secondary key	보조 키
 Secondary key copied.	보조 키를 복사했습니다.
+Section count	섹션 카운트
 Section interference color	단면 간섭 색상
 Section plane __oneTwoOrThree__ __name__	단면 __oneTwoOrThree__ __name__
 Section planes	단면
@@ -5734,8 +6594,13 @@ Sectioned __typeName__ of __entityName__	__entityName__의 단면 __typeName__
 Security	보안
 Security code exceeded maximum length.	보안 코드가 최대 길이를 초과했습니다.
 See all your enterprises	모든 엔터프라이즈 보기
+Seed geometry type	시드 형상 유형
 Seen when collaborating with other users	다른 사용자와 공동작업할 때 표시
+Segment edit type	세그먼트 편집 유형
+Segments	세그먼트(S)
 Select	선택
+Select (edge)	선택(모서리)
+Select (vertex)	선택(꼭지점)
 Select Onshape category	Onshape 범주 선택
 Select Onshape property	Onshape 속성 선택
 Select __companyType__	__companyType__ 선택
@@ -5783,10 +6648,12 @@ Select a workspace to update	업데이트할 작업공간 선택
 Select action	작업 선택
 Select advanced permissions	고급 권한 선택
 Select all	모두 선택
+Select all frames	모든 프레임 선택
 Select an action	작업 선택
 Select an action below to continue	계속하려면 아래에서 작업을 선택하십시오.
 Select an assignment to view analytics	분석을 확인할 과제 할당을 선택하십시오.
 Select an assignment to view details	세부 정보를 확인할 과제 할당을 선택하십시오.
+Select an entity or mate connector	요소 또는 메이트 커넥터 선택
 Select an entity to add tag to current comment.	현재 설명에 태그를 추가할 요소를 선택하십시오.
 Select an individual assembly tree item to view its properties. Select nothing to view assembly properties	속성을 표시할 개별 어셈블리 트리 항목을 선택하십시오. 어셈블리 속성을 보려면 없음을 선택하십시오.
 Select an individual part to view its properties. Select multiple parts to view their properties. Select nothing to view part studio and all part properties.	개별 파트를 선택하면 해당 파트의 속성을 볼 수 있습니다. 여러 파트를 선택하면 선택한 파트의 속성을 확인할 수 있습니다. 아무것도 선택하지 않으면 Part Studio 및 모든 파트 속성이 표시됩니다.
@@ -5810,10 +6677,12 @@ Select degree of freedom	자유도 선택
 Select dimension and annotation types to show	표시할 치수 및 주석 유형 선택
 Select dimensions or sketch plane to configure	구성할 치수 또는 스케치 평면 선택
 Select dimensions or sketch plane to configure with __configurationName__	__configurationName__(으)로 구성할 치수 또는 스케치 평면 선택
+Select distance to measure the linear distance between two entities./nSelect length to measure the total length of the selected entities.	두 요소 사이에 선형 거리를 측정하려면 거리를 선택합니다./n선택한 요소의 총 길이를 측정하려면 길이를 선택합니다.
 Select document	통합문서 선택
 Select entities to be mirrored.	대칭 복사할 요소를 선택하십시오.
 Select entities to measure	측정할 요소 선택
 Select entities to split. For parts and surfaces, specify whether to keep or remove the split tool. For faces, select a sketch curve, curve, surface, or plane to use as the split tool.	분할할 요소를 선택합니다. 파트 및 표면의 경우, 분할 도구를 유지할지, 제거할지를 지정합니다. 면의 경우, 분할 도구로 사용할 스케치 곡선, 곡선, 표면 또는 면을 선택합니다.
+Select face	면 선택
 Select file	파일 선택
 Select folder	폴더 선택
 Select from your published and draft classes	게시 및 구배 클래스에서 선택
@@ -5828,9 +6697,11 @@ Select items to insert	삽입할 항목 선택
 Select mate connector (__keybind__)	메이트 커넥터 선택(__keybind__)
 Select mate connectors (__keybind__)	메이트 커넥터 선택(__keybind__)
 Select options	옵션 선택
+Select or create mate connectors in this Part Studio to position derived instances	이 Part Studio에서 메이트 커넥터를 선택하거나 생성하여 파생된 부품 위치 지정
 Select origin/mate connector	원점/메이트 커넥터 선택
 Select other	다른 요소 선택
 Select other…	다른 요소 선택…
+Select owner entity	소유자 요소 선택
 Select parameters to configure	구성할 매개변수 선택
 Select parameters to configure with __configurationName__	__configurationName__(으)로 구성할 매개변수 선택
 Select parent categories	상위 범주 선택
@@ -5839,6 +6710,7 @@ Select part or appearance	부품 또는 모양 선택
 Select part or assembly	파트 또는 어셈블리 선택
 Select parts/surfaces/sketches	파트/면/스케치 선택
 Select patterns	패턴 선택
+Select point	점 선택
 Select provider type	제공업체 유형 선택
 Select range end	범위 끝 선택
 Select range start	범위 시작 선택
@@ -5868,6 +6740,7 @@ Selected edges do not form a continuous chain.	선택한 모서리가 연속 체
 Selected format only supports exporting the active sheet.	선택한 형식은 활성 시트 내보내기만 지원합니다.
 Selected items moved.	선택한 아이템을 이동했습니다.
 Selected material library has a new version available. Accept changes to update part(s) to latest version.	선택한 재질 라이브러리에서 새로운 버전을 사용할 수 있습니다. 파트를 최신 버전으로 업데이트하려면 변경 내용을 수락하십시오.
+Selected points	선택한 점
 Selected resource is not valid for ownership transfer.	선택한 리소스가 소유권 양도에 대해 유효하지 않습니다.
 Selected tab contains no supported geometry for export.	선택한 탭에 내보내기가 지원되지 않는 형상이 있습니다.
 Selected users and teams	선택한 사용자 및 팀
@@ -5882,8 +6755,13 @@ Selection no longer available. Close the dialog to leave unchanged.	선택 항�
 Selection no longer available. Make a new selection (or close the dialog to leave unchanged)	선택 항목을 더 이상 사용할 수 없습니다. 새로 선택하십시오(또는 변경되지 않은 상태로 두려면 대화상자를 닫으십시오)
 Selection to replace	교체할 선택 항목
 Selection to replace with	교체되는 선택 항목
+Selection type	선택 유형
+Selections	선택 항목
 Selective update	선택적 업데이트
 Select…	선택…
+Self-clinching nuts	셀프 클린칭 너트
+Self-clinching standoffs	셀프 클린칭 스탠드오프
+Self-clinching studs & pins	셀프 클린칭 스터드 및 핀
 Semantic	시맨틱
 Send invitation	초대 보내기
 Send me a copy	나에게 사본 보내기
@@ -5926,6 +6804,7 @@ Setup a new domain for verification	확인을 위해 새로운 도메인 설정
 Shaded bodies	음영 바디
 Shaded with edges	모서리를 포함한 음영
 Shaded without edges	가장자리가 없는 음영
+Shaft class	샤프트 클래스
 Share	공유
 Share details	공유 세부사항
 Share dialog failed to open.	공유 대화상자를 열지 못했습니다.
@@ -5941,6 +6820,7 @@ Share with mentioned approver	언급된 승인자와 공유
 Share with mentioned approvers	언급된 승인자와 공유
 Share with mentioned user	지정된 사용자와 공유
 Share with mentioned users	지정된 사용자들과 공유
+Shared	공유
 Shared with Onshape support	Onshape 지원팀과 공유된 문서
 Shared with me	공유된 문서
 Share…	공유…
@@ -5955,18 +6835,23 @@ Sharing will give this user permission to view and comment on this publication.	
 Sharing…	공유하는 중…
 Sheet	시트
 Sheet metal context:	금속 판재 컨텍스트:
+Sheet metal face to bend	굽힐 금속 판재 면
 Sheet metal form library	금속 판재 형상 라이브러리
 Sheet metal loft	금속 판재 로프트
 Sheet metal materials	금속 판재 재질
 Sheet metal materials library	금속 판재 재질 라이브러리
 Sheet metal model	금속 판재 모델
+Sheet metal part	금속 판재 파트
+Sheet metal parts	금속 판재 파트
 Sheet metal table and flat view	금속 판재 테이블 및 플랫 뷰
 Sheet range cannot be empty	시트 범위는 비워둘 수 없습니다.
 Sheet range is out of bounds	시트 범위가 범위를 벗어납니다.
 Sheets	시트
 Shell	쉘
+Shell thickness	쉘 두께
 Shift + Middle mouse button drag	Shift + 가운데 마우스 버튼 드래그
 Shininess	광택도
+Short	짧게
 Shortcut toolbar settings updated.	단축키 툴바 설정이 업데이트 되었습니다.
 Shortcut toolbars	단축키 툴바
 Show	표시
@@ -6002,6 +6887,7 @@ Show all rigid bodies	모든 강체 바디 표시
 Show analysis tools__ctxt__toolbar-analysis-btn	분석 도구 표시
 Show analysis tools…	분석 도구 표시…
 Show automatic versions	자동 버전 표시
+Show calculation variance	계산 변화 표시
 Show center of mass	질량 중심 표시
 Show changes in history	히스토리에 변경 내용 표시
 Show changes…	변경 내용 표시…
@@ -6010,14 +6896,17 @@ Show code	코드 표시
 Show completed	완료된 항목 보기
 Show connections	연결 표시
 Show constraints	구속 조건 표시
+Show coordinate system of the reference used by the current vertex.	현재 꼭지점에 사용된 참조의 좌표계를 표시합니다.
 Show current branch	현재 브랜치 표시
 Show current branch with parent branches	상위 브랜치와 함께 현재 브랜치 표시
+Show default points	기본 점 표시
 Show default tolerances	기본 공차 표시
 Show deformation	변형 표시
 Show dependencies of __name__…	__name__의 종속성 표시…
 Show dependencies…	종속성 표시…
 Show derived tolerances	파생 공차 표시
 Show details	세부사항 표시
+Show deviation	편차 표시
 Show dimensions	치수 표시
 Show distortion	왜곡 표시
 Show drawings	도면 표시
@@ -6042,6 +6931,7 @@ Show inactive values	비활성 값 표시
 Show instance list properties	부품 목록 속성 표시
 Show instances	인스턴스 부품 표시
 Show internal geometry	내부 형상 표시
+Show isocurves	iso 곡선 보이기
 Show items already in toolbar	이미 도구 모음에 있는 항목 표시
 Show less	간단히 표시
 Show mates	메이트 표시
@@ -6063,16 +6953,20 @@ Show parts list properties	파트 목록 속성 표시
 Show password	비밀번호 표시
 Show pinned references only	고정된 참조만 표시
 Show preview	미리보기 표시
+Show reference coordinate system	참조 좌표계 표시
 Show regeneration times	재생성 횟수 표시
 Show replies	답글 표시
 Show results	결과 표시
 Show results in new browser tab	새 브라우저 탭에 결과 표시
 Show revisions	리비전 표시
+Show ruled lines	측정된 선 표시
 Show search results as list	검색 결과를 목록으로 표시
 Show selected part	선택한 파트 표시
+Show selection	선택 항목 표시
 Show setup	설정 표시
 Show setup in new browser tab	새 브라우저 탭에 설정 표시
 Show sketch diagnostics tools	스케치 진단 도구 표시
+Show start and end profiles	시작 및 끝 프로파일 표시
 Show top level assembly row	최상위 어셈블리 행 표시
 Show top level only	상위 레벨만 표시
 Show undercut regions	언더컷 영역 보이기
@@ -6092,8 +6986,11 @@ Showing message	메시지 표시 중
 Shown when __displayName__ is __value__	__displayName__이(가) __value__일 때 표시됨
 Shown when __displayName__ is between __value__	__displayName__이(가) __value__ 사이일 때 표시됨
 Shows all top level symbols in the dropdown. Use the search field to filter symbols by name. Click on a symbol to navigate to it in the editor.	드롭다운에 모든 최상위 기호를 표시합니다. 검색 필드를 사용하여 이름으로 기호를 필터링할 수 있습니다. 기호를 클릭하면 편집기에서 해당 위치로 이동합니다.
+Side	측면(S)
 Side 1	측면 1
 Side 2	측면 2
+Side length	측면 길이
+Sides	측면
 Sign in	로그인
 Sign in to Onshape	Onshape 로그인
 Sign in to __companyName__	__companyName__에 로그인
@@ -6115,6 +7012,7 @@ Sign-in attempt throttled. Click "Sign in" again to continue.	로그인 시도�
 Sign-in attempt throttled. Solve recaptcha puzzle to continue.	로그인 시도가 제한되었습니다. 계속하려면 recaptcha 퍼즐을 해결하십시오.
 Signed von Mises stress (__unit__)	부호가 지정된 von Mises 스트레스(__unit__)
 Signing in…	로그인 중…
+Simple	단순
 Simulate the effect of a bearing load on one or more faces of an instance.	부품의 하나 또는 여러 면에서 베어링 하중의 효과를 시뮬레이션합니다.
 Simulate the effect of a static, uniform, linear acceleration acting on an instance.	부품에서 작용하는 정적, 균일, 선형 가속의 효과를 시뮬레이션합니다.
 Simulate the effect of an angular velocity and the resultant load acting on an instance.	부품에 작용하는 각속도와 그에 따른 결과 하중의 영향을 시뮬레이션합니다.
@@ -6130,6 +7028,7 @@ Simulation "__simulationName__" results were deleted	시뮬레이션 "__simulati
 Simulation "__simulationName__" was canceled	시뮬레이션 "__simulationName__"이(가) 취소되었습니다
 Simulation bonded	시뮬레이션 연결됨
 Simulation cannot be queued. The maximum number of queued simulations per user (__max__) has been reached.	시뮬레이션을 대기열에 추가할 수 없습니다. 사용자당 허용되는 최대 대기 중인 시뮬레이션 수(__max__)에 도달했습니다.
+Simulation connection	시뮬레이션 연결
 Simulation features	시뮬레이션 피처
 Simulation is complete	시뮬레이션이 완료되었습니다
 Simulation is not included in your current Onshape subscription plan	시뮬레이션은 현재 Onshape 회원 가입 플랜에 포함되지 않습니다.
@@ -6142,10 +7041,12 @@ Simulation status	시뮬레이션 상태
 Simulation was canceled	시뮬레이션이 취소되었습니다
 Simulations	시뮬레이션
 Simulations can help estimate how a loaded assembly behaves while being constrained by mates and fixed components.	시뮬레이션을 통해 메이트 및 고정 구성요소로 구속될 때 로드된 어셈블리가 어떻게 동작하는지를 손쉽게예측할 수 있습니다.
+Single	단일
 Single flat pattern part only	단일 플랫 패턴 파트만
 Single sign on (SSO)	싱글 사인온(SSO)
 Single sign on (SSO) user auto-provisioning	SSO(Single Sign On) 사용자 자동 프로비저닝
 Single sign on is disabled due to bad configuration.	잘못된 구성으로 인해 SSO가 비활성화됩니다.
+Single value	단일 값
 Size	크기
 Size bytes: __sizeBytes__	크기 바이트: __sizeBytes__
 Size to Part Studio	Part Studio에 맞게 크기 조정
@@ -6172,16 +7073,24 @@ Sketch an elliptical arc by defining its center point, major axis, minor axis, s
 Sketch chamfer	스케치 챔퍼
 Sketch copy and pasted	스케치 복사 및 붙여 넣기
 Sketch curved text	곡선 텍스트 스케치
+Sketch curves to extrude	돌출할 스케치 곡선
 Sketch fillet (Shift-f)	필렛
+Sketch for flat view	평면도용 스케치
 Sketch functions	스케치 기능
 Sketch inflection points	구속 제한 점 스케치
 Sketch new construction geometry or convert existing sketch entities into construction geometry.	새 보조선 형상을 스케치하거나 기존 스케치 요소를 보조선 형상으로 변환합니다.
+Sketch plane	스케치 면
 Sketch point	스케치 점
+Sketch points	스케치 점
+Sketch points to place holes	홀을 배치할 스케치 지점
+Sketch profile	스케치 프로파일
+Sketch profiles	스케치 프로파일
 Sketch text border	스케치 텍스트 테두리
 Sketches	스케치
 Sketches and curves	스케치 및 곡선
 Skip	건너뛰기
 Skip aggregation	집계 건너뛰기
+Skip instances	부품 건너뛰기
 Slack Workspace ID	Slack 작업공간 ID
 Slack connection	Slack 연결
 Slack integration token	Slack 통합 토큰
@@ -6192,6 +7101,10 @@ Slider mate	슬라이더 메이트
 Slider mate (m)	슬라이더 메이트
 Slot	슬롯
 Slowest features (__numberOfFeatures__)	가장 느린 피처(__numberOfFeatures__)
+Smooth	부드럽게
+Smooth fillet corners	매끄러운 필렛 코너
+Smooth transition	완만한 전환
+Smoothness	평활도
 Snap mode	스냅 모드
 Snap mode (Shift-s)	스냅 모드
 Snippet not found. To use this snippet, import the Onshape Standard Library.	조각을 찾을 수 없습니다. 이 조각을 사용하려면 Onshape 표준 라이브러리를 가져와 주십시오.
@@ -6237,7 +7150,9 @@ Sort tasks	작업 정렬
 Source	원본(S)
 Source category	소스 범주
 Source drawing view is not selected	소스 도면 뷰가 선택되지 않았습니다.
+Source is 'Y Axis Up'	원점이 'Y 축 위로'입니다.
 Source version name	소스 버전 이름
+Spacing type	간격 유형
 Spans	범위
 Specify a maximum count no greater than __maxLength__.	__maxLength__ 이하의 최대 개수를 지정하십시오.
 Specify a maximum count of at least __minLength__.	최소 __minLength__의 최대 개수를 지정하십시오.
@@ -6250,20 +7165,29 @@ Specify a minimum length of at least __minLength__.	최소 __minLength__의 최�
 Specify a valid configuration.	적합한 구성을 지정하십시오.
 Specify a value no greater than __maxValue__.	__maxValue__ 이하의 값을 지정하십시오.
 Specify a value of at least __minValue__.	최소 __minValue__의 값을 지정하십시오.
+Specify anchor points	고정점 지정
+Specify axis	축 지정
 Specify diameter	지름 지정
+Specify direction	방향 지정
 Specify what user type should be used when automatically provisioning a user who signs in using SSO.	SSO를 사용해 로그인한 사용자를 자동으로 프로비저닝할 때 사용할 사용자 유형을 지정하십시오.
 Specular color	반사광 색상
 Sphere	구
 Spherical diameter	구 지름
 Spherical radius	구 반지름
+Spine	스파인
 Spline	스플라인
 Spline control point	스플라인 제어점
 Spline handle	스플라인 핸들
 Split	분할
+Split face	면 분할
+Split faces	면 분할
 Split into multiple documents	여러 통합문서로 분할
 Split sketch curves into multiple segments. For open curves, select 1 or more points. For closed curves, select 2 or more points.	스케치 곡선을 여러 세그먼트로 분할합니다. 열린 곡선의 경우, 1개 이상의 점을 선택합니다. 닫힌 곡선의 경우, 2개 이상의 점을 선택합니다.
+Split type	분할 유형
 Spot face	스팟 면
+Spun corner	스핀 코너
 Square	정사각형
+Square - Sized	정사각형 - 확대됨
 Standard	표준
 Standard Content	표준 콘텐츠
 Standard Content Administration	표준 콘텐츠 관리
@@ -6277,21 +7201,54 @@ Standard content library	표준 콘텐츠 라이브러리
 Standard content parameters failed to load.	표준 콘텐츠 매개변수를 로드하지 못했습니다.
 Standard library version range start must not be after its stop.	표준 라이브러리 버전 범위의 시작은 중지 이후일 수 없습니다.
 Standard:	표준:
+Start	시작
 Start 7 day trial	7일 시험사용 시작
 Start New Run	새 실행 시작
 Start Onshape Professional Trial	Onshape 프로페셔널 시험사용 시작
 Start Professional Trial	프로페셔널 시험사용 시작
+Start angle	시작 각도
 Start assignment	과제 할당 시작
 Start assignment and select an existing document.	과제를 시작하고 기존 통합문서를 선택하십시오.
 Start assignment to create a copy of the starter document.	과제를 시작하여 스타터 문서의 사본을 만드십시오.
 Start assignment to create a new document.	과제를 시작하여 새로운 통합문서를 만드십시오.
 Start assignment…	과제 시작…
+Start condition	시작 조건
+Start curvature offset	시작 곡률 오프셋
 Start date	시작일
 Start date is after end date	시작일이 종료일 이후입니다.
 Start date is after today's date	시작일이 오늘 날짜 이후입니다.
+Start direction	시작 방향
+Start direction has offset	시작 방향에 오프셋이 있습니다
+Start direction offset angle	시작 방향 오프셋 각도
+Start edge position	시작 모서리 위치
+Start flow offset	흐름 오프셋 시작
+Start from part	파트에서 시작
+Start from selected plane	선택한 면에서 시작
+Start from sketch plane	스케치 면에서 시작
+Start magnitude	시작 규모
+Start offset	시작 오프셋
+Start offset opposite direction	시작 오프셋 반대 방향
+Start opposite direction	시작 반대 방향
+Start plane	시작면
+Start point	시작점
+Start position	시작 위치
+Start profile adjacent faces	시작 프로파일 인접 면
+Start profile condition	시작 프로파일 상태
+Start radius	시작 반경
+Start trim	잘라내기 시작
+Start type	시작 유형
 Start typing to search tools	검색 도구에 입력 시작
+Start up to face	곡면까지 방향 시작
+Start up to surface or part	면 또는 파트까지 방향 시작
+Start up to vertex or mate connector	꼭지점 또는 메이트 커넥터까지 방향 시작
+Start value	시작 값
 Start zones	시작 영역
 Started	시작함
+Starting offset	시작 오프셋
+Starting offset bound	시작 오프셋 바인딩
+Starting offset depth	시작 오프셋 깊이
+Starting offset entity	시작 오프셋 요소
+Starting offset opposite direction	시작 오프셋 반대 방향
 Starting simulation (__current__ of __max__ allocated)...	시뮬레이션 시작 중(할당된 __max__개 중 __current__개)...
 Starting…	시작 중…
 Startup page	시작 페이지
@@ -6301,6 +7258,8 @@ State / Region:	주/지역
 Statistical tolerance	통계 공차
 Status	상태
 Steep	급경사
+Step	단계
+Steps	단계
 Still waiting on an input TRS for __assemblyName__ __simulation__.	__assemblyName__ __simulation__에 대한 입력 TRS를 여전히 기다리는 중입니다.
 Still waiting on an input TRS for __assemblyName__.	__assemblyName__에 대한 입력 TRS를 여전히 기다리는 중입니다.
 Stop	중지
@@ -6308,6 +7267,9 @@ Stop Document Extraction	통합문서 추출 중지
 Stop extraction if running	실행 중일 경우 추출 중지
 Store file in __drive__ (__account__)	__drive__(__account__)에 파일 저장
 Store file in a new tab	새 탭에 파일 저장
+Straight	직선
+Straight pipe tap	직선 파이프 탭
+Straight tap	직선 탭
 Street address	거리 주소
 Stripe count	스트립 카운트
 Structural	정형화
@@ -6327,6 +7289,7 @@ Students do not have sharing permissions.	학생들이 공유 권한을 갖지 �
 Students will have view access to the starter document once the assignment is published. It will appear in their document list.	과제가 게시되면 학생들이 스타터 통합문서에 대한 보기 액세스 권한을 갖게 됩니다. 해당 항목이 통합문서 목록에 나타납니다.
 Students: __students__	학생: __students__
 Studio	스튜디오
+Style	스타일
 Sub-total	소계
 Subassemblies added to named positions.	서브어셈블리를 명명된 위치에 추가했습니다.
 Subassemblies position unlocked.	서브 어셈블리 위치의 잠금이 해제되었습니다.
@@ -6372,6 +7335,9 @@ Subscription: Active	회원 계정: 활성
 Subscription: __accountState__	회원 계정: __accountState__
 Subscriptions	회원 계정
 Subtotal	소계
+Subtract	차집합
+Subtraction offset	차집합 오프셋
+Subtraction scope	차집합 범위
 Successfully added export rule with convention:  __convention__	다음 표기 규칙과 함께 내보내기 규칙 추가 성공: __convention__
 Successfully exported Onshape__type__ library.	Onshape__type__ 라이브러리를 성공적으로 내보냈습니다.
 Successfully exported __name____type__ library.	__name____type__ 라이브러리를 성공적으로 내보냈습니다.
@@ -6399,10 +7365,15 @@ Suppressed from this BOM	이 자재명세서(BOM)에서 제외하고 표시됨
 Surface	면
 Surface area	표면 영역
 Surface finish symbol	면 마감 기호
+Surface or boundary edges	면 또는 경계 모서리
 Surfaces	면
 Surfaces (__numberOfSurfaces__)	면(__numberOfSurfaces__)
 Sweep	스윕
+Sweep path	스윕 경로
+Swept profile	스윕된 프로파일
 Switch context workspace?	컨텍스트 작업공간을 전환하시겠습니까?
+Switch face	면 전환
+Switch side	변 바꾸기
 Switch to	전환 대상
 Switch to "__rowName__"	"__rowName__"(으)로 전환
 Switch to Assembly	어셈블리로 전환
@@ -6419,6 +7390,7 @@ Symbol "__symbolName__" no longer exists at specified location	기호 "__symbolN
 Symbol search cannot be performed due to a collaborator edit.	공동작업자 편집으로 인해 기호 검색을 수행할 수 없습니다.
 Symmetric	대칭
 Symmetric Dirichlet	대칭 디리클레
+Symmetrical	대칭
 Sync Arena revision value upon release candidate approval	릴리스 후보자 승인 시 Arena 리비전 값 동기화
 Sync BOM line items	BOM 라인 아이템 동기화
 Sync BOM to __plmName__	__plmName__에 자재명세서(BOM) 동기화
@@ -6447,6 +7419,11 @@ Syncing to Windchill is enabled.	Windchill에 동기화가 활성화됩니다.
 Syncing to __plmName__…	__plmName__에 동기화 중…
 System	시스템
 System check	시스템 체크
+S™/SS™/CLS™/CLSS™/SP™ nuts	S™/SS™/CLS™/CLSS™/SP™ 너트
+TFH™/TFHS™ non-flush studs	TFH™/TFHS™ 비-플러시 스터드
+TPS™/TP4™ flush-head pilot pins	TPS™/TP4™ 플러시 헤드 파일럿 핀
+TPXS™ self-clinching pilot pins	TPXS™ 셀프 클린칭 파일럿 핀
+TSO™/TSOS™/TSOA™/TSO4™ blind standoffs for thin sheet	박막 시트용 TSO™/TSOS™/TSOA™/TSO4™ 단방향 스탠드오프
 TXT verification code	TXT 확인 코드
 TXT verification file	TXT 확인 파일
 TYPE INFO	유형 정보
@@ -6457,6 +7434,7 @@ Tab failed to be moved.	탭을 이동하지 못했습니다.
 Tab failed to paste.	탭을 붙여 넣지 못했습니다.
 Tab graphics	탭 그래픽
 Tab manager (Alt-t)	탭 관리자
+Tab mate connector(s)	탭 메이트 커넥터
 Tab merge strategy	탭 병합 전략
 Tab must be opened before actions can be performed.	작업을 수행하기 전에 탭을 열어야 합니다.
 Tab name cannot be empty.	탭 이름은 비워둘 수 없습니다.
@@ -6465,6 +7443,7 @@ Tab name cannot contain HTML.	탭 이름에 HTML이 포함될 수 없습니다.
 Tab only exists in '__versionName__'.	탭은 '__versionName__'에만 존재합니다.
 Tab order	탭 순서
 Tab performance	탭 성능
+Tab profile	탭 프로파일
 Tab restore strategy	탭 복원 전략
 Tab types	탭 유형
 Tab will not exist in __targetname__ after merge	병합 후 탭이 __targetname__에 존재하지 않게 됩니다.
@@ -6481,21 +7460,62 @@ Tabs are filtered, some results may not appear in search.	탭이 필터링됩니
 Tag	태그
 Tag entity	요소 태그 지정
 Tag profile	태그 프로파일
+Tag purpose	태그 용도
 Take a self-paced course	셀프 교육 과전 진행하기
+Tangency	탄젠시
 Tangent	접선
 Tangent (t)	접선
 Tangent arc	접원호
 Tangent connected	접선 연결됨
 Tangent connected edges	접선 연결 모서리
 Tangent connected faces	접선 연결 면
+Tangent direction	접선 방향
+Tangent edges	접선 모서리
 Tangent edges phantom	접선 모서리 팬텀
 Tangent edges removed	접선 모서리 제거됨
 Tangent edges visible	접선 모서리 보이기
+Tangent hold lines	접선 유지선
 Tangent mate	접선 메이트
 Tangent mates	접선 메이트
 Tangent plane	접평면
+Tangent propagation	접선 처리
+Tangent to curve	곡선에 접함
+Tangent to face	면에 접함
+Tangent to guide	가이드에 접함
+Tangent to profile	프로파일로 접선
+Tap clearance (number of thread pitch lengths)	탭 공차(쓰레드 피치 길이 개수)
+Tap drill diameter	탭 드릴 지름
+Tap drill diameter deviation	탭 드릴 지름 편차
+Tap drill diameter lower deviation	탭 드릴 지름 하한 편차
+Tap drill diameter lower limit	탭 드릴 지름 하한
+Tap drill diameter precision	탭 드릴 지름 정밀도
+Tap drill diameter tolerance controls	탭 드릴 지름 공차 제어
+Tap drill diameter tolerance type	탭 드릴 지름 공차 유형
+Tap drill diameter upper deviation	탭 드릴 지름 상한 편차
+Tap drill diameter upper limit	탭 드릴 지름 상한
+Tap through all	전체 범위 탭
+Tap type	탭 유형
+Tapered pipe tap	테이퍼드 파이프 탭
+Tapped	탭 가공됨
+Tapped depth	탭 가공된 깊이
+Tapped depth deviation	탭 깊이 편차
+Tapped depth lower deviation	탭 깊이 하한 편차
+Tapped depth lower limit	탭 깊이 하한
+Tapped depth precision	탭 깊이 정밀도
+Tapped depth tolerance controls	탭 깊이 공차 제어
+Tapped depth tolerance type	탭 깊이 공차 유형
+Tapped depth upper deviation	탭 깊이 상한 편차
+Tapped depth upper limit	탭 깊이 상한
+Target	대상
+Target anchor point	대상 앵커 점
+Target degree	목표 각도
+Target face(s)	대상 면
 Target input is empty	대상 입력이 비어 있습니다.
+Target length	목표 길이
+Target pitch	목표 피치
+Target revolutions	목표 회전
 Target version name	접선 버전 이름
+Targets	대상
 Task	작업
 Task failed to be completed.	작업을 완료하지 못했습니다.
 Task failed to be deleted.	작업을 삭제하지 못했습니다.
@@ -6533,11 +7553,14 @@ Teams connection	팀 연결
 Teams deleted.	팀을 삭제했습니다.
 Teams failed to delete.	팀을 삭제하지 못했습니다.
 Teams failed to load.	팀을 로드하지 못했습니다.
+Tear	전단
+Tear drop	전단 드롭
 Template	템플릿
 Template document:	템플릿 통합문서:
 Templates	템플릿
 Tensile yield strength	인장항복강도
 Tensile yield strength (__units__)	인장항복강도(__units__)
+Termination	종료
 Terms	약관
 Terms & Privacy	약관 및 개인정보 보호정책
 Terms failed to load.	조건을 로드하지 못했습니다.
@@ -6646,6 +7669,7 @@ There was a problem creating a Websocket connection to Onshape's servers. This u
 There was a problem submitting your ticket. Try again.	티켓을 제출하는 중 문제가 발생했습니다. 다시 시도하십시오.
 There was an error upgrading your subscription. Try again or contact Onshape Support.	귀하의 회원 계정을 업그레이드하는 중 오류가 발생했습니다. 다시 시도하시거나 Onshape 지원팀에 문의하십시오.
 There was an error upgrading your subscription. __error__. Try again or contact Onshape Support.	귀하의 회원 계정을 업그레이드하는 중 오류가 발생했습니다. __error__. 다시 시도하시거나 Onshape 지원팀에 문의하십시오.
+Thermal via	서멀 비아
 These categories are owned by __company__.	이들 범주는 __company__의 소유입니다.
 These configuration inputs will always be visible	이러한 구성 입력은 항상 표시됩니다.
 These drawings should be updated before creating a version	버전을 생성하기 전에 이러한 도면을 업데이트해야 합니다.
@@ -6654,10 +7678,21 @@ These properties only apply to documents owned by __company__.	이러한 속성�
 These tabs should be updated	이러한 탭을 업데이트해야 합니다.
 They can obtain their enterprise ID from the Details page of their Enterprise setting.	엔터프라이즈 설정의 세부사항 페이지에서 엔터프라이즈 ID를 가져올 수 있습니다.
 Thicken	두껍게 하기
+Thickness	두께
+Thickness 1	두께 1
+Thickness 2	두께 2
 Thickness analysis	두께 분석
 Thickness analysis on closed composite parts is not supported.	닫힌 합성 파트의 두께 분석은 지원되지 않습니다.
 Thickness analysis…	두께 분석…
+Thickness factor	두께 비율
+Thickness opposite direction	반대 방향의 두께
+Thin	얇게
 Third angle (ANSI)	세 번째 각도(ANSI)
+Third centered	세 번째 중심 맞춤
+Third direction	세 번째 방향
+Third distance	세 번째 거리
+Third equal spacing	세 번째 동일 간격
+Third instance count	세 번째 부품 수
 This Variable Studio is automatically referenced in this workspace	이 Variable Studio가 해당 작업공간에서 자동으로 참조됩니다.
 This __documentType__ was created by an education subscriber.	이 __documentType__은(는) 에듀케이션 회원 계정에 의해 생성되었습니다.
 This action cannot be undone.	이 작업은 취소할 수 없습니다.
@@ -6758,13 +7793,29 @@ This workspace is currently being updated. Try again later. You may	현재 작�
 This workspace is currently not accessible. Try again later.	현재 이 작업공간에 액세스할 수 없습니다. 나중에 다시 시도하십시오.
 This workspace is using an old version of the feature library and must be updated before the __featureTypeName__ feature can be used.	이 작업공간은 이전 버전의 피처 라이브러리를 사용 중이며, __featureTypeName__ 피처를 사용하기 전에 업데이트해야 합니다.
 This workspace only	이 작업공간만
+Thread class	스레드 클래스
+Thread length	나사산 길이
+Thread type	나사산 유형
+Threads/inch	인치당 나사산 수
+Three point	3점
 Three point angular dimension	3점 각도 치수
 Three point circular centerline	3점 원 중심선
+Through all	전체 범위
 Thumbnail image for a document.	통합문서의 썸네일 이미지.
 Thursday	목요일
 Time	시간
 Time format	시간 형식
 Timed out while verifying that no other users are in the document.	통합문서에 다른 사용자가 없는지 확인하는 중 시간이 초과되었습니다.
+Tip angle	팁 각도
+Tip angle deviation	팁 각도 편차
+Tip angle lower deviation	팁 각도 하한 편차
+Tip angle lower limit	팁 각도 하한
+Tip angle precision	팁 각도 정밀도
+Tip angle style	팁 각도 스타일
+Tip angle tolerance controls	팁 각도 공차 제어
+Tip angle tolerance type	팁 각도 공차 유형
+Tip angle upper deviation	팁 각도 상한 편차
+Tip angle upper limit	팁 각도 상한
 Title	제목
 Title 1	제목 1
 Title 2	제목 2
@@ -6779,7 +7830,10 @@ To edit this material library:	이 재질 라이브러리를 편집하려면:
 To get started, enter a name for your company	시작하려면 귀사의 이름을 입력하십시오.
 To insert closest to selection, preselect planar faces containing holes first.	선택 항목에 가장 가까이에 삽입하려면 먼저 홀을 포함하는 평면을 미리 선택하십시오.
 To insert furthest from selection, preselect planar faces containing holes first.	선택 항목에서 가장 멀리 삽입하려면 먼저 홀을 포함하는 평면을 미리 선택하십시오.
+To mate connector	대상 메이트 커넥터
 To measure	측정 방법
+To owner	권한 소유자에게
+To selection	선택 항목으로
 To size the component, select a circular edge or cylindrical face.	구성요소의 크기를 조정하려면 원형 모서리 또는 원통형 면을 선택하십시오.
 To: __toEmailList__	받는 사람: __toEmailList__
 Toggle construction	보조선 토글
@@ -6791,12 +7845,16 @@ Toggle replace	바꾸기 토글
 Token Value:	토큰 값:
 Tolerance	공차
 Tolerance options	공차 옵션
+Tolerance type	공차 유형
 Too few fields on row #__rowNumber__.	#__rowNumber__ 행에 필드가 너무 적습니다.
 Too many fields on row #__rowNumber__.	# __rowNumber__ 행에 필드가 너무 많습니다.
 Toolbar customization could not be saved.	도구 모음 사용자 정의를 저장할 수 없습니다.
 Toolbars	도구 모음
 Toolbars failed to reset.	툴바를 재설정하지 못했습니다.
 Toolbars reset.	도구 모음이 재설정됩니다.
+Tooling	툴링
+Tools	도구
+Tools anchor point	도구 앵커 점
 Top	윗면
 Top left	왼쪽 위
 Top level instances	최상위 부품
@@ -6804,6 +7862,7 @@ Top view	윗면 뷰
 Torus	원환체
 Total	합계
 Total instances (__numberOfInstances__)	총 부품(__numberOfInstances__)
+Total length	총 길이
 Total modules imported: __numImportedModules__	가져온 총 모듈 수: __numImportedModules__
 Total parts	총 파트
 Total reflects charge of the next bill.	합계는 다음 번 청구서의 요금을 반영합니다.
@@ -6829,12 +7888,21 @@ Transferred publication __documentName__ to __companyType__ __companyName__.	__d
 Transferred publication __documentName__ to user __userEmail__.	__userEmail__ 사용자에게 __documentName__ 게시물을 전송했습니다.
 Transferring ownership…	소유권 양도 중…
 Transform	변형
+Transform by mate connectors	메이트 커넥터로 변형
 Transform sketch entities	스케치 요소 변환
+Transform type	변형 유형
+Transition	전환
 Translate	선형 이동
+Translate by XYZ	XYZ에 따라 선형 이동
+Translate by distance	거리에 따라 선형 이동
+Translate by line	선을 따라 선형 이동
 Translate, rotate, or offset selected faces. Specify end type and distance, or axis and rotation angle. Useful for imported parts.	선택한 면을 선형 이동, 회전 또는 오프셋합니다. 마침 조건과 거리 또는 축과 회전 각도를 지정하십시오. 가져온 파트에 유용합니다.
 Translated	선형 이동됨
 Translating…	선형 이동 중…
 Translation	변환
+Translation along X	X를 따라 선형 이동
+Translation along Y	Y를 따라 선형 이동
+Translation along Z	Z를 따라 선형 이동
 Translation failed.	선형 이동이 실패했습니다.
 Translucent	반투명
 Transmit relevant data to third-party AI providers to generate outputs, where applicable.	해당되는 경우 결과 생성을 위해 관련 데이터를 제3자 AI 제공업체로 전송합니다.
@@ -6845,17 +7913,28 @@ Trashed	휴지통에 버림
 Treat as false	거짓으로 처리
 Treat as true	참으로 처리
 Treat as zero	0으로 처리
+Treatment type	처리 유형
 Trial	시험사용
 Trial expires 	시험사용 만료 
+Triangle	삼각형
 Triangles	삼각형
 Triggers	트리거
 Trim	자르기
 Trim (m)	자르기
+Trim Type	잘라내기 유형
 Trim a face or extend a face to a new surface. Select faces to replace and the surface to use for the replacement. Useful for imported parts.	새로운 표면으로 면을 잘라내거나 면을 확장합니다. 교체할 면과 교체에 사용할 표면을 선택합니다. 가져온 파트에 유용합니다.
 Trim a line or curve to the first intersecting point or bounding geometry. If no intersection or bounding geometry is found, the entire entity is deleted.	첫 번째 교차점이나 경계 형상까지 선 또는 곡선을 자릅니다. 교차점 또는 경계 형상을 찾을 수 없는 경우, 전체 요소가 삭제됩니다.
+Trim control	잘라내기 컨트롤
 Trim curve	곡선 잘라내기
+Trim ends	끝 잘라내기
+Trim guides	자르기 가이드
 Trim or extend existing curves by a distance or to a bounding entity.	거리를 기준으로 또는 경계 요소까지 기존 곡선을 잘라내거나 연장합니다.
+Trim profiles	자르기 프로파일
+Trim to face boundaries	면 경계로 자르기
+Trim to target	대사으로 자르기
+Trim type	트림 유형
 Trimetric	부등각 투상
+Trimming	잘라내기
 Troubleshooting the performance check	성능 확인 문제 해결
 True	참
 Try	시험 사용
@@ -6875,14 +7954,24 @@ Turn profile inspector off	프로파일 검사자 끄기
 Turn reflection analysis off	반사 분석 끄기
 Turn thickness analysis off	두께 분석 끄기
 Turn zebra stripes off	제브라 스트라이프 끄기
+Turns	회전 수
+Turns and pitch	회전수와 피치
 Tutorial	튜토리얼
 Tutorial name is required	튜토리얼 이름은 필수항목입니다.
 Tutorial type	튜토리얼 유형
+Tutorials	튜토리얼
 Tutorials & Samples	튜토리얼 및 샘플
+Tutorials [9]	튜토리얼
+Twist	비틀림
+Twist opposite direction	반대 방향으로 비틀기
+Twist type	비틀림 유형
+Two distances	두 거리
 Two edge centerline	2개 모서리 중심선
 Two point circular centerline	2점 원 중심선
 Two point line	2점 선
 Two point linear centerline	2점 선형 중심선
+Two sided	양면
+Two sketches	2개 스케치
 Two-factor authentication	2채널 인증
 Two-factor authentication (2FA)	2채널 인증(2FA)
 Two-factor authentication activated.	2채널 인증이 활성화되었습니다.
@@ -6898,9 +7987,15 @@ Type to filter	입력해서 필터링
 Type:	유형:
 Types	유형
 U curves	U 곡선
+U direction	U 방향
+U profiles	U 프로파일
+U shift	U 이동
+U shift opposite direction	U 이동 반대 방향
 URL of a document in trash cannot be changed.	휴지통에 있는 통합문서의 URL은 변경할 수 없습니다.
 USD user / month	USD 사용자 / 월
 USD user / year	USD 사용자 / 년
+UVN (Control polygon)	UVN(제어 다각형)
+UVN (Tangent)	UVN(접선)
 Ultimate compressive strength	극한 압축 강도
 Ultimate compressive strength (__units__)	극한 압축 강도(__units__)
 Ultimate tensile strength	극한 인장 강도
@@ -6943,6 +8038,8 @@ Unconfigure text	텍스트 구성 취소
 Underconstrained color	구속 조건이 부족한 색상
 Underconstrained occluded color	구속 조건이 부족한 가려진 색상
 Undercut	언더컷
+Undercut diameter	언더컷 지름
+Undercut length	언더컷 길이
 Understand Onshape's document structure with a simple model.	간단한 모델로 Onshape의 통합문서 구조를 이해할 수 있습니다.
 Undo	실행 취소
 Undo (Ctrl-z)	실행 취소
@@ -6953,10 +8050,17 @@ Unexpected character "__char__".	예기치 않은 문자 "__char__"입니다.
 Unfix	고정 취소
 Unfix all	모두 고정 취소
 Unfold	펼치기
+Unfold all	모두 펼치기
+Unfold none	펼치기 안 함
+Unfold selected	선택 항목 펼치기
+Unfold type	펼치기 유형
+Unified	통합
+Union	합집합
 Unique parts	고유 파트
 Unique sketches	고유 스케치
 Unique subassemblies	고유 하위 어셈블리
 Unique surfaces	고유 면
+Unit	유닛
 Unit of measure	측정 단위
 Unit settings failed to load.	단위 설정을 로드하지 못했습니다.
 Unit type	단위 유형
@@ -6972,6 +8076,7 @@ Unlock	잠금 해제
 Unlock assembly from named positon	명명된 위치에서 어셈블리 잠금 해제
 Unmark visited	방문 내역 표시 취소
 Unnamed	이름 없음
+Unowned	소유자 없음
 Unpack	압축 풀기
 Unpack folder	폴더 압축 풀기
 Unpaid	미납
@@ -7015,6 +8120,16 @@ Unverified emails cannot be made primary. Click `Resend verification email` butt
 Up to	까지
 Up to 6 months free	최장 6개월까지 무료 이용
 Up to __limit__	최대__limit__까지
+Up to entity	선택 요소까지
+Up to entity or mate connector	요소 또는 메이트 커넥터까지
+Up to entity with offset	오프셋한 선택 요소까지
+Up to face	면까지
+Up to next	다음까지
+Up to part	파트까지
+Up to part/surface	파트/면까지
+Up to surface or part	면 또는 부품까지
+Up to vertex	꼭지점까지
+Up to vertex or mate connector	꼭지점 또는 메이트 커넥터까지
 Update	업데이트
 Update FeatureScript version	FeatureScript 버전 업데이트
 Update SSO provider	SSO 제공자 업데이트
@@ -7107,6 +8222,7 @@ Uploaded file	업로드된 파일
 Uploading…	업로드 중…
 Upon closing, assignment will be in a "Closed" state. Students will no longer be able to submit and view from the assignments list.	과제를 마감하면 상태가 "마감됨"으로 변경됩니다. 학생들은 과제 목록에서 더 이상 제출하거나 열람할 수 없습니다.
 Upon publishing, assignment will be in an "In progress" state.	과제를 게시하면 상태가 "진행 중"으로 변경됩니다.
+Upper	상한
 Upper flag symbol	상단 플래그 기호
 Upper limit should be greater	상한은 다음보다 커야 합니다.
 Upper text	상단 텍스트
@@ -7118,18 +8234,25 @@ Use	사용
 Use (Project/Convert) (u)	사용(투영/변환)(u)
 Use AI to contextually suggest and complete code as you type. Toggling this setting will only affect this session.	AI를 사용하여 입력하는 동안 상황에 맞는 코드를 제안하고 완성합니다. 이 설정을 전환해도 현재 세션에만 적용됩니다.
 Use automatic tessellation setting	자동 테셀레이션 설정 사용
+Use axis	축 사용
 Use best available tessellation	가능한 최상의 테셀레이션 사용
 Use comma as decimal separator	소수점 구분 기호로 쉼표 사용
 Use compatibility mode for surfaces and curves	면 및 곡선에 대해 호환성 모드 사용
+Use cubic interpolation	큐빅 보간 사용
 Use custom annotation text height for MBD export	MBD 내보내기에 사용자 지정 주석 텍스트 높이 사용
 Use custom units for export	내보내기에 사용자 지정 단위 사용
+Use default minimal gap	기본 최소 간격 사용
 Use drawing units	도면 단위 사용
 Use entityId with company domain prefix	Company 도메인 접두어와 함께 요소 ID 사용
 Use file origin position	파일 원점 위치 사용
 Use latest version	최신 버전 사용
+Use minimal gap	최소 간격 사용
+Use model K Factor	모델 K 지수 사용
+Use model bend radius	모델 벤드 반지름 사용
 Use one of the recovery codes you previously obtained. Cross it off your list after you've entered it here.	이전에 받은 복구 코드 중 하나를 사용해 주십시오. 여기에 입력한 후에는 목록에서 해당 코드를 삭제해 주십시오
 Use pen input as mouse	펜 입력을 마우스로 사용
 Use scheduled date/time	예약된 날짜/시간 사용
+Use sketch plane direction	스케치 면 방향 사용
 Use with small assemblies	작은 어셈블리와 함께 사용
 Use workspace units	작업공간 단위 사용
 User	사용자
@@ -7142,6 +8265,7 @@ User added to __companyType__. User __user__ is already a member of the __compan
 User added to __companyType__. Users __users__ are already members of the __companyType__.	사용자를 __companyType__에 추가했습니다. __users__사용자는 이미 __companyType__의 일원입니다.
 User added to your class.	사용자를 클래스에 추가했습니다.
 User agent	사용자 에이전트
+User defined	사용자 정의(U)
 User details failed to load.	사용자 세부사항을 로드하지 못했습니다.
 User enterprise companies failed to load.	사용자 엔터프라이즈 Company를 로드하지 못했습니다.
 User export rules	사용자 내보내기 규칙
@@ -7196,6 +8320,10 @@ Using an associative link, insert parts, sketches, surfaces, curves, planes, or 
 Using file:	파일 사용:
 Using this feature will allow data to leave this Customer-Managed Keys (CMK) enterprise through export/transfer methods. Data will no longer be encrypted and will not be destroyed upon revocation of your Customer-Managed Keys.	이 기능을 사용하면 내보내기/전송 방법을 통해 이 고객 관리형 키(CMK) 엔터프라이즈의 데이터가 외부로 유출될 수 있습니다. 더 이상 데이터가 암호화되지 않으며, 고객 관리형 키가 해지되어도 데이터가 삭제되지 않습니다.
 V curves	V 곡선
+V direction	V 방향
+V profiles	V 프로파일
+V shift	V 이동
+V shift opposite direction	V 이동 반대 방향
 Valid annotations text height in range from 0.0001 to 50 is required.	유효한 주석 텍스트 높이는 0.0001에서 50 사이여야 합니다.
 Valid email required	유효한 이메일 필요
 Valid file name is required.	적합한 파일 이름은 필수 항목입니다.
@@ -7225,17 +8353,21 @@ Value is required for __propertyName__. 	__propertyName__에 대한 값이 필�
 Value is too low.	값이 너무 낮습니다.
 Value must be an integer.	값은 정수여야 합니다.
 Value should not be empty	값은 비워둘 수 없습니다.
+Value to record	기록할 값
 Value with units	값(단위 포함)
 Variable	변수
 Variable Studio name	Variable Studio 이름
 Variable Studio name cannot be longer than 256 characters	Variable Studio 이름은 256자 이하여야 합니다.
+Variable Studio reference	Variable Studio 참조
 Variable Studio reference failed. The source tab may have been deleted.	Variable Studio 참조에 실패했습니다. 소스 탭이 삭제되었을 수 있습니다.
 Variable Studios	Variable Studio
 Variable feature	변수 피처
+Variable fillet	변수 필렛
 Variable input	변수 입력
 Variable name must be a letter followed by a string of letters or numbers.	변수 이름은 글자여야 하며, 그 후에 글자나 숫자의 스트링이 이어져야 합니다.
 Variable table	변수 테이블
 Variable tables are not shown without edit or copy permissions.	편집 또는 복사 권한 없이 변수 테이블이 표시되지 않습니다.
+Variable type	변수 유형
 Variables are used to drive mates and part configurations in the assembly.	변수는 어셈블리에서 메이트 및 파트 구성을 구동하는 데 사용됩니다.
 Variables are used to drive sketch and feature parameters in the Part Studio.	변수는 Part Studio에서 스케치 및 피처 매개변수를 구동하는 데 사용됩니다.
 Vendor	공급업체
@@ -7277,12 +8409,17 @@ Versions of __instanceName__ and __extraNumber__ referenced elements updated.	__
 Versions of a document in trash cannot be shown.	휴지통에 있는 통합문서의 버전을 표시할 수 없습니다.
 Versions updated	버전 업데이트됨
 Vertex	꼭지점
+Vertex overrides	꼭지점 재정의
+Vertex pairs to split with	분할에 사용할 꼭지점 쌍
 Vertical	수직
 Vertical (v)	수직
 Vertical zones	수직 영역
 Vertices	꼭지점
+Vertices or curves	꼭지점 또는 곡선
+Vertices or edges	꼭지점 또는 모서리
 Very fine	초미세
 Very fine tessellation (__numberOfVeryFineTessellation__)	초미세 테셀레이션(__numberOfVeryFineTessellation__)
+Via	비아
 Video	동영상
 View	뷰
 View & comment	보기 및 의견 추가
@@ -7349,7 +8486,9 @@ Volume	부피
 Wait	대기
 Waiting for workflow transition…	워크플로 전환 대기 중…
 Waiting to run…	실행 대기 중...
+Wall face or bounding edge to hold	유지할 벽면 또는 경계 모서리
 Wall stripes	벽 스트라이프
+Walls	벽
 Warning: Onshape does not currently support ' + browserName + '.	경고: 현재 Onshape는 ' + browserName + '을(를) 지원하지 않습니다.
 Warning: Onshape does not currently support mobile browsers.	경고: 현재 Onshape는 모바일 브라우저를 지원하지 않습니다.
 Warning: White is a difficult color to see on an Onshape drawing.	경고: 흰색은 Onshape 도면에서 표시하기 어려운 색상입니다.
@@ -7383,6 +8522,7 @@ Webhook signatures	웹후크 서명
 Webhooks	웹후크
 Wednesday	수요일
 Weekly	매주
+Weight	무게
 Weight property	가중 속성
 Weighted average	가중 평균
 Weighted sum	가중 합계
@@ -7407,7 +8547,9 @@ Where used for workspaces is not supported.	작업공간에 대한 사용 위치
 Where used is not included in your current Onshape subscription plan	사용 위치가 현재 Onshape 회원계정 플랜에 포함되어 있지 않습니다.
 Where used…	사용 위치…
 White	흰색
+Width	폭
 Width mate	폭 메이트
+Width mate connectors	폭 메이트 커넥터
 Will be seen by all members of the connection.	연결의 모든 구성원이 볼 수 있습니다.
 Will navigate to versions and history	버전 및 히스토리로 이동합니다.
 Windchill BOM sync scheduled.	Windchill 자재명세서(BOM) 동기화가 예약되었습니다.
@@ -7476,8 +8618,20 @@ Workspace units…	작업공간 단위…
 Workspaces	작업공간
 Workspaces and versions	작업공간 및 버전
 Workspaces can be restored within 30 days of deletion.	작업공간은 삭제 후 30일 내에 복원할 수 있습니다.
+World	표준
 Wrap	둘러싸기
 Wrap faces or sketch entities around a cylindrical or conical part or surface. Create, add to, subtract from, or intersect solids. Create surfaces or split the target face. Adjust the position of the result by specifying anchor points, angle, or shift.	원통형/원추형 파트 또는 면 둘레에 면 또는 스케치 요소를 둘러쌉니다. 솔리드를 생성, 추가, 제거하거나 교차시킵니다. 표면을 생성하거나 대상 면을 분할합니다. 앵커 점, 각도 또는 이동을 지정해서 결과의 위치를 조정할 수 있습니다.
+X offset	X 오프셋
+X rotation	X 회전
+X scale	X 축척
+X translation	X 선형 이동
+XY plane	YZ 면
+XZ plane	YZ 면
+Y offset	Y 오프셋
+Y rotation	Y 회전
+Y scale	Y 축척
+Y translation	Y 선형 이동
+YZ plane	YZ 면
 Yellow	노란색
 Yes	예
 Yes, I'm a student	네, 학생입니다
@@ -7623,6 +8777,10 @@ Your subscription will be invoiced to the address on file:	회원계정의 인�
 Your system is running an integrated GPU. If you have a dual-GPU system with a discrete chipset (NVIDIA or AMD) you can get better performance by forcing the browser to use the discrete GPU. See	시스템이 통합 GPU를 실행 중입니다. 분리형 칩셋(NVIDIA 또는 AMD)과 함께 이중 GPU 시스템을 보유하고 있는 경우, 브라우저에서 분리형 GPU를 강제로 사용하게 설정하면 성능을 향상시킬 수 있습니다. 다음을 참조하십시오.
 Your toolbar changed elsewhere, so we could not apply your edit.	도구 모음이 다른 위치에서 변경되어 편집 내용을 적용할 수 없습니다.
 Your__type__ library is already up to date.	__type__ 라이브러리는 이미 최신 버전입니다.
+Z offset	Z 오프셋
+Z rotation	Z 회전
+Z scale	Z 축척
+Z translation	Z 선형 이동
 Zebra stripes	제브라 스트라이프
 Zebra stripes are not supported during interference detection.	간섭 감지 중에는 제브라 스트라이프가 지원되지 않습니다.
 Zebra stripes…	제브라 스트라이프…
@@ -7850,6 +9008,7 @@ __prettyName__ (pending)	__prettyName__ (진행 중)
 __previousItemOrItems__ and __finalItem__	__previousItemOrItems__ 및 __finalItem__
 __projectName__ (Inactive)	__projectName__ (비활성)
 __propertiesName__ has no configured properties.	__propertiesName__에 구성된 속성이 없습니다.
+__propertyName__	__propertyName__
 __propertyName__ (N/A)	__propertyName__ (해당 없음)
 __propertyName__ is configured. Its configured values can be viewed in the configured properties table.	__propertyName__이(가) 구성되었습니다. 구성된 값은 구성된 속성 테이블에서 확인할 수 있습니다.
 __propertyName__ is not editable in this context	__propertyName__은(는) 이 컨텍스트에서 편집할 수 없습니다.

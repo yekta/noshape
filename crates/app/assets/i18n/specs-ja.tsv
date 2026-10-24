@@ -1,0 +1,1603 @@
+ - X	 - X
+###name	###name
+###name #description	###name #description
+###name = #value	###name = #value
+###name = #value #description	###name = #value #description
+#booleanOperation of #addQlowercaseSelectionType	#booleanOperation of #addQlowercaseSelectionType
+#column = #value	#column = #value
+#connectionEntities	#connectionEntities
+#edge	#edge
+#entity	#entity
+#featureName	#featureName
+#frames	#frames
+#guideEntities	#guideEntities
+#header = #value	#header = #value
+#index	#index
+#index: #x;#y;#z	#index: #x;#y;#z
+#matesQuery	#matesQuery
+#sheetProfileEntities	#sheetProfileEntities
+#vertex	#vertex
+#vertex [#cornerType]	#vertex [#cornerType]
+#wireProfileEntities	#wireProfileEntities
+% diametric engagement	％ 直径エンゲージメント
+(#index1, #index2)	(#index1, #index2)
++/-	+/-
++X	+X
++Y	+Y
+- Y	- Y
+- Y'	- Y'
+- Z	- Z
+- Z'	- Z'
+-X	-X
+-Y	-Y
+0	0
+0.1	0.1
+0.12	0.12
+0.123	0.123
+0.1234	0.1234
+0.12345	0.12345
+0.123456	0.123456
+118 deg	118 度
+135 deg	135 度
+3D fit spline	3D フィットスプライン
+ANSI	ANSI
+Acceleration	加速度
+Access type	アクセスタイプ
+Add	追加
+Add additional queries	クエリを追加
+Add chamfer	面取りを追加
+Add point on axis drag	軸ドラッグ上に点を追加
+Add points	点を追加
+Add undercut	アンダーカットを追加
+Added by the array	Added by the array
+Additional alignment points	追加の位置合わせ点
+Additional columns	その他の列
+Additional queries	追加のクエリ
+Adjacent	隣接
+Adjacent faces	隣接面
+Align coordinate system	座標系を揃える
+Align to geometry	ジオメトリに揃える
+Aligned	位置合わせ済み
+Aligned with direction	方向に揃える
+Alignment entity	位置合わせエンティティ
+All deviations	すべての偏差
+All frames	すべてのフレーム
+All solid bodies	すべてのソリッドボディ
+All values	すべての値
+Allow edge overflow	エッジオーバーフローを許可
+Allow faulty parts	欠陥のあるパーツを許容
+Allow owner entity	Allow owner entity
+Along X	X 軸方向
+Along Y	Y 軸方向
+Along Z	Z 軸方向
+Along custom	カスタム方向
+Angle	角度
+Angle Tolerance	角度許容差
+Angle control type	角度制御タイプ
+Angle from direction	方向からの角度
+Angle opposite direction	反対方向の角度
+Angle reference	角度参照
+Angular velocity	角速度
+Animate Mate	合致をアニメート
+Any	任意
+Approximate	近似
+Approximation parameters	近似パラメータ
+Approximation target degree	近似ターゲット角度
+Approximation type	近似タイプ
+Arcs to extrude as bends	曲げとして押し出す円弧
+Array	配列
+Aspect ratio constraint	縦横比拘束
+Assembly to mirror	ミラーリングするアセンブリ
+Assigned	割り当て済み
+Associated component instance	関連付けられたコンポーネントインスタンス
+Asymmetric	非対称
+Attach to	添付先
+Attachment	添付
+Auto position	自動配置
+Automatic miter	自動マイター
+Axes are determined by the first selected instance	Axes are determined by the first selected instance
+Axis	軸
+Axis measurements	軸の測定
+Axis of pattern	パターン軸
+BOTTOM_AXIS_POINT	BOTTOM_AXIS_POINT
+BSO™/BSOS™/BSOA™/BSO4™ blind threaded standoffs	BSO™/ BSOS™/ BSOA™/ BSO4™ ブラインドスレッドスタンドオフ
+Ball	球
+Base faces	Base faces
+Base mate connector	基準の合致コネクタ
+Base mate connector feature index	Base mate connector feature index
+Base mate connector id	Base mate connector id
+Base origin	基準の原点
+Base plane	基準となる平面
+Basic	基準
+Bearing	ベアリング
+Bend	曲げ
+Bend alignment	曲げの位置合わせ
+Bend allowance	曲げの許容範囲
+Bend angle	曲げ角度
+Bend angle set programmatically	Bend angle set programmatically
+Bend calculation	曲げ計算
+Bend deduction	曲げ控除
+Bend line	曲げ線
+Bend or non-planar faces	曲げ面または非平面上の面
+Bend or non-planar faces to unfold	展開する曲げ面または非平面上の面
+Bend radius	曲げ半径
+Bend relief	曲げリリーフ
+Bend relief depth	曲げリリーフ深さ
+Bend relief depth scale	曲げリリーフ深さスケール
+Bend relief type	曲げリリーフタイプ
+Bend relief width scale	曲げリリーフ幅スケール
+Best fit	ベストフィット
+Between entities	エンティティ間
+Between entity	エンティティ間
+Bias	バイアス
+Blind	ブラインド
+Blind in last	最後にブラインド
+Blob Data	Blob Data
+Bodies	ボディ
+Body	ボディ
+Body draft	ボディ抜き勾配
+Body type	ボディタイプ
+Boolean	ブーリアン演算
+Boolean operation	ブーリアン操作
+Bottom edges	下部エッジ
+Bound type	境界タイプ
+Boundary condition	境界条件
+Boundary condition direction	境界条件の方向
+Boundary surface	境界サーフェス
+Bounded faces	境界面
+Bounding box XY	境界ボックス XY
+Bounding box YZ	境界ボックス YZ
+Bounding box ZX	境界ボックス ZX
+Bounding type	境界タイプ
+Bounds	境界
+Bridging curve	ブリッジ曲線
+Butt	突合せ
+Butt joint - Direction 1	突合せジョイント - 方向 1
+Butt joint - Direction 2	突合せジョイント - 方向 2
+By index	インデックス別
+By index range	インデックス範囲別
+By label	ラベル別
+CENTER	CENTER
+CENTROID	CENTROID
+CLA™ free-running locknuts	CLA™ 自走かしめナット
+CSV file	CSV ファイル
+Cap	キャップ
+Cap entity	キャップエンティティ
+Caps	キャップ
+Center	中心
+Center of mass x coordinate	x 座標の重心
+Center of mass y coordinate	y 座標の重心
+Center of mass z coordinate	z 座標の重心
+Centered	中央揃え
+Centimeter	Centimeter
+Chain type	チェーンタイプ
+Chamfer	面取り
+Chamfer angle	面取り角度
+Chamfer length	面取りの長さ
+Chamfer size	面取りサイズ
+Chamfer type	面取りタイプ
+Change radius	半径を変更
+Change thickness	厚みを変更
+Check to include the clearance for bends	チェックして曲げのクリアランスを含める
+Choose to measure minimum or maximum distance between entities	選択してエンティティ間の最小距離または最大距離を測定
+Chordal tolerance	弦の許容差
+Circle	円
+Circular	円形
+Circular edge	円形エッジ
+Circular pattern	円形パターン
+Clearance	クリアランス
+Clearance & tapped	クリアランスとタップ
+Clearance from input	入力からのクリアランス
+Cliff edges	クリフエッジ
+Clockwise	時計回り
+Close	閉じる
+Close (ASME)	クローズ (ASME)
+Closed	閉じた
+Closed spline	閉じたスプライン
+Column	列
+Column Override	Column Override
+Column access type	列アクセスタイプ
+Column index (0-based)	列インデックス (0 から始まる)
+Column max index (0-based)	列の最大インデックス (0 から始まる)
+Column min index (0-based)	列の最小インデックス (0 から始まる)
+Column regular expression	列の正規表現
+Column result type	列の結果タイプ
+Column value	列の値
+Composite curve	複合曲線
+Composite name	Composite name
+Composite part	複合部品
+Composite part options	複合部品オプション
+Compressive yield strength	Compressive yield strength
+Computed pitch	計算済みピッチ
+Computed revolutions	計算済みの回転
+Concave	凹状
+Concave repair	凹形修復
+Confirm	確認
+Conic	円錐
+Conic edges	円錐エッジ
+Conic hold lines	円錐保持線
+Conical or cylindrical face	円錐面または円筒状
+Connections	接続
+Constrained surface	拘束サーフェス
+Constraints	拘束
+Constraints and limits	拘束と制限
+Contact analysis	Contact analysis
+Continuity	連続性
+Control	制御
+Control how the load is transferred between the instances	インスタンス間での荷重の転送方法を制御
+Control point index	制御点インデックス
+Control point index #indexValue	Control point index #indexValue
+Control point indices	制御点インデックス
+Control points	制御点
+Conversion factor	変換係数
+Convert	変換
+Convex	凸状
+Coordinate system	座標系
+Coped butt	コープ突合せ
+Copy in place	その場でコピー
+Copy part	パーツをコピー
+Corner	コーナー
+Corner break	コーナー切断
+Corner break style	コーナー切断スタイル
+Corner overrides	コーナーオーバーライド
+Corner relief diameter	コーナーリリーフ直径
+Corner relief scale	コーナーリリーフスケール
+Corner relief type	コーナーリリーフタイプ
+Corner relief width	コーナーリリーフ幅
+Corner type	コーナータイプ
+Corners to break	切断するコーナー
+Corners to exclude	除外するコーナー
+Count	カウント
+Counterbore	座ぐり
+Counterbore depth	座ぐり深さ
+Counterbore depth deviation	座ぐり深さ偏差
+Counterbore depth lower deviation	座ぐり深さ偏差の下限
+Counterbore depth lower limit	座ぐり深さの下限
+Counterbore depth precision	座ぐり深さの精度
+Counterbore depth tolerance controls	座ぐり深さ許容差の制御
+Counterbore depth tolerance type	座ぐり深さ許容差のタイプ
+Counterbore depth upper deviation	座ぐり深さ偏差の上限
+Counterbore depth upper limit	座ぐり深さの上限
+Counterbore diameter	座ぐり直径
+Counterbore diameter deviation	座ぐり直径の偏差
+Counterbore diameter lower deviation	座ぐり直径偏差の下限
+Counterbore diameter lower limit	座ぐり直径の下限
+Counterbore diameter precision	座ぐり直径の精度
+Counterbore diameter tolerance controls	座ぐり直径許容差の制御
+Counterbore diameter tolerance type	座ぐり直径許容差のタイプ
+Counterbore diameter upper deviation	座ぐり直径偏差の上限
+Counterbore diameter upper limit	座ぐり直径の上限
+Counterclockwise	反時計回り
+Countersink	皿穴
+Countersink angle	皿穴角度
+Countersink angle deviation	皿穴角度の偏差
+Countersink angle lower deviation	皿穴角度偏差の下限
+Countersink angle lower limit	皿穴角度の下限
+Countersink angle precision	皿穴角度の精度
+Countersink angle tolerance controls	皿穴角度許容差の制御
+Countersink angle tolerance type	皿穴角度許容差のタイプ
+Countersink angle upper deviation	皿穴角度偏差の上限
+Countersink angle upper limit	皿穴角度の上限
+Countersink diameter	皿穴径
+Countersink diameter deviation	皿穴直径の偏差
+Countersink diameter lower deviation	皿穴直径偏差の下限
+Countersink diameter lower limit	皿穴直径の下限
+Countersink diameter precision	皿穴直径の精度
+Countersink diameter tolerance controls	皿穴直径許容差の制御
+Countersink diameter tolerance type	皿穴直径許容差のタイプ
+Countersink diameter upper deviation	皿穴直径偏差の上限
+Countersink diameter upper limit	皿穴直径の上限
+Create	Create
+Create composite	コンポジットを作成
+Create points in addition to the curve.	曲線に加えて点を作成します。
+Created by	作成者
+Created by features	フィーチャーごとに作成
+Creation type	作成タイプ
+Cross section	クロス切断
+Cross sectional control	クロス断面制御
+Cube	立方体
+Current value	現在値
+Curvature	曲率
+Curve	曲線
+Curve length	Curve length
+Curve pattern	曲線パターン
+Curve point	曲線の点
+Curve projection type	曲線投影タイプ
+Curve reference	曲線参照
+Curve to face	面に対する曲線
+Curve type	曲線タイプ
+Curves	曲線
+Curves to adjust	調整する曲線
+Custom	カスタム
+Custom direction	カスタムの方向
+CustomMaterial	CustomMaterial
+Cut list	カットリスト
+Cut list table	カットリストテーブル
+Cutouts	切り抜き
+Cylinder edges	円筒エッジ
+Cylinder/Cone	円筒/円錐
+Cylindrical	円筒状
+DSO™/DSOS™ threaded standoffs	DSO™/ DSOS™ スレッドスタンドオフ
+Data start column (0,1,2,.)	データの開始列 (0,1,2,.)
+Decal	デカール
+Default	既定
+Default bend K Factor	既定の曲げ K 係数
+Default corner type	既定のコーナータイプ
+Defaults changed	Defaults changed
+Degree	度数
+Delete composite parts	複合部品を削除
+Delete face	面を削除
+Delete faces	面を削除
+Delete fillet faces	フィレット面を削除
+Delete part	パーツを削除
+Density	密度
+Depends on blob	Depends on blob
+Depth	深度
+Depth deviation	深度偏差
+Depth lower deviation	深度偏差の下限
+Depth lower limit	深度下限
+Depth precision	深度の精度
+Depth tolerance controls	深度許容差の制御
+Depth tolerance type	深度許容差のタイプ
+Depth upper deviation	深度偏差の上限
+Depth upper limit	深度上限
+Derivative	派生物
+Derivative alignment	派生物の位置合わせ
+Derivative direction	派生物の方向
+Derived	派生
+Derived mirror	派生したミラー
+Description	説明
+Designator	指定子
+Detached	アタッチ解除済み
+Deviation	偏差
+Deviation type	偏差の種類
+Diameter	直径
+Diameter Tolerance	直径許容差
+Diameter deviation	直径偏差
+Diameter fit tolerance table	直径はめあい公差テーブル
+Diameter lower deviation	直径偏差の下限
+Diameter lower limit	直径下限
+Diameter precision	直径の精度
+Diameter tolerance controls	直径許容差の制御
+Diameter tolerance type	直径許容差のタイプ
+Diameter upper deviation	直径偏差の上限
+Diameter upper limit	直径上限
+Direction	方向
+Direction overrides	方向のオーバーライド
+Direction to lock	ロックする方向
+Disable imprinting	インプリントを無効にする
+Dissolve composite parts	複合部品を分解
+Distance	距離
+Distance 1	距離 1
+Distance 2	距離 2
+Distance and angle	距離と角度
+Distance per revolution	1 回転あたりの距離
+Draft	抜き勾配
+Draft angle	勾配角度
+Draft on self	自己抜き勾配
+Draft opposite direction	反対方向の抜き勾配
+Draft scope	抜き勾配範囲
+Draft type	抜き勾配タイプ
+Drill size	ドリルサイズ
+Drilled	ドリル
+Driving mate selector	合致作動セレクタ
+ECAD	ECAD
+Edge	エッジ
+Edge convexity	エッジの凹凸
+Edge convexity type	エッジの凹凸の種類
+Edge joint	エッジジョイント
+Edge limit	エッジの制限
+Edge limits	エッジの制限
+Edge match scope	エッジマッチ範囲
+Edge or face	エッジまたは面
+Edge overflow	エッジオーバーフロー
+Edge parameters	Edge parameters
+Edge point	エッジの点
+Edge positions	エッジの位置
+Edge projection options	エッジ投影オプション
+Edge queries	Edge queries
+Edges	エッジ
+Edges and curves for ruled surface path	ルールドサーフェスパスのエッジと曲線
+Edges and faces	エッジと面
+Edges and sketch curves to revolve	回転するエッジとスケッチ線
+Edges and sketch curves to sweep	スイープするエッジとスケッチ曲線
+Edges or cylinders to bend	曲げるエッジまたは円柱
+Edges or faces	エッジまたは面
+Edges or side faces to flange	フランジのエッジまたは側面
+Edges or side faces to hem	エッジまたは面からヘムまで
+Edges or side faces to join	結合するエッジまたは側面
+Edges that define the bases of the gussets	ガセットのベースを定義するエッジ
+Edges to hold	保持するエッジ
+Edges to keep	維持するエッジ
+Edges, curves and sketches	エッジ、曲線、スケッチ
+Edges, faces, and vertices	エッジ、面、頂点
+Edges, vertices, or faces	エッジ、頂点、または面
+Edit angles	角度を編集
+Edit control points	制御点を編集
+Edit curve	曲線を編集
+Edit edge positions	エッジの位置を編集
+Edit mode	編集モード
+Edit reference	参照を編集
+Edit tangency angles	接線角度を編集
+Edits a curve directly if possible or a composite curve of the selection otherwise.	Edits a curve directly if possible or a composite curve of the selection otherwise.
+Elevate	引き上げ
+Elevation parameters	引き上げパラメータ
+Elevation target degree	引き上げターゲット角度
+Enclose	囲い込み
+End	終了
+End angle	終了角
+End cap	エンドキャップ
+End condition	端点の条件
+End conditions	端点の条件
+End curvature offset	終了曲率オフセット
+End direction	終了方向
+End edge position	終了エッジの位置
+End flow offset	終了フローオフセット
+End magnitude	終了マグニチュード
+End offset	終了オフセット
+End point	終点
+End position	終了位置
+End profile adjacent faces	終了輪郭の隣接面
+End profile condition	終了輪郭条件
+End radius	終端半径
+End trim	末端トリム
+End type	末端の種類
+End value	最終値
+Entities	エンティティ
+Entities to chamfer	面取りエンティティ
+Entities to copy	コピーするためのエンティティ
+Entities to delete	削除するエンティティ
+Entities to draft	抜き勾配のためのエンティティ
+Entities to fillet	フィレットするためのエンティティ
+Entities to fillet or chamfer	フィレットまたは面取りするエンティティ
+Entities to measure between	以下の間隔を測定するエンティティ
+Entities to mirror	ミラーリングするエンティティ
+Entities to pattern	パターン化するエンティティ
+Entities to split with	分割エンティティ
+Entities to transform or copy	トランスフォームまたはコピーするエンティティ
+Entity	エンティティ
+Entity or mate connector	エンティティまたは合致コネクタ
+Entity to split with	分割するエンティティ
+Entity type	エンティティの種類
+Equal	等しい
+Equal distance	等距離
+Equal spacing	等間隔
+Equal trim	同等トリム
+Euclidean	ユークリッド
+Evaluate on use	使用時に評価
+Explode lines	線を分解
+Explode step	分解手順
+Explode step type	分解手順タイプ
+Extend	延長
+Extend bend relief	曲げリリーフを延長
+Extend entities	エンティティの延長
+Extend profiles to part	輪郭をパーツに延長
+Extend to full path	フルパスに延長
+Extended corner	拡張コーナー
+Extension shape	補助図形
+External thread	外部ねじ
+Extrude	押し出し
+Extrude direction	押し出し方向
+FH4™/FHP™ flush-head studs for stainless steel sheets	ステンレス鋼板用 FH4™/ FHP™ フラッシュヘッドスタッド
+FHL™/FHLS™ flush, low-displacement head studs	FHL™/ FHLS™ フラッシュ、低排気量ヘッドスタッド
+FHX™ flush-head studs with X-Press™ thread	X-Press™ スレッドを備えた FHX™ フラッシュヘッドスタッド
+FH™/FHS™/FHA™ flush-head pins	FH™/ FHS™/ FHA™ フラッシュヘッドピン
+FH™/FHS™/FHA™ flush-head studs	FH™/ FHS™/ FHA™ フラッシュヘッドスタッド
+FLAT	FLAT
+FS sizes	FS sizes
+Face	面
+Face blend	面のブレンド
+Face limits	面の制限
+Face match scope	面マッチ範囲
+Face mirror	面ミラー
+Face pattern	面パターン
+Face to trim to	トリミングする面
+Face, edge or vertex	面、エッジ、または頂点
+Face, plane, mate connector, or planar face to use as trim tool	トリミングツールとして使用する面、平面、合致コネクタ、または平面上の面
+Faces	面
+Faces and sketch regions	面とスケッチ領域
+Faces and sketch regions to extrude	押し出す面とスケッチ領域
+Faces and sketch regions to revolve	回転する面とスケッチ領域
+Faces and sketch regions to sweep	スイープする面とスケッチ領域
+Faces and surfaces to thicken	厚みつけする面とサーフェス
+Faces or sketch regions to thicken	厚みつけの面またはスケッチ領域
+Faces to be normal to	法線にする面
+Faces to connect	接続する面
+Faces to draft	抜き勾配の面
+Faces to exclude	除外する面
+Faces to find match in	一致を検索する面
+Faces to load	荷重をかける面
+Faces to lock	ロックする面
+Faces to measure	測定する面
+Faces to mirror	ミラーリングする面
+Faces to move	動く面
+Faces to offset	オフセットする面
+Faces to pattern	面のためのパターン
+Faces to remove	削除する面
+Faces to replace	置き換える面
+Faces to replace with	置き換える面
+Faces to round	丸める面
+Faces to split	分割する面
+Faces to trim to	トリミングする面
+Faces, edges, and vertices that define sweep paths	スイープパスを定義する面、エッジ、および頂点
+Faces, surfaces, and sketch regions to offset	オフセットする面、サーフェス、およびスケッチ領域
+Fastened	固定
+Fastener	ファスナー
+Fastener fit	ファスナーフィット
+Fastener type	ファスナータイプ
+Feature Name Template	Feature Name Template
+Feature mirror	フィーチャーミラー
+Feature pattern	フィーチャーパターン
+Feature version	Feature version
+Features to find match in	で一致を探すフィーチャー
+Features to mirror	ミラーリングするフィーチャー
+Features to pattern	フィーチャーのためのパターン
+Fill	フィル
+Fillet	フィレット
+Fillet compare type	フィレット比較タイプ
+Fillet faces to modify	修正するフィレット面
+Fillet radius	フィレット半径
+Fillet type	フィレットタイプ
+Fillets	フィレット
+Filter by body type	ボディタイプで絞り込む
+Filter construction entities	作図エンティティをフィルター
+Finish flex PCB model	フレキシブル PCB モデルを仕上げる
+Finish sheet metal model	シートメタルモデル仕上げ
+First direction	最初の方向
+First set of surfaces	最初のサーフェスセット
+First side face	最初の側面
+First sketch	最初のスケッチ
+Fit	フィット
+Fit (tolerance only)	はめあい (公差のみ)
+Fit type	はめあいタイプ
+Fit with tolerance	はめあい公差
+Flange	フランジ
+Flange alignment	フランジの位置合わせ
+Flange to merge	マージするフランジ
+Flat	フラット
+Flatten assembly	Flatten assembly
+Flattened	フラット化
+Flex PCB model	フレキシブル PCB モデル
+Flip	反転
+Flip alignment	方向を逆にする
+Flip asymmetric	非対称に反転
+Flip base sides	基底面を反転
+Flip cap	キャップを反転
+Flip coordinate system	座標系を反転
+Flip corner	コーナーを反転
+Flip direction	方向を反転
+Flip direction up	上方向に反転
+Flip first plane	最初の平面を反転
+Flip normal	法線を反転
+Flip offset	反転オフセット
+Flip primary axis	主軸を反転させる
+Flip pull direction	引く方向を反転
+Flip rounding	丸めを反転
+Flip second plane	2 番目の平面を反転
+Flip side 1	側面 1 を反転
+Flip side 2	側面 2 を反転
+Flip sides	側面を反転
+Flip wall	壁を反転
+Follow seed position	Follow seed position
+Foot	Foot
+Force	強制
+Foreign Id	Foreign Id
+Form	フォーム
+Form Part Studio	Part Studio を成形
+Form origin mate connector	フォームの原点の合致コネクタ
+Frame	フレーム
+Frame groups	フレームグループ
+Frame segments are trimmed against preceding groups and are used as tools for later groups	フレーム断片は先行するグループに対してトリミングされ、後続のグループのツールとして使用されます
+Frame segments in earlier groups are used as tools for later groups	前のグループのセグメントが後のグループのツールとして使用されます
+Frame trim	フレームのトリミング
+Frames	フレーム
+Free	無料
+From import	インポートから
+From mate connector	合致コネクタから
+Full revolve	完全回転
+Full round	完全円
+Gap	ギャップ
+Gap fill	ギャップフィル
+Gear	ギア
+General	全般
+Geodesic	測地線
+Greater or equal	以上
+Group	グループ
+Group 1	グループ 1
+Group 2	グループ 2
+Guides	ガイド
+Guides and continuity	ガイドと継続性
+Gusset	ガセット
+Gusset position	ガセットの位置
+Gusset type	ガセットタイプ
+HF109™ heavy-duty, high tensile strength studs	HF109™ ヘビーデューティー、高引張強度スタッド
+HFE™/THFE™ heavy-duty studs for thin sheets	薄いシート用の HFE™/ THFE™ ヘビーデューティースタッド
+HFG8™ heavy-duty, high tensile strength studs	HFG8 ™ ヘビーデューティー、高引張強度スタッド
+HFH™/HFHS™/HFHB™ heavy-duty studs	HFH™/ HFHS™/ HFHB™ ヘビーデューティースタッド
+HFLH™ hard panel studs	HFLH™ ハードパネルスタッド
+Handedness	利き手
+Has clearance	Has clearance
+Has end direction	Has end direction
+Has offset	オフセットあり
+Has second direction	二次方向あり
+Has start direction	Has start direction
+Has style	Has style
+Has third direction	三次方向あり
+Header	ヘッダー
+Heal	修復
+Height	高さ
+Helix	ヘリカル
+Helix axis	ヘリカル軸
+Helix axis type	ヘリカル軸タイプ
+Help point	ヘルプポイント
+Hem	ヘム
+Hem alignment	ヘムアライメント
+Hem type	ヘムタイプ
+Hidden references	Hidden references
+Hold adjacent edges	隣のエッジを保持
+Hold line	保持線
+Hold opposite side	反対側を保持
+Hold other line	他の線を保持
+Hole	穴
+Hole ID	Hole ID
+Hole class	穴クラス
+Hole start plane or mate connector	穴開始平面または合致コネクタ
+Hole table	穴テーブル
+Hole type	穴タイプ
+Hole version	Hole version
+Holes	穴
+Hollow	空洞
+Horizontal reference	水平参照
+H™ nuts/HNL™ prevailing torque locknuts	H™ nuts/HNL™ 一般的なトルクロックナット
+ISO	ISO
+If none selected, this feature will create one at Origin	何も選択しない場合は、このフィーチャーにより原点で 1 つ作成されます
+Ignore composite parts	複合部品を無視
+Image	画像
+Image origin index	Image origin index
+Import	インポート
+Import appearances	外観をインポート
+Import material density	マテリアルの密度をインポート
+In place	インプレース
+Inch	Inch
+Include bends	曲げを含める
+Include composite parts filter	Include composite parts filter
+Include mate connectors	合致コネクタを含める
+Include parts filter	Include parts filter
+Include properties	プロパティを含める
+Include sketches filter	Include sketches filter
+Include surfaces filter	Include surfaces filter
+Index	インデックス
+Index (0-based)	インデックス (0 から始まる)
+Individual edges to match	一致する個々のエッジ
+Individual faces to match	一致させる個々の面
+Inertial relief	Inertial relief
+Initial Entities	Initial Entities
+Inner	内側
+Inner radius	内半径
+Input type	入力タイプ
+Inputs	入力
+Inset	埋め込み
+Inside	内側
+Instance	インスタンス
+Instance count	インスタンス数
+Instances	インスタンス
+Instances or faces to constrain	拘束するインスタンスまたは面
+Instances to measure	測定するインスタンス
+Instances to mirror	ミラーリングするインスタンス
+Instances to replace	置き換えるインスタンス
+Instances to skip	スキップするインスタンス
+Interference	干渉
+Interior faces	内側の面
+Internal	内部
+Interpolated spline	補間スプライン
+Intersect	交差
+Intersection curve	交差曲線
+Inverse conic edges	円錐エッジの反転
+Inverse tangent edges	逆接線エッジ
+Is first	Is first
+IsInContext	IsInContext
+Isocline	等密度線
+Isoparametric curve	アイソパラメトリック曲線
+Jog	折り曲げ
+Jog offset	折り曲げオフセット
+Jog offset anchor	折り曲げオフセットアンカー
+Joint	ジョイント
+Joint style	ジョイントスタイル
+Joint type	ジョイントタイプ
+K Factor	K ファクター
+Keep both sides	両側面を保持
+Keep end derivative	派生の終点を保持
+Keep input parts	入力パーツを保持
+Keep material	マテリアルを保持
+Keep opposite side	反対側を保持
+Keep points	点を保持
+Keep profile orientation	輪郭の向きを維持
+Keep start derivative	派生の始点を保持
+Keep tool surfaces and curves	ツールのサーフェスと曲線を保持
+Keep tools	ツールを保持
+LOOP_CENTER	LOOP_CENTER
+LRA or Length, Rotation, and Angle table shows coordinates for CNC tube bending machines.	LRA (長さ、回転、角度) テーブルには、CNC パイプ曲げ加工機の座標が示されています。
+LRA table	LRA タブ
+Label column index	列インデックスにラベルを付ける
+Label row index	行インデックスにラベルを付ける
+Leave open	開いたままにする
+Legacy	Legacy
+Length	長さ
+Length Tolerance	長さ許容差
+Length control	長さ制御
+Less or equal	以下
+Limit	制限
+Limit X maximum distance	限界 X 最大距離
+Limit X minimum distance	限界 X 最小距離
+Limit Y maximum distance	限界 Y 最大距離
+Limit Y minimum distance	限界 Y 最小距離
+Limit Z maximum distance	限界 Z 最大距離
+Limit Z minimum distance	限界 Z 最小距離
+Limit axial X maximum angle	軸限界 X 最大角
+Limit axial X minimum angle	軸限界 X 最小角
+Limit axial Y maximum angle	軸限界 Y 最大角
+Limit axial Y minimum angle	軸限界 Y 最小角
+Limit axial Z maximum angle	軸限界 Z 最大角
+Limit axial Z minimum angle	軸限界 Z 最小角
+Limit cone maximum angle	Limit cone maximum angle
+Limit frame ends	フレーム末端を制限
+Limits	制限
+Line angle	線角度
+Line or points	線または点
+Linear	直線
+Linear pattern	直線パターン
+Linear static	Linear static
+Load	Load
+Load direction	荷重方向
+Load region	荷重領域
+Load type	Load type
+Location	所在地
+Location signatures	Location signatures
+Location(s)	場所
+Locations	場所
+Lock ends	端点をロック
+Lock profile direction	輪郭方向をロック
+Lock profile faces	輪郭面をロック
+Locked	ロック済み
+Loft	ロフト
+Lofted corner	ロフトコーナー
+Long	長い
+Loop	Loop
+Loop/chain connected	ループ / チェーンを接続
+Loose	ルース
+Loose (ASME)	ルーズ (ASME)
+Lower	下部
+Lxx	Lxx
+Lxy	Lxy
+Lxz	Lxz
+Lyx	Lyx
+Lyy	Lyy
+Lyz	Lyz
+Lzx	Lzx
+Lzy	Lzy
+Lzz	Lzz
+MCAD	MCAD
+MID_AXIS_POINT	MID_AXIS_POINT
+MID_POINT	MID_POINT
+MODEL	MODEL
+Magnitude	マグニチュード
+Magnitude/bias	大きさ/偏り
+Maintain aspect ratio	縦横比を維持
+Maintain curvature	曲率を維持
+Make joint	ジョイントを作成
+Make periodic	Make periodic
+Manipulator X axis	マニピュレータ X 軸
+Manipulator Y axis	マニピュレータ Y 軸
+Manipulator Z axis	マニピュレータ Z 軸
+Map	マップ
+Mass	マス
+Match	一致
+Match connections	接続の一致
+Match curvature	曲率の一致
+Match curvature at end	終了点で曲率を一致させる
+Match curvature at start	開始点で曲率を一致させる
+Match edges on face	面のエッジを一致させる
+Match edges on plane	平面上のエッジを一致させる
+Match face options	面を一致させるオプション
+Match faces at parting	パーティングで面を一致させる
+Match faces in features	フィーチャーの面を一致させる
+Match faces in parts	パーツの面を一致させる
+Match flow (G3)	フローの一致 (G3)
+Match individual edges	個々のエッジを一致させる
+Match individual faces	個々の面を一致させる
+Match position	位置を合わせる
+Match profile	輪郭の一致
+Match tangent	接線の一致
+Match type	一致タイプ
+Matching	一致
+Mate	合致
+Mate DOF to animate	アニメートする合致 DOF
+Mate connector	合致コネクタ
+Mate connector for reference frame	参照フレーム用の合致コネクタ
+Mate connector index	Mate connector index
+Mate connectors	合致拘束
+Mate to be matched	一致する合致
+Mate type	合致タイプ
+Mate(s)	合致
+Material	マテリアル
+Mates to drive positions	駆動位置への合致
+Max	最大
+Max deviation	最大偏差
+Max index (0-based)	最大インデックス (0 から始まる)
+Maximum	最大
+Maximum angle	最大角度
+Maximum control points	最大制御点
+Maximum deviation	最大偏差
+Maximum number of assemblies created	Maximum number of assemblies created
+Measure instances	Measure instances
+Measure to axis of cylinders, circles, arcs, or revolved surfaces	円柱、円、円弧、または回転サーフェスの軸を測定
+Measure to infinitely extended lines, arcs, cylinders, etc.	無限に延長された直線、円弧、円柱などを測定します。
+Measured	測定済み
+Measurement	測定値
+Merge	マージ
+Merge ribs	マージリブ
+Merge scope	マージ範囲
+Merge tangent segments	接線セグメントをマージ
+Merge with all	すべてとマージ
+Mesh	メッシュ
+Mesh bodies or faces	メッシュボディまたは面
+Mesh point	メッシュの点
+Meter	Meter
+Method	メソッド
+Metric	メトリック
+Mid plane	中間平面
+Middle	中央
+Millimeter	Millimeter
+Min	最小
+Min index (0-based)	最小インデックス (0 から始まる)
+Minimal gap	最小ギャップ
+Minimum	最小
+Minimum/Maximum	最小値/最大値
+Mirror	ミラー
+Mirror across Y axis	Y 軸全体をミラーリング
+Mirror placement type	Mirror placement type
+Mirror plane	ミラー平面
+Mirror reference	ミラー参照
+Mirror strategy	ミラー方法
+Mirror type	ミラー タイプ
+Miter	マイター
+Miter angle	マイター角度
+Mix	混合
+Modal	Modal
+Mode	モード
+Modification type	変更タイプ
+Modify fillet	フィレットを変更
+Modify joint	ジョイントを変更
+Moment	モーメント
+Mounting	マウンティング
+Move	Move
+Move boundary	境界を移動
+Move curve boundary type	曲線境界の移動のタイプ
+Move end condition	移動終了条件
+Move face	面を移動
+Move face type	移動面タイプ
+Multi X offset	Multi X offset
+Multi Y offset	Multi Y offset
+Multi Z offset	Multi Z offset
+Multi rotation matrix	Multi rotation matrix
+Multiple	Multiple
+Mutual trim	相互トリム
+Name	名前
+Name #entityName	名前 #entityName
+Name entity	名前エンティティ
+Neutral plane	中立平面
+New	新規
+Next	次へ
+No corner	コーナーなし
+No maximum	最大値なし
+No minimum	最小値なし
+No tolerance	許容差なし
+No trim	トリミングなし
+Nominal	公称
+NonGeometricItem	NonGeometricItem
+None	なし
+Normal	法線
+Normal (ASME)	通常 (ASME)
+Normal direction	垂直方向
+Normal to face	面に垂直
+Normal to guide	ガイドに垂直
+Normal to profile	輪郭に垂直
+Normal to sketch plane	スケッチ平面に垂直
+Normal to target	ターゲットに垂直
+Normal x	Normal x
+Normal y	Normal y
+Normal z	Normal z
+Not supported	Not supported
+Number	数
+Number of modes	Number of modes
+Number of points to add	追加する点の数
+Number of samples	サンプル数
+ORIGIN_X	ORIGIN_X
+ORIGIN_Y	ORIGIN_Y
+ORIGIN_Z	ORIGIN_Z
+Obround - Scaled	角丸長方形 - スケール
+Obround - Sized	角丸長方形 - サイズ
+Offset	オフセット
+Offset X distance	オフセット X 距離
+Offset Y distance	オフセット Y 距離
+Offset Z distance	オフセット Z 距離
+Offset all	すべてをオフセット
+Offset and extend	オフセットと延長
+Offset angle	角度をオフセット
+Offset curve	曲線をオフセット
+Offset distance	オフセット距離
+Offset from tip	先端からオフセット
+Offset opposite direction	反対方向にオフセット
+Offset surface	サーフェスをオフセット
+Offset type	オフセットタイプ
+Offset, extend, and split	オフセット、延長、および分割
+On entity	エンティティ上
+One sided	片面
+Only edges	エッジのみ
+Only faces	面のみ
+Only vertices	頂点のみ
+Operation type	操作タイプ
+Opposite alignment	反対の位置合わせ
+Opposite angle	反対の角度
+Opposite direction	反対方向
+Opposite direction angle	反対方向の角度
+Opposite offset direction	反対方向のオフセット
+Opposite origin	反対の原点
+Opposite side	反対側
+Optimize	最適化
+Ordered groups	順序付けたグループ
+Orientation	向き
+Origin	原点
+Origin XY	原点 XY
+Origin YZ	原点 YZ
+Origin ZX	原点 ZX
+Origin entity	原点エンティティ
+Origin type	原点タイプ
+Original unit	Original unit
+Orthogonal path	直交パス
+Orthogonal path coordinate system	直交パスの座標系
+Other	その他
+Outer	外側
+Outside	外側
+Overall parameters	全体パラメータ
+Override	オーバーライド
+Override bend radius	曲げ半径をオーバーライド
+Overrides	オーバーライド
+Overwrite points	点を上書き
+Owned by	所有者
+Owner	所有者
+Owner entity	所有者エンティティ
+PART_ORIGIN	PART_ORIGIN
+PCB entity type	PCB のエンティティタイプ
+PCB holes	PCB の穴
+PCB part to finish	仕上げる PCB パーツ
+POINT	POINT
+Parallel	平行
+Parallel to	次と平行
+Parallel to sketch plane	スケッチ平面に平行
+Parameter	パラメータ
+ParametricPartStudio	ParametricPartStudio
+Part	パーツ
+Part Studio	Part Studio
+Part mirror	パーツミラー
+Part or Face mode	Part or Face mode
+Part pattern	パーツパターン
+Part to add	追加するパーツ
+Part to remove	削除するパーツ
+Partial fillet	部分フィレット
+Partial flange	部分フランジ
+Parting edges	分割エッジ
+Parting entity	パーティングエンティティ
+Parting line	パーティングライン
+Parting line propagation	パーティングラインの伝播
+Parts	パーツ
+Parts and surfaces to convert	変換するパーツとサーフェス
+Parts or bends	パーツまたは曲げ
+Parts to draft	抜き勾配のパーツ
+Parts to find match in	一致を検索するパーツ
+Parts to hollow	空洞のパーツ
+Parts to import	Parts to import
+Parts to measure	測定するパーツ
+Parts to trim	トリミングするパーツ
+Parts to trim to	パーツをトリミング
+Parts to trim using trim tool	トリミングツールを使用してトリミングするパス
+Parts to use as trim tools	トリミングツールとして使用するパーツ
+Parts, surfaces, or curves to split	分割するパーツ、サーフェス、または曲線
+Path	パス
+Path to pattern along	パターン化するパス
+Pattern	パターン
+Pattern type	パターン タイプ
+Per chain	チェーン単位
+Per edge	エッジ単位
+Performance	パフォーマンス
+Perimeter	周長
+Pin	ピン
+Pin slot	ピンスロット
+Pitch	ピッチ
+Pitch length	ピッチの長さ
+Placement	配置
+Placement origin	配置原点
+Planar	平面
+Planarization parameters	平面化パラメータ
+Planarize	平面化
+Plane	平面
+Plane limit	面の制限
+Plane point	平面と点
+Plane type	平面タイプ
+Planes and planar faces to use as trim tools	トリミングツールとして使用する平面と平面上の面
+Planes to find match in	一致を検索する平面
+Plated	めっき
+Playback type	Playback type
+Pocket	ポケット
+Point	点
+Point #index	Point #index
+Point edit type	点の編集タイプ
+Point index	Point index
+Point normal	法線と点
+Point or mate connector	ポイントまたは合致コネクタ
+Point or mate connector used as reference for the curve. Defaults to origin.	曲線の基準点として使用される点または合致コネクタ。既定値は原点です。
+Point type	点タイプ
+Points	点
+Points on edges	エッジ上の点
+Points overrides	点のオーバーライド
+Poisson's ratio	Poisson's ratio
+Polyline	ポリライン
+Position	位置
+Precise	正確
+Precision	精度
+Preselection	Preselection
+Preserve active sheet metal models	アクティブなシートメタルモデルを保持
+Preserve material	マテリアルを保持
+Pressure	圧力
+Previous	前へ
+Primary axis entity	主軸エンティティ
+Process	処理
+Profile 1	プロファイル 1
+Profile 2	プロファイル 2
+Profile control	輪郭制御
+Profile type	輪郭タイプ
+Profiles	輪郭
+Projected curve	投影曲線
+Projection direction type	投影方向タイプ
+Propagation	伝播
+Propagation type	伝播タイプ
+Protrusion	突起
+Pull direction	引く方向
+Purpose	目的
+Quantity	Quantity
+Query variable	クエリ変数
+Rack and pinion	ラックアンドピニオン
+Radius	半径
+Range	範囲
+Ratio	比率
+Realign	再配置
+Reapply features	フィーチャーを再適用
+Reapply fillet	フィレットを再適用
+Reciprocate	Reciprocate
+Recognize	認識
+Rectangle	長方形
+Rectangle - Scaled	長方形 - スケーリング
+Reference	参照
+Reference edge	参照エッジ
+Reference faces	参照面
+Reference plane	参照平面
+References	参照
+Refold	再び折りたたむ
+Regular expression	正規表現
+Relation	リレーション
+Relation ratio	リレーション比
+Relation type	リレーションタイプ
+Relative	相対
+Relief	リリーフ
+Remove	削除
+Remove fillet	フィレットを削除
+Reorient secondary axis	二次軸の向きを変更
+Replace all instances	すべてのインスタンスを置換
+Replace face	面を置換
+Replace part	Replace part
+Replacement component	交換コンポーネント
+Replacement part	交換パーツ
+Replicate	複製
+Reset triad	トライアドをリセット
+Result body operation type	結果ボディ操作タイプ
+Result type	結果タイプ
+Reverse direction	逆方向
+Reverse playback	Reverse playback
+Revolute	回転
+Revolutions	回転
+Revolve	回転
+Revolve angle	回転角
+Revolve axis	回転軸
+Rho	Rho
+Rib	リブ
+Rib extrusion direction	リブ押し出し深さ方向
+Rigid body	Rigid body
+Rip	リッピング
+Rolled	ロール
+Rolled K Factor	ロール K ファクター
+Rolling ball	回転球
+Rotate	回転させる
+Rotate about X	X を中心に回転
+Rotate about Y	Y を中心に回転
+Rotate about Z	Z を中心に回転
+Rotation	回転させる
+Rotation about Y'	Y' を中心に回転
+Rotation about Z	Z を中心に回転
+Rotation about Z'	Z' を中心に回転
+Rotation angle	回転角度
+Rotation axis	回転軸
+Rotation matrix	Rotation matrix
+Round	円形
+Round - Scaled	円形 - スケール
+Round - Sized	円形 - サイズ
+Routing curve	ルーティング曲線
+Routing curve (#curveLength)	ルーティング曲線 (#curveLength)
+Routing curve table	ルーティング曲線テーブル
+Row	行
+Row access type	行アクセスタイプ
+Row index (0-based)	行インデックス (0 から始まる)
+Row max index (0-based)	行の最大インデックス (0 から始まる)
+Row min index (0-based)	行の最小インデックス (0 から始まる)
+Row regular expression	行の正規表現
+Row result type	行の結果タイプ
+Row value	行の値
+Ruled surface	ルールドサーフェス
+Ruled surface type	ルールドサーフェスの種類
+S-RT™ free-running locknuts	S-RT™ 自走式かしめナット
+SGPC™ swaging collar studs	SGPC™ スエージングカラースタッド
+SH™ hard panel nuts	SH™ ハードパネルナット
+SL™ TRI-DENT® prevailing torque locknuts	SL™TRI-DENT® 一般的なトルクロックナット
+SMPS™/SMPP™ nuts	SMPS™ / SMPP™ ナット
+SOSG™/SOAG™ threaded standoffs	SOSG™/ SOAG™ スレッドスタンドオフ
+SO™/SOS™/SOA™/SO4™ through threaded standoffs	スレッドスタンドオフによる SO™/ SOS™/ SOA™/ SO4™
+SO™/SOS™/SOA™/SO4™ through unthreaded standoffs	スレッド化されていないスタンドオフを介した SO™/ SOS™/ SOA™/ SO4™
+Same frames as previous	前と同じフレーム
+Sample size	サンプリング
+Sampled	サンプリング済み
+Scale	スケール
+Scale factor	縮尺計数
+Scale uniformly	均一にスケーリング
+Scope	範囲
+Screw	ねじ
+Second bound	2 番目の境界
+Second bound type	2 番目の境界の種類
+Second centered	二次中心
+Second depth	二次深さ
+Second direction	二次方向
+Second direction has offset	二次方向にオフセットあり
+Second distance	二次距離
+Second draft	二次抜き勾配
+Second draft angle	二次勾配角度
+Second draft opposite direction	反対方向の二次抜き勾配
+Second end position	二次終点
+Second end type	二次末端の種類
+Second equal spacing	二次等間隔
+Second instance count	二次インスタンス数
+Second match	2 つ目の一致
+Second offset distance	二次オフセット距離
+Second offset opposite direction	反対方向の二次オフセット
+Second opposite direction	二次反対方向
+Second plane limit	平面の 2 番目の制限
+Second radius	2 つ目の半径
+Second set of surfaces	2 番目のサーフェスセット
+Second side face	2 番目の側面
+Second sketch	2 つ目のスケッチ
+Second trim to face boundaries	面の境界まで 2 つ目のトリム
+Second up to face	二次面へ
+Second up to surface or part	二次サーフェスまたはパーツへ
+Second up to vertex or mate connector	二次頂点または合致コネクタへ
+Secondary axis entity	二次軸エンティティ
+Section count	セクション数
+Seed geometry type	シードジオメトリのギャップ
+Seed instance key	Seed instance key
+Segment edit type	セグメント編集タイプ
+Segment index	Segment index
+Segments	セグメント
+Select	選択
+Select (edge)	選択 (エッジ)
+Select (vertex)	選択 (頂点)
+Select all frames	すべてのフレームを選択
+Select an entity or mate connector	エンティティまたは合致コネクタを選択
+Select distance to measure the linear distance between two entities./nSelect length to measure the total length of the selected entities.	距離を選択して、2 つのエンティティ間の直線距離を測定します。/n長さを選択して、選択したエンティティの長さの合計を測定します。
+Select face	面を選択
+Select or create mate connectors in this Part Studio to position derived instances	この Part Studio で合致コネクタを選択または作成して派生インスタンスを配置する
+Select owner entity	所有者エンティティを選択
+Select point	点を選択
+Selected Point	Selected Point
+Selected point #indexValue	Selected point #indexValue
+Selected points	選択した点
+Selection	選択
+Selection type	選択の種類
+Selections	選択
+Self-clinching nuts	セルフクリンチングナット
+Self-clinching standoffs	セルフクリンチングスタンドオフ
+Self-clinching studs & pins	セルフクリンチングスタッド＆ピン
+Shaft class	シャフトクラス
+Shared	共有済み
+Sheet metal face to bend	曲げるシートメタル面
+Sheet metal loft	シートメタルロフト
+Sheet metal model	シートメタルモデル
+Sheet metal part	シートメタルパーツ
+Sheet metal parts	シートメタルパーツ
+Shell	シェル
+Shell thickness	シェルの厚さ
+Short	短い
+Show Flip	Show Flip
+Show calculation variance	計算上の分散を表示
+Show coordinate system of the reference used by the current vertex.	現在の頂点で使用されている基準座標系を表示します。
+Show default points	既定点を表示
+Show details	詳細を表示
+Show deviation	偏差を表示
+Show isocurves	ISO 曲線を表示
+Show reference coordinate system	基準座標系を表示
+Show ruled lines	罫線を表示
+Show selection	選択を表示
+Show start and end profiles	開始輪郭と終了輪郭を表示
+Side	側面
+Side 1	側面 1
+Side 2	側面 2
+Side length	辺の長さ
+Sides	側面
+Simple	シンプル
+Simulation	シミュレーション
+Simulation connection	シミュレーション接続
+Single	シングル
+Single value	単一値
+Size	サイズ
+Sketch	スケッチ
+Sketch curves to extrude	押し出しをするスケッチ線
+Sketch for flat view	展開図用のスケッチ
+Sketch plane	スケッチ平面
+Sketch points	スケッチ点
+Sketch points to place holes	穴を配置するためのスケッチポイント
+Sketch profile	スケッチ輪郭
+Sketch profiles	スケッチ輪郭
+Skip instances	インスタンスをスキップ
+Slider	スライダ
+Smooth	スムーズ
+Smooth fillet corners	スムーズなフィレットコーナー
+Smooth transition	スムーズな変換
+Smoothness	滑らかさ
+Solid	ソリッド
+Solution index	Solution index
+Source is 'Y Axis Up'	ソースは「YAxisUp」
+Spacing type	間隔タイプ
+Spans	スパン
+Specify anchor points	アンカーポイントを指定
+Specify axis	軸を指定
+Specify direction	方向を指定
+Specify normal	Specify normal
+Sphere	球体
+Spine	スパイン
+Split	分割
+Split face	面を分割
+Split faces	面を分割
+Split type	分割タイプ
+Spun corner	スパンコーナー
+Square - Sized	正方形 - サイズ
+Standard	標準
+Start	開始
+Start angle	開始角
+Start condition	開始条件
+Start curvature offset	開始曲率オフセット
+Start direction	開始方向
+Start direction has offset	開始方向にオフセットがあります
+Start direction offset angle	開始方向のオフセット角度
+Start edge position	開始エッジの位置
+Start flow offset	開始フローオフセット
+Start from part	パーツから開始
+Start from selected plane	選択した平面から開始
+Start from sketch plane	スケッチ平面から開始
+Start magnitude	開始マグニチュード
+Start offset	開始オフセット
+Start offset opposite direction	反対方向のオフセットの開始
+Start opposite direction	反対方向の開始
+Start plane	開始平面
+Start point	始点
+Start position	開始位置
+Start profile adjacent faces	開始輪郭の隣接面
+Start profile condition	開始輪郭条件
+Start radius	開始半径
+Start trim	始点トリム
+Start type	開始タイプ
+Start up to face	[面まで] を開始
+Start up to surface or part	[サーフェスまで] または [パーツまで] を開始
+Start up to vertex or mate connector	[頂点まで] または [合致コネクタまで] を開始
+Start value	開始値
+Starting height	Starting height
+Starting offset	オフセットの開始
+Starting offset bound	オフセット境界の開始
+Starting offset depth	オフセット深度の開始
+Starting offset entity	オフセットエンティティの開始
+Starting offset opposite direction	反対方向のオフセットの開始
+Starting width	Starting width
+Step	ステップ
+Steps	ステップ
+Straight	直線
+Straight pipe tap	直線パイプタップ
+Straight tap	直線タップ
+Style	スタイル
+Subtract	差
+Subtraction offset	減算オフセット
+Subtraction scope	差の範囲
+Surface	サーフェス
+Surface area	サーフェス面積
+Surface or boundary edges	サーフェスまたは境界エッジ
+Sweep	スイープ
+Sweep path	スイープパス
+Swept profile	輪郭をスイープ
+Switch face	スイッチ面
+Switch side	側面の切り替え
+Symmetric	対称
+Symmetrical	対称
+S™/SS™/CLS™/CLSS™/SP™ nuts	S™/ SS™/ CLS™/ CLSS™/ SP™ ナット
+TFH™/TFHS™ non-flush studs	TFH™/ TFHS™ 非フラッシュスタッド
+TOP_AXIS_POINT	TOP_AXIS_POINT
+TPS™/TP4™ flush-head pilot pins	TPS™/ TP4™ フラッシュヘッドパイロットピン
+TPXS™ self-clinching pilot pins	TPXS™ セルフクリンチングパイロットピン
+TSO™/TSOS™/TSOA™/TSO4™ blind standoffs for thin sheet	薄いシート用の TSO™/ TSOS™/ TSOA™/ TSO4™ ブラインドスタンドオフ
+Tab	タブ
+Tab mate connector(s)	タブの合致コネクタ
+Tab profile	タブプロファイル
+Table	テーブル
+Tag	タグ
+Tag purpose	タグの目的
+Tangency	接線
+Tangent	接線
+Tangent connected	接線を接続
+Tangent direction	接線方向
+Tangent edges	接線エッジ
+Tangent hold lines	接線保持線
+Tangent propagation	接線伝播
+Tangent to curve	曲線に正接
+Tangent to face	面に正接
+Tangent to guide	ガイドに正接
+Tangent to profile	輪郭に正接
+Tap clearance (number of thread pitch lengths)	タップクリアランス (ネジピッチの長さ数)
+Tap drill diameter	タップドリル径
+Tap drill diameter deviation	ねじ下錐直径の偏差
+Tap drill diameter lower deviation	ねじ下錐直径偏差の下限
+Tap drill diameter lower limit	ねじ下錐直径の下限
+Tap drill diameter precision	ねじ下錐直径精度
+Tap drill diameter tolerance controls	ねじ下錐直径許容差の制御
+Tap drill diameter tolerance type	ねじ下錐直径許容差のタイプ
+Tap drill diameter upper deviation	ねじ下錐直径偏差の上限
+Tap drill diameter upper limit	ねじ下錐直径の上限
+Tap major diameter	Tap major diameter
+Tap through all	すべてをタップ貫通
+Tap type	タップの種類
+Tapered pipe tap	テーパーパイプタップ
+Tapped	タップ
+Tapped angle	Tapped angle
+Tapped depth	タップ深さ
+Tapped depth deviation	タップ深さの偏差
+Tapped depth lower deviation	タップ深さ偏差の下限
+Tapped depth lower limit	タップ深さの下限
+Tapped depth precision	タップ深さの精度
+Tapped depth tolerance controls	タップ深さ許容差の制御
+Tapped depth tolerance type	タップ深さ許容差のタイプ
+Tapped depth upper deviation	タップ深さ偏差の上限
+Tapped depth upper limit	タップ深さの上限
+Tapped details	Tapped details
+Target	ターゲット
+Target anchor point	ターゲットアンカーポイント
+Target degree	ターゲット角度
+Target face(s)	ターゲット面
+Target length	ターゲット長さ
+Target pitch	ターゲットのピッチ
+Target revolutions	ターゲットの回転
+Targets	ターゲット
+Tear	ティア
+Tear drop	ティアドロップ
+Tensile yield strength	Tensile yield strength
+Termination	終端
+Thermal via	熱源
+Thicken	厚みつけ
+Thickness	厚さ
+Thickness 1	厚さ 1
+Thickness 2	厚さ 2
+Thickness factor	厚さ係数
+Thickness opposite direction	反対方向の厚さ
+Thin	薄い
+Third centered	三次中心
+Third direction	三次方向
+Third distance	3 番目の距離
+Third equal spacing	三次等間隔
+Third instance count	三次インスタンス数
+Thread class	ねじのクラス
+Thread length	ねじ部の長さ
+Thread standard	Thread standard
+Thread type	ねじの種類
+Threads/inch	1 インチあたりのねじ数
+Three point	3 点
+Through all	すべてを貫通
+Tip angle	先端角度
+Tip angle deviation	先端角度の偏差
+Tip angle lower deviation	先端角度偏差の下限
+Tip angle lower limit	先端角度の下限
+Tip angle precision	先端角度の精度
+Tip angle style	先端角度スタイル
+Tip angle tolerance controls	先端角度許容差の制御
+Tip angle tolerance type	先端角度許容差のタイプ
+Tip angle upper deviation	先端角度偏差の上限
+Tip angle upper limit	先端角度の上限
+To mate connector	合致コネクタへ
+To owner	所有者へ
+To selection	選択範囲へ
+Tolerance	許容差
+Tolerance matching	Tolerance matching
+Tolerance type	許容差タイプ
+Tooling	ツーリング
+Tools	ツール
+Tools anchor point	アンカーポイントを指定
+Total length	全長
+Transform	トランスフォーム
+Transform by mate connectors	合致コネクタによるトランスフォーム
+Transform type	トランスフォームの種類
+Transition	トランジション
+Translate	平行移動
+Translate by XYZ	XYZ で平行移動
+Translate by distance	距離で平行移動
+Translate by line	線で平行移動
+Translation	変換
+Translation along X	X に沿って平行移動
+Translation along Y	Y に沿って平行移動
+Translation along Z	Z に沿って平行移動
+Treatment type	処理タイプ
+Triangle	三角記号
+Trim	トリミング
+Trim Type	トリミングの種類
+Trim control	トリム制御
+Trim curve	曲線をトリミング
+Trim ends	末端をトリミング
+Trim guides	トリミングガイド
+Trim profiles	輪郭をトリミング
+Trim to face boundaries	面の境界までトリム
+Trim to target	ターゲットにトリミング
+Trim type	トリミングタイプ
+Trimming	トリミング
+Turns	ターン
+Turns and pitch	ターンとピッチ
+Twist	ツイスト
+Twist opposite direction	反対方向にツイスト
+Twist type	ツイストタイプ
+Two distances	2 つの距離
+Two sided	両面
+Two sketches	2 つのスケッチ
+Type	タイプ
+U direction	U 方向
+U profiles	U 輪郭
+U shift	U シフト
+U shift opposite direction	U シフト反対方向
+UNSET	UNSET
+UVN (Control polygon)	UVN (制御ポリゴン)
+UVN (Tangent)	UVN (接線)
+Ultimate compressive strength	Ultimate compressive strength
+Ultimate tensile strength	Ultimate tensile strength
+Undercut	アンダーカット
+Undercut diameter	アンダーカットの直径
+Undercut length	アンダーカットの長さ
+Unfold	展開
+Unfold all	すべて展開
+Unfold none	展開しない
+Unfold selected	選択範囲を展開
+Unfold type	タイプを展開
+Unified	統一された
+Union	和
+Unit	単位
+Units	単位
+Unowned	所有者なし
+Up to entity	エンティティまで
+Up to entity or mate connector	エンティティまたは合致コネクタまで
+Up to entity with offset	オフセットのあるエンティティまで
+Up to face	面へ
+Up to next	次まで
+Up to part	パーツまで
+Up to part/surface	パーツ/サーフェスまで
+Up to surface or part	サーフェスまたはパーツまで
+Up to vertex	頂点まで
+Up to vertex or mate connector	頂点または合致コネクタまで
+Upper	上部
+Use axis	軸を使用
+Use cubic interpolation	立方体補間の使用
+Use default minimal gap	既定の最小ギャップを使用
+Use minimal gap	最小ギャップを使用
+Use model K Factor	モデル K 係数を使用
+Use model bend radius	モデルの曲げ半径を使用
+Use sketch plane direction	スケッチ平面の方向を使用
+User defined	ユーザー定義
+V direction	V 方向
+V profiles	V 輪郭
+V shift	V シフト
+V shift opposite direction	V シフト反対方向
+V3	V3
+VIRTUAL_SHARP	VIRTUAL_SHARP
+Value	値
+Value to record	記録する値
+Variable	変数
+Variable Studio reference	Variable Studio の参照
+Variable fillet	可変フィレット
+Variable type	変数タイプ
+VariableStudioVariable	VariableStudioVariable
+Vertex	頂点
+Vertex overrides	頂点のオーバーライド
+Vertex pairs to split with	分割する頂点ペア
+Vertices	頂点
+Vertices or curves	頂点または曲線
+Vertices or edges	頂点またはエッジ
+Via	経由
+Volume	ボリューム
+Wall face or bounding edge to hold	保持する壁面または境界エッジ
+Walls	壁
+Weight	重量
+Width	幅
+Width mate connectors	幅の合致コネクタ
+Workspace precision	ワークスペースの精度
+World	ワールド
+Wrap	ラップ
+X	X
+X Component	X Component
+X axis	X axis
+X offset	X オフセット
+X rotation	X 回転
+X scale	X スケール
+X translation	X 軸移動
+XY plane	XY 平面
+XYZ	XYZ
+XZ plane	XZ 平面
+Y	Y
+Y Component	Y Component
+Y axis	Y axis
+Y offset	Y オフセット
+Y rotation	Y 回転
+Y scale	Y スケール
+Y translation	Y 軸移動
+YZ plane	YZ 平面
+Yard	Yard
+Young's modulus	Young's modulus
+Z	Z
+Z Component	Z Component
+Z axis	Z axis
+Z offset	Z オフセット
+Z rotation	Z 回転
+Z scale	Z スケール
+Z translation	Z 軸移動
+[#continuity] #entities	[#continuity] #entities
+[#designator] #interiorFaces	[#designator] #interiorFaces
+[#pointOnEdgeRadius] #edge	[#pointOnEdgeRadius] #edge
+[#uCondition] #uProfileEntities	[#uCondition] #uProfileEntities
+[#vCondition] #vProfileEntities	[#vCondition] #vProfileEntities
+[#vertexRadius] #vertex	[#vertexRadius] #vertex
+additional query	additional query
+arrayItem	arrayItem
+baseOccurrence	baseOccurrence
+buildFunction	buildFunction
+cap	cap
+computeMass	computeMass
+connection	connection
+domain	domain
+edge	edge
+edge limit	edge limit
+entityInferenceType	entityInferenceType
+fixSingleCompositeEmptyName	fixSingleCompositeEmptyName
+group	group
+guide	guide
+hintFaces	hintFaces
+index	index
+instance	instance
+isForSubFeature	isForSubFeature
+newUI	newUI
+point	point
+point on edge	point on edge
+point override	point override
+profile	profile
+secondaryOriginQuery	secondaryOriginQuery
+side1HasFace	side1HasFace
+side1HasVertex	side1HasVertex
+side2HasFace	side2HasFace
+side2HasVertex	side2HasVertex
+source	source
+specifyMaterialData	specifyMaterialData
+specifyUnits	specifyUnits
+value	value
+vertex	vertex

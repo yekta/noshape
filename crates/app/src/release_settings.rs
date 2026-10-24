@@ -123,6 +123,9 @@ pub struct ReleaseSettings {
     /// Obsoletion › Automatically obsolete previous released revisions.
     #[serde(default)]
     pub auto_obsolete: bool,
+    /// Revisions and part numbers › Revision table template.
+    #[serde(default)]
+    pub revision_table: noshape_model::drawing::tables::RevisionTemplate,
 }
 
 fn yes() -> bool {
@@ -158,6 +161,7 @@ impl Default for ReleaseSettings {
             custom_display_names: false,
             display_names: default_display_names(),
             auto_obsolete: false,
+            revision_table: Default::default(),
         }
     }
 }
@@ -191,11 +195,15 @@ fn settings_path() -> std::path::PathBuf {
 }
 
 pub fn release_settings() -> ReleaseSettings {
-    std::fs::read(settings_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+    let s: ReleaseSettings = std::fs::read(settings_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    // Drawings' revision tables follow the company template.
+    noshape_model::drawing::tables::set_revision_template(Some(s.revision_table.clone()));
+    s
 }
 
 pub fn set_release_settings(s: &ReleaseSettings) {
     let _ = std::fs::write(settings_path(), serde_json::to_vec_pretty(s).unwrap_or_default());
+    noshape_model::drawing::tables::set_revision_template(Some(s.revision_table.clone()));
 }
 
 #[cfg(test)]

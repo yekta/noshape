@@ -401,7 +401,8 @@ pub fn jog() -> FeatureType {
     p.extend(bend_radius_override(always, "bendRadius"));
     p.extend(k_factor_override(always));
     p.extend([
-        ParamSpec::enum_("offsetType", "Bounding type", &[("BLIND", "Blind"), ("UP_TO_ENTITY", "Up to entity"), ("THICKNESS", "Thickness")]),
+        // sheetMetalJog.fs: both selects SHOW_LABEL (live qa5-sm-dialog-jog).
+        ParamSpec::enum_("offsetType", "Bounding type", &[("BLIND", "Blind"), ("UP_TO_ENTITY", "Up to entity"), ("THICKNESS", "Thickness")]).hints(Hints::SHOW_LABEL),
         ParamSpec::num("bendOffset", "Jog offset", ZERO_INCLUSIVE_OFFSET.bounded(0.0, 500.0)).visible(move |v| bt(v, "BLIND")),
         ParamSpec::query1("jogLimit", "Up to entity", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::POINT_LIKE | QueryFilter::EDGE)
             .visible(move |v| bt(v, "UP_TO_ENTITY")),
@@ -413,7 +414,7 @@ pub fn jog() -> FeatureType {
             .visible(move |v| bt(v, "UP_TO_ENTITY") && v.bool("jogLimitOffset")),
         ParamSpec::flip("jogLimitOppositeDirection", "Opposite direction").visible(move |v| bt(v, "UP_TO_ENTITY") && v.bool("jogLimitOffset")),
         ParamSpec::num("thicknessFactor", "Thickness factor", NumSpec::real(3.0, 1e-5, 1e5)).visible(move |v| bt(v, "THICKNESS")),
-        ParamSpec::enum_("bendOffsetAnchor", "Jog offset anchor", &[("INSIDE", "Inside"), ("NOMINAL", "Nominal"), ("OUTSIDE", "Outside")]),
+        ParamSpec::enum_("bendOffsetAnchor", "Jog offset anchor", &[("INSIDE", "Inside"), ("NOMINAL", "Nominal"), ("OUTSIDE", "Outside")]).hints(Hints::SHOW_LABEL),
         ParamSpec::bool("preserveMaterial", "Preserve material", true),
     ]);
     FeatureType::new("sheetMetalJog", "Jog", Category::SheetMetal, p).icon("jog").describe("Offset part of a wall with two opposite bends")
