@@ -38,8 +38,8 @@ pub struct ReleasePrefsView {
     /// Workflows: 0 Release workflow, 1 Obsoletion workflow.
     workflow_tab: usize,
     new_scheme: Option<NewScheme>,
-    /// The default release workflow's chart, rasterized at a scale.
-    chart: Option<(f32, Arc<RenderImage>)>,
+    /// The shown workflow tab's chart, rasterized at a scale: (scale, tab, image).
+    chart: Option<(f32, usize, Arc<RenderImage>)>,
     _subs: Vec<Subscription>,
 }
 
@@ -264,8 +264,9 @@ impl Render for ReleasePrefsView {
 
         // ---- Workflows
         let sf = window.scale_factor();
-        if self.chart.as_ref().is_none_or(|(s, _)| *s != sf) {
-            self.chart = crate::release_dialog::workflow::rasterize(&release_chart_svg(), CHART_W, CHART_H, sf).map(|i| (sf, i));
+        if self.chart.as_ref().is_none_or(|(s, tab, _)| *s != sf || *tab != self.workflow_tab) {
+            let svg = if self.workflow_tab == 0 { release_chart_svg() } else { obsoletion_chart_svg() };
+            self.chart = crate::release_dialog::workflow::rasterize(&svg, CHART_W, CHART_H, sf).map(|i| (sf, self.workflow_tab, i));
         }
         let tab = |i: usize, t: &'static str, cx: &mut Context<Self>| {
             let active = self.workflow_tab == i;
@@ -285,12 +286,13 @@ impl Render for ReleasePrefsView {
         let workflow = if self.workflow_tab == 0 {
             v_flex()
                 .child(div().pt(px(12.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Onshape default release workflow"))
-                .children(self.chart.as_ref().map(|(_, img)| img_el(img.clone()).mt(px(8.))))
+                .children(self.chart.as_ref().map(|(_, _, img)| img_el(img.clone()).mt(px(8.))))
                 .child(div().pt(px(8.)).text_size(px(13.)).text_color(pal.text).child("This is Onshape's default release workflow."))
                 .child(div().pt(px(14.)).max_w(px(700.)).text_size(px(13.)).text_color(pal.text).child("The creator of a Release candidate specifies a set of approvers and a set of observers who will be notified when the Release candidate is transitioned. Observers are optional, and approvers may be optional or required depending on company settings."))
         } else {
             v_flex()
                 .child(div().pt(px(12.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Onshape default obsoletion workflow"))
+                .children(self.chart.as_ref().map(|(_, _, img)| img_el(img.clone()).mt(px(8.))))
                 .child(div().pt(px(8.)).text_size(px(13.)).text_color(pal.text).child("This is Onshape's default obsoletion workflow."))
         };
         let workflows = section("Workflows", Some(crate::assets::icon("help-gray", 20., cx)))
@@ -504,38 +506,58 @@ fn img_el(image: Arc<RenderImage>) -> Img {
     img(ImageSource::Render(image)).w(px(CHART_W)).h(px(CHART_H)).flex_none()
 }
 
-/// The default release workflow chart (help image relmgmt-workflows-13, 1:1).
+/// The workflow charts' size (the release chart: help image relmgmt-workflows-13, 1:1).
 const CHART_W: f32 = 720.;
 const CHART_H: f32 = 285.;
 
-/// Drawn here: the states as cards (a black frame, the state's colour panel
-/// and its marker), the approval diamond, arrows and labels.
-fn release_chart_svg() -> String {
+/// Chart drawing (both workflow charts): polylines, arrowheads, labels,
+/// state cards and the approval diamond, in the help images' style.
+mod chart {
     use std::fmt::Write as _;
-    let mut s = String::new();
-    let _ = write!(s, r##"<svg xmlns="http://www.w3.org/2000/svg" width="{CHART_W}" height="{CHART_H}" viewBox="0 0 {CHART_W} {CHART_H}" font-family="Roboto" font-size="13" fill="#1f1f1f"><rect width="100%" height="100%" fill="#ffffff"/>"##);
-    // Lines and arrowheads.
-    let line = |s: &mut String, pts: &[(f32, f32)]| {
+
+    pub fn open(w: f32, h: f32) -> String {
+        format!(r##"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" font-family="Roboto" font-size="13" fill="#1f1f1f"><rect width="100%" height="100%" fill="#ffffff"/>"##)
+    }
+
+    pub fn line(s: &mut String, pts: &[(f32, f32)]) {
         let d: Vec<String> = pts.iter().map(|(x, y)| format!("{x},{y}")).collect();
         let _ = write!(s, r##"<polyline points="{}" fill="none" stroke="#1f1f1f" stroke-width="1.2"/>"##, d.join(" "));
-    };
-    let arrow = |s: &mut String, (x, y): (f32, f32), dir: char| {
+    }
+
+    /// An arrowhead with its tip at `(x, y)`, pointing right, down or up.
+    pub fn arrow(s: &mut String, (x, y): (f32, f32), dir: char) {
         let pts = match dir {
             'r' => format!("{x},{y} {},{} {},{}", x - 7., y - 3.5, x - 7., y + 3.5),
             'd' => format!("{x},{y} {},{} {},{}", x - 3.5, y - 7., x + 3.5, y - 7.),
             _ => format!("{x},{y} {},{} {},{}", x - 3.5, y + 7., x + 3.5, y + 7.),
         };
         let _ = write!(s, r##"<polygon points="{pts}" fill="#1f1f1f"/>"##);
-    };
-    let text = |s: &mut String, x: f32, y: f32, t: &str, anchor: &str| {
+    }
+
+    pub fn text(s: &mut String, x: f32, y: f32, t: &str, anchor: &str) {
         let _ = write!(s, r#"<text x="{x}" y="{y}" text-anchor="{anchor}">{t}</text>"#);
-    };
-    // A state card: frame, colour panel, label and the caption's marker.
-    let card = |s: &mut String, x: f32, y: f32, h: f32, fill: &str, label: &str, caption: &str, marker: &str| {
+    }
+
+    /// The approval diamond centred at `(x, y)`.
+    pub fn diamond(s: &mut String, x: f32, y: f32) {
+        let _ = write!(s, r##"<polygon points="{x},{} {},{y} {x},{} {},{y}" fill="#f5d664" stroke="#1f1f1f" stroke-width="1.2"/>"##, y - 45., x + 46., y + 45., x - 46.);
+        text(s, x, y - 3., "Approval", "middle");
+        text(s, x, y + 13., "required?", "middle");
+    }
+
+    /// A state card: frame, colour panel, label (lines split at `\n`) and
+    /// the caption's marker: "circle", "solid" ▲, "open" △ or "crossed"
+    /// (△ struck through, Obsolete).
+    pub fn card(s: &mut String, (x, y): (f32, f32), h: f32, fill: &str, label: &str, caption: &str, marker: &str) {
         let w = 80.;
         let _ = write!(s, r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="4" fill="#ffffff" stroke="#1f1f1f" stroke-width="1.5"/>"##);
         let _ = write!(s, r##"<rect x="{}" y="{}" width="{}" height="{}" fill="{fill}" stroke="#898d92"/>"##, x + 6., y + 7., w - 12., h - 31.);
-        let _ = write!(s, r#"<text x="{}" y="{}" text-anchor="middle" font-size="13">{label}</text>"#, x + w / 2., y + (h - 24.) / 2. + 8.);
+        let lines: Vec<&str> = label.split('\n').collect();
+        let mid = y + (h - 24.) / 2. + 8.;
+        for (i, l) in lines.iter().enumerate() {
+            let ly = mid + 16. * (i as f32 - (lines.len() - 1) as f32 / 2.);
+            let _ = write!(s, r#"<text x="{}" y="{ly}" text-anchor="middle" font-size="13">{l}</text>"#, x + w / 2.);
+        }
         // The caption and its marker centred under the panel (Roboto 11 px:
         // "Workspace" about 52 px, "Version" 38 px).
         let cy = y + h - 10.;
@@ -543,18 +565,30 @@ fn release_chart_svg() -> String {
         let start = x + w / 2. - (text_w + 15.) / 2.;
         let _ = write!(s, r#"<text x="{start}" y="{}" font-size="11">{caption}</text>"#, cy + 4.);
         let mx = start + text_w + 9.5;
+        let triangle = format!("{mx},{} {},{} {},{}", cy - 6., mx - 6., cy + 5., mx + 6., cy + 5.);
         match marker {
             "circle" => {
                 let _ = write!(s, r##"<circle cx="{mx}" cy="{cy}" r="5" fill="none" stroke="#1f1f1f" stroke-width="1.2"/>"##);
             }
             "solid" => {
-                let _ = write!(s, r##"<polygon points="{mx},{} {},{} {},{}" fill="#1f1f1f"/>"##, cy - 6., mx - 6., cy + 5., mx + 6., cy + 5.);
+                let _ = write!(s, r##"<polygon points="{triangle}" fill="#1f1f1f"/>"##);
+            }
+            "crossed" => {
+                let _ = write!(s, r##"<polygon points="{triangle}" fill="none" stroke="#1f1f1f" stroke-width="1.2"/>"##);
+                let _ = write!(s, r##"<path d="M{} {}L{} {}M{} {}L{} {}" stroke="#1f1f1f" stroke-width="1.2"/>"##, mx - 6., cy - 6., mx + 6., cy + 5., mx + 6., cy - 6., mx - 6., cy + 5.);
             }
             _ => {
-                let _ = write!(s, r##"<polygon points="{mx},{} {},{} {},{}" fill="none" stroke="#1f1f1f" stroke-width="1.2"/>"##, cy - 6., mx - 6., cy + 5., mx + 6., cy + 5.);
+                let _ = write!(s, r##"<polygon points="{triangle}" fill="none" stroke="#1f1f1f" stroke-width="1.2"/>"##);
             }
         }
-    };
+    }
+}
+
+/// The default release workflow chart: the states as cards, the approval
+/// diamond, arrows and labels.
+fn release_chart_svg() -> String {
+    use chart::{arrow, card, line, text};
+    let mut s = chart::open(CHART_W, CHART_H);
     // Revise loops (top: from Released; bottom: from Rejected).
     line(&mut s, &[(668., 48.), (668., 30.), (166., 30.), (166., 101.)]);
     arrow(&mut s, (166., 108.), 'd');
@@ -568,27 +602,25 @@ fn release_chart_svg() -> String {
     }
     line(&mut s, &[(104., 163.), (116., 163.)]);
     arrow(&mut s, (123., 163.), 'r');
-    card(&mut s, 123., 108., 107., "#d1dced", "In progress", "Workspace", "circle");
+    card(&mut s, (123., 108.), 107., "#d1dced", "In progress", "Workspace", "circle");
     // Release → diamond.
     line(&mut s, &[(205., 163.), (220., 163.)]);
     text(&mut s, 249., 168., "Release", "middle");
     line(&mut s, &[(278., 163.), (289., 163.)]);
     arrow(&mut s, (296., 163.), 'r');
-    let _ = write!(s, r##"<polygon points="342,118 388,163 342,208 296,163" fill="#f5d664" stroke="#1f1f1f" stroke-width="1.2"/>"##);
-    text(&mut s, 342., 160., "Approval", "middle");
-    text(&mut s, 342., 176., "required?", "middle");
+    chart::diamond(&mut s, 342., 163.);
     // Yes → Pending.
     line(&mut s, &[(388., 163.), (402., 163.)]);
     text(&mut s, 418., 168., "Yes", "middle");
     line(&mut s, &[(433., 163.), (445., 163.)]);
     arrow(&mut s, (452., 163.), 'r');
-    card(&mut s, 452., 112., 100., "#bde0f5", "Pending", "Version", "open");
+    card(&mut s, (452., 112.), 100., "#bde0f5", "Pending", "Version", "open");
     // No → Released.
     line(&mut s, &[(342., 118.), (342., 102.)]);
     text(&mut s, 342., 96., "No", "middle");
     line(&mut s, &[(342., 82.), (342., 65.), (621., 65.)]);
     arrow(&mut s, (628., 65.), 'r');
-    card(&mut s, 628., 48., 102., "#b8e986", "Released", "Version", "solid");
+    card(&mut s, (628., 48.), 102., "#b8e986", "Released", "Version", "solid");
     // Approved / Rejected.
     line(&mut s, &[(532., 127.), (544., 127.)]);
     text(&mut s, 574., 131., "Approved", "middle");
@@ -598,7 +630,46 @@ fn release_chart_svg() -> String {
     text(&mut s, 574., 200., "Rejected", "middle");
     line(&mut s, &[(604., 196.), (621., 196.)]);
     arrow(&mut s, (628., 196.), 'r');
-    card(&mut s, 628., 173., 102., "#e98d86", "Rejected", "Version", "open");
+    card(&mut s, (628., 173.), 102., "#e98d86", "Rejected", "Version", "open");
+    s.push_str("</svg>");
+    s
+}
+
+/// The default obsoletion workflow chart (help image relmgmt-workflows-04,
+/// at the release chart's scale): Released → Obsolete → approval? No:
+/// Obsolete; Yes: Released (pending) → Approved: Obsolete, Rejected: back
+/// to Released.
+fn obsoletion_chart_svg() -> String {
+    use chart::{arrow, card, line, text};
+    let mut s = chart::open(CHART_W, CHART_H);
+    card(&mut s, (13., 73.), 104., "#b8e986", "Released", "Version", "solid");
+    // Obsolete → diamond.
+    line(&mut s, &[(93., 124.), (108., 124.)]);
+    text(&mut s, 136., 129., "Obsolete", "middle");
+    line(&mut s, &[(164., 124.), (179., 124.)]);
+    arrow(&mut s, (186., 124.), 'r');
+    chart::diamond(&mut s, 232., 124.);
+    // No → Obsolete (up and across).
+    line(&mut s, &[(232., 79.), (232., 62.)]);
+    text(&mut s, 232., 56., "No", "middle");
+    line(&mut s, &[(232., 42.), (232., 26.), (518., 26.)]);
+    arrow(&mut s, (525., 26.), 'r');
+    card(&mut s, (525., 10.), 104., "#cbcfda", "Obsolete", "Version", "crossed");
+    // Yes → Released (pending).
+    line(&mut s, &[(278., 124.), (296., 124.)]);
+    text(&mut s, 312., 129., "Yes", "middle");
+    line(&mut s, &[(328., 124.), (340., 124.)]);
+    arrow(&mut s, (347., 124.), 'r');
+    card(&mut s, (347., 73.), 104., "#bde0f5", "Released\n(pending)", "Version", "open");
+    // Approved → Obsolete; Rejected → back to Released along the bottom.
+    line(&mut s, &[(427., 89.), (441., 89.)]);
+    text(&mut s, 470., 93., "Approved", "middle");
+    line(&mut s, &[(500., 89.), (518., 89.)]);
+    arrow(&mut s, (525., 89.), 'r');
+    line(&mut s, &[(427., 159.), (441., 159.)]);
+    text(&mut s, 470., 163., "Rejected", "middle");
+    line(&mut s, &[(500., 159.), (511., 159.), (511., 220.), (53., 220.), (53., 184.)]);
+    arrow(&mut s, (53., 177.), 'u');
     s.push_str("</svg>");
     s
 }
@@ -606,9 +677,10 @@ fn release_chart_svg() -> String {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn the_release_chart_parses() {
-        let svg = super::release_chart_svg();
-        assert!(resvg::usvg::Tree::from_str(&svg, &Default::default()).is_ok());
+    fn the_workflow_charts_parse() {
+        for svg in [super::release_chart_svg(), super::obsoletion_chart_svg()] {
+            assert!(resvg::usvg::Tree::from_str(&svg, &Default::default()).is_ok());
+        }
         assert_eq!(super::watermark_text("Entwurf – ok"), "Entwurf  ok");
         assert_eq!(super::watermark_text(&"x".repeat(80)).len(), 64);
     }
