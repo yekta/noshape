@@ -496,7 +496,9 @@ impl MateDialog {
     /// next pick.
     fn query_box(&self, id: &'static str, label: &'static str, fields: &[usize], cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let active = self.active.is_some_and(|a| fields.contains(&a));
+        // Live (assembly/2220): once both connectors are picked the
+        // connectors box keeps its active look (blue, framed).
+        let active = self.active.is_some_and(|a| fields.contains(&a)) || (self.active.is_none() && fields.contains(&0) && self.editing_field.is_none());
         let mut rows = Vec::new();
         for &field in fields {
             let Some(c) = self.slot(field) else { continue };

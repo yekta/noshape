@@ -1055,14 +1055,22 @@ impl AssemblyView {
                 (true, Some(top)) => asm.mates.iter().filter(|m| m.uses_instance(top)).map(|m| m.id).collect(),
                 _ => Vec::new(),
             };
+            // Live (assembly/2220): a new mate's indicator shows at its
+            // connectors while its dialog is open (it is only in the preview).
+            let new_mate = self.mate.as_ref().filter(|s| s.editing.is_none()).map(|s| s.dialog.read(cx).id);
             for ms in &self.result.mates {
-                let Some(m) = asm.mate(ms.id) else { continue };
-                let visible = (self.show_mates && !m.hidden && !ms.inactive) || self.selected_mate == Some(m.id) || self.list_hover_mate == Some(m.id) || shown_mode.contains(&m.id);
+                let pending = new_mate == Some(ms.id) && asm.mate(ms.id).is_none();
+                let visible = match asm.mate(ms.id) {
+                    Some(m) => (self.show_mates && !m.hidden && !ms.inactive) || self.selected_mate == Some(m.id) || self.list_hover_mate == Some(m.id) || shown_mode.contains(&m.id),
+                    None if pending => true,
+                    None => continue,
+                };
+                let suppressed = asm.mate(ms.id).is_some_and(|m| m.suppressed);
                 let Some(f) = ms.frame_b.or(ms.frame_a) else { continue };
                 if visible {
                     let i = overlay_mates.len();
-                    let hl = hovered_overlay == Some(OverlayPick::Mate(i)) || self.selected_mate == Some(m.id);
-                    let st = if ms.inactive || m.suppressed {
+                    let hl = hovered_overlay == Some(OverlayPick::Mate(i)) || self.selected_mate == Some(ms.id);
+                    let st = if ms.inactive || suppressed {
                         assembly_scene::MateGlyphState::Inactive
                     } else if !ms.ok {
                         assembly_scene::MateGlyphState::Error
@@ -1070,7 +1078,7 @@ impl AssemblyView {
                         assembly_scene::MateGlyphState::Ok
                     };
                     h.mate_glyphs.push((f, size * 0.17, hl, st));
-                    overlay_mates.push(m.id);
+                    overlay_mates.push(ms.id);
                 }
             }
         }
@@ -3722,9 +3730,6 @@ impl AssemblyView {
             }
         }
         rows.extend(self.pending_pattern_row(cx));
-        if asm.instances.is_empty() {
-            rows.push(div().px_3().py_2().text_xs().text_color(pal.text_faint).child("Insert parts and assemblies (I) to start.").into_any_element());
-        }
         // Selecting in the graphics area scrolls the list to the row.
         if std::mem::take(&mut self.ui.scroll_to_selection)
             && let Some(ix) = selected_row
@@ -3777,6 +3782,15 @@ impl AssemblyView {
             );
             mate_ids.push(MateId(u64::MAX));
         }
+        // Live (assembly/2219): a new mate's row ("Revolute 1", selected, red
+        // until both connectors are picked) is in the list while its dialog
+        // is open.
+        let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some()));
+        if let Some((id, mate_type, name, complete)) = new_mate.clone() {
+            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, message: (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
+            mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
+            mate_ids.push(id);
+        }
         for g in &asm.groups {
             if !self.feature_passes(noshape_model::assembly::ops::RowKind::Group, &g.name, false, g.suppressed, false, false) {
                 continue;
@@ -3789,7 +3803,7 @@ impl AssemblyView {
         // with its new-folder button, then one tree that ends with the
         // collapsible "Mate features (N)" folder holding the mates.
         let mates_open = !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]);
-        let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some());
+        let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some()) + usize::from(new_mate.is_some());
         let mate_error = result.mates.iter().any(|m| !m.ok) || result.relations.iter().any(|r| !r.ok);
         if !filtering || (tree && !mate_rows.is_empty()) {
             rows.push(
@@ -4089,6 +4103,8 @@ impl AssemblyView {
                     Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
                     None => crate::assets::icon(&icon_path(icon), 28., cx).into_any_element(),
                 }))
+                // Live (assembly/03): hovering a row shows its name in a tooltip.
+                .tooltip(crate::ui::user_tooltip(name.clone()))
                 .child(div().flex_1().min_w_0().pl(px(4.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(crate::ui::user_text(name)))
         };
         let mut body = v_flex().id("insert-body").size_full().overflow_y_scroll();

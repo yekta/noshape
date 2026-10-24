@@ -31,6 +31,9 @@ pub struct InsertViewState {
     /// "Select a part or assembly" chooser: open, and its tab (0 Part
     /// Studios, 1 Assemblies).
     pub chooser: Option<u8>,
+    /// The Insert view tool's empty panel is open without the chooser
+    /// (live drawing/122, 170a: [Insert] opens the chooser).
+    pub panel: bool,
     /// Insert a sketch of the source (a sketch view).
     pub sketch: Option<noshape_model::FeatureId>,
     /// Insert the chosen sheet metal part's flat pattern.
@@ -55,7 +58,7 @@ pub struct InsertViewState {
 
 impl Default for InsertViewState {
     fn default() -> Self {
-        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
+        Self { scale: None, simplification: Simplification::Auto, simp_value: None, sketch_appearances: false, model_annotations: true, chooser: None, panel: false, sketch: None, flat: false, replace: None, replace_part: None, named: None, asm_position: AsmPosition::Default, display_state: None, pinned: None }
     }
 }
 
@@ -94,6 +97,15 @@ impl DrawingEditor {
     }
 
     /// Toolbar Insert view / the panel's Insert button: the chooser.
+    /// The Insert view tool: its panel, empty until [Insert] picks a source
+    /// (live drawing/122).
+    pub fn open_insert_panel(&mut self, cx: &mut Context<Self>) {
+        if self.insert.chooser.is_none() && !matches!(self.tool, Tool::InsertView { .. }) {
+            self.insert.panel = true;
+        }
+        cx.notify();
+    }
+
     pub fn open_insert_chooser(&mut self, cx: &mut Context<Self>) {
         self.insert.chooser = Some(self.insert.chooser.unwrap_or(0));
         self.ensure_sources(false, cx);
@@ -125,6 +137,7 @@ impl DrawingEditor {
 
     pub(crate) fn choose_source(&mut self, source: TabId, part: Option<noshape_model::BodyId>, cx: &mut Context<Self>) {
         self.insert.chooser = None;
+        self.insert.panel = false;
         self.insert.pinned = None;
         if let (Some(old), Some(old_part)) = (self.insert.replace, self.insert.replace_part.take()) {
             // Sheets panel reference › Replace: on every sheet (help H:sheets).

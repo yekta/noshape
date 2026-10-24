@@ -567,12 +567,24 @@ impl DrawingEditor {
     /// Insert, then the greyed fields.
     fn render_empty_insert_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let row = |label: &'static str, value: &'static str| {
+        // Live drawing/122: the fields greyed with grey ▼, View scale focused
+        // (a 2 px blue underline, a dark ▼).
+        let row = |label: &'static str, value: &'static str, focused: bool| {
             h_flex()
                 .h(px(28.))
                 .px(px(6.))
                 .child(div().w(px(105.)).flex_none().text_size(px(12.)).child(label))
-                .child(h_flex().flex_1().h(px(22.)).px(px(4.)).border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).text_size(px(12.)).text_color(gpui_kit::rgb(0xaaaaaa)).child(div().flex_1().child(value)).child(crate::assets::icon("drawing-tool-caret", 12., cx)))
+                .child(
+                    h_flex()
+                        .flex_1()
+                        .h(px(22.))
+                        .px(px(4.))
+                        .map(|d| if focused { d.border_b_2().border_color(gpui_kit::rgb(0x1651b0)) } else { d.border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)) })
+                        .text_size(px(12.))
+                        .text_color(gpui_kit::rgb(0xaaaaaa))
+                        .child(div().flex_1().child(value))
+                        .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., gpui_kit::rgb_static(if focused { 0x555555 } else { 0xaaaaaa }))),
+                )
         };
         v_flex()
             .id("dr-insert-empty")
@@ -588,23 +600,52 @@ impl DrawingEditor {
                     .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Insert view"))
                     .child(div().id("die-close").w(px(28.)).h(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.insert.chooser = None;
+                        this.insert.panel = false;
                         cx.notify();
                     }))),
             )
             .child(
                 div().px(px(4.)).py(px(2.)).child(
-                    h_flex().h(px(26.)).justify_center().gap(px(6.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).bg(crate::theme::light().panel).text_size(px(13.33)).child(crate::assets::icon("insert", 16., cx)).child("Insert"),
+                    h_flex()
+                        .id("die-insert")
+                        .h(px(26.))
+                        .justify_center()
+                        .gap(px(6.))
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0xcccccc))
+                        .bg(crate::theme::light().panel)
+                        .text_size(px(13.33))
+                        .cursor_pointer()
+                        .child(crate::assets::icon("insert", 16., cx))
+                        .child("Insert")
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_chooser(cx))),
                 ),
             )
-            .child(row("View orientation", "Front"))
-            .child(row("View scale", ""))
-            .child(row("View simplification", "Auto"))
+            .child(row("View orientation", "Front", false))
+            .child(row("View scale", "", true))
+            .child(row("View simplification", "Auto", false))
             .child(h_flex().h(px(26.)).px(px(6.)).gap(px(6.)).text_size(px(12.)).child(div().size(px(12.)).border_1().border_color(gpui_kit::rgb(0xbbbbbb)).rounded(px(2.))).child("Show sketch appearances"))
             .into_any_element()
     }
 
     /// "Select a part or assembly".
     pub fn render_insert_chooser(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // The tool's panel alone until [Insert] opens the chooser.
+        if self.insert.chooser.is_none() && self.insert.panel && !matches!(self.tool, Tool::InsertView { .. }) {
+            let panel = self.render_empty_insert_panel(cx);
+            return Some(
+                div()
+                    .id("dr-insert-panel-wrap")
+                    .absolute()
+                    .top(px(DIALOG_TOP))
+                    .left(px(self.dialog_left()))
+                    .occlude()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(panel)
+                    .into_any_element(),
+            );
+        }
         let tab = self.insert.chooser?;
         let pal = p();
         let blue = gpui_kit::rgb(0x1651b0);

@@ -139,7 +139,7 @@ pub const SHORTCUT_CATALOGUE: [(&str, &str, Act); 64] = [
     ("Insert DXF or DWG", "dwg-insert", |e, w, cx| e.insert_cad_file(w, cx)),
     ("Insert image", "image", |e, w, cx| e.insert_image(w, cx)),
     ("Format painter", "format-painter", |e, _, cx| e.toggle_format_painter(cx)),
-    ("Insert view", "base-view", |e, _, cx| e.open_insert_chooser(cx)),
+    ("Insert view", "base-view", |e, _, cx| e.open_insert_panel(cx)),
     ("Projected view", "projected-view", |e, _, cx| e.set_tool(Tool::Projected { parent: None }, cx)),
     ("Auxiliary view", "auxiliary-view", |e, _, cx| e.set_tool(Tool::Auxiliary { parent: None }, cx)),
     ("Detail view", "detail-view", |e, _, cx| e.set_tool(Tool::Detail { parent: None, center: None, radius: None }, cx)),
