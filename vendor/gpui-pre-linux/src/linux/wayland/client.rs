@@ -2101,6 +2101,14 @@ impl Dispatch<wl_seat::WlSeat, ()> for WaylandClientStatePtr {
                     .as_ref()
                     .map(|cursor_shape_manager| cursor_shape_manager.get_pointer(&pointer, qh, ()));
 
+                // NOSHAPE PATCH (agent nav2): a seat announcing its pointer
+                // again (a device plugged in) must not leave the old pinch
+                // object alive: the compositor keeps sending it every pinch
+                // update, so each one arrived twice (the copy with scale
+                // change 0).
+                if let Some(old) = state.pinch_gesture.take() {
+                    old.destroy();
+                }
                 state.pinch_gesture = state.globals.gesture_manager.as_ref().map(
                     |gesture_manager: &zwp_pointer_gestures_v1::ZwpPointerGesturesV1| {
                         gesture_manager.get_pinch_gesture(&pointer, qh, ())

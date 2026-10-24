@@ -18,11 +18,17 @@ import uinput as ui  # noqa: E402
 
 
 def read_trace(path):
+    out = []
     try:
         with open(path) as f:
-            return [json.loads(line) for line in f if line.strip()]
+            for line in f:
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    pass  # a line still being written
     except FileNotFoundError:
-        return []
+        pass
+    return out
 
 
 class Replay:
@@ -38,7 +44,7 @@ class Replay:
         """Until the viewport has drawn a camera, then let the model settle."""
         end = time.time() + timeout
         while time.time() < end:
-            cams = [r for r in read_trace(self.trace) if "camera" in r]
+            cams = [r for r in read_trace(self.trace) if "camera" in r and min(r["viewport"]) > 100]
             if cams:
                 self.origin, self.size = cams[-1]["origin"], cams[-1]["viewport"]
                 time.sleep(8)
@@ -72,25 +78,27 @@ class Replay:
 
     # ------------------------------------------------------------ steps
 
+    def post_wheel(self, hi, horizontal=False):
+        """A wheel movement of `hi` 120ths, logged as posted (WHEEL_DELTA-like
+        units: libinput passes them on as value120, Xwayland as valuators)."""
+        with open(self.trace, "a") as f:
+            f.write(json.dumps({"posted": {"kind": "scroll", "wheel": hi, "horizontal": horizontal}}) + "\n")
+        self.mouse.wheel(hi_res=hi, horizontal=horizontal)
+        time.sleep(0.12)
+
     def wheel(self):
         self.cursor(*self.screen_point(150, 80))
-        for n in (1, 1, 1, -1, -1, -1):
-            self.mouse.wheel(n)
-            time.sleep(0.12)
-        for hi in (30, 30, 30, 30, -30, -30, -30, -30, 7, -7):
-            self.mouse.wheel(hi_res=hi)
-            time.sleep(0.12)
-        self.mouse.wheel(1, horizontal=True)
-        time.sleep(0.12)
+        for hi in (120, 120, 120, -120, -120, -120, 30, 30, 30, 30, -30, -30, -30, -30, 7, -7):
+            self.post_wheel(hi)
+        self.post_wheel(120, horizontal=True)
 
     def modifier_wheel(self, key):
         def run():
             self.cursor(*self.screen_point(-120, -60))
             self.keys.key(key, True)
             time.sleep(0.1)
-            for n in (1, -1):
-                self.mouse.wheel(n)
-                time.sleep(0.12)
+            for hi in (120, -120):
+                self.post_wheel(hi)
             self.keys.key(key, False)
         return run
 
@@ -134,6 +142,14 @@ class Replay:
             time.sleep(1.2 if pause < 0.05 else 0.2)
         return run
 
+    def with_key(self, key, fn):
+        def run():
+            self.keys.key(key, True)
+            time.sleep(0.1)
+            fn()
+            self.keys.key(key, False)
+        return run
+
     def run(self):
         self.wait_ready()
         c = self.screen_point()
@@ -148,6 +164,7 @@ class Replay:
         self.step("right-drag", self.drag(ui.BTN_RIGHT, -200, 0))
         self.step("right-drag-fling", self.drag(ui.BTN_RIGHT, -200, 0, pause=0.0))
         self.step("middle-drag", self.drag(ui.BTN_MIDDLE, 200, 100))
+        self.step("alt-right-drag", self.with_key(ui.KEY_LEFTALT, self.drag(ui.BTN_RIGHT, -200, 0)))
         self.step("touch-rotate", self.touch({0: c}, {0: (c[0] - 200, c[1])}))
         self.step("touch-pan", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] + 100, c[1]), 1: (c[0] + 200, c[1])}, steps=15))
         self.step("touch-pinch", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] - 100, c[1]), 1: (c[0] + 100, c[1])}))

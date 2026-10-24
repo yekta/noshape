@@ -79,7 +79,10 @@ def wayland_scroll_frames(log):
                             frames.append((data[0] / 120.0, data[1] / 120.0))
                     data = None
             elif iface == "zwp_pointer_gesture_pinch_v1" and ev == "update":
-                pinches.append(float(args[3]))
+                # One per compositor event: a client holding two pinch
+                # objects sees each update twice (same time); Chrome has one.
+                if not pinches or pinches[-1][0] != args[0]:
+                    pinches.append((args[0], float(args[3])))
     return frames, pinches
 
 
@@ -96,9 +99,19 @@ def posted_ticks(p):
     return (0.0, p["wheel"] / 120.0)
 
 
+BAD_LINES = []
+
+
 def load(trace):
+    out = []
     with open(trace) as f:
-        return [json.loads(line) for line in f if line.strip()]
+        for line in f:
+            if line.strip():
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    BAD_LINES.append(line)
+    return out
 
 
 def steps(records):
@@ -145,11 +158,18 @@ class Checker:
     def note(self, step, what, value):
         self.rows.append((step, what, value, None, None))
 
-    def report(self):
+    def report(self, verbose=False):
+        fmt = lambda v: "-" if v is None else (f"{v:.6g}" if isinstance(v, float) else str(v))  # noqa: E731
+        per_step = {}
         for step, what, got, want, ok in self.rows:
             status = "info" if ok is None else ("PASS" if ok else "FAIL")
-            fmt = lambda v: "-" if v is None else (f"{v:.6g}" if isinstance(v, float) else str(v))  # noqa: E731
-            print(f"{status:4}  {step:22} {what:44} got {fmt(got):>12}  want {fmt(want):>12}")
+            if ok is not None:
+                n = per_step.setdefault(step, [0, 0])
+                n[0 if ok else 1] += 1
+            if verbose or ok is not True:
+                print(f"{status:4}  {step:22} {what:44} got {fmt(got):>12}  want {fmt(want):>12}")
+        for step, (good, bad) in per_step.items():
+            print(f"{'PASS' if not bad else 'FAIL':4}  {step:22} {good} checks passed, {bad} failed")
         print(f"{len([r for r in self.rows if r[4] is not None])} checks, {self.failed} failed")
 
 
@@ -189,17 +209,17 @@ def main():
     ap.add_argument("--trace", required=True)
     ap.add_argument("--wayland-log")
     ap.add_argument("--mode", default="wayland")
+    ap.add_argument("--verbose", action="store_true")
     a = ap.parse_args()
     rec = load(a.trace)
     by = steps(rec)
     ch = Checker()
+    ch.check("trace", "malformed lines (interleaved writes)", float(len(BAD_LINES)), 0.0, 0)
     frames, pinch_scales = ([], [])
     windows = a.mode == "windows"
     if a.wayland_log and a.mode == "wayland":
         frames, pinch_scales = wayland_scroll_frames(a.wayland_log)
-    elif a.mode in ("mac", "windows"):
-        # The drivers log each OS event they post; Chrome's ticks for it.
-        frames = [posted_ticks(r["posted"]) for r in rec if r.get("posted", {}).get("kind") == "scroll"]
+
     # The app's scroll inputs in order, to line them up with the protocol.
     scrolls = [r["data"] for r in rec if r.get("input") == "scroll"]
     if frames:
@@ -208,6 +228,19 @@ def main():
             got = s.get("ticks")
             ch.check("protocol", f"scroll #{i} wheelDelta y (Chrome)", None if got is None else float(trunc120(got[1])), float(trunc120(fr[1])), 0)
             ch.check("protocol", f"scroll #{i} wheelDelta x (Chrome)", None if got is None else float(trunc120(got[0])), float(trunc120(fr[0])), 0)
+
+    # The drivers log each wheel event they post; per step, Chrome's ticks for
+    # each must equal the ticks the app's platform layer reported.
+    for name, recs in by.items():
+        posted = [posted_ticks(r["posted"]) for r in recs if r.get("posted", {}).get("kind") == "scroll"]
+        if not posted:
+            continue
+        got = [r["data"] for r in recs if r.get("input") == "scroll"]
+        ch.check(name, "scroll inputs = posted wheel events", float(len(got)), float(len(posted)), 0)
+        for i, (s_, p_) in enumerate(zip(got, posted)):
+            t = s_.get("ticks")
+            ch.check(name, f"#{i} wheelDelta y (Chrome, posted)", None if t is None else float(trunc120(t[1])), float(trunc120(p_[1])), 0)
+            ch.check(name, f"#{i} wheelDelta x (Chrome, posted)", None if t is None else float(trunc120(t[0])), float(trunc120(p_[0])), 0)
 
     def wheel_amount(d, _n):
         t = d.get("ticks")
@@ -230,7 +263,8 @@ def main():
             n = check_zoom_events(ch, name, by[name], "pinch", pinch_amount)
             ch.note(name, "pinch events", n)
     if pinch_scales:
-        ch.note("protocol", "pinch updates", len(pinch_scales))
+        moved = [r for r in rec if r.get("input") == "pinch" and r["data"]["phase"] == "Moved"]
+        ch.check("protocol", "pinch updates = app pinch updates", float(len(moved)), float(len(pinch_scales)), 0)
 
     # Drags: rotation angle about the camera's up axis, pan of the target.
     def first_last(name):
@@ -247,6 +281,15 @@ def main():
         w, h = c1["viewport"]
         ch.note("right-drag-fling", "turn (deg), 200 px + inertia", angle(c0["camera"]["forward"], c1["camera"]["forward"]))
         ch.note("right-drag-fling", "  without inertia it would be", 3 * 360 * 200 / math.hypot(w, h))
+    c0, c1 = first_last("alt-right-drag")
+    if c0 and c1:
+        # Constrained rotate about world Z: the first move only levels / tags
+        # the view (Onshape's axisRotateCanvasTag), the other 19 x 10 px turn.
+        w, h = c1["viewport"]
+        az = lambda f: math.degrees(math.atan2(f[1], f[0]))  # noqa: E731
+        turn = (az(c1["camera"]["forward"]) - az(c0["camera"]["forward"])) % 360
+        ch.check("alt-right-drag", "turn about world Z (deg), 190 px", min(turn, 360 - turn), 3 * 360 * 190 / math.hypot(w, h), 0.5)
+        ch.check("alt-right-drag", "elevation change (deg)", abs(math.degrees(math.asin(c1["camera"]["forward"][2]) - math.asin(c0["camera"]["forward"][2]))), 0.0, 0.05)
     c0, c1 = first_last("middle-drag")
     if c0 and c1:
         moved = math.dist(c0["camera"]["target"], c1["camera"]["target"]) / c1["camera"]["world_per_pixel"]
@@ -266,7 +309,7 @@ def main():
     c0, c1 = first_last("touch-roll")
     if c0 and c1:
         ch.check("touch-roll", "roll (deg) for a 30 deg finger turn", angle(c0["camera"]["up"], c1["camera"]["up"]), 30.0, 1.0)
-    ch.report()
+    ch.report(a.verbose)
     sys.exit(1 if ch.failed else 0)
 
 

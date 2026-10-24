@@ -37,8 +37,10 @@ fn write(record: Value) {
     let Ok(mut t) = t.lock() else { return };
     let mut record = record;
     record["t_ms"] = json!(t.start.elapsed().as_secs_f64() * 1000.0);
-    let _ = writeln!(t.file, "{record}");
-    let _ = t.file.flush();
+    // One write per line: the replay drivers append their own lines to the
+    // same file (O_APPEND), so a line must not be split across writes.
+    let line = format!("{record}\n");
+    let _ = t.file.write_all(line.as_bytes());
 }
 
 /// An input event as received (`kind` e.g. "scroll", `data` its raw fields).
