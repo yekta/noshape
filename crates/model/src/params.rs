@@ -219,9 +219,6 @@ impl Hints {
     pub const UNCONFIGURABLE: Self = Self(1 << 8);
     pub const ALLOW_QUERY_ORDER: Self = Self(1 << 9);
     pub const INITIAL_FOCUS: Self = Self(1 << 10);
-    /// The selection field that takes the focus when an existing feature is
-    /// opened for editing (FeatureScript `INITIAL_FOCUS_ON_EDIT`).
-    pub const INITIAL_FOCUS_ON_EDIT: Self = Self(1 << 23);
     pub const COLLAPSE_ARRAY_ITEMS: Self = Self(1 << 11);
     pub const MATCH_LAST_ARRAY_ITEM: Self = Self(1 << 12);
     /// Boolean acts as a collapsible group header for the following params.
@@ -251,6 +248,10 @@ impl Hints {
     /// FeatureScript `UIHint.MATE_CONNECTOR_AXIS_TYPE`: an enum shown as one
     /// icon button that steps through the options ("Reorient secondary axis").
     pub const MATE_CONNECTOR_AXIS_TYPE: Self = Self(1 << 22);
+    /// FeatureScript `UIHint.INITIAL_FOCUS_ON_EDIT`: when an existing
+    /// feature is edited, the first visible selection field with this hint
+    /// is the active one (Draft's Entities to draft / Parting edges).
+    pub const INITIAL_FOCUS_ON_EDIT: Self = Self(1 << 23);
 
     pub const fn or(self, other: Self) -> Self {
         Self(self.0 | other.0)

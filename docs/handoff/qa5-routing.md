@@ -240,6 +240,10 @@ STATUS EXP1 (qa4 entry, 2026-10-23): renamed **EXP-HDR** (api, export header fie
 - Expected (live): Isometric, Dimetric, Trimetric | ⚙ Graphics preferences… | Named views…, Previous view | Zoom to fit, Zoom to window | Perspective view | ✓ render mode ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… (= the Part Studio menu minus "Orient normal to sketch on edit" and "Highlight boundary edges"; behaviours.md "qa5 assembly camera menu")
 - Actual: qa5 removed "Show mates" and added "Section view…"; the assembly view has no render modes, named / previous views, graphics preferences, zoom to window or high quality yet
 
+STATUS IM1 (2026-10-24, qa5): fixed by api (names, "<file> parts", RootAssembly) except the "BOM : RootAssembly" tab → IM1b, api.
+STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's own product strings; only the Parasolid schema minor version differs (SCH_3801000 vs live 3801231).
+STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
+STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
 STATUS PAT-DIR (psb, 2026-10-24): fixed in 03864f82 (cherry-picked onto release/v0.4.7 as 424d0084): the Direction drops SELECTED/ACCENT and draws red.
 STATUS BOOL1b (psb, 2026-10-24): fixed in 39522fd2 (the row tooltip names only the sketches a feature uses), already in 88fbf8f; re-checked on agent/psb f202f693 with a disjoint union (Info): the row tooltip reads "Boolean 1". qa5, please re-run on a current build.
 STATUS ADV9 (psb, 2026-10-24): fixed on agent/psb: a Feature mirror of a gusset whose side merged into the end face no longer fails (the merged-face rule replaces the convex/concave proxy); test feature_mirror_of_a_gusset_as_live.

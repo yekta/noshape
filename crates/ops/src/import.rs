@@ -95,7 +95,19 @@ pub fn read_foreign(path: &Path, units: &UnitPrefs) -> anyhow::Result<Foreign> {
         "stl" | "obj" => k::read_mesh_bodies(path, mesh_unit)?,
         // 3MF and glTF carry their units (read in millimetres).
         "3mf" | "gltf" | "glb" => k::read_mesh_bodies(path, k::LengthUnit::Millimeter)?,
-        "pvz" => k::read_pvz(path, k::LengthUnit::Meter)?,
+        // Every placed instance, named like it (a single instance, or Combine).
+        "pvz" => {
+            let parts = k::read_pvz_parts(path, k::LengthUnit::Meter)?;
+            let (_, instances) = k::read_pvz_instances(path)?;
+            let placed = instances
+                .iter()
+                .filter_map(|i| {
+                    let p = parts.get(i.part)?;
+                    Some(p.shape.transformed(&k::Transform::Matrix(i.transform)).map(|shape| k::ImportedShape { shape, name: Some(i.name.clone()), ..p.clone() }))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            compound(placed)
+        }
         "x_t" | "x_b" | "xmt_txt" | "xmt_bin" => compound(k::read_parasolid_parts(path, k::LengthUnit::Meter)?),
         "3dm" => compound(k::read_rhino_parts(path, k::LengthUnit::Meter)?),
         // Native CAD parts: the geometry they embed (Parasolid: SolidWorks, Solid Edge, NX; ACIS: Inventor).
@@ -121,10 +133,10 @@ pub fn add_import_feature(ps: &mut PartStudio, file: &str, foreign: Foreign, uni
     }
 }
 
-/// Add a file tab named after the file (unique), in `folder` when given.
+/// Add a file tab named after the file, in `folder` when given. A second
+/// file of the same name keeps it (live: two "g25-b.step" tabs).
 pub fn add_file_tab(d: &mut Document, file: FileTab, folder: Option<TabId>, after: Option<TabId>) -> TabId {
-    let base = file.file_name.clone();
-    let name = if d.tabs.iter().any(|t| t.name == base) { d.next_tab_name(&base) } else { base };
+    let name = file.file_name.clone();
     let id = d.add_tab(&name, TabContent::File(file));
     crate::docedit::place_after(d, id, after);
     if let Some(f) = folder {
@@ -141,9 +153,39 @@ pub fn cad_imports_folder(d: &mut Document) -> TabId {
     }
 }
 
+/// A .pvz file of several part instances: a Part Studio "<name> parts" and
+/// an Assembly (see `noshape_model::native_assembly::add_pvz_assembly`).
+struct PvzAssembly {
+    name: String,
+    file: String,
+    root: String,
+    /// The distinct parts in their own coordinates.
+    foreign: Foreign,
+    names: Vec<Option<String>>,
+    instances: Vec<noshape_kernel::PvzInstance>,
+}
+
+/// Read a .pvz of several instances for [`PvzAssembly`]; `None` for one
+/// instance (an ordinary Part Studio).
+fn read_pvz_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
+    use noshape_kernel as k;
+    let (root, instances) = k::read_pvz_instances(path)?;
+    if instances.len() < 2 {
+        return Ok(None);
+    }
+    let parts = k::read_pvz_parts(path, k::LengthUnit::Meter)?;
+    let info: Vec<noshape_model::features::importing::ImportPartInfo> = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), ..Default::default() }).collect();
+    let names = parts.iter().map(|p| p.name.clone()).collect();
+    let shape = k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>());
+    let foreign = Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts: serde_json::to_string(&info)? };
+    let (name, file) = import_names(path);
+    Ok(Some(PvzAssembly { name, file, root: if root.is_empty() { "RootAssembly".into() } else { root }, foreign, names, instances }))
+}
+
 /// Files read for an import (before the document edit).
 pub struct ImportInputs {
     read: Vec<(String, String, Foreign)>,
+    pvz: Vec<PvzAssembly>,
     assemblies: Vec<noshape_model::native_assembly::AssemblyZip>,
     files: Vec<FileTab>,
     /// "a.step, b.zip": the history entry is "Import <label>".
@@ -153,7 +195,7 @@ pub struct ImportInputs {
 impl ImportInputs {
     /// Nothing to add: no translation and no file tab.
     pub fn is_empty(&self) -> bool {
-        self.read.is_empty() && self.assemblies.is_empty() && self.files.is_empty()
+        self.read.is_empty() && self.pvz.is_empty() && self.assemblies.is_empty() && self.files.is_empty()
     }
 }
 
@@ -164,6 +206,7 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
     let mut read = Vec::new();
     // Native assemblies (a zip named like the root assembly; live G38).
     let mut assemblies = Vec::new();
+    let mut pvz = Vec::new();
     for path in paths {
         if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
             match noshape_model::native_assembly::read_assembly_zip(path) {
@@ -173,6 +216,20 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
                 Err(e) => errors.push(format!("Import failed: {}: {e:#}", path.display())),
             }
             continue;
+        }
+        // A .pvz of several instances: Part Studio + Assembly (not when combining).
+        if !c.combine && path.extension().is_some_and(|e| e.eq_ignore_ascii_case("pvz")) {
+            match read_pvz_assembly(path) {
+                Ok(Some(a)) => {
+                    pvz.push(a);
+                    continue;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    errors.push(format!("Import failed: {}: {e:#}", path.display()));
+                    continue;
+                }
+            }
         }
         // Mesh files in the unit chosen in the dialog.
         let units = if MESH_FILES.iter().any(|e| path.extension().is_some_and(|x| x.eq_ignore_ascii_case(e))) { UnitPrefs { length: MESH_UNITS[c.unit.min(MESH_UNITS.len() - 1)].1, ..*units } } else { *units };
@@ -184,12 +241,12 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
             Err(e) => errors.push(format!("Import failed: {}: {e:#}", path.display())),
         }
     }
-    let mut label = read.iter().map(|r| r.1.clone()).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
+    let mut label = read.iter().map(|r| r.1.clone()).chain(pvz.iter().map(|p| p.file.clone())).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
     if label.is_empty() {
         label = paths.iter().map(|p| import_names(p).1).collect::<Vec<_>>().join(", ");
     }
     let files = if keep_files { paths.iter().filter_map(|p| Some(FileTab::new(&import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect() } else { Vec::new() };
-    (ImportInputs { read, assemblies, files, label }, errors)
+    (ImportInputs { read, pvz, assemblies, files, label }, errors)
 }
 
 /// The import's tabs added to `d` after `after`: returns the first new tab
@@ -233,6 +290,27 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
             Err(e) => errors.push(format!("Import failed: {}: {e}", a.root)),
         }
     }
+    for p in &inputs.pvz {
+        let pvz = noshape_model::native_assembly::PvzImport { stem: p.name.clone(), root: p.root.clone(), brep: p.foreign.brep.clone(), info: p.foreign.parts.clone(), foreign_id: p.file.clone(), instances: p.instances.clone(), names: p.names.clone() };
+        match noshape_model::native_assembly::add_pvz_assembly(d, &pvz, units) {
+            Ok((studio, assembly)) => {
+                for tab in [studio] {
+                    if let Some(TabContent::PartStudio(ps)) = d.tab_mut(tab).map(|t| &mut t.content)
+                        && let Some(f) = ps.features.last_mut()
+                    {
+                        f.params.set("importAppearances", ParamValue::Bool(c.appearances));
+                        f.params.set("yAxisIsUp", ParamValue::Bool(c.y_up));
+                        f.params.set("createComposite", ParamValue::Bool(c.composite));
+                    }
+                }
+                crate::docedit::place_after(d, assembly, at);
+                crate::docedit::place_after(d, studio, Some(assembly));
+                at = Some(studio);
+                first.get_or_insert(assembly);
+            }
+            Err(e) => errors.push(format!("Import failed: {}: {e}", p.file)),
+        }
+    }
     let groups: Vec<Vec<&(String, String, Foreign)>> = if c.combine { vec![inputs.read.iter().collect()] } else { inputs.read.iter().map(|r| vec![r]).collect() };
     for g in groups.into_iter().filter(|g| !g.is_empty()) {
         let mut ps = PartStudio::new();
@@ -247,8 +325,8 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
                 f.params.set("joinAdjacentSurfaces", ParamValue::Bool(c.join));
             }
         }
-        let base = g[0].0.clone();
-        let name = if d.tabs.iter().any(|t| t.name == base) { d.next_tab_name(&base) } else { base };
+        // A name already used: "<name> (1)", "(2)", … (live).
+        let name = noshape_model::native_assembly::unique_name(d, &g[0].0);
         let id = d.add_tab(&name, TabContent::PartStudio(ps));
         crate::docedit::place_after(d, id, at);
         at = Some(id);

@@ -237,7 +237,10 @@ pub struct UiState {
     pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
-    pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
+    pub measure_lines: Option<(Vec<Reference>, Option<String>, Option<noshape_render::Instance>)>,
+    /// The Measure panel's distance row under the pointer (its label): live
+    /// draws that one measurement's dashed line, nothing otherwise.
+    pub measure_hover: Option<String>,
     /// Dynamic suppression editor: feature, expression input.
     pub dyn_suppression: Option<(FeatureId, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
@@ -245,6 +248,8 @@ pub struct UiState {
     pub shortcut_query: String,
     /// Shortcut sheet tab (General, Part Studio, …).
     pub shortcut_tab: usize,
+    /// The shortcut map's rows (Chrome's scrollbar, live menus/616).
+    pub shortcut_scroll: gpui_kit::ScrollHandle,
     /// Recently started tools, newest first (Search tools with no query).
     pub recent_tools: Vec<&'static str>,
     /// Camera menu "Orient normal to sketch on edit" and its state: an
@@ -436,10 +441,12 @@ impl UiState {
             hole_prev: None,
             preview_tool_task: None,
             measure_lines: None,
+            measure_hover: None,
             dyn_suppression: None,
             shortcut_filter: None,
             shortcut_query: String::new(),
             shortcut_tab: 0,
+            shortcut_scroll: gpui_kit::ScrollHandle::new(),
             recent_tools: Vec::new(),
             orient_on_edit: false,
             orient_pending: false,
@@ -2172,18 +2179,33 @@ impl PartStudioView {
         acc
     }
 
-    /// What zoom to fit and the standard views frame: Onshape's `getFitBounds`
-    /// = the model node's bounds, which hold the visible planes (default
-    /// planes included) as well as parts and sketches.
+    /// What Zoom to fit and the standard views frame (Onshape, live "Zoom to
+    /// fit (perf 10-23 22:40)"): the visible parts and sketches, the origin
+    /// point when it is shown, and the visible planes (the default ones
+    /// span ±75 mm).
     pub(super) fn zoom_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
+        let origin = self.opts.show_origin && self.display.show_origin;
+        self.fit_box(origin, |pl| self.opts.show_planes && !pl.hidden)
+    }
+
+    /// The camera a Part Studio opens with frames its parts and the default
+    /// planes' box, also when those are hidden (live, the same capture).
+    pub(super) fn load_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
+        self.fit_box(true, |pl| matches!(pl.reference, noshape_model::reference::Reference::Plane(_)))
+    }
+
+    /// The parts and sketches ([`Self::fit_bounds`]), the origin point if
+    /// `origin`, and the planes `planes` takes.
+    fn fit_box(&self, origin: bool, planes: impl Fn(&noshape_model::display::PlaneDisplay) -> bool) -> Option<(glam::DVec3, glam::DVec3)> {
         let mut acc = self.fit_bounds();
-        if self.opts.show_planes {
-            for pl in self.display.planes.iter().filter(|p| !p.hidden) {
-                let f = &pl.frame;
-                for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
-                    let q = f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height);
-                    acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
-                }
+        let mut add = |q: glam::DVec3| acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
+        if origin {
+            add(glam::DVec3::ZERO);
+        }
+        for pl in self.display.planes.iter().filter(|p| planes(p)) {
+            let f = &pl.frame;
+            for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
+                add(f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height));
             }
         }
         acc
@@ -2440,14 +2462,19 @@ impl PartStudioView {
     /// components.
     pub(super) fn measure_overlay(&mut self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineData, LineSegment};
-        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 {
+        // Live (behaviours "ui (10-23 a)"): no measure lines from the
+        // selection alone; hovering a distance row of the open Measure panel
+        // draws that distance as one black dashed line.
+        let hover = self.ui.measure_hover.clone().filter(|_| self.ui.measure_pinned);
+        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 || hover.is_none() {
             return Vec::new();
         }
         let sel = self.selection.clone();
         let Some(ctx) = self.measure_context(&sel, cx) else { return Vec::new() };
-        // Uploaded once per selection (refresh_scene runs on every hover).
-        if let Some((s, inst)) = &self.ui.measure_lines
+        // Uploaded once per selection and row (refresh_scene runs on every hover).
+        if let Some((s, h, inst)) = &self.ui.measure_lines
             && *s == sel
+            && *h == hover
         {
             return inst.iter().cloned().collect();
         }
@@ -2460,25 +2487,18 @@ impl PartStudioView {
             }
         };
         let mut l = LineData::default();
-        for (_, m) in results {
-            if let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m {
+        for (label, m) in results {
+            if Some(&label) == hover.as_ref()
+                && let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m
+            {
                 let f = |v: glam::DVec3| -> [f32; 3] { v.as_vec3().into() };
-                let style = LineSegment::DASHED | LineSegment::ON_TOP;
-                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style });
-                let x = glam::DVec3::new(b.x, a.y, a.z);
-                let y = glam::DVec3::new(b.x, b.y, a.z);
-                for (p, q, c) in [(a, x, [220, 40, 40, 255]), (x, y, [40, 170, 60, 255]), (y, b, [40, 90, 220, 255])] {
-                    if p.distance(q) > 1e-9 {
-                        l.segments.push(LineSegment { a: f(p), b: f(q), color: c, pick_id: 0, width: 1.0, style });
-                    }
-                }
+                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style: LineSegment::DASHED | LineSegment::ON_TOP });
             }
         }
-        // Out of the scene bounds (qa4 R1): a distance to a default plane ends
-        // far out on it, and the depth range fitted to that let edges show
-        // through the parts.
+        // Out of the scene bounds (qa4 R1): a distance to a default plane can
+        // end far out on it.
         let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().no_bounds().layer(21));
-        self.ui.measure_lines = Some((self.selection.clone(), inst.clone()));
+        self.ui.measure_lines = Some((self.selection.clone(), hover, inst.clone()));
         inst.into_iter().collect()
     }
 
