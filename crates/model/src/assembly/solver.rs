@@ -923,6 +923,51 @@ mod tests {
         assert!((o.z - 0.05).abs() < 1e-3, "{o:?}");
     }
 
+    /// The six everyday mates (Onshape: Fastened 0 DOF; Revolute rotate Z;
+    /// Slider translate Z; Cylindrical translate + rotate Z; Planar translate
+    /// X, Y + rotate Z; Ball rotate X, Y, Z): their DOF and which way a drag
+    /// of the moving part's origin can carry it.
+    #[test]
+    fn core_mates_leave_their_degrees_of_freedom() {
+        // (mate, DOF, which of the dragged x, y, z the origin follows)
+        let cases = [
+            (MateType::Fastened, 0, [false, false, false]),
+            (MateType::Revolute, 1, [false, false, false]),
+            (MateType::Slider, 1, [false, false, true]),
+            (MateType::Cylindrical, 2, [false, false, true]),
+            (MateType::Planar, 3, [true, true, false]),
+            (MateType::Ball, 3, [false, false, false]),
+        ];
+        let la = Frame::from_axes(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let lb = Frame::from_axes(DVec3::ZERO, DVec3::NEG_Z, DVec3::X);
+        let target = DVec3::new(0.02, -0.03, 0.05);
+        for (kind, dof, follows) in cases {
+            let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::ZERO, false)];
+            let mates = vec![mate(kind, 0, la, 1, lb)];
+            let r = solve(&mut bodies, &mates, &[], &[]);
+            assert!(r.converged, "{kind:?}");
+            assert_eq!(r.dof, dof, "{kind:?} DOF");
+            assert_eq!(r.body_dof[1], dof, "{kind:?} body DOF");
+            let drags = vec![DragTarget { body: 1, local_point: DVec3::ZERO, target }];
+            let r = solve(&mut bodies, &mates, &[], &drags);
+            assert!(r.converged, "{kind:?} drag");
+            let o = bodies[1].pose.origin;
+            for (k, f) in follows.iter().enumerate() {
+                let want = if *f { target[k] } else { 0.0 };
+                assert!((o[k] - want).abs() < 1e-3, "{kind:?}: origin {o:?}, axis {k} should be {want}");
+            }
+        }
+        // Ball: dragging a point off the centre turns the part about it.
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::ZERO, false)];
+        let mates = vec![mate(MateType::Ball, 0, la, 1, lb)];
+        let drags = vec![DragTarget { body: 1, local_point: DVec3::new(0.01, 0.0, 0.0), target: DVec3::new(0.0, 0.0, 0.01) }];
+        let r = solve(&mut bodies, &mates, &[], &drags);
+        assert!(r.converged);
+        let p = bodies[1].pose;
+        assert!(p.origin.length() < 1e-6, "{:?}", p.origin);
+        assert!((p.transform_point(DVec3::new(0.01, 0.0, 0.0)) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-3);
+    }
+
     #[test]
     fn tangent_sphere_on_plane_and_sphere_on_sphere() {
         // Ball (r = 10 mm) on a fixed plane z = 0 (normal +Z): center at z = 10 mm, 5 DOF left.
