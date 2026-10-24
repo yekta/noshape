@@ -72,3 +72,12 @@ Fresh doc /tmp/qa5/d23b/derive.noshape (pass9/mkderive.py), configured /tmp/qa5/
 | DER4 fillet chip on a derived edge | "Edge of Derived 1" (z03) | ✅ **fixed** |
 | DER13 fillet error after suppressing the source | "Fillet 1 did not regenerate properly: Select edges or faces to fillet." (z04) | ✅ **fixed** |
 | DER14 Derived row menu | has "Add appearance to feature…" (z02) | ✅ **fixed** |
+
+## Re-check on main a0e360a3 (qa4, 2026-10-23 19:30–20:40, FRESH=1, /root/qa4-scratch/bin/noshape-main)
+| Finding | Result |
+|---|---|
+| DER2 panel icons | ✅ second icon is the branch glyph |
+| Row 4 (DER3) pick the studio | ✅ row blue, expands inline, ‹ back arrow, contents listed |
+| DER5 row expander | ✅ "›" on the Derived row |
+| DER7 second Derived of the same studio | ✅ parts drawn normally while its dialog is open, ✓ enabled |
+| DER1, DER4, DER6, DER8–DER11, DER13, DER14, TAB1, CRASH1 | fixes cited in code; not re-run this pass |

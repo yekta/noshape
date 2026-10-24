@@ -601,7 +601,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             return err("Could not pattern selected parts.");
         }
         let mut n = 0u32;
-        let mut made: Vec<(String, BodyId)> = Vec::new();
+        let mut made: Vec<(String, BodyId, BodyId)> = Vec::new();
         for bi in bodies {
             let body = ev.ctx.bodies[bi].clone();
             for (k_, m) in transforms.iter().enumerate() {
@@ -609,7 +609,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let inst = instance_number(names.get(k_).map(|s| s.as_str()).unwrap_or(""), k_);
                 let faces = copy_names(ev, &body.faces, &res, inst);
                 push_body(ev, BodyId { feature: ev.feature, index: n }, body.kind, res.shape, faces);
-                made.push((names.get(k_).cloned().unwrap_or_default(), BodyId { feature: ev.feature, index: n }));
+                made.push((names.get(k_).cloned().unwrap_or_default(), body.id.clone(), BodyId { feature: ev.feature, index: n }));
                 n += 1;
             }
         }
@@ -618,8 +618,14 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // Instance bodies as renamed after the operation.
     let mut st = cx.state.lock();
     let (marker, feature) = (super::marker_of(&id), st.feature);
-    for (name, b) in made {
-        st.pattern_instances.entry((id.clone(), name)).or_default().push(super::wrap_body_id(&b, marker, feature));
+    for (name, source, b) in made {
+        let inst = super::wrap_body_id(&b, marker, feature);
+        // A copy keeps its body's attributes (std Form's tool instances keep the Tag's form attributes).
+        let copied: Vec<Value> = st.attributes.iter().filter(|(r, _)| *r == Reference::Body(source.clone())).map(|(_, v)| v.clone()).collect();
+        for v in copied {
+            st.push_attribute(Reference::Body(inst.clone()), v);
+        }
+        st.pattern_instances.entry((id.clone(), name)).or_default().push(inst);
     }
     Ok(Value::Undefined)
 }
@@ -1520,7 +1526,10 @@ fn op_merge_contexts(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     for q in def.get("trackThroughMerge").as_array().iter().flat_map(|v| v.iter()) {
         tracked.push(evaluate_refs(i, other, q)?);
     }
-    let source = other.state.lock().ctx.clone();
+    let (source, source_attributes) = {
+        let o = other.state.lock();
+        (o.ctx.clone(), o.attributes.clone())
+    };
     let (marker, moved) = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
         let mut moved: Vec<(BodyId, u32)> = Vec::new();
         for b in &source.bodies {
@@ -1533,19 +1542,25 @@ fn op_merge_contexts(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     })?;
     let mut st = cx.state.lock();
     let feature = st.feature;
+    let merged = |r: Reference| match &r {
+        Reference::Body(old) => match moved.iter().find(|(o, _)| o == old) {
+            Some((_, index)) => Reference::Body(super::wrap_body_id(&BodyId { feature: marker, index: *index }, marker, feature)),
+            None => r,
+        },
+        _ => r,
+    };
+    // The merged entities keep their attributes (std Form imports its tools by
+    // the Tag feature's form attributes).
+    for (r, v) in source_attributes {
+        st.push_attribute(merged(r), v);
+    }
     let out: Vec<Value> = tracked
         .into_iter()
         .map(|refs| {
             let ids = refs
                 .into_iter()
                 .map(|r| {
-                    let r = match &r {
-                        Reference::Body(old) => match moved.iter().find(|(o, _)| o == old) {
-                            Some((_, index)) => Reference::Body(super::wrap_body_id(&BodyId { feature: marker, index: *index }, marker, feature)),
-                            None => r,
-                        },
-                        _ => r,
-                    };
+                    let r = merged(r);
                     Value::str(st.transient(&r))
                 })
                 .collect();

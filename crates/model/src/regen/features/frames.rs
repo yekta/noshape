@@ -987,17 +987,17 @@ pub fn tag(ev: &mut EvalCtx) -> FResult<()> {
         return Ok(());
     }
     let body = |ev: &EvalCtx, id: &str| ev.resolve_bodies(ev.query(id)).first().map(|&i| ev.ctx.bodies[i].id.clone());
-    let add = body(ev, "partToAdd");
-    let remove = body(ev, "partToRemove");
+    let add = body(ev, "positivePart");
+    let remove = body(ev, "negativePart");
     if add.is_none() && remove.is_none() {
         return err("Select the part to add and/or the part to remove");
     }
-    let sketch = ev.query("flatSketch").iter().find_map(|r| match r {
+    let sketch = ev.query("flatFormSketch").iter().find_map(|r| match r {
         Reference::Sketch(f) | Reference::Feature(f) => Some(*f),
         Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } => Some(*sketch),
         _ => None,
     });
-    let origin = ev.query("formOrigin").first().and_then(|r| ev.resolve_connector(r)).map(|c| (c.origin, c.x, c.z));
+    let origin = ev.query("cSysMateConnector").first().and_then(|r| ev.resolve_connector(r)).map(|c| (c.origin, c.x, c.z));
     let feature = ev.feature;
     ev.ctx.form_tools.push(crate::sheetmetal::FormTool { feature, add, remove, sketch, origin });
     Ok(())

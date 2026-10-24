@@ -95,6 +95,15 @@ fn blend_failed(message: &str, e: impl std::fmt::Display) -> crate::regen::eval:
     crate::regen::eval::FeatureError::new(message)
 }
 
+/// Onshape's message for a failed fillet: one that would roll past the faces
+/// it touches has its own (live "kern blend sweep" 2a).
+fn fillet_failed(e: k::KernelError) -> crate::regen::eval::FeatureError {
+    if e.to_string().contains("unfilleted edge overlapped") {
+        return blend_failed("Unfilleted edge overlapped by fillet.", e);
+    }
+    blend_failed("Failed to fillet selections.", e)
+}
+
 /// Onshape's message for a failed chamfer: a chamfer wider than a face it
 /// runs over has its own.
 fn chamfer_failed(e: k::KernelError) -> crate::regen::eval::FeatureError {
@@ -223,7 +232,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             // Without propagation a single straight edge whose ball fits its faces
             // can still be filleted by booleans (F3: R4 after R2/R3 stopped at their edges).
             Err(_) if !propagate && edges.len() == 1 && super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius)).is_ok() => continue,
-            Err(e) => return Err(blend_failed("Failed to fillet selections.", e)),
+            Err(e) => return Err(fillet_failed(e)),
         };
         let t1 = std::time::Instant::now();
         let names = body.shape_names();
