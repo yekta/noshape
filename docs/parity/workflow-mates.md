@@ -50,3 +50,11 @@ Docs /tmp/qa5/d24b/m.noshape (mate-base copy), /tmp/qa5/d24b/full.noshape (pass 
 ## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
 - MT3 tooltip "… (Click to edit)" ✅ in code; MT5 offset values now regular text (QuantityInput, qa4 10-22) ✅; MT5 limit fields,
   MT6 default axis, MT7 label, MT9: fixes cited in code, not re-run (the demo's mates are drawn grey here: checked separately).
+
+## skb P1 mates audit (2026-10-24, agent/skb on main fde24dac; /root/skb-scratch/mates, plate with Ø10 hole + Ø10×30 pin)
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| MT10 HUD position | centred on the 2nd pick, bottom edge on it, kept inside the graphics area (assembly/35, 93; mate-hud.txt) | was +14/+14 below-right, unclamped (✓/✕ cut off at the right edge, mates/s06) | ✅ **fixed** |
+| MT11 DOF and drag per type | Fastened 0, Revolute ⟳z, Slider ↹z, Cylindrical ⟳z ↹z, Planar ⟳z ↹x ↹y, Ball 3 rotations (behaviours DOF table) | same (solver test + drags in the app, mates/t-*.png) | ✅ |
+| MT12 retype via Edit… | the row is renamed, the solve follows the new type | same (Revolute → Slider → Cylindrical → Planar → Ball) | ✅ |
+| MT13 cylinder-face inference | connector on the axis at mid-length, dots at the end centres (assembly/31) | same (mates/s10) | ✅ |
