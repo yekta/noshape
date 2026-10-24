@@ -47,17 +47,9 @@ pub fn file_icon(f: &FileTab) -> &'static str {
     }
 }
 
-/// Add a file tab named after the file (unique), in `folder` when given.
-pub fn add_file_tab(d: &mut Document, file: FileTab, folder: Option<TabId>, after: Option<TabId>) -> TabId {
-    let base = file.file_name.clone();
-    let name = if d.tabs.iter().any(|t| t.name == base) { d.next_tab_name(&base) } else { base };
-    let id = d.add_tab(&name, TabContent::File(file));
-    crate::workspace::place_after(d, id, after);
-    if let Some(f) = folder {
-        d.set_parent(id, Some(f));
-    }
-    id
-}
+/// Add a file tab named after the file, in `folder` when given (shared with
+/// the agent API).
+pub use noshape_ops::import::add_file_tab;
 
 /// The "CAD Imports" folder (Onshape keeps imported CAD files there), made if needed.
 pub fn cad_imports_folder(d: &mut Document) -> TabId {

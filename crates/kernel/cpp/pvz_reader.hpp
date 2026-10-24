@@ -25,9 +25,10 @@ struct MeshInstance
   std::array<double, 12>       placement{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 };
 
-// Every part instance of the file (root last, children in file order).
+// Every part instance of the file (root last, children in file order), and
+// the root node's name ("RootAssembly") in `root_name` when given.
 // Throws std::runtime_error on a malformed file.
-std::vector<MeshInstance> read_meshes(const std::string& bytes);
+std::vector<MeshInstance> read_meshes(const std::string& bytes, std::string* root_name = nullptr);
 
 // Raw deflate (RFC 1951) of `in`; throws std::runtime_error.
 std::string inflate_raw(const unsigned char* in, size_t len);

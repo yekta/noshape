@@ -2089,82 +2089,8 @@ fn tab_chip(id: impl Into<ElementId>, active: bool) -> Stateful<Div> {
         .text_color(if active { pal.text } else { pal.text_muted })
 }
 
-/// File types "Import files…" translates.
-pub(crate) const IMPORT_EXTS: &[&str] =
-    &["step", "stp", "iges", "igs", "brep", "stl", "obj", "pvz", "x_t", "x_b", "xmt_txt", "xmt_bin", "3dm", "sldprt", "par", "psm", "prt", "ipt", "sat", "sab", "3mf", "gltf", "glb", "jt", "zip"];
-
-/// Tab (and document) name of an imported file: the file name without its
-/// extension; and the full file name.
-pub(crate) fn import_names(path: &std::path::Path) -> (String, String) {
-    let file = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
-    let stem = path.file_stem().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| file.clone());
-    (stem, file)
-}
-
-/// Read a CAD or mesh file as BREP text. Mesh files carry no unit: they are
-/// read in the document's length unit.
-/// A translated CAD file: its shapes as BREP text (a compound, one child per
-/// part when `parts` is set) and what the file says about each part (JSON
-/// list of `ImportPartInfo`, empty when the format names none).
-#[derive(Clone)]
-pub(crate) struct Foreign {
-    pub brep: String,
-    pub parts: String,
-}
-
-pub(crate) fn read_foreign(path: &std::path::Path, units: &noshape_units::UnitPrefs) -> anyhow::Result<Foreign> {
-    use noshape_kernel as k;
-    let mesh_unit = {
-        use noshape_units::LengthUnit as U;
-        match units.length {
-            U::Centimeter => k::LengthUnit::Centimeter,
-            U::Meter => k::LengthUnit::Meter,
-            U::Inch => k::LengthUnit::Inch,
-            U::Foot => k::LengthUnit::Foot,
-            U::Yard => k::LengthUnit::Yard,
-            _ => k::LengthUnit::Millimeter,
-        }
-    };
-    let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-    // Parts with names and colours: one compound child each, described in `info`.
-    let mut info: Vec<noshape_model::features::importing::ImportPartInfo> = Vec::new();
-    let mut compound = |parts: Vec<k::ImportedShape>| {
-        info = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, opacity: p.opacity, faces: p.face_colors.clone() }).collect();
-        k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>())
-    };
-    let shape = match ext.as_str() {
-        "step" | "stp" => compound(k::read_step(path, k::LengthUnit::Meter)?),
-        "iges" | "igs" => k::read_iges(path, k::LengthUnit::Meter)?,
-        "brep" => k::read_brep(path)?,
-        // Onshape imports STL, OBJ and PVZ as mesh parts (PVZ is in metres).
-        "stl" | "obj" => k::read_mesh_bodies(path, mesh_unit)?,
-        // 3MF and glTF carry their units (read in millimetres).
-        "3mf" | "gltf" | "glb" => k::read_mesh_bodies(path, k::LengthUnit::Millimeter)?,
-        "pvz" => k::read_pvz(path, k::LengthUnit::Meter)?,
-        "x_t" | "x_b" | "xmt_txt" | "xmt_bin" => compound(k::read_parasolid_parts(path, k::LengthUnit::Meter)?),
-        "3dm" => compound(k::read_rhino_parts(path, k::LengthUnit::Meter)?),
-        // Native CAD parts: the geometry they embed (Parasolid: SolidWorks, Solid Edge, NX; ACIS: Inventor).
-        "sat" | "sab" => compound(k::read_acis_parts(path, k::LengthUnit::Meter)?),
-        "jt" => compound(k::read_jt_parts(path, k::LengthUnit::Meter)?),
-        "sldprt" | "par" | "psm" | "prt" | "ipt" => compound(k::read_native_parts(path, k::LengthUnit::Meter)?),
-        other => anyhow::bail!("Unsupported file type .{other}"),
-    };
-    let parts = if info.is_empty() { String::new() } else { serde_json::to_string(&info)? };
-    Ok(Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts })
-}
-
-/// Append an Import feature ("Import N") holding `brep` to `ps`.
-pub(crate) fn add_import_feature(ps: &mut noshape_model::PartStudio, file: &str, foreign: Foreign, units: &noshape_units::UnitPrefs) {
-    if let Some(mut f) = ps.new_feature("importForeign", units) {
-        // Live (documents/64-import-feature-dialog.png): the feature is
-        // numbered like any other ("Import 1") and allows faulty parts.
-        f.params.set("allowFaultyParts", noshape_model::ParamValue::Bool(true));
-        f.params.set("blobData", noshape_model::ParamValue::Text(foreign.brep));
-        f.params.set("partInfo", noshape_model::ParamValue::Text(foreign.parts));
-        f.params.set("foreignId", noshape_model::ParamValue::Text(file.to_string()));
-        ps.insert_at_rollback(f);
-    }
-}
+// Importing is shared with the agent API (crates/ops/src/import.rs).
+pub(crate) use noshape_ops::import::{IMPORT_EXTS, add_import_feature, import_names, read_foreign};
 
 /// Tab right-click menus (live menus/rmb-tab-*): they open upward, the
 /// bottom on the tab bar's top edge and the left edge at the tab's.

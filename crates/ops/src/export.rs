@@ -265,9 +265,12 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
             k::write_step_with(path, &shapes, k::LengthUnit::Meter, &k::StepOptions { schema, file_unit })?;
         }
         PartFormat::Iges => k::write_iges(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
-        // Text transmit file, schema 12006: every Parasolid version reads it, so
-        // the Version choice needs no other format.
-        PartFormat::Parasolid => k::write_parasolid(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter, false)?,
+        // Text transmit file in the chosen version (live G36: the body in that
+        // version's layouts; "Use latest version" = 38.1).
+        PartFormat::Parasolid => {
+            let version = if s.latest { PARASOLID_VERSIONS[0] } else { PARASOLID_VERSIONS.get(s.version).copied().unwrap_or(PARASOLID_VERSIONS[0]) };
+            k::write_parasolid_version(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter, false, version)?
+        }
         PartFormat::Acis => k::write_acis(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         PartFormat::Pvz => {
             let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, _)| k::ExportShape { shape: sh.clone(), name: Some(n.clone()), color: None }).collect();
