@@ -27,7 +27,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
 use crate::os_ui::OsDropdownExt as _;
-use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::assembly::analysis;
@@ -843,7 +843,10 @@ impl AssemblyView {
             o.ghost_tops.extend(t.iter().copied());
         }
         if let Some(s) = &self.ui.section {
-            o.section.push(s.clip());
+            o.section = s.planes.iter().map(|p| p.clip()).collect();
+            // Exclude: the listed instances stay whole; Include: only they are cut.
+            o.section_skip = if s.include { self.result.occurrences.iter().map(|oc| oc.top()).filter(|t| !s.items.contains(t)).collect() } else { s.items.iter().copied().collect() };
+            o.section_selected = s.dialog.as_ref().map(|d| d.active);
         }
         // Interference detection: everything see-through around the red
         // overlaps, still pickable for Instances to analyze (live 736).
@@ -2346,6 +2349,13 @@ impl AssemblyView {
                     // Explode step dialog: picks go to its active field.
                     if let Some(t) = self.pick(*pick) {
                         self.step_edit_pick(t, cx);
+                    }
+                    return;
+                }
+                if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some()) {
+                    // Section view dialog: picks go to its active field.
+                    if let Some(t) = self.pick(*pick) {
+                        self.section_pick(t, cx);
                     }
                     return;
                 }
@@ -3872,11 +3882,6 @@ impl AssemblyView {
         Self::panel_frame_full(title, body, close, id, plain_close, None)
     }
 
-    /// `panel_frame` whose title moves the panel (`crate::ui::panel_title`).
-    pub(super) fn panel_frame_moving(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, drag: &'static str) -> Div {
-        Self::panel_frame_full(title, body, close, id, false, Some(drag))
-    }
-
     fn panel_frame_full(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, plain_close: bool, drag: Option<&'static str>) -> Div {
         let pal = p();
         let title = div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title.to_string());
@@ -5075,7 +5080,7 @@ impl AssemblyView {
         let pal = p();
         let view = cx.entity();
         let perspective = self.viewport.read(cx).camera.projection == noshape_render::Projection::Perspective;
-        let show_mates = self.show_mates;
+        let section = self.ui.section.is_some();
         let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
         Button::new("asm-camera-menu")
             .custom(variant)
@@ -5091,6 +5096,8 @@ impl AssemblyView {
                     m = m.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.view(sv, cx))));
                 }
                 let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                // Live ("qa5 assembly camera menu", VC8): no "Show mates" here;
+                // Section view… ends the menu as in the Part Studio.
                 m.separator()
                     .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx)))))
                     .separator()
@@ -5102,13 +5109,8 @@ impl AssemblyView {
                             })
                         })
                     }))
-                    .item(crate::os_menu::OsMenuItem::new("Show mates").checked(show_mates).on_click(move |_, _, cx| {
-                        v3.update(cx, |this, cx| {
-                            this.show_mates = !this.show_mates;
-                            this.refresh_scene(false, cx);
-                            cx.notify();
-                        })
-                    }))
+                    .separator()
+                    .item(crate::os_menu::OsMenuItem::new(if section { "Turn off section view" } else { "Section view…" }).icon_name("menu-section-view").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_section(w, cx))))
             })
             .into_any_element()
     }
@@ -5327,8 +5329,8 @@ impl AssemblyView {
             cx.notify();
         } else if self.ui.measure.is_some() {
             self.toggle_measure(cx);
-        } else if self.ui.section.is_some() {
-            self.toggle_section(window, cx);
+        } else if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some()) {
+            self.close_section_dialog(false, window, cx);
         } else if self.exit_isolate(cx) {
         } else {
             // Esc keeps the selection (live 312; Space clears it).

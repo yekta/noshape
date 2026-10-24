@@ -208,17 +208,28 @@ pub fn write_iges(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()>
     let f = unit.mm_per_unit();
     let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
-    ck(ffi::write_iges(&l, path_str(path)?))
+    ck(ffi::write_iges(&l, path_str(path)?, "NOSHAPE", env!("CARGO_PKG_VERSION")))
 }
 
+/// The Parasolid versions the Export dialog offers, newest first (Onshape's
+/// list), and 12.0 (the schema the XT Format Reference documents).
+pub const PARASOLID_VERSIONS: [&str; 26] = ["38.1", "37.1", "37.0", "36.0", "35.1", "34.1", "34.0", "33.1", "33.0", "32.1", "32.0", "31.1", "31.0", "30.1", "30.0", "29.1", "29.0", "28.1", "28.0", "27.1", "27.0", "26.1", "26.0", "25.1", "25.0", "12.0"];
+
 /// Write shapes to a Parasolid transmit file, one body each: text (.x_t) or
-/// neutral binary (.x_b), schema 12006 (read by every Parasolid since V12).
-/// Shapes are in `unit`; Parasolid files are in meters.
+/// neutral binary (.x_b), in the latest version (38.1, Onshape's "Use latest
+/// version"). Shapes are in `unit`; Parasolid files are in meters.
 pub fn write_parasolid(path: &Path, shapes: &[Shape], unit: LengthUnit, binary: bool) -> Result<()> {
+    write_parasolid_version(path, shapes, unit, binary, PARASOLID_VERSIONS[0])
+}
+
+/// [`write_parasolid`] in Parasolid version `version` (one of
+/// [`PARASOLID_VERSIONS`]): the body in that version's node layouts, as
+/// Onshape writes each version (live G36).
+pub fn write_parasolid_version(path: &Path, shapes: &[Shape], unit: LengthUnit, binary: bool, version: &str) -> Result<()> {
     let f = unit.mm_per_unit() * 1e-3;
     let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
-    ck(ffi::write_parasolid(&l, path_str(path)?, binary))
+    ck(ffi::write_parasolid(&l, path_str(path)?, binary, version, concat!("noshape ", env!("CARGO_PKG_VERSION"))))
 }
 
 /// Write shapes to an ACIS save file (.sat, version 7.0), one body each, in
@@ -274,6 +285,40 @@ pub fn write_pvz(path: &Path, shapes: &[ExportShape], unit: LengthUnit) -> Resul
 pub fn read_pvz(path: &Path, unit: LengthUnit) -> Result<Shape> {
     let s = Shape::from_res(ffi::read_pvz(path_str(path)?))?;
     scaled(&s, 1e3 / unit.mm_per_unit())
+}
+
+/// A .pvz file's distinct parts as mesh bodies, each in its own
+/// coordinates and named like its first instance, in Onshape's order (the
+/// part files' numbers, highest first), in `unit`. See [`read_pvz_instances`]
+/// for where they are placed.
+pub fn read_pvz_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+    imported(ck(ffi::read_pvz_parts(path_str(path)?))?, unit)
+}
+
+/// A placed part instance of a .pvz file.
+#[derive(Clone, Debug)]
+pub struct PvzInstance {
+    /// Index into [`read_pvz_parts`].
+    pub part: usize,
+    pub name: String,
+    /// Placement in the file, metres.
+    pub transform: glam::DMat4,
+}
+
+/// A .pvz file's part instances (product tree order) and the tree's root
+/// name ("RootAssembly").
+pub fn read_pvz_instances(path: &Path) -> Result<(String, Vec<PvzInstance>)> {
+    let list = ck(ffi::read_pvz_instances(path_str(path)?))?;
+    let root = list.first().map(|i| i.root.clone()).unwrap_or_default();
+    let instances = list
+        .iter()
+        .map(|i| {
+            let t = &i.transform;
+            let m = glam::DMat4::from_cols_array(&[t[0], t[4], t[8], 0.0, t[1], t[5], t[9], 0.0, t[2], t[6], t[10], 0.0, t[3], t[7], t[11], 1.0]);
+            PvzInstance { part: i.part as usize, name: i.name.clone(), transform: m }
+        })
+        .collect();
+    Ok((root, instances))
 }
 
 /// Read an STL or OBJ file as Onshape imports it: mesh bodies (a compound of

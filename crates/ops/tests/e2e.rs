@@ -1576,3 +1576,116 @@ fn drawing_auxiliary_view_in_line_with_a_sketch_line() {
     let id = r["view"].clone();
     assert_eq!(r["views"].as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["kind"], "auxiliary", "{r}");
 }
+
+/// Live samples (outside the repo; skipped when missing).
+fn live_sample(name: &str) -> Option<std::path::PathBuf> {
+    let p = std::path::Path::new("/root/onshape-research/live/samples").join(name);
+    p.is_file().then_some(p)
+}
+
+#[test]
+fn pvz_of_several_parts_imports_as_part_studio_and_assembly() {
+    let Some(pvz) = live_sample("pvz-shapes.pvz") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("pvz_import.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+    // Live (qa5 zip import): Assembly "RootAssembly" then Part Studio "pvz-shapes parts".
+    let mut tabs: Vec<(String, String)> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+    tabs.sort();
+    assert_eq!(tabs, vec![("RootAssembly".to_string(), "Assembly".to_string()), ("pvz-shapes parts".to_string(), "Part Studio".to_string())], "{r}");
+    let order: Vec<String> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    let (a, s) = (order.iter().position(|t| t == "RootAssembly").unwrap(), order.iter().position(|t| t == "pvz-shapes parts").unwrap());
+    assert!(a < s, "the Assembly tab first: {order:?}");
+    // Parts named as in the file, in live's order, mesh volumes as live's.
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "pvz-shapes parts" }));
+    let solids: Vec<(String, f64)> = parts["parts"].as_array().unwrap().iter().filter(|p| p["kind"] == "Solid").map(|p| (p["name"].as_str().unwrap().to_string(), num(&p["volume"]))).collect();
+    let names: Vec<&str> = solids.iter().map(|s| s.0.as_str()).collect();
+    assert_eq!(names, ["Cylinder", "Torus", "Cone"], "{parts}");
+    for (got, live) in solids.iter().map(|s| s.1).zip([9407.77811303131, 1770.239206699627, 1569.176626930149]) {
+        assert!((got - live).abs() < 1e-3, "{got} vs {live}");
+    }
+    assert!(parts["parts"].as_array().unwrap().iter().any(|p| p["kind"] == "Surface"), "the Loft's open mesh: {parts}");
+    // The Assembly: an instance per solid (the composite isn't instanced).
+    let asm = call(&mut ctx, "assembly_list", json!({ "tab": "RootAssembly" }));
+    let mut inst: Vec<String> = asm["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect();
+    inst.sort();
+    assert_eq!(inst, ["Cone <1>", "Cylinder <1>", "Torus <1>"], "{asm}");
+}
+
+#[test]
+fn pvz_of_one_part_keeps_its_name() {
+    let Some(pvz) = live_sample("pvz-block.pvz") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("pvz_import1.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+    let kinds: Vec<&str> = r["tabs"].as_array().unwrap().iter().map(|t| t["kind"].as_str().unwrap()).collect();
+    assert!(!kinds.contains(&"Assembly"), "{r}");
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "pvz-block" }));
+    assert_eq!(parts["parts"][0]["name"], "Part 1", "{parts}");
+    assert!((num(&parts["parts"][0]["volume"]) - 7999.999463558208).abs() < 1e-3, "{parts}");
+}
+
+/// qa4 IMP1: the parts of one Import feature never share face names (picking
+/// one part highlighted faces of the other).
+#[test]
+fn imported_parts_have_their_own_face_names() {
+    let Some(step) = live_sample("g48-two.step") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("imp1.noshape").to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let faces = call(&mut ctx, "query_entities", json!({ "tab": "g48-two", "kind": "faces" }));
+    let list = faces["faces"].as_array().unwrap();
+    let parts: std::collections::BTreeSet<&str> = list.iter().map(|f| f["part"].as_str().unwrap()).collect();
+    assert_eq!(parts.len(), 2, "{faces}");
+    let mut ids: Vec<&str> = list.iter().map(|f| f["id"].as_str().unwrap()).collect();
+    let n = ids.len();
+    ids.sort();
+    ids.dedup();
+    assert_eq!(ids.len(), n, "a face id names faces of both parts: {faces}");
+}
+
+/// Live ("api (10-23) import parity"): a second import of a file gives its
+/// Part Studio the next free " (n)" and keeps the file tab's name.
+#[test]
+fn second_import_of_a_file_is_numbered_like_onshape() {
+    let Some(step) = live_sample("g25-b.step") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("reimport.noshape").to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let tabs: Vec<(String, String)> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+    let studios: Vec<&str> = tabs.iter().filter(|t| t.1 == "Part Studio" && t.0.starts_with("g25-b")).map(|t| t.0.as_str()).collect();
+    assert_eq!(studios, ["g25-b", "g25-b (1)"], "{tabs:?}");
+    assert_eq!(tabs.iter().filter(|t| t.1 == "File" && t.0 == "g25-b.step").count(), 2, "{tabs:?}");
+}
+
+/// Live: pvz-rot-asm.pvz's instances: <1> turned 90° about z and moved 50 mm
+/// along x, <2> in place.
+#[test]
+fn pvz_instances_keep_their_placements() {
+    let Some(pvz) = live_sample("pvz-rot-asm.pvz") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("pvz_rot.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+    let asm = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
+    assert_eq!(asm, "pvz rot asm", "{r}");
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
+    let inst = list["instances"].as_array().unwrap();
+    let find = |n: &str| inst.iter().find(|i| i["name"] == n).unwrap_or_else(|| panic!("{n}: {list}"));
+    let (a, b) = (find("Part 1 <1>"), find("Part 1 <2>"));
+    let t = |i: &Value| [num(&i["translation"][0]), num(&i["translation"][1]), num(&i["translation"][2])];
+    assert!((t(a)[0] - 50.0).abs() < 1e-6 && t(a)[1].abs() < 1e-6, "{a}");
+    assert!(t(b).iter().all(|x| x.abs() < 1e-6), "{b}");
+    // 90° about z: quaternion (0, 0, ±√½, √½).
+    let q = &a["rotation"];
+    assert!((num(&q[2]).abs() - 0.5f64.sqrt()).abs() < 1e-6, "{a}");
+    // pvz-assembly.pvz: <1> in place, <2> 50 mm along x.
+    let Some(pvz) = live_sample("pvz-assembly.pvz") else { return };
+    let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+    let asm = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
+    let inst = list["instances"].as_array().unwrap();
+    let find = |n: &str| inst.iter().find(|i| i["name"] == n).unwrap_or_else(|| panic!("{n}: {list}"));
+    assert!(t(find("Part 1 <1>")).iter().all(|x| x.abs() < 1e-6), "{list}");
+    assert!((t(find("Part 1 <2>"))[0] - 50.0).abs() < 1e-6, "{list}");
+}

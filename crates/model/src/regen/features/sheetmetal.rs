@@ -429,6 +429,7 @@ fn thicken(ev: &mut EvalCtx, t: f64) -> FResult<()> {
     for bi in before..ev.ctx.bodies.len() {
         let body = ev.ctx.bodies[bi].clone();
         let mut data = model.clone();
+        data.view_back = true;
         data.walls = walls.iter().filter(|w| !faces_named(&body, &w.faces).is_empty()).cloned().collect();
         put_data(ev, bi, data);
         bend_edges(ev, bi)?;

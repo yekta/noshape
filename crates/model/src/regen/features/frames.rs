@@ -15,7 +15,7 @@ use crate::display::BodyKind;
 use crate::naming::Name;
 use crate::reference::{BodyId, FeatureId, Reference, Role, Source, TopoName};
 use crate::regen::context::{Body, Context};
-use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, Profile, err, region_profile, sweep_names};
+use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, Profile, err, err_at, region_profile, sweep_names};
 use glam::{DQuat, DVec2, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
@@ -983,20 +983,33 @@ pub fn cutlist(ev: &mut EvalCtx) -> FResult<()> {
 /// Tag: metadata only (profile tags are read by name from the sketch). Form
 /// tags record the form tool in the context for sheet metal Form.
 pub fn tag(ev: &mut EvalCtx) -> FResult<()> {
+    let sketch_of = |r: &Reference| match r {
+        Reference::Sketch(f) | Reference::Feature(f) => Some(*f),
+        Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } => Some(*sketch),
+        _ => None,
+    };
+    if ev.is("tagPurpose", "FRAME") {
+        // Std doTagProfile: one sketch feature that makes regions (faulty field as std's).
+        let mut sketches: Vec<FeatureId> = ev.query("sketch").iter().filter_map(sketch_of).collect();
+        sketches.dedup();
+        if sketches.len() != 1 || !ev.ctx.sketches.iter().any(|s| s.feature == sketches[0] && !s.regions.is_empty()) {
+            return err_at(&["instanceFunction"], "Select a single sketch feature. The selected feature must create sketch regions.");
+        }
+        return Ok(());
+    }
     if !ev.is("tagPurpose", "FORM") {
         return Ok(());
     }
     let body = |ev: &EvalCtx, id: &str| ev.resolve_bodies(ev.query(id)).first().map(|&i| ev.ctx.bodies[i].id.clone());
     let add = body(ev, "positivePart");
     let remove = body(ev, "negativePart");
-    if add.is_none() && remove.is_none() {
-        return err("Select the part to add and/or the part to remove");
+    if add.is_some() && add == remove {
+        return err_at(&["positivePart", "negativePart"], "Select different parts to add and remove.");
     }
-    let sketch = ev.query("flatFormSketch").iter().find_map(|r| match r {
-        Reference::Sketch(f) | Reference::Feature(f) => Some(*f),
-        Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } => Some(*sketch),
-        _ => None,
-    });
+    if add.is_none() && remove.is_none() {
+        return err("Form must be tagged with at least one part to add or remove.");
+    }
+    let sketch = ev.query("flatFormSketch").iter().find_map(sketch_of);
     let origin = ev.query("cSysMateConnector").first().and_then(|r| ev.resolve_connector(r)).map(|c| (c.origin, c.x, c.z));
     let feature = ev.feature;
     ev.ctx.form_tools.push(crate::sheetmetal::FormTool { feature, add, remove, sketch, origin });

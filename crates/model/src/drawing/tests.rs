@@ -876,7 +876,7 @@ fn gdt_leaders_and_datum_targets() {
     let s = &mut drawing.sheets[0];
     let id = s.next_annotation_id();
     let target = [0.05, 0.0];
-    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target, nodes: Vec::new() }], extra: Default::default() }, position: [200.0, 250.0], ..Default::default() });
+    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target, nodes: Vec::new(), ..Default::default() }], extra: Default::default() }, position: [200.0, 250.0], ..Default::default() });
     s.annotations.push(Annotation { id: id + 1, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.03, 0.0], label: "A1".into(), area: DatumTargetArea::Circle { diameter: 0.01 } }, position: [60.0, 250.0], ..Default::default() });
     s.annotations.push(Annotation { id: id + 2, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A2".into(), area: DatumTargetArea::Point }, position: [50.0, 262.0], ..Default::default() });
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
@@ -2073,6 +2073,10 @@ fn cad_export_dimensions_layers_and_r12_like_onshape() {
     assert_eq!(dimensions.len(), dims);
     for b in &dimensions {
         assert!(b.block_name.starts_with("*D") && b.style_name.starts_with("Onshape-"), "{} {}", b.block_name, b.style_name);
+        // In the drawing's family (Onshape-ISO-25$N in ISO drawings like the
+        // demo, Onshape-Standard$N in ANSI ones), a style of the table.
+        let family = if drawing.is_ansi() { "Onshape-Standard$" } else { "Onshape-ISO-25$" };
+        assert!(d.dim_styles.iter().any(|s| s.name == b.style_name) && (b.style_name.starts_with(family) || b.style_name == "Onshape-OrdinateStyle"), "{}", b.style_name);
         assert_eq!(b.common.layer, "ANNOTATION_TEXT");
         let inner: Vec<&str> = d.entities_in_block(&b.block_name).map(|e| e.as_entity().entity_type()).collect();
         assert!(inner.contains(&"MTEXT") && inner.contains(&"POINT"), "{inner:?}");
@@ -2287,4 +2291,53 @@ fn cad_export_text_styles_per_kind_like_onshape() {
     assert!(mtexts.iter().any(|(s, _)| s == "Onshape-Standard-BomTable-HeaderRow"));
     assert!(mtexts.iter().any(|(s, v)| s == "Onshape-Standard-Table-TitleRow" && v.contains("REVISIONS")), "{mtexts:?}");
     assert!(mtexts.iter().filter(|(s, _)| s.starts_with("Onshape-Standard-Table-")).all(|(_, v)| v.starts_with("{\\pxq")));
+}
+
+/// Help H:views: a child view's scale links to its parent's (default) or,
+/// with "Sheet scale", to the sheet's.
+#[test]
+fn child_view_scale_follows_parent_or_sheet() {
+    let (_, mut drawing) = demo();
+    let sheet = &mut drawing.sheets[0];
+    let child = sheet.views.iter().find(|v| matches!(v.kind, ViewKind::Projected { .. }) && v.scale.is_none()).map(|v| v.id).unwrap();
+    let parent = sheet.parent_of(child).unwrap();
+    sheet.scale = 1.0;
+    sheet.view_mut(parent).unwrap().scale = Some(2.0);
+    assert_eq!(views::view_scale(sheet, child), 2.0);
+    sheet.view_mut(child).unwrap().sheet_scale = true;
+    assert_eq!(views::view_scale(sheet, child), 1.0);
+    // Its own scale still wins.
+    sheet.view_mut(child).unwrap().scale = Some(0.5);
+    assert_eq!(views::view_scale(sheet, child), 0.5);
+}
+
+/// Live drw2 10-21 g: a note leader's landing and side, branches off its
+/// bend and nodes, and node / leader removal keeping the branches.
+#[test]
+fn note_leaders_land_branch_and_lose_nodes() {
+    use super::sheet::note_leader_paths;
+    let bbox = [10.0, 10.0, 30.0, 14.0];
+    let mut leaders = vec![
+        Leader { point: [60.0, 40.0], nodes: vec![[45.0, 30.0]], landing: Some(8.0), ..Default::default() },
+        Leader { point: [70.0, 0.0], start: LeaderStart::Bend(0), ..Default::default() },
+        Leader { point: [50.0, 60.0], start: LeaderStart::Node(0, 0), ..Default::default() },
+    ];
+    let targets: Vec<[f64; 2]> = leaders.iter().map(|l| l.point).collect();
+    let p = note_leader_paths(bbox, &leaders, &targets);
+    // Right side (target to the right), an 8 mm landing, the node, the target.
+    assert_eq!(p[0].points, vec![[31.0, 12.0], [39.0, 12.0], [45.0, 30.0], [60.0, 40.0]]);
+    assert_eq!((p[0].head, p[0].bend()), (2, [39.0, 12.0]));
+    // A branch off the bend, and one off the node.
+    assert_eq!(p[1].points, vec![[39.0, 12.0], [70.0, 0.0]]);
+    assert_eq!(p[2].points, vec![[45.0, 30.0], [50.0, 60.0]]);
+    // A fixed side wins over the nearer one.
+    leaders[0].right = Some(false);
+    assert_eq!(note_leader_paths(bbox, &leaders, &targets)[0].points[0], [9.0, 12.0]);
+    // The node goes: its branch starts at the bend.
+    remove_leader_node(&mut leaders, 0, 0);
+    assert_eq!(leaders[2].start, LeaderStart::Bend(0));
+    // The first leader goes: the branches start at the note's side, renumbered.
+    remove_leader(&mut leaders, 0);
+    assert_eq!(leaders.len(), 2);
+    assert!(leaders.iter().all(|l| l.start == LeaderStart::Side));
 }

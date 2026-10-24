@@ -998,3 +998,37 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
 - Feature list: 88 feature types; all resolve to icons except hidden copyPart / nameEntity / sheetMetalRecognize
   (no file: imported docs only). Light: all at or under the floor; dark: every one within 2 of its light score (sheet-metal-end fixed).
   No live ref for point, refold, unfold, sheet-metal-rip (request filed, with a dark Finish-sheet-metal row).
+
+## Round 20 (2026-10-23) — look parity for ui's backlog: Section view, Named views, Analysis menu, shortcuts pop-out
+- Tool: /root/icons2-scratch/tools/runs.py IMG x|y N A B [tol] = colour runs down a column / along a row (edge
+  positions, 1x, live vs ours). Dark captures of all four requested (REQUESTS icons2 10-23).
+- Section view (part_studio/section.rs), measured against part-studio/70-71: dialog top 3 (as feature dialogs),
+  tabs' underline drawn over the label box (2 px blue / 1 px #d7d7d7, labels on one baseline), fields 3 px in and
+  7 px under the tabs, 5 px apart, plane button flush, empty field 27 px, chip 22 px bold, help = help-dot glyph
+  (#a0a0a0 = live) 4 px from the bottom. Column x=300 now equals live line for line (79..241).
+- Caps: the bundle's endcap shader mixes a SELECTED plane (the dialog's) 80 % toward rgb(255,198,133) → live's
+  tan #e9c698. New `Scene::clip_selected` (render), `SceneOptions::section_selected` (scene), CapPlane.index.y,
+  fs_section_cap. The cap pipeline lost its face depth bias so the coplanar datum plane (strictly-in-front
+  transparent pass) no longer tints it (live 73/74). Open: after ✓ ours is 0.9 x part colour (bundle maths:
+  selector 0 mixes 10 % to black) where live 74 reads (143,196,228) for #9dcfed: request filed with known colours.
+  Assembly section view is a different, simpler panel than Onshape's dialog: capture requested.
+- Named views (part_studio/view_tools.rs) vs part-studio/75-76, psb/nv-911/915: close = GLYPH_CLOSE 23 px #333 at
+  .5 (11x11, darkest 153 = live), 30 px square buttons, "+" #aeaeae in #ddd until a name is typed, field 1 px lower,
+  "No views created" row 26 px (dialog 117 = live), view list = os_ui::select_field_flat (new: native <select>,
+  underline only, black text, #777 arrow; Chrome's native list), remove = new os_ui::GLYPH_REMOVE_CIRCLE (opaque,
+  our drawing) #333 in #aaa once a view is picked, 40 % in #ddd before (live 51 / 174). The OsSelect it used is gone.
+- Analysis tools menu = live (rows, anchor, right edge 1878); 3 px wider only from font metrics (Flama vs ours).
+  Thickness analysis is kept: paid-plan item (Help), absent on the free capture account.
+- Keyboard shortcuts: ↗ (new icon popout-arrow, hand drawn: 11x11, #333 at .75 = live darkest 102) opens the new
+  shortcuts_page.rs window (two columns: General, Sketch, Drawing | 3D view, Part Studio, Assembly, Feature
+  Studio; keys right-aligned at 39.6 %, legend bar, our version in the footer — no PTC/Terms, rule 6/cloud).
+  The modal is now window-level (deferred/anchored over navbar and panels), 1000 px centred, top 26, height
+  window − 154 (live 616). Page section spacing and the popout window size: requested.
+- Round 20b (10-24): crates/app/src/section_dialog.rs = the Section view dialog for both views (Props + Action,
+  host handles actions). Assembly: our simpler panel (offset field + Flip) replaced by it: AsmSection now =
+  planes (≤3, from the hovered face / selected mate connector on open, then face picks), Exclude/Include
+  instances (AsmSceneOptions::section_skip → ignore_clip), dialog state with Cancel restoring; tan cap while open
+  (section_selected). Missing for skb: the assembly section ARROW manipulator (offset/rotate + value box; the
+  Part Studio's lives in part_studio/manipulators.rs), right-click "Edit section view…/Turn off section view".
+  The plane button adds Front (assembly) / a view-facing plane (Part Studio) until Onshape's "Select a plane"
+  options are captured (requested). Shortcut modal: ↗ ml 17 / × ml -5 (header is right-anchored), legend spacers 4.

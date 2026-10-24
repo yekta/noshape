@@ -253,12 +253,13 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         let colored_faces: Vec<(k::Shape, [f32; 3])> = part.faces.iter().filter_map(|&(i, c)| Some((s.sub_shape(ShapeType::Face, i).ok()?, c))).collect();
         if s.is_mesh() {
             let children = s.children();
-            let parts = if s.shape_type() == ShapeType::Compound && !children.is_empty() && children.iter().all(|c| c.shape_type() == ShapeType::Compound) { children } else { vec![s] };
-            for part in parts {
-                let solids = part.solids();
-                looks.extend(solids.iter().map(|_| Look::default()));
+            let pieces = if s.shape_type() == ShapeType::Compound && !children.is_empty() && children.iter().all(|c| c.shape_type() == ShapeType::Compound) { children } else { vec![s] };
+            for piece in pieces {
+                // The file's part name (PVZ) goes to the part's solid.
+                let solids = piece.solids();
+                looks.extend(solids.iter().map(|_| Look { name: part.name.clone(), ..Look::default() }));
                 tools.extend(solids);
-                let open: Vec<k::Shape> = part.children().into_iter().filter(|c| c.shape_type() == ShapeType::Shell).collect();
+                let open: Vec<k::Shape> = piece.children().into_iter().filter(|c| c.shape_type() == ShapeType::Shell).collect();
                 if !open.is_empty() {
                     open_groups.push(open);
                 }
@@ -302,8 +303,12 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     // Separate bodies even if they touch (imports are never merged), each
     // with its own body index.
     let mut next = 0u32;
+    // Face names run on across the bodies (Onshape: every face of an import
+    // has its own id), so two parts never share a face name (qa4 IMP1).
+    let mut face_base = 0u32;
     let mut add = |ev: &mut EvalCtx, p: k::Shape, kind: BodyKind| -> FResult<()> {
-        let names = new_face_names(ev, &p);
+        let names = new_face_names(ev, &p).into_iter().map(|n| offset_new_name(n, face_base)).collect();
+        face_base += p.count(ShapeType::Face) as u32;
         let before = ev.ctx.bodies.len();
         ev.add_new_bodies(NamedShape::new(p, names), kind, next)?;
         next += 1;
@@ -401,4 +406,12 @@ fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
 
 pub fn decal(_ev: &mut EvalCtx) -> FResult<()> {
     err("Decal is not supported yet")
+}
+
+/// A `Role::New` face name moved on by `base` (other names as they are).
+fn offset_new_name(n: crate::naming::Name, base: u32) -> crate::naming::Name {
+    match &*n {
+        crate::reference::TopoName::Face { feature, role: crate::reference::Role::New(i) } if base > 0 => std::sync::Arc::new(crate::reference::TopoName::Face { feature: *feature, role: crate::reference::Role::New(i + base) }),
+        _ => n,
+    }
 }

@@ -81,3 +81,11 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
 | I1 g25-b.sat via the app's + › Import… | 7585.979 mm³ | ✗ still (live 7582.912) |
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
+| Row | Ours now | Status |
+|---|---|---|
+| TAB1 | copy of the qa5 import doc: switching to the g48-two tab shows Parts (2) at once | ✅ fixed |
+| I2 | Delete face field, click right on a block's top edge: "Face of Extrude 3" (face picked) | ✅ |
+| I4 | Plane dialog, click Top in the list, move into the dialog: no row tooltip left | ✅ |
+| API1 / API2 | fixed on agent/qa5 (CLI exits quietly on a closed pipe; tab_create takes "Part Studio" and lists the kinds in its error) | 🔧 |

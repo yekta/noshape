@@ -349,3 +349,12 @@ fn reachability_check_detects_dead_params() {
     let list = vec![ParamSpec::bool("flag", "Flag", false), ParamSpec::bool("dead", "Dead", false).visible(|v| v.is("misspelled", "X"))];
     check_reachable("test", &list, &[], &UnitPrefs::default(), &mut Rng(1));
 }
+
+/// draft.fs: Entities to draft and Parting edges take the focus when a Draft
+/// is edited (UIHint.INITIAL_FOCUS_ON_EDIT).
+#[test]
+fn draft_focus_on_edit_as_draft_fs() {
+    let ty = get("draft").unwrap();
+    let focused: Vec<&str> = ty.params.iter().filter(|s| s.hints.has(Hints::INITIAL_FOCUS_ON_EDIT)).map(|s| s.id).collect();
+    assert_eq!(focused, ["draftFaces", "partingEdges"]);
+}

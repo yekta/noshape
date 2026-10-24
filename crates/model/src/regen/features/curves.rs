@@ -83,15 +83,17 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("startType", "START_POINT") {
         // Live L34: no start point reads "Cannot resolve entities.", no field.
         let Some(p) = ev.query("startPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Cannot resolve entities.") };
-        base += z * (p - base).dot(z);
+        // helix.fs clampWorldPointToRadius: the point must lie in the plane
+        // of the axis start; it is then moved radially onto the helix.
+        if (p - base).dot(z).abs() > 1e-9 {
+            return crate::regen::eval::err_at(&["startPoint"], "Start point and axis start should be coplanar normal to helix direction.");
+        }
         let radial = p - base;
         if radial.length() < 1e-9 {
             return err("The start point lies on the helix axis");
         }
         if axis_type == "AXIS" {
             r0 = radial.length();
-        } else if (radial.length() - r0).abs() > 1e-5 * r0.max(1e-3) {
-            return err("The start point does not lie on the helix start circle");
         }
         x = radial.normalize();
     } else {
@@ -107,6 +109,13 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
         let height = if ev.is("endType", "END_POINT") {
             let Some(p) = ev.query("endPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Select an end point") };
             let mut h = (p - base).dot(z);
+            // helix.fs: on a face the end point must be level with the face's
+            // end (on an axis the point sets the height).
+            if let Some(gh) = geom_height
+                && (h.abs() - gh).abs() > 1e-9
+            {
+                return crate::regen::eval::err_at(&["endPoint"], "End point and axis end should be coplanar normal to helix direction.");
+            }
             if h < 0.0 {
                 // End point below the start: run the other way.
                 z = -z;
@@ -148,7 +157,12 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
                 let round_up = if path == "PITCH" { ev.bool("roundUpPitch") } else { ev.bool("roundUpTurns") };
                 let n = if round_up { (raw - frac).ceil() } else { (raw - frac).floor() }.max(0.0);
                 let r = n + frac;
-                if r < 1e-9 { 1.0 } else { r }
+                let r = if r < 1e-9 { 1.0 } else { r };
+                // helix.fs: an end point sets the revolutions and pitch shown
+                // read-only in the dialog.
+                ev.computed.push(("actualRevolutions".into(), crate::display::ComputedValue::Text(noshape_units::format_number(r, 6))));
+                ev.computed.push(("actualPitch".into(), crate::display::ComputedValue::Length(height / r)));
+                r
             }
             None => raw,
         };
@@ -179,6 +193,22 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     let pitch = height / revs;
     let frame = k::Plane::new(base, z, x);
     let wire = k::make_helix(&frame, r0, pitch, height, left_handed, taper)?;
+    // helix.fs drawConstructionEnds: the end profiles as magenta debug
+    // geometry, a circle across the axis at each end (a point at a zero
+    // radius) and its centre (live 2111).
+    if ev.bool("showStartEndProfiles") {
+        let y = z.cross(x).normalize_or_zero();
+        for (c, r) in [(base, r0), (base + z * height, r0 + height * taper.tan())] {
+            if r > 1e-9 {
+                ev.debug.lines.push((0..=96).map(|i| {
+                    let a = TAU * i as f64 / 96.0;
+                    let p = c + (x * a.cos() + y * a.sin()) * r;
+                    [p.x as f32, p.y as f32, p.z as f32]
+                }).collect());
+            }
+            ev.debug.points.push([c.x as f32, c.y as f32, c.z as f32]);
+        }
+    }
     add_wire_bodies(ev, vec![wire])
 }
 

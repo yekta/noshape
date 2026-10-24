@@ -209,7 +209,7 @@ impl Regenerator {
             }
             live.push(f.id);
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() });
                 continue;
             }
             if let Some(e) = self.entries.get(&f.id)
@@ -220,7 +220,7 @@ impl Regenerator {
                 continue;
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -286,6 +286,8 @@ impl Regenerator {
                                 }
                                 state.computed = std::mem::take(&mut ev.computed);
                                 state.touched = std::mem::take(&mut ev.touched);
+                                state.touched_behind = std::mem::take(&mut ev.touched_behind);
+                                state.debug = std::mem::take(&mut ev.debug);
                                 if uses_context {
                                     ev.ctx.bodies.retain(|b| !crate::in_context::is_context_feature(b.id.feature));
                                 }
@@ -297,6 +299,7 @@ impl Regenerator {
                                 state.message = Some(e.message);
                                 state.faulty = e.faulty.iter().map(|s| s.to_string()).collect();
                                 state.touched = std::mem::take(&mut ev.touched);
+                                state.touched_behind = std::mem::take(&mut ev.touched_behind);
                                 if !ev.error_shapes.is_empty() {
                                     state.error_mesh = Some(display::tessellate_error(&noshape_kernel::Shape::compound(&ev.error_shapes), opts));
                                 }
