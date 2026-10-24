@@ -267,8 +267,61 @@ fn flange_outer_alignment_volume_and_flat() {
     let expected = (mm(40.0) - (rad + t)) + ba(PI / 2.0, rad, k, t) + (mm(20.0) - (rad + t));
     assert!(near(len, expected, 1e-7), "flat {len} vs {expected}");
     assert!(near(width, mm(60.0), 1e-9));
-    // Seen from the reference (bottom) side the flange bends away.
-    assert!(!fp.bend_lines[0].up);
+    // Seen from the definition (top) side, as live shows Thicken models (SM1), the flange bends up.
+    assert!(fp.bend_lines[0].up);
+}
+
+/// Live SM1 ("qa5 sheet metal" (2)-(4), (8), (10)): Thicken of (0,0)-(60,40) on
+/// Top, t 2, r 2; Flange 20 mm on the top edges y = 0 and x = 0 (Inner); Hem on
+/// the top edge x = 60. The sheet metal table lists Bend B, Bend C and Hem D as
+/// Up, and the flat DXF (samples/qa5-sm-flat.dxf, model x / y) has its 3 bend
+/// lines on SHEETMETAL_BEND_LINES_UP, the flanges' at x = -0.27765 and y = -0.27765 mm.
+#[test]
+fn sm1_bends_are_up_in_table_flat_notes_and_dxf() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (0.0, 40.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let key = s.regen().display.sketches[0].regions[0].key.clone();
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+        set_model(p, "2 mm", "2 mm");
+    });
+    let r = s.ok();
+    let (e1, e2) = (edge_at(&r, 0, DVec3::new(mm(30.0), 0.0, mm(2.0))), edge_at(&r, 0, DVec3::new(0.0, mm(20.0), mm(2.0))));
+    s.add("sheetMetalFlange", move |p| {
+        p.set("edges", ParamValue::Query(vec![e1, e2]));
+        p.set("flangeAlignment", en("INNER"));
+        p.set("distance", expr("20 mm"));
+    });
+    let r = s.ok();
+    // The plate's top edge at x = 60 (the flange shortened it).
+    let b = &r.context.bodies[0];
+    let hem = b.shape.edges().iter().position(|e| e.endpoints().is_ok_and(|(a, c)| [a, c].iter().all(|q| near(q.x, mm(60.0), 1e-9) && near(q.z, mm(2.0), 1e-9))));
+    let hem = Reference::Edge((*b.edges[hem.expect("top edge at x = 60")]).clone());
+    s.add("sheetMetalHem", move |p| p.set("edges", ParamValue::Query(vec![hem])));
+    let r = s.ok();
+    // Table (the panel's Bend direction column shows these flags).
+    let fp = flat(&r, 0);
+    assert_eq!(fp.bend_lines.len(), 3);
+    assert!(fp.bend_lines.iter().all(|b| b.up), "{:?}", fp.bend_lines.iter().map(|b| (b.a, b.b, b.up)).collect::<Vec<_>>());
+    // The flanges' bend lines lie where live's do (the flat in model x / y).
+    let c = mm(2.0) - 0.5 * (PI / 2.0) * (mm(2.0) + 0.45 * mm(2.0));
+    let lines: Vec<(DVec2, DVec2)> = fp.bend_lines.iter().map(|b| (b.a, b.b)).collect();
+    assert!(lines.iter().any(|(a, b)| near(a.x, c, 1e-7) && near(b.x, c, 1e-7)), "x = 0 flange at x = {c}: {lines:?}");
+    assert!(lines.iter().any(|(a, b)| near(a.y, c, 1e-7) && near(b.y, c, 1e-7)), "y = 0 flange at y = {c}: {lines:?}");
+    // Flat view notes.
+    let g = fp.to_sheet_geometry();
+    let notes: Vec<&str> = g.texts.iter().map(|t| t.text.as_str()).filter(|t| t.starts_with("UP") || t.starts_with("DOWN")).collect();
+    assert!(notes.len() == 3 && notes.iter().all(|n| n.starts_with("UP ")), "{notes:?}");
+    // DXF layers.
+    let dxf = noshape_model::sheetmetal::flat_dxf::flat_dxf(&fp, &noshape_model::sheetmetal::flat_dxf::FlatExport::default()).unwrap();
+    let dxf = String::from_utf8_lossy(&dxf);
+    let entities = &dxf[dxf.find("ENTITIES").unwrap()..];
+    let entities = &entities[..entities.find("ENDSEC").unwrap()];
+    let on = |layer: &str| entities.lines().filter(|l| l.trim() == layer).count();
+    assert_eq!((on("SHEETMETAL_BEND_LINES_UP"), on("SHEETMETAL_BEND_LINES_DOWN")), (3, 0));
 }
 
 #[test]
@@ -626,8 +679,10 @@ fn frame_rectangle_mitered_cut_list() {
         assert!(row.description.contains("SHS 40x40x3"));
     }
     s.add("cutlist", |p| p.set("selectAllFrames", ParamValue::Bool(true)));
-    s.add("tag", |_| {});
     s.ok();
+    // A Tag with no sketch (std doTagProfile).
+    s.add("tag", |_| {});
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a single sketch feature. The selected feature must create sketch regions.".to_string()));
 }
 
 #[test]

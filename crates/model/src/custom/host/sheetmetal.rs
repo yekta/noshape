@@ -25,8 +25,8 @@ use glam::DVec3;
 use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::Value;
 use noshape_kernel as k;
-use noshape_kernel::Shape;
-use std::collections::BTreeMap;
+use noshape_kernel::{Shape, ShapeType};
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
@@ -84,6 +84,8 @@ struct Definition {
     default_radius: f64,
     /// The parts built from it before (rebuilt in place).
     previous: Vec<BodyId>,
+    /// Form tools registered on walls (std registerSheetMetalFormedTools).
+    forms: Vec<FormTools>,
 }
 
 /// A definition body's bends (edge index → radius), rips (edge indices),
@@ -199,6 +201,50 @@ enum Def {
 }
 
 /// A construction piece's face and the definition entity it comes from.
+/// A form registered on a wall (definition face `face`): the parts to add
+/// and to remove (hidden bodies kept with the model).
+struct FormTools {
+    face: usize,
+    add: Vec<BodyId>,
+    remove: Vec<BodyId>,
+}
+
+/// The body ids a wall attribute's `formedToolBodyIds` name, by role, and every
+/// transient id in them with its entity.
+fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>, Reference)>) -> Vec<FormTools> {
+    let mut out = Vec::new();
+    let Some(items) = wall.get("formedToolBodyIds").as_array() else { return out };
+    for item in items.iter() {
+        let mut body = |v: &Value| -> Option<BodyId> {
+            let s = v.as_str()?;
+            let r = st.transient_ref(&s)?.clone();
+            ids.push((s, r.clone()));
+            if let Reference::Body(b) = r { Some(b) } else { None }
+        };
+        let add = body(item.get("positiveBodyId")).into_iter().collect();
+        let remove = body(item.get("negativeBodyId")).into_iter().collect();
+        body(item.get("placementBodyId"));
+        for sk in item.get("sketchBodyIds").as_array().iter().flat_map(|a| a.iter()) {
+            body(sk);
+        }
+        out.push(FormTools { face, add, remove });
+    }
+    out
+}
+
+/// `v` with the strings `map` renames replaced (a wall attribute's tool ids).
+fn rename_strings(v: &Value, map: &HashMap<Arc<str>, Arc<str>>) -> Value {
+    match v {
+        Value::Str(s, t) => match map.get(s) {
+            Some(n) => Value::Str(n.clone(), *t),
+            None => v.clone(),
+        },
+        Value::Array(a, t) => Value::Array(Arc::new(a.iter().map(|x| rename_strings(x, map)).collect()), *t),
+        Value::Map(m, t) => Value::Map(Arc::new(m.iter().map(|(k, x)| (k.clone(), rename_strings(x, map))).collect()), *t),
+        _ => v.clone(),
+    }
+}
+
 struct Piece {
     face: Shape,
     from: Def,
@@ -1083,6 +1129,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let args = def_arg(i, &a, 2)?;
     let changed = evaluate_refs(i, &cx, args.get("entities"))?;
     // The definition sheets to rebuild and their attributes.
+    let mut tool_ids: Vec<(Arc<str>, Reference)> = Vec::new();
     let (defs, def_refs) = {
         let st = cx.state.lock();
         let q = QueryCx::new(&st);
@@ -1099,7 +1146,13 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             // The part made from it before: the solid carrying its association.
             let own = associations(&st, &body_ref);
             let previous: Vec<BodyId> = st.ctx.bodies.iter().enumerate().filter(|(pb, p)| p.kind == BodyKind::Solid && !own.is_empty() && associations(&st, &q.to_ref(&Ent::Body(*pb))).iter().any(|x| own.contains(x))).map(|(_, p)| p.id.clone()).collect();
-            defs.push(Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous });
+            let mut forms = Vec::new();
+            for f in 0..body.faces.len() {
+                if let Some(wall) = sm_attribute(&st, &q.to_ref(&Ent::Face(b, f)), "WALL") {
+                    forms.extend(form_tools(&st, &wall, f, &mut tool_ids));
+                }
+            }
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -1117,7 +1170,23 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for (n, def) in defs.iter().enumerate() {
             let Some(bi) = ev.ctx.bodies.iter().position(|b| b.id == def.body) else { continue };
             let shape = ev.ctx.bodies[bi].shape.clone();
-            let Built { part, pieces, topo, wall_flats, strips } = build_part(def, &shape)?;
+            let Built { mut part, mut pieces, topo, wall_flats, strips } = build_part(def, &shape)?;
+            // Forms: the parts to remove cut, then the parts to add united;
+            // their faces belong to the wall they sit on.
+            let mut form_shapes: Vec<(usize, Vec<Shape>)> = Vec::new();
+            for ft in &def.forms {
+                let shapes = |ids: &[BodyId]| -> Vec<Shape> { ids.iter().filter_map(|id| ev.ctx.bodies.iter().find(|b| &b.id == id)).map(|b| b.shape.clone()).collect() };
+                let (adds, removes) = (shapes(&ft.add), shapes(&ft.remove));
+                if !removes.is_empty() {
+                    part = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&part), &removes, &k::BooleanOptions::default()).map_err(|e| fe(format!("The form failed: {e}")))?.shape;
+                }
+                if !adds.is_empty() {
+                    part = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&part), &adds, &k::BooleanOptions::default()).map_err(|e| fe(format!("The form failed: {e}")))?.shape;
+                }
+                let tools: Vec<Shape> = removes.into_iter().chain(adds).collect();
+                pieces.extend(tools.iter().flat_map(|t| t.faces()).map(|face| Piece { face, from: Def::Face(ft.face) }));
+                form_shapes.push((ft.face, tools));
+            }
             // The definition body's own topology order (references are by index).
             let def_topo = (ev.ctx.bodies[bi].faces.len(), ev.ctx.bodies[bi].edges.len());
             if def_topo != (topo.faces.len(), topo.edges.len()) {
@@ -1152,7 +1221,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             for (k, p) in parts.into_iter().enumerate() {
                 let walls: Vec<(usize, Shape)> = wall_flats.iter().filter(|w| p.members.contains(&w.0)).cloned().collect();
                 let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();
-                let flat = flat_of(def, &topo, &walls, &own);
+                let own_forms: Vec<(usize, Vec<Shape>)> = form_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
+                let flat = flat_of(def, &topo, &walls, &own, &own_forms);
                 let data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others);
                 let id = def.previous.get(k).cloned().unwrap_or_else(|| {
                     fresh += 1;
@@ -1167,6 +1237,25 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // Associations and hiding.
     let mut st = cx.state.lock();
     let (marker, feature) = (super::marker_of(&op), st.feature);
+    // Form tools go with the model (hidden; std deletes the ones left
+    // public), named by ids that last for the features after this one.
+    let mut renamed: HashMap<Arc<str>, Arc<str>> = HashMap::new();
+    for (old, r) in &tool_ids {
+        let new = st.persist_transient(r);
+        if *old != new {
+            renamed.insert(old.clone(), new);
+        }
+        if let Reference::Body(b) = r {
+            st.hidden.insert(b.clone());
+        }
+    }
+    if !renamed.is_empty() {
+        for (_, v) in st.attributes.iter_mut() {
+            if v.get("attribute").get("formedToolBodyIds").as_array().is_some() {
+                *v = rename_strings(v, &renamed);
+            }
+        }
+    }
     for (n, part_id, (faces, edges, vertices), flat, data) in built {
         let Some((body_ref, dfaces, dedges, dverts)) = def_refs.get(n) else { continue };
         // New parts were renamed to the feature after the operation.
@@ -1368,7 +1457,7 @@ fn wall_faces(topo: &Topo, fi: usize, part_faces: &[Shape], named: &[(usize, cra
 /// definition plane at z = 0, seen from +z; dom/qa5-sm-flat.dxf): walls and
 /// bend strips unfolded, bend lines on the strips' centres, up when the bend
 /// rises toward the viewer.
-fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip]) -> Option<crate::sheetmetal::FlatPattern> {
+fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips: &[Strip], forms: &[(usize, Vec<Shape>)]) -> Option<crate::sheetmetal::FlatPattern> {
     let unfolded = unfold(def, def.k_factor, topo).ok()?;
     let mut pieces = Vec::new();
     for (fi, face) in wall_flats {
@@ -1376,6 +1465,48 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
         pieces.push(k::transform(face, &k::Transform::Matrix(*m), true).ok()?.shape);
     }
     let thickness = def.front + def.back;
+    let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    // Forms: their footprint fills the flat, outlined with a center mark (as the native route).
+    let mut flat_forms = Vec::new();
+    for (fi, tools) in forms {
+        let (Some(m), Some((_, wall))) = (unfolded.walls.get(fi), wall_flats.iter().find(|w| w.0 == *fi)) else { continue };
+        let Ok(Some(plane)) = wall.face_plane() else { continue };
+        let (o, n, x) = (plane.origin, plane.normal.normalize(), plane.x_dir);
+        let tools = if tools.len() == 1 { tools[0].clone() } else { Shape::compound(tools) };
+        let to_plane = |p: DVec3| p - n * (p - o).dot(n);
+        let extent = |l: &Vec<DVec3>| {
+            let (lo, hi) = l.iter().fold((DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY)), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+            (hi - lo).length()
+        };
+        let mut loops: Vec<Vec<DVec3>> = Vec::new();
+        for h in [-def.back - 0.5 * thickness, -0.5 * def.back, 0.0, 0.5 * def.front, def.front + 0.5 * thickness] {
+            let mut ls: Vec<Vec<DVec3>> = Vec::new();
+            for w in k::section_wires(&tools, &k::Plane::new(o + n * h, n, x)).unwrap_or_default() {
+                let pts = crate::sheetmetal::flat::wire_points(&w);
+                if pts.len() >= 3 {
+                    ls.push(pts.into_iter().map(to_plane).collect());
+                }
+            }
+            ls.sort_by(|a, b| extent(b).total_cmp(&extent(a)));
+            if ls.first().map(extent).unwrap_or(0.0) > loops.first().map(extent).unwrap_or(0.0) + 1e-9 {
+                loops = ls;
+            }
+        }
+        let mid = 0.5 * (def.front - def.back);
+        if let Ok(fill) = k::section_caps(&tools, &k::Plane::new(o + n * mid, n, x))
+            && fill.count(ShapeType::Face) > 0
+            && let Ok(fill) = fill.translated(-n * mid)
+            && let Ok(fill) = k::transform(&fill, &k::Transform::Matrix(*m), true)
+        {
+            pieces.extend(fill.shape.faces());
+        }
+        let Some(first) = loops.first() else { continue };
+        let center = first.iter().copied().sum::<DVec3>() / first.len() as f64;
+        flat_forms.push(crate::sheetmetal::flat::FlatForm {
+            loops: loops.iter().map(|l| l.iter().map(|p| frame.to_local(m.transform_point3(*p))).collect()).collect(),
+            center: frame.to_local(m.transform_point3(center)),
+        });
+    }
     let mut lines = Vec::new();
     for (n, s) in strips.iter().enumerate() {
         let Some(ma) = unfolded.walls.get(&s.wall_a) else { continue };
@@ -1405,8 +1536,9 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
             bend: n,
         });
     }
-    let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
-    crate::sheetmetal::flat::flat_from_pieces(frame, &pieces, lines, thickness).ok()
+    let mut flat = crate::sheetmetal::flat::flat_from_pieces(frame, &pieces, lines, thickness).ok()?;
+    flat.forms = flat_forms;
+    Some(flat)
 }
 
 struct Unfolded {
@@ -1522,7 +1654,7 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
             let body = &st.ctx.bodies[b];
             let (bends, rips, rolled, rip_styles) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };
