@@ -941,3 +941,27 @@ step (live +0.05). Owner: drawing (asb). Sheet properties width not re-checked.
   count, Bezier degree) stay as they are (lead: not a pure refactor). Prefs have no numeric fields.
 - Next: sketch fields (sketch.rs open_otf_input / open_count_edit / option_input / offset / bezier / tolerances),
   feature_dialog.rs:623 tolerances, the other assembly panels (same assembly variable scope), prefs.
+
+## QA round 4 (lead 10-24): realistic user sessions on v0.4.7 (tag v0.4.7 = 30979bc1, /root/qa4-scratch/bin/noshape-v047b + noshape-cli-v047b), fresh profile
+Live side: REQUESTS.md "qa4 (10-24, QA round 4: five user sessions)" (same recipes, answers in behaviours.md
+"qa4 round 4 sN"). Scripts and screenshots: /root/qa4-scratch/r4/.
+
+### Session 1: sheet-metal enclosure (r4/s1.py builds the model by CLI; drawing in the app)
+Recipe: Thicken 100×60 on Top (t 1.5, r 1.5, K 0.45) → Flange 30 mm on the long edges + x=100 edge → Hem on the
+y=0 flange's top edge → Front-plane circle Ø12 at (50, 1.5) Remove through all both ways → flat → drawing.
+
+| Step | noshape v0.4.7 | Live |
+|---|---|---|
+| Sheet metal model | OK, 9000 mm³, 6 faces | pending |
+| Flange 1 | OK, 20051.651 mm³, 28 faces | pending |
+| Hem 1 | OK, 21804.734 mm³, 34 faces | pending |
+| Extrude (cut through bends) | OK, 20547.157 mm³, 37 faces (the Ø12 at z 1.5 also cuts a 12 mm strip out of the base and both y bends) | pending |
+| Sheet metal table | 4 bends: 3 × 90° R1.5 allowance 3.416 mm, hem 180° R0.01 allowance 2.152; all **Down** (= SM5, routed fs); flat 129.465 × 128.916 mm, area 13744 mm² | pending |
+| Drawing › Insert view › Flat patterns filter | "Flat pattern of Part 1" with a flat thumbnail ✅; placed flat view with dash-dot bend lines and notes "DOWN 90.0° R1.5" / "DOWN 180.0° R0.01" | pending |
+
+Differences so far (live numbers pending):
+- **S1-a** the flat view in the drawing is turned 90° against the Sheet metal panel's flat (panel: flanges left/right/bottom;
+  drawing: rotated). Which way live orients it: pending.
+- **S1-b** a bend note sits on top of the cutout's arc ("DOWN 90.0° R1.5" covers the left half-circle, r4/s1-drawing-note-over-cut.png).
+  Live's note placement on a cut bend: pending.
+- Known, already routed: SM4 (panel design), SM5 (Down vs Up).
