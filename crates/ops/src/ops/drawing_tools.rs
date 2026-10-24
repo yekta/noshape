@@ -1176,7 +1176,7 @@ fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(l) = a.get("leader") {
         let c = point_value(l, "leader")?;
         let p = t.m.pick(&Tool::Note, &[], c).snap_at(c).ok_or_else(|| OpError::param("leader", "not a vertex, circle center or edge point of a view"))?;
-        style.leaders.push(noshape_model::drawing::Leader { view: Some(p.view), point: p.p, nodes: Vec::new() });
+        style.leaders.push(noshape_model::drawing::Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() });
     }
     let sheet = t.sheet;
     let ann = dt::new_note(&mut t.d, sheet, a.str("text")?.to_string(), a.opt_f64("height")?, style, pt_arg(a, "position")?).ok_or_else(|| OpError::param("text", "a note needs text"))?;

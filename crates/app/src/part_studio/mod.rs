@@ -882,6 +882,12 @@ impl PartStudioView {
         if let Some(m) = &error_mesh {
             extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
         }
+        // FeatureScript debug geometry of the open feature (Helix profiles).
+        if let Some(st) = self.edit.as_ref().and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id))
+            && (!st.debug.lines.is_empty() || !st.debug.points.is_empty())
+        {
+            extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
+        }
         let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
         // Live (lp wall over 2258): the pattern's other inputs (its
         // Direction) are drawn red; the seed keeps the selection colors.
@@ -4463,10 +4469,11 @@ impl PartStudioView {
         // Live (part-studio/00, 77): the strip is centered 8 px above the
         // viewport's middle (4 or 5 buttons alike).
         overlay.push(div().absolute().top_0().bottom(px(16.)).right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
-        overlay.extend(self.render_measure_panel(cx));
         // Live (sketch/01, part-studio/230, 234): also while a sketch or a
         // feature dialog is open.
         overlay.push(self.render_evaluation_tools(cx));
+        // Live (part-studio/82): the Measure panel covers those buttons.
+        overlay.extend(self.render_measure_panel(cx));
         overlay.extend(self.render_context_menu());
         overlay.extend(self.render_section_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))));
         // Value boxes at model points are drawn in the 3D frame

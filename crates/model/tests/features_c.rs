@@ -857,10 +857,10 @@ fn vertex_near(r: &RegenResult, p: DVec3) -> Reference {
 }
 
 #[test]
-#[ignore = "live: a no-op; which std step makes it one is asked (REQUESTS fs 10-23 17:30). Std splits the face, native cuts a slot"]
 fn rip_diagonal_on_flat_plate_is_a_no_op() {
     // Live (behaviours.md "fs (10-23 13:30)"): a corner-to-corner Rip across a single flat wall regenerates OK
-    // but changes nothing: 1 part, 8000 mm³, 6 planar faces, no joint.
+    // but changes nothing: 1 part, 8000 mm³, 6 planar faces, no joint. Its probe ("fs (10-23 17:30)"): std's
+    // split works and the edge is a rip; a rip between coplanar pieces of a wall leaves no gap.
     let mut s = plate();
     let r = s.ok();
     let (a, b) = (vertex_near(&r, DVec3::new(0.0, 0.0, mm(2.0))), vertex_near(&r, DVec3::new(mm(100.0), mm(40.0), mm(2.0))));
@@ -870,6 +870,14 @@ fn rip_diagonal_on_flat_plate_is_a_no_op() {
     let full = mm(100.0) * mm(40.0) * mm(2.0);
     assert!(near(volume(&r, 0), full, 1e-15), "volume unchanged: {}", volume(&r, 0));
     assert_eq!(r.context.bodies[0].faces.len(), 6, "faces unchanged");
+    assert!(flat(&r, 0).bend_lines.is_empty());
+    assert!(r.context.sheet_metal.get(&r.context.bodies[0].id).is_none_or(|d| d.rips.is_empty()), "no joint in the table");
+    // An odd number of vertices (live: "Select pairs of vertices.").
+    let mut s = plate();
+    let r = s.ok();
+    let a = vertex_near(&r, DVec3::new(0.0, 0.0, mm(2.0)));
+    s.add("sheetMetalRip", move |p| p.set("vertices", ParamValue::Query(vec![a])));
+    assert_eq!(s.last_status(), (FeatureStatus::Error, "Select pairs of vertices.".to_string()));
 }
 
 #[test]
