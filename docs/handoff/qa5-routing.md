@@ -126,3 +126,11 @@ STATUS EXP1 (qa4 entry, 2026-10-23): renamed **EXP-HDR** (api, export header fie
   `drawing_callout` anchored on the pin's centre line attaches to the plate (balloon "1"); in the app a click on the pin's
   silhouette gives "2". Expected: silhouettes listed like other edges (and the anchor resolved to the part under it).
   Evidence /root/qa4-scratch/r4/s2-drawing-bom-balloons.png, s2-balloon-pin-app.png; model by r4/s2.py.
+
+## CFG-MASS — api — CLI: mass properties ignore the active configuration; Derived accepts a tab name and fails
+- Source: qa4 QA round 4 session 4 (2026-10-24, v0.4.7), model by /root/qa4-scratch/r4/s4.py.
+- (1) After `config_activate {"Size": "L"}` (`active` reports L), `query_mass_properties` still returns 12000 mm³ (the S
+  block); M and L should give 27000 / 48000. The app rebuilds L correctly.
+- (2) `feature_add importDerived {"partStudio": "Part Studio 1"}` is accepted (a tab name, not an id) and the feature errors
+  "Error regenerating."; the app then shows "Missing Part Studio". Expected: resolve tab names (like `tab` arguments do) or
+  reject with `invalid_argument`.

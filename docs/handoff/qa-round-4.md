@@ -1010,3 +1010,24 @@ Differences:
   disc: pending live.
 - CLI note (not a defect): a surface loft takes `wireProfilesArray` (sketch curves), regions give "Select profiles in order
   from start to finish."; Fill `edges` are objects `{"entities":[…]}`.
+
+### Session 4: configured part S/M/L, Derived (r4/s4.py builds it by CLI; switching and Derived in the app)
+Recipe: List input "Size" (S/M/L; the default option renamed S), Variable #w = 40 / 60 / 80 mm, Sketch 1 rectangle with its
+bottom dimensioned #w and 30 high, Extrude 1 depth 10 / 15 / 20 mm; Part Studio 2 › Derived of Part Studio 1, then M.
+
+| Step | noshape v0.4.7 | Live |
+|---|---|---|
+| Configuration panel | Size S / M / L, switching S → L rebuilds the block 80 × 30 × 20 ✅ | pending |
+| Variable row under L | **"#w = 40 mm"** (the stored value) → S4-a | pending |
+| Derived (app) | Select Part Studio panel: studio row expands with Size ▾ + Generate; M → Generate → block 60 × 30 × 15, part "Part 1" ✅ | pending |
+
+Differences:
+- **S4-a (fixed by qa4)** a configured Variable's list row kept its stored value; it now shows the active configuration's
+  value (`part_studio/mod.rs` row name from `Configuration::for_editing`; test `a_configured_variable_names_itself_with_the_active_value`).
+- **S4-c (fixed by qa4)** a Derived whose Part Studio is missing ("Missing Part Studio") opened the picker drilled into that
+  studio, showing "No Part Studios available."; it now opens the whole list (`select_item.rs` `picked_studio_exists`; test
+  `a_missing_studio_opens_the_whole_list`).
+- **S4-b (api)** `query_mass_properties` returns the default configuration's volume (12000 mm³ for S, M and L) after
+  `config_activate`; the app's geometry does change. → qa5-routing CFG-MASS.
+- **S4-d (api)** `feature_add importDerived` takes `partStudio: "Part Studio 1"` (a tab name) without complaint and the
+  feature fails with "Error regenerating."; it needs the tab id. → qa5-routing CFG-MASS (same entry).
