@@ -113,7 +113,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("material_list", &[r##"{"search": "steel"}"##]),
     // queries, analysis, render
     ("query_parts", &[r##"{}"##]),
-    ("query_entities", &[r##"{"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}"##, r##"{"kind": "edges", "created_by": "Extrude 1"}"##]),
+    ("query_entities", &[r##"{"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}"##, r##"{"kind": "edges", "created_by": "Extrude 1"}"##, r##"{"kind": "faces", "context": true, "surface": "plane"}"##]),
     ("query_datums", &[r##"{}"##]),
     ("query_measure", &[r##"{"entities": ["face:…", "face:…"]}"##]),
     ("query_mass_properties", &[r##"{}"##, r##"{"parts": ["Part 1"]}"##]),
@@ -186,6 +186,17 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_insert_standard", &[r##"{"component": "Hex socket head cap screw ISO 4762", "holes": [{"instance": "Base <1>", "entity": "face:…"}], "auto_size": true}"##]),
     ("assembly_edit_standard", &[r##"{"instances": ["Hex socket head cap screw M6x1.00 x 20 <1>"], "length": "30"}"##]),
     // drawings
+    ("assembly_edit_in_context", &[r##"{"instance": "Part 1 <1>"}"##, r##"{"instance": "Part 1 <1>", "context": "Context 1"}"##]),
+    ("assembly_create_part_studio_in_context", &[r##"{"origin": "Mate connector 1"}"##]),
+    ("assembly_update_context", &[r##"{"instance": "Part 1 <1>", "context": "Context 1"}"##]),
+    ("assembly_set_primary_instance", &[r##"{"instance": "Part 1 <2>", "context": "Context 1"}"##]),
+    ("context_list", &[r##"{"tab": "Part Studio 1"}"##]),
+    ("context_show", &[r##"{"tab": "Part Studio 1", "context": "Context 1"}"##, r##"{"tab": "Part Studio 1", "context": null}"##]),
+    ("context_update", &[r##"{"tab": "Part Studio 1", "context": "Context 1"}"##]),
+    ("context_rename", &[r##"{"tab": "Part Studio 1", "context": "Context 1", "name": "Housing"}"##]),
+    ("context_delete", &[r##"{"tab": "Part Studio 1", "context": "Context 1"}"##]),
+    ("context_exit", &[r##"{"tab": "Part Studio 1"}"##]),
+    ("context_insert_in_assembly", &[r##"{"tab": "Part Studio 2", "parts": ["Part 1"]}"##]),
     ("drawing_templates", &[r##"{}"##]),
     ("drawing_create", &[r##"{"source": "Part Studio 1", "template": "ISO A3", "suggested_views": true}"##, r##"{"source": "Assembly 1", "custom_template": {"standard": "ANSI", "size": "B"}}"##]),
     ("drawing_get", &[r##"{"drawing": "Part 1 Drawing 1"}"##, r##"{"drawing": "Part 1 Drawing 1", "edges": false}"##]),
@@ -237,7 +248,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
 ];
 
 /// The groups whose every operation must have examples (the coverage test).
-pub const REQUIRED_GROUPS: &[&str] = &["ops", "document", "tab", "feature", "sketch", "variable", "config", "part", "material", "query", "analysis", "render", "export", "import", "featurestudio", "history", "assembly", "drawing"];
+pub const REQUIRED_GROUPS: &[&str] = &["ops", "document", "tab", "feature", "sketch", "variable", "config", "part", "material", "query", "analysis", "render", "export", "import", "featurestudio", "history", "assembly", "context", "drawing"];
 
 /// Examples of an operation (MCP tool name).
 pub fn of(tool: &str) -> &'static [&'static str] {

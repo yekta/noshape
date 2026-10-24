@@ -246,7 +246,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-196 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
+207 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -255,7 +255,8 @@ the app.
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
-- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard)
+- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance)
+- **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly)
 - **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
@@ -2630,6 +2631,211 @@ Examples:
 | `material` | string |  | Material. |
 | `finish` | string |  | Finish. |
 
+#### assembly_edit_in_context
+
+Edit in context: open an instance's Part Studio with the assembly around it as context geometry (edits the document (one undoable history entry)).
+
+Instance › Edit in context (help: Modeling in context): the instance's Part Studio shows the rest of the assembly, placed around the part, as its Assembly context. Without `context`, a new snapshot "Context N" (Edit in context, or Create new context once the Part Studio has contexts); with `context`, that existing context of this assembly (Edit Context N). List its geometry with query_entities `context: true` and reference it in features; a context no feature references goes away on context_exit. Not undoable, like the app. Replies with the Part Studio and the context (context_list's fields).
+
+Examples:
+
+```json
+{"instance": "Part 1 <1>"}
+{"instance": "Part 1 <1>", "context": "Context 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instance` | string | required | A part or Part Studio instance (id or name). |
+| `context` | string |  | An existing context of this assembly to edit in (default: a new one). |
+
+#### assembly_create_part_studio_in_context
+
+Create Part Studio in context: a new Part Studio with the assembly as context, its origin at a connector (edits the document (one undoable history entry)).
+
+Toolbar › Create Part Studio in context and its "Origin of new Part Studio" dialog: a new Part Studio ("Part Studio N", after the assembly) whose origin sits at `origin` (an assembly mate connector, id or name; default the assembly origin), showing the whole assembly as its Assembly context. Model there, then context_insert_in_assembly places its parts at that origin. One edit ("Create Part Studio in context").
+
+Examples:
+
+```json
+{"origin": "Mate connector 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `origin` | string |  | An assembly mate connector (assembly_mate_connector) for the new Part Studio's origin. |
+
+#### assembly_update_context
+
+Update context: re-snapshot a Part Studio's Assembly context from the assembly as it is now (edits the document (one undoable history entry)).
+
+Instance › Update context ▸ <context>: a new snapshot around the context's primary instance (or this instance when that one is gone); features referencing it regenerate. `out_of_date` in context_list says when an update is available. One edit ("Update context : Context 1").
+
+Examples:
+
+```json
+{"instance": "Part 1 <1>", "context": "Context 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instance` | string | required | An instance of the context's Part Studio. |
+| `context` | string | required | Context name ("Context 1") or id (context_list). |
+
+#### assembly_set_primary_instance
+
+Set as primary instance: re-anchor a context on another instance of the same part (edits the document (one undoable history entry)).
+
+Instance › Set as primary instance ▸ <context> (other instances of the context's part): the context is re-anchored on this instance and re-snapshotted around it ("Update context : Context 1").
+
+Examples:
+
+```json
+{"instance": "Part 1 <2>", "context": "Context 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `instance` | string | required | Another instance of the context's part. |
+| `context` | string | required | Context name ("Context 1") or id (context_list). |
+
+### context
+
+#### context_list
+
+A Part Studio's Assembly contexts.
+
+The Assembly contexts section above the Feature list: each context's `id`, `name`, `assembly`, whether it is `shown` and `referenced` (only referenced contexts persist), `out_of_date` (an update is available), its `primary` instance, whether it has an `origin` (created in context: context_insert_in_assembly works) and its `instances` (instance and part names).
+
+Examples:
+
+```json
+{"tab": "Part Studio 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name or id. Default: the first Part Studio. |
+
+#### context_show
+
+Show an Assembly context, or None (edits the document (one undoable history entry)).
+
+The Assembly contexts dropdown: show `context`, or None without it (the context stays). Not undoable ("Assembly context").
+
+Examples:
+
+```json
+{"tab": "Part Studio 1", "context": "Context 1"}
+{"tab": "Part Studio 1", "context": null}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name or id. Default: the first Part Studio. |
+| `context` | string or null |  | Context name or id; omitted or null: None. |
+
+#### context_update
+
+Update context: re-snapshot the assembly around the context's primary instance (edits the document (one undoable history entry)).
+
+Context ⋯ › Update context ("Update context : Context 1"); features referencing it regenerate.
+
+Examples:
+
+```json
+{"tab": "Part Studio 1", "context": "Context 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name or id. Default: the first Part Studio. |
+| `context` | string | required | Context name ("Context 1") or id (context_list). |
+
+#### context_rename
+
+Rename an Assembly context (edits the document (one undoable history entry)).
+
+Context ⋯ › Rename… ("Rename context").
+
+Examples:
+
+```json
+{"tab": "Part Studio 1", "context": "Context 1", "name": "Housing"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name or id. Default: the first Part Studio. |
+| `context` | string | required | Context name ("Context 1") or id (context_list). |
+| `name` | string | required | The new name. |
+
+#### context_delete
+
+Delete an Assembly context (edits the document (one undoable history entry); deletes or overwrites).
+
+Context ⋯ › Delete ("Delete context"); features referencing its geometry lose those references.
+
+Examples:
+
+```json
+{"tab": "Part Studio 1", "context": "Context 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name or id. Default: the first Part Studio. |
+| `context` | string | required | Context name ("Context 1") or id (context_list). |
+
+#### context_exit
+
+Exit context: stop showing the assembly (edits the document (one undoable history entry)).
+
+The in-context banner's ✕ (or going back to the assembly): no context shown; a context no feature references goes away. Not undoable ("Exit context").
+
+Examples:
+
+```json
+{"tab": "Part Studio 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name or id. Default: the first Part Studio. |
+
+#### context_insert_in_assembly
+
+Insert and go to assembly: insert a Part Studio created in context at its origin (edits the document (one undoable history entry)).
+
+The in-context banner's Insert and go to assembly and its "Select items to insert" dialog, in a Part Studio created in context (assembly_create_part_studio_in_context): `parts` and `sketches` (names) become instances of the context's assembly at the Part Studio's origin. One edit on the assembly ("Insert and go to assembly"); replies with the new instance ids.
+
+Examples:
+
+```json
+{"tab": "Part Studio 2", "parts": ["Part 1"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name or id. Default: the first Part Studio. |
+| `parts` | array of string |  | Part names (query_parts). |
+| `sketches` | array of string |  | Sketch names. |
+
 ### drawing
 
 #### drawing_templates
@@ -3990,13 +4196,14 @@ Examples:
 
 Faces, edges or vertices with stable ids and their geometry, to select for features.
 
-Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `created_by` (feature id or name), `near` (closest first, max `limit`).
+Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `created_by` (feature id or name), `near` (closest first, max `limit`). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.
 
 Examples:
 
 ```json
 {"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}
 {"kind": "edges", "created_by": "Extrude 1"}
+{"kind": "faces", "context": true, "surface": "plane"}
 ```
 
 | field | type | | description |
@@ -4011,6 +4218,7 @@ Examples:
 | `created_by` | string |  | Only entities made by this feature (id or name). |
 | `near` | array of number or string |  | Sort by distance from this point (workspace units). |
 | `limit` | integer |  | At most this many results (default 200). |
+| `context` | boolean |  | The shown Assembly context's instances instead of the parts. |
 
 #### query_datums
 

@@ -28,7 +28,7 @@ pub fn ops() -> Vec<Op> {
             group: "query",
             verb: "entities",
             summary: "Faces, edges or vertices with stable ids and their geometry, to select for features",
-            description: "Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `created_by` (feature id or name), `near` (closest first, max `limit`).",
+            description: "Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `created_by` (feature id or name), `near` (closest first, max `limit`). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.",
             fields: vec![
                 doc_field(),
                 tab_field(),
@@ -40,6 +40,7 @@ pub fn ops() -> Vec<Op> {
                 opt("created_by", s(), "Only entities made by this feature (id or name)."),
                 opt("near", json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }), "Sort by distance from this point (workspace units)."),
                 opt("limit", json!({ "type": "integer", "minimum": 1 }), "At most this many results (default 200)."),
+                opt("context", json!({ "type": "boolean", "default": false }), "The shown Assembly context's instances instead of the parts."),
             ],
             mutates: false,
             destructive: false,
@@ -271,9 +272,17 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(c) => Some(crate::doc::find_feature(&ps, c).map_err(|e| e.with_param("created_by"))?),
         None => None,
     };
-    let bodies: Vec<&Body> = match a.opt_str("part")? {
-        Some(p) => vec![find_part(&r, p)?],
-        None => r.context.bodies.iter().map(|b| &**b).collect(),
+    let context_bodies: Vec<std::sync::Arc<Body>> = if a.bool_or("context", false)? {
+        let c = ps.active_context.and_then(|id| ps.contexts.iter().find(|c| c.id == id)).ok_or_else(|| OpError::param("context", "no Assembly context is shown (assembly_edit_in_context, context_show)"))?;
+        c.regen_bodies()
+    } else {
+        Vec::new()
+    };
+    let bodies: Vec<&Body> = match (a.opt_str("part")?, a.bool_or("context", false)?) {
+        (Some(p), true) => vec![&**context_bodies.iter().find(|b| b.name == p).ok_or_else(|| OpError::param("part", &format!("the context's instances: {}", context_bodies.iter().map(|b| b.name.as_str()).collect::<Vec<_>>().join(", "))))?],
+        (None, true) => context_bodies.iter().map(|b| &**b).collect(),
+        (Some(p), false) => vec![find_part(&r, p)?],
+        (None, false) => r.context.bodies.iter().map(|b| &**b).collect(),
     };
     let normal = match a.opt_array("normal")? {
         Some(n) => {

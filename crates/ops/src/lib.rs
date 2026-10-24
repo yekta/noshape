@@ -23,6 +23,7 @@ pub mod docedit;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod in_context;
 pub mod live;
 pub mod material_data;
 pub mod ops;

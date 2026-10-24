@@ -2556,3 +2556,158 @@ fn drawing_table_menu_edits() {
     let e = try_call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "split", "row": 1 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("row"), "{e:?}");
 }
+
+/// A Part Studio with two parts (a block with a hole and a pin) inserted
+/// in an assembly ("Assembly 1"): their instance ids.
+fn two_part_assembly(ctx: &mut Ctx, file: &str) -> (String, String) {
+    let path = scratch(file);
+    call(ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Block" }))["sketch"].as_str().unwrap().to_string();
+    call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-20, -20], [20, 20]] }));
+    call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    let st = call(ctx, "sketch_get", json!({ "sketch": sk }));
+    let plate = st["regions"].as_array().unwrap().iter().find(|r| r["holes"] == 1).unwrap()["id"].as_str().unwrap().to_string();
+    call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [plate], "depth": "20 mm" } }));
+    let sk = call(ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Pin" }))["sketch"].as_str().unwrap().to_string();
+    call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[60, 0], [65, 0]] }));
+    let disc = call(ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "depth": "50 mm", "operationType": "NEW" } }));
+    let parts = call(ctx, "query_parts", json!({}));
+    let ids: Vec<String> = parts["parts"].as_array().unwrap().iter().map(|p| p["id"].as_str().unwrap().to_string()).collect();
+    assert_eq!(ids.len(), 2, "{parts}");
+    let b = call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": ids[0] }))["instance"].as_str().unwrap().to_string();
+    let p = call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": ids[1] }))["instance"].as_str().unwrap().to_string();
+    (b, p)
+}
+
+/// Split BOM table below / Unsplit table on a two-item BOM.
+#[test]
+fn drawing_bom_split_and_unsplit() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "drawing_bom_split.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Assembly 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let base = d["views"].as_array().unwrap().iter().find(|v| v["kind"] == "base").unwrap()["id"].clone();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().rsplit(":: ").next().unwrap().to_string();
+    let tables = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].as_array().unwrap().clone();
+    let bt = call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "bom", "view": base, "position": [20, 280] }));
+    let bid = bt["table"].clone();
+    let t = tables(&mut ctx).into_iter().find(|t| t["id"] == bid).unwrap();
+    assert_eq!(t["rows"].as_array().unwrap().len(), 2, "two items: {t}");
+    // The last data row can't be split off below itself.
+    let e = try_call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "split", "row": 2 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("row"), "{e:?}");
+    // Below the first item (displayed row 1; the header is row 0).
+    let r = call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "split", "row": 1 }));
+    assert_eq!(last(&mut ctx), "Split table");
+    let second = r["table"].clone();
+    assert_ne!(second, bid);
+    let ts = tables(&mut ctx);
+    let (a, b) = (ts.iter().find(|t| t["id"] == bid).unwrap(), ts.iter().find(|t| t["id"] == second).unwrap());
+    assert_eq!(a["part_rows"], json!([0, 1]), "{a}");
+    assert_eq!(b["part_rows"], json!([1, 2]), "{b}");
+    assert_eq!((a["rows"].as_array().unwrap().len(), b["rows"].as_array().unwrap().len()), (1, 1), "{a} {b}");
+    // Beside the first part, not on it.
+    assert!(num(&b["bounds"]["min"][0]) >= num(&a["bounds"]["max"][0]) || num(&b["bounds"]["max"][0]) <= num(&a["bounds"]["min"][0]), "{a} {b}");
+    // The first part can't be unsplit; the second goes back.
+    let e = try_call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "unsplit" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("action"), "{e:?}");
+    call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": second, "action": "unsplit" }));
+    assert_eq!(last(&mut ctx), "Unsplit table");
+    let ts = tables(&mut ctx);
+    assert_eq!(ts.len(), 1, "{ts:?}");
+    assert!(ts[0]["part_rows"].is_null(), "{ts:?}");
+    assert_eq!(ts[0]["rows"].as_array().unwrap().len(), 2);
+}
+
+/// Modeling in context: Edit in context, context geometry referenced by a
+/// feature, Update / Rename / Exit / Show / Delete, Set as primary
+/// instance, and Create Part Studio in context with Insert and go to
+/// assembly.
+#[test]
+fn edit_in_context_and_part_studio_in_context() {
+    let mut ctx = Ctx::new();
+    let (block, pin) = two_part_assembly(&mut ctx, "in_context.noshape");
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().rsplit(":: ").next().unwrap().to_string();
+    let contexts = |ctx: &mut Ctx, tab: &str| call(ctx, "context_list", json!({ "tab": tab }))["contexts"].as_array().unwrap().clone();
+
+    let r = call(&mut ctx, "assembly_edit_in_context", json!({ "instance": block }));
+    assert_eq!(r["part_studio"], "Part Studio 1", "{r}");
+    let c = &r["context"];
+    assert_eq!((c["name"].clone(), c["shown"].clone(), c["referenced"].clone()), (json!("Context 1"), json!(true), json!(false)), "{r}");
+    assert_eq!(c["instances"].as_array().unwrap().len(), 1, "the pin around the block: {r}");
+    // The pin's top face, from the context.
+    let faces = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "context": true, "surface": "plane", "normal": [0, 0, 1] }));
+    let top = faces["faces"][0]["id"].as_str().unwrap_or_else(|| panic!("{faces}")).to_string();
+    let e = try_call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "context": true, "part": "Nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("part"), "{e:?}");
+    // A sketch on it references the context: it persists.
+    call(&mut ctx, "sketch_create", json!({ "tab": "Part Studio 1", "plane": top, "name": "On pin" }));
+    let cs = contexts(&mut ctx, "Part Studio 1");
+    assert_eq!(cs[0]["referenced"], true, "{cs:?}");
+    assert_eq!(cs[0]["out_of_date"], false, "{cs:?}");
+
+    // Moving the pin makes an update available.
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin, "translation": [0, 0, 15] }));
+    assert_eq!(contexts(&mut ctx, "Part Studio 1")[0]["out_of_date"], true);
+    call(&mut ctx, "context_update", json!({ "tab": "Part Studio 1", "context": "Context 1" }));
+    assert_eq!(last(&mut ctx), "Update context : Context 1");
+    assert_eq!(contexts(&mut ctx, "Part Studio 1")[0]["out_of_date"], false);
+    call(&mut ctx, "context_rename", json!({ "tab": "Part Studio 1", "context": "Context 1", "name": "Housing" }));
+    assert_eq!(last(&mut ctx), "Rename context");
+
+    // Exit keeps a referenced context; show / None.
+    let cs = call(&mut ctx, "context_exit", json!({ "tab": "Part Studio 1" }))["contexts"].as_array().unwrap().clone();
+    assert_eq!((cs.len(), cs[0]["shown"].clone()), (1, json!(false)), "{cs:?}");
+    let e = try_call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "context": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("context"), "{e:?}");
+    assert_eq!(call(&mut ctx, "context_show", json!({ "tab": "Part Studio 1", "context": "Housing" }))["contexts"][0]["shown"], true);
+    assert_eq!(call(&mut ctx, "context_show", json!({ "tab": "Part Studio 1", "context": null }))["contexts"][0]["shown"], false);
+
+    // Edit in context again: Edit Housing, or a new context.
+    let r = call(&mut ctx, "assembly_edit_in_context", json!({ "instance": block, "context": "Housing" }));
+    assert_eq!(r["context"]["name"], "Housing", "{r}");
+    let e = try_call(&mut ctx, "assembly_edit_in_context", json!({ "instance": block, "context": "Nope" })).unwrap_err();
+    assert!(e.message.contains("Housing"), "{e:?}");
+    call(&mut ctx, "assembly_update_context", json!({ "instance": block, "context": "Housing" }));
+    assert_eq!(last(&mut ctx), "Update context : Housing");
+
+    // Another instance of the block becomes the primary one.
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }));
+    let block_part = parts["parts"][0]["id"].as_str().unwrap().to_string();
+    let b2 = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": block_part }))["instance"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "assembly_set_primary_instance", json!({ "instance": b2, "context": "Housing" }));
+    let b2_name = call(&mut ctx, "assembly_list", json!({}))["instances"].as_array().unwrap().iter().find(|i| i["id"] == b2).unwrap()["name"].clone();
+    assert_eq!(r["context"]["primary"], b2_name, "{r}");
+    let e = try_call(&mut ctx, "assembly_set_primary_instance", json!({ "instance": pin, "context": "Housing" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("instance"), "{e:?}");
+
+    // Create Part Studio in context, model there, Insert and go to assembly.
+    let e = try_call(&mut ctx, "assembly_create_part_studio_in_context", json!({ "origin": "Nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("origin"), "{e:?}");
+    let r = call(&mut ctx, "assembly_create_part_studio_in_context", json!({}));
+    // The new tab (undoable), then its context shown (not undoable), as in the app.
+    let h = call(&mut ctx, "history_list", json!({ "limit": 2 }))["history"].as_array().unwrap().iter().map(|h| h["description"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert_eq!(h, ["Edit in context", "Create Part Studio in context"], "{h:?}");
+    let studio = r["part_studio"].as_str().unwrap().to_string();
+    assert_eq!(studio, "Part Studio 2", "{r}");
+    assert_eq!((r["context"]["origin"].clone(), r["context"]["instances"].as_array().unwrap().len()), (json!(true), 3), "{r}");
+    let sk = call(&mut ctx, "sketch_create", json!({ "tab": studio, "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "tab": studio, "sketch": sk, "tool": "circle", "points": [[0, 0], [8, 0]] }));
+    let disc = call(&mut ctx, "sketch_get", json!({ "tab": studio, "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "tab": studio, "type": "extrude", "params": { "entities": [disc], "depth": "5 mm" } }));
+    let n = call(&mut ctx, "assembly_list", json!({}))["instances"].as_array().unwrap().len();
+    let e = try_call(&mut ctx, "context_insert_in_assembly", json!({ "tab": studio })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("parts"), "{e:?}");
+    let r = call(&mut ctx, "context_insert_in_assembly", json!({ "tab": studio, "parts": ["Part 1"] }));
+    assert_eq!(last(&mut ctx), "Insert and go to assembly");
+    assert_eq!(r["instances"].as_array().unwrap().len(), 1, "{r}");
+    assert_eq!(call(&mut ctx, "assembly_list", json!({}))["instances"].as_array().unwrap().len(), n + 1);
+    call(&mut ctx, "context_show", json!({ "tab": "Part Studio 1", "context": "Housing" }));
+    let e = try_call(&mut ctx, "context_insert_in_assembly", json!({ "tab": "Part Studio 1", "parts": ["Part 1"] })).unwrap_err();
+    assert!(e.message.contains("not created in context"), "{e:?}");
+
+    call(&mut ctx, "context_delete", json!({ "tab": "Part Studio 1", "context": "Housing" }));
+    assert_eq!(last(&mut ctx), "Delete context");
+    assert!(contexts(&mut ctx, "Part Studio 1").is_empty());
+}

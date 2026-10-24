@@ -5,6 +5,7 @@ mod appearance;
 mod assembly;
 mod configuration;
 mod document;
+mod context;
 mod drawing;
 mod drawing_tools;
 mod drawing_table;
@@ -39,6 +40,7 @@ pub fn all() -> Vec<Op> {
     v.extend(variables::ops());
     v.extend(configuration::ops());
     v.extend(assembly::ops());
+    v.extend(context::ops());
     v.extend(drawing::ops());
     v.extend(drawing_tools::ops());
     v.extend(drawing_view::ops());

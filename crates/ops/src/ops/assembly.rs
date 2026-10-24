@@ -185,6 +185,17 @@ fn assembly(od: &OpenDoc, tab: TabId) -> Result<&Assembly, OpError> {
     }
 }
 
+/// The document and Assembly tab a call names.
+pub(crate) fn asm_target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut OpenDoc, TabId), OpError> {
+    target(ctx, a)
+}
+
+/// Solve assembly `asm` (tab `tab`) in its current configuration.
+pub(crate) fn solve_assembly(od: &mut OpenDoc, tab: TabId, asm: &Assembly, opts: &SolveOptions) -> AssemblyResult {
+    let eff = sa::effective(asm, &super::configuration::asm::values(od, tab, asm));
+    od.evaluate_assembly(tab, &eff, opts)
+}
+
 /// Solve the assembly in its default configuration.
 fn solve(od: &mut OpenDoc, tab: TabId, opts: &SolveOptions) -> Result<AssemblyResult, OpError> {
     let a = assembly(od, tab)?;
