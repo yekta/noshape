@@ -2352,7 +2352,7 @@ fn drawing_fonts_are_lives_and_old_families_migrate() {
     assert_eq!((FONT_FAMILIES[0], FONT_FAMILIES[21]), ("APMONO", "Tinos"));
     assert!(FONT_FAMILIES.contains(&DRAWING_DEFAULT_FONT));
     assert!(!FONT_FAMILIES.iter().any(|f| f.starts_with("Liberation")));
-    for (old, new) in [("Liberation Sans", "Arimo"), ("Liberation Serif", "Tinos"), ("Liberation Mono", "DejaVu Sans Mono"), ("Noto Sans", "Noto Sans")] {
+    for (old, new) in [("Liberation Sans", "Arimo"), ("Liberation Serif", "Tinos"), ("Liberation Mono", "DejaVu Sans Mono"), ("Noto Sans", "Noto Sans"), ("Comic Sans", "ARSimp")] {
         let f: TextFont = serde_json::from_str(&format!("{{\"family\":\"{old}\",\"bold\":true}}")).unwrap();
         assert_eq!((f.family.as_str(), f.bold), (new, true));
     }
