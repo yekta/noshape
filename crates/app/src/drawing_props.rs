@@ -107,6 +107,8 @@ pub struct ViewProps {
     named: Option<String>,
     /// None: parent (or sheet) scale.
     scale: Option<f64>,
+    /// Child views: Sheet scale (not Parent scale) while `scale` is None.
+    sheet_scale: bool,
     scale_input: Entity<InputState>,
     rotation: Entity<InputState>,
     /// Rotation angle › reverse direction (the angle turns clockwise).
@@ -513,7 +515,7 @@ impl DrawingEditor {
         // Rotation angle 0–360 (counter-clockwise).
         let deg = v.rotation.to_degrees().rem_euclid(360.0);
         // The Scale combo shows "1:1 (Sheet)" / "1:2 (Parent)" or the view's own scale.
-        let inherit = if self.current_sheet().parent_of(id).is_some() { "Parent" } else { "Sheet" };
+        let inherit = if self.current_sheet().parent_of(id).is_some() && !v.sheet_scale { "Parent" } else { "Sheet" };
         let scale_text = match v.scale {
             Some(s) => noshape_model::drawing::sheet::format_scale(s),
             None => format!("{} ({inherit})", noshape_model::drawing::sheet::format_scale(views::view_scale(self.current_sheet(), id))),
@@ -533,6 +535,7 @@ impl DrawingEditor {
             },
             named: v.named_view.clone(),
             scale: v.scale,
+            sheet_scale: v.sheet_scale,
             scale_input: input(scale_text, window, cx),
             rotation: input(format!("{}", (deg * 1000.0).round() / 1000.0), window, cx),
             rot_reverse: false,
@@ -611,6 +614,7 @@ impl DrawingEditor {
             let Some(v) = d.sheets[self.sheet].view_mut(*id) else { continue };
             if let Some(s) = scale {
                 v.scale = s;
+                v.sheet_scale = s.is_none() && typed.ends_with("(Sheet)");
             }
             if p.tangent_pick {
                 p.tangent.apply(v);
@@ -656,6 +660,8 @@ impl DrawingEditor {
         // or N/N sets the view's own.
         let typed = p.scale_input.read(cx).value().trim().to_string();
         let scale = if typed.is_empty() || typed.ends_with("(Sheet)") || typed.ends_with("(Parent)") { p.scale } else { crate::drawing_ui::parse_scale(&typed).or(p.scale) };
+        // Child views: "(Sheet)" links to the sheet's scale, "(Parent)" to the parent's.
+        let sheet_scale = if typed.ends_with("(Sheet)") { true } else if typed.ends_with("(Parent)") { false } else { p.sheet_scale && scale.is_none() };
         // Rotation angle: 0–360; the reverse button turns it clockwise.
         let rotation = p.rotation.read(cx).value().trim().trim_end_matches('°').parse::<f64>().ok().filter(|a| (0.0..=360.0).contains(a)).map(|a| if p.rot_reverse { -a } else { a });
         let (unaligned, parent_cut) = (p.unaligned, p.parent_cut);
@@ -672,6 +678,7 @@ impl DrawingEditor {
         let mut d = self.drawing.clone();
         if let Some(v) = d.sheets[self.sheet].view_mut(id) {
             v.scale = scale;
+            v.sheet_scale = sheet_scale && scale.is_none();
             if let Some(r) = rotation {
                 v.rotation = r.to_radians();
             }
@@ -767,7 +774,6 @@ impl DrawingEditor {
         let has_parent = parent.is_some();
         let parent_is_section = parent.and_then(|p| sheet.view(p)).is_some_and(|p| matches!(p.kind, ViewKind::Section { .. }));
         let has_children = sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(props.view));
-        let parent_scale = views::view_scale(sheet, props.view);
         let ink = gpui_kit::rgb(0x333333);
         let field_ink = gpui_kit::rgb(0x555555);
         let line = gpui_kit::rgb(0xdddddd);
@@ -911,14 +917,30 @@ impl DrawingEditor {
         }
         // Scale: one combo ("1:1 (Sheet)" / "(Parent)" or a scale): type N:N
         // or N/N, or pick one from its menu.
-        let inherit = if has_parent { "Parent" } else { "Sheet" };
-        let text_for = move |s: Option<f64>| match s {
-            None => format!("{} ({inherit})", noshape_model::drawing::sheet::format_scale(parent_scale)),
-            Some(s) => noshape_model::drawing::sheet::format_scale(s),
+        // Child views: Parent scale or Sheet scale (help H:views); base views: the sheet's.
+        let sheet_scale_value = if sheet.scale > 0.0 { sheet.scale } else { 1.0 };
+        let parent_scale_value = parent.map(|p| views::view_scale(sheet, p)).unwrap_or(sheet_scale_value);
+        let fmt = noshape_model::drawing::sheet::format_scale;
+        let text_for = move |s: Option<f64>, on_sheet: bool| match s {
+            None if has_parent && !on_sheet => format!("{} (Parent)", fmt(parent_scale_value)),
+            None => format!("{} (Sheet)", fmt(sheet_scale_value)),
+            Some(s) => fmt(s),
         };
-        let mut scale_items: Vec<(String, bool, PropsAct)> = vec![(text_for(None), props.scale.is_none(), std::rc::Rc::new(|p: &mut ViewProps| p.scale = None))];
+        let mut scale_items: Vec<(String, bool, PropsAct)> = vec![(text_for(None, false), props.scale.is_none() && !props.sheet_scale, std::rc::Rc::new(|p: &mut ViewProps| {
+            p.scale = None;
+            p.sheet_scale = false;
+        }))];
+        if has_parent {
+            scale_items.push((text_for(None, true), props.scale.is_none() && props.sheet_scale, std::rc::Rc::new(|p: &mut ViewProps| {
+                p.scale = None;
+                p.sheet_scale = true;
+            })));
+        }
         for s in [10.0, 5.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.2, 0.1, 0.05] {
-            scale_items.push((noshape_model::drawing::sheet::format_scale(s), props.scale == Some(s), std::rc::Rc::new(move |p: &mut ViewProps| p.scale = Some(s))));
+            scale_items.push((fmt(s), props.scale == Some(s), std::rc::Rc::new(move |p: &mut ViewProps| {
+                p.scale = Some(s);
+                p.sheet_scale = false;
+            })));
         }
         let scale_menu = {
             let view = view.clone();
@@ -929,7 +951,7 @@ impl DrawingEditor {
                         v.update(cx, |this, cx| {
                             if let Some(p) = &mut this.view_props {
                                 f(p);
-                                let t = text_for(p.scale);
+                                let t = text_for(p.scale, p.sheet_scale);
                                 p.scale_input.update(cx, |s, cx| s.set_value(t, w, cx));
                             }
                             cx.notify();
