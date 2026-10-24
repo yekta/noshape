@@ -1063,3 +1063,21 @@ Differences:
   `surfaces_have_no_mass_properties`; also fixes the CLI).
 - **S4** live: S 12000 / M 27000 / L 48000 = ours in the app ✅; the picker's configuration dropdown under the studio ✅; the
   configuration not in the feature dialog itself ✅; the derived part named "Part 1" ✅.
+
+### In-app checks of the round-4 fixes (10-24 ~07:30, worktree build)
+- **S2-c** ✅ a new Callout on the plate's edge in "Assembly 1 Drawing 1" ends in a filled arrowhead on the edge (the
+  v0.4.7-made balloons beside it keep their stored dot). r4/s2c-callout-arrow-on-edge.png.
+- **S3-a** values ✅ blank for the lone open loft surface. Follow-up found in the app: the Part tab still took the surface
+  pick as a chip "Face of Loft 1"; live's field stays empty → **fixed by qa4** (`app/src/part_studio/menus.rs`
+  `mass_parts`: the Part tab measures and lists the solids owning the selection, each once; test
+  `mass_parts_tests::surfaces_never_enter_parts_to_measure`). Also from live's part-studio/2382: with nothing measurable
+  Onshape keeps the **whole dialog** (Mate connector field, Show calculation variance, Mass/Volume/Surface area/Center of
+  mass/inertia rows, all blank); ours collapsed to the one field → **fixed by qa4** (`MassView::blank`; test
+  `nothing_to_measure_keeps_every_row_blank`; seen in the app, r4/s3a-mass-blank-dialog.png). Mass's Override is then
+  greyed like Center of mass's (live 2382; ours was an enabled box) → fixed (`MassView::mass_override_enabled`, same test).
+  Not changed, unverified: after a click on the surface ours keeps the face highlighted orange (it just doesn't enter the
+  field); live says the click "adds nothing" without saying whether it highlights. Ours shows the "no material" toast with only a surface present; live's
+  REST counts the sheet body in massMissingCount, so it may be right → live asked (REQUESTS.md), not changed.
+- S2-a, S4-a, S4-c were seen in the app on the earlier worktree build.
+- Incident (qa4, 07:14): `qkill.sh` run without its pattern matched every process and SIGTERMed the whole server (all
+  agent sessions, Chrome, builds); reported to the lead. The script now refuses an empty pattern.

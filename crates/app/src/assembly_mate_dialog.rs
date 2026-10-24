@@ -126,6 +126,24 @@ impl Focusable for MateDialog {
 /// What an unset limit field reads (live).
 const NO_LIMIT: [&str; 3] = ["No minimum", "No maximum", "No maximum angle"];
 
+/// The unit kind of a mate limit: rotations (`rz`, the ball's `cone`) are
+/// angles, translations lengths.
+fn limit_dim(key: &str) -> noshape_units::Dim {
+    if matches!(key, "rz" | "cone") { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH }
+}
+
+/// A limit field's text after a commit as Onshape's number field writes it
+/// ("50" → "50 mm", "1+1" → "(1+1) mm"); None when it stays as it is (empty,
+/// "No minimum", or already in that form).
+fn commit_limit_text(text: &str, dim: noshape_units::Dim, units: &noshape_units::UnitPrefs, variables: &std::collections::BTreeMap<String, noshape_units::Quantity>) -> Option<String> {
+    let t = text.trim();
+    if t.is_empty() || NO_LIMIT.contains(&t) {
+        return None;
+    }
+    let out = noshape_model::quantity_text::commit_text(t, dim, units, variables);
+    (out != text).then_some(out)
+}
+
 fn text_of(e: &Option<ExprValue>) -> String {
     e.as_ref().map(|e| e.text.clone()).unwrap_or_default()
 }
@@ -204,11 +222,22 @@ impl MateDialog {
                 _ => {}
             }));
         }
-        let all: Vec<Entity<InputState>> = limits.values().flat_map(|(a, b)| [a.clone(), b.clone()]).collect();
-        for s in all {
-            subs.push(cx.subscribe_in(&s, window, |_: &mut Self, _, ev: &InputEvent, _, cx| match ev {
+        // A committed limit gets Onshape's unit like the offsets ("50" →
+        // "50 mm", qa4 round 4 S2-a); "No minimum" stays as it is.
+        let all: Vec<(Entity<InputState>, noshape_units::Dim)> = limits.iter().flat_map(|(k, (a, b))| [(a.clone(), limit_dim(k)), (b.clone(), limit_dim(k))]).collect();
+        for (s, dim) in all {
+            subs.push(cx.subscribe_in(&s, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
                 InputEvent::Change => cx.emit(MateDialogEvent::Changed),
-                InputEvent::PressEnter { .. } => cx.emit(MateDialogEvent::Accept),
+                InputEvent::PressEnter { .. } | InputEvent::Blur => {
+                    let text = st.read(cx).value().to_string();
+                    if let Some(t) = commit_limit_text(&text, dim, &this.units, &this.variables) {
+                        st.update(cx, |s, cx| s.set_value(t, window, cx));
+                        cx.emit(MateDialogEvent::Changed);
+                    }
+                    if matches!(ev, InputEvent::PressEnter { .. }) {
+                        cx.emit(MateDialogEvent::Accept);
+                    }
+                }
                 _ => {}
             }));
         }
@@ -902,4 +931,22 @@ const MATE_TYPE_ORDER: [MateType; 8] = [MateType::Slider, MateType::Cylindrical,
 /// connectors' Z axes agree, which is Onshape's flip flag off).
 pub(crate) fn flip_icon_name(flip_primary: bool) -> &'static str {
     if flip_primary { "flip-direction" } else { "flip-direction-opposite" }
+}
+
+#[cfg(test)]
+mod limit_text_tests {
+    use super::*;
+
+    #[::core::prelude::v1::test]
+    fn limits_commit_with_units_like_onshape() {
+        // qa4 round 4 S2-a: "50" → "50 mm" (offsets do the same); rotations
+        // in degrees; "No minimum" and empty stay.
+        let units = noshape_units::UnitPrefs::default();
+        let vars = std::collections::BTreeMap::new();
+        assert_eq!(commit_limit_text("50", limit_dim("z"), &units, &vars).as_deref(), Some("50 mm"));
+        assert_eq!(commit_limit_text("90", limit_dim("rz"), &units, &vars).as_deref(), Some("90 deg"));
+        assert_eq!(commit_limit_text("No minimum", limit_dim("z"), &units, &vars), None);
+        assert_eq!(commit_limit_text("", limit_dim("x"), &units, &vars), None);
+        assert_eq!(commit_limit_text("50 mm", limit_dim("x"), &units, &vars), None);
+    }
 }

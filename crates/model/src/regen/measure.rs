@@ -431,7 +431,10 @@ pub fn mass_properties(ctx: &Context, bodies: &[crate::reference::BodyId], densi
     let mut com = DVec3::ZERO;
     // (weight, own center, inertia about the own center, weighted).
     let mut parts: Vec<(f64, DVec3, glam::DMat3)> = Vec::new();
-    for b in ctx.bodies.iter().filter(|b| bodies.is_empty() || bodies.contains(&b.id)) {
+    // Only parts (solids) have mass properties: Onshape's dialog can't
+    // measure a surface, wire or point (live qa4 round 4 s3: an open loft
+    // surface leaves Parts to measure, Volume and Surface area blank).
+    for b in ctx.bodies.iter().filter(|b| b.kind == crate::display::BodyKind::Solid && (bodies.is_empty() || bodies.contains(&b.id))) {
         let Ok(p) = k::volume_properties(&b.shape) else { continue };
         let Ok(s) = k::surface_properties(&b.shape) else { continue };
         let rho = densities(&b.id);
@@ -594,6 +597,20 @@ mod tests {
         assert!(!rows.is_empty(), "a result row");
         let e = k::make_line(DVec3::new(0.0, 0.0, 0.02), DVec3::new(0.1, 0.0, 0.02)).unwrap();
         assert!(!measure_shapes(&[vec![e], top]).is_empty());
+    }
+
+    /// qa4 round 4 S3-a: a surface body has no mass properties (ours gave a
+    /// "volume" for an open loft); with a part beside it only the part counts.
+    #[test]
+    fn surfaces_have_no_mass_properties() {
+        let face = k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap().faces()[0].clone();
+        let surf = Arc::new(super::super::context::Body::new(BodyId { feature: FeatureId(2), index: 0 }, "Surface 1".into(), crate::display::BodyKind::Surface, face, Vec::new(), 0, FeatureId(2)));
+        let ctx = Context { bodies: vec![surf.clone()], ..Default::default() };
+        assert!(mass_properties(&ctx, &[], &|_| None).is_none());
+        assert!(mass_properties(&ctx, std::slice::from_ref(&surf.id), &|_| None).is_none());
+        let solid = body(0, k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap());
+        let ctx = Context { bodies: vec![surf, solid], ..Default::default() };
+        assert!((mass_properties(&ctx, &[], &|_| None).unwrap().volume - 48.0).abs() < 1e-9);
     }
 
     #[test]
