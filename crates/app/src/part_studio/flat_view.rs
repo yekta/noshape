@@ -20,7 +20,7 @@ pub struct FlatView {
     cube_origin: Option<Point<Pixels>>,
     /// The pattern shown (by identity) and its highlighted bend: a change
     /// rebuilds the scene.
-    shown: Option<(usize, Option<usize>)>,
+    shown: Option<(usize, Option<usize>, Option<usize>)>,
     /// Keep the Top view fitted while the view's size settles (until the
     /// user moves the camera), and the size it was last fitted at.
     pending_fit: bool,
@@ -53,14 +53,14 @@ impl FlatView {
     /// Show `flat` in `color` (linear RGBA, the part's). The first pattern
     /// fits the Top view; later ones keep the camera (live: editing the
     /// model keeps the flat view's zoom).
-    pub fn show(&mut self, flat: Option<&Arc<FlatPattern>>, color: [f32; 4], highlight: Option<usize>, cx: &mut Context<Self>) {
-        let key = flat.map(|f| (Arc::as_ptr(f) as usize, highlight));
+    pub fn show(&mut self, flat: Option<&Arc<FlatPattern>>, color: [f32; 4], highlight: Option<usize>, hovered: Option<usize>, cx: &mut Context<Self>) {
+        let key = flat.map(|f| (Arc::as_ptr(f) as usize, highlight, hovered));
         if key == self.shown {
             return;
         }
         self.pending_fit |= self.shown.is_none();
         self.shown = key;
-        let scene = flat.map(|f| flat_scene(f, color, highlight, &self.gpu)).unwrap_or_default();
+        let scene = flat.map(|f| flat_scene(f, color, highlight, hovered, &self.gpu)).unwrap_or_default();
         self.viewport.update(cx, |vp, cx| vp.set_scene(Arc::new(scene), true, cx));
         cx.notify();
     }
@@ -80,7 +80,7 @@ impl FlatView {
 }
 
 /// The flat solid and its bend lines.
-fn flat_scene(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, gpu: &Gpu) -> Scene {
+fn flat_scene(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, hovered: Option<usize>, gpu: &Gpu) -> Scene {
     let Some(display) = noshape_model::regen::flat_view_display(flat, color) else { return Scene::default() };
     let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
     let mut scene = crate::scene_builder::build(&display, &opts, &mut Default::default(), gpu.uploader()).scene;
@@ -92,6 +92,18 @@ fn flat_scene(flat: &FlatPattern, color: [f32; 4], highlight: Option<usize>, gpu
     }
     if !lines.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12));
+    }
+    // The hovered row's bend zone outlined in the pre-select colour
+    // #FFC685 (live ui-sm4b-2: about 3 px).
+    let mut outline = LineData::default();
+    for l in flat.bend_lines.iter().filter(|l| Some(l.bend) == hovered) {
+        let d = (l.b - l.a).normalize_or_zero();
+        let n = glam::DVec2::new(-d.y, d.x) * (l.allowance / 2.0);
+        let p = |q: glam::DVec2| [q.x as f32, q.y as f32, 2e-5];
+        outline.push_polyline(&[p(l.a - n), p(l.b - n), p(l.b + n), p(l.a + n), p(l.a - n)], [0xff, 0xc6, 0x85, 0xff], 0, 3.0, LineSegment::ON_TOP);
+    }
+    if !outline.segments.is_empty() {
+        scene.instances.push(Instance::new(Drawable::Lines(gpu.uploader().upload_lines(&outline))).per_primitive_color().unpickable().layer(13));
     }
     // The selected bend's strip (its developed length wide) over the top.
     for l in flat.bend_lines.iter().filter(|l| Some(l.bend) == highlight) {
