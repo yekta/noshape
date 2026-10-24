@@ -233,7 +233,10 @@ pub struct UiState {
     pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
-    pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
+    pub measure_lines: Option<(Vec<Reference>, Option<String>, Option<noshape_render::Instance>)>,
+    /// The Measure panel's distance row under the pointer (its label): live
+    /// draws that one measurement's dashed line, nothing otherwise.
+    pub measure_hover: Option<String>,
     /// Dynamic suppression editor: feature, expression input.
     pub dyn_suppression: Option<(FeatureId, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
@@ -431,6 +434,7 @@ impl UiState {
             hole_prev: None,
             preview_tool_task: None,
             measure_lines: None,
+            measure_hover: None,
             dyn_suppression: None,
             shortcut_filter: None,
             shortcut_query: String::new(),
@@ -2435,14 +2439,19 @@ impl PartStudioView {
     /// components.
     pub(super) fn measure_overlay(&mut self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineData, LineSegment};
-        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 {
+        // Live (behaviours "ui (10-23 a)"): no measure lines from the
+        // selection alone; hovering a distance row of the open Measure panel
+        // draws that distance as one black dashed line.
+        let hover = self.ui.measure_hover.clone().filter(|_| self.ui.measure_pinned);
+        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 || hover.is_none() {
             return Vec::new();
         }
         let sel = self.selection.clone();
         let Some(ctx) = self.measure_context(&sel, cx) else { return Vec::new() };
-        // Uploaded once per selection (refresh_scene runs on every hover).
-        if let Some((s, inst)) = &self.ui.measure_lines
+        // Uploaded once per selection and row (refresh_scene runs on every hover).
+        if let Some((s, h, inst)) = &self.ui.measure_lines
             && *s == sel
+            && *h == hover
         {
             return inst.iter().cloned().collect();
         }
@@ -2455,25 +2464,18 @@ impl PartStudioView {
             }
         };
         let mut l = LineData::default();
-        for (_, m) in results {
-            if let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m {
+        for (label, m) in results {
+            if Some(&label) == hover.as_ref()
+                && let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m
+            {
                 let f = |v: glam::DVec3| -> [f32; 3] { v.as_vec3().into() };
-                let style = LineSegment::DASHED | LineSegment::ON_TOP;
-                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style });
-                let x = glam::DVec3::new(b.x, a.y, a.z);
-                let y = glam::DVec3::new(b.x, b.y, a.z);
-                for (p, q, c) in [(a, x, [220, 40, 40, 255]), (x, y, [40, 170, 60, 255]), (y, b, [40, 90, 220, 255])] {
-                    if p.distance(q) > 1e-9 {
-                        l.segments.push(LineSegment { a: f(p), b: f(q), color: c, pick_id: 0, width: 1.0, style });
-                    }
-                }
+                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style: LineSegment::DASHED | LineSegment::ON_TOP });
             }
         }
-        // Out of the scene bounds (qa4 R1): a distance to a default plane ends
-        // far out on it, and the depth range fitted to that let edges show
-        // through the parts.
+        // Out of the scene bounds (qa4 R1): a distance to a default plane can
+        // end far out on it.
         let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().no_bounds().layer(21));
-        self.ui.measure_lines = Some((self.selection.clone(), inst.clone()));
+        self.ui.measure_lines = Some((self.selection.clone(), hover, inst.clone()));
         inst.into_iter().collect()
     }
 
