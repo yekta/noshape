@@ -196,8 +196,12 @@ fn l_bracket_flat_length() {
     assert_eq!(data.walls.len(), 2);
     assert_eq!(data.bends.len(), 1);
     let (t, rad, k) = (mm(2.0), mm(3.0), 0.45);
-    // The sketch is the outer face: walls lose R + T each.
-    let expected = (mm(50.0) - (rad + t)) + (mm(30.0) - (rad + t)) + ba(PI / 2.0, rad, k, t);
+    // Live ("fs (10-23 05:00)"): material outside the L by default, the sketch is
+    // the inner face, walls lose R each: flat 80.126106 x 20, 3211.3274122872 mm³.
+    let expected = (mm(50.0) - rad) + (mm(30.0) - rad) + ba(PI / 2.0, rad, k, t);
+    assert!(near(volume(&r, 0) * 1e9, 3211.327_412_287_2, 1e-6), "volume {}", volume(&r, 0) * 1e9);
+    let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!(near(bb.min.y, -t, 1e-7) && near(bb.max.x, mm(52.0), 1e-7), "material outside: {bb:?}");
     let fp = flat(&r, 0);
     let (len, width) = sorted_size(&fp);
     assert!(near(len, expected, 1e-7), "flat length {len} vs {expected}");
@@ -209,11 +213,13 @@ fn l_bracket_flat_length() {
     let bl = &fp.bend_lines[0];
     assert!(near((bl.b - bl.a).length(), mm(20.0), 1e-9));
 
-    // Material outside the turn: the sketch is the inner face.
+    // Opposite direction: material inside, the sketch is the outer face, walls lose
+    // R + T each (live: 76.126106 x 20, 3051.3274122872 mm³).
     let mut s = extrude_model(&[(0.0, 0.0), (50.0, 0.0), (50.0, 30.0)]);
     s.ps.features.last_mut().unwrap().params.set("oppositeDirection", ParamValue::Bool(true));
     let r = s.ok();
-    let expected = (mm(50.0) - rad) + (mm(30.0) - rad) + ba(PI / 2.0, rad, k, t);
+    assert!(near(volume(&r, 0) * 1e9, 3051.327_412_287_2, 1e-6), "volume {}", volume(&r, 0) * 1e9);
+    let expected = (mm(50.0) - (rad + t)) + (mm(30.0) - (rad + t)) + ba(PI / 2.0, rad, k, t);
     let (len, _) = sorted_size(&flat(&r, 0));
     assert!(near(len, expected, 1e-7), "flat length {len} vs {expected}");
 }
@@ -223,7 +229,8 @@ fn u_channel_flat_length_and_export() {
     let mut s = extrude_model(&[(0.0, 30.0), (0.0, 0.0), (50.0, 0.0), (50.0, 30.0)]);
     let r = s.ok();
     let (t, rad, k) = (mm(2.0), mm(3.0), 0.45);
-    let expected = (mm(30.0) - (rad + t)) + (mm(50.0) - 2.0 * (rad + t)) + (mm(30.0) - (rad + t)) + 2.0 * ba(PI / 2.0, rad, k, t);
+    // Material outside (the default, as live's L): the sketch is the inner face.
+    let expected = (mm(30.0) - rad) + (mm(50.0) - 2.0 * rad) + (mm(30.0) - rad) + 2.0 * ba(PI / 2.0, rad, k, t);
     let fp = flat(&r, 0);
     let (len, width) = sorted_size(&fp);
     assert!(near(len, expected, 1e-7), "flat length {len} vs {expected}");
