@@ -508,8 +508,10 @@ impl PartStudioView {
             let v = vp.read(cx);
             v.camera.world_per_pixel(v.size().y)
         };
+        // The pointer stands for its pixel's centre (live sketch/51: a point
+        // placed at a pointer pixel draws centred on that pixel row).
         let to_plane = |this: &Self, pos: DVec2, cx: &App| -> Option<DVec2> {
-            let (o, d) = vp.read(cx).ray(pos);
+            let (o, d) = vp.read(cx).ray(pos + DVec2::splat(0.5));
             this.sketch.as_ref()?.plane_point(o, d)
         };
         let wpp_changed = self.sketch.as_ref().is_some_and(|ed| (ed.world_per_px - wpp).abs() > wpp * 1e-6);
@@ -3197,13 +3199,16 @@ impl PartStudioView {
             && let Some((x, y)) = project(inf.position)
         {
             let icons: Vec<&'static str> = if inf.kind == noshape_sketch::InferenceKind::AlignBoth { vec!["horizontal", "vertical"] } else { vec![crate::sketch_mode::inference_icon(inf.kind)] };
+            // Live (sketch/51, 52): the bare constraint icon in `#333`, centred
+            // 30 px right of and 31 px below the point (at 18 px our icons give
+            // live's 14 px horizontal bar and 16 px perpendicular base).
             out.push(
                 h_flex()
                     .absolute()
-                    .left(px(x + 12.0))
-                    .top(px(y + 10.0))
+                    .left(px(x + 20.0))
+                    .top(px(y + 22.0))
                     .gap_0p5()
-                    .children(icons.into_iter().map(|i| div().size(px(18.)).flex().items_center().justify_center().rounded(px(3.)).bg(with_alpha(rgb(0x27aae1), 0.35)).border_1().border_color(rgb(0xffc20e)).child(icon_px(i, 13.0, rgb(0xffffff)))))
+                    .children(icons.into_iter().map(|i| icon_px(i, 18.0, gpui_kit::rgb_static(0x333333))))
                     .into_any_element(),
             );
         }

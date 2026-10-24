@@ -55,6 +55,9 @@ impl LineSegment {
     /// Construction line: the dash / gap / dash / gap pattern of
     /// [`Style::construction_dash`] (Onshape's Graphics preferences).
     pub const CONSTRUCTION: u32 = 8;
+    /// Onshape's inferred-direction dash over a sketch rubber band: 4 px on,
+    /// 4 px off, starting 1.25 px from the segment's start (live sketch/51).
+    pub const INFERRED: u32 = 16;
 }
 
 impl LineData {

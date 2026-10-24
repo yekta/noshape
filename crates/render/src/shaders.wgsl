@@ -750,6 +750,8 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let t = fract(i.along / (16.0 * g.viewport.z));
         if (t > 0.55 && (t < 0.68 || t > 0.8)) { discard; }
     }
+    // Inferred direction over a rubber band: 4 px on / 4 off from 1.25 px.
+    if ((i.style & 16u) != 0u && fract((i.along / g.viewport.z - 1.25) / 8.0) >= 0.5) { discard; }
     // Construction lines: dash, gap, dash, gap (Graphics preferences).
     if ((i.style & 8u) != 0u) {
         let period = max(g.dash.x + g.dash.y + g.dash.z + g.dash.w, 1.0);
