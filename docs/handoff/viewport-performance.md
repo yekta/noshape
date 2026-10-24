@@ -666,6 +666,14 @@ changes. I write the renderer part first (my files) and show crops before touchi
     Like for like v0.4.8 = v0.4.7 (34.3 / 33.6 first orbit). perf.yml now builds a ref on macos-latest (the
     release's image) so the first orbit comes a minute into the job; `env` / `modes` inputs to compare settings in
     separate jobs. A ref built on the macOS 14 / 15 runners also measured 19 fps (benched after ~40 min compiling).
+  - Slow-state trigger (run 40137610372, texture runs only, no readback): both runners drop from 33 to 19 fps on
+    the third launch, ~2.5-3 min into the job; so time or launch count, not the readback mode. Even in the fast
+    state the 8 ms bench timer fires only every ~36 ms (once per presented frame; ~62 ms when slow): the main thread
+    gets to the tick once per frame on these runners. Fresh jobs can also start slow (runner idle before the job).
+  - Angle vs chord, first orbit per fresh job (`env=NOSHAPE_DISPLAY_MESH=...`, 3 jobs each, runs in
+    /root/perf-scratch/firstorbit-runs.txt), presented fps by state: fast chord 34.1 / 34.2 / 34.6 vs angle
+    33.5 / 33.9 (-1.7%); slow chord 19.3 / 19.3 / 19.2 vs angle 18.9 / 19.1 / 18.9 / 18.9 (-1.6%). Within 5%:
+    main keeps the angle mesh default (release/v0.4.8 ships chord, fcd0166b).
   - Found on the way (not fixed): with a section plane on, anti-aliased silhouette pixels of parts seen through
     the plane change (41 px in the offscreen two-box scene, plane cutting nothing): the cap quad, drawn on the plane,
     takes colour from the 1-sample cap mask, which disagrees with the MSAA frame at silhouettes.
