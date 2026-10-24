@@ -66,18 +66,7 @@ const SELECT_SECTION_PLANE: &str = "Select a plane, planar face, cylinder, cone,
 impl PartStudioView {
     /// Plane frame of a plane, planar face, sketch entity or mate connector.
     pub(super) fn frame_of_ref(&self, r: &Reference) -> Option<PlaneFrame> {
-        match r {
-            Reference::Plane(_) | Reference::FeaturePlane(_) => self.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
-            Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => self.display.sketches.iter().find(|s| s.feature == *sketch).map(|s| s.frame),
-            Reference::MateConnector { .. } => self.display.connectors.iter().find(|c| &c.reference == r).map(|c| PlaneFrame { origin: c.origin, x: c.x, y: c.z.cross(c.x), normal: c.z }),
-            Reference::Face(n) => self.context.as_ref()?.bodies.iter().find_map(|b| {
-                let fi = *b.find_faces(n).first()?;
-                let pl = b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?.face_plane().ok()??;
-                let (normal, x) = (pl.unit_normal(), pl.unit_x());
-                Some(PlaneFrame { origin: pl.origin, x, y: normal.cross(x), normal })
-            }),
-            _ => None,
-        }
+        noshape_ops::studio::frame_of_ref(&self.display, self.context.as_deref(), r)
     }
 
     /// Push the planes and the excluded parts into the scene and rebuild.

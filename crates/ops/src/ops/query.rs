@@ -34,7 +34,7 @@ pub fn ops() -> Vec<Op> {
                 tab_field(),
                 req("kind", json!({ "type": "string", "enum": ["faces", "edges", "vertices"] }), "Which entities."),
                 opt("part", s(), "Only this part (`body:…` id or part name)."),
-                opt("surface", json!({ "type": "string", "enum": ["plane", "cylinder", "cone", "sphere", "torus", "bspline", "other"] }), "Faces: only this surface type."),
+                opt("surface", json!({ "type": "string", "enum": ["plane", "cylinder", "cone", "sphere", "torus", "bspline", "extruded", "revolved", "other"] }), "Faces: only this surface type."),
                 opt("curve", json!({ "type": "string", "enum": ["line", "circle", "ellipse", "bspline", "other"] }), "Edges: only this curve type."),
                 opt("normal", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "Faces: outward normal direction, e.g. [0,0,1] for faces facing +Z."),
                 opt("created_by", s(), "Only entities made by this feature (id or name)."),
@@ -166,6 +166,10 @@ fn surface_name(s: &Surface) -> &'static str {
         Surface::Sphere { .. } => "sphere",
         Surface::Torus { .. } => "torus",
         Surface::BSpline { .. } | Surface::Bezier { .. } => "bspline",
+        // Onshape's EXTRUDED and REVOLVED (a B-surface that is an exact
+        // extrusion reports as one, as after Parasolid's import).
+        Surface::Extrusion { .. } => "extruded",
+        Surface::Revolution { .. } => "revolved",
         _ => "other",
     }
 }

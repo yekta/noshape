@@ -156,6 +156,28 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "sketch",
+            verb: "dimension_options",
+            summary: "A sketch dimension's menu: driving / driven, tolerance and precision, configure",
+            description: "The sketch dimension's context menu: Change to driven / driving dimension (`driving`), Tolerance and precision… (`tolerance` none, symmetrical, deviation, limits, min, max or basic, with `upper` / `lower` values and `precision` decimals or \"default\"; not on angles of some kinds, as the menu), Configure dimension with a List or Checkbox `configure` input (each configuration starts with the current value; set them with config_set_value on the sketch with `param` the reply's `configured_param`), Unconfigure dimension (`unconfigure`).",
+            fields: vec![
+                doc_field(),
+                tab_field(),
+                req("sketch", s(), "Sketch feature id or name."),
+                req("dimension", s(), "Dimension id (`dim:…`)."),
+                opt("driving", json!({ "type": "boolean" }), "Driving (true) or driven (false)."),
+                opt("tolerance", json!({ "type": "string", "enum": ["none", "symmetrical", "deviation", "limits", "min", "max", "basic"] }), "Tolerance type."),
+                opt("upper", json!({ "type": ["string", "number"] }), "Symmetrical ± / Deviation + / Limits upper value."),
+                opt("lower", json!({ "type": ["string", "number"] }), "Deviation − / Limits lower value."),
+                opt("precision", json!({ "type": ["integer", "string"] }), "Decimals 0–8, or \"default\" (the workspace precision)."),
+                opt("configure", s(), "Configuration input (id or name) to configure the dimension with."),
+                opt("unconfigure", json!({ "type": "boolean" }), "Unconfigure the dimension."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: dimension_options,
+        },
+        Op {
+            group: "sketch",
             verb: "delete",
             summary: "Delete sketch entities, constraints or dimensions",
             description: "Deleting a curve deletes its constraints; its points stay when other curves use them.",
@@ -377,6 +399,11 @@ fn constraint_json(data: &SketchData, sketch: FeatureId, c: &noshape_sketch::Con
         v["driving"] = json!(c.driving);
         if let Some(e) = data.dimension_exprs.get(&c.id.0) {
             v["expression"] = json!(e.text);
+        }
+        if let Some(t) = data.dimension_tolerances.get(&c.id.0) {
+            let unit = sm::dim_unit(&c.kind);
+            let q = |x: f64| noshape_units::format_quantity_exact(noshape_units::Quantity::new(x, unit), units);
+            v["tolerance"] = json!({ "type": format!("{:?}", t.kind).to_lowercase(), "upper": q(t.upper), "lower": q(t.lower), "precision": t.precision });
         }
     }
     v
@@ -720,6 +747,102 @@ fn set_dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     commit(od, t)?;
     let mut v = sketch_state(od, tab, id, Some(&[]))?;
     v.as_object_mut().expect("object").remove("created");
+    Ok(v.into())
+}
+
+fn dimension_options(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::sketch_feature::ToleranceKind as T;
+    let (od, tab) = studio_target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let mut t = target(od, tab, a)?;
+    let cid = parse_constraint_id(a.str("dimension")?).filter(|c| t.data.sketch.constraint(*c).is_some_and(|c| c.kind.is_dimension())).ok_or_else(|| OpError::param("dimension", "not a dimension of this sketch"))?;
+    let kind = t.data.sketch.constraint(cid).expect("found").kind.clone();
+    let mut changed = false;
+    if let Some(d) = a.get("driving").and_then(Value::as_bool)
+        && t.data.sketch.constraint(cid).is_some_and(|c| c.driving != d)
+    {
+        let mut ed = editor(&t);
+        ed.toggle_driving(&mut t.data, cid).map_err(|m| OpError::invalid(m).with_param("driving"))?;
+        changed = true;
+    }
+    let tol_given = ["tolerance", "upper", "lower", "precision"].iter().any(|k| a.get(k).is_some());
+    if tol_given {
+        if !sm::tolerance_allowed(&kind) {
+            return Err(OpError::param("tolerance", "this dimension takes no tolerance (the menu doesn't offer it)"));
+        }
+        let unit = sm::dim_unit(&kind);
+        let q = |k: &str| -> Result<Option<f64>, OpError> {
+            match a.get(k) {
+                None => Ok(None),
+                Some(v) => {
+                    let text = value_text(v)?;
+                    noshape_units::evaluate_as(&text, unit, &units, &noshape_units::EmptyScope).map(|q| Some(q.value.abs())).map_err(|e| OpError::param(k, &e.to_string()))
+                }
+            }
+        };
+        let (upper, lower) = (q("upper")?, q("lower")?);
+        let entry = t.data.dimension_tolerances.entry(cid.0).or_default();
+        if let Some(k) = a.opt_str("tolerance")? {
+            entry.kind = match k {
+                "none" => T::None,
+                "symmetrical" => T::Symmetrical,
+                "deviation" => T::Deviation,
+                "limits" => T::Limits,
+                "min" => T::Min,
+                "max" => T::Max,
+                "basic" => T::Basic,
+                _ => return Err(OpError::param("tolerance", "none, symmetrical, deviation, limits, min, max or basic")),
+            };
+        }
+        if let Some(u) = upper {
+            entry.upper = u;
+        }
+        if let Some(l) = lower {
+            entry.lower = l;
+        }
+        match a.get("precision") {
+            None => {}
+            Some(Value::String(p)) if p == "default" => entry.precision = None,
+            Some(v) => entry.precision = Some(v.as_u64().filter(|n| *n <= 8).ok_or_else(|| OpError::param("precision", "0–8 or \"default\""))? as u8),
+        }
+        if entry.kind == T::None && entry.precision.is_none() {
+            t.data.dimension_tolerances.remove(&cid.0);
+        }
+        changed = true;
+    }
+    let (sketch, tab, text) = (t.id, t.tab, studio::dimension_text(&t.data, cid.0, &units));
+    if changed {
+        commit(od, t)?;
+    }
+    if let Some(input) = a.opt_str("configure")? {
+        let ps = doc::studio(od.doc(), tab)?;
+        let id = ps
+            .configuration
+            .inputs
+            .iter()
+            .find(|i| i.id == input || i.name == input)
+            .filter(|i| matches!(i.kind, noshape_model::configuration::ConfigInputKind::List { .. } | noshape_model::configuration::ConfigInputKind::Checkbox { .. }))
+            .map(|i| i.id.clone())
+            .ok_or_else(|| OpError::param("configure", "a List or Checkbox configuration input of this Part Studio"))?;
+        let text = text.ok_or_else(|| OpError::param("dimension", "no value"))?;
+        edit_studio(od, tab, studio::CONFIGURE_DIMENSION, |ps| {
+            studio::configure_dimension(ps, sketch, cid.0, &id, &text);
+            Ok(())
+        })?;
+        changed = true;
+    }
+    if a.bool_or("unconfigure", false)? {
+        edit_studio(od, tab, studio::UNCONFIGURE_DIMENSION, |ps| {
+            studio::unconfigure_dimension(ps, sketch, cid.0);
+            Ok(())
+        })?;
+        changed = true;
+    }
+    if !changed {
+        return Err(OpError::invalid("nothing to change: give driving, tolerance / upper / lower / precision, configure or unconfigure"));
+    }
+    let mut v = sketch_state(od, tab, sketch, None)?;
+    v["configured_param"] = json!(studio::configured_dim_key(cid.0));
     Ok(v.into())
 }
 

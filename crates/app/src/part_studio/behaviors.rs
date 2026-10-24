@@ -1044,25 +1044,9 @@ impl PartStudioView {
 
     /// Plane menu "Size to Part Studio": the plane grows to frame the parts.
     pub(super) fn size_plane_to_studio(&mut self, r: Reference, cx: &mut Context<Self>) {
-        let Some(pl) = self.display.planes.iter().find(|p| p.reference == r) else { return };
-        let f = pl.frame;
-        let (mut hw, mut hh) = (0.0f64, 0.0f64);
-        for (lo, hi) in self.display.bodies.iter().filter(|b| !b.hidden).filter_map(|b| b.bounds) {
-            for k in 0..8 {
-                let c = glam::DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z }) - f.origin;
-                hw = hw.max(c.dot(f.x).abs());
-                hh = hh.max(c.dot(f.y).abs());
-            }
-        }
-        if hw <= 0.0 || hh <= 0.0 {
-            return;
-        }
-        let (hw, hh) = (hw * 1.1, hh * 1.1);
+        let Some((hw, hh)) = noshape_ops::studio::plane_size_to_studio(&self.display, &r) else { return };
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Size to Part Studio", cx, |ps| {
-                ps.plane_sizes.retain(|(x, ..)| *x != r);
-                ps.plane_sizes.push((r.clone(), hw, hh));
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::SIZE_PLANE_DESCRIPTION, cx, |ps| noshape_ops::studio::set_plane_size(ps, &r, hw, hh));
         });
     }
 
@@ -3007,74 +2991,11 @@ impl PartStudioView {
             self.direct_edit_logic(&dialog, cx);
             return;
         }
-        if !matches!(ty.as_str(), "extrude" | "revolve" | "sweep" | "thicken") {
-            return;
-        }
-        // Sweep's profiles are `profiles` (sweep.fs); the others' `entities`.
-        let profiles_id = if ty == "sweep" { "profiles" } else { "entities" };
-        let (op_user, flip_user, profiles, op, scope_user, flipped) = {
+        let changes = {
+            let Some(studio) = self.studio(cx) else { return };
             let d = dialog.read(cx);
-            (d.user_set.contains("operationType"), d.user_set.contains("oppositeDirection"), d.feature.params.query(profiles_id).to_vec(), d.feature.params.enum_("operationType").to_string(), d.user_set.contains("booleanScope"), d.feature.params.bool("oppositeDirection"))
+            noshape_ops::studio::auto_operation(studio, &self.display, &d.feature, &|k| d.user_set.contains(k))
         };
-        // Parts the profiles lie on: a picked face, or the face a sketch was
-        // drawn on. Thicken (thickenEditLogic) takes the owners of every
-        // picked solid face.
-        // thickenEditLogic counts only faces of solids (live L18: a surface's
-        // face leaves the operation on New).
-        let solid = |b: &BodyId| ty != "thicken" || self.context.as_ref().and_then(|c| c.body(b)).is_some_and(|b| b.kind == noshape_model::display::BodyKind::Solid);
-        let host_of = |r: &Reference| match r {
-            Reference::Face(_) => self.body_of(r).filter(|b| solid(b)),
-            Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) if ty != "thicken" => {
-                let plane = self.studio(cx)?.feature(*sketch)?.params.query("sketchPlane").first().cloned()?;
-                self.body_of(&plane)
-            }
-            _ => None,
-        };
-        let hosts: Vec<BodyId> = if ty == "thicken" {
-            let mut v: Vec<BodyId> = Vec::new();
-            for b in profiles.iter().filter_map(host_of) {
-                if !v.contains(&b) {
-                    v.push(b);
-                }
-            }
-            v
-        } else {
-            profiles.iter().find_map(host_of).into_iter().collect()
-        };
-        let mut changes: Vec<(&'static str, ParamValue)> = Vec::new();
-        // Extrude, revolve and sweep take their operation and merge scope
-        // from the tool's collisions once the preview has them
-        // (`boolean_edit_logic`); Thicken follows thickenEditLogic here.
-        if !op_user && ty == "thicken" {
-            // thickenEditLogic: Remove when the wall points into the part.
-            let want = match (hosts.is_empty(), ty.as_str()) {
-                (true, _) => "NEW",
-                (false, "thicken") if flipped => "REMOVE",
-                _ => "ADD",
-            };
-            if op != want && (matches!(op.as_str(), "NEW" | "ADD") || ty == "thicken") {
-                changes.push(("operationType", ParamValue::Enum(want.into())));
-            }
-        }
-        // The merge scope starts as the profiles' part, also when the user
-        // picked the operation (live, qa5 EXT1: Remove fills "Part 1").
-        if ty == "thicken" && !hosts.is_empty() && !scope_user && dialog.read(cx).feature.params.query("booleanScope").is_empty() {
-            changes.push(("booleanScope", ParamValue::Query(hosts.iter().map(|b| Reference::Body(b.clone())).collect())));
-        }
-        // thickenEditLogic's canSetBooleanFlip: a user-picked Remove points
-        // the wall into the part, Add out of it.
-        if ty == "thicken" && op_user && !flip_user && !hosts.is_empty() && matches!(op.as_str(), "ADD" | "REMOVE") {
-            let into = op == "REMOVE";
-            if flipped != into {
-                changes.push(("oppositeDirection", ParamValue::Bool(into)));
-            }
-        }
-        if ty == "extrude" && !flip_user && !hosts.is_empty() {
-            let into = matches!(op.as_str(), "REMOVE" | "INTERSECT");
-            if flipped != into {
-                changes.push(("oppositeDirection", ParamValue::Bool(into)));
-            }
-        }
         if changes.is_empty() {
             return;
         }
@@ -3207,30 +3128,20 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        let (ty, id, user, scope, flip_user, flipped, located) = {
-            let d = dialog.read(cx);
-            let p = &d.feature.params;
-            (d.feature.type_id.clone(), d.feature.id, d.user_set.contains("scope"), p.query("scope").to_vec(), d.user_set.contains("oppositeDirection"), p.bool("oppositeDirection"), !p.query("locations").is_empty())
-        };
-        if ty != "hole" || !located {
-            return;
-        }
+        let id = dialog.read(cx).feature.id;
         let Some((touched, behind)) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| (s.touched.clone(), s.touched_behind.clone())) else { return };
-        // holeScopeFlipHeuristics: more parts behind the locations than in
-        // front flips the hole (until the user sets the flip).
-        if !flip_user && !user && behind.len() > touched.len() {
-            dialog.update(cx, |d, cx| d.set_value_auto("oppositeDirection", ParamValue::Bool(!flipped), cx));
+        let changes = {
+            let d = dialog.read(cx);
+            noshape_ops::studio::hole_scope_logic(&d.feature, &|k| d.user_set.contains(k), &touched, &behind)
+        };
+        if changes.is_empty() {
             return;
         }
-        if user {
-            return;
-        }
-        // The scope follows; a flip that reaches nothing clears it (live L57).
-        let want: Vec<Reference> = touched.into_iter().map(Reference::Body).collect();
-        if want == scope {
-            return;
-        }
-        dialog.update(cx, |d, cx| d.set_value_auto("scope", ParamValue::Query(want), cx));
+        dialog.update(cx, |d, cx| {
+            for (k, v) in changes {
+                d.set_value_auto(k, v, cx);
+            }
+        });
     }
 
     /// Onshape's booleanStepEditLogic (booleanHeuristics.fs) for a new
@@ -3247,37 +3158,12 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        let (ty, id) = {
-            let d = dialog.read(cx);
-            (d.feature.type_id.clone(), d.feature.id)
-        };
-        if !matches!(ty.as_str(), "extrude" | "revolve" | "sweep" | "loft") {
-            return;
-        }
+        let id = dialog.read(cx).feature.id;
         let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
-        let (op, scope, op_user) = {
+        let changes = {
             let d = dialog.read(cx);
-            if d.user_set.contains("booleanScope") || d.user_set.contains("defaultScope") || d.feature.params.enum_("bodyType") == "SURFACE" {
-                return;
-            }
-            (d.feature.params.enum_("operationType").to_string(), d.feature.params.query("booleanScope").to_vec(), d.user_set.contains("operationType"))
+            noshape_ops::studio::boolean_edit_logic(&d.feature, &|k| d.user_set.contains(k), &touched)
         };
-        if op_user && op == "NEW" {
-            return;
-        }
-        let can_scope = !op_user || scope.is_empty();
-        let (want_op, want_scope): (&str, Vec<Reference>) = match touched.as_slice() {
-            [one] => ("ADD", vec![Reference::Body(one.clone())]),
-            _ => ("NEW", Vec::new()),
-        };
-        let mut changes: Vec<(&'static str, ParamValue)> = Vec::new();
-        // Remove / Intersect picked by the flip logic stay (canSetBooleanFlip).
-        if !op_user && op != want_op && !matches!(op.as_str(), "REMOVE" | "INTERSECT") {
-            changes.push(("operationType", ParamValue::Enum(want_op.into())));
-        }
-        if can_scope && scope != want_scope && !(op_user && want_scope.is_empty()) {
-            changes.push(("booleanScope", ParamValue::Query(want_scope)));
-        }
         if changes.is_empty() {
             return;
         }

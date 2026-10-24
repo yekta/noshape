@@ -18,6 +18,7 @@ pub mod derived;
 pub mod doc;
 pub mod drawing;
 pub mod drawing_export;
+pub mod examples;
 pub mod docedit;
 pub mod error;
 pub mod export;

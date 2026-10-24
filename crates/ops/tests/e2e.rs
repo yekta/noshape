@@ -2097,3 +2097,111 @@ fn drawing_insert_view_options() {
     let e = try_call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "simplification": "auto", "simplification_value": "1 mm", "position": [200, 60] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("simplification_value"));
 }
+
+/// feature_add makes the dialog's own choices for fields not given: an
+/// Extrude from a sketch on a part's face adds to that part (merge scope
+/// the part); Remove there cuts into it.
+#[test]
+fn feature_add_makes_the_dialogs_choices() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "dialog-logic.noshape");
+    let faces = call(&mut ctx, "query_entities", json!({ "kind": "faces" }));
+    let top = faces["faces"].as_array().unwrap().iter().find(|f| f["surface"] == "plane" && num(&f["normal"][2]) > 0.99).unwrap()["id"].as_str().unwrap().to_string();
+    let volume = |ctx: &mut Ctx| num(&call(ctx, "query_mass_properties", json!({}))["volume"]);
+    let v0 = volume(&mut ctx);
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": top }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[25, 0], [30, 0]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
+    let f = call(&mut ctx, "feature_get", json!({ "feature": ex["feature"] }));
+    assert_eq!(f["params"]["operationType"], "ADD", "{f}");
+    assert_eq!(f["params"]["booleanScope"].as_array().map(|a| a.len()), Some(1), "{f}");
+    assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 1, "added to the block");
+    let v1 = volume(&mut ctx);
+    assert!((v1 - v0 - std::f64::consts::PI * 25.0 * 5.0).abs() < 0.5, "{v0} -> {v1}");
+    // Remove from the same face: points into the part.
+    let sk2 = call(&mut ctx, "sketch_create", json!({ "plane": top }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk2, "tool": "circle", "points": [[-25, 0], [-30, 0]] }));
+    let r2 = call(&mut ctx, "sketch_get", json!({ "sketch": sk2 }))["regions"][0]["id"].as_str().unwrap().to_string();
+    let cut = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r2], "depth": "5 mm", "operationType": "REMOVE" } }));
+    assert_eq!(cut["feature_status"]["status"], "Ok", "{cut}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": cut["feature"] }));
+    assert_eq!(g["params"]["oppositeDirection"], true, "into the part: {g}");
+    let v2 = volume(&mut ctx);
+    assert!((v1 - v2 - std::f64::consts::PI * 25.0 * 5.0).abs() < 0.5, "{v1} -> {v2}");
+    // A field the caller gives is kept.
+    let sk3 = call(&mut ctx, "sketch_create", json!({ "plane": top }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk3, "tool": "circle", "points": [[0, 12], [0, 15]] }));
+    let r3 = call(&mut ctx, "sketch_get", json!({ "sketch": sk3 }))["regions"][0]["id"].as_str().unwrap().to_string();
+    let n = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r3], "depth": "5 mm", "operationType": "NEW" } }));
+    assert_eq!(call(&mut ctx, "feature_get", json!({ "feature": n["feature"] }))["params"]["operationType"], "NEW");
+    assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 2);
+}
+
+/// The sketch dimension's menu: driven / driving, tolerance and precision
+/// (a diameter; line lengths take none, as the menu), configure /
+/// unconfigure.
+#[test]
+fn sketch_dimension_menu() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "dim-menu.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    let circles = entities(&mut ctx, &sk, "circle");
+    let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [circles[0]["id"]], "value": "10 mm" }));
+    let dim = d["dimension"].as_str().map(str::to_string).unwrap_or_else(|| d["constraints"].as_array().unwrap().iter().rev().find(|c| c["id"].as_str().unwrap().starts_with("dim:")).unwrap()["id"].as_str().unwrap().to_string());
+    let find = |v: &Value| v["constraints"].as_array().unwrap().iter().find(|c| c["id"] == dim.as_str()).unwrap().clone();
+    let t = call(&mut ctx, "sketch_dimension_options", json!({ "sketch": sk, "dimension": dim, "tolerance": "symmetrical", "upper": "0.1 mm", "precision": 2 }));
+    let c = find(&t);
+    assert_eq!(c["tolerance"]["type"], "symmetrical", "{c}");
+    assert_eq!(c["tolerance"]["precision"], 2, "{c}");
+    let t = call(&mut ctx, "sketch_dimension_options", json!({ "sketch": sk, "dimension": dim, "driving": false }));
+    assert_eq!(find(&t)["driving"], false);
+    call(&mut ctx, "sketch_dimension_options", json!({ "sketch": sk, "dimension": dim, "driving": true }));
+    // Configure with a List input, then give the second configuration 60 mm.
+    let input = call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }))["input"].as_str().unwrap().to_string();
+    let big = call(&mut ctx, "config_add_option", json!({ "input": input, "name": "Big" }))["option"].as_str().unwrap().to_string();
+    let c = call(&mut ctx, "sketch_dimension_options", json!({ "sketch": sk, "dimension": dim, "configure": "Size" }));
+    let key = c["configured_param"].as_str().unwrap().to_string();
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.ends_with(":: Configure dimension"), "{last}");
+    call(&mut ctx, "config_set_value", json!({ "feature": sk, "param": key, "configuration": big, "value": "16 mm" }));
+    let l = call(&mut ctx, "config_list", json!({}));
+    let col = l["configured"].as_array().unwrap().iter().find(|c| c["param"] == key.as_str()).unwrap().clone();
+    assert_eq!(col["values"][&big], "16 mm", "{col}");
+    call(&mut ctx, "sketch_dimension_options", json!({ "sketch": sk, "dimension": dim, "unconfigure": true }));
+    assert!(call(&mut ctx, "config_list", json!({}))["configured"].as_array().unwrap().iter().all(|c| c["param"] != key.as_str()));
+    let e = try_call(&mut ctx, "sketch_dimension_options", json!({ "sketch": sk, "dimension": dim })).unwrap_err();
+    assert!(e.message.contains("nothing to change"), "{e:?}");
+}
+
+/// Part Studio menus: copy / paste sketch entities, Size to Part Studio,
+/// a section view render, named views.
+#[test]
+fn part_studio_menu_ops() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "ps-menus.noshape");
+    // Copy the hole circle into a new sketch on Front, moved 10 mm.
+    let circle = entities(&mut ctx, "Sketch 1", "circle")[0]["id"].as_str().unwrap().to_string();
+    let front = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "sketch_copy_entities", json!({ "sketch": "Sketch 1", "entities": [circle], "to": front, "offset": [10, 0] }));
+    assert!(p["created"].as_array().unwrap().iter().any(|e| e["type"] == "circle"), "{p}");
+    let c = entities(&mut ctx, &front, "circle");
+    assert!(near(&c[0]["center"], 10.0, 0.0), "{c:?}");
+    // In the same sketch.
+    let same = call(&mut ctx, "sketch_copy_entities", json!({ "sketch": "Sketch 1", "entities": [circle], "offset": [0, 12] }));
+    assert_eq!(same["sketch"], call(&mut ctx, "feature_get", json!({ "feature": "Sketch 1" }))["id"]);
+    // Size to Part Studio.
+    let s = call(&mut ctx, "feature_size_plane", json!({ "plane": "plane:top" }));
+    assert!(num(&s["half_width"]) > 40.0 && num(&s["half_height"]) > 20.0, "{s}");
+    assert!(try_call(&mut ctx, "feature_size_plane", json!({ "plane": "face:nope" })).is_err());
+    // A section through the hole, and a named view keeping it.
+    let img = call(&mut ctx, "render_image", json!({ "view": "isometric", "width": 200, "height": 150, "section": [{ "plane": "plane:front" }] }));
+    assert!(num(&img["bytes"]) > 100.0, "{img}");
+    let e = try_call(&mut ctx, "render_image", json!({ "section": [{ "plane": "entity:nope" }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("section[0].plane"));
+    let v = call(&mut ctx, "render_named_view", json!({ "name": "Cut", "view": "front", "section": [{ "plane": "plane:right", "flip": true }] }));
+    assert_eq!(v["saved"], "Cut");
+    call(&mut ctx, "render_image", json!({ "view": "Cut", "width": 200, "height": 150 }));
+    call(&mut ctx, "render_named_view", json!({ "name": "Cut", "delete": true }));
+    assert!(try_call(&mut ctx, "render_image", json!({ "view": "Cut" })).is_err());
+}

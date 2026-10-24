@@ -478,6 +478,9 @@ fn set_value(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let raw = a.get("value").ok_or_else(|| OpError::param("value", "required"))?;
     let value = if param == SUPPRESSED_PARAM {
         ParamValue::Bool(raw.as_bool().ok_or_else(|| OpError::param("value", "true or false"))?)
+    } else if param.starts_with(noshape_model::regen::features::sketch::CONFIGURED_DIMENSION_PREFIX) {
+        // A configured sketch dimension (sketch_dimension_options `configure`).
+        ParamValue::Expr(noshape_units::ExprValue::new(text(raw, "value")?))
     } else {
         let spec = ps.feature(feature).and_then(|f| f.feature_type()).and_then(|t| t.param(&param)).ok_or_else(|| OpError::param("param", "unknown parameter"))?;
         values::from_json(spec, raw, &units, od.doc()).map_err(|e| e.with_param("value"))?
