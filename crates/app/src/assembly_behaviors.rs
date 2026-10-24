@@ -951,20 +951,21 @@ impl AssemblyView {
         let best = inst.best_tessellation;
         let tg = targets.clone();
         m.push(item(if best { "Use automatic tessellation setting" } else { "Use best available tessellation" }, move |t, _, cx| t.set_best_tessellation(tg.clone(), !best, cx)));
+        // Live (behaviours "qa4 S2" instance menu, "skb sc stack" (7);
+        // locales/de-menu-long-asm-instance-*): with mates, "Show mates" and
+        // "Hide mates" follow Use best available tessellation in both menus
+        // (they show / hide the selected instances' mates).
+        let mates: Vec<MateId> = asm.mates.iter().filter(|mt| mt.instances().iter().any(|i| targets.contains(i))).map(|mt| mt.id).collect();
+        if !mates.is_empty() {
+            let ids = mates.clone();
+            m.push(item("Show mates", move |t, _, cx| t.set_mates_hidden(ids.clone(), false, cx)));
+            m.push(item("Hide mates", move |t, _, cx| t.set_mates_hidden(mates.clone(), true, cx)));
+        }
+        // (With mates too: their order against Check interference… is
+        // UNCONFIRMED.)
         if is_asm || multi {
             let tg = targets.clone();
             m.push(item("Check interference…", move |t, _, cx| t.open_interference_with(tg.clone(), cx)));
-        }
-        // Show mates (instances with mates).
-        let mated = asm.mates.iter().any(|mt| mt.instances().contains(&top));
-        if mated && !graphics {
-            m.push(MenuEntry::Sep);
-            m.push(item("Show mates", move |t, _, cx| {
-                t.show_mates_mode = true;
-                t.mates_pinned = Some(top);
-                t.update_capture(cx);
-                t.refresh_scene(false, cx);
-            }));
         }
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
