@@ -2867,7 +2867,9 @@ impl PartStudioView {
                 // before its ellipsis; part-studio/94, 570). A wider panel
                 // shows it whole (qa4 F16), a narrower one truncates.
                 .child(div().min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match &filtered_count {
-                    _ if errors > 0 && crate::ui::left_panel_w() < crate::ui::LEFT_PANEL_W + 10. => "Features …".to_string(),
+                    // (Other languages: the translated title, truncated where it
+                    // meets the icons, live "フィーチ…".)
+                    _ if errors > 0 && crate::ui::left_panel_w() < crate::ui::LEFT_PANEL_W + 10. && crate::i18n::current() == crate::i18n::DEFAULT => "Features …".to_string(),
                     Some(k) => format!("Features ({k} of {})", n_features + 4),
                     None => format!("Features ({})", n_features + 4),
                 }))
@@ -3103,12 +3105,12 @@ impl PartStudioView {
                 if several_parts {
                     let keep = b.clone();
                     m = m
-                        .item(item("Hide other parts", Box::new(move |this, _, cx| {
+                        .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {
                             let keep = targets(this, &keep);
                             let others: Vec<Reference> = this.display.bodies.iter().filter(|d| !keep.contains(&d.id)).map(|d| Reference::Body(d.id.clone())).collect();
                             this.set_visibility(&others, true, cx);
                         })))
-                        .item(item("Hide all parts", Box::new(|this, _, cx| {
+                        .item(item(&crate::i18n::template("Hide all __label__", &[("label", "parts")]), Box::new(|this, _, cx| {
                             let all: Vec<Reference> = this.display.bodies.iter().map(|d| Reference::Body(d.id.clone())).collect();
                             this.set_visibility(&all, true, cx);
                         })));
@@ -3718,7 +3720,7 @@ impl PartStudioView {
         let row = crate::ui::with_lazy_side_tooltip(row, anchor, tip);
         let view = cx.entity();
         let is_last = i + 1 >= self.row_ctx.n_features;
-        let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, g.name.clone()))));
+        let source_sketch = self.studio(cx).and_then(|s| noshape_model::interaction::source_sketch(&s.features, f).and_then(|sid| s.feature(sid).map(|g| (sid, typed_name(g)))));
         let feature_name = f.name.clone();
         // A Derived feature's source studio ("Switch to qa5 src", live "qa5
         // derived" (6)).
@@ -4965,9 +4967,12 @@ fn count_picks(p: &noshape_model::params::ParamValues) -> usize {
 /// feature's type gets the type in brackets (live behaviours "psb … feature
 /// sweep": "Move L5 rotate no axis [Move face] did not regenerate properly:
 /// …", "<- Path [Sketch]"); default names ("Draft 1") stay as they are.
+/// A feature's name as Onshape shows it in tooltips and menus: with its
+/// type in brackets when the name doesn't start with the type as named in
+/// the UI language ("Mount [Extrude]"; German "Sketch 1 [Skizze]", live).
 pub(crate) fn typed_name(f: &noshape_model::partstudio::Feature) -> String {
-    match f.feature_type().map(|t| t.name) {
-        Some(t) if !f.name.starts_with(t) => format!("{} [{t}]", f.name),
+    match f.feature_type().map(|t| crate::i18n::type_name(t.name)) {
+        Some(t) if !f.name.starts_with(t.as_str()) => format!("{} [{t}]", f.name),
         _ => f.name.clone(),
     }
 }

@@ -471,6 +471,23 @@ impl FeatureDialog {
     }
 
     /// A dialog without selection fields starts typing in its first text or
+    /// The dialog's width before the user resizes it: 220 px, wider when
+    /// a row of segments (Solid / Surface / Thin, New / Add / …) needs more
+    /// in the UI language (live German Extrude: 341 px for "Neu |
+    /// Hinzufügen | Entfernen | Schneiden"). Each segment is its 12 px text
+    /// plus 8 px either side; the row sits 2 px past the body's edges.
+    fn natural_width(&self, window: &Window) -> Pixels {
+        let params = &self.feature.params;
+        let rows = self.ty.params.iter().filter(|s| s.hints.has(Hints::HORIZONTAL_ENUM) && s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN));
+        let widest = rows
+            .filter_map(|s| match &s.kind {
+                ParamKind::Enum { options, .. } => Some(options.iter().map(|(_, l)| crate::ui::text_width(window, &crate::i18n::spec(l), 12.) + 16.).sum::<f32>()),
+                _ => None,
+            })
+            .fold(0., f32::max);
+        px((widest + 4.).max(220.).ceil())
+    }
+
     /// number field (Onshape: the Variable dialog opens with Name focused).
     pub fn focus_first_field(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let params = &self.feature.params;
@@ -918,7 +935,12 @@ impl FeatureDialog {
             }
         };
         let current = current.to_string();
-        sel.update(cx, |s, _| s.set_items(items, current));
+        // The options as the feature specs have them in the UI language.
+        let items = items.into_iter().map(|(id, l)| (id, SharedString::from(crate::i18n::spec(&l)))).collect();
+        sel.update(cx, |s, _| {
+            s.set_translated(true);
+            s.set_items(items, current)
+        });
         sel
     }
 
@@ -1783,7 +1805,7 @@ impl FeatureDialog {
                     .id(SharedString::from(format!("bexpr-{path}")))
                     .gap_2()
                     .w_full()
-                    .child(div().w(px(96.)).flex_none().text_xs().text_color(pal.text_muted).child(s.label))
+                    .child(div().w(px(96.)).flex_none().text_xs().text_color(pal.text_muted).child(crate::ui::spec_text(s.label)))
                     .child(div().flex_1().child(e))
                     .os_context_menu(move |m, _, _| {
                         let v = view.clone();
@@ -1820,7 +1842,7 @@ impl FeatureDialog {
                     .min_h(px(27.))
                     .cursor_pointer()
                     .child(div().w(px(20.)).flex_none().flex().justify_center().child(crate::ui::glyph(if on { "expander-down" } else { "expander-right" }, 14., if error { color } else { gpui_kit::rgb(0x555555) })))
-                    .child(div().px(px(4.)).py(px(5.)).text_size(px(13.33)).line_height(px(17.33)).text_color(color).child(s.label))
+                    .child(div().px(px(4.)).py(px(5.)).text_size(px(13.33)).line_height(px(17.33)).text_color(color).child(crate::ui::spec_text(s.label)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Bool(!on), cx)))
                     .into_any_element()
             }
@@ -1876,7 +1898,7 @@ impl FeatureDialog {
                             // Live (psb 10-20 l, part-studio/402): a long label stays
                             // on one line, clipped with an ellipsis ("Preserve active
                             // sheet meta…"), no tooltip.
-                            .child(div().flex_1().min_w_0().ml(px(-4.)).truncate().child(s.label))
+                            .child(div().flex_1().min_w_0().ml(px(-4.)).truncate().child(crate::ui::spec_text(s.label)))
                             .rounded(px(2.))
                             .flex_shrink(1.)
                             .min_w_0()
@@ -1945,7 +1967,7 @@ impl FeatureDialog {
                             .cursor_pointer()
                             .when(selected, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                             .when(!selected, |d| d.text_color(pal.text).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.border)).hover(|d| d.text_color(pal.text)))
-                            .child(*label)
+                            .child(crate::ui::spec_text(label))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)))
                     }));
                     h_flex().mx(px(-2.)).mb(px(2.)).child(group).children(flips).into_any_element()
@@ -1955,7 +1977,7 @@ impl FeatureDialog {
                     // Live: Tab skips the dropdowns (Shift+Tab from Depth lands on the flip button).
                     let dd = self.os_select(path, items, &cur, move |this, id, cx| this.set_value(&path_s, ParamValue::Enum(id.to_string()), cx), cx);
                     // Live (div.select-input tip=…): the select's tooltip is its label.
-                    let dd = div().id(SharedString::from(format!("sel-{path}"))).flex_1().min_w_0().tooltip(crate::ui::tooltip(s.label)).child(dd);
+                    let dd = div().id(SharedString::from(format!("sel-{path}"))).flex_1().min_w_0().tooltip(crate::ui::user_tooltip(crate::i18n::spec(s.label))).child(dd);
                     // Live (dom/dialog-extrude-new.txt): the select fills the dialog's
                     // first 194 px column flush with its left edge (the body has 2 px
                     // padding); flips sit in the 26 px right column.
@@ -1971,12 +1993,12 @@ impl FeatureDialog {
                     // "Chamfer type / Equal distance" wrap; Hole's "Start plane /
                     // Start from part" and Helix's "Start condition / Start angle"
                     // don't).
-                    let fits = 10.0 + crate::ui::text_width(window, s.label, 12.0) + (22.0 + crate::ui::text_width(window, cur_label, 14.0)).max(90.0) <= 194.0;
+                    let fits = 10.0 + crate::ui::text_width(window, &crate::i18n::spec(s.label), 12.0) + (22.0 + crate::ui::text_width(window, &crate::i18n::spec(cur_label), 14.0)).max(90.0) <= 194.0;
                     if s.hints.has(Hints::SHOW_LABEL) && param_icon(self.ty.id, s.id).is_none() && !fits {
                         return Some(
                             v_flex()
                                 .w_full()
-                                .child(div().mx(px(-2.)).px(px(5.)).pt(px(7.)).text_size(px(12.)).line_height(px(16.)).text_color(pal.text_muted).child(s.label))
+                                .child(div().mx(px(-2.)).px(px(5.)).pt(px(7.)).text_size(px(12.)).line_height(px(16.)).text_color(pal.text_muted).child(crate::ui::spec_text(s.label)))
                                 .child(row.child(dd).children(flips))
                                 .into_any_element(),
                         );
@@ -1987,7 +2009,7 @@ impl FeatureDialog {
                         row = row.child(match param_icon(self.ty.id, s.id) {
                             Some(icon) => div().flex_none().child(crate::assets::icon(icon, 26., cx)).into_any_element(),
                             // Live: the label's baseline is the value's (label 7 px down).
-                            None => div().px(px(5.)).pt(px(6.)).max_w(px(110.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(s.label).into_any_element(),
+                            None => div().px(px(5.)).pt(px(6.)).max_w(px(110.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::spec_text(s.label)).into_any_element(),
                         });
                     }
                     row.child(dd).children(flips).into_any_element()
@@ -2074,7 +2096,7 @@ impl FeatureDialog {
                     // instead of their label.
                     .child(match param_icon(self.ty.id, s.id) {
                         Some(icon) => div().flex_none().child(crate::assets::icon(icon, 26., cx)).into_any_element(),
-                        None => div().pl(px(5.)).pr(px(5.)).pt(px(if tolerant { 4. } else { 6. })).max_w(px(125.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(s.label).into_any_element(),
+                        None => div().pl(px(5.)).pr(px(5.)).pt(px(if tolerant { 4. } else { 6. })).max_w(px(125.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).truncate().child(crate::ui::spec_text(s.label)).into_any_element(),
                     })
                     // Live: the value's baseline 1 px under the label's, the
                     // underline on the row's bottom line.
@@ -2166,7 +2188,7 @@ impl FeatureDialog {
                             .hover(|d| d.bg(with_alpha(gpui_kit::rgb(0xffffff), 0.35)))
                             .text_size(px(13.33))
                             .text_color(if missing { pal.error } else if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
-                            .child(div().flex_1().truncate().child(crate::ui::user_text(label)))
+                            .child(div().flex_1().truncate().child(crate::ui::entity_text(label)))
                             .when(reorder_on && single, |d| d.child(self.reorder_grip(path, k, &label_for_drag, false)))
                             .when(!reorder_on, |d| d.child(
                                 div()
@@ -2246,7 +2268,7 @@ impl FeatureDialog {
                     .when(empty, |d| d.pt(px(7.)).pb(px(4.)).text_size(px(12.)).line_height(px(13.)).text_color(gpui_kit::rgb(0x555555)))
                     .when(!empty, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.)).text_color(pal.text_muted))
                     .truncate()
-                    .child(s.label);
+                    .child(crate::ui::spec_text(s.label));
                 // Live (dom/dialog-fillet.txt): fields are 3 px in from the dialog
                 // edges with 5 px above (`os-param-requires-margin`); the row
                 // after the last field also starts 5 px below it (render_params).
@@ -2392,7 +2414,7 @@ impl FeatureDialog {
                         .border_color(if active { pal.accent } else { pal.border })
                         .bg(if active { pal.query_active } else { pal.panel })
                         .cursor_pointer()
-                        .child(div().px(px(6.)).when(items == 0, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33))).when(items > 0, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.))).text_color(pal.text_muted).child(s.label));
+                        .child(div().px(px(6.)).when(items == 0, |d| d.pt(px(6.)).pb(px(5.)).text_size(px(12.)).line_height(px(13.33))).when(items > 0, |d| d.pt(px(7.)).text_size(px(10.)).line_height(px(9.))).text_color(pal.text_muted).child(crate::ui::spec_text(s.label)));
                     let mut details: Vec<AnyElement> = Vec::new();
                     // Arrays may be reordered (live: unless PREVENT_ARRAY_REORDER)
                     // once they have 2+ items: the reorder button and mode.
@@ -2480,7 +2502,7 @@ impl FeatureDialog {
                     .rounded(px(2.))
                     .border_1()
                     .border_color(pal.border)
-                    .child(div().px(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).child(s.label));
+                    .child(div().px(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).child(crate::ui::spec_text(s.label)));
                 for k in 0..items {
                     let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
                     col = col.child(
@@ -3015,7 +3037,7 @@ impl Render for FeatureDialog {
             // border or radius, shadow 0 5px 10px rgba(0,0,0,.2) (GPUI blurs
             // twice as far as CSS: half the radius).
             .relative()
-            .w(self.width.unwrap_or(px(220.)))
+            .w(self.width.unwrap_or_else(|| self.natural_width(window)))
             .max_h(px(720.))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])

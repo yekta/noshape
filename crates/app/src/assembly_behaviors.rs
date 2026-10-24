@@ -837,8 +837,8 @@ impl AssemblyView {
         let tg = targets.clone();
         m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(tg.clone(), !hidden, cx)));
         let tg = targets.clone();
-        m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
-        m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
+        m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
+        m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
         let tg = targets.clone();
         let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
         m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
@@ -1469,8 +1469,8 @@ impl AssemblyView {
             let (a1, a2, a3, a4, a5) = (insts.clone(), insts.clone(), insts.clone(), insts.clone(), insts.clone());
             let hidden = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.hidden)));
             m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(a1.clone(), !hidden, cx)));
-            m.push(item("Hide other instances", move |t, _, cx| t.hide_other_instances(a2.clone(), cx)));
-            m.push(item("Hide all instances", |t, _, cx| t.hide_all_instances(cx)));
+            m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(a2.clone(), cx)));
+            m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
             m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, a3.clone(), cx)));
             m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, a4.clone(), cx)));
             let suppressed = self.assembly(cx).is_some_and(|a| !insts.is_empty() && insts.iter().all(|i| a.instance(*i).is_some_and(|x| x.suppressed)));
