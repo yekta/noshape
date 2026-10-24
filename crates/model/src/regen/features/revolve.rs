@@ -35,7 +35,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     };
     let refs = ev.query(if thin { "wallShape" } else { "entities" });
     if refs.is_empty() {
-        return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall" } else { "Select face or sketch region to revolve." });
+        return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall." } else { "Select face or sketch region to revolve." });
     }
     let Some(axis_ref) = ev.query("axis").first() else { return err("Select a revolve axis") };
     let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return err("The revolve axis could not be resolved") };

@@ -571,7 +571,7 @@ fn partial_flange_reliefs_match_live_sm5() {
     assert_eq!(r.context.bodies.len(), 1);
     let mut got: Vec<f64> = r.context.bodies[0].shape.faces().iter().map(|f| f.area().unwrap() * 1e6).collect();
     got.sort_by(f64::total_cmp);
-    let live = [2.0, 2.0, 4.0, 4.0, 6.2832, 6.2832, 6.6759, 6.6759, 10.0, 10.0, 15.75, 15.75, 31.4159, 40.0, 40.0, 40.0, 80.0, 94.2478, 100.0, 100.0, 767.9534, 767.9534];
+    let live = [2.0, 2.0, 4.0, 4.0, std::f64::consts::TAU, std::f64::consts::TAU, 6.6759, 6.6759, 10.0, 10.0, 15.75, 15.75, 31.4159, 40.0, 40.0, 40.0, 80.0, 94.2478, 100.0, 100.0, 767.9534, 767.9534];
     assert!(got.len() == live.len() && got.iter().zip(live).all(|(g, l)| (g - l).abs() < 6e-5), "faces {}: {got:?}", got.len());
 }
 

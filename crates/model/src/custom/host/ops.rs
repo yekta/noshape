@@ -115,7 +115,11 @@ pub(super) fn fresh_names(ev: &EvalCtx, shape: &Shape) -> Vec<Name> {
 fn bound_depth(ev: &EvalCtx, def: &Value, bound: &str, depth_key: &str) -> FResult<Option<f64>> {
     match bound {
         "BLIND" => Ok(Some(length_of(def.get(depth_key)).ok_or_else(|| fe(format!("{depth_key} should be a length")))?)),
-        "THROUGH_ALL" | "UP_TO_NEXT" => Ok(Some(ev.model_extent() * 2.0 + 1.0)),
+        // As the built-in Extrude (regen/features/extrude.rs).
+        "THROUGH_ALL" => {
+            crate::regen::features::extrude::require_parts(ev).map_err(|_| super::code_error("CANNOT_BE_EMPTY"))?;
+            Ok(Some(ev.model_extent()))
+        }
         _ => Ok(None),
     }
 }
@@ -138,23 +142,41 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             Some(b) => bound_depth(ev, &def, b, "startDepth")?.map(|x| if start_opposite { x } else { -x }),
             None => Some(0.0),
         };
-        let target = |refs: &[Reference]| -> FResult<Shape> {
+        // The end: the picked faces / bodies, a plane std made (up to a
+        // vertex or mate connector), or the next part (up to next).
+        let target = |refs: &[Reference], bound: &str| -> FResult<Shape> {
+            if bound == "UP_TO_NEXT" {
+                crate::regen::features::extrude::require_parts(ev).map_err(|_| super::code_error("CANNOT_BE_EMPTY"))?;
+                return crate::regen::features::extrude::next_parts(ev);
+            }
             let faces = ev.resolve_faces(refs);
             let bodies = ev.resolve_bodies(refs);
-            let shapes: Vec<Shape> = faces.iter().filter_map(|(b, f)| ev.face_shape(*b, *f).ok()).chain(bodies.iter().map(|b| ev.ctx.bodies[*b].shape.clone())).collect();
+            let mut shapes: Vec<Shape> = faces.iter().filter_map(|(b, f)| ev.face_shape(*b, *f).ok()).chain(bodies.iter().map(|b| ev.ctx.bodies[*b].shape.clone())).collect();
+            if shapes.is_empty()
+                && let Some(f) = refs.first().and_then(|r| ev.resolve_plane(r))
+            {
+                let ext = ev.model_extent() * 4.0;
+                shapes.push(k::make_plane_face(&kernel_plane(&f), -ext, ext, -ext, ext)?);
+            }
             match shapes.len() {
                 0 => err("End condition must be a surface"),
                 1 => Ok(shapes[0].clone()),
                 _ => Ok(Shape::compound(&shapes)),
             }
         };
+        // endTranslationalOffset moves the end along the direction.
+        let end_offset = length_of(def.get("endTranslationalOffset")).unwrap_or(0.0);
+        let end_target = |refs: &[Reference]| -> FResult<Shape> {
+            let t = target(refs, &end_bound)?;
+            if end_offset == 0.0 { Ok(t) } else { Ok(t.translated(d * end_offset)?) }
+        };
         let profiles = ev.profiles(&refs)?;
         let mut tools = Vec::new();
         for p in &profiles {
             let res = match (start, end) {
                 (Some(s), Some(e)) => k::extrude_between(&p.shape, -d * s, d * e, 0.0),
-                (Some(s), None) => k::extrude_up_to(&p.shape, d, &target(&end_entity)?, -s),
-                (None, Some(e)) => k::extrude_up_to(&p.shape, -d, &target(&start_entity)?, 0.0).and_then(|r| {
+                (Some(s), None) => k::extrude_up_to(&p.shape, d, &end_target(&end_entity)?, -s),
+                (None, Some(e)) => k::extrude_up_to(&p.shape, -d, &target(&start_entity, start_bound.as_deref().unwrap_or_default())?, 0.0).and_then(|r| {
                     let ext = k::extrude(&p.shape, d * e)?;
                     k::fuse(&r.shape, &ext.shape)
                 }),
@@ -978,6 +1000,9 @@ fn op_draft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let Some(np) = neutral.first().and_then(|r| ev.resolve_plane(r)) else { return err("Could not resolve the neutral plane.") };
         let dir = pull.unwrap_or(np.normal).normalize_or_zero();
         let groups = by_body(ev.resolve_faces(&faces));
+        if super::trace_ops() {
+            eprintln!("[fs op] draft faces {:?} -> {} bodies, angle {angle}, pull {dir:?}, neutral {:?}", faces.len(), groups.len(), np.origin);
+        }
         for (bi, fs) in groups.into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
             let shapes: Vec<Shape> = fs.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();

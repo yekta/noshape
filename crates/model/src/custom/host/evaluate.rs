@@ -533,12 +533,14 @@ fn ev_distance(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 
 fn ev_mate_connector(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
+    // Only mate connectors: std tells faces from mate connectors by it
+    // (extrude's "Up to face" takes either).
     let (o, x, z) = on_first(i, &cx, &a, "mateConnector", "CANNOT_RESOLVE_ENTITIES", |q, e| match e {
         Ent::Connector(c) => {
             let c = &q.st.ctx.connectors[*c];
             Some((c.origin, c.x, c.z))
         }
-        _ => q.plane(e).map(|p| (p.origin, p.x, p.normal)),
+        _ => None,
     })?;
     Ok(coord_system_value(o, x, z))
 }
@@ -814,10 +816,17 @@ fn face_pair(a: &k::Shape, b: &k::Shape) -> bool {
 }
 
 /// Two touching faces cross (interfere) when they meet along a curve inside
-/// both, not where they only touch along a boundary or lie on each other (abut).
-fn faces_cross(a: &k::Shape, b: &k::Shape) -> bool {
-    if k::common(a, b).ok().and_then(|c| c.shape.area().ok()).is_some_and(|x| x > 1e-12) {
-        return false;
+/// both; touching along a boundary or lying on each other is abutting
+/// (std Tab: a tab on its wall, live sm8). Faces of two solids lying on each
+/// other from opposite sides (a boss sketched on a part's face) interfere:
+/// std's boolean heuristics then pick Add, as live (qa5 EXT1).
+fn faces_cross(a: &k::Shape, b: &k::Shape, solids: bool) -> bool {
+    if let Some(c) = k::common(a, b).ok().filter(|c| c.shape.area().is_ok_and(|x| x > 1e-12)) {
+        let facing = || {
+            let p = c.shape.faces().first()?.bounding_box(false).ok()?.center();
+            Some(a.normal_at_point(p).ok()?.dot(b.normal_at_point(p).ok()?) < 0.0)
+        };
+        return solids && facing() == Some(true);
     }
     let Ok(sec) = k::section(a, b) else { return false };
     let interior = |f: &k::Shape, p: DVec3| {
@@ -837,9 +846,12 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let targets = super::query::evaluate_refs(i, &cx, &field(&a, "targets"))?;
     // Per face, as live: a body's faces, each with its body (std Tab's
     // editing logic reads `tool`'s plane).
-    let shapes = |refs: &[crate::reference::Reference]| -> Vec<(crate::reference::Reference, Option<crate::reference::Reference>, k::Shape)> {
+    // (entity, its body, shape, of a solid)
+    type Hit = (crate::reference::Reference, Option<crate::reference::Reference>, k::Shape, bool);
+    let shapes = |refs: &[crate::reference::Reference]| -> Vec<Hit> {
         let st = cx.state.lock();
         let q = QueryCx::new(&st);
+        let solid = |b: usize| st.ctx.bodies[b].kind == crate::display::BodyKind::Solid;
         let mut out = Vec::new();
         for r in refs {
             for e in q.from_ref(r) {
@@ -847,13 +859,14 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     Ent::Body(b) => {
                         let body = &st.ctx.bodies[b];
                         for (fi, f) in body.shape.faces().into_iter().enumerate() {
-                            out.push((q.to_ref(&Ent::Face(b, fi)), Some(r.clone()), f));
+                            out.push((q.to_ref(&Ent::Face(b, fi)), Some(r.clone()), f, solid(b)));
                         }
                     }
                     _ => {
-                        let owner = q.owner(&e).map(|o| q.to_ref(&o));
+                        let owner = q.owner(&e);
+                        let of_solid = matches!(owner, Some(Ent::Body(b)) if solid(b));
                         if let Some(s) = q.shape(&e) {
-                            out.push((r.clone(), owner, s));
+                            out.push((r.clone(), owner.map(|o| q.to_ref(&o)), s, of_solid));
                         }
                     }
                 }
@@ -864,8 +877,8 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (ts, gs) = (shapes(&tools), shapes(&targets));
     let one = |r: &crate::reference::Reference| super::query::query_of_refs(&cx, std::slice::from_ref(r));
     let mut out = Vec::new();
-    for (tr, tb, t) in &ts {
-        for (gr, gb, g) in &gs {
+    for (tr, tb, t, ts_solid) in &ts {
+        for (gr, gb, g, gs_solid) in &gs {
             if t.is_same(g) {
                 continue;
             }
@@ -873,7 +886,7 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if d.distance > 1e-8 {
                 continue;
             }
-            let kind = if face_pair(t, g) { if faces_cross(t, g) { "INTERFERE" } else { "ABUT_NO_CLASS" } } else {
+            let kind = if face_pair(t, g) { if faces_cross(t, g, *ts_solid && *gs_solid) { "INTERFERE" } else { "ABUT_NO_CLASS" } } else {
                 match k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) {
                     Some(v) if v > 1e-15 => "INTERFERE",
                     _ => "ABUT_NO_CLASS",

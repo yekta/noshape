@@ -226,6 +226,9 @@ pub struct UiState {
     /// The edited feature's parameters when std's editing logic last ran
     /// (its `oldDefinition`; empty for a new feature's first change).
     pub std_edit_old: Option<noshape_model::params::ParamValues>,
+    /// std's editing logic running off the UI thread (std Extrude runs a
+    /// whole trial extrude for its boolean heuristics).
+    pub std_edit_task: Option<Task<()>>,
     pub preview_task: Option<Task<()>>,
     /// Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
@@ -451,6 +454,7 @@ impl UiState {
             preview_before: None,
             before_context: None,
             std_edit_old: None,
+            std_edit_task: None,
             preview_task: None,
             preview_tool: None,
             feature_drop: Default::default(),
@@ -1851,6 +1855,12 @@ impl PartStudioView {
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.before_context = Some(context);
                 this.ui.preview_before = Some(Arc::new(display));
+                // Changes made before the model was ready get std's editing logic now.
+                if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone())
+                    && noshape_model::custom::std_feature::has_editing_logic(&dialog.read(cx).feature.type_id)
+                {
+                    this.std_edit_logic(&dialog, cx);
+                }
                 // Chips of parts the feature consumes get their names now.
                 if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone()) {
                     let labeler = this.labeler(cx);
@@ -3115,7 +3125,10 @@ impl PartStudioView {
     /// the profile fills "Flange to merge" and the subtraction offset, live
     /// qa5 4.2), on the model before the feature; fields the user set are
     /// `specifiedParameters`.
-    fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
+    /// It runs in the background; a result for values the user has changed
+    /// since is dropped (the run for the new values follows). Without the
+    /// model before the feature yet, it runs once that arrives.
+    pub(super) fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
         let Some(ctx) = self.ui.before_context.clone() else { return };
         let (ty, id, name, params, user_set) = {
             let d = dialog.read(cx);
@@ -3126,21 +3139,31 @@ impl PartStudioView {
             return;
         }
         let units = self.doc.read(cx).session.doc.settings.units;
-        let Some(changed) = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &params, &user_set) else { return };
-        let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
-        if changes.is_empty() {
-            return;
-        }
-        let mut next = params;
-        for (k, v) in &changes {
-            next.set(k, v.clone());
-        }
-        self.ui.std_edit_old = Some(next);
-        dialog.update(cx, |d, cx| {
-            for (k, v) in changes {
-                d.set_value_auto(&k, v, cx);
-            }
-        });
+        let dialog = dialog.clone();
+        let sent = params.clone();
+        self.ui.std_edit_task = Some(cx.spawn(async move |this, cx| {
+            let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set) }).await;
+            let Some(changed) = changed else { return };
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if dialog.read(cx).feature.params != params {
+                    return;
+                }
+                let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
+                if changes.is_empty() {
+                    return;
+                }
+                let mut next = params;
+                for (k, v) in &changes {
+                    next.set(k, v.clone());
+                }
+                this.ui.std_edit_old = Some(next);
+                dialog.update(cx, |d, cx| {
+                    for (k, v) in changes {
+                        d.set_value_auto(&k, v, cx);
+                    }
+                });
+            });
+        }));
     }
 
     /// Onshape's deleteFaceEditLogic / replaceFaceEditLogic for a new
@@ -3275,7 +3298,7 @@ impl PartStudioView {
             let d = dialog.read(cx);
             (d.feature.type_id.clone(), d.feature.id)
         };
-        if !matches!(ty.as_str(), "extrude" | "revolve" | "sweep" | "loft") {
+        if !matches!(ty.as_str(), "extrude" | "revolve" | "sweep" | "loft") || noshape_model::custom::std_feature::has_editing_logic(&ty) {
             return;
         }
         let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };

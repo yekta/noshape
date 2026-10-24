@@ -31,7 +31,16 @@ pub fn sketch() -> FeatureType {
 }
 
 pub fn extrude() -> FeatureType {
-    let mut p = creation_and_operation(true);
+    // extrude.fs: the viewer it is made in (the sheet metal flat view has
+    // its own Creation type, Add or Remove).
+    let mut p = vec![ParamSpec::enum_("domain", "Domain", &[("MODEL", "MODEL"), ("FLAT", "FLAT")]).hints(Hints::ALWAYS_HIDDEN)];
+    p.extend(creation_and_operation(true));
+    p.push(
+        ParamSpec::enum_("flatOperationType", "Creation type", &[("ADD", "Add"), ("REMOVE", "Remove")])
+            .default_enum("REMOVE")
+            .hints(Hints::HORIZONTAL_ENUM)
+            .visible(|v| v.is("domain", "FLAT")),
+    );
     p.push(
         ParamSpec::query("entities", "Faces and sketch regions to extrude", QueryFilter::SKETCH_REGION | QueryFilter::PLANAR_FACE)
             .hints(Hints::INITIAL_FOCUS)
@@ -86,17 +95,17 @@ pub fn extrude() -> FeatureType {
     p.push(
         ParamSpec::bool("hasSecondDirectionDraft", "Draft", false)
             .hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW)
-            .visible(move |v| v.bool("hasSecondDirection") && draft_ok(v) && second_away(v)),
+            .visible(move |v| second_direction_on(v) && draft_ok(v) && second_away(v)),
     );
     p.push(
         ParamSpec::num("secondDirectionDraftAngle", "Draft angle", NumSpec::angle(3.0, 0.0, 89.9))
             .hints(Hints::DISPLAY_SHORT)
-            .visible(move |v| v.bool("hasSecondDirection") && v.bool("hasSecondDirectionDraft") && draft_ok(v) && second_away(v)),
+            .visible(move |v| second_direction_on(v) && v.bool("hasSecondDirectionDraft") && draft_ok(v) && second_away(v)),
     );
     p.push(
         ParamSpec::bool("secondDirectionDraftPullDirection", "Opposite direction", false)
             .hints(Hints::OPPOSITE_DIRECTION_CIRCULAR)
-            .visible(move |v| v.bool("hasSecondDirection") && v.bool("hasSecondDirectionDraft") && draft_ok(v) && second_away(v)),
+            .visible(move |v| second_direction_on(v) && v.bool("hasSecondDirectionDraft") && draft_ok(v) && second_away(v)),
     );
     p.extend(merge_scope());
 

@@ -476,6 +476,14 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
                 collect_in(module, stmt, &with, None, roots, out);
                 return;
             }
+            // A "Driving Parameter" group: its boolean heads the group (a
+            // checkbox title over the group's fields, as built-in dialogs).
+            if a.str("Group Name").is_some()
+                && let Some(driver) = a.str("Driving Parameter")
+                && let Some(p) = out.iter_mut().rev().find(|p| p.id == driver)
+            {
+                p.hints = p.hints | Hints::GROUP_HEADER;
+            }
             collect_in(module, stmt, conds, Some(&a), roots, out);
         }
         StmtKind::If { cond, then, otherwise } => {

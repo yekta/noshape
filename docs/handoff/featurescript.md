@@ -737,3 +737,32 @@ transient ids `JP<n>` in Context::fs_transients; flat footprint + outline). Nati
   flat 80.126106 x 20; flipped = 3051.33, inside, 76.126106. Std matches the default; the native route (inside) deviates.
 - sheetmetal_frames (7; SM5 fixed the outer-flange one): hem bbox, bend count, flange outer bend direction, convert BUTT, corner relief volume.
 Not mine but seen: drawing::tests::flat_pattern_view_shows_bend_lines_and_notes fails on "DOWN 90.0° R3" (format.rs angle).
+
+## fs (24 Oct, new account): P1 std-oracle pass
+
+Sheet-metal WIP 2c8697d2 reverted on top (f8bd0a64; `git revert f8bd0a64` brings it back when P3 resumes).
+
+**Oracle infrastructure (tests/std_oracle.rs):**
+- `core_dialogs_match_std_in_every_state`: for each feature in `STRICT`, every parameter (id, label, kind, bounds,
+  metric/imperial defaults, hints, description) equals the dialog std's precondition declares
+  (`std_feature::std_dialog`, works for defineSheetMetalFeature and non-exported features like fTransform), and the
+  shown parameters agree in the default state, every single and pair of enum/bool choices and 400 random states.
+  Query filters are not compared (the generator maps std filters roughly: no SketchObject.NO /
+  ConstructionObject.NO / QueryFilterCompound); review them by reading std. `STD_ORACLE=fillet cargo test -p
+  noshape-model --test std_oracle print_one -- --nocapture` prints one feature's diff.
+- `<feature>_regenerates_as_std`: scenarios regenerated natively and with std's own feature
+  (`std_feature::set_std_route(&["extrude"])` runs the core feature through std; CORE list in std_feature.rs);
+  status, message, faulty fields and bodies (kind, faces, edges, volume/area) must agree. `STD_ORACLE_CASE=draft
+  NOSHAPE_FS_TRACE=1` narrows to cases and traces std's operations.
+- std's faulty parameters now reach FeatureError::faulty (run.rs).
+- Dialog generator: a "Driving Parameter" group's boolean gets GROUP_HEADER (as built-in dialogs).
+
+**Extrude (in progress):** dialog identical in every state (added hidden `domain` + flat-view `flatOperationType`,
+second depth not tolerant, second end hidden when symmetric). Native errors now std's texts + faulty fields
+(EXTRUDE_SELECT_TERMINATING_*, EXTRUDE_SELECT_DIRECTION / DIRECTION_INVALID_ENTITY / DIRECTION_COPLANAR,
+EXTRUDE_SELECT_START_OFFSET_ENTITY / START_OFFSET_BOUND_NOT_PLANAR / NOT_PARALLEL, OFFSET_WIRE_SELECT_WALL_PATH,
+EXTRUDE_SURF_NO_CURVE); Through all / Up to next without parts = "Parts or Surfaces must be present in the Part
+Studio." (CANNOT_BE_EMPTY, live dialogs/extrude-endtype-*). Start offset to an entity follows std's distance rule.
+Host fixes found by the oracle: SWEPT_FACE historical query, qAdjacent of sketch regions, opExtrude up-to planes /
+UP_TO_NEXT / endTranslationalOffset, evMateConnector only for mate connectors, coplanar overlapping faces interfere
+in evCollision (boolean heuristics: boss on a face = Add, as live).

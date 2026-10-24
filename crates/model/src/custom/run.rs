@@ -244,8 +244,13 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
             (None, Some(m)) => m.to_string(),
             _ => host::error_text("REGEN_ERROR"),
         };
+        // std's faulty parameters mark those fields red (regenError's array).
+        let faulty: Vec<&'static str> = match s.get("faultyParameters") {
+            Value::Array(a, _) => a.iter().filter_map(|v| v.as_str()).filter_map(|p| specs.iter().find(|x| *x.id == *p).map(|x| x.id)).collect(),
+            _ => Vec::new(),
+        };
         match &*kind {
-            "ERROR" => return err(text),
+            "ERROR" => return Err(FeatureError { faulty, ..FeatureError::new(text) }),
             "WARNING" => ev.warnings.push(text),
             // reportFeatureInfo (std Finish sheet metal model): an Info status.
             "INFO" => ev.infos.push(text),
