@@ -242,6 +242,23 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "remove_cut",
+            summary: "Remove crop / Remove section (the boundary stays as a sketch entity)",
+            description: "The view menus' Remove crop and (on a broken-out section) Remove section (live asb 10-23 views (3)): `what` crop uncrops view `view`, broken_out removes its broken-out section number `index` (0-based, drawing_get); the boundary stays on the sheet as a plain sketch circle, polygon or closed spline. One edit (\"Remove crop\" / \"Remove section\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "The view (drawing_get)."),
+                    req("what", json!({ "type": "string", "enum": ["crop", "broken_out"] }), "What to remove."),
+                    opt("index", json!({ "type": "integer", "minimum": 0 }), "broken_out: which one (default 0)."),
+                ],
+            ),
+            mutates: true,
+            destructive: true,
+            run: remove_cut,
+        },
+        Op {
+            group: "drawing",
             verb: "hatch_region",
             summary: "Hatch closed profiles of the sheet sketch or of views",
             description: "The Hatch region dialog: each of `points` (sheet mm) picks the smallest closed sheet-sketch profile around it, else the smallest closed region of the visible edges of the view there (not detail or break views); a region per profile. Pattern tab `standard` and `pattern` (its name as listed in the dialog, e.g. \"ANSI31 general\", or just its first word \"ANSI31\"; default the tab's default), `scale` and `angle` (\"Auto\" or a number; not on the General tab), `color` (default: the drawing's hatch color). `hatch` edits that hatch region instead (its profile replaced when `points` are given). One edit (\"Hatch region\" / \"Edit hatch\"); replies with the hatch ids.",
@@ -976,6 +993,9 @@ fn broken_out_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => None,
     };
     let (view, pts) = profile(&t, a, given)?;
+    if let Some(why) = dt::broken_out_refused(&t.d.sheets[t.sheet], view) {
+        return Err(OpError::param("view", why));
+    }
     let index = a.opt_u64("index")?.map(|i| i as usize);
     if let Some(i) = index
         && t.d.sheets[t.sheet].view(view).is_none_or(|v| i >= v.broken_out.len())
@@ -1272,6 +1292,34 @@ fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = ann.id;
     t.d.sheets[sheet].annotations.push(ann);
     done(od, t, "Note", "annotation", id)
+}
+
+fn remove_cut(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let view = view_arg(&t, a, "view")?;
+    let si = t.sheet;
+    let pl = t.m.built.as_ref().and_then(|b| b.placement(view).cloned());
+    let v = t.d.sheets[si].view(view).expect("view");
+    let description = match a.str("what")? {
+        "crop" => {
+            if v.crop.is_none() {
+                return Err(OpError::param("what", "the view isn't cropped"));
+            }
+            dt::remove_crop(&mut t.d.sheets[si], pl.as_ref(), view);
+            "Remove crop"
+        }
+        "broken_out" => {
+            let index = a.opt_u64("index")?.unwrap_or(0) as usize;
+            if index >= v.broken_out.len() {
+                return Err(OpError::param("index", &format!("the view has {} broken-out section(s)", v.broken_out.len())));
+            }
+            dt::remove_broken_out(&mut t.d.sheets[si], pl.as_ref(), view, index);
+            "Remove section"
+        }
+        _ => return Err(OpError::param("what", "crop or broken_out")),
+    };
+    done(od, t, description, "view", view.0)
 }
 
 fn edit_detail(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

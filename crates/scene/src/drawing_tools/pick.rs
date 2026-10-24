@@ -140,7 +140,7 @@ impl<'a> SheetPick<'a> {
     /// The selectable entity a pick id belongs to.
     pub fn sel_of_pick(&self, pick: u32) -> Option<Sel> {
         match self.built?.picks.get(pick as usize)? {
-            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) => Some(Sel::View(*v)),
+            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) | PickTarget::BrokenOut { view: v, .. } => Some(Sel::View(*v)),
             PickTarget::Annotation(a) | PickTarget::Inspection(a) => Some(Sel::Annotation(*a)),
             PickTarget::Table(t) => Some(Sel::Table(*t)),
             PickTarget::BreakLine { view, index } => Some(Sel::Break(*view, *index)),

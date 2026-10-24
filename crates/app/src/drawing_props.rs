@@ -295,13 +295,21 @@ impl DrawingEditor {
         if v.crop.is_some() {
             // Live 5671-5677: "Edit crop..." reopens the Crop view dialog.
             edits.push(MenuEntry::item("Edit crop...", move |t, _, cx| t.edit_crop(id, cx)));
-            edits.push(MenuEntry::item("Remove crop", move |t, _, cx| t.edit_view("Remove crop", id, cx, |v| v.crop = None)));
+            // Live asb 10-23 views (3): the boundary stays as a sketch entity.
+            edits.push(MenuEntry::item("Remove crop", move |t, _, cx| {
+                let pl = t.placement(id);
+                t.edit_sheet("Remove crop", cx, |s| noshape_scene::drawing_tools::remove_crop(s, pl.as_ref(), id));
+            }));
         }
-        if !v.broken_out.is_empty() {
-            // Help broken_out_section_view: "Edit section" and "Remove section".
-            let last = v.broken_out.len() - 1;
-            edits.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_broken_out_panel(id, last, w, cx)));
-            edits.push(MenuEntry::item("Remove section", move |t, _, cx| t.edit_view("Remove broken-out sections", id, cx, |v| v.broken_out.clear())));
+        // Live asb 10-23 views (3): "Edit section... | Remove section" only on
+        // a broken-out section's hatch or profile; Remove section keeps the
+        // profile as a sketch spline.
+        if let Some((_, index)) = self.menu_broken_out.filter(|(bv, i)| *bv == id && *i < v.broken_out.len()) {
+            edits.push(MenuEntry::item("Edit section...", move |t, w, cx| t.open_broken_out_panel(id, index, w, cx)));
+            edits.push(MenuEntry::item("Remove section", move |t, _, cx| {
+                let pl = t.placement(id);
+                t.edit_sheet("Remove section", cx, |s| noshape_scene::drawing_tools::remove_broken_out(s, pl.as_ref(), id, index));
+            }));
         }
         // Live (drawing context menu): "Insert custom table of Part Studio 1…";
         // assemblies: "Insert BOM for Assembly 1 ..." (live drawing/1108).
@@ -334,7 +342,9 @@ impl DrawingEditor {
         // Rotate view vertically / horizontally: pick a straight edge (views
         // without a parent or children, like the rotation angle).
         // A view linked to a parent on another sheet doesn't align with it (live x (4)).
-        let free = sheet.parent_of(id).is_none_or(|p| p.is_ghost()) && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
+        // Detail views aren't aligned with their parent: live asb 10-23
+        // views (1) lists Rotate view on them.
+        let free = (matches!(v.kind, ViewKind::Detail { .. }) || sheet.parent_of(id).is_none_or(|p| p.is_ghost())) && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id));
         // Live (behaviours "Replicate annotations with real annotations" (5)):
         // a "Rotate view" submenu "Vertical to… | Horizontal to…".
         if free {
@@ -372,7 +382,10 @@ impl DrawingEditor {
         }
         // Live drawing/1108, u-944: Paste (with something to paste), Copy.
         out.extend(paste_entry(cx));
-        out.push(MenuEntry::item("Copy", move |t, _, cx| t.copy_views(Some(id), cx)));
+        // Live asb 10-23 views (1), (7): detail and section views have no Copy.
+        if !matches!(v.kind, ViewKind::Detail { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
+            out.push(MenuEntry::item("Copy", move |t, _, cx| t.copy_views(Some(id), cx)));
+        }
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
             t.start_paste_table(cx);
         }));

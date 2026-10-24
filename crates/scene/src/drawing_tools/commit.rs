@@ -515,6 +515,80 @@ impl SheetPick<'_> {
     }
 }
 
+/// A crop or broken-out boundary left on the sheet when its cut goes:
+/// view coordinates (meters).
+pub enum Boundary {
+    Circle { center: [f64; 2], radius: f64 },
+    Polygon(Vec<[f64; 2]>),
+    Spline(Vec<[f64; 2]>),
+}
+
+/// Remove crop / Remove section keep their boundary (live asb 10-23 views
+/// (3)): it stays on the sheet as a plain sketch circle, polygon or closed
+/// spline (sheet mm) in view `view`'s placement.
+pub fn keep_boundary(sheet: &mut Sheet, pl: &ViewPlacement, b: Boundary) {
+    use noshape_sketch::DVec2;
+    let at = |p: [f64; 2]| {
+        let s = pl.to_sheet(p);
+        DVec2::new(s[0], s[1])
+    };
+    let sk = &mut sheet.sketch.sketch;
+    match b {
+        Boundary::Circle { center, radius } => {
+            sk.add_circle(at(center), pl.len_to_sheet(radius));
+        }
+        Boundary::Polygon(pts) if pts.len() >= 2 => {
+            let q: Vec<DVec2> = pts.iter().map(|p| at(*p)).collect();
+            for (i, a) in q.iter().enumerate() {
+                sk.add_line(*a, q[(i + 1) % q.len()]);
+            }
+        }
+        Boundary::Spline(pts) if pts.len() >= 3 => {
+            let q: Vec<DVec2> = pts.iter().map(|p| at(*p)).collect();
+            if sk.add_closed_fit_spline(&q).is_err() {
+                for (i, a) in q.iter().enumerate() {
+                    sk.add_line(*a, q[(i + 1) % q.len()]);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Remove crop: the view uncropped, its boundary kept as a sketch entity.
+pub fn remove_crop(sheet: &mut Sheet, pl: Option<&ViewPlacement>, view: ViewId) {
+    let Some(crop) = sheet.view_mut(view).and_then(|v| v.crop.take()) else { return };
+    if let Some(pl) = pl {
+        let b = match crop {
+            Crop::Circle { center, radius } => Boundary::Circle { center, radius },
+            Crop::Polygon(p) => Boundary::Polygon(p),
+            Crop::Spline(p) => Boundary::Spline(p),
+        };
+        keep_boundary(sheet, pl, b);
+    }
+}
+
+/// Remove section on broken-out section `index` of `view`: that one goes,
+/// its profile kept as a sketch spline (polygon).
+pub fn remove_broken_out(sheet: &mut Sheet, pl: Option<&ViewPlacement>, view: ViewId, index: usize) {
+    let Some(v) = sheet.view_mut(view) else { return };
+    if index >= v.broken_out.len() {
+        return;
+    }
+    let b = v.broken_out.remove(index);
+    if let Some(pl) = pl {
+        keep_boundary(sheet, pl, if b.spline { Boundary::Spline(b.profile) } else { Boundary::Polygon(b.profile) });
+    }
+}
+
+/// Why a broken-out section can't go on view `view` (help
+/// broken_out_section_view: not from Section, Detail or Aligned section
+/// views), or None.
+pub fn broken_out_refused(sheet: &noshape_model::drawing::Sheet, view: ViewId) -> Option<&'static str> {
+    use noshape_model::drawing::ViewKind;
+    matches!(sheet.view(view)?.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. }).then_some("Broken-out sections can't be created from section, detail or aligned section views")
+}
+
 /// The Broken-out section dialog's ✓: a blind depth (meters, > 0) or up to
 /// a model point. `None`: invalid depth. New profiles are splines.
 pub fn broken_out(profile: Vec<[f64; 2]>, spline: bool, depth: Option<f64>, depth_ref: Option<PointRef>) -> Option<BrokenOut> {

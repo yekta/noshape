@@ -30,6 +30,9 @@ pub enum PickTarget {
     SectionLine(ViewId),
     /// Detail circle drawn in the parent of detail view `0`.
     DetailCircle(ViewId),
+    /// The profile of broken-out section `index` of a view (live: its menu
+    /// has Edit section / Remove section).
+    BrokenOut { view: ViewId, index: usize },
     TitleBlock,
     Table(u64),
     /// Break lines of break `index` of a view.
@@ -59,7 +62,7 @@ impl PickTarget {
     /// The view this target belongs to (for selecting/dragging views).
     pub fn view(&self) -> Option<ViewId> {
         match self {
-            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::ViewLabel(v) => Some(*v),
+            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::ViewLabel(v) | PickTarget::BrokenOut { view: v, .. } => Some(*v),
             _ => None,
         }
     }
@@ -1207,7 +1210,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             g.cad_since(cad_mark, CadLayer::ViewHatches);
             // Broken-out profiles (live: a SPLINE on SECTION_JOG_LINES over
             // the cut's edge; a polygon profile as a polyline).
-            for b in &v.broken_out {
+            for (index, b) in v.broken_out.iter().enumerate() {
+                let pick = picks.id(PickTarget::BrokenOut { view: v.id, index });
                 let outline = views::broken_out_outline(b);
                 if outline.len() < 3 {
                     continue;
@@ -1221,7 +1225,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     if whole {
                         piece.pop();
                     }
-                    g.lines.push(Polyline2 { points: piece, style: LineStyle::Visible, closed: whole, pick: 0 });
+                    g.lines.push(Polyline2 { points: piece, style: LineStyle::Visible, closed: whole, pick });
                 }
                 if b.spline && pl.breaks().is_empty() && g.lines.len() == cad_mark.0 + 1 {
                     let poles: Vec<[f64; 2]> = super::cad_objects::catmull_rom_poles(&b.profile).into_iter().map(|p| pl.to_sheet(p)).collect();

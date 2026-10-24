@@ -298,6 +298,9 @@ pub struct DrawingEditor {
     /// The selected note leader (note, leader): drawn amber with its nodes
     /// (live drw2 10-21 g (1)).
     pub leader_sel: Option<(u64, usize)>,
+    /// The broken-out section a context menu was opened on (live: Edit
+    /// section... / Remove section only there).
+    pub menu_broken_out: Option<(ViewId, usize)>,
     /// Weld symbol dialog (drawing_weld.rs).
     pub weld_dlg: Option<crate::drawing_weld::WeldDlg>,
     /// The note editor's formatting ruler (drawing_ruler.rs).
@@ -557,6 +560,7 @@ impl DrawingEditor {
             note_leader: None,
             leader_from: None,
             leader_sel: None,
+            menu_broken_out: None,
             cell_sel: None,
             cell_panel: None,
             note_color: None,

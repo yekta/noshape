@@ -1608,7 +1608,9 @@ impl DrawingEditor {
         // g (3), (4), (6)).
         // On a detail view's circle in its parent: the circle's menu (live
         // asb 10-23 views (2)).
-        let circle = pick.and_then(|p| self.built.as_ref()?.picks.get(p as usize).cloned()).and_then(|t| if let PickTarget::DetailCircle(v) = t { Some(v) } else { None });
+        let target = pick.and_then(|p| self.built.as_ref()?.picks.get(p as usize).cloned());
+        let circle = target.as_ref().and_then(|t| if let PickTarget::DetailCircle(v) = t { Some(*v) } else { None });
+        self.menu_broken_out = target.and_then(|t| if let PickTarget::BrokenOut { view, index } = t { Some((view, index)) } else { None });
         let entries = match (self.leader_hit(self.cursor), circle) {
             (Some(hit), _) => self.leader_entries(hit, cx),
             (None, Some(v)) => self.detail_circle_entries(v, cx),

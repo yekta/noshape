@@ -1348,6 +1348,12 @@ fn drawing_broken_out_sections_and_profile_crops() {
     assert_eq!(e.param.as_deref(), Some("depth"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": a["id"], "points": tri(a), "index": 4 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("index"), "{e:?}");
+    // Not on section, detail or aligned section views (help broken_out_section_view).
+    let (ax, ay) = ((num(&a["bounds"]["min"][0]) + num(&a["bounds"]["max"][0])) / 2.0, (num(&a["bounds"]["min"][1]) + num(&a["bounds"]["max"][1])) / 2.0);
+    let det = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": a["id"], "center": [ax, ay], "radius": 6, "position": [350, 250] }));
+    let dv = det["views"].as_array().unwrap().last().unwrap().clone();
+    let e = try_call(&mut ctx, "drawing_broken_out_section", json!({ "drawing": tab, "view": dv["id"], "points": tri(&dv) })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
     // Spline and polygon crops of the other view.
     call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "spline", "points": tri(b) }));
     assert!(last(&mut ctx).ends_with(":: Crop view"));
@@ -1356,6 +1362,21 @@ fn drawing_broken_out_sections_and_profile_crops() {
     assert_eq!(views_of(&mut ctx).into_iter().find(|v| v["id"] == b["id"]).unwrap()["crop"], "polygon");
     let e = try_call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "polygon", "points": [[1, 1], [2, 2]] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("points"), "{e:?}");
+    // Remove crop / Remove section keep their boundary as a sketch entity
+    // (live asb 10-23 views (3)).
+    let sketch_n = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["sketch_entities"].as_u64().unwrap_or(0);
+    let n0 = sketch_n(&mut ctx);
+    call(&mut ctx, "drawing_remove_cut", json!({ "drawing": tab, "view": b["id"], "what": "crop" }));
+    assert!(last(&mut ctx).ends_with(":: Remove crop"));
+    assert!(views_of(&mut ctx).into_iter().find(|v| v["id"] == b["id"]).unwrap()["crop"].is_null());
+    let n1 = sketch_n(&mut ctx);
+    assert!(n1 > n0, "the polygon stays: {n0} -> {n1}");
+    call(&mut ctx, "drawing_remove_cut", json!({ "drawing": tab, "view": a["id"], "what": "broken_out", "index": 0 }));
+    assert!(last(&mut ctx).ends_with(":: Remove section"));
+    assert!(views_of(&mut ctx).into_iter().find(|v| v["id"] == a["id"]).unwrap()["broken_out"].as_array().is_none_or(|x| x.is_empty()));
+    assert!(sketch_n(&mut ctx) > n1, "the spline stays");
+    let e = try_call(&mut ctx, "drawing_remove_cut", json!({ "drawing": tab, "view": b["id"], "what": "crop" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("what"), "{e:?}");
 }
 
 #[test]
