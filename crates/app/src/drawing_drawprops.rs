@@ -440,7 +440,7 @@ impl DrawingEditor {
         };
         // Font row: family, Bold, Italic (the default is the drawing sans).
         let font_row = |w: FontOf, cur: Option<noshape_model::drawing::sheet::TextFont>, cx: &mut Context<Self>| -> AnyElement {
-            use noshape_model::drawing::sheet::{FONT_FAMILIES, TextFont};
+            use noshape_model::drawing::sheet::{DRAWING_DEFAULT_FONT, FONT_FAMILIES, TextFont};
             let label = cur.as_ref().map(|f| f.family.clone()).unwrap_or_else(|| "Default".into());
             let mut items: Vec<(String, bool, Act)> = vec![("Default".into(), cur.is_none(), std::rc::Rc::new(move |p: &mut DrawingProps| *font_of(p, w) = None) as Act)];
             for fam in FONT_FAMILIES {
@@ -467,7 +467,7 @@ impl DrawingEditor {
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.set_drawing_prop(&move |p| {
                             let slot = font_of(p, w);
-                            let mut font = slot.clone().unwrap_or_else(|| TextFont { family: FONT_FAMILIES[0].into(), bold: false, italic: false });
+                            let mut font = slot.clone().unwrap_or_else(|| TextFont { family: DRAWING_DEFAULT_FONT.into(), bold: false, italic: false });
                             f(&mut font);
                             *slot = Some(font);
                         }, cx)

@@ -16,7 +16,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::sheet::FONT_FAMILIES;
+use noshape_model::drawing::sheet::{DRAWING_DEFAULT_FONT, FONT_FAMILIES};
 use noshape_model::drawing::{CellAlign, CellFormat, CellVAlign, Table, TableKind};
 
 /// The open Cell panel: the cells it was opened for and its Text height box.
@@ -299,11 +299,11 @@ impl DrawingEditor {
 
         // Row 2: font and text.
         let field = |w: f32| div().w(px(w)).h(px(24.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
-        let family = first.font.clone().unwrap_or_else(|| FONT_FAMILIES[0].to_string());
+        let family = first.font.clone().unwrap_or_else(|| DRAWING_DEFAULT_FONT.to_string());
         let fonts: Vec<(String, bool, FormatEdit)> = FONT_FAMILIES
             .iter()
             .map(|&fam| {
-                let set = (fam != FONT_FAMILIES[0]).then(|| fam.to_string());
+                let set = (fam != DRAWING_DEFAULT_FONT).then(|| fam.to_string());
                 (fam.to_string(), family == fam, std::rc::Rc::new(move |f: &mut CellFormat| f.font = set.clone()) as FormatEdit)
             })
             .collect();
