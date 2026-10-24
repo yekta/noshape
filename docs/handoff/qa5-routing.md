@@ -371,3 +371,6 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   live rolls forward that way (v3 s2).
 - **REGEN-SPEED (perf/kern) update** live's exact 30-feature part: ours 585 ms at load / 472 ms after an edit vs live 171 / 132 ms;
   Boss 1 152 ms on load (others 11–18 ms).
+- **MATE-FLIP-AXIAL (asb, P2 wrong placement)** Flip primary axis does nothing for Revolute / Cylindrical / Planar / Pin slot /
+  Parallel: residual `[z.x, z.y]` (`assembly/solver.rs` ~571–579) accepts anti-parallel Z; result = nearest to the prior pose.
+  Repro r5/v3s3-flip.py (identical poses for flip false/true; Fastened differs as it should) (v3 s3).

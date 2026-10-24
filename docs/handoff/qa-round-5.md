@@ -92,6 +92,21 @@ the rows below a 7 px bar; dragging shows the "Rollback bar" pill; Parts (0) wit
 - Note (cosmetic, synthetic input): after clicking a context-menu item, the row under the pointer kept its hover tint after the
   pointer left the list, until the list was hovered again.
 
+## v3 Session 3 in the app: 3-part assembly by hand (v0.4.8 c7d9d454; parts by r5/v3s3.py, assembly built in the UI)
+Plate 100×60×10, pin Ø10×40, block 20³ (round 4 S2's parts). Insert dialog (Current document › Part Studios, click part →
+click to place, "Inserted: 3") ✅; DOF glyph + tooltip "Has degrees of freedom (6)" / "(1)" ✅; row menu → Fix (ground glyph on
+the row and on Assembly 1) ✅; Revolute / Fastened via tool search: mate connector inference points on hovered faces (centroid,
+edge midpoints, vertices) and the in-canvas popup (type ▾, flip, reorient, Solve, ✓ ✕) ✅; new mates are listed grey with
+"(Hidden)" in the tooltip (= live's mate tooltips, behaviours ~1946).
+- **R5v3-S3-a → MATE-FLIP-AXIAL (asb, P2 wrong placement)** "Flip primary axis" has no effect on Revolute, Cylindrical, Planar
+  (and by the same code Pin slot, Parallel): their residual only uses `[z.x, z.y]` (`assembly/solver.rs` ~571–579), which an
+  anti-parallel Z also satisfies, so the solver keeps whichever orientation is nearer the instance's pose. In the app the pin's
+  top face mated to the plate's top face hung through the plate, and toggling the flip (popup or dialog, before and after ✓) left
+  it there. CLI (r5/v3s3-flip.py): pose identical with flip_primary false/true for revolute, cylindrical, planar; fastened
+  honours it (false → pin upside down on top, z 10..50; true → hanging, z −30..10). Fix idea: snap the moving instance to the
+  flipped frame when the flip changes / the mate is made, and give the Z residual a sign (e.g. add 1 − z.z or use log_rot of the
+  Z-to-Z rotation).
+
 ## v2 Session 2: editing an early feature in a 30-feature part (v0.4.8; r5/v2s2.py; live asked: "qa4 round 5 v2 s2")
 Plate 200×100×10 + 14 × (sketch circle + boss Add): 30 features, 1 part (211583.052 mm³, 34 faces). CLI build 23.8 s.
 - App: regen panel **total 462 ms** (bosses 17–71 ms each). Edit Extrude 1 (feature 2) 10 → 12: preview settles 0.8–1.3 s after
