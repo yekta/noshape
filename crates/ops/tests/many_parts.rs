@@ -172,7 +172,7 @@ fn write_pins_assembly_fixture() {
     asm.instances.clear();
     for i in 0..1000u64 {
         let (x, y) = ((i % 40) as f64 * 0.006, (i / 40) as f64 * 0.006);
-        let name = asm.next_instance_name(&seed.name.rsplit_once(' ').map_or(seed.name.as_str(), |(base, _)| base).to_string());
+        let name = asm.next_instance_name(seed.name.rsplit_once(' ').map_or(seed.name.as_str(), |(base, _)| base));
         let id = InstanceId(asm.next_id());
         asm.instances.push(noshape_model::assembly::Instance { id, name, placement: Placement { translation: [x, y, 0.0], ..Placement::default() }, ..seed.clone() });
     }
