@@ -29,7 +29,7 @@ fn drawn_by_survives_save_and_reopen() {
     let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
     let region = st["regions"][0]["id"].as_str().unwrap().to_string();
     call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
-    call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI A" }));
+    call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI A", "suggested_views": true }));
     drop(ctx);
 
     // Reopened by someone else: DRAWN still shows the creator.

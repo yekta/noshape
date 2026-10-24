@@ -10,8 +10,7 @@
 use super::PartStudioView;
 use crate::theme::p;
 use glam::DVec3;
-use gpui_kit::component::{Sizable as _, h_flex, v_flex};
-use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::component::Sizable as _;
 use gpui_kit::*;
 use noshape_model::display::PlaneFrame;
 use noshape_model::reference::{BodyId, Reference};
@@ -258,205 +257,53 @@ impl PartStudioView {
 
     pub(super) fn render_section_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.ui.section_dialog.as_ref()?;
-        let pal = p();
-        let (include, items_active, active) = (d.include, d.items_active, d.active);
-        let tab = |label: &'static str, on: bool, include: bool, cx: &mut Context<Self>| {
-            div()
-                .id(label)
-                .flex_1()
-                .h(px(26.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_size(px(12.))
-                .cursor_pointer()
-                .relative()
-                .when(on, |d| d.text_color(pal.accent).font_weight(FontWeight::MEDIUM))
-                .when(!on, |d| d.text_color(pal.text))
-                .child(label)
-                // Live part-studio/70: a 2 px blue underline on the active tab, 1 px
-                // #d7d7d7 on the other, over the label's box (both labels on one baseline).
-                .child(div().absolute().left_0().right_0().bottom_0().h(px(if on { 2. } else { 1. })).bg(if on { pal.accent } else { gpui_kit::rgb(0xd7d7d7) }))
-                .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
-                    if let Some(d) = &mut this.ui.section_dialog {
-                        d.include = include;
-                        if !d.items.is_empty() {
-                            this.ui.section_parts = Some((include, d.items.clone()));
-                        }
+        let planes = self.ui.section.iter().map(|pl| pl.label.trim_end_matches(" plane").to_string()).collect();
+        let items = d.items.iter().map(|b| self.display.body(b).map(|x| x.name.clone()).unwrap_or_else(|| "Part".into())).collect();
+        let props = crate::section_dialog::Props { include: d.include, items_active: d.items_active, planes, active: d.active, items };
+        Some(crate::section_dialog::render(props, "ps-section", &cx.entity(), Self::on_section_action, cx))
+    }
+
+    /// The Section view dialog's buttons, tabs, fields and chips.
+    fn on_section_action(&mut self, a: crate::section_dialog::Action, w: &mut Window, cx: &mut Context<Self>) {
+        use crate::section_dialog::Action;
+        match a {
+            Action::Accept => self.close_section_dialog(true, w, cx),
+            Action::Cancel => self.close_section_dialog(false, w, cx),
+            Action::Include(include) => {
+                if let Some(d) = &mut self.ui.section_dialog {
+                    d.include = include;
+                    if !d.items.is_empty() {
+                        self.ui.section_parts = Some((include, d.items.clone()));
                     }
-                    this.apply_section(w, cx);
-                }))
-        };
-        let chip = |id: SharedString, label: String, bold: bool, on_x: RowAction, cx: &mut Context<Self>| {
-            h_flex()
-                .id(id.clone())
-                .group("srow")
-                .h(px(22.))
-                .px(px(6.))
-                .text_size(px(12.))
-                .text_color(pal.text)
-                .when(bold, |d| d.font_weight(FontWeight::BOLD))
-                .child(div().flex_1().truncate().child(label))
-                .child(
-                    div()
-                        .id(SharedString::from(format!("{id}-x")))
-                        // Live (part-studio/71): the × is always shown.
-                        .cursor_pointer()
-                        .child(crate::ui::glyph("ui-clear", 9., crate::theme::p().icon_tertiary))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, w, cx| {
-                            cx.stop_propagation();
-                            on_x(this, w, cx)
-                        })),
-                )
-                .into_any_element()
-        };
-        let field = |id: &'static str, caption: String, on: bool, rows: Vec<AnyElement>, items: bool, cx: &mut Context<Self>| {
-            let empty = rows.is_empty();
-            v_flex()
-                .id(id)
-                .flex_1()
-                // Live part-studio/70-71: 27 px empty, 42 px with one chip.
-                .min_h(px(27.))
-                .when(empty, |d| d.justify_center())
-                .rounded(px(2.))
-                .border_1()
-                .border_color(if on { pal.accent } else { gpui_kit::rgb(0xd7d7d7) })
-                .bg(if on { gpui_kit::rgb(0xdef1fb) } else { gpui_kit::rgb(0xffffff) })
-                .cursor_pointer()
-                .child(div().px(px(6.)).when(empty, |d| d.text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(pal.text_muted).child(caption))
-                .children(rows)
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    if let Some(d) = &mut this.ui.section_dialog {
-                        d.items_active = items;
-                    }
-                    cx.notify();
-                }))
-        };
-        let plane_rows: Vec<AnyElement> = self
-            .ui
-            .section
-            .iter()
-            .enumerate()
-            .map(|(i, pl)| {
-                chip(
-                    SharedString::from(format!("sec-plane-{i}")),
-                    format!("Section plane {} ({})", i + 1, pl.label.trim_end_matches(" plane")),
-                    i == active,
-                    Box::new(move |this, w, cx| {
-                        if i < this.ui.section.len() {
-                            this.ui.section.remove(i);
-                        }
-                        if let Some(d) = &mut this.ui.section_dialog {
-                            d.active = this.ui.section.len().saturating_sub(1);
-                        }
-                        this.apply_section(w, cx);
-                    }),
-                    cx,
-                )
-            })
-            .collect();
-        let item_rows: Vec<AnyElement> = d
-            .items
-            .clone()
-            .into_iter()
-            .enumerate()
-            .map(|(i, b)| {
-                let name = self.display.body(&b).map(|x| x.name.clone()).unwrap_or_else(|| "Part".into());
-                chip(
-                    SharedString::from(format!("sec-item-{i}")),
-                    name,
-                    false,
-                    Box::new(move |this, w, cx| {
-                        if let Some(d) = &mut this.ui.section_dialog {
-                            d.items.retain(|x| *x != b);
-                            this.ui.section_parts = (!d.items.is_empty()).then(|| (d.include, d.items.clone()));
-                        }
-                        this.apply_section(w, cx);
-                    }),
-                    cx,
-                )
-            })
-            .collect();
-        let planes_field = field("sec-planes", "Section planes".into(), !items_active, plane_rows, false, cx);
-        let items_field = field("sec-items", if include { "Items to include".into() } else { "Items to exclude".into() }, items_active, item_rows, true, cx);
-        Some(
-            v_flex()
-                .id("section-dialog")
-                .occlude()
-                .child(crate::ui::panel_probe("ps-section"))
-                .absolute()
-                // Live part-studio/71: 3 px below the graphics area's top, as feature dialogs.
-                .top(px(3.))
-                .left(px(0.))
-                .w(px(220.))
-                .bg(pal.dialog_bg)
-                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
-                .child(
-                    h_flex()
-                        .h(px(29.))
-                        .pl(px(6.))
-                        .bg(pal.panel)
-                        .border_b_1()
-                        .border_color(pal.border)
-                        .child(crate::ui::panel_title("ps-section", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Section view")))
-                        .child(
-                            div()
-                                .id("sec-ok")
-                                .size(px(28.))
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .bg(pal.accept)
-                                .cursor_pointer()
-                                .child(crate::assets::icon("dialog-ok", 24., cx))
-                                .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.close_section_dialog(true, w, cx))),
-                        )
-                        .child(
-                            div()
-                                .id("sec-cancel")
-                                .size(px(28.))
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .cursor_pointer()
-                                .hover(|d| d.bg(pal.panel_hover))
-                                .child(crate::assets::icon("dialog-cancel", 24., cx))
-                                .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.close_section_dialog(false, w, cx))),
-                        ),
-                )
-                .child(h_flex().child(tab("Exclude", !include, false, cx)).child(tab("Include", include, true, cx)))
-                .child(
-                    // Live part-studio/71: fields 3 px in, 7 px under the tabs,
-                    // 5 px apart; the plane button right after the field.
-                    v_flex()
-                        .px(px(3.))
-                        .pt(px(7.))
-                        .gap(px(5.))
-                        .child(
-                            h_flex()
-                                .items_start()
-                                .child(planes_field)
-                                .child(
-                                    // A plane through the model center, facing the view.
-                                    div()
-                                        .id("sec-view-plane")
-                                        .size(px(26.))
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .cursor_pointer()
-                                        .hover(|d| d.bg(pal.panel_hover))
-                                        // Live (part-studio/71): a 20 px plane sprite in the 26 px side button.
-                                        .child(crate::assets::icon("plane", 20., cx))
-                                        .tooltip(crate::ui::tooltip("Section plane facing the view"))
-                                        .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.add_view_section_plane(w, cx))),
-                                ),
-                        )
-                        .child(items_field)
-                        .child(h_flex().justify_end().mt(px(4.)).mb(px(2.)).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x999999)))),
-                )
-                .into_any_element(),
-        )
+                }
+                self.apply_section(w, cx);
+            }
+            Action::ItemsActive(items) => {
+                if let Some(d) = &mut self.ui.section_dialog {
+                    d.items_active = items;
+                }
+                cx.notify();
+            }
+            Action::RemovePlane(i) => {
+                if i < self.ui.section.len() {
+                    self.ui.section.remove(i);
+                }
+                if let Some(d) = &mut self.ui.section_dialog {
+                    d.active = self.ui.section.len().saturating_sub(1);
+                }
+                self.apply_section(w, cx);
+            }
+            Action::RemoveItem(i) => {
+                if let Some(d) = &mut self.ui.section_dialog
+                    && i < d.items.len()
+                {
+                    d.items.remove(i);
+                    self.ui.section_parts = (!d.items.is_empty()).then(|| (d.include, d.items.clone()));
+                }
+                self.apply_section(w, cx);
+            }
+            Action::PlaneButton => self.add_view_section_plane(w, cx),
+        }
     }
 
     /// The offset box beside the section arrow, drawn in the 3D frame (it
@@ -584,9 +431,6 @@ impl PartStudioView {
         self.apply_section(window, cx);
     }
 }
-
-/// What × on a dialog row does.
-type RowAction = Box<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
 
 /// Parameter name marking the section arrow among the manipulators.
 pub(super) const SECTION_PARAM: &str = "__section";

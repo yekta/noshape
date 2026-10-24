@@ -1024,3 +1024,11 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   Studio; keys right-aligned at 39.6 %, legend bar, our version in the footer — no PTC/Terms, rule 6/cloud).
   The modal is now window-level (deferred/anchored over navbar and panels), 1000 px centred, top 26, height
   window − 154 (live 616). Page section spacing and the popout window size: requested.
+- Round 20b (10-24): crates/app/src/section_dialog.rs = the Section view dialog for both views (Props + Action,
+  host handles actions). Assembly: our simpler panel (offset field + Flip) replaced by it: AsmSection now =
+  planes (≤3, from the hovered face / selected mate connector on open, then face picks), Exclude/Include
+  instances (AsmSceneOptions::section_skip → ignore_clip), dialog state with Cancel restoring; tan cap while open
+  (section_selected). Missing for skb: the assembly section ARROW manipulator (offset/rotate + value box; the
+  Part Studio's lives in part_studio/manipulators.rs), right-click "Edit section view…/Turn off section view".
+  The plane button adds Front (assembly) / a view-facing plane (Part Studio) until Onshape's "Select a plane"
+  options are captured (requested). Shortcut modal: ↗ ml 17 / × ml -5 (header is right-anchored), legend spacers 4.
