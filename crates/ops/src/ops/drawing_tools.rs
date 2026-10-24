@@ -475,10 +475,15 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "ordinate",
             summary: "Ordinate dimensions from a datum point",
-            description: "The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, sheet mm), `side` a click that sets the measured direction (beside the origin: horizontal values; above or below: vertical), then each of `points` adds an ordinate to the group. One edit per click, as with the mouse (\"Ordinate dimension\", then \"Add to ordinate group\").",
+            description: "The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, sheet mm), `side` a click that sets the measured direction (beside the origin: horizontal values; above or below: vertical), then each of `points` adds an ordinate to the group. One edit per click, as with the mouse (\"Ordinate dimension\", then \"Add to ordinate group\"). With `group` (an ordinate dimension's id: its menu's Add to ordinate group), `points` go into that group, measured from its origin.",
             fields: with(
                 common(),
-                vec![req("origin", point(), "The datum point (sheet mm)."), req("side", point(), "Where the values line up (sheet mm)."), opt("points", points(0, 64), "Points to dimension (vertices, circle centers; sheet mm).")],
+                vec![
+                    opt("origin", point(), "The datum point (sheet mm); required without `group`."),
+                    opt("side", point(), "Where the values line up (sheet mm); required without `group`."),
+                    opt("points", points(0, 64), "Points to dimension (vertices, circle centers; sheet mm)."),
+                    opt("group", json!({ "type": "integer" }), "An existing ordinate dimension to add `points` to."),
+                ],
             ),
             mutates: true,
             destructive: false,
@@ -1137,15 +1142,33 @@ fn callout(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn ordinate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let t = target(od, a)?;
-    let o = pt_arg(a, "origin")?;
-    let origin = t.m.pick(&Tool::Ordinate { origin: None, horizontal: None, group: None }, &[], o).any_point(o).ok_or_else(|| OpError::param("origin", "not a point of a view"))?;
-    let tool = Tool::Ordinate { origin: Some(origin.clone()), horizontal: None, group: None };
-    let group = t.m.pick(&tool, &[], pt_arg(a, "side")?).pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("side", "at least 3 mm from the origin"))?;
-    let AnnotationKind::OrdinateGroup { horizontal, .. } = group.kind else { return Err(OpError::new("internal", "not an ordinate group")) };
-    let (gid, mut sheet, tab) = (group.id, t.sheet, t.tab);
-    let mut t = t;
-    t.d.sheets[sheet].annotations.push(group);
-    commit(od, tab, sheet, t.d, "Ordinate dimension")?;
+    let (origin, horizontal, gid, mut sheet, tab) = match a.opt_u64("group")? {
+        // The group's menu › Add to ordinate group: its origin and direction.
+        Some(g) => {
+            if a.get("origin").is_some() || a.get("side").is_some() {
+                return Err(OpError::param("group", "give `group` or `origin` and `side`, not both"));
+            }
+            let x = t.d.sheets[t.sheet].annotations.iter().find(|x| x.id == g).ok_or_else(|| OpError::param("group", "no such annotation on the sheet"))?;
+            let AnnotationKind::OrdinateGroup { view, origin, horizontal, .. } = x.kind else { return Err(OpError::param("group", "not an ordinate dimension")) };
+            if a.opt_array("points")?.is_none_or(|p| p.is_empty()) {
+                return Err(OpError::param("points", "the points to add to the group"));
+            }
+            let r = x.refs.iter().find(|x| x.slot == 0).map(|x| x.point.clone());
+            (PickedPoint { view, p: origin, r }, horizontal, g, t.sheet, t.tab)
+        }
+        None => {
+            let o = pt_arg(a, "origin")?;
+            let origin = t.m.pick(&Tool::Ordinate { origin: None, horizontal: None, group: None }, &[], o).any_point(o).ok_or_else(|| OpError::param("origin", "not a point of a view"))?;
+            let tool = Tool::Ordinate { origin: Some(origin.clone()), horizontal: None, group: None };
+            let group = t.m.pick(&tool, &[], pt_arg(a, "side")?).pending_annotation(&ToolValues::default()).ok_or_else(|| OpError::param("side", "at least 3 mm from the origin"))?;
+            let AnnotationKind::OrdinateGroup { horizontal, .. } = group.kind else { return Err(OpError::new("internal", "not an ordinate group")) };
+            let (gid, sheet, tab) = (group.id, t.sheet, t.tab);
+            let mut t = t;
+            t.d.sheets[sheet].annotations.push(group);
+            commit(od, tab, sheet, t.d, "Ordinate dimension")?;
+            (origin, horizontal, gid, sheet, tab)
+        }
+    };
     // Each further click adds a point to the group (one edit each).
     for (i, p) in a.opt_array("points")?.cloned().unwrap_or_default().iter().enumerate() {
         let param = format!("points[{i}]");

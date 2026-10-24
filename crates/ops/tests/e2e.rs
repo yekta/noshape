@@ -2711,3 +2711,150 @@ fn edit_in_context_and_part_studio_in_context() {
     assert_eq!(last(&mut ctx), "Delete context");
     assert!(contexts(&mut ctx, "Part Studio 1").is_empty());
 }
+
+/// The annotation menus: jogs, break, leaders and note nodes, foreshorten,
+/// groups, detach, align centermark, stacked callouts, add to an ordinate
+/// group, and Adjust linestyle.
+#[test]
+fn drawing_annotation_menu_edits() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_annotation_menu.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let (top, circle) = g["views"].as_array().unwrap().iter().find_map(|v| v["edges"].as_array().and_then(|es| es.iter().find(|e| e["type"] == "circle").map(|c| (v.clone(), c.clone())))).unwrap();
+    let top_id = top["id"].clone();
+    let (cx, cy, r) = (num(&circle["center"][0]), num(&circle["center"][1]), num(&circle["radius"]));
+    let lines: Vec<Value> = top["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line").cloned().collect();
+    let horizontal: Vec<&Value> = lines.iter().filter(|e| (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).collect();
+    let vertical: Vec<&Value> = lines.iter().filter(|e| (num(&e["a"][0]) - num(&e["b"][0])).abs() < 1e-6).collect();
+    let p = |e: &Value, k: &str| [num(&e[k][0]), num(&e[k][1])];
+    let quarter = |e: &Value| [num(&e["a"][0]) * 0.75 + num(&e["b"][0]) * 0.25, num(&e["a"][1]) * 0.75 + num(&e["b"][1]) * 0.25];
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().rsplit(":: ").next().unwrap().to_string();
+    let ann = |ctx: &mut Ctx, id: &Value| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["annotations"].as_array().unwrap().iter().find(|a| a["id"] == *id).cloned().unwrap();
+    let edit = |ctx: &mut Ctx, id: &Value, args: Value| {
+        let mut a = json!({ "drawing": tab, "annotation": id });
+        a.as_object_mut().unwrap().extend(args.as_object().unwrap().clone());
+        try_call(ctx, "drawing_annotation_edit", a)
+    };
+
+    // Edge picks first, before annotations lie over the edges.
+    // Adjust linestyle on an edge of the top view, then revert.
+    let view = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().iter().find(|v| v["id"] == top_id).cloned().unwrap();
+    call(&mut ctx, "drawing_view_linestyle", json!({ "drawing": tab, "view": top_id, "edges": [quarter(vertical[0])], "linestyle": "phantom", "thickness": 0.5 }));
+    assert_eq!(last(&mut ctx), "Adjust linestyle");
+    assert_eq!(view(&mut ctx)["edge_styles"], 1);
+    let e = try_call(&mut ctx, "drawing_view_linestyle", json!({ "drawing": tab, "view": top_id, "edges": [quarter(vertical[0])], "thickness": 0.33 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("thickness"), "{e:?}");
+    call(&mut ctx, "drawing_view_linestyle", json!({ "drawing": tab, "view": top_id, "edges": [quarter(vertical[0])], "revert": true }));
+    assert!(view(&mut ctx)["edge_styles"].is_null());
+    // Align centermark with a vertical edge.
+    let cm = call(&mut ctx, "drawing_centermark", json!({ "drawing": tab, "holes": [[cx - r, cy]] }))["annotations"][0].clone();
+    edit(&mut ctx, &cm, json!({ "action": "align_centermark", "point": quarter(vertical[0]) })).unwrap();
+    assert_eq!(last(&mut ctx), "Align centermark");
+    assert!((num(&ann(&mut ctx, &cm)["angle"]).abs() - 90.0).abs() < 1e-6);
+
+    // A linear dimension: jog, break, detach.
+    let h0 = horizontal[0];
+    // Placed outside the part (away from the other horizontal edge).
+    let out = if num(&h0["a"][1]) < num(&horizontal[1]["a"][1]) { -20.0 } else { 20.0 };
+    let dim = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "picks": [quarter(h0)], "place": [quarter(h0)[0], quarter(h0)[1] + out] }))["annotation"].clone();
+    assert_eq!(ann(&mut ctx, &dim)["kind"], "LinearDimension");
+    edit(&mut ctx, &dim, json!({ "action": "add_jog", "line": 0 })).unwrap();
+    assert_eq!(last(&mut ctx), "Add jog");
+    assert_eq!(ann(&mut ctx, &dim)["jogs"], json!([0]));
+    let e = edit(&mut ctx, &dim, json!({ "action": "add_jog", "line": 0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("action"), "{e:?}");
+    edit(&mut ctx, &dim, json!({ "action": "remove_jog", "line": 0 })).unwrap();
+    assert_eq!(last(&mut ctx), "Remove jog");
+    assert!(ann(&mut ctx, &dim)["jogs"].is_null());
+    edit(&mut ctx, &dim, json!({ "action": "break", "on": false })).unwrap();
+    assert_eq!(last(&mut ctx), "Unbreak dimension");
+    assert_eq!(ann(&mut ctx, &dim)["unbroken"], true);
+    assert_eq!(ann(&mut ctx, &dim)["attached"], true);
+    edit(&mut ctx, &dim, json!({ "action": "detach" })).unwrap();
+    assert_eq!(last(&mut ctx), "Detach");
+    assert!(ann(&mut ctx, &dim)["attached"].is_null());
+
+    // A note with a leader: another leader, a node on it, then removals.
+    let (a0, b0) = (p(h0, "a"), p(h0, "b"));
+    let note = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "BREAK ALL EDGES", "position": [40, 40], "leader": a0 }))["annotation"].clone();
+    edit(&mut ctx, &note, json!({ "action": "add_leader", "point": b0 })).unwrap();
+    assert_eq!(last(&mut ctx), "Add leader");
+    let n = ann(&mut ctx, &note);
+    assert_eq!(n["leaders"].as_array().unwrap().len(), 2, "{n}");
+    // The middle of the leader's last segment (to its point).
+    let path = n["leaders"][1]["path"].as_array().unwrap().clone();
+    let (q0, q1) = (&path[path.len() - 2], &path[path.len() - 1]);
+    let mid = [(num(&q0[0]) + num(&q1[0])) / 2.0, (num(&q0[1]) + num(&q1[1])) / 2.0];
+    // 5 mm off the line, square to it.
+    let (dx, dy) = (num(&q1[0]) - num(&q0[0]), num(&q1[1]) - num(&q0[1]));
+    let len = dx.hypot(dy);
+    let off = [mid[0] - dy / len * 5.0, mid[1] + dx / len * 5.0];
+    let e = edit(&mut ctx, &note, json!({ "action": "add_node", "leader": 1, "point": off })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("point"), "{e:?}");
+    edit(&mut ctx, &note, json!({ "action": "add_node", "leader": 1, "point": mid })).unwrap();
+    assert_eq!(last(&mut ctx), "Add node");
+    assert_eq!(ann(&mut ctx, &note)["leaders"][1]["nodes"], 1);
+    edit(&mut ctx, &note, json!({ "action": "remove_node", "leader": 1, "node": 0 })).unwrap();
+    assert_eq!(last(&mut ctx), "Remove node");
+    assert_eq!(ann(&mut ctx, &note)["leaders"][1]["nodes"], 0);
+    edit(&mut ctx, &note, json!({ "action": "delete_leader", "leader": 1 })).unwrap();
+    assert_eq!(last(&mut ctx), "Delete leader");
+    assert_eq!(ann(&mut ctx, &note)["leaders"].as_array().unwrap().len(), 1);
+
+    // Groups: with a view, and annotations together.
+    let note2 = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "NOTE 2", "position": [40, 60] }))["annotation"].clone();
+    edit(&mut ctx, &note, json!({ "action": "group_annotation", "with": [note2] })).unwrap();
+    assert_eq!(last(&mut ctx), "Group annotation");
+    let (g1, g2) = (ann(&mut ctx, &note)["annotation_group"].clone(), ann(&mut ctx, &note2)["annotation_group"].clone());
+    assert!(g1.is_u64() && g1 == g2, "{g1} {g2}");
+    edit(&mut ctx, &note, json!({ "action": "remove_annotation_from_group", "with": [note2] })).unwrap();
+    assert!(ann(&mut ctx, &note2)["annotation_group"].is_null());
+    edit(&mut ctx, &note2, json!({ "action": "group", "view": top_id })).unwrap();
+    assert_eq!(last(&mut ctx), "Group");
+    assert_eq!(ann(&mut ctx, &note2)["view_group"], top_id);
+    edit(&mut ctx, &note2, json!({ "action": "remove_from_group" })).unwrap();
+    assert_eq!(last(&mut ctx), "Remove from group");
+    assert!(ann(&mut ctx, &note2)["view_group"].is_null());
+    edit(&mut ctx, &note, json!({ "action": "remove_leaders" })).unwrap();
+    assert_eq!(last(&mut ctx), "Remove leaders");
+    assert!(ann(&mut ctx, &note)["leaders"].is_null());
+    let e = edit(&mut ctx, &note, json!({ "action": "remove_leaders" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("action"), "{e:?}");
+
+    // A GD&T frame gets a leader; it has no jogs.
+    let gdt = call(&mut ctx, "drawing_gdt", json!({ "drawing": tab, "position": [60, 80], "rows": [{ "symbol": "position", "tolerance": "0.1" }] }))["annotation"].clone();
+    let before = ann(&mut ctx, &gdt)["leaders"].as_array().map_or(0, Vec::len);
+    edit(&mut ctx, &gdt, json!({ "action": "add_leader", "point": a0 })).unwrap();
+    assert_eq!(ann(&mut ctx, &gdt)["leaders"].as_array().map_or(0, Vec::len), before + 1);
+    let e = edit(&mut ctx, &gdt, json!({ "action": "add_jog", "line": 0 })).unwrap_err();
+    assert!(e.message.contains("linear dimensions"), "{e:?}");
+
+    // Radius: foreshorten and back.
+    let rad = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "radius", "picks": [[cx + r, cy]], "place": [cx + r + 15.0, cy + 15.0] }))["annotation"].clone();
+    edit(&mut ctx, &rad, json!({ "action": "foreshorten" })).unwrap();
+    assert_eq!(last(&mut ctx), "Foreshorten");
+    assert_eq!(ann(&mut ctx, &rad)["kind"], "ForeshortenedRadial");
+    edit(&mut ctx, &rad, json!({ "action": "remove_foreshorten" })).unwrap();
+    assert_eq!(ann(&mut ctx, &rad)["kind"], "RadialDimension");
+
+    // Stacked callouts need a BOM table.
+    let co = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": quarter(h0), "position": [40, 250] }))["annotation"].clone();
+    let e = edit(&mut ctx, &co, json!({ "action": "stacked_callouts", "parts": ["Part 1"] })).unwrap_err();
+    assert!(e.message.contains("BOM"), "{e:?}");
+    call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "bom", "view": top_id, "position": [20, 280] }));
+    edit(&mut ctx, &co, json!({ "action": "stacked_callouts", "parts": ["Part 1"] })).unwrap();
+    assert_eq!(last(&mut ctx), "Add stacked callouts");
+    assert_eq!(ann(&mut ctx, &co)["stacked"], 1);
+    let e = edit(&mut ctx, &co, json!({ "action": "stacked_callouts", "parts": ["Nope"] })).unwrap_err();
+    assert!(e.message.contains("Part 1"), "{e:?}");
+
+    // Add to ordinate group.
+    let o = call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "origin": a0, "side": [a0[0], a0[1] - 15.0], "points": [b0] }))["annotation"].clone();
+    call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "group": o, "points": [p(horizontal[1], "b")] }));
+    assert_eq!(last(&mut ctx), "Add to ordinate group");
+    let e = try_call(&mut ctx, "drawing_ordinate", json!({ "drawing": tab, "group": o, "origin": a0, "points": [b0] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("group"), "{e:?}");
+
+}

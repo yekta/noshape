@@ -177,19 +177,9 @@ impl DrawingEditor {
                 }
             }
             Tool::GdtLeader { id } => {
-                let leader = match self.snap_at(c).or_else(|| self.any_point(c)) {
-                    Some(p) => Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() },
-                    None => Leader { view: None, point: c, nodes: Vec::new(), ..Default::default() },
-                };
+                let leader = noshape_scene::drawing_tools::annotation_edit::leader_to(&self.pk(), c);
                 let start = self.leader_from.take().unwrap_or_default();
-                self.edit_sheet("Add leader", cx, |s| match s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
-                    Some(AnnotationKind::Gdt { leaders, .. }) => leaders.push(leader),
-                    Some(AnnotationKind::Note { style, .. }) => style.leaders.push(Leader { start, ..leader }),
-                    Some(AnnotationKind::Weld { spec, .. }) => spec.leaders.push(leader),
-                    Some(AnnotationKind::Balloon { callout, .. }) => callout.leaders.push(leader),
-                    Some(AnnotationKind::SurfaceFinish { leaders, .. }) => leaders.push(leader),
-                    _ => {}
-                });
+                self.edit_sheet("Add leader", cx, |s| noshape_scene::drawing_tools::annotation_edit::add_leader(s, id, leader, start));
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Annotation(id)];
             }
@@ -299,13 +289,7 @@ impl DrawingEditor {
             AnnotationKind::Gdt { leaders, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::Gdt { leaders, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                leaders.clear();
-                            }
-                        })
-                    }));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
             // Callouts and surface finish symbols (help callout_balloon,
@@ -313,47 +297,31 @@ impl DrawingEditor {
             AnnotationKind::Balloon { callout, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !callout.leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::Balloon { callout, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                callout.leaders.clear();
-                            }
-                        })
-                    }));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
             AnnotationKind::SurfaceFinish { leaders, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::SurfaceFinish { leaders, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                leaders.clear();
-                            }
-                        })
-                    }));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
             AnnotationKind::Weld { spec, .. } => {
                 out.push(MenuEntry::item("Edit...", move |t, w, cx| t.open_weld_edit(id, w, cx)));
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                 if !spec.leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::Weld { spec, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                spec.leaders.clear();
-                            }
-                        })
-                    }));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
-            &AnnotationKind::RadialDimension { view, center, radius, angle, .. } => {
-                let (d, w) = ([angle.cos(), angle.sin()], [-angle.sin(), angle.cos()]);
-                let jog = [center[0] + d[0] * radius * 0.55 + w[0] * radius * 0.2, center[1] + d[1] * radius * 0.55 + w[1] * radius * 0.2];
-                out.push(MenuEntry::item("Foreshorten", move |t, _, cx| set_kind(t, "Foreshorten", AnnotationKind::ForeshortenedRadial { view, center, radius, angle, jog }, cx)));
+            AnnotationKind::RadialDimension { .. } => {
+                if let Some(k) = noshape_scene::drawing_tools::annotation_edit::foreshortened(&a.kind) {
+                    out.push(MenuEntry::item("Foreshorten", move |t, _, cx| set_kind(t, "Foreshorten", k.clone(), cx)));
+                }
             }
-            &AnnotationKind::ForeshortenedRadial { view, center, radius, angle, .. } => {
-                out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| set_kind(t, "Remove foreshorten", AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false }, cx)));
+            AnnotationKind::ForeshortenedRadial { .. } => {
+                if let Some(k) = noshape_scene::drawing_tools::annotation_edit::unforeshortened(&a.kind) {
+                    out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| set_kind(t, "Remove foreshorten", k.clone(), cx)));
+                }
             }
             &AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
                 let label = if direct { "Display as foreshortened diameter" } else { "Display as direct diameter" };
@@ -400,13 +368,7 @@ impl DrawingEditor {
                 let opts = a.target.as_deref().cloned().unwrap_or_default();
                 let set = |hide: bool, all: bool| {
                     move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
-                        t.edit_sheet(if hide { "Hide dimension" } else { "Show dimensions" }, cx, |s| {
-                            for x in s.annotations.iter_mut().filter(|x| (all || x.id == id) && matches!(x.kind, AnnotationKind::DatumTarget { .. })) {
-                                if let Some(o) = x.target.as_mut() {
-                                    o.hide_dims = hide;
-                                }
-                            }
-                        })
+                        t.edit_sheet(if hide { "Hide dimension" } else { "Show dimensions" }, cx, |s| noshape_scene::drawing_tools::annotation_edit::set_target_dims_hidden(s, id, hide, all))
                     }
                 };
                 if opts.origin.is_some() && !opts.hide_dims {

@@ -353,7 +353,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if v.pinned.is_some() {
                 j["pinned"] = json!(true);
             }
-            for (k, n) in [("hidden_parts", v.hidden_parts.len()), ("shown_sketches", v.shown_sketches.len()), ("hidden_edges", v.hidden_edges.len())] {
+            for (k, n) in [("hidden_parts", v.hidden_parts.len()), ("shown_sketches", v.shown_sketches.len()), ("hidden_edges", v.hidden_edges.len()), ("edge_styles", v.edge_styles.len())] {
                 if n > 0 {
                     j[k] = json!(n);
                 }
@@ -438,6 +438,47 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             }
             if let Some(n) = a.inspection {
                 j["inspection"] = json!(n);
+            }
+            // The annotation menus' state, when not the defaults.
+            // Follows model geometry (Detach from geometry clears it).
+            if !a.refs.is_empty() {
+                j["attached"] = json!(true);
+            }
+            let jogs: Vec<usize> = (0..2).filter(|k| a.jogs[*k].is_some()).collect();
+            if !jogs.is_empty() {
+                j["jogs"] = json!(jogs);
+            }
+            if a.unbroken {
+                j["unbroken"] = json!(true);
+            }
+            if let Some(ls) = noshape_scene::drawing_tools::annotation_edit::leaders(a).filter(|l| !l.is_empty()) {
+                // Notes: each leader's path on the sheet (landing, nodes, point).
+                let paths = m.pick(&noshape_scene::drawing_tools::Tool::Select, &[], [0.0; 2]).note_leader_paths(a);
+                j["leaders"] = ls
+                    .iter()
+                    .enumerate()
+                    .map(|(i, l)| {
+                        let mut v = json!({ "nodes": l.nodes.len() });
+                        if let Some(p) = paths.get(i) {
+                            v["path"] = p.points.iter().map(|q| pt(*q)).collect();
+                        }
+                        v
+                    })
+                    .collect();
+            }
+            if let Some(v) = a.view_group {
+                j["view_group"] = json!(v.0);
+            }
+            if let Some(g) = a.ann_group {
+                j["annotation_group"] = json!(g);
+            }
+            match &a.kind {
+                noshape_model::drawing::AnnotationKind::Centermark { angle, .. } if angle.abs() > 1e-12 => j["angle"] = json!(r3(angle.to_degrees())),
+                noshape_model::drawing::AnnotationKind::Balloon { callout, .. } if !callout.stacked.is_empty() => j["stacked"] = json!(callout.stacked.len()),
+                _ => {}
+            }
+            if a.target.as_ref().is_some_and(|o| o.hide_dims) {
+                j["dimensions_hidden"] = json!(true);
             }
             j
         })

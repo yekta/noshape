@@ -246,7 +246,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-207 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
+209 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -257,7 +257,7 @@ the app.
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
@@ -3567,12 +3567,13 @@ Examples:
 
 Ordinate dimensions from a datum point (edits the document (one undoable history entry)).
 
-The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, sheet mm), `side` a click that sets the measured direction (beside the origin: horizontal values; above or below: vertical), then each of `points` adds an ordinate to the group. One edit per click, as with the mouse ("Ordinate dimension", then "Add to ordinate group").
+The Ordinate dimension tool: `origin` is the datum (a vertex or circle center, sheet mm), `side` a click that sets the measured direction (beside the origin: horizontal values; above or below: vertical), then each of `points` adds an ordinate to the group. One edit per click, as with the mouse ("Ordinate dimension", then "Add to ordinate group"). With `group` (an ordinate dimension's id: its menu's Add to ordinate group), `points` go into that group, measured from its origin.
 
 Examples:
 
 ```json
 {"drawing": "Part 1 Drawing 1", "origin": [180, 140], "side": [180, 130], "points": [[205.5, 160], [220, 140]]}
+{"drawing": "Part 1 Drawing 1", "group": 9, "points": [[230, 140]]}
 ```
 
 | field | type | | description |
@@ -3580,9 +3581,10 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
-| `origin` | array of number | required | The datum point (sheet mm). |
-| `side` | array of number | required | Where the values line up (sheet mm). |
+| `origin` | array of number |  | The datum point (sheet mm); required without `group`. |
+| `side` | array of number |  | Where the values line up (sheet mm); required without `group`. |
 | `points` | array of array of number |  | Points to dimension (vertices, circle centers; sheet mm). |
+| `group` | integer |  | An existing ordinate dimension to add `points` to. |
 
 #### drawing_datum
 
@@ -3946,6 +3948,31 @@ Examples:
 | `toggle_edges` | array of array of number |  | Edge points (sheet mm) to hide / show. |
 | `show_all_edges` | boolean |  | Show every hidden edge first. |
 
+#### drawing_view_linestyle
+
+Adjust linestyle of model edges in a view (edits the document (one undoable history entry)).
+
+View menu › Adjust linestyle… (live drawing/443–446): the model edges of `view` at `edges` (points on them, sheet mm) get Linestyle `linestyle` (solid, phantom, center, dashed, dotted; default solid), Dashes `dashes` (scale, default 1; not for solid), Thickness `thickness` (mm, one of 0.13–2.00; default 0.35) and `color` ([r, g, b] 0–255; default the drawing's); `revert` instead puts them back to the drawing properties. One edit ("Adjust linestyle").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 3, "edges": [[190, 175]], "linestyle": "phantom", "thickness": 0.5}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer | required | View id (drawing_get). |
+| `edges` | array of array of number | required | Points on the model edges (sheet mm). |
+| `linestyle` | one of `solid`, `phantom`, `center`, `dashed`, `dotted` |  | Linestyle. |
+| `dashes` | number |  | Dash scale (not for solid). |
+| `thickness` | number |  | Line thickness, mm. |
+| `color` | array or null |  | Line color. |
+| `revert` | boolean |  | Revert to drawing properties. |
+
 #### drawing_sheet
 
 Add, rename, duplicate, copy, move or delete a sheet, or change its Sheet properties (edits the document (one undoable history entry)).
@@ -4022,6 +4049,47 @@ Examples:
 | `what` | one of `columns`, `rows` |  | remove, duplicate. |
 | `decimals` | integer or null |  | precision. |
 | `to` | string or number |  | order, bom_type, fixed_corner, text_height: the choice. |
+
+#### drawing_annotation_edit
+
+Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, detach, align centermark, stacked callouts (edits the document (one undoable history entry)).
+
+The annotation context menus, one edit each with the menu's edit text:
+- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).
+- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend, or at `from_node` [leader, node]); `remove_leaders`.
+- Note leaders: `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`), `delete_leader` (`leader`).
+- Radial dimensions: `foreshorten`; `remove_foreshorten`.
+- Datum targets: `hide_dimension` (its position dimensions), `show_dimensions` (`all`: All targets, else This target).
+- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.
+- `detach` (Detach from geometry: stays put, no longer follows the model).
+- Centermarks: `align_centermark` to the straight edge at `point`.
+- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "annotation": 12, "action": "add_jog", "line": 0}
+{"drawing": "Part 1 Drawing 1", "annotation": 14, "action": "add_leader", "point": [190, 175]}
+{"drawing": "Part 1 Drawing 1", "annotation": 15, "action": "group_annotation", "with": [16]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `annotation` | integer | required | Annotation id (drawing_get). |
+| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `stacked_callouts`, `break` | required | The menu action. |
+| `line` | one of 0, 1 |  | add_jog / remove_jog: the extension line. |
+| `point` | array of number |  | add_leader: where it points; add_node: on the leader line; align_centermark: on a straight edge (sheet mm). |
+| `leader` | integer |  | add_node / remove_node / delete_leader: the note leader (0 = first). |
+| `node` | integer |  | remove_node: the node (0 = nearest the note). |
+| `from_node` | array of integer |  | add_leader on a note: branch from [leader, node]. |
+| `all` | boolean |  | show_dimensions: All targets. |
+| `view` | integer |  | group: the view to group with. |
+| `with` | array of integer |  | group / group_annotation: the other annotations. |
+| `parts` | array of string |  | stacked_callouts: part names. |
+| `on` | boolean |  | break: Break (true) or Unbreak (false) dimension. |
 
 ### part
 

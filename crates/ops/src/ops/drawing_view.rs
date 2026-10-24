@@ -111,6 +111,26 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "view_linestyle",
+            summary: "Adjust linestyle of model edges in a view",
+            description: "View menu › Adjust linestyle… (live drawing/443–446): the model edges of `view` at `edges` (points on them, sheet mm) get Linestyle `linestyle` (solid, phantom, center, dashed, dotted; default solid), Dashes `dashes` (scale, default 1; not for solid), Thickness `thickness` (mm, one of 0.13–2.00; default 0.35) and `color` ([r, g, b] 0–255; default the drawing's); `revert` instead puts them back to the drawing properties. One edit (\"Adjust linestyle\").",
+            fields: with(
+                common(),
+                vec![
+                    req("edges", json!({ "type": "array", "items": point(), "minItems": 1 }), "Points on the model edges (sheet mm)."),
+                    opt("linestyle", json!({ "type": "string", "enum": ["solid", "phantom", "center", "dashed", "dotted"], "default": "solid" }), "Linestyle."),
+                    opt("dashes", json!({ "type": "number", "default": 1.0 }), "Dash scale (not for solid)."),
+                    opt("thickness", json!({ "type": "number", "default": 0.35 }), "Line thickness, mm."),
+                    opt("color", json!({ "type": ["array", "null"], "items": { "type": "integer", "minimum": 0, "maximum": 255 }, "minItems": 3, "maxItems": 3 }), "Line color."),
+                    opt("revert", json!({ "type": "boolean", "default": false }), "Revert to drawing properties."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: view_linestyle,
+        },
+        Op {
+            group: "drawing",
             verb: "sheet",
             summary: "Add, rename, duplicate, copy, move or delete a sheet, or change its Sheet properties",
             description: "The Sheets panel's sheet menu and the Sheet properties dialog, on sheet `sheet` (default: the one shown):\n- `add`: Insert sheet after it (same size, scale and title block; \"Add sheet\").\n- `rename`: Rename… to `name` (\"Rename sheet\").\n- `duplicate`: Duplicate, right after it, \"<name> copy\" (\"Duplicate sheet\").\n- `copy`: Copy then Paste: appended at the end, \"<name> (1)\" (\"Paste sheet\").\n- `move`: Move up / Move down to position `to` (1 = first; \"Move sheet\").\n- `delete`: Delete (never the last sheet; \"Delete sheet\").\n- `properties`: without `set`, replies with the dialog's fields (`properties`); `set` changes scale (\"1:2\"), size (\"A3\", \"A Portrait\"…, \"Custom\"), width / height (mm; Custom), zones ([horizontal, vertical], 0–20 even; Custom), zone_start (bottom_right | top_left), border (Custom), dwt (a DWT file tab: Select a DWT) or dwt: null (Format › Custom); one edit each (\"Select a DWT\", \"Format\", \"Sheet scale\", \"Sheet size\", \"Sheet zones\", \"Sheet border\").\nReplies with the sheet acted on (`sheet`, 1 = first) and the sheet list.",
@@ -829,4 +849,63 @@ fn sheet(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut out = reply(od, tab, at, false)?;
     out["sheet"] = json!(at + 1);
     Ok(out.into())
+}
+
+// ------------------------------------------------------------ Adjust linestyle
+
+fn view_linestyle(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::{LINE_THICKNESSES, LinePattern};
+    let od = od(ctx, a)?;
+    let mut t = target(od, a)?;
+    let id = view_arg(&t, a, "view")?;
+    let mut edges = Vec::new();
+    for (i, p) in a.array("edges")?.iter().enumerate() {
+        let field = format!("edges[{i}]");
+        let p = super::drawing::point_value(p, &field)?;
+        let (view, me) = t.m.pick(&Tool::Select, &[], p).hovered_edge().ok_or_else(|| OpError::param(&field, "no model edge there"))?;
+        if view != id {
+            return Err(OpError::param(&field, "an edge of another view"));
+        }
+        let key = (me.body.clone(), (*me.name).clone());
+        if !edges.contains(&key) {
+            edges.push(key);
+        }
+    }
+    let look = if a.bool_or("revert", false)? {
+        None
+    } else {
+        let pattern = match a.opt_str("linestyle")?.unwrap_or("solid") {
+            "solid" => LinePattern::Solid,
+            "phantom" => LinePattern::Phantom,
+            "center" => LinePattern::Center,
+            "dashed" => LinePattern::Dashed,
+            "dotted" => LinePattern::Dotted,
+            _ => return Err(OpError::param("linestyle", "solid, phantom, center, dashed or dotted")),
+        };
+        let dashes = a.opt_f64("dashes")?.unwrap_or(1.0);
+        if dashes <= 0.0 {
+            return Err(OpError::param("dashes", "a positive scale"));
+        }
+        if pattern == LinePattern::Solid && a.get("dashes").is_some() {
+            return Err(OpError::param("dashes", "not for a solid line"));
+        }
+        let thickness = a.opt_f64("thickness")?.unwrap_or(0.35);
+        if !LINE_THICKNESSES.iter().any(|x| (x - thickness).abs() < 1e-9) {
+            return Err(OpError::param("thickness", &format!("one of {}", LINE_THICKNESSES.iter().map(|x| format!("{x:.2}")).collect::<Vec<_>>().join(", "))));
+        }
+        let color = match a.get("color") {
+            None => None,
+            Some(c) => {
+                let v: Vec<u8> = c.as_array().map(|l| l.iter().filter_map(|x| x.as_u64().filter(|x| *x <= 255).map(|x| x as u8)).collect()).unwrap_or_default();
+                if v.len() != 3 {
+                    return Err(OpError::param("color", "[r, g, b], each 0–255"));
+                }
+                Some([v[0], v[1], v[2]])
+            }
+        };
+        Some(ve::EdgeLook { pattern, dashes, thickness, color })
+    };
+    edit_view(&mut t, id, |v| ve::set_edge_styles(v, &edges, look));
+    commit(od, t.tab, t.sheet, t.d, "Adjust linestyle")?;
+    Ok(reply(od, t.tab, t.sheet, false)?.into())
 }

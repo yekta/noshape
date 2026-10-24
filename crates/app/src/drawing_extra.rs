@@ -2002,11 +2002,7 @@ impl DrawingEditor {
 }
 
 /// A note's unrotated box (sheet mm) and its rotation.
-pub fn note_box(a: &Annotation) -> Option<([f64; 4], f64)> {
-    let AnnotationKind::Note { text, height_mm, style } = &a.kind else { return None };
-    let l = noshape_model::drawing::note::layout(&noshape_model::drawing::note::fractions(text), *height_mm, style, a.position);
-    Some((l.bbox, if style.leaders.is_empty() { style.angle } else { 0.0 }))
-}
+pub use noshape_scene::drawing_tools::annotation_edit::note_box;
 
 /// A note grip: 0 / 1 the left / right side, 2 the rotate grip above the
 /// text; its sheet point.

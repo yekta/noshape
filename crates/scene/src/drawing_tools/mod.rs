@@ -16,6 +16,7 @@ mod pick;
 mod smart;
 mod sketch;
 mod types;
+pub mod annotation_edit;
 pub mod table_edit;
 pub mod view_edit;
 

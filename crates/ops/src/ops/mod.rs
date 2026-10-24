@@ -7,6 +7,7 @@ mod configuration;
 mod document;
 mod context;
 mod drawing;
+mod drawing_annotation;
 mod drawing_tools;
 mod drawing_table;
 mod drawing_view;
@@ -45,6 +46,7 @@ pub fn all() -> Vec<Op> {
     v.extend(drawing_tools::ops());
     v.extend(drawing_view::ops());
     v.extend(drawing_table::ops());
+    v.extend(drawing_annotation::ops());
     v.extend(parts::ops());
     v.extend(appearance::ops());
     v.extend(query::ops());

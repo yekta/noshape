@@ -105,3 +105,23 @@ pub fn rotate_to_line(v: &mut DrawingView, pa: [f64; 2], pb: [f64; 2], vertical:
     }
     v.rotation += delta;
 }
+
+/// Adjust linestyle's Linestyle, Dashes, Thickness and color.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EdgeLook {
+    pub pattern: LinePattern,
+    pub dashes: f64,
+    pub thickness: f64,
+    pub color: Option<[u8; 3]>,
+}
+
+/// Adjust linestyle ✓: the picked model edges of view `v` get `look`
+/// (None: Revert to drawing properties).
+pub fn set_edge_styles(v: &mut DrawingView, edges: &[(noshape_model::BodyId, noshape_model::reference::TopoName)], look: Option<EdgeLook>) {
+    for (body, name) in edges {
+        v.edge_styles.retain(|s| !(s.body == *body && s.name == *name));
+        if let Some(l) = look {
+            v.edge_styles.push(EdgeStyle { body: body.clone(), name: name.clone(), pattern: l.pattern, dashes: l.dashes, thickness: l.thickness, color: l.color });
+        }
+    }
+}

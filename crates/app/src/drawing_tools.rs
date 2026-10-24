@@ -1662,20 +1662,17 @@ impl DrawingEditor {
                         let sel_view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
                         let anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
                         if a.view_group.is_some() {
-                            out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.view_group = None))));
+                            out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_with_view(s, &[id], None))));
                         } else if let Some(v) = sel_view {
                             let ids = anns.clone();
-                            out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.view_group = Some(v)))));
+                            out.push(MenuEntry::item("Group", move |t, _, cx| t.edit_sheet("Group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_with_view(s, &ids, Some(v)))));
                         }
                         if a.ann_group.is_some() {
                             let ids = anns.clone();
-                            out.push(MenuEntry::item("Remove annotation from group", move |t, _, cx| t.edit_sheet("Remove annotation from group", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.ann_group = None))));
+                            out.push(MenuEntry::item("Remove annotation from group", move |t, _, cx| t.edit_sheet("Remove annotation from group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_annotations(s, &ids, false))));
                         } else if anns.iter().collect::<std::collections::HashSet<_>>().len() >= 2 {
                             let ids = anns.clone();
-                            out.push(MenuEntry::item("Group annotation", move |t, _, cx| {
-                                let g = t.current_sheet().annotations.iter().filter_map(|x| x.ann_group).max().unwrap_or(0) + 1;
-                                t.edit_sheet("Group annotation", cx, |s| s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.ann_group = Some(g)));
-                            }));
+                            out.push(MenuEntry::item("Group annotation", move |t, _, cx| t.edit_sheet("Group annotation", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_annotations(s, &ids, true))));
                         }
                     }
                     // Copy (with the rest of the selection).
@@ -1704,11 +1701,7 @@ impl DrawingEditor {
                     }
                     if !a.refs.is_empty() {
                         out.push(MenuEntry::item("Detach from geometry", move |t, _, cx| {
-                            t.edit_sheet("Detach", cx, |s| {
-                                if let Some(x) = s.annotations.iter_mut().find(|x| x.id == id) {
-                                    x.refs.clear();
-                                }
-                            })
+                            t.edit_sheet("Detach", cx, |s| noshape_scene::drawing_tools::annotation_edit::detach(s, id))
                         }));
                     }
                     // Paste as table is in every drawing menu (live drawing/290).
