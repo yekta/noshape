@@ -533,7 +533,7 @@ std::string inflate_raw(const unsigned char* in, size_t len)
   return std::move(f.out);
 }
 
-std::vector<MeshInstance> read_meshes(const std::string& bytes)
+std::vector<MeshInstance> read_meshes(const std::string& bytes, std::string* root_name)
 {
   const auto members = unzip(bytes);
   const std::string* pvs = nullptr;
@@ -627,6 +627,11 @@ std::vector<MeshInstance> read_meshes(const std::string& bytes)
       }
     }
   };
+  if (root_name)
+  {
+    Cursor rc{root.list0.back().payload, 0, root.list0.back().payload.size()};
+    *root_name = pvs_string(rc, table);
+  }
   visit(root.list0.size() - 1, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0}, 0);
   return out;
 }
