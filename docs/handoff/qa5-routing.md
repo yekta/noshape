@@ -356,3 +356,12 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   s2 bosses (Extrude Add Ø8–Ø12 on a plate) ours 17–71 ms each vs live ≤ 9 ms; s1 hole 129 vs 19–21 ms, linear pattern of it
   152 vs 47–96 ms, 30-feature totals ours 462 ms (14 plain bosses) vs live 171 ms (30 mixed features incl. fillets/chamfers).
   Editing feature 2 and ✓: dialog closes ~0.1–0.2 s in both.
+
+## qa4 QA round 5 v3 s1 in the app (P1; live "qa4 round 5 s1 offset"; v0.4.8 c7d9d454) — details in qa-round-5.md "v3 Session 1"
+- **OFF-CONSTR (skb, P1 wrong geometry)** sketch Offset makes Parallel (+ Tangent) constraints only; live makes OFFSET +
+  DISTANCE (the "3" dimension). Dimensioning the source afterwards drifts the copy (3 → 2.61–2.82 mm) and changes the part.
+- **OFF-BOX (skb)** Enter should create the offset and open the value box ("5 mm" selected, ±, ✓/✕), then Enter applies the
+  typed value; ours commits without a box, the label shows only at ≥ 30 px and its box lacks ±/✓/✕.
+- **OFF-SIDE (skb)** first side: a line away from the region, a circle outward (ours: left normal / closed inward).
+- **OFF-TOAST (skb)** an unconnected second entity: select only + toast "Can only offset a single chain at once." (ours offsets both).
+- **HOLE-FACE (psb, pending live follow-up 2)** Hole locations accept a planar face (PickKind::Face matches PLANE_LIKE ⊃ MATE_CONNECTOR).

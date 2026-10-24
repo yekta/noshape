@@ -32,6 +32,38 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 1 in the app UI (v0.4.8 c7d9d454, fresh profile, doc "r5 s1 ui"; live "qa4 round 5 s1 offset", "qa4 round 5 s1")
+Sketch 1 on Top by hand: L outline (Line tool), Ø10 circle, centre line + Slot (width 20 → dimension 10), Offset of the L loop 3 mm
+in, Trim, dimensions 80 / 20 / 30 / 50 → Extrude 15 (region inside the offset loop) → Fillet 5 → Chamfer 1 (face) → Hole (tried)
+→ Linear pattern of the part. Timings = spinner gone after the action (software rendering): Extrude preview 0.47 s, ✓ 0.33 s;
+Fillet preview 0.32, ✓ 0.33; Chamfer preview 0.28–0.46, ✓ 0.32; Hole preview 0.27; Linear pattern preview 0.38, ✓ 0.43 (live:
+dialog closes 116–138 ms after ✓, last redraw ~1.8–1.9 s). No P0.
+Same as live ✅: one click offsets one line (live (1)); Trim on a slot line deletes it; dimension value box (drag dots, ±, ✓/✕);
+Extrude default 25 mm, region pick, slot + circle cut out of the inner region, slot breaks through at x=77 (live's geometry
+finding); Hole dialog rows/defaults (Inch tab, 1/4 (0.25), 6.35 / 12 mm, 118 deg); under-defined "−" badge on Sketch 1.
+- **R5v3-S1-a → OFF-CONSTR (skb, P1 wrong geometry)** the sketch Offset ties each copy to its source with **Parallel** (+
+  Tangent at joins) only (`sketch/src/tools.rs` offset_chain ~1284); live creates an **OFFSET** constraint + a **DISTANCE**
+  dimension (shown as a small "3" between the curves). Effect: dimensioning the source afterwards leaves the copy behind, so my
+  3 mm loop became 2.61 / 2.82 / 2.80 / 3.0 mm from edge to edge (CLI sketch_get) and the part volume came out 17259 mm³ instead of
+  the 3 mm loop's; the offset can't be edited later and the sketch can't become fully defined without 6 extra dimensions.
+- **R5v3-S1-b → OFF-BOX (skb)** live: Enter creates the offset at the current value **and opens the value box** (100×26, "5 mm"
+  selected, ± Tolerance options, ✓/✕); typing 3 + Enter applies 3; a small "5" label sits on the arrow stem from the first click.
+  Ours: Enter commits with no box; the box opens only by clicking the label, which is drawn between the curves and only once
+  the gap is ≥ 30 px (5 mm at default zoom = 16–19 px → no label, I had to zoom in), and it has no ±/✓/✕.
+- **R5v3-S1-c → OFF-SIDE (skb)** first side: live puts a line's copy **away from the region** (top edge → above) and a circle's
+  **outward**; ours offsets a line to its left normal (the L's top edge went **into** the L on first use) and closed curves
+  **inward**. Ours also keeps the flipped side for the next Offset (live asked).
+- **R5v3-S1-d → OFF-TOAST (skb)** a second, unconnected entity while a preview is pending: live only selects it and shows the
+  toast "Can only offset a single chain at once." (preview unchanged); ours adds it and offsets both chains.
+- **R5v3-S1-e (skb, minor)** with constraints shown, a click on an edge under its glyph cluster counts as empty space and commits
+  the pending offset (I got a partial chain); hiding constraints avoided it. Live behaviour asked (follow-up 2 (3)).
+- **R5v3-S1-f (skb, live asked)** the closing Line segment onto the origin, 0.036 mm off vertical, got Coincident but no Vertical
+  (the left edge stayed free until dimensioned).
+- **R5v3-S1-g (psb, live asked)** Hole "Sketch points to place holes" takes a click on a planar face ("Face of Extrude 1", hole
+  red): `part_studio/mod.rs` kind_matches lets PickKind::Face match PLANE_LIKE, which includes MATE_CONNECTOR. Live's filter is
+  sketch vertices or mate connectors.
+- Note: once, the first click into the graphics after opening Linear pattern selected nothing; the retry worked (not reproduced).
+
 ## v2 Session 2: editing an early feature in a 30-feature part (v0.4.8; r5/v2s2.py; live asked: "qa4 round 5 v2 s2")
 Plate 200×100×10 + 14 × (sketch circle + boss Add): 30 features, 1 part (211583.052 mm³, 34 faces). CLI build 23.8 s.
 - App: regen panel **total 462 ms** (bosses 17–71 ms each). Edit Extrude 1 (feature 2) 10 → 12: preview settles 0.8–1.3 s after
