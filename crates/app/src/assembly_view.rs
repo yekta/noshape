@@ -3967,11 +3967,19 @@ impl AssemblyView {
             });
         let grab = self.ui.hud_grab.clone();
         let (d2, d3, d4) = (dialog.clone(), dialog.clone(), dialog);
+        // Live (assembly/35, 93; dom/mate-hud.txt): the 310×51 panel is
+        // centred over the second pick with its bottom edge on it, kept
+        // inside the graphics area (pushed in from the right edge in 93).
+        let (o, size) = { let vp = self.viewport.read(cx); (vp.origin(), vp.size()) };
+        let (bx, by) = (f64::from(f32::from(o.x)), f64::from(f32::from(o.y)));
+        let (bw, bh) = (size.x, size.y);
+        let x = (at.x - 155.).min(bx + bw - 310. - 10.).max(bx + 4.);
+        let y = (at.y - 51.).min(by + bh - 51. - 4.).max(by + 4.);
         div()
             .id("mate-hud")
             .absolute()
-            .left(px(at.x as f32 + 14.))
-            .top(px(at.y as f32 + 14.))
+            .left(px(x as f32))
+            .top(px(y as f32))
             .w(px(310.))
             .bg(pal.dialog_bg)
             .border_1()
