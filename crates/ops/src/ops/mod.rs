@@ -131,6 +131,11 @@ pub(crate) fn regen_report(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpErro
 }
 
 /// A feature id or name argument resolved in a studio.
+/// A `configuration` argument: {input id: value} (values as given; numbers as text).
+pub(crate) fn config_arg(a: &Args) -> Result<noshape_model::configuration::ConfigValues, OpError> {
+    Ok(noshape_model::configuration::ConfigValues(a.object("configuration")?.map(|m| m.iter().map(|(k, v)| (k.clone(), v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))).collect()).unwrap_or_default()))
+}
+
 pub(crate) fn feature_arg(ps: &PartStudio, a: &Args, name: &str) -> Result<noshape_model::reference::FeatureId, OpError> {
     doc::find_feature(ps, a.str(name)?).map_err(|e| e.with_param(name))
 }

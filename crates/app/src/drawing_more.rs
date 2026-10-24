@@ -108,6 +108,8 @@ impl DrawingEditor {
                 let from = self.branch_point(*id).or_else(|| self.current_sheet().annotations.iter().find(|a| a.id == *id).map(|a| a.position));
                 if let Some(from) = from {
                     overlay.lines.push((vec![from, c], true));
+                    // Live (4): the rubber band ends in an arrowhead.
+                    self.rubber_band_arrow(overlay, from, c);
                 }
             }
             _ => {}

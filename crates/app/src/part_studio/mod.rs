@@ -341,7 +341,7 @@ impl PartStudioView {
                     let is_vars = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::VariableStudio(_)));
                     // A changed Part Studio may be the source of our Derived features.
                     let is_source = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::PartStudio(_)))
-                        && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| f.type_id == "importDerived" && f.params.text("partStudio") == t.to_string()));
+                        && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| noshape_model::features::importing::is_derived(&f.type_id) && f.params.text("partStudio") == t.to_string()));
                     // A Feature Studio defining custom features used here.
                     let prefix = noshape_model::custom::type_id(*t, "");
                     let is_fs = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::FeatureStudio(_)));
@@ -3163,7 +3163,7 @@ impl PartStudioView {
     /// The header's New folder: the "Folder name" popup, "New folder"
     /// selected (live 586).
     fn open_folder_prompt(&mut self, ids: Vec<FeatureId>, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value("New folder"));
+        let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(noshape_ops::studio::NEW_FOLDER_NAME));
         st.update(cx, |s, cx| {
             s.focus(window, cx);
             s.select_all(window, cx);
@@ -3180,11 +3180,10 @@ impl PartStudioView {
     /// ✓ / Enter: an empty folder at the rollback bar, or the selection wrapped.
     fn commit_folder_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((st, ids, _)) = self.folder_prompt.take() else { return };
-        let name = st.read(cx).value().trim().to_string();
-        let name = if name.is_empty() { "New folder".to_string() } else { name };
+        let name = st.read(cx).value().to_string();
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Add folder", cx, |ps| {
-                ps.new_folder(&ids, Some(name));
+            doc.edit_studio(self.tab, noshape_ops::studio::ADD_FOLDER_DESCRIPTION, cx, |ps| {
+                noshape_ops::studio::add_folder(ps, &ids, &name);
             });
         });
         let fh = self.focus.clone();
@@ -4467,10 +4466,11 @@ impl PartStudioView {
         // Live (part-studio/00, 77): the strip is centered 8 px above the
         // viewport's middle (4 or 5 buttons alike).
         overlay.push(div().absolute().top_0().bottom(px(16.)).right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
-        overlay.extend(self.render_measure_panel(cx));
         // Live (sketch/01, part-studio/230, 234): also while a sketch or a
         // feature dialog is open.
         overlay.push(self.render_evaluation_tools(cx));
+        // Live (part-studio/82): the Measure panel covers those buttons.
+        overlay.extend(self.render_measure_panel(cx));
         overlay.extend(self.render_context_menu());
         overlay.extend(self.render_section_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))));
         // Value boxes at model points are drawn in the 3D frame

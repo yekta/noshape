@@ -1018,6 +1018,8 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     } else {
         k::fuse_all(&solids, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape
     };
+    // Coplanar walls (split by a rip) are one face.
+    let fused = if (0..topo.edges.len()).any(|e| coplanar_rip(&topo, e)) { k::unify_same_domain(&fused).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape } else { fused };
     Ok(Built { part: fused, pieces, topo, wall_flats, strips })
 }
 
@@ -1084,7 +1086,14 @@ fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<D
         .iter()
         .map(|f| {
             let Some(p) = inner_point(f) else { return Def::Face(0) };
-            pieces.iter().find(|x| x.face.project_point(p).is_ok_and(|pr| pr.point.distance(p) < 1e-7)).map_or(Def::Face(0), |x| x.from)
+            // A piece through the point that faces the same way (a unified wall's
+            // middle can lie on the edge of a side piece).
+            let n = f.normal_at_point(p).ok();
+            let along = |x: &Piece| match (n, x.face.normal_at_point(p)) {
+                (Some(a), Ok(b)) => a.cross(b).length() < 1e-6,
+                _ => true,
+            };
+            pieces.iter().find(|x| x.face.project_point(p).is_ok_and(|pr| pr.point.distance(p) < 1e-7) && along(x)).map_or(Def::Face(0), |x| x.from)
         })
         .collect();
     let ef = part.edge_faces().unwrap_or_default();
@@ -1373,7 +1382,7 @@ fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, fl
             flat: false,
         });
     }
-    for &e in &def.rips {
+    for &e in def.rips.iter().filter(|&&e| !coplanar_rip(topo, e)) {
         let fs: Vec<usize> = topo.edge_faces.get(e).map(|v| v.iter().map(|x| *x as usize).collect()).unwrap_or_default();
         // Wall a in this part; wall b here or (`usize::MAX`) in another part.
         let Some(a) = fs.iter().copied().find(|f| index(*f).is_some()) else { continue };
@@ -1397,7 +1406,21 @@ fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, fl
 /// G34d with the Joint feature): the wall running through (Direction 1: the
 /// first in definition order, Direction 2 the other) covers the other's
 /// thickness; the other stops the gap short of it.
+/// A rip between two coplanar pieces of one wall (live, behaviours.md
+/// "fs (10-23 17:30)": a diagonal rip across a flat plate leaves the part as
+/// it was: no gap, no joint in the table).
+fn coplanar_rip(topo: &Topo, e: usize) -> bool {
+    let [a, b] = topo.edge_faces[e][..] else { return false };
+    match (face_normal(&topo.faces[a as usize]), face_normal(&topo.faces[b as usize])) {
+        (Ok((pa, na)), Ok((pb, nb))) => na.dot(nb) > 1.0 - 1e-9 && (pb - pa).dot(na).abs() < TOL,
+        _ => false,
+    }
+}
+
 fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
+    if coplanar_rip(topo, e) {
+        return 0.0;
+    }
     let Some(style) = def.rip_styles.get(&e) else { return def.clearance };
     let walls = &topo.edge_faces[e];
     let Some(other) = walls.iter().map(|x| *x as usize).find(|x| *x != f) else { return def.clearance };
@@ -1606,6 +1629,18 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
             bends.entry(e).or_insert(base * step(0.5));
             if let std::collections::btree_map::Entry::Vacant(v) = walls.entry(w2) {
                 v.insert(base * step(1.0));
+                queue.push(w2);
+            }
+        }
+        // Coplanar neighbours (a rip splitting a wall) lie where they are.
+        for e in (0..topo.edges.len()).filter(|&e| coplanar_rip(topo, e)) {
+            let faces = &topo.edge_faces[e];
+            if !faces.contains(&(w1 as u32)) {
+                continue;
+            }
+            let w2 = faces.iter().map(|f| *f as usize).find(|f| *f != w1).unwrap_or(w1);
+            if let std::collections::btree_map::Entry::Vacant(v) = walls.entry(w2) {
+                v.insert(base);
                 queue.push(w2);
             }
         }

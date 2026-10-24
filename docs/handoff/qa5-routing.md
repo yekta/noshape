@@ -63,6 +63,7 @@ Format: `## <id> — <owner> — <one-line summary>` then repro, expected (live)
 
 ## IMP2 — live request — Parts list order after a two-part STEP import
 - Source: qa4, v0.4.6 (d). noshape lists Part 2 above Part 1 after importing g48-two.step; live's order not captured.
+- Closed (api, 10-24): live lists "Part 2, Part 1" too, in the file's order (behaviours.md "api (10-24) IMP2 parts order"). No change.
 
 ## R1 — render (lead to assign) — two default planes selected: parts drawn with black halos and see-through holes
 - Source: qa4, v0.4.6 gate 2026-10-22; also on v0.4.5 (not a regression).
@@ -240,3 +241,8 @@ STATUS EXP1 (qa4 entry, 2026-10-23): renamed **EXP-HDR** (api, export header fie
 - Expected (live): Isometric, Dimetric, Trimetric | ⚙ Graphics preferences… | Named views…, Previous view | Zoom to fit, Zoom to window | Perspective view | ✓ render mode ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… (= the Part Studio menu minus "Orient normal to sketch on edit" and "Highlight boundary edges"; behaviours.md "qa5 assembly camera menu")
 - Actual: qa5 removed "Show mates" and added "Section view…"; the assembly view has no render modes, named / previous views, graphics preferences, zoom to window or high quality yet
 
+STATUS IM1 (2026-10-24, qa5): fixed by api (names, "<file> parts", RootAssembly) except the "BOM : RootAssembly" tab → IM1b, api.
+STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's own product strings; only the Parasolid schema minor version differs (SCH_3801000 vs live 3801231).
+STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
+STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
+STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty status bar, as live).

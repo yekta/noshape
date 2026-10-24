@@ -61,11 +61,50 @@ pub fn suppress_description(suppressed: bool) -> &'static str {
     if suppressed { "Suppress" } else { "Unsuppress" }
 }
 
+/// Suppress / Unsuppress. Unsuppress on a feature with a dynamic
+/// suppression expression drops the expression too (the menu's
+/// "Unsuppress" there).
 pub fn set_suppressed(ps: &mut PartStudio, ids: &[FeatureId], suppressed: bool) {
     for id in ids {
         if let Some(f) = ps.feature_mut(*id) {
             f.suppressed = suppressed;
+            if !suppressed {
+                f.suppression_expr = None;
+            }
         }
+    }
+}
+
+pub fn suppression_expr_description(expr: Option<&str>) -> &'static str {
+    if expr.is_some() { "Dynamic suppression" } else { "Remove dynamic suppression" }
+}
+
+/// Dynamic suppression ("Unsuppressed if" expression; None removes it).
+pub fn set_suppression_expr(ps: &mut PartStudio, id: FeatureId, expr: Option<String>) {
+    if let Some(f) = ps.feature_mut(id) {
+        f.suppression_expr = expr.filter(|e| !e.trim().is_empty());
+    }
+}
+
+/// The "Folder name" popup's default (live part-studio/586).
+pub const NEW_FOLDER_NAME: &str = "New folder";
+pub const ADD_FOLDER_DESCRIPTION: &str = "Add folder";
+pub const UNPACK_FOLDER_DESCRIPTION: &str = "Remove folder";
+
+pub fn rename_folder_description(name: &str) -> String {
+    format!("Rename folder : {name}")
+}
+
+/// Add selection to folder… / the list header's New folder (an empty
+/// folder at the rollback bar). An empty name is "New folder".
+pub fn add_folder(ps: &mut PartStudio, ids: &[FeatureId], name: &str) -> u32 {
+    let name = name.trim();
+    ps.new_folder(ids, Some(if name.is_empty() { NEW_FOLDER_NAME } else { name }.to_string()))
+}
+
+pub fn rename_folder(ps: &mut PartStudio, folder: u32, name: &str) {
+    if let Some(f) = ps.folder_mut(folder) {
+        f.name = name.to_string();
     }
 }
 
@@ -237,4 +276,18 @@ pub fn set_part_properties(ps: &mut PartStudio, body: &BodyId, v: &PartPropertyV
         }
     }
     p.mass_override = v.mass_override;
+}
+
+/// Context menu "Paste sketch" on a plane or planar face (after "Copy
+/// sketch"): the sketches pasted at the rollback bar and moved onto `plane`.
+/// One edit, "Paste sketch". Returns the new sketches.
+pub fn paste_sketches_onto(ps: &mut PartStudio, sketches: &[noshape_model::partstudio::Feature], plane: noshape_model::reference::Reference) -> Vec<noshape_model::reference::FeatureId> {
+    let at = ps.rollback_index();
+    let ids = ps.paste_features(sketches, at);
+    for id in &ids {
+        if let Some(f) = ps.feature_mut(*id) {
+            f.params.set("sketchPlane", noshape_model::params::ParamValue::Query(vec![plane.clone()]));
+        }
+    }
+    ids
 }

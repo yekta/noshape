@@ -143,6 +143,16 @@ pub(crate) struct AsmSectionDialog {
 /// Most section planes the renderer cuts with.
 const MAX_SECTION_PLANES: usize = 3;
 
+/// A drag of the section arrow: the plane's offset at the press, the line
+/// the arrow lies on and the press's parameter along it.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SectionDrag {
+    pub offset0: f64,
+    pub point: DVec3,
+    pub dir: DVec3,
+    pub s0: f64,
+}
+
 /// Row being renamed inline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum RenameRow {
@@ -297,6 +307,10 @@ pub(crate) struct AsmUi {
     pub measure_settings: crate::measure_panel::MeasureSettings,
     /// Section view (Shift+X): plane origin, normal, offset, flipped, offset field.
     pub section: Option<AsmSection>,
+    /// A drag of the section arrow in progress.
+    pub section_drag: Option<SectionDrag>,
+    /// The section arrow's offset box being typed into.
+    pub section_offset_edit: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// Isolate / Make transparent slider: opacity of the transparent instances.
     pub transparency: Option<f32>,
     /// Camera menu render choices (Onshape's display modes, hidden and
@@ -1921,6 +1935,14 @@ impl AssemblyView {
                     m.push(item("Exit isolate", |t, _, cx| {
                         t.exit_isolate(cx);
                     }));
+                    m.push(MenuEntry::Sep);
+                }
+                // Live (part-studio/74; the assembly's place in the menu
+                // UNCONFIRMED, REQUESTS "skb (10-24) assembly section"): with a
+                // section on, Edit section view… and Turn off section view.
+                if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_none() && !s.planes.is_empty()) {
+                    m.push(item("Edit section view…", |t, _, cx| t.edit_section(cx)));
+                    m.push(item("Turn off section view", |t, w, cx| t.toggle_section(w, cx)));
                     m.push(MenuEntry::Sep);
                 }
                 m.push(item("Show all", |t, _, cx| t.show_hidden(cx)));
@@ -4048,6 +4070,159 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// The active plane's arrow while the dialog is open, as the Part
+    /// Studio's (live part-studio/71–72): on the plane where it passes the
+    /// assembly's centre, along its normal; (base, normal, length to the tip).
+    pub(super) fn section_arrow(&self) -> Option<(DVec3, DVec3, f64)> {
+        let s = self.ui.section.as_ref()?;
+        let d = s.dialog.as_ref()?;
+        let pl = s.planes.get(d.active)?;
+        let (lo, hi) = self.result.bounds()?;
+        let center = (lo + hi) * 0.5;
+        let on_plane = pl.origin + pl.normal * pl.offset;
+        let base = center - pl.normal * pl.normal.dot(center - on_plane);
+        Some((base, pl.normal, ((hi - lo).length() * 0.12).max(1e-3)))
+    }
+
+    /// The arrow glyph for the scene: tip, direction, a pixel's world size
+    /// there, view direction, hovered.
+    pub(super) fn section_arrow_glyph(&self, cx: &App) -> Option<(DVec3, DVec3, f64, DVec3, bool)> {
+        let (base, dir, len) = self.section_arrow()?;
+        let vp = self.viewport.read(cx);
+        let wpp = vp.camera.world_per_pixel(vp.size().y.max(1.0));
+        let hovered = self.hover_overlay == Some(OverlayPick::SectionArrow) || self.ui.section_drag.is_some();
+        Some((base + dir * len, dir, wpp, vp.camera.forward(), hovered))
+    }
+
+    /// Where the cursor ray passes closest to the line (point, dir): the
+    /// parameter along the line.
+    fn line_param(&self, position: glam::DVec2, point: DVec3, dir: DVec3, cx: &App) -> Option<f64> {
+        let (o, r) = self.viewport.read(cx).ray(position);
+        let w = point - o;
+        let (a, b, c) = (dir.dot(dir), dir.dot(r), r.dot(r));
+        let (dd, e) = (dir.dot(w), r.dot(w));
+        let den = a * c - b * b;
+        (den.abs() > 1e-12).then(|| (b * e - c * dd) / den)
+    }
+
+    /// A press on the section arrow starts dragging the active plane.
+    pub(super) fn start_section_drag(&mut self, position: glam::DVec2, cx: &mut Context<Self>) -> bool {
+        if self.hover_overlay != Some(OverlayPick::SectionArrow) {
+            return false;
+        }
+        let Some((base, dir, _)) = self.section_arrow() else { return false };
+        let Some(s0) = self.line_param(position, base, dir, cx) else { return false };
+        let offset0 = self.ui.section.as_ref().and_then(|s| s.dialog.as_ref().and_then(|d| s.planes.get(d.active))).map(|p| p.offset).unwrap_or(0.0);
+        self.ui.section_offset_edit = None;
+        self.ui.section_drag = Some(SectionDrag { offset0, point: base, dir, s0 });
+        cx.notify();
+        true
+    }
+
+    /// Dragging the arrow moves the plane along its normal.
+    pub(super) fn drag_section(&mut self, position: glam::DVec2, cx: &mut Context<Self>) -> bool {
+        let Some(d) = self.ui.section_drag else { return false };
+        if let Some(t) = self.line_param(position, d.point, d.dir, cx)
+            && let Some(s) = &mut self.ui.section
+            && let Some(active) = s.dialog.as_ref().map(|x| x.active)
+            && let Some(pl) = s.planes.get_mut(active)
+        {
+            pl.offset = d.offset0 + (t - d.s0);
+            self.rebuild_scene(false, cx);
+            cx.notify();
+        }
+        true
+    }
+
+    pub(super) fn end_section_drag(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.ui.section_drag.take().is_none() {
+            return false;
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+        true
+    }
+
+    /// The offset box beside the arrow's tip (live part-studio/72, e.g.
+    /// "-0.91 in"); a click makes it a field taking a typed offset.
+    pub(super) fn render_section_value(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (base, dir, len) = self.section_arrow()?;
+        let s = self.viewport.read(cx).project(base + dir * len)?;
+        let offset = self.ui.section.as_ref().and_then(|s| s.dialog.as_ref().and_then(|d| s.planes.get(d.active))).map(|p| p.offset)?;
+        let text = noshape_units::format_quantity(noshape_units::Quantity::new(offset, noshape_units::Dim::LENGTH), &self.units(cx));
+        let pal = p();
+        let at = div().absolute().left(px(s.x as f32 + 12.)).top(px(s.y as f32 - 10.)).occlude();
+        if let Some((input, _)) = &self.ui.section_offset_edit {
+            let field = gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(12.));
+            return Some(at.id("asm-section-offset-field").w(px(90.)).px(px(4.)).border_1().border_color(pal.accent).bg(rgb(0xffffff)).child(gpui_kit::base::input::input_frame(div().child(field))).into_any_element());
+        }
+        Some(
+            at.id("asm-section-offset")
+                .px(px(4.))
+                .border_1()
+                .border_color(pal.accent)
+                .bg(rgb(0xffffff))
+                .text_size(px(12.))
+                .text_color(pal.text)
+                .cursor(CursorStyle::IBeam)
+                .child(text.clone())
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    this.open_section_offset_edit(text.clone(), window, cx);
+                }))
+                .into_any_element(),
+        )
+    }
+
+    fn open_section_offset_edit(&mut self, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::InputState;
+        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let sub = cx.subscribe_in(&input, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                let typed = st.read(cx).value().to_string();
+                this.commit_section_offset(&typed, window, cx);
+            }
+        });
+        input.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.ui.section_offset_edit = Some((input, sub));
+        cx.notify();
+    }
+
+    /// A typed offset (a bare number in the workspace unit) moves the
+    /// active plane; text that doesn't evaluate leaves it.
+    fn commit_section_offset(&mut self, typed: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.ui.section_offset_edit = None;
+        let units = self.units(cx);
+        let text = noshape_model::quantity_text::commit_text(typed, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope);
+        if let Ok(q) = noshape_units::evaluate_as(&text, noshape_units::Dim::LENGTH, &units, &noshape_units::EmptyScope)
+            && let Some(s) = &mut self.ui.section
+            && let Some(active) = s.dialog.as_ref().map(|d| d.active)
+            && let Some(pl) = s.planes.get_mut(active)
+        {
+            pl.offset = q.value;
+            self.rebuild_scene(false, cx);
+        }
+        window.focus(&self.focus, cx);
+        cx.notify();
+    }
+
+    /// Edit section view… (right-click with a section on): the dialog again
+    /// over the current section (Cancel keeps it as it was).
+    pub(super) fn edit_section(&mut self, cx: &mut Context<Self>) {
+        let Some(s) = &mut self.ui.section else { return };
+        if s.dialog.is_some() {
+            return;
+        }
+        let saved = Some(Box::new(s.clone()));
+        let active = s.planes.len().saturating_sub(1);
+        s.dialog = Some(AsmSectionDialog { items_active: false, active, saved });
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
     pub(super) fn render_section(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let s = self.ui.section.as_ref()?;
         let d = s.dialog.as_ref()?;
@@ -4159,11 +4334,29 @@ impl AssemblyView {
                 return;
             }
             let file = format!("{name}.{}", s.format.ext());
+            // Options › Store file in a new tab: no download.
+            if s.options == 2 {
+                v.update(cx, |this, cx| {
+                    let parts = this.export_parts(ids.as_deref(), s.hidden);
+                    this.message = Some(match crate::part_studio::export::store_export(&this.doc, this.tab, &file, |p| crate::part_studio::export::write_export(&s, p, parts), cx) {
+                        Ok(f) => (false, format!("Stored {f}")),
+                        Err(e) => (true, format!("Export failed: {e:#}")),
+                    });
+                    cx.notify();
+                });
+                return;
+            }
             crate::files::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
                 v.update(cx, |this, cx| {
                     let parts = this.export_parts(ids.as_deref(), s.hidden);
                     this.message = Some(match crate::part_studio::export::write_export(&s, &path, parts) {
-                        Ok(p) => (false, format!("Exported {}", p.display())),
+                        Ok(p) => {
+                            // Download and store file in a new tab.
+                            if s.options == 1 {
+                                crate::part_studio::export::store_written(&this.doc, this.tab, &p, cx);
+                            }
+                            (false, format!("Exported {}", p.display()))
+                        }
                         Err(e) => (true, format!("Export failed: {e:#}")),
                     });
                     cx.notify();
