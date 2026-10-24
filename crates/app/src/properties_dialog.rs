@@ -365,7 +365,8 @@ pub(crate) fn footer_button(id: &'static str, text: &'static str, primary: bool,
         .rounded(px(5.25))
         .text_size(px(14.))
         .when(primary, |d| d.bg(rgb(0x1651b0)).text_color(gpui_kit::rgb_static(0xffffff)))
-        .when(!primary, |d| d.bg(rgb(0xd7d7d7)).text_color(rgb(0x333333)))
+        // Close stays light in the dark theme (live dark/dk-999).
+        .when(!primary, |d| d.bg(gpui_kit::rgb_static(0xd7d7d7)).text_color(gpui_kit::rgb_static(0x333333)))
         .when(!enabled, |d| d.opacity(0.4))
         .when(enabled, |d| d.cursor_pointer())
         .child(text)
