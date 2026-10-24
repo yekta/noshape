@@ -45,6 +45,14 @@ on:
         description: 'Benchmark document in the repo (default the NIST assembly; tests/perf/parts-1000.noshape: 1000 parts, instancing). No baseline unless default'
         required: false
         default: ''
+      env:
+        description: 'Environment for every run on macOS and Linux, e.g. NOSHAPE_DISPLAY_MESH=chord. On macOS only the first orbit of a job is reliable for fps: compare settings in separate jobs'
+        required: false
+        default: ''
+      modes:
+        description: 'Presentation modes instead of the runner default, e.g. texture'
+        required: false
+        default: ''
   workflow_run:
     workflows: [Release]
     types: [completed]
@@ -277,12 +285,13 @@ jobs:
         if: runner.os != 'Windows'
         env:
           VARIANTS: ${{ inputs.variants || '' }}
-        run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ matrix.modes }}
+          BENCH_ENV: ${{ inputs.env || '' }}
+        run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ inputs.modes || matrix.modes }}
 
       - name: Benchmarks (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .github/perf/bench.ps1 $env:BIN $env:FIXTURE "$env:RUNNER_TEMP\perf" ${{ matrix.modes }}
+        run: .github/perf/bench.ps1 $env:BIN $env:FIXTURE "$env:RUNNER_TEMP\perf" ${{ inputs.modes || matrix.modes }}
 
       - name: Baseline (last successful run on main)
         if: inputs.fixture == ''
