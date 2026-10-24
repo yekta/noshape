@@ -867,8 +867,33 @@ impl Sheet<'_> {
         for &i in members.2 {
             self.fill(doc, i, Owner::Block(block), true)?;
         }
-        for &i in members.1 {
-            self.text(doc, i, Owner::Block(block), TextIn::Dimension)?;
+        // Dual (live samples/asb-dual-2018): the value and its dual in one
+        // MTEXT, "\A1;[2.36 in]\P60" (the dual first unless it goes below).
+        match (&d.dual, members.1) {
+            (Some(du), &[i, j]) => {
+                let (dual, primary) = if self.g.texts[i].text.starts_with('[') { (i, j) } else { (j, i) };
+                let (top, bottom) = if du.below { (primary, dual) } else { (dual, primary) };
+                let conv = |ti: usize| mtext_value(self.g.texts[ti].text.trim()).replace('Ø', "%%c").replace('°', "%%d").replace('±', "%%p");
+                let t = &self.g.texts[primary];
+                let mut e = MText::new();
+                e.value = format!("\\A1;{}\\P{}", conv(top), conv(bottom));
+                e.height = t.height * self.k;
+                e.rotation = t.angle;
+                e.insertion_point = self.p3(d.text_mid);
+                e.attachment_point = AttachmentPoint::MiddleCenter;
+                e.style = DIM_TEXT_STYLE.0.to_string();
+                e.common.layer = self.g.cad_text_layer(primary).name(self.upper).into();
+                e.common.color = match self.g.text_color(primary) {
+                    None => Color::from_index(7),
+                    c => color(c),
+                };
+                put(doc, EntityType::MText(Box::new(e)), Owner::Block(block))?;
+            }
+            _ => {
+                for &i in members.1 {
+                    self.text(doc, i, Owner::Block(block), TextIn::Dimension)?;
+                }
+            }
         }
         let p3 = |p| self.p3(p);
         let unit = self.k;
@@ -914,6 +939,10 @@ impl Sheet<'_> {
         base.style_name = style;
         base.text_middle_point = p3(d.text_mid);
         base.text_user_positioned = true;
+        // Dual: the alternate units' placeholder "[]" and the value "<>".
+        if let Some(du) = &d.dual {
+            base.text = if du.below { "<>\\P[]".to_string() } else { "[]\\P<>".to_string() };
+        }
         base.common.layer = CadLayer::AnnotationText.name(upper).into();
         // DSTYLE overrides: DIMSCALE 1, DIMLFAC (model per sheet), DIMPOST.
         let mut x = ExtendedDataRecord::new("ACAD");
@@ -926,10 +955,25 @@ impl Sheet<'_> {
             XDataValue::Real(1.0 / d.scale.max(1e-12)),
             XDataValue::Integer16(3),
             XDataValue::String(prefix.into()),
-            XDataValue::ControlString("}".into()),
         ] {
             x.add_value(v);
         }
+        // Dual: DIMALT 1, DIMALTF, DIMALTD, DIMAPOST ("[] in").
+        if let Some(du) = &d.dual {
+            for v in [
+                XDataValue::Integer16(170),
+                XDataValue::Integer16(1),
+                XDataValue::Integer16(143),
+                XDataValue::Real(du.factor),
+                XDataValue::Integer16(171),
+                XDataValue::Integer16(du.precision as i16),
+                XDataValue::Integer16(4),
+                XDataValue::String(du.post.clone()),
+            ] {
+                x.add_value(v);
+            }
+        }
+        x.add_value(XDataValue::ControlString("}".into()));
         base.common.extended_data.add_record(x);
         put(doc, EntityType::Dimension(Box::new(dim)), owner).map(|_| ())
     }

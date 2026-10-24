@@ -28,12 +28,26 @@ pub enum CadDimKind {
 /// A dimension for export.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CadDim {
+    /// Dual units (live asb-dual-2018: DIMALT; None: single).
+    pub dual: Option<CadDual>,
     pub kind: CadDimKind,
     pub measurement: f64,
     /// The text's middle (sheet mm).
     pub text_mid: [f64; 2],
     /// Sheet mm per model mm of its view (DIMLFAC is the inverse).
     pub scale: f64,
+}
+
+/// A dimension's dual units in the export (live samples/asb-dual-2018):
+/// DIMALTF (dual units per primary unit), DIMALTD, DIMAPOST ("[] in"), and
+/// whether the dual goes below the value (text override "<>\P[]" rather
+/// than "[]\P<>").
+#[derive(Clone, Debug, PartialEq)]
+pub struct CadDual {
+    pub factor: f64,
+    pub precision: u8,
+    pub post: String,
+    pub below: bool,
 }
 
 /// What a group of elements is.
@@ -232,7 +246,8 @@ impl SheetGeometry {
                 [(x0 + x1) / 2.0, (y0 + y1) / 2.0]
             };
             let obj = self.cad_objects.len();
-            self.cad_objects.push(CadObject::Dimension(CadDim { kind, measurement, text_mid, scale: env.scale(view) }));
+            let dual = env.dual_cad(a, matches!(kind, CadDimKind::Angular { .. }));
+            self.cad_objects.push(CadObject::Dimension(CadDim { dual, kind, measurement, text_mid, scale: env.scale(view) }));
             self.cad_members.push(CadMember { lines: l0..l1, texts: t0..t1, fills: f0..f1, obj });
         }
     }

@@ -2406,6 +2406,10 @@ pub trait AnnotationEnv {
         Some(revision.to_string())
     }
     /// Lines of a hole / thread callout (from the Hole feature).
+    /// A dimension's dual units for the DXF / DWG export (None: single).
+    fn dual_cad(&self, _a: &Annotation, _angular: bool) -> Option<super::cad_objects::CadDual> {
+        None
+    }
     fn hole_callout(&self, _a: &Annotation) -> Vec<String> {
         vec!["⌀?".into()]
     }
