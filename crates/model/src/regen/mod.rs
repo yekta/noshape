@@ -253,9 +253,18 @@ impl Regenerator {
                         ev.custom = opts.custom_features.clone();
                         ev.custom_type = crate::custom::is_custom(&f.type_id).then(|| f.type_id.clone());
                         let specs = f.feature_type().map(|t| t.params.as_slice()).unwrap_or(&[]);
+                        // Every boolean of the feature on this thread stops
+                        // when the run is aborted (not only boolean_into's).
+                        let cancel = opts.cancel.clone();
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            ev.check_bounds(specs)?;
-                            eval_fn(&mut ev)
+                            let mut run = || {
+                                ev.check_bounds(specs)?;
+                                eval_fn(&mut ev)
+                            };
+                            match &cancel {
+                                Some(c) => c.scope(run),
+                                None => run(),
+                            }
                         }));
                         // Stopped part-way: don't cache a half-done feature.
                         if aborted() {

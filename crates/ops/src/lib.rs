@@ -28,6 +28,7 @@ pub mod reference;
 pub mod refs;
 pub mod registry;
 pub mod session;
+pub mod sketch_export;
 pub mod sketch_use;
 pub mod studio;
 pub mod values;

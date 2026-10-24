@@ -94,11 +94,61 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "suppress",
             summary: "Suppress or unsuppress features",
-            description: "",
+            description: "Unsuppress also removes a dynamic suppression expression (feature_dynamic_suppression), like the menu's Unsuppress on such a feature.",
             fields: vec![doc_field(), tab_field(), req("features", strings(), "Feature ids or names."), opt("suppressed", json!({ "type": "boolean", "default": true }), "true: suppress, false: unsuppress.")],
             mutates: true,
             destructive: false,
             run: suppress,
+        },
+        Op {
+            group: "feature",
+            verb: "dynamic_suppression",
+            summary: "Set or remove a feature's dynamic suppression expression",
+            description: "The Dynamic suppression dialog: the feature is active while `unsuppressed_if` is true (an expression of variables and configuration inputs, e.g. \"#holes > 2\"). Empty or omitted removes the expression (feature_suppress with suppressed false does too).",
+            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), opt("unsuppressed_if", s(), "Unsuppressed if: expression.")],
+            mutates: true,
+            destructive: false,
+            run: dynamic_suppression,
+        },
+        Op {
+            group: "feature",
+            verb: "dependencies",
+            summary: "Show dependencies: the features a feature uses and the features using it",
+            description: "Parents are the earlier features whose geometry, sketches, planes or #variables the feature references; children are the later features referencing it. In history order.",
+            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name.")],
+            mutates: false,
+            destructive: false,
+            run: dependencies,
+        },
+        Op {
+            group: "feature",
+            verb: "add_folder",
+            summary: "Add features to a new folder",
+            description: "Add selection to folder… (or, without `features`, the list's New folder: an empty folder at the rollback bar). Folders hold a contiguous run: the features gather after the first one. Features all in one folder make a nested folder. feature_list lists folders.",
+            fields: vec![doc_field(), tab_field(), opt("features", strings(), "Feature ids or names."), opt("name", json!({ "type": "string", "default": studio::NEW_FOLDER_NAME }), "Folder name.")],
+            mutates: true,
+            destructive: false,
+            run: add_folder,
+        },
+        Op {
+            group: "feature",
+            verb: "rename_folder",
+            summary: "Rename a feature folder",
+            description: "",
+            fields: vec![doc_field(), tab_field(), req("folder", json!({ "type": ["integer", "string"] }), "Folder id or name (feature_list)."), req("name", s(), "New name.")],
+            mutates: true,
+            destructive: false,
+            run: rename_folder,
+        },
+        Op {
+            group: "feature",
+            verb: "unpack_folder",
+            summary: "Unpack a feature folder",
+            description: "Removes the folder; its features (and sub-folders) stay in place, in the enclosing folder.",
+            fields: vec![doc_field(), tab_field(), req("folder", json!({ "type": ["integer", "string"] }), "Folder id or name (feature_list).")],
+            mutates: true,
+            destructive: false,
+            run: unpack_folder,
         },
         Op {
             group: "feature",
@@ -299,7 +349,7 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut r = regen_report(od, tab)?;
     let ps = doc::studio(od.doc(), tab)?;
     r["tab"] = json!({ "id": tab.to_string(), "name": od.doc().tab(tab).map(|t| t.name.clone()) });
-    r["folders"] = json!(ps.folders.iter().map(|f| json!({ "id": f.id, "name": f.name, "features": ps.features.iter().filter(|x| x.folder == Some(f.id)).map(|x| x.id.to_string()).collect::<Vec<_>>() })).collect::<Vec<_>>());
+    r["folders"] = json!(ps.folders.iter().map(|f| json!({ "id": f.id, "name": f.name, "parent": f.parent, "features": ps.features.iter().filter(|x| x.folder == Some(f.id)).map(|x| x.id.to_string()).collect::<Vec<_>>() })).collect::<Vec<_>>());
     Ok(r.into())
 }
 
@@ -400,4 +450,82 @@ fn show_all(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Ok(())
     })?;
     Ok(json!({ "ok": true }).into())
+}
+
+fn dynamic_suppression(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let id = feature_arg(ps, a, "feature")?;
+    let expr = a.opt_str("unsuppressed_if")?.map(str::trim).filter(|e| !e.is_empty()).map(str::to_string);
+    edit_studio(od, tab, studio::suppression_expr_description(expr.as_deref()), |ps| {
+        studio::set_suppression_expr(ps, id, expr.clone());
+        Ok(())
+    })?;
+    Ok(json!({ "feature": id.to_string(), "unsuppressed_if": expr, "regeneration": regen_report(od, tab)? }).into())
+}
+
+fn dependencies(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::interaction;
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let id = feature_arg(ps, a, "feature")?;
+    let idx = ps.index_of(id).expect("found");
+    let rows = |ids: Vec<noshape_model::FeatureId>| -> Vec<Value> { ids.into_iter().filter_map(|i| ps.feature(i)).map(|f| json!({ "id": f.id.to_string(), "name": f.name, "type": f.type_id })).collect() };
+    Ok(json!({
+        "feature": id.to_string(),
+        "parents": rows(interaction::feature_dependencies(&ps.features, idx)),
+        "children": rows(interaction::feature_dependents(&ps.features, idx)),
+    })
+    .into())
+}
+
+/// A `folder` argument: folder id or name.
+fn folder_arg(ps: &noshape_model::PartStudio, a: &Args) -> Result<u32, OpError> {
+    let found = match a.get("folder") {
+        Some(Value::Number(n)) => n.as_u64().and_then(|n| ps.folder(n as u32)),
+        Some(Value::String(t)) => ps.folders.iter().find(|f| f.name == *t).or_else(|| t.parse().ok().and_then(|n| ps.folder(n))),
+        _ => return Err(OpError::param("folder", "a folder id or name")),
+    };
+    found.map(|f| f.id).ok_or_else(|| OpError::param("folder", "no such folder (see feature_list)"))
+}
+
+fn add_folder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let ids = if a.get("features").is_some() { features_arg(ps, a, "features")? } else { Vec::new() };
+    let name = a.opt_str("name")?.unwrap_or(studio::NEW_FOLDER_NAME).to_string();
+    let mut folder = 0;
+    edit_studio(od, tab, studio::ADD_FOLDER_DESCRIPTION, |ps| {
+        folder = studio::add_folder(ps, &ids, &name);
+        Ok(())
+    })?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let f = ps.folder(folder).expect("added");
+    Ok(json!({ "folder": folder, "name": f.name, "parent": f.parent, "features": ps.features.iter().filter(|x| x.folder == Some(folder)).map(|x| x.id.to_string()).collect::<Vec<_>>() }).into())
+}
+
+fn rename_folder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let folder = folder_arg(ps, a)?;
+    let name = a.str("name")?.trim().to_string();
+    if name.is_empty() {
+        return Err(OpError::param("name", "must not be empty"));
+    }
+    edit_studio(od, tab, &studio::rename_folder_description(&name), |ps| {
+        studio::rename_folder(ps, folder, &name);
+        Ok(())
+    })?;
+    Ok(json!({ "folder": folder, "name": name }).into())
+}
+
+fn unpack_folder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let ps = doc::studio(od.doc(), tab)?;
+    let folder = folder_arg(ps, a)?;
+    edit_studio(od, tab, studio::UNPACK_FOLDER_DESCRIPTION, |ps| {
+        ps.dissolve_folder(folder);
+        Ok(())
+    })?;
+    Ok(json!({ "unpacked": folder }).into())
 }

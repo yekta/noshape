@@ -17,7 +17,7 @@ use gpui_kit::*;
 use noshape_model::drawing::create::DrawingSource;
 use noshape_model::drawing::tb_lang::TitleLanguage;
 use noshape_model::drawing::templates::DrawingTemplate;
-use noshape_model::drawing::{DimUnits, Projection, SheetFormat, SheetSize, TitleBlockStyle, ZoneStart};
+use noshape_ops::drawing::{CUSTOM_UNITS, CustomTemplate, TemplateRow, ZONE_COUNTS, custom_sizes, template_rows};
 use parking_lot::Mutex;
 
 /// A pending "create drawing" request (set by a view, taken by the workspace).
@@ -47,49 +47,6 @@ pub fn take_request() -> Option<CreateRequest> {
     REQUEST.lock().take()
 }
 
-/// One row of the Existing templates list: Onshape's file name, its
-/// document and the sheet setup.
-#[derive(Clone, Copy, Debug)]
-pub struct TemplateRow {
-    pub file: &'static str,
-    pub document: &'static str,
-    pub standard: &'static str,
-    pub template: DrawingTemplate,
-}
-
-/// Onshape's standard templates (ISO in millimeters, first angle; ANSI in
-/// inches or millimeters, third angle): (file, sheet setup name, size, inches).
-const ANSI: [(&str, &str, SheetSize, bool); 12] = [
-    ("ANSI_A_INCH.dwt", "ANSI A", SheetSize::AnsiA, true),
-    ("ANSI_A_MM.dwt", "ANSI A", SheetSize::AnsiA, false),
-    ("ANSI_A_Portrait_INCH.dwt", "ANSI A Portrait", SheetSize::AnsiAPortrait, true),
-    ("ANSI_A_Portrait_MM.dwt", "ANSI A Portrait", SheetSize::AnsiAPortrait, false),
-    ("ANSI_B_INCH.dwt", "ANSI B", SheetSize::AnsiB, true),
-    ("ANSI_B_MM.dwt", "ANSI B", SheetSize::AnsiB, false),
-    ("ANSI_C_INCH.dwt", "ANSI C", SheetSize::AnsiC, true),
-    ("ANSI_C_MM.dwt", "ANSI C", SheetSize::AnsiC, false),
-    ("ANSI_D_INCH.dwt", "ANSI D", SheetSize::AnsiD, true),
-    ("ANSI_D_MM.dwt", "ANSI D", SheetSize::AnsiD, false),
-    ("ANSI_E_INCH.dwt", "ANSI E", SheetSize::AnsiE, true),
-    ("ANSI_E_MM.dwt", "ANSI E", SheetSize::AnsiE, false),
-];
-const ISO: [(&str, &str, SheetSize); 5] = [("ISO_A0.dwt", "ISO A0", SheetSize::A0), ("ISO_A1.dwt", "ISO A1", SheetSize::A1), ("ISO_A2.dwt", "ISO A2", SheetSize::A2), ("ISO_A3.dwt", "ISO A3", SheetSize::A3), ("ISO_A4.dwt", "ISO A4", SheetSize::A4)];
-
-pub fn template_rows() -> Vec<TemplateRow> {
-    let ansi = ANSI.iter().map(|&(file, name, size, inches)| TemplateRow {
-        file,
-        document: "noshape ANSI Drawing Templates",
-        standard: "ANSI",
-        template: DrawingTemplate::standard(name, size, TitleBlockStyle::Ansi, inches, Projection::ThirdAngle),
-    });
-    let iso = ISO.iter().map(|&(file, name, size)| TemplateRow {
-        file,
-        document: "noshape ISO Drawing Templates",
-        standard: "ISO",
-        template: DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::FirstAngle),
-    });
-    ansi.chain(iso).collect()
-}
 
 /// Template sources of the Existing templates tab (label, icon).
 const SOURCES: [(&str, &str); 6] = [("noshape", "noshape-logo"), ("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
@@ -125,109 +82,6 @@ impl Focusable for CreateDrawingDialog {
     }
 }
 
-/// Sheet sizes of the Custom template tab per standard.
-/// (sheet setup name, size); the size label is the name's last word.
-/// Live drawing/800–825: ANSI A (default), A Portrait, B, C, D; ISO and
-/// JIS A4 (default), A4 Portrait, A3, A2, A1, A0.
-fn custom_sizes(standard: &str) -> Vec<(&'static str, SheetSize)> {
-    let names: &[&'static str] = match standard {
-        "ISO" => &["ISO A4", "ISO A4 Portrait", "ISO A3", "ISO A2", "ISO A1", "ISO A0"],
-        "JIS" => &["JIS A4", "JIS A4 Portrait", "JIS A3", "JIS A2", "JIS A1", "JIS A0"],
-        _ => &["ANSI A", "ANSI A Portrait", "ANSI B", "ANSI C", "ANSI D"],
-    };
-    names.iter().copied().zip(SheetSize::standard_list(standard == "ANSI").iter().copied()).collect()
-}
-
-/// The Custom template's default zones per size (live: ANSI A and A Portrait
-/// 2 x 2, B and C 4 x 4, D 8 x 4; ISO / JIS A4 0 x 0, A3 6 x 4, A2 8 x 6, A1
-/// 12 x 8, A0 16 x 12).
-fn custom_zones(size: SheetSize) -> [u32; 2] {
-    match size {
-        SheetSize::AnsiB | SheetSize::AnsiC => [4, 4],
-        s => s.standard_zones(),
-    }
-}
-
-/// Custom template › Units (help H:custom_drawing_templates; "Feet and
-/// inches" exists only in drawings).
-const CUSTOM_UNITS: [(DimUnits, &str); 7] = [
-    (DimUnits::Millimeter, "Millimeters"),
-    (DimUnits::Centimeter, "Centimeter"),
-    (DimUnits::Meter, "Meter"),
-    (DimUnits::Inch, "Inches"),
-    (DimUnits::FeetInches, "Feet and inches"),
-    (DimUnits::Foot, "Foot"),
-    (DimUnits::Yard, "Yard"),
-];
-
-
-/// Zone counts offered by Horizontal / Vertical zones: even numbers 0–20 (live).
-const ZONE_COUNTS: [u32; 11] = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
-
-/// The Custom template tab's choices (live drawing/02).
-#[derive(Clone, Copy, Debug)]
-struct CustomTemplate {
-    standard: &'static str,
-    language: usize,
-    size: usize,
-    units: DimUnits,
-    comma: bool,
-    first_angle: bool,
-    border: bool,
-    zones: [u32; 2],
-    top_left: bool,
-    title_block: bool,
-}
-
-impl CustomTemplate {
-    fn new(metric: bool) -> Self {
-        let mut t = Self { standard: "ANSI", language: 2, size: 0, units: DimUnits::Inch, comma: false, first_angle: false, border: true, zones: [2, 2], top_left: false, title_block: true };
-        t.set_standard(if metric { "ISO" } else { "ANSI" });
-        t
-    }
-
-    /// Choosing a standard resets the size (A / A4) and its zones, the
-    /// units, the decimal separator and the projection (live: ANSI Inches,
-    /// Period, Third angle; ISO Millimeters, Comma, First angle; JIS
-    /// Millimeters, Comma, Third angle). Border, start zones and title block
-    /// stay.
-    fn set_standard(&mut self, standard: &'static str) {
-        self.standard = standard;
-        let ansi = standard == "ANSI";
-        self.units = if ansi { DimUnits::Inch } else { DimUnits::Millimeter };
-        self.comma = !ansi;
-        self.first_angle = standard == "ISO";
-        self.set_size(0);
-    }
-
-    fn set_size(&mut self, i: usize) {
-        self.size = i;
-        if let Some((_, size)) = custom_sizes(self.standard).get(i) {
-            self.zones = custom_zones(*size);
-        }
-    }
-
-    fn template(&self) -> Option<DrawingTemplate> {
-        let (name, size) = *custom_sizes(self.standard).get(self.size)?;
-        let style = if !self.title_block {
-            TitleBlockStyle::None
-        } else if self.standard == "ANSI" {
-            TitleBlockStyle::Ansi
-        } else {
-            TitleBlockStyle::Iso
-        };
-        let projection = if self.first_angle { Projection::FirstAngle } else { Projection::ThirdAngle };
-        let mut t = DrawingTemplate::standard(name, size, style, self.units.imperial(), projection);
-        if !matches!(self.units, DimUnits::Millimeter | DimUnits::Inch) {
-            t.units = Some(self.units);
-        }
-        t.decimal_comma = self.comma;
-        t.language = TitleLanguage::ALL.get(self.language).copied().unwrap_or_default();
-        let zones = (self.zones != size.standard_zones()).then_some(self.zones);
-        t.format = SheetFormat { border: self.border, zones, start: if self.top_left { ZoneStart::TopLeft } else { ZoneStart::BottomRight } };
-        Some(t)
-    }
-}
 
 impl CreateDrawingDialog {
     /// `metric`: the document works in millimeters (the Custom template's

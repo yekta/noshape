@@ -60,11 +60,26 @@ impl PartStudioView {
         }
         let name = if name.is_empty() { self.studio_name(cx) } else { name };
         let ext = s.format.ext();
+        // Options › Store file in a new tab: no download.
+        if s.options == 2 {
+            let msg = match store_export(&self.doc, self.tab, &format!("{name}.{ext}"), |p| self.write_part_export(&s, p, &bodies), cx) {
+                Ok(file) => format!("Stored {file}"),
+                Err(e) => format!("Export failed: {e:#}"),
+            };
+            self.flash_info(msg, cx);
+            return;
+        }
         let view = cx.entity();
         crate::files::request_save_path("Export", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
             view.update(cx, |this, cx| {
                 let msg = match this.write_part_export(&s, &path, &bodies) {
-                    Ok(p) => format!("Exported {}", p.display()),
+                    Ok(p) => {
+                        // Download and store file in a new tab.
+                        if s.options == 1 {
+                            store_written(&this.doc, this.tab, &p, cx);
+                        }
+                        format!("Exported {}", p.display())
+                    }
                     Err(e) => format!("Export failed: {e:#}"),
                 };
                 this.flash_info(msg, cx);
@@ -174,7 +189,7 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
             }
             PartFormat::Acis | PartFormat::Jt => {}
         }
-        rows.push(sel("ex-options", "Options", &OPTIONS, 0, false, |_, _| {}));
+        rows.push(sel("ex-options", "Options", &OPTIONS, s.options, false, |s, i| s.options = i));
         if !parts_only {
             if f != PartFormat::Urdf {
                 rows.push(chk("ex-individual", "Export unique parts as individual files", s.individual, |s, v| s.individual = v));
@@ -279,4 +294,28 @@ fn modal_checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<D
                 .when(on, |d| d.child(crate::ui::glyph("check", 10., gpui_kit::rgb_static(0xffffff)))),
         )
         .child(label)
+}
+
+/// Options › Store file in a new tab: write the export to a temporary file
+/// (`write` returns the file written: a .zip for individual files) and keep
+/// it as a file tab after `tab` (shared with the agent API:
+/// `noshape_ops::export::store_file_tab`). Returns the stored file's name.
+pub fn store_export(doc: &Entity<crate::doc_model::DocModel>, tab: noshape_model::document::TabId, file: &str, write: impl FnOnce(&std::path::Path) -> anyhow::Result<std::path::PathBuf>, cx: &mut App) -> anyhow::Result<String> {
+    let dir = std::env::temp_dir().join(format!("noshape-store-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let written = write(&dir.join(file))?;
+    let name = store_written(doc, tab, &written, cx);
+    let _ = std::fs::remove_file(&written);
+    Ok(name)
+}
+
+/// Keep an exported file (already written to `path`) as a file tab after `tab`.
+pub fn store_written(doc: &Entity<crate::doc_model::DocModel>, tab: noshape_model::document::TabId, path: &std::path::Path, cx: &mut App) -> String {
+    let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+    if let Ok(bytes) = std::fs::read(path) {
+        doc.update(cx, |d, cx| d.edit_document(&noshape_ops::export::store_description(&name), cx, |d| {
+            noshape_ops::export::store_file_tab(d, &name, &bytes, tab);
+        }));
+    }
+    name
 }

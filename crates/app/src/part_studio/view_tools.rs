@@ -422,19 +422,19 @@ impl PartStudioView {
             .text_color(pal.text)
             .child(chip(KeyStyle::Customized))
             .child("Customized")
-            .child(div().w(px(7.)))
+            .child(div().w(px(4.)))
             .child(chip(KeyStyle::Default))
             .child("Onshape default")
-            .child(div().w(px(7.)))
+            .child(div().w(px(4.)))
             .child(chip(KeyStyle::Disabled))
             .child("Disabled")
-            .child(div().w(px(7.)))
+            .child(div().w(px(4.)))
             .child(crate::assets::icon("lock", 16., cx))
             .child("Onshape controlled")
-            .child(div().w(px(7.)))
+            .child(div().w(px(4.)))
             .child(crate::assets::icon("shortcut-conflict", 18., cx))
             .child("Has conflict")
-            .child(div().w(px(7.)))
+            .child(div().w(px(4.)))
             .child("* applies in drawing sketches");
         // Live (menus/616): over the whole window (navbar and panels dimmed
         // too), 1000 px wide and centred, 26 px from the top, the window's
@@ -498,7 +498,7 @@ impl PartStudioView {
                                     div()
                                         .id("sc-popout")
                                         // Live menus/616: 21 px after the search box, 6 px above centre.
-                                        .ml(px(31.))
+                                        .ml(px(17.))
                                         .relative()
                                         .top(px(-4.))
                                         .cursor_pointer()
@@ -508,7 +508,7 @@ impl PartStudioView {
                                 .child(
                                     div()
                                         .id("sc-close")
-                                        .ml(px(-2.))
+                                        .ml(px(-5.))
                                         .relative()
                                         .top(px(-3.))
                                         .cursor_pointer()
