@@ -193,6 +193,22 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     let pitch = height / revs;
     let frame = k::Plane::new(base, z, x);
     let wire = k::make_helix(&frame, r0, pitch, height, left_handed, taper)?;
+    // helix.fs drawConstructionEnds: the end profiles as magenta debug
+    // geometry, a circle across the axis at each end (a point at a zero
+    // radius) and its centre (live 2111).
+    if ev.bool("showStartEndProfiles") {
+        let y = z.cross(x).normalize_or_zero();
+        for (c, r) in [(base, r0), (base + z * height, r0 + height * taper.tan())] {
+            if r > 1e-9 {
+                ev.debug.lines.push((0..=96).map(|i| {
+                    let a = TAU * i as f64 / 96.0;
+                    let p = c + (x * a.cos() + y * a.sin()) * r;
+                    [p.x as f32, p.y as f32, p.z as f32]
+                }).collect());
+            }
+            ev.debug.points.push([c.x as f32, c.y as f32, c.z as f32]);
+        }
+    }
     add_wire_bodies(ev, vec![wire])
 }
 

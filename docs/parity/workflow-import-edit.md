@@ -89,3 +89,8 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | I2 | Delete face field, click right on a block's top edge: "Face of Extrude 3" (face picked) | ✅ |
 | I4 | Plane dialog, click Top in the list, move into the dialog: no row tooltip left | ✅ |
 | API1 / API2 | fixed on agent/qa5 (CLI exits quietly on a closed pipe; tab_create takes "Part Studio" and lists the kinds in its error) | 🔧 |
+
+## Re-run pass 22 (qa5, 2026-10-24, CLI built from main c59c5af9 after the api import/export batch; /root/qa5-scratch/pass21/impmatrix21.*)
+| I1 | unchanged (three volumes) | ✗ kern |
+| I5 | Parasolid export header in live's layout (see workflow-export-roundtrip.md) | ✅ |
+| API1 / API2 | fixed on main (api's versions) | ✅ |

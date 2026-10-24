@@ -17,7 +17,8 @@ pub fn ops() -> Vec<Op> {
             doc_field(),
             tab_field(),
             req("format", json!({ "type": "string", "enum": PartFormat::ALL.iter().map(|f| f.label()).collect::<Vec<_>>() }), "File format."),
-            req("file", s(), "Output path; without an extension the format's is added (\"part\" -> \"part.x_t\"); individual files go in a .zip."),
+            opt("file", s(), "Output path; without an extension the format's is added (\"part\" -> \"part.x_t\"); individual files go in a .zip. Required unless `options` is \"store\" (then only its name is used; default \"<tab>.<ext>\")."),
+            opt("options", json!({ "type": "string", "enum": ["download", "download_and_store", "store"], "default": "download" }), "Options: write `file` (Download), and / or keep the file as a file tab right after the tab (Store file in a new tab; one edit \"Store <file>\")."),
             opt("parts", strings(), "Part ids (`body:…`) or names; default all visible parts."),
             opt("y_up", json!({ "type": "boolean" }), "Export models oriented Y axis up."),
             opt("version", s(), "Format version (e.g. \"AP214\", \"35.1\", \"7\")."),
@@ -34,7 +35,7 @@ pub fn ops() -> Vec<Op> {
             opt("compress", json!({ "type": "boolean" }), "glTF / GLB: Compress."),
             opt("geometry_format", json!({ "type": "string", "enum": crate::export::URDF_GEOMETRY.iter().map(|f| f.label()).collect::<Vec<_>>() }), "URDF: Geometry format (default STL)."),
         ],
-        mutates: false,
+        mutates: true,
         destructive: false,
         run: parts,
     }]
@@ -112,7 +113,16 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         })
         .collect();
     let n = list.len();
-    let mut file = std::path::PathBuf::from(a.str("file")?);
+    let (download, store) = options_arg(a)?;
+    let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+    let mut file = match a.opt_str("file")? {
+        Some(f) => std::path::PathBuf::from(f),
+        None if !download => store_dir()?.join(&tab_name),
+        None => return Err(OpError::param("file", "required (or options \"store\")")),
+    };
+    if !download && a.opt_str("file")?.is_some() {
+        file = store_dir()?.join(file.file_name().unwrap_or_default());
+    }
     if file.extension().is_none() {
         file.set_extension(format.ext());
     }
@@ -121,5 +131,39 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let out = crate::export::write_export(&s, &file, list).map_err(|e| OpError::new("export_failed", format!("{e:#}")))?;
     let bytes = std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
-    Ok(json!({ "file": out.display().to_string(), "format": format.label(), "parts": n, "bytes": bytes }).into())
+    let mut reply = json!({ "format": format.label(), "parts": n, "bytes": bytes });
+    if store {
+        reply["stored_tab"] = json!(store_tab(od, tab, &out)?);
+    }
+    if download {
+        reply["file"] = json!(out.display().to_string());
+    } else {
+        let _ = std::fs::remove_file(&out);
+    }
+    Ok(reply.into())
+}
+
+/// The export `options` field: (download, store).
+pub(super) fn options_arg(a: &Args) -> Result<(bool, bool), OpError> {
+    match a.opt_str("options")?.unwrap_or("download") {
+        "download" => Ok((true, false)),
+        "download_and_store" => Ok((true, true)),
+        "store" => Ok((false, true)),
+        _ => Err(OpError::param("options", "download, download_and_store or store")),
+    }
+}
+
+/// Where a stored-only export is written before it becomes a file tab.
+pub(super) fn store_dir() -> Result<std::path::PathBuf, OpError> {
+    let d = std::env::temp_dir().join(format!("noshape-store-{}", std::process::id()));
+    std::fs::create_dir_all(&d).map_err(|e| OpError::new("io", format!("{}: {e}", d.display())))?;
+    Ok(d)
+}
+
+/// Keep the exported file `path` as a file tab right after `tab` ("Store <file>").
+pub(super) fn store_tab(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, path: &std::path::Path) -> Result<String, OpError> {
+    let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+    let bytes = std::fs::read(path).map_err(|e| OpError::new("io", format!("{}: {e}", path.display())))?;
+    let id = od.session.edit_document(&crate::export::store_description(&name), |d| crate::export::store_file_tab(d, &name, &bytes, tab))?;
+    Ok(id.to_string())
 }

@@ -740,27 +740,16 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     if feats.is_empty() {
         return Ok(());
     }
+    // With Reapply, patternUtils.fs re-runs the features and reports their
+    // failure as is (no fallback to the geometry).
     if ev.bool("fullFeaturePattern") {
-        match reapply_features(ev, &feats, instances) {
-            Ok(()) => return Ok(()),
-            Err(e) => {
-                ev.ctx = before.clone();
-                ev.warnings.truncate(warnings_before);
-                let r = geometric_feature_pattern(ev, &feats, instances);
-                if r.is_err() {
-                    ev.error_shapes.clear();
-                    return Err(e);
-                }
-                ev.warnings.push(format!("Reapply features failed ({}); the features' geometry was patterned instead", e.message));
-                return r;
-            }
-        }
+        return reapply_features(ev, &feats, instances);
     }
     match geometric_feature_pattern(ev, &feats, instances) {
         Ok(()) => Ok(()),
         // Onshape's own failure (live G45): no re-apply.
         // Live L40: every instance off the part fails too.
-        Err(e) if e.message == SWITCH_TO_PER_INSTANCE || e.message == NO_GEOMETRY_FROM_FEATURES || e.message == NOT_ON_BODY => Err(e),
+        Err(e) if e.message == SWITCH_TO_PER_INSTANCE || e.message == NO_GEOMETRY_FROM_FEATURES || e.message == NOT_ON_BODY || ev.cancelled() => Err(e),
         // Faces our face pattern can't make a tool of (Parasolid's can):
         // the same instances by re-applying the features.
         Err(e) => {
@@ -907,6 +896,8 @@ fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
     params.set("operationType", crate::params::ParamValue::Enum("NEW".into()));
     let mut sub = EvalCtx::new(tmp, &seed.name, &params, ev.units, ev.ctx.clone(), ev.outer_vars);
     sub.features = ev.features;
+    sub.scratch = true;
+    sub.cancel = ev.cancel.clone();
     eval_fn(&mut sub).ok()?;
     let made: Vec<Shape> = sub.ctx.bodies.iter().filter(|b| b.id.feature == tmp).map(|b| b.shape.clone()).collect();
     (!made.is_empty()).then(|| Shape::compound(&made))
@@ -1250,6 +1241,8 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
             }
             let mut sub = EvalCtx::new(tmp, &seed.name, params, ev.units, scratch, ev.outer_vars);
             sub.features = features;
+            sub.scratch = true;
+            sub.cancel = ev.cancel.clone();
             sub.xform = Some(total);
             sub.custom = ev.custom.clone();
             sub.custom_type = crate::custom::is_custom(&seed.type_id).then(|| seed.type_id.clone());
@@ -1293,10 +1286,7 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
     // and the bodies it made (renamed), or its error.
     type Made = Vec<(BodyId, BodyKind, Shape, Vec<Name>)>;
     type PerSeed = Vec<Result<(Vec<String>, Made), String>>;
-    let instance = |inst: &Instance| -> Option<PerSeed> {
-        if cancel.as_ref().is_some_and(crate::regen::RegenCancel::aborted) {
-            return None;
-        }
+    let instance_body = |inst: &Instance| -> Option<PerSeed> {
         let m = inst.t.matrix();
         let total = match &xform {
             Some(outer) => m * *outer,
@@ -1317,6 +1307,8 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
             }
             let mut sub = EvalCtx::new(tmp, &seed.name, &params, units, scratch, outer_vars);
             sub.features = features;
+            sub.scratch = true;
+            sub.cancel = cancel.clone();
             sub.xform = Some(total);
             sub.custom = custom.clone();
             sub.custom_type = crate::custom::is_custom(&seed.type_id).then(|| seed.type_id.clone());
@@ -1331,6 +1323,16 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
             });
         }
         Some(out)
+    };
+    let instance = |inst: &Instance| -> Option<PerSeed> {
+        if cancel.as_ref().is_some_and(crate::regen::RegenCancel::aborted) {
+            return None;
+        }
+        // On a pool thread: its booleans see the abort too.
+        if let Some(c) = &cancel {
+            return c.scope(|| instance_body(inst));
+        }
+        instance_body(inst)
     };
     // In parallel (each instance is independent; built-in features only:
     // FeatureScript evaluation stays on this thread), in instance order.
@@ -1536,6 +1538,14 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
             ev.ctx.bodies.push(Arc::new(Body::new(BodyId { feature: f, index: bj as u32 }, name, kind, ns.shape, ns.names.faces, color, f)));
         }
         return Ok(());
+    }
+    // Mate connectors owned by a moved part move with it.
+    let moved: Vec<BodyId> = bodies.iter().map(|&bi| ev.ctx.bodies[bi].id.clone()).collect();
+    let mut conn_refs = conn_refs;
+    for (c, owner) in &ev.ctx.connector_owners {
+        if moved.contains(owner) && !conn_refs.contains(c) {
+            conn_refs.push(c.clone());
+        }
     }
     // Move in place: bodies keep their ids, names and face names.
     for bi in bodies {

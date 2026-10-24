@@ -120,3 +120,7 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | SM4h | Bends row right-click | Move up / Move down (not on the first / last row), separator, "Convert Bend A to rip" | — | ✅ Convert (a Modify joint with Joint type Rip); ✗ Move up / down (asked: live "ui (10-24 b)"). Our model can't rip a bend yet ("The walls must meet in a sharp corner to rip") |
 | SM4i | Other joints Type ▾ (Bend / Rip) and Style ▾ (Edge joint / Butt joint - Direction 1 / 2) | custom dropdowns; a change edits the joint | static cells | ✗ needs model support: Modify joint can't restyle an existing rip or turn it into a bend from the table (fs) |
 | SM4j | Editing a finished model's table, and two models (the other model's part dark grey), flat-face hover outline, the flat-part right-click menu | as described (finished model: asked "ui (10-24 b)") | — | ✗ next |
+
+## qa5 MEAS1 (2026-10-24)
+| MEAS1 / MS1 | Top row alone: ours "Area: 4000000000000.000 mm²" | live (behaviours "ui (10-23 a)", case e): nothing in the status bar; panel "No measurements available for current selection." Fixed on ready/ui 6f16c117 (not on main yet, c59c5af9); re-check when it lands | ui |
+| MEAS1 / MS1 (re-check 2026-10-24 07:20, main 78109ebc, target-lead 07:07) | Top row alone: nothing in the status bar (live case e) | ✅ fixed (ui) |

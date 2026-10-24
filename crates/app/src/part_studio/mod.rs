@@ -346,7 +346,7 @@ impl PartStudioView {
                     let is_vars = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::VariableStudio(_)));
                     // A changed Part Studio may be the source of our Derived features.
                     let is_source = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::PartStudio(_)))
-                        && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| f.type_id == "importDerived" && f.params.text("partStudio") == t.to_string()));
+                        && this.studio(cx).is_some_and(|s| s.features.iter().any(|f| noshape_model::features::importing::is_derived(&f.type_id) && f.params.text("partStudio") == t.to_string()));
                     // A Feature Studio defining custom features used here.
                     let prefix = noshape_model::custom::type_id(*t, "");
                     let is_fs = matches!(doc.tab(*t).map(|t| &t.content), Some(noshape_model::TabContent::FeatureStudio(_)));
@@ -887,6 +887,12 @@ impl PartStudioView {
         let error_mesh = self.edit.as_ref().filter(|_| failing).and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id)).and_then(|s| s.error_mesh.clone());
         if let Some(m) = &error_mesh {
             extra.extend(scene_builder::error_geometry(m, self.gpu.uploader()));
+        }
+        // FeatureScript debug geometry of the open feature (Helix profiles).
+        if let Some(st) = self.edit.as_ref().and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id))
+            && (!st.debug.lines.is_empty() || !st.debug.points.is_empty())
+        {
+            extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
         }
         let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
         // Live (lp wall over 2258): the pattern's other inputs (its
@@ -3165,7 +3171,7 @@ impl PartStudioView {
     /// The header's New folder: the "Folder name" popup, "New folder"
     /// selected (live 586).
     fn open_folder_prompt(&mut self, ids: Vec<FeatureId>, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value("New folder"));
+        let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(noshape_ops::studio::NEW_FOLDER_NAME));
         st.update(cx, |s, cx| {
             s.focus(window, cx);
             s.select_all(window, cx);
@@ -3182,11 +3188,10 @@ impl PartStudioView {
     /// ✓ / Enter: an empty folder at the rollback bar, or the selection wrapped.
     fn commit_folder_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((st, ids, _)) = self.folder_prompt.take() else { return };
-        let name = st.read(cx).value().trim().to_string();
-        let name = if name.is_empty() { "New folder".to_string() } else { name };
+        let name = st.read(cx).value().to_string();
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Add folder", cx, |ps| {
-                ps.new_folder(&ids, Some(name));
+            doc.edit_studio(self.tab, noshape_ops::studio::ADD_FOLDER_DESCRIPTION, cx, |ps| {
+                noshape_ops::studio::add_folder(ps, &ids, &name);
             });
         });
         let fh = self.focus.clone();

@@ -198,7 +198,7 @@ impl Regenerator {
             let blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
             key = hash_bytes(key, &blob);
             // Derived features depend on another Part Studio's state.
-            if f.type_id == "importDerived"
+            if crate::features::importing::is_derived(&f.type_id)
                 && let Some(p) = &opts.derived
             {
                 key = hash_bytes(key, &p.version(params.text("partStudio")).to_le_bytes());
@@ -210,7 +210,7 @@ impl Regenerator {
             }
             live.push(f.id);
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() });
                 continue;
             }
             if let Some(e) = self.entries.get(&f.id)
@@ -221,7 +221,7 @@ impl Regenerator {
                 continue;
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -254,9 +254,18 @@ impl Regenerator {
                         ev.custom = opts.custom_features.clone();
                         ev.custom_type = crate::custom::is_custom(&f.type_id).then(|| f.type_id.clone());
                         let specs = f.feature_type().map(|t| t.params.as_slice()).unwrap_or(&[]);
+                        // Every boolean of the feature on this thread stops
+                        // when the run is aborted (not only boolean_into's).
+                        let cancel = opts.cancel.clone();
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            ev.check_bounds(specs)?;
-                            eval_fn(&mut ev)
+                            let mut run = || {
+                                ev.check_bounds(specs)?;
+                                eval_fn(&mut ev)
+                            };
+                            match &cancel {
+                                Some(c) => c.scope(run),
+                                None => run(),
+                            }
                         }));
                         // Stopped part-way: don't cache a half-done feature.
                         if aborted() {
@@ -288,6 +297,7 @@ impl Regenerator {
                                 state.computed = std::mem::take(&mut ev.computed);
                                 state.touched = std::mem::take(&mut ev.touched);
                                 state.touched_behind = std::mem::take(&mut ev.touched_behind);
+                                state.debug = std::mem::take(&mut ev.debug);
                                 if uses_context {
                                     ev.ctx.bodies.retain(|b| !crate::in_context::is_context_feature(b.id.feature));
                                 }

@@ -47,7 +47,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Empty Faces to replace | "Select faces to replace." on Faces to replace | no period, no field | 🔧 |
 | 3 | Failure | "Could not replace faces as requested." | our own texts with kernel detail | 🔧 |
 | 4 | Flip alignment | used; hidden when several replace-with faces; defaults on when the normals oppose (replaceFaceEditLogic) | ignored, always shown, always off | 🔧 L7/L8: wrong sense fails "Could not replace faces as requested.", offset along the template's (flipped) normal, hidden with 2 faces, auto-ticked when the normals oppose |
-| 5 | Several replace-with faces | used (must be adjacent, one body) | only the first | ✗ |
+| 5 | Several replace-with faces | used (must be adjacent, one body) | only the first | 🔧 the faces are sewn into one template (not joined: "Could not replace faces as requested.") |
 | 6 | Empty replace-with | kernel text | "Select the face or plane to replace with" | 🔧 L9 "Cannot resolve entities." on Faces to replace with |
 
 ## Delete face
@@ -163,7 +163,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 5 | Zero radius | error only when both are 0 ("Start or end radius should be greater than 0."), else swapped | error when the start is 0 | 🔧 L33 start 0 with an end radius makes the conical spiral; both 0 fails |
 | 6 | Start / end point | must be coplanar with the axis start / end (errors on startPoint / endPoint), snapped onto the radius | moves the plane, own errors | 🔧 helix.fs texts on startPoint / endPoint (end point only checked on a face: on an axis it sets the height); a point on a face or circle is moved onto the radius |
 | 7 | Computed revolutions / pitch | filled | never | 🔧 filled when the end type is End point (helix.fs) |
-| 8 | Show start and end profiles | magenta circles | nothing | ✗ |
+| 8 | Show start and end profiles | magenta circles | nothing | 🔧 magenta debug circles (#ff2bc1) and centre dots (#e224e3) at both ends while the dialog is open (helix.fs drawConstructionEnds) |
 | 9 | Preselection, start angle 0 | type from the preselection; canonical start angle | no; surface x direction | 🔧 L34 the preselection picks the tab (face → Surface, line edge / connector / sketch line → Axis, circle → Circle). L35 won't be matched: live's start angle follows Parasolid's own surface frames (a Z or X cylinder starts at the extrude's end, a tilted one at its base), which OCCT doesn't share |
 
 ## Composite part
@@ -180,7 +180,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 2 | Empty owner | "Cannot determine owner of mate connector." on Select owner entity | no error | 🔧 L37 (owner inferred from the origin's part or the only part, as the dialog does) |
 | 3 | Owner / attachment auto-fill | from the origin entity or the only part (connectorEditLogic) | none | 🔧 L37 |
 | 4 | To selection, empty | "Select an entity for the mate connector attachment." on Attach to | no check | ✅ (already in refgeom.rs; the doc was stale) |
-| 5 | Owner / attachment at regen | the connector follows them | not stored | ✗ |
+| 5 | Owner / attachment at regen | the connector follows them | not stored | 🔧 the owner part is kept with the connector and a Transform that moves the part moves it (attachment to a selection still follows the owner, not the selected face) |
 | 6 | Move vs Reorient secondary axis | translation in the reoriented frame (likely) | translated first | 🔧 L38 order: flip/reorient, move, rotate; "+Y" = X to −Y |
 | 7 | Between entities / Realign errors | built-in texts | own texts | 🔧 L39 "Failed to resolve mate connector coordinate system."; empty Realign axis = OK |
 
@@ -192,7 +192,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 3 | Empty Feature mode | "Select features to pattern." / "…mirror." on Features, before the direction / plane | direction first, then "Select features to pattern" | 🔧 |
 | 4 | Unresolvable plane / direction / axis | "Select a mirror plane." / "Select a pattern direction." / "Select a pattern axis." on the field | "…could not be resolved" | 🔧 |
 | 5 | Linear second direction empty | error only when its count > 1: "Select a pattern direction." on directionTwo | always, own text | 🔧 |
-| 6 | Reapply failures | "Could not pattern selected features." when all fail; partial failures silent | first failure's text; partial warning; geometric fallback | 🔧 texts and silent partial failures; the geometric fallback when a feature can't be re-run stays ✗ ? L40 |
+| 6 | Reapply failures | "Could not pattern selected features." when all fail; partial failures silent | first failure's text; partial warning; geometric fallback | 🔧 texts and silent partial failures; no fallback to the geometry: a failing Reapply reports as is |
 | 7 | Sketch in a feature pattern | re-run, info "Sketch dimensions and constraints using the Origin or the default planes as reference will not be reapplied. Learn more" | skipped | 🔧 L41 the sketch is copied to every instance (with or without Reapply; no part), Reapply adds the info |
 | 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | 🔧 texts; L42 any face-pattern instance off the part fails "Pattern could not be created on the same part." (no part made); L40 a Feature pattern (Reapply off) skips one off-part instance and fails when all are off (text pending from live, ours the same) |
 | 9 | Feature selection in Faces to pattern | a feature-list click adds its faces | not supported | ✅ L44 (live adds nothing either; Hole not verified) |

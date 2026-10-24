@@ -104,8 +104,12 @@ impl DrawingEditor {
                 }
             }
             Tool::GdtLeader { id } => {
-                if let Some(a) = self.current_sheet().annotations.iter().find(|a| a.id == *id) {
-                    overlay.lines.push((vec![a.position, c], true));
+                // A note's branch rubber-bands from its bend or node.
+                let from = self.branch_point(*id).or_else(|| self.current_sheet().annotations.iter().find(|a| a.id == *id).map(|a| a.position));
+                if let Some(from) = from {
+                    overlay.lines.push((vec![from, c], true));
+                    // Live (4): the rubber band ends in an arrowhead.
+                    self.rubber_band_arrow(overlay, from, c);
                 }
             }
             _ => {}
@@ -173,12 +177,13 @@ impl DrawingEditor {
             }
             Tool::GdtLeader { id } => {
                 let leader = match self.snap_at(c).or_else(|| self.any_point(c)) {
-                    Some(p) => Leader { view: Some(p.view), point: p.p, nodes: Vec::new() },
-                    None => Leader { view: None, point: c, nodes: Vec::new() },
+                    Some(p) => Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() },
+                    None => Leader { view: None, point: c, nodes: Vec::new(), ..Default::default() },
                 };
+                let start = self.leader_from.take().unwrap_or_default();
                 self.edit_sheet("Add leader", cx, |s| match s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
                     Some(AnnotationKind::Gdt { leaders, .. }) => leaders.push(leader),
-                    Some(AnnotationKind::Note { style, .. }) => style.leaders.push(leader),
+                    Some(AnnotationKind::Note { style, .. }) => style.leaders.push(Leader { start, ..leader }),
                     Some(AnnotationKind::Weld { spec, .. }) => spec.leaders.push(leader),
                     Some(AnnotationKind::Balloon { callout, .. }) => callout.leaders.push(leader),
                     Some(AnnotationKind::SurfaceFinish { leaders, .. }) => leaders.push(leader),
@@ -340,27 +345,6 @@ impl DrawingEditor {
                         })
                     }));
                 }
-            }
-            AnnotationKind::Note { style, .. } => {
-                out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
-                if !style.leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
-                        t.edit_sheet("Remove leaders", cx, |s| {
-                            if let Some(AnnotationKind::Note { style, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                                style.leaders.clear();
-                            }
-                        })
-                    }));
-                }
-                // Explode: the note exports as polylines (a check item).
-                let on = style.explode;
-                out.push(MenuEntry::check("Explode note", on, move |t, _, cx| {
-                    t.edit_sheet("Explode note", cx, |s| {
-                        if let Some(AnnotationKind::Note { style, .. }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) {
-                            style.explode = !on;
-                        }
-                    })
-                }));
             }
             &AnnotationKind::RadialDimension { view, center, radius, angle, .. } => {
                 let (d, w) = ([angle.cos(), angle.sin()], [-angle.sin(), angle.cos()]);
