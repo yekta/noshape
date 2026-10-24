@@ -144,18 +144,7 @@ impl DrawingEditor {
     pub fn finish_detail_profile(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(d) = &mut self.detail_dlg else { return false };
         let (Some(view), true) = (d.view, d.shape != 0 && d.profile.is_none()) else { return false };
-        let poly: Vec<[f64; 2]> = match d.shape {
-            1 if d.pts.len() >= 2 => {
-                let (a, b) = (d.pts[0], d.pts[1]);
-                vec![a, [b[0], a[1]], b, [a[0], b[1]]]
-            }
-            2 if d.pts.len() >= 3 => views::closed_spline(&d.pts, 16),
-            3 if d.pts.len() >= 3 => d.pts.clone(),
-            _ => return false,
-        };
-        let n = poly.len() as f64;
-        let center = [poly.iter().map(|p| p[0]).sum::<f64>() / n, poly.iter().map(|p| p[1]).sum::<f64>() / n];
-        let radius = poly.iter().map(|p| ((p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2)).sqrt()).fold(0.0, f64::max);
+        let Some((poly, center, radius)) = noshape_scene::drawing_tools::detail_profile(d.shape, &d.pts) else { return false };
         d.profile = Some(poly);
         self.tool = Tool::Detail { parent: Some(view), center: Some(center), radius: Some(radius) };
         self.update_preview(cx);

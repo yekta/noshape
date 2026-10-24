@@ -5,7 +5,7 @@
 use noshape_model::assembly::analysis::InstanceInterference;
 use noshape_model::assembly::eval::AssemblyResult;
 use noshape_model::assembly::config::{self as acfg, ConfigTarget};
-use noshape_model::assembly::{AsmMateConnector, Assembly, Group, Instance, InstanceId, InstancePattern, InstanceSource, Mate, MateId, MateType, NamedPosition, Placement, Relation, RelationType, SubassemblyLock};
+use noshape_model::assembly::{AsmMateConnector, Assembly, Group, Instance, InstanceId, InstancePattern, InstanceSource, Mate, MateConnectorRef, MateId, MateType, NamedPosition, Placement, Relation, RelationType, SubassemblyLock};
 use noshape_model::configuration::ConfigValues;
 use noshape_model::document::TabId;
 use noshape_model::params::ParamValue;
@@ -635,5 +635,308 @@ mod tests {
         assert_eq!(same_configuration(&a, p0, false), vec![p0, p0b, p1]);
         assert_eq!(same_configuration(&a, p0, true), vec![p0, p0b]);
         assert_eq!(same_configuration(&a, small, true), vec![small]);
+    }
+}
+
+// ------------------------------------------------------------ instance menu
+
+pub const MOVE_TO_NEW_SUBASSEMBLY: &str = "Move to new subassembly";
+pub const CREATE_EMPTY_SUBASSEMBLY: &str = "Create empty subassembly";
+pub const DISSOLVE_SUBASSEMBLY: &str = "Dissolve subassembly";
+
+fn assembly_mut(doc: &mut noshape_model::Document, tab: TabId) -> Option<&mut Assembly> {
+    match doc.tab_mut(tab).map(|t| &mut t.content) {
+        Some(noshape_model::document::TabContent::Assembly(a)) => Some(a),
+        _ => None,
+    }
+}
+
+/// Instances Move to new subassembly takes (pattern / mirror copies stay).
+pub fn movable_to_subassembly(a: &Assembly, ids: &[InstanceId]) -> Vec<InstanceId> {
+    ids.iter().copied().filter(|id| a.instance(*id).is_some() && a.generated_by(*id).is_none()).collect()
+}
+
+/// Move to new subassembly: a new Assembly tab holding the instances (and
+/// their mates), inserted in their place. Returns the new instance.
+pub fn move_to_new_subassembly(doc: &mut noshape_model::Document, tab: TabId, ids: &[InstanceId]) -> Option<InstanceId> {
+    let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
+    let sub_tab = doc.add_tab(&name, noshape_model::document::TabContent::Assembly(Box::default()));
+    let (sub, sid) = assembly_mut(doc, tab)?.move_to_new_subassembly(ids, sub_tab, &name);
+    if let Some(t) = doc.tab_mut(sub_tab) {
+        t.content = noshape_model::document::TabContent::Assembly(Box::new(sub));
+    }
+    Some(sid)
+}
+
+/// Create empty subassembly: a new, empty Assembly tab inserted here.
+pub fn create_empty_subassembly(doc: &mut noshape_model::Document, tab: TabId) -> Option<InstanceId> {
+    let name = noshape_model::assembly::ops::next_assembly_tab_name(doc);
+    let sub_tab = doc.add_tab(&name, noshape_model::document::TabContent::Assembly(Box::default()));
+    let parent = assembly_mut(doc, tab)?;
+    let id = InstanceId(parent.next_id());
+    let n = parent.next_instance_name(&name);
+    parent.instances.push(Instance::new(id, n, InstanceSource::Assembly { assembly: sub_tab, config: Default::default() }, Placement::default()));
+    Some(id)
+}
+
+/// Dissolve subassembly: its instances and mates move up into this
+/// assembly; the subassembly tab is left empty when nothing else uses it.
+/// Returns the instances made.
+pub fn dissolve_subassemblies(doc: &mut noshape_model::Document, tab: TabId, ids: &[InstanceId]) -> Vec<InstanceId> {
+    use noshape_model::document::TabContent;
+    let mut created = Vec::new();
+    for sid in ids {
+        let Some(InstanceSource::Assembly { assembly: sub_tab, .. }) = assembly_mut(doc, tab).and_then(|p| p.instance(*sid)).map(|i| i.source.clone()) else { continue };
+        let Some(TabContent::Assembly(sub)) = doc.tab(sub_tab).map(|t| t.content.clone()) else { continue };
+        if let Some(parent) = assembly_mut(doc, tab) {
+            created.extend(parent.dissolve_subassembly(*sid, &sub));
+        }
+        let used_elsewhere = doc.tabs.iter().any(|t| match &t.content {
+            TabContent::Assembly(a) => a.instances.iter().any(|i| matches!(i.source, InstanceSource::Assembly { assembly, .. } if assembly == sub_tab)),
+            _ => false,
+        });
+        if !used_elsewhere && let Some(t) = doc.tab_mut(sub_tab) {
+            t.content = TabContent::Assembly(Box::default());
+        }
+    }
+    created
+}
+
+/// Paste's history entry ("Paste Part 1 <1>", "Paste 3 items").
+pub fn paste_description(clip: &noshape_model::assembly::ops::InstanceClipboard) -> String {
+    match clip.instances.as_slice() {
+        [one] => format!("Paste {}", one.name),
+        all => format!("Paste {} items", all.len()),
+    }
+}
+
+pub fn best_tessellation_description(on: bool) -> &'static str {
+    if on { "Use best available tessellation" } else { "Use automatic tessellation setting" }
+}
+
+pub fn set_best_tessellation(a: &mut Assembly, ids: &[InstanceId], on: bool) {
+    for id in ids {
+        if let Some(i) = a.instance_mut(*id) {
+            i.best_tessellation = on;
+        }
+    }
+}
+
+pub const INSTANCE_PROPERTIES_DESCRIPTION: &str = "Instance properties";
+
+/// Instance properties…: the Reference designator (empty clears it).
+pub fn set_reference_designator(a: &mut Assembly, id: InstanceId, value: &str) {
+    if let Some(i) = a.instance_mut(id) {
+        i.reference_designator = Some(value.trim().to_string()).filter(|s| !s.is_empty());
+    }
+}
+
+/// Lock / follow position: the history entry and the message the view shows.
+pub fn lock_description(name: &str, lock: &SubassemblyLock) -> (String, String) {
+    let message = match lock {
+        SubassemblyLock::Flexible => "Assembly is unlocked from named position.".to_string(),
+        SubassemblyLock::Current => format!("{name} locked at current position."),
+        SubassemblyLock::Named(n) => format!("{name} locked at named position {n}."),
+    };
+    (format!("Lock/follow position : {name}"), message)
+}
+
+pub fn set_lock(a: &mut Assembly, id: InstanceId, lock: SubassemblyLock) {
+    if let Some(i) = a.instance_mut(id) {
+        i.lock = lock;
+    }
+}
+
+/// What a Dynamic suppression expression is on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DynTarget {
+    Instance(InstanceId),
+    Mate(MateId),
+    /// An instance folder (its instances).
+    Folder(MateId),
+}
+
+pub const DYNAMIC_SUPPRESSION_DESCRIPTION: &str = "Dynamic suppression";
+
+/// Set (or remove, `None`) an "Unsuppressed if" expression.
+pub fn set_unsuppressed_if(a: &mut Assembly, target: DynTarget, text: Option<String>) {
+    let text = text.filter(|t| !t.trim().is_empty());
+    match target {
+        DynTarget::Instance(id) => {
+            if let Some(i) = a.instance_mut(id) {
+                i.unsuppressed_if = text;
+            }
+        }
+        DynTarget::Mate(id) => {
+            if let Some(m) = a.mates.iter_mut().find(|m| m.id == id) {
+                m.unsuppressed_if = text;
+            }
+        }
+        DynTarget::Folder(id) => {
+            if let Some(f) = a.folders.iter_mut().find(|f| f.id == id) {
+                f.unsuppressed_if = text;
+            }
+        }
+    }
+}
+
+pub const ADD_FOLDER_DESCRIPTION: &str = "Add selection to folder";
+pub const UNPACK_FOLDER_DESCRIPTION: &str = "Unpack folder";
+
+/// Add selection to folder… with the name typed in its popup (empty: the
+/// default "New folder").
+pub fn add_folder(a: &mut Assembly, instances: &[InstanceId], features: &[MateId], name: &str) -> MateId {
+    let id = a.add_folder(instances, features);
+    let name = name.trim();
+    if !name.is_empty()
+        && let Some(f) = a.folders.iter_mut().find(|f| f.id == id)
+    {
+        f.name = name.to_string();
+    }
+    id
+}
+
+pub fn change_configuration_description(name: &str) -> String {
+    format!("Change configuration : {name}")
+}
+
+/// Does assembly `tab` (transitively) contain assembly `target`?
+pub fn contains_assembly(doc: &noshape_model::Document, tab: TabId, target: TabId, depth: usize) -> bool {
+    if tab == target || depth > 16 {
+        return true;
+    }
+    let Some(noshape_model::document::TabContent::Assembly(a)) = doc.tab(tab).map(|t| &t.content) else { return false };
+    a.instances.iter().any(|i| match &i.source {
+        InstanceSource::Assembly { assembly, .. } => contains_assembly(doc, *assembly, target, depth + 1),
+        _ => false,
+    })
+}
+
+/// Insert a Part Studio sketch as an instance ("Insert : Sketch 1").
+pub fn insert_sketch(a: &mut Assembly, studio: TabId, sketch: noshape_model::FeatureId, name: &str, config: ConfigValues) -> InstanceId {
+    let id = InstanceId(a.next_id());
+    let n = a.next_instance_name(name);
+    a.instances.push(Instance::new(id, n, InstanceSource::Sketch { studio, sketch, config }, Placement::default()));
+    id
+}
+
+// ------------------------------------------------------------ standard content
+
+/// Where Insert puts standard content in a hole.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stack {
+    /// Insert: a washer or nut goes under a bolt already in the hole.
+    Plain,
+    /// Insert closest to selection: against the picked face, what was there
+    /// moves onto the new part.
+    Closest,
+    /// Insert furthest from selection: at the far end of the stack.
+    Furthest,
+}
+
+/// Live (behaviours "Standard content: … stacking").
+pub const STACK_TOPPED: &str = "Component on top of existing stack cannot accept additional top stack components.";
+
+fn stacks(a: &Assembly, id: InstanceId) -> bool {
+    use noshape_model::assembly::standard;
+    a.instance(id).and_then(|i| i.source.standard()).and_then(standard::component).is_some_and(|c| !c.shape.has_length())
+}
+
+fn same_connector(c: &MateConnectorRef, at: &MateConnectorRef) -> bool {
+    c.instance == at.instance && c.path == at.path && c.reference == at.reference && c.align == at.align
+}
+
+/// The fastened mate on connector `at`: its index and whether `at` is its `b`.
+fn held(a: &Assembly, at: &MateConnectorRef) -> Option<(usize, bool)> {
+    a.mates.iter().position(|m| !m.suppressed && m.mate_type == MateType::Fastened && (same_connector(&m.b, at) || same_connector(&m.a, at))).map(|k| (k, same_connector(&a.mates[k].b, at)))
+}
+
+/// Insert furthest from selection: the free connector at the outer end of
+/// the stack on `hole` (past every nut and washer); None when a bolt or
+/// screw tops it.
+fn stack_end(a: &Assembly, hole: &MateConnectorRef) -> Option<MateConnectorRef> {
+    use noshape_model::assembly::standard;
+    let mut at = hole.clone();
+    for _ in 0..32 {
+        let Some((k, at_is_b)) = held(a, &at) else { return Some(at) };
+        let other = if at_is_b { a.mates[k].a.clone() } else { a.mates[k].b.clone() };
+        if !stacks(a, other.instance) {
+            return None;
+        }
+        let next = if other.reference == standard::connector_reference(0) { 1 } else { 0 };
+        at = MateConnectorRef::on(other.instance, other.path.clone(), standard::connector_reference(next));
+    }
+    Some(at)
+}
+
+/// Insert furthest onto a stack topped by a bolt is refused.
+pub fn stack_topped(a: &Assembly, holes: &[MateConnectorRef]) -> bool {
+    holes.iter().any(|h| stack_end(a, h).is_none())
+}
+
+pub fn insert_standard_description(spec: &noshape_model::assembly::standard::StandardSpec) -> String {
+    format!("Insert : {}", spec.part_name())
+}
+
+/// Insert standard content: one instance per hole, fastened there (or one
+/// unplaced instance without holes). `flip`: the `a` key while inserting.
+pub fn insert_standard(a: &mut Assembly, spec: &noshape_model::assembly::standard::StandardSpec, holes: &[MateConnectorRef], flip: bool, mode: Stack) -> Vec<InstanceId> {
+    use noshape_model::assembly::standard;
+    let base = spec.part_name();
+    let mut ids = Vec::new();
+    for _ in 0..holes.len().max(1) {
+        let id = InstanceId(a.next_id());
+        let name = a.next_instance_name(&base);
+        a.instances.push(Instance::new(id, name, InstanceSource::Standard { spec: spec.clone() }, Placement::default()));
+        ids.push(id);
+    }
+    for (id, hole) in ids.iter().zip(holes) {
+        let mut src = MateConnectorRef::on(*id, vec![], standard::connector_reference(0));
+        src.flip = flip;
+        let top = MateConnectorRef::on(*id, vec![], standard::connector_reference(1));
+        let fastened = |a: &mut Assembly, x: MateConnectorRef, y: MateConnectorRef| {
+            let mid = MateId(a.next_id());
+            let n = a.next_feature_name("Fastened");
+            a.mates.push(Mate::new(mid, n, MateType::Fastened, x, y));
+        };
+        if mode == Stack::Furthest {
+            let at = stack_end(a, hole).unwrap_or_else(|| hole.clone());
+            fastened(a, src, at);
+            continue;
+        }
+        // Closest (and Insert of a washer / nut into a hole holding a
+        // bolt): the part goes against the face. Live: the face's
+        // Fastened is re-pointed from what sat there to the new part,
+        // and a new Fastened joins the new part's top to it.
+        let under = held(a, hole).filter(|(k, at_is_b)| {
+            let other = if *at_is_b { &a.mates[*k].a } else { &a.mates[*k].b };
+            stacks(a, *id) && (mode == Stack::Closest || !stacks(a, other.instance))
+        });
+        match under {
+            Some((k, at_is_b)) => {
+                let m = &mut a.mates[k];
+                let was = if at_is_b { std::mem::replace(&mut m.a, src) } else { std::mem::replace(&mut m.b, src) };
+                fastened(a, top, was);
+            }
+            None => fastened(a, src, hole.clone()),
+        }
+    }
+    ids
+}
+
+pub fn edit_standard_description(spec: &noshape_model::assembly::standard::StandardSpec) -> String {
+    format!("Edit standard content : {}", spec.part_name())
+}
+
+/// Edit standard content instance: the instances take the new size /
+/// length (mates stay: face names do not depend on the size).
+pub fn edit_standard(a: &mut Assembly, ids: &[InstanceId], spec: &noshape_model::assembly::standard::StandardSpec) {
+    let name = spec.part_name();
+    for id in ids {
+        let base = a.next_instance_name(&name);
+        if let Some(i) = a.instance_mut(*id) {
+            i.source = InstanceSource::Standard { spec: spec.clone() };
+            i.name = base;
+        }
     }
 }

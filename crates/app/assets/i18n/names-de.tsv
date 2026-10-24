@@ -1,0 +1,228 @@
+2 point circle centerline	2-Punkt-Kreis-Mittellinie
+2 point linear centerline	Lineare Mittellinie mit 2 Punkten
+2 point linear dimension	2-Punkt-Linearbemaßung
+3 point angular dimension	3-Punkt-Winkelbemaßung
+3 point arc	3-Punkt-Bogen
+3 point circle	3-Punkt-Kreis
+3 point circle centerline	3-Punkt-Kreis-Mittellinie
+Acceleration	Beschleunigung
+Aligned rectangle	Ausgerichtetes Rechteck
+Aligned section view	Ausgerichtete Schnittansicht
+Angular velocity	Winkelgeschwindigkeit
+Animate Mate	Verknüpfung animieren
+Arc length dimension	Bogenlängenbemaßung
+Assembly circular pattern	Kreismuster aus Baugruppen
+Assembly linear pattern	Lineare Muster aus Baugruppen
+Assembly mirror	Spiegel-Feature für Baugruppen
+Auxiliary view	Hilfsansicht
+Ball	Kugel
+Ball mate	Kugelverknüpfung
+Bearing	Lager
+Body draft	Formschräge auf Körper
+Boolean	Boolesch
+Boundary condition	Begrenzungsbedingung
+Boundary surface	Begrenzungsoberfläche
+Break view	Bruchansicht
+Bridging curve	Kurve überbrücken
+Broken-out section	Ausgebrochener Schnitt
+Callout	Beschreibung
+Center point arc	Mittelpunktbogen
+Center point circle	Mittelpunktkreis
+Center point rectangle	Mittelpunktrechteck
+Centermark	Zentrumskreuz
+Chamfer	Fase
+Chamfer dimension	Fasenbemaßung
+Circular pattern	Kreismuster
+Circumscribed polygon	Umschriebenes Polygon
+Coincident	Deckungsgleich
+Commit	Übernehmen
+Commit all	Alle übernehmen
+Composite curve	Zusammengesetzte Kurve
+Composite part	Zusammengesetztes Bauteil
+Concentric	Konzentrisch
+Conic	Konisch
+Constrained surface	Beschränkte Oberfläche
+Construction	Konstruktion
+Corner rectangle	Ecken-Rechteck
+Create Part Studio in context	Part Studio im Kontext erstellen
+Create generative	Generativ erstellen
+Crop view	Freistellungsansicht
+Curve pattern	Kurvenmuster
+Curved Text	Geschwungener Text
+Custom table	Benutzerdefinierte Tabelle
+Cut list	Schnittliste
+Cut list table	Schnittlisten-Tabelle
+Cylindrical	Zylindrisch
+Cylindrical mate	Zylindrische Verknüpfung
+Datum	Bezugspunkt
+Decal	Aufkleber
+Delete face	Fläche löschen
+Delete part	Bauteil löschen
+Derived	Abgeleitet
+Derived mirror	Abgeleitetes Spiegel-Feature
+Detail view	Detailansicht
+Diameter dimension	Durchmesserbemaßung
+Dimension	Bemaßung
+Display states	Anzeigestatus
+Draft	Formschräge
+Driving mate selector	Selektor steuernde Verknüpfung
+Edge	Kante
+Edge condition symbol	Symbol für Kantenbedingung
+Edge point	Kantenpunkt
+Edge to edge centerline	Kante-zu-Kante-Mittellinie
+Edit curve	Kurve bearbeiten
+Elliptical arc	Elliptischer Bogen
+Enclose	Umschließen
+End cap	Endkappe
+Entity	Element
+Equal	Gleich
+Explode step	Explosionsstufe
+Extend	Dehnen
+Extend surface	Begrenzung verschieben
+External thread	Außengewinde
+Extrude	Linear austragen
+Face	Fläche
+Face blend	Flächenüberblendung
+Fastened	Fest
+Fastened mate	Feste Verknüpfung
+Fill	Füllen
+Fillet	Verrundung
+Fillet dimension	Verrundungsbemaßung
+Fit spline	3D Fit Spline
+Fix	Verankern
+Flange	Flansch
+Force	Kraft
+Foreshorten dimension	Bemaßung kürzen
+Format painter	Formatübertragung
+Frame	Rahmen
+Frame trim	Rahmen trimmen
+Gear relation	Zahnradbeziehung
+Geometric tolerance	Form- und Lagetoleranz
+Group	Gruppe
+Gusset	Knotenblech
+Hatch region	Schraffurbereich
+Hide inspection item	Prüfobjekt ausblenden
+Hole	Bohrung
+Hole table	Bohrungstabelle
+Hole/thread callout	Bohrungs-/Gewindebeschreibung
+Import	Importieren
+Inscribed polygon	Eingeschriebenes Polygon
+Insert	Einfügen
+Insert BOM	Stückliste einfügen
+Insert DXF or DWG	DXF oder DWG einfügen
+Insert image	Bild einfügen
+Insert view	Ansicht einfügen
+Inspection item	Prüfobjekt
+Internal feature	Internes Feature
+Intersection	Schnittpunkt
+Intersection curve	Schnittpunkt-Kurve
+Isocline	Isokline
+Isoparametric curve	Isoparametrische Kurve
+Item	Objekt
+Line	Linie
+Line to line angular dimension	Linie-zu-Linie-Winkelbemaßung
+Line to line linear dimension	Linie-zu-Linie-Linearbemaßung
+Linear pattern	Lineares Muster
+Linear relation	Lineare Beziehung
+Loft	Ausformung
+Mass	Masse
+Mate	Verknüpfung
+Mate connector	Verknüpfungsverbindung
+Maximum dimension	Maximale Bemaßung
+Maximum/minimum dimension	Maximale/minimale Bemaßung
+Mesh point	Netzpunkt
+Midpoint	Mittelpunkt
+Midpoint line	Mittelpunkt-Linie
+Minimum dimension	Minimale Bemaßung
+Mirror	Spiegeln
+Modify fillet	Verrundung ändern
+Move face	Fläche verschieben
+Mutual trim	Gegenseitiges Trimmen
+New feature	Neues Feature
+Normal	Senkrecht
+Note	Bezugstext
+Offset	Versatz
+Offset curve	Versatzkurve
+Offset surface	Versatz der Oberfläche
+Ordinate dimension	Ordinatenbemaßung
+Parallel mate	Parallelverknüpfung
+Pattern	Muster
+Perpendicular	Senkrecht
+Pierce	Anstecken
+Pin slot	Stift-Langloch
+Pin slot mate	Stift-Langloch-Verknüpfung
+Planar mate	Ebene Verknüpfung
+Plane	Ebene
+Point	Punkt
+Point to line linear dimension	Punkt-zu-Linie-Linearbemaßung
+Pressure	Druck
+Projected curve	Projizierte Kurve
+Projected view	Projektionsansicht
+Query variable	Abfragevariable
+Rack and pinion relation	Zahnstange-Ritzel-Beziehung
+Radial dimension	Radienbemaßung
+Refold	Neu falten
+Relation	Beziehung
+Replace face	Fläche ersetzen
+Replace instance	Instanz ersetzen
+Replicate	Replizieren
+Revision table	Revisionstabelle
+Revolute	Drehen
+Revolute mate	Drehverknüpfung
+Revolve	Rotieren
+Rib	Rippe
+Rigid body	Starrer Körper
+Routing curve	Routing-Kurve
+Ruled surface	Regeloberfläche
+Run generative	Generativ ausführen
+SMBend	Biegung
+SMBendRelief	Biegeentlastung
+SMCorner	Ecke
+SMCornerBreak	Eckenausbruch
+SMEndSheetMetal	Blechmodell fertigstellen
+SMForm	Form
+SMHem	Blechkantenrand
+SMJoint	Verbindung
+SMLoft	Blech-Ausformung
+SMMakeJoint	Verbindung erstellen
+SMRip	Schlitz
+SMStartSheetMetal	Blechmodell
+SMTab	Zunge
+Screw relation	Schraubbeziehung
+Section view	Schnittansicht
+Shell	Wandung
+Show mates mode	Verknüpfungsmodus anzeigen
+Sketch	Skizze
+Sketch Curvature	Krümmung
+Sketch Flow	Skizzenfluss
+Sketch point	Skizzenpunkt
+Slider	Gleiter
+Slider mate	Gleitverknüpfung
+Slot	Langloch
+Snap mode	Fangmodus
+Spline control point	Spline-Steuerpunkt
+Spline handle	Spline-Griff
+Split	Trennen
+Surface finish symbol	Symbol für Oberflächenbeschaffenheit
+Sweep	Austragung
+Symmetric	Symmetrisch
+Table	Tabelle
+Tag	Markieren
+Tag profile	Profil markieren
+Tangent	Tangential
+Tangent arc	Tangentialbogen
+Tangent mate	Tangentialverknüpfung
+Thicken	Verdicken
+Transform	Transformieren
+Trim	Trimmen
+Trim curve	Kurve trimmen
+Unfold	Entfalten
+Update all references to latest versions	Alle Referenzen auf neueste Versionen aktualisieren
+Use	Verwenden
+Vertex	Scheitelpunkt
+Vertical	Vertikal
+Virtual sharp	Virtueller Eckpunkt
+Weld symbol	Schweißsymbol
+Width	Breite
+Width mate	Breitenverknüpfung
+Wrap	Umwickeln

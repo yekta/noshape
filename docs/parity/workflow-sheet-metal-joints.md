@@ -44,3 +44,8 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
 | BEND2 | Bend line without the mate-connector button; "Bend alignment" label shown (SHOW_LABEL) | ✅ fixed (code; std sheetMetalBend.fs) |
+
+## Re-run pass 22 (qa5, 2026-10-24; live dialogs dom/qa5-sm-dialog-{tab,rip,bend,jog}.html)
+| 7 Tab dialog | Tab profile · Flange to merge · Subtraction offset · Subtraction scope | ✅ |
+| 9 Bend dialog | Bend line · Sheet metal face to bend · Bend alignment [Bend line] · [Bend angle] · Use model bend radius · Use model K Factor | ✅ |
+| 10 Jog dialog | live labels "Bounding type" and "Jog offset anchor" (SHOW_LABEL); ours had bare selects | 🔧 fixed (qa5); std_show_label_hints_match_builtin now checks every dialog |

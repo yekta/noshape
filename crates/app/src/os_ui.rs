@@ -361,7 +361,7 @@ pub fn query_box_tip(id: impl Into<ElementId>, label: impl Into<SharedString>, t
 /// Its text names entities (instances, mates, "Face of Extrude 1"): user
 /// text, never translated.
 pub fn query_row(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Stateful<Div> {
-    h_flex().id(id).h(px(24.)).pl(px(6.)).pr(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(rgb(0x555555)).child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(text)))
+    h_flex().id(id).h(px(24.)).pl(px(6.)).pr(px(4.)).gap(px(4.)).text_size(px(13.33)).text_color(rgb(0x555555)).child(div().flex_1().min_w_0().truncate().child(crate::ui::entity_text(text)))
 }
 
 /// Hover/selected styling of a plain clickable row.

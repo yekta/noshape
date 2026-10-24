@@ -1,0 +1,232 @@
+2 point circle centerline	Línea central de círculo por 2 puntos
+2 point linear centerline	Línea central lineal por 2 puntos
+2 point linear dimension	Cota lineal por 2 puntos
+3 point angular dimension	Cota angular por 3 puntos
+3 point arc	Arco por 3 puntos
+3 point circle	Círculo por 3 puntos
+3 point circle centerline	Línea central de círculo por 3 puntos
+Acceleration	Aceleración
+Aligned rectangle	Rectángulo alineado
+Aligned section view	Vista Sección alineada
+Angular velocity	Velocidad angular
+Animate Mate	Animar relación
+Arc length dimension	Cota de longitud de arco
+Assembly circular pattern	Patrón circular de ensamblaje
+Assembly linear pattern	Patrón lineal de ensamblaje
+Assembly mirror	Simetría de ensamblaje
+Auxiliary view	Vista auxiliar
+Ball	Bola
+Ball mate	Relación de bola
+Bearing	Cojinete
+Body draft	Desmoldeo del cuerpo
+Boolean	Booleano
+Boundary condition	Condición de delimitación!Instancias o caras que restringir
+Boundary surface	Superficie de delimitación
+Break view	Vista dividida
+Bridging curve	Curva de enlace
+Broken-out section	Sección parcial
+Callout	Anotación
+Center point arc	Arco por punto central
+Center point circle	Círculo por punto central
+Center point rectangle	Rectángulo por punto central
+Centermark	Marca central
+Chamfer	Chaflán
+Chamfer dimension	Cota de chaflán
+Circular pattern	Patrón circular
+Circumscribed polygon	Polígono circunscrito
+Coincident	Coincidente
+Commit	Confirmar
+Commit all	Confirmar todo
+Composite curve	Curva compuesta
+Composite part	Pieza compuesta
+Concentric	Concéntrico
+Conic	Cónica
+Constrained surface	Superficie restringida
+Construction	Construcción
+Corner rectangle	Rectángulo por esquina
+Create Part Studio in context	Crear Part Studio en contexto
+Create generative	Crear generativa
+Crop view	Recortar vista
+Curve pattern	Patrón de curva
+Curved Text	Texto curvo
+Custom table	Tabla personalizada
+Cut list	Lista de cortes
+Cut list table	Tabla de lista de cortes
+Cylindrical	Cilíndrico
+Cylindrical mate	Relación cilíndrica
+Datum	Referencia
+Decal	Calcomanía
+Delete face	Eliminar cara
+Delete part	Eliminar pieza
+Derived	Derivado
+Derived mirror	Simetría derivada
+Detail view	Vista Detalles
+Diameter dimension	Cota de diámetro
+Dimension	Cota
+Display states	Estados de visualización
+Draft	Desmoldeo
+Edge	Arista
+Edge condition symbol	Símbolo de condición de arista
+Edge point	Punto de arista
+Edge to edge centerline	Línea central de arista a arista
+Edit curve	Editar curva
+Ellipse	Elipse
+Elliptical arc	Arco elíptico
+Enclose	Encerrar
+End cap	Exhibidor
+Entity	Entidad
+Equal	Igual
+Explode step	Paso de explosión
+Extend	Alargar
+Extend surface	Mover límite
+External thread	Rosca externa
+Extrude	Extrusión
+Face	Cara
+Face blend	Pliegue de cara
+Fastened	Cerrado
+Fastened mate	Relación cerrada
+Feature	Operación
+Fill	Rellenar
+Fillet	Redondeo
+Fillet dimension	Cota de redondeo
+Fit spline	Ajuste a spline 3D
+Fix	Fijar
+Flange	Brida
+Force	Fuerza
+Foreshorten dimension	Cota de escorzo
+Format painter	Pintor de formatos
+Frame	Estructura
+Frame trim	Recortar estructura
+Gear relation	Relación de engranaje
+Geometric tolerance	Tolerancia geométrica
+Group	Grupo
+Gusset	Cartela
+Hatch region	Región de sombreado
+Helix	Hélice
+Hide inspection item	Elemento Ocultar inspección
+Hole	Taladro
+Hole table	Tabla de taladros
+Hole/thread callout	Anotación del taladro/rosca
+Import	Importar
+Inscribed polygon	Polígono inscrito
+Insert	Insertar
+Insert BOM	Insertar LDM
+Insert DXF or DWG	Insertar DXF o DWG
+Insert image	Insertar imagen
+Insert view	Insertar vista
+Inspection item	Elemento de inspección
+Internal feature	Operación interna
+Intersection	Intersección
+Intersection curve	Curva de intersección
+Isoparametric curve	Curva isoparamétrica
+Item	Elemento
+Line	Línea
+Line to line angular dimension	Cota angular de línea a línea
+Line to line linear dimension	Cota lineal de línea a línea
+Linear pattern	Patrón lineal
+Linear relation	Relación lineal
+Loft	Solevación
+Mass	Masa
+Mate	Relación
+Mate connector	Conector de relación
+Maximum dimension	Cota máxima
+Maximum/minimum dimension	Cota máxima/mínima
+Mesh point	Punto de malla
+Midpoint	Punto medio
+Midpoint line	Línea de punto medio
+Minimum dimension	Cota mínima
+Mirror	Simetría
+Modify fillet	Modificar redondeo
+Moment	Momento
+Move face	Mover cara
+Mutual trim	Recorte mutuo
+New feature	Nueva operación
+Note	Nota
+Offset	Equidistanciar
+Offset curve	Desfasar curva
+Offset surface	Equidistanciar superficie
+Ordinate dimension	Cota de coordenada
+Parallel	Paralelo
+Parallel mate	Relación paralela
+Pattern	Patrón
+Pierce	Perforar
+Pin slot	Ranura de pasador
+Pin slot mate	Coincidencia de ranura de pasador
+Planar	Plano
+Planar mate	Coincidencia en plano
+Plane	Plano
+Point	Punto
+Point to line linear dimension	Cota lineal de punto a línea
+Pressure	Presión
+Projected curve	Curva proyectada
+Projected view	Vista proyectada
+Query variable	Variable de consulta
+Rack and pinion relation	Relación de cremallera y piñón
+Radial dimension	Cota radial
+Refold	Volver a doblar
+Relation	Relation type
+Replace face	Reemplazar cara
+Replace instance	Reemplazar instancia
+Replicate	Replicar
+Revision table	Tabla de revisiones
+Revolute	Revolución
+Revolute mate	Relación de revolución
+Revolve	Hacer revolución
+Rib	Nervio
+Rigid body	Cuerpo rígido
+Routing curve	Curva de enrutamiento
+Ruled surface	Superficie reglada
+Run generative	Ejecutar generativa
+SMBend	Pliegue
+SMBendRelief	Liberación de pliegue
+SMCorner	Esquina
+SMCornerBreak	Corte de esquina
+SMEndSheetMetal	Acabar modelo de chapa metálica
+SMForm	Forma
+SMHem	Dobladillo
+SMJoint	Unión
+SMLoft	Solevación de chapa metálica
+SMMakeJoint	Hacer unión
+SMRip	Rasgadura
+SMStartSheetMetal	Modelo de chapa metálica
+SMTab	Pestaña
+Screw relation	Relación de tornillo
+Section view	Vista de sección
+Shell	Vaciado
+Show mates mode	Mostrar modo de relaciones
+Simulation	Simulación
+Sketch	Boceto
+Sketch Curvature	Curvatura
+Sketch Flow	Flujo de bocetos
+Sketch point	Punto de boceto
+Slider	Control deslizante
+Slider mate	Relación deslizante
+Slot	Ranura
+Snap mode	Modo de enganche
+Spline control point	Punto de control de Spline
+Spline handle	Asa de spline
+Split	Partir
+Surface finish symbol	Símbolo de acabado de superficie
+Sweep	Barrido
+Symmetric	Simétrico
+Table	Tabla
+Tag	Etiqueta
+Tag profile	Etiquetar perfil
+Tangent	Tangente
+Tangent arc	Arco tangente
+Tangent mate	Relación tangente
+Text	Texto
+Thicken	Aumentar espesor
+Transform	Transformar
+Trim	Recortar
+Trim curve	Recortar curva
+Unfold	Desplegar
+Update	Actualizar
+Update all references to latest versions	Actualice todas las referencias a las últimas versiones.
+Use	Utilizar
+Vertex	Vértice
+Virtual sharp	Intersección virtual
+Weld symbol	Símbolo de soldadura
+Width	Ancho
+Width mate	Relación de ancho
+Wrap	Envolver
