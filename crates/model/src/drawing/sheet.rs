@@ -243,6 +243,7 @@ pub struct AnnTypeStyle {
 /// A text font (Drawing properties › Font): family, bold, italic.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TextFont {
+    #[serde(deserialize_with = "migrated_family")]
     pub family: String,
     #[serde(default)]
     pub bold: bool,
@@ -250,8 +251,52 @@ pub struct TextFont {
     pub italic: bool,
 }
 
-/// Families the drawing fonts offer (bundled; Noto Sans is Onshape's default).
-pub const FONT_FAMILIES: [&str; 4] = ["Noto Sans", "Liberation Sans", "Liberation Serif", "Liberation Mono"];
+/// The drawing Font lists' families (live drawing/161, dom/drawing-
+/// properties-annotations: these 22 in this order).
+pub const FONT_FAMILIES: [&str; 22] = [
+    "APMONO",
+    "ARComp",
+    "ARIsoP1",
+    "ARItal",
+    "ARMono",
+    "ARSimp",
+    "ARTxt",
+    "Arimo",
+    "DejaVu Sans",
+    "DejaVu Sans Mono",
+    "DejaVu Serif",
+    "Noto Sans",
+    "Noto Sans Chinese Simplified",
+    "Noto Sans Chinese Simplified Light",
+    "Noto Sans Chinese Traditional",
+    "Noto Sans Chinese Traditional Light",
+    "Noto Sans Japanese",
+    "Noto Sans Korean",
+    "Noto Sans UI",
+    "Noto Serif",
+    "Open Sans",
+    "Tinos",
+];
+
+/// Onshape's default drawing font.
+pub const DRAWING_DEFAULT_FONT: &str = "Noto Sans";
+
+/// Families of earlier documents not on live's list, as their nearest one
+/// on it (lead decision S28): Liberation Sans → Arimo, Liberation Serif →
+/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono.
+pub fn migrate_font_family(family: &str) -> &str {
+    match family {
+        "Liberation Sans" => "Arimo",
+        "Liberation Serif" => "Tinos",
+        "Liberation Mono" => "DejaVu Sans Mono",
+        f => f,
+    }
+}
+
+fn migrated_family<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let f = <String as serde::Deserialize>::deserialize(d)?;
+    Ok(migrate_font_family(&f).to_string())
+}
 
 /// Texts drawn in a font.
 #[derive(Clone, Debug, PartialEq)]

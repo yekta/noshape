@@ -721,7 +721,8 @@ impl Workspace {
                         ws2.update(cx, |this, cx| this.activate(id, window, cx));
                     }
                     if !cad.is_empty() {
-                        crate::import_dialog::open(doc, cad, after, true, move |id, window, cx| ws.update(cx, |this, cx| this.activate(id, window, cx)), window, cx)
+                        // Live: the view stays on the open tab (the new tabs go after it).
+                        crate::import_dialog::open(doc, cad, after, true, |_, _, _| {}, window, cx)
                     }
                 });
             });

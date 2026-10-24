@@ -445,8 +445,9 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
 }
 
 /// The Assembly's name from the product tree's root name (live: "pvz rot
-/// asm_54" comes in as "pvz rot asm", or as "pvz rot asm_54" when that name
-/// is taken; a root without the suffix as "RootAssembly (1)").
+/// asm_54" comes in as "pvz rot asm", as "pvz rot asm_54" when that name is
+/// taken, then "pvz rot asm_54 (1)"; a root without the suffix as
+/// "RootAssembly (1)").
 fn pvz_assembly_name(doc: &Document, root: &str) -> String {
     let taken = |n: &str| doc.tabs.iter().any(|t| t.name == n);
     let plain = match root.rsplit_once('_') {
@@ -458,6 +459,6 @@ fn pvz_assembly_name(doc: &Document, root: &str) -> String {
     } else if plain != root && !taken(root) {
         root.to_string()
     } else {
-        unique_name(doc, plain)
+        unique_name(doc, root)
     }
 }

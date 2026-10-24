@@ -4404,6 +4404,7 @@ version = "0.4.6"
 dependencies = [
  "anyhow",
  "glam 0.34.1",
+ "image",
  "log",
  "miniz_oxide 0.8.9",
  "noshape-kernel",
@@ -4414,6 +4415,7 @@ dependencies = [
  "noshape-store",
  "noshape-units",
  "parking_lot",
+ "resvg 0.46.0",
  "serde",
  "serde_json",
 ]

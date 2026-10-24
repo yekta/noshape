@@ -2341,3 +2341,19 @@ fn note_leaders_land_branch_and_lose_nodes() {
     assert_eq!(leaders.len(), 2);
     assert!(leaders.iter().all(|l| l.start == LeaderStart::Side));
 }
+
+/// Lead decision S28: the drawing Font list is live's 22 families; fonts of
+/// earlier documents not on it load as the nearest one (Liberation Sans →
+/// Arimo, Liberation Serif → Tinos, Liberation Mono → DejaVu Sans Mono).
+#[test]
+fn drawing_fonts_are_lives_and_old_families_migrate() {
+    use super::sheet::{DRAWING_DEFAULT_FONT, FONT_FAMILIES, TextFont};
+    assert_eq!(FONT_FAMILIES.len(), 22);
+    assert_eq!((FONT_FAMILIES[0], FONT_FAMILIES[21]), ("APMONO", "Tinos"));
+    assert!(FONT_FAMILIES.contains(&DRAWING_DEFAULT_FONT));
+    assert!(!FONT_FAMILIES.iter().any(|f| f.starts_with("Liberation")));
+    for (old, new) in [("Liberation Sans", "Arimo"), ("Liberation Serif", "Tinos"), ("Liberation Mono", "DejaVu Sans Mono"), ("Noto Sans", "Noto Sans")] {
+        let f: TextFont = serde_json::from_str(&format!("{{\"family\":\"{old}\",\"bold\":true}}")).unwrap();
+        assert_eq!((f.family.as_str(), f.bold), (new, true));
+    }
+}
