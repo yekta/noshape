@@ -229,6 +229,8 @@ pub(crate) struct AsmUi {
     pub filter_flat: bool,
     /// Instance row under the cursor in the list (highlighted in the viewport).
     pub list_hover: Option<InstanceId>,
+    /// Last clicked instance row: the anchor of Shift+click ranges.
+    pub list_anchor: Option<InstanceId>,
     /// Make transparent (Shift+T): instances drawn transparent.
     pub transparent: Option<HashSet<InstanceId>>,
     /// S shortcut toolbar position (viewport-local).

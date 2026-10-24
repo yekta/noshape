@@ -3316,7 +3316,7 @@ impl AssemblyView {
                     this.refresh_scene(false, cx);
                 }
             }))
-            .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
+            .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 this.ui.root_selected = false;
                 if this.ui.interference.is_some() {
                     this.toggle_interference_instance(p3[0], cx);
@@ -3330,17 +3330,27 @@ impl AssemblyView {
                     this.toggle_group_member(p3[0], cx);
                     return;
                 }
-                this.selected_mate = None;
                 let top = p3[0];
-                if ev.modifiers().shift || ev.modifiers().secondary() {
-                    if let Some(i) = this.selected.iter().position(|x| *x == top) {
-                        this.selected.remove(i);
-                    } else {
-                        this.selected.push(top);
+                // Live (behaviours "skb (10-24) section base snap + move to
+                // origin" (3)): Ctrl+click opens the row's menu for the
+                // selection, which stays as it is.
+                if ev.modifiers().control && !ev.modifiers().shift {
+                    // The entries are read here: the menu builds at once,
+                    // while this view is being updated.
+                    let entries = this.instance_menu(top, false, cx);
+                    let view = cx.entity();
+                    let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_menu(m, entries, view, window, cx));
+                    if !menu.read(cx).is_empty() {
+                        crate::os_menu::open(ev.position() + point(px(0.), px(2.)), menu, window, cx);
                     }
-                } else {
-                    this.selected = vec![top];
+                    return;
                 }
+                this.selected_mate = None;
+                // Clicks are additive (a selected row toggles off); Shift+click
+                // adds the visible rows from the last clicked one.
+                let order = this.visible_instance_order(cx);
+                this.selected = noshape_model::interaction::list_click(&order, &this.selected, this.ui.list_anchor.as_ref(), &top, ev.modifiers().shift);
+                this.ui.list_anchor = Some(top);
                 this.refresh_scene(false, cx);
                 cx.notify();
             }));
@@ -3634,6 +3644,87 @@ impl AssemblyView {
         ))
     }
 
+    /// A pattern's row with, when expanded, its instances and its mates.
+    #[allow(clippy::too_many_arguments)]
+    fn push_pattern_rows(&self, p: &InstancePattern, asm: &Assembly, result: &AssemblyResult, filtering: bool, rows: &mut Vec<AnyElement>, selected_row: &mut Option<usize>, cx: &mut Context<Self>) {
+        if !self.feature_passes(noshape_model::assembly::ops::RowKind::Pattern, &p.name, false, p.suppressed, false, false) {
+            return;
+        }
+        let err = result.pattern_errors.iter().find(|(id, _)| *id == p.id).map(|(_, m)| m.clone());
+        rows.push(self.pattern_row(p, err, cx));
+        if self.expanded.contains(&vec![InstanceId(p.id.0)]) {
+            for g in &p.generated {
+                if let Some(inst) = asm.instance(g.instance) {
+                    if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
+                        *selected_row = Some(rows.len());
+                    }
+                    rows.push(self.instance_row(result.node(&[inst.id]), Some(inst), vec![inst.id], 1, cx));
+                }
+            }
+            // Live (qa5 asm-056): "Replicate 1 ▸ Part 3 <2>, ▸ Mate features (1)",
+            // that folder collapsed at first.
+            let mates: Vec<&Mate> = asm.pattern_mates(p).collect();
+            if !mates.is_empty() && !filtering {
+                let key = vec![InstanceId(p.id.0), MATE_FEATURES_COLLAPSED];
+                let open = self.expanded.contains(&key);
+                let pid = p.id;
+                rows.push(
+                    crate::ui::tree_row(SharedString::from(format!("pat-mates-{}", p.id.0)), false)
+                        .pl(px(5. + 22.))
+                        .cursor_pointer()
+                        .child(crate::ui::caret(open))
+                        .child(format!("Mate features ({})", mates.len()))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            let key = vec![InstanceId(pid.0), MATE_FEATURES_COLLAPSED];
+                            if !this.expanded.remove(&key) {
+                                this.expanded.insert(key);
+                            }
+                            cx.notify();
+                        }))
+                        .into_any_element(),
+                );
+                if open {
+                    let labeler = self.labeler(cx);
+                    for m in mates {
+                        if let Some(row) = self.mate_list_row(m, result, &labeler, cx) {
+                            rows.push(div().pl(px(17. + 22.)).child(row).into_any_element());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Top-level instances in the order their rows show in the list (as
+    /// `render_list` lays them out): folders' and patterns' instances where
+    /// expanded. Subassembly children select their top-level instance, so
+    /// they add nothing here.
+    fn visible_instance_order(&self, cx: &App) -> Vec<InstanceId> {
+        let Some(asm) = self.assembly(cx) else { return Vec::new() };
+        let filtering = !self.ui.filter.is_empty();
+        let mut out = Vec::new();
+        let mut shown_folders: HashSet<MateId> = HashSet::new();
+        let mut shown_patterns: HashSet<MateId> = HashSet::new();
+        for inst in &asm.instances {
+            if let Some(p) = asm.generated_by(inst.id) {
+                if shown_patterns.insert(p.id) && self.expanded.contains(&vec![InstanceId(p.id.0)]) {
+                    out.extend(p.generated.iter().map(|g| g.instance).filter(|id| asm.instance(*id).is_some()));
+                }
+                continue;
+            }
+            if !filtering && let Some(folder) = asm.folder_of_instance(inst.id) {
+                if shown_folders.insert(folder.id) && self.expanded.contains(&vec![InstanceId(folder.id.0)]) {
+                    out.extend(folder.instances.iter().copied().filter(|m| asm.instance(*m).is_some()));
+                }
+                continue;
+            }
+            if self.instance_passes(inst, self.result.node(&[inst.id]), cx) {
+                out.push(inst.id);
+            }
+        }
+        out
+    }
+
     fn render_list(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(asm) = self.assembly(cx).cloned() else { return div().into_any_element() };
@@ -3651,8 +3742,15 @@ impl AssemblyView {
             rows.push(self.origin_row(cx));
         }
         let mut shown_folders: HashSet<MateId> = HashSet::new();
+        // Live (behaviours "skb (10-24) section base snap + move to origin"
+        // (3)): a pattern's row sits in the instance order, where its first
+        // instance is ("<3>, Linear pattern 1, <5>").
+        let mut shown_patterns: HashSet<MateId> = HashSet::new();
         for inst in &asm.instances {
-            if asm.generated_by(inst.id).is_some() {
+            if let Some(p) = asm.generated_by(inst.id) {
+                if shown_patterns.insert(p.id) {
+                    self.push_pattern_rows(p, &asm, &result, filtering, &mut rows, &mut selected_row, cx);
+                }
                 continue;
             }
             // Folders show at the place of their first member (not while filtering).
@@ -3700,53 +3798,9 @@ impl AssemblyView {
                 rows.push(self.folder_row(folder, cx));
             }
         }
-        for p in &asm.patterns {
-            if !self.feature_passes(noshape_model::assembly::ops::RowKind::Pattern, &p.name, false, p.suppressed, false, false) {
-                continue;
-            }
-            let err = result.pattern_errors.iter().find(|(id, _)| *id == p.id).map(|(_, m)| m.clone());
-            rows.push(self.pattern_row(p, err, cx));
-            if self.expanded.contains(&vec![InstanceId(p.id.0)]) {
-                for g in &p.generated {
-                    if let Some(inst) = asm.instance(g.instance) {
-                        if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
-                            selected_row = Some(rows.len());
-                        }
-                        rows.push(self.instance_row(result.node(&[inst.id]), Some(inst), vec![inst.id], 1, cx));
-                    }
-                }
-                // Live (qa5 asm-056): "Replicate 1 ▸ Part 3 <2>, ▸ Mate features (1)",
-                // that folder collapsed at first.
-                let mates: Vec<&Mate> = asm.pattern_mates(p).collect();
-                if !mates.is_empty() && !filtering {
-                    let key = vec![InstanceId(p.id.0), MATE_FEATURES_COLLAPSED];
-                    let open = self.expanded.contains(&key);
-                    let pid = p.id;
-                    rows.push(
-                        crate::ui::tree_row(SharedString::from(format!("pat-mates-{}", p.id.0)), false)
-                            .pl(px(5. + 22.))
-                            .cursor_pointer()
-                            .child(crate::ui::caret(open))
-                            .child(format!("Mate features ({})", mates.len()))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                let key = vec![InstanceId(pid.0), MATE_FEATURES_COLLAPSED];
-                                if !this.expanded.remove(&key) {
-                                    this.expanded.insert(key);
-                                }
-                                cx.notify();
-                            }))
-                            .into_any_element(),
-                    );
-                    if open {
-                        let labeler = self.labeler(cx);
-                        for m in mates {
-                            if let Some(row) = self.mate_list_row(m, &result, &labeler, cx) {
-                                rows.push(div().pl(px(17. + 22.)).child(row).into_any_element());
-                            }
-                        }
-                    }
-                }
-            }
+        // Patterns not placed with their instances (none generated) go last.
+        for p in asm.patterns.iter().filter(|p| !shown_patterns.contains(&p.id)) {
+            self.push_pattern_rows(p, &asm, &result, filtering, &mut rows, &mut selected_row, cx);
         }
         rows.extend(self.pending_pattern_row(cx));
         if asm.instances.is_empty() {
