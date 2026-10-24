@@ -175,35 +175,14 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
     let base = (0..nw).find(|&i| !wall_faces[i].is_empty()).ok_or_else(|| "The sheet metal part has no walls to flatten".to_string())?;
     let base_face = &wall_faces[base][0];
     let base_plane = base_face.face_plane().map_err(|e| e.to_string())?.ok_or_else(|| "Base wall is not planar".to_string())?;
+    // Seen as Onshape shows it (live SM1 DXF, samples/qa5-sm-flat.dxf, is in model
+    // x/y): from the definition side, turned by the smallest rotation taking that
+    // side's normal to +z, and moved along it only.
     let normal = base_plane.unit_normal();
-    // X axis: across the first bend of the base wall, else the longest edge.
-    let mut x = DVec3::ZERO;
-    for b in &data.bends {
-        if b.parent == base {
-            x = -b.dir_a;
-            break;
-        }
-        if b.child == Some(base) {
-            x = b.axis.cross(normal);
-            break;
-        }
-    }
-    if x.length() < 1e-9 {
-        let mut best = 0.0;
-        for e in base_face.edges() {
-            if let Ok((a, b)) = e.endpoints() {
-                let d = b - a;
-                if d.length() > best {
-                    best = d.length();
-                    x = d;
-                }
-            }
-        }
-    }
-    let x = (x - normal * x.dot(normal)).normalize_or_zero();
-    let x = if x.length() < 0.5 { base_plane.unit_x() } else { x };
-    let origin = base_face.centroid().unwrap_or(base_plane.origin);
-    let frame = k::Plane::new(origin, normal, x);
+    let view = if data.view_back { -normal } else { normal };
+    let to_z = glam::DQuat::from_rotation_arc(view, DVec3::Z).inverse();
+    let x = to_z * DVec3::X;
+    let frame = k::Plane::new(view * base_plane.origin.dot(view), view, x);
 
     let mut warnings = Vec::new();
     let mut xf: Vec<Option<DMat4>> = vec![None; nw];
@@ -297,7 +276,8 @@ pub fn flat_pattern(body: &Body, data: &SheetMetalData) -> Result<FlatPattern, S
             lines.push(FlatBendLine {
                 a: frame.to_local(ca),
                 b: frame.to_local(cb),
-                up: b.is_up() != data.flip_direction_up,
+                // Up: toward the viewer of the definition side (live SM1: flanges and hem rising from the top are Up).
+                up: (b.is_up() != data.view_back) != data.flip_direction_up,
                 angle: b.angle,
                 radius: b.radius,
                 k_factor: b.k_factor,

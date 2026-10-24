@@ -1139,6 +1139,99 @@ const NUT_CAP = 4;
 const NUT_INSERT = 5;
 const NUT_WELD = 6;
 const NUT_T_SLOT = 7;
+const NUT_CLINCH_HEX = 8;
+const NUT_CLINCH_FLUSH = 9;
+const NUT_CLINCH = 10;
+
+/**
+ * Live's NASM 45938 self-locking clinch nut (raw /features + B-rep): a
+ * collar dc at z = 0 whose side falls 15° in to a step (alen - 0.012 in
+ * down), a ring out to (dc + de) / 2 then 0.012 in down to alen, the shank de
+ * tlen long with its edges rounded de / 40, the bore at the minor diameter
+ * dh opening to the major d over the top 0.012 in then out at 25° to the top,
+ * countersunk at the bottom over 1.5 (d - dh); the step's ring cut by 24
+ * scallops of radius 0.06 de meeting on its edge.
+ */
+function selfLockingClinchNut(context is Context, id is Id, def is map)
+{
+    const a = def.alen;
+    const t = def.tlen;
+    const k = 0.012 * inch;
+    const rs = (def.dc + def.de) / 4;
+    const R = def.de / 2;
+    const f = def.de / 40;
+    const rmaj = def.d / 2;
+    const rmin = def.dh / 2;
+    const rtop = rmaj + (a - k) * tan(25 * degree);
+    const s45 = sin(45 * degree);
+    revolveProfile(context, id + "body", [{ "p" : rz(rtop, Z) }, { "p" : rz(def.dc / 2, Z) }, { "p" : rz(def.dc / 2 - (a - k) * tan(15 * degree), -(a - k)) },
+                { "p" : rz(rs, -(a - k)) }, { "p" : rz(rs, -a) }, { "p" : rz(R - f, -a) }, { "p" : rz(R, -a - f), "mid" : rz(R - f + f * s45, -a - f + f * s45) },
+                { "p" : rz(R, -a - t + f) }, { "p" : rz(R - f, -a - t), "mid" : rz(R - f + f * s45, -a - t + f - f * s45) },
+                { "p" : rz(rmaj, -a - t) }, { "p" : rz(rmin, -a - t + 1.5 * (def.d - def.dh)) }, { "p" : rz(rmin, -a) }, { "p" : rz(rmaj, -a) },
+                { "p" : rz(rmaj, -(a - k)) }]);
+    // The scallops: 24 circles whose neighbours meet on the ring's edge.
+    const rho = 0.06 * def.de;
+    const half = 7.5 * degree;
+    const theta = acos(rs * sin(half) / rho);
+    const yc = rs * cos(half) + rho * sin(theta);
+    var tools = [];
+    for (var i = 0; i < 24; i += 1)
+    {
+        const ang = (90 + 15 * i) * degree;
+        const c = cylinderZ(context, id + ("scallop" ~ i), -a, -(a - k) + k, rho);
+        opTransform(context, id + ("moveScallop" ~ i), { "bodies" : c, "transform" : transform(vector(yc * cos(ang), yc * sin(ang), Z)) });
+        tools = append(tools, c);
+    }
+    subtract(context, id + "scallops", qCreatedBy(id + "body", EntityType.BODY), qUnion(tools));
+}
+
+/**
+ * Live's NAS clinch nuts (raw /features), the thread's minor diameter dh
+ * bored through, its ends chamfered 45° out to the major diameter d.
+ * NASM 45938/2 (NUT_CLINCH_HEX): a hex s across flats (flats facing ±Y) m
+ * high on z = 0, its top corners cut at 30°, on a pilot hex sp across flats
+ * hp deep below; the bore's pilot end coned out to the pilot's flats over
+ * 0.83 hp. NASM 3214 (NUT_CLINCH_FLUSH): a hex s across flats (flats facing
+ * ±X) ll / 3 high on a shank dc ll / 3 then 0.92 dc ll / 3 below.
+ */
+function clinchNut(context is Context, id is Id, def is map)
+{
+    if (def.form == NUT_CLINCH)
+    {
+        selfLockingClinchNut(context, id, def);
+        return;
+    }
+    const r = def.dh / 2;
+    const c = (def.d - def.dh) / 2;
+    const e = c + def.s;
+    var top;
+    var holeBottom;
+    if (def.form == NUT_CLINCH_HEX)
+    {
+        top = def.m;
+        const nut = prismZ(context, id + "nut", Z, def.m, polygonPoints(6, def.s, 1));
+        cornerChamferAngle(context, id + "chamfer", nut, Z, def.m, def.s, def.s, true, false, 30 * degree);
+        prismZ(context, id + "pilot", -def.hp, def.hp + EPS, polygonPoints(6, def.sp, 1));
+        uniteAll(context, id);
+        // The pilot end: a cone from the bore 0.83 hp up out to the flats.
+        const rp = def.sp / 2;
+        const zc = -def.hp + 0.83 * def.hp;
+        const slope = (rp - r) / (0.83 * def.hp);
+        holeBottom = [{ "p" : rz(Z, -def.hp - e) }, { "p" : rz(rp + e * slope, -def.hp - e) }, { "p" : rz(r, zc) }];
+    }
+    else
+    {
+        const l3 = def.ll / 3;
+        top = l3;
+        prismZ(context, id + "nut", Z, l3, polygonPoints(6, def.s, 0));
+        revolveProfile(context, id + "shank", [{ "p" : rz(Z, -2 * l3) }, { "p" : rz(def.dc / 2, -2 * l3) }, { "p" : rz(def.dc / 2, -l3) },
+                    { "p" : rz(0.92 * def.dc / 2, -l3) }, { "p" : rz(0.92 * def.dc / 2, l3 / 2) }, { "p" : rz(Z, l3 / 2) }]);
+        uniteAll(context, id);
+        holeBottom = [{ "p" : rz(Z, -2 * l3 - e) }, { "p" : rz(r + c + e, -2 * l3 - e) }, { "p" : rz(r, -2 * l3 + c) }];
+    }
+    const nutBody = solidsOf(context, id);
+    subtract(context, id + "bore", nutBody, revolveProfile(context, id + "hole", join(holeBottom, [{ "p" : rz(r, top - c) }, { "p" : rz(r + c + e, top + e) }, { "p" : rz(Z, top + e) }])));
+}
 
 annotation { "Feature Type Name" : "Nut" }
 export const nut = defineFeature(function(context is Context, id is Id, definition is map)
@@ -1194,9 +1287,24 @@ export const nut = defineFeature(function(context is Context, id is Id, definiti
         isLength(definition.tr, LENGTH_0);
         annotation { "Name" : "Corner chamfer" }
         isLength(definition.tc, LENGTH_0);
+        annotation { "Name" : "Pilot across flats" }
+        isLength(definition.sp, LENGTH_0);
+        annotation { "Name" : "Pilot height" }
+        isLength(definition.hp, LENGTH_0);
+        annotation { "Name" : "Nut thickness" }
+        isLength(definition.ll, LENGTH_0);
+        annotation { "Name" : "Shank length" }
+        isLength(definition.tlen, LENGTH_0);
+        annotation { "Name" : "Clinch length" }
+        isLength(definition.alen, LENGTH_0);
     }
     {
         const form = definition.form;
+        if (form == NUT_CLINCH_HEX || form == NUT_CLINCH_FLUSH || form == NUT_CLINCH)
+        {
+            clinchNut(context, id, definition);
+            return;
+        }
         const sides = form == NUT_SQUARE || form == NUT_WELD ? 4 : 6;
         // Flange (dc, c) under the body; the body from c to m.
         const z0 = definition.c;

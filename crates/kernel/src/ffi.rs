@@ -219,6 +219,16 @@ pub(crate) mod ffi {
         points: Vec<f64>,
     }
 
+    /// A placed part instance of a .pvz product tree: the part (index into
+    /// read_pvz_parts), the instance name, the tree's root name, and the
+    /// placement (row-major 3x4, metres).
+    struct PvzInstance {
+        part: u32,
+        name: String,
+        root: String,
+        transform: Vec<f64>,
+    }
+
     struct StepImport {
         shapes: UniquePtr<OcShapeList>,
         names: Vec<String>,
@@ -542,8 +552,8 @@ pub(crate) mod ffi {
         ) -> Result<()>;
         fn read_iges(path: &str) -> Result<UniquePtr<OcShape>>;
         fn read_mesh(path: &str, merge_limit: u32) -> Result<UniquePtr<OcShape>>;
-        fn write_iges(shapes: &OcShapeList, path: &str) -> Result<()>;
-        fn write_parasolid(shapes: &OcShapeList, path: &str, binary: bool) -> Result<()>;
+        fn write_iges(shapes: &OcShapeList, path: &str, system: &str, version: &str) -> Result<()>;
+        fn write_parasolid(shapes: &OcShapeList, path: &str, binary: bool, version: &str, application: &str) -> Result<()>;
         fn read_parasolid(path: &str) -> Result<UniquePtr<OcShape>>;
         fn read_parasolid_parts(path: &str) -> Result<StepImport>;
         fn read_rhino_parts_ffi(path: &str) -> Result<StepImport>;
@@ -559,6 +569,8 @@ pub(crate) mod ffi {
         fn write_jt(shapes: &OcShapeList, names: &[String], path: &str) -> Result<()>;
         fn write_pvz(shapes: &OcShapeList, names: &[String], path: &str) -> Result<()>;
         fn read_pvz(path: &str) -> Result<UniquePtr<OcShape>>;
+        fn read_pvz_parts(path: &str) -> Result<StepImport>;
+        fn read_pvz_instances(path: &str) -> Result<Vec<PvzInstance>>;
         fn read_mesh_bodies(path: &str) -> Result<UniquePtr<OcShape>>;
         fn is_mesh(s: &OcShape) -> bool;
 
