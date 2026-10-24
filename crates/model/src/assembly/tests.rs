@@ -3239,12 +3239,21 @@ fn remaining_tapping_screws_match_live() {
             let failed: Vec<_> = r.display.features.iter().filter_map(|f| f.message.clone()).collect();
             assert!(failed.is_empty(), "{name} {head}: {failed:?}");
             let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
-            // Flat countersunk Type VI: live's 14 (behaviours "skb (10-23
-            // 03:30)") has the mouth fillet, which OCCT can't make on this
-            // smaller Ø0.132 in recess yet: 13.
-            let unproven = name == "Flat countersunk head tapping screw" && *head == "Type VI" && body.faces.len() == 13;
-            if body.faces.len() != *faces && !unproven {
+            if body.faces.len() != *faces {
                 wrong.push(format!("{name} {head}: {} faces, live {faces}", body.faces.len()));
+            }
+            // Flat countersunk Type VI: live's 14 (behaviours "skb (10-23
+            // 03:30)") include the 0.002 in recess-mouth fillet, one OTHER
+            // (B-spline) face of 0.00134 in².
+            if name == "Flat countersunk head tapping screw" && *head == "Type VI" {
+                let mouth: Vec<f64> = (0..body.faces.len())
+                    .filter_map(|i| body.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok())
+                    .filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::BSpline { .. })))
+                    .filter_map(|f| f.area().ok().map(|a| a / 0.0254 / 0.0254))
+                    .collect();
+                if mouth.len() != 1 || (mouth[0] - 0.00134).abs() > 0.000005 {
+                    wrong.push(format!("{name} {head}: B-spline faces {mouth:?} in², live one of 0.00134"));
+                }
             }
             // Overall height as live's geometry files (in; a slot can take the apex).
             let live_h = match (name, *head) {
@@ -3686,5 +3695,37 @@ fn tooth_lock_washers_match_live() {
         let area: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap()).sum();
         assert_eq!(b.faces.len(), faces, "{name} {size}");
         assert!((area / live_area - 1.0).abs() < 1e-3, "{name} {size}: area {area} live {live_area}");
+    }
+}
+
+/// Acorn high / low crown nuts 1/4-20 (live dom/skb-sc-geom, default): 26 faces
+/// (CONE 14, PLANE 8, CYLINDER 2, TORUS 1, SPHERE 1); the crown's arc of
+/// BODY_RADIUS is a spindle torus whose lemon part Parasolid reports with a
+/// negative major radius (high: -3.429 / 8.636 mm, low: -1.143 / 6.35 mm), the
+/// nose a sphere (1.524 / 2.794 mm).
+#[test]
+fn acorn_nut_crown_is_a_torus_like_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    for (name, major, minor, nose) in [("Acorn high crown nut", -3.429, 8.636, 1.524), ("Acorn low crown nut", -1.143, 6.35, 2.794)] {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size("1/4-20");
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let body = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let surfaces: Vec<noshape_kernel::Surface> = (0..body.faces.len()).filter_map(|i| body.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_surface().ok()).collect();
+        let mut kinds: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        for s in &surfaces {
+            *kinds.entry(format!("{s:?}").split([' ', '(']).next().unwrap_or_default().to_string()).or_default() += 1;
+        }
+        let want: std::collections::BTreeMap<String, usize> = [("Cone", 14), ("Plane", 8), ("Cylinder", 2), ("Torus", 1), ("Sphere", 1)].iter().map(|(k, n)| (k.to_string(), *n)).collect();
+        assert_eq!(kinds, want, "{name}");
+        let torus = surfaces.iter().find_map(|s| match s {
+            noshape_kernel::Surface::Torus { major_radius, minor_radius, .. } => Some((*major_radius * 1e3, *minor_radius * 1e3)),
+            _ => None,
+        });
+        let (a, b) = torus.unwrap();
+        assert!((a - major).abs() < 1e-3 && (b - minor).abs() < 1e-3, "{name}: torus {a} / {b} mm, live {major} / {minor}");
+        let sphere = surfaces.iter().find_map(|s| if let noshape_kernel::Surface::Sphere { radius, .. } = s { Some(*radius * 1e3) } else { None }).unwrap();
+        assert!((sphere - nose).abs() < 1e-3, "{name}: nose {sphere} mm, live {nose}");
     }
 }

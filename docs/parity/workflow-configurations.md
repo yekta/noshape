@@ -103,3 +103,10 @@ Pass 6 (17:11) had found C5 fixed (bubble at the window's top centre, unclipped,
 | Row | Ours | Status |
 |---|---|---|
 | C1 List input names | "Configuration", then "List input 1" | ✅ **fixed** |
+
+## Re-check on main 88fbf8f5 (qa4, 2026-10-23 18:00–19:00, FRESH=1, /root/qa4-scratch/bin/noshape-m88)
+| Finding | Result |
+|---|---|
+| C1 List input names | ✅ Configuration, then "List input 1", "List input 2" |
+| C5 bubbles | ✅ the configure toast is drawn over the right panel and goes by itself (code: 5 s auto-dismiss, window-centred) |
+| C3, C4, C8, "Configured" tag | fixes cited in code (config_panel.rs, feature_dialog.rs); not re-run in the app this pass |

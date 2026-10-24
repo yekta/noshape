@@ -553,6 +553,8 @@ struct DrawLists {
     reflective: Vec<usize>,
     /// Color pass only: opaque meshes drawn after the transparent ones.
     over_transparent: Vec<usize>,
+    /// Color pass only: translucent meshes drawn after the lines and points.
+    over_lines: Vec<usize>,
     lines: Vec<usize>,
     /// Color pass only: silhouette candidates (`GpuLines::silhouette`) and
     /// backface silhouette meshes (`Instance::back_silhouette`).
@@ -578,6 +580,14 @@ struct DrawLists {
     lod_order: Vec<u32>,
     /// By body id − 1: drawn as its [`Instance::lod_box`].
     boxes: Vec<bool>,
+    /// By body id − 1: its edge line level ([`Instance::line_lod`]).
+    line_levels: Vec<u8>,
+    diagonal_px: Vec<f32>,
+    /// By body id − 1: its display level ([`Instance::mesh_lod`] − 1).
+    mesh_levels: Vec<u8>,
+    /// The frame's [`Detail::mesh_error_px`] (every pass: picks follow the
+    /// levels shown).
+    mesh_error_px: f32,
 }
 
 /// A body for [`lod_boxes`]: its [`Instance::lod_box`]'s transform (the
@@ -588,35 +598,65 @@ pub struct LodBody {
     pub triangles: u32,
     /// Has a box (wire bodies have none and are never boxed).
     pub has_box: bool,
+    /// Its display levels present (bit k: level k, [`Instance::mesh_lod`]
+    /// − 1; 0 without levels) and the mesh of its coarsest (the key of the
+    /// finest level it has shown, [`MeshLodMemory`]).
+    pub levels: u8,
+    pub coarse_mesh: usize,
+    coarse_level: u8,
 }
+
+/// The finest display level each body has shown, by (its coarsest mesh,
+/// body id): Onshape keeps a body's finest tessellation once loaded, so a
+/// body doesn't go coarser when the camera zooms out.
+pub type MeshLodMemory = std::collections::HashMap<(usize, u32), u8>;
 
 /// `MAXIMUM_BODY_CULL_DIAMETER_PROPORTION`: only bodies smaller than this
 /// share of the viewport diagonal are ever drawn as their box.
 const MAX_BOX_DIAMETER_PROPORTION: f32 = 0.01;
 
-/// Onshape's `performAggressiveCulling` (webgl BodyManager): which bodies
-/// to draw as their box (`boxes[id - 1]`). Those under
-/// `extent_culling_px` on screen and, with `low_level_body_proportion`
-/// above 0, that share of all bodies taken by most triangles per squared
-/// radius first (`getBenefitToCull`), the ones outside the view counting
-/// against it; either only while under 1% of the viewport diagonal. The
-/// viewport is `width` × `height` device pixels, `dpr` per CSS px.
-pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), detail: &Detail, order: &mut Vec<u32>, boxes: &mut Vec<bool>) {
-    boxes.clear();
-    boxes.resize(bodies.len(), false);
+/// A body's bounding radius in world units (its box's half diagonal).
+fn box_radius(b: &LodBody) -> f32 {
+    0.5 * (b.box_transform.x_axis + b.box_transform.y_axis + b.box_transform.z_axis).truncate().length()
+}
+
+/// Each body's bounding-box diagonal on screen (CSS px; infinite for one
+/// without a box): its size for [`lod_boxes`], [`line_lod_level`] and
+/// [`mesh_lod_level`]. The viewport is `width` × `height` device pixels,
+/// `dpr` per CSS px.
+pub fn body_diagonals_px(bodies: &[LodBody], view_proj: &Mat4, (_, height, dpr): (u32, u32, f32), out: &mut Vec<f32>) {
     let dpr = dpr.max(1e-3);
     // Clip-space y per world unit: row 1 of the view-projection's 3x3 (a
     // rotation times the projection's y scale).
     let y_scale = Vec3::new(view_proj.x_axis.y, view_proj.y_axis.y, view_proj.z_axis.y).length();
-    let max_px = MAX_BOX_DIAMETER_PROPORTION * (width as f32).hypot(height as f32) / dpr;
-    let radius = |b: &LodBody| 0.5 * (b.box_transform.x_axis + b.box_transform.y_axis + b.box_transform.z_axis).truncate().length();
+    out.clear();
+    out.extend(bodies.iter().map(|b| {
+        if !b.has_box {
+            return f32::INFINITY;
+        }
+        let w = (*view_proj * b.box_transform.w_axis).w.max(1e-9);
+        2.0 * box_radius(b) * y_scale / w * height as f32 * 0.5 / dpr
+    }));
+}
+
+/// Onshape's `performAggressiveCulling` (webgl BodyManager): which bodies
+/// to draw as their box (`boxes[id - 1]`). Those under
+/// `extent_culling_px` on screen and, with `low_level_body_proportion`
+/// above 0, that share of all bodies taken by most (coarse) triangles per
+/// squared radius first (`getBenefitToCull`), the ones outside the view
+/// counting against it; either only while under 1% of the viewport
+/// diagonal. `diagonal_px`: [`body_diagonals_px`].
+pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), detail: &Detail, diagonal_px: &[f32], order: &mut Vec<u32>, boxes: &mut Vec<bool>) {
+    boxes.clear();
+    boxes.resize(bodies.len(), false);
+    let max_px = MAX_BOX_DIAMETER_PROPORTION * (width as f32).hypot(height as f32) / dpr.max(1e-3);
     order.clear();
     order.extend((0..bodies.len() as u32).filter(|&i| bodies[i as usize].has_box));
     let mut budget = (detail.low_level_body_proportion.clamp(0.0, 1.0) * bodies.len() as f32).floor() as i64;
     if budget > 0 {
         let benefit = |i: u32| {
             let b = &bodies[i as usize];
-            b.triangles as f32 / radius(b).powi(2).max(1e-30)
+            b.triangles as f32 / box_radius(b).powi(2).max(1e-30)
         };
         order.sort_by(|&a, &b| benefit(b).total_cmp(&benefit(a)).then(a.cmp(&b)));
     }
@@ -626,8 +666,7 @@ pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u3
             budget -= 1;
             continue;
         }
-        let w = (*view_proj * b.box_transform.w_axis).w.max(1e-9);
-        let px = 2.0 * radius(b) * y_scale / w * height as f32 * 0.5 / dpr;
+        let px = diagonal_px[i as usize];
         if ((a as i64) < budget || px < detail.extent_culling_px) && px < max_px {
             boxes[i as usize] = true;
         }
@@ -635,6 +674,22 @@ pub fn lod_boxes(bodies: &[LodBody], view_proj: &Mat4, (width, height, dpr): (u3
 }
 
 impl DrawLists {
+    /// The edge line level body `id` draws this pass (1: full edges).
+    fn line_level(&self, id: u32) -> u8 {
+        if id == 0 {
+            return 1;
+        }
+        self.line_levels.get(id as usize - 1).copied().unwrap_or(1)
+    }
+
+    /// The display level body `id` shows this pass.
+    fn mesh_level(&self, id: u32) -> u8 {
+        if id == 0 {
+            return 0;
+        }
+        self.mesh_levels.get(id as usize - 1).copied().unwrap_or(0)
+    }
+
     /// Whether body `id`'s box replaces it this pass.
     fn boxed(&self, id: u32) -> bool {
         id > 0 && self.boxes.get(id as usize - 1).copied().unwrap_or(false)
@@ -652,7 +707,7 @@ impl DrawLists {
     }
 
     /// Partition the scene's visible instances by pass, sorted by layer.
-    fn build(&mut self, scene: &Scene, view_proj: &Mat4, width: u32, height: u32, dpr: f32, pick: bool) {
+    fn build(&mut self, scene: &Scene, view_proj: &Mat4, (width, height, dpr): (u32, u32, f32), pick: bool, memory: &mut MeshLodMemory) {
         self.opaque.clear();
         self.transparent.clear();
         self.pick_priority.clear();
@@ -660,6 +715,7 @@ impl DrawLists {
         self.images_faded.clear();
         self.reflective.clear();
         self.over_transparent.clear();
+        self.over_lines.clear();
         self.lines.clear();
         self.silhouettes.clear();
         self.back_silhouettes.clear();
@@ -668,26 +724,63 @@ impl DrawLists {
         self.points_hidden.clear();
         self.culled = 0;
         self.boxes.clear();
-        if let Some(detail) = self.lod.filter(|_| !pick) {
-            self.lod_bodies.clear();
-            for inst in scene.instances.iter().filter(|i| i.body > 0) {
-                let k = inst.body as usize - 1;
-                if k >= self.lod_bodies.len() {
-                    self.lod_bodies.resize(k + 1, LodBody::default());
-                }
-                let b = &mut self.lod_bodies[k];
-                match &inst.drawable {
-                    _ if inst.lod_box => {
-                        b.box_transform = inst.transform;
-                        b.has_box = true;
-                    }
-                    Drawable::Mesh(m) if !inst.back_silhouette => b.triangles += m.0.index_count / 3,
-                    _ => {}
-                }
+        self.line_levels.clear();
+        self.mesh_levels.clear();
+        self.lod_bodies.clear();
+        for inst in scene.instances.iter().filter(|i| i.body > 0) {
+            let k = inst.body as usize - 1;
+            if k >= self.lod_bodies.len() {
+                self.lod_bodies.resize(k + 1, LodBody::default());
             }
-            lod_boxes(&self.lod_bodies, view_proj, (width, height, dpr), &detail, &mut self.lod_order, &mut self.boxes);
-            if perf::enabled() {
-                perf::record_ms("r.lod_boxes", self.boxes.iter().filter(|b| **b).count() as f32);
+            let b = &mut self.lod_bodies[k];
+            if inst.mesh_lod > 0 {
+                b.levels |= 1 << (inst.mesh_lod - 1);
+            }
+            match &inst.drawable {
+                _ if inst.lod_box => {
+                    b.box_transform = inst.transform;
+                    b.has_box = true;
+                }
+                Drawable::Mesh(m) if !inst.back_silhouette => {
+                    // The coarsest level's mesh: the memory key and (Onshape
+                    // ranks by the coarse triangle count) the triangles.
+                    if inst.mesh_lod > 0 && (b.coarse_level == 0 || inst.mesh_lod < b.coarse_level) {
+                        (b.coarse_level, b.coarse_mesh, b.triangles) = (inst.mesh_lod, Arc::as_ptr(&m.0) as usize, 0);
+                    }
+                    if inst.mesh_lod == b.coarse_level {
+                        b.triangles += m.0.index_count / 3;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !self.lod_bodies.is_empty() {
+            body_diagonals_px(&self.lod_bodies, view_proj, (width, height, dpr), &mut self.diagonal_px);
+            // Each body's display level (Onshape refines a body while its
+            // chordal error is over the threshold, and keeps the finest).
+            if memory.len() > 200_000 {
+                memory.clear();
+            }
+            for (i, b) in self.lod_bodies.iter().enumerate() {
+                if b.levels == 0 {
+                    self.mesh_levels.push(0);
+                    continue;
+                }
+                let (from, to) = (b.levels.trailing_zeros() as u8, 7 - b.levels.leading_zeros() as u8);
+                let mut level = mesh_lod_level(self.diagonal_px[i] * 0.5, self.mesh_error_px, from, to);
+                let shown = memory.entry((b.coarse_mesh, i as u32 + 1)).or_insert(from);
+                level = level.max(*shown).min(to);
+                *shown = level;
+                self.mesh_levels.push(level);
+            }
+            if let Some(detail) = self.lod.filter(|_| !pick) {
+                lod_boxes(&self.lod_bodies, view_proj, (width, height, dpr), &detail, &self.diagonal_px, &mut self.lod_order, &mut self.boxes);
+                self.line_levels.extend(self.diagonal_px.iter().map(|&px| line_lod_level(px)));
+                if perf::enabled() {
+                    perf::record_ms("r.lod_boxes", self.boxes.iter().filter(|b| **b).count() as f32);
+                    let n = self.mesh_levels.len().max(1) as f32;
+                    perf::record_ms("r.mesh_level_mean", self.mesh_levels.iter().map(|&l| l as f32).sum::<f32>() / n);
+                }
             }
         }
         // Screen-space margin for wide lines, points and the pick widening.
@@ -698,8 +791,9 @@ impl DrawLists {
             if self.skip_compare != 0 && inst.compare == self.skip_compare {
                 continue;
             }
-            // A body's box instead of the body, never both.
-            if inst.lod_box != self.boxed(inst.body) {
+            // A body's box instead of the body, never both; one level of
+            // its edges (the full ones when picking).
+            if inst.lod_box != self.boxed(inst.body) || (inst.line_lod > 0 && inst.line_lod != self.line_level(inst.body)) || (inst.mesh_lod > 0 && inst.mesh_lod - 1 != self.mesh_level(inst.body)) {
                 continue;
             }
             if pick {
@@ -750,6 +844,11 @@ impl DrawLists {
                 Drawable::Mesh(_) if pick && inst.pick_only => self.pick_priority.push(i),
                 Drawable::Mesh(_) if !pick && inst.reflection.is_some() && inst.color[3] >= 0.999 => self.reflective.push(i),
                 Drawable::Mesh(_) if !pick && inst.over_transparent && inst.color[3] >= 0.999 => self.over_transparent.push(i),
+                Drawable::Mesh(_) if inst.over_lines => {
+                    if !pick {
+                        self.over_lines.push(i);
+                    }
+                }
                 Drawable::Mesh(_) if inst.color[3] >= 0.999 => self.opaque.push(i),
                 Drawable::Mesh(_) => self.transparent.push(i),
                 Drawable::Image(_) if inst.color[3] >= 0.999 => self.images.push(i),
@@ -772,15 +871,22 @@ impl DrawLists {
                 self.silhouettes.clear();
                 self.back_silhouettes.clear();
             }
+            if o.skip_backsil {
+                self.back_silhouettes.clear();
+            }
+            if o.skip_silhouettes {
+                self.silhouettes.clear();
+            }
             if o.skip_meshes {
                 self.opaque.clear();
                 self.transparent.clear();
+                self.over_lines.clear();
                 self.reflective.clear();
             }
         }
         let inst = &scene.instances;
-        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
-        let all = [opaque, transparent, pick_priority, reflective, over_transparent, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
+        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
+        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
         slots.clear();
         slot_of.clear();
         slot_of.resize(inst.len(), u32::MAX);
@@ -973,6 +1079,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.lines, &pipelines.line);
         draw(pass, &lists.silhouettes, &pipelines.silhouette);
         draw(pass, &lists.points, &pipelines.point);
+        draw(pass, &lists.over_lines, &pipelines.mesh_transparent);
         // Outlined see-through parts, last (their depth would hide what
         // is behind them).
         if outline {
@@ -984,13 +1091,18 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
 
 /// Diagnostics for GPU cost analysis (`NOSHAPE_PERF_MSAA=<n>` overrides the
 /// sample count, `NOSHAPE_PERF_SKIP=lines,meshes` skips draw categories in
-/// the color pass, `instancing` draws every copy with its own call and its
-/// own buffers, see [`instancing_disabled`]). Unset in normal use.
+/// the color pass (`backsil`: the backface silhouette meshes alone,
+/// `silhouettes`: the edge silhouettes alone, `ao`: ambient occlusion),
+/// `instancing` draws every copy with its own call and its own buffers, see
+/// [`instancing_disabled`]). Unset in normal use.
 struct PerfOverrides {
     msaa: Option<u32>,
     skip_lines: bool,
     skip_meshes: bool,
     skip_instancing: bool,
+    skip_backsil: bool,
+    skip_silhouettes: bool,
+    skip_ao: bool,
 }
 
 /// `NOSHAPE_PERF_SKIP=instancing`: no instanced calls, and the scene builder
@@ -1009,6 +1121,9 @@ fn perf_overrides() -> &'static PerfOverrides {
             skip_lines: skip.contains("lines"),
             skip_meshes: skip.contains("meshes"),
             skip_instancing: skip.contains("instancing"),
+            skip_backsil: skip.split(',').any(|t| t == "backsil"),
+            skip_silhouettes: skip.split(',').any(|t| t == "silhouettes"),
+            skip_ao: skip.split(',').any(|t| t == "ao"),
         }
     })
 }
@@ -1299,6 +1414,8 @@ pub struct Renderer {
     last_inst: Vec<u8>,
     inst_scratch: Vec<u8>,
     lists: DrawLists,
+    /// The finest display level each body has shown ([`MeshLodMemory`]).
+    mesh_lod_memory: MeshLodMemory,
     /// Compare mode: both versions' draw lists.
     lists_over: DrawLists,
     targets: HashMap<u64, TargetState>,
@@ -1645,6 +1762,7 @@ impl Renderer {
             last_inst: Vec::new(),
             inst_scratch: Vec::new(),
             lists: DrawLists::default(),
+            mesh_lod_memory: MeshLodMemory::default(),
             lists_over: DrawLists::default(),
             targets: HashMap::new(),
             pending: VecDeque::new(),
@@ -2081,7 +2199,8 @@ impl Renderer {
             None => 0,
         };
         lists.lod = Some(req.style.detail);
-        lists.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, false);
+        lists.mesh_error_px = req.style.detail.mesh_error_px;
+        lists.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
         lists.apply_detail(&req.style.detail);
         let bind_inst = self.prepare_slots(SLOTS_COLOR, &lists.slots);
         // ...then both versions together, and each version's opaque faces
@@ -2090,7 +2209,8 @@ impl Renderer {
             let mut over = std::mem::take(&mut self.lists_over);
             over.skip_compare = 0;
             over.lod = Some(req.style.detail);
-            over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, false);
+            over.mesh_error_px = req.style.detail.mesh_error_px;
+            over.build(&req.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, dpr), false, &mut self.mesh_lod_memory);
             over.apply_detail(&req.style.detail);
             let bind_over = self.prepare_slots(SLOTS_COMPARE_OVER, &over.slots);
             let faces = [crate::scene::compare::BASE, crate::scene::compare::TARGET]
@@ -2119,7 +2239,7 @@ impl Renderer {
 
         let t_encode = perf::scope("r.encode_submit");
         let Self { device, queue, pipelines, targets, bind_color, pending, ao, timer, overlay_gpu, text_shading, section_caps, compare_none, .. } = self;
-        let ao_on = ao_strength > 0.001 && ao.is_some();
+        let ao_on = ao_strength > 0.001 && ao.is_some() && !perf_overrides().skip_ao;
         let timer_slot = timer.as_ref().and_then(|t| t.free_slot());
         let pipelines = pipelines.as_ref().expect("pipelines");
         let ts = targets.get_mut(&target).expect("target");
@@ -2379,7 +2499,8 @@ impl Renderer {
             globals.viewport[3] = 8.0 * last.device_pixel_ratio;
             self.queue.write_buffer(&self.globals_pick, 0, bytemuck::bytes_of(&globals));
             let mut lists = std::mem::take(&mut self.lists);
-            lists.build(&last.scene, &Mat4::from_cols_array_2d(&globals.view_proj), width, height, last.device_pixel_ratio, true);
+            lists.mesh_error_px = last.style.detail.mesh_error_px;
+            lists.build(&last.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, last.device_pixel_ratio), true, &mut self.mesh_lod_memory);
             let bind_inst = self.prepare_slots(SLOTS_PICK, &lists.slots);
             let tex = self.targets[&target].tex.as_ref().expect("textures");
             {
@@ -2499,8 +2620,8 @@ impl Renderer {
         globals.viewport[3] = 8.0 * dpr;
         self.queue.write_buffer(&self.globals_sample, 0, bytemuck::bytes_of(&globals));
         let view_proj = Mat4::from_cols_array_2d(&globals.view_proj);
-        let mut lists = DrawLists::default();
-        lists.build(&last.scene, &view_proj, sw, sh, dpr, true);
+        let mut lists = DrawLists { mesh_error_px: last.style.detail.mesh_error_px, ..Default::default() };
+        lists.build(&last.scene, &view_proj, (sw, sh, dpr), true, &mut self.mesh_lod_memory);
         let bind_inst = self.prepare_slots(SLOTS_SAMPLE, &lists.slots);
         let tex = |label, format| {
             self.device.create_texture(&wgpu::TextureDescriptor {
@@ -3067,7 +3188,7 @@ mod tests {
     /// A cube body `diag` px across at `x` (1 world unit = 1 px in a
     /// 1000 × 800 viewport, so boxes stay under 12.8 px).
     fn cube(x: f32, diag: f32, triangles: u32) -> LodBody {
-        LodBody { box_transform: Mat4::from_translation(Vec3::new(x, 0.0, 0.0)) * Mat4::from_scale(Vec3::splat(diag / 3f32.sqrt())), triangles, has_box: true }
+        LodBody { box_transform: Mat4::from_translation(Vec3::new(x, 0.0, 0.0)) * Mat4::from_scale(Vec3::splat(diag / 3f32.sqrt())), triangles, has_box: true, ..Default::default() }
     }
 
     fn boxed(bodies: &[LodBody], proportion: f32, extent_px: f32) -> Vec<bool> {
@@ -3075,8 +3196,66 @@ mod tests {
         let vp = Mat4::from_scale(Vec3::new(1.0 / 500.0, 1.0 / 400.0, 1.0 / 1000.0));
         let detail = Detail { low_level_body_proportion: proportion, extent_culling_px: extent_px, ..Default::default() };
         let (mut order, mut boxes) = (Vec::new(), Vec::new());
-        lod_boxes(bodies, &vp, (1000, 800, 1.0), &detail, &mut order, &mut boxes);
+        let mut diagonals = Vec::new();
+        body_diagonals_px(bodies, &vp, (1000, 800, 1.0), &mut diagonals);
+        lod_boxes(bodies, &vp, (1000, 800, 1.0), &detail, &diagonals, &mut order, &mut boxes);
         boxes
+    }
+
+    #[test]
+    fn line_lod_simplifies_within_the_tolerance() {
+        // A 144-segment circle of radius 2: dropped points stay within tol.
+        let circle: Vec<[f32; 3]> = (0..=144).map(|i| {
+            let a = i as f32 / 144.0 * std::f32::consts::TAU;
+            [2.0 * a.cos(), 2.0 * a.sin(), 0.0]
+        }).collect();
+        assert_eq!(simplify_polyline(&circle, 0.0).len(), 145);
+        let coarse = simplify_polyline(&circle, 0.04);
+        assert!(coarse.len() < 30 && coarse.len() >= 5, "{}", coarse.len());
+        assert_eq!((coarse[0], coarse[coarse.len() - 1]), (circle[0], circle[144]));
+        // Every full point within 0.04 of the coarse loop.
+        let near = |p: Vec3| coarse.windows(2).map(|w| {
+            let (a, b) = (Vec3::from(w[0]), Vec3::from(w[1]));
+            let t = ((p - a).dot(b - a) / (b - a).length_squared()).clamp(0.0, 1.0);
+            (p - (a + (b - a) * t)).length()
+        }).fold(f32::MAX, f32::min);
+        assert!(circle.iter().all(|p| near(Vec3::from(*p)) <= 0.04 + 1e-5));
+        // One line data per coarser level, pick ids kept per edge.
+        let lods = edge_line_lods(&[circle.clone(), vec![[0.0; 3], [1.0, 0.0, 0.0]]], 6.0);
+        assert_eq!(lods.len(), LINE_LOD_TOLERANCES.len() - 1);
+        assert!(lods.windows(2).all(|w| w[1].segments.len() <= w[0].segments.len()));
+        assert_eq!(lods[2].segments.last().map(|s| s.pick_id), Some(2));
+    }
+
+    #[test]
+    fn mesh_lod_levels_refine_like_onshape() {
+        // View in high quality in a Part Studio (0.1 px), an Auto part (Fine
+        // up to Very fine): live 10-23 a3 saw 144 segments at ~70 px and 600
+        // from ~550 px; Fine's chordal error (0.00095178 × r) reaches
+        // 0.1 px from a ~105 px bounding radius.
+        let t = MESH_ERROR_PX_HIGH_QUALITY_STUDIO;
+        assert_eq!(mesh_lod_level(35.0, t, 2, 3), 2);
+        assert_eq!(mesh_lod_level(100.0, t, 2, 3), 2);
+        assert_eq!(mesh_lod_level(110.0, t, 2, 3), 3);
+        assert_eq!(mesh_lod_level(275.0, t, 2, 3), 3);
+        // A Coarse part refines through Medium and Fine.
+        assert_eq!(mesh_lod_level(5.0, t, 0, 3), 1);
+        assert_eq!(mesh_lod_level(20.0, t, 0, 3), 2);
+        // A single level never changes; 3 px (outside high quality) keeps
+        // a part where it is at any practical size.
+        assert_eq!(mesh_lod_level(1e6, t, 2, 2), 2);
+        assert_eq!(mesh_lod_level(2000.0, MESH_ERROR_PX, 2, 3), 2);
+    }
+
+    #[test]
+    fn line_lod_level_keeps_the_error_under_a_quarter_pixel() {
+        assert_eq!(line_lod_level(f32::INFINITY), 1);
+        assert_eq!(line_lod_level(5000.0), 1);
+        assert_eq!(line_lod_level(3000.0), 2);
+        assert_eq!(line_lod_level(900.0), 3);
+        assert_eq!(line_lod_level(240.0), 4);
+        assert_eq!(line_lod_level(50.0), 5);
+        assert_eq!(line_lod_level(10.0), 6);
     }
 
     #[test]

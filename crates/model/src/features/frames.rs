@@ -161,10 +161,10 @@ pub fn tag() -> FeatureType {
         .visible(frame),
         ParamSpec::bool("showDefaultAlignmentPoints", "Show default points", true).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(frame),
         // Form tag (sheet metal form tools).
-        ParamSpec::query1("partToAdd", "Part to add", QueryFilter::SOLID_BODY).visible(form),
-        ParamSpec::query1("partToRemove", "Part to remove", QueryFilter::SOLID_BODY).visible(form),
-        ParamSpec::query1("flatSketch", "Sketch for flat view", QueryFilter::FEATURE | QueryFilter::SKETCH).visible(form),
-        ParamSpec::query1("formOrigin", "Form origin mate connector", QueryFilter::MATE_CONNECTOR).visible(form),
+        ParamSpec::query1("positivePart", "Part to add", QueryFilter::SOLID_BODY).visible(form),
+        ParamSpec::query1("negativePart", "Part to remove", QueryFilter::SOLID_BODY).visible(form),
+        ParamSpec::query1("flatFormSketch", "Sketch for flat view", QueryFilter::FEATURE | QueryFilter::SKETCH).visible(form),
+        ParamSpec::query1("cSysMateConnector", "Form origin mate connector", QueryFilter::MATE_CONNECTOR).visible(form),
     ];
     FeatureType::new("tag", "Tag", Category::Frame, p).icon("tagProfile").describe("Tag a profile sketch for frames or a form tool for sheet metal")
 }

@@ -47,3 +47,9 @@ Live answered "qa5 pass 7" (4) + asb (d) "shaded drawing views": picker filters 
 ## DSM4 re-check (10-22, app /tmp/qa5/noshape-1013; doc /tmp/qa5/d29/kinds.noshape from /root/qa5-scratch/pass20/mkkinds.py: parts, a composite part, a surface, a curve, sketches, a sheet-metal studio)
 - Live (behaviours ~6840): filter icons Part Studios, Parts, Composite parts, Sketches, Surfaces, Curves, Flat patterns; **a document that lacks some kinds shows only the relevant ones**.
 - Ours with all kinds present: **7 icons in that order** (z31). The sheet-metal doc has no composite parts, surfaces or curves, hence 4. → **DSM4 withdrawn** (asb's report was right).
+
+## Re-check (qa4, 2026-10-23 20:40–21:10, main a0e360a3; code and the latest qa5 passes)
+- DSM1, DSM5 fixed; DSM4 withdrawn; DSM3 label ✅ (new flat view's default shading not re-checked).
+- **DSM2 / SM5** still open: bend notes "DOWN 90.0° R2" where live reads "UP 90.0° …". The notes print `FlatBendLine.up`
+  (sheetmetal/flat.rs:300); fs's test `sheetmetal_frames.rs:271` still asserts a flange is *not* up. asb: lands with fs's
+  std-route switch → qa5-routing DSM2 (**fs**).
