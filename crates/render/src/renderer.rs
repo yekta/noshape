@@ -101,6 +101,11 @@ pub(crate) struct GpuMesh {
     vertices: wgpu::Buffer,
     indices: wgpu::Buffer,
     index_count: u32,
+    /// `Uint16` when every vertex index fits.
+    index_format: wgpu::IndexFormat,
+    /// Fixed-point vertex positions → mesh coordinates (see [`MeshVertex`]),
+    /// folded into the instance's model matrix.
+    dequant: Mat4,
     pub(crate) bounds: Option<(Vec3, Vec3)>,
 }
 pub(crate) struct GpuLines {
@@ -135,12 +140,40 @@ struct ImageVertex {
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct MeshVertex {
-    pos: [f32; 3],
-    normal: [f32; 3],
+    /// Position as 21-bit fixed point per axis over the mesh bounds (x in
+    /// bits 0–20 of the first word, y in 21–31 and 0–9 of the second, z in
+    /// 10–30): 0.5 µm steps on a 1 m part, decoded by `mesh_pos` and
+    /// [`GpuMesh::dequant`].
+    pos: [u32; 2],
+    /// Unit normal, octahedral encoded (`oct_normal`).
+    normal: [i16; 2],
     pick: u32,
     /// sRGB RGBA8 per-vertex color (used by per-primitive color instances;
     /// alpha 0 = instance color).
     color: [u8; 4],
+}
+
+/// Fixed-point steps across the mesh bounds per axis ([`MeshVertex::pos`]).
+const POS_STEPS: f32 = ((1u32 << 21) - 1) as f32;
+
+/// [`MeshVertex::pos`] from fixed-point coordinates in `0..=POS_STEPS`.
+fn pack_pos(q: Vec3) -> [u32; 2] {
+    let [x, y, z] = q.to_array().map(|c| c.clamp(0.0, POS_STEPS) as u32);
+    [x | (y << 21), (y >> 11) | (z << 10)]
+}
+
+/// Octahedral encoding of a unit vector in two snorm16 values (decoded by
+/// the shaders' `oct_decode`).
+fn oct_normal(n: [f32; 3]) -> [i16; 2] {
+    let n = Vec3::from(n);
+    let s = n.x.abs() + n.y.abs() + n.z.abs();
+    if s <= 0.0 {
+        return [0, 0];
+    }
+    let (x, y) = (n.x / s, n.y / s);
+    let sign = |v: f32| if v >= 0.0 { 1.0 } else { -1.0 };
+    let (x, y) = if n.z < 0.0 { ((1.0 - y.abs()) * sign(x), (1.0 - x.abs()) * sign(y)) } else { (x, y) };
+    [x, y].map(|c| (c.clamp(-1.0, 1.0) * 32767.0).round() as i16)
 }
 
 #[repr(C)]
@@ -995,7 +1028,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
                         pass.set_bind_group(2, &r.environment.0.bind_group, &[]);
                     }
                     pass.set_vertex_buffer(0, m.0.vertices.slice(..));
-                    pass.set_index_buffer(m.0.indices.slice(..), wgpu::IndexFormat::Uint32);
+                    pass.set_index_buffer(m.0.indices.slice(..), m.0.index_format);
                     pass.draw_indexed(0..m.0.index_count, 0, slots);
                 }
                 // Six vertices per slot: the shaders take the slot from the
@@ -1049,6 +1082,10 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &lists.lines, &pipelines.line_pick);
         draw(pass, &lists.points, &pipelines.point_pick);
     } else {
+        // Before the faces: its cheap fragments fill the depth of each part's
+        // outline, so faces of parts behind it are rejected before shading
+        // (drawn after the faces it cost up to 37 % more GPU time on the
+        // macOS runners, docs/handoff/viewport-performance.md).
         draw(pass, &lists.back_silhouettes, &pipelines.mesh_backsil);
         draw(pass, &lists.opaque, &pipelines.mesh_opaque);
         if outline {
@@ -1821,7 +1858,7 @@ impl Renderer {
         let mesh_buffers = [wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<MeshVertex>() as u64,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Uint32, 3 => Unorm8x4],
+            attributes: &wgpu::vertex_attr_array![0 => Uint32x2, 1 => Snorm16x2, 2 => Uint32, 3 => Unorm8x4],
         }];
         let silhouette_buffers = [wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<SilhouetteSegment>() as u64,
@@ -2045,8 +2082,12 @@ impl Renderer {
         bytes.resize((scene.instances.len() as u64 * INST_STRIDE) as usize, 0);
         for (i, inst) in scene.instances.iter().enumerate() {
             let normal_m = inst.transform.inverse().transpose();
+            let model = match &inst.drawable {
+                Drawable::Mesh(m) => inst.transform * m.0.dequant,
+                _ => inst.transform,
+            };
             let u = InstUniform {
-                model: inst.transform.to_cols_array_2d(),
+                model: model.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
                 params: [(inst.color_mode == ColorMode::PerPrimitive) as u32, inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32, inst.pick_base],
@@ -2293,7 +2334,7 @@ impl Renderer {
                 for (k, &i) in faces[v].iter().enumerate() {
                     if let Drawable::Mesh(m) = &req.scene.instances[i as usize].drawable {
                         pass.set_vertex_buffer(0, m.0.vertices.slice(..));
-                        pass.set_index_buffer(m.0.indices.slice(..), wgpu::IndexFormat::Uint32);
+                        pass.set_index_buffer(m.0.indices.slice(..), m.0.index_format);
                         pass.draw_indexed(0..m.0.index_count, 0, k as u32..k as u32 + 1);
                     }
                 }
@@ -3083,6 +3124,9 @@ impl Uploader {
     pub fn upload_mesh_colored(&self, positions: &[[f32; 3]], normals: &[[f32; 3]], pick_ids: &[u32], colors: &[[u8; 4]], indices: &[u32]) -> MeshHandle {
         const STRIDE: usize = std::mem::size_of::<MeshVertex>();
         let n = positions.len();
+        let bounds = crate::scene::bounds_of(positions.iter().copied());
+        let (lo, ext) = bounds.map_or((Vec3::ZERO, Vec3::ZERO), |(lo, hi)| (lo, hi - lo));
+        let inv = Vec3::select(ext.cmpgt(Vec3::ZERO), Vec3::splat(POS_STEPS) / ext, Vec3::ZERO);
         let vertices = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("mesh-vertices"),
             size: (n.max(1) * STRIDE) as u64,
@@ -3098,8 +3142,8 @@ impl Uploader {
                 let end = (start + 4096).min(n);
                 chunk.clear();
                 chunk.extend((start..end).map(|i| MeshVertex {
-                    pos: positions[i],
-                    normal: normals.get(i).copied().unwrap_or([0.0, 0.0, 1.0]),
+                    pos: pack_pos(((Vec3::from(positions[i]) - lo) * inv).round()),
+                    normal: oct_normal(normals.get(i).copied().unwrap_or([0.0, 0.0, 1.0])),
                     pick: pick_ids.get(i).copied().unwrap_or(0),
                     color: colors.get(i).copied().unwrap_or([0; 4]),
                 }));
@@ -3108,13 +3152,24 @@ impl Uploader {
             }
         }
         vertices.unmap();
+        let (short, index_format) = if n <= 1 << 16 {
+            (indices.iter().map(|&i| i as u16).collect::<Vec<_>>(), wgpu::IndexFormat::Uint16)
+        } else {
+            (Vec::new(), wgpu::IndexFormat::Uint32)
+        };
         let indices_buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh-indices"),
-            contents: if indices.is_empty() { &[0u8; 4] } else { bytemuck::cast_slice(indices) },
+            contents: if indices.is_empty() {
+                &[0u8; 4]
+            } else if index_format == wgpu::IndexFormat::Uint16 {
+                bytemuck::cast_slice(&short)
+            } else {
+                bytemuck::cast_slice(indices)
+            },
             usage: wgpu::BufferUsages::INDEX,
         });
-        let bounds = crate::scene::bounds_of(positions.iter().copied());
-        MeshHandle(Arc::new(GpuMesh { vertices, indices: indices_buf, index_count: indices.len() as u32, bounds }))
+        let dequant = Mat4::from_translation(lo) * Mat4::from_scale(ext / POS_STEPS);
+        MeshHandle(Arc::new(GpuMesh { vertices, indices: indices_buf, index_count: indices.len() as u32, index_format, dequant, bounds }))
     }
 
     pub fn upload_lines(&self, lines: &LineData) -> LinesHandle {
@@ -3184,6 +3239,46 @@ fn room_of(bounds: Option<(glam::Vec3, glam::Vec3)>) -> [f32; 4] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The shaders' `mesh_pos` / `oct_decode`, on the CPU.
+    fn unpack_pos([a, b]: [u32; 2]) -> Vec3 {
+        Vec3::new((a & 0x1f_ffff) as f32, ((a >> 21) | ((b & 0x3ff) << 11)) as f32, (b >> 10) as f32)
+    }
+
+    fn oct_decode(e: [i16; 2]) -> Vec3 {
+        let (x, y) = (e[0] as f32 / 32767.0, e[1] as f32 / 32767.0);
+        let mut n = Vec3::new(x, y, 1.0 - x.abs() - y.abs());
+        let t = (-n.z).max(0.0);
+        n.x += if n.x >= 0.0 { -t } else { t };
+        n.y += if n.y >= 0.0 { -t } else { t };
+        n.normalize()
+    }
+
+    #[test]
+    fn compact_vertices_round_trip() {
+        // Positions: within half a step of 2^21 - 1 over the bounds.
+        let (lo, hi) = (Vec3::new(-512.0, 3.0, 0.25), Vec3::new(488.0, 1003.0, 0.25));
+        let ext = hi - lo;
+        let inv = Vec3::select(ext.cmpgt(Vec3::ZERO), Vec3::splat(POS_STEPS) / ext, Vec3::ZERO);
+        let dequant = Mat4::from_translation(lo) * Mat4::from_scale(ext / POS_STEPS);
+        for p in [lo, hi, Vec3::new(0.0, 500.123_45, 0.25), Vec3::new(-511.999, 3.000_2, 0.25)] {
+            let q = pack_pos(((p - lo) * inv).round());
+            let back = dequant.transform_point3(unpack_pos(q));
+            assert!((back - p).abs().max_element() <= 1000.0 / POS_STEPS * 0.51, "{p} -> {back}");
+        }
+        // Normals: within 0.01° everywhere on the sphere.
+        for i in 0..2000 {
+            let (u, v) = (i as f32 * 0.618_034 % 1.0, (i as f32 + 0.5) / 2000.0);
+            let z = 1.0 - 2.0 * v;
+            let r = (1.0 - z * z).max(0.0).sqrt();
+            let n = Vec3::new(r * (u * std::f32::consts::TAU).cos(), r * (u * std::f32::consts::TAU).sin(), z);
+            let d = oct_decode(oct_normal(n.to_array()));
+            assert!(n.cross(d).length().atan2(n.dot(d)).to_degrees() < 0.01, "{n} -> {d}");
+        }
+        for n in [Vec3::X, Vec3::NEG_X, Vec3::Y, Vec3::NEG_Y, Vec3::Z, Vec3::NEG_Z] {
+            assert!(oct_decode(oct_normal(n.to_array())).abs_diff_eq(n, 1e-6), "{n}");
+        }
+    }
 
     /// A cube body `diag` px across at `x` (1 world unit = 1 px in a
     /// 1000 × 800 viewport, so boxes stay under 12.8 px).
