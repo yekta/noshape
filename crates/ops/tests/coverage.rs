@@ -166,7 +166,7 @@ fn every_menu_item_is_listed() {
 /// Planned menu items, per area: these only go down (lower them as ops land).
 #[test]
 fn menu_coverage_report() {
-    const CEILINGS: [(&str, usize); 4] = [("partStudio", 4), ("assembly", 6), ("drawing", 13), ("document", 23)];
+    const CEILINGS: [(&str, usize); 4] = [("partStudio", 2), ("assembly", 1), ("drawing", 13), ("document", 23)];
     for (area, ceiling) in CEILINGS {
         let all: Vec<&(&str, Cover)> = MENUS.iter().filter(|(id, _)| id.starts_with(&format!("{area}:"))).collect();
         let planned: Vec<&str> = all.iter().filter(|c| matches!(c.1, Cover::Planned)).map(|c| c.0).collect();
@@ -178,7 +178,7 @@ fn menu_coverage_report() {
 /// Coverage only goes up: lower `PLANNED_CEILING` as operations land.
 #[test]
 fn coverage_report() {
-    const PLANNED_CEILING: usize = 18;
+    const PLANNED_CEILING: usize = 14;
     let features = feature_shortcuts().len();
     let ops = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Op(_))).count();
     let planned = SHORTCUTS.iter().filter(|c| matches!(c.1, Cover::Planned)).count();

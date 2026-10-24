@@ -2858,3 +2858,118 @@ fn drawing_annotation_menu_edits() {
     assert_eq!(e.param.as_deref(), Some("group"), "{e:?}");
 
 }
+
+/// P1 menu gaps: display states, the assembly configuration panel's input
+/// menus, Change to version, configured part properties and Part Studio
+/// datum annotations.
+#[test]
+fn assembly_and_part_studio_menu_gaps() {
+    let mut ctx = Ctx::new();
+    let (block, pin) = two_part_assembly(&mut ctx, "menu_gaps.noshape");
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().rsplit(":: ").next().unwrap().to_string();
+    let name_of = |ctx: &mut Ctx, id: &str| call(ctx, "assembly_list", json!({}))["instances"].as_array().unwrap().iter().find(|i| i["id"] == id).unwrap()["name"].as_str().unwrap().to_string();
+    let pin_name = name_of(&mut ctx, &pin);
+
+    // Display states.
+    call(&mut ctx, "assembly_set_state", json!({ "instances": [pin], "hidden": true }));
+    let r = call(&mut ctx, "assembly_display_state", json!({ "action": "add", "name": "Pin hidden" }));
+    assert_eq!(last(&mut ctx), "Add display state : Pin hidden");
+    assert_eq!(r["display_states"][0]["hidden_instances"], json!([pin_name]), "{r}");
+    let e = try_call(&mut ctx, "assembly_display_state", json!({ "action": "add", "name": "Pin hidden" })).unwrap_err();
+    assert!(e.message.contains("already a display state"), "{e:?}");
+    call(&mut ctx, "assembly_set_state", json!({ "instances": [pin], "hidden": false }));
+    let r = call(&mut ctx, "assembly_display_state", json!({ "action": "apply", "state": "Pin hidden" }));
+    assert_eq!(last(&mut ctx), "Apply display state : Pin hidden");
+    assert_eq!(r["hidden_instances"], json!([pin_name]), "{r}");
+    call(&mut ctx, "assembly_display_state", json!({ "action": "rename", "state": "1", "name": "No pin" }));
+    assert_eq!(last(&mut ctx), "Rename display state : No pin");
+    let r = call(&mut ctx, "assembly_display_state", json!({ "action": "remove", "state": "No pin" }));
+    assert_eq!(last(&mut ctx), "Remove display state");
+    assert!(r["display_states"].as_array().unwrap().is_empty());
+
+    // Configuration inputs: duplicate, visibility, copy into the Part Studio, propagate.
+    let list = call(&mut ctx, "config_add_input", json!({ "tab": "Assembly 1", "kind": "list" }))["input"].as_str().unwrap().to_string();
+    let lite = call(&mut ctx, "config_add_option", json!({ "tab": "Assembly 1", "input": list, "name": "Lite" }))["option"].as_str().unwrap().to_string();
+    let check = call(&mut ctx, "config_add_input", json!({ "tab": "Assembly 1", "kind": "checkbox", "name": "Holes" }))["input"].as_str().unwrap().to_string();
+    let d = call(&mut ctx, "config_duplicate_input", json!({ "tab": "Assembly 1", "input": "Holes" }));
+    assert_eq!(last(&mut ctx), "Copy configuration input");
+    assert!(d["configuration"]["inputs"].as_array().unwrap().iter().any(|i| i["name"] == "Holes copy"), "{d}");
+    let e = try_call(&mut ctx, "config_duplicate_input", json!({ "tab": "Part Studio 1", "input": "x" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tab"), "{e:?}");
+    call(&mut ctx, "config_visibility", json!({ "tab": "Assembly 1", "input": check, "visibility": { "conditions": [{ "input": list, "test": { "Is": [lite] } }], "option_rules": [] } }));
+    assert_eq!(last(&mut ctx), "Edit visibility conditions");
+    let l = call(&mut ctx, "config_list", json!({ "tab": "Assembly 1" }));
+    assert!(l["inputs"].as_array().unwrap().iter().find(|i| i["id"] == check).unwrap()["visible_when"].is_object(), "{l}");
+    let e = try_call(&mut ctx, "config_visibility", json!({ "tab": "Assembly 1", "input": list, "visibility": { "conditions": [{ "input": check, "test": { "Is": ["true"] } }], "option_rules": [] } })).unwrap_err();
+    assert!(e.message.contains("not above"), "{e:?}");
+    let c = call(&mut ctx, "config_copy_inputs", json!({ "from": "Assembly 1", "tab": "Part Studio 1" }));
+    assert_eq!(c["pasted"].as_array().unwrap().len(), 3, "{c}");
+    let p = call(&mut ctx, "config_propagate", json!({ "tab": "Assembly 1", "input": list }));
+    assert_eq!(last(&mut ctx), "Input propagation");
+    let cands = p["candidates"].as_array().unwrap();
+    assert_eq!(cands.len(), 2, "{p}");
+    assert!(cands.iter().all(|c| c["propagated"] == true), "{p}");
+    let e = try_call(&mut ctx, "config_propagate", json!({ "tab": "Assembly 1", "input": list, "features": ["x"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("features"), "{e:?}");
+
+    // Change to version: the block shows V1, then V2; it keeps its geometry.
+    let e = try_call(&mut ctx, "assembly_change_to_version", json!({ "version": "V1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    call(&mut ctx, "assembly_change_to_version", json!({ "version": "V1", "instances": [block] }));
+    assert_eq!(last(&mut ctx), "Change to version : V1");
+    let src = |ctx: &mut Ctx| call(ctx, "assembly_list", json!({}))["instances"].as_array().unwrap().iter().find(|i| i["id"] == block).unwrap()["source"].clone();
+    assert!(src(&mut ctx)["version_of"].is_object(), "{}", src(&mut ctx));
+    let faces = call(&mut ctx, "assembly_entities", json!({ "instance": block, "kind": "faces" }));
+    assert!(!faces["faces"].as_array().unwrap().is_empty(), "the versioned block keeps its geometry: {faces}");
+    call(&mut ctx, "history_create_version", json!({ "name": "V2" }));
+    call(&mut ctx, "assembly_change_to_version", json!({ "version": "V2", "instances": [block] }));
+    assert_eq!(last(&mut ctx), "Update to V2");
+
+    // Configured part properties.
+    let part = call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["id"].as_str().unwrap().to_string();
+    let t = call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": part, "action": "add_property", "property": "Description" }));
+    assert_eq!(last(&mut ctx), "Add configured property");
+    assert_eq!(t["table"]["properties"], json!(["Description"]), "{t}");
+    let t = call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": part, "action": "set", "property": "Description", "value": "Long" }));
+    assert_eq!(last(&mut ctx), "Edit configured properties");
+    assert_eq!(t["table"]["rows"][0]["values"]["Description"], "Long", "{t}");
+    let t = call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": part, "action": "delete_column", "property": "Description" }));
+    assert_eq!(last(&mut ctx), "Delete configured property");
+    assert!(t["table"]["properties"].as_array().unwrap().is_empty(), "{t}");
+    call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": part, "action": "delete_table" }));
+    assert_eq!(last(&mut ctx), "Delete configured properties table");
+    let e = try_call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": part, "action": "delete_table" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("part"), "{e:?}");
+
+    // Datum annotations.
+    let top = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "surface": "plane", "normal": [0, 0, 1] }))["faces"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "add_datum", "face": top }));
+    assert_eq!(last(&mut ctx), "Datum");
+    let r = call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "add_datum", "face": top }));
+    let letters: Vec<Value> = r["annotations"].as_array().unwrap().iter().map(|a| a["kind"]["datum"].clone()).collect();
+    assert_eq!(letters, [json!("A"), json!("B")], "{r}");
+    let r = call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "delete", "annotation": 1 }));
+    assert_eq!(last(&mut ctx), "Delete annotation");
+    assert_eq!(r["annotations"].as_array().unwrap().len(), 1, "{r}");
+    let e = try_call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "add_datum", "face": "plane:top" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("face"), "{e:?}");
+}
+
+/// Flex PCB model and Finish flex PCB model are feature_add types.
+#[test]
+fn flex_pcb_model_features() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "flex_pcb.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 20]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "1 mm" } }));
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let s = call(&mut ctx, "feature_add", json!({ "type": "pcbStart", "params": { "process": "CONVERT", "partToConvert": [part] } }));
+    assert_eq!(s["feature_status"]["status"], "Ok", "{s}");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    let f = call(&mut ctx, "feature_add", json!({ "type": "pcbEnd", "params": { "unfoldType": "UNFOLD_NONE", "pcbPart": [part] } }));
+    // Finishing reports Onshape's note, an Info, not an error.
+    let st = &f["feature_status"];
+    assert!(st["status"] == "Ok" || (st["status"] == "Info" && st["message"].as_str().is_some_and(|m| m.contains("flat pattern"))), "{f}");
+}

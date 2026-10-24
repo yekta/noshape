@@ -96,7 +96,12 @@ impl OpenDoc {
     /// any previewed edits), as the Assembly view does.
     pub fn evaluate_assembly(&mut self, tab: TabId, asm: &noshape_model::assembly::Assembly, opts: &noshape_model::assembly::eval::SolveOptions) -> noshape_model::assembly::eval::AssemblyResult {
         let doc = &self.session.doc;
-        let ev = self.assemblies.entry(tab).or_default();
+        let ev = self.assemblies.entry(tab).or_insert_with(|| {
+            let mut ev = noshape_model::assembly::eval::AssemblyEvaluator::default();
+            // Instances showing a version of this or another document.
+            ev.set_external(std::sync::Arc::new(crate::derived::ExternalDocs));
+            ev
+        });
         ev.retain_tabs(doc);
         ev.evaluate(doc, asm, opts, None)
     }

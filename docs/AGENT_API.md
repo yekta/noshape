@@ -246,7 +246,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-209 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
+214 operations in 19 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -254,11 +254,11 @@ the app.
 - **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
-- **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
-- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance)
+- **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
+- **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly)
 - **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit)
-- **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
+- **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference)
@@ -1760,14 +1760,15 @@ Examples:
 
 #### config_copy_inputs
 
-Copy configuration inputs from another Part Studio (edits the document (one undoable history entry)).
+Copy configuration inputs from another Part Studio or an Assembly (edits the document (one undoable history entry)).
 
-Copy input / Copy all inputs in `from`, then Paste inputs here: the inputs whose ids this Part Studio doesn't have yet (with their options and visibility conditions; conditions on inputs not pasted are repaired). Inputs with the same id can then drive Derived features (config_propagate).
+Copy input / Copy all inputs in `from` (a Part Studio, or an Assembly's Copy all inputs), then Paste inputs in this Part Studio: the inputs whose ids this Part Studio doesn't have yet (with their options and visibility conditions; conditions on inputs not pasted are repaired). Inputs with the same id can then drive Derived features (config_propagate).
 
 Examples:
 
 ```json
 {"from": "Part Studio 1", "tab": "Part Studio 2"}
+{"from": "Assembly 1", "tab": "Part Studio 1"}
 {"from": "Part Studio 1", "tab": "Part Studio 2", "inputs": ["Size"]}
 ```
 
@@ -1775,20 +1776,19 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
-| `from` | string | required | Part Studio to copy from. |
+| `from` | string | required | Part Studio or Assembly to copy from. |
 | `inputs` | array of string |  | Input ids or names (default all). |
 
-#### config_propagate
+#### config_duplicate_input
 
-Input propagation: drive Derived features' configuration from this Part Studio's input (edits the document (one undoable history entry)).
+Assembly input ⋯ › Copy input: a copy of the input (edits the document (one undoable history entry)).
 
-Input propagation…: for a List or Checkbox `input`, the Derived features whose source has an input with the same id and kind take each option's same option (a configured column per feature). `features` limits it (default all candidates). The reply lists the candidates and which are propagated.
+The Assembly's Configuration panel, input ⋯ › Copy input: a copy "<name> copy" of `input` (new ids, the same options) after the others. One edit ("Copy configuration input"). In a Part Studio, Copy input copies to the clipboard: use config_copy_inputs.
 
 Examples:
 
 ```json
-{"input": "Size"}
-{"input": "Size", "features": ["Derived 1"]}
+{"tab": "Assembly 1", "input": "Configuration"}
 ```
 
 | field | type | | description |
@@ -1796,7 +1796,28 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `input` | string | required | Input id or name. |
-| `features` | array of string |  | Derived features (ids or names). |
+
+#### config_propagate
+
+Input propagation: drive Derived features' configuration from this Part Studio's input (edits the document (one undoable history entry)).
+
+Input propagation…: for a List or Checkbox `input`, the Derived features whose source has an input with the same id and kind take each option's same option (a configured column per feature). `features` limits it (default all candidates). On an Assembly: the instances whose source Part Studio or assembly has an input with the same id and kind follow the assembly's input (`instances` limits it). The reply lists the candidates and which are propagated.
+
+Examples:
+
+```json
+{"input": "Size"}
+{"input": "Size", "features": ["Derived 1"]}
+{"tab": "Assembly 1", "input": "Size", "instances": ["Part 1 <1>"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `input` | string | required | Input id or name. |
+| `features` | array of string |  | Part Studios: Derived features (ids or names). |
+| `instances` | array of string |  | Assemblies: instances (ids or names). |
 
 #### config_edit_ids
 
@@ -2146,6 +2167,26 @@ Examples:
 | `include_standard` | boolean |  | Include standard content (fasteners). |
 | `top_only` | boolean |  | Show top level only: one row per pair of top-level instances. |
 
+#### assembly_change_to_version
+
+Change to version: instances show a version of this document (edits the document (one undoable history entry)).
+
+Instance › Change to version… (the Reference manager): the `instances` (default all) that reference this document's workspace (parts, Part Studios, subassemblies) show version `version` instead ("Change to version : V1"); instances already showing a version of this document move to `version` ("Update to V1"). Versions: history_create_version. Sketch, mirrored and standard content instances are left alone.
+
+Examples:
+
+```json
+{"version": "V1"}
+{"version": "V2", "instances": ["Part 1 <1>"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `version` | string | required | Version name. |
+| `instances` | array of string |  | Instance ids or names (default all). |
+
 #### assembly_group
 
 Group instances so they move as one rigid body (edits the document (one undoable history entry)).
@@ -2364,6 +2405,27 @@ Examples:
 | `pivot` | array of number |  | Rotation pivot [x, y, z] in document units. |
 | `lines` | boolean |  | Show explode lines. |
 | `step` | integer |  | Edit this step (1-based) instead of adding one. |
+
+#### assembly_display_state
+
+Display states: add, apply, update, rename, remove (edits the document (one undoable history entry)).
+
+The Display states panel: `add` saves which instances and mates are hidden now as a new state `name` ("Add display state : Front"); `apply` shows and hides them as the state says (instances added since keep theirs); `update` saves the current visibility into the state; `rename` to `name`; `remove`. One edit each with the panel's text.
+
+Examples:
+
+```json
+{"action": "add", "name": "Pin hidden"}
+{"action": "apply", "state": "Pin hidden"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Assembly tab, by name or id. Default: the first Assembly. |
+| `action` | one of `add`, `apply`, `update`, `rename`, `remove` | required | What to do. |
+| `state` | string |  | The display state: its name or 1-based row (all actions but add). |
+| `name` | string |  | add: the new state's name; rename: the new name. |
 
 #### assembly_move_to_subassembly
 
@@ -4140,6 +4202,51 @@ Examples:
 | `title2` | string |  | Title 2. |
 | `title3` | string |  | Title 3. |
 | `mass_override` | number or null |  | Mass override in kg (null: computed). |
+
+#### part_configured_properties
+
+Configured part properties: add a property column, set a value, delete a column or the table (edits the document (one undoable history entry)).
+
+The Configuration panel's configured properties table of a part (Configure part properties): without `action`, replies with the table (`properties`, `rows`: each row's configuration and values). `add_property` adds a column ("Add configured property"; the first one creates the table with a row for the active configuration; values start from the part's own); `set` sets `property` to `value` in the row of the active configuration (or `configuration`: {input: value}), adding that row when missing ("Edit configured properties"); `delete_column` is a column's right-click › Delete column ("Delete configured property"); `delete_table` is ⋯ › Delete table ("Delete configured properties table").
+
+Examples:
+
+```json
+{"part": "body:F1a2b.0", "action": "add_property", "property": "Description"}
+{"part": "body:F1a2b.0", "action": "set", "property": "Description", "value": "Long bracket"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `part` | string | required | Part id (`body:…`). |
+| `action` | one of `add_property`, `set`, `delete_column`, `delete_table` |  | What to do (default: read the table). |
+| `property` | one of `Appearance`, `Name`, `Description`, `Part number`, `Revision`, `Vendor`, `Project`, `Product line`, `Material`, `Title 1`, `Title 2`, `Title 3`, `Not revision managed`, `Exclude from all BOMs`, `Unit of measure`, `Mass`, `Tessellation quality` |  | The property (column). |
+| `value` | string |  | set: the value ("true" / "false" for checkboxes). |
+| `configuration` | object |  | set: the row's configuration, input id → value (default: the active one). |
+
+#### part_annotation
+
+Part Studio annotations: add a datum, list, delete (edits the document (one undoable history entry)).
+
+Inspection panel › Datum and the annotations' right-click › Delete annotation (Model definitions; annotations aren't features). `add_datum` puts datum `letter` (default the next free letter) on planar face `face`, lying in the face's plane at its center ("Datum"); `delete` removes annotation `annotation` ("Delete annotation"). Without `action`, lists them.
+
+Examples:
+
+```json
+{"action": "add_datum", "face": "face:eJyrVkr…"}
+{"action": "delete", "annotation": 1}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `action` | one of `add_datum`, `delete` |  | What to do (default: list). |
+| `face` | string |  | add_datum: a planar face id. |
+| `letter` | string |  | add_datum: the datum letter. |
+| `annotation` | integer |  | delete: the annotation id. |
 
 #### part_set_material
 
