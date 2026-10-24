@@ -3,6 +3,7 @@
 //! ([`sketch_mode`]), the viewport [`palette`], the [`graphics_prefs`] data
 //! and offscreen PNG rendering ([`png`]).
 
+pub mod asm_scene;
 pub mod builder;
 pub mod drawing_tools;
 pub mod graphics_prefs;

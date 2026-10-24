@@ -22,6 +22,29 @@ fn op(verb: &'static str, summary: &'static str, description: &'static str, fiel
 pub fn ops() -> Vec<Op> {
     vec![
         op(
+            "curvature_map",
+            "Curvature color map: the parts' surface curvature",
+            "The Curvature color map (Analysis tools menu) as numbers: each part's surface sampled at its mesh vertices with the Curvature menu's `kind` — gaussian (1/length², default), mean (1/length), max_radius or min_radius (length) — giving each part's min / max over its curved surface, the share that is flat, and the `points` most extreme spots (largest curvature, smallest radius).",
+            vec![
+                opt("parts", strings(), "Part ids (`body:…`) or names; default all shown parts."),
+                opt("kind", json!({ "type": "string", "enum": ["gaussian", "mean", "max_radius", "min_radius"], "default": "gaussian" }), "Curvature."),
+                opt("points", json!({ "type": "integer", "minimum": 0, "default": 10 }), "Extreme spots to list."),
+            ],
+            curvature_map,
+        ),
+        op(
+            "thickness",
+            "Thickness analysis: the parts' wall thickness",
+            "The Thickness analysis tool (Analysis tools menu): each part's surface sampled and measured with the color bar's Method — rolling_ball (default: the largest ball touching both walls), ray (straight through the part), or their _gradient forms (the rate of change, %). Returns each part's min / max / mean over its samples and, with `below`, the share of the surface thinner than that and up to `points` of the thinnest spots (location, thickness).",
+            vec![
+                opt("parts", strings(), "Part ids (`body:…`) or names; default all shown parts."),
+                opt("method", json!({ "type": "string", "enum": ["rolling_ball", "rolling_ball_gradient", "ray", "ray_gradient"], "default": "rolling_ball" }), "Method."),
+                opt("below", json!({ "type": ["number", "string"] }), "Report surface thinner than this (a length, or % for gradients)."),
+                opt("points", json!({ "type": "integer", "minimum": 0, "default": 10 }), "Thinnest spots to list."),
+            ],
+            thickness,
+        ),
+        op(
             "curvature",
             "Curvature of edges, sketch curves and faces (Curve/surface analysis)",
             "The minimum radius of curvature over the selection and where it is, the inflection points of sketch curves, and the number of curvature combs (one per curve; U and V isoparametric curves per face).",
@@ -165,4 +188,104 @@ fn interference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         })).collect::<Vec<_>>(),
     })
     .into())
+}
+
+fn thickness(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::thickness::{ThicknessMethod as M, analyze};
+    let method = match a.opt_str("method")?.unwrap_or("rolling_ball") {
+        "rolling_ball" => M::RollingBall,
+        "rolling_ball_gradient" => M::RollingBallGradient,
+        "ray" => M::Ray,
+        "ray_gradient" => M::RayGradient,
+        _ => return Err(OpError::param("method", "rolling_ball, rolling_ball_gradient, ray or ray_gradient")),
+    };
+    let (od, tab) = studio_target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let k = len_scale(&units);
+    let r = od.regenerate(tab, None)?;
+    let parts = shown_parts(&r.display, a)?;
+    // Gradients are percentages; thicknesses lengths in workspace units.
+    let scale = if method.is_gradient() { 1.0 } else { k };
+    let below = match a.get("below") {
+        None => None,
+        Some(v) if method.is_gradient() => Some(v.as_f64().or_else(|| v.as_str().and_then(|t| t.trim().trim_end_matches('%').trim().parse().ok())).ok_or_else(|| OpError::param("below", "a percentage"))?),
+        Some(v) => Some(crate::ops::sketch::length_value(v, &units).map_err(|e| e.with_param("below"))? * k),
+    };
+    let points = a.opt_u64("points")?.unwrap_or(10) as usize;
+    let mut out = Vec::new();
+    for b in parts {
+        let (mesh, values) = analyze(&b.mesh, method, 25_000);
+        let vals: Vec<(usize, f64)> = values.iter().enumerate().filter_map(|(i, v)| v.map(|x| (i, x * scale))).collect();
+        let mut j = json!({ "id": refs::body_id(&b.id), "name": b.name, "samples": vals.len() });
+        if !vals.is_empty() {
+            let (min, max) = vals.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), (_, v)| (lo.min(*v), hi.max(*v)));
+            j["min"] = json!(min);
+            j["max"] = json!(max);
+            j["mean"] = json!(vals.iter().map(|(_, v)| v).sum::<f64>() / vals.len() as f64);
+            if let Some(t) = below {
+                j["below_share"] = json!(vals.iter().filter(|(_, v)| *v < t).count() as f64 / vals.len() as f64);
+            }
+            let mut thin = vals.clone();
+            thin.sort_by(|x, y| x.1.total_cmp(&y.1));
+            j["thinnest"] = json!(thin.iter().filter(|(_, v)| below.is_none_or(|t| *v < t)).take(points).map(|(i, v)| json!({ "at": pt(mesh.positions[*i], k), "value": v })).collect::<Vec<_>>());
+        }
+        out.push(j);
+    }
+    Ok(json!({ "units": units_json(&units), "method": a.opt_str("method")?.unwrap_or("rolling_ball"), "values": if method.is_gradient() { "percent" } else { "length" }, "parts": out }).into())
+}
+
+/// Shown parts by id or name (`parts`), else all shown solid parts.
+fn shown_parts<'a>(display: &'a noshape_model::display::StudioDisplay, a: &Args) -> Result<Vec<&'a noshape_model::display::BodyDisplay>, OpError> {
+    let shown: Vec<&noshape_model::display::BodyDisplay> = display.bodies.iter().filter(|b| !b.hidden && b.kind == noshape_model::display::BodyKind::Solid).collect();
+    match a.opt_array("parts")? {
+        Some(list) => list
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                let key = v.as_str().unwrap_or_default();
+                shown.iter().copied().find(|b| refs::body_id(&b.id) == key || b.name == key).ok_or_else(|| OpError::param(&format!("parts[{i}]"), "a shown solid part (id or name)"))
+            })
+            .collect(),
+        None => Ok(shown),
+    }
+}
+
+fn curvature_map(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::analysis::{CurvatureKind as K, curvature_values};
+    let kind = match a.opt_str("kind")?.unwrap_or("gaussian") {
+        "gaussian" => K::Gaussian,
+        "mean" => K::Mean,
+        "max_radius" => K::MaxRadius,
+        "min_radius" => K::MinRadius,
+        _ => return Err(OpError::param("kind", "gaussian, mean, max_radius or min_radius")),
+    };
+    let (od, tab) = studio_target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let k = len_scale(&units);
+    let r = od.regenerate(tab, None)?;
+    let points = a.opt_u64("points")?.unwrap_or(10) as usize;
+    let mut out = Vec::new();
+    for b in shown_parts(&r.display, a)? {
+        let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1);
+        let values = curvature_values(&b.mesh, size, kind, 1.0 / k);
+        let curved: Vec<(usize, f64)> = values.iter().enumerate().filter_map(|(i, v)| v.map(|x| (i, x))).collect();
+        let mut j = json!({ "id": refs::body_id(&b.id), "name": b.name, "samples": values.len(), "flat_share": if values.is_empty() { 0.0 } else { 1.0 - curved.len() as f64 / values.len() as f64 } });
+        if !curved.is_empty() {
+            let (min, max) = curved.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), (_, v)| (lo.min(*v), hi.max(*v)));
+            j["min"] = json!(min);
+            j["max"] = json!(max);
+            let mut ext = curved.clone();
+            // The most curved: largest |curvature|, or smallest radius.
+            match kind {
+                K::MaxRadius | K::MinRadius => ext.sort_by(|x, y| x.1.total_cmp(&y.1)),
+                _ => ext.sort_by(|x, y| y.1.abs().total_cmp(&x.1.abs())),
+            }
+            j["extremes"] = json!(ext.iter().take(points).map(|(i, v)| {
+                let p = b.mesh.positions[*i];
+                json!({ "at": pt(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64), k), "value": v })
+            }).collect::<Vec<_>>());
+        }
+        out.push(j);
+    }
+    Ok(json!({ "units": units_json(&units), "kind": a.opt_str("kind")?.unwrap_or("gaussian"), "parts": out }).into())
 }

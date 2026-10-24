@@ -246,7 +246,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-183 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
+189 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -254,13 +254,13 @@ the app.
 - **feature**: [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
-- **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_reorder_inputs`](#config_reorder_inputs)
+- **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard)
 - **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
-- **analysis**: [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference)
+- **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference)
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
@@ -1756,6 +1756,86 @@ Examples:
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `values` | object |  | Input -> value. |
 | `reset` | boolean |  | Start from the default configuration. |
+
+#### config_copy_inputs
+
+Copy configuration inputs from another Part Studio (edits the document (one undoable history entry)).
+
+Copy input / Copy all inputs in `from`, then Paste inputs here: the inputs whose ids this Part Studio doesn't have yet (with their options and visibility conditions; conditions on inputs not pasted are repaired). Inputs with the same id can then drive Derived features (config_propagate).
+
+Examples:
+
+```json
+{"from": "Part Studio 1", "tab": "Part Studio 2"}
+{"from": "Part Studio 1", "tab": "Part Studio 2", "inputs": ["Size"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `from` | string | required | Part Studio to copy from. |
+| `inputs` | array of string |  | Input ids or names (default all). |
+
+#### config_propagate
+
+Input propagation: drive Derived features' configuration from this Part Studio's input (edits the document (one undoable history entry)).
+
+Input propagation…: for a List or Checkbox `input`, the Derived features whose source has an input with the same id and kind take each option's same option (a configured column per feature). `features` limits it (default all candidates). The reply lists the candidates and which are propagated.
+
+Examples:
+
+```json
+{"input": "Size"}
+{"input": "Size", "features": ["Derived 1"]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `input` | string | required | Input id or name. |
+| `features` | array of string |  | Derived features (ids or names). |
+
+#### config_edit_ids
+
+Edit FeatureScript IDs of a configuration input and its options (edits the document (one undoable history entry)).
+
+Edit FeatureScript IDs…: the input's id and, for a List, its options' ids (`options`: {current option id or name: new id}); configured values follow.
+
+Examples:
+
+```json
+{"input": "Size", "id": "size", "options": {"Large": "large"}}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `input` | string | required | Input id or name. |
+| `id` | string |  | New input id. |
+| `options` | object |  | Option renames: {option: new id}. |
+
+#### config_visibility
+
+Set an input's visibility conditions (edits the document (one undoable history entry)).
+
+Visibility conditions…: when the input shows and which List options do. `visibility` is {"conditions": [{"input": id, "test": {"Is": [option ids or "true"/"false"]} | {"Between": [a, b]}}], "option_rules": [{"show": {"Options": [ids]} | {"Range": [a, b]}, "always": bool, "conditions": [...]}]}; null: always shown. config_list shows each input's `visible_when`.
+
+Examples:
+
+```json
+{"input": "Hole size", "visibility": {"conditions": [{"input": "With_holes", "test": {"Is": ["true"]}}], "option_rules": []}}
+{"input": "Hole size", "visibility": null}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `input` | string | required | Input id or name. |
+| `visibility` | object or null |  | The conditions; omitted or null: always shown. |
 
 #### config_reorder_inputs
 
@@ -3769,6 +3849,49 @@ Examples:
 
 ### analysis
 
+#### analysis_curvature_map
+
+Curvature color map: the parts' surface curvature.
+
+The Curvature color map (Analysis tools menu) as numbers: each part's surface sampled at its mesh vertices with the Curvature menu's `kind` — gaussian (1/length², default), mean (1/length), max_radius or min_radius (length) — giving each part's min / max over its curved surface, the share that is flat, and the `points` most extreme spots (largest curvature, smallest radius).
+
+Examples:
+
+```json
+{}
+{"parts": ["Part 1"], "kind": "min_radius", "points": 5}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `parts` | array of string |  | Part ids (`body:…`) or names; default all shown parts. |
+| `kind` | one of `gaussian`, `mean`, `max_radius`, `min_radius` |  | Curvature. |
+| `points` | integer |  | Extreme spots to list. |
+
+#### analysis_thickness
+
+Thickness analysis: the parts' wall thickness.
+
+The Thickness analysis tool (Analysis tools menu): each part's surface sampled and measured with the color bar's Method — rolling_ball (default: the largest ball touching both walls), ray (straight through the part), or their _gradient forms (the rate of change, %). Returns each part's min / max / mean over its samples and, with `below`, the share of the surface thinner than that and up to `points` of the thinnest spots (location, thickness).
+
+Examples:
+
+```json
+{}
+{"parts": ["Part 1"], "below": "1.5 mm", "points": 5}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `parts` | array of string |  | Part ids (`body:…`) or names; default all shown parts. |
+| `method` | one of `rolling_ball`, `rolling_ball_gradient`, `ray`, `ray_gradient` |  | Method. |
+| `below` | number or string |  | Report surface thinner than this (a length, or % for gradients). |
+| `points` | integer |  | Thinnest spots to list. |
+
 #### analysis_curvature
 
 Curvature of edges, sketch curves and faces (Curve/surface analysis).
@@ -3893,21 +4016,22 @@ Examples:
 
 #### render_image
 
-Render a Part Studio to a PNG image from a standard or named view.
+Render a Part Studio or an Assembly to a PNG image from a standard or named view.
 
-Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look: white background, shaded with edges), zoomed to fit. Returned as an image (MCP image content) and, with `file`, written to disk.
+Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look: white background, shaded with edges), zoomed to fit. With `tab` an Assembly: the solved assembly in its active configuration (standard views; sections on plane:top|front|right; `section_exclude` instance names). Returned as an image (MCP image content) and, with `file`, written to disk.
 
 Examples:
 
 ```json
 {"view": "isometric", "file": "/tmp/part.png"}
+{"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}
 {"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `section` | array of object |  | Section view: up to 3 planes [{"plane": a plane / planar face / sketch / mate connector id, "offset": length along its normal (default 0), "flip": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given. |
 | `section_exclude` | array of string |  | Section view › Items to exclude: parts (`body:…`) left whole. |
 | `view` | string |  | isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, or the name of a saved named view. |

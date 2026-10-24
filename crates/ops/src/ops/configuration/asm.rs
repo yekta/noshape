@@ -15,7 +15,7 @@ use noshape_units::ExprValue;
 use serde_json::{Value, json};
 
 /// Whether `tab` names an Assembly.
-pub(super) fn is_assembly(ctx: &mut Ctx, a: &Args) -> Result<bool, OpError> {
+pub(crate) fn is_assembly(ctx: &mut Ctx, a: &Args) -> Result<bool, OpError> {
     let Some(t) = a.opt_str("tab")? else { return Ok(false) };
     let od = ctx.doc(a.opt_str("doc")?)?;
     Ok(doc::find_tab(od.doc(), t).ok().and_then(|id| od.doc().tab(id)).is_some_and(|x| matches!(x.content, TabContent::Assembly(_))))

@@ -98,6 +98,10 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("config_configure", &[r##"{"feature": "Extrude 1", "param": "depth", "input": "Size"}"##, r##"{"feature": "Fillet 1", "param": "suppressed", "input": "Lite"}"##]),
     ("config_set_value", &[r##"{"feature": "Extrude 1", "param": "depth", "configuration": "Large", "value": "40 mm"}"##]),
     ("config_activate", &[r##"{"values": {"Size": "Large"}}"##, r##"{"reset": true}"##]),
+    ("config_copy_inputs", &[r##"{"from": "Part Studio 1", "tab": "Part Studio 2"}"##, r##"{"from": "Part Studio 1", "tab": "Part Studio 2", "inputs": ["Size"]}"##]),
+    ("config_propagate", &[r##"{"input": "Size"}"##, r##"{"input": "Size", "features": ["Derived 1"]}"##]),
+    ("config_edit_ids", &[r##"{"input": "Size", "id": "size", "options": {"Large": "large"}}"##]),
+    ("config_visibility", &[r##"{"input": "Hole size", "visibility": {"conditions": [{"input": "With_holes", "test": {"Is": ["true"]}}], "option_rules": []}}"##, r##"{"input": "Hole size", "visibility": null}"##]),
     ("config_reorder_inputs", &[r##"{"input": "Lite", "to": "Size"}"##]),
     // parts, materials
     ("part_rename", &[r##"{"part": "Part 1", "name": "Base plate"}"##]),
@@ -118,7 +122,9 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("analysis_connection", &[r##"{"entities": ["edge:…"]}"##]),
     ("analysis_dihedral", &[r##"{"entities": ["edge:…"]}"##]),
     ("analysis_interference", &[r##"{}"##]),
-    ("render_image", &[r##"{"view": "isometric", "file": "/tmp/part.png"}"##, r##"{"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}"##]),
+    ("analysis_curvature_map", &[r##"{}"##, r##"{"parts": ["Part 1"], "kind": "min_radius", "points": 5}"##]),
+    ("analysis_thickness", &[r##"{}"##, r##"{"parts": ["Part 1"], "below": "1.5 mm", "points": 5}"##]),
+    ("render_image", &[r##"{"view": "isometric", "file": "/tmp/part.png"}"##, r##"{"tab": "Assembly 1", "view": "isometric", "section": [{"plane": "plane:front"}]}"##, r##"{"view": "front", "section": [{"plane": "plane:right"}], "display_mode": "hidden_line"}"##]),
     ("render_named_view", &[r##"{"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}"##, r##"{"name": "Section A", "delete": true}"##]),
     // import / export
     ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##]),

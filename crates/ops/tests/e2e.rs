@@ -2205,3 +2205,87 @@ fn part_studio_menu_ops() {
     call(&mut ctx, "render_named_view", json!({ "name": "Cut", "delete": true }));
     assert!(try_call(&mut ctx, "render_image", json!({ "view": "Cut" })).is_err());
 }
+
+/// render_image of an assembly: what the Assembly view shows, with a section.
+#[test]
+fn render_an_assembly() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "asm-render.noshape");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }));
+    let b = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }))["instance"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_transform", json!({ "instance": b, "translation": ["100 mm", 0, 0] }));
+    let file = scratch("asm.png");
+    let r = call(&mut ctx, "render_image", json!({ "tab": "Assembly 1", "view": "isometric", "width": 320, "height": 240, "file": file.to_str().unwrap() }));
+    assert_eq!(r["instances"], 2, "{r}");
+    assert_eq!(&std::fs::read(&file).unwrap()[1..4], b"PNG");
+    let s = call(&mut ctx, "render_image", json!({ "tab": "Assembly 1", "view": "front", "width": 320, "height": 240, "section": [{ "plane": "plane:front" }], "section_exclude": [b] }));
+    assert!(num(&s["bytes"]) > 100.0, "{s}");
+    let e = try_call(&mut ctx, "render_image", json!({ "tab": "Assembly 1", "section": [{ "plane": "face:x" }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("section[0].plane"));
+    let e = try_call(&mut ctx, "render_image", json!({ "tab": "Assembly 1", "view": "My view" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"));
+}
+
+/// Thickness analysis and the curvature color map as numbers.
+#[test]
+fn thickness_and_curvature_analysis() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "thickness.noshape");
+    let t = call(&mut ctx, "analysis_thickness", json!({ "method": "ray", "below": "15 mm", "points": 3 }));
+    let p = &t["parts"][0];
+    // A 80 x 40 x 20 block: rays through it measure 20 mm (top / bottom) up to 80.
+    assert!(num(&p["min"]) > 1.0 && num(&p["min"]) < 21.0, "{t}");
+    assert!(num(&p["max"]) >= 19.9, "{t}");
+    assert!(num(&p["below_share"]) > 0.0, "{t}");
+    assert!(p["thinnest"].as_array().unwrap().len() <= 3, "{t}");
+    let e = try_call(&mut ctx, "analysis_thickness", json!({ "method": "x" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("method"));
+    // The Ø10 hole: its smallest radius is 5 mm.
+    let c = call(&mut ctx, "analysis_curvature_map", json!({ "kind": "min_radius", "points": 1 }));
+    let p = &c["parts"][0];
+    assert!((num(&p["min"]) - 5.0).abs() < 0.5, "{c}");
+    assert!(num(&p["flat_share"]) > 0.5, "mostly flat: {c}");
+}
+
+/// The Configurations panel's inputs between Part Studios: copy / paste,
+/// input propagation to a Derived feature, FeatureScript IDs, visibility.
+#[test]
+fn configuration_panel_inputs() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "config-panel.noshape");
+    call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }));
+    call(&mut ctx, "config_add_option", json!({ "input": "Size", "name": "Large" }));
+    let holder = call(&mut ctx, "tab_create", json!({ "kind": "Part Studio", "name": "Holder" }));
+    let info = call(&mut ctx, "document_info", json!({}));
+    let ps1 = info["tabs"].as_array().unwrap().iter().find(|t| t["name"] == "Part Studio 1").unwrap()["id"].as_str().unwrap().to_string();
+    let _ = holder;
+    let c = call(&mut ctx, "config_copy_inputs", json!({ "from": "Part Studio 1", "tab": "Holder" }));
+    assert_eq!(c["pasted"], json!(["Size"]), "{c}");
+    // Again: nothing new to paste.
+    let again = call(&mut ctx, "config_copy_inputs", json!({ "from": "Part Studio 1", "tab": "Holder" }));
+    assert_eq!(again["pasted"], json!([]));
+    // A Derived feature of Part Studio 1 follows Holder's Size.
+    call(&mut ctx, "feature_add", json!({ "tab": "Holder", "type": "importDerived", "params": { "partStudio": ps1 } }));
+    let p = call(&mut ctx, "config_propagate", json!({ "tab": "Holder", "input": "Size" }));
+    assert_eq!(p["candidates"][0]["propagated"], true, "{p}");
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.ends_with(":: Input propagation"), "{last}");
+    // FeatureScript IDs.
+    let e = call(&mut ctx, "config_edit_ids", json!({ "input": "Size", "id": "size_class", "options": { "Large": "large" } }));
+    let inputs = e["configuration"]["inputs"].as_array().unwrap().clone();
+    let size = inputs.iter().find(|i| i["name"] == "Size").unwrap();
+    assert_eq!(size["id"], "size_class", "{size}");
+    assert!(size["configurations"].as_array().unwrap().iter().any(|o| o["id"] == "large"), "{size}");
+    assert_eq!(try_call(&mut ctx, "config_edit_ids", json!({ "input": "Size", "id": "2bad" })).unwrap_err().param.as_deref(), Some("id"));
+    // Visibility: Size shows only with Lite unchecked.
+    let lite = call(&mut ctx, "config_add_input", json!({ "kind": "checkbox", "name": "Lite" }))["input"].as_str().unwrap().to_string();
+    let e = try_call(&mut ctx, "config_visibility", json!({ "input": "Size", "visibility": { "conditions": [{ "input": lite, "test": { "Is": ["false"] } }] } })).unwrap_err();
+    assert!(e.message.contains("not above"), "{e:?}");
+    call(&mut ctx, "config_reorder_inputs", json!({ "input": lite, "to": "Size" }));
+    let v = call(&mut ctx, "config_visibility", json!({ "input": "Size", "visibility": { "conditions": [{ "input": lite, "test": { "Is": ["false"] } }], "option_rules": [] } }));
+    let size = v["configuration"]["inputs"].as_array().unwrap().iter().find(|i| i["name"] == "Size").unwrap().clone();
+    assert!(size["visible_when"].is_object(), "{size}");
+    let v = call(&mut ctx, "config_visibility", json!({ "input": "Size", "visibility": null }));
+    assert!(v["configuration"]["inputs"].as_array().unwrap().iter().find(|i| i["name"] == "Size").unwrap().get("visible_when").is_none());
+    assert_eq!(try_call(&mut ctx, "config_visibility", json!({ "input": "Size", "visibility": { "conditions": [{ "input": "nope", "test": { "Is": ["x"] } }] } })).unwrap_err().param.as_deref(), Some("visibility"));
+}

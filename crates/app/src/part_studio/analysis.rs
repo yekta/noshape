@@ -116,9 +116,8 @@ pub fn curvature_colors(bodies: &[BodyDisplay], map: Option<&super::thickness::C
         .iter()
         .filter(|b| !b.hidden)
         .map(|b| {
-            let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1).max(1e-9);
-            let k = noshape_model::analysis::principal_curvatures(&b.mesh.positions, &b.mesh.normals, &b.mesh.indices);
-            (b, k.into_iter().map(|k| kind.value(k, meters_per_unit, 1e-3 / size)).collect())
+            let size = b.bounds.map(|(lo, hi)| (hi - lo).length()).unwrap_or(0.1);
+            (b, noshape_model::analysis::curvature_values(&b.mesh, size, kind, meters_per_unit))
         })
         .collect();
     let (mut lo, mut hi) = (f64::MAX, f64::MIN);

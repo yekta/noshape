@@ -729,3 +729,48 @@ mod tests {
         assert!((k[mid].0 - 0.5).abs() < 0.05 && k[mid].1.abs() < 0.05, "{:?}", k[mid]);
     }
 }
+
+/// What the curvature color map shows (its Curvature menu).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CurvatureKind {
+    #[default]
+    Gaussian,
+    Mean,
+    MaxRadius,
+    MinRadius,
+}
+
+impl CurvatureKind {
+    pub const ALL: [CurvatureKind; 4] = [CurvatureKind::Gaussian, CurvatureKind::Mean, CurvatureKind::MaxRadius, CurvatureKind::MinRadius];
+
+    pub fn label(self, unit: &str) -> String {
+        match self {
+            CurvatureKind::Gaussian => format!("Gaussian (1/{unit}^2)"),
+            CurvatureKind::Mean => format!("Mean (1/{unit})"),
+            CurvatureKind::MaxRadius => format!("Max radius ({unit})"),
+            CurvatureKind::MinRadius => format!("Min radius ({unit})"),
+        }
+    }
+
+    /// The value at a point with principal curvatures k1, k2 (1/m), in
+    /// display units (`m`: meters per unit); `None` where nothing curves.
+    pub fn value(self, (k1, k2): (f64, f64), m: f64, flat: f64) -> Option<f64> {
+        if k1.abs() < flat && k2.abs() < flat {
+            return None;
+        }
+        Some(match self {
+            CurvatureKind::Gaussian => k1 * k2 * m * m,
+            CurvatureKind::Mean => (k1 + k2) * 0.5 * m,
+            CurvatureKind::MaxRadius => 1.0 / k1.abs().min(k2.abs()).max(flat) / m,
+            CurvatureKind::MinRadius => 1.0 / k1.abs().max(k2.abs()) / m,
+        })
+    }
+}
+
+/// Per mesh vertex: the curvature color map's value (`kind`, display units
+/// with `meters_per_unit`), `None` where the part is flat. Flat means both
+/// principal curvatures under 1e-3 / the part's box diagonal.
+pub fn curvature_values(mesh: &crate::display::MeshBuffers, size: f64, kind: CurvatureKind, meters_per_unit: f64) -> Vec<Option<f64>> {
+    principal_curvatures(&mesh.positions, &mesh.normals, &mesh.indices).into_iter().map(|k| kind.value(k, meters_per_unit, 1e-3 / size.max(1e-9))).collect()
+}
+

@@ -42,11 +42,11 @@ pub fn ops() -> Vec<Op> {
     Op {
         group: "render",
         verb: "image",
-        summary: "Render a Part Studio to a PNG image from a standard or named view",
-        description: "Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look: white background, shaded with edges), zoomed to fit. Returned as an image (MCP image content) and, with `file`, written to disk.",
+        summary: "Render a Part Studio or an Assembly to a PNG image from a standard or named view",
+        description: "Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look: white background, shaded with edges), zoomed to fit. With `tab` an Assembly: the solved assembly in its active configuration (standard views; sections on plane:top|front|right; `section_exclude` instance names). Returned as an image (MCP image content) and, with `file`, written to disk.",
         fields: vec![
             doc_field(),
-            tab_field(),
+            opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio."),
             opt("section", json!({ "type": "array", "items": { "type": "object" }, "maxItems": 3 }), "Section view: up to 3 planes [{\"plane\": a plane / planar face / sketch / mate connector id, \"offset\": length along its normal (default 0), \"flip\": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given."),
             opt("section_exclude", json!({ "type": "array", "items": { "type": "string" } }), "Section view › Items to exclude: parts (`body:…`) left whole."),
             opt("view", json!({ "type": "string" }), "isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, or the name of a saved named view."),
@@ -81,6 +81,9 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         ..Default::default()
     };
     let view_name = a.opt_str("view")?.unwrap_or("isometric").to_string();
+    if super::configuration::asm::is_assembly(ctx, a)? {
+        return image_assembly(ctx, a, width, height, mode, &view_name);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let named = crate::doc::studio(od.doc(), tab)?.named_views.iter().find(|v| v.name.eq_ignore_ascii_case(&view_name)).cloned();
     let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1);
@@ -187,4 +190,56 @@ fn named_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Ok(())
     })?;
     Ok(json!({ "saved": name, "named_views": crate::doc::studio(od.doc(), tab)?.named_views.iter().map(|v| v.name.clone()).collect::<Vec<_>>() }).into())
+}
+
+/// render_image of an Assembly tab: the solved assembly in its active
+/// configuration, drawn as the Assembly view does.
+fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, mode: DisplayMode, view_name: &str) -> Result<OpOutput, OpError> {
+    use noshape_model::document::TabContent;
+    use noshape_scene::asm_scene::{self, AsmGpuCache, AsmSceneOptions};
+    let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1).ok_or_else(|| OpError::param("view", "a standard view: isometric, front, back, left, right, top, bottom, dimetric or trimetric"))?;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = crate::doc::tab_of_kind(od.doc(), a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
+    let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { unreachable!("checked") };
+    let values = super::configuration::asm::values(od, tab, asm);
+    let eff = crate::assembly::effective(asm, &values);
+    let mut opts = AsmSceneOptions { display_mode: mode, ..Default::default() };
+    // Section view: the default planes (an assembly's own planes).
+    let units = od.doc().settings.units;
+    for (i, p) in a.opt_array("section")?.cloned().unwrap_or_default().iter().enumerate() {
+        use noshape_model::display::PlaneFrame;
+        use noshape_model::reference::{DatumPlane, Reference};
+        let field = format!("section[{i}]");
+        let o = p.as_object().ok_or_else(|| OpError::param(&field, "{\"plane\": \"plane:top|front|right\", \"offset\", \"flip\"}"))?;
+        let f = match o.get("plane").and_then(|v| v.as_str()).and_then(crate::refs::parse_str) {
+            Some(Reference::Plane(DatumPlane::Top)) => PlaneFrame::TOP,
+            Some(Reference::Plane(DatumPlane::Front)) => PlaneFrame::FRONT,
+            Some(Reference::Plane(DatumPlane::Right)) => PlaneFrame::RIGHT,
+            _ => return Err(OpError::param(&format!("{field}.plane"), "in an assembly: plane:top, plane:front or plane:right")),
+        };
+        let offset = match o.get("offset") {
+            Some(v) => crate::ops::sketch::length_value(v, &units).map_err(|e| e.with_param(format!("{field}.offset")))?,
+            None => 0.0,
+        };
+        let n = if o.get("flip").and_then(|v| v.as_bool()) == Some(true) { -f.normal } else { f.normal };
+        opts.section.push((n, n.dot(f.origin + f.normal * offset)));
+    }
+    for (i, v) in a.opt_array("section_exclude")?.cloned().unwrap_or_default().iter().enumerate() {
+        let id = super::assembly::find_instance(asm, v.as_str().unwrap_or_default(), &format!("section_exclude[{i}]"))?;
+        opts.section_skip.insert(id);
+    }
+    let result = od.evaluate_assembly(tab, &eff, &Default::default());
+    let off = ctx.offscreen()?;
+    let up = off.renderer.uploader();
+    let built = asm_scene::build(&result, &opts, &mut AsmGpuCache::default(), &up);
+    let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
+    let camera = noshape_scene::png::fit_camera(lo, hi, width as f64 / height as f64, Some(view));
+    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    let png = off.render_png(&built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
+    let mut v = json!({ "width": width, "height": height, "view": view_name, "bytes": png.len(), "instances": result.occurrences.iter().filter(|o| !o.hidden).count() });
+    if let Some(f) = a.opt_str("file")? {
+        std::fs::write(f, &png).map_err(|e| OpError::new("io", format!("writing {f}: {e}")).with_param("file"))?;
+        v["file"] = json!(f);
+    }
+    Ok(OpOutput { value: v, images: vec![Image { png }] })
 }
