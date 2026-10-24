@@ -49,6 +49,11 @@ pub(crate) struct StdUi {
     /// Live's red toasts at the top centre ("Standard content component
     /// failed to solve. …"); they stack, each ✕ closes one.
     pub toasts: Vec<String>,
+    /// The editable Length box (B17.1 keys) while typed into.
+    pub length_edit: Option<(Entity<InputState>, Subscription)>,
+    /// Its last committed text when the server rejected it (live keeps the
+    /// bad text in the box; the part keeps the last good length).
+    pub length_text: Option<String>,
 }
 
 /// Where Insert puts the part in a hole that already holds standard content.
@@ -74,6 +79,8 @@ impl AssemblyView {
     /// levels below fall back to their first entry, as in Onshape.
     fn std_choose(&mut self, level: usize, value: &str, cx: &mut Context<Self>) {
         self.ui.std.failed_size = None;
+        self.ui.std.length_edit = None;
+        self.ui.std.length_text = None;
         let cur = self.std_spec();
         let mut path = [cur.standard.clone(), cur.category.clone(), cur.class.clone(), cur.component.clone()];
         path[level] = value.to_string();
@@ -374,6 +381,71 @@ impl AssemblyView {
             .into_any_element()
     }
 
+    /// Live's free Length box (behaviours "skb (10-24) B17.1 length"): a
+    /// plain text box (no arrow, no unit; the component's unit), committed on
+    /// blur (Enter does nothing); a click makes it a field.
+    fn std_length_box(&mut self, current: String, disabled: bool, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let base = div().id("std-length").w(px(146.)).h(px(26.)).flex_none().flex().items_center().pl(px(2.)).pr(px(20.)).border_b_1().text_size(px(12.));
+        if let Some((input, _)) = &self.ui.std.length_edit {
+            // Focused: the bottom border rgb(22, 81, 176).
+            let field = gpui_kit::component::input::Input::new(input).xsmall().appearance(false).text_size(px(12.));
+            return base.border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff)).child(gpui_kit::base::input::input_frame(div().w_full().child(field))).into_any_element();
+        }
+        let shown = self.ui.std.length_text.clone().unwrap_or(current);
+        let el = base
+            .border_color(gpui_kit::rgb(0xd7d7d7))
+            .bg(gpui_kit::rgb(if disabled { 0xeeeeee } else { 0xffffff }))
+            .text_color(if disabled { pal.text_faint } else { pal.text })
+            .child(div().flex_1().min_w_0().truncate().child(shown.clone()));
+        if disabled {
+            return el.into_any_element();
+        }
+        el.cursor(CursorStyle::IBeam)
+            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                cx.stop_propagation();
+                this.std_open_length_edit(shown.clone(), window, cx);
+            }))
+            .into_any_element()
+    }
+
+    fn std_open_length_edit(&mut self, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::InputEvent;
+        let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        let sub = cx.subscribe_in(&input, window, |this: &mut Self, st, ev: &InputEvent, _window, cx| {
+            if matches!(ev, InputEvent::Blur) {
+                let typed = st.read(cx).value().to_string();
+                this.std_commit_length(typed, cx);
+            }
+        });
+        input.update(cx, |s, cx| s.focus(window, cx));
+        self.ui.std.length_edit = Some((input, sub));
+        cx.notify();
+    }
+
+    /// A committed Length: a positive number becomes the length; otherwise
+    /// live's red toast, the text stays in the box and the part keeps the
+    /// last good length.
+    fn std_commit_length(&mut self, typed: String, cx: &mut Context<Self>) {
+        self.ui.std.length_edit = None;
+        let t = typed.trim().to_string();
+        match t.parse::<f64>() {
+            Ok(v) if v > 0.0 && v.is_finite() => {
+                self.ui.std.length_text = None;
+                self.std_edit_spec(cx, |s| s.length = Some(t));
+            }
+            Ok(_) => {
+                self.ui.std.length_text = Some(t);
+                self.ui.std.toasts.push("Standard content component failed to solve. Not found.".into());
+            }
+            Err(_) => {
+                self.ui.std.toasts.push(format!("Standard content component failed to solve. com.belmonttech.service.exception.BTBadRequestException: Feature script error: @stringToNumber: String is not a number {t}"));
+                self.ui.std.length_text = Some(t);
+            }
+        }
+        cx.notify();
+    }
+
     /// The Standard content tab body (also the Edit standard content dialog,
     /// where the Standard › Component pickers are greyed).
     pub(super) fn render_standard_content(&mut self, editing: bool, cx: &mut Context<Self>) -> AnyElement {
@@ -451,7 +523,12 @@ impl AssemblyView {
             && c.shape.has_length()
         {
             let cur = spec.length.clone().unwrap_or_default();
-            params = params.child(row(c.length_label(), 27., Self::std_select("std-length", 146., cur.clone(), c.lengths(size), locked, |t, v, cx| t.std_edit_spec(cx, |s| s.length = Some(v.to_string())), cx)));
+            let length_el = if c.length_edit {
+                self.std_length_box(cur.clone(), locked, cx)
+            } else {
+                Self::std_select("std-length", 146., cur.clone(), c.lengths(size), locked, |t, v, cx| t.std_edit_spec(cx, |s| s.length = Some(v.to_string())), cx)
+            };
+            params = params.child(row(c.length_label(), 27., length_el));
             let threads = c.thread_lengths(size, &cur);
             if let Some(first) = threads.first().cloned() {
                 let chosen = spec.params.get(standard::THREAD_LENGTH).filter(|t| threads.contains(*t)).cloned().unwrap_or(first);

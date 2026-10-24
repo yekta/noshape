@@ -1051,11 +1051,21 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   A, which is what we build — the rule is unconfirmed (REQUESTS "skb (10-24)"). Internal heavy DIN 472 is left
   out: its default B-rep has a different lug (lug circle + an r 8.49 arc + 0.25 rounds), only one size captured.
   Test `retaining_rings_match_live` (faces + areas at 11 live sizes).
+* Internal rings by live's FSRules configuration (behaviours "skb (10-24) rings / washers"; counts `ringConfig`):
+  DIN 472 < 25 A, < 170 B, else C; heavy DIN 472 ≤ 24 A, else B (now in the catalogue); ANSI internal groove >
+  1.962 in B, else A. B: the lug's inner edge on the lug circle, a blend arc (through the A-arc's centre, tangent
+  in the inner circle; meeting the lug circle square for DIN 472, 0.96 D off the hole for heavy / ANSI: form
+  `blendRule`, solved in `ringBlend`) and its 4 corners rounded `rc` (0.5 mm / 0.25 mm / 0.02 in), as profile
+  arcs. C: the inner circle concentric at rg − lug, holes on rg − lug/2 1.5 D from the end planes. The test now
+  pins 19 live sizes (A 12 faces, B 16, C 8; the earlier #300 / ANSI 10 captures were config A, wrong).
 * B17.1 keys (FSRules + raw /features): Type per size by WIDTH (< 1/8 Square only, < 4 Square / Rectangle, else
   Rectangle; HEIGHT_SQR / HEIGHT_REC) as size rows with `when` {Type} (generator `variants`); parallel = the box
   (key form 1), tapered = key form 7 (`flat` = the width for Taper type Plain, 0 for Alternate, 1/8 in per foot
-  falling to −Y, extruded symmetric). Live's Length is a free-entry field (FSRules `EDIT`, default 1): we list
-  "1" only until live's capture of that field arrives (REQUESTS "skb (10-24) B17.1 length"). The tapered key's
+  falling to −Y, extruded symmetric). Live's Length is a free text box (behaviours "skb (10-24) B17.1 length";
+  catalogue `lengthEdit`, app `std_length_box`): default "1", the component's unit, blur commits (Enter does
+  nothing), a positive number names the part ("Parallel key B17.1 7 x 5 x 2.5"); otherwise live's red toast
+  ("…@stringToNumber: String is not a number <text>" / "Not found." for 0 and negatives), the text stays and
+  the part keeps the last good length. `fix_length` keeps a typed length. The tapered key's
   sizes from 4-1/2 - 5-1/2 up answer "Not found." on live's insert endpoint (crawl), listed as failing sizes.
   Test `b17_keys_match_live`.
 * Askew head bolt (screw head form 10, `askewBolt`): live's order — square head with its bearing face skewed
