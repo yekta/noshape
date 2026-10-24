@@ -4,7 +4,7 @@
 //! editor's own tool code (`noshape_scene::drawing_tools`) on the clicks
 //! given (sheet mm) and commits with the editor's edit text.
 
-use super::doc_field;
+use super::{doc_field, s};
 use super::drawing::{commit, drawing_field, drawing_tab, point, point_value, reply, sheet_field, sheet_index};
 use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
@@ -116,14 +116,16 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "drawing",
             verb: "detail_view",
-            summary: "Detail view of a circular region of a view",
-            description: "The Detail view tool: the circle centered at `center` (sheet mm; a vertex or circle center there is snapped) with `radius` (sheet mm) on the parent view, shown at `scale` (default twice the parent's) at `position`. One edit (\"Detail view\").",
+            summary: "Detail view of a region of a view (circle, rectangle, spline or polygon profile)",
+            description: "The Detail view tool: the circle centered at `center` (sheet mm; a vertex or circle center there is snapped) with `radius` (sheet mm), or a rectangle / spline / polygon `profile` through `points`, on the parent view, shown at `scale` (default twice the parent's) at `position`. One edit (\"Detail view\").",
             fields: with(
                 common(),
                 vec![
                     view_id("parent", "View to detail."),
-                    req("center", point(), "Detail circle center (sheet mm)."),
-                    req("radius", json!({ "type": "number", "exclusiveMinimum": 0 }), "Detail circle radius (sheet mm)."),
+                    opt("profile", json!({ "type": "string", "enum": ["circle", "rectangle", "spline", "polygon"], "default": "circle" }), "The dialog's profile tool."),
+                    opt("center", point(), "Circle: the center (sheet mm; a vertex or circle center there is snapped)."),
+                    opt("radius", json!({ "type": "number", "exclusiveMinimum": 0 }), "Circle: the radius (sheet mm)."),
+                    opt("points", json!({ "type": "array", "items": point() }), "Rectangle: two corners; spline / polygon: at least 3 points (sheet mm), closed."),
                     req("position", point(), "Where the detail view goes (sheet mm)."),
                     opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "View scale (default 2 x the parent's)."),
                     opt("label", json!({ "type": "string" }), "Detail id (default the sheet's next letter)."),
@@ -303,6 +305,39 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: drawing_sketch,
+        },
+        Op {
+            group: "drawing",
+            verb: "edit_dimension",
+            summary: "Edit a dimension or hole callout: text, precision, units, tolerance, dual, parentheses",
+            description: "The dimension palette (double-click a dimension or hole callout): text above / below, prefix, suffix, the value (typing it overrides a linear dimension's text; empty puts the measured value back), precision, units, tolerance and its values, Parentheses, Inspection dimension, Dual dimension, a radial dimension's radius / diameter; hole callouts: Override precision/tolerance. Tolerance values are in the dimension's units (or with units: \"0.05 mm\"). One edit (\"Edit dimension\" / \"Edit hole callout\").",
+            fields: with(
+                common(),
+                vec![
+                    req("annotation", json!({ "type": "integer" }), "Dimension or hole callout id (drawing_get)."),
+                    opt("above", s(), "Text above."),
+                    opt("below", s(), "Text below."),
+                    opt("prefix", s(), "Prefix."),
+                    opt("suffix", s(), "Suffix."),
+                    opt("value", s(), "Linear dimensions: the value text (an override; empty: the measured value)."),
+                    opt("precision", json!({ "type": ["integer", "string"] }), "Decimals 0–8, or \"drawing\" (the drawing's)."),
+                    opt("units", s(), "Millimeters, Centimeters, Meters, Inches, Inches fractional, Feet and inches, Feet, Yards, or \"drawing\"."),
+                    opt("tolerance", s(), "None, Symmetrical, Deviation, Limits, Basic (not hole callouts), MIN, MAX, Fit, Fit with tolerance, Fit (Tolerance only)."),
+                    opt("tolerance_value", json!({ "type": ["number", "string"] }), "Symmetrical: ± value."),
+                    opt("upper", json!({ "type": ["number", "string"] }), "Deviation / Limits: upper value."),
+                    opt("lower", json!({ "type": ["number", "string"] }), "Deviation / Limits: lower value."),
+                    opt("hole_class", s(), "Fits: hole class (\"H7\")."),
+                    opt("shaft_class", s(), "Fits: shaft class (\"g6\")."),
+                    opt("parentheses", json!({ "type": "boolean" }), "Parentheses (a reference value)."),
+                    opt("inspection", json!({ "type": "boolean" }), "Inspection dimension (oval frame)."),
+                    opt("dual", json!({ "type": "string", "enum": ["single", "drawing", "dual"] }), "Single unit, Single unit (Drawing) or Dual unit."),
+                    opt("diameter", json!({ "type": "boolean" }), "Radial dimensions: diameter (true) or radius (false)."),
+                    opt("override_tolerance", json!({ "type": "boolean" }), "Hole callouts: Override precision/tolerance."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: edit_dimension,
         },
         Op {
             group: "drawing",
@@ -756,19 +791,29 @@ fn detail_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let t = target(od, a)?;
     let parent = view_arg(&t, a, "parent")?;
-    let c = pt_arg(a, "center")?;
+    let shape = enum_arg(a, "profile", &[("circle", 0u8), ("rectangle", 1), ("spline", 2), ("polygon", 3)], 0)?;
     let tool0 = Tool::Detail { parent: None, center: None, radius: None };
-    let pl = t.m.pick(&tool0, &[], c).placement(parent).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
-    let center = snap_in(&t, &tool0, parent, c).map(|s| s.p).unwrap_or(pl.to_view(c));
-    let r = a.opt_f64("radius")?.unwrap_or(0.0) / (pl.scale * 1000.0);
-    if r <= 1e-6 {
-        return Err(OpError::param("radius", "must be greater than zero"));
-    }
+    let (center, r, profile) = if shape == 0 {
+        let c = pt_arg(a, "center")?;
+        let pl = t.m.pick(&tool0, &[], c).placement(parent).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
+        let center = snap_in(&t, &tool0, parent, c).map(|s| s.p).unwrap_or(pl.to_view(c));
+        let r = a.opt_f64("radius")?.unwrap_or(0.0) / (pl.scale * 1000.0);
+        if r <= 1e-6 {
+            return Err(OpError::param("radius", "must be greater than zero"));
+        }
+        (center, r, None)
+    } else {
+        let pts = a.opt_array("points")?.ok_or_else(|| OpError::param("points", "the profile's points"))?.iter().enumerate().map(|(i, p)| point_value(p, &format!("points[{i}]"))).collect::<Result<Vec<_>, _>>()?;
+        let pl = pts.first().and_then(|p| t.m.pick(&tool0, &[], *p).placement(parent)).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
+        let local: Vec<[f64; 2]> = pts.iter().map(|p| pl.to_view(*p)).collect();
+        let (poly, center, r) = dt::detail_profile(shape, &local).ok_or_else(|| OpError::param("points", if shape == 1 { "two corners" } else { "at least 3 points" }))?;
+        (center, r, Some(poly))
+    };
     let props = &t.d.props.view_tab;
     let style = enum_arg(a, "style", &[("in_line", 0u8), ("connected", 1), ("leader", 2)], props.detail_style)?;
     let detail = DetailOpts {
         scale: a.opt_f64("scale")?,
-        profile: None,
+        profile,
         style,
         show_profile: a.bool_or("show_profile", props.detail_show_profile)?,
         clip_border: a.bool_or("clip_border", props.detail_clip_border)?,
@@ -1808,4 +1853,105 @@ fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut out = reply(od, t.tab, sheet, false)?;
     out["properties"] = props(&d);
     Ok(out.into())
+}
+
+fn edit_dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::{DimUnits, Tolerance};
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let id = a.opt_u64("annotation")?.unwrap_or(0);
+    let drawing = t.d.clone();
+    let ann = t.d.sheets[t.sheet].annotations.iter_mut().find(|x| x.id == id).ok_or_else(|| OpError::param("annotation", "no such annotation on the sheet"))?;
+    let hole = matches!(ann.kind, AnnotationKind::HoleCallout { .. });
+    if !hole && !ann.kind.is_dimension() {
+        return Err(OpError::param("annotation", "not a dimension or hole callout"));
+    }
+    let f = &mut ann.format;
+    for (k, slot) in [("above", &mut f.above), ("below", &mut f.below), ("prefix", &mut f.prefix), ("suffix", &mut f.suffix)] {
+        if let Some(v) = a.opt_str(k)? {
+            *slot = v.to_string();
+        }
+    }
+    match a.get("precision") {
+        None => {}
+        Some(Value::String(s)) if s == "drawing" => f.precision = None,
+        Some(v) => f.precision = Some(v.as_u64().filter(|n| *n <= 8).ok_or_else(|| OpError::param("precision", "0–8 or \"drawing\""))? as u8),
+    }
+    if let Some(u) = a.opt_str("units")? {
+        f.units = match u {
+            "drawing" => None,
+            _ => Some(DimUnits::CALLOUT.iter().copied().find(|x| x.name().eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("units", &format!("one of {} or \"drawing\"", DimUnits::CALLOUT.iter().map(|x| x.name()).collect::<Vec<_>>().join(", "))))?),
+        };
+    }
+    for (k, slot) in [("parentheses", &mut f.reference), ("inspection", &mut f.inspection_frame)] {
+        if let Some(b) = a.get(k).and_then(Value::as_bool) {
+            *slot = b;
+        }
+    }
+    if let Some(d) = a.opt_str("dual")? {
+        f.dual = match d {
+            "single" => Some(false),
+            "dual" => Some(true),
+            _ => None,
+        };
+    }
+    // Tolerance values: numbers in the dimension's units, or with units.
+    let u = noshape_model::drawing::format::length_units(&drawing, f);
+    let len = |k: &str| -> Result<Option<f64>, OpError> {
+        Ok(match a.get(k) {
+            None => None,
+            Some(Value::Number(n)) => n.as_f64().map(|v| v * u.meters()),
+            Some(Value::String(s)) => match s.trim().parse::<f64>() {
+                Ok(v) => Some(v * u.meters()),
+                Err(_) => Some(noshape_units::evaluate_as(s, noshape_units::Dim::LENGTH, &Default::default(), &noshape_units::EmptyScope).map_err(|e| OpError::param(k, &e.to_string()))?.value),
+            },
+            Some(_) => return Err(OpError::param(k, "a number or a length")),
+        })
+    };
+    let (tv, up, lo) = (len("tolerance_value")?, len("upper")?, len("lower")?);
+    let current = dr::tolerance_name(&noshape_model::drawing::Annotation { format: f.clone(), ..noshape_model::drawing::Annotation::default() });
+    let name = match a.opt_str("tolerance")? {
+        Some(n) => {
+            let list: &[&str] = if hole { &dr::HOLE_TOLERANCES } else { &dr::DIM_TOLERANCES };
+            list.iter().copied().find(|x| x.eq_ignore_ascii_case(n)).ok_or_else(|| OpError::param("tolerance", &format!("one of {}", list.join(", "))))?
+        }
+        None => current,
+    };
+    if a.get("tolerance").is_some() || tv.is_some() || up.is_some() || lo.is_some() {
+        let (ca, cb) = match &f.tolerance {
+            Tolerance::Symmetric { value } => (*value, 0.0),
+            Tolerance::Deviation { upper, lower } | Tolerance::Limits { upper, lower } => (*upper, *lower),
+            _ => (0.0, 0.0),
+        };
+        let (va, vb) = if name == "Symmetrical" { (tv.unwrap_or(ca), 0.0) } else { (up.unwrap_or(ca), lo.unwrap_or(cb)) };
+        dr::set_tolerance(f, name, va, vb);
+    }
+    if let Tolerance::Fit { hole: h, shaft } = &mut f.tolerance {
+        if let Some(c) = a.opt_str("hole_class")? {
+            *h = c.to_string();
+        }
+        if let Some(c) = a.opt_str("shaft_class")? {
+            *shaft = c.to_string();
+        }
+    } else if a.get("hole_class").is_some() || a.get("shaft_class").is_some() {
+        return Err(OpError::param("hole_class", "fit classes need a Fit tolerance"));
+    }
+    if let Some(v) = a.opt_str("value")? {
+        let AnnotationKind::LinearDimension { override_text, .. } = &mut ann.kind else { return Err(OpError::param("value", "only linear dimensions take a typed value")) };
+        *override_text = Some(v.to_string()).filter(|s| !s.trim().is_empty());
+    }
+    if let Some(d) = a.get("diameter").and_then(Value::as_bool) {
+        let AnnotationKind::RadialDimension { diameter, .. } = &mut ann.kind else { return Err(OpError::param("diameter", "only radial dimensions")) };
+        *diameter = d;
+    }
+    if let Some(o) = a.get("override_tolerance").and_then(Value::as_bool) {
+        if !hole {
+            return Err(OpError::param("override_tolerance", "only hole callouts"));
+        }
+        ann.hole.get_or_insert_with(Default::default).override_tol = o;
+        if ann.hole.as_deref().is_some_and(|h| *h == Default::default()) {
+            ann.hole = None;
+        }
+    }
+    done(od, t, if hole { "Edit hole callout" } else { "Edit dimension" }, "annotation", id)
 }

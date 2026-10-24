@@ -10,6 +10,7 @@
 pub mod analysis;
 pub mod analysis_tools;
 pub mod appearance;
+pub mod asm_config;
 pub mod assembly;
 pub mod config;
 pub mod coverage;
