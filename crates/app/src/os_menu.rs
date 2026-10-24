@@ -193,6 +193,8 @@ pub struct OsMenu {
     /// with a 2 px `#3e94ff` focus ring (live assembly/182, navigation/62).
     /// Drawn by the menu host, so it shows exactly while the list is open.
     ring: Option<Bounds<Pixels>>,
+    /// Long labels cut with "…" on one line instead of wrapping.
+    truncate: bool,
 }
 
 /// An `OsMenu`'s one-shot Esc handler.
@@ -209,7 +211,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, camera: false, on_escape: None, ring: None }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, camera: false, on_escape: None, ring: None, truncate: false }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -253,6 +255,13 @@ impl OsMenu {
     }
 
     /// This menu's minimum width instead of its style's.
+    /// Long labels on one line, cut with "…" at the 250 px limit (live
+    /// qa5/sm-111, the Sheet metal flat view's menu).
+    pub fn truncate_labels(mut self) -> Self {
+        self.truncate = true;
+        self
+    }
+
     pub fn min_width(mut self, w: f32) -> Self {
         self.min_width = Some(w);
         self
@@ -452,6 +461,7 @@ impl Render for OsMenu {
         let text_x = self.text_inset.unwrap_or(text_x);
         let plain_menu = !dropdown && !snippets && select.is_none() && !self.toolbar;
         let camera = self.camera;
+        let truncate = self.truncate;
         let window_w = window.viewport_size().width;
         let hover_bg = gpui_kit::rgb(0xdef1fb);
         let bounds = self.bounds.clone();
@@ -493,13 +503,14 @@ impl Render for OsMenu {
                             .child(text.to_string())
                             .child(div().ml(px(15.)).px(px(6.)).h(px(20.)).flex().items_center().rounded(px(3.)).bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb_static(0xffffff)).text_size(px(12.)).child(badge.to_string()))
                             .into_any_element(),
+                        None if truncate => div().min_w_0().truncate().child(label.clone()).into_any_element(),
                         None => label.clone().into_any_element(),
                     }
                 };
                 // Context menus (live `.context-menu-list`, at most 250 px):
                 // a long label wraps, 18 px lines in a row 2 px padded (22,
                 // 40 for two lines: "Add mate connector to instance origin…").
-                let wraps = plain_menu && !camera;
+                let wraps = plain_menu && !camera && !truncate;
                 let row = |id: usize| {
                     h_flex()
                         .id(id)
@@ -528,7 +539,7 @@ impl Render for OsMenu {
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
                             d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(crate::assets::icon("menu-check", 16., cx)))
                         })
-                        .child(div().when(wraps, |d| d.flex_1().min_w_0()).child(label_el(label, *user)))
+                        .child(div().when(wraps || truncate, |d| d.flex_1().min_w_0()).child(label_el(label, *user)))
                         .when(!keys.is_empty(), |d| {
                             let chip = |k: &SharedString| div().px(px(3.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0x333333)).text_size(px(12.)).text_color(pal.text).child(k.clone());
                             d.child(div().flex_1().min_w(px(16.))).child(h_flex().gap(px(2.)).children(keys.iter().map(chip)))
@@ -541,7 +552,7 @@ impl Render for OsMenu {
                         .text_color(pal.text)
                         .when(hovered, |d| d.bg(hover_bg))
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
-                        .child(div().flex_1().when(wraps, |d| d.min_w_0()).child(label_el(label, false)))
+                        .child(div().flex_1().when(wraps || truncate, |d| d.min_w_0()).child(label_el(label, false)))
                         .child({
                             let tops = self.row_tops.clone();
                             canvas(move |b, _, _| { tops.borrow_mut().insert(ix, b.top()); }, |_, _, _, _| {}).absolute().top_0().left_0().size_full()
