@@ -335,6 +335,9 @@ pub struct FeatureState {
     /// a Feature pattern's instances that couldn't be made (user's live
     /// shot 2026-10-23: red edges, dark red faces).
     pub error_mesh: Option<Arc<MeshBuffers>>,
+    /// Hole: parts behind its locations (against the hole direction), for
+    /// the dialog's flip heuristic (hole.fs holeScopeFlipHeuristics).
+    pub touched_behind: Vec<BodyId>,
 }
 
 /// A computed parameter value: a length (meters) or text such as "Multiple".
@@ -421,9 +424,12 @@ impl MeshBuffers {
 }
 
 impl StudioDisplay {
-    /// Display of an empty Part Studio: origin and the three default planes.
+    /// Display of an empty Part Studio: origin and the three default planes,
+    /// 150 × 150 mm squares centred on the origin (Onshape, live "Zoom to fit
+    /// (perf 10-23 22:40)"; a new Part Studio frames them at 0.615 of the
+    /// viewport height, as measured live).
     pub fn defaults() -> Self {
-        let half = 0.05;
+        let half = 0.075;
         let mk = |p: crate::reference::DatumPlane, name: &str, frame| PlaneDisplay {
             reference: Reference::Plane(p),
             name: name.into(),

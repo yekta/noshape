@@ -2443,7 +2443,7 @@ Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look
 
 Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino).
 
-Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`.
+Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
 
 | field | type | | description |
 |---|---|---|---|
@@ -2459,6 +2459,13 @@ Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Optio
 | `stl_text` | boolean |  | STL as text instead of binary. |
 | `individual` | boolean |  | Export unique parts as individual files (zipped). |
 | `include_hidden` | boolean |  | Include hidden parts. |
+| `preprocessing` | one of `None`, `Automatic`, `Remove small entities only (advanced)`, `Remove small entities only (basic)`, `Remove small entities only (advanced) and convert all surfaces to b-surfaces` |  | STEP: Preprocessing (default None). |
+| `derived_tolerances` | boolean |  | STEP: Include derived tolerances in export. |
+| `mbd_text_height` | boolean |  | STEP: Use custom annotation text height for MBD export. |
+| `iges_compatibility` | boolean |  | IGES: Use compatibility mode for surfaces and curves. |
+| `group_composites` | boolean |  | PVZ: Group composite parts into a single part file. |
+| `compress` | boolean |  | glTF / GLB: Compress. |
+| `geometry_format` | one of `STL`, `GLTF`, `GLB`, `OBJ` |  | URDF: Geometry format (default STL). |
 
 ### import
 
