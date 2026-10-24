@@ -80,6 +80,10 @@ impl PickMap {
     pub fn len(&self) -> usize {
         self.targets.len()
     }
+    /// Ids of the targets `f` accepts.
+    pub fn ids_where<'a>(&'a self, f: impl Fn(&PickTarget) -> bool + 'a) -> impl Iterator<Item = u32> + 'a {
+        self.targets.iter().enumerate().filter(move |(_, t)| f(t)).map(|(i, _)| i as u32 + 1)
+    }
     pub fn is_empty(&self) -> bool {
         self.targets.is_empty()
     }

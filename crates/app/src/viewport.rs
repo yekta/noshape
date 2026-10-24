@@ -480,9 +480,12 @@ impl Viewport {
             // Nothing visible changed (e.g. a refresh with the same highlights).
             return;
         }
+        // Pick-only state (a field's filter) changes the pick buffer too.
+        let no_pick = |s: &Scene| s.states.iter().enumerate().filter(|(_, f)| **f & noshape_render::scene::state::NO_PICK != 0).map(|(i, _)| i).collect::<Vec<_>>();
+        let picks_changed = no_pick(&scene) != no_pick(&self.scene);
         self.scene_bounds = scene.bounds();
         self.scene = scene;
-        if geometry_changed {
+        if geometry_changed || picks_changed {
             self.pick_dirty = true;
         }
         self.request_frame(cx);

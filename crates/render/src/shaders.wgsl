@@ -57,6 +57,7 @@ const DIM: u32 = 32u;
 const QUERY: u32 = 64u;
 const OUTLINE: u32 = 128u;
 const TINT: u32 = 512u;
+const NO_PICK: u32 = 1024u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -576,7 +577,7 @@ fn fs_section_cap(i: CapOut) -> @location(0) vec4<f32> {
 fn fs_mesh_pick(i: MeshOut) -> @location(0) u32 {
     load_inst(i.slot);
     let st = state_of(i.pick);
-    if ((st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    if ((st & (HIDDEN | NO_PICK)) != 0u || clipped(i.world)) { discard; }
     if (inst.params.z == 0u) { return 0u; }
     return i.pick;
 }
@@ -745,7 +746,7 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
 @fragment
 fn fs_line_pick(i: LineOut) -> @location(0) u32 {
     load_inst(i.slot);
-    if (clipped(i.world)) { discard; }
+    if (clipped(i.world) || (state_of(i.pick) & NO_PICK) != 0u) { discard; }
     if (inst.params.z == 0u) { discard; }
     return i.pick;
 }
@@ -821,7 +822,7 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
 @fragment
 fn fs_point_pick(i: PointOut) -> @location(0) u32 {
     load_inst(i.slot);
-    if (dot(i.uv, i.uv) > 1.0 || clipped(i.world)) { discard; }
+    if (dot(i.uv, i.uv) > 1.0 || clipped(i.world) || (state_of(i.pick) & NO_PICK) != 0u) { discard; }
     if (inst.params.z == 0u) { discard; }
     return i.pick;
 }

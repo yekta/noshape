@@ -746,7 +746,7 @@ impl PartStudioView {
     /// Which pick kinds the graphics area offers: what the active dialog
     /// field or analysis tool can take (Onshape: only acceptable entities
     /// highlight and get picked), `None` for everything.
-    fn pick_kinds(&self, cx: &App) -> Option<Vec<PickKind>> {
+    pub(super) fn pick_kinds(&self, cx: &App) -> Option<Vec<PickKind>> {
         const ALL: [PickKind; 9] = [PickKind::Face, PickKind::Edge, PickKind::Vertex, PickKind::Plane, PickKind::Origin, PickKind::SketchCurve, PickKind::SketchPoint, PickKind::SketchRegion, PickKind::Connector];
         if self.sketch.is_some() {
             return None;

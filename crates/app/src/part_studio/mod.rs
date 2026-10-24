@@ -889,6 +889,15 @@ impl PartStudioView {
             extra.extend(scene_builder::debug_geometry(&st.debug, self.gpu.uploader()));
         }
         let mut scene = scene_builder::with_highlights(built, &self.display, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        // Overlays the active field can't take (a shown sketch line on a
+        // part edge for Fillet's edges) leave the pick pass, so what lies
+        // under them is picked. Faces keep hiding what's behind them.
+        if let Some(kinds) = self.pick_kinds(cx) {
+            let overlay = |k: PickKind| matches!(k, PickKind::SketchCurve | PickKind::SketchPoint | PickKind::SketchRegion | PickKind::Edge | PickKind::Vertex);
+            for id in built.picks.ids_where(|t| overlay(t.kind) && !kinds.contains(&t.kind)) {
+                scene.add_flag(id, noshape_render::scene::state::NO_PICK);
+            }
+        }
         // Live (lp wall over 2258): the pattern's other inputs (its
         // Direction) are drawn red; the seed keeps the selection colors.
         if error_mesh.is_some()
