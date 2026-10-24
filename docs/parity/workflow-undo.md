@@ -41,3 +41,8 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 |---|---|---|
 | UNDO1 | Insert the qa5 bool Part Studio (3 instances) into Assembly 1, ✓, switch to the Part Studio tab and back, Ctrl+Z once: all 3 instances go (Instances (0)); Ctrl+Y brings them back | ✅ fixed |
 | UNDO2 | Drawing of Assembly 1 (suggested views): an assembly insert shows the drawing's Update button highlighted (out of date); after Ctrl+Q, Ctrl+Z in the assembly shows it out of date again. Both directions behave the same | ✅ fixed |
+
+## Re-run pass 24 (qa5, 2026-10-24 ~00:10, main 538981d5, target-lead 23:22; d10 drawing copy)
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| Drawing note, Ctrl+Z | **two** steps: the 1st leaves the note and enables Redo, the 2nd removes it (behaviours "qa5 undo across tabs") | one Ctrl+Z removes "hello" at once (Undo greys, Redo enabled); Ctrl+Y brings it back | ✗ **UNDO3** (asb, minor) |

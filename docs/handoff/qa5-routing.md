@@ -292,3 +292,9 @@ STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF i
 - Expected (live): not pickable (fillet.fs / chamfer.fs filters have SketchObject.NO).
 - Actual: chip "Sketch 1 line" added. Cause: kind_matches lets PickKind::SketchCurve into any field with the EDGE bit; the std filter parser ignores SketchObject.NO; some EDGE fields (Composite curve, Bridging curve) do take sketch curves, so the fix needs EDGE = model edges only, ANY_EDGE where sketch curves are allowed, and a std-vs-builtin test.
 
+## UNDO3 — asb — drawing note undo takes one step, live two
+- Source: qa5 pass 24, 2026-10-24, main 538981d5.
+- Repro: drawing tab, Note (n), click on the sheet, type "hello", ✓; click empty space; Ctrl+Z.
+- Expected (live, behaviours "qa5 undo across tabs"): the 1st Ctrl+Z leaves the note and enables Redo; the 2nd removes it.
+- Actual: the 1st Ctrl+Z removes the note.
+
