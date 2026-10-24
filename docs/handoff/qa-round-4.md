@@ -1031,3 +1031,35 @@ Differences:
   `config_activate`; the app's geometry does change. → qa5-routing CFG-MASS.
 - **S4-d (api)** `feature_add importDerived` takes `partStudio: "Part Studio 1"` (a tab name) without complaint and the
   feature fails with "Error regenerating."; it needs the tab id. → qa5-routing CFG-MASS (same entry).
+
+### Session 5: STEP round trip (r4/s5.py, CLI; same file as live: samples/qa4-s5-asm.step)
+| Step | noshape v0.4.7 | Live (behaviours "qa4 round 4 s5") |
+|---|---|---|
+| Import (defaults) | tabs **"qa4-s5-asm"** (Part Studio) + file tab "qa4-s5-asm.step"; parts **Part 1, Part 3, Part 2**, placed where the assembly had them (x 0…110) | **"Assembly 1 (1)"** assembly tab + **"qa4-s5-asm parts"** Part Studio + blob in **CAD Imports** + "BOM : Assembly 1 (1)"; parts **Part 2, Part 3, Part 1**, each at its own product position (x 0…320) |
+| Ø5 hole through Part 1 | **59803.650459 mm³** | 59803.65045915 ✅ |
+| Rename "Edited" | Edited, Part 3, Part 2 | Part 2, Part 3, Edited |
+| STEP export | AP242 Ed. 2 header, same CAx-IF lines and schema ✅; products Part 2, Part 3, Edited, no NEXT_ASSEMBLY_USAGE ✅ (order differs) | Edited, Part 2, Part 3 |
+| STL binary mm Fine | header **"noshape-kernel st…"**, 652 triangles, x 0…110 z 0…50 | header **all zeros**, 604 triangles, x 0…320 z 0…40 |
+| Parasolid | `APPL=noshape`, `SCH_1200000_12006`, no MC_MODEL/FRU/KEY/FILE/DATE lines (= EXP-HDR, api) | `APPL=Onshape`, `FRU=Parasolid 38.1.231`, `SCH_3801231_38101`, … |
+| Default file name | (CLI: the given path) | the Part Studio name "qa4-s5-asm parts" |
+
+### Live comparison of sessions 1–4 (behaviours "qa4 round 4 s1…s4", answered 10-24 ~02:00)
+- **S1** live: Flange 1 20295.075 / 34 faces, Hem 22074.861 / 43, cut 20805.412 / 61 vs ours 20051.651 / 28, 21804.734 / 34,
+  20547.157 / 37: the corner difference is **SM1** (fs, routed: live's walls run to the corner with rips "Joint B/C Rip").
+  Flat **128.9165 × 129.4650** (x × y) vs ours 129.465 × 128.916: **S1-a confirmed**, our flat is turned 90° → FLAT-ROT (fs).
+  Bend notes: live **one per bend-line segment** (the slot splits each long bend: 5 × "UP 90.0° R1.5" + 1 hem note), ours one
+  per bend (3 + 1) → FLAT-SEG (fs). Live's notes also overlap each other and the slot, so **S1-b is not a difference**
+  (withdrawn). Flat view auto scale live **1:3**, ours 1:1 → FLAT-SCALE (asb). The rest as live: "Flat pattern of Part 1"
+  only with the Flat patterns filter on; the drawing tab right after Part Studio 1; obround slot outline.
+- **S2** live: limit stop at exactly +50 mm, no message ✅; BOM columns ✅; balloon numbers ✅; exploded view ✅; drawing tab
+  right after the assembly ✅. **S2-c** live leaders end in an **arrowhead on an edge** and a dot only inside a face; ours put
+  a dot on every assembly-part leader → **fixed by qa4** (`scene/src/drawing_tools/pending.rs` `leader_dot`; test
+  `callout_leaders_end_in_arrows_on_edges`). Live notes: "REST-made mates show (Hidden) … UI-made mates are normally shown",
+  which contradicts the earlier capture ("a new mate is hidden by default", behaviours ~1268) → live asked (REQUESTS.md).
+- **S3** live: loft **4 faces / 12 edges / 6060.134 mm²** (ours 5 faces, 6058.817), Fill 1 an exact **PLANE 314.159265**
+  (ours 314.212, not planar), Enclose 31743.525 / 6 faces (ours 31807.093 / 7), Fillet 31730.804 / 10 (ours 31805.016 / 11)
+  → LOFT-SEAM + FILL-PLANE (kern). **S3-a confirmed**: Onshape can't measure an open surface (Parts to measure stays empty,
+  every value blank) → **fixed by qa4** (`regen/measure.rs` `mass_properties` counts solids only; test
+  `surfaces_have_no_mass_properties`; also fixes the CLI).
+- **S4** live: S 12000 / M 27000 / L 48000 = ours in the app ✅; the picker's configuration dropdown under the studio ✅; the
+  configuration not in the feature dialog itself ✅; the derived part named "Part 1" ✅.

@@ -134,3 +134,26 @@ STATUS EXP1 (qa4 entry, 2026-10-23): renamed **EXP-HDR** (api, export header fie
 - (2) `feature_add importDerived {"partStudio": "Part Studio 1"}` is accepted (a tab name, not an id) and the feature errors
   "Error regenerating."; the app then shows "Missing Part Studio". Expected: resolve tab names (like `tab` arguments do) or
   reject with `invalid_argument`.
+
+## FLAT-ROT — fs — flat pattern is turned 90° against Onshape's
+- qa4 round 4 S1 (r4/s1.py): live flat bounding box x 128.9165 × y 129.4650 mm; ours 129.465 × 128.916 (panel "Flat size" and the
+  drawing's flat view both turned). Live keeps the base in place: the x = 100 flange extends along +x, the y walls along ±y.
+
+## FLAT-SEG — fs — bend lines split by a cutout
+- qa4 round 4 S1: a Ø12 cut through both long bends splits each bend line in two in live (6 "Bend line" bodies, 5 × "UP 90.0°
+  R1.5" + "UP 180.0° R0.01" notes in the drawing's flat view); ours keeps one bend line per bend (3 + 1 notes).
+
+## FLAT-SCALE — asb — flat pattern view auto scale
+- qa4 round 4 S1: Insert view › Flat pattern of Part 1 on ANSI_A_MM: live auto scale 1:3 (title block SCALE 1:3); ours 1:1.
+
+## LOFT-SEAM / FILL-PLANE — kern — loft keeps the circle's seam; planar fill isn't a plane
+- qa4 round 4 S3 (r4/s3.py): surface loft Ø20 circle → 30×16 rectangle: live 4 faces / 12 edges / 6060.1344235 mm² (the 4 matched
+  points split the circle, its own seam is not kept); ours 5 faces, 6058.8169 mm². Fill of the circle: live an exact PLANE,
+  314.1592653589793 mm²; ours 314.212. Downstream: Enclose live 31743.5253 / 6 faces vs ours 31807.0934 / 7.
+
+## STEP-ASM — api — importing a STEP assembly
+- qa4 round 4 S5 (r4/s5.py, samples/qa4-s5-asm.step): live makes an **Assembly tab "Assembly 1 (1)"** (root product name, " (1)" on a
+  clash) + Part Studio **"qa4-s5-asm parts"** + the blob in a **CAD Imports** folder + a BOM element; parts listed Part 2, Part 3,
+  Part 1, each at its **own product position** (the assembly places the instances). Ours: one Part Studio "qa4-s5-asm", parts
+  Part 1, Part 3, Part 2 at the assembly's positions, no assembly. (PVZ: IM1, kern row, is the same gap.)
+- Export details (minor): STL binary header "noshape-kernel st…" (live 80 zero bytes); STEP product order; Parasolid header = EXP-HDR.
