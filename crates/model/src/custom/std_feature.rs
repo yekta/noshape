@@ -180,17 +180,19 @@ pub fn editing_logic(
     old: &crate::params::ParamValues,
     new: &crate::params::ParamValues,
     specified: &[String],
+    creating: bool,
 ) -> Option<crate::params::ParamValues> {
     let feature = studio.features.get(index)?;
     let before = crate::regen::RegenOptions { upto: Some(index), ..opts.clone() };
     let ctx = crate::regen::Regenerator::new().regenerate(studio, config, units, &before).context;
-    editing_logic_in((*ctx).clone(), &feature.type_id, feature.id, &feature.name, units, old, new, specified)
+    editing_logic_in((*ctx).clone(), &feature.type_id, feature.id, &feature.name, units, old, new, specified, creating)
 }
 
 /// Core features whose dialogs run std's editing logic although they
 /// regenerate natively (std Extrude: Add and the merge scope from the trial
-/// tool's collisions, flips for Up to and Remove, the second direction).
-const STD_EDITING_LOGIC: &[&str] = &["extrude"];
+/// tool's collisions, flips for Up to and Remove, the second direction;
+/// std Fillet: a variable fillet's first vertex takes the fillet's values).
+const STD_EDITING_LOGIC: &[&str] = &["extrude", "fillet"];
 
 /// Whether std has editing logic for built-in feature `type_id` and the
 /// dialog runs it (std runs the feature, or it is in STD_EDITING_LOGIC).
@@ -210,11 +212,12 @@ pub fn editing_logic_in(
     old: &crate::params::ParamValues,
     new: &crate::params::ParamValues,
     specified: &[String],
+    creating: bool,
 ) -> Option<crate::params::ParamValues> {
     let (module, std) = std_name(type_id)?;
     let f = FEATURES.lock().entry(std).or_insert_with(|| load(module, std)).clone()?;
     let editing = f.editing.as_ref()?;
-    super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified)
+    super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified, creating)
 }
 
 /// The dialog std's precondition declares for built-in feature `type_id`

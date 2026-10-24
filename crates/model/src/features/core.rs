@@ -114,6 +114,9 @@ pub fn extrude() -> FeatureType {
         .describe("Add or remove material perpendicular to a sketch region or planar face")
 }
 
+/// Fillet radii and widths (valueBounds.fs `BLEND_BOUNDS`: above 0.00001 m).
+const BLEND: NumSpec = NumSpec::positive_length(5.0, 0.2).bounded(1e-5, 500.0);
+
 /// Variable fillet radii may be zero (fillet.fs `VR_BLEND_BOUNDS`).
 const VR_BLEND: NumSpec = NumSpec { kind: crate::params::NumKind::Length, default_metric: 5.0e-3, default_imperial: 0.2 * 0.0254, min: 0.0, max: 500.0 };
 
@@ -138,18 +141,19 @@ pub fn fillet() -> FeatureType {
         ParamSpec::enum_("blendControlType", "Measurement", &[("RADIUS", "Radius"), ("WIDTH", "Width")]).hints(Hints::REMEMBER_PREVIOUS_VALUE | Hints::SHOW_LABEL).visible(edge),
         ParamSpec::enum_("crossSection", "Control", &[("CIRCULAR", "Distance"), ("CONIC", "Conic"), ("CURVATURE", "Curvature")])
             .hints(Hints::REMEMBER_PREVIOUS_VALUE | Hints::SHOW_LABEL)
+            .describe("Cross sectional control")
             .visible(edge),
-        ParamSpec::num("radius", "Radius", NumSpec::positive_length(5.0, 0.2))
+        ParamSpec::num("radius", "Radius", BLEND)
             .hints(Hints::REMEMBER_PREVIOUS_VALUE | Hints::CAN_BE_TOLERANT)
             .visible(move |v| radius_ctl(v) && v.is("crossSection", "CIRCULAR")),
-        ParamSpec::num("nonCircularRadius", "Radius", NumSpec::positive_length(5.0, 0.2))
+        ParamSpec::num("nonCircularRadius", "Radius", BLEND)
             .hints(Hints::REMEMBER_PREVIOUS_VALUE)
             .visible(move |v| radius_ctl(v) && !v.is("crossSection", "CIRCULAR")),
-        ParamSpec::num("width", "Width", NumSpec::positive_length(5.0, 0.2)).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| edge(v) && v.is("blendControlType", "WIDTH")),
+        ParamSpec::num("width", "Width", BLEND).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| edge(v) && v.is("blendControlType", "WIDTH")),
         ParamSpec::num("rho", "Rho", NumSpec::real(0.5, 0.0, 0.99999)).visible(move |v| edge(v) && v.is("crossSection", "CONIC")),
         ParamSpec::num("magnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.99999)).visible(move |v| edge(v) && v.is("crossSection", "CURVATURE")),
         ParamSpec::bool("isAsymmetric", "Asymmetric", false).visible(radius_ctl),
-        ParamSpec::num("otherRadius", "Second radius", NumSpec::positive_length(5.0, 0.2)).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| radius_ctl(v) && v.bool("isAsymmetric")),
+        ParamSpec::num("otherRadius", "Second radius", BLEND).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(move |v| radius_ctl(v) && v.bool("isAsymmetric")),
         ParamSpec::flip("flipAsymmetric", "Flip asymmetric").visible(move |v| radius_ctl(v) && v.bool("isAsymmetric")),
         ParamSpec::bool("isPartial", "Partial fillet", false).hints(Hints::GROUP_HEADER).visible(radius_ctl),
         ParamSpec::enum_("startPartialType", "End type", END_TYPES).hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE).visible(partial),
@@ -172,9 +176,10 @@ pub fn fillet() -> FeatureType {
             "Vertices",
             "vertex",
             vec![
-                ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX),
+                // fillet.fs: the vertex is picked in the array's field only.
+                ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX).hints(Hints::ALWAYS_HIDDEN),
                 ParamSpec::num("vertexRadius", "Radius", VR_BLEND).hints(Hints::MATCH_LAST_ARRAY_ITEM),
-                ParamSpec::num("vertexOtherRadius", "Second radius", NumSpec::positive_length(5.0, 0.2)).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.bool("isAsymmetric")),
+                ParamSpec::num("vertexOtherRadius", "Second radius", BLEND).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.bool("isAsymmetric")),
                 ParamSpec::flip("vertexFlipAsymmetric", "Flip asymmetric").hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.bool("isAsymmetric")),
                 ParamSpec::num("variableRho", "Rho", NumSpec::real(0.5, 0.0, 0.99999)).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.is("crossSection", "CONIC")),
                 ParamSpec::num("variableMagnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.99999)).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.is("crossSection", "CURVATURE")),
@@ -189,9 +194,10 @@ pub fn fillet() -> FeatureType {
             "point on edge",
             vec![
                 ParamSpec::query1("edge", "Edge", QueryFilter::EDGE),
-                ParamSpec::num("edgeParameter", "Location", NumSpec::real(0.5, 0.0, 1.0)),
+                // EDGE_INTERIOR_PARAMETER_BOUNDS_SPEC
+                ParamSpec::num("edgeParameter", "Location", NumSpec::real(0.5, 0.001, 0.999)),
                 ParamSpec::num("pointOnEdgeRadius", "Radius", VR_BLEND).hints(Hints::MATCH_LAST_ARRAY_ITEM),
-                ParamSpec::num("pointOnEdgeOtherRadius", "Second radius", NumSpec::positive_length(5.0, 0.2)).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.bool("isAsymmetric")),
+                ParamSpec::num("pointOnEdgeOtherRadius", "Second radius", BLEND).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.bool("isAsymmetric")),
                 ParamSpec::flip("pointOnEdgeFlipAsymmetric", "Flip asymmetric").hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.bool("isAsymmetric")),
                 ParamSpec::num("pointOnEdgeVariableRho", "Rho", NumSpec::real(0.5, 0.0, 0.99999)).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.is("crossSection", "CONIC")),
                 ParamSpec::num("pointOnEdgeVariableMagnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.99999)).hints(Hints::MATCH_LAST_ARRAY_ITEM).visible(|v| v.is("crossSection", "CURVATURE")),

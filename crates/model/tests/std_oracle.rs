@@ -15,7 +15,7 @@ use noshape_model::sketch_feature::SketchData;
 use noshape_units::{ExprValue, UnitPrefs};
 
 /// Core features whose dialogs equal std's in every state.
-const STRICT: &[&str] = &["extrude"];
+const STRICT: &[&str] = &["extrude", "fillet"];
 
 /// Hints only built-in dialogs carry (UI behaviour the std expresses
 /// elsewhere, e.g. `GROUP_LABEL` for std's collapsible groups).
@@ -516,7 +516,7 @@ fn edit_logic(s: &Studio, old: &ParamValues, specified: &[&str]) -> Vec<String> 
     let new = s.ps.features[index].params.clone();
     let spec: Vec<String> = specified.iter().map(|x| x.to_string()).collect();
     let t = std::time::Instant::now();
-    let out = custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), old, &new, &spec);
+    let out = custom::std_feature::editing_logic(&s.ps, index, &ConfigValues::default(), &s.units, &RegenOptions::default(), old, &new, &spec, true);
     eprintln!("editing logic: {:?}", t.elapsed());
     let mut v: Vec<String> = out.expect("editing logic ran").0.into_iter().map(|(k, v)| format!("{k}={v:?}")).collect();
     v.sort();
@@ -585,4 +585,188 @@ fn extrude_editing_logic_runs_std() {
     let region = s.sketch(Reference::Plane(DatumPlane::Top), &[SQUARE]).1[0].clone();
     s.add("extrude", |p| p.set("entities", ParamValue::Query(vec![region])));
     assert_eq!(edit_logic(&s, &ParamValues::default(), &["entities"]), Vec::<String>::new());
+}
+
+/// The edge of a body through `p` (mm).
+fn edge_at(r: &RegenResult, p: DVec3) -> Reference {
+    let v = noshape_kernel::make_vertex(p * 1e-3).unwrap();
+    for b in &r.context.bodies {
+        for (i, e) in b.shape.edges().iter().enumerate() {
+            if noshape_kernel::distance(&v, e).is_ok_and(|d| d.distance < 1e-9) {
+                return Reference::Edge((*b.edges[i]).clone());
+            }
+        }
+    }
+    panic!("no edge at {p:?}");
+}
+
+/// Fillet scenarios on the 40 mm cube, native against std fillet.fs.
+fn fillet_cases() -> Vec<(&'static str, Studio)> {
+    let mut cases = Vec::new();
+    let on_cube = |name: &'static str, set: fn(&mut ParamValues, &RegenResult)| {
+        let mut s = Studio::new();
+        s.cube();
+        let r = s.regen();
+        s.add("fillet", |p| set(p, &r));
+        (name, s)
+    };
+    cases.push(on_cube("nothing selected", |_, _| {}));
+    cases.push(on_cube("one edge", |p, r| p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]))));
+    cases.push(on_cube("a face", |p, r| p.set("entities", ParamValue::Query(vec![face_at(r, DVec3::new(20.0, 20.0, 40.0))]))));
+    cases.push(on_cube("radius 0", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("radius", expr("0 mm"));
+    }));
+    cases.push(on_cube("radius too big", |p, r| {
+        p.set("entities", ParamValue::Query(vec![face_at(r, DVec3::new(20.0, 20.0, 40.0))]));
+        p.set("radius", expr("30 mm"));
+    }));
+    cases.push(on_cube("conic", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("crossSection", en("CONIC"));
+        p.set("nonCircularRadius", expr("6 mm"));
+        p.set("rho", expr("0.3"));
+    }));
+    cases.push(on_cube("curvature", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("crossSection", en("CURVATURE"));
+        p.set("nonCircularRadius", expr("6 mm"));
+        p.set("magnitude", expr("0.7"));
+    }));
+    cases.push(on_cube("width", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("blendControlType", en("WIDTH"));
+        p.set("width", expr("6 mm"));
+    }));
+    cases.push(on_cube("asymmetric", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isAsymmetric", ParamValue::Bool(true));
+        p.set("otherRadius", expr("9 mm"));
+    }));
+    cases.push(on_cube("asymmetric flipped", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isAsymmetric", ParamValue::Bool(true));
+        p.set("otherRadius", expr("9 mm"));
+        p.set("flipAsymmetric", ParamValue::Bool(true));
+    }));
+    cases.push(on_cube("partial, position", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isPartial", ParamValue::Bool(true));
+        p.set("partialFirstEdgeTotalParameter", expr("0.25"));
+    }));
+    cases.push(on_cube("partial, both bounds", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isPartial", ParamValue::Bool(true));
+        p.set("partialFirstEdgeTotalParameter", expr("0.25"));
+        p.set("secondBound", ParamValue::Bool(true));
+        p.set("partialSecondEdgeTotalParameter", expr("0.75"));
+    }));
+    cases.push(on_cube("partial, offset", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isPartial", ParamValue::Bool(true));
+        p.set("startPartialType", en("OFFSET"));
+        p.set("startPartialOffset", expr("10 mm"));
+    }));
+    cases.push(on_cube("partial, offsets from both ends", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isPartial", ParamValue::Bool(true));
+        p.set("startPartialType", en("OFFSET"));
+        p.set("startPartialOffset", expr("5 mm"));
+        p.set("secondBound", ParamValue::Bool(true));
+        p.set("endPartialType", en("OFFSET"));
+        p.set("endPartialOffset", expr("10 mm"));
+    }));
+    cases.push(on_cube("partial, offset past the end", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isPartial", ParamValue::Bool(true));
+        p.set("startPartialType", en("OFFSET"));
+        p.set("startPartialOffset", expr("50 mm"));
+    }));
+    cases.push(on_cube("partial, no entity", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isPartial", ParamValue::Bool(true));
+        p.set("startPartialType", en("ENTITY"));
+    }));
+    cases.push(on_cube("partial, two separate edges", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0)), edge_at(r, DVec3::new(20.0, 40.0, 40.0))]));
+        p.set("isPartial", ParamValue::Bool(true));
+    }));
+    cases.push(on_cube("partial, same bounds", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isPartial", ParamValue::Bool(true));
+        p.set("partialFirstEdgeTotalParameter", expr("0.5"));
+        p.set("secondBound", ParamValue::Bool(true));
+        p.set("partialSecondEdgeTotalParameter", expr("0.5"));
+    }));
+    cases.push(on_cube("variable", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isVariable", ParamValue::Bool(true));
+        let item = |at: DVec3, radius: &str| {
+            let mut v = ParamValues::default();
+            v.set("vertex", ParamValue::Query(vec![vertex_at(r, at)]));
+            v.set("vertexRadius", expr(radius));
+            v
+        };
+        p.set("vertexSettings", ParamValue::Array(vec![item(DVec3::new(0.0, 0.0, 40.0), "3 mm"), item(DVec3::new(40.0, 0.0, 40.0), "8 mm")]));
+    }));
+    cases.push(on_cube("variable with a point on the edge", |p, r| {
+        p.set("entities", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        p.set("isVariable", ParamValue::Bool(true));
+        let mut v = ParamValues::default();
+        v.set("vertex", ParamValue::Query(vec![vertex_at(r, DVec3::new(0.0, 0.0, 40.0))]));
+        v.set("vertexRadius", expr("3 mm"));
+        let mut e = ParamValues::default();
+        e.set("edge", ParamValue::Query(vec![edge_at(r, DVec3::new(20.0, 0.0, 40.0))]));
+        e.set("edgeParameter", expr("0.5"));
+        e.set("pointOnEdgeRadius", expr("8 mm"));
+        p.set("vertexSettings", ParamValue::Array(vec![v]));
+        p.set("pointOnEdgeSettings", ParamValue::Array(vec![e]));
+    }));
+    cases.push(on_cube("full round", |p, r| {
+        p.set("filletType", en("FULL_ROUND"));
+        p.set("side1Face", ParamValue::Query(vec![face_at(r, DVec3::new(0.0, 20.0, 20.0))]));
+        p.set("side2Face", ParamValue::Query(vec![face_at(r, DVec3::new(40.0, 20.0, 20.0))]));
+        p.set("centerFaces", ParamValue::Query(vec![face_at(r, DVec3::new(20.0, 20.0, 40.0))]));
+    }));
+    cases.push(on_cube("full round, nothing selected", |p, _| p.set("filletType", en("FULL_ROUND"))));
+    cases
+}
+
+#[test]
+fn fillet_regenerates_as_std() {
+    let report: String = fillet_cases().iter().filter(|(name, _)| only(name)).filter_map(|(name, s)| same_as_std(name, "fillet", s)).collect();
+    assert!(report.is_empty(), "native Fillet differs from std:\n{report}");
+}
+
+/// std's filletEditLogic: the first vertex of a variable fillet takes the
+/// fillet's radius, second radius, flip (reversed) and rho.
+#[test]
+fn fillet_editing_logic_runs_std() {
+    let mut s = Studio::new();
+    s.cube();
+    let r = s.regen();
+    let edge = edge_at(&r, DVec3::new(20.0, 0.0, 40.0));
+    let vertex = vertex_at(&r, DVec3::new(0.0, 0.0, 40.0));
+    let set = |p: &mut ParamValues| {
+        p.set("entities", ParamValue::Query(vec![edge.clone()]));
+        p.set("crossSection", en("CONIC"));
+        p.set("nonCircularRadius", expr("7 mm"));
+        p.set("rho", expr("0.3"));
+        p.set("isAsymmetric", ParamValue::Bool(true));
+        p.set("otherRadius", expr("9 mm"));
+        p.set("isVariable", ParamValue::Bool(true));
+    };
+    let mut old = ParamValues::default();
+    set(&mut old);
+    s.add("fillet", |p| {
+        set(p);
+        let mut item = ParamValues::default();
+        item.set("vertex", ParamValue::Query(vec![vertex.clone()]));
+        p.set("vertexSettings", ParamValue::Array(vec![item]));
+    });
+    let got = edit_logic(&s, &old, &["entities", "crossSection", "nonCircularRadius", "rho", "isAsymmetric", "otherRadius", "isVariable", "vertexSettings"]);
+    let item = got.iter().find(|x| x.starts_with("vertexSettings=")).unwrap_or_else(|| panic!("{got:?}"));
+    for want in ["vertexRadius", "Expr", "0.007", "vertexOtherRadius", "0.009", "vertexFlipAsymmetric\": Bool(true)", "variableRho", "0.3"] {
+        assert!(item.contains(want), "{want}: {item}");
+    }
 }

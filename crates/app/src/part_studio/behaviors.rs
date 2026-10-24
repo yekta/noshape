@@ -3138,11 +3138,12 @@ impl PartStudioView {
         if old == params {
             return;
         }
+        let creating = self.edit.as_ref().is_some_and(|e| e.is_new);
         let units = self.doc.read(cx).session.doc.settings.units;
         let dialog = dialog.clone();
         let sent = params.clone();
         self.ui.std_edit_task = Some(cx.spawn(async move |this, cx| {
-            let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set) }).await;
+            let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating) }).await;
             let Some(changed) = changed else { return };
             let _ = this.update(cx, |this: &mut Self, cx| {
                 if dialog.read(cx).feature.params != params {

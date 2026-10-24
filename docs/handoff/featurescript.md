@@ -757,7 +757,7 @@ Sheet-metal WIP 2c8697d2 reverted on top (f8bd0a64; `git revert f8bd0a64` brings
 - std's faulty parameters now reach FeatureError::faulty (run.rs).
 - Dialog generator: a "Driving Parameter" group's boolean gets GROUP_HEADER (as built-in dialogs).
 
-**Extrude (in progress):** dialog identical in every state (added hidden `domain` + flat-view `flatOperationType`,
+**Extrude (done, 7e603877, ready):** dialog identical in every state (added hidden `domain` + flat-view `flatOperationType`,
 second depth not tolerant, second end hidden when symmetric). Native errors now std's texts + faulty fields
 (EXTRUDE_SELECT_TERMINATING_*, EXTRUDE_SELECT_DIRECTION / DIRECTION_INVALID_ENTITY / DIRECTION_COPLANAR,
 EXTRUDE_SELECT_START_OFFSET_ENTITY / START_OFFSET_BOUND_NOT_PLANAR / NOT_PARALLEL, OFFSET_WIRE_SELECT_WALL_PATH,
@@ -766,3 +766,20 @@ Studio." (CANNOT_BE_EMPTY, live dialogs/extrude-endtype-*). Start offset to an e
 Host fixes found by the oracle: SWEPT_FACE historical query, qAdjacent of sketch regions, opExtrude up-to planes /
 UP_TO_NEXT / endTranslationalOffset, evMateConnector only for mate connectors, coplanar overlapping faces interfere
 in evCollision (boolean heuristics: boss on a face = Add, as live).
+
+std's editing logic for core features: `std_feature::STD_EDITING_LOGIC` (extrude, fillet) makes `has_editing_logic` true,
+so the app runs std's function (part_studio/behaviors.rs `std_edit_logic`, now on a background thread; results for
+stale values are dropped; changes made before `before_context` arrives run when it does) and skips the native
+`boolean_edit_logic` for them. Seven-parameter editing functions get `isCreating` (EditSession::is_new); returned
+arrays convert item by item (run.rs `editing_value`). Debug-build timing: std extrudeEditLogic ~300 ms (it runs a
+trial extrude + evCollision), filletEditLogic ~3 ms.
+
+**Fillet (done):** dialog identical (BLEND_BOUNDS min 1e-5 m, Location 0.001..0.999, cross-section description,
+variable fillet's vertex field always hidden). `fillet_regenerates_as_std` (24 cases): std's partial-fillet
+checks now native (`blend_section::check_partial`: one chain, closed chain needs two bounds, offsets within the
+chain, distinct bounds; std's texts), the second offset is measured from the chain's end (std), full round's
+messages are opFullRoundFillet's (FULL_ROUND_SELECT_FACES / FULL_ROUND_COMMON_BODY; unsupported shapes =
+FILLET_FAILED). Host: `opFillet` now runs the Fillet evaluator (every option: cross sections, width, asymmetric,
+partial, variable), so the std route's fillet geometry equals native by construction; the oracle there compares
+std's preprocessing and errors. Built-in evaluators' Onshape messages map back to their ErrorStringEnum member in
+FS ops (`host::error_code`). filletEditLogic runs in the dialog (`fillet_editing_logic_runs_std`).

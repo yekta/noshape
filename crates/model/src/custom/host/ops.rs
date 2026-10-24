@@ -27,7 +27,6 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opExtrude", op_extrude),
     ("opRevolve", op_revolve),
     ("opBoolean", op_boolean),
-    ("opFillet", op_fillet),
     ("opChamfer", op_chamfer),
     ("opTransform", op_transform),
     ("opPattern", op_pattern),
@@ -521,10 +520,6 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
         Ok(())
     })?;
     Ok(Value::Undefined)
-}
-
-fn op_fillet(i: &mut Interp, a: Vec<Value>) -> R<Value> {
-    blend(i, &a, false)
 }
 
 fn op_chamfer(i: &mut Interp, a: Vec<Value>) -> R<Value> {
