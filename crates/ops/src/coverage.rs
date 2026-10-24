@@ -261,6 +261,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Hide all explode lines", Ui("explode line display; no model change")),
     ("assembly:Hide all mate connectors and mates", Op("assembly_set_feature_state")),
     ("assembly:Hide all mates", Op("assembly_set_feature_state")),
+    ("assembly:Hide mates", Op("assembly_set_feature_state")),
     ("assembly:Hide other mate connectors and mates", Op("assembly_set_feature_state")),
     ("assembly:Hide other mate connectors", Op("assembly_set_feature_state")),
     ("assembly:Hide other mates", Op("assembly_set_feature_state")),
