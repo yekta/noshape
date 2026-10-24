@@ -2449,7 +2449,8 @@ fn hole_and_rib_match_onshape() {
         params.extend(extra);
         t.add("hole", &params)
     };
-    let cases: Vec<(&str, (f64, f64), Vec<(&'static str, ParamValue)>)> = vec![
+    type Case = (&'static str, (f64, f64), Vec<(&'static str, ParamValue)>);
+    let cases: Vec<Case> = vec![
         ("H1", (30.0, 0.0), vec![("holeDepthV3", e("10 mm"))]),
         ("H1 start at sketch", (30.0, 0.0), vec![("holeDepthV3", e("10 mm")), ("startStyle", en("SKETCH"))]),
         ("H1 flipped", (30.0, 0.0), vec![("holeDepthV3", e("10 mm")), ("oppositeDirection", ParamValue::Bool(true))]),
