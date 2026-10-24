@@ -34,3 +34,10 @@ Live behaviour pending (REQUESTS.md "qa5 undo across tabs"). Status: ✅ ok, ✗
 |---|---|
 | UNDO1 insert + Ctrl+Z | ✅ one Ctrl+Z removes the inserted instance (Instances 4 → 3), no invisible step |
 | UNDO2 drawing "Out of date" after an assembly undo | fix cited in code; not re-run |
+
+## Re-run pass 21 (2026-10-23, main 40e23871 binary /root/target-lead/debug/noshape)
+
+| Row | Ours now | Status |
+|---|---|---|
+| UNDO1 | Insert the qa5 bool Part Studio (3 instances) into Assembly 1, ✓, switch to the Part Studio tab and back, Ctrl+Z once: all 3 instances go (Instances (0)); Ctrl+Y brings them back | ✅ fixed |
+| UNDO2 | Drawing of Assembly 1 (suggested views): an assembly insert shows the drawing's Update button highlighted (out of date); after Ctrl+Q, Ctrl+Z in the assembly shows it out of date again. Both directions behave the same | ✅ fixed |

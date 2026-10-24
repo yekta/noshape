@@ -95,3 +95,6 @@ Docs /tmp/qa5/d25c/b2.noshape, /tmp/qa5/d25d/s.noshape, /tmp/qa5/d25b/merge.nosh
 | COPY1 Copy here colour | ✅ the copy keeps the source's colour (dark blue) |
 | INT1, SPLIT1, DEL2 | fixed in qa5's later pass |
 | BOOL3, BOOL4(b), INT2, NAME2, DEL1 | fixes cited in code (psb/ui), not re-run this pass |
+
+## Re-run pass 23 (qa5, 2026-10-24, agent/qa5 on main c703b0d0)
+| BOOL1b no-change row tooltip | disjoint Union of Part 1 + Part 3 (Info "Boolean resulted in no geometry change…"): row tooltip **"Boolean 1"** | ✅ fixed |

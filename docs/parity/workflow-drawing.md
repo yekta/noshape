@@ -116,3 +116,9 @@ Live answered "qa5 pass 7" (3): SCALE "----" before any view, 1:1 after → D14 
 - Fixed in qa5's later passes (rows marked ✅ above): D2, D3, D5, D7, D8, D9, D11, D14, D15, D16; D1, D4 fixes cited in code.
 - Still open, not re-run since pass 3: **D10** (PDF: iso view shaded, Detail circle/clip lost) and **D12** (DXF explodes circles,
   arcs, hatches, dimensions, tables into lines) → qa5-routing D10 / D12 (**api**, owns export).
+
+## Re-run pass 23 (qa5, 2026-10-24, app from agent/qa5 on main c703b0d0, which has api's drawing export b4b803af; d10 doc)
+| Row | Ours now | Status |
+|---|---|---|
+| D10 PDF | tab › Export… › PDF 1.5 Color: the isometric view is **lines** (not shaded); Detail A keeps its circle and the clipped content, "DETAIL A / SCALE 2:1" (pass23/d10pdf-1.png) | ✅ fixed (api) |
+| D12 DXF | Release 14: CIRCLE ×5, ELLIPSE ×2, MTEXT ×43, LINE, POLYLINE; layers VISIBLE, TITLE_BLOCK, BORDER_ZONES / BORDER_FRAME, DETAIL_VIEW_BORDER / DETAIL_VIEW_PARENT_BORDER, ANNOTATION_TEXT (R14 writes upper-case layer names, behaviours ~6165) | ✅ fixed (api) for this drawing; hatches, dimensions and tables not in it (not checked) |

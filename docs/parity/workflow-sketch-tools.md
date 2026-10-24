@@ -74,3 +74,5 @@ Doc /tmp/qa5/d29/sk.noshape (same steps as pass 14). Shots z20–z29.
 | PAT1 linear pattern | ✅ hollow arrows, square handles, "3x" with a leader, 25 spacing dimension with extension lines |
 | **POLY1** inscribed polygon | ✗ **still** (= qa5 pass 21): construction circle solid while pending (looked before the vertex click, so the spinner wasn't checked) → qa5-routing POLY1 (skb). Evidence /root/qa4-scratch/gate-v047/poly1-main-a0e360a3.png |
 | OFF1, VB1, STB1, SK5 | fixed in earlier passes / code (SK5 matches live's numbers, d1a1d056 test) |
+
+| FIL2 CLI default (pass 21, 10-23) | `sketch_fillet` documents and uses 5 mm (0.5 in in inch documents) at first, then the tab's last radius | ✅ fixed |

@@ -246,3 +246,5 @@ STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's
 STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
 STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
 STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty status bar, as live).
+STATUS BOOL1b (2026-10-24 15:3x, qa5): fixed on main; disjoint Union row tooltip reads "Boolean 1".
+STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF iso view as lines, detail clip kept; DXF R14 with CIRCLE / ELLIPSE / MTEXT and live's layer names. Hatch / dimension / table entities not covered by this drawing.
