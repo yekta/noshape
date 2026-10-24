@@ -48,7 +48,7 @@ impl Shape {
     }
     /// The script's dimension giving the part's height (its top face, where
     /// the second mate connector sits), for parts with no length.
-    fn height_key(self) -> &'static [&'static str] {
+    pub(crate) fn height_key(self) -> &'static [&'static str] {
         match self {
             Shape::Nut => &["m"],
             Shape::Washer => &["h"],
