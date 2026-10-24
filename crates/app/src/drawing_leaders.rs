@@ -127,6 +127,7 @@ impl DrawingEditor {
                         }
                     });
                     t.selection = vec![Sel::Annotation(id)];
+                    t.leader_sel = Some((id, leader));
                 }));
             }
             LeaderHit::Bend { .. } => {}
@@ -271,5 +272,45 @@ impl DrawingEditor {
                 }
             }
         });
+    }
+
+    /// The selected leader (live (1)): amber, every node and the bend an
+    /// amber dot, the anchor an amber ring with a blue centre.
+    pub fn leader_overlay(&self, o: &mut crate::drawing_scene::Overlay) {
+        const AMBER: [u8; 4] = [204, 146, 92, 255];
+        const BLUE: [u8; 4] = [0, 136, 204, 255];
+        let Some((id, leader)) = self.leader_sel else { return };
+        if !self.selection.contains(&Sel::Annotation(id)) {
+            return;
+        }
+        let Some(a) = self.current_sheet().annotations.iter().find(|a| a.id == id) else { return };
+        let Some(path) = self.note_leader_paths_of(a).into_iter().nth(leader) else { return };
+        o.tinted.push((path.points.clone(), AMBER, 1.5));
+        let n = path.points.len();
+        for p in &path.points[path.head - 1..n - 1] {
+            o.dots.push((*p, AMBER));
+        }
+        let t = path.points[n - 1];
+        // Outside the blue centre dot.
+        let r = self.tol_mm(7.0);
+        let ring: Vec<[f64; 2]> = (0..=24).map(|i| {
+            let a = i as f64 / 24.0 * std::f64::consts::TAU;
+            [t[0] + r * a.cos(), t[1] + r * a.sin()]
+        }).collect();
+        o.tinted.push((ring, AMBER, 1.5));
+        o.dots.push((t, BLUE));
+    }
+
+    /// The Add leader rubber band's arrowhead at `to`, pointing away from `from`.
+    pub fn rubber_band_arrow(&self, o: &mut crate::drawing_scene::Overlay, from: [f64; 2], to: [f64; 2]) {
+        let d = [to[0] - from[0], to[1] - from[1]];
+        let l = d[0].hypot(d[1]);
+        if l < 1e-9 {
+            return;
+        }
+        let (u, w) = ([d[0] / l, d[1] / l], [-d[1] / l, d[0] / l]);
+        let (len, half) = (3.0, 1.0);
+        let base = [to[0] - u[0] * len, to[1] - u[1] * len];
+        o.tinted.push((vec![to, [base[0] + w[0] * half, base[1] + w[1] * half], [base[0] - w[0] * half, base[1] - w[1] * half], to], [0, 0, 0, 255], 1.2));
     }
 }
