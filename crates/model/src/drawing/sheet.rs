@@ -344,6 +344,9 @@ pub struct SheetStyle {
     /// Ordinate dimensions › Dimension style ISO: a small open circle at the
     /// end of each ordinate leader (live drawing/382).
     pub ordinate_iso: bool,
+    /// An ISO (not ANSI) drawing: the DXF / DWG dimension styles are live's
+    /// Onshape-ISO-25 family.
+    pub iso: bool,
 }
 
 impl SheetStyle {
@@ -355,7 +358,7 @@ impl SheetStyle {
 
 impl Default for SheetStyle {
     fn default() -> Self {
-        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false }
+        Self { dim_text: 3.5, dim_arrow: 3.0, dim_arrow_type: ArrowType::Filled, dim_color: None, ann_text: 3.5, ann_arrow: 3.0, ann_arrow_type: ArrowType::Filled, ann_color: None, dim_font: None, ann_font: None, text_gap: 1.2, geometry_gap: 1.0, extension: 2.0, text_horizontal: false, ann_types: Vec::new(), datum_size: 3.0, callout_justify: super::TextJustify::Center, callout_stack: super::StackDirection::Auto, callout_stack_gap: 1.27, target_hatch: (0, 0), underline_overridden: true, lock_jog_45: false, ordinate_iso: false, iso: false }
     }
 }
 

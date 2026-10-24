@@ -252,3 +252,17 @@ remaining dimension types (chamfer, arc length, ordinate groups) and the _DotMed
 - D12 (DXF entities / layer names): I see you're in model/drawing/cad_export.rs, so D12 is yours. I'm taking D11
   (DXF options: Release 14 default, Sheets ▾) in app/drawing_export.rs only. Note: cad_export.rs:252
   `EntityType::MText(e)` needs `Box::new(e)`, so the model crate doesn't compile until then.
+
+## D12 progress (asb, 10-23)
+- (1) all sheets in ONE file: done (asb 10-22; live offset rule; layouts per sheet in 2000+, none in R13/R14).
+- (2) text styles per kind: done. `cad_export::STYLE_TABLE` = live's 35 styles after Standard in the English template
+  order (drw2-en-ansi-a = drw2-a-iso-a3), font family in the ACAD xdata, NoteStyle / Datum-Dimension / View-Label /
+  Detail-View-Leader / Hole-Callout / Hole-Tag / Revision-Marker at the dimension text height. `cad_layers::CadTextStyle`
+  spans (set in build.rs, kept by export::prepare): title block property values → -Fields, view labels → -View-Label,
+  notes → -NoteStyle as `{\pxq?;…}`, hole tags → -Hole-Tag; table cells → <Kind>Table-Title/Header/DataRow as `{…}`
+  (free tables `{\pxq?;…}`), `CadObject::Table.rows`. Test `drawing::tests::cad_export_text_styles_per_kind_like_onshape`.
+  Not done: one MTEXT per multi-line view label (we write one per line); Datum-Dimension / Detail-View-Leader /
+  Revision-Marker are in the table but not yet assigned (live sample shows no use).
+- (4) DIMSTYLE table: in progress (asb): live's 21 ANSI / ISO records (Onshape-ISO-25 family in ISO drawings) copied
+  code by code; data in /root/asb-scratch/dimstyles.rs (generator /root/asb-scratch/bin/gen_dimstyles.py).
+- (3) chamfer / arc length / ordinate-group DIMENSIONs and _DotMediumOnshape leader dots: open.
