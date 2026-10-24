@@ -176,3 +176,10 @@ Live answered "qa5 pass 7" (behaviours.md ~6868): no "Solving…" text with an e
 | A5 MC inference | hovering the hole rim: rim highlighted, connector at the hole centre, no dots on other parts (b16) | ✅ **fixed** |
 | DOC5 new Assembly tab position | + › Create Assembly with Part Studio 1 active → "Assembly 2" right after Part Studio 1, stays there after tab switches (t01) | ✅ **fixed** |
 | A15 / A18 | fixed in pass 8 (rows in workflow-configured-assembly.md are stale) | ✅ |
+
+## skb P3 check (2026-10-24 evening, agent/skb after the drag-speed batch)
+| Row | Live | Ours | Status |
+|---|---|---|---|
+| PT1 pattern field chips | Direction "Edge of Part 1 <2>", Axis of pattern "Face of Part 2 <1>", Mirror plane "Mate connector" (dom/dialog-asm-{linear,circular}-pattern-filled, -mirror-filled) | were "Mate connector of Part 1 <1>" for all three; now the entity ("Edge of Part 1 <1>") for Direction/Axis, "Mate connector" for the mirror plane (perf/p21, p22) | ✅ **fixed** |
+| PT2 pattern follows its seed | copies keep their pattern placement relative to the seed | circular pattern of a revolute pin (6): dragging the seed turns every copy by the same −19.2° (CLI list), 1.6 ms per drag solve | ✅ |
+| A9 sign | which way along the picked edge | live's capture doesn't say which edge was picked; still ? | ? |

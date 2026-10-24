@@ -1312,10 +1312,18 @@ impl AssemblyView {
             let rows: Vec<AnyElement> = value
                 .as_ref()
                 .map(|c| {
-                    let label = (this.labeler(cx))(c);
+                    // Live (dom/dialog-asm-{linear,circular}-pattern-filled,
+                    // -mirror-filled): Direction / Axis name the picked
+                    // entity ("Edge of Part 1 <2>", "Face of Part 2 <1>"); a
+                    // mirror plane picked on geometry reads "Mate connector".
+                    let text = match (&c.reference, c.connector) {
+                        (noshape_model::reference::Reference::Implicit { .. }, None) if label == "Mirror plane" => "Mate connector".to_string(),
+                        (noshape_model::reference::Reference::Implicit { on, .. }, None) => (this.labeler(cx))(&MateConnectorRef { reference: (**on).clone(), ..c.clone() }),
+                        _ => (this.labeler(cx))(c),
+                    };
                     vec![chip(
                         SharedString::from(format!("{id}-v")),
-                        label,
+                        text,
                         cx,
                         Box::new(move |this: &mut Self| {
                             if let Some(p) = &mut this.pattern {
