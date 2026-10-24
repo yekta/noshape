@@ -335,6 +335,9 @@ pub struct FeatureState {
     /// a Feature pattern's instances that couldn't be made (user's live
     /// shot 2026-10-23: red edges, dark red faces).
     pub error_mesh: Option<Arc<MeshBuffers>>,
+    /// Hole: parts behind its locations (against the hole direction), for
+    /// the dialog's flip heuristic (hole.fs holeScopeFlipHeuristics).
+    pub touched_behind: Vec<BodyId>,
 }
 
 /// A computed parameter value: a length (meters) or text such as "Multiple".
