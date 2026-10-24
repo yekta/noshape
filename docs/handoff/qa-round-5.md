@@ -107,6 +107,20 @@ edge midpoints, vertices) and the in-canvas popup (type ▾, flip, reorient, Sol
   flipped frame when the flip changes / the mate is made, and give the Z residual a sign (e.g. add 1 − z.z or use log_rot of the
   Z-to-Z rotation).
 
+## v3 Session 4 in the app: drawing with views and dimensions (v0.4.8 c7d9d454; the v3 s2 30-feature part)
+Part 1 › Create Drawing of Part 1… → Create Drawing dialog (templates noshape/ANSI/ISO/JIS, ANSI_A_INCH preselected, Options
+Suggested views | No views) → ANSI_A_MM, No views → Insert view (orientation Top, 1:1) → click places the base view, then the
+projected Front (below) and Right (right, bosses pointing left = third angle) follow the cursor; Esc ends ✅. Centre marks on
+every circle, tangent edges of the R3 corners drawn ✅. Dimensions: plate top edge → **94** (the straight edge between the R3
+corners, extension lines at the tangent points) ✅; Diameter (Shift+D) on a hole → **Ø6** with leader ✅; point-to-point between
+two boss centre marks → **25** ✅.
+- **R5v3-S4-a → DRW-DIM-2EDGES (asb, P2)** the smart Dimension (D): first click on an edge, second click on a **parallel edge of
+  the same view** → instead of taking it as the second entity it places the first edge's length dimension at that click. 3/3
+  tries (Front view top + bottom edge → "94" laid on the bottom edge; Top view left + right edge → "54" laid on the right
+  edge), clicks on the exact edge pixel rows. `scene/drawing_tools/smart.rs` dimension_takes_more → smart_takes(c, first) must
+  be returning false there (smart_pick(c) none / not the edge). Point-to-point picks work. Live's smart dimension takes the
+  second edge and dimensions between the two.
+
 ## v2 Session 2: editing an early feature in a 30-feature part (v0.4.8; r5/v2s2.py; live asked: "qa4 round 5 v2 s2")
 Plate 200×100×10 + 14 × (sketch circle + boss Add): 30 features, 1 part (211583.052 mm³, 34 faces). CLI build 23.8 s.
 - App: regen panel **total 462 ms** (bosses 17–71 ms each). Edit Extrude 1 (feature 2) 10 → 12: preview settles 0.8–1.3 s after

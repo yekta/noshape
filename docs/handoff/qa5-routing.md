@@ -374,3 +374,6 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - **MATE-FLIP-AXIAL (asb, P2 wrong placement)** Flip primary axis does nothing for Revolute / Cylindrical / Planar / Pin slot /
   Parallel: residual `[z.x, z.y]` (`assembly/solver.rs` ~571–579) accepts anti-parallel Z; result = nearest to the prior pose.
   Repro r5/v3s3-flip.py (identical poses for flip false/true; Fastened differs as it should) (v3 s3).
+- **DRW-DIM-2EDGES (asb, P2)** drawing smart Dimension: a second click on a parallel edge in the same view places the first
+  edge's length there instead of picking the edge (3/3; Top view left+right edge → "54" on the right edge). smart.rs
+  dimension_takes_more / smart_takes (v3 s4).
