@@ -1051,3 +1051,51 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
   plane (plain chip, part-colour caps: live dark-2437). Esc closes the assembly Named views from the graphics.
   Open: our 3D-drawn cube (triangle, X label) is 1 px above live in both views (button/menu exact); live's
   open button reads #eaeaea with darker edges vs our flat #e5e5e5 (captures disagree: part-studio/53).
+- Round 21 (10-24, lead: cube offset + look-only 🔧 rows of docs/parity/part-studio.md):
+  - View cube: `overlay::view_cube::CENTER` = (75, 76): live draws the cube 1 px under the widget middle (every
+    arrow 1 px lower, x exact). Used by the overlay drawing, the axis-label boxes and the app's hit testing
+    (part_studio/view_cube.rs `local`). Arrows now at live's pixels in both views; hover/click checked.
+  - 6.16: icons/list-warning-overlay.svg (hand-drawn 12x12 #FAB601 triangle, white !) at the row icon's
+    (9, 8) for Warning status, at live's pixels (part-studio/2071). Live also shows it for ERROR rows with a
+    missing selection: our model doesn't track missing selections (psb).
+  - 2.22: analysis.rs `render_analysis_panel` = live's 433x28 #90cef1 bar at the graphics top centre, 13 px
+    #333 text 12 px in, white 65x21 Disable (1 px #aaa) 8 px from the right: bar, button and text rows exact,
+    our text 5 px longer (font).
+  - 3.10: hover midpoint = 8 px black ring (layer 11) + 5.5 px #ffd3a0 fill (layer 22), selection/06. Open:
+    live's hovered edge covers the ring where it crosses; our renderer draws all points after lines (a ring
+    pass before the line pass would be needed). Depth-testing the ring hides its lower half (tried).
+  - Survey for the lead (other owners): 5.8 contradicts live (a rejected pick adds nothing, no flash/message;
+    psb built a flash); 6.12 tooltip should read "N feature(s) failed to regenerate" (ui); 11.7's "no mixer tab"
+    is stale (the Mixer exists; only custom-colour tiles are missing). No live capture: 6.25 paused banner, 5.8.
+- **HANDOFF STATE (10-24, moved to another account; lead quota pre-empt)**. Branch agent/icons2:
+  - Committed + verified: d08bfff7 (view cube 1 px, block 1). NOT yet marked ready (ready/icons2 is still
+    the VC8 merge 3e67232e).
+  - WIP commit (built and checked in the app unless noted, clippy NOT yet run on it):
+    - 6.16 warning badge (list-warning-overlay.svg, left 9 top 8): at live's pixels; last tweak (sharper apex)
+      not rebuilt.
+    - 2.22 high-quality bar (analysis.rs): bar/button/text rows exact vs lod4-fill-shiftR.
+    - 3.10 midpoint marker (behaviors.rs midpoint_overlay): ring + fill; edge-over-ring open (see above).
+    - P1 look, NOT rebuilt yet: ui.rs `search_tools_toggle` chips = live 19 px joined keys (alt/⌥ 35 px,
+      c 17 px, 1 px #aaa + 2 px bottom, on the box fill, gap 3 after the label); feature_dialog.rs bool rows
+      min_h 27.333 (live 27.33: checkboxes at 262/290/317/344/372 in extrude-01), tolerant-row label pt 6,
+      tolerance button mt 7, expander pt 2 (Depth row ink vs extrude-01: label +2, button +4, › +1).
+    - parity doc rows 2.22 / 3.10 / 6.16 updated.
+  - Next steps, in order: build (`cargo build -p noshape`), re-measure (tools in /root/icons2-scratch/tools:
+    runs.py, sbs3.py; app3.sh start <doc>; live refs part-studio/00-new-doc-initial.png for the toolbar row,
+    dialogs/extrude-01-new-empty.png + dom/dialog-extrude-new.txt for Extrude; checkbox tops should read
+    262/290/317/344/372, slider 404, search box 1665–1826 with chips 1765–1799 / 1800–1816); then clippy
+    `-p noshape-render -p noshape --all-targets -D warnings`, `cargo test -p noshape-render`, the view_cube
+    tests; split/squash the WIP into blocks, merge main, mark ready.
+  - P1 look rows: done = toolbar icon positions (all exact vs part-studio/00), feature list panel (matches),
+    Extrude header/tabs/field/Blind rows (exact). In progress = Search tools chip, Extrude rows (above).
+    Next (most-used first) = Revolve / Fillet / Chamfer / Hole / Shell / Sweep / Loft / patterns / Mirror /
+    Boolean / Plane dialogs (live dialogs/*-01-open.png, compare in an inch doc:
+    /root/icons2-scratch/docs/empty-in.noshape), sketch toolbar + dimension visuals, parts list, viewport
+    overlays (manipulator arrows, previews, selection highlight). Left rail icons differ from live (ui's).
+  - Test docs: /root/icons2-scratch/docs/warn.noshape (Query variable 1 = Warning row), empty-in.noshape.
+  - Checks after the WIP commit: clippy `-p noshape-render -p noshape --all-targets -D warnings` CLEAN; app
+    view_cube tests pass; render `offscreen::view_cube_overlay_is_drawn_in_the_top_right_corner_only` failed
+    (2 px of the down arrow's AA 1 px under the widget, from the 1 px CENTER shift, as live) → test box widened
+    by 1 row (commit "View cube test…"); its re-run was still queued at handoff: re-run
+    `cargo test -p noshape-render --test offscreen view_cube`.
+  - Re-run done: `offscreen view_cube` passes (1 passed). Block 1 (d08bfff7 + 2ce6ecb1) is fully checked.
