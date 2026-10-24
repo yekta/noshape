@@ -219,7 +219,7 @@ fn char_width(c: char) -> f64 {
     }
     let mut buf = [0u8; 4];
     let v = if fill_supported(c.encode_utf8(&mut buf)) {
-        noshape_sketch::text::layout_text(c.encode_utf8(&mut buf), DEFAULT_FAMILY, false, false).width / fill_cap(DEFAULT_FAMILY, false, false)
+        noshape_sketch::text::layout_drawing_text(c.encode_utf8(&mut buf), DEFAULT_FAMILY, false, false).width / fill_cap(DEFAULT_FAMILY, false, false)
     } else {
         glyph(c).advance / CAP
     };
@@ -298,8 +298,9 @@ pub fn text_fill(t: &Text2) -> (Vec<[f64; 2]>, Vec<u32>) {
     text_fill_font(t, None)
 }
 
-/// Cap height of a font in [`noshape_sketch::text::layout_text`] units
-/// (the top of its "H"), cached.
+/// The text height of a font in [`noshape_sketch::text::layout_drawing_text`]
+/// units: the top of its capital "A" (live asb 10-24: a note's text height
+/// is the "A"'s yMax for every TrueType / OpenType font), cached.
 fn fill_cap(family: &str, bold: bool, italic: bool) -> f64 {
     use std::collections::HashMap;
     use std::sync::{Mutex, OnceLock};
@@ -310,7 +311,7 @@ fn fill_cap(family: &str, bold: bool, italic: bool) -> f64 {
     if let Some(v) = CACHE.get_or_init(Default::default).lock().ok().and_then(|c| c.get(&key).copied()) {
         return v;
     }
-    let l = noshape_sketch::text::layout_text("H", family, bold, italic);
+    let l = noshape_sketch::text::layout_drawing_text("A", family, bold, italic);
     let top = l.polylines(2).iter().flatten().map(|p| p.y).fold(0.0f64, f64::max);
     let v = if top > 0.1 { top } else { FILL_CAP };
     if let Ok(mut c) = CACHE.get_or_init(Default::default).lock() {
@@ -325,7 +326,7 @@ pub fn text_fill_font(t: &Text2, font: Option<&super::sheet::TextFont>) -> (Vec<
         Some(f) => (f.family.as_str(), f.bold, f.italic),
         None => (DEFAULT_FAMILY, false, false),
     };
-    let layout = noshape_sketch::text::layout_text(&t.text, family, bold, italic);
+    let layout = noshape_sketch::text::layout_drawing_text(&t.text, family, bold, italic);
     if layout.contours.is_empty() || layout.width <= 0.0 {
         return (Vec::new(), Vec::new());
     }

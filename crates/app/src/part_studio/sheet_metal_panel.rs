@@ -11,7 +11,7 @@ use crate::theme::p;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::reference::{BodyId, FeatureId};
+use noshape_model::reference::{BodyId, FeatureId, Reference};
 use noshape_model::sheetmetal::{BendKind, SheetMetalData};
 use std::sync::Arc;
 
@@ -98,6 +98,41 @@ fn joint_rows(data: &SheetMetalData, up: &dyn Fn(usize) -> Option<bool>, order: 
         bends.push(JointRow { name: format!("{kind} {}", name_of(0, i)), radius: b.radius, angle: b.angle.to_degrees(), up: up(i), k_factor: b.k_factor, style: "" });
     }
     (bends, joints)
+}
+
+/// Where a table edit's Modify joint goes (live "ui (10-24 b)"): at the
+/// rollback bar, but before the model's Finish sheet metal model when that
+/// comes first.
+fn joint_edit_index(ps: &noshape_model::partstudio::PartStudio, model: FeatureId) -> usize {
+    let bar = ps.rollback_index();
+    let from = ps.features.iter().position(|f| f.id == model).map_or(0, |i| i + 1);
+    let finish = ps.features.iter().enumerate().skip(from).find(|(_, f)| f.type_id == "sheetMetalEnd" && !f.suppressed).map(|(i, _)| i);
+    finish.map_or(bar, |f| f.min(bar))
+}
+
+/// Insert a table edit's feature at `at`, the rollback bar staying under it.
+fn insert_joint_edit(ps: &mut noshape_model::partstudio::PartStudio, f: noshape_model::partstudio::Feature, at: usize) {
+    let at = at.min(ps.features.len());
+    ps.features.insert(at, f);
+    if let Some(r) = ps.rollback
+        && at <= r
+    {
+        ps.rollback = Some(r + 1);
+    }
+}
+
+/// A bend's faces as references.
+fn bend_faces(b: &noshape_model::sheetmetal::Bend) -> Vec<Reference> {
+    b.inner_faces.iter().chain(&b.outer_faces).map(|n| Reference::Face((**n).clone())).collect()
+}
+
+/// The Bends rows' order (indices into the model's bends): the stored Move
+/// up / Move down order, then the rest in model order.
+fn bend_row_order(data: &SheetMetalData, stored: &[Reference]) -> Vec<usize> {
+    let key = |i: usize| bend_faces(&data.bends[i]).iter().filter_map(|r| stored.iter().position(|s| s == r)).min().unwrap_or(usize::MAX);
+    let mut idx: Vec<usize> = (0..data.bends.len()).collect();
+    idx.sort_by_key(|&i| (key(i), i));
+    idx
 }
 
 /// A table number as live writes it ("2", "0.01", "0.45", "180"): up to
@@ -194,6 +229,29 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// The active model's stored Bends row order.
+    fn sm_stored_order(&self, model: FeatureId, cx: &App) -> Vec<Reference> {
+        self.studio(cx).and_then(|s| s.bend_order.iter().find(|(m, _)| *m == model).map(|(_, v)| v.clone())).unwrap_or_default()
+    }
+
+    /// Move up (`delta` -1) / Move down (+1) bend `bend` in the table.
+    fn sm_move_bend(&mut self, model: FeatureId, bend: usize, delta: isize, cx: &mut Context<Self>) {
+        let Some(data) = self.context.as_ref().and_then(|c| c.sheet_metal.values().find(|d| d.model == model).cloned()) else { return };
+        let mut order = bend_row_order(&data, &self.sm_stored_order(model, cx));
+        let Some(pos) = order.iter().position(|&i| i == bend) else { return };
+        let to = pos as isize + delta;
+        if to < 0 || to as usize >= order.len() {
+            return;
+        }
+        order.swap(pos, to as usize);
+        let list: Vec<Reference> = order.iter().filter_map(|&i| bend_faces(&data.bends[i]).into_iter().next()).collect();
+        self.edit_config(if delta < 0 { "Move up" } else { "Move down" }, cx, |ps| {
+            ps.bend_order.retain(|(m, _)| *m != model);
+            ps.bend_order.push((model, list));
+        });
+        cx.notify();
+    }
+
     /// The faces of Bends row `row` of the active model.
     fn sm_bend_refs(&self, row: usize) -> Vec<noshape_model::reference::Reference> {
         let Some(ctx) = self.context.as_ref() else { return Vec::new() };
@@ -212,8 +270,6 @@ impl PartStudioView {
 
     /// Right-click on a Bends row. Live: Move up / Move down (not the first
     /// / last row), a separator, "Convert <name> to rip".
-    /// TODO(live ui 10-24 b): Move up / Move down (a bend order edit; what
-    /// it changes is asked).
     fn open_bend_row_menu(&mut self, row: usize, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let models = self.sheet_metal_models(cx);
         let Some(model) = self.sheet_metal_context(&models) else { return };
@@ -224,15 +280,32 @@ impl PartStudioView {
         let (bends, _) = joint_rows(&data, &up, &order);
         let Some(name) = bends.get(row).map(|r| r.name.clone()) else { return };
         let Some(face) = data.bends.get(row).and_then(|b| b.inner_faces.first().or(b.outer_faces.first())).map(|n| noshape_model::reference::Reference::Face((**n).clone())) else { return };
+        let order = bend_row_order(&data, &self.sm_stored_order(model, cx));
+        let pos = order.iter().position(|&i| i == row).unwrap_or(0);
+        let (first, last) = (pos == 0, pos + 1 >= order.len());
         let view = cx.entity();
-        let menu = OsMenu::build(window, cx, move |m, _, _| {
+        let menu = OsMenu::build(window, cx, move |mut m, _, _| {
+            for (show, label, delta) in [(!first, "Move up", -1isize), (!last, "Move down", 1)] {
+                if show {
+                    let v = view.clone();
+                    m = m.item(OsMenuItem::new(label).on_click(move |_, _, cx| {
+                        v.update(cx, |this, cx| {
+                            this.close_context_menu(cx);
+                            this.sm_move_bend(model, row, delta, cx);
+                        })
+                    }));
+                }
+            }
+            if !(first && last) {
+                m = m.separator();
+            }
             let v = view.clone();
             let face = face.clone();
             m.item(OsMenuItem::new(format!("Convert {name} to rip")).on_click(move |_, _, cx| {
                 let face = face.clone();
                 v.update(cx, |this, cx| {
                     this.close_context_menu(cx);
-                    this.sm_convert_to_rip(face, cx);
+                    this.sm_convert_to_rip(model, face, cx);
                 })
             }))
         });
@@ -242,24 +315,28 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// "Convert … to rip": a Modify joint of the bend with Joint type Rip.
-    fn sm_convert_to_rip(&mut self, face: noshape_model::reference::Reference, cx: &mut Context<Self>) {
+    /// "Convert … to rip": a Modify joint of the bend, Rip / Edge joint
+    /// (live "ui (10-24 b)").
+    fn sm_convert_to_rip(&mut self, model: FeatureId, face: noshape_model::reference::Reference, cx: &mut Context<Self>) {
         use noshape_model::params::ParamValue;
         let units = self.doc.read(cx).session.doc.settings.units;
         self.edit_config("Convert joint to rip.", cx, |ps| {
             let Some(mut f) = ps.new_feature("sheetMetalJoint", &units) else { return };
             f.params.set("entity", ParamValue::Query(vec![face]));
             f.params.set("jointType", ParamValue::Enum("RIP".into()));
-            ps.insert_at_rollback(f);
+            f.params.set("jointStyle", ParamValue::Enum("EDGE".into()));
+            let at = joint_edit_index(ps, model);
+            insert_joint_edit(ps, f, at);
         });
         self.selection.clear();
         cx.notify();
     }
 
-    /// Apply an edited Bends cell: live adds a "Modify joint N" feature at
-    /// the end of the list for that bend with the value overridden ("3" +
-    /// Tab on Bend B's radius → Modify joint 1, radius 3 mm). A bare number
-    /// is in the document's unit.
+    /// Apply an edited Bends cell: live adds a "Modify joint N" for that bend
+    /// with the value overridden ("3" + Tab on Bend B's radius → Modify
+    /// joint 1, radius 3 mm) at the rollback bar or before the model's
+    /// Finish; a second edit of the bend changes that Modify joint (live "ui
+    /// (10-24 b)"). A bare number is in the document's unit.
     fn sm_apply_edit(&mut self, row: usize, col: usize, text: String, cx: &mut Context<Self>) {
         use noshape_model::params::ParamValue;
         use noshape_units::ExprValue;
@@ -281,19 +358,35 @@ impl PartStudioView {
         }
         let bare = text.parse::<f64>().is_ok();
         let value = if col == 2 && bare { format!("{text} {}", units.length.symbol()) } else { text };
+        let faces = bend_faces(&data.bends[row]);
+        let set = move |p: &mut noshape_model::params::ParamValues| {
+            if col == 2 {
+                p.set("useDefaultRadius", ParamValue::Bool(false));
+                p.set("radius", ParamValue::Expr(ExprValue::new(&value)));
+            } else {
+                p.set("useDefaultKFactor", ParamValue::Bool(false));
+                p.set("bendCalculationType", ParamValue::Enum("K_FACTOR".into()));
+                p.set("kFactor", ParamValue::Expr(ExprValue::new(&value)));
+            }
+        };
         self.edit_config("Modify joint", cx, |ps| {
+            let at = joint_edit_index(ps, model);
+            let from = ps.features.iter().position(|f| f.id == model).map_or(0, |i| i + 1);
+            let is_this_bend = |f: &noshape_model::partstudio::Feature| {
+                f.type_id == "sheetMetalJoint"
+                    && !f.suppressed
+                    && matches!(f.params.0.get("jointType"), Some(ParamValue::Enum(t)) if t == "BEND")
+                    && matches!(f.params.0.get("entity"), Some(ParamValue::Query(q)) if q.iter().any(|r| faces.contains(r)))
+            };
+            if let Some(i) = (from..at.min(ps.features.len())).rev().find(|&i| is_this_bend(&ps.features[i])) {
+                set(&mut ps.features[i].params);
+                return;
+            }
             let Some(mut f) = ps.new_feature("sheetMetalJoint", &units) else { return };
             f.params.set("entity", ParamValue::Query(vec![face]));
             f.params.set("jointType", ParamValue::Enum("BEND".into()));
-            if col == 2 {
-                f.params.set("useDefaultRadius", ParamValue::Bool(false));
-                f.params.set("radius", ParamValue::Expr(ExprValue::new(&value)));
-            } else {
-                f.params.set("useDefaultKFactor", ParamValue::Bool(false));
-                f.params.set("bendCalculationType", ParamValue::Enum("K_FACTOR".into()));
-                f.params.set("kFactor", ParamValue::Expr(ExprValue::new(&value)));
-            }
-            ps.insert_at_rollback(f);
+            set(&mut f.params);
+            insert_joint_edit(ps, f, at);
         });
         cx.notify();
     }
@@ -348,6 +441,11 @@ impl PartStudioView {
             joint_rows(d, &flat_up, &order)
         });
         let (bends, joints) = tables.unwrap_or_default();
+        // Move up / Move down order (indices into `bends`).
+        let row_order = match (bodies.first(), active) {
+            (Some((_, d)), Some(m)) => bend_row_order(d, &self.sm_stored_order(m, cx)),
+            _ => (0..bends.len()).collect(),
+        };
         let units = self.doc.read(cx).session.doc.settings.units;
         let unit = units.length.symbol();
         let len = |x: f64| plain(x / units.si_factor(noshape_units::Dim::LENGTH));
@@ -523,13 +621,13 @@ impl PartStudioView {
                 })
                 .into_any_element()
         };
-        let bend_rows = bends.iter().enumerate().map(|(i, r)| {
+        let bend_rows = row_order.iter().enumerate().filter_map(|(pos, &i)| bends.get(i).map(|r| (pos, i, r))).map(|(pos, i, r)| {
             let row_on = selected == Some((0, i, 0));
             h_flex()
                 .relative()
                 .border_l_1()
                 .border_color(grid)
-                .child(cell(60., head, true, (i + 1).to_string().into(), Some((0, i, 0))))
+                .child(cell(60., head, true, (pos + 1).to_string().into(), Some((0, i, 0))))
                 .child(cell(140., readonly, false, r.name.clone().into(), Some((0, i, 1))))
                 .child(edit_cell(i, 2, len(r.radius)))
                 .child(cell(140., readonly, false, plain(r.angle).into(), Some((0, i, 3))))
@@ -594,7 +692,12 @@ impl PartStudioView {
             Some((0, row, 0)) => Some(row),
             _ => None,
         };
-        fv.update(cx, |v, cx| v.show(flat.as_ref(), color, highlight, cx));
+        // Live "ui (10-24 b)": the hovered row's bend zone outlined too.
+        let hovered = match self.ui.sm_hover {
+            Some((0, row, _)) => Some(row),
+            _ => None,
+        };
+        fv.update(cx, |v, cx| v.show(flat.as_ref(), color, highlight, hovered, cx));
 
         let split = SPLIT.with(|s| s.get());
         v_flex()
