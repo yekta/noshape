@@ -968,6 +968,40 @@ mod tests {
     use super::*;
     use gpui_kit::{point, px};
 
+    /// Onshape's Zoom to fit (live "Zoom to fit (perf 10-23 22:40)", camera
+    /// matrices to 0.001 mm): the box's 8 corners in the view, their extent's
+    /// centre in the middle, half-height 1.05 × max(half-height, half-width
+    /// / aspect), at the capture's aspect 1.7194. (box in mm, view, half-height
+    /// mm, view centre mm.)
+    #[test]
+    fn zoom_to_fit_frames_like_onshape() {
+        use noshape_render::{Camera, StandardView};
+        let fins = (glam::DVec3::ZERO, glam::DVec3::new(100.0, 50.0, 80.0));
+        let planes = (glam::DVec3::splat(-75.0), glam::DVec3::splat(75.0));
+        let cube = (glam::DVec3::new(200.0, 200.0, 0.0), glam::DVec3::new(210.0, 210.0, 10.0));
+        let union = |a: (glam::DVec3, glam::DVec3), b: (glam::DVec3, glam::DVec3)| (a.0.min(b.0), a.1.max(b.1));
+        let origin = (glam::DVec3::ZERO, glam::DVec3::ZERO);
+        let cases = [
+            // Shift+7 / F, planes hidden: the parts (and the origin point).
+            ("fins", union(fins, origin), StandardView::Isometric, 66.442, (53.033, 22.454)),
+            ("fins + planes", union(fins, planes), StandardView::Isometric, 136.100, (8.839, -3.062)),
+            ("cube + origin", union(cube, origin), StandardView::Isometric, 94.305, (148.492, 4.082)),
+            ("cube + planes", union(union(cube, origin), planes), StandardView::Isometric, 186.467, (95.459, 0.0)),
+            ("cube alone", cube, StandardView::Isometric, 8.573, (289.914, 4.082)),
+            // The camera a Part Studio opens with: Trimetric, planes' box always.
+            ("fins on load", union(fins, planes), StandardView::Trimetric, 127.541, (10.825, -0.960)),
+            ("cube on load", union(union(cube, origin), planes), StandardView::Trimetric, 170.395, (92.207, 12.353)),
+        ];
+        for (name, (lo, hi), view, half, (cx, cy)) in cases {
+            let mut cam = Camera { rotation: Camera::rotation_for(view), ..Camera::default() };
+            crate::viewport::fit_camera_to_box(&mut cam, lo * 1e-3, hi * 1e-3, glam::DVec2::new(1719.4, 1000.0), 0.0);
+            let got = cam.half_height() * 1e3;
+            let centre = (cam.target.dot(cam.right()) * 1e3, cam.target.dot(cam.up()) * 1e3);
+            assert!((got - half).abs() < 0.01, "{name}: half-height {got:.3} mm, live {half}");
+            assert!((centre.0 - cx).abs() < 0.01 && (centre.1 - cy).abs() < 0.01, "{name}: centre {centre:?}, live ({cx}, {cy})");
+        }
+    }
+
     fn b(middle: bool, right: bool) -> Buttons {
         Buttons { left: false, middle, right }
     }
