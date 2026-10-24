@@ -3712,6 +3712,15 @@ fn b17_keys_match_live() {
         assert_eq!(b.faces.len(), faces, "{name} {size}");
         assert!((area / live_area - 1.0).abs() < 1e-6, "{name} {size}: area {area} live {live_area}");
     }
+    // Live's Length is a free text box: a typed length stays through size
+    // changes and names the part ("… x 2.5").
+    let c = CATALOGUE.iter().find(|c| c.name == "B17.1 Standard parallel key").unwrap();
+    assert!(c.length_edit);
+    let mut spec = StandardSpec::new(c);
+    assert_eq!(spec.length.as_deref(), Some("1"));
+    spec.length = Some("2.5".into());
+    spec.set_size("26 - 30");
+    assert_eq!(spec.part_name(), "Parallel key B17.1 7 x 5 x 2.5");
     let c = CATALOGUE.iter().find(|c| c.name == "B17.1 Tapered key").unwrap();
     let mut spec = StandardSpec::new(c);
     spec.set_size("7/16 - 9/16");
@@ -3726,18 +3735,28 @@ fn b17_keys_match_live() {
 #[test]
 fn retaining_rings_match_live() {
     use super::standard::{self, CATALOGUE, StandardSpec};
-    let cases: [(&str, &str, usize, f64); 11] = [
+    let cases: [(&str, &str, usize, f64); 19] = [
         ("External retaining ring DIN 471", "3", 16, 2.9818272413563026e-5),
         ("External retaining ring DIN 471", "20", 16, 4.335286134113179e-4),
         ("External retaining ring DIN 471", "300", 16, 2.9904218621879402e-2),
         ("External heavy retaining ring DIN 471", "15", 16, 3.8767709584080676e-4),
         ("External retaining ring ANSI", "1/8", 16, 1.7601329908219825e-5),
         ("External retaining ring ANSI", "10", 16, 2.9542221674196612e-2),
+        // Internal rings by live's configuration (behaviours "skb (10-24)
+        // rings / washers", dom/skb-sc-geom/*-cfg.json): A 12 faces, B 16, C 8.
         ("Internal retaining ring DIN 472", "8", 12, 9.06039056661354e-5),
         ("Internal retaining ring DIN 472", "20", 12, 3.530270066208348e-4),
-        ("Internal retaining ring DIN 472", "300", 12, 3.015440638327799e-2),
+        ("Internal retaining ring DIN 472", "50", 16, 1.736065747516791e-3),
+        ("Internal retaining ring DIN 472", "165", 16, 1.2673866128864023e-2),
+        ("Internal retaining ring DIN 472", "170", 8, 1.6487842814705427e-2),
+        ("Internal retaining ring DIN 472", "300", 8, 3.598308846165846e-2),
+        ("Internal heavy retaining ring DIN 472", "20", 12, 4.3285329774319357e-4),
+        ("Internal heavy retaining ring DIN 472", "24", 12, 5.705149742541508e-4),
+        ("Internal heavy retaining ring DIN 472", "25", 16, 6.296372798030354e-4),
+        ("Internal heavy retaining ring DIN 472", "50", 16, 1.9563687460152457e-3),
+        ("Internal heavy retaining ring DIN 472", "100", 16, 6.267662448717445e-3),
         ("Internal retaining ring ANSI", "1/4", 12, 4.179622202617048e-5),
-        ("Internal retaining ring ANSI", "10", 12, 2.6594710422036226e-2),
+        ("Internal retaining ring ANSI", "10", 16, 2.6929616519916714e-2),
     ];
     for (name, size, faces, live_area) in cases {
         let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
