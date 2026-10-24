@@ -338,6 +338,16 @@ pub struct FeatureState {
     /// Hole: parts behind its locations (against the hole direction), for
     /// the dialog's flip heuristic (hole.fs holeScopeFlipHeuristics).
     pub touched_behind: Vec<BodyId>,
+    /// A feature's debug geometry (FeatureScript `addDebugEntities`), drawn
+    /// while its dialog is open: Helix's start and end profiles.
+    pub debug: DebugGeometry,
+}
+
+/// Polylines and points in world coordinates (see [`FeatureState::debug`]).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct DebugGeometry {
+    pub lines: Vec<Vec<[f32; 3]>>,
+    pub points: Vec<[f32; 3]>,
 }
 
 /// A computed parameter value: a length (meters) or text such as "Multiple".

@@ -718,21 +718,22 @@ Still to do:
 
 ### What still fails with the std route forced on (NOSHAPE_STD_SHEET_METAL=1, 23 Oct ~21:00)
 Gate for switching it on: every one of these passes (or is shown to test native-only internals and is rewritten
-against live numbers). features_c now passes fully both ways (3 ignored, below); sheetmetal_std 9/9 + Closed corner ignored.
+against live numbers). features_c passes fully both ways (2 ignored: loft rect->triangle, below; one older); sheetmetal_std 9/9 + Closed corner ignored.
 Done today: Jog preserve-off (kernel find_plane), native Jog follows std's applyEditLogicForBendAngle (Info, smaller
 angle); Form on std end to end: Tag runs by std (std param ids; FeatureList values `{Id: function}` tagged FeatureList),
 qConsumed, opMergeContexts / opPattern keep attributes, evCollision face pairs (crossing = INTERFERE), and
 updateSheetMetalGeometry applies walls' formedToolBodyIds (cut removes, fuse adds; tools hidden with persistent
 transient ids `JP<n>` in Context::fs_transients; flat footprint + outline). Native Form/Tag follow std's rules
 (untagged studio fails, locations only on targetFaces, std messages). recognize / jog tests check geometry.
-- Rip (ignored test): live = no-op (1 part, 8000 mm³, 6 faces). Live's probe (behaviours "fs (10-23 17:30)"): std's split
-  works and the edge gets its rip attribute; updateSheetMetalGeometry makes the same solid: a rip between coplanar
-  pieces of one wall leaves no gap. To do: host build_part ignores coplanar rips (faces unified); native rip = checks only.
+- Rip: done (24 Oct). Live = no-op (1 part, 8000 mm³, 6 faces, no joint); its probe: std's split works, and a rip
+  between coplanar pieces of a wall leaves no gap. Host: coplanar definition faces get no rip gap, the part's faces
+  are unified, the unfold carries them over, no table joint; native Rip = std's checks only. (Our qCreatedBy(split,
+  EDGE) seems to give no edge where live gives 1; harmless here, look at it if a rip ever needs its attribute.)
 - Sheet metal loft rect -> triangle (ignored test, live "fs (10-23 10:30)": 17452.843417228427 mm³, 49 faces: PLANE 37,
   CYL 10, OTHER 2; 5 bends + rip). Std (host loft.rs walks unequal profiles: shortest diagonal, parallel edges
   together = live's trapezoid + 5 triangles, bend angles match) gives 51 faces / 17449.70: where three bends meet live has
   2 swept corner faces, we have planar patches. Native: unequal corner counts unsupported.
 - EXTRUDE process: live answered (REQUESTS "fs (10-23 05:00)"): default = 3211.3274122872 mm³, material OUTSIDE the L,
   flat 80.126106 x 20; flipped = 3051.33, inside, 76.126106. Std matches the default; the native route (inside) deviates.
-- sheetmetal_frames (8): hem bbox, bend count, flange outer bend direction, convert BUTT, corner relief volume.
+- sheetmetal_frames (7; SM5 fixed the outer-flange one): hem bbox, bend count, flange outer bend direction, convert BUTT, corner relief volume.
 Not mine but seen: drawing::tests::flat_pattern_view_shows_bend_lines_and_notes fails on "DOWN 90.0° R3" (format.rs angle).

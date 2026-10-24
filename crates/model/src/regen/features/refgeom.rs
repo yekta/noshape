@@ -300,6 +300,16 @@ pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
 
     let name = ev.name.to_string();
     let reference = Reference::MateConnector { feature: ev.feature, index: 0 };
+    // The owner: the picked part, else the one the dialog would pick.
+    if ev.bool("allowOwnerEntity") {
+        let picked = ev.resolve_bodies(ev.query("ownerPart")).first().copied();
+        let one = std::slice::from_ref(&origin_ref);
+        let owner = picked.or_else(|| ev.resolve_faces(one).first().map(|x| x.0)).or_else(|| ev.resolve_edges(one).first().map(|x| x.0)).or_else(|| (ev.ctx.bodies.len() == 1).then_some(0));
+        if let Some(bi) = owner {
+            let id = ev.ctx.bodies[bi].id.clone();
+            ev.ctx.connector_owners.push((reference.clone(), id));
+        }
+    }
     ev.ctx.connectors.push(Connector { reference, name, origin: cs.origin, x: cs.x, z: cs.z });
     Ok(())
 }

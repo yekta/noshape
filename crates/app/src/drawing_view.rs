@@ -293,6 +293,8 @@ pub struct DrawingEditor {
     pub paste_table: Option<Vec<Vec<String>>>,
     /// Note tool: the leader anchored by the first click (on a snap point).
     pub note_leader: Option<Leader>,
+    /// Add leader on a note: where the new leader starts (`drawing_leaders`).
+    pub leader_from: Option<noshape_model::drawing::LeaderStart>,
     /// Weld symbol dialog (drawing_weld.rs).
     pub weld_dlg: Option<crate::drawing_weld::WeldDlg>,
     /// The note editor's formatting ruler (drawing_ruler.rs).
@@ -550,6 +552,7 @@ impl DrawingEditor {
             styles_gap: None,
             table_tool: None,
             note_leader: None,
+            leader_from: None,
             cell_sel: None,
             cell_panel: None,
             note_color: None,

@@ -335,7 +335,7 @@ impl PartStudioView {
         )
     }
 
-    pub(super) fn render_shortcut_sheet(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(super) fn render_shortcut_sheet(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         if !self.show_shortcuts {
             return None;
         }
@@ -367,13 +367,18 @@ impl PartStudioView {
         };
         let custom = shortcuts::current();
         let rows: Vec<SheetRow> = if query.trim().is_empty() { shortcuts::sheet_rows(&custom, Tab::SHEET[tab]) } else { shortcuts::sheet_search(&custom, &query) };
+        // Live (menus/616): the rows fill the tab bar's 599 px column, the
+        // chips right-aligned in its first 230 px, the action 14 px after.
+        // The rows' area: the sheet less its header, tabs and legend.
+        let vp_h = window.viewport_size().height;
+        let long = px(rows.len() as f32 * 39. + 21.) > vp_h - px(154. + 55. + 46. + 59.);
         let body = rows.into_iter().map(|r| {
             h_flex()
-                .w(px(560.))
+                .w_full()
                 .h(px(39.))
                 .flex_none()
                 .gap(px(14.))
-                .child(div().w(px(273.)).flex_none().child(keys_el(&r)))
+                .child(div().w(px(230.)).flex_none().child(keys_el(&r)))
                 .child(
                     h_flex()
                         .flex_1()
@@ -381,7 +386,7 @@ impl PartStudioView {
                         .text_size(px(14.))
                         .text_color(pal.text)
                         .child(r.name)
-                        .when(r.locked, |d| d.child(crate::assets::icon("lock", 14., cx)))
+                        .when(r.locked, |d| d.child(crate::assets::icon("lock", 20., cx)))
                         .when(r.conflict, |d| d.child(crate::assets::icon("shortcut-conflict", 16., cx))),
                 )
         });
@@ -390,14 +395,18 @@ impl PartStudioView {
             div()
                 .id(SharedString::from(format!("sc-tab-{i}")))
                 .px(px(6.))
-                .pb(px(4.))
+                .pb(px(6.))
                 .cursor_pointer()
                 .text_size(px(14.))
+                .relative()
                 .text_color(if on { pal.accent } else { pal.text })
-                .when(on, |d| d.border_b_2().border_color(pal.accent))
+                .when(on, |d| d.font_weight(FontWeight::MEDIUM))
                 .child(t.label())
+                // Live: the active tab's 2 px underline sits on the bar's 1 px line.
+                .when(on, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(3.)).bg(pal.accent)))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.ui.shortcut_tab = i;
+                    this.ui.shortcut_scroll.set_offset(point(px(0.), px(0.)));
                     cx.notify();
                 }))
         });
@@ -413,29 +422,32 @@ impl PartStudioView {
             .text_color(pal.text)
             .child(chip(KeyStyle::Customized))
             .child("Customized")
-            .child(div().w(px(12.)))
+            .child(div().w(px(7.)))
             .child(chip(KeyStyle::Default))
             .child("Onshape default")
-            .child(div().w(px(12.)))
+            .child(div().w(px(7.)))
             .child(chip(KeyStyle::Disabled))
             .child("Disabled")
-            .child(div().w(px(12.)))
+            .child(div().w(px(7.)))
             .child(crate::assets::icon("lock", 16., cx))
             .child("Onshape controlled")
-            .child(div().w(px(12.)))
+            .child(div().w(px(7.)))
             .child(crate::assets::icon("shortcut-conflict", 18., cx))
             .child("Has conflict")
-            .child(div().w(px(12.)))
+            .child(div().w(px(7.)))
             .child("* applies in drawing sketches");
-        Some(
-            div()
+        // Live (menus/616): over the whole window (navbar and panels dimmed
+        // too), 1000 px wide and centred, 26 px from the top, the window's
+        // height less 154 px tall.
+        let vp = window.viewport_size();
+        let sheet = div()
                 .id("shortcut-sheet")
                 .occlude()
-                .absolute()
-                .inset_0()
+                .w(vp.width)
+                .h(vp.height)
                 .flex()
-                .items_center()
                 .justify_center()
+                .pt(px(26.))
                 .bg(with_alpha(pal.overlay_shadow, 0.5))
                 .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                     if ev.keystroke.key == "escape" {
@@ -452,8 +464,7 @@ impl PartStudioView {
                         .id("shortcut-panel")
                         .w(px(1000.))
                         .max_w(relative(0.95))
-                        .h(relative(0.92))
-                        .max_h(px(928.))
+                        .h((vp.height - px(154.)).max(px(300.)))
                         .bg(gpui_kit::rgb(0xffffff))
                         .shadow_lg()
                         // Clicks inside the sheet (search box, tabs) keep it open.
@@ -461,12 +472,13 @@ impl PartStudioView {
                         .child(
                             h_flex()
                                 .flex_none()
-                                .h(px(54.))
+                                .h(px(55.))
                                 .px(px(10.))
                                 .gap(px(6.))
                                 .border_b_1()
                                 .border_color(pal.border)
-                                .child(div().text_size(px(19.)).text_color(pal.text).child("Keyboard shortcuts"))
+                                // Live (menus/616): #555, 12 px in.
+                                .child(div().ml(px(2.)).text_size(px(19.)).text_color(gpui_kit::rgb(0x555555)).child("Keyboard shortcuts"))
                                 .child(
                                     div()
                                         .id("sc-customize")
@@ -480,24 +492,53 @@ impl PartStudioView {
                                         .on_click(|_: &ClickEvent, _, cx| crate::preferences_window::show(crate::preferences_window::Page::KeyboardShortcuts, cx)),
                                 )
                                 .child(div().flex_1())
-                                .children(search.map(|st| div().w(px(198.)).child(Input::new(&st).small())))
+                                .children(search.map(|st| div().w(px(198.)).h(px(34.)).child(Input::new(&st).h(px(34.)))))
+                                // Live (menus/616): ↗ opens the page in its own window.
+                                .child(
+                                    div()
+                                        .id("sc-popout")
+                                        // Live menus/616: 21 px after the search box, 6 px above centre.
+                                        .ml(px(31.))
+                                        .relative()
+                                        .top(px(-4.))
+                                        .cursor_pointer()
+                                        .child(crate::assets::icon("popout-arrow", 14., cx))
+                                        .on_click(|_: &ClickEvent, _, cx| crate::shortcuts_page::show(cx)),
+                                )
                                 .child(
                                     div()
                                         .id("sc-close")
-                                        .px_1()
+                                        .ml(px(-2.))
+                                        .relative()
+                                        .top(px(-3.))
                                         .cursor_pointer()
-                                        // Live (shortcuts/01): the modal's × (10 px, #333 at .5).
-                                        .opacity(0.86)
-                                        .child(crate::ui::glyph("close", 21., gpui_kit::rgb(0x333333)))
+                                        // Live (menus/616): the modal's × 10 x 10, darkest 136, 9 px after ↗.
+                                        .opacity(0.95)
+                                        .child(crate::ui::glyph("close", 19., gpui_kit::rgb(0x333333)))
                                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_shortcut_sheet(window, cx))),
                                 ),
                         )
-                        .child(h_flex().flex_none().justify_center().gap(px(20.)).pt(px(16.)).pb(px(6.)).children(tabs))
-                        .child(div().id("sc-rows").flex_1().min_h_0().overflow_y_scroll().py(px(8.)).child(v_flex().items_center().children(body)))
+                        .child(h_flex().flex_none().w(px(599.)).mx_auto().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).gap(px(17.)).pt(px(16.)).children(tabs))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_h_0()
+                                .w(px(599.))
+                                .mx_auto()
+                                .mt(px(10.))
+                                .relative()
+                                .child(div().id("sc-rows").size_full().overflow_y_scroll().track_scroll(&self.ui.shortcut_scroll).pt(px(3.)).pb(px(8.)).pr(px(gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH)).child(v_flex().children(body)))
+                                .when(long, |d| d.child(gpui_kit::component::menu::native_scrollbar(&self.ui.shortcut_scroll, cx)))
+                                .on_drag_move(cx.listener(|this, e: &DragMoveEvent<gpui_kit::component::menu::NativeThumbDrag>, window, cx| {
+                                    gpui_kit::component::menu::native_scrollbar_drag(&this.ui.shortcut_scroll, e.event.position.y);
+                                    window.refresh();
+                                    cx.notify();
+                                })),
+                        )
                         .child(div().flex_none().p(px(10.)).border_t_1().border_color(pal.border).flex().justify_center().child(legend)),
-                )
-                .into_any_element(),
-        )
+                );
+        // Drawn over everything in the window, from its top-left corner.
+        Some(deferred(anchored().position(point(px(0.), px(0.))).child(sheet)).with_priority(8).into_any_element())
     }
 
     /// Shift+/ toggles the shortcut map; it opens with a search box.
@@ -506,6 +547,7 @@ impl PartStudioView {
         self.ui.shortcut_query.clear();
         if self.show_shortcuts {
             self.ui.shortcut_tab = 0;
+            self.ui.shortcut_scroll.set_offset(point(px(0.), px(0.)));
             let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search shortcuts"));
             let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
                 if matches!(ev, InputEvent::Change) {
@@ -662,45 +704,43 @@ impl PartStudioView {
         if self.named_view_picked.as_ref().is_some_and(|n| !views.iter().any(|v| &v.name == n)) {
             self.named_view_picked = None;
         }
-        let select = match &self.named_view_select {
-            Some((s, _)) => s.clone(),
-            None => {
-                let s = cx.new(|_| crate::os_select::OsSelect::new("named-view-select"));
-                let sub = cx.subscribe(&s, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
-                    let crate::os_select::OsSelectEvent::Picked(name) = ev;
-                    this.named_view_picked = (!name.is_empty()).then(|| name.to_string());
-                    // Applied on the next render (it needs the window).
-                    this.pending_named_view = this.studio(cx).and_then(|s| s.named_views.iter().find(|v| v.name.as_str() == name.as_ref()).cloned());
-                    cx.notify();
-                });
-                self.named_view_select = Some((s.clone(), sub));
-                s
-            }
-        };
-        // Live: the list reads "Select a view" until one is picked.
-        let items: Vec<(SharedString, SharedString)> = std::iter::once((SharedString::default(), SharedString::from("Select a view"))).chain(views.iter().map(|v| (SharedString::from(v.name.clone()), SharedString::from(v.name.clone())))).collect();
-        let current = self.named_view_picked.clone().unwrap_or_default();
-        select.update(cx, |s, _| s.set_items(items, current));
+        // Live (psb/nv-911, behaviours "Named views"): a native <select>,
+        // "Select a view" (a disabled placeholder) until one is picked;
+        // picking a view applies it at once.
+        let names: Vec<String> = views.iter().map(|v| v.name.clone()).collect();
+        let current = self.named_view_picked.as_ref().and_then(|n| names.iter().position(|x| x == n)).map_or(0, |i| i + 1);
+        let view = cx.entity().downgrade();
+        let pick_names = names.clone();
+        let select = crate::os_ui::select_field_flat("named-view-select", std::iter::once("Select a view".to_string()).chain(names).collect(), vec![0], 1, current, move |i, _, cx| {
+            let (Some(name), Some(v)) = (i.checked_sub(1).and_then(|k| pick_names.get(k)).cloned(), view.upgrade()) else { return };
+            v.update(cx, |this, cx| {
+                // Applied on the next render (it needs the window).
+                this.pending_named_view = this.studio(cx).and_then(|s| s.named_views.iter().find(|v| v.name == name).cloned());
+                this.named_view_picked = Some(name);
+                cx.notify();
+            });
+        });
         let empty_name = st.read(cx).value().is_empty();
-        let square = |id: &'static str, icon: &'static str, color: Rgba| {
+        let picked = self.named_view_picked.is_some();
+        let square = |id: &'static str, icon: AnyElement, border: Rgba| {
             div()
                 .id(id)
                 .size(px(30.))
-                .h(px(31.))
                 .flex_none()
                 .flex()
                 .items_center()
                 .justify_center()
                 .bg(gpui_kit::rgb(0xffffff))
                 .border_1()
-                .border_color(gpui_kit::rgb(0xaaaaaa))
+                .border_color(border)
                 .rounded(px(3.5))
                 .cursor_pointer()
                 .hover(|d| d.bg(pal.panel_hover))
-                .child(crate::ui::glyph(icon, 20., color))
+                .child(icon)
         };
-        // Live: "+" is pale until a name is typed.
-        let add_color = if empty_name { gpui_kit::rgb(0xcccccc) } else { gpui_kit::rgb(0x999999) };
+        // Live part-studio/75 (measured): until a name is typed the "+" is
+        // #aeaeae in a #ddd border; enabled #999 in #aaa (dom/panel-named-views).
+        let (add_color, add_border) = if empty_name { (gpui_kit::rgb(0xaeaeae), gpui_kit::rgb(0xdddddd)) } else { (gpui_kit::rgb(0x999999), gpui_kit::rgb(0xaaaaaa)) };
         let st2 = st.clone();
         let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }];
         Some(
@@ -731,7 +771,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .opacity(0.5)
-                                .child(crate::ui::glyph("close", 16., gpui_kit::rgb(0x000000)))
+                                .child(crate::os_ui::glyph(crate::os_ui::GLYPH_CLOSE, 23., gpui_kit::rgb(0x333333)))
                                 .on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_named_views(w, cx))),
                         ),
                 )
@@ -743,8 +783,10 @@ impl PartStudioView {
                         // Live: a focused 2 px blue underline (1 px + inset),
                         // italic placeholder, text 6 px down.
                         .child(
+                            // Live: the field's top at 115, 1 px under the centred position.
                             div()
                                 .relative()
+                                .top(px(1.))
                                 .w(px(220.))
                                 .h(px(27.))
                                 .pt(px(3.))
@@ -753,21 +795,23 @@ impl PartStudioView {
                                 .child(crate::ui::input_with_placeholder(&st, "New view name", cx).appearance(false).small().text_size(px(13.33)).pl(px(3.)))
                                 .child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)),
                         )
-                        .child(square("nv-add", "add-button", add_color).tooltip(crate::ui::tooltip("Add view")).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        .child(square("nv-add", crate::ui::glyph("add-button", 20., add_color).into_any_element(), add_border).tooltip(crate::ui::tooltip("Add view")).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             let name = st2.read(cx).value().trim().to_string();
                             this.save_named_view(name, cx);
                             st2.update(cx, |s, cx| s.set_value("", window, cx));
                         }))),
                 )
-                .when(views.is_empty(), |d| d.child(div().px(px(5.)).h(px(22.)).flex().items_center().text_size(px(12.)).child("No views created")))
+                .when(views.is_empty(), |d| d.child(div().px(px(5.)).h(px(26.)).flex().items_center().text_size(px(12.)).child("No views created")))
                 .when(!views.is_empty(), |d| {
                     d.child(
                         h_flex()
                             .h(px(40.))
                             .px(px(5.))
                             .gap(px(5.))
-                            .child(div().w(px(220.)).child(select.clone()))
-                            .child(square("nv-remove", "remove-circle", gpui_kit::rgb(0x999999)).tooltip(crate::ui::tooltip("Remove view")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .child(div().w(px(220.)).child(select))
+                            // Live psb/nv-911 / nv-915: a solid #333 ⊗ in an #aaa border once a
+                            // view is picked, 40 % in a #ddd border before.
+                            .child(square("nv-remove", crate::os_ui::glyph(crate::os_ui::GLYPH_REMOVE_CIRCLE, 20., if picked { gpui_kit::Hsla::from(gpui_kit::rgb(0x333333)) } else { gpui_kit::Hsla::from(gpui_kit::rgb(0x333333)).opacity(0.4) }).into_any_element(), if picked { gpui_kit::rgb(0xaaaaaa) } else { gpui_kit::rgb(0xdddddd) }).tooltip(crate::ui::tooltip("Remove view")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 let Some(name) = this.named_view_picked.take() else { return };
                                 this.doc.update(cx, |doc, cx| {
                                     doc.edit_studio(this.tab, &format!("Delete view : {name}"), cx, |ps| ps.named_views.retain(|v| v.name != name));
