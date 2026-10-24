@@ -823,8 +823,9 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
                 ev.replace_body(bi, res.shape, names);
                 continue;
             }
+            let merged = index_of_body(ev, &id).and_then(|bi| seed_tool(ev, f).map(|tool| merged_faces(&tool, &ev.ctx.bodies[bi], &fs)));
             if let Some(bi) = index_of_body(ev, &id)
-                && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances)
+                && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances, merged.as_deref())
             {
                 let body = ev.ctx.bodies[bi].clone();
                 ev.error_shapes = failed_instances(ev, f, &body, &fs, instances);
@@ -845,43 +846,45 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
 /// into (a coplanar face of the part running on into the tool is the
 /// feature's face too in Parasolid: the user's flush side) moved likewise.
 fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], instances: &[Instance]) -> Vec<Shape> {
-    let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
     let mut ghost: Vec<Shape> = Vec::new();
     match seed_tool(ev, f) {
         Some(tool) => {
-            let tool_planes: Vec<(k::Plane, DVec3, f64)> = tool
-                .faces()
-                .iter()
-                .filter_map(|t| match (t.face_surface(), t.centroid(), t.area()) {
-                    (Ok(k::Surface::Plane(pl)), Ok(c), Ok(a)) => Some((pl, c, a)),
-                    _ => None,
-                })
-                .collect();
-            for i in (0..body.faces.len()).filter(|i| !fs.contains(i)) {
-                let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { continue };
-                let Ok(k::Surface::Plane(pl)) = face.face_surface() else { continue };
-                let n = pl.normal.normalize_or_zero();
-                // Only a face reaching past the tool's own face: one that is
-                // just the tool face (the wall's end, merged with the block's
-                // smaller end) is already in the ghost, and a second layer
-                // made the ghost too dark (qa4 gate v0.4.7).
-                let area = face.area().unwrap_or(0.0);
-                let merged = tool_planes.iter().any(|(tp, c, ta)| {
-                    tp.normal.normalize_or_zero().dot(n).abs() > 1.0 - 1e-9
-                        && (tp.origin - pl.origin).dot(n).abs() < tol
-                        && area > ta * (1.0 + 1e-6)
-                        && k::make_vertex(*c).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
-                });
-                if merged {
-                    ghost.push(face);
-                }
-            }
+            ghost.extend(merged_faces(&tool, body, fs).into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()));
             ghost.push(tool);
         }
         None => ghost.extend(fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok())),
     }
     let seed = Shape::compound(&ghost);
     instances.iter().filter_map(|inst| k::transform(&seed, &inst.t, true).ok().map(|r| r.shape)).collect()
+}
+
+/// The body's faces (not the feature's own `fs`) that carry on a face of the
+/// seed's tool: in the same plane, facing the same way, reaching past it
+/// (Parasolid merges them; the merged face is the feature's too).
+fn merged_faces(tool: &Shape, body: &Body, fs: &[usize]) -> Vec<usize> {
+    let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
+    let tool_planes: Vec<(DVec3, DVec3, DVec3, f64)> = tool
+        .faces()
+        .iter()
+        .filter_map(|t| {
+            let k::Surface::Plane(pl) = t.face_surface().ok()? else { return None };
+            let c = t.centroid().ok()?;
+            Some((pl.origin, t.normal_at_point(c).ok()?.normalize_or_zero(), c, t.area().ok()?))
+        })
+        .collect();
+    (0..body.faces.len())
+        .filter(|i| !fs.contains(i))
+        .filter(|&i| {
+            let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { return false };
+            let Ok(k::Surface::Plane(_)) = face.face_surface() else { return false };
+            let (Ok(c), Ok(area)) = (face.centroid(), face.area()) else { return false };
+            let Ok(n) = face.normal_at_point(c) else { return false };
+            let n = n.normalize_or_zero();
+            tool_planes.iter().any(|(o, tn, tc, ta)| {
+                tn.dot(n) > 1.0 - 1e-9 && (*o - c).dot(n).abs() < tol && area > ta * (1.0 + 1e-6) && k::make_vertex(*tc).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
+            })
+        })
+        .collect()
 }
 
 /// The solid a feature adds or removes, evaluated as New where it stands.
@@ -948,11 +951,28 @@ const NO_GEOMETRY_FROM_FEATURES: &str = "Selected features do not create any geo
 /// - an instance's boundary leaves the surfaces it has to attach to (a hole
 ///   on the block's corner, its edges on the side planes, patterned along
 ///   them: qa4 F12).
-fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance]) -> bool {
+fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merged: Option<&[usize]>) -> bool {
     let sel: BTreeSet<u32> = faces.iter().map(|f| *f as u32).collect();
     let Ok(ef) = body.shape.edge_faces() else { return false };
     let probes: Vec<DMat4> = [instances.first(), instances.last()].into_iter().flatten().map(|i| i.t.matrix()).collect();
     let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
+    // A face the seed merged into, mapped onto its own plane by an instance:
+    // the copy would merge into it there too (G45's full-width rib patterned
+    // along the block, "lp wall over"'s floor); mirrored to another plane
+    // it attaches like any face (qa5 ADV9: a gusset on the bracket's end).
+    if let Some(merged) = merged {
+        for &m in merged {
+            let Ok(face) = body.shape.sub_shape(ShapeType::Face, m) else { continue };
+            let Ok(k::Surface::Plane(pl)) = face.face_surface() else { continue };
+            let n = pl.normal.normalize_or_zero();
+            if probes.iter().any(|t| {
+                let n2 = t.transform_vector3(n).normalize_or_zero();
+                n2.dot(n).abs() > 1.0 - 1e-9 && (t.transform_point3(pl.origin) - pl.origin).dot(n).abs() < tol
+            }) {
+                return true;
+            }
+        }
+    }
     let (mut convex, mut concave) = (false, false);
     for (e, fs) in ef.iter().enumerate() {
         let [a, b] = fs[..] else { continue };
@@ -961,13 +981,21 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance]) -> b
             (false, true) => (b, a),
             _ => continue,
         };
-        match edge_convexity(body, e, s as usize, o as usize) {
-            1 => convex = true,
-            -1 => concave = true,
-            _ => {}
+        // Merged faces are judged above.
+        if merged.is_some_and(|m| m.contains(&(o as usize))) {
+            continue;
         }
-        if convex && concave {
-            return true;
+        // Without the seed's tool, merged faces show as a boss meeting the
+        // part along concave edges and its continuations along convex ones.
+        if merged.is_none() {
+            match edge_convexity(body, e, s as usize, o as usize) {
+                1 => convex = true,
+                -1 => concave = true,
+                _ => {}
+            }
+            if convex && concave {
+                return true;
+            }
         }
         // The edge, moved by the instances, still on the other face's surface.
         let (Ok(edge), Ok(other)) = (body.shape.sub_shape(ShapeType::Edge, e), body.shape.sub_shape(ShapeType::Face, o as usize)) else { continue };

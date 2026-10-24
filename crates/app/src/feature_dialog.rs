@@ -368,6 +368,15 @@ impl FeatureDialog {
             .map(|s| s.id.to_string())
     }
 
+    /// An existing feature opened for editing: its INITIAL_FOCUS_ON_EDIT
+    /// field takes the selection focus (draft.fs: Entities to draft /
+    /// Parting edges), else the first one keeps it.
+    pub fn focus_for_edit(&mut self) {
+        if let Some(s) = self.ty.params.iter().find(|s| s.is_visible(&self.feature.params) && s.hints.has(Hints::INITIAL_FOCUS_ON_EDIT)) {
+            self.active_query = Some(s.id.to_string());
+        }
+    }
+
     /// Onshape: when an edit hides the active selection field (Part pattern
     /// switched to Feature pattern, say), the first visible one becomes active
     /// so picks keep going somewhere.

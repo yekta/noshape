@@ -3000,7 +3000,7 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
-        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace") {
+        if matches!(ty.as_str(), "deleteFace" | "replaceFace" | "rib" | "mateConnector" | "moveFace" | "draft") {
             self.direct_edit_logic(&dialog, cx);
             return;
         }
@@ -3144,6 +3144,17 @@ impl PartStudioView {
                     && params.query("direction").first() != Some(&f)
                 {
                     changes.push(("direction", ParamValue::Query(vec![f])));
+                }
+            }
+            // draftEditLogic (flipAlongPull): the first parting edge picked
+            // drafts the steeper of its faces.
+            "draft" if params.is("draftFeatureType", "PARTING_LINE") && params.is("partingLineSides", "ONE_SIDED") && params.query("partingEdges").len() == 1 && !user_set.contains("alongPull") => {
+                let units = self.doc.read(cx).session.doc.settings.units;
+                if let Some(c) = ctx
+                    && let Some(want) = noshape_model::interaction::draft_switch_face(c, &params, &units)
+                    && params.bool("alongPull") != want
+                {
+                    changes.push(("alongPull", ParamValue::Bool(want)));
                 }
             }
             // Live L22: a new Rib's Parts holds the studio's parts.

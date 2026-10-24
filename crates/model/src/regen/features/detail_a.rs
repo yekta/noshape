@@ -109,7 +109,7 @@ fn fillet_radius(shape: &Shape, faces: &[Shape], names: &[Name], ef: &[Vec<u32>]
 /// Fillets to remove and roll again around a draft (see `draft`): blends
 /// beside the drafted faces (and, with Reapply fillet, those among them),
 /// plus blends touching those (corner patches).
-fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize], refillet: bool) -> FResult<Vec<usize>> {
+pub(super) fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize], refillet: bool) -> FResult<Vec<usize>> {
     let faces = shape.faces();
     let ef = shape.edge_faces()?;
     let is_blend: Vec<bool> = (0..faces.len()).map(|f| fillet_radius(shape, &faces, names, &ef, f).is_some()).collect();
@@ -151,11 +151,18 @@ fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize], refillet:
     Ok(set.into_iter().collect())
 }
 
-/// Draft with fillets rolled again: remove `blends`, draft the remaining
-/// drafted faces, fillet the edges between each removed fillet's two support
-/// faces again (one operation, original radii), the new fillet faces keep
-/// the old names.
+/// Draft with fillets rolled again (see [`reblend`]).
 fn draft_reblend(ev: &mut EvalCtx, bi: usize, drafted: &[usize], blends: &[usize], pull: DVec3, neutral: &k::Plane, angle: f64) -> FResult<()> {
+    reblend(ev, bi, drafted, blends, DRAFT_FAILED, |shape, faces| draft_robust(shape, faces, pull, neutral, angle))
+}
+
+/// An operation on some faces with fillets rolled again (Parasolid's
+/// re-fillet): remove `blends`, apply `op` to the remaining `modified`
+/// faces, fillet the edges between each removed fillet's two support faces
+/// again (one operation, original radii); the new fillet faces keep the old
+/// names. Failures read `failed`.
+pub(super) fn reblend(ev: &mut EvalCtx, bi: usize, modified: &[usize], blends: &[usize], failed: &str, op: impl Fn(&Shape, &[Shape]) -> k::Result<k::OpResult>) -> FResult<()> {
+    let drafted = modified;
     let body = ev.ctx.bodies[bi].clone();
     let faces = body.shape.faces();
     let ef = body.shape.edge_faces()?;
@@ -182,14 +189,37 @@ fn draft_reblend(ev: &mut EvalCtx, bi: usize, drafted: &[usize], blends: &[usize
         }
     }
     let del: Vec<Shape> = blends.iter().map(|f| faces[*f].clone()).collect();
-    let res = k::delete_faces(&body.shape, &del).map_err(|_| fe(DRAFT_FAILED))?;
+    let res = k::delete_faces(&body.shape, &del).map_err(|_| fe(failed))?;
     let n1 = crate::regen::eval::names_for(&res.shape, ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None));
-    let img1 = |f: usize| -> Vec<u32> { res.history.modified(0, ShapeType::Face, f as u32) };
+    // A face's images through an operation: its history, else (a face the
+    // operation left alone has no record) the face of the result through a
+    // point of it, facing the same way.
+    fn image(hist: &k::History, from: &Shape, to: &Shape, f: u32) -> Vec<u32> {
+        let m = hist.modified(0, ShapeType::Face, f);
+        if !m.is_empty() {
+            return m;
+        }
+        // Some operations (a face offset) record a moved face as generated.
+        let g: Vec<u32> = hist.generated(0, ShapeType::Face, f).into_iter().filter(|(k, _)| *k == ShapeType::Face).map(|(_, i)| i).collect();
+        if !g.is_empty() {
+            return g;
+        }
+        let Ok(face) = from.sub_shape(ShapeType::Face, f as usize) else { return Vec::new() };
+        let Some(p) = point_on_face(&face) else { return Vec::new() };
+        let Ok(n) = face.normal_at_point(p) else { return Vec::new() };
+        to.faces()
+            .iter()
+            .enumerate()
+            .filter(|(_, g)| g.project_point(p).is_ok_and(|q| q.distance < 1e-7) && g.normal_at_point(p).is_ok_and(|m| m.dot(n) > 1.0 - 1e-6))
+            .map(|(i, _)| i as u32)
+            .collect()
+    }
+    let img1 = |f: usize| -> Vec<u32> { image(&res.history, &body.shape, &res.shape, f as u32) };
     let to_draft: Vec<u32> = drafted.iter().filter(|f| !removed.contains(f)).flat_map(|&f| img1(f)).collect();
     let shapes: Vec<Shape> = to_draft.iter().filter_map(|&f| res.shape.sub_shape(ShapeType::Face, f as usize).ok()).collect();
-    let res2 = draft_robust(&res.shape, &shapes, pull, neutral, angle).map_err(|_| fe(DRAFT_FAILED))?;
+    let res2 = op(&res.shape, &shapes).map_err(|_| fe(failed))?;
     let n2 = crate::regen::eval::names_for(&res2.shape, ev.name_result(&[&n1], &res2.history, &res2.shape, &BTreeMap::new(), None));
-    let img = |f: usize| -> Vec<u32> { img1(f).into_iter().flat_map(|g| res2.history.modified(0, ShapeType::Face, g)).collect() };
+    let img = |f: usize| -> Vec<u32> { img1(f).into_iter().flat_map(|g| image(&res2.history, &res.shape, &res2.shape, g)).collect() };
     let ef2 = res2.shape.edge_faces()?;
     let mut edges: Vec<usize> = Vec::new();
     let mut radii: Vec<f64> = Vec::new();
@@ -210,7 +240,7 @@ fn draft_reblend(ev: &mut EvalCtx, bi: usize, drafted: &[usize], blends: &[usize
         return Ok(());
     }
     let shapes: Vec<Shape> = edges.iter().filter_map(|e| res2.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-    let res3 = k::fillet_checked(&res2.shape, &shapes, &radii).map_err(|_| fe(DRAFT_FAILED))?;
+    let res3 = k::fillet_checked(&res2.shape, &shapes, &radii).map_err(|_| fe(failed))?;
     let mut names3 = ev.name_result(&[&n2], &res3.history, &res3.shape, &BTreeMap::new(), Some(&blend_role));
     let map: BTreeMap<Name, Name> = keep_name.into_iter().filter_map(|(ei, old)| n2.edges.get(ei).map(|en| (Arc::new(TopoName::face(ev.feature, Role::Blend(en.clone()))), old))).collect();
     for n in names3.iter_mut() {

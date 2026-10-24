@@ -1630,6 +1630,9 @@ impl PartStudioView {
             d.final_available = later;
             window.focus(&d.focus_handle(cx), cx);
             d.focus_first_field(window, cx);
+            if !is_new {
+                d.focus_for_edit();
+            }
         });
         let history = DraftHistory::new(&dialog.read(cx).feature);
         self.ui.orient_pending = self.ui.orient_on_edit && dialog.read(cx).feature.type_id == "sketch";

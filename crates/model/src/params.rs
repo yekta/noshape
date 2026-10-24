@@ -219,6 +219,9 @@ impl Hints {
     pub const UNCONFIGURABLE: Self = Self(1 << 8);
     pub const ALLOW_QUERY_ORDER: Self = Self(1 << 9);
     pub const INITIAL_FOCUS: Self = Self(1 << 10);
+    /// The selection field that takes the focus when an existing feature is
+    /// opened for editing (FeatureScript `INITIAL_FOCUS_ON_EDIT`).
+    pub const INITIAL_FOCUS_ON_EDIT: Self = Self(1 << 23);
     pub const COLLAPSE_ARRAY_ITEMS: Self = Self(1 << 11);
     pub const MATCH_LAST_ARRAY_ITEM: Self = Self(1 << 12);
     /// Boolean acts as a collapsible group header for the following params.

@@ -22,7 +22,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 7 | Parting edge parallel to pull | "Parting edge cannot be parallel to pull direction." on Parting edges | no check | 🔧 checked per edge before the planarity check, on Parting edges |
 | 8 | Parting line scope | any parting line (non-planar, several parts), each edge's faces drafted about the edge | planar lines perpendicular to the pull, one part ("Parting lines must lie in a plane…", "…must belong to one part") | ✗ |
 | 9 | Two sided | first angle on the faces "away" from the pull, second on "along"; Opposite direction doesn't change which side One sided drafts | angle on the +pull side; sides follow the flipped pull | 🔧 live L1/L2: first angle below the parting line, second above, both narrowing toward it; each Opposite flips its side's taper only (test with live's 5 volumes) |
-| 10 | Edit logic | hint faces, focus on Entities to draft / Parting edges when editing | none; focus on Neutral plane | ✗ |
+| 10 | Edit logic | hint faces, focus on Entities to draft / Parting edges when editing | none; focus on Neutral plane | 🔧 INITIAL_FOCUS_ON_EDIT (Entities to draft / Parting edges focused when an existing draft opens); the first parting edge sets "Switch face" to the steeper face (flipAlongPull). Hint faces and the side-change flip adjustment ✗ (our planar parting lines decide the sides geometrically) |
 | 11 | 0° draft, empty Entities to draft | — | — | 🔧 L3 0° = no change; L4 ✅ |
 
 ## Move face
@@ -38,7 +38,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 8 | Offset up to a non-parallel plane | the extended face meets the plane: distance 0 | distance along the normal | 🔧 |
 | 9 | 0 offset / translation | succeeds, part unchanged | went to the kernel | 🔧 |
 | 10 | Kernel failure | "Could not offset selected faces as requested." / "Could not transform selected faces as requested." | "Move face failed: …" | 🔧 |
-| 11 | Reapply fillet | removes and re-rolls fillets touching the moved faces | ignored | ✗ |
+| 11 | Reapply fillet | removes and re-rolls fillets touching the moved faces | ignored | 🔧 on by default: the fillets beside the moved faces are removed, the faces moved, the fillets rolled again at their radii (shared with Draft) |
 
 ## Replace face
 | # | Area | Onshape | Ours | Status |

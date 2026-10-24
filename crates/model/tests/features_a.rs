@@ -1366,3 +1366,65 @@ fn helix_start_end_profiles() {
     t.set(h, "showStartEndProfiles", b(false));
     assert!(t.ok().display.features.last().unwrap().debug.lines.is_empty());
 }
+
+/// draftEditLogic (flipAlongPull): the block's top front edge with the pull
+/// up drafts the vertical front face below it, so "Switch face" goes off.
+#[test]
+fn draft_first_parting_edge_picks_the_steeper_face() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let res = t.ok();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.02, 0.0, 0.01));
+    let mut p = ParamValues::default();
+    p.set("pullDirectionEntity", q(vec![Reference::Plane(DatumPlane::Top)]));
+    p.set("partingEdges", q(vec![edge]));
+    assert_eq!(noshape_model::interaction::draft_switch_face(&res.context, &p, &t.units), Some(false));
+}
+
+/// moveFace.fs "Reapply fillet" (default on): moving the top face up 5 mm
+/// rolls the R2 fillet on its edge again at R2 (not stretched).
+#[test]
+fn move_face_reapplies_fillets() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let res = t.ok();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.02, 0.0, 0.01));
+    t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("2 mm"))]);
+    let res = t.ok();
+    let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
+    t.add("moveFace", &[("moveFaces", q(vec![top])), ("moveFaceType", en("OFFSET")), ("offsetDistance", e("5 mm"))]);
+    let res = t.ok();
+    let v = total_volume(&res.context) * 1e9;
+    let want = 40.0 * 20.0 * 15.0 - 40.0 * (4.0 - PI);
+    assert!((v - want).abs() < 1e-3, "{v} vs {want}");
+    let cyl = res.context.bodies[0].shape.faces().iter().filter_map(|f| f.face_surface().ok()).find_map(|s| if let noshape_kernel::Surface::Cylinder { radius, .. } = s { Some(radius) } else { None });
+    assert!(cyl.is_some_and(|r| (r - 0.002).abs() < 1e-9), "{cyl:?}");
+}
+
+/// qa5 ADV9 (live "qa5 bracket" step 8): a Feature mirror (Reapply off) of
+/// a gusset whose side merged into the bracket's end face is OK: the mirror
+/// takes that face to the other end, unlike G45's rib patterned within its
+/// merged faces' planes.
+#[test]
+fn feature_mirror_of_a_gusset_as_live() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.08, 0.05, "8 mm");
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.0, 0.0, 0.08, 0.008));
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "60 mm", "ADD");
+    // Right plane: sketch x = world Y, y = Z.
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts: Vec<_> = [(0.008, 0.008), (0.03, 0.008), (0.008, 0.04)].iter().map(|p| sk.add_point(DVec2::new(p.0, p.1))).collect();
+    for i in 0..3 {
+        sk.add_line_between(pts[i], pts[(i + 1) % 3]).unwrap();
+    }
+    let gs = t.sketch(Reference::Plane(DatumPlane::Right), sk);
+    let r = t.regions(gs)[0].clone();
+    let gus = t.extrude(r, "5 mm", "ADD");
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("cplaneType", en("OFFSET")), ("offset", e("40 mm"))]);
+    t.add("mirror", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(gus)])), ("mirrorPlane", q(vec![Reference::FeaturePlane(pl)]))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    let v = total_volume(&res.context) * 1e9;
+    assert!((v - 68800.0).abs() < 1e-3, "{v}");
+}
