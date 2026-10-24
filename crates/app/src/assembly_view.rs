@@ -935,6 +935,11 @@ impl AssemblyView {
             && self.pick_mode(cx) != Some(PickMode::Inference)
         {
             h.hover_entity = Some((t.path.clone(), t.reference.clone()));
+            // Live (behaviours "Assembly selection model" (1)): a hovered face
+            // shows its boundary edges orange, no fill.
+            if t.kind == PickKind::Face {
+                h.hover_outline = Some((t.path.clone(), t.reference.clone()));
+            }
         }
         let mate_glyph = |h: &mut Highlights, ms: &noshape_model::assembly::eval::MateStatus, strong: bool, scale: f64| {
             for f in [ms.frame_a, ms.frame_b].into_iter().flatten() {
