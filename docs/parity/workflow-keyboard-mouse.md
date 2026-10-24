@@ -142,3 +142,9 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 | KB3 Isolate | other parts translucent ✅, planes hidden ✅; **Default geometry rows not grey** ✗ → fixed by qa4 (part_studio/mod.rs `default_row_dimmed`, test `default_geometry_rows_gray_while_isolating`), lands with this batch |
 | KB4 right-drag rate | ✅ consistent with live's formula (navigation.rs test: 75.3° per 100 px in a 1440×900 window; 55.8° was a 1919×1079 window) |
 | DOC3 (Ctrl+C / Ctrl+V of a part) | see workflow-document.md |
+
+## Re-run pass 24 (qa5, 2026-10-24 ~00:00, main 538981d5, target-lead 23:22)
+| Row | Ours | Status |
+|---|---|---|
+| KB1 Shift+N on a part row | inline rename, name selected | ✅ |
+| KB3 Shift+I Isolate (Part 1 + Part 2) | Default geometry rows greyed, the other part translucent, planes faint | ✅ |

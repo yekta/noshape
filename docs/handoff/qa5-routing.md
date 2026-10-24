@@ -286,3 +286,9 @@ STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF i
   Part 1, each at its **own product position** (the assembly places the instances). Ours: one Part Studio "qa4-s5-asm", parts
   Part 1, Part 3, Part 2 at the assembly's positions, no assembly. (PVZ: IM1, kern row, is the same gap.)
 - Export details (minor): STL binary header "noshape-kernel st…" (live 80 zero bytes); STEP product order; Parasolid header = EXP-HDR.
+## SEL1 — psb (lead to assign) — Fillet / Chamfer fields accept sketch curves
+- Source: qa5 pass 24, 2026-10-24, main 538981d5.
+- Repro: sketch with a rectangle, close it; Fillet (Shift+F) or Chamfer, click a sketch line in the graphics.
+- Expected (live): not pickable (fillet.fs / chamfer.fs filters have SketchObject.NO).
+- Actual: chip "Sketch 1 line" added. Cause: kind_matches lets PickKind::SketchCurve into any field with the EDGE bit; the std filter parser ignores SketchObject.NO; some EDGE fields (Composite curve, Bridging curve) do take sketch curves, so the fix needs EDGE = model edges only, ANY_EDGE where sketch curves are allowed, and a std-vs-builtin test.
+
