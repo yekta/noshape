@@ -557,15 +557,15 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "leader",
             summary: "Edit a note's or callout's leaders: Add leader, Add node, Remove node, Remove leaders, Delete",
-            description: "The leader menus (right-click on a leader line, a node or the annotation): `add` a leader to `to` (sheet mm; a vertex, circle center or edge point there anchors it to that view, else the sheet point); a note's starts at its existing landing's bend, with `leader` and `node` it branches from that node (notes and callouts); GD&T, surface finish and weld symbols take `add` too. `add_node` puts a node at `at` (sheet mm) on the nearest segment of leader `leader`; `remove_node` removes node `node` of leader `leader` (its branches then start at the bend); `remove_leaders` removes a note's leaders, a callout's added ones; `delete` deletes leader `leader` (a callout's leader 0, the one to its anchor, leaves it in space). Leader indices: a note's in order, a callout's 0 = the leader to the anchor, then the added ones (drawing_get). One edit (\"Add leader\", \"Add node\", \"Remove node\", \"Remove leaders\", \"Delete leader\").",
+            description: "The leader menus (right-click on a leader line, a node or the annotation): `add` a leader to `to` (sheet mm; a vertex, circle center or edge point there anchors it to that view, else the sheet point); a note's starts at its existing landing's bend, with `leader` and `node` it branches from that node (notes and callouts); GD&T, surface finish and weld symbols take `add` too. `add_node` puts a node at `at` (sheet mm) on the nearest segment of leader `leader`; `remove_node` removes node `node` of leader `leader` (its branches then start at the bend); `remove_leaders` removes a note's leaders, a callout's added ones; `move` drags leader `leader`'s anchor grip to `to` (onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point); `delete` deletes leader `leader` (a callout's leader 0, the one to its anchor, leaves it in space). Leader indices: a note's in order, a callout's 0 = the leader to the anchor, then the added ones (drawing_get). One edit (\"Add leader\", \"Add node\", \"Remove node\", \"Move by grip\", \"Remove leaders\", \"Delete leader\").",
             fields: with(
                 common(),
                 vec![
                     req("annotation", json!({ "type": "integer" }), "The note or callout (drawing_get)."),
-                    req("action", json!({ "type": "string", "enum": ["add", "add_node", "remove_node", "remove_leaders", "delete"] }), "What to do."),
+                    req("action", json!({ "type": "string", "enum": ["add", "add_node", "remove_node", "move", "remove_leaders", "delete"] }), "What to do."),
                     opt("leader", json!({ "type": "integer", "minimum": 0 }), "The leader (add_node, remove_node, delete; with `node`, the leader `add` branches from)."),
                     opt("node", json!({ "type": "integer", "minimum": 0 }), "The node (remove_node; add: branch from it)."),
-                    opt("to", point(), "add: where the new leader points (sheet mm)."),
+                    opt("to", point(), "add: where the new leader points; move: where leader `leader`'s end goes (sheet mm)."),
                     opt("at", point(), "add_node: where the node goes (sheet mm)."),
                 ],
             ),
@@ -1439,6 +1439,18 @@ fn leader(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             leaders::remove_node(&mut ann, j, n);
             "Remove node"
         }
+        "move" => {
+            let j = leader_arg()?;
+            let c = pt_arg(a, "to")?;
+            let (view, point, r) = match t.m.pick(&Tool::Note, &[], c).snap_at(c) {
+                Some(p) => (Some(p.view), p.p, p.r),
+                None => (None, c, None),
+            };
+            if !leaders::move_leader_end(&mut ann, j, view, point, r) {
+                return Err(OpError::param("to", "a callout's leader to its anchor only attaches to a model point"));
+            }
+            "Move by grip"
+        }
         "remove_leaders" => {
             if !leaders::remove_leaders(&mut ann) {
                 return Err(leaders_only());
@@ -1450,7 +1462,7 @@ fn leader(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             leaders::delete_leader(&mut ann, j);
             "Delete leader"
         }
-        _ => return Err(OpError::param("action", "add, add_node, remove_node, remove_leaders or delete")),
+        _ => return Err(OpError::param("action", "add, add_node, remove_node, move, remove_leaders or delete")),
     };
     if let Some(x) = t.d.sheets[si].annotations.iter_mut().find(|x| x.id == id) {
         *x = ann;

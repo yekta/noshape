@@ -1603,6 +1603,15 @@ fn drawing_leader_nodes_and_branches() {
     let l = leaders_of(&mut ctx, n);
     assert_eq!(l.len(), 2);
     assert_eq!(l[1]["path"][0], l[0]["path"][1], "from the bend");
+    // Move by grip: the second leader's end into empty sheet, then onto the edge's end.
+    call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": n, "action": "move", "leader": 1, "to": [14, 150] }));
+    assert!(last(&mut ctx).ends_with(":: Move by grip"));
+    let l = leaders_of(&mut ctx, n);
+    let end = |l: &Vec<Value>, i: usize| p2(l[i]["path"].as_array().unwrap().last().unwrap());
+    assert!((end(&l, 1)[0] - 14.0).abs() < 1e-3 && (end(&l, 1)[1] - 150.0).abs() < 1e-3, "{l:?}");
+    call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": n, "action": "move", "leader": 1, "to": a0 }));
+    let l = leaders_of(&mut ctx, n);
+    assert!((end(&l, 1)[0] - a0[0]).abs() < 0.5 && (end(&l, 1)[1] - a0[1]).abs() < 0.5, "attached to the vertex: {l:?}");
     call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": n, "action": "remove_leaders" }));
     assert!(last(&mut ctx).ends_with(":: Remove leaders"));
     assert!(leaders_of(&mut ctx, n).is_empty());

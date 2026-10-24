@@ -118,6 +118,33 @@ impl DrawingEditor {
         Some(Drag::LeaderBend { id, leader, start, orig })
     }
 
+    /// A drag starting on a selected note's or callout's leader anchor (its
+    /// circle grip, live (1)).
+    pub fn leader_end_drag(&self, start: [f64; 2]) -> Option<Drag> {
+        let tol = self.tol_mm(5.0);
+        self.current_sheet().annotations.iter().filter(|a| self.selection.contains(&Sel::Annotation(a.id))).find_map(|a| {
+            let (leader, _) = self.leader_paths_of(a).into_iter().find(|(_, p)| p.points.last().is_some_and(|q| (q[0] - start[0]).hypot(q[1] - start[1]) < tol))?;
+            Some(Drag::LeaderEnd { id: a.id, leader, orig: a.clone() })
+        })
+    }
+
+    /// The anchor follows the pointer: onto a snap point or edge of a view
+    /// it attaches there, elsewhere it stays on the sheet.
+    pub fn leader_end_move(&mut self, drag: &Drag, cx: &mut Context<Self>) {
+        let Drag::LeaderEnd { id, leader, orig } = drag else { return };
+        let c = self.cursor;
+        let (view, point, r) = match self.snap_at(c).or_else(|| self.any_point(c)) {
+            Some(p) => (Some(p.view), p.p, p.r),
+            None => (None, c, None),
+        };
+        let mut dr = self.drawing.clone();
+        if let Some(a) = dr.sheets.get_mut(self.sheet).and_then(|s| s.annotations.iter_mut().find(|a| a.id == *id)) {
+            *a = orig.clone();
+            leaders::move_leader_end(a, *leader, view, point, r);
+        }
+        self.set_preview(Some(dr), cx);
+    }
+
     /// The bend follows the pointer horizontally only (live (2)); the leader
     /// keeps its side.
     pub fn leader_bend_move(&mut self, drag: &Drag, cx: &mut Context<Self>) {

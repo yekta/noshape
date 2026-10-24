@@ -149,6 +149,35 @@ pub fn delete_leader(a: &mut Annotation, leader: usize) -> bool {
     }
 }
 
+/// Drag a leader's anchor grip (help note: off an edge detaches it, onto
+/// one re-attaches it): its end goes to `point` in `view` (view
+/// coordinates), or to sheet point `point` when `view` is None. A
+/// callout's leader to the anchor moves only onto a model point (`r`: its
+/// BOM item follows it). False when nothing moved.
+pub fn move_leader_end(a: &mut Annotation, leader: usize, view: Option<noshape_model::drawing::ViewId>, point: [f64; 2], r: Option<noshape_model::drawing::PointRef>) -> bool {
+    if let AnnotationKind::Balloon { view: v, anchor, callout, .. } = &mut a.kind
+        && leader == 0
+    {
+        let (Some(nv), Some(r)) = (view, r) else { return false };
+        *v = nv;
+        *anchor = point;
+        callout.free = false;
+        callout.part = None;
+        a.refs.retain(|x| x.slot != 0);
+        a.refs.push(noshape_model::drawing::AnnotationRef { slot: 0, point: r });
+        return true;
+    }
+    let mut moved = false;
+    with_leaders(a, |l| {
+        if let Some(ld) = l.get_mut(leader) {
+            ld.view = view;
+            ld.point = point;
+            moved = true;
+        }
+    });
+    moved
+}
+
 /// Add leader: `leader` (with its `start`) to annotation `a`. Notes and
 /// callouts keep the start; GD&T, weld and surface finish leaders start at
 /// the symbol. False for annotations without leaders.

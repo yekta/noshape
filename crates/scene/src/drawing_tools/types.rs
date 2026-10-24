@@ -276,6 +276,8 @@ pub enum Drag {
     NoteGrip { id: u64, grip: u8, start: [f64; 2], orig: Annotation },
     /// A note leader's bend: the landing's length (live "Move by grip").
     LeaderBend { id: u64, leader: usize, start: [f64; 2], orig: Annotation },
+    /// A note's or callout's leader anchor grip: detach / re-attach.
+    LeaderEnd { id: u64, leader: usize, orig: Annotation },
     /// Drag a drawing sketch entity (from `orig`).
     MoveSketch { id: u32, start: [f64; 2], orig: noshape_model::drawing::sheet_sketch::SheetSketch },
 }

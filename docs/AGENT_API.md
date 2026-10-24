@@ -2430,7 +2430,7 @@ The Note tool and panel: `text` (several lines with \n) placed at `position` (sh
 
 Edit a note's or callout's leaders: Add leader, Add node, Remove node, Remove leaders, Delete (edits the document (one undoable history entry)).
 
-The leader menus (right-click on a leader line, a node or the annotation): `add` a leader to `to` (sheet mm; a vertex, circle center or edge point there anchors it to that view, else the sheet point); a note's starts at its existing landing's bend, with `leader` and `node` it branches from that node (notes and callouts); GD&T, surface finish and weld symbols take `add` too. `add_node` puts a node at `at` (sheet mm) on the nearest segment of leader `leader`; `remove_node` removes node `node` of leader `leader` (its branches then start at the bend); `remove_leaders` removes a note's leaders, a callout's added ones; `delete` deletes leader `leader` (a callout's leader 0, the one to its anchor, leaves it in space). Leader indices: a note's in order, a callout's 0 = the leader to the anchor, then the added ones (drawing_get). One edit ("Add leader", "Add node", "Remove node", "Remove leaders", "Delete leader").
+The leader menus (right-click on a leader line, a node or the annotation): `add` a leader to `to` (sheet mm; a vertex, circle center or edge point there anchors it to that view, else the sheet point); a note's starts at its existing landing's bend, with `leader` and `node` it branches from that node (notes and callouts); GD&T, surface finish and weld symbols take `add` too. `add_node` puts a node at `at` (sheet mm) on the nearest segment of leader `leader`; `remove_node` removes node `node` of leader `leader` (its branches then start at the bend); `remove_leaders` removes a note's leaders, a callout's added ones; `move` drags leader `leader`'s anchor grip to `to` (onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point); `delete` deletes leader `leader` (a callout's leader 0, the one to its anchor, leaves it in space). Leader indices: a note's in order, a callout's 0 = the leader to the anchor, then the added ones (drawing_get). One edit ("Add leader", "Add node", "Remove node", "Move by grip", "Remove leaders", "Delete leader").
 
 | field | type | | description |
 |---|---|---|---|
@@ -2438,10 +2438,10 @@ The leader menus (right-click on a leader line, a node or the annotation): `add`
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `annotation` | integer | required | The note or callout (drawing_get). |
-| `action` | one of `add`, `add_node`, `remove_node`, `remove_leaders`, `delete` | required | What to do. |
+| `action` | one of `add`, `add_node`, `remove_node`, `move`, `remove_leaders`, `delete` | required | What to do. |
 | `leader` | integer |  | The leader (add_node, remove_node, delete; with `node`, the leader `add` branches from). |
 | `node` | integer |  | The node (remove_node; add: branch from it). |
-| `to` | array of number |  | add: where the new leader points (sheet mm). |
+| `to` | array of number |  | add: where the new leader points; move: where leader `leader`'s end goes (sheet mm). |
 | `at` | array of number |  | add_node: where the node goes (sheet mm). |
 
 #### drawing_gdt
