@@ -3431,7 +3431,10 @@ impl PartStudioView {
         // The feature being edited shows its draft's name (live: a Hole's
         // row reads "Ø 6.35 mm ↧ 12 mm" while its dialog is open).
         let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.clone()).filter(|d| d.id == f.id);
-        let f = draft.as_ref().unwrap_or(f);
+        // The name shows the active configuration's values (a configured
+        // Variable reads "#w = 80 mm" under L; qa4 round 4 S4-a).
+        let configured = draft.is_none().then(|| self.studio(cx).filter(|s| s.configuration.configured.iter().any(|c| c.feature == f.id)).map(|s| s.configuration.for_editing(f, &self.current_config(s)))).flatten();
+        let f = draft.as_ref().or(configured.as_ref()).unwrap_or(f);
         let name = {
             let computed = self.computed_values(f.id, cx);
             let units = self.doc.read(cx).session.doc.settings.units;

@@ -246,3 +246,41 @@ STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's
 STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
 STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
 STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty status bar, as live).
+
+## DRW-SIL — api — drawing_get omits silhouette edges; callouts can't target curved parts by script
+- Source: qa4 QA round 4 session 2 (2026-10-24, v0.4.7). Assembly drawing iso view of a plate + Ø10 pin: `drawing_get
+  edges:true` lists the plate and block lines but nothing for the pin (its silhouettes are drawn on the sheet).
+  `drawing_callout` anchored on the pin's centre line attaches to the plate (balloon "1"); in the app a click on the pin's
+  silhouette gives "2". Expected: silhouettes listed like other edges (and the anchor resolved to the part under it).
+  Evidence /root/qa4-scratch/r4/s2-drawing-bom-balloons.png, s2-balloon-pin-app.png; model by r4/s2.py.
+
+## CFG-MASS — api — CLI: mass properties ignore the active configuration; Derived accepts a tab name and fails
+- Source: qa4 QA round 4 session 4 (2026-10-24, v0.4.7), model by /root/qa4-scratch/r4/s4.py.
+- (1) After `config_activate {"Size": "L"}` (`active` reports L), `query_mass_properties` still returns 12000 mm³ (the S
+  block); M and L should give 27000 / 48000. The app rebuilds L correctly.
+- (2) `feature_add importDerived {"partStudio": "Part Studio 1"}` is accepted (a tab name, not an id) and the feature errors
+  "Error regenerating."; the app then shows "Missing Part Studio". Expected: resolve tab names (like `tab` arguments do) or
+  reject with `invalid_argument`.
+
+## FLAT-ROT — fs — flat pattern is turned 90° against Onshape's
+- qa4 round 4 S1 (r4/s1.py): live flat bounding box x 128.9165 × y 129.4650 mm; ours 129.465 × 128.916 (panel "Flat size" and the
+  drawing's flat view both turned). Live keeps the base in place: the x = 100 flange extends along +x, the y walls along ±y.
+
+## FLAT-SEG — fs — bend lines split by a cutout
+- qa4 round 4 S1: a Ø12 cut through both long bends splits each bend line in two in live (6 "Bend line" bodies, 5 × "UP 90.0°
+  R1.5" + "UP 180.0° R0.01" notes in the drawing's flat view); ours keeps one bend line per bend (3 + 1 notes).
+
+## FLAT-SCALE — asb — flat pattern view auto scale
+- qa4 round 4 S1: Insert view › Flat pattern of Part 1 on ANSI_A_MM: live auto scale 1:3 (title block SCALE 1:3); ours 1:1.
+
+## LOFT-SEAM / FILL-PLANE — kern — loft keeps the circle's seam; planar fill isn't a plane
+- qa4 round 4 S3 (r4/s3.py): surface loft Ø20 circle → 30×16 rectangle: live 4 faces / 12 edges / 6060.1344235 mm² (the 4 matched
+  points split the circle, its own seam is not kept); ours 5 faces, 6058.8169 mm². Fill of the circle: live an exact PLANE,
+  314.1592653589793 mm²; ours 314.212. Downstream: Enclose live 31743.5253 / 6 faces vs ours 31807.0934 / 7.
+
+## STEP-ASM — api — importing a STEP assembly
+- qa4 round 4 S5 (r4/s5.py, samples/qa4-s5-asm.step): live makes an **Assembly tab "Assembly 1 (1)"** (root product name, " (1)" on a
+  clash) + Part Studio **"qa4-s5-asm parts"** + the blob in a **CAD Imports** folder + a BOM element; parts listed Part 2, Part 3,
+  Part 1, each at its **own product position** (the assembly places the instances). Ours: one Part Studio "qa4-s5-asm", parts
+  Part 1, Part 3, Part 2 at the assembly's positions, no assembly. (PVZ: IM1, kern row, is the same gap.)
+- Export details (minor): STL binary header "noshape-kernel st…" (live 80 zero bytes); STEP product order; Parasolid header = EXP-HDR.
