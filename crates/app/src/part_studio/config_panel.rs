@@ -101,7 +101,7 @@ impl PartStudioView {
     }
 
     /// A text cell bound to a stable key; `commit` runs on Enter/blur.
-    fn cell_input(&mut self, key: String, value: String, window: &mut Window, cx: &mut Context<Self>, commit: impl Fn(&mut Self, String, &mut Context<Self>) + 'static) -> Entity<InputState> {
+    pub(super) fn cell_input(&mut self, key: String, value: String, window: &mut Window, cx: &mut Context<Self>, commit: impl Fn(&mut Self, String, &mut Context<Self>) + 'static) -> Entity<InputState> {
         let commit: CellCommit = std::rc::Rc::new(commit);
         // The newest closure (it captures the current ids).
         self.panel_commits.insert(key.clone(), commit.clone());
@@ -177,7 +177,7 @@ impl PartStudioView {
             RightPanel::CustomTables => self.render_custom_tables(cx),
             RightPanel::HoleTable => self.render_hole_table(cx),
             RightPanel::Inspection => self.render_inspection(cx),
-            RightPanel::SheetMetal => self.render_sheet_metal_panel(cx),
+            RightPanel::SheetMetal => self.render_sheet_metal_panel(window, cx),
             RightPanel::CutList => self.render_cut_list_panel(cx),
         };
         let title = match panel {
@@ -190,6 +190,24 @@ impl PartStudioView {
             RightPanel::SheetMetal => "Sheet metal",
             RightPanel::CutList => "Cut list",
         };
+        // Live (qa5/sm-091, dk-973): the Sheet metal table and flat view has
+        // no title tab and no footer; its context row starts under the line.
+        if panel == RightPanel::SheetMetal {
+            return Some(
+                crate::ui::right_resizable(v_flex().relative(), 6.)
+                    .w(px(crate::ui::right_panel_w() + 6.))
+                    .max_w(relative(0.5))
+                    .h_full()
+                    .flex_none()
+                    .bg(pal.panel)
+                    .border_l_1()
+                    .border_color(pal.border)
+                    .pl(px(5.))
+                    .child(div().h(px(1.)).ml(px(-5.)).flex_none().bg(gpui_kit::rgb(0xcccccc)))
+                    .child(div().flex_1().min_h_0().child(body))
+                    .into_any_element(),
+            );
+        }
         // Onshape (live, dom/panel-appearance.txt): 712 px, white; a 30 px
         // header whose title is one full-width active tab (13.33 px / 500
         // blue, 2 px blue underline); a 40 px `#eee` footer with `?`. The

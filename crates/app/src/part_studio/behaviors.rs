@@ -241,6 +241,22 @@ pub struct UiState {
     /// The Measure panel's distance row under the pointer (its label): live
     /// draws that one measurement's dashed line, nothing otherwise.
     pub measure_hover: Option<String>,
+    /// Sheet metal table and flat view: the chosen context (else the first
+    /// model by name) and the collapsed tables.
+    pub sm_context: Option<noshape_model::reference::FeatureId>,
+    pub sm_bends_closed: bool,
+    pub sm_joints_closed: bool,
+    /// The Bends table's horizontal scroll.
+    pub sm_bends_scroll: ScrollHandle,
+    /// The table cell under the pointer: (table: 0 Bends / 1 Other joints,
+    /// row, column).
+    pub sm_hover: Option<(u8, usize, usize)>,
+    /// The Bends cell being edited (row, column 2 Radius / 5 K Factor), and
+    /// whether its field still needs the focus.
+    pub sm_edit: Option<(usize, usize)>,
+    pub sm_edit_focus: bool,
+    /// The selected cell (table, row, column; column 0 selects the row).
+    pub sm_cell: Option<(u8, usize, usize)>,
     /// Dynamic suppression editor: feature, expression input.
     pub dyn_suppression: Option<(FeatureId, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
@@ -442,6 +458,14 @@ impl UiState {
             preview_tool_task: None,
             measure_lines: None,
             measure_hover: None,
+            sm_context: None,
+            sm_bends_closed: false,
+            sm_joints_closed: false,
+            sm_bends_scroll: ScrollHandle::new(),
+            sm_hover: None,
+            sm_edit: None,
+            sm_edit_focus: false,
+            sm_cell: None,
             dyn_suppression: None,
             shortcut_filter: None,
             shortcut_query: String::new(),

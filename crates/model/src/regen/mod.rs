@@ -11,6 +11,7 @@
 pub mod context;
 pub mod derived;
 mod display;
+pub use display::flat_view_display;
 pub use display::{PART_COLORS, angle_display_mesh, set_angle_display_mesh, tessellate_shape};
 pub mod eval;
 pub mod features;

@@ -19,6 +19,8 @@ mod scope;
 mod default_tolerances;
 mod pending;
 mod fab_panel;
+mod flat_view;
+mod sheet_metal_panel;
 mod feature_ops;
 mod manipulators;
 mod menus;
@@ -307,6 +309,8 @@ pub struct PartStudioView {
     pending_named_view: Option<noshape_model::partstudio::NamedView>,
     flat_cache: Option<fab_panel::FlatCache>,
     flat_task: Option<(usize, Task<()>)>,
+    /// The Sheet metal table and flat view panel's graphics area.
+    flat_view: Option<Entity<flat_view::FlatView>>,
     /// Onshape interaction state (hide/isolate, select other, S toolbar...).
     ui: behaviors::UiState,
     _subs: Vec<Subscription>,
@@ -431,6 +435,7 @@ impl PartStudioView {
             pending_named_view: None,
             flat_cache: None,
             flat_task: None,
+            flat_view: None,
             ui: behaviors::UiState::new(cx),
             _subs: subs,
         };
@@ -852,6 +857,7 @@ impl PartStudioView {
             accent.extend(hovered);
         }
         accent.extend(self.ui.appearance_hover.iter().cloned());
+        accent.extend(self.sm_hover_refs());
         let cs = self.cs_preview();
         if let Some((seeds, _)) = &cs {
             selection.extend(seeds.iter().cloned());

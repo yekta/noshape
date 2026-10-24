@@ -737,11 +737,7 @@ impl PartStudioView {
         // corner, white at 75%, holding three 30x30 buttons 5 px apart:
         // Measure, Analysis tools and Mass properties (20 px icons).
         let pal = p();
-        let measure_on = self.ui.measure_pinned;
-        let mass_on = self.show_mass;
-        let btn = |id: &'static str, icon: &'static str, on: bool, cx: &App| crate::ui::icon_button(id, icon, 30., on, cx);
-        let view = cx.entity();
-        let thickness_on = self.ui.thickness.is_some();
+        let (measure_on, mass_on) = (self.ui.measure_pinned, self.show_mass);
         let readout = (!measure_on && !mass_on && self.edit.is_none() && !self.selection.is_empty()).then(|| self.selection_readout(cx)).flatten();
         h_flex()
             .id("eval-tools")
@@ -756,52 +752,82 @@ impl PartStudioView {
             .bg(with_alpha(pal.panel, 0.75))
             .children(readout)
             // Live (part-studio/22): the tooltips sit over the buttons.
-            .child(
-                div().id("eval-measure-tip").child(btn("eval-measure", "measure", measure_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            .children(self.eval_buttons("eval", true, cx))
+            .into_any_element()
+    }
+
+    /// The Measure, Analysis tools and (`mass`) Mass and section properties
+    /// buttons, ids `<prefix>-…`: under the graphics area, and without Mass
+    /// properties under the Sheet metal flat view (live "ui (10-24 a)" (4):
+    /// the main window's buttons there too).
+    pub(super) fn eval_buttons(&mut self, prefix: &'static str, mass: bool, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let (measure_on, mass_on) = (self.ui.measure_pinned, self.show_mass);
+        let id = |s: &str| SharedString::from(format!("{prefix}-{s}"));
+        let btn = |id: SharedString, icon: &'static str, on: bool, cx: &App| crate::ui::icon_button(id, icon, 30., on, cx);
+        let view = cx.entity();
+        let thickness_on = self.ui.thickness.is_some();
+        let analysis_on = self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some();
+        let mut out = vec![
+            div()
+                .id(id("measure-tip"))
+                .child(btn(id("measure"), "measure", measure_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.ui.measure_pinned = !this.ui.measure_pinned;
                     this.set_show_mass(false, cx);
                     cx.notify();
-                }))).tip("Show measure details ([)", TipSide::Above),
-            )
+                })))
+                .tip("Show measure details ([)", TipSide::Above)
+                .into_any_element(),
             // Onshape's "Show analysis tools" menu (Help: Analysis tools), in its order.
             // Live (dom/menu-analysis-tools.txt): a 157 px context-menu list of
             // 22 px rows above the button. Thickness analysis is only offered
             // on paid plans (Help View__thickness_analysis: "Only available
             // for", in this menu; the free account's capture has 10 items).
-            .child(div().id("eval-analysis-tip").child(btn("eval-analysis", "analysis-tools", self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some(), cx).os_dropup_menu("eval-analysis-menu", move |m, _, _| {
-                use super::analysis_tools::ToolKind as K;
-                let tool = |label: &'static str, kind: K| {
+            div()
+                .id(id("analysis-tip"))
+                .child(btn(id("analysis"), "analysis-tools", analysis_on, cx).os_dropup_menu(id("analysis-menu"), move |m, _, _| {
+                    use super::analysis_tools::ToolKind as K;
+                    let tool = |label: &'static str, kind: K| {
+                        let v = view.clone();
+                        crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_analysis_tool(kind, w, cx)))
+                    };
                     let v = view.clone();
-                    crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_analysis_tool(kind, w, cx)))
-                };
-                let v = view.clone();
-                let (v9, v10, v11) = (view.clone(), view.clone(), view.clone());
-                let m = m.min_width(157.)
-                    .item(tool("Curve/surface analysis…", K::CurveSurface))
-                    .item(tool("Deviation analysis…", K::Deviation))
-                    .item(tool("Connection analysis…", K::Connection))
-                    .item(tool("Dihedral analysis…", K::Dihedral))
-                    .item(tool("Interference detection…", K::Interference))
-                    .item(tool("Zebra stripes…", K::Zebra))
-                    .item(tool("Reflection analysis…", K::Reflection))
-                    .item(crate::os_menu::OsMenuItem::new("Curvature color map").on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
-                    .item(tool("Draft analysis…", K::Draft));
-                // Once on, the menu edits or turns it off (Help).
-                let m = if thickness_on {
-                    m.item(crate::os_menu::OsMenuItem::new("Edit thickness analysis").on_click(move |_, w, cx| v11.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
-                        .item(crate::os_menu::OsMenuItem::new("Turn thickness analysis off").on_click(move |_, _, cx| v10.update(cx, |this, cx| this.thickness_off(cx))))
-                } else {
-                    m.item(crate::os_menu::OsMenuItem::new("Thickness analysis…").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
-                };
-                m.item(tool("Flatten surfaces…", K::Flatten))
-            })).tip("Show analysis tools", TipSide::Above))
-            .child(
-                div().id("eval-mass-tip").child(btn("eval-mass", "mass-properties", mass_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.ui.measure_pinned = false;
-                    this.set_show_mass(!this.show_mass, cx);
-                }))).tip("Display mass and section properties", TipSide::Above),
-            )
-            .into_any_element()
+                    let (v9, v10, v11) = (view.clone(), view.clone(), view.clone());
+                    let m = m
+                        .min_width(157.)
+                        .item(tool("Curve/surface analysis…", K::CurveSurface))
+                        .item(tool("Deviation analysis…", K::Deviation))
+                        .item(tool("Connection analysis…", K::Connection))
+                        .item(tool("Dihedral analysis…", K::Dihedral))
+                        .item(tool("Interference detection…", K::Interference))
+                        .item(tool("Zebra stripes…", K::Zebra))
+                        .item(tool("Reflection analysis…", K::Reflection))
+                        .item(crate::os_menu::OsMenuItem::new("Curvature color map").on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
+                        .item(tool("Draft analysis…", K::Draft));
+                    // Once on, the menu edits or turns it off (Help).
+                    let m = if thickness_on {
+                        m.item(crate::os_menu::OsMenuItem::new("Edit thickness analysis").on_click(move |_, w, cx| v11.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
+                            .item(crate::os_menu::OsMenuItem::new("Turn thickness analysis off").on_click(move |_, _, cx| v10.update(cx, |this, cx| this.thickness_off(cx))))
+                    } else {
+                        m.item(crate::os_menu::OsMenuItem::new("Thickness analysis…").on_click(move |_, w, cx| v9.update(cx, |this, cx| this.toggle_analysis_tool(K::Thickness, w, cx))))
+                    };
+                    m.item(tool("Flatten surfaces…", K::Flatten))
+                }))
+                .tip("Show analysis tools", TipSide::Above)
+                .into_any_element(),
+        ];
+        if mass {
+            out.push(
+                div()
+                    .id(id("mass-tip"))
+                    .child(btn(id("mass"), "mass-properties", mass_on, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.ui.measure_pinned = false;
+                        this.set_show_mass(!this.show_mass, cx);
+                    })))
+                    .tip("Display mass and section properties", TipSide::Above)
+                    .into_any_element(),
+            );
+        }
+        out
     }
 
     pub(super) fn render_measure_panel(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
