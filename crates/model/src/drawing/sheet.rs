@@ -283,14 +283,22 @@ pub const DRAWING_DEFAULT_FONT: &str = "Noto Sans";
 
 /// Families of earlier documents not on live's list, as their nearest one
 /// on it (lead decision S28): Liberation Sans → Arimo, Liberation Serif →
-/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono.
+/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono; any other
+/// unknown name is ARSimp, as live (asb 10-24: unknown fonts render in
+/// ARSimp.shx and re-open as "ARSimp").
 pub fn migrate_font_family(family: &str) -> &str {
     match family {
         "Liberation Sans" => "Arimo",
         "Liberation Serif" => "Tinos",
         "Liberation Mono" => "DejaVu Sans Mono",
-        f => f,
+        f if FONT_FAMILIES.contains(&f) => f,
+        _ => "ARSimp",
     }
+}
+
+/// The SHX shape fonts of the list (live: no Bold / Italic for them).
+pub fn is_shx(family: &str) -> bool {
+    matches!(family, "APMONO" | "ARComp" | "ARIsoP1" | "ARItal" | "ARMono" | "ARSimp" | "ARTxt")
 }
 
 fn migrated_family<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
@@ -2133,17 +2141,44 @@ impl SheetGeometry {
         let d = [dq[0] - dp[0], dq[1] - dp[1]];
         let dl = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-12);
         let du = [d[0] / dl, d[1] / dl];
+        // A dual value straddles the line (below): the line breaks around
+        // the text block (live asbdd-20: DIMGAP, 0.75 of the text height from
+        // the ink, = 0.65 from our text box), here the half gap along it.
+        let along = !(self.style.text_horizontal && dir[1].abs() > 1e-9);
+        let gap = dual_straddles(text).filter(|_| along).map(|dual| {
+            let h = self.style.dim_text;
+            font::text_width(&dual, h).max(font::text_width(&text.main, h)) / 2.0 + 0.65 * h
+        });
+        let c = [(dp[0] + dq[0]) / 2.0, (dp[1] + dq[1]) / 2.0];
+        let broken = |line: [[f64; 2]; 2]| -> Vec<Vec<[f64; 2]>> {
+            let Some(g) = gap else { return vec![line.to_vec()] };
+            let t = |p: [f64; 2]| (p[0] - c[0]) * du[0] + (p[1] - c[1]) * du[1];
+            let at = |t: f64| [c[0] + du[0] * t, c[1] + du[1] * t];
+            let (t0, t1) = (t(line[0]), t(line[1]));
+            let mut out = Vec::new();
+            if t0 < -g {
+                out.push(vec![line[0], at(t1.min(-g))]);
+            }
+            if t1 > g {
+                out.push(vec![at(t0.max(g)), line[1]]);
+            }
+            out
+        };
         if self.flip_arrows {
             // Flipped: arrows outside pointing in, the line runs past them.
             let ext = self.style.dim_arrow + 3.0;
-            for piece in cut_polyline(&[[dp[0] - du[0] * ext, dp[1] - du[1] * ext], [dq[0] + du[0] * ext, dq[1] + du[1] * ext]], &cuts, half) {
-                self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
+            for seg in broken([[dp[0] - du[0] * ext, dp[1] - du[1] * ext], [dq[0] + du[0] * ext, dq[1] + du[1] * ext]]) {
+                for piece in cut_polyline(&seg, &cuts, half) {
+                    self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
+                }
             }
             self.arrow(dp, d, 3.0);
             self.arrow(dq, [-d[0], -d[1]], 3.0);
         } else {
-            for piece in cut_polyline(&[dp, dq], &cuts, half) {
-                self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
+            for seg in broken([dp, dq]) {
+                for piece in cut_polyline(&seg, &cuts, half) {
+                    self.lines.push(Polyline2 { points: piece, style: LineStyle::Thin, closed: false, pick });
+                }
             }
             self.arrow(dp, [-d[0], -d[1]], 3.0);
             self.arrow(dq, d, 3.0);
@@ -2174,9 +2209,10 @@ impl SheetGeometry {
             mid = [mid[0] + up[0] * k, mid[1] + up[1] * k];
             angle = 0.0;
         }
-        if let Some(dual) = text.dual.clone().filter(|_| text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval) {
+        if let Some(dual) = dual_straddles(text) {
             // Dual (live asb 10-24): the dimension line runs between the two
-            // lines; the dual above it for Top, below it for Bottom.
+            // lines, broken around them; the dual above it for Top, below it
+            // for Bottom.
             let h = self.style.dim_text;
             let below = [mid[0] - up[0] * (2.0 * tg + h), mid[1] - up[1] * (2.0 * tg + h)];
             let (top_text, bottom_text) = if text.dual_below { (text.main.clone(), dual) } else { (dual, text.main.clone()) };
@@ -2189,6 +2225,12 @@ impl SheetGeometry {
             self.dim_label(mid, angle, 0.5, false, text, self.style.dim_text, pick);
         }
     }
+}
+
+/// The dual value of a dimension label drawn as two lines across the
+/// dimension line (plain values only).
+fn dual_straddles(text: &DimText) -> Option<String> {
+    text.dual.clone().filter(|_| text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval)
 }
 
 /// Where a linear dimension's lines go (sheet mm): its direction, the
@@ -2406,6 +2448,10 @@ pub trait AnnotationEnv {
         Some(revision.to_string())
     }
     /// Lines of a hole / thread callout (from the Hole feature).
+    /// A dimension's dual units for the DXF / DWG export (None: single).
+    fn dual_cad(&self, _a: &Annotation, _angular: bool) -> Option<super::cad_objects::CadDual> {
+        None
+    }
     fn hole_callout(&self, _a: &Annotation) -> Vec<String> {
         vec!["⌀?".into()]
     }

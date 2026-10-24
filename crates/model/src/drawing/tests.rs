@@ -2352,7 +2352,7 @@ fn drawing_fonts_are_lives_and_old_families_migrate() {
     assert_eq!((FONT_FAMILIES[0], FONT_FAMILIES[21]), ("APMONO", "Tinos"));
     assert!(FONT_FAMILIES.contains(&DRAWING_DEFAULT_FONT));
     assert!(!FONT_FAMILIES.iter().any(|f| f.starts_with("Liberation")));
-    for (old, new) in [("Liberation Sans", "Arimo"), ("Liberation Serif", "Tinos"), ("Liberation Mono", "DejaVu Sans Mono"), ("Noto Sans", "Noto Sans")] {
+    for (old, new) in [("Liberation Sans", "Arimo"), ("Liberation Serif", "Tinos"), ("Liberation Mono", "DejaVu Sans Mono"), ("Noto Sans", "Noto Sans"), ("Comic Sans", "ARSimp")] {
         let f: TextFont = serde_json::from_str(&format!("{{\"family\":\"{old}\",\"bold\":true}}")).unwrap();
         assert_eq!((f.family.as_str(), f.bold), (new, true));
     }
@@ -2374,4 +2374,84 @@ fn hole_callout_dual_block_like_onshape() {
     assert_eq!(super::format::dual_len(&d, &DimFormat::default(), 0.00635).as_deref(), Some("6.35 mm"));
     assert_eq!(super::format::dual_len(&d, &DimFormat::default(), 0.012).as_deref(), Some("12.00 mm"));
     assert_eq!(super::format::dual_len(&d, &DimFormat { dual: Some(false), ..Default::default() }, 0.012), None);
+}
+
+/// Live samples/asb-dual-2018: with dual dimensions each DIMENSION's text
+/// override is "[]\P<>" (the alternate units, then the value) and its block
+/// holds one MTEXT "\A1;[…]\P…"; angular dimensions have no dual.
+/// Gate v0.4.8 (f), live asbdd-20: a linear dual dimension's line breaks
+/// around the two-line text block (DIMGAP from the ink, ANSI and ISO, Top
+/// and Bottom, horizontal and vertical); a single value keeps it whole.
+#[test]
+fn dual_dimension_line_breaks_around_the_text() {
+    use super::format::DimText;
+    for iso in [false, true] {
+        for below in [false, true] {
+            for vertical in [false, true] {
+                let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+                g.style.iso = iso;
+                let h = g.style.dim_text;
+                let text = DimText { main: "60".into(), dual: Some("[2.36 in]".into()), dual_below: below, ..Default::default() };
+                let (p, q, o) = if vertical { ([100.0, 50.0], [100.0, 110.0], DimOrientation::Vertical) } else { ([50.0, 100.0], [110.0, 100.0], DimOrientation::Horizontal) };
+                g.linear_dimension_text(p, q, -20.0, o, &text, 1);
+                // The dimension line's pieces: along the dimension direction.
+                let ax = if vertical { 1 } else { 0 };
+                let pieces: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1 - ax] - l.points[1][1 - ax]).abs() < 1e-9 && (l.points[0][ax] - l.points[1][ax]).abs() > 1e-6).map(|l| {
+                    let (a, b) = (l.points[0][ax], l.points[1][ax]);
+                    [a.min(b), a.max(b)]
+                }).collect();
+                assert_eq!(pieces.len(), 2, "iso {iso} below {below} vertical {vertical}: {pieces:?}");
+                let mut pieces = pieces;
+                pieces.sort_by(|a, b| a[0].total_cmp(&b[0]));
+                let (gap0, gap1) = (pieces[0][1], pieces[1][0]);
+                // Centred on the value; half the block plus 0.65 h each side.
+                assert!(((gap0 + gap1) / 2.0 - 80.0).abs() < 1e-9);
+                let half = font::text_width("[2.36 in]", h) / 2.0 + 0.65 * h;
+                assert!(((gap1 - gap0) / 2.0 - half).abs() < 1e-9, "{gap0} {gap1}");
+                // The line reaches the arrows.
+                assert!((pieces[0][0] - 50.0).abs() < 1e-9 && (pieces[1][1] - 110.0).abs() < 1e-9);
+                // Both texts sit inside the gap.
+                for t in g.texts.iter().filter(|t| t.text == "60" || t.text == "[2.36 in]") {
+                    let w = font::text_width(&t.text, h);
+                    assert!(t.pos[ax] - w / 2.0 > gap0 && t.pos[ax] + w / 2.0 < gap1);
+                }
+            }
+        }
+    }
+    // A single value: one unbroken line.
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.linear_dimension_text([50.0, 100.0], [110.0, 100.0], -20.0, DimOrientation::Horizontal, &DimText::plain("60"), 1);
+    assert_eq!(g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9 && (l.points[0][0] - l.points[1][0]).abs() > 1e-6).count(), 1);
+}
+
+#[test]
+fn cad_export_dual_dimensions_like_onshape() {
+    use super::cad_export::to_dxf_version;
+    use acadrust::{DxfVersion, EntityType};
+    let (doc, mut drawing) = demo();
+    drawing.props.dual = DualDims { show: true, show_unit: true, ..Default::default() };
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let built = render_sheet(&drawing, 0, &sources, &cache, true).unwrap();
+    let g = export::prepare(&built.geometry, &export::ExportOptions { strokes: true, ..Default::default() });
+    let d = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap())).unwrap().read().unwrap();
+    let dims: Vec<_> = d.entities().filter_map(|e| if let EntityType::Dimension(x) = e { Some(x.clone()) } else { None }).collect();
+    assert!(!dims.is_empty());
+    let mut duals = 0;
+    for x in &dims {
+        let b = x.base();
+        let angular = matches!(&**x, acadrust::entities::Dimension::Angular3Pt(_) | acadrust::entities::Dimension::Angular2Ln(_));
+        if angular {
+            assert!(!b.text.contains("[]"), "{}", b.text);
+            continue;
+        }
+        if b.text == "[]\\P<>" {
+            duals += 1;
+            let texts: Vec<String> = d.entities_in_block(&b.block_name).filter_map(|e| if let EntityType::MText(m) = e { Some(m.value.clone()) } else { None }).collect();
+            if texts.len() == 1 {
+                assert!(texts[0].starts_with("\\A1;[") && texts[0].contains("in]\\P"), "{texts:?}");
+            }
+        }
+    }
+    assert!(duals > 0, "{:?}", dims.iter().map(|x| x.base().text.clone()).collect::<Vec<_>>());
 }

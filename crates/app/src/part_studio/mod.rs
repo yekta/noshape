@@ -19,6 +19,8 @@ mod scope;
 mod default_tolerances;
 mod pending;
 mod fab_panel;
+mod flat_view;
+mod sheet_metal_panel;
 mod feature_ops;
 mod manipulators;
 mod menus;
@@ -306,6 +308,8 @@ pub struct PartStudioView {
     named_view_picked: Option<String>,
     flat_cache: Option<fab_panel::FlatCache>,
     flat_task: Option<(usize, Task<()>)>,
+    /// The Sheet metal table and flat view panel's graphics area.
+    flat_view: Option<Entity<flat_view::FlatView>>,
     /// Onshape interaction state (hide/isolate, select other, S toolbar...).
     ui: behaviors::UiState,
     _subs: Vec<Subscription>,
@@ -429,6 +433,7 @@ impl PartStudioView {
             named_view_picked: None,
             flat_cache: None,
             flat_task: None,
+            flat_view: None,
             ui: behaviors::UiState::new(cx),
             _subs: subs,
         };
@@ -850,6 +855,7 @@ impl PartStudioView {
             accent.extend(hovered);
         }
         accent.extend(self.ui.appearance_hover.iter().cloned());
+        accent.extend(self.sm_hover_refs());
         let cs = self.cs_preview();
         if let Some((seeds, _)) = &cs {
             selection.extend(seeds.iter().cloned());
@@ -3431,7 +3437,10 @@ impl PartStudioView {
         // The feature being edited shows its draft's name (live: a Hole's
         // row reads "Ø 6.35 mm ↧ 12 mm" while its dialog is open).
         let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.clone()).filter(|d| d.id == f.id);
-        let f = draft.as_ref().unwrap_or(f);
+        // The name shows the active configuration's values (a configured
+        // Variable reads "#w = 80 mm" under L; qa4 round 4 S4-a).
+        let configured = draft.is_none().then(|| self.studio(cx).filter(|s| s.configuration.configured.iter().any(|c| c.feature == f.id)).map(|s| s.configuration.for_editing(f, &self.current_config(s)))).flatten();
+        let f = draft.as_ref().or(configured.as_ref()).unwrap_or(f);
         let name = {
             let computed = self.computed_values(f.id, cx);
             let units = self.doc.read(cx).session.doc.settings.units;

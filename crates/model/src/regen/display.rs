@@ -114,6 +114,34 @@ pub(super) fn tessellate_error(shape: &noshape_kernel::Shape, opts: &RegenOption
     tessellate_body(shape, "error geometry", 1.0, opts)
 }
 
+/// The Sheet metal flat view's display: the flat solid of `flat` (in the
+/// flat view's place) as one solid body in `color`, its faces and edges
+/// all naming the body (the view only shows it).
+pub fn flat_view_display(flat: &crate::sheetmetal::FlatPattern, color: [f32; 4]) -> Option<StudioDisplay> {
+    let shape = flat.flat_view_solid()?;
+    let mesh = tessellate_body(&shape, "flat pattern", 1.0, &RegenOptions::default());
+    let id = crate::reference::BodyId { feature: crate::reference::FeatureId(0), index: 0 };
+    let me = Reference::Body(id.clone());
+    let body = BodyDisplay {
+        id,
+        name: "Flat pattern".into(),
+        kind: BodyKind::Solid,
+        color,
+        hidden: false,
+        face_refs: vec![me.clone(); mesh.face_ranges.len()],
+        edge_refs: vec![me.clone(); mesh.edges.len()],
+        vertex_refs: vec![me; mesh.vertices.len()],
+        mesh,
+        coarser: Vec::new(),
+        levels_from: 0,
+        bounds: shape.bounding_box(false).ok().map(|b| (b.min, b.max)),
+        composite: None,
+        is_mesh: false,
+        face_colors: Vec::new(),
+    };
+    Some(StudioDisplay { bodies: vec![body], ..Default::default() })
+}
+
 fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts: &RegenOptions) -> Arc<MeshBuffers> {
     let (lin, ang) = display_deflection(shape, quality, opts.preview_meshes);
     let tt = std::time::Instant::now();

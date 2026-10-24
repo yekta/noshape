@@ -18,6 +18,18 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  commit-messages:
+    name: No AI attribution in history
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Reject Co-Authored-By Claude / "Generated with Claude Code" lines
+        run: |
+          bad=$(git log --format='%H %B' | grep -iE 'co-authored-by:.*(claude|anthropic)|generated with \[?claude code' || true)
+          if [ -n "$bad" ]; then echo "$bad"; echo "::error::AI attribution lines in commit messages"; exit 1; fi
+
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
