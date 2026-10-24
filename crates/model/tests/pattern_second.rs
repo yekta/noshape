@@ -129,24 +129,26 @@ fn second_pattern_case(reapply: bool) {
 #[test]
 fn deleting_the_running_second_pattern_stops_it_at_once() {
     let n = count();
-    let (s, lp1, _) = model(n, true);
-    // How long the regeneration takes up to the middle of LP2.
+    let (s, _, lp2) = model(n, true);
+    // Where LP2 runs in a regeneration: after the features before it.
     let r = s.regen(None);
-    let ms = |f: FeatureId| r.display.features.iter().find(|x| x.id == f).unwrap().time_ms as f64;
-    let before_lp2: f64 = r.display.features.iter().take_while(|x| x.id != lp1).map(|x| x.time_ms as f64).sum::<f64>() + ms(lp1);
-    let lp2_ms = r.display.features.last().unwrap().time_ms as f64;
-    let at = Duration::from_secs_f64((before_lp2 + lp2_ms / 2.0) / 1e3);
-    let cancel = RegenCancel::default();
-    let c2 = cancel.clone();
+    let lp2_ms = r.display.features.iter().find(|x| x.id == lp2).unwrap().time_ms as f64;
+    let start: f64 = r.display.features.iter().take_while(|x| x.id != lp2).map(|x| x.time_ms as f64).sum();
     let s = std::sync::Arc::new(s);
-    let s2 = s.clone();
-    let worker = std::thread::spawn(move || s2.regen(Some(c2)));
-    std::thread::sleep(at);
-    let t = Instant::now();
-    cancel.abort();
-    let out = worker.join().unwrap();
-    let latency = t.elapsed();
-    eprintln!("×{n}: aborted {:.0} ms in (LP2 runs {:.0} ms), returned {:.0} ms after the abort", at.as_secs_f64() * 1e3, lp2_ms, latency.as_secs_f64() * 1e3);
-    assert!(out.cancelled, "the regeneration finished before the abort");
-    assert!(latency < Duration::from_millis(200), "returned {:.0} ms after the abort", latency.as_secs_f64() * 1e3);
+    for frac in [0.2, 0.5, 0.8] {
+        let at = Duration::from_secs_f64((start + lp2_ms * frac) / 1e3);
+        let cancel = RegenCancel::default();
+        let (c2, s2) = (cancel.clone(), s.clone());
+        let worker = std::thread::spawn(move || s2.regen(Some(c2)));
+        std::thread::sleep(at);
+        let t = Instant::now();
+        cancel.abort();
+        let out = worker.join().unwrap();
+        let latency = t.elapsed();
+        eprintln!("×{n}: aborted {:.0} ms in ({:.0} % into LP2, which runs {lp2_ms:.0} ms), returned {:.0} ms after the abort", at.as_secs_f64() * 1e3, frac * 100.0, latency.as_secs_f64() * 1e3);
+        assert!(out.cancelled, "the regeneration finished before the abort");
+        // 200 ms in release (the UI's budget); a debug build runs ~4× slower.
+        let budget = Duration::from_millis(if cfg!(debug_assertions) { 600 } else { 200 });
+        assert!(latency < budget, "returned {:.0} ms after the abort ({:.0} % into LP2)", latency.as_secs_f64() * 1e3, frac * 100.0);
+    }
 }

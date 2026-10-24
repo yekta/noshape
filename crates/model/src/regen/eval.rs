@@ -856,6 +856,10 @@ impl<'a> EvalCtx<'a> {
                 }
             }
             let t_bool = t0.elapsed();
+            // Aborted: no naming / unify of a result nobody will see.
+            if self.cancelled() {
+                return err("Cancelled");
+            }
             let mut args: Vec<ShapeNames> = vec![target.shape_names()];
             args.extend(near.iter().map(|&i| tools[i].names.clone()));
             let arg_refs: Vec<&ShapeNames> = args.iter().collect();
