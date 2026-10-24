@@ -1894,8 +1894,9 @@ impl Renderer {
         }
         struct Extra {
             writes: wgpu::ColorWrites,
+            cull: Option<wgpu::Face>,
         }
-        let plain = || Extra { writes: wgpu::ColorWrites::ALL };
+        let plain = || Extra { writes: wgpu::ColorWrites::ALL, cull: None };
         let make_full = |layout: &wgpu::PipelineLayout, p: P, x: Extra| {
             d.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(p.label),
@@ -1920,7 +1921,7 @@ impl Renderer {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: None,
+                    cull_mode: x.cull,
                     polygon_mode: wgpu::PolygonMode::Fill,
                     unclipped_depth: false,
                     conservative: false,
@@ -1953,7 +1954,7 @@ impl Renderer {
             mesh_outline_depth: make_full(
                 layout,
                 P { label: "mesh-outline-depth", vs: "vs_mesh", fs: "fs_outline_depth", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa },
-                Extra { writes: wgpu::ColorWrites::empty() },
+                Extra { writes: wgpu::ColorWrites::empty(), cull: None },
             ),
             // Every kept surface of a cut part adds its color, without depth
             // test or culling.
@@ -1965,7 +1966,12 @@ impl Renderer {
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
             mesh_transparent: make(P { label: "mesh-t", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }),
             line: make(P { label: "line", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
-            mesh_backsil: make(P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa }),
+            // Front faces culled, like Onshape's pass (`setOverrideFaceCullingMode(FRONT)`).
+            mesh_backsil: make_full(
+                layout,
+                P { label: "mesh-backsil", vs: "vs_backsil", fs: "fs_backsil", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: msaa },
+                Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) },
+            ),
             silhouette: make(P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: &silhouette_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
             line_hidden: make(P { label: "line-hidden", vs: "vs_line", fs: "fs_line", buffers: &line_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: EDGE_DEPTH_BIAS, samples: msaa }),
             point: make(P { label: "point", vs: "vs_point", fs: "fs_point", buffers: &point_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: msaa }),
