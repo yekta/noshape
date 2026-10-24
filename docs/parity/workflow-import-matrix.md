@@ -4,6 +4,13 @@ qa5, 2026-10-21 pass 4, CLI /tmp/qa5/noshape-cli-1436 `import_files` (defaults),
 script /root/qa5-scratch/pass3/impmatrix.py, raw results pass3/impmatrix.log/.json. Live values: behaviours.md G13–G38, G47.
 Status: ✅ matches live (≤1e-5 relative), ✗ differs, ? live value unknown.
 
+**Grading rule for volumes and areas (lead, 2026-10-24):** Onshape's mass properties are estimates with a band
+(REST massproperties `[value, lo, hi]`; e.g. "kern G24 b" volume 7582.912205 in 7576.2420 – 7589.5825, and its own
+STEP / SAT re-imports give 7582.848 / 7582.872; behaviours.md "api (10-23) import parity"). An import **matches**
+(✅) when our value lies inside live's band **and** the faces whose exact areas can be computed (planes, cylinders,
+cones, spheres, tori) have those areas; digit-for-digit equality with live's estimate is not required. Rows without a
+known band keep the ≤1e-5 rule until live supplies one.
+
 | Sample (format) | Ours | Live | Status |
 |---|---|---|---|
 | g36-g24b-v25.0 … v38.1 (27 Parasolid versions) | 7583.000869, 18 faces, all identical | B-rep 7582.912205 | ✗ I1 (+0.089, same for every version) |

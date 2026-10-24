@@ -4028,11 +4028,29 @@ impl AssemblyView {
                 return;
             }
             let file = format!("{name}.{}", s.format.ext());
+            // Options › Store file in a new tab: no download.
+            if s.options == 2 {
+                v.update(cx, |this, cx| {
+                    let parts = this.export_parts(ids.as_deref(), s.hidden);
+                    this.message = Some(match crate::part_studio::export::store_export(&this.doc, this.tab, &file, |p| crate::part_studio::export::write_export(&s, p, parts), cx) {
+                        Ok(f) => (false, format!("Stored {f}")),
+                        Err(e) => (true, format!("Export failed: {e:#}")),
+                    });
+                    cx.notify();
+                });
+                return;
+            }
             crate::files::request_save_path("Export", file, s.format.ext(), window, cx, move |path, cx| {
                 v.update(cx, |this, cx| {
                     let parts = this.export_parts(ids.as_deref(), s.hidden);
                     this.message = Some(match crate::part_studio::export::write_export(&s, &path, parts) {
-                        Ok(p) => (false, format!("Exported {}", p.display())),
+                        Ok(p) => {
+                            // Download and store file in a new tab.
+                            if s.options == 1 {
+                                crate::part_studio::export::store_written(&this.doc, this.tab, &p, cx);
+                            }
+                            (false, format!("Exported {}", p.display()))
+                        }
                         Err(e) => (true, format!("Export failed: {e:#}")),
                     });
                     cx.notify();

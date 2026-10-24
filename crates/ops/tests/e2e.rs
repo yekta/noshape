@@ -1679,6 +1679,13 @@ fn pvz_instances_keep_their_placements() {
     // 90° about z: quaternion (0, 0, ±√½, √½).
     let q = &a["rotation"];
     assert!((num(&q[2]).abs() - 0.5f64.sqrt()).abs() < 1e-6, "{a}");
+    // Imported again: the root's raw name, then that numbered (live).
+    let again = |ctx: &mut Ctx| -> String {
+        let r = call(ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+        r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string()
+    };
+    assert_eq!(again(&mut ctx), "pvz rot asm_54");
+    assert_eq!(again(&mut ctx), "pvz rot asm_54 (1)");
     // pvz-assembly.pvz: <1> in place, <2> 50 mm along x.
     let Some(pvz) = live_sample("pvz-assembly.pvz") else { return };
     let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
@@ -1688,4 +1695,82 @@ fn pvz_instances_keep_their_placements() {
     let find = |n: &str| inst.iter().find(|i| i["name"] == n).unwrap_or_else(|| panic!("{n}: {list}"));
     assert!(t(find("Part 1 <1>")).iter().all(|x| x.abs() < 1e-6), "{list}");
     assert!((t(find("Part 1 <2>"))[0] - 50.0).abs() < 1e-6, "{list}");
+}
+
+/// Export Options › Store file in a new tab (live: the file tab "<name>.<ext>"
+/// directly after the exported tab).
+#[test]
+fn export_store_file_in_a_new_tab() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "export_store.noshape");
+    let order = |ctx: &mut Ctx| -> Vec<String> { call(ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect() };
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "PARASOLID", "options": "store" }));
+    assert!(r.get("file").is_none() && r["stored_tab"].is_string(), "{r}");
+    assert_eq!(last(&mut ctx), "Store Part Studio 1.x_t");
+    let o = order(&mut ctx);
+    let ps = o.iter().position(|t| t == "Part Studio 1").unwrap();
+    assert_eq!(o[ps + 1], "Part Studio 1.x_t", "{o:?}");
+    // Download and store: the file too.
+    let file = scratch("stored.step");
+    let r = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": file.to_str().unwrap(), "options": "download_and_store" }));
+    assert!(file.is_file(), "{r}");
+    assert!(order(&mut ctx).contains(&"stored.step".to_string()));
+    // A drawing's export.
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let name = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().find(|t| t["id"] == tab.as_str() || t["name"] == tab.as_str()).unwrap()["name"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "PDF", "options": "store" }));
+    let o = order(&mut ctx);
+    let di = o.iter().position(|t| *t == name).unwrap();
+    assert_eq!(o[di + 1], format!("{name}.pdf"), "{o:?}");
+    let e = try_call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("file"), "{e:?}");
+}
+
+/// Rhino (EXP1): export and import back with the same volume (builds with
+/// openNURBS; without it the export says so).
+#[test]
+fn rhino_export_round_trip() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "rhino_rt.noshape");
+    let want = num(&call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
+    let file = scratch("rhino_rt.3dm");
+    match try_call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "RHINO", "file": file.to_str().unwrap() })) {
+        Ok(_) => {}
+        Err(e) => {
+            assert!(e.message.contains("openNURBS"), "{e:?}");
+            return;
+        }
+    }
+    let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+    let got = num(&call(&mut ctx, "query_parts", json!({ "tab": studio }))["parts"][0]["volume"]);
+    assert!((got - want).abs() < 2e-5 * want, "{got} vs {want}");
+}
+
+/// Export Drawing through the API with the modal's options: raster formats,
+/// versions, the inspection list.
+#[test]
+fn drawing_export_formats_and_options() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_export_all.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let head = |p: &std::path::Path, n: usize| std::fs::read(p).unwrap()[..n].to_vec();
+    for (format, magic) in [("PNG", &[0x89u8, b'P', b'N', b'G'][..]), ("JPEG", &[0xffu8, 0xd8, 0xff][..]), ("TIFF", &[b'I', b'I', 42, 0][..])] {
+        let f = scratch(&format!("sheet.{}", format.to_lowercase()));
+        call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": format, "file": f.to_str().unwrap() }));
+        assert_eq!(head(&f, magic.len()), magic, "{format}");
+    }
+    let dxf = scratch("sheet.dxf");
+    call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "version": "2018", "file": dxf.to_str().unwrap(), "text": "explode_all", "units": "Inch" }));
+    assert!(std::fs::read_to_string(&dxf).unwrap().contains("AC1032"));
+    let e = try_call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "PDF", "version": "9.9", "file": "/tmp/x.pdf" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    // The inspection list: a CSV with the panel's columns.
+    call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "A", "position": [30, 30] }));
+    let csv = scratch("insp.csv");
+    call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "Inspection list", "file": csv.to_str().unwrap() }));
+    assert!(!std::fs::read_to_string(&csv).unwrap().is_empty());
 }
