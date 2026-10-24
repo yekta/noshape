@@ -80,6 +80,9 @@ struct Definition {
     corners: BTreeMap<usize, CornerRelief>,
     /// Bend relief features' settings by definition vertex (else `relief`).
     reliefs: BTreeMap<usize, BendRelief>,
+    /// Each definition face's place in Onshape's creation order within the
+    /// feature that made it (feature, rank), when its name tells.
+    created: Vec<Option<(crate::reference::FeatureId, u32)>>,
     k_factor: f64,
     /// Active (not finished by Finish sheet metal model), default bend radius.
     active: bool,
@@ -210,6 +213,37 @@ impl BendRelief {
 /// Corner features' settings on a definition body's vertices.
 fn corner_overrides(st: &CtxState, q: &QueryCx, b: usize, model: &CornerRelief) -> BTreeMap<usize, CornerRelief> {
     (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| sm_attribute(st, &q.to_ref(&Ent::Vertex(b, v)), "CORNER").map(|a| (v, CornerRelief::of_corner(&a, model)))).collect()
+}
+
+/// Where each definition face comes in Parasolid's face order of the feature
+/// that made it (live "fs (10-24 12:00)": an extrusion lists the first sketch
+/// edge's side, the start cap, the end cap, then the other sides). A face
+/// offset or generated from another (Convert) ranks as its source.
+fn creation_ranks(st: &CtxState, b: usize) -> Vec<Option<(crate::reference::FeatureId, u32)>> {
+    use crate::reference::{Role, Source, TopoName};
+    fn rank(st: &CtxState, n: &TopoName) -> Option<(crate::reference::FeatureId, u32)> {
+        match n {
+            TopoName::Split { parent, .. } => rank(st, parent),
+            TopoName::Face { role: Role::Offset(src) | Role::Generated(src), .. } => rank(st, src),
+            TopoName::Face { feature, role: Role::CapStart(_) } => Some((*feature, 1)),
+            TopoName::Face { feature, role: Role::CapEnd(_) } => Some((*feature, 2)),
+            TopoName::Face { feature, role: Role::Side(Source::Sketch { sketch, entity, segment }) } => {
+                let first = st.ctx.sketches.iter().find(|s| s.feature == *sketch).and_then(|s| s.sketch.entities().filter(|e| !e.construction && e.kind().is_curve()).map(|e| e.id.0).min());
+                Some((*feature, if Some(*entity) == first && *segment == 0 { 0 } else { 3 + *entity * 64 + *segment as u32 }))
+            }
+            _ => None,
+        }
+    }
+    st.ctx.bodies[b].faces.iter().map(|n| rank(st, n)).collect()
+}
+
+/// Whether definition face `a` was made before `b` (by its creation rank within
+/// one feature, else by face order).
+fn created_before(def: &Definition, a: usize, b: usize) -> bool {
+    match (def.created.get(a).copied().flatten(), def.created.get(b).copied().flatten()) {
+        (Some((fa, ra)), Some((fb, rb))) if fa == fb => ra < rb,
+        _ => a < b,
+    }
 }
 
 /// Bend relief features' settings on a definition body's vertices.
@@ -1233,7 +1267,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     forms.extend(form_tools(&st, &wall, f, &mut tool_ids));
                 }
             }
-            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous });
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), created: creation_ranks(&st, b), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -1500,7 +1534,8 @@ fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
     let Some(style) = def.rip_styles.get(&e) else { return def.clearance };
     let walls = &topo.edge_faces[e];
     let Some(other) = walls.iter().map(|x| *x as usize).find(|x| *x != f) else { return def.clearance };
-    let first = f.min(other);
+    // Butt joint Direction 1 extends the wall made first (live "fs (10-24 09:30)").
+    let first = if created_before(def, f, other) { f } else { other };
     let through = if style == "BUTT2" { first != f } else { first == f };
     let (s, t) = topo.edge_ends[e];
     let dir = (t - s).normalize_or_zero();
@@ -1765,7 +1800,7 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
             let body = &st.ctx.bodies[b];
             let (bends, rips, rolled, rip_styles) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), created: creation_ranks(&st, b), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };
