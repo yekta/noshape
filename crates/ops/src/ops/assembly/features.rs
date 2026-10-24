@@ -8,7 +8,6 @@ use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, assembly as sa, doc, refs};
 use noshape_model::assembly::eval::SolveOptions;
 use noshape_model::assembly::{AsmMateConnector, InstanceSource, MateId, RelationType};
-use noshape_model::configuration::ConfigValues;
 use noshape_model::document::TabContent;
 use noshape_model::reference::Reference;
 use noshape_units::ExprValue;
@@ -238,7 +237,7 @@ fn replace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let asm = assembly(od, tab)?.clone();
     let id = find_instance(&asm, a.str("instance")?, "instance")?;
     let src = doc::find_tab(od.doc(), a.str("source")?).map_err(|e| e.with_param("source"))?;
-    let config = ConfigValues(a.object("configuration")?.map(|m| m.iter().map(|(k, v)| (k.clone(), v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))).collect()).unwrap_or_default());
+    let config = crate::ops::config_arg(a)?;
     let src_name = od.doc().tab(src).map(|t| t.name.clone()).unwrap_or_default();
     let before = solve(od, tab, &SolveOptions::default())?;
     let (source, base, studio) = match od.doc().tab(src).map(|t| &t.content) {

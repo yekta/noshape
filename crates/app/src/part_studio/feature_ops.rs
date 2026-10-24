@@ -48,7 +48,7 @@ impl PartStudioView {
 
     pub(super) fn dissolve_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Remove folder", cx, |ps| ps.dissolve_folder(folder));
+            doc.edit_studio(self.tab, noshape_ops::studio::UNPACK_FOLDER_DESCRIPTION, cx, |ps| ps.dissolve_folder(folder));
         });
     }
 
@@ -89,11 +89,7 @@ impl PartStudioView {
                 this.folder_renaming = None;
                 if !v.is_empty() {
                     this.doc.update(cx, |doc, cx| {
-                        doc.edit_studio(this.tab, &format!("Rename folder : {v}"), cx, |ps| {
-                            if let Some(f) = ps.folder_mut(folder) {
-                                f.name = v;
-                            }
-                        });
+                        doc.edit_studio(this.tab, &noshape_ops::studio::rename_folder_description(&v), cx, |ps| noshape_ops::studio::rename_folder(ps, folder, &v));
                     });
                 }
                 cx.notify();

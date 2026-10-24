@@ -910,7 +910,7 @@ impl DrawingEditor {
         let ed = cx.entity();
         let locked = self.drawing.props.locked;
         let dwt = Button::new("dp-dwt").ghost().small().w(px(25.)).h(px(25.)).p_0().border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(0.)).child(crate::assets::icon(&crate::assets::icon_path("dwt-template"), 20., cx)).tooltip("Select a DWT").os_dropdown_menu("dp-dwt-dd", true, move |mut m, _, _| {
-            for row in crate::drawing_create::template_rows() {
+            for row in noshape_ops::drawing::template_rows() {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(row.file).on_click(move |_, _, cx| {
                     e.update(cx, |t, cx| {
