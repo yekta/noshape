@@ -828,6 +828,9 @@ pub struct Assembly {
     pub position_drivers: Vec<(MateId, u8)>,
     #[serde(default)]
     pub exploded_views: Vec<ExplodedView>,
+    /// Named views (camera menu "Named views…", Shift+V), as in a Part Studio.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub named_views: Vec<crate::partstudio::NamedView>,
     /// Assembly mate connector features.
     #[serde(default)]
     pub connectors: Vec<AsmMateConnector>,

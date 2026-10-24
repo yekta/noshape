@@ -189,7 +189,7 @@ impl SelectItemPanel {
             }),
         ];
         let picked = source_of(split_value(&value).0);
-        let focused = (matches!(mode, PanelMode::Reference(ReferenceKind::PartStudio)) && !picked.is_empty()).then_some(picked);
+        let focused = (matches!(mode, PanelMode::Reference(ReferenceKind::PartStudio)) && picked_studio_exists(&picked, &sources)).then_some(picked);
         let current = doc_path.as_deref().and_then(document_versions).map(|(name, versions)| VersionedDoc { path: doc_path.clone().unwrap_or_default(), name, versions, version: None, changes: 0, sources: None });
         SelectItemPanel {
             mode,
@@ -916,6 +916,14 @@ impl SelectItemPanel {
 }
 
 /// The studio a value (`key` or `key#part`, `ext:mv|tab#part|path`) is about.
+/// The picked studio is shown alone only if it still exists (another
+/// document's studio counts); a missing one ("Missing Part Studio") opens
+/// the whole list instead of an empty "No Part Studios available." (qa4
+/// round 4 S4-c).
+fn picked_studio_exists(picked: &str, sources: &[RefSource]) -> bool {
+    !picked.is_empty() && (picked.starts_with("ext:") || sources.iter().any(|s| s.tab == picked))
+}
+
 fn source_of(base: &str) -> String {
     match base.strip_prefix("ext:") {
         Some(rest) => {
@@ -1100,5 +1108,20 @@ impl Render for SelectItemPanel {
                         .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(SelectItemEvent::ImportFile))),
                 )
             })
+    }
+}
+
+#[cfg(test)]
+mod picked_tests {
+    use super::*;
+
+    #[::core::prelude::v1::test]
+    fn a_missing_studio_opens_the_whole_list() {
+        let src = |tab: &str| RefSource { tab: tab.into(), name: tab.into(), what: RefSourceKind::PartStudio(Vec::new()), configuration: None };
+        let sources = vec![src("abc")];
+        assert!(picked_studio_exists("abc", &sources));
+        assert!(!picked_studio_exists("Part Studio 1", &sources));
+        assert!(!picked_studio_exists("", &sources));
+        assert!(picked_studio_exists("ext:x|t|/p.noshape", &sources));
     }
 }
