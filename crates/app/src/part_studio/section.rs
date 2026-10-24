@@ -432,6 +432,21 @@ impl PartStudioView {
     }
 }
 
+impl PartStudioView {
+    /// `NOSHAPE_PERF_SECTION=1` (benchmarks, perf.yml variants): a section
+    /// by a horizontal plane through the middle of the parts, once they are
+    /// there.
+    pub(super) fn bench_section(&mut self, cx: &mut Context<Self>) {
+        if !self.ui.section.is_empty() || std::env::var_os("NOSHAPE_PERF_SECTION").is_none() {
+            return;
+        }
+        let Some((lo, hi)) = self.fit_bounds() else { return };
+        self.ui.section.push(plane("Top plane", (lo + hi) * 0.5, DVec3::Z));
+        self.opts.section = self.ui.section.iter().map(|p| p.clip()).collect();
+        self.refresh_scene(true, cx);
+    }
+}
+
 /// Parameter name marking the section arrow among the manipulators.
 pub(super) const SECTION_PARAM: &str = "__section";
 

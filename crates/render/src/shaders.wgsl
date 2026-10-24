@@ -171,7 +171,9 @@ fn oct_decode(e: vec2<f32>) -> vec3<f32> {
 }
 
 struct MeshOut {
-    @builtin(position) pos: vec4<f32>,
+    // Invariant: the depth pre-pass and the depth-equal shading pass
+    // (renderer `mesh_depth` / `mesh_equal`) must get the same depth.
+    @builtin(position) @invariant pos: vec4<f32>,
     @location(0) world: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) @interpolate(flat) pick: u32,
@@ -358,6 +360,15 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
 fn fs_mesh(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     return mesh_color(i, front);
+}
+
+// The depth pre-pass of meshes with hidden or clipped faces (renderer
+// `mesh_depth`): `mesh_color`'s discarding test alone, no color.
+@fragment
+fn fs_mesh_depth(i: MeshOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    if ((state_of(i.pick) & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return vec4(0.0);
 }
 
 // `fs_mesh` for meshes nothing hides or clips (renderer `DrawLists::solid`):

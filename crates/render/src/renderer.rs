@@ -1156,8 +1156,21 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
             draw(pass, &lists.back_silhouettes, &pipelines.mesh_backsil);
         }
         let mut start = 0;
+        let prepass = !perf_overrides().no_prepass;
         for &(end, solid) in &lists.opaque_runs {
-            draw(pass, &lists.opaque[start..end], if solid { &pipelines.mesh_solid } else { &pipelines.mesh_opaque });
+            let run = &lists.opaque[start..end];
+            if solid {
+                draw(pass, run, &pipelines.mesh_solid);
+            } else if prepass {
+                // Hidden faces or section clipping: their depth first (the
+                // discarding test alone), then shaded where the depth is
+                // theirs, without discarding, so each visible fragment is
+                // shaded once.
+                draw(pass, run, &pipelines.mesh_depth);
+                draw(pass, run, &pipelines.mesh_equal);
+            } else {
+                draw(pass, run, &pipelines.mesh_opaque);
+            }
             start = end;
         }
         if after {
@@ -1207,7 +1220,9 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
 /// `silhouettes`: the edge silhouettes alone, `ao`: ambient occlusion),
 /// `instancing` draws every copy with its own call and its own buffers, see
 /// [`instancing_disabled`]; `solid` draws every opaque face with the
-/// discarding pipeline, see [`DrawLists::solid`]). Unset in normal use.
+/// discarding pipeline, see [`DrawLists::solid`]; `prepass` draws the
+/// discarding ones without their depth pre-pass, see `mesh_depth`). Unset
+/// in normal use.
 struct PerfOverrides {
     msaa: Option<u32>,
     skip_lines: bool,
@@ -1215,6 +1230,7 @@ struct PerfOverrides {
     skip_instancing: bool,
     skip_backsil: bool,
     no_solid: bool,
+    no_prepass: bool,
     skip_silhouettes: bool,
     skip_ao: bool,
 }
@@ -1237,6 +1253,7 @@ fn perf_overrides() -> &'static PerfOverrides {
             skip_instancing: skip.contains("instancing"),
             skip_backsil: skip.split(',').any(|t| t == "backsil"),
             no_solid: skip.split(',').any(|t| t == "solid"),
+            no_prepass: skip.split(',').any(|t| t == "prepass"),
             skip_silhouettes: skip.split(',').any(|t| t == "silhouettes"),
             skip_ao: skip.split(',').any(|t| t == "ao"),
         }
@@ -1447,6 +1464,10 @@ struct Pipelines {
     mesh_backsil: wgpu::RenderPipeline,
     /// `mesh_opaque` without `discard` ([`DrawLists::solid`] meshes).
     mesh_solid: wgpu::RenderPipeline,
+    /// The other opaque meshes: their depth alone (`fs_mesh_depth`, no color
+    /// writes), then shaded where the depth is equal (`fs_mesh_solid`).
+    mesh_depth: wgpu::RenderPipeline,
+    mesh_equal: wgpu::RenderPipeline,
     point_hidden: wgpu::RenderPipeline,
     mesh_pick: wgpu::RenderPipeline,
     mesh_pick_transparent: wgpu::RenderPipeline,
@@ -2031,6 +2052,12 @@ impl Renderer {
             background: make(P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }),
             mesh_opaque: make(P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
             mesh_solid: make(P { label: "mesh-solid", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }),
+            mesh_depth: make_full(
+                layout,
+                P { label: "mesh-depth", vs: "vs_mesh", fs: "fs_mesh_depth", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa },
+                Extra { writes: wgpu::ColorWrites::empty(), cull: None },
+            ),
+            mesh_equal: make(P { label: "mesh-equal", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Equal)), bias: face, samples: msaa }),
             mesh_outline: make(P { label: "mesh-outline", vs: "vs_outline", fs: "fs_outline", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: None, depth: Some((false, ge)), bias: face, samples: msaa }),
             mesh_outline_depth: make_full(
                 layout,

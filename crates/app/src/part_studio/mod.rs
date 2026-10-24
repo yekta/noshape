@@ -762,6 +762,7 @@ impl PartStudioView {
                 vp.request_redraw(cx);
             });
         }
+        self.bench_section(cx);
         cx.notify();
     }
 

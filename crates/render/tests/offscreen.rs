@@ -1370,8 +1370,9 @@ fn label_quads_and_shadows_follow_gpui() {
 }
 
 /// Faces nothing hides or clips are drawn by the discard-free pipeline
-/// (`mesh-solid`); the same parts drawn by the discarding one (a hidden
-/// pick id the mesh doesn't use moves it there) give the same pixels.
+/// (`mesh-solid`); the same parts drawn the other way (a hidden pick id
+/// the mesh doesn't use moves it there: depth pre-pass, then shaded where
+/// the depth is equal) give the same pixels.
 #[test]
 fn faces_without_discard_match_the_discarding_pipeline() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
