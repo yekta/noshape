@@ -296,6 +296,17 @@ def main():
         w, h = c1["viewport"]
         want = 3 * 360 * 200 / math.hypot(w, h)
         ch.check("right-drag", "turn (deg) for 200 px", angle(c0["camera"]["forward"], c1["camera"]["forward"]), want, 0.5)
+    # The rotate centre (the geometry under the pointer at the press, else the
+    # visible-depth average) stays put on screen while the view turns.
+    pivots = [r["data"]["pivot"] for r in by.get("right-drag", []) if r.get("input") == "pivot" and r["data"].get("pivot")]
+    if c0 and c1 and pivots:
+        def screen(p, cam):
+            c, (w, h) = cam["camera"], cam["viewport"]
+            d = [p[i] - c["target"][i] for i in range(3)]
+            wpp = c["world_per_pixel"]
+            return (sum(d[i] * c["right"][i] for i in range(3)) / wpp + w / 2, -sum(d[i] * c["up"][i] for i in range(3)) / wpp + h / 2)
+        a0, a1 = screen(pivots[-1], c0), screen(pivots[-1], c1)
+        ch.check("right-drag", "rotate centre moved on screen (px)", math.dist(a0, a1), 0.0, 0.01)
     c0, c1 = first_last("right-drag-fling")
     if c0 and c1:
         w, h = c1["viewport"]
@@ -305,25 +316,21 @@ def main():
         # Constrained rotate: the view is first levelled (snapped, or animated
         # while drag moves are ignored), which tags it; only moves after that
         # turn it about world Z, 3 turns per diagonal (Onshape onDrag
-        # isAxisRotating, axisRotateCanvasTag).
-        recs = by["alt-right-drag"]
-        level_at, last_at, cams = None, None, []
-        for r in recs[1:]:
-            if r.get("input") == "mouse_move":
-                last_at = r["data"]["at"]
-            elif "camera" in r:
-                if level_at is None and abs(r["camera"]["right"][2]) < 1e-9:
-                    level_at = last_at
-                    cams.append(r)
-                elif level_at is not None:
-                    cams.append(r)
-        if level_at and len(cams) > 1 and last_at:
-            c0, c1 = cams[0], cams[-1]
+        # isAxisRotating, axisRotateCanvasTag). How many of the 10 px moves
+        # fall after the levelling depends on timing, so the check is that the
+        # turn is a whole number of moves, about Z, with the view level.
+        cams = [r for r in by["alt-right-drag"][1:] if "camera" in r]
+        level = [r for r in cams if abs(r["camera"]["right"][2]) < 1e-9]
+        if level:
+            c0, c1 = level[0], cams[-1]
             w, h = c1["viewport"]
             az = lambda f: math.degrees(math.atan2(f[1], f[0]))  # noqa: E731
             turn = (az(c1["camera"]["forward"]) - az(c0["camera"]["forward"])) % 360
-            moved = abs(last_at[0] - level_at[0])
-            ch.check("alt-right-drag", f"turn about world Z (deg) for {moved:.0f} px after levelling", min(turn, 360 - turn), 3 * 360 * moved / math.hypot(w, h), 0.5)
+            turn = min(turn, 360 - turn)
+            per_move = 3 * 360 * 10 / math.hypot(w, h)
+            k = round(turn / per_move)
+            ch.check("alt-right-drag", "turn = whole 10 px moves at 3 turns/diagonal (deg)", turn, k * per_move, 0.01)
+            ch.note("alt-right-drag", "moves that turned the levelled view", k)
             el = lambda c: math.degrees(math.asin(c["camera"]["forward"][2]))  # noqa: E731
             ch.check("alt-right-drag", "elevation change after levelling (deg)", abs(el(c1) - el(c0)), 0.0, 0.01)
             ch.check("alt-right-drag", "right vector stays horizontal", abs(c1["camera"]["right"][2]), 0.0, 1e-9)
@@ -348,6 +355,18 @@ def main():
     c0, c1 = first_last("touch-roll")
     if c0 and c1:
         ch.check("touch-roll", "roll (deg) for a 30 deg finger turn", angle(c0["camera"]["up"], c1["camera"]["up"]), 30.0, 1.0)
+    # Taps and the two-finger long press (Onshape's tap recognizer): what the
+    # recognizer reported, and that the camera did not move.
+    for name, want in (("touch-tap", "fingers: 1"), ("touch-two-finger-tap", "fingers: 2"), ("touch-long-press", "BoxStart")):
+        if name not in by:
+            continue
+        actions = [r["data"]["debug"] for r in by[name] if r.get("input") == "touch_action"]
+        ch.check(name, f"recognized ({want})", float(any(want in x for x in actions)), 1.0, 0)
+        if want.startswith("fingers"):
+            ch.check(name, "one tap", float(sum("Tap" in x for x in actions)), 1.0, 0)
+        cams = [r for r in by[name] if "camera" in r]
+        ch.check(name, "camera unchanged", float(len(cams)), 0.0, 0)
+        ch.note(name, "actions", "; ".join(actions))
     ch.report(a.verbose)
     sys.exit(1 if ch.failed else 0)
 

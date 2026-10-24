@@ -79,7 +79,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 |---|---|---|---|
 | 1.1 | Right-drag: 3D rotate, free (about the camera's own up/right axes, not a turntable) | help table; `onDrag` ROTATE | ✅ L: 200 px → 111.6066° = 3 turns per canvas diagonal; R: 133.127° for 200 px, exact |
 | 1.2 | Rotation speed: 3 full turns per viewport diagonal | `ROTATION_CYCLES_PER_SCREEN` | ✅ L, R, U `drag_rotate_rate_matches_live` |
-| 1.3 | Rotate centre: the geometry under the cursor; else the average of ~2000 visible-depth samples (planes excluded, ≥ 4 hits); else the same with the planes' depth (only planes visible); else the model centre when it fits the view; else the cursor ray at the model's depth | `getRotateCenterForCanvasLocation`, `getRotateCenterBasedOnWindowDepths({includePlanes})`, `DepthSamplingPass` | 🔧 (render worker draws two ~2000 px sample passes, without and with plane depth, true depth without the pick bias, read back off the UI thread at the press) |
+| 1.3 | Rotate centre: the geometry under the cursor; else the average of ~2000 visible-depth samples (planes excluded, ≥ 4 hits); else the same with the planes' depth (only planes visible); else the model centre when it fits the view; else the cursor ray at the model's depth | `getRotateCenterForCanvasLocation`, `getRotateCenterBasedOnWindowDepths({includePlanes})`, `DepthSamplingPass` | ✅ fixed 10-24: moves wait for the visible-depth centre (Onshape finds it before rotating; ours comes back from the render worker a frame or two later), then apply about it; R: the centre stays put on screen (< 0.01 px) on Wayland and X11 |
 | 1.4 | Rotation inertia: speed averaged per step, continues if released within 50 ms, decays ×0.77 per 60 Hz frame (time based), stops under 1 px/step | `performStopRotationAnimation` | ✅ L (client code: speed ½(speed+Δ), ×0.77 per 16.67 ms, > 1 px) = U `inertia_decays_like_onshape`; R: no coast under 20 fps, as Onshape |
 | 1.5 | Alt+right-drag: constrained rotate (horizontal = about world Z, vertical = pitch); first animates to the nearest floor-down view (125 ms, 250 ms if over 45°) | help (Windows column); `AXIS_ROTATE` | ✅ fixed 10-24: the levelling event adds no rotation (Onshape `axisRotateCanvasTag`); L 190 px of 200 turn; R: 53.2507° for 80 px after levelling, elevation and right.z unchanged |
 | 1.6 | Ctrl+right-drag: 2D pan | help table | ✅ |
@@ -175,14 +175,14 @@ Wayland (`wl_touch`). Gestures are `touch.rs` (Onshape's recognizers).
 
 | # | Behaviour | Source | Status |
 |---|---|---|---|
-| 7.1 | One-finger tap selects; double tap clears the selection / edits the feature under it (a double click) | help; `onTap` | 🔧 |
+| 7.1 | One-finger tap selects; double tap clears the selection / edits the feature under it (a double click) | help; `onTap` | ✅ L: a tap selects like a left click; R: Tap (1 finger) → click |
 | 7.2 | One-finger drag: 3D rotate (2 turns per diagonal, 2 px slop), inertia on release; on a tool's draggable geometry it drags it | help; `POINTER_ROTATION_CYCLES_PER_SCREEN`, single-pointer drag | ✅ L: 70.6841° = 190 px × 2 turns/diagonal (the first move only crosses the threshold); R: 84.31° = 190 px |
-| 7.3 | Two-finger tap: context menu | help | 🔧 |
-| 7.4 | Two-finger long press (750 ms, fingers within 10 px): box selection between the fingers (window), blocks other gestures | help; `TWO_POINTER_DELAYED_DRAG` | 🔧 |
+| 7.3 | Two-finger tap: context menu | help | ✅ L: two-finger tap opens the context menu; R: Tap (2 fingers) → context menu |
+| 7.4 | Two-finger long press (750 ms, fingers within 10 px): box selection between the fingers (window), blocks other gestures | help; `TWO_POINTER_DELAYED_DRAG` | ✅ L: 750 ms hold → box between the fingers, camera still; R: BoxStart … BoxStop, camera unchanged |
 | 7.5 | Two-finger drag pans (skipped when the fingers move very differently) | help; pan recognizer | ✅ L exact; R: 150 px move → 149.99 px |
 | 7.6 | Pinch zooms by the finger ratio about their centre (centre still within 15 px, turn under 10°) | help; pinch recognizer | ✅ L ×2.000000; R ×2.00004 |
 | 7.7 | Two-finger rotate rolls the view about the fingers' centre | help; `rotateAboutCanvasPoint` | ✅ L 30.0000°; R 29.993° |
-| 7.8 | Taps: lifted within 200 ms; reported 200 ms after the last (double tap); fingers overlapping in time are one multi-finger tap | tap recognizer | 🔧 |
+| 7.8 | Taps: lifted within 200 ms; reported 200 ms after the last (double tap); fingers overlapping in time are one multi-finger tap | tap recognizer | ✅ fixed 10-24: a tap is reported 200 ms after the lift even while the long-press timer runs (it waited 750 ms after the touch); R |
 | 7.9 | Touches on overlays above the graphics area (view cube, dialogs) stay normal taps | — | 🔧 (only touches starting on the viewport's own topmost hitbox are claimed) |
 | 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | 🔧 Windows; ⏳ Linux (tablet pens arrive as pointer devices) |
 | 7.11 | Trimetric / plane views from the view cube menu, 3D Rotate Lock | help (mobile apps) | ❌ mobile apps only |
@@ -224,8 +224,9 @@ drives the app through the kernel: a uinput mouse, keyboard, clickpad and touch 
 libinput in a headless sway, the app on Wayland or on X11 through Xwayland. `check.py`
 recomputes every expected number independently (Chromium's rules on the WAYLAND_DEBUG protocol
 log or on the posted events, Onshape's formulas) and compares each camera change.
-Local run (main a40ad0ea + nav2): **Wayland 468/468, X11 240/240 checks pass** (wheel notches and
-120ths, Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch out/in,
-right-drag, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll). macOS (CGEvent scroll with
+Local run 10-24 22:50: **Wayland 477/477, X11 249/249 checks pass** (wheel notches and 120ths,
+Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch out/in, right-drag
+with its rotate centre fixed on screen, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll,
+tap, two-finger tap, two-finger long press). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
 phases and momentum, drags) and Windows (SendInput wheel, InjectTouchInput touch, drags) run in
 `.github/workflows/nav.yml`.

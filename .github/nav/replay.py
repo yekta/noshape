@@ -47,7 +47,17 @@ class Replay:
             cams = [r for r in read_trace(self.trace) if "camera" in r and min(r["viewport"]) > 100]
             if cams:
                 self.origin, self.size = cams[-1]["origin"], cams[-1]["viewport"]
-                time.sleep(8)
+                # Let loading finish: no camera change (a late zoom to fit)
+                # for 3 s.
+                still = time.time()
+                count = len(read_trace(self.trace))
+                while time.time() - still < 3 and time.time() < end:
+                    time.sleep(0.5)
+                    n = len(read_trace(self.trace))
+                    if n != count:
+                        count, still = n, time.time()
+                cams = [r for r in read_trace(self.trace) if "camera" in r and min(r["viewport"]) > 100]
+                self.origin, self.size = cams[-1]["origin"], cams[-1]["viewport"]
                 return
             # The viewport only traces a camera once it changes: nudge it
             # with a zero-sum wheel away from any panel.
@@ -129,6 +139,29 @@ class Replay:
             time.sleep(1.2)  # inertia
         return run
 
+    def tap(self, fingers_px, hold=0.08):
+        """Touch the screen with the fingers {slot: window px} for `hold` s."""
+        def run():
+            self.screen.frame({k: (x * 10.0, y * 10.0) for k, (x, y) in fingers_px.items()})
+            time.sleep(hold)
+            self.screen.frame({})
+            time.sleep(0.8)  # the tap is reported 200 ms after the last one
+        return run
+
+    def long_press(self, a, b, hold=0.9, move=120):
+        """Two fingers held still, then the second one moved: a box selection."""
+        def run():
+            to = lambda p: (p[0] * 10.0, p[1] * 10.0)  # noqa: E731
+            self.screen.frame({0: to(a), 1: to(b)})
+            time.sleep(hold)
+            for i in range(1, 13):
+                self.screen.frame({0: to(a), 1: to((b[0] + move * i / 12, b[1]))})
+                time.sleep(0.016)
+            time.sleep(0.2)
+            self.screen.frame({})
+            time.sleep(0.5)
+        return run
+
     def drag(self, button, dx, dy, steps=20, pause=0.1):
         def run():
             self.cursor(*self.screen_point())
@@ -170,6 +203,10 @@ class Replay:
         self.step("touch-pinch", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] - 100, c[1]), 1: (c[0] + 100, c[1])}))
         self.step("touch-roll", self.touch({0: (c[0] - 80, c[1]), 1: (c[0] + 80, c[1])},
                                            {0: (c[0] - 80 * 0.866, c[1] - 80 * 0.5), 1: (c[0] + 80 * 0.866, c[1] + 80 * 0.5)}, steps=15))
+        self.step("touch-tap", self.tap({0: c}))
+        self.step("touch-long-press", self.long_press((c[0] - 60, c[1] - 40), (c[0] + 60, c[1] + 40)))
+        # Last: it opens the context menu, which covers the viewport.
+        self.step("touch-two-finger-tap", self.tap({0: (c[0] - 40, c[1]), 1: (c[0] + 40, c[1])}))
         for d in (self.mouse, self.keys, self.pad, self.screen):
             d.close()
 

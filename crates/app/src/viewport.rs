@@ -115,6 +115,18 @@ struct CameraAnimation {
     duration: Duration,
 }
 
+/// A rotate move waiting for the rotate centre ([`Viewport::pending_rotate`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PendingRotate {
+    Mouse,
+    Touch,
+    Axis,
+}
+
+/// Moves held for the rotate centre before they are applied about the
+/// fallback centre (the samples normally land within a frame or two).
+const MAX_PENDING_ROTATE: usize = 30;
+
 /// See [`Viewport::axis_tag`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AxisTag {
@@ -258,6 +270,13 @@ pub struct Viewport {
     depth_pivot: Option<(u64, Option<DVec3>)>,
     depth_pivot_asked: Option<u64>,
     pivot_awaits_depth: bool,
+    /// Rotate moves (delta, kind, time) made while the rotate centre waits for the
+    /// visible-depth samples: Onshape finds the centre before rotating
+    /// (`getRotateCenterForCanvasLocation` reads the depths at once), so they
+    /// are applied about it when it lands.
+    pending_rotate: Vec<(DVec2, PendingRotate, Instant)>,
+    /// Since when the release inertia waits for the rotate centre.
+    inertia_held_since: Option<Instant>,
     /// macOS: the pending right press is a Ctrl+left click converted by the
     /// platform (Chrome reports it as a left click with Ctrl, which never
     /// navigates: clicking still opens the context menu, dragging does nothing).
@@ -268,7 +287,8 @@ pub struct Viewport {
     touch: crate::touch::TouchRecognizer,
     touch_ids: std::collections::HashSet<u64>,
     touch_epoch: Instant,
-    touch_tick_scheduled: bool,
+    /// The recognizer deadline a timer is set for (`touch.next_deadline`).
+    touch_tick_at: Option<Duration>,
     touch_drag: TouchDrag,
     /// Rotation speed, last rotate step time, and the post-release inertia
     /// with the time of its last step.
@@ -464,11 +484,13 @@ impl Viewport {
             depth_pivot: None,
             depth_pivot_asked: None,
             pivot_awaits_depth: false,
+            pending_rotate: Vec::new(),
+            inertia_held_since: None,
             ctrl_click_press: false,
             touch: Default::default(),
             touch_ids: Default::default(),
             touch_epoch: Instant::now(),
-            touch_tick_scheduled: false,
+            touch_tick_at: None,
             touch_drag: TouchDrag::None,
             rotation_speed: RotationSpeed::default(),
             last_rotation: None,
@@ -658,9 +680,14 @@ impl Viewport {
 
     /// Animate to `to` over `duration` with Onshape's easing (smootherstep).
     pub fn animate_to_with(&mut self, to: Camera, duration: Duration, cx: &mut Context<Self>) {
+        self.animate_from(to, duration, Instant::now(), cx);
+    }
+
+    /// [`Self::animate_to_with`] as if started at `start` (a held move's time).
+    fn animate_from(&mut self, to: Camera, duration: Duration, start: Instant, cx: &mut Context<Self>) {
         self.inertia = None;
         self.axis_tag = AxisTag::None;
-        self.anim = Some(CameraAnimation { from: self.camera, to, start: Instant::now(), duration });
+        self.anim = Some(CameraAnimation { from: self.camera, to, start, duration });
         self.dirty = true;
         cx.notify();
     }
@@ -836,14 +863,15 @@ impl Viewport {
                 }
                 // A drag that started meanwhile picks the centre up now (the
                 // samples show the view at the press; a world point stays valid).
-                if std::mem::take(&mut self.pivot_awaits_depth)
-                    && self.drag == Drag::Nav
-                    && let Some(p) = pivot
-                {
-                    self.orbit_pivot = Some(p);
-                    if let Some((inertia, _)) = &mut self.inertia {
-                        inertia.pivot = p;
+                if self.pivot_awaits_depth {
+                    if let Some(p) = pivot {
+                        self.orbit_pivot = Some(p);
+                        crate::nav_trace::input("pivot", serde_json::json!({ "depth_samples": true, "pivot": [p.x, p.y, p.z] }));
+                        if let Some((inertia, _)) = &mut self.inertia {
+                            inertia.pivot = p;
+                        }
                     }
+                    self.flush_pending_rotate(cx);
                 }
             }
         }
@@ -1350,6 +1378,10 @@ impl Viewport {
         if nav::needs_new_pivot(prev, mode) {
             let perspective_pan = mode == Mode::Pan && self.camera.projection == noshape_render::Projection::Perspective;
             self.orbit_pivot = (mode != Mode::Pan || perspective_pan).then(|| self.pivot_at(at));
+            if crate::nav_trace::enabled() {
+                let p = self.orbit_pivot.map(|p| [p.x, p.y, p.z]);
+                crate::nav_trace::input("pivot", serde_json::json!({ "mode": format!("{mode:?}"), "at": [at.x, at.y], "pivot": p }));
+            }
         }
         if mode == Mode::Rotate {
             self.last_rotation = Some(Instant::now());
@@ -1405,7 +1437,11 @@ impl Viewport {
         match self.nav_mode {
             Mode::None => return,
             Mode::Rotate => {
-                nav::drag_rotate(&mut self.camera, delta, size, pivot, false);
+                if self.pivot_awaits_depth {
+                    self.hold_rotate(delta, PendingRotate::Mouse, cx);
+                } else {
+                    nav::drag_rotate(&mut self.camera, delta, size, pivot, false);
+                }
                 if let Some(l) = &mut self.rotate_log {
                     l.1 += delta.length();
                 }
@@ -1414,27 +1450,12 @@ impl Viewport {
                 self.axis_tag = AxisTag::None;
             }
             Mode::AxisRotate => {
-                // The view is first levelled to the nearest floor-down view
-                // (snapped, or animated while drags wait), which tags the
-                // canvas; only drag events on a tagged view turn it about
-                // world Z, so the levelling event itself adds no rotation.
-                if self.anim.is_some() {
+                if self.pivot_awaits_depth {
+                    self.hold_rotate(delta, PendingRotate::Axis, cx);
                     return;
                 }
-                if self.axis_tag == AxisTag::Tagged {
-                    nav::drag_axis_rotate(&mut self.camera, delta, size, pivot);
-                } else {
-                    match nav::level_view(&self.camera, pivot) {
-                        (level, None) => {
-                            self.camera = level;
-                            self.axis_tag = AxisTag::Tagged;
-                        }
-                        (level, Some(duration)) => {
-                            self.animate_to_with(level, duration, cx);
-                            self.axis_tag = AxisTag::Levelling;
-                            return;
-                        }
-                    }
+                if !self.axis_rotate_step(delta, Instant::now(), cx) {
+                    return;
                 }
             }
             Mode::Pan => nav::pan(&mut self.camera, delta, size, self.orbit_pivot),
@@ -1444,6 +1465,75 @@ impl Viewport {
                 let bounds = self.zoom_bounds();
                 if amount.abs() < 1e-12 || !nav::zoom_at(&mut self.camera, Zoom::Amount(amount), self.zoom_anchor, size, bounds) {
                     return;
+                }
+            }
+        }
+        self.camera_changed(cx);
+    }
+
+    /// One constrained-rotate drag event (Onshape's `isAxisRotating` branch):
+    /// the view is first levelled to the nearest floor-down view (snapped, or
+    /// animated while drag events are ignored), which tags the canvas; only
+    /// events on a tagged view turn it about world Z, so the levelling event
+    /// itself adds no rotation. Returns whether the camera changed.
+    fn axis_rotate_step(&mut self, delta: DVec2, at: Instant, cx: &mut Context<Self>) -> bool {
+        if let Some(anim) = &self.anim {
+            // Events while the camera animates are ignored; a held event from
+            // after the animation's end finds it finished.
+            if at < anim.start + anim.duration {
+                return false;
+            }
+            self.camera = anim.to;
+            self.anim = None;
+            if self.axis_tag == AxisTag::Levelling {
+                self.axis_tag = AxisTag::Tagged;
+            }
+        }
+        let pivot = self.orbit_pivot.unwrap_or(self.camera.target);
+        if self.axis_tag == AxisTag::Tagged {
+            let size = self.size();
+            nav::drag_axis_rotate(&mut self.camera, delta, size, pivot);
+            return true;
+        }
+        match nav::level_view(&self.camera, pivot) {
+            (level, None) => {
+                self.camera = level;
+                self.axis_tag = AxisTag::Tagged;
+                true
+            }
+            (level, Some(duration)) => {
+                self.animate_from(level, duration, at, cx);
+                self.axis_tag = AxisTag::Levelling;
+                false
+            }
+        }
+    }
+
+    /// Hold a rotate move until the rotate centre is known; give up waiting
+    /// (fallback centre) after [`MAX_PENDING_ROTATE`] moves.
+    fn hold_rotate(&mut self, delta: DVec2, kind: PendingRotate, cx: &mut Context<Self>) {
+        self.pending_rotate.push((delta, kind, Instant::now()));
+        if self.pending_rotate.len() >= MAX_PENDING_ROTATE {
+            self.flush_pending_rotate(cx);
+        }
+    }
+
+    /// Stop waiting for the rotate centre and apply the held moves about the
+    /// current one, in order.
+    fn flush_pending_rotate(&mut self, cx: &mut Context<Self>) {
+        self.pivot_awaits_depth = false;
+        self.inertia_held_since = None;
+        let pending = std::mem::take(&mut self.pending_rotate);
+        if pending.is_empty() {
+            return;
+        }
+        let (size, pivot) = (self.size(), self.orbit_pivot.unwrap_or(self.camera.target));
+        for (d, kind, at) in pending {
+            match kind {
+                PendingRotate::Mouse => nav::drag_rotate(&mut self.camera, d, size, pivot, false),
+                PendingRotate::Touch => nav::drag_rotate(&mut self.camera, d, size, pivot, true),
+                PendingRotate::Axis => {
+                    self.axis_rotate_step(d, at, cx);
                 }
             }
         }
@@ -1547,7 +1637,7 @@ impl Viewport {
                 self.nav_resolver = Some(resolver);
                 self.nav_keys = keys;
                 self.zoom_anchor = self.press_pos;
-                self.pivot_awaits_depth = false;
+                self.flush_pending_rotate(cx);
                 self.set_nav_mode(mode, self.press_pos);
             } else {
                 // Dragging from geometry with no tool is a box select too
@@ -1762,16 +1852,21 @@ impl Viewport {
 
     /// Run the recognizer's timers (tap report, two-finger long press).
     fn schedule_touch_tick(&mut self, cx: &mut Context<Self>) {
-        if self.touch_tick_scheduled {
+        let Some(deadline) = self.touch.next_deadline() else { return };
+        // A timer for this deadline or an earlier one is already set (an
+        // earlier one reschedules when it fires); a two-finger tap's report
+        // (200 ms after the lift) must not wait for the long-press timer.
+        if self.touch_tick_at.is_some_and(|at| at <= deadline) {
             return;
         }
-        let Some(deadline) = self.touch.next_deadline() else { return };
-        self.touch_tick_scheduled = true;
+        self.touch_tick_at = Some(deadline);
         let wait = deadline.saturating_sub(self.touch_epoch.elapsed());
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(wait).await;
             let _ = this.update(cx, |this: &mut Viewport, cx| {
-                this.touch_tick_scheduled = false;
+                if this.touch_tick_at == Some(deadline) {
+                    this.touch_tick_at = None;
+                }
                 let actions = this.touch.tick(this.touch_epoch.elapsed());
                 this.touch_actions(actions, cx);
                 this.schedule_touch_tick(cx);
@@ -1790,6 +1885,9 @@ impl Viewport {
             if self.touch.boxing() && !matches!(action, A::Box { .. } | A::BoxStart { .. } | A::BoxStop) {
                 continue;
             }
+            if crate::nav_trace::enabled() && !matches!(action, A::Drag { .. } | A::Pan { .. } | A::Rotate { .. } | A::Pinch { .. } | A::Box { .. }) {
+                crate::nav_trace::input("touch_action", serde_json::json!({ "debug": format!("{action:?}") }));
+            }
             match action {
                 A::DragStart { at } => {
                     let p = at / s;
@@ -1800,6 +1898,7 @@ impl Viewport {
                         self.drag = Drag::Tool;
                         cx.emit(ViewportEvent::ToolDown { position: p, modifiers: Modifiers::default(), click_count: 1 });
                     } else {
+                        self.flush_pending_rotate(cx);
                         self.touch_drag = TouchDrag::Rotate;
                         self.drag = Drag::Nav;
                         self.nav_mode = Mode::Rotate;
@@ -1813,10 +1912,14 @@ impl Viewport {
                     TouchDrag::Rotate => {
                         let d = delta / s;
                         let pivot = self.orbit_pivot.unwrap_or(self.camera.target);
-                        nav::drag_rotate(&mut self.camera, d, size, pivot, true);
                         self.axis_tag = AxisTag::None;
                         self.rotation_speed.push(d);
                         self.last_rotation = Some(Instant::now());
+                        if self.pivot_awaits_depth {
+                            self.hold_rotate(d, PendingRotate::Touch, cx);
+                            continue;
+                        }
+                        nav::drag_rotate(&mut self.camera, d, size, pivot, true);
                         self.camera_changed(cx);
                     }
                     TouchDrag::None => {}
@@ -2017,7 +2120,20 @@ impl Render for Viewport {
         }
         // Rotation inertia (Onshape's post-rotation animation: ×0.77 per
         // 60 Hz frame until under a pixel per step).
-        if let Some((mut inertia, last)) = self.inertia.take() {
+        if let Some((inertia, _)) = self.inertia
+            && self.pivot_awaits_depth
+        {
+            // The coast starts once the rotate centre is known (or after
+            // 250 ms without it, about the fallback centre).
+            let now = Instant::now();
+            let since = *self.inertia_held_since.get_or_insert(now);
+            self.inertia = Some((inertia, now));
+            if now - since > Duration::from_millis(250) {
+                self.flush_pending_rotate(cx);
+            }
+            window.request_animation_frame();
+        } else if let Some((mut inertia, last)) = self.inertia.take() {
+            self.inertia_held_since = None;
             let now = Instant::now();
             match inertia.step(now - last) {
                 Some(d) => {

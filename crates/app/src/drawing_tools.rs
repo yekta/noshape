@@ -1296,7 +1296,7 @@ impl DrawingEditor {
     pub fn on_scroll(&mut self, e: &ScrollWheelEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let lp = self.local(e.position);
         let reverse = nav::MouseControls::current().reverse_scroll;
-        let Some(amount) = nav::wheel_zoom_amount(e, nav::Platform::current(), reverse) else { return };
+        let Some(amount) = nav::drawing_wheel_zoom_amount(e, nav::Platform::current(), reverse) else { return };
         self.zoom_by(1.0 / nav::zoom_scale(amount), lp, cx);
     }
 

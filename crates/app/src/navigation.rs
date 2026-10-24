@@ -145,6 +145,24 @@ pub fn wheel_zoom_amount(e: &ScrollWheelEvent, platform: Platform, reverse: bool
     browser_wheel_amount(wheel_delta(e, platform), platform, reverse)
 }
 
+/// The drawing editor's wheel zoom (its own `procWheelDelta`, live nav2
+/// drawing wheel): the same law about the pointer, but where `wheelDelta` is 0
+/// it uses −1.2 × the DOM `deltaY` (Chromium's pixel delta, 120 × the ticks
+/// for the sub-unit Linux touchpad deltas that truncate to 0), so those still
+/// zoom a little in a drawing while the Part Studio ignores them.
+pub fn drawing_wheel_zoom_amount(e: &ScrollWheelEvent, platform: Platform, reverse: bool) -> Option<f64> {
+    let mut w = wheel_delta(e, platform);
+    if let Some(t) = e.wheel_ticks {
+        if w.x == 0.0 {
+            w.x = 1.2 * 120.0 * t.x as f64;
+        }
+        if w.y == 0.0 {
+            w.y = 1.2 * 120.0 * t.y as f64;
+        }
+    }
+    browser_wheel_amount(w, platform, reverse)
+}
+
 fn browser_wheel_amount(w: DVec2, platform: Platform, reverse: bool) -> Option<f64> {
     if w.y == 0.0 || (w.x != 0.0 && w.x.abs() > w.y.abs()) {
         return None;
@@ -1157,6 +1175,18 @@ mod tests {
         assert!((amount(&pixels, Platform::Linux) - 120.0 * 0.5 / 120.0).abs() < 1e-12);
         let swapped = wheel(None, ScrollDelta::Lines(point(3.0, 0.0)), true);
         assert_eq!(wheel_zoom_amount(&swapped, Platform::Linux, false), Some(0.5));
+    }
+
+    #[test]
+    fn drawing_wheel_uses_delta_y_when_wheel_delta_is_zero() {
+        let ticks = |y: f32| wheel(Some((0.0, y)), ScrollDelta::Pixels(point(px(0.0), px(0.0))), false);
+        // Wayland finger scroll of 0.05 units: wheelDelta trunc(0.6) = 0 →
+        // the Part Studio ignores it, the drawing zooms by 1.2 × 0.6.
+        let e = ticks(0.05 * 12.0 / 120.0);
+        assert_eq!(wheel_zoom_amount(&e, Platform::Linux, false), None);
+        assert!((drawing_wheel_zoom_amount(&e, Platform::Linux, false).unwrap() - 0.5 / 120.0 * 1.2 * 0.6).abs() < 1e-9);
+        // Whole wheelDelta values: the same as the Part Studio.
+        assert_eq!(drawing_wheel_zoom_amount(&ticks(1.0), Platform::Windows, false), Some(1.5));
     }
 
     #[test]
