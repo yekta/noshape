@@ -97,6 +97,8 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     let mut lk: Vec<Option<CadLayer>> = (0..g.lines.len()).map(|i| cad_of(&g.cad, 0, i)).collect();
     let mut fk: Vec<Option<CadLayer>> = (0..g.fills.len()).map(|i| cad_of(&g.cad, 2, i)).collect();
     let mut tk: Vec<Option<CadLayer>> = Vec::new();
+    // Text styles of the kept texts (exploded text has none).
+    let mut ts: Vec<Option<super::cad_layers::CadTextStyle>> = Vec::new();
     // CAD objects (dimensions) per element, kept the same way.
     let (mut lo, text_obj, mut fo) = g.cad_members_of();
     let mut to: Vec<Option<usize>> = Vec::new();
@@ -123,6 +125,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             tc.push(c);
             tl.push(layer);
             tk.push(kind);
+            ts.push(g.cad_text_style(i));
             to.push(obj);
             tf.push(g.text_font(i).cloned());
             continue;
@@ -168,6 +171,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         filter(&mut lk, &keep_l);
         filter(&mut fk, &keep_f);
         filter(&mut tk, &keep_t);
+        filter(&mut ts, &keep_t);
         lo.resize(keep_l.len(), None);
         filter(&mut lo, &keep_l);
         filter(&mut fo, &keep_f);
@@ -198,6 +202,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     out.cad = lk.iter().enumerate().filter_map(|(i, l)| span(i, l, 0)).chain(tk.iter().enumerate().filter_map(|(i, l)| span(i, l, 1))).chain(fk.iter().enumerate().filter_map(|(i, l)| span(i, l, 2))).collect();
     let member = |i: usize, o: &Option<usize>, k: u8| o.map(|obj| super::cad_objects::CadMember { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, obj });
     out.cad_members = lo.iter().enumerate().filter_map(|(i, o)| member(i, o, 0)).chain(to.iter().enumerate().filter_map(|(i, o)| member(i, o, 1))).chain(fo.iter().enumerate().filter_map(|(i, o)| member(i, o, 2))).collect();
+    out.cad_text_styles = ts.into_iter().enumerate().filter_map(|(i, s)| s.map(|style| super::cad_layers::CadTextStyleSpan { texts: i..i + 1, style })).collect();
     out.fonts = tf.into_iter().enumerate().filter_map(|(i, f)| f.map(|font| FontSpan { texts: i..i + 1, font })).collect();
     out
 }
@@ -319,6 +324,15 @@ pub fn to_svg(g: &SheetGeometry) -> String {
             -t.angle.to_degrees(),
             esc_xml(&t.text)
         );
+    }
+    // Translucent overlays over everything (a release watermark).
+    if !g.overlays.is_empty() {
+        let _ = writeln!(s, r#"<g transform="translate(0 {}) scale(1 -1)" stroke="none">"#, g.height);
+        for (pts, c, a) in &g.overlays {
+            let pts: Vec<String> = pts.iter().map(|p| format!("{:.4},{:.4}", p[0], p[1])).collect();
+            let _ = writeln!(s, r#"<polygon points="{}" fill="{}" fill-opacity="{a:.3}"/>"#, pts.join(" "), hex(Some(*c)));
+        }
+        let _ = writeln!(s, "</g>");
     }
     let _ = writeln!(s, "</svg>");
     s
@@ -591,7 +605,25 @@ fn pdf_content(g: &SheetGeometry) -> String {
             .collect();
         let _ = writeln!(content, "BT /F{} {size:.3} Tf {c:.5} {s:.5} {:.5} {c:.5} {x:.3} {y:.3} Tm ({text}) Tj ET", pdf_font(g.text_font(ti)), -s);
     }
+    // Translucent overlays over everything, each with its opacity's
+    // graphics state (`/Ov<k>`, see [`pdf_overlay_states`]).
+    for (k, (pts, c, _)) in g.overlays.iter().enumerate() {
+        let _ = writeln!(content, "q /Ov{k} gs {} rg", rgb(Some(*c)));
+        for (i, p) in pts.iter().enumerate() {
+            let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
+        }
+        content.push_str("f Q\n");
+    }
     content
+}
+
+/// The page resource naming each overlay's opacity (`/ExtGState`), if any.
+fn pdf_overlay_states(g: &SheetGeometry) -> String {
+    if g.overlays.is_empty() {
+        return String::new();
+    }
+    let states: String = g.overlays.iter().enumerate().map(|(k, (_, _, a))| format!(" /Ov{k} << /ca {a:.3} >>")).collect();
+    format!(" /ExtGState <<{states} >>")
 }
 
 /// Single-page vector PDF.
@@ -635,7 +667,8 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
         let content = draw + pdf_content(g).as_str();
         let (w, h) = (g.width * pt, g.height * pt);
         let xo = if xobjects.is_empty() { String::new() } else { format!(" /XObject <<{xobjects} >>") };
-        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R{fonts} >>{xo} >> /Contents {} 0 R >>", 5 + 2 * i).into_bytes());
+        let gs = pdf_overlay_states(g);
+        objects.push(format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w:.3} {h:.3}] /Resources << /Font << /F1 3 0 R{fonts} >>{xo}{gs} >> /Contents {} 0 R >>", 5 + 2 * i).into_bytes());
         objects.push(format!("<< /Length {} >>\nstream\n{}endstream", content.len(), content).into_bytes());
     }
     for name in &PDF_FONTS[1..] {
@@ -741,6 +774,21 @@ mod tests {
         let s = to_svg(&sample());
         assert!(s.starts_with("<svg") && s.trim_end().ends_with("</svg>"));
         assert!(s.contains("stroke-dasharray"));
+    }
+
+    #[test]
+    fn overlays_draw_over_the_ink_with_their_opacity() {
+        let mut g = sample();
+        g.overlays.push((vec![[10.0, 10.0], [60.0, 10.0], [60.0, 40.0]], [192, 192, 192], 0.25));
+        // The colour mode leaves them as they are.
+        let g = prepare(&g, &ExportOptions { color_mode: 2, ..Default::default() });
+        assert_eq!(g.overlays[0].1, [192, 192, 192]);
+        let svg = to_svg(&g);
+        let at = svg.find(r#"fill-opacity="0.250""#).expect("overlay polygon");
+        assert!(svg.rfind("<text").is_none_or(|t| t < at) && svg.rfind("<polyline").is_none_or(|l| l < at), "after the ink");
+        let pdf = String::from_utf8_lossy(&to_pdf(&g)).to_string();
+        assert!(pdf.contains("/ExtGState << /Ov0 << /ca 0.250 >> >>"));
+        assert!(pdf.find("/Ov0 gs").unwrap() > pdf.rfind(" Tj ET").unwrap(), "after the texts");
     }
 
     #[test]

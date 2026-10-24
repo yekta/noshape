@@ -194,10 +194,10 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 5 | Linear second direction empty | error only when its count > 1: "Select a pattern direction." on directionTwo | always, own text | 🔧 |
 | 6 | Reapply failures | "Could not pattern selected features." when all fail; partial failures silent | first failure's text; partial warning; geometric fallback | 🔧 texts and silent partial failures; the geometric fallback when a feature can't be re-run stays ✗ ? L40 |
 | 7 | Sketch in a feature pattern | re-run, info "Sketch dimensions and constraints using the Origin or the default planes as reference will not be reapplied. Learn more" | skipped | 🔧 L41 the sketch is copied to every instance (with or without Reapply; no part), Reapply adds the info |
-| 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | 🔧 texts; off-part instances still become parts ✗ ? L42, L43 |
+| 8 | Face pattern failures | "Failed to create pattern, check input.", "Pattern could not be created on the same part.", mirror "Failed to create face mirror, check input." | own texts; off-part instances become parts | 🔧 texts; L42 any face-pattern instance off the part fails "Pattern could not be created on the same part." (no part made); L40 a Feature pattern (Reapply off) skips one off-part instance and fails when all are off (text pending from live, ours the same) |
 | 9 | Feature selection in Faces to pattern | a feature-list click adds its faces | not supported | ✅ L44 (live adds nothing either; Hole not verified) |
-| 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | 🔧 except the start-point info ✗ ? L45 |
-| 11 | Limits and infos | "Cannot have more than 2500 instances in a pattern.", parallel directions info, skip-instance infos | missing | 🔧 2500 limit (linear) and parallel info; skip-instance infos ✗ |
+| 10 | Curve pattern | selection checked first; "Select a path to pattern along." on edges; "Edges do not form a continuous path."; distance-too-large text on distance; closed-path rule; start-point info | own texts, no fields | 🔧 incl. the start point: an open path starts at its end nearer the seed, a closed one at its point nearest the seed (path.fs), and a start outside the seed's box gives "For best results ensure that the path start point and pattern seed are touching." ("…the path and pattern seed…" when closed) |
+| 11 | Limits and infos | "Cannot have more than 2500 instances in a pattern.", parallel directions info, skip-instance infos | missing | 🔧 2500 limit (linear), parallel info, skip infos "Original pattern instance will not be skipped." / "Index is outside patterned instance count." (linear, circular, curve) |
 
 ## Hole
 | # | Area | Onshape | Ours | Status |
@@ -213,7 +213,7 @@ Status: ✅ matches, ✗ differs (open), 🔧 fixed on agent/psb, ? live pending
 | 9 | Tapped hole cut | Diameter, tap drill only with a fastener fit | tap drill always | 🔧 L51 (+ fit info bubble) |
 | 10 | Up to next / entity + Offset from tip | the tip ends at entity − offset | the shaft ends there (one tip too deep) | 🔧 L61 apex at the offset, Depth shows 4.092 |
 | 11 | Depth / Tapped depth / Tap clearance | kept consistent by edit logic; inconsistency warning | independent | 🔧 L49/L50 linked in the dialog (no mismatch warning, as live) |
-| 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; L52 "Parameters have been overridden. Check input." when Diameter or Tap drill differ from the standard (not for counterbore / countersink); other infos ✗ |
+| 12 | Infos | overridden parameters, fastener fit < 2 parts, tapped depth readjusted, too many locations (500, on locations) | missing / own text | 🔧 500-location text; L52 "Parameters have been overridden. Check input." when Diameter or Tap drill differ from the standard (not for counterbore / countersink); "Tapped depth readjusted. …" (tapped depth past the hole's depth in the part) and "Counterbore and countersink values are non standard for tapered holes."; the inconsistent-depth warning stays off as live L49/L50 |
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871; source and app checks)
 

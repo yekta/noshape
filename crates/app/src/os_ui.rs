@@ -105,20 +105,15 @@ pub fn danger_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
         .rounded(px(3.))
 }
 
-/// Onshape's gray modal "Cancel" button: `#d7d7d7`, hover `#eeeeee`.
+/// Onshape's gray modal "Cancel" button: `#d7d7d7`, hover `#eeeeee`,
+/// `#333` text. It stays light in the dark theme (live dark/dk-9bb Export
+/// Drawing, dk-999 Properties: `btn-secondary` rgb(215,215,215)).
 pub fn cancel_button(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Button {
-    let pal = p();
+    let (fill, hover, text) = (gpui_kit::rgb_static(CANCEL_FILL), gpui_kit::rgb_static(CANCEL_HOVER), gpui_kit::rgb_static(0x333333));
     Button::new(id)
-        .custom(
-            ButtonCustomVariant::new(cx)
-                .color(rgb(CANCEL_FILL).into())
-                .foreground(pal.text.into())
-                .hover(rgb(CANCEL_HOVER).into())
-                .active(rgb(CANCEL_FILL).into())
-                .shadow(false),
-        )
-        .bg(rgb(CANCEL_FILL))
-        .child(div().text_size(px(14.)).child(label.into()))
+        .custom(ButtonCustomVariant::new(cx).color(fill.into()).foreground(text.into()).hover(hover.into()).active(fill.into()).shadow(false))
+        .bg(fill)
+        .child(div().text_size(px(14.)).text_color(text).child(label.into()))
         .h(px(34.))
         .px(px(11.))
         .rounded(px(3.))
@@ -322,6 +317,13 @@ pub fn param_row_plain(label: impl Into<SharedString>, field: impl IntoElement) 
 /// shows `label` (12 px `#555`); with entries the label shrinks to the top.
 pub fn query_box(id: impl Into<ElementId>, label: impl Into<SharedString>, active: bool, rows: Vec<AnyElement>) -> Stateful<Div> {
     query_box_tip(id, label, None, active, rows)
+}
+
+/// Live's query field carrying the dialog's error (dom/dialog-asm-replicate-*):
+/// filled pink `#f9ebec` with a 1 px `#bd3039` border; the label stays grey.
+pub fn query_box_error(el: Stateful<Div>) -> Stateful<Div> {
+    let pal = p();
+    el.bg(pal.error_fill).border_color(pal.error)
 }
 
 /// [`query_box`] whose label's tooltip is `tip` instead of the label (live:

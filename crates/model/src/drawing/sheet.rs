@@ -123,6 +123,9 @@ pub struct SheetGeometry {
     pub fonts: Vec<FontSpan>,
     /// Colored areas drawn under all the ink (pending revision rows).
     pub backdrops: Vec<(Vec<[f64; 2]>, [u8; 3])>,
+    /// Translucent areas drawn over all the ink (a release watermark):
+    /// outline, colour, opacity. The colour mode leaves them as they are.
+    pub overlays: Vec<(Vec<[f64; 2]>, [u8; 3], f32)>,
     /// Grey areas behind property fields, on screen only (Drawing
     /// properties › Notes › Hide property background turns them off).
     pub field_backdrops: Vec<Vec<[f64; 2]>>,
@@ -134,6 +137,8 @@ pub struct SheetGeometry {
     /// What the elements are, for the DXF / DWG layers (`cad_layers`; last
     /// span wins, untagged ones by style).
     pub cad: Vec<super::cad_layers::CadSpan>,
+    /// Text styles of the DXF / DWG export by kind of text (`cad_layers`).
+    pub cad_text_styles: Vec<super::cad_layers::CadTextStyleSpan>,
     /// Hatched sections, written as HATCH entities by the DXF / DWG export.
     pub hatches: Vec<super::cad_layers::HatchRegion>,
     /// Element groups the DXF / DWG export writes as one object

@@ -63,6 +63,27 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | R1 | Two default planes (or a plane and an edge) selected | parts unchanged (part-studio/81: "Perp planes angle: 90.000 deg" in the status bar only) | parts see-through with dark outlines | ✅ cause: the measure treats a default plane as a 2 000 000 mm face, so its Min/Max dist lines end ±1e6 mm out; those lines counted in the scene bounds, the fitted depth range grew, and the faces' depth bias let edges and silhouettes show through. Measure lines are now left out of the bounds (`Instance::no_bounds`) |
 | MS1 | Measurements of default planes | ? (asked: REQUESTS "ui (10-23 a)") | Top + Front: Perp planes angle 90°, **Area 8e12 mm², Max dist 2 449 490 mm, Min dist 0** | ? |
 
+## 7. Right-side panels (live part-studio/77–78; dom/panel-appearance.txt; measured at 1×)
+
+| # | What | Live | Ours | Status |
+|---|---|---|---|---|
+| RP0 | Panel strip, closed and open | x 1887 (closed) / 1169 (panel open), button rows 471–636 | the same | ✅ matches |
+| RP1 | Appearances: tab row under the title | 4 px top padding: tabs 111–137, rows from 147 | tabs 107–133, rows from 143 | ✅ +4 px |
+| RP2 | Configuration (empty): illustration and help text | ink 252–401; lines 428, 449, 469, 490 (20.8 px) | ink 251–406; lines 434…494 (20 px) | ✅ 154 px illustration, 20.8 px lines (checked 10-23: within 1 px) |
+| RP3 | Custom tables (empty) | ink from 252; lines 428, 449, 470, 491, 511, 532 | ink from 249; lines from 425, 20 px pitch | ✅ +3 px, 20.8 px lines (checked 10-23: within 1 px) |
+| RP4 | Inspection table (empty) | header text 125–134; tool band 154–199 (46 px, full width, 1 px #d7d7d7 line at 198), icons 170–189 from x 1217; illustration ink 304–453 (170 × 149); text from 480 | header 122–131; band 142–177 (36 px, inset), no line; icons 150–169 from 1225; ink 246–359 (128 × 113); text from 389 | ✅ band, header, 172 px illustration (checked 10-23: within 1 px) |
+| RP5 | Variable table (empty) | ink 312–461 (168 × 149); two lines from 488, the second ending in the link **"Learn more about variable tables."** | ink 272–429 (178 × 157); text from 468; no link | ✅ 171 px illustration lower, the link (checked 10-23: within 1 px) |
+| RP6 | Custom tables illustration art | no inner line | an extra vertical line in front of the cube | ✗ icon art (icons2) |
+| RP7 | Help-text width | Flama/Open Sans | our UI font is a little narrower | ✗ app-wide font (VC7) |
+
+## 8. Mass and section properties (live part-studio/80; dom/dialog-mass-properties.txt)
+
+| # | What | Live | Ours | Status |
+|---|---|---|---|---|
+| MP1 | Dialog rows (borders, underlines) | 107, 133, 141–182, 188, 214, 276, 305, 333, 392, 423, 454, 513, 541, 569 | the same, except the empty mate connector field ends at 213 and its text sits 2 px high | ✅ empty field caption 25 px with 2 px top padding |
+| MP2 | Parts to measure prefilled from the selection | Part 1 (red: no material) | the same | ✅ matches |
+| MP3 | Text baselines of the labels | — | within 1–2 px (font metrics) | ✗ app-wide font (VC7) |
+
 ## qa5 re-run pass 21 (2026-10-23, app = target-lead 17:10, main 88fbf8f)
 | Row | Ours | Status |
 |---|---|---|
