@@ -918,6 +918,16 @@ impl AnnotationEnv for Env<'_> {
     fn rotation(&self, view: ViewId) -> f64 {
         self.placements.iter().find(|pl| pl.id == view).map(|pl| pl.rotation).unwrap_or(0.0)
     }
+    fn dual_cad(&self, a: &Annotation, angular: bool) -> Option<super::cad_objects::CadDual> {
+        let p = &self.drawing.props;
+        if angular || !a.format.dual.unwrap_or(p.dual.show) {
+            return None;
+        }
+        let primary = format::length_units(self.drawing, &a.format);
+        let du = p.dual.units_for(!primary.imperial());
+        let post = if p.dual.show_unit && !du.symbol().is_empty() { format!("[] {}", du.symbol()) } else { "[]".to_string() };
+        Some(super::cad_objects::CadDual { factor: primary.meters() / du.meters(), precision: p.dual.precision.unwrap_or(3), post, below: p.dual.dim_location == super::DualLocation::Bottom })
+    }
     fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
         let mut f = a.format.clone();
         f.prefix = self.expand(&f.prefix);
