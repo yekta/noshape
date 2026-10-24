@@ -106,6 +106,21 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | VC7 menu font, KS1 shortcuts pop-out page | not local (app-wide font / new window) | ✗ → ui (qa5-routing.md) |
 | VC8 (live answered, behaviours "qa5 assembly camera menu") | live = Part Studio menu minus "Orient normal to sketch on edit" / "Highlight boundary edges", no "Show mates". qa5: "Show mates" removed, "Section view…" added; the rest needs assembly features (render modes, named / previous views, graphics prefs, zoom to window, high quality) → qa5-routing ui | 🔧 partly / ✗ ui |
 
+## 10. Sheet metal table and flat view (SM4; live "qa5 sm" (8), qa5/sm-091…105, dark/dk-973, behaviours "ui (10-24 a)")
+
+| # | What | Live | Ours (before) | Status |
+|---|---|---|---|---|
+| SM4a | Layout | no title tab, no footer; "Sheet metal context:" + a 220 × 28 select of the models; collapsible "⌄ Bends" and "⌄ Other joints" tables (37 px #eaeaea title rows, 16 px / 500); the flat view under a 9 px row-resize splitter (1 px #d7d7d7, 50 %, tables ≥ 140 px, flat ≥ 210 px, kept as a share) | a "Sheet metal" tab, the part name, a white line drawing, summary rows, a Dir / Angle / Radius / Allow table, Export DXF / SVG buttons | ✅ (grid lines and columns at live's pixels) |
+| SM4b | Bends table | # (60 px, #eaeaea bold) · Name · Radius(mm) · Angle(deg) · Bend direction · K Factor (140 px; Radius and K Factor white, the rest #f5f5f5); headers 700 14 px; #aaa grid, 34 px rows; Chrome's horizontal scrollbar | — | ✅ |
+| SM4c | Joint names | one letter sequence over all the model's joints in feature order, a feature's bends before its rips: Bend / Hem / Joint + letter | — | ✅ (live re-sequences after a joint changes: not reproduced) |
+| SM4d | Hover | the cell #eee, its row header and column header #d7d7d7 (dark #666) | — | ✅ |
+| SM4e | Editing | double-click Radius / K Factor: 2 px #1651b0 outline, the number selected; Enter / Tab adds "Modify joint N" at the end; Esc cancels | — | ✅ |
+| SM4f | Flat view | its own graphics area: the flat as a shaded solid seen from Top, dark centre lines on the bends, a view cube without ▾; wheel zoom, right-drag rotate; empty-space right-click Zoom to fit / Isometric; the main window's Measure and Analysis tools at its bottom right | — | ✅ |
+| SM4g | Row selection and hover | "#" click selects the row (2 px #1651b0 outline) and its bend in the graphics and in the flat view (selection orange); a cell click outlines the cell; hovering a row pre-highlights its bend | — | ✅ |
+| SM4h | Bends row right-click | Move up / Move down (not on the first / last row), separator, "Convert Bend A to rip" | — | ✅ Convert (a Modify joint with Joint type Rip); ✗ Move up / down (asked: live "ui (10-24 b)"). Our model can't rip a bend yet ("The walls must meet in a sharp corner to rip") |
+| SM4i | Other joints Type ▾ (Bend / Rip) and Style ▾ (Edge joint / Butt joint - Direction 1 / 2) | custom dropdowns; a change edits the joint | static cells | ✗ needs model support: Modify joint can't restyle an existing rip or turn it into a bend from the table (fs) |
+| SM4j | Editing a finished model's table, and two models (the other model's part dark grey), flat-face hover outline, the flat-part right-click menu | as described (finished model: asked "ui (10-24 b)") | — | ✗ next |
+
 ## qa5 MEAS1 (2026-10-24)
 | MEAS1 / MS1 | Top row alone: ours "Area: 4000000000000.000 mm²" | live (behaviours "ui (10-23 a)", case e): nothing in the status bar; panel "No measurements available for current selection." Fixed on ready/ui 6f16c117 (not on main yet, c59c5af9); re-check when it lands | ui |
 | MEAS1 / MS1 (re-check 2026-10-24 07:20, main 78109ebc, target-lead 07:07) | Top row alone: nothing in the status bar (live case e) | ✅ fixed (ui) |
