@@ -90,3 +90,6 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | VC8 Assembly camera menu | Isometric, Dimetric, Trimetric \| Zoom to fit \| Perspective view, Show mates; larger rows, chevron caret; the Part Studio menu (v01) has the full live list | ? live capture requested ("qa5 (10-23 pass 21, ui VC8)") |
 | VC7 menu font, KS1 shortcuts pop-out page | not local (app-wide font / new window) | ✗ → ui (qa5-routing.md) |
 | VC8 (live answered, behaviours "qa5 assembly camera menu") | live = Part Studio menu minus "Orient normal to sketch on edit" / "Highlight boundary edges", no "Show mates". qa5: "Show mates" removed, "Section view…" added; the rest needs assembly features (render modes, named / previous views, graphics prefs, zoom to window, high quality) → qa5-routing ui | 🔧 partly / ✗ ui |
+
+## qa5 MEAS1 (2026-10-24)
+| MEAS1 / MS1 | Top row alone: ours "Area: 4000000000000.000 mm²" | live (behaviours "ui (10-23 a)", case e): nothing in the status bar; panel "No measurements available for current selection." Fixed on ready/ui 6f16c117 (not on main yet, c59c5af9); re-check when it lands | ui |
