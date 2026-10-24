@@ -100,3 +100,7 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 SF2 8000 / 10 faces, SF5 2400 mm² (all edges move), SF6 −514.304543 → ✗ still, routed kern.
 | SF1 Fill preview while editing | the fill surface previews (f02) | ✅ **fixed** |
 | (feature-sweep Fill #3) Continuity label | items show a bare "Position" select (f02) | ✗ → **qa5 fix**: SHOW_LABEL on Fill "Continuity" and Boundary surface "Boundary condition" (fillSurface.fs / bsurf.fs) |
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
+| I2 | face-only fields pick the face when clicking on its edge | ✅ fixed |
+| I4 | row tooltip after picking a plane from the list hides | ✅ fixed |

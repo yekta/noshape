@@ -249,7 +249,9 @@ impl AssemblyView {
     pub(super) fn render_bom_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let border = rgb(0xaaaaaa);
-        let head_bg = rgb(0xeaeaea);
+        // Header, toolbar strip and Item column: `#eaeaea`, dark `#555`
+        // (live dark/dk-942).
+        let head_bg = pal.table_header;
         let s = self.bom_settings(cx);
         let lines = self.bom_lines(cx);
         let view = cx.entity();
@@ -379,6 +381,8 @@ impl AssemblyView {
                     .relative()
                     .when(frozen, |d| d.bg(if selected.is_some_and(|(sr, _)| sr == r) { rgb(0xd7d7d7) } else { head_bg }).font_weight(FontWeight::BOLD))
                     .when(!frozen && !can_edit, |d| d.bg(rgb(0xf5f5f5)))
+                    // Editable cells: white, dark `#1c1c1c` (live dark/dk-942).
+                    .when(!frozen && can_edit, |d| d.bg(pal.bg_senary))
                     .when(missing, |d| d.bg(rgb(0xf9ebec)))
                     .when(line.top_level, |d| d.font_weight(FontWeight::BOLD))
                     .when(is_sel, |d| d.border_2().border_color(rgb(0x1651b0)));
@@ -489,7 +493,7 @@ impl AssemblyView {
                         .border_color(rgb(0x1651b0))
                         .text_size(px(13.33))
                         .font_weight(FontWeight::MEDIUM)
-                        .text_color(rgb(0x1651b0))
+                        .text_color(pal.emphasis)
                         .child("Bill of materials"),
                 ),
             )

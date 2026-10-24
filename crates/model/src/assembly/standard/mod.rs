@@ -472,7 +472,7 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
     let mut tops = vec![0.0];
     // Retaining rings (extruded symmetric about z = 0): live's one "Near"
     // connector, mid-plane.
-    if !c.shape.has_length() && c.shape != Shape::RetainingRing {
+    if !c.shape.has_length() && c.shape != Shape::RetainingRing && c.near_only.is_none() {
         // The chosen option's thickness (a washer's Outside diameter).
         tops.push(c.shape.height_key().iter().find_map(|k| chosen.get(*k).copied()).unwrap_or(0.0) * u);
     }
@@ -480,7 +480,7 @@ pub fn part_studio(spec: &StandardSpec) -> Option<PartStudio> {
         let mut m = ps.new_feature("mateConnector", &units)?;
         m.id = FeatureId(PART_FEATURE.0 + 1 + i as u64);
         m.params.set("originQuery", ParamValue::Query(vec![crate::reference::Reference::Origin]));
-        if i == 0 {
+        if i == 0 && c.near_only != Some(false) {
             m.params.set("flipPrimary", ParamValue::Bool(true));
         }
         if z != 0.0 {

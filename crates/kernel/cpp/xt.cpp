@@ -82,6 +82,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <functional>
 #include <fstream>
 #include <sstream>
@@ -177,6 +178,132 @@ struct Node
   std::vector<Field> fields;
 };
 
+// Node layouts per version (shared with the reader): the base schema and
+// the node types each Parasolid version lays out differently.
+struct FieldSpec
+{
+  std::string name;
+  char        type = 'd';
+  int         n    = 0;
+};
+struct BaseType
+{
+  const char*            name;
+  std::vector<FieldSpec> fields;
+};
+#include "xt_schema.inc"
+
+// The Export dialog's Parasolid versions (live G36: Onshape's file of each
+// version names the body's schema in its first line; the 12.0 schema is
+// the one the "Parasolid XT Format Reference" documents).
+struct XtVersion
+{
+  const char* name;
+  const char* modeller; // the version's modeller id (major minor build)
+  const char* schema;
+};
+const XtVersion kVersions[] = {
+  {"38.1", "3801000", "SCH_3801000_38101"}, {"37.1", "3701000", "SCH_3701000_37102"}, {"37.0", "3700000", "SCH_3700000_36001"},
+  {"36.0", "3600000", "SCH_3600000_36001"}, {"35.1", "3501000", "SCH_3501000_35102"}, {"34.1", "3401000", "SCH_3401000_34101"},
+  {"34.0", "3400000", "SCH_3400000_34001"}, {"33.1", "3301000", "SCH_3301000_33103"}, {"33.0", "3300000", "SCH_3300000_32001"},
+  {"32.1", "3201000", "SCH_3201000_32001"}, {"32.0", "3200000", "SCH_3200000_32001"}, {"31.1", "3101000", "SCH_3101000_31100"},
+  {"31.0", "3100000", "SCH_3100000_31001"}, {"30.1", "3001000", "SCH_3001000_30100"}, {"30.0", "3000000", "SCH_3000000_30000"},
+  {"29.1", "2901000", "SCH_2901000_28101"}, {"29.0", "2900000", "SCH_2900000_28101"}, {"28.1", "2801000", "SCH_2801000_28101"},
+  {"28.0", "2800000", "SCH_2800000_28002"}, {"27.1", "2701000", "SCH_2701000_26105"}, {"27.0", "2700000", "SCH_2700000_26105"},
+  {"26.1", "2601000", "SCH_2601000_26105"}, {"26.0", "2600000", "SCH_2600000_25001"}, {"25.1", "2501000", "SCH_2501000_25001"},
+  {"25.0", "2500000", "SCH_2500000_25001"}, {"12.0", "1200000", "SCH_1200000_12006"},
+};
+
+XtVersion xt_version(const std::string& name)
+{
+  for (const XtVersion& v : kVersions)
+    if (name == v.name)
+      return v;
+  if (name.empty())
+    return kVersions[0];
+  fail_invalid("unknown Parasolid version " + name);
+  return kVersions[0];
+}
+
+// The layout code of a schema (as the reader computes it: 38101 -> 38100).
+int schema_code(const XtVersion& v)
+{
+  const std::string s  = v.schema;
+  const long long   sc = std::atoll(s.substr(s.rfind('_') + 1).c_str());
+  return (int)(sc / 1000 * 1000 + sc % 1000 / 100 * 100);
+}
+
+// Our nodes (base-schema layouts) laid out as version `v` lays them out:
+// fields by name, the ones the version adds 0 / null (as Onshape's files
+// have them, live G36), the ones it drops left out.
+std::vector<Node> to_version(std::vector<Node> nodes, const XtVersion& v)
+{
+  const int code = schema_code(v);
+  if (code <= 13006)
+    return nodes;
+  std::map<int, const std::vector<FieldSpec>*> layouts;
+  for (const auto& [c, types] : version_schemas())
+    if (c <= code)
+      for (const auto& [t, f] : types)
+        layouts[t] = &f;
+  const auto& base = base_schema();
+  for (Node& n : nodes)
+  {
+    auto lt = layouts.find(n.type);
+    auto bt = base.find(n.type);
+    if (lt == layouts.end() || bt == base.end())
+      continue;
+    const std::vector<FieldSpec>& bf = bt->second.fields;
+    // Each base field's values (a variable-length one takes the rest).
+    std::map<std::string, std::vector<Field>> by_name;
+    size_t                                    at = 0;
+    for (const FieldSpec& f : bf)
+    {
+      const size_t k = f.n == 1 ? n.fields.size() - std::min(at, n.fields.size()) : (size_t)std::max(1, f.n);
+      std::vector<Field> vals(n.fields.begin() + (long)std::min(at, n.fields.size()), n.fields.begin() + (long)std::min(at + k, n.fields.size()));
+      by_name[f.name] = std::move(vals);
+      at += k;
+    }
+    std::vector<Field> out;
+    for (const FieldSpec& f : *lt->second)
+    {
+      auto it = by_name.find(f.name);
+      if (it != by_name.end())
+      {
+        out.insert(out.end(), it->second.begin(), it->second.end());
+        continue;
+      }
+      const int k = std::max(1, f.n == 1 ? 0 : f.n);
+      for (int i = 0; i < k && f.n != 1; ++i)
+        switch (f.type)
+        {
+          case 'f':
+            out.push_back(ff_null());
+            break;
+          case 'v':
+            out.push_back(fv_null());
+            break;
+          case 'c':
+            out.push_back(fc('?'));
+            break;
+          case 'l':
+            out.push_back(fl(false));
+            break;
+          case 'u':
+            out.push_back(fu(0));
+            break;
+          case 'p':
+            out.push_back(fp(0));
+            break;
+          default:
+            out.push_back(fd(0));
+        }
+    }
+    n.fields = std::move(out);
+  }
+  return nodes;
+}
+
 std::string num(double v)
 {
   if (v == 0)
@@ -203,19 +330,18 @@ std::string num(double v)
   return r;
 }
 
-const char* kVersion = ": TRANSMIT FILE created by modeller version 1200000";
-const char* kSchema  = "SCH_1200000_12006";
-
-std::string text_body(const std::vector<Node>& nodes)
+std::string text_body(const std::vector<Node>& nodes, const XtVersion& v)
 {
-  std::string s = "T";
+  const std::string kVersion = std::string(": TRANSMIT FILE created by modeller version ") + v.modeller;
+  const std::string kSchema  = v.schema;
+  std::string       s        = "T";
   auto        put = [&](const std::string& t) {
     s += t;
     s += ' ';
   };
-  put(std::to_string(std::strlen(kVersion)));
+  put(std::to_string(kVersion.size()));
   s += kVersion;
-  put(std::to_string(std::strlen(kSchema)));
+  put(std::to_string(kSchema.size()));
   s += kSchema;
   put("0");
   for (const Node& n : nodes)
@@ -306,14 +432,16 @@ struct Bin
   }
 };
 
-std::string binary_body(const std::vector<Node>& nodes)
+std::string binary_body(const std::vector<Node>& nodes, const XtVersion& v)
 {
-  const double kNullReal = -3.14158e13;
-  Bin          b;
+  const std::string kVersion  = std::string(": TRANSMIT FILE created by modeller version ") + v.modeller;
+  const std::string kSchema   = v.schema;
+  const double      kNullReal = -3.14158e13;
+  Bin               b;
   b.s = std::string("PS\0\0", 4);
-  b.i16((int)std::strlen(kVersion));
+  b.i16((int)kVersion.size());
   b.s += kVersion;
-  b.i32((long long)std::strlen(kSchema));
+  b.i32((long long)kSchema.size());
   b.s += kSchema;
   b.i32(0);
   for (const Node& n : nodes)
@@ -353,15 +481,32 @@ std::string binary_body(const std::vector<Node>& nodes)
   return b.s;
 }
 
-std::string header(bool binary)
+// The header as Onshape's exports have it (live G25/G36: one key per line,
+// unknown machine fields, the file name, a UTC date; part 2 names the
+// writing modeller's schema whatever the body's version).
+std::string header(bool binary, const std::string& path, const std::string& application)
 {
+  const size_t      slash = path.find_last_of("/\\");
+  const std::string file  = slash == std::string::npos ? path : path.substr(slash + 1);
+  char              date[40];
+  {
+    const std::time_t now = std::time(nullptr);
+    std::tm           tm{};
+#ifdef _WIN32
+    gmtime_s(&tm, &now);
+#else
+    gmtime_r(&now, &tm);
+#endif
+    std::strftime(date, sizeof date, "%Y-%m-%dT%H:%M:%S (UTC)", &tm);
+  }
   std::string h;
   h += "**ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz**************************\n";
   h += "**PARASOLID !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~0123456789**************************\n";
-  h += "**PART1;MC=unknown;APPL=noshape;FORMAT=";
-  h += binary ? "binary" : "text";
-  h += ";GUISE=transmit;\n";
-  h += "**PART2;SCH=SCH_1200000_12006;USFLD_SIZE=0;\n";
+  h += "**PART1;\nMC=unknown;\nMC_MODEL=unknown;\nMC_ID=unknown;\nOS=unknown;\nOS_RELEASE=unknown;\n";
+  h += "FRU=" + application + ";\nAPPL=" + application + ";\nSITE=unknown;\nUSER=unknown;\n";
+  h += std::string("FORMAT=") + (binary ? "binary" : "text") + ";\nGUISE=transmit;\n";
+  h += "KEY=" + file + ";\nFILE=" + file + ";\nDATE=" + date + ";\n";
+  h += std::string("**PART2;\nSCH=") + kVersions[0].schema + ";\nUSFLD_SIZE=0;\n";
   h += "**PART3;\n";
   h += "**END_OF_HEADER*****************************************************************\n";
   return h;
@@ -1576,11 +1721,13 @@ std::string parasolid_binary_body(const TopoDS_Shape& prepared, std::vector<Topo
   faces.clear();
   for (int i = 1; i <= bw.faces.Extent(); ++i)
     faces.push_back(TopoDS::Face(bw.faces(i)));
-  return binary_body(w.nodes);
+  // Embedded in other formats: the 12.0 layouts, as before.
+  return binary_body(w.nodes, xt_version("12.0"));
 }
 
-void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary)
+void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary, rust::Str version, rust::Str application)
 {
+  const XtVersion ver = xt_version(std::string(version));
   Writer           w;
   std::vector<int> bodies;
   const bool       list = shapes.items.size() != 1;
@@ -1607,7 +1754,8 @@ void write_parasolid(const OcShapeList& shapes, rust::Str path, bool binary)
     for (int b : bodies)
       n.fields.push_back(fp(b));
   }
-  const std::string   data = header(binary) + (binary ? binary_body(w.nodes) : text_body(w.nodes));
+  const std::vector<Node> nodes = to_version(std::move(w.nodes), ver);
+  const std::string       data  = header(binary, std::string(path), std::string(application)) + (binary ? binary_body(nodes, ver) : text_body(nodes, ver));
   std::ofstream       out(std::string(path), std::ios::binary);
   if (!out)
     fail_invalid("cannot write " + std::string(path));

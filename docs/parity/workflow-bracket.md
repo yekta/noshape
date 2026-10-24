@@ -64,3 +64,11 @@ UI findings while building:
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 | RD1 volume readout | stays 64475.752 after Extrude 1 8 → 10 (real 70994.690) | ✗ still |
+
+## Re-run pass 21 (2026-10-23, CLI built from main 88fbf8f; /root/qa5-scratch/pass3/mkbracket2.py = mkbracket + Merge with all on Add/Remove, since an empty merge scope now errors as live)
+Steps 1–7 OK (65431.3275 after the gusset); step 8 feature mirror (Reapply off): still "Could not create all instances as entered. Try selecting "Reapply features" option." → ✗ ADV9, routed psb.
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app)
+| REG1 | Regeneration times: floating dialog, # \| Feature name \| Time ▾ (slowest first), blue bar under each time, footer "Total regen time: 16ms" | ✅ fixed |
+| RD1 | no stale volume readout after the part goes | ✅ fixed |
+| PERF2 | debug build only here; re-measure on a release build | perf |

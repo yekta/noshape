@@ -1,1 +1,815 @@
-[]
+[
+ {
+  "standard": "NAS",
+  "inch": true,
+  "components": [
+   {
+    "category": "Sheet metal fasteners",
+    "class": "Clinch nuts",
+    "name": "Hex head self-locking clinch nut NASM 45938/2",
+    "shape": "nut",
+    "form": {
+     "form": 8
+    },
+    "sizes": [
+     {
+      "name": "#6-32",
+      "label": "Hex head self-locking clinch nut #6-32",
+      "d": 0.138,
+      "dims": {
+       "d": 0.138,
+       "dh": 0.104,
+       "s": 0.297,
+       "m": 0.109,
+       "sp": 0.244,
+       "hp": 0.078
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "Hex head self-locking clinch nut #8-32",
+      "d": 0.164,
+      "dims": {
+       "d": 0.164,
+       "dh": 0.13,
+       "s": 0.368,
+       "m": 0.125,
+       "sp": 0.305,
+       "hp": 0.094
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "Hex head self-locking clinch nut #10-32",
+      "d": 0.19,
+      "dims": {
+       "d": 0.19,
+       "dh": 0.156,
+       "s": 0.368,
+       "m": 0.125,
+       "sp": 0.305,
+       "hp": 0.094
+      }
+     },
+     {
+      "name": "1/4-28",
+      "label": "Hex head self-locking clinch nut 1/4-28",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.211,
+       "s": 0.521,
+       "m": 0.172,
+       "sp": 0.429,
+       "hp": 0.125
+      }
+     },
+     {
+      "name": "5/16-24",
+      "label": "Hex head self-locking clinch nut 5/16-24",
+      "d": 0.3125,
+      "dims": {
+       "d": 0.3125,
+       "dh": 0.267,
+       "s": 0.584,
+       "m": 0.203,
+       "sp": 0.491,
+       "hp": 0.156
+      }
+     },
+     {
+      "name": "3/8-24",
+      "label": "Hex head self-locking clinch nut 3/8-24",
+      "d": 0.375,
+      "dims": {
+       "d": 0.375,
+       "dh": 0.33,
+       "s": 0.67,
+       "m": 0.234,
+       "sp": 0.551,
+       "hp": 0.188
+      }
+     },
+     {
+      "name": "1/2-20",
+      "label": "Hex head self-locking clinch nut 1/2-20",
+      "d": 0.5,
+      "dims": {
+       "d": 0.5,
+       "dh": 0.383,
+       "s": 0.86,
+       "m": 0.297,
+       "sp": 0.742,
+       "hp": 0.25
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_SELF_LOCKING_SWAGE_CLINCH_NUT_MAIN (document 3419bb7937f56c3e708995e1, version Adding smart names)"
+   },
+   {
+    "category": "Sheet metal fasteners",
+    "class": "Clinch nuts",
+    "name": "Self-locking clinch nut without self-locking threads NASM 45938",
+    "shape": "nut",
+    "form": {
+     "form": 10
+    },
+    "sizes": [
+     {
+      "name": "1/4-20",
+      "label": "Self-locking clinch nut 1/4-20",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.196,
+       "dc": 0.343,
+       "de": 0.5,
+       "alen": 0.058,
+       "tlen": 0.189
+      }
+     },
+     {
+      "name": "5/16-18",
+      "label": "Self-locking clinch nut 5/16-18",
+      "d": 0.3125,
+      "dims": {
+       "d": 0.3125,
+       "dh": 0.252,
+       "dc": 0.412,
+       "de": 0.575,
+       "alen": 0.058,
+       "tlen": 0.24
+      }
+     },
+     {
+      "name": "3/8-16",
+      "label": "Self-locking clinch nut 3/8-16",
+      "d": 0.375,
+      "dims": {
+       "d": 0.375,
+       "dh": 0.307,
+       "dc": 0.499,
+       "de": 0.65,
+       "alen": 0.058,
+       "tlen": 0.3
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_SELF_LOCKING_CLINCH_NUT_MAIN (document ad85ffb79a686f1a51fe5fdf, version Adding smart names)",
+    "nearOnly": false
+   },
+   {
+    "category": "Sheet metal fasteners",
+    "class": "Flush nuts",
+    "name": "Plain clinch flush nut NASM 3214",
+    "shape": "nut",
+    "form": {
+     "form": 9
+    },
+    "sizes": [
+     {
+      "name": "#2-56",
+      "label": "Plain clinch flush nut #2-56 x 0.058",
+      "d": 0.086,
+      "dims": {
+       "d": 0.086,
+       "dh": 0.0667,
+       "s": 0.188,
+       "dc": 0.157,
+       "ll": 0.058
+      },
+      "when": {
+       "Nut thickness": "0.058"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.058"
+       ]
+      }
+     },
+     {
+      "name": "#4-40",
+      "label": "Plain clinch flush nut #4-40 x 0.058",
+      "d": 0.112,
+      "dims": {
+       "d": 0.112,
+       "dh": 0.0849,
+       "s": 0.188,
+       "dc": 0.157,
+       "ll": 0.058
+      },
+      "when": {
+       "Nut thickness": "0.058"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.058",
+        "0.085",
+        "0.117"
+       ]
+      }
+     },
+     {
+      "name": "#4-40",
+      "label": "Plain clinch flush nut #4-40 x 0.085",
+      "d": 0.112,
+      "dims": {
+       "d": 0.112,
+       "dh": 0.0849,
+       "s": 0.188,
+       "dc": 0.157,
+       "ll": 0.085
+      },
+      "when": {
+       "Nut thickness": "0.085"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.058",
+        "0.085",
+        "0.117"
+       ]
+      }
+     },
+     {
+      "name": "#4-40",
+      "label": "Plain clinch flush nut #4-40 x 0.117",
+      "d": 0.112,
+      "dims": {
+       "d": 0.112,
+       "dh": 0.0849,
+       "s": 0.188,
+       "dc": 0.157,
+       "ll": 0.117
+      },
+      "when": {
+       "Nut thickness": "0.117"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.058",
+        "0.085",
+        "0.117"
+       ]
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "Plain clinch flush nut #6-32 x 0.085",
+      "d": 0.138,
+      "dims": {
+       "d": 0.138,
+       "dh": 0.104,
+       "s": 0.25,
+       "dc": 0.199,
+       "ll": 0.085
+      },
+      "when": {
+       "Nut thickness": "0.085"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "Plain clinch flush nut #6-32 x 0.117",
+      "d": 0.138,
+      "dims": {
+       "d": 0.138,
+       "dh": 0.104,
+       "s": 0.25,
+       "dc": 0.199,
+       "ll": 0.117
+      },
+      "when": {
+       "Nut thickness": "0.117"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "Plain clinch flush nut #6-32 x 0.147",
+      "d": 0.138,
+      "dims": {
+       "d": 0.138,
+       "dh": 0.104,
+       "s": 0.25,
+       "dc": 0.199,
+       "ll": 0.147
+      },
+      "when": {
+       "Nut thickness": "0.147"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "Plain clinch flush nut #6-32 x 0.177",
+      "d": 0.138,
+      "dims": {
+       "d": 0.138,
+       "dh": 0.104,
+       "s": 0.25,
+       "dc": 0.199,
+       "ll": 0.177
+      },
+      "when": {
+       "Nut thickness": "0.177"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#6-32",
+      "label": "Plain clinch flush nut #6-32 x 0.236",
+      "d": 0.138,
+      "dims": {
+       "d": 0.138,
+       "dh": 0.104,
+       "s": 0.25,
+       "dc": 0.199,
+       "ll": 0.236
+      },
+      "when": {
+       "Nut thickness": "0.236"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "Plain clinch flush nut #8-32 x 0.085",
+      "d": 0.164,
+      "dims": {
+       "d": 0.164,
+       "dh": 0.13,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.085
+      },
+      "when": {
+       "Nut thickness": "0.085"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "Plain clinch flush nut #8-32 x 0.117",
+      "d": 0.164,
+      "dims": {
+       "d": 0.164,
+       "dh": 0.13,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.117
+      },
+      "when": {
+       "Nut thickness": "0.117"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "Plain clinch flush nut #8-32 x 0.147",
+      "d": 0.164,
+      "dims": {
+       "d": 0.164,
+       "dh": 0.13,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.147
+      },
+      "when": {
+       "Nut thickness": "0.147"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "Plain clinch flush nut #8-32 x 0.177",
+      "d": 0.164,
+      "dims": {
+       "d": 0.164,
+       "dh": 0.13,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.177
+      },
+      "when": {
+       "Nut thickness": "0.177"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#8-32",
+      "label": "Plain clinch flush nut #8-32 x 0.236",
+      "d": 0.164,
+      "dims": {
+       "d": 0.164,
+       "dh": 0.13,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.236
+      },
+      "when": {
+       "Nut thickness": "0.236"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "Plain clinch flush nut #10-32 x 0.085",
+      "d": 0.19,
+      "dims": {
+       "d": 0.19,
+       "dh": 0.156,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.085
+      },
+      "when": {
+       "Nut thickness": "0.085"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "Plain clinch flush nut #10-32 x 0.117",
+      "d": 0.19,
+      "dims": {
+       "d": 0.19,
+       "dh": 0.156,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.117
+      },
+      "when": {
+       "Nut thickness": "0.117"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "Plain clinch flush nut #10-32 x 0.147",
+      "d": 0.19,
+      "dims": {
+       "d": 0.19,
+       "dh": 0.156,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.147
+      },
+      "when": {
+       "Nut thickness": "0.147"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "Plain clinch flush nut #10-32 x 0.177",
+      "d": 0.19,
+      "dims": {
+       "d": 0.19,
+       "dh": 0.156,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.177
+      },
+      "when": {
+       "Nut thickness": "0.177"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "#10-32",
+      "label": "Plain clinch flush nut #10-32 x 0.236",
+      "d": 0.19,
+      "dims": {
+       "d": 0.19,
+       "dh": 0.156,
+       "s": 0.313,
+       "dc": 0.261,
+       "ll": 0.236
+      },
+      "when": {
+       "Nut thickness": "0.236"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.085",
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "Plain clinch flush nut 1/4-20 x 0.117",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.196,
+       "s": 0.438,
+       "dc": 0.382,
+       "ll": 0.117
+      },
+      "when": {
+       "Nut thickness": "0.117"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "Plain clinch flush nut 1/4-20 x 0.147",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.196,
+       "s": 0.438,
+       "dc": 0.382,
+       "ll": 0.147
+      },
+      "when": {
+       "Nut thickness": "0.147"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "Plain clinch flush nut 1/4-20 x 0.177",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.196,
+       "s": 0.438,
+       "dc": 0.382,
+       "ll": 0.177
+      },
+      "when": {
+       "Nut thickness": "0.177"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "1/4-20",
+      "label": "Plain clinch flush nut 1/4-20 x 0.236",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.196,
+       "s": 0.438,
+       "dc": 0.382,
+       "ll": 0.236
+      },
+      "when": {
+       "Nut thickness": "0.236"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "1/4-28",
+      "label": "Plain clinch flush nut 1/4-28 x 0.117",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.211,
+       "s": 0.438,
+       "dc": 0.381,
+       "ll": 0.117
+      },
+      "when": {
+       "Nut thickness": "0.117"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "1/4-28",
+      "label": "Plain clinch flush nut 1/4-28 x 0.147",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.211,
+       "s": 0.438,
+       "dc": 0.381,
+       "ll": 0.147
+      },
+      "when": {
+       "Nut thickness": "0.147"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "1/4-28",
+      "label": "Plain clinch flush nut 1/4-28 x 0.177",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.211,
+       "s": 0.438,
+       "dc": 0.381,
+       "ll": 0.177
+      },
+      "when": {
+       "Nut thickness": "0.177"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     },
+     {
+      "name": "1/4-28",
+      "label": "Plain clinch flush nut 1/4-28 x 0.236",
+      "d": 0.25,
+      "dims": {
+       "d": 0.25,
+       "dh": 0.211,
+       "s": 0.438,
+       "dc": 0.381,
+       "ll": 0.236
+      },
+      "when": {
+       "Nut thickness": "0.236"
+      },
+      "values": {
+       "Nut thickness": [
+        "0.117",
+        "0.147",
+        "0.177",
+        "0.236"
+       ]
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_CLINCH_FLUSH_NUT_MAIN (document 4ac4415a4fe051a69a3fec59, version Changed to minor diameter)",
+    "nearOnly": true,
+    "params": [
+     {
+      "label": "Nut thickness",
+      "options": [
+       "0.058"
+      ],
+      "default": "0.058"
+     }
+    ]
+   }
+  ]
+ }
+]
