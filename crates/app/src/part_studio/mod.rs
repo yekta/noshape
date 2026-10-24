@@ -1141,6 +1141,10 @@ impl PartStudioView {
         } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_POINT)) {
             // Hole locations: every point of the sketch (Onshape).
             sketch_points(sk)
+        } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH_EDGE) {
+            // Curve fields (Rib's Sketch profiles, Sweep's path): the whole
+            // sketch, shown as "Edges of Sketch 2" (live "Edges of Rib sketch").
+            vec![Reference::Sketch(id)]
         } else if let Some(pl) = self.display.planes.iter().find(|p| p.reference == Reference::FeaturePlane(id)).filter(|_| filter.intersects(QueryFilter::PLANE)) {
             // A Plane feature's row fills a plane field (Sketch plane, Mirror
             // plane), like the default planes' rows (qa5 ADV1).
