@@ -1522,15 +1522,15 @@ impl FeatureDialog {
         };
         // Items of a driven array show their query in the array's field.
         let driven = prefix.is_some_and(|(arr, _)| self.ty.params.iter().any(|p| p.id == arr && p.hints.has(Hints::DRIVEN_QUERY)));
-        let mut rows: Vec<AnyElement> = Vec::new();
+        // Rows with their group depth (indented once the next row is known).
+        let mut rows: Vec<(AnyElement, usize)> = Vec::new();
         let mut i = 0;
-        // Open groups, outermost first: the header, whether it is expanded,
-        // and whether it is a plain group title (Onshape "Group Name").
+        // Open groups, outermost first: the header and whether it is expanded.
         // Groups nest (Sheet metal model's Selections holds Extrude's
         // Second end position group); a param belongs to a group while
         // turning the header off would hide it.
-        let mut groups: Vec<(&'static str, bool, bool)> = Vec::new();
-        let mut prev_query = false;
+        let mut groups: Vec<(&'static str, bool)> = Vec::new();
+        let (mut prev_query, mut prev_depth) = (false, 0);
         while i < specs.len() {
             let s = &specs[i];
             i += 1;
@@ -1556,7 +1556,7 @@ impl FeatureDialog {
             if groups.iter().any(|g| !g.1) {
                 continue;
             }
-            let levels: Vec<bool> = groups.iter().map(|g| g.2).collect();
+            let depth = groups.len();
             // Gather trailing flip toggles that belong on this row.
             let mut trailing: Vec<&'static ParamSpec> = Vec::new();
             let mut companion: Option<&'static ParamSpec> = None;
@@ -1651,34 +1651,44 @@ impl FeatureDialog {
                 el.into_any_element()
             });
             if s.hints.has(Hints::GROUP_HEADER) {
-                groups.push((s.id, values.bool(s.id) && !self.collapsed_groups.contains(&path), s.hints.has(Hints::GROUP_LABEL)));
+                groups.push((s.id, values.bool(s.id) && !self.collapsed_groups.contains(&path)));
             }
-            // Onshape (dialogs/extrude-24): a group's params are indented 24 px
-            // with a 1 px `#d7d7d7` guide line under the expander; under a
-            // plain group title 20 px (dom/dialog-sheet-metal-model.txt,
-            // os-param-group-indent).
-            let row = row.map(|r| {
-                levels.iter().rev().fold(r, |r, label| {
-                    let (w, line) = if *label { (20., 8.) } else { (24., 13.) };
-                    div().relative().pl(px(w)).child(div().absolute().left(px(line)).top_0().bottom_0().w(px(1.)).bg(p().border)).child(r).into_any_element()
-                })
-            });
             if let Some(row) = row {
                 let is_query = matches!(s.kind, ParamKind::Query { .. }) || s.hints.has(Hints::DRIVEN_QUERY);
                 if prev_query && !is_query {
-                    // Live (`os-param-requires-margin`): 5 px under the last field.
-                    rows.push(div().h(px(5.)).flex_none().into_any_element());
+                    // Live (`os-param-requires-margin`): 5 px under the last
+                    // field, inside its group.
+                    rows.push((div().h(px(5.)).flex_none().into_any_element(), prev_depth));
                 }
-                prev_query = is_query;
-                rows.push(row);
+                (prev_query, prev_depth) = (is_query, depth);
+                rows.push((row, depth));
             }
         }
         // Live (dialogs/mirror, delete-part): a query field ending the
         // dialog keeps its 5 px bottom margin.
         if prev_query && prefix.is_none() {
-            rows.push(div().h(px(5.)).flex_none().into_any_element());
+            rows.push((div().h(px(5.)).flex_none().into_any_element(), prev_depth));
         }
-        rows
+        // Live (extrude-24, dom/dialog-fillet-partial `os-param-group-indent`):
+        // each group level indents its params 20 px with a 1 px `#d7d7d7`
+        // guide 8 px in, under the expander; on the group's last row the
+        // guide ends in a 10 px foot (`node-indent-line-end`).
+        let depths: Vec<usize> = rows.iter().map(|r| r.1).collect();
+        rows.into_iter()
+            .enumerate()
+            .map(|(k, (row, depth))| {
+                let next = depths.get(k + 1).copied().unwrap_or(0);
+                (0..depth).rev().fold(row, |r, level| {
+                    div()
+                        .relative()
+                        .pl(px(20.))
+                        .child(div().absolute().left(px(8.)).top_0().bottom_0().w(px(1.)).bg(p().border))
+                        .when(level >= next, |d| d.child(div().absolute().left(px(3.)).bottom_0().w(px(10.)).h(px(1.)).bg(p().border)))
+                        .child(r)
+                        .into_any_element()
+                })
+            })
+            .collect()
     }
 
     /// Mate connector's axis row: the primary axis flip (its arrow shows the
@@ -1977,7 +1987,10 @@ impl FeatureDialog {
                         Some((arr, idx)) => item_path(arr, idx, c.id),
                     };
                     if let Some(e) = self.render_inline_value(c, &cpath, values, window, cx) {
-                        row = row.child(div().flex_1().child(e));
+                        // Live (extrude-21 "Draft  3 deg ↻"): the value runs to
+                        // the 194 px column like a quantity row; its flip sits
+                        // in the 26 px right column.
+                        row = row.pr(px(if flips.is_empty() { 26. } else { 0. })).child(div().flex_1().child(e));
                     }
                 }
                 row.children(flips).into_any_element()
