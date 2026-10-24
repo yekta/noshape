@@ -846,7 +846,7 @@ impl DrawingEditor {
                 // A click on a snap point anchors a leader; the next click
                 // places the text.
                 match (self.note_leader.is_some(), self.snap_at(c)) {
-                    (false, Some(p)) => self.note_leader = Some(Leader { view: Some(p.view), point: p.p, nodes: Vec::new() }),
+                    (false, Some(p)) => self.note_leader = Some(Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() }),
                     _ => self.open_note_panel(None, c, window, cx),
                 }
             }
@@ -1044,6 +1044,10 @@ impl DrawingEditor {
             Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
+            }
+            Drag::LeaderBend { .. } => {
+                let drag = self.drag.clone();
+                self.leader_bend_move(&drag, cx);
             }
             // A datum from the model moves along its face normal only.
             Drag::MoveAnnotation { start, orig } if orig.model.is_some() => self.drag_model_datum(&orig, start, cx),
@@ -1264,8 +1268,9 @@ impl DrawingEditor {
                 }
             }
             Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } => {
                 let name = match drag {
+                    Drag::LeaderBend { .. } => "Move by grip",
                     Drag::MoveTable { .. } => "Move table",
                     Drag::TableDivider { .. } => "Resize cells",
                     Drag::ResizeTable { .. } => "Resize table",
@@ -1443,6 +1448,9 @@ impl DrawingEditor {
     }
 
     fn start_drag(&mut self, pick: Option<u32>, start: [f64; 2]) -> Drag {
+        if let Some(d) = self.leader_bend_drag(start) {
+            return d;
+        }
         if let Some(d) = self.note_grip_drag(start) {
             return d;
         }
@@ -1546,8 +1554,10 @@ impl DrawingEditor {
                 }
             }
             Some(t) => {
-                // Onshape: double-clicking a view opens View properties.
+                // Onshape: double-clicking a view opens View properties (with
+                // several selected: just that view's, live drw2 10-21 j).
                 if let Some(v) = t.view() {
+                    self.selection = vec![Sel::View(v)];
                     self.open_view_props(v, window, cx);
                 }
             }
@@ -1570,7 +1580,11 @@ impl DrawingEditor {
             self.redraw(cx);
         }
         self.menu_at = self.local(position);
-        let entries = self.context_entries(sel, cx);
+        // Exactly on a note leader: its own menu (live drw2 10-21 g (3), (4)).
+        let entries = match self.leader_hit(self.cursor) {
+            Some(hit) => self.leader_entries(hit, cx),
+            None => self.context_entries(sel, cx),
+        };
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
@@ -1609,7 +1623,7 @@ impl DrawingEditor {
         let mut out = Vec::new();
         // Several entities selected (live drawing/291).
         if self.selection.len() > 1 && sel.is_some_and(|s| self.selection.contains(&s)) {
-            return self.multi_selection_entries();
+            return self.multi_selection_entries(cx);
         }
         match sel {
             Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),
@@ -1637,6 +1651,12 @@ impl DrawingEditor {
                     ];
                 }
                 let a = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned();
+                // Notes: their own menu in live's order (drawing_leaders).
+                if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Note { .. })) {
+                    let mut out = self.inspection_entries(a);
+                    out.extend(self.note_entries(a, cx));
+                    return out;
+                }
                 if let Some(a) = &a {
                     out.extend(self.inspection_entries(a));
                     if let AnnotationKind::Note { .. } = a.kind {
@@ -1779,6 +1799,18 @@ impl DrawingEditor {
             }
         }
         out
+    }
+
+    /// `edit_view` on several views, one undo step.
+    pub fn edit_views(&mut self, description: &str, ids: &[ViewId], cx: &mut Context<Self>, f: impl Fn(&mut DrawingView)) {
+        let targets: Vec<(usize, ViewId)> = ids.iter().map(|id| self.drawing.real_view_of(self.sheet, *id)).collect();
+        self.edit(description, cx, |d| {
+            for (si, id) in targets {
+                if let Some(v) = d.sheets.get_mut(si).and_then(|s| s.view_mut(id)) {
+                    f(v);
+                }
+            }
+        });
     }
 
     pub fn edit_view(&mut self, description: &str, id: ViewId, cx: &mut Context<Self>, f: impl FnOnce(&mut DrawingView)) {

@@ -55,6 +55,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("removeAttributes", remove_attributes),
     ("valuesSortedById", values_sorted_by_id),
     ("containsSketch", contains_sketch),
+    ("featureListFunction", feature_list_function),
     ("setProperty", set_property),
     ("getProperty", get_property),
     ("lastModifyingOperationId", last_modifying_operation_id),
@@ -64,6 +65,33 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
 fn values_sorted_by_id(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let m = noshape_featurescript::natives::map_arg(i, &a, 1)?;
     Ok(Value::array(m.values().cloned().collect()))
+}
+
+/// A FeatureList parameter value: picked feature Id -> feature function.
+pub fn feature_list_value(refs: &[Reference]) -> Value {
+    let mut m = Map::new();
+    for f in refs.iter().filter_map(Reference::depends_on) {
+        let id = id_value(&[std::sync::Arc::from(f.to_string())]);
+        let func = noshape_featurescript::interp::native_function("featureListFunction", vec![id.clone()]).unwrap_or_default();
+        m.insert(id, func);
+    }
+    Value::map(m).with_tag(super::std_tag("featureList.fs", "FeatureList"))
+}
+
+/// The picked features of a FeatureList value (editing logic results).
+pub fn feature_list_refs(v: &Value) -> Vec<Reference> {
+    let Value::Map(m, _) = v else { return Vec::new() };
+    m.keys()
+        .filter_map(|k| {
+            let s = k.as_array()?.first()?.as_str()?;
+            u64::from_str_radix(s.strip_prefix('F')?, 16).ok().map(|n| Reference::Feature(crate::reference::FeatureId(n)))
+        })
+        .collect()
+}
+
+/// A picked feature's function: features are not re-run from a FeatureList here.
+fn feature_list_function(i: &mut Interp, _a: Vec<Value>) -> R<Value> {
+    Err(i.error("A picked feature cannot be re-run"))
 }
 
 /// Whether a feature list contains a sketch feature.

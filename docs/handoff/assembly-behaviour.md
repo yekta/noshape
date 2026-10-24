@@ -1026,8 +1026,55 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   materials (Butyl default; generator `MATERIAL_NAMES`).
 * Deviations left: our kernel reports the acorn's spindle torus (negative major radius) as a surface of revolution
   (kern); live's acorn 1/4 hex measures 0.438 where its table says 0.4375 (0.1 % area). ISO 7380's head uses HEAD_TOP_DIA (no rule yet).
-* Waiting on live (REQUESTS "skb (10-23 06:30)"): toothed lock washers, retaining rings, PEM® (44), NAS (6),
-  askew head bolt, B17.1 keys (PART 2 with every /features expression after 16:52 UTC); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
+* ANSI toothed lock washers (PART 2 raw /features; washer forms 9 / 10 / 11, helper `toothCut`): straight bands on
+  radial lines (`teeth`, half angle `ta`, first at `t0`). External (A 12 × 7.5°, B 10 × 9°): root Ø 1.05 (ID+OD)/2,
+  the bands are the teeth (all else beyond the root cut away). Internal (A / A heavy 10 × 9°, B / B heavy 9 × 10°):
+  the bands as wide as the bore's chord are the slots, out to Ø (ID+OD)/2. Internal/external (form 11): 8 inner
+  slots (±11.25°) to Ø ID+(OD−ID)/3, outer teeth (A 16 × 5.625°, B 12 × 7.5°) from Ø ID+2(OD−ID)/3 — live's volume
+  fixes which bands are teeth (to 1e-15). Its "Outside diameter" select is per size (FSRules DATA_AI_OUTSIDE_DIAMETER,
+  several ODs each with its thickness; generator `size_dims` → "d2@Outside diameter=…", "h@…"); the top
+  connector follows the chosen thickness. Unconfirmed: Type B's OD table (its FSRules wasn't captured; same table
+  name in its setData) and the list order/default for sizes whose table rows aren't ascending (#6: 1.510, 1.610,
+  0.690) — REQUESTS "skb (10-24)". Tests `tooth_lock_washers_match_live`,
+  `internal_external_tooth_lock_washers_match_live`.
+* Retaining rings (PART 2; feature `retainingRing` rewritten, one sketch extruded symmetric about z = 0, lugs at
+  −Y, live's single mid-plane "Near" connector). External (DIN 471, DIN 471 heavy, ANSI): groove circle inside; the
+  outer circle as wide as L at +Y and S at −Y (DIN S = 0.3 L; ANSI SMALL_SECTION); lugs out to rg + lug with sides
+  tilted 7° (heavy 7.5°), lug fillet 0.8 lug (ANSI 0.5 LugHeight), tip rounds 0.85 mm (heavy 0.8 mm, ANSI
+  0.011116 in), gap s/1.95 (heavy s/2); holes on rg + lug/2, s apart edge to edge, the lug side placed 0.4 D from
+  the hole: DIN 471 measures it from the lug fillet, heavy and ANSI from the side line (`holeRule`). Internal (DIN
+  472, ANSI): the bore circle outside, the inner circle L wide at +Y and S at −Y (DIN S = L/2); lug ends on radial
+  planes through the bore's dg/4 chord (±14.48°); each lug end an arc 0.5 (lug − L/2) (ANSI 0.55) tangent to the
+  end plane and the lug circle rg − lug, a second equal arc into the inner circle; holes concentric with the end
+  arcs. ANSI's select is "Shaft diameter" (rows keyed by SHAFT_/HOUSING_DIAMETER). Live's internal rings have a
+  hidden Configuration enum (A/B/C: a 0.5 mm / 0.02 in fillet, or a second hole sketch); every captured size is
+  A, which is what we build — the rule is unconfirmed (REQUESTS "skb (10-24)"). Internal heavy DIN 472 is left
+  out: its default B-rep has a different lug (lug circle + an r 8.49 arc + 0.25 rounds), only one size captured.
+  Test `retaining_rings_match_live` (faces + areas at 11 live sizes).
+* B17.1 keys (FSRules + raw /features): Type per size by WIDTH (< 1/8 Square only, < 4 Square / Rectangle, else
+  Rectangle; HEIGHT_SQR / HEIGHT_REC) as size rows with `when` {Type} (generator `variants`); parallel = the box
+  (key form 1), tapered = key form 7 (`flat` = the width for Taper type Plain, 0 for Alternate, 1/8 in per foot
+  falling to −Y, extruded symmetric). Live's Length is a free-entry field (FSRules `EDIT`, default 1): we list
+  "1" only until live's capture of that field arrives (REQUESTS "skb (10-24) B17.1 length"). The tapered key's
+  sizes from 4-1/2 - 5-1/2 up answer "Not found." on live's insert endpoint (crawl), listed as failing sizes.
+  Test `b17_keys_match_live`.
+* Askew head bolt (screw head form 10, `askewBolt`): live's order — square head with its bearing face skewed
+  9.45° through the origin (HEAD_HEIGHT at +X), 25° corner cone cut from the flats, shank revolved, FILLET_RADIUS
+  fillet, end chamfer 0.625·P·√3/2, the shank face split at the Thread length above the end (Thread length per
+  length from DATA_AI_ASKEW_HEAD_BOLT_LENGTHS, generator `size_threads`; mod.rs now passes the chosen Thread
+  length to the screw script as `lt`). Test `askew_head_bolt_matches_live`.
+* NAS clinch nuts (raw /features; nut forms 8–10, `clinchNut` / `selfLockingClinchNut`): NASM 45938/2 = hex (flats
+  ±Y) on a pilot hex, top corners 30°, the bore's pilot end coned out to the pilot's flats over 0.83·PILOT_HEIGHT
+  (Chamfer 1's two offsets), top chamfer to the major; NASM 3214 = hex (flats ±X) LLen/3 on a CDia shank LLen/3
+  then 0.92·CDia LLen/3, both bore ends chamfered to the major, a row per Nut thickness (DATA_CLINCH_FLUSH_NUT_
+  THICKNESS; part name "… #6-32 x 0.147"); NASM 45938 (without self-locking threads) = the 12-line profile (collar
+  CDia falling 15°, step 0.012 in, shank E_DIA T_LEN with E_DIA/40 rounds as profile arcs, bore opening 25° to the
+  top, 1.5·(major − minor) countersink at the bottom) and 24 scallops (radius 0.06·E_DIA, neighbours meeting on
+  the step's edge (CDia + EDia)/4). Connectors: catalogue `nearOnly` = live's single "Near" (3214 flipped, 45938
+  not flipped, at the origin — which face live puts it on is not in the capture, unconfirmed). Test
+  `nas_clinch_nuts_match_live` (faces + areas, both captured sizes).
+* Still to do from PART 2: PEM® (44), NAS 45938 with self-locking threads, 45938/4 flush nut, NAS 1129 blind /
+  thru standoffs (live's captures lack ALen / Length, so only the recipes check them); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
   slotted spring pins (no live table). The face-type/area diagnostic is /root/skb-scratch/zz_live_face_types.rs
   (paste into assembly/tests.rs to run; reads the live captures directly).
 

@@ -12,12 +12,13 @@ pub fn ops() -> Vec<Op> {
         group: "export",
         verb: "parts",
         summary: "Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
-        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`.",
+        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
         fields: vec![
             doc_field(),
             tab_field(),
             req("format", json!({ "type": "string", "enum": PartFormat::ALL.iter().map(|f| f.label()).collect::<Vec<_>>() }), "File format."),
-            req("file", s(), "Output path; without an extension the format's is added (\"part\" -> \"part.x_t\"); individual files go in a .zip."),
+            opt("file", s(), "Output path; without an extension the format's is added (\"part\" -> \"part.x_t\"); individual files go in a .zip. Required unless `options` is \"store\" (then only its name is used; default \"<tab>.<ext>\")."),
+            opt("options", json!({ "type": "string", "enum": ["download", "download_and_store", "store"], "default": "download" }), "Options: write `file` (Download), and / or keep the file as a file tab right after the tab (Store file in a new tab; one edit \"Store <file>\")."),
             opt("parts", strings(), "Part ids (`body:…`) or names; default all visible parts."),
             opt("y_up", json!({ "type": "boolean" }), "Export models oriented Y axis up."),
             opt("version", s(), "Format version (e.g. \"AP214\", \"35.1\", \"7\")."),
@@ -26,8 +27,15 @@ pub fn ops() -> Vec<Op> {
             opt("stl_text", json!({ "type": "boolean" }), "STL as text instead of binary."),
             opt("individual", json!({ "type": "boolean" }), "Export unique parts as individual files (zipped)."),
             opt("include_hidden", json!({ "type": "boolean" }), "Include hidden parts."),
+            opt("preprocessing", json!({ "type": "string", "enum": crate::export::STEP_PREPROCESSING }), "STEP: Preprocessing (default None)."),
+            opt("derived_tolerances", json!({ "type": "boolean" }), "STEP: Include derived tolerances in export."),
+            opt("mbd_text_height", json!({ "type": "boolean" }), "STEP: Use custom annotation text height for MBD export."),
+            opt("iges_compatibility", json!({ "type": "boolean" }), "IGES: Use compatibility mode for surfaces and curves."),
+            opt("group_composites", json!({ "type": "boolean" }), "PVZ: Group composite parts into a single part file."),
+            opt("compress", json!({ "type": "boolean" }), "glTF / GLB: Compress."),
+            opt("geometry_format", json!({ "type": "string", "enum": crate::export::URDF_GEOMETRY.iter().map(|f| f.label()).collect::<Vec<_>>() }), "URDF: Geometry format (default STL)."),
         ],
-        mutates: false,
+        mutates: true,
         destructive: false,
         run: parts,
     }]
@@ -42,6 +50,17 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     s.stl_text = a.bool_or("stl_text", false)?;
     s.individual = a.bool_or("individual", false)?;
     s.hidden = a.bool_or("include_hidden", false)?;
+    s.derived_tolerances = a.bool_or("derived_tolerances", false)?;
+    s.mbd_text_height = a.bool_or("mbd_text_height", false)?;
+    s.iges_compat = a.bool_or("iges_compatibility", false)?;
+    s.pvz_group = a.bool_or("group_composites", false)?;
+    s.compress = a.bool_or("compress", false)?;
+    if let Some(p) = a.opt_str("preprocessing")? {
+        s.preprocessing = crate::export::STEP_PREPROCESSING.iter().position(|x| x.eq_ignore_ascii_case(p)).ok_or_else(|| OpError::param("preprocessing", "one of the listed choices"))?;
+    }
+    if let Some(g) = a.opt_str("geometry_format")? {
+        s.urdf_geometry = crate::export::URDF_GEOMETRY.iter().position(|f| f.label().eq_ignore_ascii_case(g)).ok_or_else(|| OpError::param("geometry_format", "STL, GLTF, GLB or OBJ"))?;
+    }
     if let Some(u) = a.opt_str("units")? {
         s.units = UNITS.iter().position(|x| x.0.eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("units", "unknown unit"))?;
         s.custom_units = true;
@@ -94,7 +113,16 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         })
         .collect();
     let n = list.len();
-    let mut file = std::path::PathBuf::from(a.str("file")?);
+    let (download, store) = options_arg(a)?;
+    let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+    let mut file = match a.opt_str("file")? {
+        Some(f) => std::path::PathBuf::from(f),
+        None if !download => store_dir()?.join(&tab_name),
+        None => return Err(OpError::param("file", "required (or options \"store\")")),
+    };
+    if !download && a.opt_str("file")?.is_some() {
+        file = store_dir()?.join(file.file_name().unwrap_or_default());
+    }
     if file.extension().is_none() {
         file.set_extension(format.ext());
     }
@@ -103,5 +131,39 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let out = crate::export::write_export(&s, &file, list).map_err(|e| OpError::new("export_failed", format!("{e:#}")))?;
     let bytes = std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
-    Ok(json!({ "file": out.display().to_string(), "format": format.label(), "parts": n, "bytes": bytes }).into())
+    let mut reply = json!({ "format": format.label(), "parts": n, "bytes": bytes });
+    if store {
+        reply["stored_tab"] = json!(store_tab(od, tab, &out)?);
+    }
+    if download {
+        reply["file"] = json!(out.display().to_string());
+    } else {
+        let _ = std::fs::remove_file(&out);
+    }
+    Ok(reply.into())
+}
+
+/// The export `options` field: (download, store).
+pub(super) fn options_arg(a: &Args) -> Result<(bool, bool), OpError> {
+    match a.opt_str("options")?.unwrap_or("download") {
+        "download" => Ok((true, false)),
+        "download_and_store" => Ok((true, true)),
+        "store" => Ok((false, true)),
+        _ => Err(OpError::param("options", "download, download_and_store or store")),
+    }
+}
+
+/// Where a stored-only export is written before it becomes a file tab.
+pub(super) fn store_dir() -> Result<std::path::PathBuf, OpError> {
+    let d = std::env::temp_dir().join(format!("noshape-store-{}", std::process::id()));
+    std::fs::create_dir_all(&d).map_err(|e| OpError::new("io", format!("{}: {e}", d.display())))?;
+    Ok(d)
+}
+
+/// Keep the exported file `path` as a file tab right after `tab` ("Store <file>").
+pub(super) fn store_tab(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, path: &std::path::Path) -> Result<String, OpError> {
+    let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+    let bytes = std::fs::read(path).map_err(|e| OpError::new("io", format!("{}: {e}", path.display())))?;
+    let id = od.session.edit_document(&crate::export::store_description(&name), |d| crate::export::store_file_tab(d, &name, &bytes, tab))?;
+    Ok(id.to_string())
 }

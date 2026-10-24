@@ -243,6 +243,9 @@ pub struct Instance {
     /// see-through parts around them don't tint them: the red overlaps of
     /// Interference detection.
     pub over_transparent: bool,
+    /// Translucent meshes drawn after the lines and points (color pass): a
+    /// drawing's release watermark lies over the ink.
+    pub over_lines: bool,
     /// Only rendered into the pick buffer (invisible but selectable), e.g.
     /// B-rep vertices and sketch regions; highlights are drawn separately.
     pub pick_only: bool,
@@ -337,6 +340,7 @@ impl Instance {
             line_scale: 1.0,
             hidden_only: false,
             over_transparent: false,
+            over_lines: false,
             pick_only: false,
             pick_base: 0,
             zebra: None,
@@ -356,6 +360,11 @@ impl Instance {
     /// Draw an opaque mesh after the transparent meshes ([`Instance::over_transparent`]).
     pub fn over_transparent(mut self) -> Self {
         self.over_transparent = true;
+        self
+    }
+    /// Draw a translucent mesh after the lines and points ([`Instance::over_lines`]).
+    pub fn over_lines(mut self) -> Self {
+        self.over_lines = true;
         self
     }
     /// Draw only the parts hidden behind other geometry (lines and points).
@@ -734,6 +743,10 @@ pub struct Scene {
     /// Up to two more section planes (with `clip`): geometry is removed
     /// where all planes clip it.
     pub clip_extra: Vec<ClipPlane>,
+    /// Section planes drawn selected (`clip` first, then `clip_extra`): the
+    /// one being edited in the Section view dialog. Onshape mixes its cap 80%
+    /// toward the section pre-highlight color (webgl endcap shader).
+    pub clip_selected: [bool; 3],
     /// Compare mode: instances tagged [`Instance::compare`] are the two
     /// versions (see [`compare`]).
     pub compare: Option<Compare>,

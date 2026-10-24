@@ -164,3 +164,6 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 | ADV4 Hole countersink rows | icon rows, values readable ("12.878 mm", "82 deg") (a12) | ✅ **fixed** |
 | Hole Tapped defaults | Straight tap, 1/4, **20 tpi (UNC)**, Fastener fit None, ☐ Thread class (live ~8515 ☐) (a15); an old doc's stored Threads/inch shows blank (legacy value) | ✅ |
 | ADV1, ADV3, ADV6, ADV7, ADV8, TAB1 | fixed in earlier passes; ADV5, ADV12 withdrawn | ✅ |
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
+| PS2 / TAB1 | imported tab shows its parts as soon as it opens | ✅ fixed |

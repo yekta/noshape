@@ -31,6 +31,7 @@ pub(crate) use status::quantity_of;
 
 pub use convert::*;
 pub use query::{Ent, entity_type_of};
+pub use status::{feature_list_refs, feature_list_value};
 
 use crate::reference::{BodyId, FeatureId, Reference, Role, TopoName};
 use crate::regen::context::{Body, Context};
@@ -96,6 +97,8 @@ pub struct CtxState {
     pub xform: Option<DMat4>,
     transient_ids: HashMap<Arc<str>, Reference>,
     transient_of: HashMap<Reference, Arc<str>>,
+    /// Transient ids kept from feature to feature ([`Context::fs_transients`]).
+    pub persistent: Vec<(Arc<str>, Reference)>,
     /// Marker feature id -> operation.
     pub ops: HashMap<FeatureId, OpInfo>,
     /// Bodies merged by an operation (union, intersection of tools) are
@@ -186,6 +189,7 @@ impl FsContext {
         let hidden: HashSet<BodyId> = hidden_bodies.iter().map(|b| b.id.clone()).collect();
         ctx.bodies.extend(hidden_bodies);
         let attributes = std::mem::take(&mut ctx.fs_attributes);
+        let persistent = std::mem::take(&mut ctx.fs_transients);
         let cx = Arc::new(FsContext {
             serial: next_serial(),
             state: Mutex::new(CtxState {
@@ -197,6 +201,7 @@ impl FsContext {
                 xform,
                 transient_ids: HashMap::new(),
                 transient_of: HashMap::new(),
+                persistent,
                 ops: HashMap::new(),
                 merged_creators: HashMap::new(),
                 body_ops: HashMap::new(),
@@ -253,6 +258,7 @@ impl FsContext {
         ctx.bodies = shown;
         ctx.fs_hidden_bodies = hidden;
         ctx.fs_attributes = st.attributes.clone();
+        ctx.fs_transients = st.persistent.clone();
         ctx
     }
 
@@ -312,6 +318,9 @@ impl CtxState {
     }
 
     pub fn transient(&mut self, r: &Reference) -> Arc<str> {
+        if let Some((s, _)) = self.persistent.iter().find(|(_, x)| x == r) {
+            return s.clone();
+        }
         if let Some(s) = self.transient_of.get(r).cloned() {
             if !matches!(r, Reference::Edge(_) | Reference::Vertex(_)) {
                 return s;
@@ -380,7 +389,18 @@ impl CtxState {
     }
 
     pub fn transient_ref(&self, id: &str) -> Option<&Reference> {
-        self.transient_ids.get(id)
+        self.transient_ids.get(id).or_else(|| self.persistent.iter().find(|(s, _)| &**s == id).map(|(_, r)| r))
+    }
+
+    /// A transient id that lasts beyond this feature for `r` (outside the
+    /// `J..` letters [`Self::transient`] hands out).
+    pub fn persist_transient(&mut self, r: &Reference) -> Arc<str> {
+        if let Some((s, _)) = self.persistent.iter().find(|(_, x)| x == r) {
+            return s.clone();
+        }
+        let id: Arc<str> = format!("JP{}", self.persistent.len()).into();
+        self.persistent.push((id.clone(), r.clone()));
+        id
     }
 
     /// Register an operation id; `None` if it was used before.

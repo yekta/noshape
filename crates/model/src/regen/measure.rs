@@ -127,7 +127,33 @@ fn plane_face(f: &crate::display::PlaneFrame) -> Option<Shape> {
 /// distance/angle for two entities).
 pub fn measure(ctx: &Context, refs: &[Reference]) -> Vec<(String, Measurement)> {
     let shapes: Vec<Vec<Shape>> = refs.iter().map(|r| resolve_shapes(ctx, r)).collect();
-    measure_shapes(&shapes)
+    let rows = measure_shapes(&shapes);
+    let is_plane = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_));
+    if !refs.iter().any(is_plane) {
+        return rows;
+    }
+    // Live (behaviours "ui (10-23 a)"): a default plane is unbounded. It
+    // never contributes an Area, Max dist, Length or Position: alone it has
+    // no measurements, two crossing planes give only their angle, and the
+    // Area / Length of a pair are the other entity's own.
+    if refs.len() == 1 {
+        return Vec::new();
+    }
+    let own: Vec<&Shape> = refs.iter().zip(&shapes).filter(|(r, _)| !is_plane(r)).flat_map(|(_, s)| s.iter()).collect();
+    let faces: Vec<&&Shape> = own.iter().filter(|s| s.shape_type() == ShapeType::Face).collect();
+    let edges: Vec<&&Shape> = own.iter().filter(|s| s.shape_type() == ShapeType::Edge).collect();
+    let area: f64 = faces.iter().filter_map(|s| s.area().ok()).sum();
+    let length: f64 = edges.iter().filter_map(|s| s.length().ok()).sum();
+    let crossing_planes = refs.iter().all(is_plane) && !rows.iter().any(|(l, _)| l == "Parallel dist");
+    rows.into_iter()
+        .filter_map(|(l, m)| match l.as_str() {
+            "Max dist" | "Position" | "Center position" => None,
+            "Area" => (!faces.is_empty()).then_some((l, Measurement::Area(area))),
+            "Length" => (!edges.is_empty()).then_some((l, Measurement::Length(length))),
+            "Min dist" if crossing_planes => None,
+            _ => Some((l, m)),
+        })
+        .collect()
 }
 
 /// The geometry a pair measurement looks at.
@@ -585,6 +611,19 @@ mod tests {
 
     /// The Measure tool with nothing selected (or a selection that resolves
     /// to nothing) measures nothing; it panicked on `shapes[0]`.
+    /// Live (ui 10-23 a): default planes add no Area, Max dist, Length or
+    /// Position; two crossing planes read only their angle; one alone reads
+    /// nothing.
+    #[test]
+    fn default_planes_add_only_angles_and_distances() {
+        use crate::reference::DatumPlane;
+        let ctx = Context::default();
+        let rows = measure(&ctx, &[Reference::Plane(DatumPlane::Top), Reference::Plane(DatumPlane::Front)]);
+        let labels: Vec<&str> = rows.iter().map(|(l, _)| l.as_str()).collect();
+        assert_eq!(labels, ["Perp planes angle"]);
+        assert!(measure(&ctx, &[Reference::Plane(DatumPlane::Top)]).is_empty());
+    }
+
     /// qa5 AN1: a vertex or an edge with a default plane measures their
     /// distance (the plane is unbounded).
     #[test]

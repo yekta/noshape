@@ -936,7 +936,9 @@ impl PartStudioView {
         }
         let current_type = self.ui.measure_type.unwrap_or("Show all");
         let view = cx.entity();
-        let close = move |id: &'static str, cx: &mut Context<Self>| {
+        // `panel`: the Measure panel's thin grey × (live part-studio/82: 11 px
+        // of `#999` ink) instead of the feature dialogs' red ✕.
+        let close = move |id: &'static str, panel: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
                 .size(px(28.))
@@ -945,7 +947,9 @@ impl PartStudioView {
                 .justify_center()
                 .cursor_pointer()
                 .hover(|d| d.bg(pal.panel_hover))
-                .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx))
+                .cursor(gpui_kit::CursorStyle::Arrow)
+                .when(panel, |d| d.child(crate::ui::glyph("panel-close", 20., gpui_kit::rgb(0x999999))))
+                .when(!panel, |d| d.child(crate::assets::icon("dialog-cancel", 24., cx)))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.set_show_mass(false, cx);
                     this.ui.measure_pinned = false;
@@ -958,7 +962,10 @@ impl PartStudioView {
         // Onshape's selection box: `#def1fb` with a 1 px `#1651b0` border when
         // active, the caption small on top once something is listed.
         // `invalid`: entries in red (live: parts without a material).
-        let field = |label: &str, items: Vec<String>, active: bool, invalid: bool| {
+        // `removable`: the items are `self.selection` and a chip's × drops
+        // its entry (the Measure field).
+        let field_view = cx.entity();
+        let field = |label: &str, items: Vec<String>, active: bool, invalid: bool, removable: bool| {
             let empty = items.is_empty();
             v_flex()
                 .mx(px(3.))
@@ -970,7 +977,33 @@ impl PartStudioView {
                 // Live (dom/dialog-mass-properties.txt): 26 px empty, 42 with one
                 // chip (16 px label strip + 24 px chip rows) with the border.
                 .child(div().px(px(6.)).flex().items_center().when(empty, |d| d.h(px(25.)).pt(px(2.)).text_size(px(12.))).when(!empty, |d| d.h(px(16.)).pt(px(2.)).text_size(px(10.))).text_color(gpui_kit::rgb(0x555555)).child(label.to_string()))
-                .children(items.into_iter().map(|t| h_flex().h(px(24.)).px(px(6.)).text_size(px(13.33)).text_color(if invalid { pal.text_invalid } else { gpui_kit::rgb(0x555555) }).child(div().flex_1().truncate().child(t)).child(div().text_color(pal.text_muted).child("×"))))
+                // Live (part-studio/82): a 20 x 24 × cell (5 px left pad, 7 px of
+                // `#666` ink, red on hover) 5 px from the border; every second
+                // row 35 % lighter (woolsthorpe.css, as in the feature dialogs).
+                .children(items.into_iter().enumerate().map(|(i, t)| {
+                    h_flex()
+                        .id(SharedString::from(format!("{label}-chip-{i}")))
+                        .h(px(24.))
+                        .pl(px(6.))
+                        .pr(px(5.))
+                        .text_size(px(13.33))
+                        .text_color(if invalid { pal.text_invalid } else { gpui_kit::rgb(0x555555) })
+                        .when(i % 2 == 1, |d| d.bg(hsla(0., 0., 1., 0.35)))
+                        .child(div().flex_1().truncate().child(t))
+                        .child(div().id("x").group("measure-x").w(px(20.)).h(px(24.)).pl(px(5.)).flex().items_center().child(crate::ui::glyph("ui-clear", 9., pal.icon_tertiary).when(removable, |g| g.group_hover("measure-x", |s| s.text_color(pal.error)))).when(removable, |d| {
+                            let view = field_view.clone();
+                            d.cursor_pointer().on_click(move |_, _, cx| {
+                                cx.stop_propagation();
+                                view.update(cx, |this, cx| {
+                                    if i < this.selection.len() {
+                                        this.selection.remove(i);
+                                        this.refresh_scene(false, cx);
+                                        cx.notify();
+                                    }
+                                })
+                            })
+                        }))
+                }))
         };
         // Label and right-aligned read-only value on an underline (12 px `#666` label).
         let value_row = |label: SharedString, value: String| {
@@ -1016,8 +1049,8 @@ impl PartStudioView {
                 Some(m) => {
                     body = body
                         // Live: 5 px between the tabs and the two fields, 8 under them.
-                        .child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, m.parts.clone(), true, m.mass.is_none()).mt(px(5.)).mb(px(0.)))
-                        .child(field("Mate connector for reference frame", m.reference.clone().into_iter().collect(), false, false).mt(px(5.)).mb(px(0.)))
+                        .child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, m.parts.clone(), true, m.mass.is_none(), false).mt(px(5.)).mb(px(0.)))
+                        .child(field("Mate connector for reference frame", m.reference.clone().into_iter().collect(), false, false, false).mt(px(5.)).mb(px(0.)))
                         // Live (dom/dialog-mass-properties.txt): the rows from here are
                         // 27 / 26 / 29 px tall, 2 px apart (3 px above X): X, Y and Z
                         // sit 31 px apart, the inertia rows 28.
@@ -1042,7 +1075,7 @@ impl PartStudioView {
                     }
                 }
                 None => {
-                    body = body.child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, selected_names.clone(), true, false));
+                    body = body.child(field(if self.ui.mass_faces { "Faces to measure" } else { "Parts to measure" }, selected_names.clone(), true, false, false));
                     for (k, v) in rows {
                         body = body.child(value_row(k.into(), v));
                     }
@@ -1069,7 +1102,7 @@ impl PartStudioView {
                             .border_color(pal.border)
                             .child(crate::ui::panel_title("ps-mass", div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Mass and section properties")))
                             .child(div().size(px(28.)).flex().items_center().justify_center().bg(crate::theme::p().accept).when(true, crate::ui::disabled_accept).cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)))
-                            .child(close("mass-close", cx)),
+                            .child(close("mass-close", false, cx)),
                     )
                     // Live: 46 px from the last inertia row to the dialog's
                     // bottom (the list's 2 px, a 22 px band, the 22 px ? row).
@@ -1082,23 +1115,19 @@ impl PartStudioView {
         // bottom right; "Measure" + ×; the selection field; Measure type,
         // Length unit, Angle unit; Reference coordinate system; then one row
         // per result with the value in monospace.
-        let select_row = |label: &'static str, value: SharedString, menu: Option<AnyElement>| {
-            h_flex()
-                .h(px(26.))
-                .px(px(5.))
-                .gap(px(4.))
-                .child(div().text_size(px(12.)).text_color(pal.text).child(label))
-                .child(match menu {
-                    Some(m) => m,
-                    None => h_flex().flex_1().h(px(22.)).px(px(4.)).border_b_1().border_color(pal.border).text_size(px(13.33)).child(div().flex_1().child(value)).child(crate::ui::glyph("ui-caret-down", 10., pal.text)).into_any_element(),
-                })
-        };
+        // Live (part-studio/82, at 1×): a 12 px `#666` label, then the select
+        // over the rest of the row: 14 px black text and a 7 px `#777` ▼ 7 px
+        // in from the end of its `#d7d7d7` underline (5 px from the panel's
+        // edge, 2 px under the row's middle).
+        let select_row = |label: &'static str, menu: AnyElement| h_flex().h(px(26.)).px(px(5.)).gap(px(4.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child(label)).child(div().flex_1().mt(px(2.)).child(menu));
+        let select_face = |value: SharedString| h_flex().w_full().child(div().flex_1().text_size(px(14.)).text_color(gpui_kit::rgb(0x000000)).child(value)).child(crate::ui::glyph("ui-select-caret", 7., gpui_kit::rgb(0x777777)));
         let type_menu = Button::new("measure-type")
             .custom(gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.row_hover.into()).active(pal.accent_soft.into()).shadow(false))
-            .child(h_flex().w_full().child(div().flex_1().text_size(px(13.33)).child(current_type)).child(crate::ui::glyph("ui-caret-down", 10., pal.text)))
-            .flex_1()
-            .h(px(22.))
-            .px(px(4.))
+            .child(select_face(current_type.into()))
+            .w_full()
+            .h(px(24.))
+            .pl(px(4.))
+            .pr(px(7.))
             .rounded(px(0.))
             .border_b_1()
             .border_color(pal.border)
@@ -1123,10 +1152,11 @@ impl PartStudioView {
             let items = std::rc::Rc::new(items);
             Button::new(id)
                 .custom(gpui_kit::component::button::ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.row_hover.into()).active(pal.accent_soft.into()).shadow(false))
-                .child(h_flex().w_full().child(div().flex_1().text_size(px(13.33)).child(value.clone())).child(crate::ui::glyph("ui-caret-down", 10., pal.text)))
-                .flex_1()
-                .h(px(22.))
-                .px(px(4.))
+                .child(select_face(value.clone().into()))
+                .w_full()
+                .h(px(24.))
+                .pl(px(4.))
+                .pr(px(7.))
                 .rounded(px(0.))
                 .border_b_1()
                 .border_color(pal.border)
@@ -1156,6 +1186,9 @@ impl PartStudioView {
         let angle_name = format!("{:?}", munits.angle);
         let length_menu = unit_menu("measure-length-unit", length_name, length_items, cx);
         let angle_menu = unit_menu("measure-angle-unit", angle_name, angle_items, cx);
+        // Live (ui 10-23 a (e), a default plane alone): a selection with no
+        // measurements says so.
+        let nothing = mrows.is_empty() && !self.selection.is_empty();
         let view_rows = cx.entity();
         // The distance row an X/Y/Z row belongs to (picks its glyph).
         let mut parent = String::new();
@@ -1163,19 +1196,47 @@ impl PartStudioView {
             v_flex()
                 .id("measure-panel")
                 .occlude()
+                // Live (part-studio/82, at 1×): 220 px, flush with the
+                // viewport's bottom-right corner, over the panel strip and
+                // the measure buttons.
                 .absolute()
-                .bottom(px(36.))
-                .right(px(40.))
+                .bottom(px(2.))
+                .right_0()
                 .w(px(220.))
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_color(pal.text)
-                .child(h_flex().h(px(29.)).pl(px(6.)).border_b_1().border_color(pal.border).child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)).child(close("measure-close", cx)))
-                .child(field("Select entities to measure", selected_names, true, false))
-                .child(select_row("Measure type:", current_type.into(), Some(type_menu)))
-                .child(select_row("Length unit:", SharedString::default(), Some(length_menu)))
-                .child(select_row("Angle unit:", SharedString::default(), Some(angle_menu)))
+                .child(h_flex().h(px(29.)).pl(px(6.)).border_b_1().border_color(pal.border).child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)).child(close("measure-close", true, cx)))
+                .child(field("Select entities to measure", selected_names, true, false, true).mt(px(5.)).mb(px(5.)))
+                .child(select_row("Measure type:", type_menu))
+                .child(select_row("Length unit:", length_menu))
+                .child(select_row("Angle unit:", angle_menu))
                 .child(crate::ui::os_checkbox("measure-ref", "Reference coordinate system", false))
+                .child(div().h(px(5.)))
+                // Live (part-studio/2244, at 1×): a 202 px info box (`#def1fb`,
+                // 1 px `#b2ddf6`) 5 px in, 14 px `#094174` text on 21 px lines
+                // wrapping after "for"; 15 px above the footer line.
+                .when(nothing, |d| {
+                    let (fill, outline, text) = crate::ui::alert_colors(crate::ui::AlertKind::Info);
+                    d.child(
+                        div()
+                            .mt(px(6.))
+                            .mb(px(9.))
+                            .ml(px(5.))
+                            .w(px(202.))
+                            .rounded(px(2.))
+                            .border_1()
+                            .border_color(outline)
+                            .bg(fill)
+                            .pt(px(4.))
+                            .pb(px(7.))
+                            .px(px(11.))
+                            .text_size(px(14.))
+                            .line_height(px(21.))
+                            .text_color(text)
+                            .child("No measurements available for current selection."),
+                    )
+                })
                 .children(mrows.into_iter().enumerate().map(|(n, (k, v, axis, var))| {
                     if axis.is_none() {
                         parent = k.to_string();
@@ -1186,7 +1247,9 @@ impl PartStudioView {
                         .gap(px(2.))
                         .child(crate::ui::measure_value(num))
                         .child(div().text_size(px(12.)).child(unit));
-                    let row = h_flex().min_h(px(26.)).px(px(4.)).gap(px(4.)).text_size(px(12.)).text_color(pal.text);
+                    // Live (part-studio/82): labels, values and units all `#666`.
+                    // The (x) 9 px from the panel's edge.
+                    let row = h_flex().min_h(px(26.)).pl(px(4.)).pr(px(9.)).gap(px(4.)).text_size(px(12.)).text_color(pal.text_muted);
                     let row = match axis {
                         // Live (part-studio/495): the letter, then a glyph in the axis
                         // colour: arrows under a distance, converging arrows under
@@ -1198,6 +1261,24 @@ impl PartStudioView {
                         }
                         None => row.child(div().child(format!("{k}:"))).child(value),
                     };
+                    // A distance row (not its X/Y/Z sub-rows) shows its dashed
+                    // line while hovered (live ui 10-23 a).
+                    let distance = axis.is_none() && var.is_some_and(|v| v.0 == "DISTANCE");
+                    let hover_view = view_rows.clone();
+                    let label = k.to_string();
+                    let row = row.id(SharedString::from(format!("measure-row-{n}"))).when(distance, |d| {
+                        d.on_hover(move |h: &bool, _, cx| {
+                            let label = label.clone();
+                            let h = *h;
+                            hover_view.update(cx, |this, cx| {
+                                let next = if h { Some(label) } else if this.ui.measure_hover.as_ref() == Some(&label) { None } else { this.ui.measure_hover.clone() };
+                                if next != this.ui.measure_hover {
+                                    this.ui.measure_hover = next;
+                                    this.refresh_scene(false, cx);
+                                }
+                            });
+                        })
+                    });
                     // Live (behaviours.md: each row has an (x) "create variable"
                     // icon at the right).
                     let view = view_rows.clone();
@@ -1210,7 +1291,10 @@ impl PartStudioView {
                             .on_click(move |_, window, cx| view.update(cx, |this, cx| this.create_variable_from_measure(var, axis, window, cx)))
                     }))
                 }))
-                .child(h_flex().h(px(22.)).px(px(4.)).justify_end().bg(gpui_kit::rgb(0xeeeeee)).child(help()))
+                // Live: 24 px from the last row's text to a 1 px `#d7d7d7` line
+                // over a 21 px `#eee` band with the ?.
+                .child(div().h(px(6.)))
+                .child(h_flex().h(px(22.)).px(px(4.)).justify_end().border_t_1().border_color(pal.border).bg(gpui_kit::rgb(0xeeeeee)).child(help()))
                 .into_any_element(),
         ]
     }

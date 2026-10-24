@@ -1576,3 +1576,201 @@ fn drawing_auxiliary_view_in_line_with_a_sketch_line() {
     let id = r["view"].clone();
     assert_eq!(r["views"].as_array().unwrap().iter().find(|x| x["id"] == id).unwrap()["kind"], "auxiliary", "{r}");
 }
+
+/// Live samples (outside the repo; skipped when missing).
+fn live_sample(name: &str) -> Option<std::path::PathBuf> {
+    let p = std::path::Path::new("/root/onshape-research/live/samples").join(name);
+    p.is_file().then_some(p)
+}
+
+#[test]
+fn pvz_of_several_parts_imports_as_part_studio_and_assembly() {
+    let Some(pvz) = live_sample("pvz-shapes.pvz") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("pvz_import.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+    // Live (qa5 zip import): Assembly "RootAssembly" then Part Studio "pvz-shapes parts".
+    let mut tabs: Vec<(String, String)> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+    tabs.sort();
+    assert_eq!(tabs, vec![("RootAssembly".to_string(), "Assembly".to_string()), ("pvz-shapes parts".to_string(), "Part Studio".to_string())], "{r}");
+    let order: Vec<String> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    let (a, s) = (order.iter().position(|t| t == "RootAssembly").unwrap(), order.iter().position(|t| t == "pvz-shapes parts").unwrap());
+    assert!(a < s, "the Assembly tab first: {order:?}");
+    // Parts named as in the file, in live's order, mesh volumes as live's.
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "pvz-shapes parts" }));
+    let solids: Vec<(String, f64)> = parts["parts"].as_array().unwrap().iter().filter(|p| p["kind"] == "Solid").map(|p| (p["name"].as_str().unwrap().to_string(), num(&p["volume"]))).collect();
+    let names: Vec<&str> = solids.iter().map(|s| s.0.as_str()).collect();
+    assert_eq!(names, ["Cylinder", "Torus", "Cone"], "{parts}");
+    for (got, live) in solids.iter().map(|s| s.1).zip([9407.77811303131, 1770.239206699627, 1569.176626930149]) {
+        assert!((got - live).abs() < 1e-3, "{got} vs {live}");
+    }
+    assert!(parts["parts"].as_array().unwrap().iter().any(|p| p["kind"] == "Surface"), "the Loft's open mesh: {parts}");
+    // The Assembly: an instance per solid (the composite isn't instanced).
+    let asm = call(&mut ctx, "assembly_list", json!({ "tab": "RootAssembly" }));
+    let mut inst: Vec<String> = asm["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect();
+    inst.sort();
+    assert_eq!(inst, ["Cone <1>", "Cylinder <1>", "Torus <1>"], "{asm}");
+}
+
+#[test]
+fn pvz_of_one_part_keeps_its_name() {
+    let Some(pvz) = live_sample("pvz-block.pvz") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("pvz_import1.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+    let kinds: Vec<&str> = r["tabs"].as_array().unwrap().iter().map(|t| t["kind"].as_str().unwrap()).collect();
+    assert!(!kinds.contains(&"Assembly"), "{r}");
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "pvz-block" }));
+    assert_eq!(parts["parts"][0]["name"], "Part 1", "{parts}");
+    assert!((num(&parts["parts"][0]["volume"]) - 7999.999463558208).abs() < 1e-3, "{parts}");
+}
+
+/// qa4 IMP1: the parts of one Import feature never share face names (picking
+/// one part highlighted faces of the other).
+#[test]
+fn imported_parts_have_their_own_face_names() {
+    let Some(step) = live_sample("g48-two.step") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("imp1.noshape").to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let faces = call(&mut ctx, "query_entities", json!({ "tab": "g48-two", "kind": "faces" }));
+    let list = faces["faces"].as_array().unwrap();
+    let parts: std::collections::BTreeSet<&str> = list.iter().map(|f| f["part"].as_str().unwrap()).collect();
+    assert_eq!(parts.len(), 2, "{faces}");
+    let mut ids: Vec<&str> = list.iter().map(|f| f["id"].as_str().unwrap()).collect();
+    let n = ids.len();
+    ids.sort();
+    ids.dedup();
+    assert_eq!(ids.len(), n, "a face id names faces of both parts: {faces}");
+}
+
+/// Live ("api (10-23) import parity"): a second import of a file gives its
+/// Part Studio the next free " (n)" and keeps the file tab's name.
+#[test]
+fn second_import_of_a_file_is_numbered_like_onshape() {
+    let Some(step) = live_sample("g25-b.step") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("reimport.noshape").to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let tabs: Vec<(String, String)> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+    let studios: Vec<&str> = tabs.iter().filter(|t| t.1 == "Part Studio" && t.0.starts_with("g25-b")).map(|t| t.0.as_str()).collect();
+    assert_eq!(studios, ["g25-b", "g25-b (1)"], "{tabs:?}");
+    assert_eq!(tabs.iter().filter(|t| t.1 == "File" && t.0 == "g25-b.step").count(), 2, "{tabs:?}");
+}
+
+/// Live: pvz-rot-asm.pvz's instances: <1> turned 90° about z and moved 50 mm
+/// along x, <2> in place.
+#[test]
+fn pvz_instances_keep_their_placements() {
+    let Some(pvz) = live_sample("pvz-rot-asm.pvz") else { return };
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("pvz_rot.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+    let asm = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
+    assert_eq!(asm, "pvz rot asm", "{r}");
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
+    let inst = list["instances"].as_array().unwrap();
+    let find = |n: &str| inst.iter().find(|i| i["name"] == n).unwrap_or_else(|| panic!("{n}: {list}"));
+    let (a, b) = (find("Part 1 <1>"), find("Part 1 <2>"));
+    let t = |i: &Value| [num(&i["translation"][0]), num(&i["translation"][1]), num(&i["translation"][2])];
+    assert!((t(a)[0] - 50.0).abs() < 1e-6 && t(a)[1].abs() < 1e-6, "{a}");
+    assert!(t(b).iter().all(|x| x.abs() < 1e-6), "{b}");
+    // 90° about z: quaternion (0, 0, ±√½, √½).
+    let q = &a["rotation"];
+    assert!((num(&q[2]).abs() - 0.5f64.sqrt()).abs() < 1e-6, "{a}");
+    // Imported again: the root's raw name, then that numbered (live).
+    let again = |ctx: &mut Ctx| -> String {
+        let r = call(ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+        r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string()
+    };
+    assert_eq!(again(&mut ctx), "pvz rot asm_54");
+    assert_eq!(again(&mut ctx), "pvz rot asm_54 (1)");
+    // pvz-assembly.pvz: <1> in place, <2> 50 mm along x.
+    let Some(pvz) = live_sample("pvz-assembly.pvz") else { return };
+    let r = call(&mut ctx, "import_files", json!({ "files": [pvz.to_str().unwrap()] }));
+    let asm = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": asm }));
+    let inst = list["instances"].as_array().unwrap();
+    let find = |n: &str| inst.iter().find(|i| i["name"] == n).unwrap_or_else(|| panic!("{n}: {list}"));
+    assert!(t(find("Part 1 <1>")).iter().all(|x| x.abs() < 1e-6), "{list}");
+    assert!((t(find("Part 1 <2>"))[0] - 50.0).abs() < 1e-6, "{list}");
+}
+
+/// Export Options › Store file in a new tab (live: the file tab "<name>.<ext>"
+/// directly after the exported tab).
+#[test]
+fn export_store_file_in_a_new_tab() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "export_store.noshape");
+    let order = |ctx: &mut Ctx| -> Vec<String> { call(ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect() };
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "PARASOLID", "options": "store" }));
+    assert!(r.get("file").is_none() && r["stored_tab"].is_string(), "{r}");
+    assert_eq!(last(&mut ctx), "Store Part Studio 1.x_t");
+    let o = order(&mut ctx);
+    let ps = o.iter().position(|t| t == "Part Studio 1").unwrap();
+    assert_eq!(o[ps + 1], "Part Studio 1.x_t", "{o:?}");
+    // Download and store: the file too.
+    let file = scratch("stored.step");
+    let r = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": file.to_str().unwrap(), "options": "download_and_store" }));
+    assert!(file.is_file(), "{r}");
+    assert!(order(&mut ctx).contains(&"stored.step".to_string()));
+    // A drawing's export.
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let name = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().find(|t| t["id"] == tab.as_str() || t["name"] == tab.as_str()).unwrap()["name"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "PDF", "options": "store" }));
+    let o = order(&mut ctx);
+    let di = o.iter().position(|t| *t == name).unwrap();
+    assert_eq!(o[di + 1], format!("{name}.pdf"), "{o:?}");
+    let e = try_call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("file"), "{e:?}");
+}
+
+/// Rhino (EXP1): export and import back with the same volume (builds with
+/// openNURBS; without it the export says so).
+#[test]
+fn rhino_export_round_trip() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "rhino_rt.noshape");
+    let want = num(&call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
+    let file = scratch("rhino_rt.3dm");
+    match try_call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "RHINO", "file": file.to_str().unwrap() })) {
+        Ok(_) => {}
+        Err(e) => {
+            assert!(e.message.contains("openNURBS"), "{e:?}");
+            return;
+        }
+    }
+    let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+    let got = num(&call(&mut ctx, "query_parts", json!({ "tab": studio }))["parts"][0]["volume"]);
+    assert!((got - want).abs() < 2e-5 * want, "{got} vs {want}");
+}
+
+/// Export Drawing through the API with the modal's options: raster formats,
+/// versions, the inspection list.
+#[test]
+fn drawing_export_formats_and_options() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_export_all.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let head = |p: &std::path::Path, n: usize| std::fs::read(p).unwrap()[..n].to_vec();
+    for (format, magic) in [("PNG", &[0x89u8, b'P', b'N', b'G'][..]), ("JPEG", &[0xffu8, 0xd8, 0xff][..]), ("TIFF", &[b'I', b'I', 42, 0][..])] {
+        let f = scratch(&format!("sheet.{}", format.to_lowercase()));
+        call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": format, "file": f.to_str().unwrap() }));
+        assert_eq!(head(&f, magic.len()), magic, "{format}");
+    }
+    let dxf = scratch("sheet.dxf");
+    call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "version": "2018", "file": dxf.to_str().unwrap(), "text": "explode_all", "units": "Inch" }));
+    assert!(std::fs::read_to_string(&dxf).unwrap().contains("AC1032"));
+    let e = try_call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "PDF", "version": "9.9", "file": "/tmp/x.pdf" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    // The inspection list: a CSV with the panel's columns.
+    call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "A", "position": [30, 30] }));
+    let csv = scratch("insp.csv");
+    call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "Inspection list", "file": csv.to_str().unwrap() }));
+    assert!(!std::fs::read_to_string(&csv).unwrap().is_empty());
+}

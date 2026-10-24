@@ -1619,18 +1619,27 @@ After the model changes, a drawing's views keep the geometry they were made from
 
 #### drawing_export
 
-Export a drawing to PDF, DWG, DXF, DWT or SVG.
+Export a drawing (PDF, DWG, DXF, DWT, SVG, PNG, JPEG, TIFF, inspection lists) (edits the document (one undoable history entry)).
 
-The Export Drawing modal: all sheets (or `sheets`: "current" or a range like "1-3, 5") to one file; PDF and DWT hold every sheet, other formats with several sheets are zipped (one file per sheet).
+The Export Drawing modal with every option. PDF holds every sheet, DWT the first two, DXF / DWG a layout per sheet of `sheets`; SVG and the raster formats (300 dpi) the active sheet. `version` from the format's list (PDF 1.4–1.7, default 1.5; DWG / DXF Release 11-12 … 2018, default 2000 / Release 14; DWT 2013 / 2018). Inspection list / Drawing definition list are the CSV lists.
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
-| `format` | one of `PDF`, `DWG`, `DXF`, `DWT`, `SVG` | required | Format. |
-| `file` | string | required | Output path. |
-| `sheets` | string |  | "all" (default), "current" or a range "1-3, 5". |
-| `color` | one of `color`, `black_and_white`, `grayscale` |  | PDF color (default color). |
+| `format` | one of `PDF`, `DWG`, `DXF`, `DWT`, `SVG`, `PNG`, `JPEG`, `TIFF`, `Inspection list`, `Drawing definition list` | required | Format. |
+| `file` | string |  | Output path (required unless `options` is "store"; then only its name is used, default "<drawing>.<ext>"). |
+| `options` | one of `download`, `download_and_store`, `store` |  | Options: write `file`, and / or keep the file as a file tab right after the drawing ("Store <file>"). |
+| `version` | string |  | The format's Version (e.g. "1.7", "2018", "Release 14"). |
+| `sheets` | string |  | DWG / DXF: "all" (default), "current" or a range "1-3, 5" (PDF: every sheet; DWT: the first two; SVG and rasters: the active sheet). |
+| `overridden_dimensions` | one of `show_underlines`, `hide_underlines` |  | Overridden dimensions. |
+| `text` | one of `normal`, `selectable`, `export_as_text`, `explode_notes`, `explode_all` |  | PDF Text (normal / selectable) or DWG / DXF / DWT Text (export_as_text / explode_notes / explode_all). |
+| `color` | one of `color`, `black_and_white`, `grayscale` |  | PDF Color (default color; only PDF has it). |
+| `units` | one of `Use drawing units`, `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | DWG / DXF Units (default "Use drawing units"). |
+| `splines_as_polylines` | boolean |  | Export splines as polylines. |
+| `z_zero` | boolean |  | DWG / DXF / DWT: Set z-height to zero and normals to positive. |
+| `hide_inspection_items` | boolean |  | Hide inspection items. |
+| `exclude_off_sheet` | boolean |  | DWG / DXF / DWT: Exclude off-sheet content. |
 
 #### drawing_section_view
 
@@ -2441,16 +2450,17 @@ Draws the parts, sketches, planes and origin as the 3D view does (Onshape's look
 
 #### export_parts
 
-Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino).
+Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino) (edits the document (one undoable history entry)).
 
-Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`.
+Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the first Part Studio. |
 | `format` | one of `PARASOLID`, `ACIS`, `STEP`, `IGES`, `PVZ`, `JT`, `RHINO`, `GLTF`, `GLB`, `OBJ`, `3MF`, `STL` | required | File format. |
-| `file` | string | required | Output path; without an extension the format's is added ("part" -> "part.x_t"); individual files go in a .zip. |
+| `file` | string |  | Output path; without an extension the format's is added ("part" -> "part.x_t"); individual files go in a .zip. Required unless `options` is "store" (then only its name is used; default "<tab>.<ext>"). |
+| `options` | one of `download`, `download_and_store`, `store` |  | Options: write `file` (Download), and / or keep the file as a file tab right after the tab (Store file in a new tab; one edit "Store <file>"). |
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all visible parts. |
 | `y_up` | boolean |  | Export models oriented Y axis up. |
 | `version` | string |  | Format version (e.g. "AP214", "35.1", "7"). |
@@ -2459,6 +2469,13 @@ Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Optio
 | `stl_text` | boolean |  | STL as text instead of binary. |
 | `individual` | boolean |  | Export unique parts as individual files (zipped). |
 | `include_hidden` | boolean |  | Include hidden parts. |
+| `preprocessing` | one of `None`, `Automatic`, `Remove small entities only (advanced)`, `Remove small entities only (basic)`, `Remove small entities only (advanced) and convert all surfaces to b-surfaces` |  | STEP: Preprocessing (default None). |
+| `derived_tolerances` | boolean |  | STEP: Include derived tolerances in export. |
+| `mbd_text_height` | boolean |  | STEP: Use custom annotation text height for MBD export. |
+| `iges_compatibility` | boolean |  | IGES: Use compatibility mode for surfaces and curves. |
+| `group_composites` | boolean |  | PVZ: Group composite parts into a single part file. |
+| `compress` | boolean |  | glTF / GLB: Compress. |
+| `geometry_format` | one of `STL`, `GLTF`, `GLB`, `OBJ` |  | URDF: Geometry format (default STL). |
 
 ### import
 

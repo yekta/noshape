@@ -137,6 +137,54 @@ static SKETCH_FILES: [&[u8]; 55] = [
 
 static SKETCH_UNPACKED: [std::sync::OnceLock<&'static [u8]>; 55] = [const { std::sync::OnceLock::new() }; 55];
 
+/// The drawing Font list's families that the Text tool lacks: DejaVu Sans,
+/// DejaVu Sans Mono, DejaVu Serif (Bitstream Vera license, see
+/// `fonts/drawing/LICENSE-DejaVu.txt`), regular / bold / italic / bold
+/// italic each, zstd-compressed (unpacked on first use).
+static DRAWING_FILES: [&[u8]; 12] = [
+    include_bytes!("../fonts/drawing/DejaVuSans.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSans-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSans-Oblique.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSans-BoldOblique.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSansMono.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSansMono-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSansMono-Oblique.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSansMono-BoldOblique.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSerif.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSerif-Bold.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSerif-Italic.ttf.zst"),
+    include_bytes!("../fonts/drawing/DejaVuSerif-BoldItalic.ttf.zst"),
+];
+
+static DRAWING_UNPACKED: [std::sync::OnceLock<&'static [u8]>; 12] = [const { std::sync::OnceLock::new() }; 12];
+
+fn drawing_file(i: usize) -> &'static [u8] {
+    DRAWING_UNPACKED[i].get_or_init(|| Box::leak(zstd::decode_all(DRAWING_FILES[i]).unwrap_or_default().into_boxed_slice()))
+}
+
+/// The face of a drawing Font list family the Text tool lacks (live's 22,
+/// drawing/161): its file and variable-font weight. The CJK "Light"
+/// families are the Text tool's variable fonts at weight 300. "Noto Sans
+/// UI" and the AR* / APMONO families draw in a free stand-in until their
+/// files are known (live request asb 10-24, parity S28).
+fn drawing_face(font: &str, bold: bool, italic: bool) -> Option<(&'static [u8], Option<f32>)> {
+    let style = usize::from(bold) + 2 * usize::from(italic);
+    match font {
+        "DejaVu Sans" => Some((drawing_file(style), None)),
+        "DejaVu Sans Mono" => Some((drawing_file(4 + style), None)),
+        "DejaVu Serif" => Some((drawing_file(8 + style), None)),
+        "Noto Sans Chinese Simplified Light" | "Noto Sans Chinese Traditional Light" => match sketch_face(font.trim_end_matches(" Light"), bold, italic) {
+            Some(SketchFace::File(i, _)) => Some((sketch_file(i), Some(if bold { 700.0 } else { 300.0 }))),
+            _ => None,
+        },
+        "Noto Sans UI" => Some((font_data("Noto Sans", bold, italic), None)),
+        "APMONO" | "ARMono" => drawing_face("DejaVu Sans Mono", bold, italic),
+        "ARComp" | "ARIsoP1" | "ARSimp" | "ARTxt" => drawing_face("DejaVu Sans", bold, italic),
+        "ARItal" => drawing_face("DejaVu Sans", bold, true),
+        _ => None,
+    }
+}
+
 fn sketch_file(i: usize) -> &'static [u8] {
     SKETCH_UNPACKED[i].get_or_init(|| Box::leak(zstd::decode_all(SKETCH_FILES[i]).unwrap_or_default().into_boxed_slice()))
 }
@@ -427,10 +475,13 @@ impl ttf_parser::OutlineBuilder for Outline {
 
 /// Lays out `text` (newlines start new lines) in box units.
 pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayout {
-    let (data, wght) = match sketch_face(font, bold, italic) {
-        Some(SketchFace::File(i, w)) => (sketch_file(i), w),
-        Some(SketchFace::Noto) => (font_data("Noto Sans", bold, italic), None),
-        None => (font_data(font, bold, italic), None),
+    let (data, wght) = match drawing_face(font, bold, italic) {
+        Some(f) => f,
+        None => match sketch_face(font, bold, italic) {
+            Some(SketchFace::File(i, w)) => (sketch_file(i), w),
+            Some(SketchFace::Noto) => (font_data("Noto Sans", bold, italic), None),
+            None => (font_data(font, bold, italic), None),
+        },
     };
     let Ok(mut face) = ttf_parser::Face::parse(data, 0) else { return TextLayout::default() };
     // A variable font's weight (Bold = 700; otherwise its default instance).
@@ -622,5 +673,26 @@ mod tests {
         assert_eq!(two.lines, 2);
         let ys: Vec<f64> = two.polylines(4).iter().flatten().map(|p| p.y).collect();
         assert!(ys.iter().cloned().fold(f64::INFINITY, f64::min) < -0.5, "second line below the first");
+    }
+}
+
+#[cfg(test)]
+mod drawing_font_tests {
+    use super::*;
+
+    /// Live's 22 drawing families all lay out real glyphs; DejaVu is its own
+    /// face, and the CJK "Light" ones are thinner than their regular.
+    #[test]
+    fn drawing_font_families_have_faces() {
+        let families = ["APMONO", "ARComp", "ARIsoP1", "ARItal", "ARMono", "ARSimp", "ARTxt", "Arimo", "DejaVu Sans", "DejaVu Sans Mono", "DejaVu Serif", "Noto Sans", "Noto Sans Chinese Simplified", "Noto Sans Chinese Simplified Light", "Noto Sans Chinese Traditional", "Noto Sans Chinese Traditional Light", "Noto Sans Japanese", "Noto Sans Korean", "Noto Sans UI", "Noto Serif", "Open Sans", "Tinos"];
+        for f in families {
+            let l = layout_text("Hag", f, false, false);
+            assert!(l.width > 0.0 && !l.contours.is_empty(), "{f}");
+        }
+        assert_ne!(layout_text("Hag", "DejaVu Sans", false, false).width, layout_text("Hag", "Noto Sans", false, false).width);
+        let ink = |f: &str| -> usize { layout_text("永", f, false, false).contours.iter().map(|c| c.len()).sum() };
+        assert!(ink("Noto Sans Chinese Simplified Light") > 0 && ink("Noto Sans Chinese Simplified") > 0);
+        let wide = |f: &str| layout_text("Hag", f, true, false).width;
+        assert!(wide("DejaVu Sans") > layout_text("Hag", "DejaVu Sans", false, false).width);
     }
 }

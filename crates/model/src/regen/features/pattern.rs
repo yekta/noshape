@@ -71,6 +71,18 @@ fn skipped(ev: &EvalCtx, two: bool) -> FResult<BTreeSet<(i64, i64)>> {
     Ok(out)
 }
 
+/// linearPattern.fs / circularPattern.fs / curvePattern.fs: the info for a
+/// skipped seed (index 0) or an index outside `(count, centered)` per
+/// direction, the seed's first.
+fn skip_info(ev: &mut EvalCtx, skip: &BTreeSet<(i64, i64)>, one: (i64, bool), two: (i64, bool)) {
+    let outside = |i: i64, (n, centered): (i64, bool)| i >= n || i < if centered { -n + 1 } else { 0 };
+    if skip.contains(&(0, 0)) {
+        ev.infos.push("Original pattern instance will not be skipped.".into());
+    } else if skip.iter().any(|&(a, b)| outside(a, one) || outside(b, two)) {
+        ev.infos.push("Index is outside patterned instance count.".into());
+    }
+}
+
 fn index_range(n: i64, centered: bool) -> std::ops::RangeInclusive<i64> {
     if centered { -(n - 1)..=(n - 1) } else { 0..=(n - 1) }
 }
@@ -153,6 +165,14 @@ struct Path {
 }
 
 impl Path {
+    fn new(pts: Vec<DVec3>) -> Self {
+        let mut cum = vec![0.0];
+        for w in pts.windows(2) {
+            let l = cum.last().copied().unwrap_or(0.0) + w[0].distance(w[1]);
+            cum.push(l);
+        }
+        Path { pts, cum }
+    }
     fn length(&self) -> f64 {
         *self.cum.last().unwrap_or(&0.0)
     }
@@ -240,18 +260,36 @@ fn chain_path(edges: &[SourcedEdge]) -> FResult<Path> {
             }
         }
     }
-    let mut cum = vec![0.0];
-    for w in chain.windows(2) {
-        let l = cum.last().copied().unwrap_or(0.0) + w[0].distance(w[1]);
-        cum.push(l);
-    }
     if chain.len() < 2 {
         return err("The pattern path is degenerate");
     }
-    Ok(Path { pts: chain, cum })
+    Ok(Path::new(chain))
 }
 
-fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
+/// Tight box of what a pattern copies (parts, faces, or the selected
+/// features' bodies and faces).
+fn seed_box(ev: &EvalCtx) -> Option<(DVec3, DVec3)> {
+    let mut shapes: Vec<Shape> = Vec::new();
+    match ev.enum_("patternType") {
+        "FACE" => shapes.extend(ev.resolve_faces(ev.query("faces")).into_iter().filter_map(|(bi, fi)| ev.ctx.bodies[bi].shape.sub_shape(ShapeType::Face, fi).ok())),
+        "FEATURE" => {
+            let feats: Vec<FeatureId> = ev.query("instanceFunction").iter().filter_map(|r| if let Reference::Feature(f) = r { Some(*f) } else { None }).collect();
+            for b in &ev.ctx.bodies {
+                if feats.contains(&b.id.feature) {
+                    shapes.push(b.shape.clone());
+                } else {
+                    shapes.extend(b.faces.iter().enumerate().filter(|(_, n)| n.creator().is_some_and(|c| feats.contains(&c))).filter_map(|(i, _)| b.shape.sub_shape(ShapeType::Face, i).ok()));
+                }
+            }
+        }
+        _ => shapes.extend(ev.resolve_bodies(ev.query("entities")).into_iter().map(|i| ev.ctx.bodies[i].shape.clone())),
+    }
+    let boxes: Vec<k::BoundingBox> = shapes.iter().filter_map(|s| s.bounding_box(true).ok()).collect();
+    let first = boxes.first()?;
+    Some(boxes.iter().fold((first.min, first.max), |(lo, hi), b| (lo.min(b.min), hi.max(b.max))))
+}
+
+fn curve_instances(ev: &EvalCtx) -> FResult<(Vec<Instance>, Option<&'static str>)> {
     let edges = resolve_curves(ev, ev.query("edges"))?;
     if edges.is_empty() {
         return crate::regen::eval::err_at(&["edges"], "Select a path to pattern along.");
@@ -261,10 +299,35 @@ fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
     if orient == "LOCK_FACES" && ev.query("lockedFaces").is_empty() {
         return crate::regen::eval::err_at(&["lockedFaces"], "Select face to be normal to.");
     }
-    let path = chain_path(&edges).or_else(|_| crate::regen::eval::err_at(&["edges"], "Edges do not form a continuous path."))?;
+    let mut path = chain_path(&edges).or_else(|_| crate::regen::eval::err_at(&["edges"], "Edges do not form a continuous path."))?;
     let len = path.length();
     let n = ev.integer("instanceCount")?.max(1);
     let closed = path.pts.first().zip(path.pts.last()).is_some_and(|(a, b)| a.distance(*b) < 1e-6);
+    // path.fs: the path starts at the end nearer the seed (a closed one at
+    // its point nearest the seed); curvePattern.fs's info when that start
+    // isn't in the seed's box.
+    let mut info = None;
+    if let Some((lo, hi)) = seed_box(ev) {
+        let c = (lo + hi) * 0.5;
+        if closed {
+            let i = path.pts.iter().enumerate().min_by(|a, b| a.1.distance(c).total_cmp(&b.1.distance(c))).map_or(0, |(i, _)| i);
+            if i > 0 && i + 1 < path.pts.len() {
+                let mut pts = path.pts[i..path.pts.len() - 1].to_vec();
+                pts.extend_from_slice(&path.pts[..=i]);
+                path = Path::new(pts);
+            }
+        } else if path.pts.last().is_some_and(|e| e.distance(c) < path.pts[0].distance(c)) {
+            let mut pts = path.pts.clone();
+            pts.reverse();
+            path = Path::new(pts);
+        }
+        let tol = 1e-9 + (hi - lo).length() * 1e-9;
+        let start = path.pts[0];
+        let inside = start.cmpge(lo - DVec3::splat(tol)).all() && start.cmple(hi + DVec3::splat(tol)).all();
+        if !inside && n > 1 {
+            info = Some(if closed { "For best results ensure that the path and pattern seed are touching." } else { "For best results ensure that the path start point and pattern seed are touching." });
+        }
+    }
     let spacing = if ev.is("spacingType", "DISTANCE") {
         let d = ev.length("distance")?;
         // A closed path needs room for the gap back to the start.
@@ -330,7 +393,7 @@ fn curve_instances(ev: &EvalCtx) -> FResult<Vec<Instance>> {
         };
         out.push(Instance { code: code2(i, 0), t: k::Transform::Matrix(m) });
     }
-    Ok(out)
+    Ok((out, info))
 }
 
 // ------------------------------------------------------------------ entry points
@@ -347,6 +410,11 @@ fn parallel_directions(ev: &EvalCtx) -> bool {
 pub fn linear_pattern(ev: &mut EvalCtx) -> FResult<()> {
     check_seeds(ev, "pattern")?;
     let inst = linear_instances(ev)?;
+    let two = ev.bool("hasSecondDir");
+    let (n1, n2) = (ev.integer("instanceCount")?.max(1), if two { ev.integer("instanceCountTwo")?.max(1) } else { 1 });
+    let (c1, c2) = (ev.bool("isCentered"), two && ev.bool("isCenteredTwo"));
+    let skip = skipped(ev, true)?;
+    skip_info(ev, &skip, (n1, c1), (n2, c2));
     if parallel_directions(ev) {
         ev.infos.push("Parallel directions selected for first and second direction.".into());
     }
@@ -356,12 +424,19 @@ pub fn linear_pattern(ev: &mut EvalCtx) -> FResult<()> {
 pub fn circular_pattern(ev: &mut EvalCtx) -> FResult<()> {
     check_seeds(ev, "pattern")?;
     let inst = circular_instances(ev)?;
+    let (n, centered) = (ev.integer("instanceCount")?.max(1), ev.bool("isCentered"));
+    let skip = skipped(ev, false)?;
+    skip_info(ev, &skip, (n, centered), (1, false));
     run_pattern(ev, inst)
 }
 
 pub fn curve_pattern(ev: &mut EvalCtx) -> FResult<()> {
     check_seeds(ev, "pattern")?;
-    let inst = curve_instances(ev)?;
+    let (inst, info) = curve_instances(ev)?;
+    ev.infos.extend(info.map(String::from));
+    let n = ev.integer("instanceCount")?.max(1);
+    let skip = skipped(ev, false)?;
+    skip_info(ev, &skip, (n, false), (1, false));
     run_pattern(ev, inst)
 }
 
@@ -596,13 +671,15 @@ fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances:
 
 /// Fuse (boss) or cut (pocket) instance tools into the parts they touch.
 fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: bool, kind: BodyKind, strict: bool) -> FResult<()> {
-    if strict && let Some(bi) = index_of_body(ev, seed) {
+    if let Some(bi) = index_of_body(ev, seed) {
         let seed_box = ev.ctx.bodies[bi].shape.bounding_box(false).ok();
-        let off = tools.iter().any(|t| match (&seed_box, t.shape.bounding_box(false)) {
+        let off = |t: &NamedShape| match (&seed_box, t.shape.bounding_box(false)) {
             (Some(a), Ok(b)) => !boxes_meet(a, &b, 1e-7),
             _ => false,
-        });
-        if off {
+        };
+        // Live L42: a face pattern fails on any instance off the part; L40:
+        // a Feature pattern skips one and fails when all are off.
+        if (strict && tools.iter().any(off)) || (!tools.is_empty() && tools.iter().all(off)) {
             return err(NOT_ON_BODY);
         }
     }
@@ -663,26 +740,16 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     if feats.is_empty() {
         return Ok(());
     }
+    // With Reapply, patternUtils.fs re-runs the features and reports their
+    // failure as is (no fallback to the geometry).
     if ev.bool("fullFeaturePattern") {
-        match reapply_features(ev, &feats, instances) {
-            Ok(()) => return Ok(()),
-            Err(e) => {
-                ev.ctx = before.clone();
-                ev.warnings.truncate(warnings_before);
-                let r = geometric_feature_pattern(ev, &feats, instances);
-                if r.is_err() {
-                    ev.error_shapes.clear();
-                    return Err(e);
-                }
-                ev.warnings.push(format!("Reapply features failed ({}); the features' geometry was patterned instead", e.message));
-                return r;
-            }
-        }
+        return reapply_features(ev, &feats, instances);
     }
     match geometric_feature_pattern(ev, &feats, instances) {
         Ok(()) => Ok(()),
         // Onshape's own failure (live G45): no re-apply.
-        Err(e) if e.message == SWITCH_TO_PER_INSTANCE || e.message == NO_GEOMETRY_FROM_FEATURES => Err(e),
+        // Live L40: every instance off the part fails too.
+        Err(e) if e.message == SWITCH_TO_PER_INSTANCE || e.message == NO_GEOMETRY_FROM_FEATURES || e.message == NOT_ON_BODY => Err(e),
         // Faces our face pattern can't make a tool of (Parasolid's can):
         // the same instances by re-applying the features.
         Err(e) => {
@@ -738,6 +805,24 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             .collect();
         for (id, fs) in groups {
             found = true;
+            // Live "psb flush wall" W1: a wall flush with the part (the
+            // feature owns only its caps across the pattern direction) fails
+            // from 3 instances; with 2 the copy moves the cap (Parasolid).
+            if let Some(bi) = index_of_body(ev, &id)
+                && let Some(step) = flush_caps_step(&ev.ctx.bodies[bi], &fs, instances)
+            {
+                let body = ev.ctx.bodies[bi].clone();
+                if instances.len() > 1 {
+                    ev.error_shapes = failed_instances(ev, f, &body, &fs, instances);
+                    return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
+                }
+                let caps: Vec<Shape> = fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok()).collect();
+                let res = k::offset_faces(&body.shape, &caps, step).map_err(|_| fe(SWITCH_TO_PER_INSTANCE))?;
+                let offset_role = |n: &Name| Role::Offset(n.clone());
+                let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &std::collections::BTreeMap::new(), Some(&offset_role));
+                ev.replace_body(bi, res.shape, names);
+                continue;
+            }
             if let Some(bi) = index_of_body(ev, &id)
                 && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances)
             {
@@ -814,6 +899,31 @@ fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
     eval_fn(&mut sub).ok()?;
     let made: Vec<Shape> = sub.ctx.bodies.iter().filter(|b| b.id.feature == tmp).map(|b| b.shape.clone()).collect();
     (!made.is_empty()).then(|| Shape::compound(&made))
+}
+
+/// When a feature's faces on a part are only planar caps across a straight
+/// pattern direction (its sides merged into the part's faces: a wall flush
+/// with the part), the offset that moves those caps by one step (negative:
+/// into the part). None otherwise.
+fn flush_caps_step(body: &Body, faces: &[usize], instances: &[Instance]) -> Option<f64> {
+    let k::Transform::Translate(v) = instances.first()?.t else { return None };
+    let d = v.try_normalize()?;
+    let mut step = None;
+    for &i in faces {
+        let f = body.shape.sub_shape(ShapeType::Face, i).ok()?;
+        let k::Surface::Plane(_) = f.face_surface().ok()? else { return None };
+        let n = f.normal_at_point(f.centroid().ok()?).ok()?.normalize_or_zero();
+        if n.dot(d).abs() < 1.0 - 1e-9 {
+            return None;
+        }
+        // The cap's outward normal: an offset along it by −v·n moves it by v.
+        let s = -v.dot(n);
+        if step.is_some_and(|x: f64| (x - s).abs() > 1e-12) {
+            return None;
+        }
+        step = Some(s);
+    }
+    step
 }
 
 /// Onshape's PATTERN_SWITCH_TO_PER_INSTANCE: a feature pattern whose face
@@ -1415,6 +1525,14 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
             ev.ctx.bodies.push(Arc::new(Body::new(BodyId { feature: f, index: bj as u32 }, name, kind, ns.shape, ns.names.faces, color, f)));
         }
         return Ok(());
+    }
+    // Mate connectors owned by a moved part move with it.
+    let moved: Vec<BodyId> = bodies.iter().map(|&bi| ev.ctx.bodies[bi].id.clone()).collect();
+    let mut conn_refs = conn_refs;
+    for (c, owner) in &ev.ctx.connector_owners {
+        if moved.contains(owner) && !conn_refs.contains(c) {
+            conn_refs.push(c.clone());
+        }
     }
     // Move in place: bodies keep their ids, names and face names.
     for bi in bodies {

@@ -29,3 +29,6 @@ Status: ✅ matches live, ✗ differs, ? live pending.
 Live answered "qa5 pass 7" (7): an empty-graphics click keeps dialog chips. Ours on 5bd50b2: Mass properties chip kept after clicks at (1400,850) and (800,102) → row 11 ✅.
 
 Row 10 (Mass properties panel translucency): **? pending** ui's comparison (live dialogs are rgba(255,255,255,.95), see workflow-configured-assembly.md CA3).
+
+## Re-run pass 21 (qa5, 2026-10-23)
+| 10 / CA3 | closed in workflow-configured-assembly.md (CA3: live's 95 % white panels show what is behind them too; no change) | ✅ closed |

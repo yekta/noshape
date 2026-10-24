@@ -111,6 +111,9 @@ pub struct ExportSettings {
     pub hidden: bool,
     /// URDF: index into `URDF_GEOMETRY`.
     pub urdf_geometry: usize,
+    /// Options: 0 Download, 1 Download and store file in a new tab, 2 Store
+    /// file in a new tab (see [`store_file_tab`]).
+    pub options: usize,
 }
 
 impl Default for ExportSettings {
@@ -133,6 +136,7 @@ impl Default for ExportSettings {
             individual: false,
             hidden: false,
             urdf_geometry: 0,
+            options: 0,
         }
     }
 }
@@ -265,9 +269,12 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
             k::write_step_with(path, &shapes, k::LengthUnit::Meter, &k::StepOptions { schema, file_unit })?;
         }
         PartFormat::Iges => k::write_iges(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
-        // Text transmit file, schema 12006: every Parasolid version reads it, so
-        // the Version choice needs no other format.
-        PartFormat::Parasolid => k::write_parasolid(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter, false)?,
+        // Text transmit file in the chosen version (live G36: the body in that
+        // version's layouts; "Use latest version" = 38.1).
+        PartFormat::Parasolid => {
+            let version = if s.latest { PARASOLID_VERSIONS[0] } else { PARASOLID_VERSIONS.get(s.version).copied().unwrap_or(PARASOLID_VERSIONS[0]) };
+            k::write_parasolid_version(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter, false, version)?
+        }
         PartFormat::Acis => k::write_acis(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         PartFormat::Pvz => {
             let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, _)| k::ExportShape { shape: sh.clone(), name: Some(n.clone()), color: None }).collect();
@@ -489,6 +496,19 @@ fn crc32(data: &[u8]) -> u32 {
         }
     }
     !crc
+}
+
+/// Export Options › "Store file in a new tab" (and "Download and store"):
+/// the exported file becomes a file tab directly after the exported tab
+/// (live: "Part 1 Drawing 1.dwt" right after the drawing; the exported tab
+/// stays active). One edit, [`store_description`].
+pub fn store_file_tab(d: &mut noshape_model::document::Document, file_name: &str, bytes: &[u8], after: noshape_model::document::TabId) -> noshape_model::document::TabId {
+    crate::import::add_file_tab(d, noshape_model::file_tab::FileTab::new(file_name, bytes, noshape_model::file_tab::now()), None, Some(after))
+}
+
+/// The history entry of [`store_file_tab`]: "Store <file>".
+pub fn store_description(file_name: &str) -> String {
+    format!("Store {file_name}")
 }
 
 #[cfg(test)]

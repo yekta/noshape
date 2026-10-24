@@ -157,14 +157,14 @@ Assembly items not re-checked.
 - ✅ (skb: live 300–318 show mate values only on the selected mate, never during/after a drag) **Drag readout "Rz -12.232°" stays in the viewport** after the drag ends (still there after Animate…).
 - ✅ (skb: live layout, verified GUI v41) **Animate dialog**: no "Mate DOF to animate" field, Steps 60 (Onshape 300), Single/Reciprocate/Loop toggles
   (Onshape: Playback type ▾ Reciprocate + ↻), title "Animate Revolute 1" (Onshape "Animate mate").
-- **Drawing: Create Drawing from + doesn't open Insert view**; Onshape opens the Insert view panel with the view
+- ✅ (asb 10-23, app check: + › Create Drawing… OK with No views opens Insert view with the part picker; ANSI_A_INCH.dwt row highlighted) **Drawing: Create Drawing from + doesn't open Insert view**; Onshape opens the Insert view panel with the view
   following the cursor. Template table: no default row highlighted.
-- **Drawing views stay orange after Esc** (QA2 reported it too).
-- **Drawing Section view**: no dialog (Onshape: Vertical | Horizontal | Angular tabs, label "A", jog/flip, Show
+- ✅ (asb 10-23, app check: Esc clears the view selection) **Drawing views stay orange after Esc** (QA2 reported it too).
+- ✅ (asb 10-23: Section view dialog Vertical / Horizontal / Angular, label, Show cut geometry only, Cut angle, Section depth, Exclude from cut; `drawing_section.rs`) **Drawing Section view**: no dialog (Onshape: Vertical | Horizontal | Angular tabs, label "A", jog/flip, Show
   cut geometry only, Section depth); clicks just outside the view are silently ignored.
-- **Drawing Dimension (d) doesn't take a circle** ("Select a point or a straight edge"); I believe Onshape's
+- ✅ (asb 10-23, app check: d + a click on a circle away from its snap points gives Ø, as live's tool help "Select … arcs and circles") **Drawing Dimension (d) doesn't take a circle** ("Select a point or a straight edge"); I believe Onshape's
   Dimension tool is smart (circle → diameter). Shift+D works. Please verify live.
-- **Drawing export**: toolbar ⤓ ▾ PDF/SVG/DXF straight to a path. Onshape: tab right-click → Export… → "Export
+- ✅ (asb 10-22: tab right-click › Export… opens the Export Drawing modal with live's formats and options) **Drawing export**: toolbar ⤓ ▾ PDF/SVG/DXF straight to a path. Onshape: tab right-click → Export… → "Export
   Drawing" modal (File name, Format ▾ PDF/DWG/DXF/DWT/SVG/PNG/JPEG/TIFF…, Version, Text, Color, Options).
 
 ### skb (sketch)

@@ -293,6 +293,8 @@ pub struct DrawingEditor {
     pub paste_table: Option<Vec<Vec<String>>>,
     /// Note tool: the leader anchored by the first click (on a snap point).
     pub note_leader: Option<Leader>,
+    /// Add leader on a note: where the new leader starts (`drawing_leaders`).
+    pub leader_from: Option<noshape_model::drawing::LeaderStart>,
     /// Weld symbol dialog (drawing_weld.rs).
     pub weld_dlg: Option<crate::drawing_weld::WeldDlg>,
     /// The note editor's formatting ruler (drawing_ruler.rs).
@@ -376,6 +378,10 @@ pub struct DrawingEditor {
     pub inspection: Option<crate::drawing_inspection::InspectionDlg>,
     pub measure: Option<Vec<crate::drawing_keys::MeasurePick>>,
     pub status: Option<SharedString>,
+    /// The green success bubble at the top centre of the sheet (`show_toast`)
+    /// and its generation (a newer one replaces it).
+    pub toast: Option<SharedString>,
+    pub toast_gen: u64,
     pub _subs: Vec<Subscription>,
 }
 
@@ -386,6 +392,37 @@ impl Focusable for DrawingEditor {
 }
 
 impl DrawingEditor {
+    /// A green success bubble at the top centre of the sheet (live: "✓
+    /// Successfully replicated 7/7 annotations ×"), gone after 5 s or on ×.
+    pub fn show_toast(&mut self, text: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.toast_gen += 1;
+        let generation = self.toast_gen;
+        self.toast = Some(text.into());
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(std::time::Duration::from_secs(5)).await;
+            let _ = this.update(cx, |this, cx| {
+                if this.toast_gen == generation {
+                    this.toast = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    fn render_toast(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let text = self.toast.clone()?;
+        let entity = cx.entity().downgrade();
+        let close = move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+            let _ = entity.update(cx, |this, cx| {
+                this.toast = None;
+                cx.notify();
+            });
+        };
+        Some(div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(crate::os_ui::message_bubble("dr-toast", crate::os_ui::BubbleKind::Success, text, close, cx)).into_any_element())
+    }
+
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         // Read before `doc` moves into the view (derived parts' sources, DER8).
         let studio_cache = doc.read(cx).studio_cache.clone();
@@ -515,6 +552,7 @@ impl DrawingEditor {
             styles_gap: None,
             table_tool: None,
             note_leader: None,
+            leader_from: None,
             cell_sel: None,
             cell_panel: None,
             note_color: None,
@@ -546,6 +584,8 @@ impl DrawingEditor {
             insp_table: Default::default(),
             measure: None,
             status: None,
+            toast: None,
+            toast_gen: 0,
             _subs: subs,
         };
         this.old_state = this.load_old_state(cx);
@@ -1035,7 +1075,7 @@ impl DrawingEditor {
             let (pts, idx) = noshape_model::drawing::font::text_fill_font(&crate::drawing_watermark::geometry(t, w, h), None);
             let mut m = noshape_render::MeshData::default();
             for p in pts {
-                m.positions.push([p[0] as f32, p[1] as f32, -0.5]);
+                m.positions.push([p[0] as f32, p[1] as f32, 0.5]);
                 m.normals.push([0.0, 0.0, 1.0]);
                 m.pick_ids.push(0);
             }
@@ -1100,9 +1140,6 @@ impl DrawingEditor {
         // Onshape: the white sheet sits flat on the gray surround (no shadow).
         if let Some((_shadow, paper, _)) = self.paper.as_ref().filter(|_| self.model_bg.is_none()) {
             scene.instances.push(Instance::new(Drawable::Mesh(paper.clone())).with_color([1.0, 1.0, 1.0, 1.0]).unlit().unpickable().layer(-5));
-            if let Some(m) = &self.watermark_mesh {
-                scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(crate::theme::lin(crate::drawing_watermark::COLOR)).unlit().unpickable().layer(-4));
-            }
         }
         // Inserted images and backdrops, under the sheet geometry.
         scene.instances.extend(self.image_instances());
@@ -1128,6 +1165,11 @@ impl DrawingEditor {
         }
         for (m, color) in &self.colored.1 {
             scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color(*color).unlit().layer(2));
+        }
+        // The release watermark, translucent over the sheet's content (live).
+        if let Some(m) = self.watermark_mesh.as_ref().filter(|_| self.paper.is_some() && self.model_bg.is_none()) {
+            let [r, g, b, _] = crate::theme::lin(crate::drawing_watermark::EDITOR_COLOR);
+            scene.instances.push(Instance::new(Drawable::Mesh(m.clone())).with_color([r, g, b, crate::drawing_watermark::EDITOR_ALPHA]).unlit().unpickable().over_lines());
         }
         if let Some((l, pts)) = &self.overlay_handles {
             scene.instances.push(Instance::new(Drawable::Lines(l.clone())).per_primitive_color().unpickable().layer(20));
@@ -1491,6 +1533,7 @@ impl DrawingEditor {
             .children(self.render_measure())
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
+            .children(self.render_toast(cx))
             .children(self.render_section_dlg(cx))
             .children(self.render_break_dlg(cx))
             .children(self.render_aux_dlg(cx))

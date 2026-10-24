@@ -481,6 +481,10 @@ pub struct DrawingView {
     /// neither slides along its alignment axis nor follows its parent).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unaligned: bool,
+    /// Scale › Sheet scale (child views, help H:views): with no scale of its
+    /// own the view follows the sheet's scale, not its parent's.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sheet_scale: bool,
     /// View simplification (None: the parent's, Auto for base views).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub simplification: Option<Simplification>,
@@ -592,6 +596,7 @@ impl Default for DrawingView {
             kind: ViewKind::Projected { parent: ViewId(0), direction: None },
             position: [0.0, 0.0],
             scale: None,
+            sheet_scale: false,
             style: RenderStyle::HiddenLinesRemoved,
             show_tangent_edges: true,
             show_centerlines: false,
@@ -814,7 +819,7 @@ pub enum ArcCondition {
 
 /// A leader from an annotation to a point: view coordinates (meters) of
 /// `view` when set (the leader follows the view), else sheet millimeters.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Leader {
     #[serde(default)]
     pub view: Option<ViewId>,
@@ -822,6 +827,68 @@ pub struct Leader {
     /// Bend nodes between the shoulder and the point (sheet mm).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes: Vec<[f64; 2]>,
+    /// Notes: the horizontal landing from the note's side to the bend (mm;
+    /// None: 4). Live drw2 10-21 g: dragging the bend changes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing: Option<f64>,
+    /// Notes: the side the leader leaves (None: the nearer one).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub right: Option<bool>,
+    /// Notes: where the leader starts (live: Add leader branches from the
+    /// existing landing's bend, or from a node of a leader).
+    #[serde(default, skip_serializing_if = "LeaderStart::is_side")]
+    pub start: LeaderStart,
+}
+
+/// Where a note leader starts: the note's side, or a branch off the bend or
+/// a node of an earlier leader of the same note (its index).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LeaderStart {
+    #[default]
+    Side,
+    Bend(usize),
+    Node(usize, usize),
+}
+
+impl LeaderStart {
+    pub fn is_side(&self) -> bool {
+        *self == LeaderStart::Side
+    }
+}
+
+/// Remove node `node` of leader `leader`; branches from it start at the
+/// leader's bend instead, later nodes' branches move down one.
+pub fn remove_leader_node(leaders: &mut [Leader], leader: usize, node: usize) {
+    let Some(l) = leaders.get_mut(leader) else { return };
+    if node >= l.nodes.len() {
+        return;
+    }
+    l.nodes.remove(node);
+    for b in leaders.iter_mut() {
+        b.start = match b.start {
+            LeaderStart::Node(j, n) if j == leader && n == node => LeaderStart::Bend(j),
+            LeaderStart::Node(j, n) if j == leader && n > node => LeaderStart::Node(j, n - 1),
+            s => s,
+        };
+    }
+}
+
+/// Remove leader `leader`; branches off it start at the note's side, later
+/// indices move down one.
+pub fn remove_leader(leaders: &mut Vec<Leader>, leader: usize) {
+    if leader >= leaders.len() {
+        return;
+    }
+    leaders.remove(leader);
+    for b in leaders.iter_mut() {
+        let shift = |j: usize| if j > leader { j - 1 } else { j };
+        b.start = match b.start {
+            LeaderStart::Bend(j) | LeaderStart::Node(j, _) if j == leader => LeaderStart::Side,
+            LeaderStart::Bend(j) => LeaderStart::Bend(shift(j)),
+            LeaderStart::Node(j, n) => LeaderStart::Node(shift(j), n),
+            s => s,
+        };
+    }
 }
 
 /// Target area of a datum target (sizes in model meters).
@@ -3408,6 +3475,7 @@ impl Drawing {
 pub mod build;
 pub mod clipboard;
 pub mod create;
+mod cad_dimstyles;
 pub mod cad_export;
 pub mod cad_fit;
 pub mod cad_layers;
