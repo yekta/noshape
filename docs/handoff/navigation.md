@@ -36,8 +36,9 @@ Worktree /root/wt/nav2 (branch agent/nav2, codegen-units 237), scratch
   `replay.py` → `check.py` recomputes Chrome+Onshape from WAYLAND_DEBUG and
   checks each camera change. macOS: `mac-replay.swift` (CGEvents). Windows:
   `win-replay.ps1` (SendInput, InjectTouchInput; touchpads can't be injected).
-  Locally sway sees the four devices; Xwayland isn't installed here (X11 mode
-  runs in CI only).
+  Local run 10-24 (Xwayland installed with apt): Wayland 468/468 and X11
+  240/240 checks pass. Run it as root:
+  `.github/nav/linux-replay.sh <bin> .github/nav/block.noshape <out> wayland|x11`.
 * **Live request** REQUESTS.md "nav2 (P1)": DOM WheelEvent wheelDelta sweep,
   CDP synthesizePinchGesture (real touchpad-pinch pipeline), drags with the
   camera read from the view controller, CDP touch gestures.
@@ -62,7 +63,8 @@ Key facts derived from it:
 * Browser `wheelDelta` per platform is emulated in `navigation::wheel_delta`
   (macOS 120/line, 3/px; Windows 120/notch from gpui lines ÷ system wheel
   lines, 1.2/px; Linux 40/gpui line, 120/45 per Wayland px).
-* Pinch: the model scales by the finger ratio about the pinch centre.
+* Touchpad pinch: one wheel notch per pinch update (Chrome sends ±120
+  Ctrl+wheel events); touch-screen pinch: the finger ratio (`pinchZoom`).
 * Right-drag rotate is free (camera axes), 3 turns per viewport diagonal;
   Alt = constrained (levels the view, then about world Z).
 * Bindings: flags MMB=1 RMB=2 SHIFT=4 CTRL=8 ALT=16; left button has no
