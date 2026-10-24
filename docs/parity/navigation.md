@@ -26,6 +26,52 @@ canvas (`drawing_tools.rs` / `drawing_view.rs`, 2D).
 
 Status: ✅ works · 🔧 fixed/added in this pass · ⏳ partial · ❌ missing.
 
+## Chrome's input mapping (what Onshape's client actually receives)
+
+Onshape's zoom reads only the legacy DOM `wheelDelta` of `mousewheel` events
+(`zoomOnMouseWheelScroll`: i = 0.5/120 × wheelDelta, ×3 when
+`navigator.platform` contains "Win"; scale 2^(−i/6)). So every trackpad,
+wheel and pinch number depends on how the browser turns OS input into
+`wheelDelta`. Chromium's own source (fetched 10-24, copies in
+/root/nav2-scratch/chromium) says:
+
+* **Blink** (`wheel_event.cc`): `wheelDelta = int(wheel_ticks × 120)`, in f32,
+  truncated; `wheelDelta` is the vertical value unless that is 0.
+* **macOS** (`web_input_event_builders_mac.mm`): notched wheels give
+  `wheel_ticks = kCGScrollWheelEventDeltaAxis1` (raw ±1 per notch, *no*
+  acceleration, however fast the wheel spins); continuous devices (trackpad,
+  Magic Mouse) `PointDeltaAxis1 / 40`, i.e. wheelDelta = 3 × points. Shift
+  moves a notched wheel to axis 2 (ignored); trackpad point deltas stay
+  vertical with Shift. Momentum events go the same way.
+* **Windows** (`web_input_event_builders_win.cc`): `GET_WHEEL_DELTA_WPARAM`
+  as is (120 per notch, high-resolution wheels and legacy touchpads less).
+  **Shift+wheel stays vertical** (the Shift swap in `mouse_wheel_event_queue.cc`
+  is only for page scrolling, after the page saw the event), so it zooms.
+  Precision touchpads (`direct_manipulation_event_handler_win.cc`): whole
+  DIP pixels of the DirectManipulation translation per update, wheelDelta =
+  pixels.
+* **X11** (`events_x_utils.cc`): 120 per wheel button or per scroll-valuator
+  increment (touchpads: 120 × Δvaluator / increment). **No touchpad pinch.**
+* **Wayland** (`wayland_pointer.cc`, `wayland_event_source.cc`): wheels
+  `value120` (rounded per frame), finger / continuous scroll −12 × the axis
+  value (`kWaylandUnscaledTouchpadScrolling` is off by default).
+* **Touchpad pinch** (macOS magnify, Windows precision touchpad, Wayland
+  `zwp_pointer_gestures`; `touchpad_pinch_event_queue.cc`): each pinch update
+  becomes one Ctrl+`mousewheel` with `wheel_ticks` = +1 if its scale is above
+  1, else −1. Onshape zooms **one notch per update** (×1.06, ×1.19 on Windows)
+  whatever the size of the step; begin/end events zoom nothing; smart zoom
+  (two-finger double tap) is wheelDelta 0 (nothing).
+* **CDP** (`input_handler.cc`) and synthesized gestures always send ±1 tick per
+  event, which is why the live capture saw "one event = one ×1.06 step
+  whatever its size". Live checks of fractional wheelDelta must dispatch DOM
+  `WheelEvent('mousewheel', {wheelDeltaY})` (requested: REQUESTS.md "nav2 (P1)").
+
+noshape: the vendored platform layers report Chromium's `wheel_ticks` in
+`ScrollWheelEvent::wheel_ticks` (NOSHAPE PATCH in gpui-pre, -macos, -windows,
+-linux), and `navigation.rs` applies Blink's truncation and Onshape's
+formula. Replay harness (real OS input → camera trace → independent
+recomputation from the raw OS/protocol events): `.github/nav/`.
+
 ## 1. Mouse (desktop, default "Onshape" mouse controls)
 
 | # | Behaviour | Source | Status |

@@ -115,6 +115,15 @@ struct CameraAnimation {
     duration: Duration,
 }
 
+/// See [`Viewport::axis_tag`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AxisTag {
+    None,
+    /// Animating to the levelled view; tagged when it lands.
+    Levelling,
+    Tagged,
+}
+
 pub struct Viewport {
     gpu: Gpu,
     target_id: u64,
@@ -136,6 +145,8 @@ pub struct Viewport {
     /// texture of that size for that camera needs no re-render (overlays
     /// such as the view cube follow the camera), only a present.
     rendered: Option<(Camera, (u32, u32))>,
+    /// The camera last written to the navigation trace (`nav_trace`).
+    traced_camera: Option<Camera>,
     /// Screen overlays drawn into the frame (`noshape_render::overlay`): the view
     /// cube's hover cell (`None`: no cube), the plane names, the X/Y/Z masks
     /// rasterized for a scale factor, and the overlay last sent.
@@ -287,6 +298,11 @@ pub struct Viewport {
     pub fit_inset_left: f64,
     box_rect: Option<(DVec2, DVec2)>,
     anim: Option<CameraAnimation>,
+    /// Onshape's canvas view tag for constrained rotate
+    /// (`data-view-shown` = `axisRotateCanvasTag`): the view has been levelled
+    /// for it, so Alt+drags turn it. Free rotation, view animations and key
+    /// steps clear it; pan and zoom keep it.
+    axis_tag: AxisTag,
     _frames: Task<()>,
     _picks: Task<()>,
     /// Frames presented so far.
@@ -391,6 +407,7 @@ impl Viewport {
             shown_texture: None,
             retired_textures: Vec::new(),
             rendered: None,
+            traced_camera: None,
             cube: None,
             cube_origin: None,
             plane_labels: Vec::new(),
@@ -465,6 +482,7 @@ impl Viewport {
             fit_inset_left: 0.0,
             box_rect: None,
             anim: None,
+            axis_tag: AxisTag::None,
             _frames: frames,
             _picks: picks,
             frames_presented: 0,
@@ -641,6 +659,7 @@ impl Viewport {
     /// Animate to `to` over `duration` with Onshape's easing (smootherstep).
     pub fn animate_to_with(&mut self, to: Camera, duration: Duration, cx: &mut Context<Self>) {
         self.inertia = None;
+        self.axis_tag = AxisTag::None;
         self.anim = Some(CameraAnimation { from: self.camera, to, start: Instant::now(), duration });
         self.dirty = true;
         cx.notify();
@@ -677,10 +696,19 @@ impl Viewport {
     }
 
     fn camera_changed(&mut self, cx: &mut Context<Self>) {
+        self.trace_camera();
         self.pick_dirty = true;
         self.pick_changed_at = Instant::now();
         cx.emit(ViewportEvent::CameraChanged);
         self.request_frame(cx);
+    }
+
+    fn trace_camera(&mut self) {
+        if crate::nav_trace::enabled() && self.traced_camera != Some(self.camera) {
+            let origin = DVec2::new(f64::from(f32::from(self.bounds.origin.x)), f64::from(f32::from(self.bounds.origin.y)));
+            crate::nav_trace::camera(&self.camera, self.size(), origin);
+            self.traced_camera = Some(self.camera);
+        }
     }
 
     fn local(&self, p: Point<Pixels>) -> DVec2 {
@@ -1383,21 +1411,29 @@ impl Viewport {
                 }
                 self.rotation_speed.push(delta);
                 self.last_rotation = Some(Instant::now());
+                self.axis_tag = AxisTag::None;
             }
             Mode::AxisRotate => {
-                // The view is first animated to the nearest floor-down view
-                // (drags wait for that), then turns about world Z.
+                // The view is first levelled to the nearest floor-down view
+                // (snapped, or animated while drags wait), which tags the
+                // canvas; only drag events on a tagged view turn it about
+                // world Z, so the levelling event itself adds no rotation.
                 if self.anim.is_some() {
                     return;
                 }
-                match nav::level_view(&self.camera, pivot) {
-                    (level, None) => {
-                        self.camera = level;
-                        nav::drag_axis_rotate(&mut self.camera, delta, size, pivot);
-                    }
-                    (level, Some(duration)) => {
-                        self.animate_to_with(level, duration, cx);
-                        return;
+                if self.axis_tag == AxisTag::Tagged {
+                    nav::drag_axis_rotate(&mut self.camera, delta, size, pivot);
+                } else {
+                    match nav::level_view(&self.camera, pivot) {
+                        (level, None) => {
+                            self.camera = level;
+                            self.axis_tag = AxisTag::Tagged;
+                        }
+                        (level, Some(duration)) => {
+                            self.animate_to_with(level, duration, cx);
+                            self.axis_tag = AxisTag::Levelling;
+                            return;
+                        }
                     }
                 }
             }
@@ -1415,6 +1451,10 @@ impl Viewport {
     }
 
     fn on_mouse_down(&mut self, e: &MouseDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        if crate::nav_trace::enabled() {
+            let local = self.local(e.position);
+            crate::nav_trace::input("mouse_down", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
+        }
         let p = self.local(e.position);
         self.buttons.set(e.button, true);
         cx.stop_propagation();
@@ -1463,6 +1503,10 @@ impl Viewport {
     }
 
     fn on_mouse_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if crate::nav_trace::enabled() {
+            let local = self.local(e.position);
+            crate::nav_trace::input("mouse_move", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
+        }
         let p = self.local(e.position);
         // Another element's drag over the graphics (the dimension box by its
         // strip, a dialog by its title): no hover, tool or cursor follows it.
@@ -1543,6 +1587,10 @@ impl Viewport {
     }
 
     fn on_mouse_up(&mut self, e: &MouseUpEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        if crate::nav_trace::enabled() {
+            let local = self.local(e.position);
+            crate::nav_trace::input("mouse_up", serde_json::json!({ "at": [local.x, local.y], "debug": format!("{e:?}") }));
+        }
         let p = self.local(e.position);
         self.buttons.set(e.button, false);
         if self.drag == Drag::Nav {
@@ -1632,27 +1680,50 @@ impl Viewport {
     /// the cursor, never pan (Onshape's `zoomOnMouseWheelScroll`).
     fn on_scroll(&mut self, e: &ScrollWheelEvent, _window: &mut Window, cx: &mut Context<Self>) {
         cx.stop_propagation();
+        if crate::nav_trace::enabled() {
+            let (kind, d) = match e.delta {
+                ScrollDelta::Pixels(p) => ("pixels", (f32::from(p.x), f32::from(p.y))),
+                ScrollDelta::Lines(l) => ("lines", (l.x, l.y)),
+            };
+            let local = self.local(e.position);
+            crate::nav_trace::input("scroll", serde_json::json!({
+                "at": [local.x, local.y], "unit": kind, "delta": [d.0, d.1],
+                "ticks": e.wheel_ticks.map(|t| [t.x, t.y]), "phase": format!("{:?}", e.touch_phase),
+                "shift": e.modifiers.shift, "control": e.modifiers.control,
+            }));
+        }
         if self.drag == Drag::Box {
             return;
         }
         let reverse = MouseControls::current().reverse_scroll;
-        let Some(amount) = nav::wheel_zoom_amount(e.delta, nav::Platform::current(), reverse, e.modifiers.shift) else { return };
-        let (p, size, bounds) = (self.local(e.position), self.size(), self.zoom_bounds());
-        if nav::zoom_at(&mut self.camera, Zoom::Amount(amount), p, size, bounds) {
-            self.anim = None;
-            self.camera_changed(cx);
-        }
+        let Some(amount) = nav::wheel_zoom_amount(e, nav::Platform::current(), reverse) else { return };
+        self.wheel_zoom(amount, e.position, cx);
     }
 
-    /// Trackpad pinch (macOS magnify, Windows precision touchpad, Linux
-    /// gestures): the model scales with the fingers about the pinch centre.
-    fn on_pinch(&mut self, e: &PinchEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    /// Trackpad pinch (macOS magnify, Windows precision touchpad, Wayland
+    /// gestures): one wheel notch per pinch update, as Chromium sends them
+    /// to Onshape (`nav::pinch_zoom_amount`).
+    fn on_pinch(&mut self, e: &PinchEvent, window: &mut Window, cx: &mut Context<Self>) {
         cx.stop_propagation();
-        if self.drag == Drag::Box || e.delta == 0.0 {
+        if crate::nav_trace::enabled() {
+            let local = self.local(e.position);
+            crate::nav_trace::input("pinch", serde_json::json!({ "at": [local.x, local.y], "delta": e.delta, "phase": format!("{:?}", e.phase) }));
+        }
+        if self.drag == Drag::Box {
             return;
         }
-        let (p, size, bounds) = (self.local(e.position), self.size(), self.zoom_bounds());
-        if nav::zoom_at(&mut self.camera, Zoom::Pinch(nav::pinch_ratio(e.delta)), p, size, bounds) {
+        let reverse = MouseControls::current().reverse_scroll;
+        let Some(amount) = nav::pinch_zoom_amount(e, nav::Platform::current(), nav::is_x11(window), reverse) else { return };
+        self.wheel_zoom(amount, e.position, cx);
+    }
+
+    /// `zoomOnCanvasPoint`: zoom by a wheel amount about a window point.
+    /// Onshape's ray (`camera.getRay`) goes through the canvas point +½
+    /// device pixel right and up (`unproject([x + .5, (h − y) + .5])`).
+    fn wheel_zoom(&mut self, amount: f64, position: Point<Pixels>, cx: &mut Context<Self>) {
+        let half = 0.5 / self.scale.max(0.1) as f64;
+        let (p, size, bounds) = (self.local(position) + DVec2::new(half, -half), self.size(), self.zoom_bounds());
+        if nav::zoom_at(&mut self.camera, Zoom::Amount(amount), p, size, bounds) {
             self.anim = None;
             self.camera_changed(cx);
         }
@@ -1663,6 +1734,9 @@ impl Viewport {
     /// A raw touch (vendor/gpui-pre routes them here): fed to Onshape's
     /// gesture recognizer (`touch.rs`) in device pixels.
     fn on_touch(&mut self, e: &TouchEvent, hitbox: HitboxId, window: &mut Window, cx: &mut Context<Self>) {
+        if crate::nav_trace::enabled() {
+            crate::nav_trace::input("touch", serde_json::json!({ "debug": format!("{e:?}") }));
+        }
         let id = e.id.0;
         let now = self.touch_epoch.elapsed();
         let at = self.local(e.position) * self.scale as f64;
@@ -1740,6 +1814,7 @@ impl Viewport {
                         let d = delta / s;
                         let pivot = self.orbit_pivot.unwrap_or(self.camera.target);
                         nav::drag_rotate(&mut self.camera, d, size, pivot, true);
+                        self.axis_tag = AxisTag::None;
                         self.rotation_speed.push(d);
                         self.last_rotation = Some(Instant::now());
                         self.camera_changed(cx);
@@ -1821,6 +1896,7 @@ impl Viewport {
             self.step_clock = Some(Instant::now());
         }
         self.step_rotations.push(StepRotation::new(axis, angle, self.camera.target));
+        self.axis_tag = AxisTag::None;
         self.dirty = true;
         cx.notify();
     }
@@ -1931,6 +2007,9 @@ impl Render for Viewport {
             self.pick_dirty = true;
             if t >= 1.0 {
                 self.anim = None;
+                if self.axis_tag == AxisTag::Levelling {
+                    self.axis_tag = AxisTag::Tagged;
+                }
                 cx.emit(ViewportEvent::CameraChanged);
             } else {
                 window.request_animation_frame();
@@ -1972,6 +2051,7 @@ impl Render for Viewport {
             self.dirty = true;
             self.pick_dirty = true;
         }
+        self.trace_camera();
         self.scale = window.scale_factor();
         self.submit_if_ready(cx);
 

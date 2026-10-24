@@ -397,6 +397,10 @@ pub(crate) struct WaylandClientState {
     pub mouse_location: Option<Point<Pixels>>,
     continuous_scroll_delta: Option<Point<Pixels>>,
     discrete_scroll_delta: Option<Point<f32>>,
+    // NOSHAPE PATCH (agent nav2): this frame's scroll as Chromium sums it
+    // (wayland_event_source.cc `OnPointerAxisEvent`): axis values × −12, or
+    // −value120 (which replaces them); and whether it is value120.
+    chrome_scroll: Option<(Point<f32>, bool)>,
     vertical_modifier: f32,
     horizontal_modifier: f32,
     scroll_event_received: bool,
@@ -560,6 +564,22 @@ pub(crate) enum PendingActivation {
 }
 
 impl WaylandClientState {
+    // NOSHAPE PATCH (agent nav2): see `chrome_scroll`.
+    fn chrome_axis(&mut self, axis: wl_pointer::Axis, delta: f32, high_resolution: bool) {
+        let offset = match axis {
+            wl_pointer::Axis::VerticalScroll => point(0.0, delta),
+            wl_pointer::Axis::HorizontalScroll => point(delta, 0.0),
+            _ => return,
+        };
+        let (sum, high) = self.chrome_scroll.get_or_insert((point(0.0, 0.0), high_resolution));
+        if *high == high_resolution {
+            *sum = point(sum.x + offset.x, sum.y + offset.y);
+        } else if high_resolution {
+            *sum = offset;
+            *high = true;
+        }
+    }
+
     fn consume_startup_activation_token(&mut self, surface: &wl_surface::WlSurface) {
         let Some(startup_activation_token) = self.startup_activation_token.take() else {
             return;
@@ -1159,6 +1179,7 @@ impl WaylandConnection {
             mouse_location: None,
             continuous_scroll_delta: None,
             discrete_scroll_delta: None,
+            chrome_scroll: None,
             vertical_modifier: -1.0,
             horizontal_modifier: -1.0,
             button_pressed: None,
@@ -2726,6 +2747,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                 value,
                 ..
             } => {
+                state.chrome_axis(axis, -value as f32 * 12.0, false);
                 if state.axis_source == AxisSource::Wheel {
                     return;
                 }
@@ -2785,6 +2807,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                 axis: WEnum::Value(axis),
                 value120,
             } => {
+                state.chrome_axis(axis, -value120 as f32, true);
                 state.scroll_event_received = true;
                 let axis = if state.modifiers.shift {
                     wl_pointer::Axis::HorizontalScroll
@@ -2814,6 +2837,15 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                     state.scroll_event_received = false;
                     let continuous = state.continuous_scroll_delta.take();
                     let discrete = state.discrete_scroll_delta.take();
+                    // Chromium rounds wheel frames to whole units and sends
+                    // finger / continuous frames as they are, 120 per tick.
+                    let wheel_ticks = state.chrome_scroll.take().map(|(d, _)| {
+                        if state.axis_source == AxisSource::Wheel || state.axis_source == AxisSource::WheelTilt {
+                            point(d.x.round() / 120.0, d.y.round() / 120.0)
+                        } else {
+                            point(d.x / 120.0, d.y / 120.0)
+                        }
+                    });
                     if let Some(continuous) = continuous {
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::ScrollWheel(ScrollWheelEvent {
@@ -2821,6 +2853,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                                 delta: ScrollDelta::Pixels(continuous),
                                 modifiers: state.modifiers,
                                 touch_phase: TouchPhase::Moved,
+                                wheel_ticks,
                             });
                             drop(state);
                             window.handle_input(input);
@@ -2833,6 +2866,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                             delta: ScrollDelta::Lines(discrete),
                             modifiers: state.modifiers,
                             touch_phase: TouchPhase::Moved,
+                            wheel_ticks,
                         });
                         drop(state);
                         window.handle_input(input);

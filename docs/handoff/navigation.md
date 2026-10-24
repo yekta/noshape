@@ -5,6 +5,43 @@ platform (mouse, trackpad incl. pinch, keyboard, view cube, touchscreen,
 Preferences › Mouse controls) in Part Studio, Assembly and Drawing.
 Checklist: `docs/parity/navigation.md`.
 
+## nav2 (2026-10-24): exact input numbers without hardware
+
+Worktree /root/wt/nav2 (branch agent/nav2, codegen-units 237), scratch
+/root/nav2-scratch (Chromium sources in chromium/, test fixture fix/).
+
+* **Chrome mapping**: Onshape reads `wheelDelta` only; how each OS's input
+  becomes it is in docs/parity/navigation.md "Chrome's input mapping"
+  (Chromium source, quoted file by file). Consequences fixed here: pinch =
+  one wheel notch per update (not the finger ratio), Windows Shift+wheel
+  zooms, macOS notched wheels use the raw notch (no acceleration), Wayland
+  finger scroll 12 per axis unit (was 8), Windows precision touchpad 1 per
+  whole pixel (was 1.2), X11 has no touchpad pinch.
+* **gpui patch**: `ScrollWheelEvent::wheel_ticks` (Chromium's wheel_ticks,
+  before any Shift swap) filled by every platform layer (macOS CGEvent
+  fields, Windows WHEEL_DELTA / DirectManipulation whole pixels, X11
+  valuator increments, Wayland value120 / axis); macOS magnify Cancelled =
+  Ended. `navigation::wheel_delta` / `wheel_zoom_amount` / `pinch_zoom_amount`.
+  Cross-checks: `cargo +stable check --target aarch64-apple-darwin -p
+  gpui-pre-macos` and `--target x86_64-pc-windows-msvc -p gpui-pre-windows`
+  with CARGO_TARGET_DIR=/root/target-shared/cross (macOS: touch the
+  placeholder `…/gpui-pre-apple-*/out/stitched_shaders.metal`; Windows:
+  PATH=/root/nav2-scratch/fakebin for a stub `llvm-rc`). The pinned 1.98.1
+  toolchain has no cross std; stable (also 1.98.1) does.
+* **Replay harness** `.github/nav/` + `.github/workflows/nav.yml`
+  (workflow_dispatch): `NOSHAPE_NAV_TRACE=<file>` makes the viewport write
+  every input and camera as JSON lines (`nav_trace.rs`). Linux: uinput
+  mouse/keyboard/touchpad/touchscreen (`uinput.py`, no deps) under a headless
+  sway (`WLR_BACKENDS=headless,libinput LIBSEAT_BACKEND=noop`, root) →
+  `replay.py` → `check.py` recomputes Chrome+Onshape from WAYLAND_DEBUG and
+  checks each camera change. macOS: `mac-replay.swift` (CGEvents). Windows:
+  `win-replay.ps1` (SendInput, InjectTouchInput; touchpads can't be injected).
+  Locally sway sees the four devices; Xwayland isn't installed here (X11 mode
+  runs in CI only).
+* **Live request** REQUESTS.md "nav2 (P1)": DOM WheelEvent wheelDelta sweep,
+  CDP synthesizePinchGesture (real touchpad-pinch pipeline), drags with the
+  camera read from the view controller, CDP touch gestures.
+
 ## Where the truth comes from
 
 Onshape's own client code is in `/root/onshape-research/bundle-raw/`:
