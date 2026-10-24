@@ -733,3 +733,14 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
     uncompressed one strip at 100 dpi, SVG text as outlines. Still different from live: our templates draw a thin
     line on the sheet edge (live's export has none) and inset the frame 10 mm (live ANSI A ≈ 9.6 mm), reported to
     the lead. IM2 graded ✅ under the band rule (workflow-import-matrix.md).
+  - (10-24) API coverage audit 2: assembly instance / mate menus (assembly_move_to_subassembly, _create_subassembly,
+    _dissolve_subassembly, _add_folder, _unpack_folder, _copy, _set_configuration, _lock, _instance_properties,
+    _dynamic_suppression; assembly_insert `sketch`), Standard content (assembly_standard_content, _insert_standard
+    with holes / auto-size / closest / furthest, _edit_standard), assembly configurations through the config_* ops
+    (Assembly `tab`: inputs, configurations, instance suppression and mate parameters, the active configuration),
+    drawing_insert_view's Insert view panel options (sketch views, flat pattern, named views, simplification, model
+    annotations, sketch appearances, explode / position, display state), drawing_detail_view profiles (rectangle,
+    spline, polygon), drawing_edit_dimension (the dimension palette). The app's handlers call the shared code
+    (ops::assembly, ops::asm_config, ops::drawing, scene detail_profile). config_add_option / _edit_option now return
+    the configuration id as `option` (it was overwritten by the description). Parts menu: covered (Copy here =
+    Transform copy, Copy part = Derived); Release / Revision history have no ops yet.

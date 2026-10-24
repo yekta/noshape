@@ -249,6 +249,26 @@ impl SheetPick<'_> {
     }
 }
 
+/// A Detail view profile from the dialog's shape (1 Rectangle: two
+/// corners; 2 Spline, 3 Polygon: the points) in parent view coordinates:
+/// the closed polygon, its center and the radius around it (the detail's
+/// circle). None when there are too few points.
+pub fn detail_profile(shape: u8, pts: &[[f64; 2]]) -> Option<(Vec<[f64; 2]>, [f64; 2], f64)> {
+    let poly: Vec<[f64; 2]> = match shape {
+        1 if pts.len() >= 2 => {
+            let (a, b) = (pts[0], pts[1]);
+            vec![a, [b[0], a[1]], b, [a[0], b[1]]]
+        }
+        2 if pts.len() >= 3 => views::closed_spline(pts, 16),
+        3 if pts.len() >= 3 => pts.to_vec(),
+        _ => return None,
+    };
+    let n = poly.len() as f64;
+    let center = [poly.iter().map(|p| p[0]).sum::<f64>() / n, poly.iter().map(|p| p[1]).sum::<f64>() / n];
+    let radius = poly.iter().map(|p| ((p[0] - center[0]).powi(2) + (p[1] - center[1]).powi(2)).sqrt()).fold(0.0, f64::max);
+    Some((poly, center, radius))
+}
+
 // ------------------------------------------------------------ hatch
 
 /// A closed profile: outer boundary and holes (sheet mm, or view
