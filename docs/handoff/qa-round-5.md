@@ -32,6 +32,36 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   and, with several parts, `scope` ("No target parts selected for hole.").
 - The hole's row reads "Ø 6 mm THRU" (= live's callout naming) but the Regeneration times panel lists it as "Hole 1".
 
+## v3 Session 5 in the app: sketch constraints and dimension editing (v0.4.8 c7d9d454; doc by r5/v3s5.py: Variable #v = 10 mm + free lines and circles; live "Sketch dimension display + Enter/Esc", "qa5 dim conflict", "Constraints")
+Same as live ✅: new box "62 mm" selected, ± and ✓/✕; `1 in` → label **25.4**, reopens as **`1 in`**; `2*5` → **ƒ 10** with the
+tan just-applied background; `#v` → grey **ƒx 10**; Diameter box "16 mm" → **Ø10**; typed value + Esc → Esc #1 reverts to the
+committed value and blurs (box stays), Esc #2 closes; the Dimension tool stays active after Enter; Equal by selection + E
+(glyph "=" on both, line re-solved to length 40); glyph hover (yellow-orange box, both entities pre-highlighted), click selects
+(orange glyph, yellow-green entities), Delete removes the constraint; **unsolvable** (32 → 50 against Equal 40): toast "Sketch
+could not be solved." top centre with ×, sketch title + feature row red, red error icon on the Features header, conflicting
+entities / dimension / glyphs red; setting 32 back clears everything within 0.5 s and restores the shape.
+- **R5v3-S5-a → DIM-EXPR-UNIT (skb)** a bare expression `2*5` reopens as `2*5`; live wraps it with the document unit:
+  **`(2*5) mm`** (the feature dialog already does this via quantity_field::commit_text).
+- **R5v3-S5-b → DIM-AUTOCOMPLETE (skb)** the sketch dimension box has no autocomplete: live drops down "in" / "isInteger(x)"
+  for `1 in` and "(x) #var 10 mm" / "(x) New variable…" for `#var`; ours shows nothing (`VarCompletion` is only wired into
+  feature_dialog.rs).
+- **R5v3-S5-c → DIM-ESC-UNTOUCHED (skb)** Esc on an **untouched** box (new or reopened) only blurs it (a second Esc closes);
+  live closes it at once (lead's table: "Esc: closes the box … a new dimension is still created, with its measured value"); the
+  two-step Esc is only for a box whose text was changed.
+- **R5v3-S5-d → DIM-UNSOLVED-GEOM (skb)** while unsolvable, ours redraws the line at a half-way solve (49.6 mm tall) while the
+  "50" dimension still points at the old endpoints; live keeps the last solved shape. The edited "50" stays tan, not red
+  (live: the edited R2 turns red with the rest).
+- **R5v3-S5-e → DIM-MENU (skb)** right-click on a sketch dimension: ours = a small custom button list ("Change to driven
+  dimension", "Delete dimension"; labels centred, `part_studio/sketch.rs` render_dim_menu ~2441); live = the standard sketch
+  context menu: Change to driven dimension | Confirm Sketch 1 | Copy sketch | Show all, Curve/surface analysis… | Select ▸,
+  Select other… | (Add comment) | Zoom to fit, View normal to sketch plane | Delete dimension.
+- **R5v3-S5-f → VAR-KEYWORD (psb/api)** a Variable can't be named `var` ("Variable name must be a letter followed by …";
+  `variable_table.rs` is_identifier rejects FS_KEYWORDS); live's own test Part Studios use **`#var`** (behaviours ~4759), so
+  variable names (always written `#name`) must not be checked against the FeatureScript keyword list, and the message is wrong
+  for a keyword anyway.
+- A redundant second Ø on the same circle is created as a grey driven "(Ø10)" without a box (live: an extra radius dimension
+  is drawn grey; parentheses asked).
+
 ## v3 Session 1 in the app UI (v0.4.8 c7d9d454, fresh profile, doc "r5 s1 ui"; live "qa4 round 5 s1 offset", "qa4 round 5 s1")
 Sketch 1 on Top by hand: L outline (Line tool), Ø10 circle, centre line + Slot (width 20 → dimension 10), Offset of the L loop 3 mm
 in, Trim, dimensions 80 / 20 / 30 / 50 → Extrude 15 (region inside the offset loop) → Fillet 5 → Chamfer 1 (face) → Hole (tried)

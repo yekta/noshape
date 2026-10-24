@@ -388,3 +388,14 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
   keeps Edit… / Zoom to selection / Show dependencies… on rolled-back rows and has no "Roll to end" (s2 rollback follow-up).
 - **ROLLBACK-DROP-TOP (psb)** dropping the dragged bar over Default geometry rows/header: live clamps to the top slot; ours
   leaves the bar where it was.
+
+## qa4 QA round 5 v3 s5: sketch constraints + dimension editing (P1; v0.4.8 c7d9d454) — qa-round-5.md "v3 Session 5"
+- **DIM-EXPR-UNIT (skb)** bare expression `2*5` should reopen as `(2*5) mm` (ours `2*5`).
+- **DIM-AUTOCOMPLETE (skb)** sketch dimension box: no unit/function/variable dropdown (live: "in", "isInteger(x)"; "#var 10 mm",
+  "New variable…"); VarCompletion is feature-dialog only.
+- **DIM-ESC-UNTOUCHED (skb)** Esc on an unchanged box should close it at once; ours needs two Escs.
+- **DIM-UNSOLVED-GEOM (skb)** unsolvable sketch: keep the last solved shape (ours draws a half-way solve, dimension at old
+  points); the edited dimension should turn red too.
+- **DIM-MENU (skb)** right-click on a sketch dimension should be the standard sketch context menu with "Change to driven
+  dimension" on top and "Delete dimension" last; ours is a 2-item custom list with centred labels (sketch.rs render_dim_menu).
+- **VAR-KEYWORD (psb/api)** `#var` is a valid live variable name; ours rejects it via FS_KEYWORDS (variable_table.rs is_identifier).
