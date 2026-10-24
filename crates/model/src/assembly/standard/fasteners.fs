@@ -278,6 +278,7 @@ const HEAD_T = 6;
 const HEAD_EYE = 7;
 const HEAD_LIFTING_EYE = 8;
 const HEAD_WING = 9;
+const HEAD_ASKEW = 10;
 
 // Drives (definition.drive).
 const DRIVE_NONE = 0;
@@ -862,6 +863,60 @@ function screwNeck(context is Context, id is Id, def is map, bottom is ValueWith
     return [qNothing(), bottom];
 }
 
+/**
+ * Live's ANSI askew head bolt (raw /features): a square head s across flats
+ * whose bearing face is skewed 9.45° about Y through the origin (k high at
+ * +X), its top corners cut by a 25° cone from the flats; the shank (d, l
+ * below the origin) with a fillet rf into the head and a 45° end chamfer to
+ * dp; the shank face split lt above the end.
+ */
+function askewBolt(context is Context, id is Id, def is map)
+{
+    const w = def.s / 2;
+    const ta = tan(9.45 * degree);
+    const top = def.k - w * ta;
+    const r = def.d / 2;
+    const sketch = newSketchOnPlane(context, id + "headSketch", { "sketchPlane" : plane(vector(Z, w, Z), vector(0, -1, 0), vector(1, 0, 0)) });
+    skPolyline(sketch, "outline", { "points" : [vector(-w, w * ta), vector(w, -w * ta), vector(w, top), vector(-w, top), vector(-w, w * ta)] });
+    skSolve(sketch);
+    opExtrude(context, id + "head", { "entities" : qSketchRegion(id + "headSketch"), "direction" : vector(0, -1, 0), "endBound" : BoundingType.BLIND, "endDepth" : def.s });
+    opDeleteBodies(context, id + "deleteHeadSketch", { "entities" : qCreatedBy(id + "headSketch", EntityType.BODY) });
+    const corner = w * sqrt(2);
+    subtract(context, id + "headChamfer", qCreatedBy(id + "head", EntityType.BODY),
+        revolveProfile(context, id + "cone", [{ "p" : rz(w, top) }, { "p" : rz(2 * corner, top - (2 * corner - w) * tan(25 * degree)) }, { "p" : rz(2 * corner, top + w) }, { "p" : rz(w, top + w) }]));
+    const zs = (r * ta + top) / 2;
+    const c = (def.d - def.dp) / 2;
+    revolveProfile(context, id + "shank", [{ "p" : rz(Z, -def.l) }, { "p" : rz(r - c, -def.l) }, { "p" : rz(r, -def.l + c) }, { "p" : rz(r, zs) }, { "p" : rz(Z, zs) }]);
+    uniteAll(context, id);
+    const bolt = solidsOf(context, id);
+    if (def.rf > EPS)
+    {
+        // The shank's edge on the bearing face.
+        var edges = [];
+        for (var e in evaluateQuery(context, qOwnedByBody(bolt, EntityType.EDGE)))
+        {
+            const bb = evBox3d(context, { "topology" : e });
+            if (max([abs(bb.minCorner[0]), abs(bb.maxCorner[0]), abs(bb.minCorner[1]), abs(bb.maxCorner[1])]) < r + EPS && bb.maxCorner[2] - bb.minCorner[2] > EPS && bb.minCorner[2] > -r * ta - EPS && bb.maxCorner[2] < r * ta + EPS)
+                edges = append(edges, e);
+        }
+        if (size(edges) > 0)
+            opFillet(context, id + "fillet", { "entities" : qUnion(edges), "radius" : def.rf });
+    }
+    if (def.lt > EPS)
+    {
+        // The thread's end: the shank face split lt above the end.
+        var p = XY_PLANE;
+        p.origin[2] = -def.l + def.lt;
+        opPlane(context, id + "threadPlane", { "plane" : p, "width" : 4 * def.s, "height" : 4 * def.s });
+        try silent
+        {
+            opSplitFace(context, id + "threadSplit", { "faceTargets" : qGeometry(qOwnedByBody(solidsOf(context, id), EntityType.FACE), GeometryType.CYLINDER),
+                        "faceTools" : qCreatedBy(id + "threadPlane", EntityType.FACE), "keepToolSurfaces" : false });
+        }
+        opDeleteBodies(context, id + "deleteThreadPlane", { "entities" : qCreatedBy(id + "threadPlane", EntityType.BODY) });
+    }
+}
+
 annotation { "Feature Type Name" : "Screw" }
 export const screw = defineFeature(function(context is Context, id is Id, definition is map)
     precondition
@@ -944,6 +999,8 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isLength(definition.dp, LENGTH_0);
         annotation { "Name" : "z" }
         isLength(definition.z, LENGTH_0);
+        annotation { "Name" : "Thread length" }
+        isLength(definition.lt, LENGTH_0);
         annotation { "Name" : "Thread under the shoulder" }
         isLength(definition.tu, LENGTH_0);
         annotation { "Name" : "Ribs" }
@@ -968,6 +1025,11 @@ export const screw = defineFeature(function(context is Context, id is Id, defini
         isLength(definition.zs, LENGTH_0);
     }
     {
+        if (definition.head == HEAD_ASKEW)
+        {
+            askewBolt(context, id, definition);
+            return;
+        }
         var def = definition;
         // Shoulder screws: the Length is the shoulder's, the thread (tu)
         // goes on below it.
@@ -1273,6 +1335,50 @@ const WASHER_COUNTERSUNK_TEETH = 5;
 const WASHER_CONICAL = 6;
 const WASHER_SQUARE = 7;
 const WASHER_SPRING = 8;
+const WASHER_TOOTH_OUT = 9;
+const WASHER_TOOTH_IN = 10;
+const WASHER_TOOTH_IN_OUT = 11;
+
+/**
+ * Cut a tooth lock washer's `ring` (thickness h, outer radius r2): `teeth`
+ * bands 2 half wide on radial lines from t0 degrees; `external`: the bands
+ * are teeth beyond the root circle rr (all else beyond it cut away), else
+ * slots inside it.
+ */
+function toothCut(context is Context, id is Id, ring is Query, h is ValueWithUnits, r2 is ValueWithUnits, external is boolean, rr is ValueWithUnits, half is ValueWithUnits, teeth is number, t0 is number)
+{
+    const big = r2 * 2 + h;
+    const axis = line(vector(Z, Z, Z), vector(0, 0, 1));
+    const band = cuboid(context, id + "band", vector(Z, -half, -h), vector(big, half, 2 * h));
+    opTransform(context, id + "bandTurn", { "bodies" : band, "transform" : rotationAround(axis, t0 * degree) });
+    var transforms = [];
+    var names = [];
+    for (var i = 1; i < teeth; i += 1)
+    {
+        transforms = append(transforms, rotationAround(axis, i * 360 / teeth * degree));
+        names = append(names, "t" ~ i);
+    }
+    opPattern(context, id + "bands", { "entities" : band, "transforms" : transforms, "instanceNames" : names });
+    const bands = qUnion([band, qCreatedBy(id + "bands", EntityType.BODY)]);
+    if (external)
+    {
+        // The cut: outside the root circle, between the teeth.
+        const outer = cylinderZ(context, id + "outer", -2 * h, 3 * h, big);
+        subtract(context, id + "rootCut", outer, cylinderZ(context, id + "root", -3 * h, 4 * h, rr));
+        subtract(context, id + "teethCut", outer, bands);
+        subtract(context, id + "slots", ring, outer);
+    }
+    else
+    {
+        // The slots: the bands inside the root circle (the disc less the
+        // disc without the bands).
+        const disc = cylinderZ(context, id + "disc", -2 * h, 3 * h, rr);
+        const rest = cylinderZ(context, id + "rest", -3 * h, 4 * h, rr);
+        subtract(context, id + "restCut", rest, bands);
+        subtract(context, id + "discCut", disc, rest);
+        subtract(context, id + "slots", ring, disc);
+    }
+}
 
 annotation { "Feature Type Name" : "Washer" }
 export const washer = defineFeature(function(context is Context, id is Id, definition is map)
@@ -1290,6 +1396,14 @@ export const washer = defineFeature(function(context is Context, id is Id, defin
         isLength(definition.h, NONNEGATIVE_LENGTH_BOUNDS);
         annotation { "Name" : "s" }
         isLength(definition.s, LENGTH_0);
+        annotation { "Name" : "Slot half angle" }
+        isReal(definition.ta, { (unitless) : [0, 0, 90] } as RealBoundSpec);
+        annotation { "Name" : "First slot angle" }
+        isReal(definition.t0, { (unitless) : [-360, 0, 360] } as RealBoundSpec);
+        annotation { "Name" : "Outer teeth" }
+        isInteger(definition.teeth2, { (unitless) : [0, 0, 100] } as IntegerBoundSpec);
+        annotation { "Name" : "Outer tooth half angle" }
+        isReal(definition.ta2, { (unitless) : [0, 0, 90] } as RealBoundSpec);
     }
     {
         const form = definition.form;
@@ -1301,6 +1415,33 @@ export const washer = defineFeature(function(context is Context, id is Id, defin
             // A cone frustum of material thickness s, overall height h.
             const s = definition.s;
             revolveProfile(context, id + "washer", [{ "p" : rz(r1, h - s) }, { "p" : rz(r2, Z) }, { "p" : rz(r2, s) }, { "p" : rz(r1, h) }]);
+            return;
+        }
+        if (form == WASHER_TOOTH_OUT || form == WASHER_TOOTH_IN || form == WASHER_TOOTH_IN_OUT)
+        {
+            // Live's ANSI tooth lock washers (raw /features + B-rep): a flat
+            // ring and straight-sided bands centred on radial lines.
+            // External: the root circle Ø 1.05 (d1 + d2) / 2; the bands (the
+            // root circle's chord at ±ta) are the teeth, all else outside the
+            // root is cut away. Internal: the bands (the bore's chord at ±ta)
+            // are the slots, from the bore out to the root circle Ø (d1 +
+            // d2) / 2. Internal/external: 8 inner slots out to Ø d1 + (d2 -
+            // d1) / 3 and `teeth2` outer teeth (±ta2) from Ø d1 + 2 (d2 -
+            // d1) / 3.
+            const ring = revolveProfile(context, id + "washer", [{ "p" : rz(r1, Z) }, { "p" : rz(r2, Z) }, { "p" : rz(r2, h) }, { "p" : rz(r1, h) }]);
+            if (form == WASHER_TOOTH_OUT)
+            {
+                const rr = 1.05 * (r1 + r2) / 2;
+                toothCut(context, id + "outer", ring, h, r2, true, rr, rr * sin(definition.ta * degree), definition.teeth, definition.t0);
+            }
+            else if (form == WASHER_TOOTH_IN)
+                toothCut(context, id + "inner", ring, h, r2, false, (r1 + r2) / 2, r1 * sin(definition.ta * degree), definition.teeth, definition.t0);
+            else
+            {
+                toothCut(context, id + "inner", ring, h, r2, false, r1 + (r2 - r1) / 3, r1 * sin(definition.ta * degree), definition.teeth, definition.t0);
+                const rr = r1 + 2 * (r2 - r1) / 3;
+                toothCut(context, id + "outer", solidsOf(context, id), h, r2, true, rr, rr * sin(definition.ta2 * degree), definition.teeth2, definition.t0);
+            }
             return;
         }
         if (form == WASHER_SPRING)
@@ -1482,6 +1623,7 @@ const KEY_TAPER = 3;
 const KEY_GIB_HEAD = 4;
 const KEY_ROUND_TAPER = 5;
 const KEY_ONE_ROUND_END = 6;
+const KEY_B17_TAPER = 7;
 
 annotation { "Feature Type Name" : "Key" }
 export const key = defineFeature(function(context is Context, id is Id, definition is map)
@@ -1499,12 +1641,31 @@ export const key = defineFeature(function(context is Context, id is Id, definiti
         isLength(definition.h1, LENGTH_0);
         annotation { "Name" : "d1" }
         isLength(definition.d1, LENGTH_0);
+        annotation { "Name" : "Flat" }
+        isLength(definition.flat, LENGTH_0);
     }
     {
         const form = definition.form;
         const b = definition.b;
         const h = definition.h;
         const l = definition.l;
+        if (form == KEY_B17_TAPER)
+        {
+            // Live's B17.1 tapered key: the side profile (Y along the key, Z
+            // up) h high at +Y, flat for `flat` (Plain: the width, Alternate:
+            // none), then falling 1/8 in per foot to -Y; extruded symmetric b.
+            const drop = 0.125 / 12 * (l - definition.flat);
+            const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : plane(vector(-b / 2, Z, Z), vector(1, 0, 0), vector(0, 1, 0)) });
+            var pts = [vector(-l / 2, Z), vector(l / 2, Z), vector(l / 2, h)];
+            if (definition.flat > EPS)
+                pts = append(pts, vector(l / 2 - definition.flat, h));
+            pts = append(pts, vector(-l / 2, h - drop));
+            skPolyline(sketch, "outline", { "points" : append(pts, pts[0]) });
+            skSolve(sketch);
+            opExtrude(context, id + "key", { "entities" : qSketchRegion(id + "sketch"), "direction" : vector(1, 0, 0), "endBound" : BoundingType.BLIND, "endDepth" : b });
+            opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
+            return;
+        }
         if (form == KEY_WOODRUFF)
         {
             // A disc segment of diameter d1 and height h, b thick (along Y).
@@ -1556,64 +1717,192 @@ export const key = defineFeature(function(context is Context, id is Id, definiti
         }
     });
 
+/**
+ * A closed profile in the XY plane extruded symmetrically about z = 0 (2h
+ * thick). `segments` as for `revolveProfile`; a last segment back to the
+ * first point (an arc) closes it, else a line does.
+ */
+function extrudeProfileZ(context is Context, id is Id, h is ValueWithUnits, segments is array) returns Query
+{
+    var p = XY_PLANE;
+    p.origin[2] = -h;
+    const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : p });
+    var prev = segments[0].p;
+    const n = size(segments);
+    const closed = norm(segments[n - 1].p - segments[0].p) < EPS;
+    for (var i = 1; i <= n; i += 1)
+    {
+        if (i == n && closed)
+            break;
+        const s = i < n ? segments[i] : { "p" : segments[0].p };
+        if (s.mid != undefined)
+            skArc(sketch, "a" ~ i, { "start" : prev, "mid" : s.mid, "end" : s.p });
+        else if (norm(s.p - prev) > EPS)
+            skLineSegment(sketch, "l" ~ i, { "start" : prev, "end" : s.p });
+        prev = s.p;
+    }
+    skSolve(sketch);
+    opExtrude(context, id + "extrude", { "entities" : qSketchRegion(id + "sketch"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 2 * h });
+    opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
+    return qCreatedBy(id + "extrude", EntityType.BODY);
+}
+
+/** The point mirrored in the YZ plane. */
+function mirrorX(p is Vector) returns Vector
+{
+    return vector(-p[0], p[1]);
+}
+
+/** Where the line dot(n, X) = k meets the circle (c, r): the lower point. */
+function lineCircleLow(n is Vector, k is ValueWithUnits, c is Vector, r is ValueWithUnits) returns Vector
+{
+    const m = vector(-n[1], n[0]);
+    const pn = dot(n, c);
+    const pm = dot(m, c);
+    const t = pm - sqrt(r * r - (k - pn) * (k - pn)) * (m[1] > 0 ? 1 : -1);
+    return n * k + m * t;
+}
+
+/** Where circles (c1, r1) and (c2, r2) meet: the point with the smaller x. */
+function circleCircleLeft(c1 is Vector, r1 is ValueWithUnits, c2 is Vector, r2 is ValueWithUnits) returns Vector
+{
+    const d = norm(c2 - c1);
+    const u = (c2 - c1) / d;
+    const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+    const b = sqrt(r1 * r1 - a * a);
+    const w = vector(-u[1], u[0]);
+    const p = c1 + u * a + w * b;
+    const q = c1 + u * a - w * b;
+    return p[0] < q[0] ? p : q;
+}
+
+/** Hole rules of the external rings' lugs: 0.4 hole diameters from the lug fillet (DIN 471) or the lug side. */
+const RING_HOLE_TO_FILLET = 0;
+const RING_HOLE_TO_SIDE = 1;
+
 annotation { "Feature Type Name" : "Retaining ring" }
 export const retainingRing = defineFeature(function(context is Context, id is Id, definition is map)
     precondition
     {
         annotation { "Name" : "Internal" }
         isInteger(definition.internal, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
-        annotation { "Name" : "d3" }
-        isLength(definition.d3, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "Hole rule" }
+        isInteger(definition.holeRule, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
+        annotation { "Name" : "Groove diameter" }
+        isLength(definition.dg, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "Large section" }
+        isLength(definition.large, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "Small section" }
+        isLength(definition.small, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "Lug section" }
+        isLength(definition.lug, NONNEGATIVE_LENGTH_BOUNDS);
+        annotation { "Name" : "Hole diameter" }
+        isLength(definition.d5, LENGTH_0);
         annotation { "Name" : "s" }
         isLength(definition.s, NONNEGATIVE_LENGTH_BOUNDS);
-        annotation { "Name" : "a" }
-        isLength(definition.a, NONNEGATIVE_LENGTH_BOUNDS);
-        annotation { "Name" : "b" }
-        isLength(definition.b, NONNEGATIVE_LENGTH_BOUNDS);
-        annotation { "Name" : "d5" }
-        isLength(definition.d5, LENGTH_0);
+        annotation { "Name" : "Lug corner radius" }
+        isLength(definition.rc, LENGTH_0);
+        annotation { "Name" : "Gap divisor" }
+        isReal(definition.gapDiv, { (unitless) : [0.1, 1.95, 100] } as RealBoundSpec);
+        annotation { "Name" : "Lug side angle" }
+        isReal(definition.sideAngle, { (unitless) : [0, 7, 45] } as RealBoundSpec);
+        annotation { "Name" : "Lug radius factor" }
+        isReal(definition.lugK, { (unitless) : [0, 0.8, 10] } as RealBoundSpec);
     }
     {
-        // DIN 471 / 472: a ring of free diameter d3 (inner for shafts, outer
-        // for bores), section b opposite the opening narrowing toward the
-        // lugs, two lugs (a high, with holes d5) at the opening.
-        const internal = definition.internal == 1;
-        const r3 = definition.d3 / 2;
-        const b = definition.b;
-        const a = definition.a;
-        // The ring's other edge: eccentric so the section is b at the back
-        // and b / 2 at the lugs.
-        const rOther = internal ? r3 - b * 0.75 : r3 + b * 0.75;
-        const shift = b * 0.25;
-        var p = XY_PLANE;
-        const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : p });
-        skCircle(sketch, "free", { "center" : vector(Z, Z), "radius" : r3 });
-        skCircle(sketch, "other", { "center" : vector(internal ? shift : -shift, Z), "radius" : rOther });
-        skSolve(sketch);
-        opExtrude(context, id + "ring", { "entities" : qSketchRegion(id + "sketch", true), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : definition.s });
-        opDeleteBodies(context, id + "deleteSketch", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
-        const ring = qCreatedBy(id + "ring", EntityType.BODY);
-        // The opening at +X between the lugs, and the lugs beside it.
-        const gap = a * 0.5;
-        const rOut = internal ? r3 : rOther;
-        const rIn = internal ? rOther : r3;
-        subtract(context, id + "opening", ring, cuboid(context, id + "gap", vector(Z, -gap / 2, -definition.s), vector(rOut + a, gap / 2, 2 * definition.s)));
-        const lugX0 = internal ? rOut - a : rIn - EPS;
-        const lugX1 = internal ? rIn + EPS : rIn + a;
-        cuboid(context, id + "lugA", vector(min(lugX0, lugX1), gap / 2, Z), vector(max(lugX0, lugX1), gap / 2 + a, definition.s));
-        cuboid(context, id + "lugB", vector(min(lugX0, lugX1), -gap / 2 - a, Z), vector(max(lugX0, lugX1), -gap / 2, definition.s));
-        uniteAll(context, id);
-        if (definition.d5 > EPS)
+        // Live's DIN 471 / 472 and ANSI rings (raw /features: one sketch,
+        // extruded symmetric s), lugs at -Y.
+        const s = definition.s;
+        const rg = definition.dg / 2;
+        const L = definition.large;
+        const S = definition.small;
+        const lug = definition.lug;
+        const D = definition.d5;
+        const big = 4 * rg + 4 * lug;
+        if (definition.internal == 0)
         {
-            const ringBody = solidsOf(context, id);
-            const hx = (lugX0 + lugX1) / 2;
-            const hA = cylinderZ(context, id + "holeA", -definition.s, 2 * definition.s, definition.d5 / 2);
-            opTransform(context, id + "moveHoleA", { "bodies" : hA, "transform" : transform(vector(hx, gap / 2 + a / 2, Z)) });
-            const hB = cylinderZ(context, id + "holeB", -definition.s, 2 * definition.s, definition.d5 / 2);
-            opTransform(context, id + "moveHoleB", { "bodies" : hB, "transform" : transform(vector(hx, -gap / 2 - a / 2, Z)) });
-            subtract(context, id + "holes", ringBody, qUnion([hA, hB]));
+            // External: the groove circle inside; outside, a circle as wide
+            // as L at +Y and S at -Y; the lugs out to rg + lug with sides
+            // tilted sideAngle, rounded rc at the tips and lugK·lug into the
+            // ring; the gap s / gapDiv; holes on rg + lug / 2, s apart.
+            const Re = rg + (L + S) / 2;
+            const E = vector(Z, (L - S) / 2);
+            const rl = rg + lug;
+            const Rf = definition.lugK * lug;
+            const rc = definition.rc;
+            const a = definition.sideAngle * degree;
+            const n = vector(cos(a), sin(a));
+            const hx = s / 2 + D / 2;
+            const rh = rg + lug / 2;
+            const H = vector(-hx, -sqrt(rh * rh - hx * hx));
+            var C;
+            var c;
+            if (definition.holeRule == RING_HOLE_TO_SIDE)
+            {
+                c = dot(n, H) - 0.9 * D;
+                C = lineCircleLow(n, c - Rf, E, Re + Rf);
+            }
+            else
+            {
+                C = circleCircleLeft(E, Re + Rf, H, Rf + 0.9 * D);
+                c = dot(n, C) + Rf;
+            }
+            const K = lineCircleLow(n, c + rc, vector(Z, Z), rl - rc);
+            const t1 = E + (C - E) * (Re / (Re + Rf));
+            const t2 = C + n * Rf;
+            const t3 = K - n * rc;
+            const t4 = K * (rl / (rl - rc));
+            const bigMid = C + normalize(normalize(E - C) + n) * Rf;
+            const smallMid = K + normalize(normalize(K) - n) * rc;
+            extrudeProfileZ(context, id + "ring", s / 2, [{ "p" : t1 }, { "p" : t2, "mid" : bigMid }, { "p" : t3 }, { "p" : t4, "mid" : smallMid },
+                        { "p" : mirrorX(t4), "mid" : vector(Z, -rl) }, { "p" : mirrorX(t3), "mid" : mirrorX(smallMid) }, { "p" : mirrorX(t2) },
+                        { "p" : mirrorX(t1), "mid" : mirrorX(bigMid) }, { "p" : t1, "mid" : vector(Z, E[1] + Re) }]);
+            subtract(context, id + "bore", qCreatedBy(id + "ring", EntityType.BODY), cylinderZ(context, id + "groove", -s, s, rg));
+            const gap = s / definition.gapDiv;
+            subtract(context, id + "opening", solidsOf(context, id), cuboid(context, id + "gap", vector(-gap / 2, -big, -s), vector(gap / 2, Z, s)));
+            ringHoles(context, id, s, D, H);
+        }
+        else
+        {
+            // Internal: the bore circle outside; inside, a circle as wide as
+            // L at +Y and S at -Y; the lugs end on radial planes through the
+            // bore's chord of dg / 4, rounded lugK (lug - L / 2) against the
+            // lug circle rg - lug and again into the ring; holes concentric
+            // with the lug ends.
+            const R = rg;
+            const ri = R - (L + S) / 2;
+            const ci = vector(Z, (S - L) / 2);
+            const rl = R - lug;
+            const Rs = definition.lugK * (lug - L / 2);
+            const v = vector(-0.25, -sqrt(15) / 4);
+            const n = vector(-sqrt(15) / 4, 0.25);
+            const pl = v * R;
+            const zc = n * Rs + v * sqrt((rl + Rs) * (rl + Rs) - Rs * Rs);
+            const F = circleCircleLeft(zc, 2 * Rs, ci, ri - Rs);
+            const tlz = zc - n * Rs;
+            const tzf = (zc + F) / 2;
+            const tfe = ci + (F - ci) * (ri / (ri - Rs));
+            const zMid = zc - normalize(zc) * Rs;
+            const fMid = F + normalize(normalize(tzf - F) + normalize(tfe - F)) * Rs;
+            extrudeProfileZ(context, id + "ring", s / 2, [{ "p" : mirrorX(pl) }, { "p" : pl, "mid" : vector(Z, R) }, { "p" : tlz }, { "p" : tzf, "mid" : zMid },
+                        { "p" : tfe, "mid" : fMid }, { "p" : mirrorX(tfe), "mid" : vector(Z, ci[1] + ri) }, { "p" : mirrorX(tzf), "mid" : mirrorX(fMid) },
+                        { "p" : mirrorX(tlz), "mid" : mirrorX(zMid) }]);
+            ringHoles(context, id, s, D, zc);
         }
     });
+
+/** The lug holes (diameter d) at `c` and its mirror image. */
+function ringHoles(context is Context, id is Id, s is ValueWithUnits, d is ValueWithUnits, c is Vector)
+{
+    if (d < EPS)
+        return;
+    const body = solidsOf(context, id);
+    const hA = cylinderZ(context, id + "holeA", -s, s, d / 2);
+    opTransform(context, id + "moveHoleA", { "bodies" : hA, "transform" : transform(vector(c[0], c[1], Z)) });
+    const hB = cylinderZ(context, id + "holeB", -s, s, d / 2);
+    opTransform(context, id + "moveHoleB", { "bodies" : hB, "transform" : transform(vector(-c[0], c[1], Z)) });
+    subtract(context, id + "holes", body, qUnion([hA, hB]));
+}
 
 annotation { "Feature Type Name" : "O-ring" }
 export const oRing = defineFeature(function(context is Context, id is Id, definition is map)
