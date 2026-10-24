@@ -365,3 +365,9 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - **OFF-SIDE (skb)** first side: a line away from the region, a circle outward (ours: left normal / closed inward).
 - **OFF-TOAST (skb)** an unconnected second entity: select only + toast "Can only offset a single chain at once." (ours offsets both).
 - **HOLE-FACE (psb, pending live follow-up 2)** Hole locations accept a planar face (PickKind::Face matches PLANE_LIKE ⊃ MATE_CONNECTOR).
+- **EDIT-TYPING-PREVIEW (psb/ui2)** dialog number fields re-run the preview on each keystroke; live only on commit (Tab/Enter).
+  `feature_dialog.rs` on_text_changed → DialogEvent::Changed per InputEvent::Change (v3 s2).
+- **ROLL-LAST (psb)** "Roll to here" missing on the last feature while the bar is above it (`part_studio/mod.rs` ~3927 `!is_last`);
+  live rolls forward that way (v3 s2).
+- **REGEN-SPEED (perf/kern) update** live's exact 30-feature part: ours 585 ms at load / 472 ms after an edit vs live 171 / 132 ms;
+  Boss 1 152 ms on load (others 11–18 ms).

@@ -64,6 +64,34 @@ finding); Hole dialog rows/defaults (Inch tab, 1/4 (0.25), 6.35 / 12 mm, 118 deg
   sketch vertices or mate connectors.
 - Note: once, the first click into the graphics after opening Linear pattern selected nothing; the retry worked (not reproduced).
 
+## v3 Session 2 in the app: live's own 30-feature part (v0.4.8 c7d9d454; r5/v3s2.py builds it by CLI; live "qa4 round 5 v2 s1 / s2")
+Same features as live's "v2 s2 30 features": plate 100×60×10, Plane 1 (Top + 10), 6 × (boss sketch + Ø8×5 Boss Add), Hole points
++ Hole (2 × Ø6 through), Fillet 1–4 R3 corners, Chamfer 1–3 0.5 on boss tops, Linear pattern 1 (Boss 6 × 2, Reapply), Fillet 5–7
+R1 on boss tops, Chamfer 4 1 mm (top loop, tangent-propagated), Chamfer 5 (bottom edge): all OK, 60779.484 mm³, 48 faces.
+"Features (34)" ✅ (live counts the 4 default items too). Timings (spinner gone; live = last redraw on its software-GL box):
+| step | ours | live |
+|---|---|---|
+| ⏱ total at load | **585 ms** (Boss 1 152, Hole 53, Extrude 1 44, Linear pattern 42, Fillet 1 39) | **171 ms** (Hole 18, Boss 5 9) |
+| edit Extrude 1 10 → 14: Tab → preview | 0.28–0.50 s | first redraw 327 ms, last 2.9 s |
+| ✓ | 0.35 s; ⏱ total after 472 ms (Fillet 5–7 66–82 ms) | dialog closes 201 ms, last redraw 4.28 s; ⏱ 132 ms |
+| Roll to here (Extrude 1) | 0.39 s | 1.73 s |
+| rollback bar to the top (Parts (0)) | 0.35 s | 2.24 s |
+| roll forward (Roll to here Chamfer 4, then drag) | 0.38 s / 0.40 s | 3.60 s / 4.38 s |
+Same as live ✅: editing rolls back to the feature with later rows grey italic and the "Final" toggle; Roll to here greys
+the rows below a 7 px bar; dragging shows the "Rollback bar" pill; Parts (0) with the bar on top; the Extrude 1 menu order.
+- **R5v3-S2-a → REGEN-SPEED (perf/kern)** now on the identical model: 585 ms vs live 171 ms at load (3.4×), 472 vs 132 after the
+  edit; Boss 1 alone 152 ms on load (the other bosses 11–18), Hole 53 vs 18.
+- **R5v3-S2-b → EDIT-TYPING-PREVIEW (psb/ui2)** typing in a dialog number field re-runs the preview on every keystroke (typing
+  "14" over 12 redrew the plate at 14 before Tab; `feature_dialog.rs` on_text_changed emits DialogEvent::Changed per
+  InputEvent::Change); live: "Typing does not update the preview … re-runs when the field commits (Tab or Enter)".
+- **R5v3-S2-c → ROLL-LAST (psb)** with the bar above the last feature, its right-click menu has no "Roll to here"
+  (`part_studio/mod.rs` ~3927 hides it whenever `is_last`); live used exactly that (Roll to here on Chamfer 5) to roll back to
+  the end. Our menu of a rolled-back feature also lacks "Add appearance to feature…" (live asked which items it has).
+- **R5v3-S2-d (psb, minor, live asked)** releasing the dragged bar over the Default geometry rows leaves it where it was;
+  releasing just above Sketch 1 works (live: "To the top, under Default geometry").
+- Note (cosmetic, synthetic input): after clicking a context-menu item, the row under the pointer kept its hover tint after the
+  pointer left the list, until the list was hovered again.
+
 ## v2 Session 2: editing an early feature in a 30-feature part (v0.4.8; r5/v2s2.py; live asked: "qa4 round 5 v2 s2")
 Plate 200×100×10 + 14 × (sketch circle + boss Add): 30 features, 1 part (211583.052 mm³, 34 faces). CLI build 23.8 s.
 - App: regen panel **total 462 ms** (bosses 17–71 ms each). Edit Extrude 1 (feature 2) 10 → 12: preview settles 0.8–1.3 s after
