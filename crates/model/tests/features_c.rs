@@ -509,7 +509,7 @@ fn sheet_metal_loft_rectangle_to_triangle() {
     let radii = cylinder_radii(&r, 0);
     assert_eq!((r.context.bodies[0].faces.len(), radii.len()), (49, 10), "faces; volume {v}; radii {radii:?}");
     assert!(radii.iter().all(|&x| near(x, mm(2.3), 1e-9) || near(x, mm(3.9), 1e-9)), "{radii:?}");
-    assert!(near(v, 17452.843417228427, 1e-3), "volume {v}");
+    assert!(near(v, 17_452.843_417_228_43, 1e-3), "volume {v}");
 }
 
 /// Cylinder of radius 20 mm around Z, 60 mm long centered at z = 0, and a

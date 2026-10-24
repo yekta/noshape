@@ -236,11 +236,11 @@ fn form_tools(st: &CtxState, wall: &Value, face: usize, ids: &mut Vec<(Arc<str>,
 fn rename_strings(v: &Value, map: &HashMap<Arc<str>, Arc<str>>) -> Value {
     match v {
         Value::Str(s, t) => match map.get(s) {
-            Some(n) => Value::Str(n.clone(), t.clone()),
+            Some(n) => Value::Str(n.clone(), *t),
             None => v.clone(),
         },
-        Value::Array(a, t) => Value::Array(Arc::new(a.iter().map(|x| rename_strings(x, map)).collect()), t.clone()),
-        Value::Map(m, t) => Value::Map(Arc::new(m.iter().map(|(k, x)| (k.clone(), rename_strings(x, map))).collect()), t.clone()),
+        Value::Array(a, t) => Value::Array(Arc::new(a.iter().map(|x| rename_strings(x, map)).collect()), *t),
+        Value::Map(m, t) => Value::Map(Arc::new(m.iter().map(|(k, x)| (k.clone(), rename_strings(x, map))).collect()), *t),
         _ => v.clone(),
     }
 }
