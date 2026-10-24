@@ -2170,8 +2170,10 @@ impl FeatureDialog {
                         let p2 = path_s.clone();
                         let hover_ref = r.clone();
                         let tip = label.clone();
-                        // Onshape selection rows: 24 px plain text, × on hover, white
-                        // 35% overlay on hover, the entity name as tooltip.
+                        // Onshape selection rows: 24 px plain text, the entity name as
+                        // tooltip; every second row under a 35 % white overlay
+                        // (woolsthorpe.css `.os-param-selection-list-entry:nth-of-type(2n)`;
+                        // no hover background).
                         h_flex()
                             .id(SharedString::from(format!("chip-{path}-{row}")))
                             .on_hover(cx.listener(move |_, h: &bool, _, cx| cx.emit(DialogEvent::HoverRef(h.then(|| hover_ref.clone())))))
@@ -2181,7 +2183,7 @@ impl FeatureDialog {
                             .h(px(24.))
                             .pl(px(6.))
                             .pr(px(4.))
-                            .hover(|d| d.bg(with_alpha(gpui_kit::rgb(0xffffff), 0.35)))
+                            .when(row % 2 == 1, |d| d.bg(with_alpha(gpui_kit::rgb(0xffffff), 0.35)))
                             .text_size(px(13.33))
                             .text_color(if missing { pal.error } else if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
                             .child(div().flex_1().truncate().child(crate::ui::user_text(label)))

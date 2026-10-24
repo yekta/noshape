@@ -4469,10 +4469,11 @@ impl PartStudioView {
         // Live (part-studio/00, 77): the strip is centered 8 px above the
         // viewport's middle (4 or 5 buttons alike).
         overlay.push(div().absolute().top_0().bottom(px(16.)).right_0().flex().items_center().child(self.render_panel_toggles(cx)).into_any_element());
-        overlay.extend(self.render_measure_panel(cx));
         // Live (sketch/01, part-studio/230, 234): also while a sketch or a
         // feature dialog is open.
         overlay.push(self.render_evaluation_tools(cx));
+        // Live (part-studio/82): the Measure panel covers those buttons.
+        overlay.extend(self.render_measure_panel(cx));
         overlay.extend(self.render_context_menu());
         overlay.extend(self.render_section_panel(cx).map(|e| crate::ui::moved_panel(e, self.ui.panels.get("ps-section"))));
         // Value boxes at model points are drawn in the 3D frame
