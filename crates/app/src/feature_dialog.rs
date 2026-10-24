@@ -3312,7 +3312,9 @@ impl Render for FeatureDialog {
                             // right edge (dialogs/*-01-open: disc x 449–461).
                             .size(px(12.))
                             .relative()
-                            .top(px(-2.))
+                            // Live (dom/dialog-sketch-empty): in the Sketch
+                            // dialog's 25 px footer the help sits 10 px down.
+                            .top(px(if sketch { 1. } else { -2. }))
                             .rounded_full()
                             .flex()
                             .items_center()
