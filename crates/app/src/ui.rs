@@ -1248,6 +1248,17 @@ pub fn feature_initials(name: &str) -> String {
 /// part-studio/1252): the initials in a 20 px box with a 1 px `#999`
 /// border, in the custom features dropdown and the feature list.
 pub fn initials_icon(name: &str) -> Div {
+    initials_icon_status(name, false)
+}
+
+/// The initials box's border: `#999`, or the error red while the feature
+/// fails to regenerate (live qa5 featurescript (7): "Qc" outlined red).
+pub fn initials_border(failing: bool) -> u32 {
+    if failing { 0xbd3039 } else { 0x999999 }
+}
+
+/// [`initials_icon`] for a feature-list row, red-outlined when it fails.
+pub fn initials_icon_status(name: &str, failing: bool) -> Div {
     div()
         .flex_none()
         .size(px(20.))
@@ -1255,7 +1266,7 @@ pub fn initials_icon(name: &str) -> Div {
         .items_center()
         .justify_center()
         .border_1()
-        .border_color(gpui_kit::rgb(0x999999))
+        .border_color(gpui_kit::rgb(initials_border(failing)))
         .rounded(px(2.))
         .bg(gpui_kit::rgb(0xffffff))
         .text_size(px(12.))
@@ -1274,6 +1285,15 @@ mod tests {
     // `super::*` brings gpui's `test` attribute (via gpui_kit), which would
     // shadow the built-in one and expand forever.
     use super::*;
+
+    #[::core::prelude::v1::test]
+    fn failing_custom_feature_icon_is_outlined_red() {
+        // Live (qa5 featurescript (7)): a failing custom feature's "Qc" box
+        // is outlined red; otherwise #999.
+        assert_eq!(initials_border(true), 0xbd3039);
+        assert_eq!(initials_border(false), 0x999999);
+        assert_eq!(feature_initials("QA cube"), "Qc");
+    }
 
     fn rect(x: f32, y: f32, w: f32, h: f32) -> Bounds<Pixels> {
         Bounds { origin: point(px(x), px(y)), size: size(px(w), px(h)) }
