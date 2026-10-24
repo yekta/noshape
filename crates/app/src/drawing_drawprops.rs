@@ -449,7 +449,7 @@ impl DrawingEditor {
                 let on = cur.as_ref().map_or(fam == DRAWING_DEFAULT_FONT, |f| f.family == fam);
                 items.push((fam.to_string(), on, std::rc::Rc::new(move |p: &mut DrawingProps| {
                     let f = font_of(p, w);
-                    let (b, i) = f.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
+                    let (b, i) = f.as_ref().map(|f| (f.bold, f.italic)).filter(|_| !noshape_model::drawing::sheet::is_shx(fam)).unwrap_or((false, false));
                     *f = Some(TextFont { family: fam.into(), bold: b, italic: i });
                 }) as Act));
             }
@@ -476,6 +476,8 @@ impl DrawingEditor {
                     }))
             };
             let (b, i) = cur.as_ref().map(|f| (f.bold, f.italic)).unwrap_or((false, false));
+            // Live (asb 10-24): SHX fonts disable Bold and Italic.
+            let shx = cur.as_ref().is_some_and(|f| noshape_model::drawing::sheet::is_shx(&f.family));
             let id = match w {
                 FontOf::Dims => ("dp-dfont", "dp-dfont-b", "dp-dfont-i"),
                 FontOf::Inspection => ("dp-ifont", "dp-ifont-b", "dp-ifont-i"),
@@ -487,8 +489,8 @@ impl DrawingEditor {
             h_flex()
                 .gap(px(2.))
                 .child(select(id.0, label, items))
-                .child(toggle(id.1, "B", b, |f| f.bold = !f.bold, cx))
-                .child(toggle(id.2, "I", i, |f| f.italic = !f.italic, cx))
+                .child(if shx { div().size(px(24.)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).opacity(0.4).child("B").into_any_element() } else { toggle(id.1, "B", b, |f| f.bold = !f.bold, cx).into_any_element() })
+                .child(if shx { div().size(px(24.)).flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).opacity(0.4).child("I").into_any_element() } else { toggle(id.2, "I", i, |f| f.italic = !f.italic, cx).into_any_element() })
                 .into_any_element()
         };
         // Live dom drawing-properties-*: labels 14 px in, 13.33 px #666; group
