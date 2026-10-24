@@ -325,3 +325,15 @@ STATUS STEP-ASM minor (qa4, 2026-10-24): the STL binary header is fixed by qa4 (
 - **CTX-USE** (skb) in a Part Studio's assembly context, **Use (u) on the context face the sketch lies on projects nothing** (no
   hover) and Use on its in-plane edges says "That geometry can't be used in this sketch"; an out-of-plane context edge projects.
   Live: Use on that face projects its 4 outer edges. On an ordinary face (CLI sketch_use) the same works.
+
+## CI-TIMING (lead, WORKFLOW 17; qa4 2026-10-24) — wall-clock assertions in ci.yml tests (`cargo test --workspace --exclude noshape`)
+These assert on elapsed time, so they can go red on a loaded runner; per WORKFLOW 17 the timing part belongs in perf.yml, the
+functional part (volumes, cancelled = true, error message) can stay:
+- `crates/model/tests/pattern_second.rs:127` `c < 3.0 * a + 300.0` (LP2 vs LP1 ms; comment: "CI release ×400: 1.9-2.7× (runner
+  noise)", already loosened once in c5cf7366) — kern/perf.
+- `crates/model/tests/pattern_second.rs:163` abort latency `< 200 ms` release / `600 ms` debug — kern/perf (the gate (a) property;
+  keep `out.cancelled` as the deterministic check).
+- `crates/model/tests/qa_regressions.rs:114` `t0.elapsed().as_secs() < 30` (1 000 000-instance pattern rejected) — psb; the
+  error-message assert above it is the deterministic part.
+- `crates/store/src/tests.rs:963` 1 MB commit median `< 250 ms` — owner of store (2b3f0530 area).
+Not timing (no action): custom_features.rs:660 only checks the Timer line's format.
