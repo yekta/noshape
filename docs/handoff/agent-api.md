@@ -700,3 +700,21 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
     7589.58) and its STEP/SAT re-imports give 7582.848 / 7582.872, so I1 is Onshape's estimator, not geometry.
   - Not done / for the lead: EXP1 Rhino in dev builds = OPENNURBS_ROOT=/root/opennurbs for the engine group (CI and
     releases already build it); Export "Options" (store file in a new tab) does nothing in the app either.
+- 2026-10-24 (api): **import/export parity, batches 2–3** (lead's decisions of 10-24):
+  - Import-matrix doc header: volumes / areas graded against live's estimate band when analytic areas match.
+  - EXP1: `OPENNURBS_ROOT=/root/opennurbs` in this worktree's excluded .cargo/config.toml [env]; e2e
+    rhino_export_round_trip (export RHINO → import, same volume); kernel rhino_breps_are_valid now really runs.
+  - Export Options › Store file in a new tab (and Download and store): ops::export::store_file_tab /
+    store_description ("Store <file>", file tab right after the exported tab, live drawing/121); Part Studio and
+    Assembly dialogs now honour Options (were no-ops), the drawing's deliver uses the same helper; export_parts and
+    drawing_export take `options` (`file` optional for "store"). e2e export_store_file_in_a_new_tab.
+  - Drawing export unified: ops::drawing_export is the app's code (formats, PDF / DWG / DXF / DWT versions and
+    defaults, Units, sheets, zip rule, writers) + ExportExtras for the editor's shaded pictures and watermark +
+    rasterize (resvg, 300 dpi; the app's modal uses it too). The app's drawing_export.rs keeps only the modal and
+    delivery. drawing_export op: every format (PNG/JPEG/TIFF, inspection lists) and option (version, overridden
+    dimensions, text, color, units, splines, z-height, hide inspection items, exclude off-sheet).
+  - Import follow-ups from live: "+ › Import…" no longer switches to the new tab (live: the view stays); Import
+    material density shows for STEP / Parasolid too; a PVZ Assembly whose plain and raw names are taken is "<raw>
+    (1)". Single-part PVZ stays one Part Studio (live).
+  - BOM tab: NOT added. Live (kern G38g): "BOM : <assembly>" elements are hidden backing data of the assembly's
+    Bill of materials panel, never tabs ("Can't open tab. The tab does not exist…"); reported to the lead.

@@ -1,14 +1,19 @@
-//! Drawing export (the Export Drawing modal's writers), GUI-free: the
-//! formats, the modal's settings and the per-sheet rendering to PDF, DWG,
-//! DXF, DWT and SVG. Raster formats are the SVG rendered by the app (the
-//! modal keeps that step); CSV inspection lists come from the drawing's
-//! inspection panel. From `crates/app/src/drawing_export.rs`.
+//! Drawing export (the Export Drawing modal), GUI-free and shared by the
+//! app's modal (`crates/app/src/drawing_export.rs`) and the agent API: the
+//! formats, versions and settings as the modal offers them (live
+//! dom/dialog-export-drawing-all-formats) and the per-sheet writers for PDF,
+//! DWG, DXF, DWT and SVG. Raster formats are each sheet's SVG, rasterized by
+//! the caller; what only the app has (shaded views' pictures, the release
+//! watermark) comes in [`ExportExtras`].
 
 use noshape_model::drawing::build::{SheetInfo, render_sheet_with};
+use noshape_model::drawing::cad_export::{CAD_VERSIONS, CadVersion};
 use noshape_model::drawing::export::{self, ExportOptions};
 use noshape_model::drawing::views::{Sources, ViewCache};
-use noshape_model::drawing::{AnnotationKind, Drawing};
+use noshape_model::drawing::{AnnotationKind, Drawing, ViewId};
+use std::sync::Arc;
 
+/// Export Drawing › Format, in Onshape's order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DrawingFormat {
     Pdf,
@@ -62,16 +67,38 @@ impl DrawingFormat {
     pub fn csv(self) -> bool {
         matches!(self, DrawingFormat::InspectionList | DrawingFormat::DefinitionList)
     }
+    /// The format's Version list (empty: no Version select).
+    pub fn versions(self) -> Vec<&'static str> {
+        match self {
+            DrawingFormat::Pdf => PDF_VERSIONS.to_vec(),
+            DrawingFormat::Dwg | DrawingFormat::Dxf => CAD_VERSIONS.iter().map(|v| v.0).collect(),
+            DrawingFormat::Dwt => DWT_VERSIONS.iter().map(|v| v.0).collect(),
+            _ => Vec::new(),
+        }
+    }
 }
 
-pub const PDF_VERSIONS: [&str; 4] = ["1.5", "1.6", "1.7", "1.4"];
+pub const PDF_VERSIONS: [&str; 4] = ["1.4", "1.5", "1.6", "1.7"];
+pub const DWT_VERSIONS: [(&str, CadVersion); 2] = [("2013", CadVersion::AC1027), ("2018", CadVersion::AC1032)];
+
+/// The Version a format starts with (live: PDF 1.5, DWG 2000, DXF Release
+/// 14, DWT 2013).
+pub fn default_version(f: DrawingFormat) -> usize {
+    match f {
+        DrawingFormat::Pdf => 1,
+        DrawingFormat::Dwg => noshape_model::drawing::cad_export::DEFAULT_DWG,
+        DrawingFormat::Dxf => noshape_model::drawing::cad_export::DEFAULT_DXF,
+        _ => 0,
+    }
+}
 pub const SHEETS: [&str; 3] = ["All sheets", "Current sheet", "Custom sheets"];
 pub const OVERRIDDEN: [&str; 2] = ["Show underlines", "Hide underlines"];
 pub const PDF_TEXT: [&str; 2] = ["Normal", "Selectable"];
 pub const DXF_TEXT: [&str; 3] = ["Export as text", "Explode into polylines (notes)", "Explode all into polylines"];
 pub const COLOR: [&str; 3] = ["Color", "Black and white", "Grayscale"];
-/// DXF Units: the drawing's, or another (INSUNITS code).
-pub const UNITS: [(&str, u8); 6] = [("Drawing units", 0), ("Millimeters", 4), ("Centimeters", 5), ("Meters", 6), ("Inches", 1), ("Feet", 2)];
+/// DXF / DWG Units: the drawing's, or another (INSUNITS code). Live
+/// dialog-export-drawing-all-formats.
+pub const UNITS: [(&str, u8); 7] = [("Use drawing units", 0), ("Centimeter", 5), ("Foot", 2), ("Inch", 1), ("Meter", 6), ("Millimeter", 4), ("Yard", 10)];
 pub const OPTIONS: [&str; 3] = ["Download", "Download and store…", "Store file in a new tab"];
 
 /// The modal's settings.
@@ -98,7 +125,7 @@ pub struct ExportSettings {
 
 impl Default for ExportSettings {
     fn default() -> Self {
-        Self { format: DrawingFormat::Pdf, version: 0, sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: false, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false }
+        Self { format: DrawingFormat::Pdf, version: default_version(DrawingFormat::Pdf), sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: true, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false }
     }
 }
 
@@ -135,20 +162,33 @@ pub fn export_sheets_of(s: &ExportSettings, count: usize, current: usize) -> Vec
     }
 }
 
-/// Several files go into a zip (one file per sheet), PDF / DWT hold all sheets.
+/// Several sheets go into a zip (one file per sheet); PDF and DWT hold every
+/// sheet, DXF / DWG a layout per sheet (live drw2 l).
 pub fn zipped(format: DrawingFormat, sheets: usize) -> bool {
-    !matches!(format, DrawingFormat::Pdf | DrawingFormat::Dwt) && sheets > 1
+    !matches!(format, DrawingFormat::Pdf | DrawingFormat::Dwt | DrawingFormat::Dxf | DrawingFormat::Dwg) && sheets > 1
 }
 
-/// AutoCAD 2013 (DWT exports always use it).
-pub fn acadrust_2013() -> noshape_model::drawing::cad_export::CadVersion {
-    noshape_model::drawing::cad_export::VERSIONS[1].1
+/// A shaded view's picture on its sheet: view, corner, size (sheet mm), PNG.
+pub type ShadedExport = (ViewId, [f64; 2], [f64; 2], Arc<Vec<u8>>);
+
+/// A watermark's filled triangles for a sheet of the given size (mm).
+pub type WatermarkFn = dyn Fn(f64, f64) -> Vec<(Vec<[f64; 2]>, [u8; 3], f32)> + Send + Sync;
+
+/// What the app adds to an export: the shaded views' pictures (they replace
+/// those views' edges on sheet `shaded_sheet` in PDF, SVG and the rasters)
+/// and the release watermark (PDF and rasters).
+#[derive(Default)]
+pub struct ExportExtras {
+    pub shaded: Vec<ShadedExport>,
+    pub shaded_sheet: usize,
+    pub watermark: Option<Box<WatermarkFn>>,
 }
 
-/// The vector files of an export: one (sheet name, bytes) per sheet, or a
-/// single unnamed file for PDF / DWT (all sheets). Raster formats return
-/// each sheet's SVG for the caller to rasterize.
-pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sources: &Sources, cache: &ViewCache, info: &SheetInfo) -> Result<Vec<(String, Vec<u8>)>, String> {
+/// The files of an export: one (sheet name, bytes) per sheet, or a single
+/// unnamed file (PDF, DWT, several-sheet DXF / DWG). Raster formats give
+/// each sheet's SVG for the caller to rasterize; inspection lists are the
+/// caller's.
+pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sources: &Sources, cache: &ViewCache, info: &SheetInfo, extras: &ExportExtras) -> Result<Vec<(String, Vec<u8>)>, String> {
     let f = s.format;
     let mut drawing = drawing.clone();
     // Help H:drawing_properties_-_annotations: "all exported drawings
@@ -167,14 +207,14 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
             sh.tables.clear();
         }
     }
-    // DWG / DXF versions (Export Drawing's list); DWT is 2013.
-    let versions = noshape_model::drawing::cad_export::CAD_VERSIONS;
+    // DWG / DXF / DWT versions; DXF Release 11-12 is our R12 writer.
     let cad_version = match f {
-        DrawingFormat::Dwt => Some(acadrust_2013()),
-        DrawingFormat::Dwg | DrawingFormat::Dxf => versions.get(s.version).map(|v| v.1),
+        DrawingFormat::Dwt => Some(DWT_VERSIONS.get(s.version).unwrap_or(&DWT_VERSIONS[0]).1),
+        DrawingFormat::Dxf if s.version == 0 => None,
+        DrawingFormat::Dwg | DrawingFormat::Dxf => CAD_VERSIONS.get(s.version).map(|v| v.1),
         _ => None,
     };
-    let insunits = match UNITS[s.units].1 {
+    let insunits = match UNITS.get(s.units).map_or(0, |u| u.1) {
         0 if drawing.units_mm => 4,
         0 => 1,
         u => u,
@@ -202,28 +242,55 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
             exclude_off_sheet: s.exclude_off_sheet,
             color_mode: if f == DrawingFormat::Pdf || f.raster() { s.color as u8 } else { 0 },
         };
-        let mut geo = export::prepare(&built.geometry, &opts);
+        let pictures = i == extras.shaded_sheet && !extras.shaded.is_empty() && (f == DrawingFormat::Pdf || f == DrawingFormat::Svg || f.raster());
+        // A shaded view's picture replaces its edges.
+        let mut g = built.geometry.clone();
+        if pictures {
+            for (_, r) in g.view_edges.clone().iter().filter(|(v, _)| extras.shaded.iter().any(|x| x.0 == *v)) {
+                for l in &mut g.lines[r.clone()] {
+                    l.points.clear();
+                }
+            }
+        }
+        let mut geo = export::prepare(&g, &opts);
+        // Release management › Watermarks: over everything, whatever the
+        // colour mode, on PDF and the raster formats; model spaces have none.
+        if let Some(w) = extras.watermark.as_ref().filter(|_| (f == DrawingFormat::Pdf || f.raster()) && !sheet.imported.as_ref().is_some_and(|m| m.model)) {
+            geo.overlays.extend(w(geo.width, geo.height));
+        }
+        if pictures {
+            for (_, pos, size, png) in &extras.shaded {
+                geo.images.insert(0, noshape_model::drawing::sheet::GeomImage { pos: *pos, size: *size, data_base64: noshape_model::sketch_feature::base64_encode(png).into(), rgb: None });
+            }
+        }
         // PDF and DWG / DXF (OLE2FRAME) embed decoded image pixels.
         if f == DrawingFormat::Pdf || f.cad() {
             for im in &mut geo.images {
                 im.rgb = noshape_scene::png::decode_rgb(&im.data_base64);
             }
         }
-        pages.push((drawing.sheets[i].name.clone(), geo));
+        // DXF / DWG lay the sheets out by their content before exclusion.
+        let range = noshape_model::drawing::cad_export::content_x_range(&built.geometry);
+        pages.push((drawing.sheets[i].name.clone(), geo, range));
     }
+    use noshape_model::drawing::cad_export as cad;
     let files: Vec<(String, Vec<u8>)> = match f {
-        DrawingFormat::Pdf => vec![(String::new(), export::to_pdf_pages_version(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), PDF_VERSIONS[s.version]))],
+        DrawingFormat::Pdf => vec![(String::new(), export::to_pdf_pages_version(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), PDF_VERSIONS.get(s.version).copied().unwrap_or(PDF_VERSIONS[1])))],
+        // Several sheets: one file, a layout per sheet (live drw2 l).
+        DrawingFormat::Dxf if pages.len() > 1 => vec![(String::new(), cad::to_dxf_sheets(&pages, insunits, cad_version.unwrap_or(CadVersion::AC1009))?)],
+        DrawingFormat::Dwg if pages.len() > 1 => vec![(String::new(), cad::to_dwg_sheets(&pages, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1))?)],
         DrawingFormat::Dxf => match cad_version {
-            Some(v) => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dxf_file(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
-            None => pages.iter().map(|(n, g)| (n.clone(), export::to_dxf_units(g, insunits).into_bytes())).collect(),
+            Some(v) => pages.iter().map(|(n, g, _)| cad::to_dxf_version(g, insunits, v).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+            // Release 11-12: the view geometry only (live).
+            None => pages.iter().map(|(n, g, _)| (n.clone(), cad::to_dxf_r12(g, insunits).into_bytes())).collect(),
         },
-        DrawingFormat::Dwg => pages.iter().map(|(n, g)| noshape_model::drawing::cad_export::to_dwg_file(g, insunits, cad_version.unwrap_or(versions[noshape_model::drawing::cad_export::DEFAULT_DWG].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
+        DrawingFormat::Dwg => pages.iter().map(|(n, g, _)| cad::to_dwg_file(g, insunits, cad_version.unwrap_or(CAD_VERSIONS[3].1)).map(|b| (n.clone(), b))).collect::<Result<Vec<_>, String>>()?,
         // With the sheet formats, so Select a DWT gets them back exactly.
         DrawingFormat::Dwt => {
             let templates: Vec<noshape_model::drawing::dwt::SheetTemplate> = sheets.iter().filter_map(|i| drawing.sheets.get(*i)).map(noshape_model::drawing::dwt::SheetTemplate::of).collect();
-            vec![(String::new(), noshape_model::drawing::dwt::to_dwt(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &templates, insunits, acadrust_2013())?)]
+            vec![(String::new(), noshape_model::drawing::dwt::to_dwt(&pages.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), &templates, insunits, cad_version.unwrap_or(DWT_VERSIONS[0].1))?)]
         }
-        _ => pages.iter().map(|(n, g)| (n.clone(), export::to_svg(g).into_bytes())).collect(),
+        _ => pages.iter().map(|(n, g, _)| (n.clone(), export::to_svg(g).into_bytes())).collect(),
     };
     Ok(files)
 }
@@ -239,9 +306,46 @@ pub fn bundle(files: Vec<(String, Vec<u8>)>, name: &str, format: DrawingFormat) 
     }
 }
 
+/// A sheet's exported SVG as PNG, JPEG or TIFF at 300 dpi (the SVG is in
+/// millimetres, read at 96 dpi).
+pub fn rasterize(svg: &[u8], format: DrawingFormat) -> Result<Vec<u8>, String> {
+    use resvg::{tiny_skia, usvg};
+    let tree = usvg::Tree::from_data(svg, &usvg::Options::default()).map_err(|e| e.to_string())?;
+    let scale = 300.0 / 96.0;
+    let size = tree.size();
+    let (w, h) = ((size.width() * scale).round().max(1.0) as u32, (size.height() * scale).round().max(1.0) as u32);
+    let mut pixmap = tiny_skia::Pixmap::new(w, h).ok_or("bad image size")?;
+    resvg::render(&tree, tiny_skia::Transform::from_scale(scale, scale), &mut pixmap.as_mut());
+    let rgba: Vec<u8> = pixmap.pixels().iter().flat_map(|p| {
+        let c = p.demultiply();
+        [c.red(), c.green(), c.blue(), c.alpha()]
+    }).collect();
+    let buf = image::RgbaImage::from_raw(w, h, rgba).ok_or("bad image size")?;
+    let mut out = std::io::Cursor::new(Vec::new());
+    let r = match format {
+        DrawingFormat::Jpeg => image::DynamicImage::ImageRgba8(buf).to_rgb8().write_to(&mut out, image::ImageFormat::Jpeg),
+        DrawingFormat::Tiff => buf.write_to(&mut out, image::ImageFormat::Tiff),
+        _ => buf.write_to(&mut out, image::ImageFormat::Png),
+    };
+    r.map_err(|e| e.to_string())?;
+    Ok(out.into_inner())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::parse_sheet_range;
+    use super::*;
+
+    #[test]
+    fn default_versions_are_onshapes() {
+        // qa5 D11 / live dialog-export-drawing-all-formats.
+        assert_eq!(PDF_VERSIONS[default_version(DrawingFormat::Pdf)], "1.5");
+        assert_eq!(CAD_VERSIONS[default_version(DrawingFormat::Dwg)].0, "2000");
+        assert_eq!(CAD_VERSIONS[default_version(DrawingFormat::Dxf)].0, "Release 14");
+        assert_eq!(DWT_VERSIONS[default_version(DrawingFormat::Dwt)].0, "2013");
+        // qa5 D15: z-height to zero on, "Use drawing units".
+        assert!(ExportSettings::default().z_zero);
+        assert_eq!(UNITS[ExportSettings::default().units].0, "Use drawing units");
+    }
 
     #[test]
     fn custom_sheet_ranges() {

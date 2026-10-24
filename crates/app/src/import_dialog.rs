@@ -52,9 +52,10 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     let (native, stl, obj) = (all_of(NATIVE_PARTS), all_of(&["stl"]), all_of(&["obj"]));
     let (mesh, units_select) = (all_of(&["stl", "obj", "3mf"]), stl || obj);
     // Native assemblies (a zip; live G38h) keep the tiles and add Import
-    // material density like native parts.
+    // material density like native parts; STEP and Parasolid files have it
+    // too, SAT and PVZ not (live "qa5 zip import", "api (10-23) import parity").
     let zip = all_of(&["zip"]);
-    let density = native || zip;
+    let density = native || zip || all_of(&["step", "stp", "x_t", "x_b", "xmt_txt", "xmt_bin"]);
     let doc_unit = doc.read(cx).session.doc.settings.units.length;
     let default_unit = if obj { noshape_units::LengthUnit::Meter } else { doc_unit };
     let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);

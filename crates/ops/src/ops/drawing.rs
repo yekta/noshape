@@ -158,17 +158,26 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "drawing",
             verb: "export",
-            summary: "Export a drawing to PDF, DWG, DXF, DWT or SVG",
-            description: "The Export Drawing modal: all sheets (or `sheets`: \"current\" or a range like \"1-3, 5\") to one file; PDF and DWT hold every sheet, other formats with several sheets are zipped (one file per sheet).",
+            summary: "Export a drawing (PDF, DWG, DXF, DWT, SVG, PNG, JPEG, TIFF, inspection lists)",
+            description: "The Export Drawing modal with every option. PDF and DWT hold every sheet, DXF / DWG a layout per sheet; SVG and the raster formats (300 dpi) of several sheets are zipped (one file per sheet). `version` from the format's list (PDF 1.4–1.7, default 1.5; DWG / DXF Release 11-12 … 2018, default 2000 / Release 14; DWT 2013 / 2018). Inspection list / Drawing definition list are the CSV lists.",
             fields: vec![
                 doc_field(),
                 drawing_field(),
-                req("format", json!({ "type": "string", "enum": ["PDF", "DWG", "DXF", "DWT", "SVG"] }), "Format."),
-                req("file", s(), "Output path."),
-                opt("sheets", s(), "\"all\" (default), \"current\" or a range \"1-3, 5\"."),
-                opt("color", json!({ "type": "string", "enum": ["color", "black_and_white", "grayscale"] }), "PDF color (default color)."),
+                req("format", json!({ "type": "string", "enum": crate::drawing_export::DrawingFormat::ALL.iter().map(|f| f.label()).collect::<Vec<_>>() }), "Format."),
+                opt("file", s(), "Output path (required unless `options` is \"store\"; then only its name is used, default \"<drawing>.<ext>\")."),
+                opt("options", json!({ "type": "string", "enum": ["download", "download_and_store", "store"], "default": "download" }), "Options: write `file`, and / or keep the file as a file tab right after the drawing (\"Store <file>\")."),
+                opt("version", s(), "The format's Version (e.g. \"1.7\", \"2018\", \"Release 14\")."),
+                opt("sheets", s(), "DWG / DXF: \"all\" (default), \"current\" or a range \"1-3, 5\"."),
+                opt("overridden_dimensions", json!({ "type": "string", "enum": ["show_underlines", "hide_underlines"], "default": "show_underlines" }), "Overridden dimensions."),
+                opt("text", json!({ "type": "string", "enum": ["normal", "selectable", "export_as_text", "explode_notes", "explode_all"] }), "PDF Text (normal / selectable) or DWG / DXF / DWT Text (export_as_text / explode_notes / explode_all)."),
+                opt("color", json!({ "type": "string", "enum": ["color", "black_and_white", "grayscale"] }), "PDF / raster color (default color)."),
+                opt("units", json!({ "type": "string", "enum": crate::drawing_export::UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "DWG / DXF Units (default \"Use drawing units\")."),
+                opt("splines_as_polylines", json!({ "type": "boolean" }), "Export splines as polylines."),
+                opt("z_zero", json!({ "type": "boolean", "default": true }), "DWG / DXF / DWT: Set z-height to zero and normals to positive."),
+                opt("hide_inspection_items", json!({ "type": "boolean" }), "Hide inspection items."),
+                opt("exclude_off_sheet", json!({ "type": "boolean" }), "DWG / DXF / DWT: Exclude off-sheet content."),
             ],
-            mutates: false,
+            mutates: true,
             destructive: false,
             run: export,
         },
@@ -593,19 +602,17 @@ fn update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    use crate::drawing_export::{DrawingFormat, ExportSettings, bundle, export_files, export_sheets_of, zipped};
+    use crate::drawing_export::{self as de, DrawingFormat, ExportExtras, ExportSettings};
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = drawing_tab(od, a)?;
     let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
     let f = a.str("format")?;
-    let format = DrawingFormat::ALL.into_iter().filter(|x| !x.raster() && !x.csv()).find(|x| x.label().eq_ignore_ascii_case(f)).ok_or_else(|| OpError::param("format", "PDF, DWG, DXF, DWT or SVG"))?;
-    // DXF / DWG start at live's Version (Release 14 / 2000).
-    let version = match format {
-        DrawingFormat::Dxf => noshape_model::drawing::cad_export::DEFAULT_DXF,
-        DrawingFormat::Dwg => noshape_model::drawing::cad_export::DEFAULT_DWG,
-        _ => 0,
-    };
-    let mut s = ExportSettings { format, version, ..Default::default() };
+    let format = DrawingFormat::ALL.into_iter().find(|x| x.label().eq_ignore_ascii_case(f) || x.ext().eq_ignore_ascii_case(f)).ok_or_else(|| OpError::param("format", "one of the listed formats"))?;
+    let mut s = ExportSettings { format, version: de::default_version(format), ..Default::default() };
+    if let Some(v) = a.opt_str("version")? {
+        let list = format.versions();
+        s.version = list.iter().position(|x| x.eq_ignore_ascii_case(v)).ok_or_else(|| OpError::param("version", &if list.is_empty() { "this format has no version choice".to_string() } else { format!("one of {}", list.join(", ")) }))?;
+    }
     match a.opt_str("sheets")? {
         None | Some("all") => {}
         Some("current") => s.sheets = 1,
@@ -614,24 +621,70 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             s.custom = r.to_string();
         }
     }
+    s.overridden = match a.opt_str("overridden_dimensions")? {
+        None | Some("show_underlines") => 0,
+        Some("hide_underlines") => 1,
+        Some(_) => return Err(OpError::param("overridden_dimensions", "show_underlines or hide_underlines")),
+    };
+    s.text = match (a.opt_str("text")?, format.cad()) {
+        (None, _) | (Some("normal"), false) | (Some("export_as_text"), true) => 0,
+        (Some("selectable"), false) => 1,
+        (Some("explode_notes"), true) => 1,
+        (Some("explode_all"), true) => 2,
+        _ => return Err(OpError::param("text", if format.cad() { "export_as_text, explode_notes or explode_all" } else { "normal or selectable" })),
+    };
     s.color = match a.opt_str("color")? {
         None | Some("color") => 0,
         Some("black_and_white") => 1,
         Some("grayscale") => 2,
         Some(_) => return Err(OpError::param("color", "color, black_and_white or grayscale")),
     };
+    if let Some(u) = a.opt_str("units")? {
+        s.units = de::UNITS.iter().position(|x| x.0.eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("units", "one of the listed units"))?;
+    }
+    s.splines = a.bool_or("splines_as_polylines", false)?;
+    s.z_zero = a.bool_or("z_zero", true)?;
+    s.hide_inspection = a.bool_or("hide_inspection_items", false)?;
+    s.exclude_off_sheet = a.bool_or("exclude_off_sheet", false)?;
     let current = d.active_sheet.min(d.sheets.len().saturating_sub(1));
-    let sheets = export_sheets_of(&s, d.sheets.len(), current);
-    if sheets.is_empty() {
+    let sheets = de::export_sheets_of(&s, d.sheets.len(), current);
+    if !format.csv() && sheets.is_empty() {
         return Err(OpError::param("sheets", "No sheets to export"));
     }
     let versions = |id: &str| od.session.document_at_version(id).ok().flatten();
     let sources = noshape_model::drawing::views::regenerate_sources_with(od.doc(), &d, &versions);
-    let info = dr::sheet_info(&od.session, tab);
-    let files = export_files(&d, &sheets, &s, &sources, &noshape_model::drawing::views::ViewCache::new(), &info).map_err(|e| OpError::new("io", format!("Export failed: {e}")))?;
     let name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into());
-    let bytes = bundle(files, &name, format);
-    let path = std::path::Path::new(a.str("file")?);
+    let bytes = if format.csv() {
+        // The inspection panel's rows (hole callouts from the model).
+        let rows = d.inspection_rows_with(&|si, an| noshape_model::drawing::build::hole_callout_lines(&d, &d.sheets[si], &sources, an), format == DrawingFormat::DefinitionList);
+        noshape_model::drawing::inspection::rows_csv(&rows).into_bytes()
+    } else {
+        let info = dr::sheet_info(&od.session, tab);
+        let files = de::export_files(&d, &sheets, &s, &sources, &noshape_model::drawing::views::ViewCache::new(), &info, &ExportExtras::default()).map_err(|e| OpError::new("io", format!("Export failed: {e}")))?;
+        let files = if format.raster() { files.into_iter().map(|(n, svg)| de::rasterize(&svg, format).map(|b| (n, b))).collect::<Result<Vec<_>, String>>().map_err(|e| OpError::new("io", format!("Export failed: {e}")))? } else { files };
+        de::bundle(files, &name, format)
+    };
+    let zip = !format.csv() && de::zipped(format, sheets.len());
+    let (download, store) = super::export::options_arg(a)?;
+    let ext = if zip { "zip" } else { format.ext() };
+    let path = match a.opt_str("file")? {
+        Some(f) if download => std::path::PathBuf::from(f),
+        Some(f) => super::export::store_dir()?.join(std::path::Path::new(f).file_name().unwrap_or_default()),
+        None if !download => super::export::store_dir()?.join(format!("{name}.{ext}")),
+        None => return Err(OpError::param("file", "required (or options \"store\")")),
+    };
+    let path = path.as_path();
     std::fs::write(path, &bytes).map_err(|e| OpError::new("io", format!("writing {}: {e}", path.display())).with_param("file"))?;
-    Ok(json!({ "file": path.display().to_string(), "bytes": bytes.len(), "sheets": sheets.len(), "zip": zipped(format, sheets.len()) }).into())
+    let stored = if store { Some(super::export::store_tab(od, tab, path)?) } else { None };
+    if !download {
+        let _ = std::fs::remove_file(path);
+    }
+    let mut reply = json!({ "bytes": bytes.len(), "sheets": sheets.len(), "zip": zip });
+    if download {
+        reply["file"] = json!(path.display().to_string());
+    }
+    if let Some(t) = stored {
+        reply["stored_tab"] = json!(t);
+    }
+    Ok(reply.into())
 }
