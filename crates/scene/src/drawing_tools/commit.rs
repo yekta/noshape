@@ -515,6 +515,20 @@ impl SheetPick<'_> {
     }
 }
 
+/// Edit hatch section... (live asb 10-23 views (4)): the region of the
+/// view's cut containing `at` (view coordinates) takes `style` (its `at` is
+/// set to `at`; None: back to the drawing's hatch). False when `at` isn't
+/// in a region of `geo`'s cut.
+pub fn set_section_hatch(v: &mut DrawingView, geo: &views::ViewGeometry, at: [f64; 2], style: Option<SectionHatch>) -> bool {
+    let Some(regions) = views::section_regions(&geo.section_segments) else { return false };
+    let Some(k) = views::section_region_at(&regions, at) else { return false };
+    v.section_hatches.retain(|h| views::section_region_at(&regions, h.at) != Some(k));
+    if let Some(h) = style {
+        v.section_hatches.push(SectionHatch { at, ..h });
+    }
+    true
+}
+
 /// A crop or broken-out boundary left on the sheet when its cut goes:
 /// view coordinates (meters).
 pub enum Boundary {

@@ -72,6 +72,38 @@ fn set_standard_orientation(v: &mut DrawingView, o: ViewOrientation) {
     }
 }
 
+impl DrawingEditor {
+    /// Right-click on a section's cutting line, its arrows or letters (live
+    /// asb 10-23 views (7)): Edit section... | Flip direction | Paste |
+    /// Paste as table | Clear selection | Zoom to fit | Delete.
+    pub fn section_line_entries(&self, id: ViewId, cx: &App) -> Vec<MenuEntry> {
+        let sheet = self.current_sheet();
+        let Some(v) = sheet.view(id) else { return Vec::new() };
+        let mut out = Vec::new();
+        if matches!(v.kind, ViewKind::Section { .. }) {
+            out.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
+        } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
+            out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
+        }
+        out.push(MenuEntry::item("Flip direction", move |t, _, cx| t.flip_section(id, cx)));
+        out.extend(paste_entry(cx));
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
+        out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+            t.selection.clear();
+            t.redraw(cx);
+        }));
+        out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+        out.push(MenuEntry::item("Delete", move |t, _, cx| {
+            t.selection.clear();
+            t.edit_sheet("Delete view", cx, |s| s.remove_view(id));
+        }));
+        out
+    }
+}
+
 /// Default view name: the orientation of a base view or the standard
 /// orientation a projected view shows ("Right"), else the view type.
 pub fn default_view_name(drawing: &Drawing, sheet: &Sheet, v: &DrawingView) -> String {
@@ -188,6 +220,11 @@ impl DrawingEditor {
         show.push(MenuEntry::item(if threads { "Hide threads" } else { "Show threads" }, move |t, _, cx| t.edit_view("Threads", id, cx, |v| v.hide_threads = threads)));
         let faulty = v.show_faulty;
         show.push(MenuEntry::item(if faulty { "Hide faulty parts" } else { "Show faulty parts" }, move |t, _, cx| t.edit_view("Faulty parts", id, cx, |v| v.show_faulty = !faulty)));
+        // Section views (live asb 10-23 views (6)): after Show faulty parts.
+        if matches!(v.kind, ViewKind::Section { .. }) {
+            let oc = v.show_offset_cut_lines;
+            show.push(MenuEntry::item(if oc { "Hide offset cut lines" } else { "Show offset cut lines" }, move |t, _, cx| t.edit_view("Offset cut lines", id, cx, |v| v.show_offset_cut_lines = !oc)));
+        }
         // Part views (not sketch views): the source's sketches and their points.
         if v.sketch.is_none() && !self.view_sketch_list(id).is_empty() {
             show.push(MenuEntry::item("Show/hide sketches...", move |t, _, cx| t.open_view_sketches(id, cx)));
@@ -277,13 +314,19 @@ impl DrawingEditor {
         // View-type entries (Onshape: Edit / Flip direction / Remove crop ...),
         // after Paste as table (live 5664-5670 crop, 2853 auxiliary).
         let mut edits: Vec<MenuEntry> = Vec::new();
+        // Flip direction is only on the cutting line's menu (live asb 10-23
+        // views (7), `section_line_entries`).
         if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
-            edits.push(MenuEntry::item("Flip direction", move |t, _, cx| t.flip_section(id, cx)));
             if matches!(v.kind, ViewKind::Section { .. }) {
                 edits.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
             } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
                 edits.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
             }
+        }
+        // Live asb 10-23 views (4), (7): Edit hatch section... on any view
+        // whose cut is hatched (after Edit section... on section views).
+        if self.geoms.get(&id).is_some_and(|g| !g.section_segments.is_empty()) {
+            edits.push(MenuEntry::item("Edit hatch section...", |t, w, cx| t.open_section_hatch_dialog(w, cx)));
         }
         if matches!(v.kind, ViewKind::Auxiliary { .. }) {
             edits.push(MenuEntry::item("Edit auxiliary view...", move |t, w, cx| t.edit_aux_view(id, w, cx)));

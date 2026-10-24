@@ -2114,6 +2114,12 @@ impl SheetGeometry {
             let (yu, yl) = if t.main.is_empty() { (base + h * 0.05, base - h * 0.95) } else { (base + h * 0.5, base - h * 0.25) };
             self.texts.push(Text2 { pos: loc(xs, yu), height: hs, text: up.clone(), angle, anchor: Anchor::BottomLeft, pick });
             self.texts.push(Text2 { pos: loc(xs, yl), height: hs, text: lo.clone(), angle, anchor: Anchor::BottomLeft, pick });
+            // Stacked with line: the rule between them, as wide as the wider.
+            if t.rule {
+                let w = font::text_width(up, hs).max(font::text_width(lo, hs));
+                let y = (yu + yl + hs) / 2.0;
+                self.lines.push(Polyline2 { points: vec![loc(xs, y), loc(xs + w, y)], style: LineStyle::Thin, closed: false, pick });
+            }
         }
         if t.boxed {
             let (xa, xb, ya, yb) = (x0 - 0.8, x0 + total + 0.8, base - 0.8, base + h + 0.8);

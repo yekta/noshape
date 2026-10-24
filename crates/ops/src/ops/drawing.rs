@@ -289,6 +289,16 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if !v.model_annotations {
                 j["model_annotations"] = json!(false);
             }
+            // Show/hide ▸ (drawing_show_hide).
+            j["display"] = json!({
+                "hidden_lines": v.style == noshape_model::drawing::RenderStyle::HiddenLinesVisible,
+                "shaded_view": v.style == noshape_model::drawing::RenderStyle::Shaded,
+                "threads": !v.hide_threads,
+                "faulty_parts": v.show_faulty,
+                "offset_cut_lines": v.show_offset_cut_lines,
+                "auto_centermarks": v.show_centerlines,
+                "center_of_mass": v.show_com,
+            });
             // A detail view's circle in its parent (sheet mm) and its label
             // on a leader (drawing_edit_detail).
             if let ViewKind::Detail { parent, center, radius, .. } = &v.kind
@@ -300,6 +310,17 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                     d["label_at"] = pt([c[0] + o[0], c[1] + o[1]]);
                 }
                 j["detail"] = d;
+            }
+            // Section hatch regions and the ones restyled with Edit hatch
+            // section... (drawing_edit_hatch).
+            if let Some(regions) = m.geoms.get(&v.id).filter(|g| !g.section_segments.is_empty()).and_then(|g| noshape_model::drawing::views::section_regions(&g.section_segments)) {
+                j["hatch_regions"] = json!(regions.len());
+            }
+            if !v.section_hatches.is_empty()
+                && let Some(pl) = m.built.as_ref().and_then(|b| b.placement(v.id))
+            {
+                let name = |h: &noshape_model::drawing::SectionHatch| h.pattern.and_then(|p| noshape_model::drawing::hatch_pat::pattern(h.standard, p)).map(|p| p.name).unwrap_or("None");
+                j["section_hatches"] = json!(v.section_hatches.iter().map(|h| json!({ "at": pt(pl.to_sheet(h.at)), "pattern": name(h) })).collect::<Vec<_>>());
             }
             // What the view shows: a base view's orientation, a projected
             // view's side of its parent.

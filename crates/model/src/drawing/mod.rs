@@ -260,6 +260,24 @@ pub enum Crop {
     Spline(Vec<[f64; 2]>),
 }
 
+/// Edit hatch section... (live asb 10-23 views (4)): one hatch region of a
+/// view's cut restyled. `at` (view coordinates) lies inside the region, so
+/// the style stays with the region when the view regenerates.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SectionHatch {
+    pub at: [f64; 2],
+    /// Pattern group and index ([`hatch_pat::pattern`]); `pattern` None:
+    /// General › None (the region unhatched).
+    pub standard: usize,
+    pub pattern: Option<usize>,
+    /// Scale (1: the pattern's own size); angle in degrees added to the
+    /// pattern's own.
+    pub scale: f64,
+    pub angle: f64,
+    /// None: the drawing's hatch color.
+    pub color: Option<[u8; 3]>,
+}
+
 /// A broken-out section of a view: material inside the closed `profile`
 /// (view coordinates, meters; a smooth closed curve through the points when
 /// `spline`, else a polygon) is removed from the viewer down to `depth`
@@ -434,6 +452,10 @@ pub struct DrawingView {
     /// Show/hide › Show faulty parts (parts whose features failed).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub show_faulty: bool,
+    /// Section views: Show/hide › Show offset cut lines (a thin line across
+    /// the hatch where the cutting line jogs; live asb 10-23 views (6)).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub show_offset_cut_lines: bool,
     /// Adjust linestyle: edges drawn in their own style.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub edge_styles: Vec<EdgeStyle>,
@@ -489,6 +511,10 @@ pub struct DrawingView {
     /// Broken-out sections (base, projected and auxiliary views).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub broken_out: Vec<BrokenOut>,
+    /// Hatch regions of the cut restyled with Edit hatch section... (the
+    /// rest keep the drawing's section hatch).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub section_hatches: Vec<SectionHatch>,
     /// Base views: explicit view frame (viewing direction, up) replacing the
     /// standard orientation, e.g. for a projected view moved to another sheet
     /// without its parent.
@@ -671,6 +697,7 @@ impl Default for DrawingView {
             hide_bend_notes: false,
             hide_threads: false,
             show_faulty: false,
+            show_offset_cut_lines: false,
             edge_styles: Vec::new(),
             hidden_edges: Vec::new(),
             sketch_appearances: false,
@@ -688,6 +715,7 @@ impl Default for DrawingView {
             exclude_from_cut: Vec::new(),
             cut_from_section: false,
             broken_out: Vec::new(),
+            section_hatches: Vec::new(),
             custom_frame: None,
             named_view: None,
             named_position: None,

@@ -219,6 +219,104 @@ fn crop_view_keeps_inside_geometry() {
     assert!(built.dangling.is_empty() || !built.dangling.is_empty());
 }
 
+/// A section cut's regions (Edit hatch section...): outer loops with their
+/// holes; a point finds its region, the last style inside a region wins.
+#[test]
+fn section_regions_nest_and_find_styles() {
+    let ring = |x0: f64, y0: f64, x1: f64, y1: f64| -> Vec<[[f64; 2]; 2]> {
+        let c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+        (0..4).map(|i| [c[i], c[(i + 1) % 4]]).collect()
+    };
+    let mut segs = ring(0.0, 0.0, 10.0, 10.0);
+    segs.extend(ring(3.0, 3.0, 7.0, 7.0));
+    segs.extend(ring(20.0, 0.0, 30.0, 10.0));
+    let r = views::section_regions(&segs).unwrap();
+    assert_eq!(r.len(), 2);
+    let with_hole = r.iter().position(|(_, h)| h.len() == 1).unwrap();
+    assert_eq!(views::section_region_at(&r, [1.0, 1.0]), Some(with_hole));
+    assert_eq!(views::section_region_at(&r, [5.0, 5.0]), None, "in the hole");
+    assert!(views::section_region_at(&r, [25.0, 5.0]).is_some_and(|i| i != with_hole));
+    let h = |at: [f64; 2], pattern: Option<usize>| SectionHatch { at, standard: 0, pattern, scale: 1.0, angle: 0.0, color: None };
+    let hs = [h([1.0, 1.0], Some(1)), h([2.0, 9.0], None)];
+    let st = views::section_region_styles(&r, &hs);
+    assert_eq!(st[with_hole].map(|x| x.pattern), Some(None), "the last one inside wins");
+    assert!(st[1 - with_hole].is_none());
+    // A cut that doesn't close has no regions.
+    assert!(views::section_regions(&segs[..3]).is_none());
+}
+
+/// Live asb 10-23 views (4): Edit hatch section restyles one region of the
+/// cut; the others keep the drawing's hatch.
+#[test]
+fn edit_hatch_section_restyles_one_region() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, true);
+    let regions = views::section_regions(&g.section_segments).expect("the cut closes");
+    assert!(regions.len() >= 2, "{} regions", regions.len());
+    // A point inside region 0.
+    let (outer, _) = &regions[0];
+    let (x0, x1) = outer.iter().fold((f64::MAX, f64::MIN), |m, p| (m.0.min(p[0]), m.1.max(p[0])));
+    let (y0, y1) = outer.iter().fold((f64::MAX, f64::MIN), |m, p| (m.0.min(p[1]), m.1.max(p[1])));
+    let at = (1..20).flat_map(|i| (1..20).map(move |j| [x0 + (x1 - x0) * i as f64 / 20.0, y0 + (y1 - y0) * j as f64 / 20.0])).find(|p| views::section_region_at(&regions, *p) == Some(0)).unwrap();
+    let hatch_lines = |d: &Drawing| {
+        let b = render_sheet(d, 0, &sources, &cache, false).unwrap();
+        let vp = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(5))).unwrap() as u32;
+        let idx: Vec<usize> = b.geometry.lines.iter().enumerate().filter(|(_, l)| l.pick == vp && l.style == sheet::LineStyle::Thin).map(|(i, _)| i).collect();
+        let red = idx.iter().filter(|i| b.geometry.line_color(**i) == Some([255, 0, 0])).count();
+        (idx.len(), red)
+    };
+    let (all, _) = hatch_lines(&drawing);
+    assert!(all > 0);
+    let set = |d: &mut Drawing, h: SectionHatch| d.sheets[0].view_mut(ViewId(5)).unwrap().section_hatches = vec![h];
+    // General › None: region 0 unhatched, the others still hatched.
+    set(&mut drawing, SectionHatch { at, standard: 2, pattern: None, scale: 1.0, angle: 0.0, color: None });
+    let (fewer, _) = hatch_lines(&drawing);
+    assert!(fewer < all && fewer > 0, "{fewer} of {all}");
+    // ANSI32 steel in red: that region's lines are red.
+    set(&mut drawing, SectionHatch { at, standard: 0, pattern: Some(1), scale: 1.0, angle: 0.0, color: Some([255, 0, 0]) });
+    let (_, red) = hatch_lines(&drawing);
+    assert!(red > 0);
+}
+
+/// Live asb 10-23 views (6): Show offset cut lines draws a line across the
+/// hatch where a jogged cutting line steps (off by default).
+#[test]
+fn offset_cut_lines_cross_the_hatch_at_the_jog() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    // Jogged through the center hole (x = 0) and the corner hole (x = 38).
+    if let ViewKind::Section { line, .. } = &mut drawing.sheets[0].view_mut(ViewId(5)).unwrap().kind {
+        *line = vec![[0.0, -0.04], [0.0, 0.01], [0.038, 0.01], [0.038, 0.04]];
+    }
+    let sheet = &drawing.sheets[0];
+    let g = compute_view(&drawing, sheet, ViewId(5), &sources, &cache, true);
+    let parent = sheet.parent_of(ViewId(5)).unwrap();
+    let pg = compute_view(&drawing, sheet, parent, &sources, &cache, true);
+    let cut = views::section_cut(sheet, ViewId(5)).unwrap();
+    let lines = views::offset_cut_lines(&cut, pg.frame.as_ref().unwrap(), g.frame.as_ref().unwrap(), &g.section_segments);
+    assert!(!lines.is_empty(), "one step, one line");
+    // Each piece lies inside the cut: its midpoint is in a hatch region.
+    let regions = views::section_regions(&g.section_segments).unwrap();
+    for l in &lines {
+        // On the legs' common boundary: material just to one side of it.
+        let m = [(l[0][0] + l[1][0]) / 2.0, (l[0][1] + l[1][1]) / 2.0];
+        let (dx, dy) = (l[1][0] - l[0][0], l[1][1] - l[0][1]);
+        let n = [-dy / dx.hypot(dy) * 1e-6, dx / dx.hypot(dy) * 1e-6];
+        assert!(views::section_region_at(&regions, [m[0] + n[0], m[1] + n[1]]).is_some() || views::section_region_at(&regions, [m[0] - n[0], m[1] - n[1]]).is_some(), "{l:?}");
+    }
+    let count = |d: &Drawing| {
+        let b = render_sheet(d, 0, &sources, &cache, false).unwrap();
+        let vp = b.picks.iter().position(|p| *p == PickTarget::View(ViewId(5))).unwrap() as u32;
+        b.geometry.lines.iter().filter(|l| l.pick == vp && l.style == sheet::LineStyle::Thin).count()
+    };
+    let off = count(&drawing);
+    drawing.sheets[0].view_mut(ViewId(5)).unwrap().show_offset_cut_lines = true;
+    assert!(count(&drawing) > off);
+}
+
 #[test]
 fn jogged_and_aligned_sections() {
     let (doc, mut drawing) = demo();
@@ -2458,6 +2556,26 @@ fn hole_callout_dual_block_like_onshape() {
 /// Live samples/asb-dual-2018: with dual dimensions each DIMENSION's text
 /// override is "[]\P<>" (the alternate units, then the value) and its block
 /// holds one MTEXT "\A1;[…]\P…"; angular dimensions have no dual.
+/// Fit classes "Stacked with line": a rule between hole and shaft class,
+/// as wide as the wider; "Stacked without line" none.
+#[test]
+fn stacked_fit_classes_with_line_draw_a_rule() {
+    use super::format::DimText;
+    let label = |rule: bool| {
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        let t = DimText { main: "Ø10".into(), upper: Some("H7".into()), lower: Some("g6".into()), rule, ..Default::default() };
+        g.dim_label([100.0, 100.0], 0.0, 0.0, false, &t, 3.5, 1);
+        g
+    };
+    assert!(label(false).lines.is_empty());
+    let g = label(true);
+    assert_eq!(g.lines.len(), 1);
+    let (up, lo) = (g.texts.iter().find(|t| t.text == "H7").unwrap(), g.texts.iter().find(|t| t.text == "g6").unwrap());
+    let l = &g.lines[0].points;
+    assert!((l[0][1] - l[1][1]).abs() < 1e-9 && l[0][1] < up.pos[1] && l[0][1] > lo.pos[1], "between the classes");
+    assert!((l[0][0] - up.pos[0]).abs() < 1e-9 && (l[1][0] - l[0][0] - font::text_width("H7", up.height).max(font::text_width("g6", lo.height))).abs() < 1e-9);
+}
+
 /// Gate v0.4.8 (f), live asbdd-20: a linear dual dimension's line breaks
 /// around the two-line text block (DIMGAP from the ink, ANSI and ISO, Top
 /// and Bottom, horizontal and vertical); a single value keeps it whole.

@@ -626,6 +626,26 @@ fn circle_points(c: [f64; 2], r: f64, n: usize) -> Vec<[f64; 2]> {
         .collect()
 }
 
+/// One section hatch line `l` (unbroken sheet coordinates): clipped to a
+/// detail's profile, the crop, and mapped through the view's breaks.
+fn push_hatch_line(g: &mut SheetGeometry, pl: &ViewPlacement, geo: &ViewGeometry, l: [[f64; 2]; 2], pick: u32) {
+    let ub = pl.unbroken();
+    let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
+    if let Some(poly) = &geo.clip_poly {
+        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_polygon(&p, poly)).collect();
+    } else if let Some((c, r)) = geo.clip {
+        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_circle(&p, c, r)).collect();
+    }
+    if let Some(crop) = &geo.crop {
+        pieces = pieces.into_iter().flat_map(|p| views::clip_to_crop(&p, crop)).collect();
+    }
+    for p in pieces {
+        for q in map_polyline(pl, &p) {
+            g.lines.push(Polyline2 { points: q, style: LineStyle::Thin, closed: false, pick });
+        }
+    }
+}
+
 /// Pieces of a view-coordinate polyline outside the view's break bands,
 /// mapped to the sheet.
 fn map_polyline(pl: &ViewPlacement, pts: &[[f64; 2]]) -> Vec<Vec<[f64; 2]>> {
@@ -1184,27 +1204,61 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let ub = pl.unbroken();
                 let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
                 let hatch_l0 = g.lines.len();
-                for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
-                    let mut pieces = vec![vec![ub.to_view(l[0]), ub.to_view(l[1])]];
-                    if let Some(poly) = &geo.clip_poly {
-                        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_polygon(&p, poly)).collect();
-                    } else if let Some((c, r)) = geo.clip {
-                        pieces = pieces.into_iter().flat_map(|p| views::clip_polyline_circle(&p, c, r)).collect();
+                let whole = geo.clip_poly.is_none() && geo.clip.is_none() && geo.crop.is_none() && pl.breaks().is_empty();
+                // Edit hatch section...: restyled regions (the rest keep the
+                // drawing's hatch; a cut that doesn't close keeps it all).
+                let regions = if v.section_hatches.is_empty() { None } else { views::section_regions(&geo.section_segments) };
+                match regions {
+                    None => {
+                        for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                        }
+                        // An uncut, unbroken section: the boundary for the HATCH entity.
+                        if whole && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6) {
+                            g.hatches.push(super::cad_layers::HatchRegion { loops, spacing: vt.hatch_spacing.max(0.3), lines: hatch_l0..g.lines.len() });
+                        }
                     }
-                    if let Some(crop) = &geo.crop {
-                        pieces = pieces.into_iter().flat_map(|p| views::clip_to_crop(&p, crop)).collect();
-                    }
-                    for p in pieces {
-                        for q in map_polyline(&pl, &p) {
-                            g.lines.push(Polyline2 { points: q, style: LineStyle::Thin, closed: false, pick: view_pick });
+                    Some(regions) => {
+                        let ring = |l: &[[f64; 2]]| (0..l.len()).map(|i| [ub.to_sheet(l[i]), ub.to_sheet(l[(i + 1) % l.len()])]).collect::<Vec<_>>();
+                        let mut plain: Vec<[[f64; 2]; 2]> = Vec::new();
+                        for ((outer, holes), style) in regions.iter().zip(views::section_region_styles(&regions, &v.section_hatches)) {
+                            let Some(h) = style else {
+                                plain.extend(ring(outer));
+                                plain.extend(holes.iter().flat_map(|x| ring(x)));
+                                continue;
+                            };
+                            let Some(pattern) = h.pattern else { continue };
+                            let mark = g.mark();
+                            let o: Vec<[f64; 2]> = outer.iter().map(|q| ub.to_sheet(*q)).collect();
+                            let hs: Vec<Vec<[f64; 2]>> = holes.iter().map(|x| x.iter().map(|q| ub.to_sheet(*q)).collect()).collect();
+                            for l in super::sheet_sketch::hatch_pattern_holes(&o, &hs, h.standard, pattern, h.scale, h.angle) {
+                                push_hatch_line(&mut g, &pl, geo, l, view_pick);
+                            }
+                            // Solid: filled (the whole region only; not cut by
+                            // crops, clips or breaks).
+                            if whole && hs.is_empty() && super::hatch_pat::pattern(h.standard, pattern).is_some_and(|p| p.families.is_empty()) {
+                                for i in 1..o.len().saturating_sub(1) {
+                                    g.fills.push(super::sheet::Fill2 { points: vec![o[0], o[i], o[i + 1]] });
+                                }
+                            }
+                            if let Some(c) = h.color {
+                                g.color_since(mark, c);
+                            }
+                        }
+                        for l in hatch(&plain, vt.hatch_spacing.max(0.3)) {
+                            push_hatch_line(&mut g, &pl, geo, l, view_pick);
                         }
                     }
                 }
-                // An uncut, unbroken section: the boundary for the HATCH entity.
-                if geo.clip_poly.is_none() && geo.clip.is_none() && geo.crop.is_none() && pl.breaks().is_empty()
-                    && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6)
-                {
-                    g.hatches.push(super::cad_layers::HatchRegion { loops, spacing: vt.hatch_spacing.max(0.3), lines: hatch_l0..g.lines.len() });
+            }
+            // Show offset cut lines (section views).
+            if v.show_offset_cut_lines
+                && matches!(v.kind, ViewKind::Section { .. })
+                && let (Some(cut), Some(frame), Some(pf)) = (views::section_cut(sheet, v.id), geo.frame.as_ref(), sheet.parent_of(v.id).and_then(|p| views.get(&p)).and_then(|p| p.frame.as_ref()))
+            {
+                let ub = pl.unbroken();
+                for l in views::offset_cut_lines(&cut, pf, frame, &geo.section_segments) {
+                    push_hatch_line(&mut g, &pl, geo, [ub.to_sheet(l[0]), ub.to_sheet(l[1])], view_pick);
                 }
             }
             g.cad_since(cad_mark, CadLayer::ViewHatches);

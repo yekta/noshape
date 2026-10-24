@@ -140,6 +140,23 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "show_hide",
+            summary: "A view's Show/hide ▸ items (hidden lines, shaded, threads, faulty parts, offset cut lines, centermarks, centerlines, center of mass, bend lines / notes, sketch points)",
+            description: "The view menu's Show/hide ▸ (live asb 10-23 views (6)): `item` shown (`show` true) or hidden on view `view`. hidden_lines and shaded_view switch the view's style (hiding either goes back to hidden lines removed); offset_cut_lines only on section views; bend_lines / bend_notes on flat patterns. drawing_get lists each view's `display`. One edit, named as the menu's (\"Hidden lines\", \"Offset cut lines\"...).",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "The view (drawing_get)."),
+                    req("item", json!({ "type": "string", "enum": ["hidden_lines", "shaded_view", "threads", "faulty_parts", "offset_cut_lines", "auto_centermarks", "centerlines", "center_of_mass", "bend_lines", "bend_notes", "sketch_points"] }), "What to show or hide."),
+                    req("show", json!({ "type": "boolean" }), "Show (true) or hide (false)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: show_hide,
+        },
+        Op {
+            group: "drawing",
             verb: "edit_detail",
             summary: "Edit a detail view: move / resize its circle, its label and leader, Edit detail's options",
             description: "The detail circle's grips and menu and Edit detail... (live asb 10-23 views (1), (2)): `center` moves the circle (sheet mm, in its parent), `radius` resizes it (sheet mm; the detail view grows with it); `leader` true puts the label on a leader with an arrow to the circle (Add leader), false back beside it; `label_at` places the label on its leader (sheet mm); the Detail view panel's `scale`, `label`, `style`, `show_profile` and `clip_border`. One edit (\"Edit detail view\").",
@@ -239,6 +256,28 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: broken_out_section,
+        },
+        Op {
+            group: "drawing",
+            verb: "edit_hatch",
+            summary: "Edit hatch section...: restyle one hatch region of a view's cut",
+            description: "The view menu's Edit hatch section... (live asb 10-23 views (4)): the hatch region of view `view`'s cut under `at` (sheet mm) takes `standard` (ansi, iso, general) and `pattern` (its name as listed, e.g. \"ANSI32 steel\", \"ISO02W100\", \"Solid\"; general \"None\" leaves the region unhatched), `scale` and `angle` (\"auto\" or numbers; angle in degrees, the pattern's own when auto) and `color` (\"#rrggbb\", default the drawing's); `reset` puts the region back to the drawing's hatch. Each region is separate. One edit (\"Edit hatch\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "The view (drawing_get)."),
+                    req("at", point(), "A point inside the hatch region (sheet mm)."),
+                    opt("standard", json!({ "type": "string", "enum": ["ansi", "iso", "general"], "default": "ansi" }), "Pattern group (the dialog's tab)."),
+                    opt("pattern", json!({ "type": "string" }), "Pattern name (default the group's first in the dialog's order)."),
+                    opt("scale", json!({ "type": ["string", "number"], "default": "auto" }), "Scale (auto = 1)."),
+                    opt("angle", json!({ "type": ["string", "number"], "default": "auto" }), "Angle in degrees (auto = the pattern's own)."),
+                    opt("color", json!({ "type": "string" }), "Color \"#rrggbb\" (default the drawing's)."),
+                    opt("reset", json!({ "type": "boolean", "default": false }), "Back to the drawing's section hatch."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: edit_hatch,
         },
         Op {
             group: "drawing",
@@ -1294,6 +1333,55 @@ fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     done(od, t, "Note", "annotation", id)
 }
 
+fn edit_hatch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::{SectionHatch, hatch_pat};
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let view = view_arg(&t, a, "view")?;
+    let si = t.sheet;
+    let pl = t.m.built.as_ref().and_then(|b| b.placement(view).cloned()).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
+    let geo = t.m.geoms.get(&view).cloned().ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
+    let at = pl.to_view(pt_arg(a, "at")?);
+    let style = if a.bool_or("reset", false)? {
+        None
+    } else {
+        let standard = enum_arg(a, "standard", &[("ansi", 0usize), ("iso", 1), ("general", 2)], 0)?;
+        let pattern = match a.opt_str("pattern")? {
+            Some(n) if standard == 2 && n.trim().eq_ignore_ascii_case("none") => None,
+            Some(n) => Some(hatch_pat::find(standard, n).ok_or_else(|| OpError::param("pattern", "no such pattern in that group"))?),
+            None => Some(hatch_pat::default_pattern(standard)),
+        };
+        // "auto" or a number: scale 1, the pattern's own angle.
+        let num = |name: &str| -> Result<Option<f64>, OpError> {
+            match a.get(name) {
+                None => Ok(None),
+                Some(v) if v.as_str().is_some_and(|s| s.trim().eq_ignore_ascii_case("auto")) => Ok(None),
+                Some(v) => v.as_f64().or_else(|| v.as_str().and_then(|s| s.trim().trim_end_matches('°').parse().ok())).map(Some).ok_or_else(|| OpError::param(name, "\"auto\" or a number")),
+            }
+        };
+        let scale = num("scale")?.unwrap_or(1.0);
+        if scale <= 0.0 {
+            return Err(OpError::param("scale", "must be > 0"));
+        }
+        let base = pattern.map(|p| hatch_pat::base_angle(standard, p)).unwrap_or(0.0);
+        let angle = num("angle")?.map(|deg| deg - base).unwrap_or(0.0);
+        let color = match a.opt_str("color")? {
+            Some(c) => {
+                let h = c.trim().trim_start_matches('#');
+                let v = (h.len() == 6).then(|| u32::from_str_radix(h, 16).ok()).flatten().ok_or_else(|| OpError::param("color", "\"#rrggbb\""))?;
+                Some([(v >> 16) as u8, (v >> 8) as u8, v as u8])
+            }
+            None => None,
+        };
+        Some(SectionHatch { at, standard, pattern, scale, angle, color })
+    };
+    let v = t.d.sheets[si].view_mut(view).expect("view");
+    if !dt::set_section_hatch(v, &geo, at, style) {
+        return Err(OpError::param("at", "not inside a hatch region of the view's cut"));
+    }
+    done(od, t, "Edit hatch", "view", view.0)
+}
+
 fn remove_cut(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
@@ -1318,6 +1406,73 @@ fn remove_cut(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             "Remove section"
         }
         _ => return Err(OpError::param("what", "crop or broken_out")),
+    };
+    done(od, t, description, "view", view.0)
+}
+
+fn show_hide(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::RenderStyle;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let view = view_arg(&t, a, "view")?;
+    let show = a.bool_or("show", true)?;
+    let item = a.str("item")?;
+    let v = t.d.sheets[t.sheet].view_mut(view).expect("view");
+    let off = |v: &noshape_model::drawing::DrawingView, s: RenderStyle| if v.style == s { RenderStyle::HiddenLinesRemoved } else { v.style };
+    let description = match item {
+        "hidden_lines" => {
+            v.style = if show { RenderStyle::HiddenLinesVisible } else { off(v, RenderStyle::HiddenLinesVisible) };
+            "Hidden lines"
+        }
+        "shaded_view" => {
+            v.style = if show { RenderStyle::Shaded } else { off(v, RenderStyle::Shaded) };
+            "Shaded view"
+        }
+        "threads" => {
+            v.hide_threads = !show;
+            "Threads"
+        }
+        "faulty_parts" => {
+            v.show_faulty = show;
+            "Faulty parts"
+        }
+        "offset_cut_lines" => {
+            if !matches!(v.kind, ViewKind::Section { .. }) {
+                return Err(OpError::param("item", "offset cut lines are on section views only"));
+            }
+            v.show_offset_cut_lines = show;
+            "Offset cut lines"
+        }
+        "auto_centermarks" => {
+            v.show_centerlines = show;
+            v.deleted_centermarks.clear();
+            "Centermarks"
+        }
+        "centerlines" => {
+            v.auto_centerlines = Some(show);
+            "Centerlines"
+        }
+        "center_of_mass" => {
+            v.show_com = show;
+            "Center of mass"
+        }
+        "bend_lines" | "bend_notes" => {
+            if !v.flat {
+                return Err(OpError::param("item", "bend lines and notes are on flat pattern views only"));
+            }
+            if item == "bend_lines" {
+                v.hide_bend_lines = !show;
+                "Bend lines"
+            } else {
+                v.hide_bend_notes = !show;
+                "Bend notes"
+            }
+        }
+        "sketch_points" => {
+            v.hide_sketch_points = !show;
+            "Sketch points"
+        }
+        _ => return Err(OpError::param("item", "one of the Show/hide items")),
     };
     done(od, t, description, "view", view.0)
 }

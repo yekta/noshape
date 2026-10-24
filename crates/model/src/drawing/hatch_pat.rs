@@ -137,6 +137,11 @@ pub const GENERAL: [Pattern; 31] = [
 /// The pattern groups (dialog tabs ANSI | ISO | General).
 pub const GROUPS: [(&str, &[Pattern]); 3] = [("ANSI", &ANSI), ("ISO", &ISO), ("General", &GENERAL)];
 
+/// The index of pattern `name` (case-insensitive) in group `group`.
+pub fn find(group: usize, name: &str) -> Option<usize> {
+    GROUPS.get(group)?.1.iter().position(|p| p.name.eq_ignore_ascii_case(name.trim()))
+}
+
 pub fn pattern(group: usize, index: usize) -> Option<&'static Pattern> {
     GROUPS.get(group)?.1.get(index)
 }

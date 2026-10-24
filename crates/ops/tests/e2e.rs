@@ -1030,6 +1030,31 @@ fn drawing_section_detail_views_and_annotations() {
     assert_eq!(sv["kind"], "section", "{sv}");
     assert_eq!(sv["parent"], top_id, "{sv}");
     assert!(last(&mut ctx).ends_with(":: Section view"));
+    // Edit hatch section...: one region restyled, then back (live asb 10-23 views (4)).
+    assert!(sv["hatch_regions"].as_u64().is_some_and(|n| n >= 1), "{sv}");
+    let corner = [num(&sv["bounds"]["min"][0]) + 0.5, num(&sv["bounds"]["min"][1]) + 0.5];
+    call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": corner, "pattern": "ANSI32 steel", "angle": 90, "color": "#ff0000" }));
+    assert!(last(&mut ctx).ends_with(":: Edit hatch"));
+    let sv = views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap();
+    assert_eq!(sv["section_hatches"][0]["pattern"], "ANSI32 steel", "{sv}");
+    call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": corner, "standard": "general", "pattern": "None" }));
+    let sv = views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap();
+    assert_eq!(sv["section_hatches"].as_array().map(|a| a.len()), Some(1), "the same region: replaced {sv}");
+    assert_eq!(sv["section_hatches"][0]["pattern"], "None");
+    call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": corner, "reset": true }));
+    // Show/hide ▸ items.
+    call(&mut ctx, "drawing_show_hide", json!({ "drawing": tab, "view": sid, "item": "offset_cut_lines", "show": true }));
+    assert!(last(&mut ctx).ends_with(":: Offset cut lines"));
+    call(&mut ctx, "drawing_show_hide", json!({ "drawing": tab, "view": sid, "item": "hidden_lines", "show": true }));
+    let disp = views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap()["display"].clone();
+    assert_eq!((disp["offset_cut_lines"].as_bool(), disp["hidden_lines"].as_bool()), (Some(true), Some(true)), "{disp}");
+    let e = try_call(&mut ctx, "drawing_show_hide", json!({ "drawing": tab, "view": top_id, "item": "offset_cut_lines", "show": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("item"), "{e:?}");
+    assert!(views_of(&mut ctx).into_iter().find(|v| v["id"] == sid).unwrap()["section_hatches"].is_null());
+    let e = try_call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": [5, 5] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("at"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_edit_hatch", json!({ "drawing": tab, "view": sid, "at": corner, "pattern": "Plaid" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("pattern"), "{e:?}");
 
     // Detail view of the hole, twice the parent's scale.
     let dv = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": top_id, "center": [cx, cy], "radius": r * 1.5, "position": [380, 60] }));

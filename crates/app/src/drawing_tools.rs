@@ -934,7 +934,7 @@ impl DrawingEditor {
             cx.stop_propagation();
             return;
         }
-        if e.button == MouseButton::Left && self.hatch_click(cx) {
+        if e.button == MouseButton::Left && self.hatch_click(window, cx) {
             cx.stop_propagation();
             return;
         }
@@ -1614,11 +1614,13 @@ impl DrawingEditor {
         // asb 10-23 views (2)).
         let target = pick.and_then(|p| self.built.as_ref()?.picks.get(p as usize).cloned());
         let circle = target.as_ref().and_then(|t| if let PickTarget::DetailCircle(v) = t { Some(*v) } else { None });
+        let cut_line = target.as_ref().and_then(|t| if let PickTarget::SectionLine(v) = t { Some(*v) } else { None });
         self.menu_broken_out = target.and_then(|t| if let PickTarget::BrokenOut { view, index } = t { Some((view, index)) } else { None });
-        let entries = match (self.leader_hit(self.cursor), circle) {
-            (Some(hit), _) => self.leader_entries(hit, cx),
-            (None, Some(v)) => self.detail_circle_entries(v, cx),
-            (None, None) => self.context_entries(sel, cx),
+        let entries = match (self.leader_hit(self.cursor), circle, cut_line) {
+            (Some(hit), _, _) => self.leader_entries(hit, cx),
+            (None, Some(v), _) => self.detail_circle_entries(v, cx),
+            (None, None, Some(v)) => self.section_line_entries(v, cx),
+            (None, None, None) => self.context_entries(sel, cx),
         };
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
