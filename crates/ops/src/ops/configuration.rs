@@ -1,6 +1,6 @@
-//! Part Studio configurations (the Configurations panel).
+//! Part Studio and Assembly configurations (the Configurations panel).
 
-use super::{doc_field, edit_studio, feature_arg, regen_report, s, studio_target, tab_field};
+use super::{doc_field, edit_studio, feature_arg, regen_report, s, studio_target};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, config, doc, values};
@@ -10,6 +10,13 @@ use noshape_model::params::ParamValue;
 use noshape_model::partstudio::PartStudio;
 use serde_json::{Value, json};
 
+pub(crate) mod asm;
+
+/// The `tab` of the config ops: a Part Studio or an Assembly.
+fn cfg_tab_field() -> crate::registry::Field {
+    opt("tab", json!({ "type": "string" }), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio.")
+}
+
 pub fn ops() -> Vec<Op> {
     vec![
         Op {
@@ -17,7 +24,7 @@ pub fn ops() -> Vec<Op> {
             verb: "list",
             summary: "The Part Studio's configuration inputs, configurations and configured parameters",
             description: "Inputs (List with its configurations, Checkbox, Variable with default and range) with ids, and every configured parameter with its value per configuration.",
-            fields: vec![doc_field(), tab_field()],
+            fields: vec![doc_field(), cfg_tab_field()],
             mutates: false,
             destructive: false,
             run: list,
@@ -29,7 +36,7 @@ pub fn ops() -> Vec<Op> {
             description: "\"Configure Part Studio\" › List / Checkbox / Variable. A List starts with one configuration \"Default\" (add more with config_add_option). A Variable input is a #variable whose value each configuration can set.",
             fields: vec![
                 doc_field(),
-                tab_field(),
+                cfg_tab_field(),
                 req("kind", json!({ "type": "string", "enum": ["list", "checkbox", "variable"] }), "Input kind."),
                 opt("name", s(), "Name (default \"Configuration\", \"List 2\", \"Checkbox 1\"...; required for a variable: its #name)."),
                 opt("variable_kind", json!({ "type": "string", "enum": ["LENGTH", "ANGLE", "INTEGER", "REAL", "TEXT"] }), "Variable: kind (default LENGTH)."),
@@ -47,7 +54,7 @@ pub fn ops() -> Vec<Op> {
             description: "",
             fields: vec![
                 doc_field(),
-                tab_field(),
+                cfg_tab_field(),
                 req("input", s(), "Input id or name."),
                 opt("name", s(), "New name."),
                 opt("value", json!({ "type": ["string", "number"] }), "Variable input: new default."),
@@ -62,7 +69,7 @@ pub fn ops() -> Vec<Op> {
             verb: "delete_input",
             summary: "Delete a configuration input and what it configures",
             description: "",
-            fields: vec![doc_field(), tab_field(), req("input", s(), "Input id or name.")],
+            fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "Input id or name.")],
             mutates: true,
             destructive: true,
             run: delete_input,
@@ -71,8 +78,8 @@ pub fn ops() -> Vec<Op> {
             group: "config",
             verb: "add_option",
             summary: "Add a configuration to a List input",
-            description: "Configured parameters take the default configuration's value in it until set with config_set_value.",
-            fields: vec![doc_field(), tab_field(), req("input", s(), "List input id or name."), req("name", s(), "Configuration name (e.g. \"Large\").")],
+            description: "Returns its id as `option`. Configured parameters take the default configuration's value in it until set with config_set_value.",
+            fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "List input id or name."), req("name", s(), "Configuration name (e.g. \"Large\").")],
             mutates: true,
             destructive: false,
             run: add_option,
@@ -82,7 +89,7 @@ pub fn ops() -> Vec<Op> {
             verb: "edit_option",
             summary: "Rename or delete a configuration of a List input",
             description: "A List keeps at least one configuration.",
-            fields: vec![doc_field(), tab_field(), req("input", s(), "List input id or name."), req("option", s(), "Configuration id or name."), opt("name", s(), "New name."), opt("delete", json!({ "type": "boolean" }), "Delete it.")],
+            fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "List input id or name."), req("option", s(), "Configuration id or name."), opt("name", s(), "New name."), opt("delete", json!({ "type": "boolean" }), "Delete it.")],
             mutates: true,
             destructive: false,
             run: edit_option,
@@ -90,9 +97,9 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "config",
             verb: "configure",
-            summary: "Make a feature parameter (or a feature's suppression) configured by a List or Checkbox input",
-            description: "Every configuration starts with the current value; then set values with config_set_value. `param` is a parameter id of the feature (see feature_schema) or \"suppressed\".",
-            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), req("param", s(), "Parameter id, or \"suppressed\"."), req("input", s(), "List or Checkbox input id or name.")],
+            summary: "Make a parameter (or suppression) of a feature, assembly instance or mate configured by a List or Checkbox input",
+            description: "Every configuration starts with the current value; then set values with config_set_value. Part Studio: `feature` and `param`, a parameter id of the feature (see feature_schema) or \"suppressed\" (Configure suppression). Assembly: `instance` with `param` \"suppressed\", or `mate` with \"suppressed\", \"offset\", \"offset_x\", \"offset_y\", \"offset_z\", \"rotation\" or \"flip_primary\".",
+            fields: vec![doc_field(), cfg_tab_field(), opt("feature", s(), "Feature id or name (Part Studio)."), opt("instance", s(), "Instance id or name (Assembly)."), opt("mate", s(), "Mate id or name (Assembly)."), req("param", s(), "Parameter id, or \"suppressed\"."), req("input", s(), "List or Checkbox input id or name.")],
             mutates: true,
             destructive: false,
             run: configure,
@@ -104,9 +111,11 @@ pub fn ops() -> Vec<Op> {
             description: "`configuration` is the List configuration's id or name, or true/false for a Checkbox. `value` uses the feature parameter's JSON form (\"40 mm\", an enum id, true/false...).",
             fields: vec![
                 doc_field(),
-                tab_field(),
-                req("feature", s(), "Feature id or name."),
-                req("param", s(), "Parameter id, or \"suppressed\"."),
+                cfg_tab_field(),
+                opt("feature", s(), "Feature id or name (Part Studio)."),
+                opt("instance", s(), "Instance id or name (Assembly)."),
+                opt("mate", s(), "Mate id or name (Assembly)."),
+                req("param", s(), "Parameter id, or \"suppressed\" (see config_configure)."),
                 req("configuration", json!({ "type": ["string", "boolean"] }), "Configuration id/name, or true/false."),
                 req("value", json!({}), "The value."),
             ],
@@ -121,7 +130,7 @@ pub fn ops() -> Vec<Op> {
             description: "Sets the active value of configuration inputs; later regenerations, queries, renders, exports and feature edits use it (feature_edit then edits that configuration's configured values). `values` maps each input (id or name) to a List configuration (id or name), true/false for a Checkbox, or an expression for a configuration Variable (\"40 mm\"). Inputs not given keep their current value; `reset: true` returns every input to its default first. View state: no history entry, as in the app.",
             fields: vec![
                 doc_field(),
-                tab_field(),
+                cfg_tab_field(),
                 opt("values", json!({ "type": "object", "additionalProperties": { "type": ["string", "boolean", "number"] } }), "Input -> value."),
                 opt("reset", json!({ "type": "boolean" }), "Start from the default configuration."),
             ],
@@ -134,7 +143,7 @@ pub fn ops() -> Vec<Op> {
             verb: "reorder_inputs",
             summary: "Move a configuration input onto another's place",
             description: "",
-            fields: vec![doc_field(), tab_field(), req("input", s(), "Input to move."), req("to", s(), "Input whose place it takes.")],
+            fields: vec![doc_field(), cfg_tab_field(), req("input", s(), "Input to move."), req("to", s(), "Input whose place it takes.")],
             mutates: true,
             destructive: false,
             run: reorder,
@@ -186,9 +195,14 @@ fn edit(od: &mut OpenDoc, tab: TabId, desc: &str, f: impl FnOnce(&mut PartStudio
 }
 
 fn describe(ps: &PartStudio) -> Value {
-    let inputs: Vec<Value> = ps
-        .configuration
-        .inputs
+    let mut v = describe_inputs(&ps.configuration.inputs);
+    v["configured"] = describe_configured(ps);
+    v
+}
+
+/// The inputs as config_list shows them.
+fn describe_inputs(inputs: &[noshape_model::configuration::ConfigInput]) -> Value {
+    let inputs: Vec<Value> = inputs
         .iter()
         .map(|i| {
             let mut v = json!({ "id": i.id, "name": i.name });
@@ -218,6 +232,10 @@ fn describe(ps: &PartStudio) -> Value {
             v
         })
         .collect();
+    json!({ "inputs": inputs })
+}
+
+fn describe_configured(ps: &PartStudio) -> Value {
     let configured: Vec<Value> = ps
         .configuration
         .configured
@@ -234,10 +252,13 @@ fn describe(ps: &PartStudio) -> Value {
             })
         })
         .collect();
-    json!({ "inputs": inputs, "configured": configured })
+    json!(configured)
 }
 
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::list(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let mut v = describe(doc::studio(od.doc(), tab)?);
     v["active"] = active(od, tab)?;
@@ -252,6 +273,9 @@ fn active(od: &OpenDoc, tab: TabId) -> Result<Value, OpError> {
 }
 
 fn activate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::activate(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let ps = doc::studio(od.doc(), tab)?;
@@ -293,6 +317,9 @@ fn text(v: &Value, field: &str) -> Result<String, OpError> {
 }
 
 fn add_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::add_input(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let kind = a.str("kind")?;
     let name = a.opt_str("name")?.map(str::to_string);
@@ -328,6 +355,9 @@ fn add_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn edit_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::edit_input(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let id = find_input(doc::studio(od.doc(), tab)?, a.str("input")?, "input")?;
     let mut out = None;
@@ -359,6 +389,9 @@ fn edit_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn delete_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::delete_input(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let id = find_input(doc::studio(od.doc(), tab)?, a.str("input")?, "input")?;
     edit(od, tab, config::DELETE_INPUT, |ps| {
@@ -368,16 +401,22 @@ fn delete_input(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn add_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::add_option(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let id = find_input(doc::studio(od.doc(), tab)?, a.str("input")?, "input")?;
     let name = a.str("name")?.trim().to_string();
     if name.is_empty() {
         return Err(OpError::param("name", "must not be empty"));
     }
-    edit(od, tab, config::ADD_OPTION, |ps| config::add_option(ps, &id, name).map(|o| json!({ "configuration": o })).ok_or_else(|| OpError::param("input", "not a List input")))
+    edit(od, tab, config::ADD_OPTION, |ps| config::add_option(ps, &id, name).map(|o| json!({ "option": o })).ok_or_else(|| OpError::param("input", "not a List input")))
 }
 
 fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::edit_option(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
     let input = find_input(ps, a.str("input")?, "input")?;
@@ -391,11 +430,14 @@ fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let name = a.opt_str("name")?.ok_or_else(|| OpError::invalid("give `name` or `delete`"))?.to_string();
     edit(od, tab, config::RENAME_OPTION, |ps| {
         config::rename_option(ps, &input, &option, name);
-        Ok(json!({ "configuration": option }))
+        Ok(json!({ "option": option }))
     })
 }
 
 fn configure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::configure(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
     let feature = feature_arg(ps, a, "feature")?;
@@ -414,6 +456,9 @@ fn configure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn set_value(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return asm::set_value(ctx, a);
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let ps = doc::studio(od.doc(), tab)?;
@@ -444,6 +489,9 @@ fn set_value(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn reorder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if asm::is_assembly(ctx, a)? {
+        return Err(OpError::param("tab", "assembly configuration inputs keep their order"));
+    }
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
     let from = find_input(ps, a.str("input")?, "input")?;

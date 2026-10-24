@@ -241,6 +241,22 @@ pub struct UiState {
     /// The Measure panel's distance row under the pointer (its label): live
     /// draws that one measurement's dashed line, nothing otherwise.
     pub measure_hover: Option<String>,
+    /// Sheet metal table and flat view: the chosen context (else the first
+    /// model by name) and the collapsed tables.
+    pub sm_context: Option<noshape_model::reference::FeatureId>,
+    pub sm_bends_closed: bool,
+    pub sm_joints_closed: bool,
+    /// The Bends table's horizontal scroll.
+    pub sm_bends_scroll: ScrollHandle,
+    /// The table cell under the pointer: (table: 0 Bends / 1 Other joints,
+    /// row, column).
+    pub sm_hover: Option<(u8, usize, usize)>,
+    /// The Bends cell being edited (row, column 2 Radius / 5 K Factor), and
+    /// whether its field still needs the focus.
+    pub sm_edit: Option<(usize, usize)>,
+    pub sm_edit_focus: bool,
+    /// The selected cell (table, row, column; column 0 selects the row).
+    pub sm_cell: Option<(u8, usize, usize)>,
     /// Dynamic suppression editor: feature, expression input.
     pub dyn_suppression: Option<(FeatureId, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
@@ -442,6 +458,14 @@ impl UiState {
             preview_tool_task: None,
             measure_lines: None,
             measure_hover: None,
+            sm_context: None,
+            sm_bends_closed: false,
+            sm_joints_closed: false,
+            sm_bends_scroll: ScrollHandle::new(),
+            sm_hover: None,
+            sm_edit: None,
+            sm_edit_focus: false,
+            sm_cell: None,
             dyn_suppression: None,
             shortcut_filter: None,
             shortcut_query: String::new(),
@@ -1097,12 +1121,7 @@ impl PartStudioView {
         }
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, "Paste sketch", cx, |ps| {
-                let at = ps.rollback_index();
-                for id in ps.paste_features(&sketches, at) {
-                    if let Some(f) = ps.feature_mut(id) {
-                        f.params.set("sketchPlane", ParamValue::Query(vec![plane.clone()]));
-                    }
-                }
+                noshape_ops::studio::paste_sketches_onto(ps, &sketches, plane);
             });
         });
     }
@@ -1111,7 +1130,7 @@ impl PartStudioView {
     /// coordinates; construction curves as hidden lines).
     pub(super) fn export_sketch(&mut self, id: FeatureId, ext: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(sk) = self.display.sketches.iter().find(|s| s.feature == id) else { return };
-        let g = sketch_sheet(sk);
+        let g = noshape_ops::sketch_export::sketch_sheet(sk);
         let name = sk.name.clone();
         let view = cx.entity();
         crate::files::request_save_path("Export sketch", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
@@ -1126,12 +1145,9 @@ impl PartStudioView {
 
     /// Face menu "Export as DXF/DWG…": the planar face's boundary in its plane.
     pub(super) fn export_face(&mut self, r: Reference, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(frame) = self.frame_of_ref(&r) else { return };
-        let Some(b) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)) else { return };
-        let fi = b.face_refs.iter().position(|x| *x == r).unwrap_or(0);
-        let lines = b.mesh.face_edges(fi).into_iter().filter_map(|e| b.mesh.edges.get(e).map(|pl| (pl.clone(), false))).collect();
-        let g = plane_sheet(&frame, lines);
-        let name = b.name.clone();
+        let Some(ctx) = self.context.as_ref() else { return };
+        let Some(g) = noshape_ops::sketch_export::face_sheet(ctx, &self.display, &r) else { return };
+        let Some(name) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)).map(|b| b.name.clone()) else { return };
         let view = cx.entity();
         crate::files::request_save_path("Export face", format!("{name} face.dxf"), "dxf", window, cx, move |path, cx| {
             let msg = match std::fs::write(&path, noshape_model::drawing::export::to_dxf(&g)) {
@@ -1176,11 +1192,7 @@ impl PartStudioView {
     pub(super) fn set_suppression_expr(&mut self, id: FeatureId, expr: Option<String>, cx: &mut Context<Self>) {
         let expr = expr.filter(|e| !e.trim().is_empty());
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, if expr.is_some() { "Dynamic suppression" } else { "Remove dynamic suppression" }, cx, |ps| {
-                if let Some(f) = ps.feature_mut(id) {
-                    f.suppression_expr = expr;
-                }
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(expr.as_deref()), cx, |ps| noshape_ops::studio::set_suppression_expr(ps, id, expr));
         });
     }
 
@@ -1188,12 +1200,7 @@ impl PartStudioView {
     /// feature active (one undo step).
     pub(super) fn clear_dynamic_suppression(&mut self, id: FeatureId, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Unsuppress", cx, |ps| {
-                if let Some(f) = ps.feature_mut(id) {
-                    f.suppression_expr = None;
-                    f.suppressed = false;
-                }
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::suppress_description(false), cx, |ps| noshape_ops::studio::set_suppressed(ps, &[id], false));
         });
     }
 
@@ -3304,31 +3311,6 @@ impl PartStudioView {
             }
         });
     }
-}
-
-/// A sketch as 2D sheet geometry in millimeters (plane coordinates).
-/// Flat sheet (millimeters, plane coordinates) of world polylines.
-fn plane_sheet(frame: &noshape_model::display::PlaneFrame, polylines: Vec<(Vec<[f32; 3]>, bool)>) -> noshape_model::drawing::sheet::SheetGeometry {
-    use noshape_model::drawing::sheet::{LineStyle, Polyline2};
-    let local = |p: [f32; 3]| {
-        let d = glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64) - frame.origin;
-        [d.dot(frame.x) * 1000.0, d.dot(frame.y) * 1000.0]
-    };
-    let lines: Vec<Polyline2> = polylines.into_iter().map(|(pts, hidden)| Polyline2 { points: pts.into_iter().map(local).collect(), style: if hidden { LineStyle::Hidden } else { LineStyle::Visible }, closed: false, pick: 0 }).collect();
-    let (mut w, mut h) = (0.0f64, 0.0f64);
-    for l in &lines {
-        for p in &l.points {
-            w = w.max(p[0].abs());
-            h = h.max(p[1].abs());
-        }
-    }
-    let mut g = noshape_model::drawing::sheet::SheetGeometry::new(w * 2.0, h * 2.0);
-    g.lines = lines;
-    g
-}
-
-pub fn sketch_sheet(sk: &noshape_model::display::SketchDisplay) -> noshape_model::drawing::sheet::SheetGeometry {
-    plane_sheet(&sk.frame, sk.curves.iter().filter(|c| c.points.len() >= 2 && !c.external).map(|c| (c.points.clone(), c.construction)).collect())
 }
 
 #[cfg(test)]

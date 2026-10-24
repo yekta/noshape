@@ -723,3 +723,24 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
     DWT, splines checkbox only for DWG / DXF / DWT; the DWG / DWT / CSV notes. Import dialog: no Join for PVZ.
     Requested live raster samples ("api (10-24) drawing raster export") to check the shared rasterizer, and the IM2
     mass-property bands ("api (10-24) IM2 bands").
+  - (10-24) API coverage audit 1: assembly_mate edits mates and takes every dialog option (offset, rotation axis,
+    limits, tangent propagation, flip / reorient); sketch_create disable_imprinting; sketch_paste, sketch_export;
+    feature_add_folder / rename_folder / unpack_folder, feature_dependencies, feature_dynamic_suppression;
+    drawing_create with sketch, configuration, custom_template and the dialog's defaults (ANSI_A_INCH.dwt, No views).
+    Shared code moved to ops (sketch_export, studio folder / suppression helpers, drawing::CustomTemplate).
+  - (10-24) Raster / SVG drawing export as live's files: 300 px per inch, opaque white RGB, no antialiasing, all black,
+    5 px visible edges and 2 px other lines, PNG pHYs 3937 px/m, JPEG q75 4:2:0 at 100 dpi (jpeg-encoder), TIFF
+    uncompressed one strip at 100 dpi, SVG text as outlines. Still different from live: our templates draw a thin
+    line on the sheet edge (live's export has none) and inset the frame 10 mm (live ANSI A ≈ 9.6 mm), reported to
+    the lead. IM2 graded ✅ under the band rule (workflow-import-matrix.md).
+  - (10-24) API coverage audit 2: assembly instance / mate menus (assembly_move_to_subassembly, _create_subassembly,
+    _dissolve_subassembly, _add_folder, _unpack_folder, _copy, _set_configuration, _lock, _instance_properties,
+    _dynamic_suppression; assembly_insert `sketch`), Standard content (assembly_standard_content, _insert_standard
+    with holes / auto-size / closest / furthest, _edit_standard), assembly configurations through the config_* ops
+    (Assembly `tab`: inputs, configurations, instance suppression and mate parameters, the active configuration),
+    drawing_insert_view's Insert view panel options (sketch views, flat pattern, named views, simplification, model
+    annotations, sketch appearances, explode / position, display state), drawing_detail_view profiles (rectangle,
+    spline, polygon), drawing_edit_dimension (the dimension palette). The app's handlers call the shared code
+    (ops::assembly, ops::asm_config, ops::drawing, scene detail_profile). config_add_option / _edit_option now return
+    the configuration id as `option` (it was overwritten by the description). Parts menu: covered (Copy here =
+    Transform copy, Copy part = Derived); Release / Revision history have no ops yet.

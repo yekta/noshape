@@ -257,7 +257,7 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             PatternKind::Linear { direction: axis.ok_or_else(|| OpError::param("direction", "Select a direction (edge, face or mate connector)"))?, distance, count, opposite, equal_spacing: equal, second, centered }
         }
         "circular" => PatternKind::Circular { axis: axis.ok_or_else(|| OpError::param("direction", "Select the axis of pattern"))?, angle: distance, count, opposite, equal_spacing: equal, centered },
-        "mirror" => PatternKind::Mirror { plane: axis.ok_or_else(|| OpError::param("direction", "Select the mirror plane (planar face or mate connector)"))?, handed: a.get("handed").and_then(Value::as_bool).unwrap_or(keep(o_handed)), derived: Vec::new(), placement: Vec::new() },
+        "mirror" => PatternKind::Mirror { plane: axis.ok_or_else(|| OpError::param("direction", "Select the mirror plane (planar face or mate connector)"))?, handed: a.get("handed").and_then(Value::as_bool).unwrap_or(keep(o_handed)), derived: Vec::new(), placement: Vec::new(), mirrored_studios: vec![] },
         "part_pattern" => PatternKind::PartPattern { mate: mate()? },
         _ => {
             let mate = mate()?;

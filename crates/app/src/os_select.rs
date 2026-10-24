@@ -59,6 +59,9 @@ pub struct OsSelect {
     id: SharedString,
     /// (id, label) in display order.
     items: Vec<(SharedString, SharedString)>,
+    /// The labels are already in the UI language (a feature dialog's
+    /// options, [`crate::i18n::spec`]): drawn as they are.
+    translated: bool,
     current: SharedString,
     /// Field height (with its underline).
     height: f32,
@@ -85,8 +88,13 @@ pub struct OsSelect {
 impl EventEmitter<OsSelectEvent> for OsSelect {}
 
 impl OsSelect {
+    /// Mark the labels as already in the UI language (not looked up again).
+    pub fn set_translated(&mut self, on: bool) {
+        self.translated = on;
+    }
+
     pub fn new(id: impl Into<SharedString>) -> Self {
-        Self { id: id.into(), items: Vec::new(), current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
+        Self { id: id.into(), items: Vec::new(), translated: false, current: SharedString::default(), height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
     }
 
     /// A shorter field (Hole's lookup rows are 22 px).
@@ -226,7 +234,7 @@ impl OsSelect {
             // `#def1fb` hover (§4.5).
             .hover(|d| d.bg(pal.row_hover))
             .cursor_pointer()
-            .child(div().flex_1().min_w_0().text_size(px(14.)).text_color(pal.text).truncate().child(label))
+            .child(div().flex_1().min_w_0().text_size(px(14.)).text_color(pal.text).truncate().map(|d| if self.translated { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
             // Live: the 8x4 bootstrap caret, 6 px from the end.
             .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
             // Focused (bootstrap .btn-default-focus inside os-enum-parameter):
@@ -248,6 +256,7 @@ impl OsSelect {
             let on = row == hl;
             let text: AnyElement = match range {
                 Some(r) => StyledText::new(label).with_highlights([(r, HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() })]).into_any_element(),
+                None if self.translated => crate::ui::user_text(label).into_any_element(),
                 None => label.into_any_element(),
             };
             div()

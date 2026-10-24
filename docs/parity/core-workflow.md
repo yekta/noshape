@@ -476,7 +476,7 @@ under the Hole row, lands under it), F8/F9/F18 closed earlier. Still open, route
 - IMP1 (kern): imported parts share face names → selection highlight crosses parts (g48-two: Part 1 lights the cube, Part 2
   lights the cube + two G48 faces). `importing.rs import_foreign` names each body with `new_face_names` → `Role::New(ordinal)`
   per body under one feature, so body 0 and body 1 both have New(0…5).
-- IMP2 (live request): Parts list after importing g48-two reads Part 2 above Part 1; live order not captured.
+- IMP2 ✅ (api 10-24): Parts list after importing g48-two reads Part 2 above Part 1, as in live (the file's order).
 - R1: fixed on main (833bfb0b), re-checked in the app: closed.
 - PAT-DIR (psb, v0.4.7 gate): failed Feature pattern's Direction drawn orange (selection) instead of red.
 - ASM-ESC: fixed on main (833bfb0b), re-checked in the app: closed.

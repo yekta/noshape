@@ -67,8 +67,8 @@ fn install_translator(code: &str) {
     } else {
         gpui_kit::set_text_translator(Some(lookup));
     }
-    // New features are named in the language ("Linear austragen 1").
-    noshape_model::default_names::set_localizer((code != DEFAULT).then_some(lookup as noshape_model::default_names::Localizer));
+    // New features are named in the language ("Linear austragen 1", "Fest 1").
+    noshape_model::default_names::set_localizer((code != DEFAULT).then_some(default_name as noshape_model::default_names::Localizer));
     if let Some(path) = std::env::var_os("NOSHAPE_I18N_LOG") {
         let _ = LOG.set(std::sync::Mutex::new((std::fs::File::create(path).ok(), Default::default())));
         gpui_kit::set_translated_text_log(Some(log_text));
@@ -120,7 +120,15 @@ impl Template {
 
     /// The translation of `s` if it's this template filled in (values
     /// non-empty, each up to the next piece's first occurrence).
+    #[cfg(test)]
     fn fill(&self, s: &str) -> Option<String> {
+        self.fill_with(s, |_| None)
+    }
+
+    /// [`Template::fill`], a type or label value ("Hide other __label__":
+    /// "planes") in the language too through `word` (live: "Andere
+    /// „Ebenen“ ausblenden"); names stay as they are.
+    fn fill_with(&self, s: &str, word: impl Fn(&str) -> Option<String>) -> Option<String> {
         let mut rest = s.strip_prefix(self.pieces[0].as_str())?;
         let mut values = Vec::with_capacity(self.names.len());
         for (i, piece) in self.pieces[1..].iter().enumerate() {
@@ -140,7 +148,9 @@ impl Template {
         }
         let mut out = self.text.clone();
         for (name, value) in self.names.iter().zip(values) {
-            out = out.replace(&format!("__{name}__"), value);
+            let lower = name.to_lowercase();
+            let typed = (lower == "label" || lower.ends_with("label") || lower.contains("type")).then(|| word(value)).flatten();
+            out = out.replace(&format!("__{name}__"), typed.as_deref().unwrap_or(value));
         }
         Some(out)
     }
@@ -153,24 +163,47 @@ struct Formatted {
     seen: HashMap<String, Option<&'static str>>,
 }
 
-/// [`lookup`] of a formatted text, by the language's templates.
-fn formatted(code: &'static str, s: &str) -> Option<&'static str> {
-    static FORMATTED: OnceLock<std::sync::Mutex<HashMap<&'static str, Formatted>>> = OnceLock::new();
-    let mut all = FORMATTED.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
-    let f = all.entry(code).or_insert_with(|| {
+static FORMATTED: OnceLock<std::sync::Mutex<HashMap<&'static str, Formatted>>> = OnceLock::new();
+
+impl Formatted {
+    fn new(code: &'static str) -> Self {
         let mut templates: HashMap<Option<char>, Vec<Template>> = HashMap::new();
         for (english, text) in table(code).iter().filter(|(k, _)| k.contains("__")) {
             if let Some(t) = Template::parse(english, text) {
                 templates.entry(t.pieces[0].chars().next()).or_default().push(t);
             }
         }
+        // The most specific first: "Edit __name__…" before "Edit __aliasName__".
+        for list in templates.values_mut() {
+            // Ties: the generic `__name__` before a specific value
+            // ("Delete __name__" → „…“ löschen, not "Delete __companyType__").
+            list.sort_by_key(|t| (std::cmp::Reverse(t.pieces.iter().map(|p| p.chars().count()).sum::<usize>()), !t.names.iter().all(|n| n == "name")));
+        }
         Formatted { templates, seen: HashMap::new() }
-    });
+    }
+}
+
+/// [`lookup`] of a formatted text, by the language's templates.
+fn formatted(code: &'static str, s: &str) -> Option<&'static str> {
+    let mut all = FORMATTED.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    let f = all.entry(code).or_insert_with(|| Formatted::new(code));
     if let Some(hit) = f.seen.get(s) {
         return *hit;
     }
     let first = s.chars().next();
-    let hit = [first, None].iter().filter_map(|k| f.templates.get(k)).flatten().find_map(|t| t.fill(s));
+    // Spacing around a text (a no-break space before a link) stays around
+    // its translation.
+    let trimmed = s.trim();
+    let spaced = (trimmed.len() != s.len() && !trimmed.is_empty()).then(|| table(code).get(trimmed)).flatten().map(|t| s.replacen(trimmed, t, 1));
+    let word = |w: &str| table(code).get(w).cloned();
+    let hit = spaced.or_else(|| [first, None].iter().filter_map(|k| f.templates.get(k)).flatten().find_map(|t| t.fill_with(s, word))).or_else(|| {
+        // A label with a count or a shortcut: "Mate features (2)" →
+        // "Verknüpfungs-Features (2)", "Extrude (shift+e)" → "Linear
+        // austragen (shift+e)" (live), when the table has the label alone.
+        let (label, suffix) = s.strip_suffix(')')?.rsplit_once(" (")?;
+        (!suffix.is_empty() && suffix.len() <= 16 && !suffix.contains(' ')).then_some(())?;
+        table(code).get(label).map(|t| format!("{t} ({suffix})"))
+    });
     // Each distinct text is kept (and its translation leaked) once; the
     // texts a session formats are few (counts, names).
     let hit: Option<&'static str> = hit.map(|t| &*Box::leak(t.into_boxed_str()));
@@ -208,6 +241,98 @@ fn log_text(text: &str, b: gpui_kit::Bounds<gpui_kit::Pixels>, looked_up: bool) 
             let _ = writeln!(f, "{line}");
         }
     }
+}
+
+/// A text naming a stored entity ("Face of Extrude 1"): translated only by
+/// a `__name__` template, keeping the name as it is ("Fläche von Extrude
+/// 1"); never looked up whole, as the text may be just a name.
+pub fn filled(text: &str) -> Option<String> {
+    let code = current();
+    if code == DEFAULT || !text.contains(' ') {
+        return None;
+    }
+    // A selection chip "Edge of Extrude 1" (live bundle buildDisplayName):
+    // "__selectionName__ of __featureNodeDisplayName__", the entity word in
+    // the server strings ("Kante von Extrude 1", "Extrude 1 の 面").
+    if let Some((word, name)) = text.split_once(" of ")
+        && let Some(local) = default_name(word)
+        && let Some(t) = table(code).get("__selectionName__ of __featureNodeDisplayName__")
+    {
+        return Some(t.replace("__selectionName__", local).replace("__featureNodeDisplayName__", name));
+    }
+    let mut all = FORMATTED.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    let f = all.entry(code).or_insert_with(|| Formatted::new(code));
+    // Only templates that open with words ("Face of __featureName__"): one
+    // starting with a value ("__a__ on __b__") could rewrite a bare name.
+    let first = text.chars().next();
+    let word = |w: &str| table(code).get(w).cloned();
+    f.templates.get(&first)?.iter().filter(|t| t.pieces[0].chars().any(char::is_alphabetic)).find_map(|t| t.fill_with(text, word))
+}
+
+/// Onshape's template `key` filled in as it builds a text, in the UI
+/// language: label values translated as words ("Hide all __label__" with
+/// "instances" → "Alle „Instanzen“ ausblenden", where the table's own
+/// "Hide all instances" lacks the quotes live shows). The result is drawn
+/// as it is (no English key looks like it).
+pub fn template(key: &str, args: &[(&str, &str)]) -> String {
+    let code = current();
+    let localized = code != DEFAULT;
+    let mut out = if localized { table(code).get(key).cloned().unwrap_or_else(|| key.to_string()) } else { key.to_string() };
+    for (name, value) in args {
+        let word = localized.then(|| table(code).get(*value).cloned()).flatten();
+        out = out.replace(&format!("__{name}__"), word.as_deref().unwrap_or(value));
+    }
+    out
+}
+
+/// A feature type's name in the UI language, as the server strings have it
+/// ("Extrude" → "Linear austragen"; English otherwise).
+pub fn type_name(english: &str) -> String {
+    if current() == DEFAULT {
+        return english.to_string();
+    }
+    default_name(english).unwrap_or(english).to_string()
+}
+
+/// A feature dialog's string (parameter label, enum option, group name) in
+/// the UI language: as the localised feature specs have it (`specs-<code>.tsv`;
+/// live keeps a spec string in English when the spec does), else as the UI
+/// text. Render the result with [`crate::ui::spec_text`] (never looked up
+/// again).
+pub fn spec(english: &str) -> String {
+    static SPECS: OnceLock<RwLock<HashMap<&'static str, &'static HashMap<String, String>>>> = OnceLock::new();
+    let code = current();
+    if code == DEFAULT {
+        return english.to_string();
+    }
+    let specs = SPECS.get_or_init(Default::default);
+    let cached = specs.read().unwrap_or_else(|e| e.into_inner()).get(code).copied();
+    let table = cached.unwrap_or_else(|| {
+        let parsed: &'static HashMap<String, String> = Box::leak(Box::new(load(&format!("specs-{code}"))));
+        specs.write().unwrap_or_else(|e| e.into_inner()).insert(code, parsed);
+        parsed
+    });
+    match table.get(english) {
+        Some(t) => t.clone(),
+        None => lookup(english).unwrap_or(english).to_string(),
+    }
+}
+
+/// The current language's base for a new feature's default name
+/// (`names-<code>.tsv`: Part Studio features as the `server` strings, mates
+/// as their mate type, see `scripts/gen-i18n-tables.py`); also the entity
+/// words of selection chips ("Edge"); None: English.
+fn default_name(english: &str) -> Option<&'static str> {
+    static NAMES: OnceLock<RwLock<HashMap<&'static str, &'static HashMap<String, String>>>> = OnceLock::new();
+    let code = current();
+    let names = NAMES.get_or_init(Default::default);
+    let cached = names.read().unwrap_or_else(|e| e.into_inner()).get(code).copied();
+    let table = cached.unwrap_or_else(|| {
+        let parsed: &'static HashMap<String, String> = Box::leak(Box::new(load(&format!("names-{code}"))));
+        names.write().unwrap_or_else(|e| e.into_inner()).insert(code, parsed);
+        parsed
+    });
+    table.get(english).map(|s| s.as_str())
 }
 
 fn table(code: &'static str) -> &'static HashMap<String, String> {
@@ -276,6 +401,18 @@ mod tests {
         assert_eq!(t.fill("Features (3 of 8)").as_deref(), Some("Features (3 von 8)"));
         assert!(Template::parse("__a__ __b__", "x").is_none(), "no words: would match anything");
         assert_eq!(Template::parse("Edit __name__", "Modifier __name__").unwrap().fill("Edit Extrude 1").as_deref(), Some("Modifier Extrude 1"));
+        // A label value is translated, a name isn't.
+        let t = Template::parse("Hide other __label__", "Andere „__label__“ ausblenden").unwrap();
+        assert_eq!(t.fill_with("Hide other planes", |w| (w == "planes").then(|| "Ebenen".to_string())).as_deref(), Some("Andere „Ebenen“ ausblenden"));
+        let t = Template::parse("Edit __name__…", "„__name__“ bearbeiten …").unwrap();
+        assert_eq!(t.fill_with("Edit planes…", |_| Some("x".into())).as_deref(), Some("„planes“ bearbeiten …"));
+    }
+
+    #[test]
+    fn a_counted_label_translates_its_label() {
+        assert_eq!(formatted("de", "Mate features (2)"), Some("Verknüpfungs-Features (2)"));
+        assert_eq!(formatted("de", "Extrude (shift+e)"), Some("Linear austragen (shift+e)"));
+        assert_eq!(formatted("de", "Mate features\u{a0}"), Some("Verknüpfungs-Features\u{a0}"));
     }
 
     #[test]
@@ -285,5 +422,36 @@ mod tests {
         }
         assert_eq!(load("de").get("Default geometry").map(String::as_str), Some("Standardgeometrie"));
         assert_eq!(load("fr").get("Extrude").map(String::as_str), Some("Extruder"));
+    }
+
+    #[test]
+    fn entity_texts_keep_their_names() {
+        let t = Template::parse("Face of __featureName__", "Fläche von __featureName__").unwrap();
+        assert_eq!(t.fill("Face of Extrude 1").as_deref(), Some("Fläche von Extrude 1"));
+        // Templates opening with a value never apply to entity texts.
+        let t = Template::parse("__annotationType__ on __partName__", "__annotationType__ für __partName__").unwrap();
+        assert!(!t.pieces[0].chars().any(char::is_alphabetic));
+    }
+
+    #[test]
+    fn dialogs_take_the_feature_specs_strings() {
+        // Live German Extrude: "Formschräge" (the UI text has "Entwurf"),
+        // "Tiefe"; a spec string the spec leaves English stays English.
+        let de = load("specs-de");
+        assert_eq!(de.get("Draft").map(String::as_str), Some("Formschräge"));
+        assert_eq!(de.get("Depth").map(String::as_str), Some("Tiefe"));
+        assert_eq!(de.get("Move").map(String::as_str), Some("Move"));
+        assert_eq!(load("de").get("Draft").map(String::as_str), Some("Entwurf"));
+    }
+
+    #[test]
+    fn default_names_follow_their_sources() {
+        // Live: Part Studio features as the server strings, mates as their
+        // mate type (German "Verrundung 1", "Fest 1"; Japanese "固定 1").
+        let de = load("names-de");
+        assert_eq!(de.get("Fillet").map(String::as_str), Some("Verrundung"));
+        assert_eq!(de.get("Fastened").map(String::as_str), Some("Fest"));
+        assert_eq!(de.get("Mate connector").map(String::as_str), Some("Verknüpfungsverbindung"));
+        assert_eq!(load("names-ja").get("Fastened").map(String::as_str), Some("固定"));
     }
 }

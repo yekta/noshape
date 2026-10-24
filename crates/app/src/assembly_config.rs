@@ -14,7 +14,7 @@ use super::*;
 use gpui_kit::component::input::InputEvent;
 use std::rc::Rc;
 use noshape_model::assembly::config::{self as acfg, ConfigTarget};
-use noshape_model::configuration::{ConfigInput, ConfigInputKind, VariableKind};
+use noshape_model::configuration::{ConfigInput, ConfigInputKind};
 use noshape_model::params::ParamValue;
 use noshape_units::ExprValue;
 
@@ -39,12 +39,6 @@ pub(crate) struct CfgEdit {
 
 type CfgCommit = Rc<dyn Fn(&mut AssemblyView, String, &mut Context<AssemblyView>)>;
 
-fn rand_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let n = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
-    format!("{:x}", n & 0xffff_ffff_ffff)
-}
-
 impl AssemblyView {
     pub(super) fn asm_configuration(&self, cx: &App) -> acfg::AsmConfiguration {
         self.assembly(cx).map(|a| a.configuration.clone()).unwrap_or_default()
@@ -59,16 +53,7 @@ impl AssemblyView {
     /// Configure Assembly ▾ / Add configuration input ▾: List, Checkbox,
     /// Configuration variable (a List is created at once, live 191).
     fn add_asm_config_input(&mut self, kind: &'static str, cx: &mut Context<Self>) {
-        self.edit("Add configuration input", cx, |a| {
-            let n = a.configuration.inputs.len() + 1;
-            let id = format!("in{}", rand_id());
-            let input = match kind {
-                "Checkbox" => ConfigInput { id, name: format!("Checkbox {n}"), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false },
-                "Variable" => ConfigInput { id, name: format!("Variable {n}"), kind: ConfigInputKind::Variable { kind: VariableKind::Length, default: ExprValue::new("10 mm"), min: None, max: None }, visible_when: None, excluded: false },
-                _ => acfg::new_list_input(id, n),
-            };
-            a.configuration.inputs.push(input);
-        });
+        self.edit(noshape_ops::config::ADD_INPUT, cx, |a| noshape_ops::asm_config::add_input(a, kind));
         cx.notify();
     }
 
@@ -126,7 +111,7 @@ impl AssemblyView {
         let mate_name = asm.mate(id).map(|m| m.name.clone()).unwrap_or_default();
         let input_name = asm.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone()).unwrap_or_default();
         let mut added = false;
-        self.edit(&format!("Configure {mate_name}"), cx, |a| added = a.configure_param(&input, ConfigTarget::Mate(id), param));
+        self.edit(&noshape_ops::asm_config::configure_mate_description(&mate_name), cx, |a| added = noshape_ops::asm_config::configure(a, &input, ConfigTarget::Mate(id), param));
         if added {
             self.show_cfg_toast(format!("{mate_name} {} added to {input_name}", acfg::param_label(param)), false, cx);
             if let Some(s) = &self.mate {
@@ -147,7 +132,7 @@ impl AssemblyView {
         let Some(input) = asm.configuration.inputs.iter().find(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).cloned() else { return };
         let name = asm.instance(id).map(|i| i.name.clone()).unwrap_or_default();
         let mut added = false;
-        self.edit(&format!("Configure suppression : {name}"), cx, |a| added = a.configure_param(&input.id, ConfigTarget::Instance(id), acfg::param::UNSUPPRESSED));
+        self.edit(&noshape_ops::asm_config::configure_suppression_description(&name), cx, |a| added = noshape_ops::asm_config::configure(a, &input.id, ConfigTarget::Instance(id), acfg::param::UNSUPPRESSED));
         if added {
             self.show_cfg_toast(format!("{name} suppression configured in {}", input.name), false, cx);
         }
@@ -487,11 +472,7 @@ impl AssemblyView {
         let (i1, i2, i3) = (iid.clone(), iid.clone(), iid.clone());
         let rename: CfgCommit = Rc::new(move |this, v, cx| {
             let id = i2.clone();
-            this.edit("Rename configuration input", cx, |a| {
-                if let Some(i) = a.configuration.inputs.iter_mut().find(|i| i.id == id) {
-                    i.name = v.trim().to_string();
-                }
-            });
+            this.edit(noshape_ops::config::RENAME_INPUT, cx, |a| noshape_ops::asm_config::rename_input(a, &id, &v));
         });
         let name_cell = self.cfg_cell_text(format!("in-name-{iid}"), input.name.clone(), (px(16.), FontWeight::MEDIUM), true, rename.clone(), cx);
         let header = h_flex()
@@ -574,11 +555,7 @@ impl AssemblyView {
                                                 name,
                                                 Rc::new(move |this, v, cx| {
                                                     let id = rr.clone();
-                                                    this.edit("Rename configuration input", cx, |a| {
-                                                        if let Some(i) = a.configuration.inputs.iter_mut().find(|i| i.id == id) {
-                                                            i.name = v.trim().to_string();
-                                                        }
-                                                    });
+                                                    this.edit(noshape_ops::config::RENAME_INPUT, cx, |a| noshape_ops::asm_config::rename_input(a, &id, &v));
                                                 }),
                                                 window,
                                                 cx,
@@ -599,7 +576,7 @@ impl AssemblyView {
                                 .item(crate::os_menu::OsMenuItem::new("Delete").on_click(move |_, _, cx| {
                                     let d = d.clone();
                                     v2.update(cx, |this, cx| {
-                                        this.edit("Delete configuration input", cx, |a| a.delete_config_input(&d));
+                                        this.edit(noshape_ops::config::DELETE_INPUT, cx, |a| a.delete_config_input(&d));
                                         this.ui.config_values.0.remove(&d);
                                         cx.notify();
                                     })
@@ -623,11 +600,7 @@ impl AssemblyView {
                 let a = iid.clone();
                 let commit: CfgCommit = Rc::new(move |this, v, cx| {
                     let a = a.clone();
-                    this.edit("Edit configuration variable", cx, |asm| {
-                        if let Some(ConfigInput { kind: ConfigInputKind::Variable { default, .. }, .. }) = asm.configuration.inputs.iter_mut().find(|i| i.id == a) {
-                            *default = ExprValue::new(v);
-                        }
-                    });
+                    this.edit(noshape_ops::config::EDIT_VARIABLE_INPUT, cx, |asm| noshape_ops::asm_config::set_variable_default(asm, &a, &v));
                 });
                 let value = self.cfg_cell_text(format!("var-def-{iid}"), default.text.clone(), (px(13.33), FontWeight::NORMAL), false, commit, cx);
                 let value_w = crate::ui::col_w(&table, "default", COL_W);
@@ -670,13 +643,7 @@ impl AssemblyView {
                             if v.is_empty() {
                                 return;
                             }
-                            this.edit("Rename configuration", cx, |asm| {
-                                if let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = asm.configuration.inputs.iter_mut().find(|i| i.id == a)
-                                    && let Some(o) = options.iter_mut().find(|o| o.id == b)
-                                {
-                                    o.name = v;
-                                }
-                            });
+                            this.edit(noshape_ops::config::RENAME_OPTION, cx, |asm| noshape_ops::asm_config::rename_option(asm, &a, &b, &v));
                         });
                         self.cfg_cell_text(format!("opt-{iid}-{rk}"), rname.clone(), (px(13.33), if active { FontWeight::MEDIUM } else { FontWeight::NORMAL }), true, commit, cx)
                     } else {
@@ -707,19 +674,7 @@ impl AssemblyView {
                                 m.item(crate::os_menu::OsMenuItem::new("Delete").icon_name("menu-delete").on_click(move |_, _, cx| {
                                     let (a, b) = (a.clone(), b.clone());
                                     v.update(cx, |this, cx| {
-                                        this.edit("Delete configuration", cx, |asm| {
-                                            if let Some(ConfigInput { kind: ConfigInputKind::List { options, default }, .. }) = asm.configuration.inputs.iter_mut().find(|i| i.id == a)
-                                                && options.len() > 1
-                                            {
-                                                options.retain(|o| o.id != b);
-                                                if *default == b {
-                                                    *default = options[0].id.clone();
-                                                }
-                                            }
-                                            for c in asm.configuration.configured.iter_mut() {
-                                                c.values.remove(&b);
-                                            }
-                                        });
+                                        this.edit(noshape_ops::config::DELETE_OPTION, cx, |asm| noshape_ops::asm_config::delete_option(asm, &a, &b));
                                     })
                                 }))
                             })
@@ -740,7 +695,7 @@ impl AssemblyView {
                             return;
                         }
                         let a = a.clone();
-                        this.edit("Add configuration", cx, |asm| asm.add_config_row(&a, &name, format!("opt{}", rand_id())));
+                        this.edit(noshape_ops::config::ADD_OPTION, cx, |asm| noshape_ops::asm_config::add_option(asm, &a, &name));
                     });
                     let editing = self.ui.cfg_edit.as_ref().is_some_and(|e| e.key == key);
                     let el = self.cfg_cell_text(key, String::new(), (px(13.33), FontWeight::NORMAL), false, commit, cx);
@@ -787,7 +742,7 @@ impl AssemblyView {
                 .justify_center()
                 .child(crate::ui::os_checkbox(SharedString::from(format!("acv-{ci}-{key}")), "", b).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     let kk = kk.clone();
-                    this.edit("Edit configured value", cx, |a| a.set_config_cell(ci, &kk, ParamValue::Bool(!b)));
+                    this.edit(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |a| noshape_ops::asm_config::set_cell(a, ci, &kk, ParamValue::Bool(!b)));
                 })))
                 .into_any_element();
         }
@@ -815,7 +770,7 @@ impl AssemblyView {
                         menu = menu.item(crate::os_menu::OsMenuItem::new(name).on_click(move |_, _, cx| {
                             let (kk, id) = (kk.clone(), id.clone());
                             v.update(cx, |this, cx| {
-                                this.edit("Edit configured value", cx, |a| a.set_config_cell(ci, &kk, ParamValue::Text(id)));
+                                this.edit(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |a| noshape_ops::asm_config::set_cell(a, ci, &kk, ParamValue::Text(id)));
                             })
                         }));
                     }
@@ -829,7 +784,7 @@ impl AssemblyView {
         };
         let commit: CfgCommit = Rc::new(move |this, v, cx| {
             let kk = kk.clone();
-            this.edit("Edit configured value", cx, |a| a.set_config_cell(ci, &kk, ParamValue::Expr(ExprValue::new(v.trim()))));
+            this.edit(noshape_ops::config::EDIT_CONFIGURED_VALUE, cx, |a| noshape_ops::asm_config::set_cell(a, ci, &kk, ParamValue::Expr(ExprValue::new(v.trim()))));
         });
         self.cfg_cell_text(format!("cv-{ci}-{key}"), text, (px(13.33), FontWeight::NORMAL), false, commit, cx)
     }
@@ -866,13 +821,7 @@ impl AssemblyView {
     }
 
     fn duplicate_config_input(&mut self, input: &str, cx: &mut Context<Self>) {
-        self.edit("Copy configuration input", cx, |a| {
-            if let Some(mut i) = a.configuration.inputs.iter().find(|i| i.id == input).cloned() {
-                i.id = format!("in{}", rand_id());
-                i.name = format!("{} copy", i.name);
-                a.configuration.inputs.push(i);
-            }
-        });
+        self.edit(noshape_ops::asm_config::COPY_INPUT, cx, |a| noshape_ops::asm_config::duplicate_input(a, input));
     }
 
     fn render_add_asm_config_input(&mut self, cx: &mut Context<Self>) -> AnyElement {

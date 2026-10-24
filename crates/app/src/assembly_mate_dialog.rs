@@ -479,9 +479,10 @@ impl MateDialog {
 
     pub fn set_type(&mut self, t: MateType, cx: &mut Context<Self>) {
         if self.mate_type != t {
-            // Keep custom names; rename default ones ("Fastened 1" -> "Revolute 1").
-            if let Some(rest) = self.name.strip_prefix(self.mate_type.name()) {
-                self.name = format!("{}{}", t.name(), rest);
+            // Keep custom names; rename default ones ("Fastened 1" -> "Revolute 1",
+            // in the UI language: "Fest 1" -> "Drehen 1").
+            if let Some(rest) = self.name.strip_prefix(noshape_model::default_names::base(self.mate_type.name()).as_str()) {
+                self.name = format!("{}{}", noshape_model::default_names::base(t.name()), rest);
             }
             self.mate_type = t;
             self.active = self.next_active();
@@ -596,7 +597,12 @@ impl Render for MateDialog {
         // Mate type: Onshape's select (live assembly/36): open, the list
         // hangs under the emptied field, plain rows, the current type blue.
         let types: Vec<MateType> = if MATE_TYPE_ORDER.contains(&t) { MATE_TYPE_ORDER.to_vec() } else { vec![t] };
-        self.type_select.update(cx, |sel, _| sel.set_items(types.iter().map(|mt| (SharedString::from(mt.name()), SharedString::from(mt.name()))).collect(), t.name()));
+        // The type names as the assembly feature specs have them in the UI
+        // language (live German "Fest", where the tooltip says "Feste Verknüpfung").
+        self.type_select.update(cx, |sel, _| {
+            sel.set_translated(true);
+            sel.set_items(types.iter().map(|mt| (SharedString::from(mt.name()), SharedString::from(crate::i18n::spec(mt.name())))).collect(), t.name())
+        });
         let type_field = div().id("mate-type-field").w(px(194.)).tooltip(crate::ui::tooltip("Mate type")).child(self.type_select.clone());
         let (ox, oy, oz, orot) = offset_axes(t);
         let has_offset = ox || oy || oz || orot;

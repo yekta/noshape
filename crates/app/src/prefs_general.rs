@@ -118,12 +118,14 @@ impl Render for LanguagePrefsView {
         let changed = self.edited != self.saved;
         let at = crate::i18n::LANGUAGES.iter().position(|(c, _)| *c == self.edited).unwrap_or(2);
         let view = cx.entity();
-        let pick = select("pref-language", crate::i18n::LANGUAGES.iter().map(|(_, n)| n.to_string()).collect(), at, true, 170., move |i, _, cx| {
+        // The languages are listed by their own names in every language
+        // (live: "Deutsch", "日本語"), so never translated.
+        let pick = div().w(px(170.)).child(os::user_select_field("pref-language", crate::i18n::LANGUAGES.iter().map(|(_, n)| n.to_string()).collect(), at, move |i, _, cx| {
             view.update(cx, |this, cx| {
                 this.edited = crate::i18n::LANGUAGES[i].0;
                 cx.notify();
             })
-        });
+        }));
         section(
             "Language",
             None,
