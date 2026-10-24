@@ -186,7 +186,7 @@ pub const PALETTE: Palette = Palette {
 /// Viewport colors (shared with the headless scene builder).
 pub use noshape_scene::palette::{pick, viewport, viewport_dark};
 
-const fn rgb_const(hex: u32) -> Rgba {
+pub(crate) const fn rgb_const(hex: u32) -> Rgba {
     Rgba {
         r: ((hex >> 16) & 0xff) as f32 / 255.0,
         g: ((hex >> 8) & 0xff) as f32 / 255.0,
@@ -290,7 +290,7 @@ pub fn set_dark(on: bool) {
 /// Light theme hex → dark theme hex for literal `rgb()` / `rgba()` colours, sorted by the light value:
 /// for each light value the dark value most of Onshape's themed tokens give it (live
 /// dom/dark-tokens-table.md), with the palette roles deciding ties (backgrounds, text).
-pub static DARK_HEX: [(u32, u32); 50] = [
+pub static DARK_HEX: [(u32, u32); 51] = [
     (0x00007f, 0xdef1fb),
     (0x0000d0, 0x90cef1),
     (0x028502, 0xa2db7d),
@@ -328,6 +328,8 @@ pub static DARK_HEX: [(u32, u32); 50] = [
     (0xd7d7d7, 0x666666),
     (0xdd979b, 0x683232),
     (0xddf6cc, 0x0b450b),
+    // Bootstrap's modal / table rules (live dk-999, dk-pref-create-profile-dialog).
+    (0xdee2e6, 0x495057),
     (0xdef1fb, 0x0a4780),
     (0xeaeaea, 0x666666),
     (0xecf0f4, 0x555555),

@@ -523,12 +523,18 @@ impl Render for OsMenu {
                     OsMenuItem::Item { label, icon, checked, disabled, keys, user, .. } => row(ix)
                         .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
-                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| d.bg(gpui_kit::rgb(if native { 0x1967d2 } else { 0x1651b0 })).text_color(gpui_kit::rgb_static(0xffffff)))
+                        // Chrome's native list: #1967d2 / white; in dark #99c8ff / black (live dk-pref-select-open).
+                        .when(select.is_some() && (hovered || (no_hover && *checked)), |d| match (native, noshape_scene::palette::is_dark()) {
+                            (true, true) => d.bg(gpui_kit::rgb_static(0x99c8ff)).text_color(gpui_kit::rgb_static(0x000000)),
+                            _ => d.bg(gpui_kit::rgb(if native { 0x1967d2 } else { 0x1651b0 })).text_color(gpui_kit::rgb_static(0xffffff)),
+                        })
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .when(*checked && icon.is_none() && select.is_none(), |d| {
                             d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).flex().items_center().justify_center().child(crate::assets::icon("menu-check", 16., cx)))
                         })
-                        .child(div().when(wraps, |d| d.flex_1().min_w_0()).child(label_el(label, *user)))
+                        // Live: a label around a name ("Create Drawing of „…“…")
+                        // stays on one line, cut with "…"; fixed labels wrap.
+                        .child(div().when(wraps, |d| d.flex_1().min_w_0()).when(wraps && (*user || crate::i18n::names_an_entity(label)), |d| d.truncate()).child(label_el(label, *user)))
                         .when(!keys.is_empty(), |d| {
                             let chip = |k: &SharedString| div().px(px(3.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0x333333)).text_size(px(12.)).text_color(pal.text).child(k.clone());
                             d.child(div().flex_1().min_w(px(16.))).child(h_flex().gap(px(2.)).children(keys.iter().map(chip)))
@@ -617,7 +623,7 @@ impl Render for OsMenu {
             .when_some(select, |d, w| d.w(px(w)).rounded(px(0.)).p_0())
             // 0 5px 10px rgba(0,0,0,.2); GPUI blurs twice as far as CSS.
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
-            .when(native, |d| d.shadow(Vec::new()).py(px(1.)).border_color(gpui_kit::rgb(0x767676)))
+            .when(native, |d| d.shadow(Vec::new()).py(px(1.)).border_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0x858585 } else { 0x767676 })))
             .text_color(pal.text)
             .children(rows)
             .child(canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
@@ -678,8 +684,15 @@ fn render_host(window: &Window, cx: &App) -> Vec<AnyElement> {
     }
     let mut out = Vec::new();
     if let Some(b) = menu.read(cx).ring {
-        let ring = div().w(b.size.width).h(b.size.height).rounded(px(5.25)).border_2().border_color(gpui_kit::rgb(0x3e94ff));
-        out.push(deferred(anchored().position(b.origin).child(ring)).with_priority(POPUP_PRIORITY).into_any_element());
+        // Dark (live dk-pref-select-open): a 1 px #3e94ff border with 1 px
+        // #90cef1 outside it.
+        let (ring, at) = if noshape_scene::palette::is_dark() {
+            let inner = div().size_full().rounded(px(4.)).border_1().border_color(gpui_kit::rgb_static(0x3e94ff));
+            (div().w(b.size.width + px(2.)).h(b.size.height + px(2.)).rounded(px(5.)).border_1().border_color(gpui_kit::rgb_static(0x90cef1)).child(inner), b.origin - point(px(1.), px(1.)))
+        } else {
+            (div().w(b.size.width).h(b.size.height).rounded(px(5.25)).border_2().border_color(gpui_kit::rgb(0x3e94ff)), b.origin)
+        };
+        out.push(deferred(anchored().position(at).child(ring)).with_priority(POPUP_PRIORITY).into_any_element());
     }
     // Live: a menu that doesn't fit below the pointer opens above it.
     out.push(deferred(anchored().anchor(*anchor).position(*pos).child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element());

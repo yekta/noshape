@@ -46,7 +46,8 @@ impl Render for MaterialLibrariesView {
                 .flex()
                 .items_center()
                 .rounded(px(3.5))
-                .bg(rgb(0x1651b0))
+                // #1651b0 in both themes (live dk-pref-toolbar-sketch-hover).
+                .bg(gpui_kit::rgb_static(0x1651b0))
                 .text_size(px(12.))
                 .text_color(gpui_kit::rgb_static(0xffffff))
                 .cursor_pointer()
@@ -91,7 +92,7 @@ impl Render for MaterialLibrariesView {
                             .mt(px(19.))
                             // Live: the table stops 15 px before the rule's end.
                             .mr(px(15.))
-                            .child(h_flex().h(px(44.)).border_b_1().border_color(rgb(LIB_RULE)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(cell("Library".into())).child(cell("Document".into())).child(cell("Owner".into())).child(div().flex_1()).child(action()))
+                            .child(h_flex().h(px(44.)).border_b_1().border_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0x555555 } else { LIB_RULE })).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(cell("Library".into())).child(cell("Document".into())).child(cell("Owner".into())).child(div().flex_1()).child(action()))
                             .children(lib_rows),
                     )
                     // Live (prefs/05): [Add material library…] under the table

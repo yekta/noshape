@@ -171,6 +171,28 @@ pub fn open_version_window(path: PathBuf, version: noshape_store::MicroversionId
     open_session_window(session, gpu, cx)
 }
 
+/// Tab › Open in new browser tab: another window on the same open document
+/// (Onshape's second browser tab on the workspace; both show every edit),
+/// with `tab` active. The document stays registered to its first window.
+pub fn open_tab_window(doc: Entity<doc_model::DocModel>, tab: noshape_model::document::TabId, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    let options = WindowOptions {
+        window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1440.), px(900.)), cx))),
+        window_min_size: Some(size(px(900.), px(560.))),
+        #[cfg(target_os = "linux")]
+        window_decorations: Some(WindowDecorations::Client),
+        app_id: Some("dev.noshape.noshape".into()),
+        ..TitleBar::window_options()
+    };
+    let title = format!("{} — noshape", doc.read(cx).session.name());
+    crate::os_menu::open_window(options, cx, move |window, cx| {
+        window.set_window_title(&title);
+        let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
+        ws.update(cx, |w, cx| w.activate(tab, window, cx));
+        ws
+    })?;
+    Ok(())
+}
+
 fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<workspace::Workspace>)> {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1440.), px(900.)), cx))),

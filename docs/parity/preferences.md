@@ -27,13 +27,22 @@ section's rule. Status: ✅ matches, ✗ differs, ⊘ excluded (cloud), ? waitin
 | P14 | Left list | Profile, Emails, Preferences, Notifications, …, Teams | Profile, Preferences | ⊘ (account / cloud pages) |
 | P15 | Release management / Numbering settings | company settings, not on this page | in Company settings (separate window) | ✅ |
 
-## Dark (live dk-904: Theming → Units only)
+## Dark (live dk-904, then the full-page dk-pref-y0 … y4500 and states, behaviours "ui2 (10-24 11:30)")
 
 | # | Item | Live | Ours | Status |
 |---|---|---|---|---|
-| D1 | Page, headings, selects, checkbox, disabled Save (`#283f65` / `#858585`) | | same | ✅ |
+| D1 | Page, headings, selects (`#333` bg, `#888` border, `#777` arrow), checkbox, disabled Save (`#283f65` / `#858585`) | | same (pixel-sampled) | ✅ |
 | D2 | Theme notes | `#bbbbbb` | white (fixed) | ✅ |
 | D3 | Checked radio | `#0d6efd` disc + white dot; off ring `#878787` | light-mode style (fixed) | ✅ |
-| D4 | Select arrow | `#777` (as in light) | `#999` through the dark palette (fixed: static `#777`) | ✅ |
+| D4 | Select arrow | `#777` (the note says white; the pixels are `#777`) | `#999` through the dark palette (fixed: static `#777`) | ✅ |
 | D5 | (?) help icons | light `#d6d6d6` ring and "?" | dim | ✗ icon (icons2, dark (?) icon routed there 10-23) |
-| D6 | Mouse controls … Onshape Labs, dialogs (Create profile, export rule, Labs consent), open selects, hover/focus | ? | ? | ? REQUESTS "ui2 (10-24 11:30)" (full-page dark captures) |
+| D6 | Focused select | 1 px `#3e94ff` border + 1 px `#90cef1` ring outside | 2 px `#3e94ff` (fixed) | ✅ |
+| D7 | Open select list | `#333` list, `#858585` border, current row `#99c8ff` with black text, 27 px rows 15 px under | `#1967d2` / white, `#767676` border (fixed) | ✅ |
+| D8 | Disabled select (pixel density, default profile) | `#666` on a `#ccc` border, `#777` caret | `#888` border, `#999` caret (fixed) | ✅ |
+| D9 | Material libraries | rule `#555` under the header, Remove `#1651b0` | `#4b5761`, Remove `#3e94ff` (fixed) | ✅ |
+| D10 | Modals (Create profile, Add export rule, Labs) | frame `#3c3c3c`, rules `#495057`, 12 px ✕ of 1.5 px strokes; "A unique profile name is required." `#ff6b6b` | light `#dee2e6` frame and rules, 8 px ✕, pink error (fixed; the ✕ in light too, the rules app-wide through DARK_HEX) | ✅ |
+| D11 | Shortcut toolbars › Sketch list | no hover; ticks blue; select 17 px under the rule, list 6 px under it and 205 px high, Save 10 px under; icon and label 10 px apart | 1 px, 1 px, 204 px, 12 px; 8 px apart (fixed, light too: prefs/04 has the same offsets) | ✅ |
+| D12 | Save after unticking again | stays enabled (the form stays dirty until saved) | went pale again (fixed: dirty until saved) | ✅ |
+| D13 | Add export rule dialog | each label (bold + 18 px (?)) above its control: select 34 px, convention an ACE line 40 px high with 12 px mono text 17 px in, "N characters remaining" 14 px right under; placeholders blue (`#cda869` in dark) | labels in a 130 px column left of the controls, a 34 px field with 14 px text (fixed, light too: er-902) | ✅ |
+| D14 | Labs consent | 24 px padding, 13 px text on 19.5 px lines, paragraphs 10.5 px apart, 16 px semibold subheadings, 5 px bullets (the same in light, 1873) | 10 px padding, 12 px text on 17 px lines, big ● bullets (fixed) | ✅ |
+| D15 | Selects' left edge | x 261 | x 260 (Chrome places the box on a half pixel) | ✅ (±1 px) |

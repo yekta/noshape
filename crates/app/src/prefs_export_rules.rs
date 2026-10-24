@@ -140,16 +140,18 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
         let text = conv.read(cx).value().to_string();
         let error = er::validate(&text, scope);
         let remaining = er::MAX_TEMPLATE.saturating_sub(text.chars().count());
+        // Live er-902: each bold label with its (?) 7 px after, the control
+        // 5 px under it, 14 px between the groups.
         let label = |t: &'static str, tip: &'static str, id: &'static str, cx: &App| {
             h_flex()
-                .w(px(130.))
-                .flex_none()
-                .gap(px(4.))
+                .h(px(21.))
+                .mb(px(5.))
+                .gap(px(7.))
                 .text_size(px(14.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(pal.text)
                 .child(tr(t))
-                .child(div().id(id).child(crate::assets::icon("help-gray", 16., cx)).tooltip(crate::ui::tooltip(tr(tip))))
+                .child(div().id(id).child(crate::assets::icon("help-gray", 18., cx)).tooltip(crate::ui::tooltip(tr(tip))))
         };
         let st1 = state.clone();
         let scope_select = os::select_field("er-scope", ExportElement::ALL.iter().map(|s| crate::i18n::tr(s.label())).collect(), ExportElement::ALL.iter().position(|s| *s == scope).unwrap_or(0), move |i, window, _| {
@@ -169,22 +171,23 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
         let mono = SharedString::from("Roboto Mono");
         let runs = colored_runs(&text, scope);
         let overlay = StyledText::new(text.clone()).with_highlights(runs);
+        // Live er-902: an ACE line 40 high, #999 border, 12 px text 17 px in.
         let field = div()
             .relative()
-            .h(px(34.))
+            .h(px(40.))
             .rounded(px(3.))
             .border_1()
-            .border_color(if error.is_some() { rgb(RED) } else { rgb(0xaaaaaa) })
+            .border_color(if error.is_some() { rgb(RED) } else { gpui_kit::rgb_static(0x999999) })
             .bg(rgb(0xffffff))
             .font_family(mono.clone())
-            .text_size(px(14.))
-            .child(div().absolute().top_0().bottom_0().left(px(9.)).right(px(6.)).flex().items_center().overflow_hidden().whitespace_nowrap().text_color(pal.text).child(overlay))
-            .child(Input::new(&conv).appearance(false).text_color(gpui_kit::transparent_black()).font_family(mono).pl(px(8.)).h(px(32.)));
+            .text_size(px(12.))
+            .child(div().absolute().top_0().bottom_0().left(px(17.)).right(px(6.)).flex().items_center().overflow_hidden().whitespace_nowrap().text_color(pal.text).child(overlay))
+            .child(Input::new(&conv).appearance(false).text_color(gpui_kit::transparent_black()).font_family(mono).text_size(px(12.)).pl(px(16.)).h(px(38.)));
         // The completion list under the field.
         let candidates = completions(&text, conv.read(cx).cursor(), scope);
         let list = complete.filter(|_| !candidates.is_empty()).map(|sel| {
             let sel = sel.min(candidates.len() - 1);
-            let mut col = v_flex().id("er-complete").absolute().top(px(36.)).left_0().w(px(360.)).max_h(px(220.)).overflow_y_scroll().bg(rgb(0xffffff)).border_1().border_color(rgb(0xcccccc)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }]).text_size(px(13.)).font_family("Roboto Mono");
+            let mut col = v_flex().id("er-complete").absolute().top(px(42.)).left_0().w(px(360.)).max_h(px(220.)).overflow_y_scroll().bg(rgb(0xffffff)).border_1().border_color(rgb(0xcccccc)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }]).text_size(px(13.)).font_family("Roboto Mono");
             for (k, (name, meta)) in candidates.iter().enumerate() {
                 let (c2, n2) = (conv.clone(), name.to_string());
                 col = col.child(
@@ -204,7 +207,6 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
         let (st_keys, conv_keys, cands) = (state.clone(), conv.clone(), candidates.clone());
         let field_box = div()
             .relative()
-            .flex_1()
             // Up / Down / Enter / Esc drive the open list; Ctrl+Space opens it.
             .capture_key_down(move |e: &KeyDownEvent, window, cx| {
                 let k = e.keystroke.key.as_str();
@@ -232,23 +234,22 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
             })
             .child(field)
             .children(list);
-        let row = |l: AnyElement, c: AnyElement| h_flex().items_start().gap(px(10.)).child(l).child(div().flex_1().child(c));
         let (st_ok, conv_ok, view_ok) = (state.clone(), conv.clone(), view.clone());
         os::modal_doc_page(dialog, tr(if editing.is_some() { "Edit export rule" } else { "Add export rule" }), 600.)
             .child(
                 os::modal_body()
-                    .gap(px(14.))
-                    .child(row(label("Scope", "The rule will apply to objects of the selected object type.", "er-scope-help", cx).into_any_element(), scope_select.into_any_element()))
-                    .child(row(label("Format", "The rule will apply when exporting applicable objects to the selected file format.", "er-format-help", cx).into_any_element(), format_select.into_any_element()))
-                    .child(row(
-                        label("Convention", "Create a file naming convention template to use when exporting applicable objects. Use template placeholder expressions of the form ${propertyName} to include an active metadata property in your naming convention. All properties must be valid and active and will be highlighted in blue, while invalid or inactive properties will be highlighted in red.", "er-conv-help", cx).into_any_element(),
-                        v_flex()
-                            .gap(px(4.))
-                            .child(field_box)
-                            .child(div().text_size(px(12.)).text_color(pal.text_muted).child(crate::i18n::tr("__n__ characters remaining").replace("__n__", &remaining.to_string())))
-                            .when_some(error, |d, e| d.child(div().text_size(px(14.)).text_color(rgb(RED)).child(tr(e))))
-                            .into_any_element(),
-                    )),
+                    .pt(px(10.))
+                    .pb(px(23.))
+                    .gap_0()
+                    .child(label("Scope", "The rule will apply to objects of the selected object type.", "er-scope-help", cx))
+                    .child(scope_select)
+                    .child(label("Format", "The rule will apply when exporting applicable objects to the selected file format.", "er-format-help", cx).mt(px(14.)))
+                    .child(format_select)
+                    .child(label("Convention", "Create a file naming convention template to use when exporting applicable objects. Use template placeholder expressions of the form ${propertyName} to include an active metadata property in your naming convention. All properties must be valid and active and will be highlighted in blue, while invalid or inactive properties will be highlighted in red.", "er-conv-help", cx).mt(px(14.)))
+                    .child(field_box)
+                    // Live er-902: 14 px body text right under the field.
+                    .child(div().h(px(21.)).text_size(px(14.)).text_color(pal.text).child(crate::i18n::tr("__n__ characters remaining").replace("__n__", &remaining.to_string())))
+                    .when_some(error, |d, e| d.child(div().text_size(px(14.)).text_color(rgb(RED)).child(tr(e)))),
             )
             .footer(
                 os::modal_footer()
@@ -325,11 +326,17 @@ fn accept(input: &Entity<InputState>, name: &str, window: &mut Window, cx: &mut 
     });
 }
 
+/// A valid placeholder: ACE's keyword colour, blue (amber `#cda869` in
+/// dark, live dk-pref-export-rule-add-dialog).
+fn valid_color() -> Rgba {
+    gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xcda869 } else { BLUE })
+}
+
 /// Colour runs for the convention: valid placeholders blue, others red.
 fn colored_runs(text: &str, scope: ExportElement) -> Vec<(std::ops::Range<usize>, HighlightStyle)> {
     er::placeholders(text, scope)
         .into_iter()
-        .map(|p| (p.range, HighlightStyle { color: Some(if p.valid { rgb(BLUE) } else { rgb(RED) }.into()), ..Default::default() }))
+        .map(|p| (p.range, HighlightStyle { color: Some(if p.valid { valid_color() } else { rgb(RED) }.into()), ..Default::default() }))
         .collect()
 }
 

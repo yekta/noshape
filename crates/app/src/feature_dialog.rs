@@ -480,23 +480,6 @@ impl FeatureDialog {
     }
 
     /// A dialog without selection fields starts typing in its first text or
-    /// The dialog's width before the user resizes it: 220 px, wider when
-    /// a row of segments (Solid / Surface / Thin, New / Add / …) needs more
-    /// in the UI language (live German Extrude: 341 px for "Neu |
-    /// Hinzufügen | Entfernen | Schneiden"). Each segment is its 12 px text
-    /// plus 8 px either side; the row sits 2 px past the body's edges.
-    fn natural_width(&self, window: &Window) -> Pixels {
-        let params = &self.feature.params;
-        let rows = self.ty.params.iter().filter(|s| s.hints.has(Hints::HORIZONTAL_ENUM) && s.is_visible(params) && !s.hints.has(Hints::ALWAYS_HIDDEN));
-        let widest = rows
-            .filter_map(|s| match &s.kind {
-                ParamKind::Enum { options, .. } => Some(options.iter().map(|(_, l)| crate::ui::text_width(window, &crate::i18n::spec(l), 12.) + 16.).sum::<f32>()),
-                _ => None,
-            })
-            .fold(0., f32::max);
-        px((widest + 4.).max(220.).ceil())
-    }
-
     /// number field (Onshape: the Variable dialog opens with Name focused).
     pub fn focus_first_field(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         // An edited feature's INITIAL_FOCUS_ON_EDIT field (`focus_for_edit`)
@@ -1964,19 +1947,25 @@ impl FeatureDialog {
                 let cur = values.enum_(s.id).to_string();
                 if s.hints.has(Hints::HORIZONTAL_ENUM) {
                     // Onshape underline tabs (Solid / Surface / Thin, New / Add / ...).
-                    let group = h_flex().w_full().h(px(26.)).children(options.iter().map(|(id, label)| {
+                    let group = h_flex().w_full().flex_wrap().children(options.iter().map(|(id, label)| {
                         let selected = cur == *id;
                         let path_s = path.to_string();
                         let id_s = id.to_string();
-                        // Onshape (live DOM): segments share the row by content
-                        // width plus an equal share of the slack; 12 px text,
-                        // the selected one 500 blue with a 2 px blue underline,
-                        // the others a 1 px #d7d7d7 underline.
+                        // Onshape (live DOM, behaviours "ui2 (10-24 09:10)"): items
+                        // `flex: 1 0 auto` with 2 px padding, so each is its text +
+                        // 4 px plus an equal share of the slack; a row too wide
+                        // wraps, a lone item too wide ellipsizes. 12 px text, the
+                        // selected one 500 blue with a 2 px blue underline, the
+                        // others a 1 px #d7d7d7 underline.
                         div()
                             .id(SharedString::from(format!("seg-{path}-{id}")))
                             .flex_grow(1.)
-                            .px(px(8.))
-                            .h_full()
+                            .flex_shrink_0()
+                            .min_w_0()
+                            .max_w_full()
+                            .overflow_hidden()
+                            .px(px(2.))
+                            .h(px(26.))
                             .relative()
                             .flex()
                             .items_center()
@@ -1985,7 +1974,7 @@ impl FeatureDialog {
                             .cursor_pointer()
                             .when(selected, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                             .when(!selected, |d| d.text_color(pal.text).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.border)).hover(|d| d.text_color(pal.text)))
-                            .child(crate::ui::spec_text(label))
+                            .child(div().min_w_0().truncate().child(crate::ui::spec_text(label)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)))
                     }));
                     h_flex().mx(px(-2.)).mb(px(2.)).child(group).children(flips).into_any_element()
@@ -3066,7 +3055,9 @@ impl Render for FeatureDialog {
             // border or radius, shadow 0 5px 10px rgba(0,0,0,.2) (GPUI blurs
             // twice as far as CSS: half the radius).
             .relative()
-            .w(self.width.unwrap_or_else(|| self.natural_width(window)))
+            // Live (behaviours "ui2 (10-24 09:10)"): 220 px in every language
+            // until the user drags the right edge (remembered per type).
+            .w(self.width.unwrap_or(px(220.)))
             .max_h(px(720.))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])

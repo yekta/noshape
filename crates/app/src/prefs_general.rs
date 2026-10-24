@@ -91,12 +91,13 @@ fn select(id: &'static str, options: Vec<String>, at: usize, enabled: bool, w: f
         .pr(px(10.))
         .rounded(px(5.25))
         .border_1()
-        .border_color(rgb(0xaaaaaa))
+        // Dark (live dk-pref-y1800): a #ccc border on #666, the caret #777 as in light.
+        .border_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xcccccc } else { 0xaaaaaa }))
         .bg(rgb(0xeaeaea))
         .text_size(px(14.))
         .text_color(pal.text)
         .child(div().flex_1().truncate().child(options.get(at).cloned().unwrap_or_default()))
-        .child(os::glyph(os::GLYPH_CARET, 8., rgb(0x777777)))
+        .child(os::glyph(os::GLYPH_CARET, 8., gpui_kit::rgb_static(0x777777)))
         .into_any_element()
 }
 
@@ -309,7 +310,8 @@ impl EnvProfilePrefsView {
                         .pt(px(3.))
                         .gap(px(2.))
                         .child(os::input_h(Input::new(&name), 34.))
-                        .when_some(error, |d, e| d.child(div().text_size(px(14.)).text_color(rgb(0xaa252d)).child(tr(e)))),
+                        // Dark: Bootstrap's invalid-feedback #ff6b6b (live dk-pref-create-profile-dialog).
+                        .when_some(error, |d, e| d.child(div().text_size(px(14.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xff6b6b } else { 0xaa252d })).child(tr(e)))),
                 )
                 .footer(
                     os::modal_footer()
@@ -438,22 +440,34 @@ impl LabsPrefsView {
     fn consent_dialog(window: &mut Window, cx: &mut App) {
         window.open_dialog(cx, move |dialog, _, cx| {
             let pal = p();
-            // Live 1873: 12 px body text, 14 px semibold subheadings, a disc list.
-            let para = |t: &str| div().text_size(px(12.)).line_height(px(17.)).text_color(pal.text).child(tr(t));
-            let bold = |t: &str| div().mt(px(4.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(tr(t));
-            let bullet = |t: &str| h_flex().items_start().pl(px(10.)).gap(px(8.)).child(div().text_size(px(12.)).line_height(px(17.)).child("●")).child(para(t));
+            // Live 1873 / dk-pref-labs-modal-top (the same in both themes): 24 px
+            // in, 13 px text on 19.5 px lines, paragraphs 10.5 px apart, 16 px
+            // semibold subheadings, 5 px bullets 23.5 px apart.
+            let para = |t: &str| div().mt(px(10.5)).text_size(px(13.)).line_height(px(19.5)).text_color(pal.text).child(tr(t));
+            let heading = |t: &str| div().mt(px(17.)).mb(px(-4.5)).text_size(px(16.)).line_height(px(19.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(tr(t));
+            let bullet = |t: &str, first: bool| {
+                h_flex()
+                    .items_start()
+                    .mt(px(if first { 10.5 } else { 4. }))
+                    .pl(px(5.))
+                    .child(div().w(px(16.)).h(px(19.5)).flex_none().flex().items_center().child(div().size(px(5.)).rounded_full().bg(pal.text)))
+                    .child(div().text_size(px(13.)).line_height(px(19.5)).text_color(pal.text).child(tr(t)))
+            };
             os::modal_doc_page(dialog, tr("Enable access to Onshape Labs features?"), 600.)
                 .child(
                     os::modal_body()
-                        .gap(px(8.))
-                        .child(h_flex().gap(px(4.)).child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(tr("Onshape Labs"))).child(div().text_size(px(12.)).italic().child(tr("Experimental features — opt-in preview"))))
+                        .px(px(24.))
+                        .pt(px(18.))
+                        .pb(px(16.))
+                        .gap_0()
+                        .child(h_flex().gap(px(4.)).items_baseline().child(div().text_size(px(15.)).font_weight(FontWeight::SEMIBOLD).child(tr("Onshape Labs"))).child(div().text_size(px(13.)).italic().text_color(pal.text_muted).child(tr("Experimental features — opt-in preview"))))
                         .child(para("Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion."))
-                        .child(bold("How Onshape Labs features use your data"))
+                        .child(heading("How Onshape Labs features use your data"))
                         .child(para("When you enable a Labs feature, it may:"))
-                        .child(bullet("Read or write data within your Onshape documents, only in response to your actions."))
-                        .child(bullet("Perform actions within Onshape on your behalf during an active session."))
-                        .child(bullet("Transmit relevant data to third-party AI providers to generate outputs, where applicable."))
-                        .child(bold("Limitations of experimental AI features"))
+                        .child(bullet("Read or write data within your Onshape documents, only in response to your actions.", true))
+                        .child(bullet("Perform actions within Onshape on your behalf during an active session.", false))
+                        .child(bullet("Transmit relevant data to third-party AI providers to generate outputs, where applicable.", false))
+                        .child(heading("Limitations of experimental AI features"))
                         .child(para("Some Onshape Labs features use generative or automated technologies, including third-party AI models, that produce outputs based on statistical models. These outputs may be inaccurate, incomplete, or inappropriate, and are not guaranteed to be correct."))
                         .child(para("You are responsible for independently reviewing, validating, and approving any outputs before relying on them for design, engineering, manufacturing, or other purposes. Onshape Labs features should not be used as a substitute for professional judgment or established controls."))
                         .child(para("Onshape does not warrant that generated outputs are free from third-party rights or suitable for any particular purpose."))

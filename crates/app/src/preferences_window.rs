@@ -70,6 +70,10 @@ pub struct ListPrefs {
     pub env_profiles: Vec<crate::prefs_general::EnvProfile>,
     #[serde(default)]
     pub env_profile: Option<String>,
+    /// Feature dialog widths the user dragged, per feature type (live:
+    /// `panelLayoutManager.<user>.feature-dialog.<type>` in localStorage).
+    #[serde(default)]
+    pub feature_dialog_widths: std::collections::BTreeMap<String, u32>,
 }
 
 fn list_prefs_path() -> std::path::PathBuf {
@@ -237,6 +241,9 @@ pub struct PreferencesView {
     /// "Save shortcut toolbar settings" writes (live: ticks apply on Save).
     toolbar: ToolbarPrefs,
     toolbar_draft: ToolbarPrefs,
+    /// A tick was clicked since the last save (live: unticking it again
+    /// leaves Save enabled, dk-pref-save-disabled).
+    toolbar_dirty: bool,
     name: Entity<InputState>,
     name_saved: String,
     /// Material libraries section (material_prefs.rs).
@@ -287,6 +294,7 @@ impl PreferencesView {
             toolbar_context: 0,
             toolbar: ToolbarPrefs::load(),
             toolbar_draft: ToolbarPrefs::load(),
+            toolbar_dirty: false,
             asm_toolbar: crate::assembly_view::AsmToolbarPrefs::load(),
             asm_toolbar_draft: crate::assembly_view::AsmToolbarPrefs::load(),
             name,
@@ -406,7 +414,14 @@ impl PreferencesView {
             .border_color(rgb(RULE))
             .text_size(px(24.))
             .child(div().font_weight(FontWeight::MEDIUM).text_color(pal.emphasis).child("My account"))
-            .child(div().text_color(pal.text_muted).child(if self.page == Page::Profile { "Profile" } else { "Preferences" }))
+            .child(div().text_color(pal.text_muted).child(match self.page {
+                Page::Profile => crate::ui::spec_text("Profile"),
+                // Live German (locales/de_DE-prefs-units): "Mein Konto
+                // Preferences", the page name left in English (the left list
+                // reads "Voreinstellungen"); French translates it (prefs/1886).
+                _ if crate::i18n::current() == "de" => crate::ui::user_text("Preferences"),
+                _ => crate::ui::spec_text("Preferences"),
+            }))
             .into_any_element()
     }
 
@@ -834,7 +849,7 @@ impl PreferencesView {
             (all, self.toolbar_draft.sketch_shortcut_tools(&sc::default_sketch_shortcut_names()))
         };
         let context = self.toolbar_context;
-        let changed = self.toolbar_draft.shortcut_tools != self.toolbar.shortcut_tools || self.toolbar_draft.sketch_shortcut_tools != self.toolbar.sketch_shortcut_tools || self.asm_toolbar_draft.shortcut_tools != self.asm_toolbar.shortcut_tools || self.toolbar_draft.drawing_shortcut_tools != self.toolbar.drawing_shortcut_tools;
+        let changed = self.toolbar_dirty || self.toolbar_draft.shortcut_tools != self.toolbar.shortcut_tools || self.toolbar_draft.sketch_shortcut_tools != self.toolbar.sketch_shortcut_tools || self.asm_toolbar_draft.shortcut_tools != self.asm_toolbar.shortcut_tools || self.toolbar_draft.drawing_shortcut_tools != self.toolbar.drawing_shortcut_tools;
         let rows: Vec<AnyElement> = items
             .iter()
             .enumerate()
@@ -845,7 +860,7 @@ impl PreferencesView {
                     .id(SharedString::from(format!("tb-item-{i}")))
                     .h(px(26.))
                     .pl(px(6.))
-                    .gap(px(8.))
+                    .gap(px(10.))
                     .cursor_pointer()
                     .child(Self::checkbox_box(on))
                     .child(crate::assets::icon(icon, 20., cx))
@@ -860,6 +875,7 @@ impl PreferencesView {
                         } else {
                             this.toolbar_draft.toggle_sketch_shortcut(&id2, &sc::default_sketch_shortcut_names());
                         }
+                        this.toolbar_dirty = true;
                         cx.notify();
                     }))
                     .into_any_element()
@@ -879,16 +895,16 @@ impl PreferencesView {
             .child(v_flex().children(preview_icons.chunks(5).map(|row| h_flex().children(row.iter().map(|icon| div().size(px(34.)).flex().items_center().justify_center().child(crate::assets::icon(icon, 20., cx))).collect::<Vec<_>>()))));
         Self::heading("Shortcut toolbars", None)
             .mt(px(38.))
-            .child(div().mt(px(17.)).pl(px(16.)).child(select))
+            .child(div().mt(px(16.)).pl(px(16.)).child(select))
             .child(
                 h_flex()
-                    .mt(px(7.))
+                    .mt(px(6.))
                     .pl(px(15.))
                     .items_start()
-                    .child(div().id("tb-list").w(px(327.)).h(px(204.)).border_1().border_color(pal.border).overflow_y_scroll().child(v_flex().py(px(4.)).children(rows)))
+                    .child(div().id("tb-list").w(px(327.)).h(px(205.)).border_1().border_color(pal.border).overflow_y_scroll().child(v_flex().py(px(4.)).children(rows)))
                     .child(preview),
             )
-            .child(h_flex().mt(px(12.)).pl(px(15.)).child(Self::save_button("tb-save", "Save shortcut toolbar settings", changed).when(changed, |b| {
+            .child(h_flex().mt(px(10.)).pl(px(15.)).child(Self::save_button("tb-save", "Save shortcut toolbar settings", changed).when(changed, |b| {
                 b.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     // Keep the toolbar customizations saved meanwhile (Customize toolbar…).
                     let mut saved = ToolbarPrefs::load();
@@ -902,6 +918,7 @@ impl PreferencesView {
                     asm.shortcut_tools = this.asm_toolbar_draft.shortcut_tools.clone();
                     asm.save();
                     this.asm_toolbar = asm;
+                    this.toolbar_dirty = false;
                     cx.notify();
                 }))
             })))
