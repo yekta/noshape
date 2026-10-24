@@ -20,6 +20,8 @@ fn asm_field() -> crate::registry::Field {
 mod features;
 mod more;
 mod positions;
+mod standard;
+mod structure;
 
 const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name, \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis.";
 
@@ -36,6 +38,7 @@ pub fn ops() -> Vec<Op> {
                 asm_field(),
                 req("source", s(), "Part Studio or Assembly tab (name or id) to insert from."),
                 opt("part", s(), "A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance."),
+                opt("sketch", s(), "A sketch of that Part Studio (feature id or name): the Insert dialog's sketches."),
                 opt("configuration", json!({ "type": "object" }), "Configuration of the source: {input id: value}."),
             ],
             mutates: true,
@@ -156,6 +159,8 @@ pub fn ops() -> Vec<Op> {
     .chain(more::ops())
     .chain(features::ops())
     .chain(positions::ops())
+    .chain(structure::ops())
+    .chain(standard::ops())
     .collect()
 }
 
@@ -182,7 +187,8 @@ fn assembly(od: &OpenDoc, tab: TabId) -> Result<&Assembly, OpError> {
 
 /// Solve the assembly in its default configuration.
 fn solve(od: &mut OpenDoc, tab: TabId, opts: &SolveOptions) -> Result<AssemblyResult, OpError> {
-    let asm = sa::effective(assembly(od, tab)?, &assembly(od, tab)?.configuration.defaults());
+    let a = assembly(od, tab)?;
+    let asm = sa::effective(a, &super::configuration::asm::values(od, tab, a));
     Ok(od.evaluate_assembly(tab, &asm, opts))
 }
 
@@ -199,7 +205,7 @@ fn commit<R>(od: &mut OpenDoc, tab: TabId, desc: &str, result: &AssemblyResult, 
     r.flatten().ok_or_else(|| OpError::param("tab", "not an Assembly"))
 }
 
-fn find_instance(a: &Assembly, key: &str, field: &str) -> Result<InstanceId, OpError> {
+pub(crate) fn find_instance(a: &Assembly, key: &str, field: &str) -> Result<InstanceId, OpError> {
     let k = key.trim();
     let by_id = k.strip_prefix("inst:").unwrap_or(k).parse::<u64>().ok().map(InstanceId);
     a.instances
@@ -219,6 +225,7 @@ fn find_mate(a: &Assembly, key: &str) -> Result<MateId, OpError> {
         .map(|m| m.id)
         .or_else(|| a.relations.iter().find(|r| Some(r.id) == by_id || r.name == k).map(|r| r.id))
         .or_else(|| more::find_feature(a, k))
+        .or_else(|| structure::find_folder(a, k))
         .ok_or_else(|| OpError::not_found(format!("no mate `{key}`")).with_param("mates"))
 }
 
@@ -228,6 +235,8 @@ fn source_json(s: &InstanceSource, d: &noshape_model::Document) -> Value {
         InstanceSource::Part { studio, body, .. } => json!({ "part_studio": tab(studio), "part": refs::body_id(body) }),
         InstanceSource::PartStudio { studio, .. } => json!({ "part_studio": tab(studio) }),
         InstanceSource::Assembly { assembly, .. } => json!({ "assembly": tab(assembly) }),
+        InstanceSource::Sketch { studio, sketch, .. } => json!({ "part_studio": tab(studio), "sketch": sketch.to_string() }),
+        InstanceSource::Standard { spec } => json!({ "standard_content": spec.part_name() }),
         other => json!({ "other": format!("{other:?}").chars().take(80).collect::<String>() }),
     }
 }
@@ -237,12 +246,14 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
     let k = len_scale(&units);
     let r = solve(od, tab, &SolveOptions::default())?;
     let a = assembly(od, tab)?;
+    // Suppression as the active configuration makes it.
+    let eff = sa::effective(a, &super::configuration::asm::values(od, tab, a));
     let instances: Vec<Value> = a
         .instances
         .iter()
         .map(|i| {
             let p = r.solved.placement(i.id).unwrap_or(i.placement);
-            json!({
+            let mut v = json!({
                 "id": format!("inst:{}", i.id.0),
                 "name": i.name,
                 "source": source_json(&i.source, od.doc()),
@@ -250,9 +261,11 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
                 "rotation": p.rotation,
                 "fixed": i.fixed,
                 "hidden": i.hidden,
-                "suppressed": i.suppressed,
+                "suppressed": eff.instance(i.id).map_or(i.suppressed, |e| e.suppressed),
                 "dof": r.solved.instance_dof.get(&i.id),
-            })
+            });
+            instance_extras(&mut v, i);
+            v
         })
         .collect();
     let mates: Vec<Value> = a
@@ -286,7 +299,32 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
         })
         .collect();
     let (named_positions, exploded_views) = positions::json(a);
-    Ok(json!({ "units": units_json(&units), "instances": instances, "mates": mates, "patterns": more::patterns_json(a), "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
+    Ok(json!({ "units": units_json(&units), "instances": instances, "mates": mates, "folders": structure::folders_json(a), "patterns": more::patterns_json(a), "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
+}
+
+/// An instance's menu settings, when not the defaults.
+fn instance_extras(v: &mut Value, i: &noshape_model::assembly::Instance) {
+    let config = match &i.source {
+        InstanceSource::Part { config, .. } | InstanceSource::PartStudio { config, .. } | InstanceSource::Assembly { config, .. } | InstanceSource::MirroredPart { config, .. } | InstanceSource::Sketch { config, .. } | InstanceSource::External { config, .. } => Some(config),
+        _ => None,
+    };
+    if let Some(c) = config.filter(|c| !c.is_empty()) {
+        v["configuration"] = json!(c.0);
+    }
+    match &i.lock {
+        noshape_model::assembly::SubassemblyLock::Flexible => {}
+        noshape_model::assembly::SubassemblyLock::Current => v["lock"] = json!("current"),
+        noshape_model::assembly::SubassemblyLock::Named(n) => v["lock"] = json!(n),
+    }
+    if i.best_tessellation {
+        v["best_tessellation"] = json!(true);
+    }
+    if let Some(r) = &i.reference_designator {
+        v["reference_designator"] = json!(r);
+    }
+    if let Some(e) = &i.unsuppressed_if {
+        v["unsuppressed_if"] = json!(e);
+    }
 }
 
 fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -296,6 +334,15 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let src_name = od.doc().tab(src).map(|t| t.name.clone()).unwrap_or_default();
     let result = solve(od, tab, &SolveOptions::default())?;
     let id = match &od.doc().tab(src).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) if a.get("sketch").is_some() => {
+            if a.get("part").is_some() {
+                return Err(OpError::param("sketch", "give `part` or `sketch`, not both"));
+            }
+            let sk = super::feature_arg(ps, a, "sketch")?;
+            let f = ps.feature(sk).filter(|f| f.type_id == "sketch").ok_or_else(|| OpError::param("sketch", "not a sketch"))?;
+            let name = f.name.clone();
+            commit(od, tab, &format!("Insert : {name}"), &result, |asm| sa::insert_sketch(asm, src, sk, &name, config))?
+        }
         Some(TabContent::PartStudio(_)) => {
             let part = match a.opt_str("part")? {
                 Some(p) => {
@@ -308,12 +355,13 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let desc = sa::insert_description(&src_name, part.as_ref());
             commit(od, tab, &desc, &result, |asm| sa::insert_part(asm, src, &src_name, part, config))?
         }
-        Some(TabContent::Assembly(_)) if src != tab => commit(od, tab, &format!("Insert : {src_name}"), &result, |asm| {
+        Some(TabContent::Assembly(_)) if !sa::contains_assembly(od.doc(), src, tab, 0) => commit(od, tab, &format!("Insert : {src_name}"), &result, |asm| {
             let id = InstanceId(asm.next_id());
             let name = asm.next_instance_name(&src_name);
             asm.instances.push(noshape_model::assembly::Instance::new(id, name, InstanceSource::Assembly { assembly: src, config }, Placement::default()));
             id
         })?,
+        Some(TabContent::Assembly(_)) => return Err(OpError::param("source", "that assembly contains this one")),
         _ => return Err(OpError::param("source", "a Part Studio or another Assembly")),
     };
     let mut v = describe(od, tab)?;
@@ -662,7 +710,7 @@ fn set_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let asm = assembly(od, tab)?;
     let ids = a.array("instances")?.iter().enumerate().map(|(i, v)| find_instance(asm, v.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<Vec<_>, _>>()?;
-    let values = asm.configuration.defaults();
+    let values = super::configuration::asm::values(od, tab, asm);
     let mut changed = false;
     if let Some(f) = a.get("fixed").and_then(Value::as_bool) {
         let r = solve(od, tab, &SolveOptions::default())?;

@@ -2588,7 +2588,7 @@ impl AssemblyView {
         }
         let name = self.assembly(cx).and_then(|a| a.instance(s.instance).map(|i| i.name.clone())).unwrap_or_default();
         let id = s.instance;
-        self.edit(&format!("Change configuration : {name}"), cx, |a| {
+        self.edit(&noshape_ops::assembly::change_configuration_description(&name), cx, |a| {
             a.set_instance_config(id, values);
         });
         cx.notify();

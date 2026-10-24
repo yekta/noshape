@@ -73,6 +73,9 @@ pub struct RevisionRow {
     pub pending: bool,
     /// Obsoleted.
     pub obsolete: bool,
+    /// The released item's part number and name (template columns).
+    pub part_number: String,
+    pub name: String,
 }
 
 /// The revisions of drawing tab `tab` in the release log, oldest first:
@@ -88,7 +91,7 @@ pub fn revision_rows(log: &crate::release::ReleaseLog, tab: crate::document::Tab
     for p in &log.packages {
         for it in p.items.iter().filter(|it| it.kind == ItemKind::Drawing && it.tab == tab) {
             match p.kind {
-                PackageKind::Release => out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: date(p.created), approved: String::new(), pending: false, obsolete: false }),
+                PackageKind::Release => out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: date(p.created), approved: String::new(), pending: false, obsolete: false, part_number: it.part_number.clone(), name: it.name.clone() }),
                 PackageKind::Obsoletion => {
                     if let Some(r) = out.iter_mut().rev().find(|r| r.revision == it.revision) {
                         r.obsolete = true;
@@ -99,7 +102,7 @@ pub fn revision_rows(log: &crate::release::ReleaseLog, tab: crate::document::Tab
     }
     for p in log.drafts.iter().filter(|p| p.kind == PackageKind::Release) {
         for it in p.items.iter().filter(|it| it.kind == ItemKind::Drawing && it.tab == tab) {
-            out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: String::new(), approved: String::new(), pending: true, obsolete: false });
+            out.push(RevisionRow { revision: it.revision.clone(), description: p.notes.clone(), date: String::new(), approved: String::new(), pending: true, obsolete: false, part_number: it.part_number.clone(), name: it.name.clone() });
         }
     }
     out
@@ -111,24 +114,95 @@ pub const PENDING_BLUE: [u8; 3] = [0xd2, 0xe8, 0xfc];
 /// Revision table column headers (defaults).
 pub const REVISION_HEADERS: [&str; 4] = ["REV", "DESCRIPTION", "DATE", "APPROVED"];
 
+/// Company settings › Release management › Revision table template (live
+/// bundle `osx-properties-table-template-*`, type REVISION_TABLE): the
+/// columns drawings' revision tables show, by property name, and "All
+/// uppercase in Drawings".
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RevisionTemplate {
+    pub name: String,
+    pub columns: Vec<String>,
+    #[serde(default)]
+    pub all_caps: bool,
+}
+
+/// The Onshape default template's columns (help image relmgmt-workflows-14).
+pub const DEFAULT_REVISION_COLUMNS: [&str; 4] = ["Revision", "Revision description", "Date approved", "Approver"];
+
+impl Default for RevisionTemplate {
+    fn default() -> Self {
+        Self { name: "Onshape Default revision table".into(), columns: DEFAULT_REVISION_COLUMNS.map(String::from).to_vec(), all_caps: false }
+    }
+}
+
+impl RevisionTemplate {
+    /// Unchanged from Onshape's default (its table keeps the REV /
+    /// DESCRIPTION / DATE / APPROVED headers).
+    pub fn is_default(&self) -> bool {
+        self.columns == DEFAULT_REVISION_COLUMNS && !self.all_caps
+    }
+
+    /// A row's value in column `column`: the revision ("B*" while pending),
+    /// its description, date, approver, the item's part number or name;
+    /// other properties are empty.
+    fn cell(column: &str, row: &RevisionRow, desc: &str) -> String {
+        match column {
+            "Revision" if row.pending => format!("{}*", row.revision),
+            "Revision" => row.revision.clone(),
+            "Revision description" => desc.to_string(),
+            "Date approved" => row.date.clone(),
+            "Approver" => row.approved.clone(),
+            "Part number" => row.part_number.clone(),
+            "Name" => row.name.clone(),
+            _ => String::new(),
+        }
+    }
+}
+
+static REVISION_TEMPLATE: std::sync::RwLock<Option<RevisionTemplate>> = std::sync::RwLock::new(None);
+
+/// The company's revision table template (the app sets it from its release
+/// settings); None: Onshape's default.
+pub fn set_revision_template(t: Option<RevisionTemplate>) {
+    *REVISION_TEMPLATE.write().unwrap_or_else(|e| e.into_inner()) = t.filter(|t| !t.is_default());
+}
+
 /// Content of a revision table: the last `visible_rows` revisions in the
 /// table's order, pending revisions marked "*".
 fn revision_data(kind: &TableKind, revisions: &[RevisionRow]) -> TableData {
+    let template = REVISION_TEMPLATE.read().unwrap_or_else(|e| e.into_inner()).clone();
+    revision_data_with(kind, revisions, template.as_ref())
+}
+
+/// [`revision_data`] with the company's template (None: Onshape's default).
+fn revision_data_with(kind: &TableKind, revisions: &[RevisionRow], template: Option<&RevisionTemplate>) -> TableData {
     let TableKind::Revision { visible_rows, newest_top, title, headers, descriptions, .. } = kind else { return TableData::default() };
     let n = (*visible_rows as usize).max(1);
     let mut shown: Vec<&RevisionRow> = revisions.iter().skip(revisions.len().saturating_sub(n)).collect();
     if *newest_top {
         shown.reverse();
     }
-    let header = REVISION_HEADERS.iter().enumerate().map(|(i, d)| headers.get(i).cloned().flatten().unwrap_or_else(|| d.to_string())).collect();
-    let rows = shown
-        .iter()
-        .map(|r| {
-            let desc = descriptions.iter().find(|(rev, _)| *rev == r.revision).map(|(_, d)| d.clone()).unwrap_or_else(|| r.description.clone());
-            let rev = if r.pending { format!("{}*", r.revision) } else { r.revision.clone() };
-            vec![rev, desc, r.date.clone(), r.approved.clone()]
-        })
-        .collect();
+    let desc_of = |r: &RevisionRow| descriptions.iter().find(|(rev, _)| *rev == r.revision).map(|(_, d)| d.clone()).unwrap_or_else(|| r.description.clone());
+    let (header, rows): (Vec<String>, Vec<Vec<String>>) = match template {
+        // A company template: its columns, in capitals with "All uppercase in Drawings".
+        Some(t) => {
+            let caps = |s: String| if t.all_caps { s.to_uppercase() } else { s };
+            let header = t.columns.iter().enumerate().map(|(i, c)| headers.get(i).cloned().flatten().unwrap_or_else(|| caps(c.clone()))).collect();
+            let rows = shown.iter().map(|r| t.columns.iter().map(|c| caps(RevisionTemplate::cell(c, r, &desc_of(r)))).collect()).collect();
+            (header, rows)
+        }
+        None => {
+            let header = REVISION_HEADERS.iter().enumerate().map(|(i, d)| headers.get(i).cloned().flatten().unwrap_or_else(|| d.to_string())).collect();
+            let rows = shown
+                .iter()
+                .map(|r| {
+                    let rev = if r.pending { format!("{}*", r.revision) } else { r.revision.clone() };
+                    vec![rev, desc_of(r), r.date.clone(), r.approved.clone()]
+                })
+                .collect();
+            (header, rows)
+        }
+    };
     let pending = shown.iter().enumerate().filter(|(_, r)| r.pending).map(|(i, _)| i).collect();
     TableData { title: Some(title.clone().unwrap_or_else(|| "REVISION HISTORY".into())), header: Some(header), rows, pending, padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), ..Default::default() }
 }
@@ -734,6 +808,12 @@ mod tests {
         let d = table_data(&Drawing::default(), &t, None, None, None, &rows, &|s| s.to_string());
         assert_eq!(d.rows.iter().map(|r| r[0].as_str()).collect::<Vec<_>>(), vec!["C*", "B"]);
         assert_eq!(d.pending, vec![0]);
+        // A company template: its columns, in capitals with "All uppercase".
+        let tpl = RevisionTemplate { name: "Ours".into(), columns: vec!["Revision".into(), "Part number".into(), "Revision description".into()], all_caps: true };
+        let d = revision_data_with(&t.kind, &rows, Some(&tpl));
+        assert_eq!(d.header.as_deref(), Some(&["REVISION".to_string(), "PART NUMBER".into(), "REVISION DESCRIPTION".into()][..]));
+        assert_eq!(d.rows[0], vec!["C*".to_string(), "DRW-1".into(), "PENDING".into()]);
+        assert!(RevisionTemplate::default().is_default());
         // The pending row gets a blue backdrop.
         let mut g = SheetGeometry::new(420.0, 297.0);
         render(&mut g, &t, &d, &layout(&t, &d), 1);

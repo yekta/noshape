@@ -1,0 +1,241 @@
+2 point circle centerline	2 點圓中心線
+2 point linear centerline	2 點線性中心線
+2 point linear dimension	2 點線性尺寸
+3 point angular dimension	3 點角度尺寸
+3 point arc	3 點定弧
+3 point circle	3 點畫圓
+3 point circle centerline	3 點圓中心線
+Acceleration	加速
+Aligned rectangle	對正矩形
+Aligned section view	轉正剖視圖
+Angular velocity	角速度
+Animate Mate	製作結合動畫
+Arc length dimension	弧長尺寸
+Assembly circular pattern	組合件環狀複製排列
+Assembly linear pattern	組合件線性複製排列
+Assembly mirror	組合件鏡射
+Auxiliary view	輔助視圖
+Ball	球面
+Ball mate	球體結合
+Bearing	軸承
+Bezier	貝茲
+Body draft	本體拔模
+Boolean	布林運算
+Boundary condition	邊界條件
+Boundary surface	邊界曲面
+Break view	斷開視圖
+Bridging curve	橋接曲線
+Broken-out section	區域深度剖視
+Callout	標註
+Center point arc	中心點畫弧
+Center point circle	中心點畫圓
+Center point rectangle	中心點矩形
+Centermark	中心符號線
+Chamfer	倒角
+Chamfer dimension	倒角尺寸
+Circular pattern	環狀複製排列
+Circumscribed polygon	外接多邊形
+Coincident	重合
+Commit	提交
+Commit all	全部提交
+Composite curve	複合曲線
+Composite part	複合零件
+Concentric	同心
+Conic	圓錐線
+Constrained surface	約束曲面
+Construction	建構線
+Corner rectangle	轉角矩形
+Create Part Studio in context	建立關聯中的 Part Studio
+Create generative	建立生成式
+Crop view	裁剪視圖
+Curve pattern	曲線複製排列
+Curved Text	彎曲文字
+Custom table	自訂表格
+Cut list	切割清單
+Cut list table	切割清單表格
+Cylindrical	圓柱
+Cylindrical mate	圓柱結合
+Datum	基準
+Decal	印花
+Delete face	刪除面
+Delete part	刪除零件
+Derived	衍生
+Derived mirror	衍生鏡射
+Detail view	細部放大圖
+Diameter dimension	直徑尺寸
+Dimension	尺寸
+Display states	顯示狀態
+Draft	拔模
+Driving mate selector	驅動結合選擇器
+Edge	邊線
+Edge condition symbol	邊線條件符號
+Edge point	邊線點
+Edge to edge centerline	邊線至邊線中心線
+Edit curve	編輯曲線
+Ellipse	橢圓
+Elliptical arc	橢圓弧
+Enclose	封閉
+End cap	端蓋
+Entity	圖元
+Equal	等長
+Explode step	爆炸步驟
+Extend	延伸
+Extend surface	移動邊界
+External thread	外螺紋
+Extrude	擠出
+Face	面
+Face blend	面混合
+Fastened	緊固
+Fastened mate	緊固結合
+Feature	特徵
+Fill	填補
+Fillet	圓角
+Fillet dimension	圓角尺寸
+Fit spline	3D 擬合樣條
+Fix	固定
+Flange	凸緣
+Force	力
+Foreshorten dimension	縮短尺寸
+Format painter	複製格式
+Frame	框架
+Frame trim	框架修剪
+Gear relation	齒輪關係
+Geometric tolerance	幾何公差
+Group	群組
+Gusset	角撐
+Hatch region	剖面線區域
+Helix	螺旋線
+Hide inspection item	隱藏檢查項目
+Hole	鑽孔
+Hole table	鑽孔表格
+Hole/thread callout	鑽孔/螺紋標註
+Horizontal	水平
+Import	匯入
+Inscribed polygon	內切多邊形
+Insert	插入
+Insert BOM	插入 BOM
+Insert DXF or DWG	插入 DXF 或 DWG
+Insert image	插入影像
+Insert view	插入視圖
+Inspection item	檢查項目
+Internal feature	內部特徵
+Intersection	相交
+Intersection curve	相交曲線
+Isocline	等傾線
+Isoparametric curve	等參數曲線
+Item	項目
+Line	直線
+Line to line angular dimension	線到線的角度尺寸
+Line to line linear dimension	線到線的線性尺寸
+Linear pattern	線性複製排列
+Linear relation	線性關係
+Loft	疊層拉伸
+Mass	質量
+Mate	結合
+Mate connector	結合連接器
+Maximum dimension	最大尺寸
+Maximum/minimum dimension	最大/最小尺寸
+Mesh point	網格點
+Midpoint	中點
+Midpoint line	中點線
+Minimum dimension	最小尺寸
+Mirror	鏡射
+Modify fillet	修改圓角
+Moment	力矩
+Move face	移動面
+Mutual trim	相互修剪
+New feature	新功能
+Normal	垂直
+Note	註解
+Offset	偏移
+Offset curve	偏移曲線
+Offset surface	偏移曲面
+Ordinate dimension	座標尺寸
+Parallel	平行
+Parallel mate	平行結合
+Pattern	複製排列
+Perpendicular	正交垂直
+Pierce	貫穿
+Pin slot	銷槽
+Pin slot mate	銷槽結合
+Planar	平面
+Planar mate	平面結合
+Plane	平面
+Point	點
+Point to line linear dimension	點到線的線性尺寸
+Pressure	壓力
+Projected curve	投影曲線
+Projected view	投影視圖
+Query variable	查詢變數
+Rack and pinion relation	齒條和小齒輪關係
+Radial dimension	半徑尺寸
+Refold	重新摺疊
+Relation	條件關係
+Replace face	替換面
+Replace instance	取代實例
+Replicate	仿製
+Revision table	修訂版表格
+Revolute	轉動
+Revolute mate	轉動結合
+Revolve	旋轉
+Rib	肋材
+Rigid body	剛體
+Routing curve	路線曲線
+Ruled surface	直紋曲面
+Run generative	執行生成式
+SMBend	彎折
+SMBendRelief	折彎止裂
+SMCorner	轉角
+SMCornerBreak	尖角倒鈍
+SMEndSheetMetal	完成鈑金模型
+SMForm	成形
+SMHem	摺邊
+SMJoint	接合
+SMLoft	鈑金疊層拉伸
+SMMakeJoint	製作接合
+SMRip	裂口
+SMStartSheetMetal	鈑金模型
+SMTab	薄板頁
+Screw relation	螺釘關係
+Section view	剖面視圖
+Shell	薄殼
+Show mates mode	顯示結合模式
+Simulation	模擬
+Sketch	草圖
+Sketch Curvature	曲率
+Sketch Flow	草圖流動
+Sketch point	草圖點
+Slider	滑動
+Slider mate	滑動結合
+Slot	溝槽
+Snap mode	卡扣模式
+Spline	樣條
+Spline control point	樣條控制點
+Spline handle	樣條柄
+Split	分割
+Surface finish symbol	表面加工符號
+Sweep	掃掠
+Symmetric	對稱
+Table	表格
+Tag	標記
+Tag profile	標記輪廓
+Tangent	相切
+Tangent arc	切線弧
+Tangent mate	相切結合
+Text	文字
+Thicken	加厚
+Transform	變換
+Trim	修剪
+Trim curve	修剪曲線
+Unfold	展開
+Update	更新
+Update all references to latest versions	將所有參考更新至最新的版本
+Use	使用
+Variable	變數
+Vertex	頂點
+Vertical	立式垂直
+Virtual sharp	虛擬交角
+Weld symbol	熔接符號
+Width	寬度
+Width mate	寬度結合
+Wrap	包覆

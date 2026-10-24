@@ -367,6 +367,15 @@ impl Render for ReleasePrefsView {
                 )
         });
         let scheme_id = rs::scheme_id(&e.scheme);
+        // The template editor saves at once (live: its own REST call).
+        let saved_view = cx.entity();
+        let template_saved: crate::revision_template::OnSaved = std::rc::Rc::new(move |t, cx| {
+            saved_view.update(cx, |this, cx| {
+                this.saved.revision_table = t.clone();
+                this.edited.revision_table = t;
+                cx.notify();
+            })
+        });
         let id_copy = scheme_id.clone();
         let revisions = section("Revisions and part numbers", None).child(
             v_flex()
@@ -386,6 +395,7 @@ impl Render for ReleasePrefsView {
                 })
                 .child(label("Unreleased revision suffix:"))
                 .child(gpui_kit::base::input::input_frame(div().w(px(167.)).h(px(32.)).border_1().rounded(px(4.)).border_color(rgb(0xaaaaaa)).flex().items_center().child(Input::new(&self.suffix).appearance(false).px(px(10.)))))
+                .child(crate::revision_template::template_list(&self.saved.revision_table, template_saved, cx))
                 .child(
                     div()
                         .id("rm-numbering-link")

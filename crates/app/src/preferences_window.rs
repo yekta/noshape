@@ -187,7 +187,7 @@ pub(crate) fn account_title_bar(cx: &App) -> AnyElement {
                         .pr(px(14.))
                         .gap(px(5.))
                         .child(crate::assets::icon("user-avatar", 22., cx))
-                        .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(180.)).truncate().child(noshape_store::local_user_name())),
+                        .child(div().text_size(px(14.)).text_color(pal.text).max_w(px(180.)).truncate().child(crate::ui::user_text(noshape_store::local_user_name()))),
                 ),
         )
         .into_any_element()

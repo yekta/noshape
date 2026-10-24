@@ -51,17 +51,7 @@ pub(crate) struct StdUi {
     pub toasts: Vec<String>,
 }
 
-/// Where Insert puts the part in a hole that already holds standard content.
-#[derive(Clone, Copy, PartialEq)]
-enum Stack {
-    /// Insert: a washer or nut goes under a bolt already in the hole.
-    Plain,
-    /// Insert closest to selection: against the picked face, what was there
-    /// moves onto the new part.
-    Closest,
-    /// Insert furthest from selection: at the far end of the stack.
-    Furthest,
-}
+use noshape_ops::assembly::Stack;
 
 impl AssemblyView {
     /// Spec of the tab, starting with the first of every picker (live:
@@ -226,54 +216,13 @@ impl AssemblyView {
         }
         // Furthest onto a stack topped by a bolt is refused (live, behaviours
         // "Standard content: … stacking").
-        if mode == Stack::Furthest && self.assembly(cx).is_some_and(|a| holes.iter().any(|h| stack_end(a, h).is_none())) {
-            self.message = Some((true, "Component on top of existing stack cannot accept additional top stack components.".into()));
+        if mode == Stack::Furthest && self.assembly(cx).is_some_and(|a| noshape_ops::assembly::stack_topped(a, &holes)) {
+            self.message = Some((true, noshape_ops::assembly::STACK_TOPPED.into()));
             cx.notify();
             return;
         }
         let flip = self.ui.std.flip;
-        let base = spec.part_name();
-        let ids = self.edit_insert(&format!("Insert : {base}"), cx, |a| {
-            let mut ids = Vec::new();
-            for _ in 0..holes.len().max(1) {
-                let id = InstanceId(a.next_id());
-                let name = a.next_instance_name(&base);
-                a.instances.push(Instance::new(id, name, InstanceSource::Standard { spec: spec.clone() }, Placement::default()));
-                ids.push(id);
-            }
-            for (id, hole) in ids.iter().zip(&holes) {
-                let mut src = MateConnectorRef::on(*id, vec![], standard::connector_reference(0));
-                src.flip = flip;
-                let top = MateConnectorRef::on(*id, vec![], standard::connector_reference(1));
-                let fastened = |a: &mut Assembly, x: MateConnectorRef, y: MateConnectorRef| {
-                    let mid = MateId(a.next_id());
-                    let n = a.next_feature_name("Fastened");
-                    a.mates.push(Mate::new(mid, n, MateType::Fastened, x, y));
-                };
-                if mode == Stack::Furthest {
-                    let at = stack_end(a, hole).unwrap_or_else(|| hole.clone());
-                    fastened(a, src, at);
-                    continue;
-                }
-                // Closest (and Insert of a washer / nut into a hole holding a
-                // bolt): the part goes against the face. Live: the face's
-                // Fastened is re-pointed from what sat there to the new part,
-                // and a new Fastened joins the new part's top to it.
-                let under = held(a, hole).filter(|(k, at_is_b)| {
-                    let other = if *at_is_b { &a.mates[*k].a } else { &a.mates[*k].b };
-                    stacks(a, *id) && (mode == Stack::Closest || !stacks(a, other.instance))
-                });
-                match under {
-                    Some((k, at_is_b)) => {
-                        let m = &mut a.mates[k];
-                        let was = if at_is_b { std::mem::replace(&mut m.a, src) } else { std::mem::replace(&mut m.b, src) };
-                        fastened(a, top, was);
-                    }
-                    None => fastened(a, src, hole.clone()),
-                }
-            }
-            ids
-        });
+        let ids = self.edit_insert(&noshape_ops::assembly::insert_standard_description(&spec), cx, |a| noshape_ops::assembly::insert_standard(a, &spec, &holes, flip, mode));
         if let Some(ids) = ids
             && holes.is_empty()
         {
@@ -321,16 +270,7 @@ impl AssemblyView {
     /// face names do not depend on the size).
     fn std_update(&mut self, cx: &mut Context<Self>) {
         let (Some(ids), Some(spec)) = (self.ui.std.editing.take(), self.ui.std.spec.clone()) else { return };
-        let name = spec.part_name();
-        self.edit(&format!("Edit standard content : {name}"), cx, |a| {
-            for id in &ids {
-                let base = a.next_instance_name(&name);
-                if let Some(i) = a.instance_mut(*id) {
-                    i.source = InstanceSource::Standard { spec: spec.clone() };
-                    i.name = base;
-                }
-            }
-        });
+        self.edit(&noshape_ops::assembly::edit_standard_description(&spec), cx, |a| noshape_ops::assembly::edit_standard(a, &ids, &spec));
         cx.notify();
     }
 
@@ -913,36 +853,6 @@ fn paint_fastener(b: Bounds<Pixels>, pv: Preview, window: &mut Window) {
 }
 
 /// Nuts and washers stack: they have a second connector on their top face.
-fn stacks(a: &Assembly, id: InstanceId) -> bool {
-    a.instance(id).and_then(|i| i.source.standard()).and_then(standard::component).is_some_and(|c| !c.shape.has_length())
-}
-
-fn same_connector(c: &MateConnectorRef, at: &MateConnectorRef) -> bool {
-    c.instance == at.instance && c.path == at.path && c.reference == at.reference && c.align == at.align
-}
-
-/// The fastened mate on connector `at`: its index and whether `at` is its `b`.
-fn held(a: &Assembly, at: &MateConnectorRef) -> Option<(usize, bool)> {
-    a.mates.iter().position(|m| !m.suppressed && m.mate_type == MateType::Fastened && (same_connector(&m.b, at) || same_connector(&m.a, at))).map(|k| (k, same_connector(&a.mates[k].b, at)))
-}
-
-/// Insert furthest from selection: the free connector at the outer end of
-/// the stack on `hole` (past every nut and washer); None when a bolt or
-/// screw tops it.
-fn stack_end(a: &Assembly, hole: &MateConnectorRef) -> Option<MateConnectorRef> {
-    let mut at = hole.clone();
-    for _ in 0..32 {
-        let Some((k, at_is_b)) = held(a, &at) else { return Some(at) };
-        let other = if at_is_b { a.mates[k].a.clone() } else { a.mates[k].b.clone() };
-        if !stacks(a, other.instance) {
-            return None;
-        }
-        let next = if other.reference == standard::connector_reference(0) { 1 } else { 0 };
-        at = MateConnectorRef::on(other.instance, other.path.clone(), standard::connector_reference(next));
-    }
-    Some(at)
-}
-
 /// Company/user wide properties of a standard content configuration (the
 /// Part number pencil, live skb/800): kept in the config directory for the
 /// user, keyed by the full configuration.

@@ -167,3 +167,11 @@ CLI rows unchanged: SF2 8000/10 faces, SF5 2400 mm², SF6 −514.304543; SM1 838
 
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
 | PS2 / TAB1 | imported tab shows its parts as soon as it opens | ✅ fixed |
+
+## Re-run pass 22 (qa5, 2026-10-24, agent/qa5 on main 037298c3)
+| Row | Ours now | Status |
+|---|---|---|
+| 2.3 / 4.7 Sketch row into a curve field | Rib: clicking the "Line sketch" row fills Sketch profiles with **"Edges of Line sketch"** (live "Edges of Rib sketch", behaviours ~983); Sweep path the same | 🔧 fixed (qa5) |
+| 3.6c Hole row named by the callout | hole.fs "Feature Name Template": "#featureName" → live names it by the callout too | ✅ |
+| 4.9 Wrap default tab | wrap.fs Creation type Default SURFACE | ✅ |
+| 1.7 point vs region priority | no live evidence yet | ? |

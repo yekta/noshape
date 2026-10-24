@@ -107,9 +107,18 @@ pub fn ops() -> Vec<Op> {
                 sheet_field(),
                 req("source", s(), "Part Studio or assembly tab."),
                 opt("part", s(), "Only this part (`body:…`)."),
+                opt("sketch", s(), "Insert a sketch of the source Part Studio (a sketch view, facing its plane)."),
+                opt("flat", json!({ "type": "boolean", "default": false }), "A sheet metal part's flat pattern."),
                 opt("orientation", json!({ "type": "string", "enum": ORIENTATIONS.iter().map(|o| o.0).collect::<Vec<_>>(), "default": "front" }), "View orientation."),
+                opt("named_view", s(), "View orientation › a named view of the source Part Studio (instead of `orientation`)."),
                 req("position", point(), "View center on the sheet (mm)."),
                 opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "View scale (paper / model)."),
+                opt("simplification", json!({ "type": "string", "enum": ["none", "auto", "absolute", "ratio_to_studio", "ratio_to_part"], "default": "auto" }), "View simplification: None, Automatic, Absolute size, Ratio to Part Studio / assembly size, Ratio to part size."),
+                opt("simplification_value", s(), "Its value: a length (\"1 mm\", default 1 mm) or a percentage (\"1 %\", default 1 %)."),
+                opt("sketch_appearances", json!({ "type": "boolean", "default": false }), "Show sketch appearances."),
+                opt("model_annotations", json!({ "type": "boolean", "default": true }), "Show annotations from model."),
+                opt("explode_position", s(), "Assemblies: Explode/Position, an exploded view or named position name (default \"Default\")."),
+                opt("display_state", s(), "Assemblies: Display state name (default Show all)."),
             ],
             mutates: true,
             destructive: false,
@@ -281,6 +290,28 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             match &v.kind {
                 ViewKind::Base { orientation, .. } => {
                     j["orientation"] = json!(ORIENTATIONS.iter().find(|o| o.1 == *orientation).map(|o| o.0));
+                    // The Insert view panel's choices, when not the defaults.
+                    if let Some(n) = &v.named_view {
+                        j["named_view"] = json!(n);
+                    }
+                    if let Some(k) = v.sketch {
+                        j["sketch"] = json!(k.to_string());
+                    }
+                    if v.flat {
+                        j["flat"] = json!(true);
+                    }
+                    if v.sketch_appearances {
+                        j["sketch_appearances"] = json!(true);
+                    }
+                    if !v.model_annotations {
+                        j["model_annotations"] = json!(false);
+                    }
+                    if let Some(s) = v.simplification.filter(|s| *s != noshape_model::drawing::Simplification::Auto) {
+                        j["simplification"] = json!(format!("{s:?}"));
+                    }
+                    if let Some(d) = &v.display_state {
+                        j["display_state"] = json!(d);
+                    }
                 }
                 ViewKind::Projected { parent, direction } => {
                     let dir = direction.or_else(|| sheet.view(*parent).map(|p| [v.position[0] - p.position[0], v.position[1] - p.position[1]]));
@@ -624,8 +655,73 @@ fn insert_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         opts.insert.scale = Some(s);
     }
+    insert_panel(od, a, source, &mut opts.insert)?;
     let tool = Tool::InsertView { source, orientation, part };
     place_view(od, a, tool, opts, &[SourceKey::studio(source)], "Insert view")
+}
+
+/// The Insert view panel's options from the arguments.
+fn insert_panel(od: &mut OpenDoc, a: &Args, source: TabId, o: &mut noshape_scene::drawing_tools::InsertOpts) -> Result<(), OpError> {
+    use noshape_model::drawing::Simplification;
+    let doc = od.doc();
+    let is_studio = matches!(doc.tab(source).map(|t| &t.content), Some(TabContent::PartStudio(_)));
+    if a.get("sketch").is_some() {
+        let ps = crate::doc::studio(doc, source).map_err(|_| OpError::param("sketch", "sketch views come from a Part Studio"))?;
+        let id = super::feature_arg(ps, a, "sketch")?;
+        if ps.feature(id).is_none_or(|f| f.type_id != "sketch") {
+            return Err(OpError::param("sketch", "not a sketch"));
+        }
+        if a.get("part").is_some() {
+            return Err(OpError::param("sketch", "give `part` or `sketch`, not both"));
+        }
+        o.sketch = Some(id);
+    }
+    if let Some(n) = a.opt_str("named_view")? {
+        let names: Vec<String> = dr::named_views(doc, source).iter().map(|v| v.name.clone()).collect();
+        let frame = dr::named_view_frame(doc, source, n).ok_or_else(|| OpError::param("named_view", &format!("the source's named views: {}", names.join(", "))))?;
+        if a.get("orientation").is_some() {
+            return Err(OpError::param("named_view", "give `orientation` or `named_view`, not both"));
+        }
+        o.named = Some((n.to_string(), frame));
+    }
+    o.flat = a.bool_or("flat", false)?;
+    if o.flat && !is_studio {
+        return Err(OpError::param("flat", "flat patterns are of Part Studio sheet metal parts"));
+    }
+    o.sketch_appearances = a.bool_or("sketch_appearances", false)?;
+    o.model_annotations = a.bool_or("model_annotations", true)?;
+    let kind = match a.opt_str("simplification")?.unwrap_or("auto") {
+        "none" => Simplification::None,
+        "auto" => Simplification::Auto,
+        "absolute" => Simplification::Absolute(0.001),
+        "ratio_to_studio" => Simplification::RatioToStudio(0.01),
+        "ratio_to_part" => Simplification::RatioToPart(0.01),
+        _ => return Err(OpError::param("simplification", "none, auto, absolute, ratio_to_studio or ratio_to_part")),
+    };
+    o.simplification = match a.opt_str("simplification_value")? {
+        Some(t) => {
+            let mm = !matches!(doc.settings.units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
+            if matches!(kind, Simplification::None | Simplification::Auto) {
+                return Err(OpError::param("simplification_value", "only for absolute and ratio simplifications"));
+            }
+            dr::parse_simplification(kind, t, mm).ok_or_else(|| OpError::param("simplification_value", "a length (\"1 mm\") or a percentage (\"1 %\")"))?
+        }
+        None => kind,
+    };
+    if let Some(p) = a.opt_str("explode_position")? {
+        let Some(TabContent::Assembly(asm)) = doc.tab(source).map(|t| &t.content) else { return Err(OpError::param("explode_position", "assemblies only")) };
+        let choices = dr::asm_positions(asm);
+        o.asm_position = choices.iter().find(|c| c.0 == p).map(|c| c.1).ok_or_else(|| OpError::param("explode_position", &format!("one of {}", choices.iter().map(|c| c.0.as_str()).collect::<Vec<_>>().join(", "))))?;
+    }
+    if let Some(d) = a.opt_str("display_state")? {
+        let Some(TabContent::Assembly(asm)) = doc.tab(source).map(|t| &t.content) else { return Err(OpError::param("display_state", "assemblies only")) };
+        let names: Vec<&str> = asm.display_states.iter().map(|s| s.name.as_str()).collect();
+        if !names.contains(&d) {
+            return Err(OpError::param("display_state", &format!("one of {}", names.join(", "))));
+        }
+        o.display_state = Some(d.to_string());
+    }
+    Ok(())
 }
 
 fn projected_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
