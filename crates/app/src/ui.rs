@@ -259,9 +259,18 @@ pub fn user_text(text: impl Into<SharedString>) -> StyledText {
 /// A tool description ([`crate::tool_text::blocks`]): its paragraphs, and
 /// list items numbered at the right of the browser's 40 px list indent.
 pub fn tool_description(text: &str) -> Div {
-    v_flex().children(crate::tool_text::blocks(text).into_iter().map(|(n, t)| match n {
+    // A numbered list as live's `<ol>` (live dom ui2-tip-list-frame-*): no
+    // gap above, 14 px below; each `<li>` 20 px in, its "1." marker outside,
+    // right-aligned a space before the text.
+    let blocks = crate::tool_text::blocks(text);
+    let ends_list: Vec<bool> = (0..blocks.len()).map(|i| blocks[i].0.is_some() && blocks.get(i + 1).is_none_or(|b| b.0.is_none())).collect();
+    v_flex().children(blocks.into_iter().zip(ends_list).map(|((n, t), end)| match n {
         None => div().child(t),
-        Some(n) => h_flex().items_start().child(div().w(px(40.)).flex_none().pr(px(4.)).flex().justify_end().child(format!("{n}."))).child(div().flex_1().min_w_0().child(t)),
+        Some(n) => h_flex()
+            .items_start()
+            .when(end, |d| d.mb(px(14.)))
+            .child(div().w(px(20.)).flex_none().pr(px(4.)).flex().justify_end().child(format!("{n}.")))
+            .child(div().flex_1().min_w_0().child(t)),
     }))
 }
 
