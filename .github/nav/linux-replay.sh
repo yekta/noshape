@@ -49,8 +49,12 @@ cp "$DOC" "$work/nav.noshape"
 TRACE="$OUT/trace-$MODE.jsonl"
 rm -f "$TRACE"
 if [[ $MODE == x11 ]]; then
-  # Xwayland starts on demand; its display number is in sway's log.
-  for _ in $(seq 20); do DISPLAY=$(grep -ao 'Xwayland.*:[0-9]*' "$OUT/sway.log" | grep -o ':[0-9]*$' | tail -1); [[ -n $DISPLAY ]] && break; sleep 0.5; done
+  # Sway's children get its Xwayland display; ask one for it.
+  rm -f "$OUT/display"
+  swaymsg exec "echo \$DISPLAY > $OUT/display" > /dev/null
+  for _ in $(seq 20); do [[ -s $OUT/display ]] && break; sleep 0.5; done
+  DISPLAY=$(cat "$OUT/display" 2>/dev/null)
+  [[ -n $DISPLAY ]] || { echo "no Xwayland display"; kill "$SWAY"; exit 1; }
   export DISPLAY
   env -u WAYLAND_DISPLAY NOSHAPE_NAV_TRACE="$TRACE" RUST_LOG=info "$BIN" "$work/nav.noshape" > "$OUT/app-$MODE.log" 2>&1 &
 else

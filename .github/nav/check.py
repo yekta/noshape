@@ -229,6 +229,18 @@ def main():
             ch.check("protocol", f"scroll #{i} wheelDelta y (Chrome)", None if got is None else float(trunc120(got[1])), float(trunc120(fr[1])), 0)
             ch.check("protocol", f"scroll #{i} wheelDelta x (Chrome)", None if got is None else float(trunc120(got[0])), float(trunc120(fr[0])), 0)
 
+    baselines = set()
+    if a.mode == "x11":
+        seen = set()
+        for r in rec:
+            if r.get("input") == "mouse_move":
+                seen.clear()
+            p_ = r.get("posted")
+            if p_ and p_.get("kind") == "scroll":
+                axis = "x" if p_.get("horizontal") else "y"
+                if axis not in seen:
+                    baselines.add(id(r))
+                seen.add(axis)
     # The drivers log each wheel event they post; per step, Chrome's ticks for
     # each must equal the ticks the app's platform layer reported.
     for name, recs in by.items():
@@ -236,6 +248,14 @@ def main():
         if not posted:
             continue
         got = [r["data"] for r in recs if r.get("input") == "scroll"]
+        if a.mode == "x11":
+            # XI2 smooth scrolling: an axis's first valuator event after the
+            # device switched (the replay's cursor warp) or the pointer entered
+            # only sets the baseline, in Chromium (`ExtractAndUpdateScrollOffset`)
+            # as in gpui. Drop those posted events from the expectation.
+            kept = [posted_ticks(r["posted"]) for r in recs if r.get("posted", {}).get("kind") == "scroll" and id(r) not in baselines]
+            ch.note(name, "baseline events (no scroll on X11)", len(posted) - len(kept))
+            posted = kept
         ch.check(name, "scroll inputs = posted wheel events", float(len(got)), float(len(posted)), 0)
         for i, (s_, p_) in enumerate(zip(got, posted)):
             t = s_.get("ticks")
@@ -281,15 +301,34 @@ def main():
         w, h = c1["viewport"]
         ch.note("right-drag-fling", "turn (deg), 200 px + inertia", angle(c0["camera"]["forward"], c1["camera"]["forward"]))
         ch.note("right-drag-fling", "  without inertia it would be", 3 * 360 * 200 / math.hypot(w, h))
-    c0, c1 = first_last("alt-right-drag")
-    if c0 and c1:
-        # Constrained rotate about world Z: the first move only levels / tags
-        # the view (Onshape's axisRotateCanvasTag), the other 19 x 10 px turn.
-        w, h = c1["viewport"]
-        az = lambda f: math.degrees(math.atan2(f[1], f[0]))  # noqa: E731
-        turn = (az(c1["camera"]["forward"]) - az(c0["camera"]["forward"])) % 360
-        ch.check("alt-right-drag", "turn about world Z (deg), 190 px", min(turn, 360 - turn), 3 * 360 * 190 / math.hypot(w, h), 0.5)
-        ch.check("alt-right-drag", "elevation change (deg)", abs(math.degrees(math.asin(c1["camera"]["forward"][2]) - math.asin(c0["camera"]["forward"][2]))), 0.0, 0.05)
+    if "alt-right-drag" in by:
+        # Constrained rotate: the view is first levelled (snapped, or animated
+        # while drag moves are ignored), which tags it; only moves after that
+        # turn it about world Z, 3 turns per diagonal (Onshape onDrag
+        # isAxisRotating, axisRotateCanvasTag).
+        recs = by["alt-right-drag"]
+        level_at, last_at, cams = None, None, []
+        for r in recs[1:]:
+            if r.get("input") == "mouse_move":
+                last_at = r["data"]["at"]
+            elif "camera" in r:
+                if level_at is None and abs(r["camera"]["right"][2]) < 1e-9:
+                    level_at = last_at
+                    cams.append(r)
+                elif level_at is not None:
+                    cams.append(r)
+        if level_at and len(cams) > 1 and last_at:
+            c0, c1 = cams[0], cams[-1]
+            w, h = c1["viewport"]
+            az = lambda f: math.degrees(math.atan2(f[1], f[0]))  # noqa: E731
+            turn = (az(c1["camera"]["forward"]) - az(c0["camera"]["forward"])) % 360
+            moved = abs(last_at[0] - level_at[0])
+            ch.check("alt-right-drag", f"turn about world Z (deg) for {moved:.0f} px after levelling", min(turn, 360 - turn), 3 * 360 * moved / math.hypot(w, h), 0.5)
+            el = lambda c: math.degrees(math.asin(c["camera"]["forward"][2]))  # noqa: E731
+            ch.check("alt-right-drag", "elevation change after levelling (deg)", abs(el(c1) - el(c0)), 0.0, 0.01)
+            ch.check("alt-right-drag", "right vector stays horizontal", abs(c1["camera"]["right"][2]), 0.0, 1e-9)
+        else:
+            ch.check("alt-right-drag", "view levelled", 0.0, 1.0, 0)
     c0, c1 = first_last("middle-drag")
     if c0 and c1:
         moved = math.dist(c0["camera"]["target"], c1["camera"]["target"]) / c1["camera"]["world_per_pixel"]
