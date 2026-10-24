@@ -595,7 +595,6 @@ pub fn tab(ev: &mut EvalCtx) -> FResult<()> {
         return err("No valid tab profiles");
     }
     let scope: Vec<(usize, usize)> = ev.resolve_faces(ev.query("booleanUnionScope"));
-
     let offset = ev.length("booleanOffset").unwrap_or(0.0);
     let subtract = ev.query("booleanSubtractScope").to_vec();
     for p in &profiles {
@@ -605,14 +604,11 @@ pub fn tab(ev: &mut EvalCtx) -> FResult<()> {
             let body = ev.ctx.bodies[bi].clone();
             let Some(data) = ev.ctx.sheet_metal.get(&body.id).filter(|d| d.active) else { continue };
             for (wi, w) in data.walls.iter().enumerate() {
-                // A picked wall: the tab may lie on either of its faces (live qa5 SM2:
-                // sketched on the Top plane, joined to the plate's top face).
-                // (No wall picked: any wall, until the std route's editing logic fills it in the dialog.)
-                if !scope.is_empty() && !faces_named(&body, &w.faces).into_iter().chain(faces_named(&body, &w.back)).any(|fi| scope.contains(&(bi, fi))) {
-                    continue;
-                }
                 for (names, on_ref) in [(&w.faces, true), (&w.back, false)] {
                     for fi in faces_named(&body, names) {
+                        if !scope.is_empty() && !scope.contains(&(bi, fi)) {
+                            continue;
+                        }
                         let Some((c, n)) = plane_of(&body.shape.sub_shape(ShapeType::Face, fi)?) else { continue };
                         if n.dot(p.frame.normal).abs() > 1.0 - 1e-9 && (p.frame.origin - c).dot(n).abs() < 1e-7 {
                             found = Some((bi, wi, on_ref, n));

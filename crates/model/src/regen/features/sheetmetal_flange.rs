@@ -461,7 +461,7 @@ pub fn flange(ev: &mut EvalCtx) -> FResult<()> {
         return err("Selected edges no longer exist");
     }
     for (bi, eis) in by_body(&edges).into_iter().rev() {
-        let mut data = (*active_edge_data(ev, bi)?).clone();
+        let mut data = (*active_data(ev, bi)?).clone();
         let t = data.thickness;
         let r = if ev.bool("useDefaultRadius") { data.radius } else { ev.length("bendRadius")? };
         if r <= 0.0 {
@@ -525,7 +525,7 @@ pub fn hem(ev: &mut EvalCtx) -> FResult<()> {
         return err("Selected edges no longer exist");
     }
     for (bi, eis) in by_body(&edges).into_iter().rev() {
-        let mut data = (*active_edge_data(ev, bi)?).clone();
+        let mut data = (*active_data(ev, bi)?).clone();
         let t = data.thickness;
         let ty = ev.enum_("hemType").to_string();
         let (angle, r, straight, kind, k_factor) = match ty.as_str() {
