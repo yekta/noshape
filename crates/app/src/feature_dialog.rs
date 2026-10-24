@@ -3308,9 +3308,9 @@ impl Render for FeatureDialog {
                             cx,
                         )
                             // Live: a 12 px `#a0a0a0` disc, its centre 1 px
-                            // above the slider track.
+                            // above the slider track, 11 px from the frame's
+                            // right edge (dialogs/*-01-open: disc x 449–461).
                             .size(px(12.))
-                            .mr(px(1.))
                             .relative()
                             .top(px(-2.))
                             .rounded_full()
