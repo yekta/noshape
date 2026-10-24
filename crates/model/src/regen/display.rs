@@ -115,8 +115,8 @@ pub(super) fn tessellate_error(shape: &noshape_kernel::Shape, opts: &RegenOption
 }
 
 /// The Sheet metal flat view's display: the flat solid of `flat` (in the
-/// flat view's place) as one solid body in `color`, its faces and edges
-/// all naming the body (the view only shows it).
+/// flat view's place) as one solid body in `color`; its faces numbered, its
+/// edges and vertices naming the body (the view only shows it).
 pub fn flat_view_display(flat: &crate::sheetmetal::FlatPattern, color: [f32; 4]) -> Option<StudioDisplay> {
     let shape = flat.flat_view_solid()?;
     let mesh = tessellate_body(&shape, "flat pattern", 1.0, &RegenOptions::default());
@@ -128,7 +128,9 @@ pub fn flat_view_display(flat: &crate::sheetmetal::FlatPattern, color: [f32; 4])
         kind: BodyKind::Solid,
         color,
         hidden: false,
-        face_refs: vec![me.clone(); mesh.face_ranges.len()],
+        // Each face its own name: the flat view outlines the face under the
+        // pointer (live "ui (10-24 a)" (4a)).
+        face_refs: (0..mesh.face_ranges.len()).map(|i| Reference::Face(crate::reference::TopoName::face(crate::reference::FeatureId(0), crate::reference::Role::New(i as u32)))).collect(),
         edge_refs: vec![me.clone(); mesh.edges.len()],
         vertex_refs: vec![me; mesh.vertices.len()],
         mesh,

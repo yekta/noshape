@@ -1137,3 +1137,20 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   section off.
 * Not done here (for icons2 / the lead): Flip lives in the "Select default plane" popup (icons2's dialog); the
   red overlap fill in caps where instances overlap (renderer). GUI-checked on :103 (/root/skb-scratch/t1–t9.png).
+
+## P1 mates audit (skb 10-24, PRIORITIES.md item 1)
+- **Solver**: `solver::tests::core_mates_leave_their_degrees_of_freedom` checks the six everyday mates against live's DOF
+  table (behaviours "skb (10-22 20:30)" › DOF per mate type): Fastened 0, Revolute 1, Slider 1, Cylindrical 2, Planar 3,
+  Ball 3. A drag of the moving part's origin follows only the free translations, and a Ball drag turns the part about
+  its centre.
+- **GUI pass on :103** (/root/skb-scratch/mates: `mk.py` builds a 60×40×5 plate with a Ø10 hole plus a Ø10×30 pin;
+  `retype.sh` retypes through Edit… and drags): Revolute from the hole edge to the pin's bottom edge stands the pin on
+  the hole (z 5). The drag turns it about Z only. Retyping to Slider snaps the rotation back, and the drag then slides
+  along Z only. Cylindrical slides and turns (2 DOF). Planar keeps z 5 and moves in XY plus Z rotation. Ball snaps the
+  centre back to the hole and tilts freely. The dialog rows per type match live (Cylindrical and Ball have no Offset).
+  Inference on the pin's side face puts the connector mid-axis, with a dot at the end centre (live assembly/31).
+- **Fixed: where the mate heads-up toolbar opens.** It used to open +14/+14 px below-right of the second pick, with no
+  clamp, so near the right edge its ✓/✕ fell off-screen. Live (assembly/35 + dom/mate-hud.txt: pick ≈ (1419, 362),
+  panel [1264, 311, 310×51]) centres the panel on the pick with its bottom edge on it. Assembly/93 shows it pushed in from
+  the right edge. Ours now does both (`render_mate_hud`). The note "just below-right" in behaviours.md is not what the
+  coordinates show.
