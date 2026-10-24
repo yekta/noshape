@@ -1268,7 +1268,7 @@ fn section_cap_planes(scene: &Scene, camera: &Camera, view_proj: &Mat4, height: 
             u: [p.tangent.x, p.tangent.y, p.tangent.z, scale],
             v: n.cross(p.tangent).extend(0.0).to_array(),
             selector: crate::section_caps::SELECTOR_COLORS[k],
-            index: [k as u32, 0, 0, 0],
+            index: [k as u32, u32::from(scene.clip_selected.get(k).copied().unwrap_or(false)), 0, 0],
         });
         if forward.dot(n) <= 0.0 {
             visible.push(k as u32);
@@ -1921,7 +1921,10 @@ impl Renderer {
             // Every kept surface of a cut part adds its color, without depth
             // test or culling.
             section_mask: make(P { label: "section-mask", vs: "vs_mesh", fs: "fs_section_mask", buffers: &mesh_buffers, format: self.section_caps.mask_format, blend: Some(wgpu::BlendState { color: add, alpha: add }), depth: None, bias: none, samples: 1 }),
-            section_cap: make_in(&self.cap_pipeline_layout, P { label: "section-cap", vs: "vs_section_cap", fs: "fs_section_cap", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
+            // No depth bias: the cap sits exactly on its plane, so the datum plane it
+            // lies in (transparent, strictly in front only) is hidden over it, as
+            // live part-studio/73-74 (the cap keeps its exact color).
+            section_cap: make_in(&self.cap_pipeline_layout, P { label: "section-cap", vs: "vs_section_cap", fs: "fs_section_cap", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }),
             mesh_reflect: make_in(image_layout, P { label: "mesh-reflect", vs: "vs_mesh", fs: "fs_mesh_reflect", buffers: &mesh_buffers, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }),
             // Strictly in front: a transparent plane coplanar with a sketch
             // image (drawn just before, without bias) doesn't veil it. Opaque

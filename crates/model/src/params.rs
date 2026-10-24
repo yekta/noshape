@@ -248,6 +248,10 @@ impl Hints {
     /// FeatureScript `UIHint.MATE_CONNECTOR_AXIS_TYPE`: an enum shown as one
     /// icon button that steps through the options ("Reorient secondary axis").
     pub const MATE_CONNECTOR_AXIS_TYPE: Self = Self(1 << 22);
+    /// FeatureScript `UIHint.INITIAL_FOCUS_ON_EDIT`: when an existing
+    /// feature is edited, the first visible selection field with this hint
+    /// is the active one (Draft's Entities to draft / Parting edges).
+    pub const INITIAL_FOCUS_ON_EDIT: Self = Self(1 << 23);
 
     pub const fn or(self, other: Self) -> Self {
         Self(self.0 | other.0)

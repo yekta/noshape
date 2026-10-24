@@ -119,3 +119,128 @@ copy) is still loose per qa5's kern row above, so AN4 stays open (kern).
 STATUS POLY1 (qa4, 2026-10-23): same as qa5's skb row: the solid circle remains; the spinner appears once a vertex is clicked
 (qa4 looked before clicking one).
 STATUS EXP1 (qa4 entry, 2026-10-23): renamed **EXP-HDR** (api, export header fields) to avoid qa5's EXP1 (Rhino export, kern).
+
+## DOC1 — kern — IGES export header (crates/kernel/cpp/io.cpp write_iges)
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Part › Export… › IGES (or `export_parts` IGES); compare with samples/qa5-iges-header.igs (behaviours.md "qa5 iges header")
+- Expected (live): Start section 1 text line; Global: 24-hex product id (fields 3 and 12), file name, system id + version strings, **32,24,8,56,15**, scale 1., units **2 / MM**, line weights **1000 / 1.**, date **13H261023.180059** (YYMMDD.HHNNSS, UTC), resolution **1D-05**, max coord **1000000.**, author and organization **empty**, IGES version flag **9** (5.1), drafting 0, mod date = date; sequence numbers space-padded ("G      1"); extension .iges
+- Actual: empty Start line; "Open CASCADE IGES processor 8.0", "Filename.iges", 32,308,15,308,15, line weights 1 / 0.01, 15H20261023.175701 (4-digit year), 0.0001, 80.0001 (bbox), author "root", version 11, "G0000001" zero-padded. The system/product strings need a decision (we shouldn't claim to be HOOPS Exchange): same as I5
+
+## I5 — kern — Parasolid export header
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Part › Export… › Parasolid
+- Expected (live): `**PART1;` MC/MC_MODEL/MC_ID/OS/OS_RELEASE=unknown, `FRU=Parasolid 38.1.231`, `APPL=Onshape`, SITE/USER=unknown, FORMAT=text, GUISE=transmit, KEY/FILE=BTGapi::writeModels_.xmt, DATE=…; `**PART2; SCH=SCH_3801231_38101` (samples/g25-a.x_t)
+- Actual: `MC=unknown;APPL=noshape;FORMAT=text;GUISE=transmit;` and `SCH=SCH_1200000_12006` (needs a decision: product/schema strings)
+
+## RHINO1 — kern — Rhino export (qa5 EXP1)
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Part › Export… › Rhino (or `export_parts` format RHINO)
+- Expected (live): .3dm written
+- Actual: "unsupported: Rhino export needs openNURBS: build with OPENNURBS_ROOT" (packaging: the shipped build must include openNURBS)
+
+## ADV9 — psb — Feature mirror (Reapply features off, the default) of a gusset Add-extrude that touches two faces
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: /root/qa5-scratch/pass3/mkbracket2.py (qa5 bracket, step 8: Mirror › Feature pattern, the gusset extrude, Plane 1 = Right + 40 mm)
+- Expected (live): OK, 67191.3275 mm³ (live "qa5 bracket", Mirror 1 8 ms)
+- Actual: "Could not create all instances as entered. Try selecting \"Reapply features\" option." (OK with Reapply ☑)
+
+## BOOL1b — psb — Boolean "no geometry change" row hover
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Union of two disjoint parts (qa5 bool doc), ✓, hover the row
+- Expected (live): just "Boolean 1"
+- Actual: "Boolean 1 <- Extrude 1, Extrude 3"
+
+## FSW-draft — psb — Parting line draft: any parting line
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Draft › Parting line, parting edges not in one plane perpendicular to the pull, or on two parts
+- Expected (live): each edge's faces drafted about the edge (draft.fs), hint faces
+- Actual: "Parting lines must lie in a plane perpendicular to the pull direction" / "…must belong to one part"
+
+## FSW-move — psb — Move face › Reapply fillet
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Move face on a face next to a fillet, Reapply fillet ☑
+- Expected (live): fillets touching the moved faces are removed and re-rolled
+- Actual: option ignored
+
+## FSW-replace — psb — Replace face with several replace-with faces
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Replace face, two adjacent template faces
+- Expected (live): all used (adjacent, one body)
+- Actual: only the first
+
+## FSW-sweep — psb — Thin sweep
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Sweep › Thin, Trim ends off, scale
+- Expected (live): sweep a sheet, thicken it, trim ends to planes; "Failed to thicken swept body, check thickness."
+- Actual: wall offset first, then swept; own texts
+
+## FSW-loft — psb — Loft guides, path, end conditions, connections, trims
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Loft with guides / path / end conditions / 2 connections
+- Expected (live): supported, with their errors ("Select a point on each profile to define a connection.")
+- Actual: "Loft guides are not supported yet", "Loft path is not supported yet", end conditions only warn, first connection only, trims ignored
+
+## FSW-fill — psb — Fill guides
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Fill with guide curves; Fill on surface edges
+- Expected (live): guide errors ("Select guide entities." …), exact curves in Precise mode; Add automatic on surface edges (SF7)
+- Actual: not checked; sampled; no Add
+
+## FSW-bsurf — psb — Boundary surface profile arrays and conditions
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Boundary surface, U/V profiles with conditions
+- Expected (live): driven-query rows "[None] Edge of Sketch 1", max 2 picks; conditions applied with their errors
+- Actual: "Add Profile" UI, no cap; conditions warn only
+
+## FSW-helix — psb — Helix start/end point rules, start/end profiles
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Helix with Start point off the axis plane; Show start and end profiles ☑
+- Expected (live): errors on startPoint/endPoint unless coplanar with the axis start/end, snapped onto the radius; magenta circles
+- Actual: moves the plane, own errors; nothing drawn
+
+## FSW-mc — psb — Mate connector owner / attachment at regen
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Mate connector on a face, move the face
+- Expected (live): connector follows its owner/attachment
+- Actual: not stored
+
+## FSW-pattern — psb — Pattern infos and fallbacks (L40/42/43/45 live pending)
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Feature pattern with a failing instance; Face pattern off the part; Curve pattern start point
+- Expected (live): geometric fallback rules, off-part instances fail, start-point info, skip-instance infos
+- Actual: own behaviour
+
+## FSW-hole — psb — Hole merge scope and infos (L56/L57 live pending)
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Hole with an empty scope / fastener fit < 2 parts / tapped depth readjusted
+- Expected (live): scope auto-filled with the parts reached, direction flipped; "No target parts selected for hole."; infos
+- Actual: empty = every solid; infos missing
+
+## FSW-unsupported — psb — Features still "not supported yet"
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Body draft; Decal; Rib draft; asymmetric / conic / curvature face blends; Face blend between faces without a common edge
+- Expected (live): supported
+- Actual: "… is not supported yet"
+
+## VC7 — ui — Menu font app-wide
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: any menu
+- Expected (live): Flama 12 px `#555`
+- Actual: our UI font (Flama / Open Sans not bundled; theme-layout.md)
+
+## KS1 — ui — Keyboard shortcuts pop-out
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Help › Keyboard shortcuts, the ↗ next to ×
+- Expected (live): `a.osx-popout-link` opens a full-size "Keyboard shortcuts" page (no tabs/search, every category in two columns, legend bar, footer); the modal stays open
+- Actual: missing
+
+## VC8 — ui — Assembly camera menu
+- Source: qa5, pass 21 re-run 2026-10-23 (main 88fbf8f / 40e23871).
+- Repro: Assembly tab, view cube ▾
+- Expected (live): Isometric, Dimetric, Trimetric | ⚙ Graphics preferences… | Named views…, Previous view | Zoom to fit, Zoom to window | Perspective view | ✓ render mode ▸, ✓ hidden edges ▸, ✓ tangent edges ▸ | View in high quality | Section view… (= the Part Studio menu minus "Orient normal to sketch on edit" and "Highlight boundary edges"; behaviours.md "qa5 assembly camera menu")
+- Actual: qa5 removed "Show mates" and added "Section view…"; the assembly view has no render modes, named / previous views, graphics preferences, zoom to window or high quality yet
+
+STATUS IM1 (2026-10-24, qa5): fixed by api (names, "<file> parts", RootAssembly) except the "BOM : RootAssembly" tab → IM1b, api.
+STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's own product strings; only the Parasolid schema minor version differs (SCH_3801000 vs live 3801231).
+STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
+STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
