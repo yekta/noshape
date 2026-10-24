@@ -140,6 +140,50 @@ fn write_parts_1000_fixture() {
     assert_eq!(od.regenerate(tab, None).unwrap().display.bodies.len(), 1000);
 }
 
+/// The 1000-instance assembly benchmark fixture
+/// (`tests/perf/pins-assembly-1000.noshape`, perf.yml `fixture`): the pin
+/// from a Part Studio inserted 1000 times into an Assembly, the instances on
+/// the 40 × 25 grid of `parts-1000` (6 mm), the Assembly first so the app
+/// opens on it. `NOSHAPE_FIXTURE_OUT=<path>` writes it.
+#[test]
+#[ignore]
+fn write_pins_assembly_fixture() {
+    use noshape_model::assembly::{InstanceId, Placement};
+    use noshape_model::document::TabContent;
+    let out = std::env::var("NOSHAPE_FIXTURE_OUT").expect("NOSHAPE_FIXTURE_OUT");
+    let _ = std::fs::remove_file(&out);
+    let dir = std::env::temp_dir().join(format!("noshape-pins-asm-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let scratch = dir.join("x.noshape");
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch.to_str().unwrap() }));
+    // The new Part Studio goes after Assembly 1.
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "Pin" }));
+    call(&mut ctx, "tab_delete", json!({ "tab": "Part Studio 1" }));
+    pin(&mut ctx, "Pin");
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "Pin" }));
+    let part = parts["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Pin", "part": part }));
+    // The other 999 copies in one go (a single microversion keeps the file small).
+    let mut doc = ctx.doc(scratch.to_str()).unwrap().doc().clone();
+    let tab = noshape_ops::doc::find_tab(&doc, "Assembly 1").unwrap();
+    let Some(TabContent::Assembly(asm)) = doc.tab_mut(tab).map(|t| &mut t.content) else { panic!("Assembly 1") };
+    let seed = asm.instances[0].clone();
+    asm.instances.clear();
+    for i in 0..1000u64 {
+        let (x, y) = ((i % 40) as f64 * 0.006, (i / 40) as f64 * 0.006);
+        let name = asm.next_instance_name(&seed.name.rsplit_once(' ').map_or(seed.name.as_str(), |(base, _)| base).to_string());
+        let id = InstanceId(asm.next_id());
+        asm.instances.push(noshape_model::assembly::Instance { id, name, placement: Placement { translation: [x, y, 0.0], ..Placement::default() }, ..seed.clone() });
+    }
+    ctx.create(std::path::Path::new(&out), doc).unwrap();
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    assert_eq!(list["instances"].as_array().unwrap().len(), 1000);
+    let info = call(&mut ctx, "document_info", json!({}));
+    assert_eq!(info["tabs"][0]["name"], "Assembly 1", "{info}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// GPU cost of the 1000-part fixture (perf.yml `fixture` parts-1000):
 /// 20 orbit frames at the CI runners' 1194×794, the app's style; mean and
 /// worst frame. Run once per diagnostic (`NOSHAPE_PERF_SKIP=lines|meshes|
