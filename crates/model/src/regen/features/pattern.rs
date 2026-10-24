@@ -743,6 +743,8 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     if ev.bool("fullFeaturePattern") {
         match reapply_features(ev, &feats, instances) {
             Ok(()) => return Ok(()),
+            // Aborted (a newer edit): no fallback, stop at once.
+            Err(e) if ev.cancelled() => return Err(e),
             Err(e) => {
                 ev.ctx = before.clone();
                 ev.warnings.truncate(warnings_before);
@@ -760,7 +762,7 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
         Ok(()) => Ok(()),
         // Onshape's own failure (live G45): no re-apply.
         // Live L40: every instance off the part fails too.
-        Err(e) if e.message == SWITCH_TO_PER_INSTANCE || e.message == NO_GEOMETRY_FROM_FEATURES || e.message == NOT_ON_BODY => Err(e),
+        Err(e) if e.message == SWITCH_TO_PER_INSTANCE || e.message == NO_GEOMETRY_FROM_FEATURES || e.message == NOT_ON_BODY || ev.cancelled() => Err(e),
         // Faces our face pattern can't make a tool of (Parasolid's can):
         // the same instances by re-applying the features.
         Err(e) => {
