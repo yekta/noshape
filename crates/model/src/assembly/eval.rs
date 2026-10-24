@@ -12,7 +12,7 @@
 //!   function of its inputs, so it can run on any thread.
 
 use super::solver::{self, DragTarget, Follow, FollowXform, Frame, RelationKind, SolverBody, SolverMate, SolverRelation, TangentFace, TangentGeom, TangentPair};
-use super::{AsmMateConnector, Assembly, ExplodedView, InstanceId, InstanceSource, MateConnectorRef, MateId, MateType, NamedPosition, PatternKind, Placement, Relation, RelationType};
+use super::{AsmMateConnector, Assembly, ExplodedView, InstanceId, InstanceSource, MateConnectorRef, MateId, MateType, MirrorPlacement, NamedPosition, PatternKind, Placement, Relation, RelationType};
 use crate::configuration::ConfigValues;
 use crate::display::{BodyKind, MeshBuffers};
 use crate::document::{Document, TabContent, TabId};
@@ -297,6 +297,9 @@ pub struct Prepared {
     pub failed_connectors: Vec<(MateId, String)>,
     /// Pattern followers (pattern id, failure message).
     pub failed_patterns: Vec<(MateId, String)>,
+    /// Instances to mirror and whether their part is mirror-symmetric (live's
+    /// Mirror strategy "Symmetric" / "Non-symmetric"; [`part_symmetry`]).
+    pub mirror_symmetric: HashMap<InstanceId, bool>,
     /// Flexible subassemblies: (subassembly instance, child) -> (solver body,
     /// child frame in body coordinates). Children fixed in the subassembly
     /// ride on the subassembly instance's body.
@@ -1681,13 +1684,13 @@ impl AssemblyEvaluator {
         // Derived parts and custom features need their sources (qa5 DER8:
         // a Part Studio of derived parts listed nothing in Insert); the
         // sources' versions are part of the cache key.
-        let needs_sources = ps.features.iter().any(|f| f.type_id == "importDerived" || crate::custom::is_custom(&f.type_id));
+        let needs_sources = ps.features.iter().any(|f| crate::features::importing::is_derived(&f.type_id) || crate::custom::is_custom(&f.type_id));
         let opts = match self.studio_options.as_ref().filter(|_| needs_sources) {
             Some(make) => make(doc),
             None => RegenOptions::default(),
         };
         if let Some(p) = &opts.derived {
-            for f in ps.features.iter().filter(|f| f.type_id == "importDerived") {
+            for f in ps.features.iter().filter(|f| crate::features::importing::is_derived(&f.type_id)) {
                 hash = hash.rotate_left(5) ^ p.version(f.params.text("partStudio").trim());
             }
         }
@@ -1789,6 +1792,15 @@ impl AssemblyEvaluator {
     }
 
     /// Drop cache entries for tabs that no longer exist.
+    /// Whether a top-level part instance's part is mirror-symmetric (live's
+    /// Mirror strategy Symmetry column: computed when the instance is listed,
+    /// no mirror plane needed). `None`: not a part instance.
+    pub fn instance_symmetric(&mut self, doc: &Document, asm: &Assembly, id: InstanceId) -> Option<bool> {
+        let InstanceSource::Part { studio, body, config } = &asm.instance(id)?.source else { return None };
+        let regen = self.studio(doc, *studio, config)?;
+        Some(cached_symmetry(&regen, body).iter().any(|s| *s))
+    }
+
     pub fn retain_tabs(&mut self, doc: &Document) {
         self.studios.retain(|(t, _), _| doc.tab(*t).is_some());
         self.mirrored.retain(|(t, _, _, _), _| doc.tab(*t).is_some());
@@ -2602,7 +2614,26 @@ impl AssemblyEvaluator {
                         Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::ZERO, DQuat::from_rotation_z(step * (index & 0x7fff) as f64 * back)))))
                     })
                 }
-                PatternKind::Mirror { plane, .. } => {
+                PatternKind::Mirror { plane, placement, mirrored_studios, .. } => {
+                    // Each seed's part symmetry (live's Symmetry column; Auto
+                    // position uses it).
+                    for seed in &p.seeds {
+                        let sym = leaves.iter().filter(|l| l.path[0] == *seed).find_map(|l| {
+                            let body = l.body.as_ref().or_else(|| l.regen.display.bodies.first().map(|b| &b.id))?;
+                            Some(cached_symmetry(&l.regen, body).iter().any(|s| *s))
+                        });
+                        if let Some(sym) = sym {
+                            prepared.mirror_symmetric.insert(*seed, sym);
+                        }
+                    }
+                    let symmetry_of = |seed: InstanceId| -> [bool; 3] {
+                        leaves
+                            .iter()
+                            .filter(|l| l.path[0] == seed)
+                            .find_map(|l| l.body.as_ref().or_else(|| l.regen.display.bodies.first().map(|b| &b.id)).map(|b| cached_symmetry(&l.regen, b)))
+                            .unwrap_or([false; 3])
+                    };
+                    let placements: HashMap<InstanceId, (MirrorPlacement, [bool; 3])> = p.seeds.iter().map(|s| (*s, (placement.iter().find(|(i, _)| i == s).map(|(_, pl)| *pl).unwrap_or_default(), symmetry_of(*s)))).collect();
                     let (ab, al) = match follow_of(plane) {
                         Ok(x) => x,
                         Err(e) => {
@@ -2613,8 +2644,12 @@ impl AssemblyEvaluator {
                     let n_world = world_of(ab, &al).z();
                     let leaves_ref = &leaves;
                     let stored_ref = &stored;
-                    let reflection_of = |id: InstanceId| match asm.instance(id).map(|i| &i.source) {
+                    // A "-Mirrored" Part Studio's parts are their source's
+                    // mirrored in its YZ plane.
+                    let mirrored_tabs: Vec<_> = mirrored_studios.iter().map(|(_, m)| *m).collect();
+                    let reflection_of = move |id: InstanceId| match asm.instance(id).map(|i| &i.source) {
                         Some(InstanceSource::MirroredPart { point, normal, .. }) => Some((DVec3::from(*point), DVec3::from(*normal))),
+                        Some(InstanceSource::Part { studio, .. }) if mirrored_tabs.contains(studio) => Some((DVec3::ZERO, DVec3::X)),
                         _ => None,
                     };
                     Box::new(move |_, seed, copy| {
@@ -2641,14 +2676,36 @@ impl AssemblyEvaluator {
                         }
                         let center = bb.map(|(a, b)| (a + b) * 0.5).unwrap_or(DVec3::ZERO);
                         let a = n_local.abs();
-                        let axis = if a.x >= a.y && a.x >= a.z {
-                            DVec3::X
+                        let (closest, k) = if a.x >= a.y && a.x >= a.z {
+                            (DVec3::X, 0)
                         } else if a.y >= a.z {
-                            DVec3::Y
+                            (DVec3::Y, 1)
                         } else {
-                            DVec3::Z
+                            (DVec3::Z, 2)
                         };
-                        Some((ab, al, FollowXform::Mirror { local_point: center, local_normal: axis }))
+                        // Live's Placement type (behaviours "skb (10-23 15:30)" (3)):
+                        // Transform is a rigid copy, the reflection completed
+                        // by the part's own plane: "Bounding box XY / YZ / ZX"
+                        // through the bounds' centre, "Origin XY / YZ / ZX"
+                        // through the part origin (an asymmetric L mirrored
+                        // in x got diag(-1, 1, -1) for both XY types). Auto
+                        // position: a symmetry plane of the part (the one
+                        // across the mirror first), so the copy is the true
+                        // mirror image; none: as Bounding box XY (UNCONFIRMED
+                        // beyond live's asymmetric sample).
+                        let (pl, sym) = placements.get(&seed).copied().unwrap_or_default();
+                        let any_sym = sym.iter().position(|s| *s).map(|i| [DVec3::X, DVec3::Y, DVec3::Z][i]);
+                        let (point, axis) = match pl {
+                            MirrorPlacement::Auto if sym[k] => (center, closest),
+                            MirrorPlacement::Auto if any_sym.is_some() => (center, any_sym.unwrap_or(closest)),
+                            MirrorPlacement::Auto | MirrorPlacement::BoxXY => (center, DVec3::Z),
+                            MirrorPlacement::BoxYZ => (center, DVec3::X),
+                            MirrorPlacement::BoxZX => (center, DVec3::Y),
+                            MirrorPlacement::OriginXY => (DVec3::ZERO, DVec3::Z),
+                            MirrorPlacement::OriginYZ => (DVec3::ZERO, DVec3::X),
+                            MirrorPlacement::OriginZX => (DVec3::ZERO, DVec3::Y),
+                        };
+                        Some((ab, al, FollowXform::Mirror { local_point: point, local_normal: axis }))
                     })
                 }
                 // Matched patterns are driven by their generated mates.
@@ -2912,4 +2969,35 @@ fn prefix_paths(n: &mut InstanceNode, id: InstanceId) {
     for c in &mut n.children {
         prefix_paths(c, id);
     }
+}
+
+/// Whether a part is mirror-symmetric about each of its bounding box's
+/// mid-planes (normals X, Y, Z in part coordinates): the part and its mirror
+/// image coincide (the common volume is the part's, to 1e-6).
+pub fn part_symmetry(shape: &noshape_kernel::Shape) -> [bool; 3] {
+    use noshape_kernel::{Plane, Transform};
+    let Ok(bb) = shape.bounding_box(false) else { return [false; 3] };
+    let center = (bb.min + bb.max) * 0.5;
+    let Ok(v) = shape.volume() else { return [false; 3] };
+    if v <= 0.0 {
+        return [false; 3];
+    }
+    [DVec3::X, DVec3::Y, DVec3::Z].map(|n| {
+        let Ok(m) = shape.transformed(&Transform::Mirror(Plane::from_normal(center, n))) else { return false };
+        noshape_kernel::common(shape, &m).ok().and_then(|c| c.shape.volume().ok()).is_some_and(|c| (c / v - 1.0).abs() < 1e-6)
+    })
+}
+
+/// [`part_symmetry`] of a regenerated body, computed once per regeneration.
+fn cached_symmetry(regen: &Arc<RegenResult>, body: &BodyId) -> [bool; 3] {
+    type Cache = Vec<(std::sync::Weak<RegenResult>, BodyId, [bool; 3])>;
+    static CACHE: std::sync::LazyLock<std::sync::Mutex<Cache>> = std::sync::LazyLock::new(Default::default);
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    cache.retain(|(w, _, _)| w.strong_count() > 0);
+    if let Some((_, _, s)) = cache.iter().find(|(w, b, _)| b == body && std::ptr::eq(w.as_ptr(), Arc::as_ptr(regen))) {
+        return *s;
+    }
+    let s = regen.context.body(body).map(|b| part_symmetry(&b.shape)).unwrap_or([false; 3]);
+    cache.push((Arc::downgrade(regen), body.clone(), s));
+    s
 }
