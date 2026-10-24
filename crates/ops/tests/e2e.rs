@@ -1523,6 +1523,78 @@ fn drawing_format_painter_copies_content() {
     assert_eq!(e.param.as_deref(), Some("targets[0]"), "{e:?}");
 }
 
+/// drawing_leader (live drw2 10-21 g, (6)): Add node / Remove node / Add
+/// leader from a node / Delete on a callout's leaders, Add leader and Remove
+/// leaders on a note, as the leader menus do.
+#[test]
+fn drawing_leader_nodes_and_branches() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_leaders.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
+    let top = g["views"].as_array().unwrap().iter().find(|v| v["edges"].as_array().is_some_and(|es| es.iter().any(|e| e["type"] == "circle"))).unwrap().clone();
+    let line = top["edges"].as_array().unwrap().iter().find(|e| e["type"] == "line" && (num(&e["a"][1]) - num(&e["b"][1])).abs() < 1e-6).unwrap().clone();
+    let quarter = [num(&line["a"][0]) * 0.75 + num(&line["b"][0]) * 0.25, num(&line["a"][1]) * 0.75 + num(&line["b"][1]) * 0.25];
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    let leaders_of = |ctx: &mut Ctx, id: u64| -> Vec<Value> {
+        let g = call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+        g["annotations"].as_array().unwrap().iter().find(|a| a["id"] == id).and_then(|a| a["leaders"].as_array().cloned()).unwrap_or_default()
+    };
+    let p2 = |v: &Value| [num(&v[0]), num(&v[1])];
+
+    let c = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": quarter, "position": [40, 250], "text": "7" }))["annotation"].as_u64().unwrap();
+    let l = leaders_of(&mut ctx, c);
+    assert_eq!((l.len(), l[0]["leader"].as_u64()), (1, Some(0)), "{l:?}");
+    // Add node halfway along the leader to the anchor.
+    let path = l[0]["path"].as_array().unwrap();
+    let (s0, s1) = (p2(&path[0]), p2(&path[1]));
+    let mid = [(s0[0] + s1[0]) / 2.0, (s0[1] + s1[1]) / 2.0 + 5.0];
+    call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": c, "action": "add_node", "leader": 0, "at": mid }));
+    assert!(last(&mut ctx).ends_with(":: Add node"));
+    let l = leaders_of(&mut ctx, c);
+    assert_eq!(l[0]["nodes"].as_array().unwrap().len(), 1);
+    let node = p2(&l[0]["nodes"][0]);
+    assert!((node[0] - mid[0]).abs() < 1e-3 && (node[1] - mid[1]).abs() < 1e-3, "{node:?}");
+    // Add leader from that node: the branch starts there.
+    call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": c, "action": "add", "leader": 0, "node": 0, "to": [120, 270] }));
+    assert!(last(&mut ctx).ends_with(":: Add leader"));
+    let l = leaders_of(&mut ctx, c);
+    assert_eq!(l.len(), 2);
+    let b0 = p2(&l[1]["path"][0]);
+    assert!((b0[0] - node[0]).abs() < 1e-3 && (b0[1] - node[1]).abs() < 1e-3, "{b0:?}");
+    // Remove node: the branch starts at the border again.
+    call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": c, "action": "remove_node", "leader": 0, "node": 0 }));
+    assert!(last(&mut ctx).ends_with(":: Remove node"));
+    let l = leaders_of(&mut ctx, c);
+    assert!(l[0]["nodes"].as_array().unwrap().is_empty());
+    assert!((p2(&l[1]["path"][0])[0] - node[0]).abs() > 1e-3);
+    // Delete the leader to the anchor: the callout keeps its added one.
+    call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": c, "action": "delete", "leader": 0 }));
+    assert!(last(&mut ctx).ends_with(":: Delete leader"));
+    let l = leaders_of(&mut ctx, c);
+    assert_eq!((l.len(), l[0]["leader"].as_u64()), (1, Some(1)), "{l:?}");
+
+    // A note: Add leader branches from its landing's bend; Remove leaders.
+    let a0 = [num(&line["a"][0]), num(&line["a"][1])];
+    let n = call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "BREAK EDGES", "position": [300, 250], "leader": a0 }))["annotation"].as_u64().unwrap();
+    call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": n, "action": "add", "to": [350, 200] }));
+    let l = leaders_of(&mut ctx, n);
+    assert_eq!(l.len(), 2);
+    assert_eq!(l[1]["path"][0], l[0]["path"][1], "from the bend");
+    call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": n, "action": "remove_leaders" }));
+    assert!(last(&mut ctx).ends_with(":: Remove leaders"));
+    assert!(leaders_of(&mut ctx, n).is_empty());
+
+    // Errors name the argument.
+    let e = try_call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": c, "action": "delete", "leader": 5 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("leader"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": c, "action": "remove_node", "leader": 1, "node": 0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("node"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_leader", json!({ "drawing": tab, "annotation": 99999, "action": "remove_leaders" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("annotation"), "{e:?}");
+}
+
 #[test]
 fn drawing_inspection_items() {
     let mut ctx = Ctx::new();
@@ -2090,6 +2162,31 @@ fn drawing_insert_view_options() {
     // A detail view with a rectangle profile.
     let det = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": base["id"], "profile": "rectangle", "points": [[90, 140], [110, 160]], "position": [200, 260] }));
     assert_eq!(det["views"].as_array().unwrap().last().unwrap()["kind"], "detail", "{det}");
+    // Child views inherit Show annotations from model (live 3102).
+    assert_eq!(det["views"].as_array().unwrap().last().unwrap()["model_annotations"], false, "{det}");
+    let pr = call(&mut ctx, "drawing_projected_view", json!({ "drawing": tab, "parent": base["id"], "position": [100, 260] }));
+    assert_eq!(pr["views"].as_array().unwrap().last().unwrap()["model_annotations"], false, "{pr}");
+    // A circle detail: move and resize its circle, its label onto a leader
+    // and back (the circle's grips and menu, live asb 10-23 views (2)).
+    let cd = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": base["id"], "center": [100, 150], "radius": 8, "position": [330, 260] }));
+    let did = cd["views"].as_array().unwrap().last().unwrap()["id"].clone();
+    let detail = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"].as_array().unwrap().iter().find(|v| v["id"] == did).unwrap()["detail"].clone();
+    call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "center": [104, 151], "radius": 12 }));
+    let dj = detail(&mut ctx);
+    assert!((num(&dj["center"][0]) - 104.0).abs() < 1e-3 && (num(&dj["center"][1]) - 151.0).abs() < 1e-3 && (num(&dj["radius"]) - 12.0).abs() < 1e-3, "{dj}");
+    assert!(dj["label_at"].is_null());
+    call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "leader": true }));
+    assert!(detail(&mut ctx)["label_at"].is_array());
+    call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "label_at": [130, 180] }));
+    assert_eq!(detail(&mut ctx)["label_at"], json!([130.0, 180.0]));
+    call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "leader": false }));
+    assert!(detail(&mut ctx)["label_at"].is_null());
+    // Edit detail's options.
+    let ed = call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": did, "scale": 3, "label": "Z" }));
+    let dv = ed["views"].as_array().unwrap().iter().find(|v| v["id"] == did).unwrap().clone();
+    assert!((num(&dv["scale"]) - 3.0).abs() < 1e-9, "{dv}");
+    let e = try_call(&mut ctx, "drawing_edit_detail", json!({ "drawing": tab, "view": base["id"], "radius": 5 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": base["id"], "profile": "polygon", "points": [[90, 140], [110, 160]], "position": [200, 260] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("points"));
     let e = try_call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "named_view": "Nope", "position": [200, 60] })).unwrap_err();

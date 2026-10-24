@@ -70,6 +70,11 @@ impl DrawingEditor {
     }
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        // Edit detail (not redrawing its profile): Esc discards it.
+        if self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some()) && !matches!(self.tool, Tool::Detail { .. }) {
+            self.close_detail_edit(false, cx);
+            return;
+        }
         // Rename sheet / Rotation angle: Esc closes them unapplied (live).
         if matches!(self.panel, Some(Panel::SheetName { .. } | Panel::Rotation { .. })) {
             self.panel = None;
@@ -559,6 +564,10 @@ impl DrawingEditor {
         } else if base.is_some() {
             preview = base;
         }
+        // Edit detail: the edited view as the dialog has it.
+        if let Some(d) = self.detail_edit_drawing(cx) {
+            preview = Some(d);
+        }
         overlay.infer.extend(self.infer_lines.iter().cloned());
         for (c, r) in self.centermark_overlay() {
             overlay.circle(c, r, false);
@@ -597,6 +606,10 @@ impl DrawingEditor {
             return;
         }
         if matches!(self.tool, Tool::Detail { .. }) && self.detail_click(cx) {
+            return;
+        }
+        // Edit detail: a redrawn profile stays on the edited view (✓ applies).
+        if matches!(self.tool, Tool::Detail { radius: Some(_), .. }) && self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some()) {
             return;
         }
         if self.weld_click(cx) || self.stack_click(cx) || self.table_dlg_click(cx) || self.custom_dlg_click(cx) || self.table_tool_click(cx) || self.gdt_click(cx) {
@@ -1041,7 +1054,7 @@ impl DrawingEditor {
                 self.set_preview(Some(dr), cx);
             }
             Drag::SelectCells { .. } => self.update_preview(cx),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
             }
@@ -1154,9 +1167,10 @@ impl DrawingEditor {
         let mut xs: Vec<f64> = Vec::new();
         let mut ys: Vec<f64> = Vec::new();
         if let Some(b) = &self.built {
-            let (w, h) = (b.geometry.width, b.geometry.height);
-            xs.extend([10.0, w - 10.0]);
-            ys.extend([10.0, h - 10.0]);
+            // The border frame's sides.
+            let [x0, y0, x1, y1] = self.current_sheet().size.frame_rect();
+            xs.extend([x0, x1]);
+            ys.extend([y0, y1]);
             if let Some(r) = b.title_rect {
                 xs.extend([r[0], r[2]]);
                 ys.extend([r[1], r[3]]);
@@ -1268,7 +1282,7 @@ impl DrawingEditor {
                 }
             }
             Drag::SelectCells { id, start } => self.select_cells_in(id, start, self.cursor, cx),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } => {
+            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } => {
                 let name = match drag {
                     Drag::LeaderBend { .. } => "Move by grip",
                     Drag::MoveTable { .. } => "Move table",
@@ -1397,7 +1411,7 @@ impl DrawingEditor {
         if self.place_paste_table(cx) {
             return;
         }
-        // Exactly on a note leader: the note with that leader selected.
+        // Exactly on a note or callout leader: it, with that leader selected.
         self.leader_sel = None;
         if let Some(crate::drawing_leaders::LeaderHit::Stroke { id, leader, .. } | crate::drawing_leaders::LeaderHit::Node { id, leader, .. }) = self.leader_hit(self.cursor)
             && !m.shift
@@ -1590,10 +1604,15 @@ impl DrawingEditor {
             self.redraw(cx);
         }
         self.menu_at = self.local(position);
-        // Exactly on a note leader: its own menu (live drw2 10-21 g (3), (4)).
-        let entries = match self.leader_hit(self.cursor) {
-            Some(hit) => self.leader_entries(hit, cx),
-            None => self.context_entries(sel, cx),
+        // Exactly on a note or callout leader: its own menu (live drw2 10-21
+        // g (3), (4), (6)).
+        // On a detail view's circle in its parent: the circle's menu (live
+        // asb 10-23 views (2)).
+        let circle = pick.and_then(|p| self.built.as_ref()?.picks.get(p as usize).cloned()).and_then(|t| if let PickTarget::DetailCircle(v) = t { Some(v) } else { None });
+        let entries = match (self.leader_hit(self.cursor), circle) {
+            (Some(hit), _) => self.leader_entries(hit, cx),
+            (None, Some(v)) => self.detail_circle_entries(v, cx),
+            (None, None) => self.context_entries(sel, cx),
         };
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).

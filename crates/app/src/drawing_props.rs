@@ -288,6 +288,10 @@ impl DrawingEditor {
         if matches!(v.kind, ViewKind::Auxiliary { .. }) {
             edits.push(MenuEntry::item("Edit auxiliary view...", move |t, w, cx| t.edit_aux_view(id, w, cx)));
         }
+        // Live asb 10-23 views (1): "Edit detail..." reopens the Detail view panel.
+        if matches!(v.kind, ViewKind::Detail { .. }) {
+            edits.push(MenuEntry::item("Edit detail...", move |t, w, cx| t.open_detail_edit(id, w, cx)));
+        }
         if v.crop.is_some() {
             // Live 5671-5677: "Edit crop..." reopens the Crop view dialog.
             edits.push(MenuEntry::item("Edit crop...", move |t, _, cx| t.edit_crop(id, cx)));

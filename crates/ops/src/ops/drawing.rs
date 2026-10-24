@@ -285,6 +285,22 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(p) = sheet.parent_of(v.id) {
                 j["parent"] = json!(p.0);
             }
+            // Show annotations from model (child views inherit it).
+            if !v.model_annotations {
+                j["model_annotations"] = json!(false);
+            }
+            // A detail view's circle in its parent (sheet mm) and its label
+            // on a leader (drawing_edit_detail).
+            if let ViewKind::Detail { parent, center, radius, .. } = &v.kind
+                && let Some(ppl) = m.built.as_ref().and_then(|b| b.placement(*parent))
+            {
+                let c = ppl.to_sheet(*center);
+                let mut d = json!({ "center": pt(c), "radius": ppl.len_to_sheet(*radius) });
+                if let Some(o) = v.detail_label_at {
+                    d["label_at"] = pt([c[0] + o[0], c[1] + o[1]]);
+                }
+                j["detail"] = d;
+            }
             // What the view shows: a base view's orientation, a projected
             // view's side of its parent.
             match &v.kind {
@@ -302,9 +318,6 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                     }
                     if v.sketch_appearances {
                         j["sketch_appearances"] = json!(true);
-                    }
-                    if !v.model_annotations {
-                        j["model_annotations"] = json!(false);
                     }
                     if let Some(s) = v.simplification.filter(|s| *s != noshape_model::drawing::Simplification::Auto) {
                         j["simplification"] = json!(format!("{s:?}"));
@@ -413,6 +426,12 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             }
             if let Some(n) = a.inspection {
                 j["inspection"] = json!(n);
+            }
+            // Note and callout leaders as drawn (drawing_leader's indices):
+            // the path from the annotation through the nodes to the target.
+            let paths = noshape_scene::drawing_tools::leaders::leader_paths(m.built.as_deref(), a);
+            if !paths.is_empty() {
+                j["leaders"] = json!(paths.iter().map(|(i, p)| json!({ "leader": i, "path": p.points.iter().map(|q| pt(*q)).collect::<Vec<_>>(), "nodes": p.points[p.head..p.points.len() - 1].iter().map(|q| pt(*q)).collect::<Vec<_>>() })).collect::<Vec<_>>());
             }
             j
         })

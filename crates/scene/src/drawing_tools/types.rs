@@ -255,6 +255,11 @@ pub enum Drag {
     MoveSectionLine { view: ViewId, start: [f64; 2], orig: ViewKind },
     /// Move a detail view's circle in its parent.
     MoveDetailCircle { view: ViewId, start: [f64; 2], orig: [f64; 2] },
+    /// Resize a detail view's circle by its grip (live asbv-9).
+    ResizeDetailCircle { view: ViewId },
+    /// Move a detail circle's label on its leader (`orig`: its
+    /// `detail_label_at`).
+    MoveDetailLabel { view: ViewId, start: [f64; 2], orig: [f64; 2] },
     /// Drag a snap point of an auxiliary view's reference indicator (0 / 1
     /// an end, 2 the middle).
     AuxIndicator { view: ViewId, grip: usize, orig: noshape_model::drawing::AuxRef },

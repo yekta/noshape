@@ -1066,8 +1066,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         if in_block {
             l.pick = tb;
         }
-        // Formats layers and colors: border frame, zones (sheet edge,
-        // dividers), title block.
+        // Formats layers and colors: border frame, zones (dividers), title
+        // block.
         let layer = if in_block { SheetLayer::TitleBlock } else if l.style == LineStyle::Border { SheetLayer::BorderFrame } else { SheetLayer::BorderZones };
         g.layers.push(LayerSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer });
         if let Some(rgb) = layer.color(fp) {

@@ -94,15 +94,14 @@ impl SheetSize {
     }
 
     /// Horizontal x vertical zones of Onshape's template for this size
-    /// (live drawing/09 ANSI A 2 x 2, drawing/156 ISO A3 6 x 4, drawing/560
-    /// A0 16 x 12, A1 12 x 8, A2 8 x 6; ISO A4 has none); custom sizes get
-    /// zones about 66 mm wide.
+    /// (live asb 10-24 "template frames", samples/tpl-*.dxf: ANSI A 2 x 2,
+    /// B and C 4 x 4, D 8 x 8; ISO / JIS A3 6 x 4, A2 8 x 6, A1 12 x 8, A0
+    /// 16 x 12, A4 none); custom sizes get zones about 66 mm wide.
     pub fn standard_zones(self) -> [u32; 2] {
         match self {
             SheetSize::AnsiA | SheetSize::AnsiAPortrait => [2, 2],
-            SheetSize::AnsiB => [4, 2],
-            SheetSize::AnsiC => [4, 4],
-            SheetSize::AnsiD | SheetSize::AnsiE => [8, 4],
+            SheetSize::AnsiB | SheetSize::AnsiC => [4, 4],
+            SheetSize::AnsiD | SheetSize::AnsiE => [8, 8],
             SheetSize::A4 | SheetSize::A4Portrait => [0, 0],
             SheetSize::A3 => [6, 4],
             SheetSize::A2 => [8, 6],
@@ -112,6 +111,57 @@ impl SheetSize {
                 let (w, h) = self.size_mm();
                 [((w - 20.0) / 66.0).round().max(2.0) as u32, ((h - 20.0) / 66.0).round().max(2.0) as u32]
             }
+        }
+    }
+}
+
+impl SheetSize {
+    /// The frame's inset at the bottom and top (mm) in Onshape's templates
+    /// (live asb 10-24 "template frames"): ANSI A 0.38 in, B 0.5 in, C
+    /// 0.62 in, D 0.75 in; ISO / JIS A4..A2 10 mm, A1 and A0 20 mm.
+    pub fn frame_margin(self) -> f64 {
+        match self {
+            SheetSize::AnsiA | SheetSize::AnsiAPortrait => 0.38 * 25.4,
+            SheetSize::AnsiB => 0.5 * 25.4,
+            SheetSize::AnsiC => 0.62 * 25.4,
+            SheetSize::AnsiD | SheetSize::AnsiE => 0.75 * 25.4,
+            SheetSize::A1 | SheetSize::A0 => 20.0,
+            SheetSize::A4 | SheetSize::A4Portrait | SheetSize::A3 | SheetSize::A2 | SheetSize::Custom { .. } => 10.0,
+        }
+    }
+
+    /// The border frame [x0, y0, x1, y1] (mm): `frame_margin` m at the
+    /// bottom and top, 1.05 m at the left and 0.95 m at the right (live's
+    /// templates sit 0.05 m right of centre); A4 runs from 20 mm to the
+    /// right edge (live ISO_A4 / JIS_A4, portrait too).
+    pub fn frame_rect(self) -> [f64; 4] {
+        let (w, h) = self.size_mm();
+        let m = self.frame_margin();
+        match self {
+            SheetSize::A4 | SheetSize::A4Portrait => [20.0, m, w, h - m],
+            SheetSize::Custom { .. } => [m, m, w - m, h - m],
+            _ => [1.05 * m, m, w - 0.95 * m, h - m],
+        }
+    }
+
+    /// The Onshape title block's height (mm; live: 1.5 in on ANSI A / ISO
+    /// A4, 2 in on B, C, A3, A2, 2.5 in on D, A1, A0; everything in it
+    /// scales with it).
+    pub fn title_block_height(self) -> f64 {
+        match self {
+            SheetSize::AnsiB | SheetSize::AnsiC | SheetSize::A3 | SheetSize::A2 => 50.8,
+            SheetSize::AnsiD | SheetSize::AnsiE | SheetSize::A1 | SheetSize::A0 => 63.5,
+            _ => 38.1,
+        }
+    }
+
+    /// Zone label height (mm; live: ANSI A 0.18 in, B..D 0.24 in, ISO / JIS
+    /// 6 mm).
+    pub fn zone_label_height(self) -> f64 {
+        match self {
+            SheetSize::AnsiA | SheetSize::AnsiAPortrait => 0.18 * 25.4,
+            s if s.is_ansi() => 0.24 * 25.4,
+            _ => 6.0,
         }
     }
 }
@@ -888,6 +938,44 @@ pub fn remove_leader(leaders: &mut Vec<Leader>, leader: usize) {
             LeaderStart::Node(j, n) => LeaderStart::Node(shift(j), n),
             s => s,
         };
+    }
+}
+
+impl CalloutStyle {
+    /// The callout's leaders as one list: 0 = the leader to `anchor` in
+    /// `view` (with [`CalloutStyle::nodes`]), then the added ones.
+    pub fn all_leaders(&self, view: ViewId, anchor: [f64; 2]) -> Vec<Leader> {
+        let main = Leader { view: Some(view), point: anchor, nodes: self.nodes.clone(), ..Default::default() };
+        std::iter::once(main).chain(self.leaders.iter().cloned()).collect()
+    }
+
+    /// Store `all` (as [`CalloutStyle::all_leaders`]) back: entry 0's nodes,
+    /// the rest as the added leaders.
+    pub fn set_all_leaders(&mut self, mut all: Vec<Leader>) {
+        if all.is_empty() {
+            return;
+        }
+        self.nodes = std::mem::take(&mut all[0].nodes);
+        self.leaders = all.split_off(1);
+    }
+
+    /// Delete leader `leader` of [`CalloutStyle::all_leaders`]: 0 leaves the
+    /// callout in space (its branches start at the border).
+    pub fn remove_leader(&mut self, leader: usize, view: ViewId, anchor: [f64; 2]) {
+        let mut all = self.all_leaders(view, anchor);
+        if leader == 0 {
+            self.free = true;
+            all[0].nodes.clear();
+            for b in all.iter_mut() {
+                if matches!(b.start, LeaderStart::Bend(0) | LeaderStart::Node(0, _)) {
+                    b.start = LeaderStart::Side;
+                }
+            }
+        } else {
+            remove_leader(&mut all, leader);
+            // Indices past the removed one moved down; 0 stays the main one.
+        }
+        self.set_all_leaders(all);
     }
 }
 
@@ -2883,7 +2971,12 @@ pub struct CalloutStyle {
     /// Stacked callouts (Add stacked callouts), in order.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub stacked: Vec<StackedCallout>,
-    /// Leaders added with Add leader (arrows).
+    /// Bend nodes of the leader to the anchor (sheet mm; Add node, live
+    /// drw2 10-21 g (6)).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<[f64; 2]>,
+    /// Leaders added with Add leader (arrows). Their `start` indexes
+    /// [`CalloutStyle::all_leaders`] (0 = the leader to the anchor).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub leaders: Vec<Leader>,
     /// The part clicked when the anchor has no point reference (an edge
@@ -2904,7 +2997,7 @@ pub struct StackedCallout {
 
 impl Default for CalloutStyle {
     fn default() -> Self {
-        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new(), leaders: Vec::new(), part: None }
+        Self { above: String::new(), below: String::new(), left: String::new(), right: String::new(), border: CalloutBorder::Circle, chars: 2, on_face: false, free: false, height: None, stacked: Vec::new(), nodes: Vec::new(), leaders: Vec::new(), part: None }
     }
 }
 
@@ -3476,6 +3569,7 @@ pub mod build;
 pub mod clipboard;
 pub mod create;
 mod cad_dimstyles;
+pub mod shx;
 pub mod cad_export;
 pub mod cad_fit;
 pub mod cad_layers;

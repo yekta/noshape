@@ -1195,6 +1195,17 @@ impl DrawingEditor {
             }
             PickTarget::DetailCircle(v) => {
                 self.selection = vec![Sel::View(v)];
+                // Live asbv-8/9/10: the grip on the circle resizes it, the rest
+                // moves it.
+                if self.detail_grip(v).is_some_and(|(_, _, g)| (g[0] - start[0]).hypot(g[1] - start[1]) < self.tol_mm(5.0)) {
+                    return Some(Drag::ResizeDetailCircle { view: v });
+                }
+                // The label on its leader (Add leader) drags on its own.
+                if let (Some(o), Some((c, _, _))) = (sheet.view(v)?.detail_label_at, self.detail_grip_any(v))
+                    && (c[0] + o[0] - start[0]).hypot(c[1] + o[1] - start[1]) < self.tol_mm(14.0)
+                {
+                    return Some(Drag::MoveDetailLabel { view: v, start, orig: o });
+                }
                 match sheet.view(v)?.kind {
                     ViewKind::Detail { center, .. } => Some(Drag::MoveDetailCircle { view: v, start, orig: center }),
                     _ => None,
@@ -1378,6 +1389,20 @@ impl DrawingEditor {
                 let dv = sub(ppl.to_view(c), ppl.to_view(*start));
                 if let Some(ViewKind::Detail { center, .. }) = sheet.view_mut(*view).map(|v| &mut v.kind) {
                     *center = add(*orig, dv);
+                }
+            }
+            Drag::MoveDetailLabel { view, start, orig } => {
+                if let Some(x) = sheet.view_mut(*view) {
+                    x.detail_label_at = Some(add(*orig, sub(c, *start)));
+                }
+            }
+            Drag::ResizeDetailCircle { view } => {
+                // The radius follows the pointer; the detail view grows with it.
+                let Some(parent) = sheet.parent_of(*view) else { return };
+                let Some(ppl) = self.placement(parent) else { return };
+                let p = ppl.to_view(c);
+                if let Some(ViewKind::Detail { center, radius, .. }) = sheet.view_mut(*view).map(|v| &mut v.kind) {
+                    *radius = (p[0] - center[0]).hypot(p[1] - center[1]).max(1e-4);
                 }
             }
             _ => return,

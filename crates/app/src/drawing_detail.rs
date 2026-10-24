@@ -36,6 +36,9 @@ pub struct DetailDlg {
     /// Esc pressed before the profile: the next click picks an existing
     /// closed sketch region as the profile.
     pub pick_region: bool,
+    /// Edit detail... (live asb 10-23 views (1)): the detail view being
+    /// edited; ✓ applies the dialog to it, ✕ discards.
+    pub edit: Option<ViewId>,
 }
 
 const SHAPES: [(&str, &str); 4] = [("Circle", "circle"), ("Rectangle", "corner-rectangle"), ("Spline", "spline"), ("Polygon", "polyline")];
@@ -50,9 +53,9 @@ impl DrawingEditor {
             (false, true) => {
                 let next = self.current_sheet().next_label();
                 let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(next));
-                self.detail_dlg = Some(DetailDlg { shape: 0, pts: Vec::new(), view: None, profile: None, scale: None, label, style: self.drawing.props.view_tab.detail_style, show_profile: self.drawing.props.view_tab.detail_show_profile, clip_border: self.drawing.props.view_tab.detail_clip_border, pick_region: false });
+                self.detail_dlg = Some(DetailDlg { shape: 0, pts: Vec::new(), view: None, profile: None, scale: None, label, style: self.drawing.props.view_tab.detail_style, show_profile: self.drawing.props.view_tab.detail_show_profile, clip_border: self.drawing.props.view_tab.detail_clip_border, pick_region: false, edit: None });
             }
-            (true, false) => self.detail_dlg = None,
+            (true, false) if self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_none()) => self.detail_dlg = None,
             _ => {}
         }
         if let Some(d) = &self.detail_dlg {
@@ -152,6 +155,149 @@ impl DrawingEditor {
         true
     }
 
+    /// Edit detail... on a detail view or its circle: the Detail view panel
+    /// with the view's values (live asb 10-23 views (1)). Picking a profile
+    /// tool and drawing a new profile replaces it.
+    pub fn open_detail_edit(&mut self, id: ViewId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(v) = self.current_sheet().view(id).cloned() else { return };
+        let noshape_model::drawing::ViewKind::Detail { parent, label: text, .. } = &v.kind else { return };
+        let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text.clone()));
+        let profile = v.detail_profile.clone().filter(|p| p.len() >= 3);
+        self.cancel(cx);
+        self.tool = Tool::Select;
+        self.detail_dlg = Some(DetailDlg { shape: if profile.is_some() { 3 } else { 0 }, pts: Vec::new(), view: Some(*parent), profile, scale: v.scale, label, style: v.detail_style, show_profile: !v.detail_hide_profile, clip_border: v.detail_clip_border, pick_region: false, edit: Some(id) });
+        self.selection = vec![Sel::View(id)];
+        self.update_preview(cx);
+        cx.notify();
+    }
+
+    /// The drawing with the edited detail view as the dialog has it (None
+    /// when not editing).
+    pub fn detail_edit_drawing(&self, cx: &App) -> Option<noshape_model::drawing::Drawing> {
+        let d = self.detail_dlg.as_ref()?;
+        let id = d.edit?;
+        let mut dr = self.drawing.clone();
+        let v = dr.sheets.get_mut(self.sheet)?.view_mut(id)?;
+        let noshape_model::drawing::ViewKind::Detail { parent, center, radius, label } = &mut v.kind else { return None };
+        // A newly drawn profile (or circle) on the same parent replaces the old one.
+        if let Tool::Detail { parent: Some(p), center: Some(c), radius: Some(r) } = &self.tool
+            && p == parent
+        {
+            *center = *c;
+            *radius = *r;
+            v.detail_profile = d.profile.clone().filter(|_| d.shape != 0);
+        }
+        let text = d.label.read(cx).value().trim().to_string();
+        if !text.is_empty() {
+            *label = text;
+        }
+        if let Some(s) = d.scale {
+            v.scale = Some(s);
+        }
+        v.detail_style = d.style;
+        v.detail_hide_profile = !d.show_profile;
+        v.detail_clip_border = d.clip_border;
+        Some(dr)
+    }
+
+    /// ✓ (Edit detail): apply the dialog to the view; ✕ discards.
+    pub fn close_detail_edit(&mut self, ok: bool, cx: &mut Context<Self>) {
+        let edited = if ok { self.detail_edit_drawing(cx) } else { None };
+        self.detail_dlg = None;
+        self.tool = Tool::Select;
+        self.set_preview(None, cx);
+        if let Some(dr) = edited {
+            let s = dr.sheets[self.sheet].clone();
+            self.edit_sheet("Edit detail view", cx, |x| *x = s);
+        }
+        cx.notify();
+    }
+
+    /// Detail view `v`'s circle in its parent (sheet mm: centre, radius)
+    /// and its resize grip (live asbv-8: on the circle's right); None for a
+    /// rectangle / spline / polygon profile.
+    pub fn detail_grip(&self, v: ViewId) -> Option<([f64; 2], f64, [f64; 2])> {
+        if self.current_sheet().view(v)?.detail_profile.as_ref().is_some_and(|p| p.len() >= 3) {
+            return None;
+        }
+        self.detail_grip_any(v)
+    }
+
+    /// A selected or hovered detail view's circle (live asbv-7/8/14/15):
+    /// dashed, light blue #90CEF1 while the view is selected and tan #CCB292
+    /// on hover, with the resize arrows beside the grip, the grip an orange
+    /// dot and the centre a blue one.
+    pub fn detail_circle_overlay(&self, o: &mut crate::drawing_scene::Overlay) {
+        const BLUE: [u8; 4] = [144, 206, 241, 255];
+        const TAN: [u8; 4] = [204, 178, 146, 255];
+        const ORANGE: [u8; 4] = [204, 146, 92, 255];
+        const CENTRE: [u8; 4] = [0, 136, 204, 255];
+        let hovered = self.hover.and_then(|h| self.sel_of_pick(h));
+        for v in self.current_sheet().views.iter().filter(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Detail { .. })) {
+            let selected = self.selection.contains(&Sel::View(v.id));
+            if !selected && hovered != Some(Sel::View(v.id)) {
+                continue;
+            }
+            let Some((c, r, g)) = self.detail_grip(v.id) else { continue };
+            let color = if selected { BLUE } else { TAN };
+            let at = |a: f64| [c[0] + r * a.cos(), c[1] + r * a.sin()];
+            let n = 64;
+            // Live draws the circle itself dashed: the gaps hide the solid one.
+            for i in 0..n {
+                let (a0, a1) = (i as f64 / n as f64 * std::f64::consts::TAU, (i + 1) as f64 / n as f64 * std::f64::consts::TAU);
+                let ink = if i % 2 == 0 { (color, 1.5) } else { ([255, 255, 255, 255], 2.5) };
+                o.tinted.push((vec![at(a0), at(a1)], ink.0, ink.1));
+            }
+            // The resize arrows: one each side of the grip, along the circle.
+            let len = self.tol_mm(9.0);
+            for s in [1.0f64, -1.0] {
+                let tip = at(s * 0.35);
+                let back = at(s * (0.35 + len / r.max(1e-9)));
+                let d = [tip[0] - back[0], tip[1] - back[1]];
+                let w = [-d[1] * 0.35, d[0] * 0.35];
+                o.tinted.push((vec![tip, [back[0] + w[0], back[1] + w[1]], [back[0] - w[0], back[1] - w[1]], tip], color, 1.5));
+            }
+            o.dots.push((g, ORANGE));
+            o.dots.push((c, CENTRE));
+        }
+    }
+
+    /// Right-click on a detail circle (live asb 10-23 views (2)): Paste,
+    /// Paste as table, Add leader (the label onto a leader with an arrow to
+    /// the circle), Edit detail..., Clear selection, Zoom to fit, Delete.
+    pub fn detail_circle_entries(&self, v: ViewId, cx: &App) -> Vec<MenuEntry> {
+        let mut out: Vec<MenuEntry> = crate::drawing_props::paste_entry(cx).into_iter().collect();
+        out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+            t.start_paste_table(cx);
+        }));
+        let leader = self.current_sheet().view(v).is_some_and(|x| x.detail_style == 2 || x.detail_label_at.is_some());
+        if !leader && let Some((_, r, _)) = self.detail_grip_any(v) {
+            let d = r * std::f64::consts::FRAC_1_SQRT_2;
+            out.push(MenuEntry::item("Add leader", move |t, _, cx| t.edit_view("Add leader", v, cx, |x| x.detail_label_at = Some([d + 12.0, d + 10.0]))));
+        }
+        out.push(MenuEntry::item("Edit detail...", move |t, w, cx| t.open_detail_edit(v, w, cx)));
+        out.push(MenuEntry::Separator);
+        out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+            t.selection.clear();
+            t.redraw(cx);
+        }));
+        out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+        out.push(MenuEntry::item("Delete", move |t, _, cx| {
+            t.selection = vec![Sel::View(v)];
+            t.delete_selection(cx);
+        }));
+        out
+    }
+
+    /// A detail view's circle (centre, radius, grip) whatever its profile.
+    pub fn detail_grip_any(&self, v: ViewId) -> Option<([f64; 2], f64, [f64; 2])> {
+        let view = self.current_sheet().view(v)?;
+        let noshape_model::drawing::ViewKind::Detail { parent, center, radius, .. } = &view.kind else { return None };
+        let ppl = self.placement(*parent)?;
+        let (c, r) = (ppl.to_sheet(*center), ppl.len_to_sheet(*radius));
+        Some((c, r, [c[0] + r, c[1]]))
+    }
+
     /// The profile in progress.
     pub fn detail_overlay(&self, overlay: &mut crate::drawing_scene::Overlay) {
         let Some(d) = &self.detail_dlg else { return };
@@ -175,7 +321,7 @@ impl DrawingEditor {
     pub fn render_detail_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.detail_dlg.as_ref()?;
         let pal = p();
-        let (shape, style, show, clip, scale) = (d.shape, d.style, d.show_profile, d.clip_border, d.scale);
+        let (shape, style, show, clip, scale, editing) = (d.shape, d.style, d.show_profile, d.clip_border, d.scale, d.edit.is_some());
         let ed = cx.entity();
         // Parent scale for the default (twice the parent's).
         let parent_scale = match &self.tool {
@@ -185,7 +331,7 @@ impl DrawingEditor {
         let fmt = |s: f64| noshape_model::drawing::sheet::format_scale(s);
         // Live 127 / 132 / 604: the scale is blank until the profile exists
         // (a circle, or a rectangle / spline / polygon profile).
-        let placed = matches!(self.tool, Tool::Detail { radius: Some(_), .. }) || d.profile.is_some();
+        let placed = matches!(self.tool, Tool::Detail { radius: Some(_), .. }) || d.profile.is_some() || (editing && !matches!(self.tool, Tool::Detail { .. }));
         let current = scale.or(placed.then_some(parent_scale * 2.0));
         let shown = current.map(fmt).unwrap_or_default();
         let ed2 = ed.clone();
@@ -284,6 +430,9 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Detail view"))
+                        // ✓ (live asbv-5: green rgb(0,149,0)): applies Edit detail;
+                        // pale while creating (the click on the sheet places).
+                        .child(div().id("det-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!editing, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::ui::glyph("check", 18., gpui_kit::white())).when(editing, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_detail_edit(true, cx)))))
                         .child(
                             div()
                                 .id("det-cancel")
@@ -294,7 +443,7 @@ impl DrawingEditor {
                                 .justify_center()
                                 .cursor_pointer()
                                 .child(crate::drawing_chrome::cancel_x(cx))
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel(cx))),
+                                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| if editing { this.close_detail_edit(false, cx) } else { this.cancel(cx) })),
                         ),
                 )
                 .child(tools)
@@ -303,7 +452,10 @@ impl DrawingEditor {
                 // rectangle / closed profile / closed polygon until the profile
                 // exists, then "Profile created" (`#dbf1fa`, 1 px `#1b5faa`,
                 // radius 2, 12 px `#616b73`).
-                .child(div().mx(px(3.)).mt(px(1.)).mb(px(2.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(if placed {
+                .child(div().mx(px(3.)).mt(px(1.)).mb(px(2.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(if editing && !matches!(self.tool, Tool::Detail { .. }) {
+                    // Edit detail (live asbv-5): the profile as a "Profile" chip.
+                    "Profile"
+                } else if placed {
                     "Profile created"
                 } else {
                     match shape {

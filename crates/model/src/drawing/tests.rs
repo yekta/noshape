@@ -1525,6 +1525,47 @@ fn jogged_extension_lines_and_broken_dimensions() {
     assert_eq!(g.grips.iter().filter(|gr| gr.pick == 1 && gr.kind == GripKind::Jog).count(), 2);
 }
 
+/// Live asb 10-24 "template frames" (samples/tpl-ISO_A3.dxf,
+/// tpl-ANSI_A_MM.dxf, tpl-ISO_A4.dxf): frame, zone dividers and labels and
+/// the title block where Onshape's templates have them; nothing at the
+/// sheet edge.
+#[test]
+fn template_frames_and_zones_match_lives() {
+    let geom = |size: SheetSize, style: TitleBlockStyle| {
+        let s = Sheet { size, title_style: style, ..Default::default() };
+        let (w, h) = size.size_mm();
+        let mut g = sheet::SheetGeometry::new(w, h);
+        g.add_border_and_title(&s);
+        (g, sheet::title_block_rect(&s).unwrap())
+    };
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-3 && (a[1] - b[1]).abs() < 1e-3;
+    let has_line = |g: &sheet::SheetGeometry, a: [f64; 2], b: [f64; 2]| g.lines.iter().any(|l| l.points.len() == 2 && ((near(l.points[0], a) && near(l.points[1], b)) || (near(l.points[0], b) && near(l.points[1], a))));
+    let label = |g: &sheet::SheetGeometry, t: &str, p: [f64; 2]| g.texts.iter().any(|x| x.text == t && near(x.pos, p));
+    let rect4 = |r: [f64; 4], e: [f64; 4]| r.iter().zip(e).all(|(a, b)| (a - b).abs() < 1e-3);
+    // ISO A3: whole-millimetre zones, columns 0.5 mm right.
+    let (g, tb) = geom(SheetSize::A3, TitleBlockStyle::Iso);
+    assert!(rect4(SheetSize::A3.frame_rect(), [10.5, 10.0, 410.5, 287.0]));
+    assert!(has_line(&g, [70.5, 10.0], [70.5, 0.5]) && has_line(&g, [350.5, 287.0], [350.5, 296.5]));
+    assert!(has_line(&g, [10.5, 74.5], [1.0, 74.5]) && has_line(&g, [410.5, 222.5], [420.0, 222.5]));
+    assert!(label(&g, "6", [35.5, 5.0]) && label(&g, "1", [385.5, 292.0]) && label(&g, "A", [5.5, 37.5]) && label(&g, "D", [415.5, 259.5]));
+    assert!(g.texts.iter().filter(|x| x.text == "A" && x.height == 6.0).count() == 2);
+    assert!(rect4(tb, [194.6, 10.0, 410.5, 60.8]), "{tb:?}");
+    assert!(!has_line(&g, [0.0, 0.0], [420.0, 0.0]) && !g.lines.iter().any(|l| l.closed && l.points.iter().any(|p| near(*p, [0.0, 0.0]))), "no sheet-edge line");
+    // ANSI A (mm): exact halves, labels 0.18 in.
+    let (g, tb) = geom(SheetSize::AnsiA, TitleBlockStyle::Ansi);
+    assert!(rect4(SheetSize::AnsiA.frame_rect(), [10.1346, 9.652, 270.2306, 206.248]));
+    assert!(has_line(&g, [140.1826, 9.652], [140.1826, 0.4826]) && has_line(&g, [270.2306, 107.95], [279.4, 107.95]) && has_line(&g, [10.1346, 107.95], [0.9652, 107.95]));
+    assert!(label(&g, "1", [210.0326, 4.826]) && label(&g, "2", [70.3326, 211.074]) && label(&g, "A", [5.3086, 53.975]) && label(&g, "B", [275.0566, 161.925]));
+    assert!(rect4(tb, [115.9256, 9.652, 270.2306, 47.752]), "{tb:?}");
+    // ANSI D: 8 x 8, a 2.5 in block; ISO A4: frame to the right edge, no zones.
+    assert_eq!(SheetSize::AnsiD.standard_zones(), [8, 8]);
+    let (_, tb) = geom(SheetSize::AnsiD, TitleBlockStyle::Ansi);
+    assert!(rect4(tb, [588.3275, 19.05, 845.5025, 82.55]), "{tb:?}");
+    let (g, tb) = geom(SheetSize::A4, TitleBlockStyle::Iso);
+    assert!(rect4(SheetSize::A4.frame_rect(), [20.0, 10.0, 297.0, 200.0]) && rect4(tb, [135.075, 10.0, 297.0, 48.1]));
+    assert!(!g.texts.iter().any(|x| x.text == "A" && x.height == 6.0));
+}
+
 #[test]
 fn custom_template_border_zones_and_units() {
     use super::templates::{DrawingTemplate, apply_template};
@@ -1538,7 +1579,7 @@ fn custom_template_border_zones_and_units() {
     };
     let mut s = Sheet { size: SheetSize::AnsiB, title_style: TitleBlockStyle::None, ..Default::default() };
     let (left, top, lines) = zone_texts(&s);
-    // ANSI B: 4 x 2, numbered from the right, lettered from the bottom.
+    // ANSI B: 4 x 4, numbered from the right, lettered from the bottom.
     assert_eq!(top.len(), 4);
     assert_eq!(top.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "4");
     assert_eq!(left.iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap().1, "A");
@@ -2311,6 +2352,44 @@ fn child_view_scale_follows_parent_or_sheet() {
     assert_eq!(views::view_scale(sheet, child), 0.5);
 }
 
+/// Live drw2 10-21 g (6): a callout's leaders take nodes and branches like
+/// a note's; deleting the leader to the anchor leaves it in space.
+#[test]
+fn callout_leaders_take_nodes_and_branches() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let mut kind = AnnotationKind::balloon(ViewId(1), [0.1, 0.05], "1");
+    if let AnnotationKind::Balloon { callout, .. } = &mut kind {
+        callout.nodes = vec![[120.0, 60.0]];
+        callout.leaders = vec![Leader { point: [200.0, 60.0], start: LeaderStart::Node(0, 0), ..Default::default() }];
+    }
+    let mut s = Sheet { annotations: vec![Annotation { id: 7, kind, position: [150.0, 120.0], ..Default::default() }], ..Default::default() };
+    let paths = |s: &Sheet| {
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(s, &env);
+        g.leader_paths.into_iter().map(|(id, i, p)| (id, i, p.points)).collect::<Vec<_>>()
+    };
+    let p = paths(&s);
+    assert_eq!(p.len(), 2);
+    // From the border towards the node, through it, to the anchor.
+    let (id, i, main) = &p[0];
+    assert_eq!((*id, *i, main.len()), (7, 0, 3));
+    assert_eq!(&main[1..], &[[120.0, 60.0], [100.0, 50.0]]);
+    let (d, n) = ([main[0][0] - 150.0, main[0][1] - 120.0], [120.0 - 150.0, 60.0 - 120.0]);
+    assert!((d[0] * n[1] - d[1] * n[0]).abs() < 1e-6 && d[0] * n[0] + d[1] * n[1] > 0.0, "on the line to the node");
+    // The branch starts at that node.
+    assert_eq!(p[1], (7, 1, vec![[120.0, 60.0], [200.0, 60.0]]));
+    // Deleting the main leader: no leader to the anchor, the branch starts
+    // at the border.
+    if let AnnotationKind::Balloon { view, anchor, callout, .. } = &mut s.annotations[0].kind {
+        callout.remove_leader(0, *view, *anchor);
+        assert!(callout.free && callout.nodes.is_empty() && callout.leaders[0].start == LeaderStart::Side);
+    }
+    let p = paths(&s);
+    assert_eq!(p.len(), 1);
+    assert_eq!((p[0].1, p[0].2.len(), p[0].2[1]), (1, 2, [200.0, 60.0]));
+}
+
 /// Live drw2 10-21 g: a note leader's landing and side, branches off its
 /// bend and nodes, and node / leader removal keeping the branches.
 #[test]
@@ -2379,6 +2458,51 @@ fn hole_callout_dual_block_like_onshape() {
 /// Live samples/asb-dual-2018: with dual dimensions each DIMENSION's text
 /// override is "[]\P<>" (the alternate units, then the value) and its block
 /// holds one MTEXT "\A1;[…]\P…"; angular dimensions have no dual.
+/// Gate v0.4.8 (f), live asbdd-20: a linear dual dimension's line breaks
+/// around the two-line text block (DIMGAP from the ink, ANSI and ISO, Top
+/// and Bottom, horizontal and vertical); a single value keeps it whole.
+#[test]
+fn dual_dimension_line_breaks_around_the_text() {
+    use super::format::DimText;
+    for iso in [false, true] {
+        for below in [false, true] {
+            for vertical in [false, true] {
+                let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+                g.style.iso = iso;
+                let h = g.style.dim_text;
+                let text = DimText { main: "60".into(), dual: Some("[2.36 in]".into()), dual_below: below, ..Default::default() };
+                let (p, q, o) = if vertical { ([100.0, 50.0], [100.0, 110.0], DimOrientation::Vertical) } else { ([50.0, 100.0], [110.0, 100.0], DimOrientation::Horizontal) };
+                g.linear_dimension_text(p, q, -20.0, o, &text, 1);
+                // The dimension line's pieces: along the dimension direction.
+                let ax = if vertical { 1 } else { 0 };
+                let pieces: Vec<[f64; 2]> = g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1 - ax] - l.points[1][1 - ax]).abs() < 1e-9 && (l.points[0][ax] - l.points[1][ax]).abs() > 1e-6).map(|l| {
+                    let (a, b) = (l.points[0][ax], l.points[1][ax]);
+                    [a.min(b), a.max(b)]
+                }).collect();
+                assert_eq!(pieces.len(), 2, "iso {iso} below {below} vertical {vertical}: {pieces:?}");
+                let mut pieces = pieces;
+                pieces.sort_by(|a, b| a[0].total_cmp(&b[0]));
+                let (gap0, gap1) = (pieces[0][1], pieces[1][0]);
+                // Centred on the value; half the block plus 0.65 h each side.
+                assert!(((gap0 + gap1) / 2.0 - 80.0).abs() < 1e-9);
+                let half = font::text_width("[2.36 in]", h) / 2.0 + 0.65 * h;
+                assert!(((gap1 - gap0) / 2.0 - half).abs() < 1e-9, "{gap0} {gap1}");
+                // The line reaches the arrows.
+                assert!((pieces[0][0] - if vertical { 50.0 } else { 50.0 }).abs() < 1e-9 && (pieces[1][1] - 110.0).abs() < 1e-9);
+                // Both texts sit inside the gap.
+                for t in g.texts.iter().filter(|t| t.text == "60" || t.text == "[2.36 in]") {
+                    let w = font::text_width(&t.text, h);
+                    assert!(t.pos[ax] - w / 2.0 > gap0 && t.pos[ax] + w / 2.0 < gap1);
+                }
+            }
+        }
+    }
+    // A single value: one unbroken line.
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.linear_dimension_text([50.0, 100.0], [110.0, 100.0], -20.0, DimOrientation::Horizontal, &DimText::plain("60"), 1);
+    assert_eq!(g.lines.iter().filter(|l| l.points.len() == 2 && (l.points[0][1] - l.points[1][1]).abs() < 1e-9 && (l.points[0][0] - l.points[1][0]).abs() > 1e-6).count(), 1);
+}
+
 #[test]
 fn cad_export_dual_dimensions_like_onshape() {
     use super::cad_export::to_dxf_version;

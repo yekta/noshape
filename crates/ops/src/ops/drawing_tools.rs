@@ -140,6 +140,30 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "edit_detail",
+            summary: "Edit a detail view: move / resize its circle, its label and leader, Edit detail's options",
+            description: "The detail circle's grips and menu and Edit detail... (live asb 10-23 views (1), (2)): `center` moves the circle (sheet mm, in its parent), `radius` resizes it (sheet mm; the detail view grows with it); `leader` true puts the label on a leader with an arrow to the circle (Add leader), false back beside it; `label_at` places the label on its leader (sheet mm); the Detail view panel's `scale`, `label`, `style`, `show_profile` and `clip_border`. One edit (\"Edit detail view\").",
+            fields: with(
+                common(),
+                vec![
+                    view_id("view", "The detail view (drawing_get)."),
+                    opt("center", point(), "New circle centre (sheet mm)."),
+                    opt("radius", json!({ "type": "number", "exclusiveMinimum": 0 }), "New circle radius (sheet mm)."),
+                    opt("leader", json!({ "type": "boolean" }), "Label on a leader (Add leader) or beside the circle."),
+                    opt("label_at", point(), "The label's position on its leader (sheet mm)."),
+                    opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "View scale."),
+                    opt("label", json!({ "type": "string", "minLength": 1 }), "View label (detail id)."),
+                    opt("style", json!({ "type": "string", "enum": ["in_line", "connected", "leader"] }), "Profile style."),
+                    opt("show_profile", json!({ "type": "boolean" }), "Show detail view profile."),
+                    opt("clip_border", json!({ "type": "boolean" }), "Clip border to geometry."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: edit_detail,
+        },
+        Op {
+            group: "drawing",
             verb: "auxiliary_view",
             summary: "Auxiliary view: normal to an edge, in line with a sketch line / centerline, or down a hole's axis",
             description: "The Auxiliary view tool. `edge` is a click (sheet mm) on the fold line for `mode`: normal, a straight model edge of the parent view (the view looks along it); in_line, a sheet sketch line or a centerline annotation; axis, a hole's axis seen side-on (its centerline or silhouette; the view looks down it). The view goes to `position` (at least 15 mm from the parent, perpendicular to the fold line). One edit (\"Auxiliary view\").",
@@ -511,6 +535,26 @@ pub fn ops() -> Vec<Op> {
             mutates: true,
             destructive: false,
             run: note,
+        },
+        Op {
+            group: "drawing",
+            verb: "leader",
+            summary: "Edit a note's or callout's leaders: Add leader, Add node, Remove node, Remove leaders, Delete",
+            description: "The leader menus (right-click on a leader line, a node or the annotation): `add` a leader to `to` (sheet mm; a vertex, circle center or edge point there anchors it to that view, else the sheet point); a note's starts at its existing landing's bend, with `leader` and `node` it branches from that node (notes and callouts); GD&T, surface finish and weld symbols take `add` too. `add_node` puts a node at `at` (sheet mm) on the nearest segment of leader `leader`; `remove_node` removes node `node` of leader `leader` (its branches then start at the bend); `remove_leaders` removes a note's leaders, a callout's added ones; `delete` deletes leader `leader` (a callout's leader 0, the one to its anchor, leaves it in space). Leader indices: a note's in order, a callout's 0 = the leader to the anchor, then the added ones (drawing_get). One edit (\"Add leader\", \"Add node\", \"Remove node\", \"Remove leaders\", \"Delete leader\").",
+            fields: with(
+                common(),
+                vec![
+                    req("annotation", json!({ "type": "integer" }), "The note or callout (drawing_get)."),
+                    req("action", json!({ "type": "string", "enum": ["add", "add_node", "remove_node", "remove_leaders", "delete"] }), "What to do."),
+                    opt("leader", json!({ "type": "integer", "minimum": 0 }), "The leader (add_node, remove_node, delete; with `node`, the leader `add` branches from)."),
+                    opt("node", json!({ "type": "integer", "minimum": 0 }), "The node (remove_node; add: branch from it)."),
+                    opt("to", point(), "add: where the new leader points (sheet mm)."),
+                    opt("at", point(), "add_node: where the node goes (sheet mm)."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: leader,
         },
         Op {
             group: "drawing",
@@ -1228,6 +1272,142 @@ fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = ann.id;
     t.d.sheets[sheet].annotations.push(ann);
     done(od, t, "Note", "annotation", id)
+}
+
+fn edit_detail(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let id = view_arg(&t, a, "view")?;
+    let si = t.sheet;
+    let parent = match t.d.sheets[si].view(id).map(|v| &v.kind) {
+        Some(ViewKind::Detail { parent, .. }) => *parent,
+        _ => return Err(OpError::param("view", "not a detail view")),
+    };
+    let ppl = t.m.built.as_ref().and_then(|b| b.placement(parent).cloned()).ok_or_else(|| OpError::param("view", "its parent view isn't drawn"))?;
+    let center = a.get("center").map(|v| point_value(v, "center")).transpose()?;
+    let radius = a.opt_f64("radius")?;
+    let leader = a.get("leader").and_then(|v| v.as_bool());
+    let label_at = a.get("label_at").map(|v| point_value(v, "label_at")).transpose()?;
+    let style = if a.get("style").is_some() { Some(enum_arg(a, "style", &[("in_line", 0u8), ("connected", 1), ("leader", 2)], 0)?) } else { None };
+    let (scale, label) = (a.opt_f64("scale")?, a.opt_str("label")?.map(str::to_string));
+    let (show, clip) = (a.get("show_profile").and_then(|v| v.as_bool()), a.get("clip_border").and_then(|v| v.as_bool()));
+    if center.is_none() && radius.is_none() && leader.is_none() && label_at.is_none() && style.is_none() && scale.is_none() && label.is_none() && show.is_none() && clip.is_none() {
+        return Err(OpError::param("center", "nothing to change"));
+    }
+    let v = t.d.sheets[si].view_mut(id).expect("view");
+    if let Some(s) = scale {
+        v.scale = Some(s);
+    }
+    if let Some(s) = style {
+        v.detail_style = s;
+    }
+    if let Some(b) = show {
+        v.detail_hide_profile = !b;
+    }
+    if let Some(b) = clip {
+        v.detail_clip_border = b;
+    }
+    let ViewKind::Detail { center: c, radius: r, label: l, .. } = &mut v.kind else { unreachable!("a detail view") };
+    if let Some(x) = label {
+        *l = x;
+    }
+    if let Some(p) = center {
+        *c = ppl.to_view(p);
+    }
+    if let Some(rs) = radius {
+        *r = rs / ppl.len_to_sheet(1.0).max(1e-12);
+    }
+    // The label's offset from the circle centre (sheet mm).
+    let (cs, rs) = (ppl.to_sheet(*c), ppl.len_to_sheet(*r));
+    match (leader, label_at) {
+        (Some(false), _) => v.detail_label_at = None,
+        (_, Some(p)) => v.detail_label_at = Some([p[0] - cs[0], p[1] - cs[1]]),
+        (Some(true), None) if v.detail_label_at.is_none() => {
+            let d = rs * std::f64::consts::FRAC_1_SQRT_2;
+            v.detail_label_at = Some([d + 12.0, d + 10.0]);
+        }
+        _ => {}
+    }
+    done(od, t, "Edit detail view", "view", id.0)
+}
+
+fn leader(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::{Leader, LeaderStart};
+    use noshape_scene::drawing_tools::leaders;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let si = t.sheet;
+    let id = a.opt_u64("annotation")?.ok_or_else(|| OpError::param("annotation", "required"))?;
+    let orig = t.d.sheets[si].annotations.iter().find(|x| x.id == id).cloned().ok_or_else(|| OpError::param("annotation", "no such annotation on the sheet"))?;
+    let built = t.m.built.clone();
+    let paths = leaders::leader_paths(built.as_deref(), &orig);
+    let count = leaders::leaders_of(&orig).map(|l| l.len());
+    let leaders_only = || OpError::param("annotation", "not a note or callout");
+    // A leader index of this annotation.
+    let leader_arg = || -> Result<usize, OpError> {
+        let n = count.ok_or_else(leaders_only)?;
+        let i = a.opt_u64("leader")?.ok_or_else(|| OpError::param("leader", "required"))? as usize;
+        (i < n).then_some(i).ok_or_else(|| OpError::param("leader", &format!("the annotation has {n} leader(s)")))
+    };
+    let mut ann = orig.clone();
+    let description = match a.str("action")? {
+        "add" => {
+            let c = pt_arg(a, "to")?;
+            let to = match t.m.pick(&Tool::Note, &[], c).snap_at(c) {
+                Some(p) => Leader { view: Some(p.view), point: p.p, ..Default::default() },
+                None => Leader { view: None, point: c, ..Default::default() },
+            };
+            let start = match a.opt_u64("node")? {
+                Some(n) => {
+                    let j = leader_arg()?;
+                    let nodes = leaders::leaders_of(&orig).map(|l| l[j].nodes.len()).unwrap_or(0);
+                    if n as usize >= nodes {
+                        return Err(OpError::param("node", &format!("leader {j} has {nodes} node(s)")));
+                    }
+                    LeaderStart::Node(j, n as usize)
+                }
+                None => leaders::note_leader_start(&orig),
+            };
+            if !leaders::add_leader(&mut ann, Leader { start, ..to }) {
+                return Err(OpError::param("annotation", "this annotation takes no leaders"));
+            }
+            "Add leader"
+        }
+        "add_node" => {
+            let j = leader_arg()?;
+            let at = pt_arg(a, "at")?;
+            let path = paths.iter().find(|(i, _)| *i == j).map(|(_, p)| p).ok_or_else(|| OpError::param("leader", "that leader isn't drawn (a callout in space)"))?;
+            let (seg, _) = leaders::nearest_segment(path, at).ok_or_else(|| OpError::param("leader", "an empty leader"))?;
+            leaders::add_node(&mut ann, j, seg, path.head, at);
+            "Add node"
+        }
+        "remove_node" => {
+            let j = leader_arg()?;
+            let n = a.opt_u64("node")?.ok_or_else(|| OpError::param("node", "required"))? as usize;
+            let nodes = leaders::leaders_of(&orig).map(|l| l[j].nodes.len()).unwrap_or(0);
+            if n >= nodes {
+                return Err(OpError::param("node", &format!("leader {j} has {nodes} node(s)")));
+            }
+            leaders::remove_node(&mut ann, j, n);
+            "Remove node"
+        }
+        "remove_leaders" => {
+            if !leaders::remove_leaders(&mut ann) {
+                return Err(leaders_only());
+            }
+            "Remove leaders"
+        }
+        "delete" => {
+            let j = leader_arg()?;
+            leaders::delete_leader(&mut ann, j);
+            "Delete leader"
+        }
+        _ => return Err(OpError::param("action", "add, add_node, remove_node, remove_leaders or delete")),
+    };
+    if let Some(x) = t.d.sheets[si].annotations.iter_mut().find(|x| x.id == id) {
+        *x = ann;
+    }
+    done(od, t, description, "annotation", id)
 }
 
 fn gdt(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

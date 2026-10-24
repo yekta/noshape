@@ -220,12 +220,12 @@ impl SheetPick<'_> {
             Tool::JoggedSection { parent: Some(pid), points, done: true } if points.len() >= 2 => {
                 let parent = sheet.view(*pid)?;
                 let pos = self.section_position(parent, points[0], points[1])?;
-                Some(DrawingView { id, kind: ViewKind::Section { parent: *pid, line: points.clone(), label: sheet.next_label(), cuts: vec![] }, position: pos, show_tangent_edges: parent.show_tangent_edges, ..Default::default() })
+                Some(DrawingView { id, kind: ViewKind::Section { parent: *pid, line: points.clone(), label: sheet.next_label(), cuts: vec![] }, position: pos, show_tangent_edges: parent.show_tangent_edges, model_annotations: parent.model_annotations, ..Default::default() })
             }
             Tool::AlignedSection { parent: Some(pid), center: Some(c), a: Some(a), b: Some(b) } => {
                 let parent = sheet.view(*pid)?;
                 let pos = self.section_position(parent, *a, *c)?;
-                Some(DrawingView { id, kind: ViewKind::AlignedSection { parent: *pid, center: *c, a: *a, b: *b, label: sheet.next_label() }, position: pos, show_tangent_edges: parent.show_tangent_edges, ..Default::default() })
+                Some(DrawingView { id, kind: ViewKind::AlignedSection { parent: *pid, center: *c, a: *a, b: *b, label: sheet.next_label() }, position: pos, show_tangent_edges: parent.show_tangent_edges, model_annotations: parent.model_annotations, ..Default::default() })
             }
             _ => None,
         }

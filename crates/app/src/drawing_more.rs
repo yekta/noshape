@@ -181,13 +181,10 @@ impl DrawingEditor {
                     None => Leader { view: None, point: c, nodes: Vec::new(), ..Default::default() },
                 };
                 let start = self.leader_from.take().unwrap_or_default();
-                self.edit_sheet("Add leader", cx, |s| match s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
-                    Some(AnnotationKind::Gdt { leaders, .. }) => leaders.push(leader),
-                    Some(AnnotationKind::Note { style, .. }) => style.leaders.push(Leader { start, ..leader }),
-                    Some(AnnotationKind::Weld { spec, .. }) => spec.leaders.push(leader),
-                    Some(AnnotationKind::Balloon { callout, .. }) => callout.leaders.push(leader),
-                    Some(AnnotationKind::SurfaceFinish { leaders, .. }) => leaders.push(leader),
-                    _ => {}
+                self.edit_sheet("Add leader", cx, |s| {
+                    if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
+                        noshape_scene::drawing_tools::leaders::add_leader(a, Leader { start, ..leader });
+                    }
                 });
                 self.tool = Tool::Select;
                 self.selection = vec![Sel::Annotation(id)];

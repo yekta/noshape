@@ -5,34 +5,15 @@
 //! (Add node puts a node at the clicked point); on a node: Paste, Copy,
 //! Paste as table, Add leader (a branch from the node), Remove leaders,
 //! Remove node, Clear selection, Zoom to fit, Delete. The note's own Add
-//! leader branches from the existing landing's bend.
+//! leader branches from the existing landing's bend. A callout's leaders
+//! give the same menus (live (6)); their nodes are added the same way.
 
 use crate::drawing_view::*;
 use gpui_kit::*;
-use noshape_model::drawing::sheet::{LeaderPath, note_leader_paths};
-use noshape_model::drawing::{Annotation, AnnotationKind, Leader, LeaderStart, remove_leader, remove_leader_node};
-
-/// What a sheet point hits on a note's leaders.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum LeaderHit {
-    /// Leader `leader`'s line, segment `seg` of its path, at `p`.
-    Stroke { id: u64, leader: usize, seg: usize, p: [f64; 2] },
-    Node { id: u64, leader: usize, node: usize },
-    /// The end of a leader's landing (leaders from the note's side).
-    Bend { id: u64, leader: usize },
-}
-
-fn dist(a: [f64; 2], b: [f64; 2]) -> f64 {
-    (a[0] - b[0]).hypot(a[1] - b[1])
-}
-
-/// Distance from `p` to the segment `a`–`b`.
-fn seg_dist(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
-    let d = [b[0] - a[0], b[1] - a[1]];
-    let l2 = d[0] * d[0] + d[1] * d[1];
-    let t = if l2 > 0.0 { (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0) } else { 0.0 };
-    dist(p, [a[0] + d[0] * t, a[1] + d[1] * t])
-}
+use noshape_model::drawing::sheet::LeaderPath;
+use noshape_model::drawing::{Annotation, AnnotationKind, Leader, LeaderStart};
+use noshape_scene::drawing_tools::leaders;
+pub use noshape_scene::drawing_tools::LeaderHit;
 
 /// The note's leaders, mutable.
 fn note_leaders(a: &mut Annotation) -> Option<&mut Vec<Leader>> {
@@ -43,55 +24,22 @@ fn note_leaders(a: &mut Annotation) -> Option<&mut Vec<Leader>> {
 }
 
 impl DrawingEditor {
-    /// A note's leader paths on the sheet.
-    pub fn note_leader_paths_of(&self, a: &Annotation) -> Vec<LeaderPath> {
-        let AnnotationKind::Note { style, .. } = &a.kind else { return Vec::new() };
-        let Some((bbox, _)) = crate::drawing_extra::note_box(a) else { return Vec::new() };
-        let targets: Vec<[f64; 2]> = style
-            .leaders
-            .iter()
-            .map(|ld| match ld.view {
-                Some(v) => self.placement(v).map(|pl| pl.to_sheet(ld.point)).unwrap_or(ld.point),
-                None => ld.point,
-            })
-            .collect();
-        note_leader_paths(bbox, &style.leaders, &targets)
+    /// A note's or callout's leader paths on the sheet, by leader index (a
+    /// callout's as last drawn).
+    pub fn leader_paths_of(&self, a: &Annotation) -> Vec<(usize, LeaderPath)> {
+        leaders::leader_paths(self.built.as_deref(), a)
     }
 
-    /// The note leader under sheet point `c`: a bend or node first, else a
-    /// line (live: exactly on the stroke; a few px off is the sheet).
+    /// The note or callout leader under sheet point `c`.
     pub fn leader_hit(&self, c: [f64; 2]) -> Option<LeaderHit> {
-        let (near, on_line) = (self.tol_mm(5.0), self.tol_mm(3.0));
-        let mut stroke = None;
-        for a in &self.current_sheet().annotations {
-            for (leader, path) in self.note_leader_paths_of(a).iter().enumerate() {
-                let id = a.id;
-                for (k, p) in path.points.iter().enumerate() {
-                    if dist(*p, c) >= near {
-                        continue;
-                    }
-                    if path.head == 2 && k == 1 {
-                        return Some(LeaderHit::Bend { id, leader });
-                    }
-                    if k >= path.head && k + 1 < path.points.len() {
-                        return Some(LeaderHit::Node { id, leader, node: k - path.head });
-                    }
-                }
-                if stroke.is_none()
-                    && let Some(seg) = path.points.windows(2).position(|w| seg_dist(c, w[0], w[1]) < on_line)
-                {
-                    stroke = Some(LeaderHit::Stroke { id, leader, seg, p: c });
-                }
-            }
-        }
-        stroke
+        leaders::leader_hit(self.built.as_deref(), &self.current_sheet().annotations, c, self.tol_mm(5.0), self.tol_mm(3.0))
     }
 
-    /// Edit note `id`'s leaders (one undo step named `what`).
-    fn edit_leaders(&mut self, what: &str, id: u64, cx: &mut Context<Self>, f: impl FnOnce(&mut Vec<Leader>)) {
+    /// Edit annotation `id` (one undo step named `what`).
+    fn edit_annotation(&mut self, what: &str, id: u64, cx: &mut Context<Self>, f: impl FnOnce(&mut Annotation)) {
         self.edit_sheet(what, cx, |s| {
-            if let Some(l) = s.annotations.iter_mut().find(|a| a.id == id).and_then(note_leaders) {
-                f(l);
+            if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
+                f(a);
             }
         });
     }
@@ -112,19 +60,18 @@ impl DrawingEditor {
         if let LeaderHit::Node { node, .. } = hit {
             out.push(MenuEntry::item("Add leader", move |t, _, cx| t.start_branch(id, LeaderStart::Node(leader, node), cx)));
         }
-        out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_leaders("Remove leaders", id, cx, |l| l.clear())));
+        out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_annotation("Remove leaders", id, cx, |a| {
+            leaders::remove_leaders(a);
+        })));
         match hit {
-            LeaderHit::Node { node, .. } => out.push(MenuEntry::item("Remove node", move |t, _, cx| t.edit_leaders("Remove node", id, cx, |l| remove_leader_node(l, leader, node)))),
+            LeaderHit::Node { node, .. } => out.push(MenuEntry::item("Remove node", move |t, _, cx| t.edit_annotation("Remove node", id, cx, |a| {
+                leaders::remove_node(a, leader, node);
+            }))),
             LeaderHit::Stroke { seg, p, .. } => {
-                let head = self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| self.note_leader_paths_of(a).get(leader).map(|p| p.head)).unwrap_or(2);
+                let head = self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| self.leader_paths_of(a).into_iter().find(|(i, _)| *i == leader).map(|(_, p)| p.head)).unwrap_or(2);
                 out.push(MenuEntry::item("Add node", move |t, _, cx| {
-                    t.edit_leaders("Add node", id, cx, |l| {
-                        if let Some(ld) = l.get_mut(leader) {
-                            // Segment `seg` runs from path point `seg` to
-                            // `seg + 1`; the nodes start at path point `head`.
-                            let at = (seg + 1).saturating_sub(head).min(ld.nodes.len());
-                            ld.nodes.insert(at, p);
-                        }
+                    t.edit_annotation("Add node", id, cx, |a| {
+                        leaders::add_node(a, leader, seg, head, p);
                     });
                     t.selection = vec![Sel::Annotation(id)];
                     t.leader_sel = Some((id, leader));
@@ -138,11 +85,13 @@ impl DrawingEditor {
             t.redraw(cx);
         }));
         out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
-        out.push(MenuEntry::item("Delete", move |t, _, cx| t.edit_leaders("Delete leader", id, cx, |l| remove_leader(l, leader))));
+        out.push(MenuEntry::item("Delete", move |t, _, cx| t.edit_annotation("Delete leader", id, cx, |a| {
+            leaders::delete_leader(a, leader);
+        })));
         out
     }
 
-    /// Add leader: a new leader of note `id` from `from` follows the pointer
+    /// Add leader: a new leader of note or callout `id` from `from` follows the pointer
     /// until a click ends it.
     pub fn start_branch(&mut self, id: u64, from: LeaderStart, cx: &mut Context<Self>) {
         self.leader_from = Some(from);
@@ -152,23 +101,14 @@ impl DrawingEditor {
     /// The note's Add leader: from the existing landing's bend (live: that
     /// side, wherever the pointer is), else from the note's side.
     pub fn note_add_leader(&mut self, id: u64, cx: &mut Context<Self>) {
-        let first = self.current_sheet().annotations.iter().find(|a| a.id == id).and_then(|a| match &a.kind {
-            AnnotationKind::Note { style, .. } => style.leaders.iter().position(|l| l.start.is_side()),
-            _ => None,
-        });
-        self.start_branch(id, first.map_or(LeaderStart::Side, LeaderStart::Bend), cx);
+        let from = self.current_sheet().annotations.iter().find(|a| a.id == id).map(leaders::note_leader_start).unwrap_or_default();
+        self.start_branch(id, from, cx);
     }
 
-    /// Where the pending branch of note `id` starts (sheet mm).
+    /// Where the pending branch of note or callout `id` starts (sheet mm).
     pub fn branch_point(&self, id: u64) -> Option<[f64; 2]> {
         let a = self.current_sheet().annotations.iter().find(|a| a.id == id)?;
-        let paths = self.note_leader_paths_of(a);
-        let AnnotationKind::Note { style, .. } = &a.kind else { return None };
-        match self.leader_from? {
-            LeaderStart::Bend(j) => paths.get(j).map(|p| p.bend()),
-            LeaderStart::Node(j, n) => style.leaders.get(j).and_then(|l| l.nodes.get(n)).copied(),
-            LeaderStart::Side => None,
-        }
+        leaders::branch_point(self.built.as_deref(), a, self.leader_from?)
     }
 
     /// A drag starting on a leader's bend: the landing's length.
@@ -182,7 +122,7 @@ impl DrawingEditor {
     /// keeps its side.
     pub fn leader_bend_move(&mut self, drag: &Drag, cx: &mut Context<Self>) {
         let Drag::LeaderBend { id, leader, start, orig } = drag else { return };
-        let Some(path) = self.note_leader_paths_of(orig).get(*leader).cloned() else { return };
+        let Some((_, path)) = self.leader_paths_of(orig).into_iter().find(|(i, _)| i == leader) else { return };
         let right = path.points[1][0] >= path.points[0][0];
         let base = (path.points[1][0] - path.points[0][0]).abs();
         let dx = self.cursor[0] - start[0];
@@ -226,7 +166,9 @@ impl DrawingEditor {
         }));
         out.push(MenuEntry::item("Add leader", move |t, _, cx| t.note_add_leader(id, cx)));
         if !style.leaders.is_empty() {
-            out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_leaders("Remove leaders", id, cx, |l| l.clear())));
+            out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_annotation("Remove leaders", id, cx, |a| {
+                leaders::remove_leaders(a);
+            })));
         }
         // Move to ▸ a format layer (or back to the drawing).
         let cur = a.layer;
@@ -284,10 +226,12 @@ impl DrawingEditor {
             return;
         }
         let Some(a) = self.current_sheet().annotations.iter().find(|a| a.id == id) else { return };
-        let Some(path) = self.note_leader_paths_of(a).into_iter().nth(leader) else { return };
+        let Some((_, path)) = self.leader_paths_of(a).into_iter().find(|(i, _)| *i == leader) else { return };
         o.tinted.push((path.points.clone(), AMBER, 1.5));
         let n = path.points.len();
-        for p in &path.points[path.head - 1..n - 1] {
+        // A callout's leader starts on its border, not at a bend.
+        let first = if matches!(a.kind, AnnotationKind::Balloon { .. }) { 1 } else { path.head - 1 };
+        for p in &path.points[first..n - 1] {
             o.dots.push((*p, AMBER));
         }
         let t = path.points[n - 1];
