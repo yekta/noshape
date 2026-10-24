@@ -2289,3 +2289,270 @@ fn configuration_panel_inputs() {
     assert!(v["configuration"]["inputs"].as_array().unwrap().iter().find(|i| i["name"] == "Size").unwrap().get("visible_when").is_none());
     assert_eq!(try_call(&mut ctx, "config_visibility", json!({ "input": "Size", "visibility": { "conditions": [{ "input": "nope", "test": { "Is": ["x"] } }] } })).unwrap_err().param.as_deref(), Some("visibility"));
 }
+
+/// The view context menu: Show/hide, orientation, tangent edges, rotate,
+/// order, align, alignment, View properties, Show/hide dialogs, copy, move
+/// to sheet and Delete, each with the editor's edit text.
+#[test]
+fn drawing_view_menu_edits() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_view_menu.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx, n: usize| call(ctx, "history_list", json!({ "limit": n }))["history"].as_array().unwrap().iter().map(|h| h["description"].as_str().unwrap().rsplit(":: ").next().unwrap().to_string()).collect::<Vec<_>>();
+    let get = |ctx: &mut Ctx, edges: bool| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": edges }));
+    let view = |ctx: &mut Ctx, id: &Value| get(ctx, false)["views"].as_array().unwrap().iter().find(|v| v["id"] == *id).cloned().unwrap_or(Value::Null);
+    let g = get(&mut ctx, false);
+    let vs = g["views"].as_array().unwrap().clone();
+    let base = vs.iter().find(|v| v["kind"] == "base").unwrap()["id"].clone();
+    let child = vs.iter().find(|v| v["kind"] == "projected").unwrap()["id"].clone();
+    // A view of its own (no parent, no children), free to turn.
+    let f = call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "position": [330, 230] }));
+    let free = f["views"].as_array().unwrap().last().unwrap()["id"].clone();
+
+    // Display: one edit per choice, in order.
+    call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": base, "tangent_edges": "phantom", "hidden_lines": true, "threads": false }));
+    assert_eq!(last(&mut ctx, 3), ["Threads", "Hidden lines", "Tangent edges"]);
+    let b = view(&mut ctx, &base);
+    assert_eq!(b["tangent_edges"], "phantom", "{b}");
+    assert_eq!(b["style"], "HiddenLinesVisible", "{b}");
+    call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": free, "orientation": "isometric" }));
+    assert_eq!(last(&mut ctx, 1), ["View orientation"]);
+    assert_eq!(view(&mut ctx, &free)["orientation"], "isometric");
+    let e = try_call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": free, "orientation": "Nope" })).unwrap_err();
+    assert!(e.message.contains("isometric"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": child, "orientation": "top" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("orientation"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": base, "bend_lines": false })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("bend_lines"), "{e:?}");
+    call(&mut ctx, "drawing_view_display", json!({ "drawing": tab, "view": free, "orientation": "front" }));
+
+    // Rotate: by, to, then to a straight edge.
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "rotate", "by": 90 }));
+    assert_eq!(last(&mut ctx, 1), ["Rotate view"]);
+    assert!((num(&view(&mut ctx, &free)["rotation"]) - 90.0).abs() < 1e-9);
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "rotate", "to": 30 }));
+    let fv = get(&mut ctx, true)["views"].as_array().unwrap().iter().find(|v| v["id"] == free).cloned().unwrap();
+    assert!((num(&fv["rotation"]) - 30.0).abs() < 1e-9, "{fv}");
+    let line = fv["edges"].as_array().unwrap().iter().find(|e| e["type"] == "line").cloned().unwrap();
+    let mid = [(num(&line["a"][0]) + num(&line["b"][0])) / 2.0, (num(&line["a"][1]) + num(&line["b"][1])) / 2.0];
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "rotate_to_edge", "edge": mid, "direction": "horizontal" }));
+    assert_eq!(last(&mut ctx, 1), ["Rotate view horizontally"]);
+    let rot = view(&mut ctx, &free)["rotation"].as_f64().unwrap_or(0.0);
+    assert!((rot / 90.0 - (rot / 90.0).round()).abs() < 1e-6, "{rot}");
+    let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": base, "action": "rotate_to_edge", "edge": mid, "direction": "vertical" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "rotate", "to": 0 }));
+    assert!(view(&mut ctx, &free)["rotation"].is_null());
+
+    // Order and align.
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "order", "to": "back" }));
+    assert_eq!(last(&mut ctx, 1), ["Send to back"]);
+    assert_eq!(get(&mut ctx, false)["views"][0]["id"], free);
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "align", "with": base, "direction": "vertical" }));
+    assert_eq!(last(&mut ctx, 1), ["Align views"]);
+    assert!((num(&view(&mut ctx, &free)["position"][0]) - num(&view(&mut ctx, &base)["position"][0])).abs() < 1e-9);
+
+    // Alignment with the parent.
+    call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": child, "action": "suppress_alignment" }));
+    assert_eq!(last(&mut ctx, 1), ["Suppress alignment with parent"]);
+    assert_eq!(view(&mut ctx, &child)["unaligned"], true);
+    let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": base, "action": "suppress_alignment" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": base, "action": "remove_crop" })).unwrap_err();
+    assert!(e.message.contains("not cropped"), "{e:?}");
+
+    // View properties: read, then name, scale and label.
+    let p = call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free }));
+    assert_eq!(p["properties"]["name"], "Front", "{p}");
+    assert_eq!(p["properties"]["orientation"], "front", "{p}");
+    call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free, "set": { "name": "Main", "scale": "1:2", "view_label": true, "tangent_edges": "hidden" } }));
+    assert_eq!(last(&mut ctx, 1), ["View properties"]);
+    let fv = view(&mut ctx, &free);
+    assert_eq!(fv["name"], "Main", "{fv}");
+    assert_eq!(fv["label"], "MAIN", "{fv}");
+    assert!((num(&fv["scale"]) - 0.5).abs() < 1e-12, "{fv}");
+    assert_eq!(fv["tangent_edges"], "hidden", "{fv}");
+    let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": free, "set": { "bogus": 1 } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set.bogus"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_view_properties", json!({ "drawing": tab, "view": child, "set": { "rotation": 45 } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set.rotation"), "{e:?}");
+
+    // Show/hide parts and edges (an edge hidden, then shown again).
+    call(&mut ctx, "drawing_view_show_hide", json!({ "drawing": tab, "view": free, "hidden_parts": ["Part 1"] }));
+    assert_eq!(last(&mut ctx, 1), ["Show/hide parts"]);
+    assert_eq!(view(&mut ctx, &free)["hidden_parts"], 1);
+    let e = try_call(&mut ctx, "drawing_view_show_hide", json!({ "drawing": tab, "view": free, "hidden_parts": ["Nope"] })).unwrap_err();
+    assert!(e.message.contains("Part 1"), "{e:?}");
+    call(&mut ctx, "drawing_view_show_hide", json!({ "drawing": tab, "view": free, "hidden_parts": [] }));
+    let fv = get(&mut ctx, true)["views"].as_array().unwrap().iter().find(|v| v["id"] == free).cloned().unwrap();
+    let line = fv["edges"].as_array().unwrap().iter().find(|e| e["type"] == "line").cloned().unwrap();
+    let mid = [(num(&line["a"][0]) + num(&line["b"][0])) / 2.0, (num(&line["a"][1]) + num(&line["b"][1])) / 2.0];
+    call(&mut ctx, "drawing_view_show_hide", json!({ "drawing": tab, "view": free, "toggle_edges": [mid] }));
+    assert_eq!(last(&mut ctx, 1), ["Show/hide edges"]);
+    assert_eq!(view(&mut ctx, &free)["hidden_edges"], 1);
+    call(&mut ctx, "drawing_view_show_hide", json!({ "drawing": tab, "view": free, "toggle_edges": [mid] }));
+    assert!(view(&mut ctx, &free)["hidden_edges"].is_null());
+
+    // Copy / paste, then Delete the copy.
+    let n = get(&mut ctx, false)["views"].as_array().unwrap().len();
+    let c = call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "copy", "at": [330, 80] }));
+    assert_eq!(last(&mut ctx, 1), ["Paste views"]);
+    let pasted = c["pasted"][0].clone();
+    assert_eq!(get(&mut ctx, false)["views"].as_array().unwrap().len(), n + 1);
+    call(&mut ctx, "drawing_delete", json!({ "drawing": tab, "views": [pasted] }));
+    assert_eq!(last(&mut ctx, 1), ["Delete"]);
+    assert_eq!(get(&mut ctx, false)["views"].as_array().unwrap().len(), n);
+    let e = try_call(&mut ctx, "drawing_delete", json!({ "drawing": tab, "views": [pasted] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("views[0]"), "{e:?}");
+
+    // Move to a new sheet.
+    let m = call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": free, "action": "move_to_sheet" }));
+    assert_eq!(last(&mut ctx, 1), ["Move to sheet"]);
+    assert_eq!(m["sheets"].as_array().unwrap().len(), 2, "{m}");
+    assert_eq!(m["sheet"], 2, "{m}");
+    let first = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "sheet": 1, "edges": false }));
+    assert_eq!(first["views"].as_array().unwrap().len(), n - 1, "{first}");
+}
+
+/// The Sheets panel menu and Sheet properties.
+#[test]
+fn drawing_sheet_menu_and_properties() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_sheets.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().rsplit(":: ").next().unwrap().to_string();
+    let sheets = |r: &Value| r["sheets"].as_array().unwrap().iter().map(|s| s.as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let r = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "action": "add" }));
+    assert_eq!(last(&mut ctx), "Add sheet");
+    assert_eq!(sheets(&r), ["Sheet1", "Sheet2"], "{r}");
+    assert_eq!(r["sheet"], 2);
+    call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": 2, "action": "rename", "name": "Details" }));
+    assert_eq!(last(&mut ctx), "Rename sheet");
+    let r = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "duplicate" }));
+    assert_eq!(last(&mut ctx), "Duplicate sheet");
+    assert_eq!(sheets(&r), ["Sheet1", "Sheet1 copy", "Details"], "{r}");
+    assert_eq!(r["views"].as_array().unwrap().len(), d["views"].as_array().unwrap().len(), "the copy has the views: {r}");
+    let r = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Details", "action": "move", "to": 1 }));
+    assert_eq!(last(&mut ctx), "Move sheet");
+    assert_eq!(sheets(&r), ["Details", "Sheet1", "Sheet1 copy"], "{r}");
+    let r = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Details", "action": "copy" }));
+    assert_eq!(last(&mut ctx), "Paste sheet");
+    assert_eq!(sheets(&r).last().unwrap(), "Details (1)");
+    let r = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Details (1)", "action": "delete" }));
+    assert_eq!(last(&mut ctx), "Delete sheet");
+    assert_eq!(sheets(&r).len(), 3);
+    let e = try_call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "action": "move", "to": 9 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("to"), "{e:?}");
+
+    // Sheet properties: read, then scale, size, Custom with zones.
+    let p = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties" }));
+    assert_eq!(p["properties"]["size"], "A3", "{p}");
+    let p = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "scale": "1:2", "size": "A2" } }));
+    assert_eq!(last(&mut ctx), "Sheet size");
+    assert_eq!(p["properties"]["scale"], "1:2", "{p}");
+    assert_eq!(p["properties"]["size"], "A2", "{p}");
+    let e = try_call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "size": "B" } })).unwrap_err();
+    assert!(e.message.contains("A4 Portrait"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "zones": [4, 4] } })).unwrap_err();
+    assert!(e.message.contains("Custom"), "{e:?}");
+    let p = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "size": "Custom", "width": 500, "zones": [8, 4], "border": false } }));
+    assert_eq!(last(&mut ctx), "Sheet border");
+    let pr = &p["properties"];
+    assert_eq!(pr["size"], "Custom", "{p}");
+    assert_eq!(pr["width"], 500.0, "{p}");
+    assert_eq!(pr["height"], 420.0, "{p}");
+    assert_eq!(pr["zones"], json!([8, 4]), "{p}");
+    assert_eq!(pr["border"], false, "{p}");
+}
+
+/// The table menus on a general table and a BOM table.
+#[test]
+fn drawing_table_menu_edits() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_table_menu.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let base = d["views"][0]["id"].clone();
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().rsplit(":: ").next().unwrap().to_string();
+    let gt = call(&mut ctx, "drawing_table", json!({ "drawing": tab, "position": [200, 60], "rows": 3, "columns": 3, "header_row": true }));
+    let gid = gt["table"].clone();
+    let table = |ctx: &mut Ctx, id: &Value| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].as_array().unwrap().iter().find(|t| t["id"] == *id).cloned().unwrap();
+    let edit = |ctx: &mut Ctx, args: Value| {
+        let mut a = json!({ "drawing": tab, "table": gid });
+        a.as_object_mut().unwrap().extend(args.as_object().unwrap().clone());
+        try_call(ctx, "drawing_table_edit", a)
+    };
+    let widths = |t: &Value| t["column_widths"].as_array().unwrap().iter().map(num).collect::<Vec<f64>>();
+
+    edit(&mut ctx, json!({ "action": "merge_right", "row": 1, "column": 0 })).unwrap();
+    assert_eq!(last(&mut ctx), "Merge cells");
+    assert_eq!(table(&mut ctx, &gid)["merges"], json!([{ "row": 1, "column": 0, "rows": 1, "columns": 2 }]));
+    edit(&mut ctx, json!({ "action": "unmerge", "row": 1, "column": 1 })).unwrap();
+    assert_eq!(last(&mut ctx), "Unmerge");
+    assert!(table(&mut ctx, &gid)["merges"].is_null());
+    edit(&mut ctx, json!({ "action": "merge", "row": 1, "column": 0, "to_row": 2, "to_column": 1 })).unwrap();
+    assert_eq!(last(&mut ctx), "All");
+    assert_eq!(table(&mut ctx, &gid)["merges"][0]["rows"], 2);
+    edit(&mut ctx, json!({ "action": "unmerge", "row": 1, "column": 0 })).unwrap();
+    let e = edit(&mut ctx, json!({ "action": "merge", "row": 1, "column": 0 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("action"), "{e:?}");
+
+    edit(&mut ctx, json!({ "action": "insert", "row": 0, "column": 2, "at": "column_right" })).unwrap();
+    assert_eq!(last(&mut ctx), "Column Right");
+    assert_eq!(widths(&table(&mut ctx, &gid)).len(), 4);
+    edit(&mut ctx, json!({ "action": "remove", "row": 0, "column": 3, "what": "columns" })).unwrap();
+    assert_eq!(last(&mut ctx), "Columns");
+    assert_eq!(widths(&table(&mut ctx, &gid)).len(), 3);
+    let rows0 = table(&mut ctx, &gid)["rows"].as_array().unwrap().len();
+    edit(&mut ctx, json!({ "action": "duplicate", "row": 1, "column": 0, "what": "rows" })).unwrap();
+    assert_eq!(last(&mut ctx), "Rows");
+    assert_eq!(table(&mut ctx, &gid)["rows"].as_array().unwrap().len(), rows0 + 1);
+
+    edit(&mut ctx, json!({ "action": "resize", "column": 0, "width": 40 })).unwrap();
+    assert_eq!(last(&mut ctx), "Resize cell");
+    assert!((widths(&table(&mut ctx, &gid))[0] - 40.0).abs() < 1e-9);
+    edit(&mut ctx, json!({ "action": "columns_equally" })).unwrap();
+    assert_eq!(last(&mut ctx), "Size columns equally");
+    let w = widths(&table(&mut ctx, &gid));
+    assert!(w.iter().all(|x| (x - w[0]).abs() < 1e-6), "{w:?}");
+    edit(&mut ctx, json!({ "action": "format_cell", "row": 0, "column": 0, "scope": "row", "align": "left", "bold": true })).unwrap();
+    assert_eq!(last(&mut ctx), "Format cells");
+
+    let before = table(&mut ctx, &gid)["bounds"].clone();
+    edit(&mut ctx, json!({ "action": "fixed_corner", "to": "bottom_left" })).unwrap();
+    assert_eq!(last(&mut ctx), "Table fixed corner");
+    let t = table(&mut ctx, &gid);
+    assert_eq!(t["corner"], "BottomLeft", "{t}");
+    for k in ["min", "max"] {
+        for i in 0..2 {
+            assert!((num(&t["bounds"][k][i]) - num(&before[k][i])).abs() < 1e-6, "{t} {before}");
+        }
+    }
+    edit(&mut ctx, json!({ "action": "text_height", "to": 5 })).unwrap();
+    assert_eq!(last(&mut ctx), "Table text height");
+    assert_eq!(table(&mut ctx, &gid)["text_height"], 5.0);
+    let e = edit(&mut ctx, json!({ "action": "text_height", "to": 4 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("to"), "{e:?}");
+    edit(&mut ctx, json!({ "action": "fit" })).unwrap();
+    assert_eq!(last(&mut ctx), "Fit table");
+    let e = edit(&mut ctx, json!({ "action": "flip_x" })).unwrap_err();
+    assert!(e.message.contains("hole tables"), "{e:?}");
+    let e = edit(&mut ctx, json!({ "action": "merge_right", "row": 1, "column": 2 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("action"), "{e:?}");
+
+    // A BOM table: type and order; no cell formats.
+    let bt = call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "bom", "view": base, "position": [20, 280] }));
+    let bid = bt["table"].clone();
+    call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "bom_type", "to": "structured" }));
+    assert_eq!(last(&mut ctx), "BOM type");
+    call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "order", "to": "bottom_to_top" }));
+    assert_eq!(last(&mut ctx), "BOM order");
+    let t = table(&mut ctx, &bid);
+    assert_eq!((t["structured"].clone(), t["bottom_to_top"].clone()), (json!(true), json!(true)), "{t}");
+    let e = try_call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "format_cell", "row": 0, "column": 0 })).unwrap_err();
+    assert!(e.message.contains("BOM"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "split", "row": 1 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("row"), "{e:?}");
+}

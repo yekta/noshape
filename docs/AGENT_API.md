@@ -246,7 +246,7 @@ the app.
 
 <!-- BEGIN GENERATED REFERENCE (noshape-cli docs) -->
 
-189 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
+196 operations in 18 groups. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list)
 - **document**: [`document_create`](#document_create), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
@@ -256,7 +256,7 @@ the app.
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move)
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_edit_standard`](#assembly_edit_standard)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_centermark`](#drawing_centermark), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit)
 - **part**: [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearances`](#part_appearances)
 - **material**: [`material_list`](#material_list)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
@@ -3138,6 +3138,32 @@ Examples:
 | `tool` | one of `line`, `circle`, `circle_3_point`, `tangent_arc`, `corner_rectangle`, `center_rectangle`, `spline`, `spline_point`, `point`, `trim` | required | Sketch tool. |
 | `picks` | array of array of number | required | Clicks (sheet mm). |
 
+#### drawing_delete
+
+Delete views, annotations, tables, images, hatches, sketch entities or view breaks (edits the document (one undoable history entry); deletes or overwrites).
+
+Select and Delete on the sheet (ids from drawing_get). Deleting a view deletes its projected / section / detail children's link and its label; deleting an annotation deletes the callouts grouped with it; a datum shown from the model is hidden instead. One edit ("Delete").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "views": [5]}
+{"drawing": "Part 1 Drawing 1", "annotations": [12, 13], "breaks": [{"view": 3, "index": 0}]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `views` | array of integer |  | View ids. |
+| `annotations` | array of integer |  | Annotation ids (dimensions, notes, callouts...). |
+| `tables` | array of integer |  | Table ids. |
+| `images` | array of integer |  | Image ids. |
+| `hatches` | array of integer |  | Hatch region ids. |
+| `sketch_entities` | array of integer |  | Drawing sketch entity ids. |
+| `breaks` | array of object |  | View breaks: [{"view": id, "index": n}] (drawing_get lists a view's breaks). |
+
 #### drawing_edit_dimension
 
 Edit a dimension or hole callout: text, precision, units, tolerance, dual, parentheses (edits the document (one undoable history entry)).
@@ -3596,6 +3622,200 @@ Examples:
 | `view` | integer | required | The view the table lists. |
 | `origin` | array of number |  | Hole table: the origin vertex (sheet mm). |
 | `position` | array of number | required | Where the table goes (sheet mm). |
+
+#### drawing_view_display
+
+Show/hide, View orientation and Tangent edges of a view (edits the document (one undoable history entry)).
+
+The view menu's Show/hide ▸ toggles (true shows, false hides; the menu only offers what applies to the view), View orientation ▸ and Tangent edges ▸. Each field given is one edit with the menu's edit text ("Hidden lines", "View orientation", "Tangent edges"...), in the order listed.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 3, "tangent_edges": "phantom", "hidden_lines": true}
+{"drawing": "Part 1 Drawing 1", "view": 3, "orientation": "isometric"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer | required | View id (drawing_get). |
+| `tangent_edges` | one of `hidden`, `solid`, `phantom` |  | Tangent edges ▸ Hidden / Solid / Phantom. |
+| `orientation` | string |  | View orientation ▸ (base views): front, back, top, bottom, left, right, isometric, or a named view of the source. |
+| `hidden_lines` | boolean |  | Show/Hide hidden lines |
+| `shaded` | boolean |  | Show/Hide shaded view |
+| `threads` | boolean |  | Show/Hide threads |
+| `faulty_parts` | boolean |  | Show/Hide faulty parts |
+| `sketch_points` | boolean |  | Show/Hide sketch points (views showing sketches) |
+| `auto_centermarks` | boolean |  | Show/Hide auto centermarks (showing them again brings back deleted ones) |
+| `centerlines` | boolean |  | Show/Hide centerlines (views with cylinder axes seen from the side) |
+| `center_of_mass` | boolean |  | Show/Hide center of mass (part views, not flat patterns) |
+| `bend_lines` | boolean |  | Show/Hide bend lines (flat pattern views) |
+| `bend_notes` | boolean |  | Show/Hide bend notes (flat pattern views) |
+
+#### drawing_view_edit
+
+Rotate, order, align, move to sheet or copy a view; remove its crop, breaks or broken-out sections (edits the document (one undoable history entry)).
+
+The view menu's actions, one edit each:
+- `rotate`: `by` degrees counter-clockwise (Rotate ▸ 90° counter-clockwise = 90, clockwise = -90, 180°) or `to` an absolute angle (Custom angle…; 0 = Reset rotation). "Rotate view".
+- `rotate_to_edge`: Rotate view ▸ Vertical to… / Horizontal to… (`direction`): turn by the smallest angle so the straight edge of the view at `edge` (sheet mm) is vertical / horizontal; views without a parent or children.
+- `order`: Order ▸ Bring to front / Send to back (`to`: front | back).
+- `align`: Align views ▸ Vertically / Horizontally (`direction`): the view's center lines up with view `with`'s.
+- `suppress_alignment`: (Un)suppress alignment with parent (`on`, default true); projected, auxiliary and section views; a rotated view can't be re-aligned.
+- `flip_direction`: section views: Flip direction (the view looks the other way across the cutting line).
+- `remove_crop`, `remove_breaks` (Remove all breaks), `remove_broken_out` (Remove section).
+- `move_to_sheet`: Move to sheet… `to_sheet` (number or name; omitted: a new sheet); the view moves alone, linked to its parent.
+- `unpin_reference`: Unpin view reference (every view of the same source and part shows the workspace again).
+- `copy`: Copy then Paste: the view with its derived views, annotations and tables, pasted centered `at` (sheet mm) on sheet `to_sheet` (default this one); "Paste views"; the reply's `pasted` lists the new view ids.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 3, "action": "rotate", "by": -90}
+{"drawing": "Part 1 Drawing 1", "view": 4, "action": "align", "with": 3, "direction": "vertical"}
+{"drawing": "Part 1 Drawing 1", "view": 3, "action": "move_to_sheet", "to_sheet": 2}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer | required | View id (drawing_get). |
+| `action` | one of `rotate`, `rotate_to_edge`, `order`, `align`, `suppress_alignment`, `flip_direction`, `remove_crop`, `remove_breaks`, `remove_broken_out`, `move_to_sheet`, `unpin_reference`, `copy` | required | The menu action. |
+| `by` | number |  | rotate: degrees counter-clockwise to add. |
+| `to` | number or string |  | rotate: the absolute angle (degrees); order: "front" or "back". |
+| `edge` | array of number |  | rotate_to_edge: a point on a straight edge of the view (sheet mm). |
+| `direction` | one of `vertical`, `horizontal` |  | rotate_to_edge, align. |
+| `with` | integer |  | align: the view to line up with. |
+| `on` | boolean |  | suppress_alignment: suppress (true) or unsuppress. |
+| `to_sheet` | integer or string |  | move_to_sheet / copy: the target sheet, number (1 = first) or name. |
+| `at` | array of number |  | copy: where the copy's center goes (sheet mm; default 20 mm right of and below the view). |
+
+#### drawing_view_properties
+
+Read or change a view's View properties (edits the document (one undoable history entry)).
+
+The View properties dialog of one view (live drawing/177). Without `set`, replies with its fields as the dialog opens (`properties`). `set` changes the fields it names (same names), then ✓: scale ("1:2", or null to inherit), sheet_scale (inherit from the sheet rather than the parent), rotation (degrees; views without a parent or children), tangent_edges, best_quality, orientation / named_view (base views), explode_position and display_state (assemblies; child views: null = Follow parent), suppress_alignment, cut_from_section, sketch_appearances, model_annotations, simplification + simplification_value, name, view_label, label, scale_label, sheet (moves the view, linked to its parent). One edit ("View properties").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 3}
+{"drawing": "Part 1 Drawing 1", "view": 3, "set": {"scale": "1:2", "name": "Main", "view_label": true}}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer | required | View id (drawing_get). |
+| `set` | object |  | Fields to change (see the reply without `set`). |
+
+#### drawing_view_show_hide
+
+Show/hide parts, sketches or edges of a view (edits the document (one undoable history entry)).
+
+The Show/hide parts…, Show/hide sketches… and Show/hide edges… dialogs, ✓ each (one edit each: "Show/hide parts", "Show/hide sketches", "Show/hide edges"). `hidden_parts`: the parts left out of the view (names; views of a whole Part Studio or assembly). `shown_sketches`: the source's sketches shown (names; part views). `toggle_edges`: points on model edges of the view (sheet mm), each hidden, or shown again when hidden; `show_all_edges` first shows every hidden edge.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "view": 3, "hidden_parts": ["Part 2"]}
+{"drawing": "Part 1 Drawing 1", "view": 3, "toggle_edges": [[190, 175]]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `view` | integer | required | View id (drawing_get). |
+| `hidden_parts` | array of string |  | Part names to hide (replaces the list; [] shows all). |
+| `shown_sketches` | array of string |  | Sketch names to show (replaces the list). |
+| `toggle_edges` | array of array of number |  | Edge points (sheet mm) to hide / show. |
+| `show_all_edges` | boolean |  | Show every hidden edge first. |
+
+#### drawing_sheet
+
+Add, rename, duplicate, copy, move or delete a sheet, or change its Sheet properties (edits the document (one undoable history entry)).
+
+The Sheets panel's sheet menu and the Sheet properties dialog, on sheet `sheet` (default: the one shown):
+- `add`: Insert sheet after it (same size, scale and title block; "Add sheet").
+- `rename`: Rename… to `name` ("Rename sheet").
+- `duplicate`: Duplicate, right after it, "<name> copy" ("Duplicate sheet").
+- `copy`: Copy then Paste: appended at the end, "<name> (1)" ("Paste sheet").
+- `move`: Move up / Move down to position `to` (1 = first; "Move sheet").
+- `delete`: Delete (never the last sheet; "Delete sheet").
+- `properties`: without `set`, replies with the dialog's fields (`properties`); `set` changes scale ("1:2"), size ("A3", "A Portrait"…, "Custom"), width / height (mm; Custom), zones ([horizontal, vertical], 0–20 even; Custom), zone_start (bottom_right | top_left), border (Custom), dwt (a DWT file tab: Select a DWT) or dwt: null (Format › Custom); one edit each ("Select a DWT", "Format", "Sheet scale", "Sheet size", "Sheet zones", "Sheet border").
+Replies with the sheet acted on (`sheet`, 1 = first) and the sheet list.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "action": "add"}
+{"drawing": "Part 1 Drawing 1", "sheet": 2, "action": "rename", "name": "Details"}
+{"drawing": "Part 1 Drawing 1", "action": "properties", "set": {"scale": "1:2", "size": "A2"}}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `action` | one of `add`, `rename`, `duplicate`, `copy`, `move`, `delete`, `properties` | required | The sheet menu action. |
+| `name` | string |  | rename: the new name. |
+| `to` | integer |  | move: the new position (1 = first). |
+| `set` | object |  | properties: fields to change (see the reply without `set`). |
+
+#### drawing_table_edit
+
+Edit a table from its menus: cells, merge, rows / columns, size, split, order, corner, text height (edits the document (one undoable history entry)).
+
+The table context menus, one edit each. Cells are (`row`, `column`) counted from 0 below the title (the header is row 0); a block of cells runs to (`to_row`, `to_column`).
+- `format_cell`: Format cell… (`scope` cell | row | column | table; `align` left | center | right, `bold`, `height` mm or null for the table's) ("Format cells").
+- `merge_right` / `merge_below` ("Merge cells"), `unmerge` ("Unmerge cells").
+- General tables, a block selected: `merge` (`mode` all | horizontal | vertical), `insert` (`at` column_left | column_right | row_above | row_below), `remove` / `duplicate` (`what` columns | rows); edit texts the menu's ("All", "Column Left", "Rows"…).
+- `columns_equally` / `rows_equally`: Size ▸ — of the block's columns / rows when a block is given (two or more), else the whole table.
+- `resize`: Resize… column `column`'s `width` and the row `height` (mm) ("Resize cell").
+- BOM, cut list and custom tables: `split` below displayed row `row` ("Split table"; the reply's `table` is the new part), `unsplit` ("Unsplit table").
+- Hole tables: `flip_x`, `flip_y`, `precision` (`decimals` 0–4 or null for the drawing's).
+- `order` (`to` top_to_bottom | bottom_to_top; BOM and cut list), `bom_type` (`to` flattened | structured).
+- `fixed_corner` (`to` top_right | top_left | bottom_right | bottom_left; the table stays put), `text_height` (`to` 2.5 | 3 | 3.5 | 5 mm), `fit` (Fit to content).
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "table": 2, "action": "merge_right", "row": 1, "column": 0}
+{"drawing": "Part 1 Drawing 1", "table": 2, "action": "insert", "row": 0, "column": 1, "at": "column_right"}
+{"drawing": "Part 1 Drawing 1", "table": 4, "action": "split", "row": 5}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `table` | integer | required | Table id (drawing_get). |
+| `action` | one of `format_cell`, `merge_right`, `merge_below`, `merge`, `unmerge`, `insert`, `remove`, `duplicate`, `columns_equally`, `rows_equally`, `resize`, `split`, `unsplit`, `flip_x`, `flip_y`, `precision`, `order`, `bom_type`, `fixed_corner`, `text_height`, `fit` | required | The menu action. |
+| `row` | integer |  | The cell's row (0 = header / first row). |
+| `column` | integer |  | The cell's column. |
+| `to_row` | integer |  | A block's last row (default `row`). |
+| `to_column` | integer |  | A block's last column (default `column`). |
+| `scope` | one of `cell`, `row`, `column`, `table` |  | format_cell: what it applies to. |
+| `align` | one of `left`, `center`, `right` |  | format_cell: horizontal alignment (default: the cell's). |
+| `bold` | boolean |  | format_cell: bold (default: the cell's). |
+| `height` | number or null |  | format_cell: text height mm (null: the table's); resize: row height mm. |
+| `width` | number |  | resize: column width mm. |
+| `mode` | one of `all`, `horizontal`, `vertical` |  | merge. |
+| `at` | one of `column_left`, `column_right`, `row_above`, `row_below` |  | insert. |
+| `what` | one of `columns`, `rows` |  | remove, duplicate. |
+| `decimals` | integer or null |  | precision. |
+| `to` | string or number |  | order, bom_type, fixed_corner, text_height: the choice. |
 
 ### part
 

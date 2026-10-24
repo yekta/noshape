@@ -16,7 +16,7 @@ use noshape_model::drawing::{Drawing, ViewId, ViewKind, ViewOrientation};
 use noshape_scene::drawing_tools::{DimTool, Pick, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
 
-const ORIENTATIONS: [(&str, ViewOrientation); 7] = [
+pub(super) const ORIENTATIONS: [(&str, ViewOrientation); 7] = [
     ("front", ViewOrientation::Front),
     ("back", ViewOrientation::Back),
     ("top", ViewOrientation::Top),
@@ -333,6 +333,31 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if let Some(l) = &v.label {
                 j["label"] = json!(l);
             }
+            // The view menu's state, when not the defaults.
+            if let Some(n) = &v.name {
+                j["name"] = json!(n);
+            }
+            if v.rotation.abs() > 1e-12 {
+                j["rotation"] = json!(r3(v.rotation.to_degrees()));
+            }
+            j["tangent_edges"] = json!(noshape_scene::drawing_tools::view_edit::TangentMode::of(v).label().to_lowercase());
+            if v.style != noshape_model::drawing::RenderStyle::HiddenLinesRemoved {
+                j["style"] = json!(variant_name(&v.style));
+            }
+            if v.unaligned {
+                j["unaligned"] = json!(true);
+            }
+            if v.flip {
+                j["flipped"] = json!(true);
+            }
+            if v.pinned.is_some() {
+                j["pinned"] = json!(true);
+            }
+            for (k, n) in [("hidden_parts", v.hidden_parts.len()), ("shown_sketches", v.shown_sketches.len()), ("hidden_edges", v.hidden_edges.len())] {
+                if n > 0 {
+                    j[k] = json!(n);
+                }
+            }
             // Crop, breaks and broken-out sections (view tools).
             if let Some(c) = &v.crop {
                 j["crop"] = json!(match c {
@@ -443,6 +468,32 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             }
             if let Some(ti) = data.title {
                 j["title"] = json!(ti);
+            }
+            // The table menus' state.
+            j["corner"] = json!(variant_name(&t.corner));
+            j["text_height"] = json!(t.text_height);
+            if !t.merges.is_empty() {
+                j["merges"] = t.merges.iter().map(|g| json!({ "row": g.row, "column": g.col, "rows": g.rows, "columns": g.cols })).collect();
+            }
+            if let Some(l) = m.built.as_ref().and_then(|b| b.table_layout(t.id)) {
+                j["column_widths"] = l.xs.windows(2).map(|w| json!(r3(w[1] - w[0]))).collect();
+                j["bounds"] = json!({ "min": pt(l.min()), "max": pt(l.max()) });
+            }
+            if let Some(r) = t.rows {
+                j["part_rows"] = json!(r);
+            }
+            match &t.kind {
+                noshape_model::drawing::TableKind::Bom { structured, bottom_to_top, .. } => {
+                    j["structured"] = json!(structured);
+                    j["bottom_to_top"] = json!(bottom_to_top);
+                }
+                noshape_model::drawing::TableKind::CutList { bottom_to_top, .. } => j["bottom_to_top"] = json!(bottom_to_top),
+                noshape_model::drawing::TableKind::Hole { flip_x, flip_y, precision, .. } => {
+                    j["flip_x"] = json!(flip_x);
+                    j["flip_y"] = json!(flip_y);
+                    j["precision"] = json!(precision);
+                }
+                _ => {}
             }
             j
         })

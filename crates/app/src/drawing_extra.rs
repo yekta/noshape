@@ -1646,35 +1646,17 @@ impl DrawingEditor {
                 MenuEntry::check(name, corner == k, move |t, _, cx| {
                     // Keep the table where it is: move the anchor to the new corner.
                     let l = t.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
-                    t.edit_table(id, "Table fixed corner", cx, |t| {
-                        if let Some(l) = &l {
-                            let (lo, hi) = (l.min(), l.max());
-                            t.position = match k {
-                                TableCorner::TopLeft => [lo[0], hi[1]],
-                                TableCorner::TopRight => [hi[0], hi[1]],
-                                TableCorner::BottomLeft => [lo[0], lo[1]],
-                                TableCorner::BottomRight => [hi[0], lo[1]],
-                            };
-                        }
-                        t.corner = k;
-                    })
+                    t.edit_table(id, "Table fixed corner", cx, |t| noshape_scene::drawing_tools::table_edit::set_fixed_corner(t, l.as_ref(), k))
                 })
             })
             .collect();
         out.push(MenuEntry::Submenu("Fixed corner".into(), corners));
         let mut text = Vec::new();
-        for h in [2.5, 3.0, 3.5, 5.0] {
-            text.push(MenuEntry::check(format!("{h} mm"), (t.text_height - h).abs() < 1e-9, move |t, _, cx| t.edit_table(id, "Table text height", cx, |t| {
-                t.text_height = h;
-                t.col_widths.clear();
-                t.row_height = (h * 2.2).max(7.0);
-            })));
+        for h in noshape_scene::drawing_tools::table_edit::TEXT_HEIGHTS {
+            text.push(MenuEntry::check(format!("{h} mm"), (t.text_height - h).abs() < 1e-9, move |t, _, cx| t.edit_table(id, "Table text height", cx, |t| noshape_scene::drawing_tools::table_edit::set_text_height(t, h))));
         }
         out.push(MenuEntry::Submenu("Text height".into(), text));
-        out.push(MenuEntry::item("Fit to content", move |t, _, cx| t.edit_table(id, "Fit table", cx, |t| {
-            t.col_widths.clear();
-            t.row_height = (t.text_height * 2.2).max(7.0);
-        })));
+        out.push(MenuEntry::item("Fit to content", move |t, _, cx| t.edit_table(id, "Fit table", cx, noshape_scene::drawing_tools::table_edit::fit_to_content)));
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Delete table", move |t, _, cx| {
             t.selection.clear();

@@ -181,46 +181,7 @@ impl DrawingEditor {
             return;
         }
         let sel = std::mem::take(&mut self.selection);
-        self.edit_sheet("Delete", cx, |s| {
-            // Breaks first (indices shift when removed).
-            let mut breaks: Vec<(ViewId, usize)> = sel.iter().filter_map(|x| if let Sel::Break(v, i) = x { Some((*v, *i)) } else { None }).collect();
-            breaks.sort_by_key(|b| std::cmp::Reverse(b.1));
-            for (v, i) in breaks {
-                if let Some(v) = s.view_mut(v)
-                    && i < v.breaks.len()
-                {
-                    v.breaks.remove(i);
-                }
-            }
-            for x in &sel {
-                match x {
-                    // A label's Delete is its view's (live u-944: the view menu).
-                    Sel::View(v) | Sel::ViewLabel(v) | Sel::AuxIndicator(v) => s.remove_view(*v),
-                    // Callouts grouped with the annotation go with it.
-                    // A datum from the model is hidden, not removed (MBD status › Show).
-                    Sel::Annotation(a) if s.annotations.iter().any(|n| n.id == *a && n.model.is_some()) => {
-                        if let Some(m) = s.annotations.iter_mut().find(|n| n.id == *a).and_then(|n| n.model.as_mut()) {
-                            m.hidden = true;
-                        }
-                    }
-                    Sel::Annotation(a) => s.annotations.retain(|n| n.id != *a && n.group != Some(*a) && !matches!(n.kind, AnnotationKind::RevisionCallout { group: Some(g), .. } if g == *a)),
-                    Sel::Table(t) => s.tables.retain(|n| n.id != *t),
-                    Sel::Sketch(e) => {
-                        s.sketch.sketch.remove_entity(noshape_sketch::EntityId(*e));
-                    }
-                    Sel::Hatch(h) => s.sketch.hatches.retain(|x| x.id != *h),
-                    Sel::Image(i) => s.images.retain(|x| x.id != *i),
-                    // Automatic centermarks are deleted one at a time (help H:creating_a_drawing).
-                    Sel::AutoCentermark(v, c) => {
-                        if let Some(v) = s.view_mut(*v) {
-                            v.deleted_centermarks.push(*c);
-                        }
-                    }
-                    Sel::Break(..) => {}
-                }
-            }
-            let _ = s.sketch.sketch.solve();
-        });
+        self.edit_sheet("Delete", cx, |s| dt::delete_selection(s, &sel));
     }
 
     /// Prompt shown in the status bar for the active tool.
