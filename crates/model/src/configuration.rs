@@ -536,6 +536,23 @@ mod describe_tests {
         assert_eq!(cfg.configured[0].values.get("a"), Some(&e("12 mm")));
         assert_eq!(shown.params.get("depth"), Some(&e("12 mm")));
     }
+
+    #[test]
+    fn a_configured_variable_names_itself_with_the_active_value() {
+        // qa4 round 4 S4-a: the list row of a Variable configured S/L reads
+        // "#w = 80 mm" under L (the row shows `for_editing`'s feature).
+        let cfg = Configuration {
+            inputs: vec![ConfigInput { id: "s".into(), name: "Size".into(), kind: ConfigInputKind::List { options: vec![ListOption { id: "a".into(), name: "S".into() }, ListOption { id: "b".into(), name: "L".into() }], default: "a".into() }, visible_when: None, excluded: false }],
+            configured: vec![ConfiguredParam { input: "s".into(), feature: FeatureId(3), param: "lengthValue".into(), values: [("a".to_string(), ParamValue::Expr(ExprValue::new("40 mm"))), ("b".to_string(), ParamValue::Expr(ExprValue::new("80 mm")))].into_iter().collect() }],
+        };
+        let mut var = Feature { id: FeatureId(3), type_id: "assignVariable".into(), name: "Variable 1".into(), suppressed: false, params: ParamValues::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None };
+        var.params.set("name", ParamValue::Text("w".into()));
+        var.params.set("lengthValue", ParamValue::Expr(ExprValue::new("40 mm")));
+        let mut large = cfg.defaults();
+        large.0.insert("s".into(), "b".into());
+        assert_eq!(crate::interaction::display_name(&cfg.for_editing(&var, &large)), "#w = 80 mm");
+        assert_eq!(crate::interaction::display_name(&cfg.for_editing(&var, &cfg.defaults())), "#w = 40 mm");
+    }
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@
 //! transform, so moving instances (drag, animation, explode) never
 //! re-uploads geometry. Pick ids map back to (instance path, reference).
 
-use crate::scene_builder::{DisplayMode, PickKind, TangentEdges, MESH_LINE_COLOR};
+use crate::scene_builder::{PickKind, MESH_LINE_COLOR};
 use crate::theme;
 use glam::{DMat4, DVec3, Mat4};
 use noshape_model::assembly::eval::{AssemblyResult, InstancePath};
@@ -88,14 +88,14 @@ struct CachedBody {
 #[derive(Default)]
 pub struct AsmGpuCache {
     bodies: HashMap<usize, (Weak<MeshBuffers>, Arc<CachedBody>)>,
+    /// Per mesh: its sharp and tangent (dash-dot) edges, for Tangent edges
+    /// phantom / removed (camera menu).
+    tangent: HashMap<usize, (Weak<MeshBuffers>, (LinesHandle, LinesHandle))>,
+    /// Per mesh: its edges dashed on top, for Hidden edges visible.
+    hidden_edges: HashMap<usize, (Weak<MeshBuffers>, LinesHandle)>,
     /// The unit cube of the occurrences' lowest level of detail
     /// ([`Instance::lod_box`]).
     lod_box: Option<MeshHandle>,
-    /// A mesh's sharp edges and its tangent (smooth) ones, for Tangent edges
-    /// phantom / removed.
-    tangent: HashMap<usize, (Weak<MeshBuffers>, (LinesHandle, LinesHandle))>,
-    /// A mesh's edges dashed on top (Hidden edges visible).
-    hidden: HashMap<usize, (Weak<MeshBuffers>, LinesHandle)>,
 }
 
 pub struct AsmBuilt {
@@ -128,13 +128,12 @@ pub struct AsmSceneOptions {
     /// Reflection analysis environment on the shaded parts.
     pub reflection: Option<noshape_render::Reflection>,
     pub hide_edges: bool,
-    /// Camera menu render mode, hidden edges and tangent edges (as in the
-    /// Part Studio, live "qa5 assembly camera menu").
-    pub display_mode: DisplayMode,
+    /// Camera menu render choices, as in the Part Studio (`SceneOptions`).
+    pub display_mode: crate::scene_builder::DisplayMode,
     pub hidden_edges_visible: bool,
-    pub tangent_edges: TangentEdges,
-    /// Phantom tangent edges' colour and width (Graphics preferences).
-    pub phantom: Option<(u32, f32)>,
+    pub tangent_edges: crate::scene_builder::TangentEdges,
+    /// Line width and phantom edges' color and width.
+    pub graphics: crate::graphics_prefs::GraphicsPrefs,
 }
 
 fn to_mat4(m: &DMat4) -> Mat4 {
@@ -146,7 +145,9 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     let mut picks = AsmPickMap::default();
     cache.bodies.retain(|_, (w, _)| w.strong_count() > 0);
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
-    cache.hidden.retain(|_, (w, _)| w.strong_count() > 0);
+    cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
+    use crate::scene_builder::{DisplayMode, TangentEdges};
+    let mode = opts.display_mode;
     let mut bodies = 0u32;
     for (oi, o) in result.occurrences.iter().enumerate() {
         if o.hidden {
@@ -188,11 +189,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         // each level's instances draw only when the renderer picks that level
         // for the occurrence (`Instance::mesh_lod`).
         let levels: Vec<&Arc<MeshBuffers>> = o.coarser.iter().chain(std::iter::once(&o.mesh)).collect();
-        let edge_color = match (sketch, opts.display_mode) {
-            (true, _) => theme::lin(0x999999),
-            (false, DisplayMode::HiddenLine) => theme::lin(theme::viewport::EDGE_UNSHADED),
-            (false, _) => theme::lin(theme::viewport::EDGE),
-        };
+        let edge_color = if sketch { theme::lin(0x999999) } else { theme::lin(theme::viewport::EDGE) };
         let mut finest_cached = None;
         for (li, &mesh) in levels.iter().enumerate() {
             let is_finest = li + 1 == levels.len();
@@ -207,27 +204,35 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 }
             };
             if !sketch || !mesh.indices.is_empty() {
-                let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_transform(t).pick_base(face_base);
-                inst = match opts.display_mode {
-                    _ if sketch || dimmed => inst.with_color(color),
-                    DisplayMode::ShadedWithEdges | DisplayMode::Shaded => inst.with_color(color).zebra(opts.zebra).reflection(opts.reflection.clone()),
-                    // As the Part Studio: ~35 % in sRGB, white unlit faces.
-                    DisplayMode::Translucent => inst.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
-                    DisplayMode::HiddenLine => inst.with_color(theme::lin(0xffffff)).unlit(),
-                };
+                let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base).zebra(opts.zebra.filter(|_| !dimmed && !sketch)).reflection(opts.reflection.clone().filter(|_| !dimmed && !sketch));
                 // Sketch regions are pickable faces (live 601).
                 if dimmed && !opts.pick_dimmed {
                     inst = inst.unpickable();
                 }
+                // The display modes as in the Part Studio (scene_builder): see-through
+                // at 0.48, or unlit faces in the background color (Unshaded).
+                if !sketch {
+                    inst = match mode {
+                        DisplayMode::Translucent => inst.with_color([color[0], color[1], color[2], color[3].min(0.48)]),
+                        DisplayMode::HiddenLine => inst.with_color(theme::lin(0xffffff)).unlit(),
+                        DisplayMode::ShadedWithEdges | DisplayMode::Shaded => inst,
+                    };
+                }
                 scene.instances.push(inst);
             }
             if !dimmed && (!opts.hide_edges || sketch) {
-                let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1);
-                let tangent = (opts.tangent_edges != TangentEdges::Visible && !sketch && opts.display_mode != DisplayMode::Shaded).then(|| {
-                    cache
-                        .tangent
-                        .entry(key)
-                        .or_insert_with(|| {
+                let edge_color = if !sketch && mode == DisplayMode::HiddenLine { theme::lin(theme::viewport::EDGE_UNSHADED) } else { edge_color };
+                let line_w = opts.graphics.line_width;
+                let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).line_scale(line_w).layer(1);
+                if !sketch && mode == DisplayMode::Shaded {
+                    // Shaded without edges: hidden but still pickable.
+                    scene.instances.push(edges.pick_only());
+                } else if !sketch && opts.tangent_edges != TangentEdges::Visible {
+                    // Tangent edges phantom / removed: the sharp edges (and the
+                    // tangent ones dash-dot); all of them stay pickable.
+                    let (sharp, phantom) = match cache.tangent.get(&key) {
+                        Some((_, h)) => h.clone(),
+                        None => {
                             let smooth = mesh.smooth_edges();
                             let (mut sharp, mut phantom) = (LineData::default(), LineData::default());
                             for (ei, pl) in mesh.edges.iter().enumerate() {
@@ -237,62 +242,51 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                                     sharp.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.25, 0);
                                 }
                             }
-                            (Arc::downgrade(mesh), (up.upload_lines(&sharp), up.upload_lines(&phantom)))
-                        })
-                        .1
-                        .clone()
-                });
-                match tangent {
-                    // Tangent edges phantom / removed: the sharp edges (and the
-                    // tangent ones dash-dot); all of them stay pickable.
-                    Some((sharp, phantom)) => {
-                        scene.instances.push(edges.pick_only());
-                        scene.instances.push(Instance::new(Drawable::Lines(sharp)).with_color(edge_color).with_transform(t).pick_base(edge_base).layer(1));
-                        if opts.tangent_edges == TangentEdges::Phantom {
-                            let (c, w) = opts.phantom.unwrap_or_else(|| {
-                                let g = noshape_scene::GraphicsPrefs::default();
-                                (g.phantom_color, g.phantom_width)
-                            });
-                            scene.instances.push(Instance::new(Drawable::Lines(phantom)).with_color(theme::lin(c)).with_transform(t).unpickable().line_scale(w / 0.5).layer(1));
+                            let h = (up.upload_lines(&sharp), up.upload_lines(&phantom));
+                            cache.tangent.insert(key, (Arc::downgrade(mesh), h.clone()));
+                            h
                         }
+                    };
+                    scene.instances.push(edges.pick_only());
+                    scene.instances.push(Instance::new(Drawable::Lines(sharp)).with_color(edge_color).with_transform(t).pick_base(edge_base).line_scale(line_w).layer(1));
+                    if opts.tangent_edges == TangentEdges::Phantom {
+                        let c = theme::lin(opts.graphics.phantom_color);
+                        scene.instances.push(Instance::new(Drawable::Lines(phantom)).with_color(c).with_transform(t).unpickable().line_scale(opts.graphics.phantom_width / 0.5).layer(1));
                     }
-                    // Shaded without edges hides them but keeps them pickable.
-                    None if opts.display_mode == DisplayMode::Shaded && !sketch => scene.instances.push(edges.pick_only()),
-                    None => {
-                        // Each coarser line level, then the full edges (also the pick).
-                        for (k, l) in cached.edge_lods.iter().enumerate().filter(|_| is_finest) {
-                            let mut e = edges.clone().line_lod(k as u8 + 2);
-                            e.drawable = Drawable::Lines(l.clone());
-                            scene.instances.push(e);
-                        }
-                        scene.instances.push(edges.line_lod(1));
+                } else {
+                    // Each coarser line level, then the full edges (also the pick).
+                    for (k, l) in cached.edge_lods.iter().enumerate().filter(|_| is_finest) {
+                        let mut e = edges.clone().line_lod(k as u8 + 2);
+                        e.drawable = Drawable::Lines(l.clone());
+                        scene.instances.push(e);
                     }
+                    scene.instances.push(edges.line_lod(1));
                 }
-                // Back-face silhouettes: the outline band of opaque solids with
-                // edges and unshaded, as the Part Studio draws them.
-                if o.kind == BodyKind::Solid && color[3] >= 0.999 && matches!(opts.display_mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine) {
-                    scene.instances.push(Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(edge_color).with_transform(t).pick_base(face_base).back_silhouette());
-                }
-                // A mesh part's triangle lines, as in the Part Studio (not in
-                // plain Shaded).
-                if let Some(lines) = cached.mesh_lines.clone().filter(|_| opts.display_mode != DisplayMode::Shaded) {
-                    scene.instances.push(Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).with_transform(t).unpickable().layer(1));
-                }
-                // Hidden edges visible: every edge dashed on top.
-                if opts.hidden_edges_visible && !sketch && is_finest {
-                    let h = cache
-                        .hidden
-                        .entry(key)
-                        .or_insert_with(|| {
+                // Hidden edges visible: every edge dashed on top (per display level).
+                if !sketch && opts.hidden_edges_visible {
+                    let h = match cache.hidden_edges.get(&key) {
+                        Some((_, h)) => h.clone(),
+                        None => {
                             let mut l = LineData::default();
                             for pl in &mesh.edges {
                                 l.push_polyline(pl, [90, 90, 90, 140], 0, 1.0, LineSegment::DASHED | LineSegment::ON_TOP);
                             }
-                            (Arc::downgrade(mesh), up.upload_lines(&l))
-                        })
-                        .1
-                        .clone();
+                            let h = up.upload_lines(&l);
+                            cache.hidden_edges.insert(key, (Arc::downgrade(mesh), h.clone()));
+                            h
+                        }
+                    };
                     scene.instances.push(Instance::new(Drawable::Lines(h)).per_primitive_color().with_transform(t).unpickable().layer(1));
+                }
+                // Back-face silhouettes: the outline band of opaque solids with
+                // edges and unshaded, as the Part Studio draws them (qa5: a
+                // cylinder's sides had no outline in an assembly).
+                if o.kind == BodyKind::Solid && color[3] >= 0.999 && matches!(mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine) {
+                    scene.instances.push(Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(edge_color).with_transform(t).pick_base(face_base).line_scale(line_w).back_silhouette());
+                }
+                // A mesh part's triangle lines, as in the Part Studio (not in plain Shaded).
+                if let Some(lines) = cached.mesh_lines.clone().filter(|_| mode != DisplayMode::Shaded) {
+                    scene.instances.push(Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).with_transform(t).unpickable().layer(1));
                 }
             }
             if levels.len() > 1 {

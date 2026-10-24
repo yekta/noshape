@@ -941,3 +941,143 @@ step (live +0.05). Owner: drawing (asb). Sheet properties width not re-checked.
   count, Bezier degree) stay as they are (lead: not a pure refactor). Prefs have no numeric fields.
 - Next: sketch fields (sketch.rs open_otf_input / open_count_edit / option_input / offset / bezier / tolerances),
   feature_dialog.rs:623 tolerances, the other assembly panels (same assembly variable scope), prefs.
+
+## QA round 4 (lead 10-24): realistic user sessions on v0.4.7 (tag v0.4.7 = 30979bc1, /root/qa4-scratch/bin/noshape-v047b + noshape-cli-v047b), fresh profile
+Live side: REQUESTS.md "qa4 (10-24, QA round 4: five user sessions)" (same recipes, answers in behaviours.md
+"qa4 round 4 sN"). Scripts and screenshots: /root/qa4-scratch/r4/.
+
+### Session 1: sheet-metal enclosure (r4/s1.py builds the model by CLI; drawing in the app)
+Recipe: Thicken 100×60 on Top (t 1.5, r 1.5, K 0.45) → Flange 30 mm on the long edges + x=100 edge → Hem on the
+y=0 flange's top edge → Front-plane circle Ø12 at (50, 1.5) Remove through all both ways → flat → drawing.
+
+| Step | noshape v0.4.7 | Live |
+|---|---|---|
+| Sheet metal model | OK, 9000 mm³, 6 faces | pending |
+| Flange 1 | OK, 20051.651 mm³, 28 faces | pending |
+| Hem 1 | OK, 21804.734 mm³, 34 faces | pending |
+| Extrude (cut through bends) | OK, 20547.157 mm³, 37 faces (the Ø12 at z 1.5 also cuts a 12 mm strip out of the base and both y bends) | pending |
+| Sheet metal table | 4 bends: 3 × 90° R1.5 allowance 3.416 mm, hem 180° R0.01 allowance 2.152; all **Down** (= SM5, routed fs); flat 129.465 × 128.916 mm, area 13744 mm² | pending |
+| Drawing › Insert view › Flat patterns filter | "Flat pattern of Part 1" with a flat thumbnail ✅; placed flat view with dash-dot bend lines and notes "DOWN 90.0° R1.5" / "DOWN 180.0° R0.01" | pending |
+
+Differences so far (live numbers pending):
+- **S1-a** the flat view in the drawing is turned 90° against the Sheet metal panel's flat (panel: flanges left/right/bottom;
+  drawing: rotated). Which way live orients it: pending.
+- **S1-b** a bend note sits on top of the cutout's arc ("DOWN 90.0° R1.5" covers the left half-circle, r4/s1-drawing-note-over-cut.png).
+  Live's note placement on a cut bend: pending.
+- Known, already routed: SM4 (panel design), SM5 (Down vs Up).
+
+### Session 2: 3-part assembly (r4/s2.py builds parts, inserts, mates, exploded view by CLI; limits, drag and drawing in the app)
+Recipe: Part 1 plate 100×60×10, Part 2 pin Ø10×40, Part 3 block 20×20×20; insert one each; Fastened 1 (plate to origin),
+Revolute 1 (pin bottom centre to the plate top centroid), Slider 1 (block bottom to the plate top); Slider limits 0 / 50 mm;
+exploded view (pin +40, block +20 along Z); drawing ANSI_A_MM with Suggested views, BOM table, balloons.
+Note: my script mates the pin and the block to the same plate centroid (the request asks for (25,30) for the pin), so they
+overlap; that doesn't change what was tested.
+
+| Step | noshape v0.4.7 | Live |
+|---|---|---|
+| Insert ×3, mates | OK; Parts 2, 3 show the DOF glyph, tooltip "Has degrees of freedom (1)" ✅ (= live); new mates hidden, rows light grey, tooltip "Revolute 1 (Hidden)" ✅ (= live "a new mate is hidden by default") | pending |
+| Slider limits | ☑ Limits shows Z "No minimum" / "No maximum" ✅; typed 0 / 50 stay **"0" / "50" (no unit)** → S2-a | pending |
+| Drag past the limit | block stops at exactly 50 mm (instance z 60 = plate top 10 + 50), no message | pending |
+| Exploded view | Explode 1 with 2 steps, dashed explode line, "Editing Explode 1 [Done]" banner ✅ | pending |
+| BOM | Flattened, columns Item / Quantity / Part number / Description (= live's default), rows 1–3 | pending |
+| Drawing | Suggested views: top, front, right, iso at 1:2 ✅; BOM table placed; balloons: plate 1, block 3, pin 2 (app click on the pin's silhouette) ✅ | pending |
+
+Differences:
+- **S2-a (fixed by qa4)** mate limit fields kept a bare number; Onshape's quantity field commits "50 mm" / "90 deg" like the
+  offsets. `assembly_mate_dialog.rs` `commit_limit_text` on Enter / blur ("No minimum" untouched); test
+  `limits_commit_with_units_like_onshape`.
+- **S2-b (api)** `drawing_get` lists no silhouette edges of curved faces, so a script can't aim a callout at the pin; a
+  `drawing_callout` anchor on the pin's centre line attached to the plate (balloon "1"). The app picks the silhouette (balloon
+  "2"). → qa5-routing DRW-SIL.
+
+### Session 3: surfaced handle (r4/s3.py, CLI; mass panel in the app)
+Recipe: Ø20 circle on Top; Plane 1 offset 80; rectangle 30×16 on it; Loft (surface, from the two sketches); Fill on each
+open end; Enclose; Fillet 1 mm on the start boundary.
+
+| Step | noshape v0.4.7 | Live |
+|---|---|---|
+| Loft (surface) | OK, Surface 1, area 6058.8169 mm², **5 faces** | pending (follow-up request) |
+| Fill 1 (Ø20 end) | OK, 314.212 mm² (exact disc 314.159265) | pending |
+| Fill 2 (rectangle end) | OK, 480.000 mm² | pending |
+| Enclose | OK, Part 1, 31807.0934 mm³, 7 faces | pending |
+| Fillet 1 mm (start boundary, tangent chain) | OK, 31805.0156 mm³, 11 faces | pending |
+
+Differences:
+- **S3-a** the Mass properties panel (and `query_mass_properties`) show a **Volume 21217.66 mm³ for the open loft surface**;
+  an open surface encloses nothing. Fill 2 / Fill 1 report 0. Live's panel for a lone surface: follow-up request; owner
+  then psb/kern (model mass properties). r4/s3-surface-mass-volume.png.
+- **S3-b** loft face count 5 (the circle's own seam stays as a fifth edge) and the planar fill's area 314.212 vs the exact
+  disc: pending live.
+- CLI note (not a defect): a surface loft takes `wireProfilesArray` (sketch curves), regions give "Select profiles in order
+  from start to finish."; Fill `edges` are objects `{"entities":[…]}`.
+
+### Session 4: configured part S/M/L, Derived (r4/s4.py builds it by CLI; switching and Derived in the app)
+Recipe: List input "Size" (S/M/L; the default option renamed S), Variable #w = 40 / 60 / 80 mm, Sketch 1 rectangle with its
+bottom dimensioned #w and 30 high, Extrude 1 depth 10 / 15 / 20 mm; Part Studio 2 › Derived of Part Studio 1, then M.
+
+| Step | noshape v0.4.7 | Live |
+|---|---|---|
+| Configuration panel | Size S / M / L, switching S → L rebuilds the block 80 × 30 × 20 ✅ | pending |
+| Variable row under L | **"#w = 40 mm"** (the stored value) → S4-a | pending |
+| Derived (app) | Select Part Studio panel: studio row expands with Size ▾ + Generate; M → Generate → block 60 × 30 × 15, part "Part 1" ✅ | pending |
+
+Differences:
+- **S4-a (fixed by qa4)** a configured Variable's list row kept its stored value; it now shows the active configuration's
+  value (`part_studio/mod.rs` row name from `Configuration::for_editing`; test `a_configured_variable_names_itself_with_the_active_value`).
+- **S4-c (fixed by qa4)** a Derived whose Part Studio is missing ("Missing Part Studio") opened the picker drilled into that
+  studio, showing "No Part Studios available."; it now opens the whole list (`select_item.rs` `picked_studio_exists`; test
+  `a_missing_studio_opens_the_whole_list`).
+- **S4-b (api)** `query_mass_properties` returns the default configuration's volume (12000 mm³ for S, M and L) after
+  `config_activate`; the app's geometry does change. → qa5-routing CFG-MASS.
+- **S4-d (api)** `feature_add importDerived` takes `partStudio: "Part Studio 1"` (a tab name) without complaint and the
+  feature fails with "Error regenerating."; it needs the tab id. → qa5-routing CFG-MASS (same entry).
+
+### Session 5: STEP round trip (r4/s5.py, CLI; same file as live: samples/qa4-s5-asm.step)
+| Step | noshape v0.4.7 | Live (behaviours "qa4 round 4 s5") |
+|---|---|---|
+| Import (defaults) | tabs **"qa4-s5-asm"** (Part Studio) + file tab "qa4-s5-asm.step"; parts **Part 1, Part 3, Part 2**, placed where the assembly had them (x 0…110) | **"Assembly 1 (1)"** assembly tab + **"qa4-s5-asm parts"** Part Studio + blob in **CAD Imports** + "BOM : Assembly 1 (1)"; parts **Part 2, Part 3, Part 1**, each at its own product position (x 0…320) |
+| Ø5 hole through Part 1 | **59803.650459 mm³** | 59803.65045915 ✅ |
+| Rename "Edited" | Edited, Part 3, Part 2 | Part 2, Part 3, Edited |
+| STEP export | AP242 Ed. 2 header, same CAx-IF lines and schema ✅; products Part 2, Part 3, Edited, no NEXT_ASSEMBLY_USAGE ✅ (order differs) | Edited, Part 2, Part 3 |
+| STL binary mm Fine | header **"noshape-kernel st…"**, 652 triangles, x 0…110 z 0…50 | header **all zeros**, 604 triangles, x 0…320 z 0…40 |
+| Parasolid | `APPL=noshape`, `SCH_1200000_12006`, no MC_MODEL/FRU/KEY/FILE/DATE lines (= EXP-HDR, api) | `APPL=Onshape`, `FRU=Parasolid 38.1.231`, `SCH_3801231_38101`, … |
+| Default file name | (CLI: the given path) | the Part Studio name "qa4-s5-asm parts" |
+
+### Live comparison of sessions 1–4 (behaviours "qa4 round 4 s1…s4", answered 10-24 ~02:00)
+- **S1** live: Flange 1 20295.075 / 34 faces, Hem 22074.861 / 43, cut 20805.412 / 61 vs ours 20051.651 / 28, 21804.734 / 34,
+  20547.157 / 37: the corner difference is **SM1** (fs, routed: live's walls run to the corner with rips "Joint B/C Rip").
+  Flat **128.9165 × 129.4650** (x × y) vs ours 129.465 × 128.916: **S1-a confirmed**, our flat is turned 90° → FLAT-ROT (fs).
+  Bend notes: live **one per bend-line segment** (the slot splits each long bend: 5 × "UP 90.0° R1.5" + 1 hem note), ours one
+  per bend (3 + 1) → FLAT-SEG (fs). Live's notes also overlap each other and the slot, so **S1-b is not a difference**
+  (withdrawn). Flat view auto scale live **1:3**, ours 1:1 → FLAT-SCALE (asb). The rest as live: "Flat pattern of Part 1"
+  only with the Flat patterns filter on; the drawing tab right after Part Studio 1; obround slot outline.
+- **S2** live: limit stop at exactly +50 mm, no message ✅; BOM columns ✅; balloon numbers ✅; exploded view ✅; drawing tab
+  right after the assembly ✅. **S2-c** live leaders end in an **arrowhead on an edge** and a dot only inside a face; ours put
+  a dot on every assembly-part leader → **fixed by qa4** (`scene/src/drawing_tools/pending.rs` `leader_dot`; test
+  `callout_leaders_end_in_arrows_on_edges`). Live notes: "REST-made mates show (Hidden) … UI-made mates are normally shown",
+  which contradicts the earlier capture ("a new mate is hidden by default", behaviours ~1268) → live asked (REQUESTS.md).
+- **S3** live: loft **4 faces / 12 edges / 6060.134 mm²** (ours 5 faces, 6058.817), Fill 1 an exact **PLANE 314.159265**
+  (ours 314.212, not planar), Enclose 31743.525 / 6 faces (ours 31807.093 / 7), Fillet 31730.804 / 10 (ours 31805.016 / 11)
+  → LOFT-SEAM + FILL-PLANE (kern). **S3-a confirmed**: Onshape can't measure an open surface (Parts to measure stays empty,
+  every value blank) → **fixed by qa4** (`regen/measure.rs` `mass_properties` counts solids only; test
+  `surfaces_have_no_mass_properties`; also fixes the CLI).
+- **S4** live: S 12000 / M 27000 / L 48000 = ours in the app ✅; the picker's configuration dropdown under the studio ✅; the
+  configuration not in the feature dialog itself ✅; the derived part named "Part 1" ✅.
+
+### In-app checks of the round-4 fixes (10-24 ~07:30, worktree build)
+- **S2-c** ✅ a new Callout on the plate's edge in "Assembly 1 Drawing 1" ends in a filled arrowhead on the edge (the
+  v0.4.7-made balloons beside it keep their stored dot). r4/s2c-callout-arrow-on-edge.png.
+- **S3-a** values ✅ blank for the lone open loft surface. Follow-up found in the app: the Part tab still took the surface
+  pick as a chip "Face of Loft 1"; live's field stays empty → **fixed by qa4** (`app/src/part_studio/menus.rs`
+  `mass_parts`: the Part tab measures and lists the solids owning the selection, each once; test
+  `mass_parts_tests::surfaces_never_enter_parts_to_measure`). Also from live's part-studio/2382: with nothing measurable
+  Onshape keeps the **whole dialog** (Mate connector field, Show calculation variance, Mass/Volume/Surface area/Center of
+  mass/inertia rows, all blank); ours collapsed to the one field → **fixed by qa4** (`MassView::blank`; test
+  `nothing_to_measure_keeps_every_row_blank`; seen in the app, r4/s3a-mass-blank-dialog.png). Mass's Override is then
+  greyed like Center of mass's (live 2382; ours was an enabled box) → fixed (`MassView::mass_override_enabled`, same test).
+  Not changed, unverified: after a click on the surface ours keeps the face highlighted orange (it just doesn't enter the
+  field); live says the click "adds nothing" without saying whether it highlights. Ours shows the "no material" toast with only a surface present; live's
+  REST counts the sheet body in massMissingCount, so it may be right → live asked (REQUESTS.md), not changed.
+- S2-a, S4-a, S4-c were seen in the app on the earlier worktree build.
+- Incident (qa4, 07:14): `qkill.sh` run without its pattern matched every process and SIGTERMed the whole server (all
+  agent sessions, Chrome, builds); reported to the lead. The script now refuses an empty pattern.
