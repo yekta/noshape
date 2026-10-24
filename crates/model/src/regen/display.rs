@@ -42,9 +42,9 @@ fn f3(p: DVec3) -> [f32; 3] {
 /// chord tolerance is smaller (a finer quality must re-mesh). `preview`
 /// meshes (instant feedback while a feature is edited) are Coarse.
 ///
-/// Gated off for now ([`angle_display_mesh`]): bodies get the chord-based
-/// mesh from before live 459 (chord 8e-4 of the body's diagonal, 0.35 rad;
-/// previews 4x the chord, 1.8x the angle).
+/// With `NOSHAPE_DISPLAY_MESH=chord` ([`angle_display_mesh`] off) bodies
+/// get the chord-based mesh from before live 459 (chord 8e-4 of the body's
+/// diagonal, 0.35 rad; previews 4x the chord, 1.8x the angle).
 fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool) -> (f64, f64) {
     let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
     if !angle_display_mesh() {
@@ -63,16 +63,15 @@ fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool
 static DISPLAY_MESH: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// Whether display meshes are Onshape's angle-based ones (live 459, 144
-/// segments per circle in Auto). Off until their GPU cost is down: on the
-/// macOS CI runners orbiting the 1000-pin fixture took 39–64% more GPU time
-/// per frame (perf.yml 2026-10-22, docs/handoff/viewport-performance.md).
-/// `NOSHAPE_DISPLAY_MESH=angle` (or `chord`) decides at start;
+/// segments per circle in Auto): yes unless `NOSHAPE_DISPLAY_MESH=chord`
+/// (the coarser chord-based mesh from before, an escape hatch for slow
+/// GPUs; docs/handoff/viewport-performance.md has the cost) at start;
 /// [`set_angle_display_mesh`] after.
 pub fn angle_display_mesh() -> bool {
     use std::sync::atomic::Ordering;
     match DISPLAY_MESH.load(Ordering::Relaxed) {
         0 => {
-            let angle = std::env::var("NOSHAPE_DISPLAY_MESH").is_ok_and(|v| v == "angle");
+            let angle = std::env::var("NOSHAPE_DISPLAY_MESH").as_deref() != Ok("chord");
             DISPLAY_MESH.store(if angle { 2 } else { 1 }, Ordering::Relaxed);
             angle
         }
