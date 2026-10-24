@@ -244,3 +244,4 @@ STATUS IM1 (2026-10-24, qa5): fixed by api (names, "<file> parts", RootAssembly)
 STATUS DOC1 / I5 (2026-10-24, qa5): fixed by api in live's layout with noshape's own product strings; only the Parasolid schema minor version differs (SCH_3801000 vs live 3801231).
 STATUS RHINO1 (2026-10-24, qa5): still "needs openNURBS" on main c59c5af9.
 STATUS MEAS1 (2026-10-24, qa5): answered by live "ui (10-23 a)"; fixed on ready/ui 6f16c117 (not on main yet).
+STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty status bar, as live).
