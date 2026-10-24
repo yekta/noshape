@@ -61,7 +61,8 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | # | What | Live | Ours | Status |
 |---|---|---|---|---|
 | R1 | Two default planes (or a plane and an edge) selected | parts unchanged (part-studio/81: "Perp planes angle: 90.000 deg" in the status bar only) | parts see-through with dark outlines | ✅ cause: the measure treats a default plane as a 2 000 000 mm face, so its Min/Max dist lines end ±1e6 mm out; those lines counted in the scene bounds, the fitted depth range grew, and the faces' depth bias let edges and silhouettes show through. Measure lines are now left out of the bounds (`Instance::no_bounds`) |
-| MS1 | Measurements of default planes | ? (asked: REQUESTS "ui (10-23 a)") | Top + Front: Perp planes angle 90°, **Area 8e12 mm², Max dist 2 449 490 mm, Min dist 0** | ? |
+| MS1 | Measurements of default planes (live ui 10-23 a, dom/ui-measure-default-planes.json) | only angles and distances: Top + Front / Top + Right "Perp planes angle: 90.000 deg" alone; Top + edge: Perp line and plane angle, Curvature deviation, Min dist, the edge's Length; Top + parallel face: Parallel dist, the face's Area, Min dist; Top alone: "No measurements available for current selection." | Top + Front: Perp planes angle 90°, **Area 8e12 mm², Max dist 2 449 490 mm, Min dist 0** | ✅ a plane adds no Area, Length, Max dist or positions; with only planes no Min dist unless parallel; a lone plane measures nothing and the panel says so (test `default_planes_add_only_angles_and_distances`; checked in the app 10-23) |
+| MS2 | Dashed measure lines | none in the graphics; a distance row's line shows while that row is hovered in the panel | the Min/Max dist lines of every distance, always | ✅ only the hovered distance row's line |
 
 ## 7. Right-side panels (live part-studio/77–78; dom/panel-appearance.txt; measured at 1×)
 
@@ -83,6 +84,20 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | MP1 | Dialog rows (borders, underlines) | 107, 133, 141–182, 188, 214, 276, 305, 333, 392, 423, 454, 513, 541, 569 | the same, except the empty mate connector field ends at 213 and its text sits 2 px high | ✅ empty field caption 25 px with 2 px top padding |
 | MP2 | Parts to measure prefilled from the selection | Part 1 (red: no material) | the same | ✅ matches |
 | MP3 | Text baselines of the labels | — | within 1–2 px (font metrics) | ✗ app-wide font (VC7) |
+
+## 9. Measure panel (live part-studio/82; measured at 1×)
+
+| # | What | Live | Ours | Status |
+|---|---|---|---|---|
+| ME1 | Position | x 1699–1918, bottom 1046 (2 px over the viewport's bottom), over the panel strip and the three bottom-right buttons | bottom 36 px up, right 40; then flush, under the buttons | ✅ docked 2 px up, drawn after the buttons |
+| ME2 | Title × | thin `#999` ×, 11 px of ink | the dialogs' red ✕ | ✅ grey panel × |
+| ME3 | Field | 5 px under the title line; chip × 7 px `#666` ink in a 20 px cell 5 px from the border, red on hover; every second chip row under a 35 % white overlay (woolsthorpe.css `.os-param-selection-list-entry:nth-of-type(2n)`), no hover background | 2 px; a 5 px text × at 9 px; no stripes | ✅ (the feature dialogs had the overlay on hover instead of on every second row: fixed there too) |
+| ME4 | Selects | label 12 px `#666`; the select fills the row (underline to 5 px from the edge), 14 px black, a 6 × 5 px `#777` ▼ 7 px from the end; underlines 31, 57, 83 px under the field | shrink-wrapped, 13.33 px `#333`, a 10 px caret next to the text; 26, 52, 78 | ✅ |
+| ME5 | Results | first row 31 px under the checkbox text; labels, values and units `#666` | 26 px; `#333` | ✅ |
+| ME6 | Footer | 1 px `#d7d7d7` line, 21 px `#eee` band, 12 px ? | the band only, hidden under the buttons | ✅ |
+| ME7 | Chip × | removes that entry from the selection | no action | ✅ |
+| ME8 | Assembly Measure panel (`measure_panel.rs`, shared code from icons2 Round 14) | as the Part Studio's | docked 36 px up / 40 px in, the old field, selects and colours | ✗ assembly (reported to the lead) |
+| ME9 | Nothing to measure (a lone plane; live part-studio/2244) | a 202 px info box (`#def1fb`, 1 px `#b2ddf6`) 5 px in, 14 px `#094174` on 21 px lines, two lines | a 12 px grey line, cut off at the panel edge | ✅ box exact (x/y to the pixel); the line breaks before "for" instead of after it because our UI font is wider (VC7) |
 
 ## qa5 re-run pass 21 (2026-10-23, app = target-lead 17:10, main 88fbf8f)
 | Row | Ours | Status |
