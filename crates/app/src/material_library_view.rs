@@ -222,7 +222,7 @@ impl Render for MaterialLibraryView {
                     .h(px(36.))
                     .px(px(6.))
                     .bg(rgb(0xeaeaea))
-                    .child(div().flex_1().text_size(px(16.)).text_color(pal.text).child(name))
+                    .child(div().flex_1().text_size(px(16.)).text_color(pal.text).child(crate::ui::user_text(name)))
                     .child(div().w(px(170.)).child(Input::new(&self.filter).h(px(26.)).text_size(px(14.)))),
             )
             .child(header)

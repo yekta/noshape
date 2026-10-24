@@ -229,6 +229,10 @@ fn hole_profile(d: f64, dims: &HoleDims, h: f64, tip: f64, over: f64) -> FResult
 
 /// Live L51: a fastener fit on a hole through one part.
 const FIT_INFO: &str = "Fastener fit will not be applied if there are fewer than two parts per hole.";
+/// hole.fs HOLE_TAP_TOO_DEEP (its help link kept as text).
+const TAP_TOO_DEEP: &str = "Tapped depth readjusted. Tapped depth input is greater than minimum computed Hole depth. Learn more";
+/// hole.fs HOLE_CBORE_CSINK_VALUES_NON_STD.
+const PIPE_TAP_HEADS: &str = "Counterbore and countersink values are non standard for tapered holes.";
 
 pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     // hole.fs order: sizes, then the end and start entities, then the points.
@@ -294,8 +298,14 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     let mut missed = 0;
     // A fastener fit on a hole through fewer than two parts (live L51).
     let mut fit_unused = false;
+    // A tapped depth deeper than a hole gets in its parts (hole.fs).
+    let mut tap_too_deep = false;
+    let tapped_input = if ev.params.bool("showTappedDepth") && end != "THROUGH" { ev.length("tappedDepthV3").ok() } else { None };
     // Depth of an Up to next / Up to entity hole, shown read-only.
     let mut up_to_depth_found: Option<f64> = None;
+    // Each hole's start, direction and length (to the tip): the parts it
+    // reaches, inside the scope or not, are the dialog's default scope.
+    let mut spans: Vec<(DVec3, DVec3, f64)> = Vec::new();
     for loc in &locs {
         let dir = if flip { loc.normal } else { -loc.normal }.normalize();
         // Ray from far behind the location so bodies around it are seen.
@@ -354,6 +364,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         // Live L61: with an offset the Depth field shows the shaft depth less
         // the offset (4.092 for a 6.092 shaft and a 2 mm offset).
         up_to_depth_found.get_or_insert(h - tip_offset);
+        spans.push((s, dir, h + tip));
         // Overshoot above the start when that is outside every part.
         let over = {
             let o = r_main * 0.25;
@@ -416,6 +427,9 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         any_hit = true;
         let ids = |v: &[(usize, f64, f64)]| -> Vec<BodyId> { v.iter().map(|x| ev.ctx.bodies[x.0].id.clone()).collect() };
         fit_unused |= dims.clearance && ordered.len() < 2;
+        // The depth in the parts: the hole's length, or less where it leaves them.
+        let in_part = h.min(ordered.iter().map(|x| x.2).fold(0.0, f64::max));
+        tap_too_deep |= tapped_input.is_some_and(|td| td > in_part + 1e-9);
         match dims.tap_drill.filter(|_| dims.clearance) {
             Some(td) if (td - dims.diameter).abs() > 1e-9 && ordered.len() > 1 => {
                 let (front, last) = ordered.split_at(ordered.len() - 1);
@@ -434,12 +448,37 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
+    // Live L57: the parts the holes reach (Blind 5 into the top of two
+    // stacked parts: the top one; 15: both), whatever the scope.
+    let mut reached: Vec<usize> = groups.keys().flatten().filter_map(|id| index_of_body(ev, id)).collect();
+    for bi in (0..ev.ctx.bodies.len()).filter(|i| ev.ctx.bodies[*i].kind == BodyKind::Solid && !candidates.contains(i)) {
+        let shape = &ev.ctx.bodies[bi].shape;
+        if spans.iter().any(|(s, dir, len)| ray_intervals(shape, *s, *dir, *len).iter().any(|(a, b)| *b > 1e-9 && *a < *len)) {
+            reached.push(bi);
+        }
+    }
+    reached.sort_unstable();
+    reached.dedup();
+    ev.touched = reached.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
     if !any_hit {
         return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
+    }
+    // Live L56: an empty Merge scope is an error (the dialog fills it with
+    // the parts reached). Holes saved before that cut every part.
+    if explicit_scope.is_empty() && !ev.params.bool("legacyAllParts") {
+        return crate::regen::eval::err_at(&["scope"], "No target parts selected for hole.");
     }
     // Live L53: a location that makes no hole fails the whole feature.
     if missed > 0 {
         return err("Hole creates invalid geometry.");
+    }
+    if tap_too_deep {
+        ev.infos.push(TAP_TOO_DEEP.into());
+    }
+    // A counterbore / countersink on a pipe tap.
+    let (pid, _) = ht::hole_table_param(ev.params);
+    if !ev.params.is("styleV2", "SIMPLE") && ev.params.lookup(pid).iter().any(|k| k.contains("Pipe Tap")) {
+        ev.infos.push(PIPE_TAP_HEADS.into());
     }
     if fit_unused {
         ev.infos.push(FIT_INFO.into());

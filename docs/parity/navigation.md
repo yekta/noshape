@@ -139,3 +139,34 @@ Wayland (`wl_touch`). Gestures are `touch.rs` (Onshape's recognizers).
 | 7.9 | Touches on overlays above the graphics area (view cube, dialogs) stay normal taps | — | 🔧 (only touches starting on the viewport's own topmost hitbox are claimed) |
 | 7.10 | Pen acts as a finger unless "Use pen input as mouse" | Preferences | 🔧 Windows; ⏳ Linux (tablet pens arrive as pointer devices) |
 | 7.11 | Trimetric / plane views from the view cube menu, 3D Rotate Lock | help (mobile apps) | ❌ mobile apps only |
+
+## Re-check of the 🔧 rows (qa4, 2026-10-23 23:30–00:30, app /root/qa4-scratch/bin/noshape-a0e = main a0e360a3, Xvfb 1600×1000, demo plate; screenshots /tmp/qa4/cw)
+Method: xdotool input on X11, model extents measured from pixels (front face colour).
+
+**Verified in the app ✅**
+| Row | Measured |
+|---|---|
+| 1.8 pan keeps the point under the cursor | middle-drag (+100, +50) px → model moved (+100, +46) px; Ctrl+right-drag back → (0, 0) |
+| 1.9 Shift+right-drag rotates | Front → Right face comes in (no pan) |
+| 1.5 Alt+right-drag | from a tilted view (↑ then ←) snaps floor-down and turns about Z (ends on Right, Z up) |
+| 1.19 zoom-out limit | 40 out-notches stop with the model ≈ 100 px across (front face 71 px) |
+| 1.20 horizontal scroll | 0 px change |
+| 1.20b Shift/Ctrl+wheel | 3 Shift + 3 Ctrl notches → ×1.416 (= 1.06⁶ 1.419) |
+| 3.1 arrows | ← from Front brings Right in, ↑ brings Bottom in |
+| 3.2 Shift+arrow | Shift+← from Front lands exactly on Right |
+| 3.5 Ctrl+Shift+→ | model moves 150 px |
+| 3.6 Z | ×1/1.77 about the centre (= 1.75; edge antialiasing) |
+| 4.1 / 4.4 view cube face, Shift+1 | Top / Front, each zoomed to fit from a zoomed-in camera |
+| 4.2 / 4.3 cube arrows | ▶ rotates 15° (Right face edge comes in), curved arrow rolls 15° |
+
+**Covered by unit tests, not separately in the app:** 1.1, 1.2 (`drag_rotate_rate_matches_live`), 1.4 (`inertia_decays_like_onshape`),
+1.16–1.18 (zoom tests), 3.3 / 3.9 (animation timing), 2.7 pinch ratio (`ortho_zoom_amounts_and_pinch_follow_fingers`).
+
+**Not conclusive here:** 1.11 (Ctrl pressed mid-drag): the screenshot after rotate → Ctrl-pan is plausible but I couldn't separate the two
+parts from one frame; 1.3 rotate centre, 1.12, 1.13, 1.21, 3.4 (key repeat), 3.7 (Assembly), 5.x (Mouse controls page), 6.x (drawing) not
+re-run this pass.
+
+**Needs real hardware (cannot be tested on Xvfb / xdotool):** 2.4–2.9 (touchpad scroll, momentum, precision touchpad, Linux smooth scroll,
+pinch, macOS Ctrl-click: X11 xdotool only sends discrete wheel buttons), 7.1–7.10 (touchscreen taps, drags, two-finger gestures, pen; no
+touch device on this server), 5.7 pen-as-mouse. Proposal: a CI macOS runner can drive 2.4 / 2.7 / 2.9 with synthetic NSEvent scroll and
+magnify events; touchscreen rows need a Windows touch device or a recorded event stream fed to `touch.rs` in tests.

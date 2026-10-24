@@ -531,7 +531,7 @@ impl Workspace {
                             .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(gpui_kit::rgb(0x4a4a4a)).child("noshape")),
                     )
                     .child(self.render_doc_menu(cx))
-                    .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().cursor_text().child(name))
+                    .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().cursor_text().child(crate::ui::user_text(name)))
                     // Live: on the name's baseline, 11 px after it. The name and this
                     // label show the I-beam (dom/cursors-controls.json).
                     // Live (navigation/301): a version shows its name ("V1", #999) in the
@@ -539,9 +539,10 @@ impl Workspace {
                     // A protected workspace: a lock before its name (live wp-929).
                     .when(protected && viewing_version.is_none(), |d| d.child(div().flex_none().mt(px(6.)).child(crate::assets::icon("lock", 14., cx))))
                     .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().child(match (&viewing_version, read_only) {
-                        (Some(v), _) => v.clone(),
-                        (None, true) => "History".to_string(),
-                        (None, false) => branch_name,
+                        // Version and workspace names are the user's.
+                        (Some(v), _) => crate::ui::user_text(v.clone()).into_any_element(),
+                        (None, true) => "History".into_any_element(),
+                        (None, false) => crate::ui::user_text(branch_name).into_any_element(),
                     }))
                     .when(read_only && viewing_version.is_none(), |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
                     .child(div().flex_1())
@@ -1058,7 +1059,7 @@ impl Workspace {
                     .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
                         // Tab › Rename / double-click: the name becomes a field.
                         Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
-                        None => div().truncate().when(compare_off, |d| d.opacity(0.5)).child(name).into_any_element(),
+                        None => div().truncate().when(compare_off, |d| d.opacity(0.5)).child(crate::ui::user_text(name)).into_any_element(),
                     })
                     .children(compare_dot.map(|dot| div().flex_none().ml(px(3.)).when(compare_off, |d| d.opacity(0.55)).child(dot)))
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
@@ -1234,7 +1235,7 @@ impl Workspace {
                     Some(i) => crate::assets::icon(i, 20., cx),
                     None => os::glyph(os::GLYPH_FOLDER, 20., pal.text).into_any_element(),
                 }))
-                .child(div().min_w_0().truncate().child(g.name.clone()))
+                .child(div().min_w_0().truncate().child(crate::ui::user_text(g.name.clone())))
         });
         let arrows = self.render_tab_scroll_buttons(cx);
         // The strip's overflow is known only after layout, and the bar is a
@@ -1802,7 +1803,7 @@ impl Workspace {
             .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
             .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
                 Some((_, st, _)) => div().w(px(150.)).child(gpui_kit::component::input::Input::new(st).h(px(22.)).text_size(px(14.)).px(px(3.)).text_color(pal.text)).into_any_element(),
-                None => div().truncate().when(current, |d| d.font_weight(FontWeight::SEMIBOLD)).child(name.clone()).into_any_element(),
+                None => div().truncate().when(current, |d| d.font_weight(FontWeight::SEMIBOLD)).child(crate::ui::user_text(name.clone())).into_any_element(),
             })
             .when(!current, |d| d.on_drag(TabDrag { id, name: name.clone(), icon: None }, start_tab_drag(cx.entity().downgrade())))
             .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))

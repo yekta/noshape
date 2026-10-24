@@ -251,6 +251,55 @@ impl Element for Text {
     }
 }
 
+/// NOSHAPE PATCH: the UI language. Plain text children (`&str`, `String`,
+/// `SharedString`) are looked up whole in the app's string table while a
+/// translator is installed; [`StyledText`] (the app's user-content text)
+/// and inputs never are. One relaxed load when no translator is set.
+static TRANSLATE_ON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static TRANSLATOR: std::sync::RwLock<Option<fn(&str) -> Option<&'static str>>> = std::sync::RwLock::new(None);
+/// NOSHAPE PATCH: a debug log of the text painted while a translator is
+/// installed, where, and whether it was looked up (`false`: [`StyledText`]).
+static TEXT_LOG: std::sync::RwLock<Option<fn(&str, Bounds<Pixels>, bool)>> = std::sync::RwLock::new(None);
+
+/// NOSHAPE PATCH: install (or remove) the UI string table.
+pub fn set_text_translator(f: Option<fn(&str) -> Option<&'static str>>) {
+    *TRANSLATOR.write().unwrap_or_else(|e| e.into_inner()) = f;
+    TRANSLATE_ON.store(f.is_some(), std::sync::atomic::Ordering::Release);
+}
+
+/// NOSHAPE PATCH: report each text painted with its bounds and whether it
+/// went through the translator (QA).
+pub fn set_translated_text_log(f: Option<fn(&str, Bounds<Pixels>, bool)>) {
+    *TEXT_LOG.write().unwrap_or_else(|e| e.into_inner()) = f;
+}
+
+/// NOSHAPE PATCH: `text` in the UI language, for UI text drawn outside the
+/// text elements (input placeholders); None: as it is.
+pub fn translate_ui_text(text: &str) -> Option<&'static str> {
+    translated(text)
+}
+
+#[inline]
+fn translated(text: &str) -> Option<&'static str> {
+    if !TRANSLATE_ON.load(std::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    translated_slow(text)
+}
+
+#[cold]
+fn translated_slow(text: &str) -> Option<&'static str> {
+    let f = (*TRANSLATOR.read().unwrap_or_else(|e| e.into_inner()))?;
+    f(text)
+}
+
+#[cold]
+fn log_text(text: &str, bounds: Bounds<Pixels>, looked_up: bool) {
+    if let Some(f) = *TEXT_LOG.read().unwrap_or_else(|e| e.into_inner()) {
+        f(text, bounds, looked_up);
+    }
+}
+
 impl Element for &'static str {
     type RequestLayoutState = TextLayout;
     type PrepaintState = ();
@@ -270,6 +319,9 @@ impl Element for &'static str {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
+        if let Some(t) = translated(self) {
+            *self = t;
+        }
         let mut state = TextLayout::default();
         let layout_id = state.layout(SharedString::from(*self), None, window, cx);
         (layout_id, state)
@@ -284,6 +336,9 @@ impl Element for &'static str {
         _window: &mut Window,
         _cx: &mut App,
     ) {
+        if TRANSLATE_ON.load(std::sync::atomic::Ordering::Relaxed) {
+            log_text(self, bounds, true);
+        }
         text_layout.prepaint(bounds, self)
     }
 
@@ -344,6 +399,9 @@ impl Element for SharedString {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
+        if let Some(t) = translated(self) {
+            *self = SharedString::new_static(t);
+        }
         let mut state = TextLayout::default();
         let layout_id = state.layout(self.clone(), None, window, cx);
         (layout_id, state)
@@ -358,6 +416,9 @@ impl Element for SharedString {
         _window: &mut Window,
         _cx: &mut App,
     ) {
+        if TRANSLATE_ON.load(std::sync::atomic::Ordering::Relaxed) {
+            log_text(self, bounds, true);
+        }
         text_layout.prepaint(bounds, self.as_ref())
     }
 
@@ -584,6 +645,9 @@ impl Element for StyledText {
         _window: &mut Window,
         _cx: &mut App,
     ) {
+        if TRANSLATE_ON.load(std::sync::atomic::Ordering::Relaxed) {
+            log_text(&self.text, bounds, false);
+        }
         self.layout.prepaint(bounds, &self.text)
     }
 

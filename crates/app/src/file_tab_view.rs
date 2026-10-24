@@ -163,7 +163,7 @@ impl Render for FileTabView {
                     .border_color(gpui_kit::rgb(0xd3d7d9))
                     .text_color(pal.text)
                     .child(crate::assets::icon(file_icon(&f), 100., cx))
-                    .child(div().pt(px(16.)).text_size(px(20.)).font_weight(FontWeight::SEMIBOLD).text_center().child(f.file_name.clone()))
+                    .child(div().pt(px(16.)).text_size(px(20.)).font_weight(FontWeight::SEMIBOLD).text_center().child(crate::ui::user_text(f.file_name.clone())))
                     .child(div().text_size(px(12.)).child(f.type_label()))
                     .child(div().text_size(px(12.)).child(format!("File size: {}", f.size_label())))
                     .child(div().text_size(px(12.)).child(uploaded_label(f.uploaded)))
@@ -215,7 +215,7 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                     .cursor_pointer()
                     .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
                     .child(crate::assets::icon(file_icon(&f), 20., cx))
-                    .child(div().flex_1().truncate().child(name))
+                    .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
                     .child(div().text_size(px(12.)).text_color(pal.text_muted).child(f.size_label()))
                     .on_click(move |_, window, cx| {
                         window.close_dialog(cx);

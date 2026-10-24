@@ -356,7 +356,7 @@ impl DrawingEditor {
                         .gap(px(4.))
                         .cursor_pointer()
                         .child(crate::ui::caret(open))
-                        .child(div().flex_1().text_size(px(13.)).child(name))
+                        .child(div().flex_1().text_size(px(13.)).child(crate::ui::user_text(name)))
                         .child(div().id(("dt-row-x", k)).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.edit_datum(
                                 |d| {
