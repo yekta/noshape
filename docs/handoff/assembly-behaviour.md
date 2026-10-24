@@ -1105,3 +1105,20 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
     "Part Studio 1-Mirrored" + folder at the end, g8 its Part Studio, h2 the copy).
 * Replicate / pattern fields carrying the error: `os::query_box_error` (pink, red border, grey label) and the
   error as the label tooltip (`os::query_box_tip`).
+
+## Assembly section view manipulator (skb 10-24, lead's priority; on icons2's shared Section view dialog)
+* While the dialog is open, the active plane's arrow (assembly_behaviors.rs `section_arrow`, the Part Studio's
+  placement: on the plane where it passes the assembly's centre, along the normal, 12 % of the bounds' diagonal)
+  is drawn like the Part Studio's (assembly_scene.rs: screen-sized, white shaft, hollow head outlined grey /
+  blue when hovered) and pickable (`OverlayPick::SectionArrow`). Dragging it moves the plane along its normal
+  (`start_section_drag` / `drag_section` / `end_section_drag` from the viewport's ToolDown / Drag / Up); the
+  offset box at the tip (`render_section_value`) shows the offset and, clicked, becomes a field (text selected,
+  Enter / blur moves the plane, like live's "-0.91 in" box).
+* Right-click empty space with a section on: Edit section view… (`edit_section`: the dialog over the current
+  section, ✕ keeps it as it was) and Turn off section view — placed at the top of the menu (their place in the
+  assembly menu is UNCONFIRMED).
+* Open (REQUESTS "skb (10-24) assembly section"): the rotate handles (live's "sun-like" glyph and ring at the
+  arrow's base) and any flip; whether the arrow shows after ✓.
+* GUI-checked on :103 (/root/skb-scratch/s1–s10.png: arrow + "0 mm", drag to -12.565 mm, typed -2 mm, menu,
+  Edit keeps -2 mm, Turn off).
+
