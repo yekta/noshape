@@ -87,7 +87,8 @@ pub struct Palette {
     /// #1c1c1c like every strip button, live dk-929).
     pub strip_inactive: Rgba,
     /// A disabled primary button on the account pages (Save theme…): fill
-    /// and text (live prefs/dk-904: #283f65 with #858585 in dark).
+    /// and text: #1651b0 at 40 % (live prefs/00 #a2b9df; dk-904 #283f65 with
+    /// #858585 in dark).
     pub button_disabled: Rgba,
     pub button_disabled_text: Rgba,
     /// Text links on the account pages ("Learn more about default units.";
@@ -163,7 +164,7 @@ pub const PALETTE: Palette = Palette {
     table_header: rgb_const(0xeaeaea),
     bg_senary: rgb_const(0xffffff),
     strip_inactive: rgb_const(0xeaeaea),
-    button_disabled: rgb_const(0xc6d5ec),
+    button_disabled: rgb_const(0xa2b9df),
     button_disabled_text: rgb_const(0xffffff),
     link: rgb_const(0x0b5394),
     query_active: rgb_const(0xdef1fb),

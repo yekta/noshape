@@ -1,16 +1,39 @@
 # Preferences page (My account › Preferences) vs live
 
-ui2, 2026-10-22, app /tmp/ui2/noshape (tree 5bd50b2 + WIP), window 1919×1079 vs live prefs/00-y0 … 05-y4500
-(full page, Free plan), er-9xx (export rules), sc-9xx (shortcut toolbars). Status: ✅ matches, ✗ differs, ⊘ excluded (cloud).
+ui2, 2026-10-24. App = ui2 build of 10-24 13:50 (tree 2d3d475e + the Preferences fixes below), the
+Preferences window sized to 1920×1080; live = prefs/00-y0 … 05-y4500 (light, full page), 1860–1919
+(profiles, Labs, export rules), sc-9xx (shortcut toolbars), dk-901…904 (dark, Theming → Units).
+Live has the cloud subscription banner on top (+53 px), so positions are compared from each
+section's rule. Status: ✅ matches, ✗ differs, ⊘ excluded (cloud), ? waiting on live.
 
-| # | Section / item | Live | Ours | Status |
+## Light
+
+| # | Section | Live | Ours | Status |
 |---|---|---|---|---|
-| P1 | **Language** (first section) | "Display language" select (English) + [Save language] (pale until changed) | missing | ✗ P1 (ui2) |
-| P2 | **Theming** | ◉ Light mode "Default color scheme for Onshape featuring dark elements on light backgrounds." / ○ Dark mode [beta] ⓘ "Low luminance color scheme…" + [Save theme] (live dt-000/dk-901…904) | missing; the app has no dark theme | ✗ P2 (ui2 page + ui theme) |
-| P3 | **Environment profile settings** ⓘ (after Mouse controls) | Environment profile [Onshape (default) ▾] [Create profile] [Delete profile] (pale); "Match pixel density on high resolution displays (can affect performance)" [Automatic (default) ▾]; [Save profile settings] | missing (capture of its dialogs requested earlier, REQUESTS ui2 22:10) | ✗ P3 (ui2) |
-| P4 | **User export rules** ⓘ (after Material libraries) | "You have not added any export rules." + [Add export rule…]; rules table, add / edit dialog with validation, effect on the export dialogs' file names (live er-900…931) | **missing** (the Export dialogs' "View export rules" link scrolls to the page end, which is Material libraries) | ✗ P4 (ui2) |
-| P5 | **Onshape Labs** 🧪 (last) | ☐ "Enable users to access experimental, proof of concept features. Learn more." | missing | ✗ P5 (ui2; lead: keep or drop?) |
-| P6 | Release management / Numbering scheme settings | not on the user Preferences page (a paid-plan company setting) | two extra sections before Material libraries | ✗ P6 (lead decides: Release is kept as a paid feature; where its settings live) |
-| P7 | Shortcut toolbars › Sketch list | starts **Extrude, Revolve**, then Line, Midpoint line, Corner rectangle… (live 04, sc-9xx) | starts Line, Midpoint line… | ✗ P7 (ui2) |
-| P8 | Left list | Profile, Emails, Preferences, Notifications, Security, Devices, Applications, Integrations, Developer; Subscription…; Teams | Profile, Preferences | ⊘ (account / cloud pages) |
-| P9 | Decimal format, Units, Mouse controls, Part Studio / Assembly settings, Keyboard shortcuts, Toolbars, Drawings, Material libraries | as live | same layout and controls | ✅ |
+| P1 | Language | Display language select + [Save language] (pale until changed) | same; the label/select gap was 3 px short (fixed: control 25 px under the label) | ✅ |
+| P2 | Theming | ◉ Light mode / ○ Dark mode [beta] (?) with 12 px `#777` notes, [Save theme] | same; notes were 11 px in the body colour, the radio a 13 px ring with a blue dot (fixed: 12 px `#777`, Bootstrap 14 px `#0d6efd` disc with a white dot, off `#ababab`) | ✅ (±2 px) |
+| P2b | Disabled Save buttons | `#1651b0` at 40 % = `#a2b9df`, white text | `#c6d5ec` (25 %) (fixed) | ✅ |
+| P3 | Decimal format | as live | as live | ✅ |
+| P4 | Units | 11 unit rows + Time format, 72 px pitch, (?) per row; selects with Chrome's 8×5 `#777` arrow 10 px in | same layout; the selects had a "▼" text glyph 24 px in and long names ran under it (fixed: the shared `#777` caret, the value truncates) | ✅ |
+| P5 | Mouse controls | View settings + table + 3 checkboxes + [Save mouse controls] | same (select caret fixed as P4) | ✅ |
+| P6 | Environment profile settings | profile select + [Create profile] [Delete profile]; pixel density select; [Save profile settings] | same; label/select gap fixed as P1 | ✅ |
+| P7 | Part Studio settings / Assembly settings | one checkbox each + Save | same | ✅ |
+| P8 | Keyboard shortcuts | tabs General…Drawing + [Reset all], list + legend | same; live's list shows Chrome's permanent scrollbar, ours an overlay one | ✅ (scrollbar style is app-wide) |
+| P9 | Shortcut toolbars › Sketch | Onshape's 56-row list: **Extrude, Revolve**, Line, …, "Center point rectangle", "Use", "Fillet", "Chamfer", …, Measure | started at Line with our tool names ("Center rectangle") (fixed: the live list and wording; ticks map to our tools) | ✅ list; ✗ ticking Extrude / Revolve / Construction / Section view / Mass and section properties / Measure has no effect on our sketch S toolbar yet |
+| P10 | Toolbars, Drawings | [Reset to defaults]; Dark/Light view select + Save | same | ✅ |
+| P11 | Material libraries | Library / Document / Owner at 425 px columns, rows 42 px, [Add material library…] 50 px under the row | columns split the width (≈384 px), rows 48 px, the button 34 px under (fixed to live's metrics) | ✅ |
+| P12 | User export rules | (?) heading; "You have not added any export rules." 43 px under the rule; [Add export rule…] at 107 px | text 31 px, button 68 px (fixed) | ✅ |
+| P13 | Onshape Labs | heading with the blue flask (on or off), checkbox + "Learn more." | flask only when Labs was on (fixed: always, live 1870/1919) | ✅ |
+| P14 | Left list | Profile, Emails, Preferences, Notifications, …, Teams | Profile, Preferences | ⊘ (account / cloud pages) |
+| P15 | Release management / Numbering settings | company settings, not on this page | in Company settings (separate window) | ✅ |
+
+## Dark (live dk-904: Theming → Units only)
+
+| # | Item | Live | Ours | Status |
+|---|---|---|---|---|
+| D1 | Page, headings, selects, checkbox, disabled Save (`#283f65` / `#858585`) | | same | ✅ |
+| D2 | Theme notes | `#bbbbbb` | white (fixed) | ✅ |
+| D3 | Checked radio | `#0d6efd` disc + white dot; off ring `#878787` | light-mode style (fixed) | ✅ |
+| D4 | Select arrow | `#777` (as in light) | `#999` through the dark palette (fixed: static `#777`) | ✅ |
+| D5 | (?) help icons | light `#d6d6d6` ring and "?" | dim | ✗ icon (icons2, dark (?) icon routed there 10-23) |
+| D6 | Mouse controls … Onshape Labs, dialogs (Create profile, export rule, Labs consent), open selects, hover/focus | ? | ? | ? REQUESTS "ui2 (10-24 11:30)" (full-page dark captures) |

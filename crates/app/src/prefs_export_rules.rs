@@ -44,7 +44,8 @@ impl Render for ExportRulesPrefsView {
             .into_any_element();
         let view = cx.entity();
         let body: AnyElement = if rules.is_empty() {
-            div().pl(px(6.)).pt(px(4.)).text_size(px(14.)).text_color(pal.text).child(tr("You have not added any export rules.")).into_any_element()
+            // Live (prefs/1919): the note 43 px under the rule, the button 107.
+            div().pl(px(6.)).pt(px(16.)).text_size(px(14.)).text_color(pal.text).child(tr("You have not added any export rules.")).into_any_element()
         } else {
             // Live 1877: Scope | Format | Convention | [Edit] [Remove], creation order.
             let cell = |w: f32, t: SharedString, bold: bool| div().w(px(w)).flex_none().px(px(10.)).truncate().when(bold, |d| d.font_weight(FontWeight::BOLD)).child(t);
@@ -81,15 +82,17 @@ impl Render for ExportRulesPrefsView {
             table.into_any_element()
         };
         let view_add = cx.entity();
+        let add_gap = if rules.is_empty() { 53. } else { 26. };
         v_flex()
-            .mb(px(38.))
+            // The next section's rule 50 px under the button (live 1919).
+            .mb(px(18.))
             .child(PreferencesView::heading(tr("User export rules"), Some(help)))
             .child(
                 v_flex()
                     .pl(px(15.))
                     .pt(px(14.))
                     .child(body)
-                    .child(h_flex().mt(px(26.)).child(os::primary_button("er-add", tr("Add export rule…")).on_click(move |_, window, cx| open_dialog(view_add.clone(), None, window, cx)))),
+                    .child(h_flex().mt(px(add_gap)).child(os::primary_button("er-add", tr("Add export rule…")).on_click(move |_, window, cx| open_dialog(view_add.clone(), None, window, cx)))),
             )
     }
 }

@@ -72,9 +72,10 @@ fn help(id: &'static str, text: &'static str, cx: &App) -> AnyElement {
     div().id(id).child(crate::assets::icon("help-gray", 18., cx)).tooltip(crate::ui::tooltip(tr(text))).into_any_element()
 }
 
-/// A label over a control (14 px, 6 px apart).
+/// A label over a control (14 px; the control's top 25 px under the
+/// label's, live prefs/00, 02).
 fn labelled(label: &str, control: impl IntoElement) -> Div {
-    v_flex().gap(px(6.)).child(div().text_size(px(14.)).text_color(p().text).child(tr(label))).child(control)
+    v_flex().gap(px(9.)).child(div().text_size(px(14.)).text_color(p().text).child(tr(label))).child(control)
 }
 
 /// A 250 × 34 browser select, or its greyed look when `enabled` is false.
@@ -162,18 +163,17 @@ impl Default for ThemingPrefsView {
     }
 }
 
-/// A browser radio button: 13 px, blue when on.
+/// Onshape's (Bootstrap) radio, live prefs/00 and dk-904: 14 px; off a 1 px
+/// `#ababab` ring (`#878787` in dark).
 fn radio(on: bool) -> Div {
-    div()
-        .size(px(13.))
-        .flex_none()
-        .rounded_full()
-        .border_1()
-        .border_color(if on { rgb(0x0075ff) } else { rgb(0x767676) })
-        .flex()
-        .items_center()
-        .justify_center()
-        .when(on, |d| d.child(div().size(px(7.)).rounded_full().bg(rgb(0x0075ff))))
+    let dark = noshape_scene::palette::is_dark();
+    let d = div().size(px(14.)).flex_none().rounded_full().flex().items_center().justify_center();
+    if on {
+        // Bootstrap's checked radio, both themes: a #0d6efd disc, white dot.
+        d.bg(gpui_kit::rgb_static(0x0d6efd)).child(div().size(px(6.)).rounded_full().bg(gpui_kit::rgb_static(0xffffff)))
+    } else {
+        d.border_1().border_color(gpui_kit::rgb_static(if dark { 0x878787 } else { 0xababab }))
+    }
 }
 
 impl Render for ThemingPrefsView {
@@ -199,7 +199,7 @@ impl Render for ThemingPrefsView {
                             cx.notify();
                         })),
                 )
-                .child(div().pl(px(21.)).text_size(px(11.)).text_color(pal.text).child(tr(note)))
+                .child(div().pl(px(22.)).pt(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xbbbbbb } else { 0x777777 })).child(tr(note)))
         };
         // Live dk-900: a blue "beta" pill and a (?) after "Dark mode".
         let beta = h_flex()
@@ -215,7 +215,7 @@ impl Render for ThemingPrefsView {
                 .gap(px(16.))
                 .child(option("pref-light", false, "Light mode", "Default color scheme for Onshape featuring dark elements on light backgrounds.", None, cx))
                 .child(option("pref-dark", true, "Dark mode", "Low luminance color scheme mainly featuring light elements on dark backgrounds.", Some(beta), cx))
-                .child(h_flex().mt(px(4.)).child(PreferencesView::save_button("pref-theme-save", tr("Save theme"), changed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                .child(h_flex().child(PreferencesView::save_button("pref-theme-save", tr("Save theme"), changed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     if this.edited == this.saved {
                         return;
                     }
@@ -492,8 +492,8 @@ impl Render for LabsPrefsView {
         };
         section(
             "Onshape Labs",
-            // Live 1900: the blue flask once Labs is on.
-            on.then(|| crate::assets::icon("onshape-labs-blue", 20., cx).into_any_element()),
+            // Live 1870, 1919: the blue flask, Labs on or off.
+            Some(crate::assets::icon("onshape-labs-blue", 20., cx).into_any_element()),
             v_flex()
                 .child(
                     check_row("pref-labs", on, tr("Enable users to access experimental, proof of concept features."))

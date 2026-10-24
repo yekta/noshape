@@ -563,7 +563,7 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
         .text_size(px(14.))
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .child(div().flex_1().truncate().map(|d| if current >= user_from { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
-        .child(glyph(GLYPH_CARET, 8., rgb(0x777777))) // live assembly/181-182: `#777`
+        .child(glyph(GLYPH_CARET, 8., gpui_kit::rgb_static(0x777777))) // live assembly/181-182: `#777` (also in dark, prefs/dk-904)
         .on_click(move |_, window, cx| open(window, cx))
 }
 

@@ -97,9 +97,38 @@ pub(crate) fn tool_name(t: Tool) -> &'static str {
     l.rsplit_once(" (").map_or(l, |(n, _)| n)
 }
 
-/// Every sketch tool (name, icon), for Preferences › Shortcut toolbars.
-pub(crate) fn sketch_toolbar_tools() -> Vec<(&'static str, &'static str)> {
-    super::sketch::all_sketch_tools().map(|t| (tool_name(t), t.icon())).collect()
+/// Preferences › Shortcut toolbars › Sketch: Onshape's list, in its order
+/// and wording (live dom preferences-shortcut-toolbars.json, 56 rows).
+pub(crate) const SKETCH_PREFS_LIST: [&str; 56] = [
+    "Extrude", "Revolve", "Line", "Midpoint line", "Corner rectangle", "Center point rectangle", "Aligned rectangle", "Center point circle", "3 point circle", "Ellipse",
+    "3 point arc", "Tangent arc", "Center point arc", "Elliptical arc", "Conic", "Inscribed polygon", "Circumscribed polygon", "Spline", "Bezier", "Spline control point",
+    "Point", "Text", "Use", "Intersection", "Construction", "Fillet", "Chamfer", "Trim", "Extend", "Split",
+    "Offset", "Slot", "Mirror", "Linear pattern", "Circular pattern", "Transform", "Insert DXF or DWG", "Insert image", "Dimension", "Coincident",
+    "Concentric", "Parallel", "Tangent", "Horizontal", "Vertical", "Perpendicular", "Equal", "Midpoint", "Normal", "Pierce",
+    "Symmetric", "Fix", "Curvature", "Section view", "Mass and section properties", "Measure",
+];
+
+/// The Sketch list's rows: (stored id: our tool's name, or the row's name
+/// for the Part Studio commands on it; Onshape's label; icon path).
+pub(crate) fn sketch_prefs_rows() -> Vec<(String, &'static str, gpui_kit::SharedString)> {
+    SKETCH_PREFS_LIST
+        .iter()
+        .map(|&name| match sketch_tool(name) {
+            Some(t) => (tool_name(t).to_string(), name, crate::assets::icon_path(t.icon())),
+            None => {
+                let icon = match name {
+                    "Extrude" => "extrude",
+                    "Revolve" => "revolve",
+                    "Section view" => "section-view",
+                    "Mass and section properties" => "mass-properties",
+                    "Measure" => "measure",
+                    "Construction" => "construction",
+                    _ => "sketch",
+                };
+                (name.to_string(), name, crate::assets::icon_path(icon))
+            }
+        })
+        .collect()
 }
 
 /// Onshape's default sketch S toolbar, by name.
@@ -124,6 +153,8 @@ pub(super) fn sketch_tool(name: &str) -> Option<Tool> {
     let name = name.trim_end_matches('*');
     let label = match name {
         "Center point rectangle" => "Center rectangle",
+        "Fillet" => "Sketch fillet",
+        "Chamfer" => "Sketch chamfer",
         "Mirror sketch" => "Mirror",
         "Use" => "Use / project edges",
         other => other,
@@ -242,6 +273,14 @@ impl PartStudioView {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_sketch_list_maps_onshape_names_to_our_tools() {
+        // Every row but the Part Studio commands is one of our sketch tools.
+        let commands = ["Extrude", "Revolve", "Construction", "Section view", "Mass and section properties", "Measure"];
+        let unmapped: Vec<&str> = super::SKETCH_PREFS_LIST.iter().copied().filter(|n| !commands.contains(n) && super::sketch_tool(n).is_none()).collect();
+        assert!(unmapped.is_empty(), "{unmapped:?}");
+    }
+
     use super::*;
     use std::prelude::v1::test;
 

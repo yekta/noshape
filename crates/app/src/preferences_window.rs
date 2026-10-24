@@ -828,7 +828,9 @@ impl PreferencesView {
                 .collect();
             (all, self.toolbar_draft.shortcut_tools())
         } else {
-            let all = sc::sketch_toolbar_tools().into_iter().map(|(name, icon)| (name.to_string(), name.to_string(), crate::assets::icon_path(icon))).collect();
+            // Onshape's own list and wording (live: "Extrude", "Revolve" first,
+            // "Center point rectangle", "Use").
+            let all = sc::sketch_prefs_rows().into_iter().map(|(id, name, icon)| (id, name.to_string(), icon)).collect();
             (all, self.toolbar_draft.sketch_shortcut_tools(&sc::default_sketch_shortcut_names()))
         };
         let context = self.toolbar_context;
