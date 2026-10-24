@@ -3299,7 +3299,7 @@ impl PartStudioView {
             let d = dialog.read(cx);
             (d.feature.type_id.clone(), d.feature.id)
         };
-        if !matches!(ty.as_str(), "extrude" | "revolve" | "sweep" | "loft") || noshape_model::custom::std_feature::has_editing_logic(&ty) {
+        if !matches!(ty.as_str(), "extrude" | "revolve" | "sweep" | "loft") {
             return;
         }
         let Some(touched) = self.display.feature_state(id).filter(|s| s.status != FeatureStatus::RolledBack).map(|s| s.touched.clone()) else { return };
