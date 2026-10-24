@@ -928,17 +928,25 @@ impl AssemblyView {
 // ---------------------------------------------------------------- Create Part Studio in context
 
 impl AssemblyView {
-    /// Toolbar / Origin row › Create Part Studio in context…: the "Origin
-    /// of new Part Studio" dialog, its field pre-filled with the Origin.
-    pub(super) fn open_ps_in_context(&mut self, cx: &mut Context<Self>) {
-        self.ui.ps_in_context = Some(None);
+    /// Toolbar (empty field) / Origin row › Create Part Studio in context…
+    /// (prefilled with the Origin): the "Origin of new Part Studio" dialog.
+    pub(super) fn open_ps_in_context(&mut self, prefill_origin: bool, cx: &mut Context<Self>) {
+        self.ui.ps_in_context = Some(if prefill_origin { behaviors::PsOrigin::Origin } else { behaviors::PsOrigin::Unset });
         cx.notify();
     }
 
     /// ✓: a new Part Studio whose origin sits at the chosen connector, opened
     /// with the assembly as context graphics.
     pub(super) fn accept_ps_in_context(&mut self, cx: &mut Context<Self>) {
-        let Some(origin) = self.ui.ps_in_context.take() else { return };
+        let origin = match self.ui.ps_in_context.take() {
+            // Live: ✓ with nothing picked just closes the dialog.
+            None | Some(behaviors::PsOrigin::Unset) => {
+                cx.notify();
+                return;
+            }
+            Some(behaviors::PsOrigin::Origin) => None,
+            Some(behaviors::PsOrigin::Connector(id)) => Some(id),
+        };
         let frame = origin.and_then(|id| self.result.connector_frame(id)).unwrap_or_default();
         let to_studio = noshape_model::assembly::eval::frame_matrix(&frame).inverse();
         let after = self.tab;
@@ -999,11 +1007,8 @@ impl AssemblyView {
     pub(super) fn render_ps_in_context_dialog(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let origin = *self.ui.ps_in_context.as_ref()?;
         let pal = p();
-        let label = match origin {
-            None => "Origin".to_string(),
-            Some(id) => self.assembly(cx).and_then(|a| a.connector(id).map(|c| c.name.clone())).unwrap_or_else(|| "Origin".into()),
-        };
-        let chip = h_flex()
+        let label = origin.chip(|id| self.assembly(cx).and_then(|a| a.connector(id).map(|c| c.name.clone())));
+        let chip = label.map(|label| h_flex()
             .h(px(24.))
             .pl(px(6.))
             .pr(px(5.))
@@ -1020,10 +1025,10 @@ impl AssemblyView {
                     .tooltip(crate::ui::tooltip(format!("Delete {label}")))
                     .child("×")
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.ui.ps_in_context = Some(None);
+                        this.ui.ps_in_context = Some(behaviors::PsOrigin::Unset);
                         cx.notify();
                     })),
-            );
+            ));
         Some(
             v_flex()
                 .w(px(220.))
@@ -1072,7 +1077,7 @@ impl AssemblyView {
                             .border_color(rgb(0x1651b0))
                             .bg(rgb(0xdef1fb))
                             .child(div().px(px(6.)).pt(px(6.)).pb(px(2.)).text_size(px(12.)).text_color(rgb(0x555555)).child("Select origin/mate connector"))
-                            .child(chip),
+                            .children(chip),
                     ),
                 )
                 .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(help_dot()))

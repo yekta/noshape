@@ -199,9 +199,8 @@ pub(crate) struct AsmUi {
     pub list_collapsed: bool,
     /// Reference manager dialog (Change to version…, Update all references).
     pub ref_manager: Option<super::props::RefManager>,
-    /// "Origin of new Part Studio" dialog: the chosen assembly mate
-    /// connector (`None` = the assembly origin).
-    pub ps_in_context: Option<Option<MateId>>,
+    /// "Origin of new Part Studio" dialog: what its field holds.
+    pub ps_in_context: Option<PsOrigin>,
     /// Tool search (Alt+C): input, query, selected row.
     pub tool_search: Option<(Entity<InputState>, Subscription)>,
     pub tool_query: String,
@@ -4269,5 +4268,39 @@ mod value_tests {
                 }
             }
         }
+    }
+}
+
+/// The "Origin of new Part Studio" field. Live: opened from the toolbar it
+/// starts empty (✓ then just closes, qa4 round 5 s2); from the Origin row's
+/// menu it is prefilled with the Origin (assembly/542).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PsOrigin {
+    Unset,
+    Origin,
+    Connector(MateId),
+}
+
+impl PsOrigin {
+    /// The chip text (None: the empty field).
+    pub fn chip(self, connector_name: impl FnOnce(MateId) -> Option<String>) -> Option<String> {
+        match self {
+            PsOrigin::Unset => None,
+            PsOrigin::Origin => Some("Origin".into()),
+            PsOrigin::Connector(id) => Some(connector_name(id).unwrap_or_else(|| "Origin".into())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod ps_origin_tests {
+    use super::PsOrigin;
+    use noshape_model::assembly::MateId;
+
+    #[::core::prelude::v1::test]
+    fn the_toolbar_field_starts_empty() {
+        assert_eq!(PsOrigin::Unset.chip(|_| None), None);
+        assert_eq!(PsOrigin::Origin.chip(|_| None).as_deref(), Some("Origin"));
+        assert_eq!(PsOrigin::Connector(MateId(3)).chip(|_| Some("Mate connector 1".into())).as_deref(), Some("Mate connector 1"));
     }
 }

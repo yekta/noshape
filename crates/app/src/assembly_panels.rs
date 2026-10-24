@@ -700,7 +700,7 @@ impl AssemblyView {
             .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child(crate::ui::user_text("Origin")))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 if this.ui.ps_in_context.is_some() {
-                    this.ui.ps_in_context = Some(None);
+                    this.ui.ps_in_context = Some(behaviors::PsOrigin::Origin);
                     cx.notify();
                     return;
                 }
@@ -720,7 +720,7 @@ impl AssemblyView {
                             label: "Create Part Studio in context…".into(),
                             icon: Some("create-partstudio-incontext"),
                             disabled: false,
-                            act: std::rc::Rc::new(|t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.open_ps_in_context(cx)),
+                            act: std::rc::Rc::new(|t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.open_ps_in_context(true, cx)),
                         },
                         behaviors::MenuEntry::Item {
                             label: if hidden { "Show".into() } else { "Hide".into() },
@@ -791,7 +791,7 @@ impl AssemblyView {
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 if this.ui.ps_in_context.is_some() {
                     // Origin of new Part Studio: this connector.
-                    this.ui.ps_in_context = Some(Some(id));
+                    this.ui.ps_in_context = Some(behaviors::PsOrigin::Connector(id));
                     cx.notify();
                     return;
                 }

@@ -283,3 +283,44 @@ STATUS MEAS1 (2026-10-24 07:20, qa5): fixed on main 78109ebc (Top alone: empty s
   Part 1, each at its **own product position** (the assembly places the instances). Ours: one Part Studio "qa4-s5-asm", parts
   Part 1, Part 3, Part 2 at the assembly's positions, no assembly. (PVZ: IM1, kern row, is the same gap.)
 - Export details (minor): STL binary header "noshape-kernel st…" (live 80 zero bytes); STEP product order; Parasolid header = EXP-HDR.
+
+## IMP-DENS — api — "Import material density" offered for STEP files (main, since 5d5e0403)
+- Source: qa4 QA round 4 session 5 in the app (2026-10-24). `crates/app/src/import_dialog.rs` `density` includes "step"/"stp".
+- Expected (live): behaviours "qa4 round 4 s5": "For STEP there is **no 'Import material density'** checkbox (an .x_t import
+  shows it)" (part-studio/2394); "api (10-23) import parity" only showed it for .x_t (2336). v0.4.7 matched live (4 checkboxes).
+- Actual (main): a STEP import shows ☐ Import material density between Import appearances and Orient … Y Axis Up.
+STATUS STEP-ASM minor (qa4, 2026-10-24): the STL binary header is fixed by qa4 (80 zero bytes, `kernel/src/io.rs`, test
+`binary_stl_header_is_zeros`); "import stays on the open tab" was fixed by api on main (5d5e0403).
+
+## qa4 QA round 5 (2026-10-24; docs/handoff/qa-round-5.md, live "qa4 round 5 s1…s5"; v0.4.7 and v0.4.8 alike unless noted)
+- **DRW-CFG** (asb) Create Drawing ignores the Part Studio's active configuration (Size M active → views 60 long = S); live:
+  "The drawing takes the Part Studio's current configuration". And the view menu has **Configuration ▸ Size ▸** where live has
+  **"Change configuration..."** (between Align views and Switch to Part Studio 1) opening a panel (document/branch, tree with
+  Size [M ▾], part thumbnail, ✓ ✕) that changes every view of that part; View properties shows it read-only.
+- **DRW-DANGLE-DOT** (asb) a dangling dimension keeps its black arrowhead; live draws a **filled orange-red dot** at the
+  attachment point (drawing/qa4-r5-s1-c-dim-2x). The colour itself is fixed by qa4 (#DD5228). Fills carry no pick id, so the
+  arrow → dot swap belongs in the sheet builder.
+- **DRW-DIMMENU** (asb) diameter-dimension right-click: ours Foreshorten · Show as radius · Edit… · Detach from geometry · Paste
+  as table | Clear selection · Zoom to fit · Delete (drawing_tools.rs ~1689, drawing_more.rs Foreshorten); live "Edit... | Paste
+  | Paste as table | Unbreak dimension | Add comment | Clear selection | Zoom to fit | Delete" for healthy and dangling alike.
+- **DRW-CMARK** (asb) Create Drawing › Suggested views: no automatic centre mark on the hole in the Top view (ANSI_A_MM); live has
+  one (ISO_A3 in r5 s1; ANSI too, behaviours ~1537). A CLI-inserted view gets one.
+- **DRW-DUAL** (asb, v0.4.8 gate (f)) the linear dimension line runs unbroken through the dual text; live breaks it around the
+  text block (asbdd-20).
+- **PS-NOTCOMPUTED** (psb) the menu of a row that is still regenerating is the full menu; live reduced "Rename | Add selection to
+  folder… | Suppress | Dynamic suppression ▸ | Add comment | Delete"; with a feature dialog open the rolled-back rows have no Delete
+  ("Rename | Suppress | Dynamic suppression ▸ | Add comment"). (Delete-during-regen speed = v0.4.8 gate (a).)
+- **I18N-DIALOGS** (ui2) German: toolbar tooltip titles ("Extrude (shift+e)", ui.rs:604 formats before the lookup); Extrude
+  (Thin, Intersect, Faces und sketch regions…, Direction, Starting offset, Entwurf → Formschräge, Second end position); Fillet
+  (Verrunden 1 → Verrundung 1, Full round, Entities auf fillet, Tangent propagation, Measurement, Control → Strg, Asymmetric,
+  Partial fillet, Variable fillet, Allow edge overflow, Smooth fillet corners); Mass properties (Parts auf measure, Mate
+  connector for reference frame, „calculation variance“ anzeigen); part menu "Drawing of Part 1… erstellen" (live „Zeichnung
+  erstellen von „Part 1" …"); Create Drawing title "Drawing: erstellen" (live "Zeichnung erstellen:"), "Owned by me" (Gehört
+  mir); Preferences units sentence, heading "Voreinstellungen" (live "Preferences"), "Dezimalstellen" (live "Dezimalstellen
+  anzeigen"). Live's strings: behaviours "qa4 round 5 s5" and ~11470.
+- **DARK-DRW** (ui2) dark mode, drawing tab: our toolbar row is dark with a white block at its right end; live's capture
+  drawing/qa4-r5-s5-12 shows the drawing toolbar light (white, dark icons; live's text says dark: ask live if unsure). Dark
+  Create Drawing: the selected "No views" tile's label is unreadable.
+- **CTX-USE** (skb) in a Part Studio's assembly context, **Use (u) on the context face the sketch lies on projects nothing** (no
+  hover) and Use on its in-plane edges says "That geometry can't be used in this sketch"; an out-of-plane context edge projects.
+  Live: Use on that face projects its 4 outer edges. On an ordinary face (CLI sketch_use) the same works.
