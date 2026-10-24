@@ -298,3 +298,4 @@ STATUS D10 / D12 (2026-10-24 17:05, qa5): fixed on main by api (b4b803af): PDF i
 - Expected (live, behaviours "qa5 undo across tabs"): the 1st Ctrl+Z leaves the note and enables Redo; the 2nd removes it.
 - Actual: the 1st Ctrl+Z removes the note.
 
+STATUS RHINO1 (2026-10-24 ~00:20, qa5): Rhino export round-trips (65431.327331 mm³, 18 faces) on the target-engine CLI built with openNURBS; still a packaging question for builds without it.
