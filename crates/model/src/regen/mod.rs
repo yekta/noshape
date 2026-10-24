@@ -11,6 +11,7 @@
 pub mod context;
 pub mod derived;
 mod display;
+pub mod runs;
 pub use display::{PART_COLORS, angle_display_mesh, set_angle_display_mesh, tessellate_shape};
 pub mod eval;
 pub mod features;
@@ -81,6 +82,12 @@ impl RegenCancel {
 
     pub fn superseded(&self) -> bool {
         self.0.superseded.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Another handle than this one exists: a regeneration (or the task
+    /// that starts its refine pass) still holds it.
+    pub fn held_elsewhere(&self) -> bool {
+        Arc::strong_count(&self.0) > 1
     }
 
     /// Run `f` (kernel work) so that an abort stops its booleans inside the

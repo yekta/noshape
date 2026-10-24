@@ -8,6 +8,7 @@
 #include <BRepMesh_FaceDiscret.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepMesh_MeshAlgoFactory.hxx>
+#include <BRepTools.hxx>
 #include <BRepMesh_ShapeTool.hxx>
 #include <IMeshData_Curve.hxx>
 #include <IMeshData_Edge.hxx>
@@ -213,7 +214,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     prm.InParallel               = parallel;
     prm.MinSize                  = Precision::Confusion();
     // Faces whose stored triangulation already satisfies the deflection are
-    // skipped by BRepMesh (triangulations are reused).
+    // skipped by BRepMesh (mesh faces; display meshes are dropped below).
     // Not Delabella for planar faces: it dereferences null on some of them
     // on macOS arm64 (features_a pattern_instance_references_survive_upstream_edit,
     // v0.4.6 CI run 39827462890).
@@ -348,6 +349,13 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         std::reverse(poly.begin(), poly.end());
       m->edge_points += poly.size();
     }
+    // The display mesh is copied out (the handles above keep it): drop it
+    // from the model's faces. OCCT's booleans take their boxes from a
+    // stored triangulation, enlarged by its deflection: a coarse display
+    // mesh made a later boolean on the shown body 5x slower and deaf to an
+    // abort for seconds (400 fins: 2.4 s -> 14 s; v0.4.8 delete-while-
+    // regenerating gate). Mesh faces (no surface) keep theirs.
+    BRepTools::Clean(s.shape);
   }
   m->faceData = side;
   return m;
