@@ -1139,7 +1139,7 @@ impl AssemblyView {
             h.cursor_mark = Some((p, size * 0.4));
         }
         h.manipulator = self.manipulator(cx).map(|f| (f, size * 1.6, self.manip_hover.or(self.ui.manip_selected)));
-        h.section_arrow = self.section_arrow_glyph(cx);
+        h.section = self.section_glyph(cx);
         h.explode_triad = self.explode_edit;
         // An explode step being made / edited: one arrow along the move
         // instead of the triad (live 805, 810).
@@ -1164,8 +1164,8 @@ impl AssemblyView {
         if let Some((f, s, _)) = &h.manipulator {
             sig.extend([f.origin.x, f.origin.y, f.origin.z, *s]);
         }
-        if let Some((t, d, w, _, _)) = &h.section_arrow {
-            sig.extend([t.x, t.y, t.z, d.x, d.y, d.z, *w]);
+        if let Some(g) = &h.section {
+            sig.extend([g.base.x, g.base.y, g.base.z, g.dir.x, g.dir.y, g.dir.z, g.x.x, g.x.y, g.x.z, g.wpp]);
         }
         if let Some((s, _)) = h.origin {
             sig.push(s);
@@ -2085,7 +2085,7 @@ impl AssemblyView {
         let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none() && self.step_edit.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
-        let capture = snapping || self.hover_overlay == Some(OverlayPick::SectionArrow) || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
+        let capture = snapping || matches!(self.hover_overlay, Some(OverlayPick::Section(_))) || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = capture);
     }
 
@@ -2098,7 +2098,7 @@ impl AssemblyView {
                 let c = self.result.connectors.iter().find(|c| c.id == id)?;
                 return Some(MateConnectorRef::assembly_connector(c.id, c.owner));
             }
-            Some(OverlayPick::Manip(_)) | Some(OverlayPick::Mate(_)) | Some(OverlayPick::SectionArrow) => return None,
+            Some(OverlayPick::Manip(_)) | Some(OverlayPick::Mate(_)) | Some(OverlayPick::Section(_)) => return None,
             None => {}
         }
         if self.pick_mode(cx) == Some(PickMode::Inference) && self.infer_locked {
@@ -2602,7 +2602,7 @@ impl AssemblyView {
                 }
             }
             ViewportEvent::ToolUp { modifiers, .. } => {
-                if self.end_section_drag(cx) {
+                if self.end_section_drag(window, cx) {
                     return;
                 }
                 if self.ui.fixed_drag.take().is_some() {

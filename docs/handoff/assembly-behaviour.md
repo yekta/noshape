@@ -1106,19 +1106,24 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
 * Replicate / pattern fields carrying the error: `os::query_box_error` (pink, red border, grey label) and the
   error as the label tooltip (`os::query_box_tip`).
 
-## Assembly section view manipulator (skb 10-24, lead's priority; on icons2's shared Section view dialog)
-* While the dialog is open, the active plane's arrow (assembly_behaviors.rs `section_arrow`, the Part Studio's
-  placement: on the plane where it passes the assembly's centre, along the normal, 12 % of the bounds' diagonal)
-  is drawn like the Part Studio's (assembly_scene.rs: screen-sized, white shaft, hollow head outlined grey /
-  blue when hovered) and pickable (`OverlayPick::SectionArrow`). Dragging it moves the plane along its normal
-  (`start_section_drag` / `drag_section` / `end_section_drag` from the viewport's ToolDown / Drag / Up); the
-  offset box at the tip (`render_section_value`) shows the offset and, clicked, becomes a field (text selected,
-  Enter / blur moves the plane, like live's "-0.91 in" box).
-* Right-click empty space with a section on: Edit section view… (`edit_section`: the dialog over the current
-  section, ✕ keeps it as it was) and Turn off section view — placed at the top of the menu (their place in the
-  assembly menu is UNCONFIRMED).
-* Open (REQUESTS "skb (10-24) assembly section"): the rotate handles (live's "sun-like" glyph and ring at the
-  arrow's base) and any flip; whether the arrow shows after ✓.
-* GUI-checked on :103 (/root/skb-scratch/s1–s10.png: arrow + "0 mm", drag to -12.565 mm, typed -2 mm, menu,
-  Edit keeps -2 mm, Turn off).
-
+## Assembly section view manipulator (skb 10-24, lead's priority; live "skb (10-24) assembly section")
+* On icons2's shared Section view dialog. While the dialog is open the active plane has live's manipulator
+  (assembly_scene.rs `SectionGlyph` / `push_section_glyph`, handles `SectionHandle`, picks `OverlayPick::Section`):
+  a base circle at the plane's base (face centroid / connector origin + offset), the shaft and hollow head, and
+  two small rings with their axis lines at the tip (ring 0 turns the plane about its in-plane Y, ring 1 about X;
+  `AsmSectionPlane::x` keeps the in-plane axes). Idle strokes light grey (230,232,233 on 194,199,203), the
+  hovered handle blue (70,123,177), the dragged one 40,97,182; no tooltips.
+* Drags (assembly_behaviors.rs `start_section_drag` / `drag_section` / `end_section_drag`): the arrow moves the
+  plane, the value being the distance from the drag's start ("⊥" mark at the start with a leader); a ring turns
+  the plane about its axis through the base ("⊢" mark at the start direction), snapping to 5° multiples within
+  2° (the window is UNCONFIRMED; live left 92.111 / 97.206 free); the base circle slides the manipulator over the
+  plane (live also snaps it to edges: not done). The value box (upper right of the tip, 75 × 26): the dragged
+  value while dragging (1 decimal mm, up to 3 decimals "deg"), then Onshape's canvas box focused and selected;
+  Enter puts the plane at the typed value from the drag's start and keeps the box; Esc closes the box only.
+* Chips "Section plane N (Top)" named by the arrow's standard direction (Top / Bottom / Front / Back / Right /
+  Left), no suffix once rotated off them (`direction_name`; the dialog drops an empty suffix).
+* Right-click empty space with a section on: Show all | Edit section view… (section icon) | Turn off section
+  view | — | Create Drawing of … ; Edit reopens over the section (offset / rotation kept) and ✕ there turns the
+  section off.
+* Not done here (for icons2 / the lead): Flip lives in the "Select default plane" popup (icons2's dialog); the
+  red overlap fill in caps where instances overlap (renderer). GUI-checked on :103 (/root/skb-scratch/t1–t9.png).
