@@ -146,12 +146,29 @@ fn fs_background(i: BgOut) -> @location(0) vec4<f32> {
 
 // ---------------------------------------------------------------- meshes
 
+// Compact vertices (renderer.rs `MeshVertex`): the position in 21-bit
+// fixed point over the mesh bounds (the instance's model matrix scales it
+// back), the normal octahedral encoded.
 struct MeshIn {
-    @location(0) pos: vec3<f32>,
-    @location(1) normal: vec3<f32>,
+    @location(0) pos: vec2<u32>,
+    @location(1) normal: vec2<f32>,
     @location(2) pick: u32,
     @location(3) color: vec4<f32>,
 };
+
+fn mesh_pos(v: MeshIn) -> vec3<f32> {
+    let a = v.pos.x;
+    let b = v.pos.y;
+    return vec3(f32(a & 0x1fffffu), f32((a >> 21u) | ((b & 0x3ffu) << 11u)), f32(b >> 10u));
+}
+
+fn oct_decode(e: vec2<f32>) -> vec3<f32> {
+    var n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+    let t = max(-n.z, 0.0);
+    n.x += select(t, -t, n.x >= 0.0);
+    n.y += select(t, -t, n.y >= 0.0);
+    return normalize(n);
+}
 
 struct MeshOut {
     @builtin(position) pos: vec4<f32>,
@@ -171,10 +188,10 @@ fn mesh_vertex(v: MeshIn, slot: u32) -> MeshOut {
     load_inst(slot);
     var o: MeshOut;
     o.slot = slot;
-    let w = inst.model * vec4(v.pos, 1.0);
+    let w = inst.model * vec4(mesh_pos(v), 1.0);
     o.world = w.xyz;
     o.pos = g.view_proj * w;
-    o.normal = (inst.normal_m * vec4(v.normal, 0.0)).xyz;
+    o.normal = (inst.normal_m * vec4(oct_decode(v.normal), 0.0)).xyz;
     o.pick = global_pick(v.pick);
     o.color = v.color;
     return o;
@@ -353,8 +370,8 @@ struct BackSilOut {
 @vertex
 fn vs_backsil(v: MeshIn, @builtin(instance_index) slot: u32) -> BackSilOut {
     load_inst(slot);
-    let w = (inst.model * vec4(v.pos, 1.0)).xyz;
-    let n = normalize((inst.normal_m * vec4(v.normal, 0.0)).xyz);
+    let w = (inst.model * vec4(mesh_pos(v), 1.0)).xyz;
+    let n = normalize((inst.normal_m * vec4(oct_decode(v.normal), 0.0)).xyz);
     let persp = g.camera_pos.w > 0.5;
     let ndv = dot(n, select(-g.camera_fwd.xyz, normalize(g.camera_pos.xyz - w), persp));
     // A small step along the normal (any length in orthographic).

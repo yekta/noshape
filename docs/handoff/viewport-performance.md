@@ -610,3 +610,28 @@ changes. I write the renderer part first (my files) and show crops before touchi
   tan 22.5° + padded half-depth (live: near 136.2, far 284.5) — all as ours. A "stronger" look comes from the
   orthographic zoom at the moment of switching, not the field of view. No Set as default, per tab for the session
   (c3a5d65b); assemblies now follow the 45° preference too.
+- **2026-10-24 (perf): per-triangle round, then the angle mesh by default.** macOS runners, w.gpu_wait mean before
+  BENCH SUMMARY, orbit, NOSHAPE_PERF_DETAIL=full, variants interleaved ×3, medians (ms, vs chord in the same run).
+  - Compact vertices (84d9ffc0): 32 → 20 bytes (21-bit fixed-point positions over the mesh bounds, the dequantization
+    folded into the instance model matrix; octahedral snorm16 normals) and u16 indices up to 65536 vertices. Neutral
+    within run-to-run noise (base f306d348 runs 40068132382 / 40068141568 vs the A/B "old" variant), kept for memory.
+  - Backface silhouettes (`mesh_backsil`): Onshape culls FRONT faces in that pass (`setOverrideFaceCullingMode(jc.FRONT)`
+    in the `-backfacesil-faces` pass class, webgl bundle); ours rasterized every triangle. Now culled (e62e47a9).
+  - Drawing that pass after the faces instead of before was much slower: its pushed-out back faces act as a cheap
+    occluder for the parts behind (no backface pass at all is slower than having it first). It stays first.
+  - A/B run 9d290d89 (bench-only switches, runs 40077048263 pins / 40077056935 plate):
+
+    | | chord | angle, pass after faces | **angle, pass first + culled (landed)** | first, not culled | no backface pass |
+    |---|---|---|---|---|---|
+    | pins macOS 14 | 12.01 | 18.06 (+50%) | **13.15 (+9%)** | 14.73 (+23%) | 16.53 (+38%) |
+    | pins macOS 15 | 11.43 | 12.47 (+9%) | **11.72 (+3%)** | 11.84 (+4%) | 11.96 (+5%) |
+    | plate macOS 14 | 12.19 | 16.17 (+33%) | **13.93 (+14%)** | 14.82 (+22%) | 14.70 (+21%) |
+    | plate macOS 15 | 10.59 | 11.80 (+11%) | **12.09 (+14%)** | 12.03 (+14%) | 11.89 (+12%) |
+
+    Before the round (base runs above): angle vs chord pins +15% / +11%, plate +20% / +18%.
+  - Flip (lead: flip unless the pins stay above +15%): `regen::angle_display_mesh()` is on by default;
+    `NOSHAPE_DISPLAY_MESH=chord` is the escape hatch. Bench variants must now name `NOSHAPE_DISPLAY_MESH=chord`
+    explicitly for the chord baseline.
+  - Next levers: `fs_mesh` has a `discard` (hidden faces, section clipping), which turns off hidden-surface removal on
+    tile-based GPUs (Apple) for every face; a variant without it when nothing is hidden or clipped, or a depth
+    pre-pass, should cut face overdraw (the "no backface pass" column shows how much overdraw costs on macOS 14).
