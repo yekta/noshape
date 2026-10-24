@@ -98,3 +98,10 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | ME7 | Chip × | removes that entry from the selection | no action | ✅ |
 | ME8 | Assembly Measure panel (`measure_panel.rs`, shared code from icons2 Round 14) | as the Part Studio's | docked 36 px up / 40 px in, the old field, selects and colours | ✗ assembly (reported to the lead) |
 | ME9 | Nothing to measure (a lone plane; live part-studio/2244) | a 202 px info box (`#def1fb`, 1 px `#b2ddf6`) 5 px in, 14 px `#094174` on 21 px lines, two lines | a 12 px grey line, cut off at the panel edge | ✅ box exact (x/y to the pixel); the line breaks before "for" instead of after it because our UI font is wider (VC7) |
+
+## qa5 re-run pass 21 (2026-10-23, app = target-lead 17:10, main 88fbf8f)
+| Row | Ours | Status |
+|---|---|---|
+| VC8 Assembly camera menu | Isometric, Dimetric, Trimetric \| Zoom to fit \| Perspective view, Show mates; larger rows, chevron caret; the Part Studio menu (v01) has the full live list | ? live capture requested ("qa5 (10-23 pass 21, ui VC8)") |
+| VC7 menu font, KS1 shortcuts pop-out page | not local (app-wide font / new window) | ✗ → ui (qa5-routing.md) |
+| VC8 (live answered, behaviours "qa5 assembly camera menu") | live = Part Studio menu minus "Orient normal to sketch on edit" / "Highlight boundary edges", no "Show mates". qa5: "Show mates" removed, "Section view…" added; the rest needs assembly features (render modes, named / previous views, graphics prefs, zoom to window, high quality) → qa5-routing ui | 🔧 partly / ✗ ui |

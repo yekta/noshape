@@ -295,6 +295,9 @@ pub struct Context {
     /// definition sheets): no part, no display; custom features see them
     /// through attribute queries only.
     pub fs_hidden_bodies: Vec<Arc<Body>>,
+    /// Transient ids FeatureScript stored in attributes that must outlive the
+    /// feature (std Form's tool bodies, kept in the walls' attributes).
+    pub fs_transients: Vec<(Arc<str>, crate::reference::Reference)>,
     /// Parts named from outside the studio (an imported file's names, a
     /// Derived source's): `renumber_default_names` leaves them as they are
     /// (live, qa5 NAME3).

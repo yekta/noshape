@@ -720,6 +720,9 @@ pub fn view_scale(sheet: &Sheet, id: ViewId) -> f64 {
         {
             return s;
         }
+        if v.sheet_scale {
+            break;
+        }
         match sheet.parent_of(cur) {
             Some(p) => cur = p,
             None => break,

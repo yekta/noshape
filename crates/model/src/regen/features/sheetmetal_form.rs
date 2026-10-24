@@ -3,9 +3,8 @@
 //!
 //! **Form.** The form tool comes from another Part Studio of the document
 //! (through the Derived provider). Its Tag feature (purpose Form) names the
-//! part to add, the part to remove and the form origin mate connector; an
-//! untagged studio uses its solid parts (names containing "remove", "cut" or
-//! "subtract" are removed, the others added) placed at its origin. The tool
+//! part to add, the part to remove and the form origin mate connector (an
+//! untagged studio has no form tools, as std's derive finds none). The tool
 //! is aligned with each location (mate connector or sketch point: origin on
 //! the sheet face, Z = outward face normal, the sheet below Z = 0), the
 //! remove part is subtracted from the wall and the add part united with it.
@@ -20,7 +19,7 @@
 use super::sheetmetal_util::*;
 use crate::naming::Name;
 use crate::reference::{Reference, Role, Source, TopoName};
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, err};
+use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, err_at};
 use crate::sheetmetal::{FlatMark, FlatMarkKind};
 use glam::{DMat4, DVec2, DVec3};
 use noshape_kernel as k;
@@ -74,21 +73,11 @@ pub fn form(ev: &mut EvalCtx) -> FResult<()> {
             let get = |id: &Option<crate::reference::BodyId>| id.as_ref().and_then(|i| src.body(i)).map(|b| b.shape.clone());
             (get(&tool.add).into_iter().collect::<Vec<_>>(), get(&tool.remove).into_iter().collect::<Vec<_>>(), tool.origin)
         }
-        None => {
-            let (mut a, mut r) = (Vec::new(), Vec::new());
-            for b in src.bodies.iter().filter(|b| b.kind == crate::display::BodyKind::Solid) {
-                let n = b.name.to_lowercase();
-                if n.contains("remove") || n.contains("cut") || n.contains("subtract") {
-                    r.push(b.shape.clone());
-                } else {
-                    a.push(b.shape.clone());
-                }
-            }
-            (a, r, None)
-        }
+        // Std derives only Tag-marked tools (IMPORT_DERIVED_NO_PARTS, reported as FORMED_FAILED_TO_DERIVE).
+        None => return err_at(&["formPartStudio"], "Failed to import form tools. Check configuration parameters and use Tag feature to mark the tool bodies."),
     };
     if adds.is_empty() && removes.is_empty() {
-        return err("The form Part Studio has no parts (tag the part to add and the part to remove)");
+        return err_at(&["formPartStudio"], "Failed to import form tools. Check configuration parameters and use Tag feature to mark the tool bodies.");
     }
     let from = match origin {
         Some((o, x, z)) => frame_matrix(o, x, z),
@@ -102,23 +91,8 @@ pub fn form(ev: &mut EvalCtx) -> FResult<()> {
     for (li, &(o, x, z)) in locs.iter().enumerate() {
         let z = if flip { -z } else { z };
         // (Re-resolved per location: earlier forms renumber the faces.)
-    // Candidate faces: the selection, else every wall face of active models.
-            let targets: Vec<(usize, usize)> = {
-            let sel = ev.resolve_faces(ev.query("targetFaces"));
-            if !sel.is_empty() {
-                sel
-            } else {
-                let mut v = Vec::new();
-                for (bi, b) in ev.ctx.bodies.iter().enumerate() {
-                    if let Some(d) = ev.ctx.sheet_metal.get(&b.id).filter(|d| d.active) {
-                        for w in &d.walls {
-                            v.extend(faces_named(b, &w.faces).into_iter().chain(faces_named(b, &w.back)).map(|f| (bi, f)));
-                        }
-                    }
-                }
-                v
-            }
-        };
+        // Candidate faces: the selection only (std: qContainsPoint(targetFaces), which the dialog's editing logic fills).
+        let targets: Vec<(usize, usize)> = ev.resolve_faces(ev.query("targetFaces"));
         // Face containing the location, parallel to the location's Z.
         let mut hit: Option<(usize, usize, DVec3)> = None;
         for &(bi, fi) in &targets {
@@ -207,11 +181,12 @@ pub fn form(ev: &mut EvalCtx) -> FResult<()> {
         put_data(ev, bi, data);
         placed += 1;
     }
+    // Std FORMED_SELECT_LOCATION_ON_ACTIVE_FACE: an error when no location is placed, else a warning.
     if placed == 0 {
-        return err("No form location lies on a selected sheet metal face (locations must be on the face, Z normal to it)");
+        return err_at(&["locations"], "Select location on selected active sheet metal faces.");
     }
     if skipped > 0 {
-        ev.warnings.push(format!("{skipped} form location(s) are not on a target face and were skipped"));
+        ev.warnings.push("Select location on selected active sheet metal faces.".into());
     }
     Ok(())
 }

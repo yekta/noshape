@@ -377,10 +377,87 @@ fn part_bodies_named(file: &PartFile, wire_name: Option<&str>, at: Option<&glam:
 }
 
 /// `base`, or Onshape's "<base> (1)", "(2)", … when a tab already has it
-/// (live G41: a second import of an assembly).
-fn unique_name(doc: &Document, base: &str) -> String {
+/// (live G41: a second import of an assembly; "api (10-23) import parity":
+/// a second import of a file's Part Studio).
+pub fn unique_name(doc: &Document, base: &str) -> String {
     if !doc.tabs.iter().any(|t| t.name == base) {
         return base.to_string();
     }
     (1..).map(|n| format!("{base} ({n})")).find(|n| !doc.tabs.iter().any(|t| &t.name == n)).unwrap_or_else(|| base.to_string())
+}
+
+/// A .pvz file read for [`add_pvz_assembly`].
+pub struct PvzImport {
+    /// The file name without extension, and the product tree's root name.
+    pub stem: String,
+    pub root: String,
+    /// The Import feature's data: the parts in their own coordinates as BREP
+    /// text and their `ImportPartInfo` JSON.
+    pub brep: String,
+    pub info: String,
+    /// The file name (the feature's foreignId).
+    pub foreign_id: String,
+    pub instances: Vec<k::PvzInstance>,
+    /// The parts' names (index = `PvzInstance::part`).
+    pub names: Vec<Option<String>>,
+}
+
+/// A PVZ (Creo View) file of several part instances, as Onshape imports it
+/// (live qa5 zip import, G22): a Part Studio "<file> parts" with one Import
+/// feature holding each distinct part once as mesh bodies, named as in the
+/// file (open meshes become a composite part), and an Assembly named like
+/// the product tree's root ("RootAssembly") whose instances ("Cylinder <1>")
+/// sit where the file places them; composite parts aren't instanced. The
+/// Assembly tab comes first. `brep` / `info` are the Import feature's data
+/// (the parts in their own coordinates, see `noshape_kernel::read_pvz_parts`).
+pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) -> Result<(TabId, TabId), String> {
+    let PvzImport { stem, root, brep, info, foreign_id, instances, names } = pvz;
+    let (brep, info) = (brep.clone(), info.clone());
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature("importForeign", units).ok_or("no Import feature")?;
+    f.params.set("allowFaultyParts", ParamValue::Bool(true));
+    f.params.set("blobData", ParamValue::Text(brep));
+    f.params.set("partInfo", ParamValue::Text(info));
+    f.params.set("foreignId", ParamValue::Text(foreign_id.clone()));
+    ps.insert_at_rollback(f);
+    let regen = Regenerator::new().regenerate(&ps, &ConfigValues::default(), units, &RegenOptions::default());
+    let studio_name = unique_name(doc, &format!("{stem} parts"));
+    let studio = doc.add_tab(&studio_name, TabContent::PartStudio(ps));
+    let mut asm = Assembly::default();
+    let mut count: Vec<u32> = vec![0; names.len()];
+    // The occurrences in the reverse of the file's order (live: pvz-rot-asm's
+    // <1> is its second, turned occurrence), as native assemblies.
+    for inst in instances.iter().rev() {
+        let Some(Some(name)) = names.get(inst.part) else { continue };
+        // The part's solid (mesh parts whose mesh is open are composites: not instanced).
+        let Some(body) = regen.context.bodies.iter().find(|b| &b.name == name && b.kind == crate::display::BodyKind::Solid).map(|b| b.id.clone()) else { continue };
+        count[inst.part] += 1;
+        let id = InstanceId(asm.next_id());
+        asm.instances.push(Instance::new(id, format!("{} <{}>", inst.name, count[inst.part]), InstanceSource::Part { studio, body, config: ConfigValues::default() }, Placement::from_dmat4(&inst.transform)));
+    }
+    let assembly = doc.add_tab(&pvz_assembly_name(doc, root), TabContent::Assembly(Box::new(asm)));
+    let order = &mut doc.settings.tab_order;
+    if let (Some(a), Some(s)) = (order.iter().position(|t| *t == assembly), order.iter().position(|t| *t == studio)) {
+        let id = order.remove(a);
+        order.insert(s, id);
+    }
+    Ok((studio, assembly))
+}
+
+/// The Assembly's name from the product tree's root name (live: "pvz rot
+/// asm_54" comes in as "pvz rot asm", or as "pvz rot asm_54" when that name
+/// is taken; a root without the suffix as "RootAssembly (1)").
+fn pvz_assembly_name(doc: &Document, root: &str) -> String {
+    let taken = |n: &str| doc.tabs.iter().any(|t| t.name == n);
+    let plain = match root.rsplit_once('_') {
+        Some((head, tail)) if !head.is_empty() && !tail.is_empty() && tail.bytes().all(|b| b.is_ascii_digit()) => head,
+        _ => root,
+    };
+    if !taken(plain) {
+        plain.to_string()
+    } else if plain != root && !taken(root) {
+        root.to_string()
+    } else {
+        unique_name(doc, plain)
+    }
 }
