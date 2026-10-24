@@ -2172,18 +2172,33 @@ impl PartStudioView {
         acc
     }
 
-    /// What zoom to fit and the standard views frame: Onshape's `getFitBounds`
-    /// = the model node's bounds, which hold the visible planes (default
-    /// planes included) as well as parts and sketches.
+    /// What Zoom to fit and the standard views frame (Onshape, live "Zoom to
+    /// fit (perf 10-23 22:40)"): the visible parts and sketches, the origin
+    /// point when it is shown, and the visible planes (the default ones
+    /// span ±75 mm).
     pub(super) fn zoom_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
+        let origin = self.opts.show_origin && self.display.show_origin;
+        self.fit_box(origin, |pl| self.opts.show_planes && !pl.hidden)
+    }
+
+    /// The camera a Part Studio opens with frames its parts and the default
+    /// planes' box, also when those are hidden (live, the same capture).
+    pub(super) fn load_fit_bounds(&self) -> Option<(glam::DVec3, glam::DVec3)> {
+        self.fit_box(true, |pl| matches!(pl.reference, noshape_model::reference::Reference::Plane(_)))
+    }
+
+    /// The parts and sketches ([`Self::fit_bounds`]), the origin point if
+    /// `origin`, and the planes `planes` takes.
+    fn fit_box(&self, origin: bool, planes: impl Fn(&noshape_model::display::PlaneDisplay) -> bool) -> Option<(glam::DVec3, glam::DVec3)> {
         let mut acc = self.fit_bounds();
-        if self.opts.show_planes {
-            for pl in self.display.planes.iter().filter(|p| !p.hidden) {
-                let f = &pl.frame;
-                for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
-                    let q = f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height);
-                    acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
-                }
+        let mut add = |q: glam::DVec3| acc = Some(acc.map_or((q, q), |(lo, hi)| (lo.min(q), hi.max(q))));
+        if origin {
+            add(glam::DVec3::ZERO);
+        }
+        for pl in self.display.planes.iter().filter(|p| planes(p)) {
+            let f = &pl.frame;
+            for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
+                add(f.origin + f.x * (sx * pl.half_width) + f.y * (sy * pl.half_height));
             }
         }
         acc

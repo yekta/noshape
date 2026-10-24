@@ -61,7 +61,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.6 | Rollback bar selected + ↑/↓ steps the bar | keyboard_shortcuts; features_and_parts_lists | 🔧 (clicking the bar now gives the list focus) |
 | 2.7 | Shift+1…7 Front, Back, Left, Right, Top, Bottom, Isometric | keyboard_shortcuts | ✅ |
 | 2.8 | N view normal to the hovered/selected plane, face or sketch; N again flips to the reverse | keyboard_shortcuts | ✅ |
-| 2.9 | F zoom to fit | keyboard_shortcuts | ✅ |
+| 2.9 | F zoom to fit: the world box of the visible parts/sketches, the origin point when shown and the default planes (150 mm, ±75) when shown, its 8 corners centred, half-height 1.05 × max(h, w/aspect), in both projections (perspective: eye at padded half-height / tan(fov/2) + padded half-depth); a Part Studio opens at Trimetric fitted to its parts and the planes' box even when hidden (live "Zoom to fit (perf 10-23 22:40)"; navigation `zoom_to_fit_frames_like_onshape`) | keyboard_shortcuts, live | ✅ |
 | 2.10 | Z zoom out, Shift+Z zoom in (about the view center) | keyboard_shortcuts | ✅ |
 | 2.11 | W zoom to window: drag a box to magnify; W again cancels | keyboard_shortcuts; View__zoom_to_fit | 🔧 |
 | 2.12 | ←→↑↓ rotate 15°, Ctrl 5°, Shift 90° | keyboard_shortcuts | ✅ |
