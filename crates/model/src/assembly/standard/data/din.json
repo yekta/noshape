@@ -17994,6 +17994,3024 @@
     "source": "ISO 8734:1997 (2nd edition); identical values in DIN EN ISO 8734 (1998-03 and 2019-05 issues, EN ISO 8734:1997) (Parallel pins, of hardened steel and martensitic stainless steel (Dowel pins)); https://www.globalfastener.com/standards/detail_260.html (ISO 8734-1997: d m6 max/min, c); https://www.globalfastener.com/standards/detail_23243.html (DIN EN ISO 8734-2019: same d m6 max/min and c); https://fasten.it/en/Norms/Norm/DIN%20EN%20ISO%208734 (DIN EN ISO 8734 1998: d, c and commercial length matrix); https://www.fasteners.eu/standards/ISO/8734/ (d m6, c, length matrix, length min/max); https://www.opac.net/en/producto-166-iso-8734?lang=en (d m6, c, lengths per diameter, length min/max)"
    },
    {
+    "category": "Retaining rings",
+    "class": "External retaining rings",
+    "name": "External heavy retaining ring DIN 471",
+    "shape": "retainingRing",
+    "form": {
+     "internal": 0,
+     "holeRule": 1,
+     "gapDiv": 2,
+     "sideAngle": 7.5,
+     "lugK": 0.8
+    },
+    "sizes": [
+     {
+      "name": "15",
+      "label": "External heavy retaining ring 15",
+      "d": 15.0,
+      "dims": {
+       "d": 15.0,
+       "dg": 14.3,
+       "large": 2.4,
+       "small": 0.72,
+       "lug": 4.8,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "16",
+      "label": "External heavy retaining ring 16",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "dg": 15.2,
+       "large": 2.5,
+       "small": 0.75,
+       "lug": 5.0,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "17",
+      "label": "External heavy retaining ring 17",
+      "d": 17.0,
+      "dims": {
+       "d": 17.0,
+       "dg": 16.2,
+       "large": 2.6,
+       "small": 0.78,
+       "lug": 5.0,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "18",
+      "label": "External heavy retaining ring 18",
+      "d": 18.0,
+      "dims": {
+       "d": 18.0,
+       "dg": 17.0,
+       "large": 2.7,
+       "small": 0.81,
+       "lug": 5.1,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "20",
+      "label": "External heavy retaining ring 20",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "dg": 19.0,
+       "large": 3.0,
+       "small": 0.9,
+       "lug": 5.5,
+       "d5": 2.0,
+       "s": 1.75,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "22",
+      "label": "External heavy retaining ring 22",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "dg": 21.0,
+       "large": 3.1,
+       "small": 0.93,
+       "lug": 6.0,
+       "d5": 2.0,
+       "s": 1.75,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "24",
+      "label": "External heavy retaining ring 24",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "dg": 22.9,
+       "large": 3.2,
+       "small": 0.96,
+       "lug": 6.3,
+       "d5": 2.0,
+       "s": 1.75,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "25",
+      "label": "External heavy retaining ring 25",
+      "d": 25.0,
+      "dims": {
+       "d": 25.0,
+       "dg": 23.9,
+       "large": 3.4,
+       "small": 1.02,
+       "lug": 6.4,
+       "d5": 2.0,
+       "s": 2.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "28",
+      "label": "External heavy retaining ring 28",
+      "d": 28.0,
+      "dims": {
+       "d": 28.0,
+       "dg": 26.6,
+       "large": 3.5,
+       "small": 1.05,
+       "lug": 6.5,
+       "d5": 2.0,
+       "s": 2.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "30",
+      "label": "External heavy retaining ring 30",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "dg": 28.6,
+       "large": 4.1,
+       "small": 1.23,
+       "lug": 6.5,
+       "d5": 2.0,
+       "s": 2.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "32",
+      "label": "External heavy retaining ring 32",
+      "d": 32.0,
+      "dims": {
+       "d": 32.0,
+       "dg": 30.3,
+       "large": 4.1,
+       "small": 1.23,
+       "lug": 6.5,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "34",
+      "label": "External heavy retaining ring 34",
+      "d": 34.0,
+      "dims": {
+       "d": 34.0,
+       "dg": 32.3,
+       "large": 4.2,
+       "small": 1.26,
+       "lug": 6.6,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "35",
+      "label": "External heavy retaining ring 35",
+      "d": 35.0,
+      "dims": {
+       "d": 35.0,
+       "dg": 33.0,
+       "large": 4.2,
+       "small": 1.26,
+       "lug": 6.7,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "38",
+      "label": "External heavy retaining ring 38",
+      "d": 38.0,
+      "dims": {
+       "d": 38.0,
+       "dg": 36.0,
+       "large": 4.3,
+       "small": 1.29,
+       "lug": 6.8,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "40",
+      "label": "External heavy retaining ring 40",
+      "d": 40.0,
+      "dims": {
+       "d": 40.0,
+       "dg": 37.5,
+       "large": 4.4,
+       "small": 1.32,
+       "lug": 7.0,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "42",
+      "label": "External heavy retaining ring 42",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "dg": 39.5,
+       "large": 4.5,
+       "small": 1.35,
+       "lug": 7.2,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "45",
+      "label": "External heavy retaining ring 45",
+      "d": 45.0,
+      "dims": {
+       "d": 45.0,
+       "dg": 42.5,
+       "large": 4.7,
+       "small": 1.41,
+       "lug": 7.5,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "48",
+      "label": "External heavy retaining ring 48",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "dg": 45.5,
+       "large": 5.0,
+       "small": 1.5,
+       "lug": 7.8,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "50",
+      "label": "External heavy retaining ring 50",
+      "d": 50.0,
+      "dims": {
+       "d": 50.0,
+       "dg": 47.0,
+       "large": 5.1,
+       "small": 1.53,
+       "lug": 8.0,
+       "d5": 2.5,
+       "s": 3.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "52",
+      "label": "External heavy retaining ring 52",
+      "d": 52.0,
+      "dims": {
+       "d": 52.0,
+       "dg": 49.0,
+       "large": 5.2,
+       "small": 1.56,
+       "lug": 8.2,
+       "d5": 2.5,
+       "s": 3.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "55",
+      "label": "External heavy retaining ring 55",
+      "d": 55.0,
+      "dims": {
+       "d": 55.0,
+       "dg": 52.0,
+       "large": 5.4,
+       "small": 1.62,
+       "lug": 8.5,
+       "d5": 2.5,
+       "s": 3.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "58",
+      "label": "External heavy retaining ring 58",
+      "d": 58.0,
+      "dims": {
+       "d": 58.0,
+       "dg": 55.0,
+       "large": 5.6,
+       "small": 1.68,
+       "lug": 8.8,
+       "d5": 2.5,
+       "s": 3.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "60",
+      "label": "External heavy retaining ring 60",
+      "d": 60.0,
+      "dims": {
+       "d": 60.0,
+       "dg": 57.0,
+       "large": 5.8,
+       "small": 1.74,
+       "lug": 9.0,
+       "d5": 2.5,
+       "s": 3.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "65",
+      "label": "External heavy retaining ring 65",
+      "d": 65.0,
+      "dims": {
+       "d": 65.0,
+       "dg": 62.0,
+       "large": 6.3,
+       "small": 1.89,
+       "lug": 9.3,
+       "d5": 3.0,
+       "s": 4.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "70",
+      "label": "External heavy retaining ring 70",
+      "d": 70.0,
+      "dims": {
+       "d": 70.0,
+       "dg": 67.0,
+       "large": 6.6,
+       "small": 1.98,
+       "lug": 9.5,
+       "d5": 3.0,
+       "s": 4.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "75",
+      "label": "External heavy retaining ring 75",
+      "d": 75.0,
+      "dims": {
+       "d": 75.0,
+       "dg": 72.0,
+       "large": 7.0,
+       "small": 2.1,
+       "lug": 9.7,
+       "d5": 3.0,
+       "s": 4.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "80",
+      "label": "External heavy retaining ring 80",
+      "d": 80.0,
+      "dims": {
+       "d": 80.0,
+       "dg": 76.5,
+       "large": 7.4,
+       "small": 2.22,
+       "lug": 9.8,
+       "d5": 3.0,
+       "s": 4.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "85",
+      "label": "External heavy retaining ring 85",
+      "d": 85.0,
+      "dims": {
+       "d": 85.0,
+       "dg": 81.5,
+       "large": 7.8,
+       "small": 2.34,
+       "lug": 10.0,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "90",
+      "label": "External heavy retaining ring 90",
+      "d": 90.0,
+      "dims": {
+       "d": 90.0,
+       "dg": 86.5,
+       "large": 8.2,
+       "small": 2.46,
+       "lug": 10.2,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.8
+      }
+     },
+     {
+      "name": "100",
+      "label": "External heavy retaining ring 100",
+      "d": 100.0,
+      "dims": {
+       "d": 100.0,
+       "dg": 96.5,
+       "large": 9.0,
+       "small": 2.7,
+       "lug": 10.5,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.8
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_471_EXTERNAL_RETAINING_RINGS_MAIN (document 4f49468704ef21196ab5f388, version More unique parameters)"
+   },
+   {
+    "category": "Retaining rings",
+    "class": "External retaining rings",
+    "name": "External retaining ring DIN 471",
+    "shape": "retainingRing",
+    "form": {
+     "internal": 0,
+     "holeRule": 0,
+     "gapDiv": 1.95,
+     "sideAngle": 7,
+     "lugK": 0.8
+    },
+    "sizes": [
+     {
+      "name": "3",
+      "label": "External retaining ring 3",
+      "d": 3.0,
+      "dims": {
+       "d": 3.0,
+       "dg": 2.8,
+       "large": 0.8,
+       "small": 0.24,
+       "lug": 1.9,
+       "d5": 1.0,
+       "s": 0.4,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "4",
+      "label": "External retaining ring 4",
+      "d": 4.0,
+      "dims": {
+       "d": 4.0,
+       "dg": 3.8,
+       "large": 0.9,
+       "small": 0.27,
+       "lug": 2.2,
+       "d5": 1.0,
+       "s": 0.4,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "5",
+      "label": "External retaining ring 5",
+      "d": 5.0,
+      "dims": {
+       "d": 5.0,
+       "dg": 4.8,
+       "large": 1.1,
+       "small": 0.33,
+       "lug": 2.5,
+       "d5": 1.0,
+       "s": 0.6,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "6",
+      "label": "External retaining ring 6",
+      "d": 6.0,
+      "dims": {
+       "d": 6.0,
+       "dg": 5.7,
+       "large": 1.3,
+       "small": 0.39,
+       "lug": 2.7,
+       "d5": 1.2,
+       "s": 0.7,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "7",
+      "label": "External retaining ring 7",
+      "d": 7.0,
+      "dims": {
+       "d": 7.0,
+       "dg": 6.7,
+       "large": 1.4,
+       "small": 0.42,
+       "lug": 3.1,
+       "d5": 1.2,
+       "s": 0.8,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "8",
+      "label": "External retaining ring 8",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dg": 7.6,
+       "large": 1.5,
+       "small": 0.45,
+       "lug": 3.2,
+       "d5": 1.2,
+       "s": 0.8,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "9",
+      "label": "External retaining ring 9",
+      "d": 9.0,
+      "dims": {
+       "d": 9.0,
+       "dg": 8.6,
+       "large": 1.7,
+       "small": 0.51,
+       "lug": 3.3,
+       "d5": 1.2,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "10",
+      "label": "External retaining ring 10",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dg": 9.6,
+       "large": 1.8,
+       "small": 0.54,
+       "lug": 3.3,
+       "d5": 1.5,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "11",
+      "label": "External retaining ring 11",
+      "d": 11.0,
+      "dims": {
+       "d": 11.0,
+       "dg": 10.5,
+       "large": 1.8,
+       "small": 0.54,
+       "lug": 3.3,
+       "d5": 1.5,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "12",
+      "label": "External retaining ring 12",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "dg": 11.5,
+       "large": 1.8,
+       "small": 0.54,
+       "lug": 3.3,
+       "d5": 1.7,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "13",
+      "label": "External retaining ring 13",
+      "d": 13.0,
+      "dims": {
+       "d": 13.0,
+       "dg": 12.4,
+       "large": 2.0,
+       "small": 0.6,
+       "lug": 3.3,
+       "d5": 1.7,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "14",
+      "label": "External retaining ring 14",
+      "d": 14.0,
+      "dims": {
+       "d": 14.0,
+       "dg": 13.4,
+       "large": 2.1,
+       "small": 0.63,
+       "lug": 3.5,
+       "d5": 1.7,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "15",
+      "label": "External retaining ring 15",
+      "d": 15.0,
+      "dims": {
+       "d": 15.0,
+       "dg": 14.3,
+       "large": 2.2,
+       "small": 0.66,
+       "lug": 3.6,
+       "d5": 1.7,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "16",
+      "label": "External retaining ring 16",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "dg": 15.2,
+       "large": 2.2,
+       "small": 0.66,
+       "lug": 3.7,
+       "d5": 1.7,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "17",
+      "label": "External retaining ring 17",
+      "d": 17.0,
+      "dims": {
+       "d": 17.0,
+       "dg": 16.2,
+       "large": 2.3,
+       "small": 0.69,
+       "lug": 3.8,
+       "d5": 1.7,
+       "s": 1.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "18",
+      "label": "External retaining ring 18",
+      "d": 18.0,
+      "dims": {
+       "d": 18.0,
+       "dg": 17.0,
+       "large": 2.4,
+       "small": 0.72,
+       "lug": 3.9,
+       "d5": 2.0,
+       "s": 1.2,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "19",
+      "label": "External retaining ring 19",
+      "d": 19.0,
+      "dims": {
+       "d": 19.0,
+       "dg": 18.0,
+       "large": 2.5,
+       "small": 0.75,
+       "lug": 3.9,
+       "d5": 2.0,
+       "s": 1.2,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "20",
+      "label": "External retaining ring 20",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "dg": 19.0,
+       "large": 2.6,
+       "small": 0.78,
+       "lug": 4.0,
+       "d5": 2.0,
+       "s": 1.2,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "21",
+      "label": "External retaining ring 21",
+      "d": 21.0,
+      "dims": {
+       "d": 21.0,
+       "dg": 20.0,
+       "large": 2.7,
+       "small": 0.81,
+       "lug": 4.1,
+       "d5": 2.0,
+       "s": 1.2,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "22",
+      "label": "External retaining ring 22",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "dg": 21.0,
+       "large": 2.8,
+       "small": 0.84,
+       "lug": 4.2,
+       "d5": 2.0,
+       "s": 1.2,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "24",
+      "label": "External retaining ring 24",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "dg": 22.9,
+       "large": 3.0,
+       "small": 0.9,
+       "lug": 4.4,
+       "d5": 2.0,
+       "s": 1.2,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "25",
+      "label": "External retaining ring 25",
+      "d": 25.0,
+      "dims": {
+       "d": 25.0,
+       "dg": 23.9,
+       "large": 3.0,
+       "small": 0.9,
+       "lug": 4.4,
+       "d5": 2.0,
+       "s": 1.2,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "26",
+      "label": "External retaining ring 26",
+      "d": 26.0,
+      "dims": {
+       "d": 26.0,
+       "dg": 24.9,
+       "large": 3.1,
+       "small": 0.93,
+       "lug": 4.5,
+       "d5": 2.0,
+       "s": 1.2,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "28",
+      "label": "External retaining ring 28",
+      "d": 28.0,
+      "dims": {
+       "d": 28.0,
+       "dg": 26.6,
+       "large": 3.2,
+       "small": 0.96,
+       "lug": 4.7,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "29",
+      "label": "External retaining ring 29",
+      "d": 29.0,
+      "dims": {
+       "d": 29.0,
+       "dg": 27.6,
+       "large": 3.4,
+       "small": 1.02,
+       "lug": 4.8,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "30",
+      "label": "External retaining ring 30",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "dg": 28.6,
+       "large": 3.5,
+       "small": 1.05,
+       "lug": 5.0,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "32",
+      "label": "External retaining ring 32",
+      "d": 32.0,
+      "dims": {
+       "d": 32.0,
+       "dg": 30.3,
+       "large": 3.6,
+       "small": 1.08,
+       "lug": 5.2,
+       "d5": 2.5,
+       "s": 1.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "34",
+      "label": "External retaining ring 34",
+      "d": 34.0,
+      "dims": {
+       "d": 34.0,
+       "dg": 32.3,
+       "large": 3.8,
+       "small": 1.14,
+       "lug": 5.4,
+       "d5": 2.5,
+       "s": 1.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "35",
+      "label": "External retaining ring 35",
+      "d": 35.0,
+      "dims": {
+       "d": 35.0,
+       "dg": 33.0,
+       "large": 3.9,
+       "small": 1.17,
+       "lug": 5.6,
+       "d5": 2.5,
+       "s": 1.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "36",
+      "label": "External retaining ring 36",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "dg": 34.0,
+       "large": 4.0,
+       "small": 1.2,
+       "lug": 5.6,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "38",
+      "label": "External retaining ring 38",
+      "d": 38.0,
+      "dims": {
+       "d": 38.0,
+       "dg": 36.0,
+       "large": 4.2,
+       "small": 1.26,
+       "lug": 5.8,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "40",
+      "label": "External retaining ring 40",
+      "d": 40.0,
+      "dims": {
+       "d": 40.0,
+       "dg": 37.5,
+       "large": 4.4,
+       "small": 1.32,
+       "lug": 6.0,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "42",
+      "label": "External retaining ring 42",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "dg": 39.5,
+       "large": 4.5,
+       "small": 1.35,
+       "lug": 6.5,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "45",
+      "label": "External retaining ring 45",
+      "d": 45.0,
+      "dims": {
+       "d": 45.0,
+       "dg": 42.5,
+       "large": 4.7,
+       "small": 1.41,
+       "lug": 6.7,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "48",
+      "label": "External retaining ring 48",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "dg": 45.5,
+       "large": 5.0,
+       "small": 1.5,
+       "lug": 6.9,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "50",
+      "label": "External retaining ring 50",
+      "d": 50.0,
+      "dims": {
+       "d": 50.0,
+       "dg": 47.0,
+       "large": 5.1,
+       "small": 1.53,
+       "lug": 6.9,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "52",
+      "label": "External retaining ring 52",
+      "d": 52.0,
+      "dims": {
+       "d": 52.0,
+       "dg": 49.0,
+       "large": 5.2,
+       "small": 1.56,
+       "lug": 7.0,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "55",
+      "label": "External retaining ring 55",
+      "d": 55.0,
+      "dims": {
+       "d": 55.0,
+       "dg": 52.0,
+       "large": 5.4,
+       "small": 1.62,
+       "lug": 7.2,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "56",
+      "label": "External retaining ring 56",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "dg": 53.0,
+       "large": 5.5,
+       "small": 1.65,
+       "lug": 7.3,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "58",
+      "label": "External retaining ring 58",
+      "d": 58.0,
+      "dims": {
+       "d": 58.0,
+       "dg": 55.0,
+       "large": 5.6,
+       "small": 1.68,
+       "lug": 7.3,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "60",
+      "label": "External retaining ring 60",
+      "d": 60.0,
+      "dims": {
+       "d": 60.0,
+       "dg": 57.0,
+       "large": 5.8,
+       "small": 1.74,
+       "lug": 7.4,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "62",
+      "label": "External retaining ring 62",
+      "d": 62.0,
+      "dims": {
+       "d": 62.0,
+       "dg": 59.0,
+       "large": 6.0,
+       "small": 1.8,
+       "lug": 7.5,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "63",
+      "label": "External retaining ring 63",
+      "d": 63.0,
+      "dims": {
+       "d": 63.0,
+       "dg": 60.0,
+       "large": 6.2,
+       "small": 1.86,
+       "lug": 7.6,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "65",
+      "label": "External retaining ring 65",
+      "d": 65.0,
+      "dims": {
+       "d": 65.0,
+       "dg": 62.0,
+       "large": 6.3,
+       "small": 1.89,
+       "lug": 7.8,
+       "d5": 3.0,
+       "s": 2.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "68",
+      "label": "External retaining ring 68",
+      "d": 68.0,
+      "dims": {
+       "d": 68.0,
+       "dg": 65.0,
+       "large": 6.5,
+       "small": 1.95,
+       "lug": 8.0,
+       "d5": 3.0,
+       "s": 2.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "70",
+      "label": "External retaining ring 70",
+      "d": 70.0,
+      "dims": {
+       "d": 70.0,
+       "dg": 67.0,
+       "large": 6.6,
+       "small": 1.98,
+       "lug": 8.1,
+       "d5": 3.0,
+       "s": 2.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "72",
+      "label": "External retaining ring 72",
+      "d": 72.0,
+      "dims": {
+       "d": 72.0,
+       "dg": 69.0,
+       "large": 6.8,
+       "small": 2.04,
+       "lug": 8.2,
+       "d5": 3.0,
+       "s": 2.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "75",
+      "label": "External retaining ring 75",
+      "d": 75.0,
+      "dims": {
+       "d": 75.0,
+       "dg": 72.0,
+       "large": 7.0,
+       "small": 2.1,
+       "lug": 8.4,
+       "d5": 3.0,
+       "s": 2.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "78",
+      "label": "External retaining ring 78",
+      "d": 78.0,
+      "dims": {
+       "d": 78.0,
+       "dg": 75.0,
+       "large": 7.3,
+       "small": 2.19,
+       "lug": 8.6,
+       "d5": 3.0,
+       "s": 2.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "80",
+      "label": "External retaining ring 80",
+      "d": 80.0,
+      "dims": {
+       "d": 80.0,
+       "dg": 76.5,
+       "large": 7.4,
+       "small": 2.22,
+       "lug": 8.6,
+       "d5": 3.0,
+       "s": 2.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "82",
+      "label": "External retaining ring 82",
+      "d": 82.0,
+      "dims": {
+       "d": 82.0,
+       "dg": 78.5,
+       "large": 7.6,
+       "small": 2.28,
+       "lug": 8.7,
+       "d5": 3.0,
+       "s": 2.5,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "85",
+      "label": "External retaining ring 85",
+      "d": 85.0,
+      "dims": {
+       "d": 85.0,
+       "dg": 81.5,
+       "large": 7.8,
+       "small": 2.34,
+       "lug": 8.7,
+       "d5": 3.5,
+       "s": 3.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "88",
+      "label": "External retaining ring 88",
+      "d": 88.0,
+      "dims": {
+       "d": 88.0,
+       "dg": 84.5,
+       "large": 8.0,
+       "small": 2.4,
+       "lug": 8.8,
+       "d5": 3.5,
+       "s": 3.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "90",
+      "label": "External retaining ring 90",
+      "d": 90.0,
+      "dims": {
+       "d": 90.0,
+       "dg": 86.5,
+       "large": 8.2,
+       "small": 2.46,
+       "lug": 8.8,
+       "d5": 3.5,
+       "s": 3.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "95",
+      "label": "External retaining ring 95",
+      "d": 95.0,
+      "dims": {
+       "d": 95.0,
+       "dg": 91.5,
+       "large": 8.6,
+       "small": 2.58,
+       "lug": 9.4,
+       "d5": 3.5,
+       "s": 3.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "100",
+      "label": "External retaining ring 100",
+      "d": 100.0,
+      "dims": {
+       "d": 100.0,
+       "dg": 96.5,
+       "large": 9.0,
+       "small": 2.7,
+       "lug": 9.6,
+       "d5": 3.5,
+       "s": 3.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "105",
+      "label": "External retaining ring 105",
+      "d": 105.0,
+      "dims": {
+       "d": 105.0,
+       "dg": 101.0,
+       "large": 9.3,
+       "small": 2.79,
+       "lug": 9.9,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "110",
+      "label": "External retaining ring 110",
+      "d": 110.0,
+      "dims": {
+       "d": 110.0,
+       "dg": 106.0,
+       "large": 9.6,
+       "small": 2.88,
+       "lug": 10.1,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "115",
+      "label": "External retaining ring 115",
+      "d": 115.0,
+      "dims": {
+       "d": 115.0,
+       "dg": 111.0,
+       "large": 9.8,
+       "small": 2.94,
+       "lug": 10.6,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "120",
+      "label": "External retaining ring 120",
+      "d": 120.0,
+      "dims": {
+       "d": 120.0,
+       "dg": 116.0,
+       "large": 10.2,
+       "small": 3.06,
+       "lug": 11.0,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "125",
+      "label": "External retaining ring 125",
+      "d": 125.0,
+      "dims": {
+       "d": 125.0,
+       "dg": 121.0,
+       "large": 10.4,
+       "small": 3.12,
+       "lug": 11.4,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "130",
+      "label": "External retaining ring 130",
+      "d": 130.0,
+      "dims": {
+       "d": 130.0,
+       "dg": 126.0,
+       "large": 10.7,
+       "small": 3.21,
+       "lug": 11.6,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "135",
+      "label": "External retaining ring 135",
+      "d": 135.0,
+      "dims": {
+       "d": 135.0,
+       "dg": 131.0,
+       "large": 11.0,
+       "small": 3.3,
+       "lug": 11.8,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "140",
+      "label": "External retaining ring 140",
+      "d": 140.0,
+      "dims": {
+       "d": 140.0,
+       "dg": 136.0,
+       "large": 11.2,
+       "small": 3.36,
+       "lug": 12.0,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "145",
+      "label": "External retaining ring 145",
+      "d": 145.0,
+      "dims": {
+       "d": 145.0,
+       "dg": 141.0,
+       "large": 11.5,
+       "small": 3.45,
+       "lug": 12.2,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "150",
+      "label": "External retaining ring 150",
+      "d": 150.0,
+      "dims": {
+       "d": 150.0,
+       "dg": 145.0,
+       "large": 11.8,
+       "small": 3.54,
+       "lug": 13.0,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "155",
+      "label": "External retaining ring 155",
+      "d": 155.0,
+      "dims": {
+       "d": 155.0,
+       "dg": 150.0,
+       "large": 12.0,
+       "small": 3.6,
+       "lug": 13.0,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "160",
+      "label": "External retaining ring 160",
+      "d": 160.0,
+      "dims": {
+       "d": 160.0,
+       "dg": 155.0,
+       "large": 12.2,
+       "small": 3.66,
+       "lug": 13.3,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "165",
+      "label": "External retaining ring 165",
+      "d": 165.0,
+      "dims": {
+       "d": 165.0,
+       "dg": 160.0,
+       "large": 12.5,
+       "small": 3.75,
+       "lug": 13.5,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "170",
+      "label": "External retaining ring 170",
+      "d": 170.0,
+      "dims": {
+       "d": 170.0,
+       "dg": 165.0,
+       "large": 12.9,
+       "small": 3.87,
+       "lug": 13.5,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "175",
+      "label": "External retaining ring 175",
+      "d": 175.0,
+      "dims": {
+       "d": 175.0,
+       "dg": 170.0,
+       "large": 12.9,
+       "small": 3.87,
+       "lug": 13.5,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "180",
+      "label": "External retaining ring 180",
+      "d": 180.0,
+      "dims": {
+       "d": 180.0,
+       "dg": 175.0,
+       "large": 13.5,
+       "small": 4.05,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "185",
+      "label": "External retaining ring 185",
+      "d": 185.0,
+      "dims": {
+       "d": 185.0,
+       "dg": 180.0,
+       "large": 13.5,
+       "small": 4.05,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "190",
+      "label": "External retaining ring 190",
+      "d": 190.0,
+      "dims": {
+       "d": 190.0,
+       "dg": 185.0,
+       "large": 14.0,
+       "small": 4.2,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "195",
+      "label": "External retaining ring 195",
+      "d": 195.0,
+      "dims": {
+       "d": 195.0,
+       "dg": 190.0,
+       "large": 14.0,
+       "small": 4.2,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "200",
+      "label": "External retaining ring 200",
+      "d": 200.0,
+      "dims": {
+       "d": 200.0,
+       "dg": 195.0,
+       "large": 14.0,
+       "small": 4.2,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "210",
+      "label": "External retaining ring 210",
+      "d": 210.0,
+      "dims": {
+       "d": 210.0,
+       "dg": 204.0,
+       "large": 14.0,
+       "small": 4.2,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "220",
+      "label": "External retaining ring 220",
+      "d": 220.0,
+      "dims": {
+       "d": 220.0,
+       "dg": 214.0,
+       "large": 14.0,
+       "small": 4.2,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "230",
+      "label": "External retaining ring 230",
+      "d": 230.0,
+      "dims": {
+       "d": 230.0,
+       "dg": 224.0,
+       "large": 14.0,
+       "small": 4.2,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "240",
+      "label": "External retaining ring 240",
+      "d": 240.0,
+      "dims": {
+       "d": 240.0,
+       "dg": 234.0,
+       "large": 14.0,
+       "small": 4.2,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "250",
+      "label": "External retaining ring 250",
+      "d": 250.0,
+      "dims": {
+       "d": 250.0,
+       "dg": 244.0,
+       "large": 14.0,
+       "small": 4.2,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "260",
+      "label": "External retaining ring 260",
+      "d": 260.0,
+      "dims": {
+       "d": 260.0,
+       "dg": 252.0,
+       "large": 16.0,
+       "small": 4.8,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "270",
+      "label": "External retaining ring 270",
+      "d": 270.0,
+      "dims": {
+       "d": 270.0,
+       "dg": 262.0,
+       "large": 16.0,
+       "small": 4.8,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "280",
+      "label": "External retaining ring 280",
+      "d": 280.0,
+      "dims": {
+       "d": 280.0,
+       "dg": 272.0,
+       "large": 16.0,
+       "small": 4.8,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "290",
+      "label": "External retaining ring 290",
+      "d": 290.0,
+      "dims": {
+       "d": 290.0,
+       "dg": 282.0,
+       "large": 16.0,
+       "small": 4.8,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     },
+     {
+      "name": "300",
+      "label": "External retaining ring 300",
+      "d": 300.0,
+      "dims": {
+       "d": 300.0,
+       "dg": 292.0,
+       "large": 16.0,
+       "small": 4.8,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0,
+       "rc": 0.85
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_471_EXTERNAL_RETAINING_RINGS_MAIN (document bf35ae4b6b4b2a66b9596a57, version Adding smart names)"
+   },
+   {
+    "category": "Retaining rings",
+    "class": "Internal retaining rings",
+    "name": "Internal retaining ring DIN 472",
+    "shape": "retainingRing",
+    "form": {
+     "internal": 1,
+     "lugK": 0.5
+    },
+    "sizes": [
+     {
+      "name": "8",
+      "label": "Internal retaining ring 8",
+      "d": 8.0,
+      "dims": {
+       "d": 8.0,
+       "dg": 8.4,
+       "large": 1.1,
+       "small": 0.55,
+       "lug": 2.4,
+       "d5": 1.0,
+       "s": 0.8
+      }
+     },
+     {
+      "name": "9",
+      "label": "Internal retaining ring 9",
+      "d": 9.0,
+      "dims": {
+       "d": 9.0,
+       "dg": 9.4,
+       "large": 1.3,
+       "small": 0.65,
+       "lug": 2.5,
+       "d5": 1.0,
+       "s": 0.8
+      }
+     },
+     {
+      "name": "10",
+      "label": "Internal retaining ring 10",
+      "d": 10.0,
+      "dims": {
+       "d": 10.0,
+       "dg": 10.4,
+       "large": 1.4,
+       "small": 0.7,
+       "lug": 3.2,
+       "d5": 1.2,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "11",
+      "label": "Internal retaining ring 11",
+      "d": 11.0,
+      "dims": {
+       "d": 11.0,
+       "dg": 11.4,
+       "large": 1.5,
+       "small": 0.75,
+       "lug": 3.3,
+       "d5": 1.2,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "12",
+      "label": "Internal retaining ring 12",
+      "d": 12.0,
+      "dims": {
+       "d": 12.0,
+       "dg": 12.5,
+       "large": 1.7,
+       "small": 0.85,
+       "lug": 3.4,
+       "d5": 1.5,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "13",
+      "label": "Internal retaining ring 13",
+      "d": 13.0,
+      "dims": {
+       "d": 13.0,
+       "dg": 13.6,
+       "large": 1.8,
+       "small": 0.9,
+       "lug": 3.6,
+       "d5": 1.5,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "14",
+      "label": "Internal retaining ring 14",
+      "d": 14.0,
+      "dims": {
+       "d": 14.0,
+       "dg": 14.6,
+       "large": 1.9,
+       "small": 0.95,
+       "lug": 3.7,
+       "d5": 1.7,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "15",
+      "label": "Internal retaining ring 15",
+      "d": 15.0,
+      "dims": {
+       "d": 15.0,
+       "dg": 15.7,
+       "large": 2.0,
+       "small": 1.0,
+       "lug": 3.7,
+       "d5": 1.7,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "16",
+      "label": "Internal retaining ring 16",
+      "d": 16.0,
+      "dims": {
+       "d": 16.0,
+       "dg": 16.8,
+       "large": 2.0,
+       "small": 1.0,
+       "lug": 3.8,
+       "d5": 1.7,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "17",
+      "label": "Internal retaining ring 17",
+      "d": 17.0,
+      "dims": {
+       "d": 17.0,
+       "dg": 17.8,
+       "large": 2.1,
+       "small": 1.05,
+       "lug": 3.9,
+       "d5": 1.7,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "18",
+      "label": "Internal retaining ring 18",
+      "d": 18.0,
+      "dims": {
+       "d": 18.0,
+       "dg": 19.0,
+       "large": 2.2,
+       "small": 1.1,
+       "lug": 4.1,
+       "d5": 2.0,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "19",
+      "label": "Internal retaining ring 19",
+      "d": 19.0,
+      "dims": {
+       "d": 19.0,
+       "dg": 20.0,
+       "large": 2.2,
+       "small": 1.1,
+       "lug": 4.1,
+       "d5": 2.0,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "20",
+      "label": "Internal retaining ring 20",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "dg": 21.0,
+       "large": 2.3,
+       "small": 1.15,
+       "lug": 4.2,
+       "d5": 2.0,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "21",
+      "label": "Internal retaining ring 21",
+      "d": 21.0,
+      "dims": {
+       "d": 21.0,
+       "dg": 22.0,
+       "large": 2.4,
+       "small": 1.2,
+       "lug": 4.2,
+       "d5": 2.0,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "22",
+      "label": "Internal retaining ring 22",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "dg": 23.0,
+       "large": 2.5,
+       "small": 1.25,
+       "lug": 4.2,
+       "d5": 2.0,
+       "s": 1.0
+      }
+     },
+     {
+      "name": "24",
+      "label": "Internal retaining ring 24",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "dg": 25.2,
+       "large": 2.6,
+       "small": 1.3,
+       "lug": 4.4,
+       "d5": 2.0,
+       "s": 1.2
+      }
+     },
+     {
+      "name": "25",
+      "label": "Internal retaining ring 25",
+      "d": 25.0,
+      "dims": {
+       "d": 25.0,
+       "dg": 26.2,
+       "large": 2.7,
+       "small": 1.35,
+       "lug": 4.5,
+       "d5": 2.0,
+       "s": 1.2
+      }
+     },
+     {
+      "name": "26",
+      "label": "Internal retaining ring 26",
+      "d": 26.0,
+      "dims": {
+       "d": 26.0,
+       "dg": 27.2,
+       "large": 2.8,
+       "small": 1.4,
+       "lug": 4.7,
+       "d5": 2.0,
+       "s": 1.2
+      }
+     },
+     {
+      "name": "28",
+      "label": "Internal retaining ring 28",
+      "d": 28.0,
+      "dims": {
+       "d": 28.0,
+       "dg": 29.4,
+       "large": 2.9,
+       "small": 1.45,
+       "lug": 4.8,
+       "d5": 2.0,
+       "s": 1.2
+      }
+     },
+     {
+      "name": "30",
+      "label": "Internal retaining ring 30",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "dg": 31.4,
+       "large": 3.0,
+       "small": 1.5,
+       "lug": 4.8,
+       "d5": 2.0,
+       "s": 1.2
+      }
+     },
+     {
+      "name": "31",
+      "label": "Internal retaining ring 31",
+      "d": 31.0,
+      "dims": {
+       "d": 31.0,
+       "dg": 32.7,
+       "large": 3.2,
+       "small": 1.6,
+       "lug": 5.2,
+       "d5": 2.5,
+       "s": 1.2
+      }
+     },
+     {
+      "name": "32",
+      "label": "Internal retaining ring 32",
+      "d": 32.0,
+      "dims": {
+       "d": 32.0,
+       "dg": 33.7,
+       "large": 3.2,
+       "small": 1.6,
+       "lug": 5.4,
+       "d5": 2.5,
+       "s": 1.2
+      }
+     },
+     {
+      "name": "34",
+      "label": "Internal retaining ring 34",
+      "d": 34.0,
+      "dims": {
+       "d": 34.0,
+       "dg": 35.7,
+       "large": 3.3,
+       "small": 1.65,
+       "lug": 5.4,
+       "d5": 2.5,
+       "s": 1.5
+      }
+     },
+     {
+      "name": "35",
+      "label": "Internal retaining ring 35",
+      "d": 35.0,
+      "dims": {
+       "d": 35.0,
+       "dg": 37.0,
+       "large": 3.4,
+       "small": 1.7,
+       "lug": 5.4,
+       "d5": 2.5,
+       "s": 1.5
+      }
+     },
+     {
+      "name": "36",
+      "label": "Internal retaining ring 36",
+      "d": 36.0,
+      "dims": {
+       "d": 36.0,
+       "dg": 38.0,
+       "large": 3.5,
+       "small": 1.75,
+       "lug": 5.4,
+       "d5": 2.5,
+       "s": 1.5
+      }
+     },
+     {
+      "name": "37",
+      "label": "Internal retaining ring 37",
+      "d": 37.0,
+      "dims": {
+       "d": 37.0,
+       "dg": 39.0,
+       "large": 3.6,
+       "small": 1.8,
+       "lug": 5.5,
+       "d5": 2.5,
+       "s": 1.5
+      }
+     },
+     {
+      "name": "38",
+      "label": "Internal retaining ring 38",
+      "d": 38.0,
+      "dims": {
+       "d": 38.0,
+       "dg": 40.0,
+       "large": 3.7,
+       "small": 1.85,
+       "lug": 5.5,
+       "d5": 2.5,
+       "s": 1.5
+      }
+     },
+     {
+      "name": "40",
+      "label": "Internal retaining ring 40",
+      "d": 40.0,
+      "dims": {
+       "d": 40.0,
+       "dg": 42.5,
+       "large": 3.9,
+       "small": 1.95,
+       "lug": 5.8,
+       "d5": 2.5,
+       "s": 1.75
+      }
+     },
+     {
+      "name": "42",
+      "label": "Internal retaining ring 42",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "dg": 44.5,
+       "large": 4.1,
+       "small": 2.05,
+       "lug": 5.9,
+       "d5": 2.5,
+       "s": 1.75
+      }
+     },
+     {
+      "name": "45",
+      "label": "Internal retaining ring 45",
+      "d": 45.0,
+      "dims": {
+       "d": 45.0,
+       "dg": 47.5,
+       "large": 4.3,
+       "small": 2.15,
+       "lug": 6.2,
+       "d5": 2.5,
+       "s": 1.75
+      }
+     },
+     {
+      "name": "47",
+      "label": "Internal retaining ring 47",
+      "d": 47.0,
+      "dims": {
+       "d": 47.0,
+       "dg": 49.5,
+       "large": 4.4,
+       "small": 2.2,
+       "lug": 6.4,
+       "d5": 2.5,
+       "s": 1.75
+      }
+     },
+     {
+      "name": "48",
+      "label": "Internal retaining ring 48",
+      "d": 48.0,
+      "dims": {
+       "d": 48.0,
+       "dg": 50.5,
+       "large": 4.5,
+       "small": 2.25,
+       "lug": 6.4,
+       "d5": 2.5,
+       "s": 1.75
+      }
+     },
+     {
+      "name": "50",
+      "label": "Internal retaining ring 50",
+      "d": 50.0,
+      "dims": {
+       "d": 50.0,
+       "dg": 53.0,
+       "large": 4.6,
+       "small": 2.3,
+       "lug": 6.5,
+       "d5": 2.5,
+       "s": 2.0
+      }
+     },
+     {
+      "name": "52",
+      "label": "Internal retaining ring 52",
+      "d": 52.0,
+      "dims": {
+       "d": 52.0,
+       "dg": 55.0,
+       "large": 4.7,
+       "small": 2.35,
+       "lug": 6.7,
+       "d5": 2.5,
+       "s": 2.0
+      }
+     },
+     {
+      "name": "55",
+      "label": "Internal retaining ring 55",
+      "d": 55.0,
+      "dims": {
+       "d": 55.0,
+       "dg": 58.0,
+       "large": 5.0,
+       "small": 2.5,
+       "lug": 6.8,
+       "d5": 2.5,
+       "s": 2.0
+      }
+     },
+     {
+      "name": "56",
+      "label": "Internal retaining ring 56",
+      "d": 56.0,
+      "dims": {
+       "d": 56.0,
+       "dg": 59.0,
+       "large": 5.1,
+       "small": 2.55,
+       "lug": 6.8,
+       "d5": 2.5,
+       "s": 2.0
+      }
+     },
+     {
+      "name": "58",
+      "label": "Internal retaining ring 58",
+      "d": 58.0,
+      "dims": {
+       "d": 58.0,
+       "dg": 61.0,
+       "large": 5.2,
+       "small": 2.6,
+       "lug": 6.9,
+       "d5": 2.5,
+       "s": 2.0
+      }
+     },
+     {
+      "name": "60",
+      "label": "Internal retaining ring 60",
+      "d": 60.0,
+      "dims": {
+       "d": 60.0,
+       "dg": 63.0,
+       "large": 5.4,
+       "small": 2.7,
+       "lug": 7.3,
+       "d5": 2.5,
+       "s": 2.0
+      }
+     },
+     {
+      "name": "62",
+      "label": "Internal retaining ring 62",
+      "d": 62.0,
+      "dims": {
+       "d": 62.0,
+       "dg": 65.0,
+       "large": 5.5,
+       "small": 2.75,
+       "lug": 7.3,
+       "d5": 2.5,
+       "s": 2.0
+      }
+     },
+     {
+      "name": "63",
+      "label": "Internal retaining ring 63",
+      "d": 63.0,
+      "dims": {
+       "d": 63.0,
+       "dg": 66.0,
+       "large": 5.6,
+       "small": 2.8,
+       "lug": 7.3,
+       "d5": 2.5,
+       "s": 2.0
+      }
+     },
+     {
+      "name": "65",
+      "label": "Internal retaining ring 65",
+      "d": 65.0,
+      "dims": {
+       "d": 65.0,
+       "dg": 68.0,
+       "large": 5.8,
+       "small": 2.9,
+       "lug": 7.6,
+       "d5": 3.0,
+       "s": 2.5
+      }
+     },
+     {
+      "name": "68",
+      "label": "Internal retaining ring 68",
+      "d": 68.0,
+      "dims": {
+       "d": 68.0,
+       "dg": 71.0,
+       "large": 6.1,
+       "small": 3.05,
+       "lug": 7.8,
+       "d5": 3.0,
+       "s": 2.5
+      }
+     },
+     {
+      "name": "70",
+      "label": "Internal retaining ring 70",
+      "d": 70.0,
+      "dims": {
+       "d": 70.0,
+       "dg": 73.0,
+       "large": 6.2,
+       "small": 3.1,
+       "lug": 7.8,
+       "d5": 3.0,
+       "s": 2.5
+      }
+     },
+     {
+      "name": "72",
+      "label": "Internal retaining ring 72",
+      "d": 72.0,
+      "dims": {
+       "d": 72.0,
+       "dg": 75.0,
+       "large": 6.4,
+       "small": 3.2,
+       "lug": 7.8,
+       "d5": 3.0,
+       "s": 2.5
+      }
+     },
+     {
+      "name": "75",
+      "label": "Internal retaining ring 75",
+      "d": 75.0,
+      "dims": {
+       "d": 75.0,
+       "dg": 78.0,
+       "large": 6.6,
+       "small": 3.3,
+       "lug": 7.8,
+       "d5": 3.0,
+       "s": 2.5
+      }
+     },
+     {
+      "name": "78",
+      "label": "Internal retaining ring 78",
+      "d": 78.0,
+      "dims": {
+       "d": 78.0,
+       "dg": 81.0,
+       "large": 6.8,
+       "small": 3.4,
+       "lug": 8.5,
+       "d5": 3.0,
+       "s": 2.5
+      }
+     },
+     {
+      "name": "80",
+      "label": "Internal retaining ring 80",
+      "d": 80.0,
+      "dims": {
+       "d": 80.0,
+       "dg": 83.5,
+       "large": 7.0,
+       "small": 3.5,
+       "lug": 8.5,
+       "d5": 3.0,
+       "s": 2.5
+      }
+     },
+     {
+      "name": "82",
+      "label": "Internal retaining ring 82",
+      "d": 82.0,
+      "dims": {
+       "d": 82.0,
+       "dg": 85.5,
+       "large": 7.0,
+       "small": 3.5,
+       "lug": 8.5,
+       "d5": 3.0,
+       "s": 2.5
+      }
+     },
+     {
+      "name": "85",
+      "label": "Internal retaining ring 85",
+      "d": 85.0,
+      "dims": {
+       "d": 85.0,
+       "dg": 88.5,
+       "large": 7.2,
+       "small": 3.6,
+       "lug": 8.6,
+       "d5": 3.5,
+       "s": 3.0
+      }
+     },
+     {
+      "name": "88",
+      "label": "Internal retaining ring 88",
+      "d": 88.0,
+      "dims": {
+       "d": 88.0,
+       "dg": 91.5,
+       "large": 7.4,
+       "small": 3.7,
+       "lug": 8.6,
+       "d5": 3.5,
+       "s": 3.0
+      }
+     },
+     {
+      "name": "90",
+      "label": "Internal retaining ring 90",
+      "d": 90.0,
+      "dims": {
+       "d": 90.0,
+       "dg": 93.5,
+       "large": 7.6,
+       "small": 3.8,
+       "lug": 8.6,
+       "d5": 3.5,
+       "s": 3.0
+      }
+     },
+     {
+      "name": "92",
+      "label": "Internal retaining ring 92",
+      "d": 92.0,
+      "dims": {
+       "d": 92.0,
+       "dg": 95.5,
+       "large": 7.8,
+       "small": 3.9,
+       "lug": 8.7,
+       "d5": 3.5,
+       "s": 3.0
+      }
+     },
+     {
+      "name": "95",
+      "label": "Internal retaining ring 95",
+      "d": 95.0,
+      "dims": {
+       "d": 95.0,
+       "dg": 98.5,
+       "large": 8.1,
+       "small": 4.05,
+       "lug": 8.8,
+       "d5": 3.5,
+       "s": 3.0
+      }
+     },
+     {
+      "name": "98",
+      "label": "Internal retaining ring 98",
+      "d": 98.0,
+      "dims": {
+       "d": 98.0,
+       "dg": 101.5,
+       "large": 8.3,
+       "small": 4.15,
+       "lug": 9.0,
+       "d5": 3.5,
+       "s": 3.0
+      }
+     },
+     {
+      "name": "100",
+      "label": "Internal retaining ring 100",
+      "d": 100.0,
+      "dims": {
+       "d": 100.0,
+       "dg": 103.5,
+       "large": 8.4,
+       "small": 4.2,
+       "lug": 9.2,
+       "d5": 3.5,
+       "s": 3.0
+      }
+     },
+     {
+      "name": "102",
+      "label": "Internal retaining ring 102",
+      "d": 102.0,
+      "dims": {
+       "d": 102.0,
+       "dg": 106.0,
+       "large": 8.5,
+       "small": 4.25,
+       "lug": 9.5,
+       "d5": 3.5,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "105",
+      "label": "Internal retaining ring 105",
+      "d": 105.0,
+      "dims": {
+       "d": 105.0,
+       "dg": 109.0,
+       "large": 8.7,
+       "small": 4.35,
+       "lug": 9.5,
+       "d5": 3.5,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "108",
+      "label": "Internal retaining ring 108",
+      "d": 108.0,
+      "dims": {
+       "d": 108.0,
+       "dg": 112.0,
+       "large": 8.9,
+       "small": 4.45,
+       "lug": 9.5,
+       "d5": 3.5,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "110",
+      "label": "Internal retaining ring 110",
+      "d": 110.0,
+      "dims": {
+       "d": 110.0,
+       "dg": 114.0,
+       "large": 9.0,
+       "small": 4.5,
+       "lug": 10.4,
+       "d5": 3.5,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "112",
+      "label": "Internal retaining ring 112",
+      "d": 112.0,
+      "dims": {
+       "d": 112.0,
+       "dg": 116.0,
+       "large": 9.1,
+       "small": 4.55,
+       "lug": 10.5,
+       "d5": 3.5,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "115",
+      "label": "Internal retaining ring 115",
+      "d": 115.0,
+      "dims": {
+       "d": 115.0,
+       "dg": 119.0,
+       "large": 9.3,
+       "small": 4.65,
+       "lug": 10.5,
+       "d5": 3.5,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "120",
+      "label": "Internal retaining ring 120",
+      "d": 120.0,
+      "dims": {
+       "d": 120.0,
+       "dg": 124.0,
+       "large": 9.7,
+       "small": 4.85,
+       "lug": 11.0,
+       "d5": 3.5,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "125",
+      "label": "Internal retaining ring 125",
+      "d": 125.0,
+      "dims": {
+       "d": 125.0,
+       "dg": 129.0,
+       "large": 10.0,
+       "small": 5.0,
+       "lug": 11.0,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "130",
+      "label": "Internal retaining ring 130",
+      "d": 130.0,
+      "dims": {
+       "d": 130.0,
+       "dg": 134.0,
+       "large": 10.2,
+       "small": 5.1,
+       "lug": 11.0,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "135",
+      "label": "Internal retaining ring 135",
+      "d": 135.0,
+      "dims": {
+       "d": 135.0,
+       "dg": 139.0,
+       "large": 10.5,
+       "small": 5.25,
+       "lug": 11.2,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "140",
+      "label": "Internal retaining ring 140",
+      "d": 140.0,
+      "dims": {
+       "d": 140.0,
+       "dg": 144.0,
+       "large": 10.7,
+       "small": 5.35,
+       "lug": 11.2,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "145",
+      "label": "Internal retaining ring 145",
+      "d": 145.0,
+      "dims": {
+       "d": 145.0,
+       "dg": 149.0,
+       "large": 10.9,
+       "small": 5.45,
+       "lug": 11.4,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "150",
+      "label": "Internal retaining ring 150",
+      "d": 150.0,
+      "dims": {
+       "d": 150.0,
+       "dg": 155.0,
+       "large": 11.2,
+       "small": 5.6,
+       "lug": 12.0,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "155",
+      "label": "Internal retaining ring 155",
+      "d": 155.0,
+      "dims": {
+       "d": 155.0,
+       "dg": 160.0,
+       "large": 11.4,
+       "small": 5.7,
+       "lug": 12.0,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "160",
+      "label": "Internal retaining ring 160",
+      "d": 160.0,
+      "dims": {
+       "d": 160.0,
+       "dg": 165.0,
+       "large": 11.6,
+       "small": 5.8,
+       "lug": 13.0,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "165",
+      "label": "Internal retaining ring 165",
+      "d": 165.0,
+      "dims": {
+       "d": 165.0,
+       "dg": 170.0,
+       "large": 11.8,
+       "small": 5.9,
+       "lug": 13.0,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "170",
+      "label": "Internal retaining ring 170",
+      "d": 170.0,
+      "dims": {
+       "d": 170.0,
+       "dg": 175.0,
+       "large": 12.2,
+       "small": 6.1,
+       "lug": 13.5,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "175",
+      "label": "Internal retaining ring 175",
+      "d": 175.0,
+      "dims": {
+       "d": 175.0,
+       "dg": 180.0,
+       "large": 12.7,
+       "small": 6.35,
+       "lug": 13.5,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "180",
+      "label": "Internal retaining ring 180",
+      "d": 180.0,
+      "dims": {
+       "d": 180.0,
+       "dg": 185.0,
+       "large": 13.2,
+       "small": 6.6,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "185",
+      "label": "Internal retaining ring 185",
+      "d": 185.0,
+      "dims": {
+       "d": 185.0,
+       "dg": 190.0,
+       "large": 13.7,
+       "small": 6.85,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "190",
+      "label": "Internal retaining ring 190",
+      "d": 190.0,
+      "dims": {
+       "d": 190.0,
+       "dg": 195.0,
+       "large": 13.8,
+       "small": 6.9,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "195",
+      "label": "Internal retaining ring 195",
+      "d": 195.0,
+      "dims": {
+       "d": 195.0,
+       "dg": 200.0,
+       "large": 13.8,
+       "small": 6.9,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "200",
+      "label": "Internal retaining ring 200",
+      "d": 200.0,
+      "dims": {
+       "d": 200.0,
+       "dg": 205.0,
+       "large": 14.0,
+       "small": 7.0,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 4.0
+      }
+     },
+     {
+      "name": "210",
+      "label": "Internal retaining ring 210",
+      "d": 210.0,
+      "dims": {
+       "d": 210.0,
+       "dg": 216.0,
+       "large": 14.0,
+       "small": 7.0,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "220",
+      "label": "Internal retaining ring 220",
+      "d": 220.0,
+      "dims": {
+       "d": 220.0,
+       "dg": 226.0,
+       "large": 14.0,
+       "small": 7.0,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "230",
+      "label": "Internal retaining ring 230",
+      "d": 230.0,
+      "dims": {
+       "d": 230.0,
+       "dg": 236.0,
+       "large": 14.0,
+       "small": 7.0,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "240",
+      "label": "Internal retaining ring 240",
+      "d": 240.0,
+      "dims": {
+       "d": 240.0,
+       "dg": 246.0,
+       "large": 14.0,
+       "small": 7.0,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "250",
+      "label": "Internal retaining ring 250",
+      "d": 250.0,
+      "dims": {
+       "d": 250.0,
+       "dg": 256.0,
+       "large": 14.0,
+       "small": 7.0,
+       "lug": 14.2,
+       "d5": 4.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "260",
+      "label": "Internal retaining ring 260",
+      "d": 260.0,
+      "dims": {
+       "d": 260.0,
+       "dg": 268.0,
+       "large": 16.0,
+       "small": 8.0,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "270",
+      "label": "Internal retaining ring 270",
+      "d": 270.0,
+      "dims": {
+       "d": 270.0,
+       "dg": 278.0,
+       "large": 16.0,
+       "small": 8.0,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "280",
+      "label": "Internal retaining ring 280",
+      "d": 280.0,
+      "dims": {
+       "d": 280.0,
+       "dg": 288.0,
+       "large": 16.0,
+       "small": 8.0,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "290",
+      "label": "Internal retaining ring 290",
+      "d": 290.0,
+      "dims": {
+       "d": 290.0,
+       "dg": 298.0,
+       "large": 16.0,
+       "small": 8.0,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0
+      }
+     },
+     {
+      "name": "300",
+      "label": "Internal retaining ring 300",
+      "d": 300.0,
+      "dims": {
+       "d": 300.0,
+       "dg": 308.0,
+       "large": 16.0,
+       "small": 8.0,
+       "lug": 16.2,
+       "d5": 5.0,
+       "s": 5.0
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_472_INTERNAL_RETAINING_RINGS_MAIN (document fda4ba2995c471efbdfee05e, version Fix for 249726)",
+    "defaultSize": "28"
+   },
+   {
     "category": "Washers",
     "class": "Lock washers",
     "name": "Conical spring lock washer DIN 6796",

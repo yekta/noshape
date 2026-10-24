@@ -751,18 +751,18 @@ impl PartStudioView {
         self.refresh_scene(true, cx);
         if !self.fitted_once {
             self.fitted_once = true;
-            if self.display.bounds().is_some() {
-                self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(false, cx));
-            } else {
-                // Empty studio: Onshape's default planes are squares whose side
-                // is 0.615 of the viewport height (measured live at 1920x1080).
-                self.viewport.update(cx, |vp, cx| {
-                    let half_height = self.display.planes.first().map(|p| p.half_height).unwrap_or(0.05);
-                    vp.camera.target = glam::DVec3::ZERO;
-                    vp.camera.distance = (half_height / 0.615) / (vp.camera.fov_y * 0.5).tan();
-                    vp.request_redraw(cx);
-                });
-            }
+            // Onshape opens a Part Studio at Trimetric, orthographic, fitted to
+            // its parts and the default planes' box even when those are hidden
+            // (live "Zoom to fit (perf 10-23 22:40)" (3)).
+            let bounds = self.load_fit_bounds();
+            self.viewport.update(cx, |vp, cx| {
+                vp.camera.rotation = noshape_render::Camera::rotation_for(noshape_render::StandardView::Trimetric);
+                if let Some((lo, hi)) = bounds {
+                    let size = vp.size();
+                    crate::viewport::fit_camera_to_box(&mut vp.camera, lo, hi, size, 0.0);
+                }
+                vp.request_redraw(cx);
+            });
         }
         cx.notify();
     }
@@ -3581,7 +3581,7 @@ impl PartStudioView {
                     .flex_none()
                     // A custom feature's row shows its initials box (live qa5 FS4).
                     .child(match features::get(&f.type_id).filter(|_| noshape_model::custom::is_custom(&f.type_id)) {
-                        Some(t) => crate::ui::initials_icon(t.name).when(rolled_back || suppressed || hidden, |d| d.opacity(0.5)),
+                        Some(t) => crate::ui::initials_icon_status(t.name, status == FeatureStatus::Error && !rolled_back).when(rolled_back || suppressed || hidden, |d| d.opacity(0.5)),
                         None => crate::ui::tree_icon(&feature_icon(&f.type_id), rolled_back || suppressed || hidden, cx),
                     })
                     // Onshape list badges: under-defined sketch (12 px blue circle,

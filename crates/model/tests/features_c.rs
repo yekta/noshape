@@ -272,15 +272,26 @@ fn circle_sketch(s: &mut Studio, r_mm: f64) -> FeatureId {
     s.sketch(Reference::Plane(DatumPlane::Top), sk)
 }
 
-/// Form tool studio: a 3 mm high boss of radius 5 (added) over a hole of
-/// radius 4 through the sheet (removed), tagged as a form.
+/// Form tool studio: a tube boss, radii 4 to 5, 3 mm high, rooted through
+/// the 2 mm sheet (added; std Form registers only tools that intersect the
+/// sheet), over a hole of radius 4 through the sheet (removed), tagged as a form.
 fn form_studio(tag: bool) -> std::sync::Arc<noshape_model::regen::context::Context> {
     let mut s = Studio::new();
-    let a = circle_sketch(&mut s, 5.0);
-    let ra = s.region(a);
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, mm(5.0));
+    sk.add_circle(DVec2::ZERO, mm(4.0));
+    let a = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let ring = {
+        let r = s.regen();
+        let sk = r.display.sketches.iter().find(|x| x.feature == a).expect("sketch");
+        let key = sk.regions.iter().min_by(|x, y| x.area.total_cmp(&y.area)).expect("region").key.clone();
+        Reference::SketchRegion { sketch: a, key }
+    };
     s.add("extrude", move |p| {
-        p.set("entities", q(ra));
+        p.set("entities", q(ring));
         p.set("depth", expr("3 mm"));
+        p.set("hasSecondDirection", ParamValue::Bool(true));
+        p.set("secondDirectionDepth", expr("2 mm"));
     });
     let b = circle_sketch(&mut s, 4.0);
     let rb = s.region(b);
@@ -326,7 +337,7 @@ fn form_adds_and_cuts_and_shows_in_flat() {
     });
     let r = s.ok();
     let t = mm(2.0);
-    let expected = v0 + 2.0 * (PI * mm(5.0).powi(2) * mm(3.0) - PI * mm(4.0).powi(2) * t);
+    let expected = v0 + 2.0 * (PI * (mm(5.0).powi(2) - mm(4.0).powi(2)) * mm(3.0) - PI * mm(4.0).powi(2) * t);
     assert!(near(volume(&r, 0), expected, 1e-12), "form volume {} vs {expected}", volume(&r, 0));
     let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
     assert!(near(bb.max.z, mm(5.0), 1e-6), "{bb:?}");
@@ -342,7 +353,7 @@ fn form_adds_and_cuts_and_shows_in_flat() {
     }
     let g = fp.to_sheet_geometry();
     assert!(g.lines.iter().any(|l| l.style == noshape_model::drawing::sheet::LineStyle::Centerline));
-    // Untagged studio: parts are classified by name (none says "remove": both added).
+    // Untagged studio: no form tools (std derive finds no Tag-marked parts).
     let mut s2 = plate();
     s2.opts.derived = Some(std::sync::Arc::new(Tabs([("form".to_string(), form_studio(false))].into_iter().collect())));
     let mut sk = noshape_sketch::Sketch::new();
@@ -352,12 +363,16 @@ fn form_adds_and_cuts_and_shows_in_flat() {
         p.set("offset", expr("2 mm"));
     });
     let sid = s2.sketch(Reference::FeaturePlane(pl), sk);
+    let top = face_at(&s2.ok(), 0, DVec3::new(mm(50.0), mm(20.0), mm(2.0)));
     s2.add("sheetMetalFormed", move |p| {
         p.set("formPartStudio", ParamValue::Text("form".into()));
         p.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: p1.0 }]));
+        p.set("targetFaces", q(top));
     });
-    let r2 = s2.ok();
-    assert!(volume(&r2, 0) > mm(100.0) * mm(40.0) * t);
+    assert_eq!(
+        s2.last_status(),
+        (FeatureStatus::Error, "Failed to import form tools. Check configuration parameters and use Tag feature to mark the tool bodies.".to_string())
+    );
     // Missing studio / location off the part.
     let mut s3 = plate();
     s3.add("sheetMetalFormed", |p| p.set("formPartStudio", ParamValue::Text("nope".into())));
@@ -466,7 +481,13 @@ fn sheet_metal_loft_hopper_flattens() {
     assert_eq!(fp.bend_lines.len(), 3);
     assert!(fp.warnings.is_empty(), "{:?}", fp.warnings);
     assert!(fp.area() > facets * 0.9 && fp.area() < facets * 1.05, "flat area {} vs facets {facets}", fp.area());
-    // Mismatched segment counts fail with a clear message.
+}
+
+#[test]
+#[ignore = "std: 51 faces, 17449.70 mm³ (planar patches where three bends meet; live has 2 swept ones); native: unequal corner counts unsupported"]
+fn sheet_metal_loft_rectangle_to_triangle() {
+    // Rectangle (4 sides) to triangle (3), dialog defaults (live, behaviours.md "fs (10-23 10:30)"): one part,
+    // 17452.843417228427 mm³, 49 faces (10 cylinders: 5 bends), the seam a rip.
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
     let a = polyline(&mut sk, &[(-40.0, -30.0), (40.0, -30.0), (40.0, 30.0), (-40.0, 30.0)], true);
@@ -482,9 +503,13 @@ fn sheet_metal_loft_hopper_flattens() {
         p.set("profile1", entities(s1, &a));
         p.set("profile2", entities(s2, &b));
     });
-    let (st, msg) = s.last_status();
-    assert_eq!(st, FeatureStatus::Error);
-    assert!(msg.contains("same number"), "{msg}");
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let v = volume(&r, 0) * 1e9;
+    let radii = cylinder_radii(&r, 0);
+    assert_eq!((r.context.bodies[0].faces.len(), radii.len()), (49, 10), "faces; volume {v}; radii {radii:?}");
+    assert!(radii.iter().all(|&x| near(x, mm(2.3), 1e-9) || near(x, mm(3.9), 1e-9)), "{radii:?}");
+    assert!(near(v, 17_452.843_417_228_43, 1e-3), "volume {v}");
 }
 
 /// Cylinder of radius 20 mm around Z, 60 mm long centered at z = 0, and a

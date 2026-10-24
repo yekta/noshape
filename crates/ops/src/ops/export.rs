@@ -12,7 +12,7 @@ pub fn ops() -> Vec<Op> {
         group: "export",
         verb: "parts",
         summary: "Export a Part Studio's parts to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
-        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`.",
+        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
         fields: vec![
             doc_field(),
             tab_field(),
@@ -26,6 +26,13 @@ pub fn ops() -> Vec<Op> {
             opt("stl_text", json!({ "type": "boolean" }), "STL as text instead of binary."),
             opt("individual", json!({ "type": "boolean" }), "Export unique parts as individual files (zipped)."),
             opt("include_hidden", json!({ "type": "boolean" }), "Include hidden parts."),
+            opt("preprocessing", json!({ "type": "string", "enum": crate::export::STEP_PREPROCESSING }), "STEP: Preprocessing (default None)."),
+            opt("derived_tolerances", json!({ "type": "boolean" }), "STEP: Include derived tolerances in export."),
+            opt("mbd_text_height", json!({ "type": "boolean" }), "STEP: Use custom annotation text height for MBD export."),
+            opt("iges_compatibility", json!({ "type": "boolean" }), "IGES: Use compatibility mode for surfaces and curves."),
+            opt("group_composites", json!({ "type": "boolean" }), "PVZ: Group composite parts into a single part file."),
+            opt("compress", json!({ "type": "boolean" }), "glTF / GLB: Compress."),
+            opt("geometry_format", json!({ "type": "string", "enum": crate::export::URDF_GEOMETRY.iter().map(|f| f.label()).collect::<Vec<_>>() }), "URDF: Geometry format (default STL)."),
         ],
         mutates: false,
         destructive: false,
@@ -42,6 +49,17 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     s.stl_text = a.bool_or("stl_text", false)?;
     s.individual = a.bool_or("individual", false)?;
     s.hidden = a.bool_or("include_hidden", false)?;
+    s.derived_tolerances = a.bool_or("derived_tolerances", false)?;
+    s.mbd_text_height = a.bool_or("mbd_text_height", false)?;
+    s.iges_compat = a.bool_or("iges_compatibility", false)?;
+    s.pvz_group = a.bool_or("group_composites", false)?;
+    s.compress = a.bool_or("compress", false)?;
+    if let Some(p) = a.opt_str("preprocessing")? {
+        s.preprocessing = crate::export::STEP_PREPROCESSING.iter().position(|x| x.eq_ignore_ascii_case(p)).ok_or_else(|| OpError::param("preprocessing", "one of the listed choices"))?;
+    }
+    if let Some(g) = a.opt_str("geometry_format")? {
+        s.urdf_geometry = crate::export::URDF_GEOMETRY.iter().position(|f| f.label().eq_ignore_ascii_case(g)).ok_or_else(|| OpError::param("geometry_format", "STL, GLTF, GLB or OBJ"))?;
+    }
     if let Some(u) = a.opt_str("units")? {
         s.units = UNITS.iter().position(|x| x.0.eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("units", "unknown unit"))?;
         s.custom_units = true;

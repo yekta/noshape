@@ -481,6 +481,10 @@ pub struct DrawingView {
     /// neither slides along its alignment axis nor follows its parent).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unaligned: bool,
+    /// Scale › Sheet scale (child views, help H:views): with no scale of its
+    /// own the view follows the sheet's scale, not its parent's.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sheet_scale: bool,
     /// View simplification (None: the parent's, Auto for base views).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub simplification: Option<Simplification>,
@@ -592,6 +596,7 @@ impl Default for DrawingView {
             kind: ViewKind::Projected { parent: ViewId(0), direction: None },
             position: [0.0, 0.0],
             scale: None,
+            sheet_scale: false,
             style: RenderStyle::HiddenLinesRemoved,
             show_tangent_edges: true,
             show_centerlines: false,
@@ -3408,6 +3413,7 @@ impl Drawing {
 pub mod build;
 pub mod clipboard;
 pub mod create;
+mod cad_dimstyles;
 pub mod cad_export;
 pub mod cad_fit;
 pub mod cad_layers;

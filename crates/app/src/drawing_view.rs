@@ -376,6 +376,10 @@ pub struct DrawingEditor {
     pub inspection: Option<crate::drawing_inspection::InspectionDlg>,
     pub measure: Option<Vec<crate::drawing_keys::MeasurePick>>,
     pub status: Option<SharedString>,
+    /// The green success bubble at the top centre of the sheet (`show_toast`)
+    /// and its generation (a newer one replaces it).
+    pub toast: Option<SharedString>,
+    pub toast_gen: u64,
     pub _subs: Vec<Subscription>,
 }
 
@@ -386,6 +390,37 @@ impl Focusable for DrawingEditor {
 }
 
 impl DrawingEditor {
+    /// A green success bubble at the top centre of the sheet (live: "✓
+    /// Successfully replicated 7/7 annotations ×"), gone after 5 s or on ×.
+    pub fn show_toast(&mut self, text: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.toast_gen += 1;
+        let generation = self.toast_gen;
+        self.toast = Some(text.into());
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(std::time::Duration::from_secs(5)).await;
+            let _ = this.update(cx, |this, cx| {
+                if this.toast_gen == generation {
+                    this.toast = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    fn render_toast(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let text = self.toast.clone()?;
+        let entity = cx.entity().downgrade();
+        let close = move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+            let _ = entity.update(cx, |this, cx| {
+                this.toast = None;
+                cx.notify();
+            });
+        };
+        Some(div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(crate::os_ui::message_bubble("dr-toast", crate::os_ui::BubbleKind::Success, text, close, cx)).into_any_element())
+    }
+
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         // Read before `doc` moves into the view (derived parts' sources, DER8).
         let studio_cache = doc.read(cx).studio_cache.clone();
@@ -546,6 +581,8 @@ impl DrawingEditor {
             insp_table: Default::default(),
             measure: None,
             status: None,
+            toast: None,
+            toast_gen: 0,
             _subs: subs,
         };
         this.old_state = this.load_old_state(cx);
@@ -1493,6 +1530,7 @@ impl DrawingEditor {
             .children(self.render_measure())
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
+            .children(self.render_toast(cx))
             .children(self.render_section_dlg(cx))
             .children(self.render_break_dlg(cx))
             .children(self.render_aux_dlg(cx))
