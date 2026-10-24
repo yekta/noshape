@@ -394,10 +394,8 @@ pub struct Highlights {
     /// triad, one arrow along the move (origin, direction, size), or for a
     /// rotation a ring with an arrowhead around the axis.
     pub step_arrow: Option<(DVec3, DVec3, f64, bool)>,
-    /// The Section view dialog's arrow: its tip, direction (the plane's
-    /// normal), world size of a pixel there, view direction and whether it is
-    /// hovered; dragging it moves the plane (live part-studio/72).
-    pub section_arrow: Option<(DVec3, DVec3, f64, DVec3, bool)>,
+    /// The Section view dialog's manipulator (live assembly/2368).
+    pub section: Option<SectionGlyph>,
     /// Pickable assembly origin triad (size) and whether it is hovered/selected.
     pub origin: Option<(f64, bool)>,
     /// Pickable assembly mate connector triads: (frame, size, highlighted).
@@ -460,6 +458,40 @@ pub enum ManipHandle {
     Center,
 }
 
+/// The section manipulator's handles (live assembly/2368): the base circle
+/// (moves the manipulator over the plane), the arrow (offset) and the two
+/// rings at its tip (turn the plane about its Y, ring 0, and X, ring 1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SectionHandle {
+    Base,
+    Arrow,
+    Ring(usize),
+}
+
+/// The section manipulator as drawn: its base on the plane, the arrow's
+/// direction, the plane's X / Y, a pixel's world size, the view direction,
+/// the hovered and dragged handles and the drag's start mark (an arrow
+/// drag's start base: "⊥"; a ring drag's start direction: "⊢").
+#[derive(Clone, Copy, Debug)]
+pub struct SectionGlyph {
+    pub base: DVec3,
+    pub dir: DVec3,
+    pub x: DVec3,
+    pub y: DVec3,
+    pub wpp: f64,
+    pub view: DVec3,
+    pub hovered: Option<SectionHandle>,
+    pub dragging: Option<SectionHandle>,
+    pub start: Option<(DVec3, bool)>,
+}
+
+/// The glyph in pixels (live assembly/2368–2370): base circle radius, the
+/// head's base and the tip along the arrow, the rings' centre.
+pub const SECTION_BASE_R_PX: f64 = 8.0;
+pub const SECTION_HEAD_PX: f64 = 60.0;
+pub const SECTION_TIP_PX: f64 = 85.0;
+pub const SECTION_RINGS_PX: f64 = 97.0;
+
 /// Pickable overlay items beyond the geometry picks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverlayPick {
@@ -468,8 +500,8 @@ pub enum OverlayPick {
     Connector(usize),
     /// Mate indicator (index into the view's displayed mates).
     Mate(usize),
-    /// The Section view arrow.
-    SectionArrow,
+    /// A Section view manipulator handle.
+    Section(SectionHandle),
 }
 
 /// Mate indicator state (color).
@@ -498,7 +530,9 @@ pub fn overlay_id(built: &AsmBuilt, o: OverlayPick) -> u32 {
         OverlayPick::Manip(ManipHandle::Center) => b + 10,
         OverlayPick::Connector(i) => b + 11 + i as u32,
         OverlayPick::Mate(i) => b + MATE_PICK_BASE + i as u32,
-        OverlayPick::SectionArrow => b + MATE_PICK_BASE - 1,
+        OverlayPick::Section(SectionHandle::Arrow) => b + MATE_PICK_BASE - 1,
+        OverlayPick::Section(SectionHandle::Base) => b + MATE_PICK_BASE - 2,
+        OverlayPick::Section(SectionHandle::Ring(k)) => b + MATE_PICK_BASE - 3 - k as u32,
     }
 }
 
@@ -515,7 +549,9 @@ pub fn overlay_pick(built: &AsmBuilt, id: u32) -> Option<OverlayPick> {
         k @ 7..=9 => OverlayPick::Manip(ManipHandle::Plane(k as usize - 7)),
         10 => OverlayPick::Manip(ManipHandle::Center),
         k if k >= MATE_PICK_BASE => OverlayPick::Mate((k - MATE_PICK_BASE) as usize),
-        k if k == MATE_PICK_BASE - 1 => OverlayPick::SectionArrow,
+        k if k == MATE_PICK_BASE - 1 => OverlayPick::Section(SectionHandle::Arrow),
+        k if k == MATE_PICK_BASE - 2 => OverlayPick::Section(SectionHandle::Base),
+        k if k == MATE_PICK_BASE - 3 || k == MATE_PICK_BASE - 4 => OverlayPick::Section(SectionHandle::Ring((MATE_PICK_BASE - 3 - k) as usize)),
         k => OverlayPick::Connector(k as usize - 11),
     })
 }
@@ -856,24 +892,10 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             stroke(&[o + d * base + side * w, o + d * tip, o + d * base - side * w], true);
         }
     }
-    if let Some((tip, dir, wpp, view_dir, hovered)) = h.section_arrow
-        && let Some(d) = dir.try_normalize()
+    if let Some(g) = h.section
+        && let Some(d) = g.dir.try_normalize()
     {
-        // As the Part Studio's arrow (live part-studio/72, 230): a screen-sized
-        // arrow past the tip, a 1.5 px white shaft and a hollow triangular
-        // head outlined light grey (blue when hovered).
-        let pick_id = overlay_id(built, OverlayPick::SectionArrow);
-        let p3 = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
-        let side = d.cross(view_dir).try_normalize().unwrap_or_else(|| d.any_orthonormal_vector());
-        let base = tip + d * 25.0 * wpp;
-        let apex = base + d * 22.0 * wpp;
-        let (l, r) = (base + side * 22.0 * 0.45 * wpp, base - side * 22.0 * 0.45 * wpp);
-        let outline = if hovered { theme::rgb8(0x3e6eb0) } else { theme::rgb8(0xa8adb2) };
-        for (color, width) in [(outline, if hovered { 4.0 } else { 3.0 }), (theme::rgb8(0xffffff), 1.5)] {
-            for (a, b) in [(tip, base), (l, apex), (apex, r), (r, l)] {
-                ol.segments.push(LineSegment { a: p3(a), b: p3(b), color, pick_id, width, style: LineSegment::ON_TOP });
-            }
-        }
+        push_section_glyph(&mut ol, built, &g, d);
     }
     if !ol.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&ol))).per_primitive_color().ignore_clip().layer(22));
@@ -923,4 +945,73 @@ fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
     seg(lines, o, o + n * (r * 1.3), [0, 0, 208, 255]);
     seg(lines, o + u * (r * 1.25), o + u * (r * 1.9), [208, 24, 24, 255]);
     seg(lines, o + v * (r * 1.25), o + v * (r * 1.9), [24, 168, 24, 255]);
+}
+
+/// Live's section manipulator (assembly/2368–2370): idle strokes light grey
+/// (core ≈ 230,232,233, edge ≈ 194,199,203); a hovered handle blue (≈ 70,123,177);
+/// the dragged one deeper blue (≈ 40,97,182). The base circle faces the
+/// viewer; the shaft and hollow head; two small rings at the tip, each with
+/// its axis line (ring 0 about the plane's Y, ring 1 about its X).
+fn push_section_glyph(ol: &mut LineData, built: &AsmBuilt, g: &SectionGlyph, d: DVec3) {
+    const CORE: [u8; 4] = [230, 232, 233, 255];
+    const EDGE: [u8; 4] = [194, 199, 203, 255];
+    const HOVER: [u8; 4] = [70, 123, 177, 255];
+    const DRAG: [u8; 4] = [40, 97, 182, 255];
+    let p3 = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
+    let w = g.wpp;
+    let side = d.cross(g.view).try_normalize().unwrap_or_else(|| d.any_orthonormal_vector());
+    let up = g.view.cross(side).try_normalize().unwrap_or(d);
+    let stroke = |ol: &mut LineData, handle: SectionHandle, pts: &[DVec3], closed: bool| {
+        let pick_id = overlay_id(built, OverlayPick::Section(handle));
+        let n = pts.len();
+        let segs = if closed { n } else { n.saturating_sub(1) };
+        let styles: &[([u8; 4], f32)] = if g.dragging == Some(handle) {
+            &[(DRAG, 2.5)]
+        } else if g.hovered == Some(handle) {
+            &[(HOVER, 2.5)]
+        } else {
+            &[(EDGE, 3.0), (CORE, 1.5)]
+        };
+        for (c, wd) in styles {
+            for i in 0..segs {
+                ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: *c, pick_id, width: *wd, style: LineSegment::ON_TOP });
+            }
+        }
+    };
+    let circle = |c: DVec3, u: DVec3, v: DVec3, r: f64| -> Vec<DVec3> {
+        (0..32)
+            .map(|i| {
+                let t = i as f64 / 32.0 * std::f64::consts::TAU;
+                c + (u * t.cos() + v * t.sin()) * r
+            })
+            .collect()
+    };
+    // Base circle (facing the viewer).
+    stroke(ol, SectionHandle::Base, &circle(g.base, side, up, SECTION_BASE_R_PX * w), true);
+    // Shaft and head.
+    let (b0, hb, tip) = (g.base + d * SECTION_BASE_R_PX * w, g.base + d * SECTION_HEAD_PX * w, g.base + d * SECTION_TIP_PX * w);
+    stroke(ol, SectionHandle::Arrow, &[b0, hb], false);
+    stroke(ol, SectionHandle::Arrow, &[hb + side * 10.0 * w, tip, hb - side * 10.0 * w], true);
+    // The rings with their axis lines.
+    let c = g.base + d * SECTION_RINGS_PX * w;
+    for (k, axis) in [(0usize, g.y), (1, g.x)] {
+        let Some(a) = axis.try_normalize() else { continue };
+        let v = a.cross(d);
+        stroke(ol, SectionHandle::Ring(k), &circle(c, d, v, 6.0 * w), true);
+        stroke(ol, SectionHandle::Ring(k), &[c - a * 20.0 * w, c + a * 20.0 * w], false);
+    }
+    // The drag's start: "⊥" at the start base with a leader to the base
+    // now; "⊢" the start direction from the base.
+    if let Some((s, rotation)) = g.start {
+        let mut mark = |a: DVec3, b: DVec3| ol.segments.push(LineSegment { a: p3(a), b: p3(b), color: DRAG, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+        if rotation {
+            let e = g.base + s * SECTION_HEAD_PX * w;
+            let t = s.cross(g.view).try_normalize().unwrap_or(side) * 10.0 * w;
+            mark(g.base, e);
+            mark(e - t, e + t);
+        } else {
+            mark(s - side * 15.0 * w, s + side * 15.0 * w);
+            mark(s, g.base);
+        }
+    }
 }
