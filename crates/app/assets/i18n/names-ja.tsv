@@ -1,0 +1,241 @@
+2 point circle centerline	2 点円形中心線
+2 point linear centerline	2 点直線中心線
+2 point linear dimension	2 点直線寸法
+3 point angular dimension	3 点角度寸法
+3 point arc	3 点円弧
+3 point circle	3 点円
+3 point circle centerline	3 点円形中心線
+Acceleration	加速度
+Aligned rectangle	傾斜長方形
+Aligned section view	揃えられた断面ビュー
+Angular velocity	角速度
+Animate Mate	合致をアニメート
+Arc length dimension	弧長寸法
+Assembly circular pattern	アセンブリ円形パターン
+Assembly linear pattern	アセンブリ直線パターン
+Assembly mirror	アセンブリミラー
+Auxiliary view	補助ビュー
+Ball	球
+Ball mate	球形合致
+Bearing	ベアリング
+Body draft	ボディ抜き勾配
+Boolean	ブーリアン演算
+Boundary condition	境界条件*拘束するインスタンスまたは面
+Boundary surface	境界サーフェス
+Break view	破断ビュー
+Bridging curve	ブリッジ曲線
+Broken-out section	部分断面
+Callout	コールアウト
+Center point arc	中心点と端点 円弧
+Center point circle	中心点円
+Center point rectangle	中心長方形
+Centermark	中心マーク
+Chamfer	面取り
+Chamfer dimension	面取り寸法
+Circular pattern	円形パターン
+Circumscribed polygon	外接多角形
+Coincident	一致
+Commit	コミットする
+Commit all	すべてにコミット
+Composite curve	複合曲線
+Composite part	複合部品
+Concentric	同心
+Conic	円錐体
+Constrained surface	拘束サーフェス
+Construction	作図線
+Corner rectangle	コーナー長方形
+Create Part Studio in context	前後関係で Part Studio を作成
+Create generative	生成物を作成
+Crop view	部分ビュー
+Curve pattern	曲線パターン
+Curved Text	曲線テキスト
+Custom table	カスタムテーブル
+Cut list	カットリスト
+Cut list table	カットリストテーブル
+Cylindrical	円筒状
+Cylindrical mate	円筒合致
+Datum	データム
+Decal	デカール
+Delete face	面を削除
+Delete part	パーツを削除
+Derived	派生
+Derived mirror	派生したミラー
+Detail view	詳細ビュー
+Diameter dimension	直径寸法
+Dimension	寸法
+Display states	表示状態
+Draft	抜き勾配
+Driving mate selector	合致作動セレクタ
+Edge	エッジ
+Edge condition symbol	エッジ状態記号
+Edge point	エッジ ポイント
+Edge to edge centerline	エッジ間の中心線
+Edit curve	曲線を編集
+Ellipse	楕円
+Elliptical arc	楕円弧
+Enclose	囲い込み
+End cap	エンドキャップ
+Entity	エンティティ
+Equal	同等
+Explode step	分解手順
+Extend	延長
+Extend surface	境界を移動
+External thread	外部ねじ
+Extrude	押し出し
+Face	面
+Face blend	面のブレンド
+Fastened	固定
+Fastened mate	ファスナー合致
+Feature	フィーチャー
+Fill	フィル
+Fillet	フィレット
+Fillet dimension	フィレットの寸法
+Fit spline	3D フィットスプライン
+Fix	固定
+Flange	フランジ
+Force	強制
+Foreshorten dimension	寸法を短縮
+Format Studio	Feature Studio
+Format painter	書式のコピー/貼り付け
+Frame	フレーム
+Frame trim	フレームのトリミング
+Gear relation	歯車リレーション
+Geometric tolerance	幾何公差
+Group	グループ
+Gusset	ガセット
+Hatch region	ハッチング領域
+Helix	ヘリカル
+Hide inspection item	調査アイテムを非表示にする
+Hole	穴
+Hole table	穴テーブル
+Hole/thread callout	穴/ねじのコールアウト
+Horizontal	水平
+Import	インポート
+Inscribed polygon	内接多角形
+Insert	挿入
+Insert BOM	BOM を挿入
+Insert DXF or DWG	DXF または DWG を挿入
+Insert image	画像の挿入
+Insert view	ビューを挿入
+Inspection item	検査アイテム
+Internal feature	内部フィーチャー
+Intersection	交差
+Intersection curve	交差曲線
+Isocline	等密度線
+Isoparametric curve	アイソパラメトリック曲線
+Item	アイテム
+Line	線
+Line to line angular dimension	線の間の角度寸法
+Line to line linear dimension	線の間の直線寸法
+Linear pattern	直線パターン
+Linear relation	直線リレーション
+Loft	ロフト
+Mass	マス
+Mate	合致
+Mate connector	合致コネクタ
+Maximum dimension	最大寸法
+Maximum/minimum dimension	最大/最小寸法
+Mesh point	メッシュポイント
+Midpoint	中点
+Midpoint line	中点の線
+Minimum dimension	最小寸法
+Mirror	ミラー
+Modify fillet	フィレット変更
+Moment	モーメント
+Move face	面を移動
+Mutual trim	相互トリム
+New feature	新規フィーチャー
+Normal	法線
+Note	注記
+Offset	オフセット
+Offset curve	曲線をオフセット
+Offset surface	サーフェスをオフセット
+Ordinate dimension	累進寸法
+Parallel	平行
+Parallel mate	平行合致
+Pattern	パターン
+Perpendicular	垂直
+Pierce	ピアス
+Pin slot	ピンスロット
+Pin slot mate	ピンスロット合致
+Planar	平面
+Planar mate	平面合致
+Plane	平面
+Point	点
+Point to line linear dimension	点から線までの直線寸法
+Pressure	圧力
+Projected curve	投影曲線
+Projected view	投影ビュー
+Query variable	クエリ変数
+Rack and pinion relation	ラックアンドピニオンリレーション
+Radial dimension	半径寸法
+Refold	再び折りたたむ
+Relation	リレーション
+Replace face	面を置き換える
+Replace instance	インスタンスを置換
+Replicate	複製する
+Revision table	リビジョンテーブル
+Revolute	回転
+Revolute mate	回転合致
+Revolve	回転
+Rib	リブ
+Rigid body	剛体
+Routing curve	ルーティング曲線
+Ruled surface	ルールドサーフェス
+Run generative	生成を実行
+SMBend	曲げ
+SMBendRelief	曲げリリーフ
+SMCorner	コーナー
+SMCornerBreak	コーナー切断
+SMEndSheetMetal	シートメタルモデル仕上げ
+SMForm	フォーム
+SMHem	ヘム
+SMJoint	ジョイント
+SMLoft	シートメタルロフト
+SMMakeJoint	ジョイントを作成する
+SMRip	リッピング
+SMStartSheetMetal	シートメタルモデル
+SMTab	タブ
+Screw relation	ねじリレーション
+Section view	断面ビュー
+Shell	シェル
+Show mates mode	合致モードを表示
+Simulation	シミュレーション
+Sketch	スケッチ
+Sketch Curvature	曲率
+Sketch Flow	スケッチフロー
+Sketch point	スケッチ点
+Slider	スライダ
+Slider mate	スライダ合致
+Slot	スロット
+Snap mode	スナップモード
+Spline	スプライン
+Spline control point	スプライン制御点
+Spline handle	スプラインハンドル
+Split	分割
+Surface finish symbol	表面粗さ記号
+Sweep	スイープ
+Symmetric	対称:
+Table	テーブル
+Tag	タグ
+Tag profile	タグプロファイル
+Tangent	接線
+Tangent arc	接線円弧
+Tangent mate	接線合致
+Text	テキスト
+Thicken	厚みつけ
+Transform	トランスフォーム
+Trim	トリミング
+Trim curve	曲線をトリミング
+Unfold	展開する
+Update	更新する
+Update all references to latest versions	すべての参照を最新バージョンに更新する
+Use	利用
+Variable	変数
+Vertex	頂点
+Vertical	垂直
+Virtual sharp	仮想交点
+Weld symbol	溶接記号
+Width	幅
+Width mate	幅合致
+Wrap	ラップ

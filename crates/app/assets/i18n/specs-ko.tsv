@@ -1,0 +1,1603 @@
+ - X	 - X
+###name	###name
+###name #description	###name #description
+###name = #value	###name = #value
+###name = #value #description	###name = #value #description
+#booleanOperation of #addQlowercaseSelectionType	#booleanOperation of #addQlowercaseSelectionType
+#column = #value	#column = #value
+#connectionEntities	#connectionEntities
+#edge	#edge
+#entity	#entity
+#featureName	#featureName
+#frames	#frames
+#guideEntities	#guideEntities
+#header = #value	#header = #value
+#index	#index
+#index: #x;#y;#z	#index: #x;#y;#z
+#matesQuery	#matesQuery
+#sheetProfileEntities	#sheetProfileEntities
+#vertex	#vertex
+#vertex [#cornerType]	#vertex [#cornerType]
+#wireProfileEntities	#wireProfileEntities
+% diametric engagement	% 지름 관여
+(#index1, #index2)	(#index1, #index2)
++/-	+/-
++X	+X
++Y	+Y
+- Y	- Y
+- Y'	- Y'
+- Z	- Z
+- Z'	- Z'
+-X	-X
+-Y	-Y
+0	0
+0.1	0.1
+0.12	0.12
+0.123	0.123
+0.1234	0.1234
+0.12345	0.12345
+0.123456	0.123456
+118 deg	118도
+135 deg	135도
+3D fit spline	3D 스플라인 맞춤
+ANSI	ANSI
+Acceleration	가속
+Access type	액세스 유형
+Add	추가
+Add additional queries	쿼리를 더 추가
+Add chamfer	챔퍼 추가
+Add point on axis drag	축방향 드래그에 점 추가
+Add points	점 추가
+Add undercut	언더컷 추가
+Added by the array	Added by the array
+Additional alignment points	추가 정렬 점
+Additional columns	추가 열
+Additional queries	추가 쿼리
+Adjacent	인접
+Adjacent faces	인접 면
+Align coordinate system	좌표계 정렬
+Align to geometry	형상에 맞춤
+Aligned	정렬
+Aligned with direction	방향과 정렬됨
+Alignment entity	정렬 요소
+All deviations	모든 파생
+All frames	모든 프레임
+All solid bodies	모든 솔리드 바디
+All values	모든 값
+Allow edge overflow	모서리 오버플로 허용
+Allow faulty parts	결함 있는 파트 허용
+Allow owner entity	Allow owner entity
+Along X	X를 따라
+Along Y	Y를 따라
+Along Z	Z를 따라
+Along custom	사용자 지정을 따라
+Angle	각도
+Angle Tolerance	각도 공차
+Angle control type	각도 제어 유형
+Angle from direction	방향의 각도
+Angle opposite direction	반대 방향의 각도
+Angle reference	각도 참조
+Angular velocity	각속도
+Animate Mate	메이트 애니메이트
+Any	임의
+Approximate	근사치
+Approximation parameters	근사치 매개변수
+Approximation target degree	근사치 목표 각도
+Approximation type	근사치 유형
+Arcs to extrude as bends	벤드로 돌출시킬 호
+Array	어레이
+Aspect ratio constraint	가로 세로 비율 구속 조건
+Assembly to mirror	대칭 복사할 어셈블리
+Assigned	할당됨
+Associated component instance	연관된 구성 요소 부품
+Asymmetric	비대칭
+Attach to	부착 대상
+Attachment	첨부
+Auto position	자동 위치
+Automatic miter	자동 결합
+Axes are determined by the first selected instance	Axes are determined by the first selected instance
+Axis	축
+Axis measurements	축 측정
+Axis of pattern	패턴축
+BOTTOM_AXIS_POINT	BOTTOM_AXIS_POINT
+BSO™/BSOS™/BSOA™/BSO4™ blind threaded standoffs	BSO™/BSOS™/BSOA™/BSO4™ 단방향 나사산 스탠드오프
+Ball	볼
+Base faces	Base faces
+Base mate connector	기준 메이트 커넥터
+Base mate connector feature index	Base mate connector feature index
+Base mate connector id	Base mate connector id
+Base origin	기준 원점
+Base plane	기준 면
+Basic	기본
+Bearing	베어링
+Bend	벤드
+Bend alignment	굽힘 맞춤
+Bend allowance	굽힘 허용
+Bend angle	벤드 각도
+Bend angle set programmatically	Bend angle set programmatically
+Bend calculation	굽힘 계산
+Bend deduction	굽힘 추정
+Bend line	굽힘 선
+Bend or non-planar faces	굽힘 또는 비평면 면
+Bend or non-planar faces to unfold	전개할 굽힘 면 또는 비평면 면
+Bend radius	벤드 반지름
+Bend relief	벤드 릴리프
+Bend relief depth	벤드 릴리프 깊이
+Bend relief depth scale	벤드 릴리프 깊이 축척
+Bend relief type	벤드 릴리프 유형
+Bend relief width scale	벤드 릴리프 너비 축척
+Best fit	가장 잘 맞음
+Between entities	선택 요소 사이
+Between entity	선택 요소 사이
+Bias	바이어스
+Blind	단방향
+Blind in last	마지막 단방향
+Blob Data	Blob Data
+Bodies	바디
+Body	바디
+Body draft	바디 구배
+Body type	바디 유형
+Boolean	합치기
+Boolean operation	합치기 연산
+Bottom edges	아래 모서리
+Bound type	경계 유형
+Boundary condition	경계 조건
+Boundary condition direction	경계 조건 방향
+Boundary surface	경계면
+Bounded faces	경계면
+Bounding box XY	경계 상자 XY
+Bounding box YZ	경계 상자 YZ
+Bounding box ZX	경계 상자 ZX
+Bounding type	바인딩 유형
+Bounds	경계(B)
+Bridging curve	브리징 곡선
+Butt	맞대기형
+Butt joint - Direction 1	벗 조인트 - 방향 1
+Butt joint - Direction 2	벗 조인트 - 방향 2
+By index	인덱스 기준
+By index range	인덱스 범위 기준
+By label	라벨 기준
+CENTER	CENTER
+CENTROID	CENTROID
+CLA™ free-running locknuts	CLA™ 프리-러닝 잠금 너트
+CSV file	CSV 파일
+Cap	캡
+Cap entity	캡 요소
+Caps	캡
+Center	중심
+Center of mass x coordinate	질량 중심 x 좌표
+Center of mass y coordinate	질량 중심 y 좌표
+Center of mass z coordinate	질량 중심 z 좌표
+Centered	중심 위치
+Centimeter	Centimeter
+Chain type	체인 유형
+Chamfer	챔퍼
+Chamfer angle	챔퍼 각도
+Chamfer length	챔퍼 길이
+Chamfer size	챔퍼 크기
+Chamfer type	챔퍼 유형
+Change radius	반지름 변경
+Change thickness	두께 변경
+Check to include the clearance for bends	벤드에 대한 여유 값을 포함시키려면 선택합니다.
+Choose to measure minimum or maximum distance between entities	요소 사이의 최소 또는 최대 거리를 측정하려면 선택
+Chordal tolerance	현 공차
+Circle	원
+Circular	원형
+Circular edge	원형 모서리
+Circular pattern	원형 패턴
+Clearance	공차
+Clearance & tapped	여유 값 및 탭 가공됨
+Clearance from input	입력의 여유 값
+Cliff edges	클리프 모서리
+Clockwise	시계방향
+Close	닫기
+Close (ASME)	닫기(ASME)
+Closed	닫힘
+Closed spline	닫힌 스플라인
+Column	열(C)
+Column Override	Column Override
+Column access type	열 액세스 유형
+Column index (0-based)	열 인덱스(0 기준)
+Column max index (0-based)	열 최대 인덱스(0 기준)
+Column min index (0-based)	열 최소 인덱스(0 기준)
+Column regular expression	열 정규식
+Column result type	열 결과 유형
+Column value	열 값
+Composite curve	합성 곡선
+Composite name	Composite name
+Composite part	합성 파트
+Composite part options	합성 파트 옵션
+Compressive yield strength	Compressive yield strength
+Computed pitch	계산된 피치
+Computed revolutions	계산된 회전
+Concave	오목
+Concave repair	오목 복구
+Confirm	확인
+Conic	원추형
+Conic edges	원추형 모서리
+Conic hold lines	원추형 유지선
+Conical or cylindrical face	원추형 또는 원통형 면
+Connections	연결
+Constrained surface	구속된 면
+Constraints	구속
+Constraints and limits	구속 조건 및 제한
+Contact analysis	Contact analysis
+Continuity	연속성
+Control	컨트롤(C)
+Control how the load is transferred between the instances	부품 사이에 하중이 전달되는 방법을 제어합니다.
+Control point index	제어점 인덱스
+Control point index #indexValue	Control point index #indexValue
+Control point indices	제어점 인덱스
+Control points	제어점
+Conversion factor	변환 계수
+Convert	변환
+Convex	볼록
+Coordinate system	좌표계
+Coped butt	코프 버트
+Copy in place	제자리에 복사
+Copy part	파트 복사
+Corner	코너
+Corner break	코너 분리
+Corner break style	코너 분리 스타일
+Corner overrides	코너 재정의
+Corner relief diameter	코너 릴리프 지름
+Corner relief scale	코너 릴리프 축척
+Corner relief type	코너 릴리프 유형
+Corner relief width	코너 릴리프 너비
+Corner type	코너 유형
+Corners to break	분리할 코너
+Corners to exclude	제외할 코너
+Count	카운트
+Counterbore	카운터보어
+Counterbore depth	카운터보어 깊이
+Counterbore depth deviation	카운터보어 깊이 편차
+Counterbore depth lower deviation	카운터보어 깊이 하한 편차
+Counterbore depth lower limit	카운터보어 깊이 하한
+Counterbore depth precision	카운터보어 깊이 정밀도
+Counterbore depth tolerance controls	카운터보어 깊이 공차 제어
+Counterbore depth tolerance type	카운터보어 깊이 공차 유형
+Counterbore depth upper deviation	카운터보어 깊이 상한 편차
+Counterbore depth upper limit	카운터보어 깊이 상한
+Counterbore diameter	카운터보어 지름
+Counterbore diameter deviation	카운터보어 지름 편차
+Counterbore diameter lower deviation	카운터보어 지름 하한 편차
+Counterbore diameter lower limit	카운터보어 지름 하한
+Counterbore diameter precision	카운터보어 지름 정밀도
+Counterbore diameter tolerance controls	카운터보어 지름 공차 제어
+Counterbore diameter tolerance type	카운터보어 지름 공차 유형
+Counterbore diameter upper deviation	카운터보어 지름 상한 편차
+Counterbore diameter upper limit	카운터보어 지름 상한
+Counterclockwise	반시계방향
+Countersink	카운터싱크
+Countersink angle	카운터싱크 각도
+Countersink angle deviation	카운터싱크 각도 편차
+Countersink angle lower deviation	카운터싱크 각도 하한 편차
+Countersink angle lower limit	카운터싱크 각도 하한
+Countersink angle precision	카운터싱크 각도 정밀도
+Countersink angle tolerance controls	카운터싱크 각도 공차 제어
+Countersink angle tolerance type	카운터싱크 각도 공차 유형
+Countersink angle upper deviation	카운터싱크 각도 상한 편차
+Countersink angle upper limit	카운터싱크 각도 상한
+Countersink diameter	카운터싱크 지름
+Countersink diameter deviation	카운터싱크 지름 편차
+Countersink diameter lower deviation	카운터싱크 지름 하한 편차
+Countersink diameter lower limit	카운터싱크 지름 하한
+Countersink diameter precision	카운터싱크 지름 정밀도
+Countersink diameter tolerance controls	카운터싱크 지름 공차 제어
+Countersink diameter tolerance type	카운터싱크 지름 공차 유형
+Countersink diameter upper deviation	카운터싱크 지름 상한 편차
+Countersink diameter upper limit	카운터싱크 지름 상한
+Create	Create
+Create composite	합성 생성
+Create points in addition to the curve.	곡선 이외에 점을 생성합니다.
+Created by	만든 사람
+Created by features	피처에서 생성됨
+Creation type	생성 유형
+Cross section	단면
+Cross sectional control	단면 제어
+Cube	정육면체
+Current value	현재 값
+Curvature	곡률
+Curve	곡선
+Curve length	Curve length
+Curve pattern	곡선 패턴
+Curve point	곡선 점
+Curve projection type	곡선 투상 유형
+Curve reference	곡선 참조
+Curve to face	면까지 곡선
+Curve type	곡선 유형
+Curves	곡선
+Curves to adjust	조정할 곡선
+Custom	사용자 정의
+Custom direction	사용자 지정 방향
+CustomMaterial	CustomMaterial
+Cut list	절단 목록
+Cut list table	절단 목록 테이블
+Cutouts	컷아웃
+Cylinder edges	원통형 모서리
+Cylinder/Cone	원통형/원추형
+Cylindrical	원통형
+DSO™/DSOS™ threaded standoffs	DSO™/DSOS™ 나사산 스탠드오프
+Data start column (0,1,2,.)	데이터 시작 열(0,1,2,.)
+Decal	데칼
+Default	기본값
+Default bend K Factor	기본 굽힘 K 지수
+Default corner type	기본 코너 유형
+Defaults changed	Defaults changed
+Degree	각도
+Delete composite parts	합성 파트 삭제
+Delete face	면 삭제
+Delete faces	면 삭제
+Delete fillet faces	필렛 면 삭제
+Delete part	파트 삭제
+Density	밀도
+Depends on blob	Depends on blob
+Depth	깊이
+Depth deviation	깊이 편차
+Depth lower deviation	깊이 하한 편차
+Depth lower limit	깊이 하한
+Depth precision	깊이 정밀도
+Depth tolerance controls	깊이 공차 제어
+Depth tolerance type	깊이 공차 유형
+Depth upper deviation	깊이 상한 편차
+Depth upper limit	깊이 상한
+Derivative	파생
+Derivative alignment	파생 정렬
+Derivative direction	파생 방향
+Derived	파생
+Derived mirror	파생된 대칭 복사
+Description	설명
+Designator	지정자
+Detached	분리됨
+Deviation	편차
+Deviation type	파생 유형
+Diameter	지름
+Diameter Tolerance	지름 공차
+Diameter deviation	지름 편차
+Diameter fit tolerance table	지름 맞춤 공차 테이블
+Diameter lower deviation	지름 하한 편차
+Diameter lower limit	지름 하한
+Diameter precision	지름 정밀도
+Diameter tolerance controls	지름 공차 제어
+Diameter tolerance type	지름 공차 유형
+Diameter upper deviation	지름 상한 편차
+Diameter upper limit	지름 상한
+Direction	방향
+Direction overrides	방향 재지정
+Direction to lock	고정할 방향
+Disable imprinting	임프린팅 비활성화
+Dissolve composite parts	합성 파트 해체
+Distance	거리
+Distance 1	거리 1
+Distance 2	거리 2
+Distance and angle	거리 및 각도
+Distance per revolution	축 회전 당 거리
+Draft	구배
+Draft angle	구배 각도
+Draft on self	자체 구배
+Draft opposite direction	구배 반대 방향
+Draft scope	구배 범위
+Draft type	구배 유형
+Drill size	드릴 크기
+Drilled	드릴됨
+Driving mate selector	구동 메이트 선택기
+ECAD	ECAD
+Edge	모서리
+Edge convexity	모서리 볼록성
+Edge convexity type	모서리 볼록성 유형
+Edge joint	모서리 조인트
+Edge limit	모서리 제한
+Edge limits	모서리 제한
+Edge match scope	모서리 일치 범위
+Edge or face	모서리 또는 면
+Edge overflow	모서리 오버플로
+Edge parameters	Edge parameters
+Edge point	모서리 점
+Edge positions	모서리 위치
+Edge projection options	모서리 투사 옵션
+Edge queries	Edge queries
+Edges	모서리
+Edges and curves for ruled surface path	측정된 면 경로의 모서리와 곡선
+Edges and faces	모서리 및 면
+Edges and sketch curves to revolve	회전할 모서리와 스케치 곡선
+Edges and sketch curves to sweep	스윕할 모서리와 스케치 곡선
+Edges or cylinders to bend	벤드할 모서리 또는 실린더
+Edges or faces	모서리 또는 면
+Edges or side faces to flange	플랜지할 모서리 또는 측면
+Edges or side faces to hem	둘러쌀 모서리 또는 측면
+Edges or side faces to join	결합할 모서리 또는 측면
+Edges that define the bases of the gussets	거싯의 베이스를 정의하는 모서리
+Edges to hold	유지할 모서리
+Edges to keep	유지할 모서리
+Edges, curves and sketches	모서리, 곡선 및 스케치
+Edges, faces, and vertices	모서리, 면 및 꼭지점
+Edges, vertices, or faces	모서리, 꼭지점 또는 면
+Edit angles	각도 편집
+Edit control points	제어점 편집
+Edit curve	곡선 편집
+Edit edge positions	모서리 위치 편집
+Edit mode	편집 모드
+Edit reference	참조 편집
+Edit tangency angles	탄젠시 각도 편집
+Edits a curve directly if possible or a composite curve of the selection otherwise.	Edits a curve directly if possible or a composite curve of the selection otherwise.
+Elevate	올리기
+Elevation parameters	고도 매개변수
+Elevation target degree	고도 목표 각도
+Enclose	둘러싸기
+End	끝
+End angle	끝 각도
+End cap	엔드 캡
+End condition	끝 조건
+End conditions	끝 상태
+End curvature offset	끝 곡률 오프셋
+End direction	끝 방향
+End edge position	끝 모서리 위치
+End flow offset	흐름 오프셋 종료
+End magnitude	끝 규모
+End offset	끝 오프셋
+End point	끝점
+End position	끝 위치
+End profile adjacent faces	끝 프로파일 인접 면
+End profile condition	끝 프로파일 상태
+End radius	끝 반경
+End trim	잘라내기 끝
+End type	끝 유형
+End value	끝 값
+Entities	요소
+Entities to chamfer	챔퍼할 요소
+Entities to copy	복사 요소
+Entities to delete	삭제할 요소
+Entities to draft	구배할 요소
+Entities to fillet	필렛할 요소
+Entities to fillet or chamfer	필렛 또는 챔퍼할 요소
+Entities to measure between	측정할 요소
+Entities to mirror	대칭 복사할 요소
+Entities to pattern	패턴을 만들 요소
+Entities to split with	분할 요소
+Entities to transform or copy	변형하거나 복사할 요소
+Entity	요소
+Entity or mate connector	요소 또는 메이트 커넥터
+Entity to split with	분할 요소
+Entity type	요소 유형
+Equal	동일
+Equal distance	동일 거리
+Equal spacing	동일 간격
+Equal trim	동일하게 잘라내기
+Euclidean	유클리드
+Evaluate on use	사용 시 평가
+Explode lines	선 분해
+Explode step	분해 단계
+Explode step type	분해 단계 유형
+Extend	연장
+Extend bend relief	벤드 릴리프 확장
+Extend entities	요소 확장
+Extend profiles to part	프로파일을 파트까지 연장
+Extend to full path	전체 경로로 확장
+Extended corner	확장 코너
+Extension shape	연장점 모양
+External thread	외부 나사산
+Extrude	돌출
+Extrude direction	돌출 방향
+FH4™/FHP™ flush-head studs for stainless steel sheets	스테인리스 스틸 시트용 FH4™/FHP™ 플러시 헤드 스터드
+FHL™/FHLS™ flush, low-displacement head studs	FHL™/FHLS™ 낮은 치환 플러시 헤드 스터드
+FHX™ flush-head studs with X-Press™ thread	FHX™ 플러시 헤드 스터드, X-Press™ 나사산 포함
+FH™/FHS™/FHA™ flush-head pins	FH™/FHS™/FHA™ 플러시 헤드 핀
+FH™/FHS™/FHA™ flush-head studs	FH™/FHS™/FHA™ 플러시 헤드 스터드
+FLAT	FLAT
+FS sizes	FS sizes
+Face	면
+Face blend	면 블렌드
+Face limits	면 제한
+Face match scope	면 일치 범위
+Face mirror	면 대칭 복사
+Face pattern	면 패턴
+Face to trim to	잘라낼 면
+Face, edge or vertex	면, 모서리 또는 꼭지점
+Face, plane, mate connector, or planar face to use as trim tool	잘라내기 도구로 사용할 면(Face), 면(Plane), 메이트 커넥터 또는 평면
+Faces	면
+Faces and sketch regions	면과 스케치 영역
+Faces and sketch regions to extrude	돌출할 면과 스케치 영역
+Faces and sketch regions to revolve	회전할 면과 스케치 영역
+Faces and sketch regions to sweep	스윕할 면과 스케치 영역
+Faces and surfaces to thicken	두껍게 할 면과 표면
+Faces or sketch regions to thicken	두께를 줄 면 또는 스케치 영역
+Faces to be normal to	수직을 이룰 면
+Faces to connect	연결할 면
+Faces to draft	구배할 면
+Faces to exclude	돌출시킬 면
+Faces to find match in	일치를 찾을 면
+Faces to load	로드할 면
+Faces to lock	고정할 면
+Faces to measure	측정할 면
+Faces to mirror	대칭 복사할 면
+Faces to move	이동할 면
+Faces to offset	오프셋할 면
+Faces to pattern	패턴을 만들 면
+Faces to remove	제거할 면
+Faces to replace	교체할 면
+Faces to replace with	교체되는 면
+Faces to round	둥글게 만들 면
+Faces to split	분할할 면
+Faces to trim to	잘라낼 면
+Faces, edges, and vertices that define sweep paths	스윕 경로를 정의하는 면, 모서리, 꼭지점
+Faces, surfaces, and sketch regions to offset	오프셋할 면, 표면 또는 스케치 영역
+Fastened	고정
+Fastener	패스너
+Fastener fit	패스너 맞춤
+Fastener type	패스너 유형
+Feature Name Template	Feature Name Template
+Feature mirror	피처 대칭 복사
+Feature pattern	피처 패턴
+Feature version	Feature version
+Features to find match in	일치를 찾을 피처
+Features to mirror	대칭 복사할 피처
+Features to pattern	패턴을 만들 피처
+Fill	채우기
+Fillet	필렛
+Fillet compare type	필렛 비교 유형
+Fillet faces to modify	수정할 필렛면
+Fillet radius	필렛 반지름
+Fillet type	필렛 유형
+Fillets	필렛
+Filter by body type	바디 유형별로 필터링
+Filter construction entities	필터 형상 요소
+Finish flex PCB model	플렉시블 PCB 모델 완료
+Finish sheet metal model	금속 판재 모델 마감
+First direction	첫 번째 방향
+First set of surfaces	첫 번째 면 세트
+First side face	첫 번째 면
+First sketch	첫 번째 스케치
+Fit	맞춤
+Fit (tolerance only)	맞춤(공차만 해당)
+Fit type	맞춤 유형
+Fit with tolerance	공차에 맞춤
+Flange	플랜지
+Flange alignment	플랜지 정렬
+Flange to merge	병합할 플랜지
+Flat	평면
+Flatten assembly	Flatten assembly
+Flattened	펼쳐진 항목
+Flex PCB model	플렉시블 PCB 모델
+Flip	뒤집기
+Flip alignment	정렬 뒤집기
+Flip asymmetric	비대칭 뒤집기
+Flip base sides	기준 변 대칭
+Flip cap	캡 대칭
+Flip coordinate system	좌표계 뒤집기
+Flip corner	코너 뒤집기
+Flip direction	방향 뒤집기
+Flip direction up	위로 방향 뒤집기
+Flip first plane	첫 번째 면 대칭
+Flip normal	수직 대칭
+Flip offset	오프셋 뒤집기
+Flip primary axis	주축 뒤집기
+Flip pull direction	당기는 방향 뒤집기
+Flip rounding	라운딩 뒤집기
+Flip second plane	두 번째 면 대칭
+Flip side 1	변 1 대칭
+Flip side 2	변 2 대칭
+Flip sides	변 대칭
+Flip wall	벽 대칭
+Follow seed position	Follow seed position
+Foot	Foot
+Force	힘
+Foreign Id	Foreign Id
+Form	형태
+Form Part Studio	Part Studio 성형
+Form origin mate connector	형상 원점 메이트 커넥터
+Frame	프레임
+Frame groups	프레임 그룹
+Frame segments are trimmed against preceding groups and are used as tools for later groups	프레임 세그먼트가 이전 그룹에 대해 잘려지고 이후 그룹의 도구로 사용됩니다.
+Frame segments in earlier groups are used as tools for later groups	이전 그룹의 프레임 세그먼트가 이후 그룹의 도구로 사용됩니다.
+Frame trim	프레임 다듬기
+Frames	프레임
+Free	자유
+From import	가져오기에서
+From mate connector	시작 메이트 커넥터
+Full revolve	전체 회전
+Full round	전체 원
+Gap	간격
+Gap fill	간격 채우기
+Gear	기어
+General	일반
+Geodesic	측지선
+Greater or equal	크거나 같음
+Group	그룹
+Group 1	그룹 1
+Group 2	그룹 2
+Guides	가이드
+Guides and continuity	가이드 및 연속
+Gusset	거싯
+Gusset position	거싯 위치
+Gusset type	거싯 유형
+HF109™ heavy-duty, high tensile strength studs	HF109™ 헤비 듀티 고인장 강도 스터드
+HFE™/THFE™ heavy-duty studs for thin sheets	박막용 HFE™/THFE™ 헤비 듀티 스터드
+HFG8™ heavy-duty, high tensile strength studs	HFG8™ 헤비 듀티 고인장 강도 스터드
+HFH™/HFHS™/HFHB™ heavy-duty studs	HFH™/HFHS™/HFHB™ 헤비 듀티 스터드
+HFLH™ hard panel studs	HFLH™ 하드 패널 스터드
+Handedness	손 쓰임
+Has clearance	Has clearance
+Has end direction	Has end direction
+Has offset	오프셋 포함
+Has second direction	두 번째 방향 포함
+Has start direction	Has start direction
+Has style	Has style
+Has third direction	세 번째 방향 포함
+Header	머리글
+Heal	복구
+Height	높이
+Helix	나선
+Helix axis	나선 축
+Helix axis type	나선 축 유형
+Help point	도움 점
+Hem	둘러싸기
+Hem alignment	둘러싸기 맞춤
+Hem type	둘러싸기 유형
+Hidden references	Hidden references
+Hold adjacent edges	인접 모서리 유지
+Hold line	유지 선
+Hold opposite side	반대면 숨기기
+Hold other line	다른 선 유지
+Hole	홀
+Hole ID	Hole ID
+Hole class	홀 클래스
+Hole start plane or mate connector	홀 시작면 또는 메이트 커넥터
+Hole table	홀 테이블
+Hole type	홀 유형
+Hole version	Hole version
+Holes	홀
+Hollow	비우기
+Horizontal reference	수평 기준
+H™ nuts/HNL™ prevailing torque locknuts	H™ nuts/HNL™ 프리베일링 토크 잠금 너트
+ISO	ISO
+If none selected, this feature will create one at Origin	아무 것도 선택하지 않을 경우, 이 피처는 원점에서 하나를 생성합니다.
+Ignore composite parts	합성 파트 무시
+Image	이미지
+Image origin index	Image origin index
+Import	가져오기
+Import appearances	모양 가져오기
+Import material density	재료 밀도 가져오기
+In place	제자리
+Inch	Inch
+Include bends	벤드 포함
+Include composite parts filter	Include composite parts filter
+Include mate connectors	메이트 커넥터 포함
+Include parts filter	Include parts filter
+Include properties	속성 포함
+Include sketches filter	Include sketches filter
+Include surfaces filter	Include surfaces filter
+Index	인덱스
+Index (0-based)	인덱스(0 기준)
+Individual edges to match	일치시킬 개별 모서리
+Individual faces to match	일치시킬 개별 면
+Inertial relief	Inertial relief
+Initial Entities	Initial Entities
+Inner	내부
+Inner radius	안쪽 반지름
+Input type	입력 유형
+Inputs	입력
+Inset	삽도
+Inside	내부
+Instance	부품
+Instance count	인스턴스 수
+Instances	인스턴스
+Instances or faces to constrain	구속할 부품 또는 면
+Instances to measure	측정할 부품
+Instances to mirror	대칭 복사할 부품
+Instances to replace	교체할 부품
+Instances to skip	건너뛸 부품
+Interference	간섭
+Interior faces	내부 면
+Internal	내부
+Interpolated spline	보간 스플라인
+Intersect	교집합
+Intersection curve	교차점 곡선
+Inverse conic edges	원추형 모서리 반전
+Inverse tangent edges	접선 모서리 반전
+Is first	Is first
+IsInContext	IsInContext
+Isocline	등경사선
+Isoparametric curve	아이소파라메트릭 곡선
+Jog	조그
+Jog offset	조그 오프셋
+Jog offset anchor	조그 오프셋 앵커
+Joint	결합
+Joint style	결합 스타일
+Joint type	결합 유형
+K Factor	K 지수
+Keep both sides	양면 유지
+Keep end derivative	끝 파생 유지
+Keep input parts	입력 파트 유지
+Keep material	재질 유지
+Keep opposite side	반대면 유지
+Keep points	점 유지
+Keep profile orientation	프로파일 방향 유지
+Keep start derivative	시작 파생 유지
+Keep tool surfaces and curves	도구 표면 및 곡선 유지
+Keep tools	도구 유지
+LOOP_CENTER	LOOP_CENTER
+LRA or Length, Rotation, and Angle table shows coordinates for CNC tube bending machines.	LRA(길이, 회전, 각도) 테이블은 CNC 튜브 벤딩 머신을 위한 좌표를 나타냅니다.
+LRA table	LRA 테이블
+Label column index	라벨 열 인덱스
+Label row index	라벨 행 인덱스
+Leave open	열어두기
+Legacy	Legacy
+Length	길이
+Length Tolerance	길이 공차
+Length control	길이 컨트롤
+Less or equal	적거나 같음
+Limit	한계
+Limit X maximum distance	X 최대 거리 한계
+Limit X minimum distance	X 최소 거리 한계
+Limit Y maximum distance	Y 최대 거리 한계
+Limit Y minimum distance	Y 최소 거리 한계
+Limit Z maximum distance	Z 최대 거리 한계
+Limit Z minimum distance	Z 최소 거리 한계
+Limit axial X maximum angle	X 최대 각도 축 한계
+Limit axial X minimum angle	X 최소 각도 축 한계
+Limit axial Y maximum angle	Y 최대 각도 축 한계
+Limit axial Y minimum angle	Y 최소 각도 축 한계
+Limit axial Z maximum angle	Z 최대 각도 축 한계
+Limit axial Z minimum angle	Z 최소 각도 축 한계
+Limit cone maximum angle	Limit cone maximum angle
+Limit frame ends	프레임 끝 제한
+Limits	한계
+Line angle	선 각도
+Line or points	선 또는 점
+Linear	선형
+Linear pattern	선형 패턴
+Linear static	Linear static
+Load	Load
+Load direction	로드 방향
+Load region	로드 영역
+Load type	Load type
+Location	위치
+Location signatures	Location signatures
+Location(s)	위치
+Locations	위치
+Lock ends	끝 잠금
+Lock profile direction	프로파일 방향 잠금
+Lock profile faces	프로파일 면 잠금
+Locked	잠김
+Loft	로프트
+Lofted corner	로프트 코너
+Long	길게
+Loop	Loop
+Loop/chain connected	루프/체인 연결됨
+Loose	풀기
+Loose (ASME)	풀기(ASME)
+Lower	하한
+Lxx	Lxx
+Lxy	Lxy
+Lxz	Lxz
+Lyx	Lyx
+Lyy	Lyy
+Lyz	Lyz
+Lzx	Lzx
+Lzy	Lzy
+Lzz	Lzz
+MCAD	MCAD
+MID_AXIS_POINT	MID_AXIS_POINT
+MID_POINT	MID_POINT
+MODEL	MODEL
+Magnitude	규모
+Magnitude/bias	규모/바이어스
+Maintain aspect ratio	가로 세로 비율 유지
+Maintain curvature	곡률 유지
+Make joint	조인트 만들기
+Make periodic	Make periodic
+Manipulator X axis	매니퓰레이터 X축
+Manipulator Y axis	매니퓰레이터 Y축
+Manipulator Z axis	매니퓰레이터 Z축
+Map	맵
+Mass	질량
+Match	매치
+Match connections	연결 일치
+Match curvature	곡률 맞추기
+Match curvature at end	끝의 곡률 맞춤
+Match curvature at start	시작의 곡률 맞춤
+Match edges on face	면에서 모서리 일치
+Match edges on plane	평면에서 모서리 일치
+Match face options	면 일치 옵션
+Match faces at parting	파팅에서 면 일치
+Match faces in features	피처에서 면 일치
+Match faces in parts	파트에서 면 일치
+Match flow (G3)	일치 흐름(G3)
+Match individual edges	개별 모서리 일치
+Match individual faces	개별 면 일치
+Match position	위치 일치
+Match profile	프로파일 일치
+Match tangent	접선 일치
+Match type	일치 유형
+Matching	매칭
+Mate	메이트
+Mate DOF to animate	애니메이트할 메이트 자유도
+Mate connector	메이트 커넥터
+Mate connector for reference frame	참조 프레임의 메이트 커넥터
+Mate connector index	Mate connector index
+Mate connectors	메이트 커넥터
+Mate to be matched	일치시킬 메이트
+Mate type	메이트 유형
+Mate(s)	메이트
+Material	재질
+Mates to drive positions	위치를 유도하기 위한 메이트
+Max	최대
+Max deviation	최대 파생
+Max index (0-based)	최대 인덱스(0 기준)
+Maximum	최대
+Maximum angle	최대 각도
+Maximum control points	최대 제어점
+Maximum deviation	최대 편차
+Maximum number of assemblies created	Maximum number of assemblies created
+Measure instances	Measure instances
+Measure to axis of cylinders, circles, arcs, or revolved surfaces	원통형의 축, 원, 호 또는 회전 표면을 측정
+Measure to infinitely extended lines, arcs, cylinders, etc.	무한대로 확장하는 선, 호, 원통형 등을 측정
+Measured	측정됨
+Measurement	측정
+Merge	병합
+Merge ribs	리브 합치기
+Merge scope	병합 파트 선택
+Merge tangent segments	접선 세그먼트 병합
+Merge with all	모든 파트 병합
+Mesh	메쉬
+Mesh bodies or faces	메쉬 바디 또는 면
+Mesh point	메쉬 점
+Meter	Meter
+Method	방법
+Metric	미터법
+Mid plane	가운데 면
+Middle	중간
+Millimeter	Millimeter
+Min	최소
+Min index (0-based)	최소 인덱스(0 기준)
+Minimal gap	최소 간격
+Minimum	최소
+Minimum/Maximum	최소/최대
+Mirror	대칭 복사
+Mirror across Y axis	Y축을 교차해서 대칭 복사
+Mirror placement type	Mirror placement type
+Mirror plane	대칭 복사면
+Mirror reference	대칭 복사 참조
+Mirror strategy	대칭 복사 전략
+Mirror type	대칭 복사 유형
+Miter	마이터
+Miter angle	수직 결합 각도
+Mix	혼합
+Modal	Modal
+Mode	모드
+Modification type	수정 유형
+Modify fillet	필렛 수정
+Modify joint	조인트 수정
+Moment	모멘트
+Mounting	마운팅
+Move	Move
+Move boundary	경계 이동
+Move curve boundary type	곡선 경계 이동 유형
+Move end condition	끝 조건 이동
+Move face	면 이동
+Move face type	면 이동 유형
+Multi X offset	Multi X offset
+Multi Y offset	Multi Y offset
+Multi Z offset	Multi Z offset
+Multi rotation matrix	Multi rotation matrix
+Multiple	Multiple
+Mutual trim	공통 잘라내기
+Name	이름
+Name #entityName	#entityName 이름 지정
+Name entity	요소 이름 지정
+Neutral plane	중립 평면
+New	신규
+Next	다음
+No corner	코너 없음
+No maximum	최대값 없음
+No minimum	최소값 없음
+No tolerance	공차 없음
+No trim	자르지 않기(N)
+Nominal	명목
+NonGeometricItem	NonGeometricItem
+None	없음
+Normal	직교
+Normal (ASME)	수직(ASME)
+Normal direction	수직 방향
+Normal to face	면에 수직
+Normal to guide	가이드에 수직
+Normal to profile	프로파일에 수직
+Normal to sketch plane	스케치 평면에 수직
+Normal to target	대상에 수직
+Normal x	Normal x
+Normal y	Normal y
+Normal z	Normal z
+Not supported	Not supported
+Number	숫자
+Number of modes	Number of modes
+Number of points to add	추가할 점 개수
+Number of samples	샘플 수
+ORIGIN_X	ORIGIN_X
+ORIGIN_Y	ORIGIN_Y
+ORIGIN_Z	ORIGIN_Z
+Obround - Scaled	장박형 - 확대됨
+Obround - Sized	장박형 - 크기 조정
+Offset	오프셋
+Offset X distance	오프셋 X 거리
+Offset Y distance	오프셋 Y 거리
+Offset Z distance	오프셋 Z 거리
+Offset all	모두 오프셋하기
+Offset and extend	오프셋 및 확장
+Offset angle	오프셋 각도
+Offset curve	오프셋 곡선
+Offset distance	오프셋 거리
+Offset from tip	팁에서 오프셋
+Offset opposite direction	오프셋 반대 방향
+Offset surface	오프셋 면
+Offset type	오프셋 유형
+Offset, extend, and split	오프셋, 확장 및 분할
+On entity	선택 요소 위
+One sided	한쪽 면
+Only edges	모서리만
+Only faces	면만
+Only vertices	꼭지점만
+Operation type	작업 유형
+Opposite alignment	반대 정렬
+Opposite angle	반대쪽 각도
+Opposite direction	반대 방향
+Opposite direction angle	반대 방향 각도
+Opposite offset direction	반대 오프셋 방향
+Opposite origin	반대 원점
+Opposite side	반대쪽
+Optimize	최적화
+Ordered groups	정렬된 그룹
+Orientation	방향
+Origin	원점
+Origin XY	원점 XY
+Origin YZ	원점 YZ
+Origin ZX	원점 ZX
+Origin entity	원점 요소
+Origin type	원점 유형
+Original unit	Original unit
+Orthogonal path	직각 경로
+Orthogonal path coordinate system	직각 경로 좌표계
+Other	다른 요소
+Outer	외부
+Outside	외부
+Overall parameters	전체 매개변수
+Override	재정의
+Override bend radius	굽힘 반지름 재지정
+Overrides	재정의
+Overwrite points	점 덮어쓰기
+Owned by	소유자
+Owner	소유자
+Owner entity	소유자 요소
+PART_ORIGIN	PART_ORIGIN
+PCB entity type	PCB 요소 유형
+PCB holes	PCB 홀
+PCB part to finish	마감 작업할 PCB 파트
+POINT	POINT
+Parallel	평행
+Parallel to	평행
+Parallel to sketch plane	스케치 평면에 평행
+Parameter	매개변수
+ParametricPartStudio	ParametricPartStudio
+Part	파트
+Part Studio	Part Studio
+Part mirror	파트 대칭 복사
+Part or Face mode	Part or Face mode
+Part pattern	파트 패턴
+Part to add	추가할 파트
+Part to remove	제거할 파트
+Partial fillet	부분 필렛
+Partial flange	부분 플랜지
+Parting edges	파팅 모서리
+Parting entity	파팅 요소
+Parting line	파팅 선
+Parting line propagation	파팅 선 처리
+Parts	파트
+Parts and surfaces to convert	변환할 파트와 면
+Parts or bends	파트 또는 벤드
+Parts to draft	구매할 파트
+Parts to find match in	일치를 찾을 파트
+Parts to hollow	비울 부품
+Parts to import	Parts to import
+Parts to measure	측정할 파트
+Parts to trim	잘라낼 파트
+Parts to trim to	잘라낼 파트
+Parts to trim using trim tool	잘라내기 도구를 사용해 잘라낼 파트
+Parts to use as trim tools	잘라내기 도구로 사용할 파트
+Parts, surfaces, or curves to split	분할할 파트, 면 또는 곡선
+Path	경로
+Path to pattern along	패턴을 지정할 경로
+Pattern	패턴
+Pattern type	패턴 유형
+Per chain	체인당
+Per edge	모서리당
+Performance	성능
+Perimeter	둘레
+Pin	핀
+Pin slot	핀 슬롯
+Pitch	피치
+Pitch length	피치 길이
+Placement	배치
+Placement origin	배치 원점
+Planar	평면
+Planarization parameters	평탄화 매개변수
+Planarize	평탄화
+Plane	면
+Plane limit	평면 제한
+Plane point	면 점
+Plane type	면 유형
+Planes and planar faces to use as trim tools	잘라내기 도구로 사용할 면 및 평면
+Planes to find match in	일치를 찾을 평면
+Plated	도금됨
+Playback type	Playback type
+Pocket	포켓
+Point	점
+Point #index	Point #index
+Point edit type	점 편집 유형
+Point index	Point index
+Point normal	점 수직
+Point or mate connector	점 또는 메이트 커넥터
+Point or mate connector used as reference for the curve. Defaults to origin.	곡선에 대한 참조로 사용된 점 또는 메이트 커넥터. 기본적으로 원점으로 설정됩니다.
+Point type	점 유형
+Points	점
+Points on edges	모서리의 점
+Points overrides	점 재지정
+Poisson's ratio	Poisson's ratio
+Polyline	폴리선
+Position	위치
+Precise	정밀도
+Precision	정밀도
+Preselection	Preselection
+Preserve active sheet metal models	활성 금속 판재 모델 보존
+Preserve material	재질 유지
+Pressure	압력
+Previous	이전
+Primary axis entity	주축 요소
+Process	처리
+Profile 1	프로파일 1
+Profile 2	프로파일 2
+Profile control	프로파일 컨트롤
+Profile type	프로파일 유형
+Profiles	프로파일
+Projected curve	투사된 곡선
+Projection direction type	투사 방향 유형
+Propagation	전파
+Propagation type	확장 유형
+Protrusion	돌출
+Pull direction	당기는 방향
+Purpose	용도
+Quantity	Quantity
+Query variable	쿼리 변수
+Rack and pinion	랙과 피니언
+Radius	반지름
+Range	범위
+Ratio	비율
+Realign	다시 정렬
+Reapply features	피처 재적용
+Reapply fillet	필렛 다시 적용
+Reciprocate	Reciprocate
+Recognize	인식하기
+Rectangle	직사각형
+Rectangle - Scaled	직사각형 - 확대됨
+Reference	참조
+Reference edge	참조 모서리
+Reference faces	참조 면
+Reference plane	기준면
+References	참조
+Refold	다시 접기
+Regular expression	정규식
+Relation	릴레이션
+Relation ratio	릴레이션 비율
+Relation type	릴레이션 유형
+Relative	상대
+Relief	릴리프
+Remove	제거
+Remove fillet	필렛 제거
+Reorient secondary axis	보조 축 재정렬
+Replace all instances	모든 부품 교체
+Replace face	면 교체
+Replace part	Replace part
+Replacement component	교체 구성 요소
+Replacement part	교체 파트
+Replicate	복제
+Reset triad	3축 재설정
+Result body operation type	결과 바디 작업 유형
+Result type	결과 유형
+Reverse direction	역방향
+Reverse playback	Reverse playback
+Revolute	축회전하기
+Revolutions	회전
+Revolve	회전
+Revolve angle	회전 각도
+Revolve axis	회전축
+Rho	Rho값
+Rib	리브
+Rib extrusion direction	돌출 방향 리브
+Rigid body	Rigid body
+Rip	립
+Rolled	롤링
+Rolled K Factor	롤링 K 지수
+Rolling ball	롤링 볼
+Rotate	회전
+Rotate about X	X에 대해 회전
+Rotate about Y	Y에 대해 회전
+Rotate about Z	Z에 대해 회전
+Rotation	회전
+Rotation about Y'	Y'를 기준으로 회전
+Rotation about Z	Z를 기준으로 회전
+Rotation about Z'	Z'를 기준으로 회전
+Rotation angle	회전 각도
+Rotation axis	회전축
+Rotation matrix	Rotation matrix
+Round	원형
+Round - Scaled	원형 - 확대됨
+Round - Sized	원형 - 확대됨
+Routing curve	경로 곡선
+Routing curve (#curveLength)	경로 곡선(#curveLength)
+Routing curve table	배선 경로 곡선 테이블
+Row	행(R)
+Row access type	행 액세스 유형
+Row index (0-based)	행 인덱스(0 기준)
+Row max index (0-based)	행 최대 인덱스(0 기준)
+Row min index (0-based)	행 최소 인덱스(0 기준)
+Row regular expression	행 정규식
+Row result type	행 결과 유형
+Row value	행 값
+Ruled surface	측정된 면
+Ruled surface type	측정된 면 유형
+S-RT™ free-running locknuts	S-RT™ 프리-러닝 잠금 너트
+SGPC™ swaging collar studs	SGPC™ 스웨이징 칼라 스터드
+SH™ hard panel nuts	SH™ 하드 패널 너트
+SL™ TRI-DENT® prevailing torque locknuts	SL™ TRI-DENT® 프리베일링 토크 잠금 너트
+SMPS™/SMPP™ nuts	SMPS™/SMPP™ 너트
+SOSG™/SOAG™ threaded standoffs	SOSG™/SOAG™ 나사산 스탠드오프
+SO™/SOS™/SOA™/SO4™ through threaded standoffs	SO™/SOS™/SOA™/SO4™ 스루 나사산 스탠드오프
+SO™/SOS™/SOA™/SO4™ through unthreaded standoffs	SO™/SOS™/SOA™/SO4™ 스루 비나사산 스탠드오프
+Same frames as previous	이전과 동일한 프레임
+Sample size	샘플 크기
+Sampled	샘플링
+Scale	축척
+Scale factor	배율
+Scale uniformly	균일하게 축척
+Scope	범위
+Screw	스크류
+Second bound	두 번째 경계
+Second bound type	두 번째 경계 유형
+Second centered	두 번째 중심 맞춤
+Second depth	두 번째 깊이
+Second direction	두 번째 방향
+Second direction has offset	두 번째 방향에 오프셋이 있습니다.
+Second distance	두 번째 거리
+Second draft	두 번째 구배
+Second draft angle	두 번째 구배 각도
+Second draft opposite direction	두 번째 구배 반대 방향
+Second end position	두 번째 방향
+Second end type	두 번째 마침 조건
+Second equal spacing	두 번째 동일 간격
+Second instance count	두 번째 부품 수
+Second match	두 번째 일치
+Second offset distance	두 번째 오프셋 거리
+Second offset opposite direction	두 번째 오프셋 반대 방향
+Second opposite direction	두 번째 반대 방향
+Second plane limit	이차 평면 제한
+Second radius	두 번째 반경
+Second set of surfaces	두 번째 면 세트
+Second side face	두 번째 면
+Second sketch	두 번째 스케치
+Second trim to face boundaries	면 경계로 두 번째 자르기
+Second up to face	면까지(이차)
+Second up to surface or part	면 또는 부품까지(이차)
+Second up to vertex or mate connector	꼭지점 또는 메이트 커넥터까지(이차)
+Secondary axis entity	보조축 요소
+Section count	섹션 카운트
+Seed geometry type	시드 형상 유형
+Seed instance key	Seed instance key
+Segment edit type	세그먼트 편집 유형
+Segment index	Segment index
+Segments	세그먼트(S)
+Select	선택
+Select (edge)	선택(모서리)
+Select (vertex)	선택(꼭지점)
+Select all frames	모든 프레임 선택
+Select an entity or mate connector	요소 또는 메이트 커넥터 선택
+Select distance to measure the linear distance between two entities./nSelect length to measure the total length of the selected entities.	두 요소 사이에 선형 거리를 측정하려면 거리를 선택합니다./n선택한 요소의 총 길이를 측정하려면 길이를 선택합니다.
+Select face	면 선택
+Select or create mate connectors in this Part Studio to position derived instances	이 Part Studio에서 메이트 커넥터를 선택하거나 생성하여 파생된 부품 위치 지정
+Select owner entity	소유자 요소 선택
+Select point	점 선택
+Selected Point	Selected Point
+Selected point #indexValue	Selected point #indexValue
+Selected points	선택한 점
+Selection	선택 항목
+Selection type	선택 유형
+Selections	선택 항목
+Self-clinching nuts	셀프 클린칭 너트
+Self-clinching standoffs	셀프 클린칭 스탠드오프
+Self-clinching studs & pins	셀프 클린칭 스터드 및 핀
+Shaft class	샤프트 클래스
+Shared	공유
+Sheet metal face to bend	굽힐 금속 판재 면
+Sheet metal loft	금속 판재 로프트
+Sheet metal model	금속 판재 모델
+Sheet metal part	금속 판재 파트
+Sheet metal parts	금속 판재 파트
+Shell	쉘
+Shell thickness	쉘 두께
+Short	짧게
+Show Flip	Show Flip
+Show calculation variance	계산 변화 표시
+Show coordinate system of the reference used by the current vertex.	현재 꼭지점에 사용된 참조의 좌표계를 표시합니다.
+Show default points	기본 점 표시
+Show details	세부사항 표시
+Show deviation	편차 표시
+Show isocurves	iso 곡선 보이기
+Show reference coordinate system	참조 좌표계 표시
+Show ruled lines	측정된 선 표시
+Show selection	선택 항목 표시
+Show start and end profiles	시작 및 끝 프로파일 표시
+Side	측면(S)
+Side 1	측면 1
+Side 2	측면 2
+Side length	측면 길이
+Sides	측면
+Simple	단순
+Simulation	시뮬레이션
+Simulation connection	시뮬레이션 연결
+Single	단일
+Single value	단일 값
+Size	크기
+Sketch	스케치
+Sketch curves to extrude	돌출할 스케치 곡선
+Sketch for flat view	평면도용 스케치
+Sketch plane	스케치 면
+Sketch points	스케치 점
+Sketch points to place holes	홀을 배치할 스케치 지점
+Sketch profile	스케치 프로파일
+Sketch profiles	스케치 프로파일
+Skip instances	부품 건너뛰기
+Slider	슬라이더
+Smooth	부드럽게
+Smooth fillet corners	매끄러운 필렛 코너
+Smooth transition	완만한 전환
+Smoothness	평활도
+Solid	솔리드
+Solution index	Solution index
+Source is 'Y Axis Up'	원점이 'Y 축 위로'입니다.
+Spacing type	간격 유형
+Spans	범위
+Specify anchor points	고정점 지정
+Specify axis	축 지정
+Specify direction	방향 지정
+Specify normal	Specify normal
+Sphere	구
+Spine	스파인
+Split	분할
+Split face	면 분할
+Split faces	면 분할
+Split type	분할 유형
+Spun corner	스핀 코너
+Square - Sized	정사각형 - 확대됨
+Standard	표준
+Start	시작
+Start angle	시작 각도
+Start condition	시작 조건
+Start curvature offset	시작 곡률 오프셋
+Start direction	시작 방향
+Start direction has offset	시작 방향에 오프셋이 있습니다
+Start direction offset angle	시작 방향 오프셋 각도
+Start edge position	시작 모서리 위치
+Start flow offset	흐름 오프셋 시작
+Start from part	파트에서 시작
+Start from selected plane	선택한 면에서 시작
+Start from sketch plane	스케치 면에서 시작
+Start magnitude	시작 규모
+Start offset	시작 오프셋
+Start offset opposite direction	시작 오프셋 반대 방향
+Start opposite direction	시작 반대 방향
+Start plane	시작면
+Start point	시작점
+Start position	시작 위치
+Start profile adjacent faces	시작 프로파일 인접 면
+Start profile condition	시작 프로파일 상태
+Start radius	시작 반경
+Start trim	잘라내기 시작
+Start type	시작 유형
+Start up to face	곡면까지 방향 시작
+Start up to surface or part	면 또는 파트까지 방향 시작
+Start up to vertex or mate connector	꼭지점 또는 메이트 커넥터까지 방향 시작
+Start value	시작 값
+Starting height	Starting height
+Starting offset	시작 오프셋
+Starting offset bound	시작 오프셋 바인딩
+Starting offset depth	시작 오프셋 깊이
+Starting offset entity	시작 오프셋 요소
+Starting offset opposite direction	시작 오프셋 반대 방향
+Starting width	Starting width
+Step	단계
+Steps	단계
+Straight	직선
+Straight pipe tap	직선 파이프 탭
+Straight tap	직선 탭
+Style	스타일
+Subtract	차집합
+Subtraction offset	차집합 오프셋
+Subtraction scope	차집합 범위
+Surface	면
+Surface area	표면 영역
+Surface or boundary edges	면 또는 경계 모서리
+Sweep	스윕
+Sweep path	스윕 경로
+Swept profile	스윕된 프로파일
+Switch face	면 전환
+Switch side	변 바꾸기
+Symmetric	대칭
+Symmetrical	대칭
+S™/SS™/CLS™/CLSS™/SP™ nuts	S™/SS™/CLS™/CLSS™/SP™ 너트
+TFH™/TFHS™ non-flush studs	TFH™/TFHS™ 비-플러시 스터드
+TOP_AXIS_POINT	TOP_AXIS_POINT
+TPS™/TP4™ flush-head pilot pins	TPS™/TP4™ 플러시 헤드 파일럿 핀
+TPXS™ self-clinching pilot pins	TPXS™ 셀프 클린칭 파일럿 핀
+TSO™/TSOS™/TSOA™/TSO4™ blind standoffs for thin sheet	박막 시트용 TSO™/TSOS™/TSOA™/TSO4™ 단방향 스탠드오프
+Tab	탭
+Tab mate connector(s)	탭 메이트 커넥터
+Tab profile	탭 프로파일
+Table	테이블
+Tag	태그
+Tag purpose	태그 용도
+Tangency	탄젠시
+Tangent	접선
+Tangent connected	접선 연결됨
+Tangent direction	접선 방향
+Tangent edges	접선 모서리
+Tangent hold lines	접선 유지선
+Tangent propagation	접선 처리
+Tangent to curve	곡선에 접함
+Tangent to face	면에 접함
+Tangent to guide	가이드에 접함
+Tangent to profile	프로파일로 접선
+Tap clearance (number of thread pitch lengths)	탭 공차(쓰레드 피치 길이 개수)
+Tap drill diameter	탭 드릴 지름
+Tap drill diameter deviation	탭 드릴 지름 편차
+Tap drill diameter lower deviation	탭 드릴 지름 하한 편차
+Tap drill diameter lower limit	탭 드릴 지름 하한
+Tap drill diameter precision	탭 드릴 지름 정밀도
+Tap drill diameter tolerance controls	탭 드릴 지름 공차 제어
+Tap drill diameter tolerance type	탭 드릴 지름 공차 유형
+Tap drill diameter upper deviation	탭 드릴 지름 상한 편차
+Tap drill diameter upper limit	탭 드릴 지름 상한
+Tap major diameter	Tap major diameter
+Tap through all	전체 범위 탭
+Tap type	탭 유형
+Tapered pipe tap	테이퍼드 파이프 탭
+Tapped	탭 가공됨
+Tapped angle	Tapped angle
+Tapped depth	탭 가공된 깊이
+Tapped depth deviation	탭 깊이 편차
+Tapped depth lower deviation	탭 깊이 하한 편차
+Tapped depth lower limit	탭 깊이 하한
+Tapped depth precision	탭 깊이 정밀도
+Tapped depth tolerance controls	탭 깊이 공차 제어
+Tapped depth tolerance type	탭 깊이 공차 유형
+Tapped depth upper deviation	탭 깊이 상한 편차
+Tapped depth upper limit	탭 깊이 상한
+Tapped details	Tapped details
+Target	대상
+Target anchor point	대상 앵커 점
+Target degree	목표 각도
+Target face(s)	대상 면
+Target length	목표 길이
+Target pitch	목표 피치
+Target revolutions	목표 회전
+Targets	대상
+Tear	전단
+Tear drop	전단 드롭
+Tensile yield strength	Tensile yield strength
+Termination	종료
+Thermal via	서멀 비아
+Thicken	두껍게 하기
+Thickness	두께
+Thickness 1	두께 1
+Thickness 2	두께 2
+Thickness factor	두께 비율
+Thickness opposite direction	반대 방향의 두께
+Thin	얇게
+Third centered	세 번째 중심 맞춤
+Third direction	세 번째 방향
+Third distance	세 번째 거리
+Third equal spacing	세 번째 동일 간격
+Third instance count	세 번째 부품 수
+Thread class	스레드 클래스
+Thread length	나사산 길이
+Thread standard	Thread standard
+Thread type	나사산 유형
+Threads/inch	인치당 나사산 수
+Three point	3점
+Through all	전체 범위
+Tip angle	팁 각도
+Tip angle deviation	팁 각도 편차
+Tip angle lower deviation	팁 각도 하한 편차
+Tip angle lower limit	팁 각도 하한
+Tip angle precision	팁 각도 정밀도
+Tip angle style	팁 각도 스타일
+Tip angle tolerance controls	팁 각도 공차 제어
+Tip angle tolerance type	팁 각도 공차 유형
+Tip angle upper deviation	팁 각도 상한 편차
+Tip angle upper limit	팁 각도 상한
+To mate connector	대상 메이트 커넥터
+To owner	권한 소유자에게
+To selection	선택 항목으로
+Tolerance	공차
+Tolerance matching	Tolerance matching
+Tolerance type	공차 유형
+Tooling	툴링
+Tools	도구
+Tools anchor point	도구 앵커 점
+Total length	총 길이
+Transform	변형
+Transform by mate connectors	메이트 커넥터로 변형
+Transform type	변형 유형
+Transition	전환
+Translate	선형 이동
+Translate by XYZ	XYZ에 따라 선형 이동
+Translate by distance	거리에 따라 선형 이동
+Translate by line	선을 따라 선형 이동
+Translation	변환
+Translation along X	X를 따라 선형 이동
+Translation along Y	Y를 따라 선형 이동
+Translation along Z	Z를 따라 선형 이동
+Treatment type	처리 유형
+Triangle	삼각형
+Trim	자르기
+Trim Type	잘라내기 유형
+Trim control	잘라내기 컨트롤
+Trim curve	곡선 잘라내기
+Trim ends	끝 잘라내기
+Trim guides	자르기 가이드
+Trim profiles	자르기 프로파일
+Trim to face boundaries	면 경계로 자르기
+Trim to target	대사으로 자르기
+Trim type	트림 유형
+Trimming	잘라내기
+Turns	회전 수
+Turns and pitch	회전수와 피치
+Twist	비틀림
+Twist opposite direction	반대 방향으로 비틀기
+Twist type	비틀림 유형
+Two distances	두 거리
+Two sided	양면
+Two sketches	2개 스케치
+Type	유형
+U direction	U 방향
+U profiles	U 프로파일
+U shift	U 이동
+U shift opposite direction	U 이동 반대 방향
+UNSET	UNSET
+UVN (Control polygon)	UVN(제어 다각형)
+UVN (Tangent)	UVN(접선)
+Ultimate compressive strength	Ultimate compressive strength
+Ultimate tensile strength	Ultimate tensile strength
+Undercut	언더컷
+Undercut diameter	언더컷 지름
+Undercut length	언더컷 길이
+Unfold	펼치기
+Unfold all	모두 펼치기
+Unfold none	펼치기 안 함
+Unfold selected	선택 항목 펼치기
+Unfold type	펼치기 유형
+Unified	통합
+Union	합집합
+Unit	유닛
+Units	단위
+Unowned	소유자 없음
+Up to entity	선택 요소까지
+Up to entity or mate connector	요소 또는 메이트 커넥터까지
+Up to entity with offset	오프셋한 선택 요소까지
+Up to face	면까지
+Up to next	다음까지
+Up to part	파트까지
+Up to part/surface	파트/면까지
+Up to surface or part	면 또는 부품까지
+Up to vertex	꼭지점까지
+Up to vertex or mate connector	꼭지점 또는 메이트 커넥터까지
+Upper	상한
+Use axis	축 사용
+Use cubic interpolation	큐빅 보간 사용
+Use default minimal gap	기본 최소 간격 사용
+Use minimal gap	최소 간격 사용
+Use model K Factor	모델 K 지수 사용
+Use model bend radius	모델 벤드 반지름 사용
+Use sketch plane direction	스케치 면 방향 사용
+User defined	사용자 정의(U)
+V direction	V 방향
+V profiles	V 프로파일
+V shift	V 이동
+V shift opposite direction	V 이동 반대 방향
+V3	V3
+VIRTUAL_SHARP	VIRTUAL_SHARP
+Value	값
+Value to record	기록할 값
+Variable	변수
+Variable Studio reference	Variable Studio 참조
+Variable fillet	변수 필렛
+Variable type	변수 유형
+VariableStudioVariable	VariableStudioVariable
+Vertex	꼭지점
+Vertex overrides	꼭지점 재정의
+Vertex pairs to split with	분할에 사용할 꼭지점 쌍
+Vertices	꼭지점
+Vertices or curves	꼭지점 또는 곡선
+Vertices or edges	꼭지점 또는 모서리
+Via	비아
+Volume	부피
+Wall face or bounding edge to hold	유지할 벽면 또는 경계 모서리
+Walls	벽
+Weight	무게
+Width	폭
+Width mate connectors	폭 메이트 커넥터
+Workspace precision	작업공간 정밀도
+World	표준
+Wrap	둘러싸기
+X	X
+X Component	X Component
+X axis	X axis
+X offset	X 오프셋
+X rotation	X 회전
+X scale	X 축척
+X translation	X 선형 이동
+XY plane	YZ 면
+XYZ	XYZ
+XZ plane	YZ 면
+Y	Y
+Y Component	Y Component
+Y axis	Y axis
+Y offset	Y 오프셋
+Y rotation	Y 회전
+Y scale	Y 축척
+Y translation	Y 선형 이동
+YZ plane	YZ 면
+Yard	Yard
+Young's modulus	Young's modulus
+Z	Z
+Z Component	Z Component
+Z axis	Z axis
+Z offset	Z 오프셋
+Z rotation	Z 회전
+Z scale	Z 축척
+Z translation	Z 선형 이동
+[#continuity] #entities	[#continuity] #entities
+[#designator] #interiorFaces	[#designator] #interiorFaces
+[#pointOnEdgeRadius] #edge	[#pointOnEdgeRadius] #edge
+[#uCondition] #uProfileEntities	[#uCondition] #uProfileEntities
+[#vCondition] #vProfileEntities	[#vCondition] #vProfileEntities
+[#vertexRadius] #vertex	[#vertexRadius] #vertex
+additional query	additional query
+arrayItem	arrayItem
+baseOccurrence	baseOccurrence
+buildFunction	buildFunction
+cap	cap
+computeMass	computeMass
+connection	connection
+domain	domain
+edge	edge
+edge limit	edge limit
+entityInferenceType	entityInferenceType
+fixSingleCompositeEmptyName	fixSingleCompositeEmptyName
+group	group
+guide	guide
+hintFaces	hintFaces
+index	index
+instance	instance
+isForSubFeature	isForSubFeature
+newUI	newUI
+point	point
+point on edge	point on edge
+point override	point override
+profile	profile
+secondaryOriginQuery	secondaryOriginQuery
+side1HasFace	side1HasFace
+side1HasVertex	side1HasVertex
+side2HasFace	side2HasFace
+side2HasVertex	side2HasVertex
+source	source
+specifyMaterialData	specifyMaterialData
+specifyUnits	specifyUnits
+value	value
+vertex	vertex

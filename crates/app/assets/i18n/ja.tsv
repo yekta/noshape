@@ -35,6 +35,7 @@
 "__value__" is not a valid standard library version.	"__value__" は有効な標準ライブラリバージョンではありません。
 #__queryName__ not found, is suppressed or evaluates to nothing in the current selection.	#__queryName__ が見つかりません。省略されているか、現在の選択ではなしと評価されます。
 $__amountOff__ off	$__amountOff__ オフ
+% diametric engagement	％ 直径エンゲージメント
 (Enterprise is Inactive. Please contact the administrator to activate.)	(Enterprise が非アクティブです。アクティブにするには管理者に連絡してください。)
 (External)	(外部)
 (Maximum of 10000 characters)	(最大 10,000 文字)
@@ -87,7 +88,9 @@ $__amountOff__ off	$__amountOff__ オフ
 1 uppercase	1 つの大文字
 1 user	1 人のユーザー
 1. Install the app	1. アプリをインストールします
+118 deg	118 度
 12 hour	12 時間
+135 deg	135 度
 2 additional months free	2 か月の無料期間が追加されます
 2 point circle centerline	2 点円形中心線
 2 point linear centerline	2 点直線中心線
@@ -170,6 +173,7 @@ Access to this document has been restricted with the message '__message__'.	こ�
 Access to this document has been restricted.	このドキュメントへのアクセスは制限されています。
 Access to this document has been temporarily restricted by an Onshape administrator. You may	このドキュメントへのアクセスは Onshape 管理者によって一時的に制限されています。次のことができます:
 Access token URL	アクセストークン URL
+Access type	アクセスタイプ
 Access your Altium 365 workspaces from Onshape. Import and export between Altium 365 and PCB Studio.	Onshape から Altium 365 ワークスペースにアクセスします。Altium 365 と PCB Studio の間でインポートおよびエクスポートします。
 Account	アカウント
 Account Balance:	口座残高:
@@ -229,6 +233,7 @@ Add a reply	返信を追加
 Add a tab to a sheet metal flange, remove interfering material, or bridge 2 flanges from the same sheet metal model.	シートメタルフランジにタブを追加したり、干渉するマテリアルを削除したり、同じシートメタルモデルから 2 つのフランジを橋渡ししたりします。
 Add a visibility condition for this configuration input	このコンフィギュレーション入力に可視性条件を追加
 Add a visibility rule for the options of this configuration input	このコンフィギュレーション入力のオプションに可視性ルールを追加
+Add additional queries	クエリを追加
 Add an external thread to cylindrical parts by selecting a leading edge or edges. Specify the standard, size, pitch, length, end type, and optionally add a chamfer or undercut.	1 つまたは複数のリーディングエッジを選択して、外部ねじを円筒状のパーツに追加します。標準、サイズ、ピッチ、長さ、末端の種類などを指定し、オプションで面取りやアンダーカットを追加します。
 Add appearance to __numberBiggerThanOne__ faces…	__numberBiggerThanOne__の面に外観を追加…
 Add appearance to __numberBiggerThanOne__ features…	__numberBiggerThanOne__フィーチャーに外観を追加…
@@ -239,6 +244,7 @@ Add appearance to feature…	フィーチャーに外観を追加…
 Add appearance to selection…	選択に外観を追加…
 Add appearance to sketch…	スケッチに外観を追加…
 Add category to rule…	カテゴリをルールに追加…
+Add chamfer	面取りを追加
 Add column	列を追加
 Add columns to the BOM table	BOM テーブルに列を追加
 Add columns to the template	テンプレートに列を追加
@@ -298,6 +304,8 @@ Add option rule	オプションルールを追加
 Add parts and assemblies to build a bill of materials where you can view and edit metadata, as well as viewing instance counts and assembly structure.	パーツやアセンブリを追加して、メタデータを表示および編集したり、インスタンス数やアセンブリ構造を表示したりできる部品表を構築します。
 Add payment information	支払い情報を追加
 Add payment information to make purchases in Onshape	Onshapeで購入するための支払い情報を追加
+Add point on axis drag	軸ドラッグ上に点を追加
+Add points	点を追加
 Add points to a spline or to a Bezier curve control polygon by clicking anywhere along it.	スプラインまたはベジェ曲線制御ポリゴンに沿った任意の場所をクリックして、点を追加します。
 Add project role	プロジェクトロールを追加
 Add project role and permissions	プロジェクトロールとアクセス許可を追加
@@ -335,6 +343,7 @@ Add to team…	チームに追加…
 Add to toolbar	ツールバーに追加
 Add tolerance type	許容差タイプを追加
 Add tolerances to sketch dimensions and feature parameters, or add annotations and dimensions with the Inspection panel tools to see data on any part in the Part Studio.	スケッチの寸法とフィーチャーパラメータに公差を追加するか、検査パネルツールを使用して注釈と寸法を追加し、Part Studio の任意のパーツにデータを表示します。
+Add undercut	アンダーカットを追加
 Add users	ユーザーを追加
 Add users / teams	ユーザーまたはチームを追加
 Add users from your enterprise	Enterprise からユーザーを追加
@@ -364,9 +373,14 @@ Adding row, __name__	行 (__name__) の追加
 Adding selection to Obsolete candidate…	廃止候補に選択を追加中…
 Adding selection to Release candidate…	リリース候補に選択を追加…
 Adding to a company will make the library available to all users of the company.	Company に追加すると、その Company のすべてのユーザーがそのライブラリを使用できるようになります。
+Additional alignment points	追加の位置合わせ点
+Additional columns	その他の列
+Additional queries	追加のクエリ
 Additionally, the following users must leave the document:	さらに、次のユーザーはドキュメントを閉じる必要があります。
 Address	住所
 Address:	アドレス:
+Adjacent	隣接
+Adjacent faces	隣接面
 Adjacent surfaces with overlapping edges will be joined upon import.	エッジが重なった隣接サーフェスは、インポート時に結合されます。
 Adjust the location, orientation and scale of a sketch entity using a manipulator.	マニピュレータを使用して、スケッチエンティティの場所、向き、および尺度を調整します。
 Adjust the whitespace of this Feature Studio to match a common style.	この Feature Studio のホワイトスペースを、共通のスタイルに合わせて調整します。
@@ -375,6 +389,7 @@ Admin tools	管理ツール
 Administration	管理
 Advanced CAD and PDM for teams that want to improve productivity and collaboration.	生産性と共同作業を向上させる必要があるチーム向けの高度な CAD および PDM。
 Advanced PDM	詳細な PDM
+Advanced admin and security	上級管理およびセキュリティ
 Advanced admin and security (SSO)	上級管理およびセキュリティ (SSO)
 Advanced built-in PDM	高度な内蔵 PDM
 Advanced provisioning & security settings	高度なプロビジョニングとセキュリティ設定
@@ -401,10 +416,15 @@ Alias name must be at least 1 and no more than __maxNameLimit__ characters in le
 Alias name must not contain HTML.	エイリアス名に HTML を含まないようにする必要があります。
 Alias saved.	エイリアスが保存されました。
 Aliases	エイリアス
+Align coordinate system	座標系を揃える
+Align to geometry	ジオメトリに揃える
 Align view with vertical axis	ビューを縦軸に揃える
 Align with Z	Z に揃える
+Aligned	位置合わせ済み
 Aligned rectangle	傾斜長方形
 Aligned section view	揃えられた断面ビュー
+Aligned with direction	方向に揃える
+Alignment entity	位置合わせエンティティ
 All	すべて
 All Feature Studios are committed.	すべての Feature Studio がコミットされました。
 All Onshape users	すべての Onshape ユーザー
@@ -417,6 +437,7 @@ All companies	すべての Company
 All company categories	すべての Company カテゴリ
 All custom features are used in at least one Part Studio	すべてのカスタムフィーチャーが 1 つ以上の Part Studio で使用されています
 All custom features have descriptions	すべてのカスタムフィーチャーに説明があります
+All deviations	すべての偏差
 All document and publication names containing only numbers must be unique	数字のみを含むすべてのドキュメント名およびパブリケーション名は一意でなければなりません。
 All document and publication names must be unique	すべてのドキュメント名およびパブリケーション名は一意でなければなりません
 All document and publication names must be unique unless they start with "test"	すべてのドキュメント名およびパブリケーション名は、先頭に "test" が付くもの以外は一意でなければなりません。
@@ -428,6 +449,7 @@ All existing documents will remain private and all new documents created on the 
 All file formats	すべてのファイル形式
 All flat pattern parts in the Part Studio	Part Studio にあるすべてのフラットパターンパーツ
 All flat pattern parts in the current model	現在のモデルにあるすべてのフラットパターンパーツ
+All frames	すべてのフレーム
 All inputs	すべての入力
 All instances are updated.	すべてのインスタンスが更新されました。
 All items are already in the toolbar	すべてのアイテムはすでにツールバーにあります
@@ -441,10 +463,12 @@ All permissions	すべてのアクセス許可
 All published classes	すべての公開済みクラス
 All revisions	すべてのリビジョン
 All sheets	すべてのシート
+All solid bodies	すべてのソリッドボディ
 All statuses	すべてのステータス
 All tabs	すべてのタブ
 All uppercase in Drawings	図面をすべて大文字
 All users	すべてのユーザー
+All values	すべての値
 All versions	すべてのバージョン
 All workspaces	すべてのワークスペース
 Allow	許可
@@ -453,6 +477,8 @@ Allow access to public documents	パブリックドキュメントへのアク�
 Allow adding items from other documents	他のドキュメントからの項目の追加を許可
 Allow administrators to add custom features to the enterprise toolset and enterprise custom tables to the custom tables panel. These features and tables will only appear for users with link permission to the source document.	管理者がカスタムフィーチャーを Enterprise ツールセットに追加し、カスタムテーブル パネルに Enterprise カスタムテーブルを追加できるようにします。これらのフィーチャーとテーブルはソース ドキュメントにアクセスできるユーザーにのみ表示されます。
 Allow all integrations	すべての統合を許可
+Allow edge overflow	エッジオーバーフローを許可
+Allow faulty parts	欠陥のあるパーツを許容
 Allow rotation about the X, Y, and Z axes. The 1st selection serves as the rotational movement point, and the 2nd selection serves as the stationary point.	X 軸、Y 軸、Z 軸を中心とした回転を許可すると、最初の選択項目が回転運動点、2 つ目の選択項目が定点となります。
 Allow rotation about the Z axis and translation along the X axis. The 1st selection serves as the pin and the rotational movement point, and the 2nd selection serves as the translational movement.	Z 軸を中心とした回転と X 軸を中心とした平行移動を許可すると、最初の選択項目がピンと回転運動点になり、2 つ目の選択項目が平行移動運動点となります。
 Allow rotation about the Z axis. The 1st selection serves as the rotational point, and the 2nd as the stationary point.	Z 軸を中心とした回転を許可すると、最初の選択項目が回転点、2 つ目の選択項目が定点となります。
@@ -465,6 +491,10 @@ Allow translation along the X and Y axes, and rotation about the Z axis. The 1st
 Allow translation along the Z axis. The 1st selection serves as the sliding point, and the 2nd as the stationary point.	Z 軸上の平行移動を許可すると、最初の選択項目がスライド点、2 つ目の選択項目が定点となります。
 Allow translation and rotation about the Z axis. The 1st selection serves as the translational and rotational point, and the 2nd as the stationary point.	Z 軸を中心とした平行移動と回転を許可すると、最初の選択項目が平行移動と回転の点、2 つ目の選択項目が定点となります。
 Allow translation on a slot’s center plane and rotation about an axis perpendicular to that plane. The 1st selection defines the item to be centered. The 2nd selection defines the center plane.	スロットの中心平面で平行移動し、その平面に垂直な軸を中心に回転させることができます。最初の選択項目が中央揃えするアイテムを定義し、2 つ目の選択項目が中心平面を定義します。
+Along X	X 軸方向
+Along Y	Y 軸方向
+Along Z	Z 軸方向
+Along custom	カスタム方向
 Always	常時
 Always open documents in view-only mode for all Editors, except document creators	ドキュメント作成者を除くすべての編集者に対して、常に閲覧限定モードでドキュメントを開く
 Always shown	常に表示
@@ -495,12 +525,18 @@ Analytics are only available for In progress and Submitted documents	アナリ�
 Analyze input tessellation…	入力テッセレーションを分析…
 And	および
 Angle	角度
+Angle Tolerance	角度許容差
+Angle control type	角度制御タイプ
+Angle from direction	方向からの角度
+Angle opposite direction	反対方向の角度
+Angle reference	角度参照
 Angle unit:  	角度単位:  
 Angle: __angleUnit__	角度: __angleUnit__
 Angular deviation	角度偏差
 Angular tolerance	角度許容差
 Angular tolerances	角度許容差
 Angular velocity	角速度
+Animate Mate	合致をアニメート
 Animate __mateName__…	__mateName__ をアニメート…
 Animate mate	合致をアニメート
 Animate mate degree of freedom	合致の自由度をアニメート
@@ -559,6 +595,10 @@ Approved by	承認者
 Approved by __name__	承認者 __name__
 Approver	承認者
 Approvers	承認者
+Approximate	近似
+Approximation parameters	近似パラメータ
+Approximation target degree	近似ターゲット角度
+Approximation type	近似タイプ
 Arc	円弧
 Arc length	弧長
 Arc length dimension	弧長寸法
@@ -568,6 +608,7 @@ Archived	アーカイブ済み
 Archived classes	アーカイブされたクラス
 Archived classes can be cloned. Cloning an archived class will create a new unpublished class without members containing all the existing content.	アーカイブされたクラスは複製できます。アーカイブされたクラスを複製すると、既存のすべてのコンテンツを含むメンバーなしの新しい未公開のクラスが作成されます。
 Archiving a class will:	クラスをアーカイブすると、次が行われます。
+Arcs to extrude as bends	曲げとして押し出す円弧
 Are you a student or an educator?	学生または教員の方ですか?
 Are you student or an educator?	学生または教員の方ですか?
 Are you sure you want to cancel your Education subscription?	Education サブスクリプションを削除してもよろしいですか？
@@ -604,6 +645,7 @@ Arena connection settings failed to save.	Arena の接続設定を保存でき�
 Arena connection settings updated.	Arena の接続設定が更新されました。
 Arena release management sync is disabled in __companyName__.	Arena のリリース管理同期が __companyName__ で無効になりました。
 Arena release management sync is enabled in __companyName__.	Arena のリリース管理同期が __companyName__ で有効になりました。
+Array	配列
 Array parameters cannot be configured.	配列のパラメータは設定できません。
 Arrow	矢印
 As a __companyType__ administrator you can override all other approvers and __transition__ this Release candidate immediately.	__companyType__ の管理者として、他のすべての承認者をオーバーライドし、このリリース候補を今すぐ__transition__することができます。
@@ -611,6 +653,7 @@ As a __companyType__ administrator you can override other users and __transition
 As a company administrator, you can complete the task on behalf of the assignee.	会社の管理者として、割り当てられたユーザーの代わりにタスクを完了することができます。
 As a light user you can view, comment on and export from documents, publications that have been shared with you. For more information about using Onshape as a light user, 	ライトユーザーとして、共有されたドキュメントやパブリケーションを参照、コメント、およびエクスポートできます。ライトユーザーとして Onshape を使用する方法の詳細については、以下を参照してください: 
 As creator of this release you can override all other approvers and reject this Release candidate immediately.	このリリースの作成者として、他のすべての承認者をオーバーライドし、このリリース候補を直ちに拒否することができます。
+Aspect ratio constraint	縦横比拘束
 Assemblies	アセンブリ
 Assemblies…	アセンブリ…
 Assembly	アセンブリ
@@ -631,6 +674,7 @@ Assembly locked to __positionName__.	アセンブリは __positionName__ にロ�
 Assembly mirror	アセンブリミラー
 Assembly settings	アセンブリ設定
 Assembly settings updated.	アセンブリ設定が更新されました。
+Assembly to mirror	ミラーリングするアセンブリ
 Assign	割り当て
 Assign a FeatureScript function to run and compute values for the part property.	FeatureScript 関数を割り当てて、パーツプロパティの値を実行および計算します。
 Assign a name to a specific display state of an assembly. Specify which parts, subassemblies, and mates are hidden or in view.	アセンブリの特定の表示状態に名前を割り当てます。パーツ、サブアセンブリ、合致を表示するか非表示にするかを指定します。
@@ -639,6 +683,7 @@ Assign material for __name__…	__name__ にマテリアルを割り当てる…
 Assign material for __numberBiggerThanOne__ parts…	__numberBiggerThanOne__ パーツのマテリアルを割り当てる…
 Assign material…	マテリアルを割り当てる…
 Assign to __assignee__	__assignee__ に割り当てる
+Assigned	割り当て済み
 Assigned seats:	割り当てられたシート:
 Assigned to	割り当て先
 Assigned to me	割り当て済み
@@ -663,7 +708,11 @@ Assignment submission type failed to load.	課題の提出タイプを読み込�
 Assignment submissions failed to download.	課題の提出をダウンロードできませんでした。
 Assignments	課題
 Assignments failed to load.	課題を読み込めませんでした。
+Associated component instance	関連付けられたコンポーネントインスタンス
+Asymmetric	非対称
 At least one workflow must be selected	1 つ以上のワークフローを選択する必要があります
+Attach to	添付先
+Attachment	添付
 Attachment cannot exceed 20MB	添付ファイルは 20MB を超えることはできません
 Attachment exceeds 20MB limit.	添付ファイルが 20MB の制限を超えています。
 Attachment failed to upload.	添付ファイルをアップロードできませんでした。
@@ -683,10 +732,12 @@ Authoring permissions updated.	アクセス許可の作成が更新されまし�
 Authorization completed successfully!	認証が正常に完了しました。
 Authorization failed!	認証できませんでした。
 Auto	自動
+Auto position	自動配置
 Auto-size fastener	自動サイズ ファスナー
 Automated part numbering	自動化されたパーツ番号付け
 Automatic	自動
 Automatic (default)	自動 (既定)
+Automatic miter	自動マイター
 Automatic obsoletion	自動廃止
 Automatic references enable you to insert this Variable Studio into multiple tabs. References to this Variable Studio will be placed in every new and existing Part Studio and Assembly in this workspace.	自動参照を使用すると、この Variable Studio を複数のタブに挿入できます。この Variable Studio への参照は、このワークスペースのすべての新規および既存の Part Studio とアセンブリに配置されます。
 Automatic version	自動バージョン
@@ -697,6 +748,9 @@ Automatically select constraints	拘束を自動的に選択
 Auxiliary view	補助ビュー
 Average	平均
 Awaiting approval	承認待ち
+Axis	軸
+Axis measurements	軸の測定
+Axis of pattern	パターン軸
 Axis perpendicular distance	軸垂直距離
 BOM Table	BOM テーブル
 BOM URL failed to load.	BOM の URL を読み込めませんでした。
@@ -708,7 +762,9 @@ BOM sync to __plmName__ has started…	BOM の __plmName__ への同期が開始
 BOM synced to Arena.	BOM を Arena に同期しました。
 BOM type	BOM タイプ
 BOM type:	BOM タイプ:
+BSO™/BSOS™/BSOA™/BSO4™ blind threaded standoffs	BSO™/ BSOS™/ BSOA™/ BSO4™ ブラインドスレッドスタンドオフ
 Back	背面
+Back reference	後方参照
 Back reference (Ctrl-a)	後方参照 (Ctrl-a)
 Back to Release properties	リリースプロパティに戻る
 Back to Task properties	タスクプロパティに戻る
@@ -720,14 +776,34 @@ Ball	球
 Ball mate	球形合致
 Ball mate (m)	球形合致 (m)
 Base URL	ベース URL
+Base mate connector	基準の合致コネクタ
+Base origin	基準の原点
+Base plane	基準となる平面
+Basic	基準
 Be confident in the security of your data	データのセキュリティについて信頼いただけます
 Bearing	ベアリング
 Before	前
 Bend	曲げ
 Bend a sheet metal model along a reference line, with additional bend control options.	追加の曲げ制御オプションを使用して、シートメタルモデルを基準線に沿って曲げます。
+Bend alignment	曲げの位置合わせ
+Bend allowance	曲げの許容範囲
+Bend angle	曲げ角度
+Bend calculation	曲げ計算
+Bend deduction	曲げ控除
+Bend line	曲げ線
+Bend or non-planar faces	曲げ面または非平面上の面
+Bend or non-planar faces to unfold	展開する曲げ面または非平面上の面
+Bend radius	曲げ半径
 Bend relief	曲げリリーフ
+Bend relief depth	曲げリリーフ深さ
+Bend relief depth scale	曲げリリーフ深さスケール
+Bend relief type	曲げリリーフタイプ
+Bend relief width scale	曲げリリーフ幅スケール
+Best fit	ベストフィット
 Best for Individuals	個人ユーザーに最適
 Between	範囲
+Between entities	エンティティ間
+Between entity	エンティティ間
 Bezier	ベジェ曲線
 Bezier degree	ベジェ角度
 Bias	バイアス
@@ -739,25 +815,38 @@ Bio	自己紹介
 Black	黒
 Black and white	黒と白
 Blend 2 or more faces. Specify propagation, cross section type, measurement type, symmetry, control type, and trim type.	2 つ以上の面を組み合わせます。伝播、クロス断面タイプ、測定タイプ、対称、制御タイプ、およびトリミングタイプを指定します。
+Blind	ブラインド
+Blind in last	最後にブラインド
 Blob	BLOB
 Blue	青
 Blue sky	青空
 Blue → Red	青 → 赤
 Blur environment	環境をぼかす
+Bodies	ボディ
 Body	ボディ
 Body Type	ボディタイプ
 Body draft	ボディ抜き勾配
+Body type	ボディタイプ
 Bold	太さ
 Bond all touching faces	すべての接地面を結合
 Boolean	ブーリアン演算
 Boolean filter property	ブーリアン演算フィルタープロパティ
+Boolean operation	ブーリアン操作
 Border	境界
 Bottom	下面
+Bottom edges	下部エッジ
 Bottom right	右下
 Bottom view	下面ビュー
+Bound type	境界タイプ
 Boundary condition	境界条件
+Boundary condition direction	境界条件の方向
 Boundary surface	境界サーフェス
 Bounded faces	境界面
+Bounding box XY	境界ボックス XY
+Bounding box YZ	境界ボックス YZ
+Bounding box ZX	境界ボックス ZX
+Bounding type	境界タイプ
+Bounds	境界
 Branch to create workspace	分岐してワークスペースを作成
 Branch to create workspace…	分岐してワークスペースを作成…
 Branched from __versionName__	__versionName__ から分岐
@@ -779,6 +868,9 @@ Browser looks good!	ブラウザは良さそうです!
 Build steps by dragging components	コンポーネントをドラッグしてステップを作成
 Built for teams	チーム向けにビルド
 Business - For designing products for my company.	ビジネス - 会社の製品の設計目的
+Butt	突合せ
+Butt joint - Direction 1	突合せジョイント - 方向 1
+Butt joint - Direction 2	突合せジョイント - 方向 2
 Button parameters cannot be configured.	ボタンのパラメータは設定できません。
 Buy	購入
 Buy Onshape now or contact our sales team	Onshape を今すぐ購入して営業チームにお問い合わせください
@@ -786,6 +878,9 @@ Buy __appName__ __planDescription__	__appName__ __planDescription__ を購入
 Buy now	今すぐ購入
 By adding or using this library, the user acknowledges and accepts full responsibility for its installation, configuration, use, and any resulting effects on their systems or applications.	ユーザーは、このライブラリを追加または使用することにより、そのインストール、コンフィギュレーション、使用、およびその結果としてシステムまたはアプリケーションに及ぼす影響について、全責任を認め、承諾するものと見なされます。
 By checking this box, I agree to the	このボックスをチェックすることで、私は以下の内容に同意します
+By index	インデックス別
+By index range	インデックス範囲別
+By label	ラベル別
 By leaving a classroom, you will:	クラスを退出すると、次のことが行われます:
 CAD Import	CAD インポート
 CAD files	CAD ファイル
@@ -794,6 +889,7 @@ CAM Studio Tool Holders	CAM Studio ツールホルダー
 CAM Studio Tools	CAM Studio ツール
 CAM, Simulation, Rendering and more	CAM、シミュレーション、レンダリングなど
 CATIA part file	CATIA パーツ ファイル
+CLA™ free-running locknuts	CLA™ 自走かしめナット
 CLEAR	クリア
 COLLADA file	COLLADA ファイル
 COMMENT	コメント
@@ -876,6 +972,9 @@ Cannot send to trash	ごみ箱に移動できません
 Cannot show versions and history of a document in the trash.	ごみ箱ではドキュメントのバージョンや履歴を表示できません。
 Cannot update an element with file type "__currentType__" with a different file type "__newType__".	異なるファイルの種類 "__newType__" を備えたファイルの種類 "__currentType__" を持つ要素を更新できません。
 Cannot update external references	外部参照を更新できません
+Cap	キャップ
+Cap entity	キャップエンティティ
+Caps	キャップ
 Capture & annotate screen	画面のキャプチャと注釈
 Capture variants of the assembly as named positions	名前の付いた位置としてアセンブリのバリアントをキャプチャする
 Card ending in	カードの末尾
@@ -897,25 +996,35 @@ Category parameters will be editable once the category is created.	カテゴリ�
 Category:	カテゴリー:
 Ceiling hexagonal	六角形の天井
 Ceiling square	四角形の天井
+Center	中心
 Center axis distance	中心軸距離
 Center distance	中心距離
 Center line	中心線
 Center of mass	重心
+Center of mass x coordinate	x 座標の重心
+Center of mass y coordinate	y 座標の重心
+Center of mass z coordinate	z 座標の重心
 Center point arc	中心点と端点 円弧
 Center point circle	中心点円
 Center point circle (c)	中心点円
 Center point rectangle	中心長方形
 Center point rectangle (r)	中心長方形
 Center position	中心位置
+Centered	中央揃え
 Centerline	中心線
 Centermark	中心マーク
 Chain 1	チェーン 1
 Chain 2	チェーン 2
+Chain type	チェーンタイプ
 Chamfer	面取り
+Chamfer angle	面取り角度
 Chamfer angles	面取り角度
 Chamfer callout	面取りコールアウト
 Chamfer dimension	面取り寸法
 Chamfer distances	面取り距離
+Chamfer length	面取りの長さ
+Chamfer size	面取りサイズ
+Chamfer type	面取りタイプ
 Chamfer…	面取り…
 Change	変更
 Change Onshape Server	Onshape サーバーを変更
@@ -931,6 +1040,7 @@ Change part transparency	パーツの透明度を変更
 Change password	パスワードを変更
 Change perspective camera field of view	透視投影カメラの視野を変更
 Change publish state to Active?	公開状態をアクティブに変更しますか？
+Change radius	半径を変更
 Change scale of dihedral combs	二面コームの尺度を変更
 Change scale of min/max deviation	最小 / 最大偏差の尺度を変更
 Change size of curvature combs	曲率コームのサイズを変更
@@ -946,6 +1056,7 @@ Change the line width of surfaces and edges	サーフェスとエッジの線の
 Change the second dash length of construction lines	作図線の 2 番目の破線の長さを変更
 Change the second gap length of construction lines	作図線の 2 番目のギャップの長さを変更
 Change the shininess of shaded surfaces	シェードサーフェスの光沢を変更
+Change thickness	厚みを変更
 Change to Free	無料プランに変更する
 Change to a version reference to maintain the link.	リンクを維持するためのバージョン参照に変更します。
 Change to driven dimension	従属寸法に変更
@@ -974,6 +1085,7 @@ Check interference…	干渉をチェック…
 Check part	パーツをチェック
 Check system compatibility in a new tab	新しいタブでシステムの互換性をチェック
 Check the configuration and try again.	コンフィギュレーションを確認して再試行してください。
+Check to include the clearance for bends	チェックして曲げのクリアランスを含める
 Checkbox	チェックボックス
 Checkbox input	チェックボックス入力
 Checked __versionCount__ recent document history moments - no healthy state found.	__versionCount__ 件の最近のドキュメント履歴をチェックしましたが、正常な状態は見つかりませんでした。
@@ -986,11 +1098,14 @@ Choose a publication	パブリケーションを選択
 Choose instances and mate parameters to be driven by this configuration input	このコンフィギュレーション入力で、駆動するインスタンスと合致のパラメータを選択します。
 Choose sketch dimensions and feature parameters to be driven by this configuration input	このコンフィギュレーション入力で駆動するスケッチ寸法とフィーチャー パラメータを選択
 Choose the integrations that are available in your enterprise.	Enterprise で使用可能な統合を選択します。
+Choose to measure minimum or maximum distance between entities	選択してエンティティ間の最小距離または最大距離を測定
 Choose who can access the integration. All users allows all members of the enterprise to access the integrations. Otherwise you can select the users or teams who can access integrations.	統合にアクセスできるユーザーを選択します。[すべてのユーザー] では、Enterprise のすべてのメンバーが統合にアクセスできます。それ以外の場合は、統合にアクセスできるユーザーまたはチームを選択できます。
 Choose your role:	ロールを選択:
 Chordal tolerance	弦の許容差
 Chromatic	有彩色
 Circle	円
+Circular	円形
+Circular edge	円形エッジ
 Circular pattern	円形パターン
 Circumscribed polygon	外接多角形
 City	市町村
@@ -1027,6 +1142,9 @@ Clear property function	プロパティ機能をクリア
 Clear scheduling applied to assignments.	課題には明確なスケジュールを適用してください。
 Clear search	検索をクリア
 Clear selection	選択解除
+Clearance	クリアランス
+Clearance & tapped	クリアランスとタップ
+Clearance from input	入力からのクリアランス
 Click here for more information.	詳しくはこちらをクリックしてください。
 Click here to go to release management part number generation settings	こちらをクリックしてリリース管理のパーツ番号の生成設定に移動します
 Click here to learn more about the system requirements.	こちらをクリックしてシステム要求の詳細を参照します。
@@ -1059,6 +1177,8 @@ Click to select one or more files to import	クリックしてインポートす
 Clicking confirm will try to stop extraction of document if one is running. You will receive a notification if/when the document extraction has stopped.	[確認] をクリックすると、ドキュメントの抽出を実行中であれば停止を試みます。ドキュメントの抽出が停止すると、通知が届きます。
 Client id	クライアント ID
 Client secret	クライアントシークレット
+Cliff edges	クリフエッジ
+Clockwise	時計回り
 Clone	複製
 Clone __currentClassname__	__currentClassname__ を複製
 Clone __projectName__	__projectName__ を複製
@@ -1079,6 +1199,7 @@ Cloned to __successCount__ classes.	__successCount__ 件のクラスに複製し
 Cloned, failed to publish	複製はしましたが、公開できませんでした。
 Cloning assignment…	課題を複製中…
 Close	閉じる
+Close (ASME)	クローズ (ASME)
 Close assignment	課題を複製
 Close assignment now?	今すぐ課題を終了しますか?
 Close date	終了日
@@ -1089,6 +1210,7 @@ Close now	今すぐ終了
 Close publication	パブリケーションを閉じる
 Close search	検索を閉じる
 Closed	クローズ
+Closed spline	閉じたスプライン
 Cloud Storage	クラウドストレージ
 Cloud storage failed to load.	クラウドストレージを読み込めませんでした。
 Cloud storage integration settings	クラウドストレージ統合設定
@@ -1118,9 +1240,17 @@ College or University	専門学校または大学
 Color	色
 Color map may exceed browser memory limits. Try hiding unnecessary parts or surfaces.	カラーマップがブラウザのメモリ制限を超えている可能性があります。不要なパーツまたはサーフェスを非表示にしてみてください。
 Colors	色
+Column	列
 Column 	列 
+Column access type	列アクセスタイプ
+Column index (0-based)	列インデックス (0 から始まる)
+Column max index (0-based)	列の最大インデックス (0 から始まる)
+Column min index (0-based)	列の最小インデックス (0 から始まる)
 Column name cannot be longer than 256 characters.	列名は 256 文字以内にする必要があります。
 Column name cannot contain HTML.	列名に HTML を含めることはできません。
+Column regular expression	列の正規表現
+Column result type	列の結果タイプ
+Column value	列の値
 Columns	列
 Columns added while viewing this bill of materials are for reference only and will not be saved.	この部品表の表示中に追加された列は閲覧限定であり、保存されません。
 Comb size	コームサイズ
@@ -1197,6 +1327,7 @@ Composite	複合
 Composite Part	複合部品
 Composite curve	複合曲線
 Composite part	複合部品
+Composite part options	複合部品オプション
 Composite parts	複合部品
 Composite parts (__numberOfCompositeParts__)	複合部品 (__numberOfCompositeParts__)
 Compress	圧縮
@@ -1211,11 +1342,15 @@ Computed part properties	計算済のパーツプロパティ
 Computed part property document/version/element not found.	計算されたパーツプロパティのドキュメント/バージョン/要素が見つかりません。
 Computed part property functions	計算されたパーツプロパティ関数
 Computed part property tables	計算されたパーツプロパティテーブル
+Computed pitch	計算済みピッチ
 Computed property overridden by Feature	計算されたプロパティは、フィーチャーにオーバーライドされました
 Computed property overridden in configuration.	計算されたプロパティは、コンフィギュレーションにオーバーライドされました
+Computed revolutions	計算済みの回転
 Computed value	計算済みの値
 Computing center of mass…	重心を計算中…
 Computing…	計算中…
+Concave	凹状
+Concave repair	凹形修復
 Concentric	同心
 Cone	円錐
 Confidence in data security	データセキュリティへの信頼
@@ -1306,6 +1441,9 @@ Confirm your Onshape password	Onshape パスワードを確認
 Confirm your password:	パスワードの確認:
 Confirmation failed: __error__	確認できませんでした: __error__
 Conic	円錐
+Conic edges	円錐エッジ
+Conic hold lines	円錐保持線
+Conical or cylindrical face	円錐面または円筒状
 Conjugate angle	共役角
 Connect	接続
 Connect service…	サービスを接続…
@@ -1344,6 +1482,8 @@ Constrained rotate	拘束回転
 Constrained surface	拘束サーフェス
 Constraint manager	拘束マネージャー
 Constraint manager…	拘束マネージャー…
+Constraints	拘束
+Constraints and limits	拘束と制限
 Construction	作図線
 Construction (q)	作図線 (q)
 Construction lines	作図線
@@ -1370,9 +1510,15 @@ Continue	続ける
 Continue to	次に続ける
 Continue to payment	支払いを続行する
 Continue to wait	引き続き待機
+Continuity	連続性
 Continuous feature	連続フィーチャー
 Contour	輪郭線
+Control	制御
+Control how the load is transferred between the instances	インスタンス間での荷重の転送方法を制御
 Control point grids	制御点グリッド
+Control point index	制御点インデックス
+Control point indices	制御点インデックス
+Control points	制御点
 Controlled radius	制御された半径
 Controls the default color of constrained lines and points.	拘束された線と点の既定の色を制御します。
 Controls the default color of lines and points in inactive sketches.	非アクティブなスケッチ内の線と点の既定の色を制御します。
@@ -1397,11 +1543,16 @@ Convention	規則
 Convention contains unknown or inactive properties.	規則には、無効または非アクティブなプロパティが含まれています。
 Convention exceeds __max__ characters in length.	規則の長さが __max__ 文字を超えています。
 Convention is blank.	規則が空白です。
+Conversion factor	変換係数
+Convert	変換
 Convert __jointName__ to __jointType__	__jointName__ を __jointType__ に変換する
 Convert to checkbox	チェックボックスに変換
 Convert to expression	数式に変換
 Convert to text	テキストに変換
 Convert to toggle button	トグルボタンに変換
+Convex	凸状
+Coordinate system	座標系
+Coped butt	コープ突合せ
 Copied generative design recipe to clipboard	ジェネレーティブデザインのレシピがクリップボードにコピーされました
 Copied link to job __jobId__.	ジョブ __jobId__ へのリンクがコピーされました。
 Copied to clipboard.	クリップボードにコピーしました。
@@ -1420,6 +1571,7 @@ Copy document to	ドキュメントのコピー先
 Copy filtered inputs	絞り込んだ入力をコピー
 Copy here	ここをコピー
 Copy here…	ここをコピー…
+Copy in place	その場でコピー
 Copy input	入力をコピー
 Copy is created in the top level of your __company__.	コピーが __company__ の最上位に作成されました。
 Copy is created in the top level.	コピーが最上位に作成されました。
@@ -1430,6 +1582,7 @@ Copy link to the document, including the active configuration, render mode, expl
 Copy link to this publication at this tab, including the active configuration, render mode, exploded view, panel states, and view orientation.	このタブでは、アクティブコンフィギュレーション、レンダリングモード、分解ビュー、パネルの状態、ビューの方向などのリンクをこのパブリケーションにコピーします。
 Copy obsoletion candidate URL	廃止候補の URL をコピー
 Copy of __configurationName__	__configurationName__ のコピー
+Copy part	パーツをコピー
 Copy publication to	パブリケーションのコピー先
 Copy publication…	パブリケーションをコピー…
 Copy release candidate URL	リリース候補の URL をコピー
@@ -1448,8 +1601,17 @@ Core	コア
 Core WebGL	コア WebGL
 Corner	コーナー
 Corner break	コーナー切断
+Corner break style	コーナー切断スタイル
+Corner overrides	コーナーオーバーライド
 Corner rectangle	コーナー長方形
 Corner rectangle (g)	コーナー長方形 (g)
+Corner relief diameter	コーナーリリーフ直径
+Corner relief scale	コーナーリリーフスケール
+Corner relief type	コーナーリリーフタイプ
+Corner relief width	コーナーリリーフ幅
+Corner type	コーナータイプ
+Corners to break	切断するコーナー
+Corners to exclude	除外するコーナー
 Cost:	コスト:
 Could not create a dimension with the selections.	選択範囲を含む寸法を作成できませんでした。
 Could not create an annotation with the selections.	選択範囲を含む注釈を作成できませんでした。
@@ -1469,7 +1631,44 @@ Count: __count__ __itemName__	カウント: __count__ 個の __itemName__
 Count: __count__ user	カウント: __count__ 名のユーザー
 Count: __count__ users	カウント: __count__ 名のユーザー
 Counterbore	座ぐり
+Counterbore depth	座ぐり深さ
+Counterbore depth deviation	座ぐり深さ偏差
+Counterbore depth lower deviation	座ぐり深さ偏差の下限
+Counterbore depth lower limit	座ぐり深さの下限
+Counterbore depth precision	座ぐり深さの精度
+Counterbore depth tolerance controls	座ぐり深さ許容差の制御
+Counterbore depth tolerance type	座ぐり深さ許容差のタイプ
+Counterbore depth upper deviation	座ぐり深さ偏差の上限
+Counterbore depth upper limit	座ぐり深さの上限
+Counterbore diameter	座ぐり直径
+Counterbore diameter deviation	座ぐり直径の偏差
+Counterbore diameter lower deviation	座ぐり直径偏差の下限
+Counterbore diameter lower limit	座ぐり直径の下限
+Counterbore diameter precision	座ぐり直径の精度
+Counterbore diameter tolerance controls	座ぐり直径許容差の制御
+Counterbore diameter tolerance type	座ぐり直径許容差のタイプ
+Counterbore diameter upper deviation	座ぐり直径偏差の上限
+Counterbore diameter upper limit	座ぐり直径の上限
+Counterclockwise	反時計回り
 Countersink	皿穴
+Countersink angle	皿穴角度
+Countersink angle deviation	皿穴角度の偏差
+Countersink angle lower deviation	皿穴角度偏差の下限
+Countersink angle lower limit	皿穴角度の下限
+Countersink angle precision	皿穴角度の精度
+Countersink angle tolerance controls	皿穴角度許容差の制御
+Countersink angle tolerance type	皿穴角度許容差のタイプ
+Countersink angle upper deviation	皿穴角度偏差の上限
+Countersink angle upper limit	皿穴角度の上限
+Countersink diameter	皿穴径
+Countersink diameter deviation	皿穴直径の偏差
+Countersink diameter lower deviation	皿穴直径偏差の下限
+Countersink diameter lower limit	皿穴直径の下限
+Countersink diameter precision	皿穴直径の精度
+Countersink diameter tolerance controls	皿穴直径許容差の制御
+Countersink diameter tolerance type	皿穴直径許容差のタイプ
+Countersink diameter upper deviation	皿穴直径偏差の上限
+Countersink diameter upper limit	皿穴直径の上限
 Country	国
 Create	作成
 Create Assembly	アセンブリを作成
@@ -1549,6 +1748,7 @@ Create assignment	課題を作成
 Create beveled edges or faces. Specify measurement type (offset or tangent) and chamfer type (equal, two distances or distance/angle). Individual edges can be overridden to change the direction.	斜辺または斜面を作成します。測定タイプ (オフセットまたは接線) と面取りタイプ (等距離、2 つの距離、距離/角度) を指定します。それぞれの辺はオーバーライドして方向を変更できます。
 Create category	カテゴリーを作成
 Create class failed: 	クラスを作成できませんでした: 
+Create composite	コンポジットを作成
 Create connection	接続を作成
 Create constant, variable, partial, or asymmetric edge fillets, or create full round fillets. Specify measurement type (radius or width) and control type (distance, conic, or curvature).	一定、部分、可変、または非対称のエッジフィレットを作成します。測定の種類 (半径または幅) および制御の種類 (距離、円錐、または曲率) を指定します。
 Create curvature continuous transitions between sketch splines or conics and surrounding geometry.	スケッチスプラインまたは円錐と周囲のジオメトリ間の曲率連続遷移を作成します。
@@ -1590,6 +1790,7 @@ Create new label __searchText__	新しいラベル __searchText__ を作成
 Create new label…	新しいラベルを作成…
 Create new project	新しいプロジェクトを作成
 Create new publication	新しいパブリケーションを作成
+Create new sketch	新しいスケッチの作成
 Create new sketch (Shift-s)	新しいスケッチの作成 (Shift-S)
 Create new workspace	新しいワークスペースを作成
 Create one document per part or assembly	パーツまたはアセンブリごとに 1 つのドキュメントを作成
@@ -1598,6 +1799,7 @@ Create or add a surface specified by its boundary profiles.	境界の輪郭で�
 Create or add to a surface by selecting a set of curves or edges to form a closed boundary. Specify the continuity condition for each selection.	曲線またはエッジのセットを選択して閉じた境界を作成することで、サーフェスを作成または追加します。それぞれの選択に対して連続性条件を指定します。
 Create or add to existing sheet metal parts by selecting two profiles to loft. Adjust chordal tolerance to change loft resolution. Rips are automatically added to closed profiles. Operations on sheet metal models are automatically represented as a flat pattern, and joints and bends are listed in a table.	ロフトする 2 つの輪郭を選択して、シートメタルパーツを作成するか、既存のシートメタルパーツに追加します。弦の許容差を調整して、ロフトの解像度を変更します。閉じた輪郭には、リップが自動的に追加されます。シートメタルモデルに対する操作は、フラットパターンとして自動的に表示され、ジョイントと曲げがテーブルに一覧表示されます。
 Create permission scheme	アクセス権管理を作成
+Create points in addition to the curve.	曲線に加えて点を作成します。
 Create profile	プロファイルを作成
 Create project role	プロジェクトロールを作成
 Create public document	パブリックのドキュメントを作成
@@ -1643,6 +1845,7 @@ Created	作成済み
 Created by	作成者
 Created by 	作成者 
 Created by __name__	作成者 __name__
+Created by features	フィーチャーごとに作成
 Created by me	自分が作成したアイテム
 Created link to __documentNameWithLink__	__documentNameWithLink__ へのリンクが作成されました
 Created on	作成日
@@ -1657,6 +1860,7 @@ Creating tutorial…	チュートリアルを作成しています…
 Creating version…	バージョンを作成しています…
 Creating workspace…	ワークスペースを作成しています…
 Creation of linked document reference failed.	リンク先のドキュメント参照の作成ができませんでした。
+Creation type	作成タイプ
 Creator	作成者
 Credi card failed to be added.	クレジットカードを追加できませんでした。
 Credit card	クレジットカード
@@ -1668,9 +1872,13 @@ Credits	クレジット
 Creo part / NX file	Creo パーツ / NX ファイル
 Creo part file	Creo パーツ ファイル
 Crop view	部分ビュー
+Cross section	クロス切断
+Cross sectional control	クロス断面制御
 Ctrl + Middle mouse button drag	Ctrl + 中央のマウスボタンをドラッグ
+Ctrl + Right mouse button drag or	Ctrl + 右のマウスボタンをドラッグまたは
 Ctrl + Right mouse button drag or \nMiddle mouse button drag	Ctrl + 右のマウスボタンをドラッグまたは\n中央のマウスボタンをドラッグ
 Ctrl + Right mouse button drag or \nMiddle mouse button drag or \nRight mouse button drag or \nCtrl + Middle mouse button drag	Ctrl + 右のマウスボタンをドラッグまたは\n中央のマウスボタンをドラッグまたは\n右のマウスボタンをドラッグまたは\nCtrl + 中央のマウスボタンをドラッグ
+Cube	立方体
 Current Onshape account email	現在の Onshape アカウントのメールアドレス
 Current assembly position	アセンブリの現在の位置
 Current category is not mapped to an Arena category. Change category or configure mapping to generate part number.	現在のカテゴリは Arena カテゴリにマッピングされていません。カテゴリを変更するか、パーツ番号を生成するマッピングを構成してください。
@@ -1681,6 +1889,7 @@ Current password	現在のパスワード
 Current publication	現在のパブリケーション
 Current sheet	現在のシート
 Current state:	現在の状態:
+Current value	現在値
 Curvature	曲率
 Curvature color map	曲率カラーマップ
 Curvature color map is not currently supported during interference detection.	現在、干渉の検出中は曲率カラーマップはサポートされていません。
@@ -1689,11 +1898,17 @@ Curvature combs	曲率コーム
 Curvature deviation	曲率偏差
 Curve	曲線
 Curve pattern	曲線パターン
+Curve point	曲線の点
+Curve projection type	曲線投影タイプ
+Curve reference	曲線参照
+Curve to face	面に対する曲線
+Curve type	曲線タイプ
 Curve/surface analysis	曲線/サーフェス分析
 Curve/surface analysis…	曲率/サーフェス分析…
 Curved Text	曲線テキスト
 Curves	曲線
 Curves (__numberOfCurves__)	曲線 (__numberOfCurves__)
+Curves to adjust	調整する曲線
 Custom	カスタム
 Custom Feature Class ID	カスタムフィーチャーのクラス ID
 Custom Parameters	カスタム パラメータ
@@ -1702,6 +1917,7 @@ Custom boundary condition	カスタム境界条件
 Custom class	カスタムクラス
 Custom class variable names must be unique for each unit type	カスタムクラスの変数名は単位タイプごとに一意である必要があります
 Custom colors	カスタムの色
+Custom direction	カスタムの方向
 Custom feature __featureName__ could not be updated because it does not exist in the update version.	カスタムフィーチャー __featureName__ が更新バージョンに存在しないため、更新できませんでした。
 Custom feature __featureName__ failed to be added to your toolbar.	カスタムフィーチャー __featureName__ をツールバーに追加できませんでした。
 Custom feature __featureName__ was updated.	カスタムフィーチャー __featureName__ が更新されました。
@@ -1754,11 +1970,15 @@ Cut	切り取る
 Cut list	カットリスト
 Cut list panel	カットリストパネル
 Cut list table	カットリストテーブル
+Cutouts	切り抜き
 Cylinder	円柱
+Cylinder edges	円筒エッジ
+Cylinder/Cone	円筒/円錐
 Cylindrical	円筒状
 Cylindrical mate	円筒合致
 Cylindrical mate (m)	円筒合致 (m)
 DONE	完了
+DSO™/DSOS™ threaded standoffs	DSO™/ DSOS™ スレッドスタンドオフ
 DXF or DWG files	DXF または DWG ファイル
 Daily	毎日
 Daily at __time__	毎日 __time__ 時
@@ -1783,6 +2003,7 @@ Data from CAM Studio (beta) is saved outside Onshape. Changes may not be visible
 Data from PCB Studios (beta) is saved outside Onshape and can be accessed from any workspace.	PCB Studio (ベータ版) のデータは、Onshape の外に保存され、どのワークスペースからでもアクセスできます。
 Data from Render Studios is saved outside Onshape and can be accessed from any workspace.	Render Studio のデータは、Onshape の外に保存され、どのワークスペースからでもアクセスできます。
 Data from application tabs may be saved outside Onshape. Changes may not be visible here.	アプリケーションタブのデータは、Onshape の外部に保存されることがあり、ここでは変更内容を表示できません。
+Data start column (0,1,2,.)	データの開始列 (0,1,2,.)
 Data to be pasted has too many columns and rows to fit in the table and will be truncated.	貼り付ける列数や行数が多すぎてテーブルに収まりきらないデータは切り捨てられます。
 Data to be pasted has too many columns to fit in the table and will be truncated.	貼り付ける列数が多すぎてテーブルに収まりきらないデータは切り捨てられます。
 Data to be pasted has too many rows to fit in the table and will be truncated.	貼り付ける行数が多すぎてテーブルに収まらないデータは切り捨てられます。
@@ -1823,7 +2044,9 @@ Default Windchill attribute with html content cannot be created in Onshape	Onsha
 Default Windchill library - Non-geometric items	既定の Windchill ライブラリ - 非幾何学的アイテム
 Default Windchill library - Standard Content	既定の Windchill ライブラリ - 標準コンテンツ
 Default assembly BOM table template failed to update.	アセンブリ用の既定の BOM テーブルテンプレートを更新できませんでした。
+Default bend K Factor	既定の曲げ K 係数
 Default color scheme for Onshape featuring dark elements on light backgrounds.	Onshape の既定の配色は、明るい背景上に暗い要素が特徴です。
+Default corner type	既定のコーナータイプ
 Default drawing BOM table template failed to update.	図面用の既定の BOM テーブルテンプレートを更新できませんでした。
 Default feature selected	選択した既定のフィーチャー
 Default geometry	既定のジオメトリ
@@ -1862,6 +2085,7 @@ Delete category	カテゴリを削除
 Delete category mapping.	カテゴリーマッピングを削除します。
 Delete column	列を削除
 Delete comment?	コメントを削除しますか？
+Delete composite parts	複合部品を削除
 Delete constraint	拘束を削除
 Delete degree of freedom	自由度を削除
 Delete dimension__ctxt__sketch-delete-action	寸法を削除
@@ -1869,6 +2093,8 @@ Delete draft	ドラフトを削除
 Delete draft release	ドラフトリリースを削除
 Delete entity	エンティティを削除
 Delete face	面を削除
+Delete faces	面を削除
+Delete fillet faces	フィレット面を削除
 Delete forever	永久に削除
 Delete forever?	永久に削除しますか？
 Delete label __labelName__?	ラベル __labelName__ を削除しますか？
@@ -1932,8 +2158,20 @@ Dependencies	依存関係
 Dependencies of __featureName__	__featureName__ の依存関係
 Deprecated	非推奨
 Depth	深度
+Depth deviation	深度偏差
+Depth lower deviation	深度偏差の下限
+Depth lower limit	深度下限
+Depth precision	深度の精度
+Depth tolerance controls	深度許容差の制御
+Depth tolerance type	深度許容差のタイプ
+Depth upper deviation	深度偏差の上限
+Depth upper limit	深度上限
+Derivative	派生物
+Derivative alignment	派生物の位置合わせ
+Derivative direction	派生物の方向
 Derive failed. The source tab may have been deleted.	派生できませんでした。ソースタブが削除された可能性があります。
 Derived	派生
+Derived mirror	派生したミラー
 Describe your feedback in detail	フィードバックを詳しく説明
 Description	説明
 Description (optional)	説明 (任意)
@@ -1960,20 +2198,34 @@ Deselect project	プロジェクトの選択取消
 Deselect publication	パブリケーションの選択取消
 Deselect variable studio	Variable Studio の選択取消
 Design it together with a document	ドキュメントで一緒にデザインする
+Designator	指定子
+Detached	アタッチ解除済み
 Detail view	詳細ビュー
 Detailed description	詳細説明
 Detailed description cannot exceed __maxLength__ characters.	詳細説明は __maxLength__ 文字以内にする必要があります。
 Details	詳細情報
 Details are only available for In progress and Submitted documents	詳細は進行中のドキュメントと提出済みのドキュメントにのみ利用できます
+Deviation	偏差
 Deviation analysis	偏差分析
 Deviation analysis failed. If the problem persists, please contact support.	偏差を分析できませんでした。問題が解決しない場合は、サポートに連絡してください。
 Deviation analysis…	偏差分析…
+Deviation type	偏差の種類
 Device failed to be removed.	デバイスを削除できませんでした。
 Device type	デバイスタイプ
 Devices	デバイス
 Devices failed to load.	デバイスを読み込めませんでした。
 Diameter	直径
+Diameter Tolerance	直径許容差
+Diameter deviation	直径偏差
 Diameter dimension	直径寸法
+Diameter fit tolerance table	直径はめあい公差テーブル
+Diameter lower deviation	直径偏差の下限
+Diameter lower limit	直径下限
+Diameter precision	直径の精度
+Diameter tolerance controls	直径許容差の制御
+Diameter tolerance type	直径許容差のタイプ
+Diameter upper deviation	直径偏差の上限
+Diameter upper limit	直径上限
 Did not update any IDs: No IDs were modified	ID を更新できません: 変更された ID はありません
 Did you mean:	もしかして:
 Differences for this type of tab cannot be displayed.	タブのこのタイプに関する相違は表示できません。
@@ -1987,11 +2239,15 @@ Dimetric	ダイメトリック
 Direct	直接
 Direct shares, mentions and marked documents	直接の共有、言及およびマークされたドキュメント
 Direct, in product support	製品内の直接サポート
+Direction	方向
+Direction overrides	方向のオーバーライド
+Direction to lock	ロックする方向
 Disable	無効にする
 Disable Onshape password sign in	Onshape パスワードによるサインインを無効にする
 Disable auto provisioning of users	ユーザーの自動プロビジョニングを無効にする
 Disable high quality	高画質を無効にする
 Disable imported appearances	インポートした外観を無効にする
+Disable imprinting	インプリントを無効にする
 Disable shortcut	ショートカットを無効にする
 Disable sync	同期を無効にする
 Disabled	無効になりました
@@ -2023,8 +2279,13 @@ Display state updated.	表示状態が更新されました。
 Display states	表示状態
 Dissolve __parametricPartStudioName__	__parametricPartStudioName__ を分解
 Dissolve __replicateName__	__replicateName__ を分解
+Dissolve composite parts	複合部品を分解
 Dissolve subassembly	サブアセンブリを分解
 Distance	距離
+Distance 1	距離 1
+Distance 2	距離 2
+Distance and angle	距離と角度
+Distance per revolution	1 回転あたりの距離
 Distance tolerance	距離公差
 Distortion scale	歪みスケール
 Do not allow creator as approver	作成者を承認者にすることはできません
@@ -2136,7 +2397,12 @@ Download users list	ユーザーリストのダウンロード
 Draft	下書き
 Draft analysis	抜き勾配分析
 Draft analysis…	抜き勾配分析…
+Draft angle	勾配角度
 Draft failed to save.	抜き勾配を保存できませんでした。
+Draft on self	自己抜き勾配
+Draft opposite direction	反対方向の抜き勾配
+Draft scope	抜き勾配範囲
+Draft type	抜き勾配タイプ
 Drafts	下書き
 Drag an entity to snap to a Mate connector on another entity. Specify the mate type and orientation.	エンティティをドラッグして、他のエンティティ上の合致コネクタにスナップします。合致の種類と向きを指定します。
 Drag sketch text by its text box.	スケッチテキストはテキストボックスでドラッグしてください。
@@ -2163,8 +2429,11 @@ Drawings were unable to be added from workspaces: 	次のワークスペース�
 Drawings…	図面…
 Drawing…	図面…
 Drawn by	作図者
+Drill size	ドリルサイズ
+Drilled	ドリル
 Drive failed to load.	ドライブを読み込めませんでした。
 Driven	被駆動
+Driving mate selector	合致作動セレクタ
 Drop items here to remove them from the toolbar	こちらでアイテムをドロップしてツールバーから削除
 Drop to import file to __containerNameForDrop__	ファイルを __containerNameForDrop__ にドロップしてインポートします
 Dropbox	ドロップボックス
@@ -2187,11 +2456,36 @@ Each part and assembly is given its own document. For large assemblies, this opt
 Edge	エッジ
 Edge __edgeNumber__ from __partName__	__edgeNumber__ からのエッジ __partName__
 Edge condition symbol	エッジ状態記号
+Edge convexity	エッジの凹凸
+Edge convexity type	エッジの凹凸の種類
+Edge joint	エッジジョイント
+Edge limit	エッジの制限
+Edge limits	エッジの制限
+Edge match scope	エッジマッチ範囲
+Edge or face	エッジまたは面
+Edge overflow	エッジオーバーフロー
 Edge point	エッジ ポイント
+Edge positions	エッジの位置
+Edge projection options	エッジ投影オプション
 Edge to edge centerline	エッジ間の中心線
 Edges	エッジ
+Edges and curves for ruled surface path	ルールドサーフェスパスのエッジと曲線
+Edges and faces	エッジと面
 Edges and faces to analyze	分析するエッジと面
+Edges and sketch curves to revolve	回転するエッジとスケッチ線
+Edges and sketch curves to sweep	スイープするエッジとスケッチ曲線
+Edges or cylinders to bend	曲げるエッジまたは円柱
+Edges or faces	エッジまたは面
+Edges or side faces to flange	フランジのエッジまたは側面
+Edges or side faces to hem	エッジまたは面からヘムまで
+Edges or side faces to join	結合するエッジまたは側面
+Edges that define the bases of the gussets	ガセットのベースを定義するエッジ
+Edges to hold	保持するエッジ
+Edges to keep	維持するエッジ
 Edges to show dihedral	二面表示するエッジ
+Edges, curves and sketches	エッジ、曲線、スケッチ
+Edges, faces, and vertices	エッジ、面、頂点
+Edges, vertices, or faces	エッジ、頂点、または面
 Edit	編集
 Edit BOM template	BOM テンプレートを編集
 Edit Exclusions	除外を編集
@@ -2214,6 +2508,7 @@ Edit __roleName__	__roleName__ を編集
 Edit __teamName__	__teamName__ を編集
 Edit alias details	エイリアスの詳細を編集
 Edit an existing curve or create a new curve by selecting sketch entities, edges, and/or curves to apply a simplified approximation, elevate the degree, reposition control curve vertices, and/or planarize into any 2D plane.	スケッチエンティティ、エッジ、曲線などを選択して既存の曲線を編集するか新規の曲線を作成し、簡略化した近似の適用、角度の引き上げ、制御曲線の頂点位置の変更、任意の 2D 平面への平面化などが行えます。
+Edit angles	角度を編集
 Edit appearance for __name__…	__name__ の外観を編集…
 Edit appearance for __numberBiggerThanOne__ curves…	__numberBiggerThanOne__ 曲線の外観を編集…
 Edit appearance for __numberBiggerThanOne__ parts…	__numberBiggerThanOne__ パーツの外観を編集…
@@ -2225,6 +2520,7 @@ Edit appearance…	外観を編集…
 Edit class properties…	クラスのプロパティを編集…
 Edit close date	終了日を編集
 Edit connection details	接続の詳細を編集
+Edit control points	制御点を編集
 Edit curve	曲線を編集
 Edit dashboard	ダッシュボードを編集
 Edit dashboard…	ダッシュボードを編集…
@@ -2234,6 +2530,7 @@ Edit details…	詳細を編集…
 Edit dialog failed to open.	編集ダイアログを開くことができませんでした。
 Edit draft analysis…	抜き勾配分析を編集…
 Edit dynamic suppression	動的抑制を編集
+Edit edge positions	エッジの位置を編集
 Edit export rule	エクスポートルールを編集
 Edit expression…	式を編集…
 Edit face appearances…	面の外観を編集…
@@ -2253,6 +2550,7 @@ Edit material for __name__…	__name__ のマテリアルを編集…
 Edit material for __numberBiggerThanOne__ parts…	__numberBiggerThanOne__ パーツのマテリアルを編集…
 Edit material…	マテリアルを編集…
 Edit mates	合致を編集
+Edit mode	編集モード
 Edit named position	名前の付いた位置を編集
 Edit named position driver mate…	名前の付いた位置のドライバー合致を編集…
 Edit notes	注記を編集
@@ -2265,6 +2563,7 @@ Edit project role and permissions	プロジェクト ロールおよびアクセ
 Edit project…	プロジェクトを編集…
 Edit properties	プロパティを編集
 Edit publish and close dates	公開日と終了日を編集
+Edit reference	参照を編集
 Edit reference…	参照を編集…
 Edit reflection analysis…	反射分析を編集…
 Edit revision table template	リビジョンテーブルテンプレートを編集
@@ -2281,6 +2580,7 @@ Edit sketch appearance…	スケッチの外観を編集…
 Edit sketches	スケッチを編集
 Edit standard content	標準コンテンツを編集
 Edit standard content instance…	標準コンテンツのインスタンスを編集…
+Edit tangency angles	接線角度を編集
 Edit task	タスクを編集
 Edit team details	チームの詳細を編集
 Edit text	テキストを編集
@@ -2316,6 +2616,9 @@ Element change URL dialog failed to open.	要素変更の URL ダイアログを
 Element libraries	要素ライブラリ
 Element not found	要素が見つかりません
 Element properties dialog failed to open.	要素プロパティダイアログを開くことができませんでした。
+Elevate	引き上げ
+Elevation parameters	引き上げパラメータ
+Elevation target degree	引き上げターゲット角度
 Ellipse	楕円
 Elliptical arc	楕円弧
 Email	メール
@@ -2362,9 +2665,27 @@ Enables users to use AI Advisor in documents.	ユーザーがドキュメント�
 Enabling sync	同期を有効にしています
 Enclose	囲い込み
 Encrypting your data with your own AWS KMS key changes how some Onshape features behave. Before you continue, please review how the following will be affected:	独自の AWS KMS キーを使用してデータを暗号化すると、Onshape の一部のフィーチャーの動作が変わります。続行する前に、次のフィーチャーがどのような影響を受けるかをご確認ください。
+End	終了
+End angle	終了角
 End cap	エンドキャップ
+End condition	端点の条件
+End conditions	端点の条件
+End curvature offset	終了曲率オフセット
 End date	終了日
 End date is before start date	終了日が開始日より前です
+End direction	終了方向
+End edge position	終了エッジの位置
+End flow offset	終了フローオフセット
+End magnitude	終了マグニチュード
+End offset	終了オフセット
+End point	終点
+End position	終了位置
+End profile adjacent faces	終了輪郭の隣接面
+End profile condition	終了輪郭条件
+End radius	終端半径
+End trim	末端トリム
+End type	末端の種類
+End value	最終値
 Energy	エネルギー
 Enforce unique document and publication name enterprise wide for matching regular expression	正規表現のマッチングにおけるドキュメント名とパブリケーション名の一意性を Enterprise 全体で強制
 Enjoy a 14-day trial of Onshape Professional at no cost.	Onshape Professional 試用版を 14 日間、無料でお楽しみください。
@@ -2424,20 +2745,37 @@ Enterprise-grade CAD and PDM for large companies that need better transparency a
 Entire document	ドキュメント全体
 Entities	エンティティ
 Entities and constraints	エンティティと拘束
+Entities to chamfer	面取りエンティティ
 Entities to check	チェックするエンティティ
+Entities to copy	コピーするためのエンティティ
+Entities to delete	削除するエンティティ
+Entities to draft	抜き勾配のためのエンティティ
+Entities to fillet	フィレットするためのエンティティ
+Entities to fillet or chamfer	フィレットまたは面取りするエンティティ
+Entities to measure between	以下の間隔を測定するエンティティ
+Entities to mirror	ミラーリングするエンティティ
+Entities to pattern	パターン化するエンティティ
+Entities to split with	分割エンティティ
+Entities to transform or copy	トランスフォームまたはコピーするエンティティ
 Entity	エンティティ
 Entity Type	エンティティタイプ
+Entity or mate connector	エンティティまたは合致コネクタ
+Entity to split with	分割するエンティティ
+Entity type	エンティティの種類
 Environment	環境
 Environment profile	環境プロファイル
 Environment profile settings	環境プロファイル設定
 Environment profiles failed to load.	環境プロファイルを読み込めませんでした。
 Equal	同等
 Equal (e)	同等 (e)
+Equal distance	等距離
 Equal length/radius	等しい長さ/半径
 Equal length/radius edges	等しい長さ/半径のエッジ
 Equal or greater radius	等しいかそれより大きい半径
 Equal or smaller radius	等しいかそれより小さい半径
 Equal radius	等しい半径
+Equal spacing	等間隔
+Equal trim	同等トリム
 Equals	等号
 Error accessing cloud drive.	クラウドドライブへのアクセス中にエラーが発生しました。
 Error accessing drive.	ドライブへのアクセス中にエラーが発生しました。
@@ -2482,7 +2820,9 @@ Error while taking screenshot.	スクリーンショットの取得中にエラ�
 Errors	エラー
 Errors must be resolved before a parameter can be configured: __parameterError__	パラメータを設定する前に、エラーを解決する必要があります: __parameterError__
 Escape __command__	エスケープ __command__
+Euclidean	ユークリッド
 Evaluate functions	機能の評価
+Evaluate on use	使用時に評価
 Evaluating…	評価中…
 Every __weekDay__ at __time__	毎週 __weekDay__ 日の __time__ 時
 Everything in Free, plus:	無料版のすべてに加えて、次の内容をご利用いただけます。
@@ -2540,6 +2880,9 @@ Explode	分解
 Explode all into polylines	すべてをポリラインに分解する
 Explode into polylines	ポリラインに分解
 Explode into polylines (notes)	ポリラインに分解する (メモ)
+Explode lines	線を分解
+Explode step	分解手順
+Explode step type	分解手順タイプ
 Exploded view failed to be activated.	分解ビューをアクティブにできませんでした。
 Exploded views	分解ビュー
 Exploded views help visualize how components fit together in an assembly.	分解ビューは、アセンブリでコンポーネントが適合する方法を可視化するのに役立ちます。
@@ -2582,9 +2925,15 @@ Extend (x)	延長 (x)
 Extend Trial	試用期間の延長
 Extend a line or curve to the first intersecting point or bounding geometry. If no intersection or bounding geometry is found, the line or curve ends at the release point.	線または曲線を最初の交差ポイントまたは境界ジオメトリまで延長します。交差ジオメトリまたは境界ジオメトリが見つからない場合、線はリリースポイントで終了します。
 Extend across face	面全体に延長
+Extend bend relief	曲げリリーフを延長
+Extend entities	エンティティの延長
 Extend or trim the boundary edges of a surface.	サーフェスの境界エッジを延長またはトリミングします。
+Extend profiles to part	輪郭をパーツに延長
 Extend surface	境界を移動
+Extend to full path	フルパスに延長
 Extended access to Onshape's Professional features	Onshape の Professional フィーチャーへの拡張アクセス
+Extended corner	拡張コーナー
+Extension shape	補助図形
 External	外部
 External access	外部アクセス
 External thread	外部ねじ
@@ -2593,19 +2942,58 @@ Extract document	ドキュメントを抽出
 Extract document…	ドキュメントを抽出…
 Extrude	押し出し
 Extrude (Shift-e)	押し出し (Shift-E)
+Extrude direction	押し出し方向
 Extruded	押し出し
 Extrude…	押し出し…
 FGS version information	FGS バージョン情報
+FH4™/FHP™ flush-head studs for stainless steel sheets	ステンレス鋼板用 FH4™/ FHP™ フラッシュヘッドスタッド
+FHL™/FHLS™ flush, low-displacement head studs	FHL™/ FHLS™ フラッシュ、低排気量ヘッドスタッド
+FHX™ flush-head studs with X-Press™ thread	X-Press™ スレッドを備えた FHX™ フラッシュヘッドスタッド
+FH™/FHS™/FHA™ flush-head pins	FH™/ FHS™/ FHA™ フラッシュヘッドピン
+FH™/FHS™/FHA™ flush-head studs	FH™/ FHS™/ FHA™ フラッシュヘッドスタッド
 Face	面
 Face appearance	面の外観
 Face blend	面のブレンド
+Face limits	面の制限
+Face match scope	面マッチ範囲
+Face mirror	面ミラー
 Face of __featureName__	__featureName__ の面
+Face pattern	面パターン
 Face selections are not coplanar	面の選択は同一平面上にありません
 Face tangent angle	面の接線の角度
+Face to trim to	トリミングする面
+Face, edge or vertex	面、エッジ、または頂点
+Face, plane, mate connector, or planar face to use as trim tool	トリミングツールとして使用する面、平面、合致コネクタ、または平面上の面
 Faces	面
+Faces and sketch regions	面とスケッチ領域
+Faces and sketch regions to extrude	押し出す面とスケッチ領域
+Faces and sketch regions to revolve	回転する面とスケッチ領域
+Faces and sketch regions to sweep	スイープする面とスケッチ領域
+Faces and surfaces to thicken	厚みつけする面とサーフェス
 Faces of __featureName__	__featureName__ の面
 Faces or features	面またはフィーチャー
+Faces or sketch regions to thicken	厚みつけの面またはスケッチ領域
+Faces to be normal to	法線にする面
+Faces to connect	接続する面
+Faces to draft	抜き勾配の面
+Faces to exclude	除外する面
+Faces to find match in	一致を検索する面
 Faces to flatten	フラット化する面
+Faces to load	荷重をかける面
+Faces to lock	ロックする面
+Faces to measure	測定する面
+Faces to mirror	ミラーリングする面
+Faces to move	動く面
+Faces to offset	オフセットする面
+Faces to pattern	面のためのパターン
+Faces to remove	削除する面
+Faces to replace	置き換える面
+Faces to replace with	置き換える面
+Faces to round	丸める面
+Faces to split	分割する面
+Faces to trim to	トリミングする面
+Faces, edges, and vertices that define sweep paths	スイープパスを定義する面、エッジ、および頂点
+Faces, surfaces, and sketch regions to offset	オフセットする面、サーフェス、およびスケッチ領域
 Failed	失敗しました
 Failed captures	失敗したキャプチャ
 Failed to accept terms.	条件を受け入れられませんでした。
@@ -2844,6 +3232,9 @@ Failed to watch Part Studio. Possibly too many clients watching Part Studios in 
 Fastened	固定
 Fastened mate	ファスナー合致
 Fastened mate (m)	ファスナー合致 (m)
+Fastener	ファスナー
+Fastener fit	ファスナーフィット
+Fastener type	ファスナータイプ
 Feature	フィーチャー
 Feature Studio __name__ has errors	Feature Studio __name__ でエラーが発生しました
 Feature Studio __name__ has errors and warnings	Feature Studio __name__ でエラーと警告が発生しました
@@ -2858,8 +3249,10 @@ Feature does not exist in target.	フィーチャーがターゲットに存在�
 Feature from __locationName__	__locationName__ のフィーチャー
 Feature from current workspace	現在のワークスペースのフィーチャー
 Feature has no dependencies.	フィーチャーに依存関係がありません。
+Feature mirror	フィーチャーミラー
 Feature name	フィーチャー名
 Feature parameters	フィーチャーパラメータ
+Feature pattern	フィーチャーパターン
 Feature-linked custom tables	フィーチャーにリンクされたカスタムテーブル
 FeatureScript documentation	FeatureScript ドキュメント
 FeatureScript execution produced table errors. See the FeatureScript notices pane for more information.	FeatureScript の実行でテーブル エラーが発生しました。詳細については、FeatureScript の通知ペインを参照してください。
@@ -2874,6 +3267,9 @@ Features (__numberOfFeatures__)	フィーチャー (__numberOfFeatures__)
 Features (__shownCount__ of __featureCount__)	フィーチャー (__featureCount__ 件中__shownCount__ 件)
 Features and parts	フィーチャーおよびパーツ
 Features in Onshape Labs are experimental, may break, and are subject to change or removal at any time. Onshape Labs features are made available for testing and evaluation only and must not be used in production. Use at your own discretion.	Onshape Labs のフィーチャーは実験的なものであり、不具合が生じたり、予告なく変更・削除されたりする可能性があります。Onshape Labs のフィーチャーはテストおよび評価のみを目的として提供されており、本番環境での使用は禁止されています。ご自身の判断でご使用ください。
+Features to find match in	で一致を探すフィーチャー
+Features to mirror	ミラーリングするフィーチャー
+Features to pattern	フィーチャーのためのパターン
 Features used by __featureName__	__featureName__ で使用するフィーチャー
 Features using __featureName__	__featureName__ を使用するフィーチャー
 Feedback/Report a bug	バグをフィードバック/報告
@@ -2900,9 +3296,13 @@ Files	ファイル
 Fill	フィル
 Fillet	フィレット
 Fillet (Shift-f)	フィレット (Shift-F)
+Fillet compare type	フィレット比較タイプ
 Fillet dimension	フィレットの寸法
 Fillet faces	フィレット面
+Fillet faces to modify	修正するフィレット面
 Fillet radii	フィレット半径
+Fillet radius	フィレット半径
+Fillet type	フィレットタイプ
 Fillets	フィレット
 Fillet…	フィレット…
 Filter	フィルター
@@ -2916,6 +3316,7 @@ Filter bodies by name and features by bodies directly affected	ボディを名�
 Filter branches	ブランチをフィルター
 Filter by __label__	__label__ で絞り込む
 Filter by assembly folders	アセンブリフォルダで絞り込む
+Filter by body type	ボディタイプで絞り込む
 Filter by contents with errors	エラーのあるコンテンツで絞り込む
 Filter by contents with warnings	警告のあるコンテンツで絞り込む
 Filter by current tab	現在のタブで絞り込む
@@ -2951,6 +3352,7 @@ Filter by type	タイプで絞り込む
 Filter by user role	ユーザーロールで絞り込む
 Filter comments	フィルター コメント
 Filter configuration inputs	コンフィギュレーション入力を絞り込む
+Filter construction entities	作図エンティティをフィルター
 Filter feature list	フィーチャーリストを絞り込む
 Filter features and bodies by name	フィーチャーおよびボディを名前で絞り込む
 Filter features and bodies by type	フィーチャーおよびボディをタイプで絞り込む
@@ -2990,16 +3392,27 @@ Finish flex PCB model	フレキシブル PCB モデルを仕上げる
 Finish sheet metal model	シートメタルモデル仕上げ
 Finishing	仕上げ加工
 First	最初
+First angle	第一角法
 First angle (ISO)	第一角法 (ISO)
 First dash	最初の破線
+First direction	最初の方向
 First gap	最初のギャップ
 First name	名
 First name must be less than 64 characters in length	名は 64 文字未満の長さにする必要があります
+First set of surfaces	最初のサーフェスセット
 First sheet	最初のシート
+First side face	最初の側面
+First sketch	最初のスケッチ
 First used on	初回使用日
+Fit	フィット
+Fit (tolerance only)	はめあい (公差のみ)
 Fit spline	3D フィットスプライン
+Fit type	はめあいタイプ
+Fit with tolerance	はめあい公差
 Fix	固定
 Flange	フランジ
+Flange alignment	フランジの位置合わせ
+Flange to merge	マージするフランジ
 Flat	フラット
 Flat patterns	フラットパターン
 Flatten	フラット化
@@ -3009,11 +3422,31 @@ Flattened	フラット化
 Flattened angle	フラット化の角度
 Flattened offset	フラット化のオフセット
 Flattened position (mate connector)	フラット化された場所 (合致コネクタ)
+Flex PCB model	フレキシブル PCB モデル
+Flip	反転
+Flip alignment	方向を逆にする
+Flip asymmetric	非対称に反転
+Flip base sides	基底面を反転
+Flip cap	キャップを反転
+Flip coordinate system	座標系を反転
+Flip corner	コーナーを反転
+Flip direction	方向を反転
+Flip direction up	上方向に反転
+Flip first plane	最初の平面を反転
 Flip horizontal	水平方向に反転
+Flip normal	法線を反転
+Flip offset	反転オフセット
 Flip plane	平面を反転
 Flip primary axis	主軸を反転させる
+Flip pull direction	引く方向を反転
+Flip rounding	丸めを反転
+Flip second plane	2 番目の平面を反転
+Flip side 1	側面 1 を反転
+Flip side 2	側面 2 を反転
+Flip sides	側面を反転
 Flip stripes	ストライプを反転
 Flip vertical	垂直方向に反転
+Flip wall	壁を反転
 Float buffer blending	浮動バッファのブレンド
 Float buffer blending is used for rendering section planes endcaps. Without this extension, this functionality will be disabled. 	浮動バッファのブレンドは、断面平面エンドキャップのレンダリングに使用されます。この拡張機能がない場合、この機能は無効になります。 
 Float framebuffer rendering	浮動フレームバッファのレンダリング
@@ -3063,6 +3496,8 @@ Forget	忘れる
 Forgot password?	パスワードを忘れた場合
 Forgot your password?	パスワードを忘れた場合
 Form	フォーム
+Form Part Studio	Part Studio を成形
+Form origin mate connector	フォームの原点の合致コネクタ
 Format	フォーマット
 Format Feature Studio	Feature Studio のフォーマット
 Format Studio	Feature Studio
@@ -3074,6 +3509,7 @@ Formats failed to load.	形式を読み込めませんでした。
 Forum username must be at least 2 characters in length	フォーラムのユーザー名は 2 文字以上である必要があります
 Forum username must be less than 64 characters in length	フォーラムのユーザー名は 64 文字未満の長さにする必要があります。
 Forums	フォーラム
+Forward reference	前方参照
 Forward reference (Ctrl-a)	前方参照 (Ctrl-a)
 Found no categories that match: 	次に一致するカテゴリーが見つかりませんでした: 
 Found no categories that match:  	次に一致するカテゴリーが見つかりませんでした:  
@@ -3082,12 +3518,19 @@ Found no items that match:  	次に一致するアイテムが見つかりませ
 Found no properties that match: 	一致するプロパティは見つかりませんでした: 
 Four views	4 つのビュー
 Frame	フレーム
+Frame groups	フレームグループ
 Frame profile library	フレーム輪郭ライブラリ
+Frame segments are trimmed against preceding groups and are used as tools for later groups	フレーム断片は先行するグループに対してトリミングされ、後続のグループのツールとして使用されます
+Frame segments in earlier groups are used as tools for later groups	前のグループのセグメントが後のグループのツールとして使用されます
 Frame trim	フレームのトリミング
+Frames	フレーム
+Free	無料
 Free state	自由な状態
 Frequency	頻度
 Frequency:	頻度:
 Friday	金曜日
+From import	インポートから
+From mate connector	合致コネクタから
 From to	始点と終点
 Front	正面
 Front view	正面図
@@ -3095,6 +3538,8 @@ Full	フル
 Full access	フルアクセス
 Full access to Onshape's Professional features	Onshape の Professional フィーチャーへのフルアクセス
 Full performance check	フルパフォーマンスチェック
+Full revolve	完全回転
+Full round	完全円
 Full user	フル ユーザー
 Full users: __fullUsers__ / __totalFullUserSeats__	フルユーザー: __fullUsers__ / __totalFullUserSeats__
 Fun - For designing personal projects as a hobby.	趣味 - 趣味としての個人的なプロジェクトの設計目的
@@ -3103,7 +3548,10 @@ G2 tolerance	G2 許容差
 G3 tolerance	G3 許容差
 GL renderer	GL レンダラー
 GL vendor	ＧＬベンダー
+Gap	ギャップ
+Gap fill	ギャップフィル
 Gaussian (1/__unit__\\u00B2)	ガウス (1/__unit__\\u00B2)
+Gear	ギア
 Gear relation	歯車リレーション
 General	全般
 General sync settings	全般の同期設定
@@ -3126,6 +3574,7 @@ Generative	生成
 Generative returned an error: __errorText__	生成でエラーが返されました: __errorText__
 Generatives (__generativeDesignItemCount__)	生成 (__generativeDesignItemCount__)
 Generic thumbnail image for a document without a preview image.	プレビュー画像のないドキュメントのための一般的なサムネイル画像。
+Geodesic	測地線
 Geographical data	地理的データ
 Geometric tolerance	幾何公差
 Geometric tolerance symbol	幾何公差のシンボル
@@ -3182,10 +3631,13 @@ Graphics preferences saved successfully.	グラフィックの環境設定が正
 Graphics preferences…	グラフィックの環境設定…
 Graphics rendering mode	グラフィックスレンダリングモード
 Grayscale	グレースケール
+Greater or equal	以上
 Green	緑
 Grid view	グリッドビュー
 Groove	グルーブ
 Group	グループ
+Group 1	グループ 1
+Group 2	グループ 2
 Group composite parts into a single part file	複合部品を単一のパーツファイルにグループ化
 Groups subassemblies with their parts in the same document	同じドキュメント内にパーツを持つグループサブアセンブリ
 Guest	ゲスト
@@ -3194,18 +3646,39 @@ Guest user	ゲストユーザー
 Guest users	ゲストユーザー
 Guests failed to be invited. Number of guests (__guestsnumber__) exceeds the remaining subscriptions (__availableseats__).	ゲストを招待できませんでした。ゲストの人数 (__guestsnumber__) が残りのサブスクリプションの数 (__availableseats__) を超えています。
 Guests only have access to data that is shared with them.	ゲストは自分と共有されているデータにしかアクセスできません。
+Guides	ガイド
+Guides and continuity	ガイドと継続性
 Gusset	ガセット
+Gusset position	ガセットの位置
+Gusset type	ガセットタイプ
+HF109™ heavy-duty, high tensile strength studs	HF109™ ヘビーデューティー、高引張強度スタッド
+HFE™/THFE™ heavy-duty studs for thin sheets	薄いシート用の HFE™/ THFE™ ヘビーデューティースタッド
+HFG8™ heavy-duty, high tensile strength studs	HFG8 ™ ヘビーデューティー、高引張強度スタッド
+HFH™/HFHS™/HFHB™ heavy-duty studs	HFH™/ HFHS™/ HFHB™ ヘビーデューティースタッド
+HFLH™ hard panel studs	HFLH™ ハードパネルスタッド
 HTML content is not supported in document notes	HTML コンテンツはドキュメントの注記ではサポートされません
 HTML content is not supported in publication notes	HTML コンテンツはパブリケーションの注釈ではサポートされません
+Handedness	利き手
 Has configured parameters	パラメータが構成されています
 Has conflict	競合あり
 Has degrees of freedom	自由度あり
+Has offset	オフセットあり
+Has second direction	二次方向あり
+Has third direction	三次方向あり
 Hatch region	ハッチング領域
+Header	ヘッダー
 Headers without properties:	プロパティのないヘッダ:
+Heal	修復
+Height	高さ
 Helix	ヘリカル
+Helix axis	ヘリカル軸
+Helix axis type	ヘリカル軸タイプ
 Help	ヘルプ
 Help menu	ヘルプメニュー
+Help point	ヘルプポイント
 Hem	ヘム
+Hem alignment	ヘムアライメント
+Hem type	ヘムタイプ
 Hencky strain	ヘンキーひずみ
 Here is a summary of what will happen next:	次に何が起こるかについての要約は次のとおりです。
 Hidden edges removed	隠線非表示
@@ -3284,19 +3757,30 @@ Highlight boundary edges enabled	境界エッジの強調表示が有効にな�
 Highlight tool in toolbar	ツールバーのハイライトツール
 History changes are view only. Viewing __momentName__	履歴の変更は表示専用です。__momentName__ を表示中
 Hobbyist - I use CAD for personal projects.	趣味 - 私は個人的なプロジェクトに CAD を使っています。
+Hold adjacent edges	隣のエッジを保持
+Hold line	保持線
+Hold opposite side	反対側を保持
+Hold other line	他の線を保持
 Hole	穴
 Hole callout	穴コールアウト
+Hole class	穴クラス
 Hole faces	穴面
+Hole start plane or mate connector	穴開始平面または合致コネクタ
 Hole table	穴テーブル
 Hole table panel	穴テーブルパネル
+Hole type	穴タイプ
 Hole/thread callout	穴/ねじのコールアウト
+Holes	穴
+Hollow	空洞
 Home	ホーム
 Horizontal	水平
 Horizontal (h)	水平 (h)
+Horizontal reference	水平参照
 Horizontal stripe	水平ストライプ
 Horizontal zones	水平ゾーン
 Hover over or select an instance to show its mates.	インスタンスにカーソルを合わせるか選択して、その合致を表示します。
 How Onshape Labs features use your data	Onshape Labs のフィーチャーにおけるデータの利用方法
+H™ nuts/HNL™ prevailing torque locknuts	H™ nuts/HNL™ 一般的なトルクロックナット
 I agree to the	に同意します
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use	私は、このプランを授業、個人の学習プロジェクト、学校のクラブ/グループ、および学術研究に使用することに同意します。私は、このプランを政府の利用、商業目的、その他の組織の利用のために使用しません。
 I agree to use this plan for classes, personal learning projects, school clubs/organizations, and academic research. I will not use this plan for government, commercial, or other organizational use.	私は、このプランを授業、個人的な学習プロジェクト、学校のクラブ/グループ、学術研究のために使用することに同意します。私は、このプランを行政、商用、その他の組織的な目的のために使用しません。
@@ -3311,11 +3795,13 @@ IGES file	IGES ファイル
 IGES postprocessing	IGES 後処理
 Id	ID
 Identical references	同一参照
+If none selected, this feature will create one at Origin	何も選択しない場合は、このフィーチャーにより原点で 1 つ作成されます
 If you are no longer an educator, please update the following:	教員でなくなった場合は、次の内容を更新してください。
 If you continue, you will be signed out and redirected to the sign in page.	続行を選択すると、サインアウトされ、サインインページにリダイレクトされます。
 If you lose access to the authentication app and the recovery codes, Onshape Support will not be able to unlock your account.	認証アプリと回復コードにアクセスできなくなった場合、Onshape サポートはアカウントのロックを解除できません。
 If your KMS key is ever deleted, your encrypted documents become permanently unrecoverable - including by Onshape.	KMS キーを削除した場合、暗号化されたドキュメントは永久に復元できなくなり、Onshape に依頼しても復元は不可能です。
 Ignore	無視
+Ignore composite parts	複合部品を無視
 Ignore faulty part warning for __numberBiggerThanOne__ parts	__numberBiggerThanOne__ 個の欠陥パーツの警告を無視
 Ignore faulty part warning for __partName__	__partName__ の欠陥パーツの警告を無視
 Ignored invalid selections. Select a plane, planar face, cylinder, cone, or mate connector in main view.	無効な選択を無視しました。メインビューで平面、平面上の面、円柱、円錐、または合致コネクタを選択してください。
@@ -3348,6 +3834,7 @@ Import…	インポート…
 In context	前後関係
 In order to re-join this classroom, the classroom's administrator must add you.	このクラスに再度参加するには、クラスの管理者に追加してもらう必要があります。
 In pan mode, click and drag to move the viewport.	パンモードで、クリックアンドドラッグしてビューポートを移動します。
+In place	インプレース
 In progress	進行中
 In property __propertyId__: __message__	プロパティ __propertyId__: __message__
 In state __stateName__: __message__	状態__stateName__:__message__
@@ -3367,6 +3854,7 @@ Include a personal message	個人的なメッセージを含める
 Include associated drawings	関連付けられた図面を含める
 Include bend centerlines	曲げ中心線を含める
 Include bend tangent lines	曲げ接線を含める
+Include bends	曲げを含める
 Include configuration parameter in properties	プロパティにコンフィギュレーションパラメーターを含める
 Include counterbore and countersink lines	座ぐりと皿穴の線を含める
 Include derived tolerances in export	エクスポートに派生許容値を含める
@@ -3375,6 +3863,8 @@ Include form feature outlines	フォームフィーチャーの枠線を含め�
 Include hidden instances in export	エクスポートに非表示のインスタンスを含める
 Include in all BOMs	すべての BOM に含める
 Include in properties	プロパティに含める
+Include mate connectors	合致コネクタを含める
+Include properties	プロパティを含める
 Include standard content	標準コンテンツを含める
 Include visible sketches	目に見えるスケッチを含める
 Include when true	true の場合は含める
@@ -3384,9 +3874,15 @@ Incompatible data for boolean type: __dataValue__	ブーリアン演算タイプ
 Incompatible data for list box type: __dataValue__	リストボックスタイプに互換性のないデータ: __dataValue__
 Incorrect password	パスワードが間違っています
 Independency	非依存関係
+Index	インデックス
+Index (0-based)	インデックス (0 から始まる)
 Individual	個人
+Individual edges to match	一致する個々のエッジ
+Individual faces to match	一致させる個々の面
 Individuals	個人
 Inherited properties	継承されたプロパティ
+Inner	内側
+Inner radius	内半径
 Input ID	入力 ID
 Input email	メールアドレスを入力
 Input is invalid: Enter text and check for unsupported entries, for example end of line markers.	インプットが無効です: テキストを入力して、行末マーカーなどサポートされていないエントリーをチェックします。
@@ -3395,6 +3891,8 @@ Input must match the pattern "__regexp__".	入力はパターン "__regexp__" �
 Input name	入力名
 Input propagation for 	入力伝播: 
 Input propagation…	入力伝播...
+Input type	入力タイプ
+Inputs	入力
 Inputs copied.	入力をコピーしました。
 Inputs pasted into Assemblies will not be excluded from properties.	アセンブリに貼り付けた入力はプロパティから除外されません。
 Inputs pasted into Variable Studios will not be excluded from properties.	Variable Studio に貼り付けた入力はプロパティから除外されません。
@@ -3441,16 +3939,21 @@ Inserted: 	挿入済み:
 Inserting __name__	__name__ の挿入中
 Inserting parts or data from public documents into your encrypted documents will be blocked.	パブリックドキュメントから暗号化されたドキュメントに、パーツやデータを挿入することはブロックされます。
 Inserting…	挿入しています…
+Inset	埋め込み
+Inside	内側
 Inspection count	検査数
 Inspection item	検査アイテム
 Inspection list	検査リスト
 Inspection table	検査テーブル
 Inspection table template	検査テーブルのテンプレート
+Instance	インスタンス
 Instance contains error	インスタンスにはエラーが含まれています
+Instance count	インスタンス数
 Instance is not primary instance of context.	インスタンスはコンテキストのプライマリインスタンスではありません。
 Instance properties	インスタンスプロパティ
 Instance properties updated.	インスタンスプロパティが更新されました。
 Instance properties…	インスタンスプロパティ…
+Instances	インスタンス
 Instances (0)	インスタンス (0)
 Instances (__instanceCount__)	インスタンス (__instanceCount__ 件)
 Instances and mates	インスタンスと合致
@@ -3462,7 +3965,12 @@ Instances in folder have newer versions	フォルダー内のインスタンス�
 Instances in folder have newer versions and contexts	フォルダー内のインスタンスには新しいバージョンとコンテキストがあります
 Instances in some documents could not be updated. Edit permissions are needed.	一部のドキュメントのインスタンスを更新できませんでした。アクセス許可の編集が必要です。
 Instances inside will update	内部のインスタンスが更新されます
+Instances or faces to constrain	拘束するインスタンスまたは面
 Instances to analyze	分析するインスタンス
+Instances to measure	測定するインスタンス
+Instances to mirror	ミラーリングするインスタンス
+Instances to replace	置き換えるインスタンス
+Instances to skip	スキップするインスタンス
 Instant access	インスタントアクセス
 Instructions	手順
 Instructions, description, or notes for this document	このドキュメントの手順、説明、または注記
@@ -3478,18 +3986,22 @@ Integrations are not allowed for all users	すべてのユーザーに、統合�
 Integrations failed to load.	統合を読み込めませんでした。
 Intended use	意図された使用
 Interactive framerate:	対面操作のフレームレート:
+Interference	干渉
 Interference __index__ between __parentPart1Name__ and __parentPart2Name__	__parentPart1Name__ と __parentPart2Name__ の間の干渉 __index__
 Interference between __parentPart1Name__ and __parentPart2Name__	__parentPart1Name__ と __parentPart2Name__ の間の干渉
 Interference detection	干渉の検出
 Interference detection not accurate, instances have moved.	干渉検出が正確でない、インスタンスが移動されました。
 Interference detection…	干渉の検出…
 Interferences	干渉
+Interior faces	内側の面
 Internal	内部
 Internal FeatureScript ID	内部のFeatureScript ID
 Internal ID	内部 ID
 Internal feature	内部フィーチャー
 Internal geometry for assembly context not shown in current graphics mode	現在のグラフィックモードでは、アセンブリコンテキストの内部ジオメトリは表示されません
 Internal geometry not shown in current graphics mode	現在のグラフィックモードでは内部ジオメトリが表示されません
+Interpolated spline	補間スプライン
+Intersect	交差
 Intersection	交差
 Intersection angle	交差角度
 Intersection curve	交差曲線
@@ -3516,6 +4028,8 @@ Invalid text entry. HTML is not supported.	無効なテキストエントリで�
 Invalid text or symbols.	テキストまたは記号が無効です。
 Invalid tutorial URL.	無効なチュートリアル URL。
 Inventor part file	Inventor パーツ ファイル
+Inverse conic edges	円錐エッジの反転
+Inverse tangent edges	逆接線エッジ
 Investigate	調査
 Invitation failed to load.	招待を読み込めませんでした。
 Invitation failed to load. Contact Onshape Support for further assistance.	招待を読み込めませんでした。Onshape サポートにお問い合わせください。
@@ -3587,20 +4101,39 @@ Job not found.	ジョブが見つかりません。
 Job queue	ジョブのキュー
 Job run started successfully.	ジョブの実行が正常に開始されました。
 Jog	折り曲げ
+Jog offset	折り曲げオフセット
+Jog offset anchor	折り曲げオフセットアンカー
 Join adjacent surfaces	隣接サーフェスを結合します
 Joint	ジョイント
+Joint style	ジョイントスタイル
+Joint type	ジョイントタイプ
+K Factor	K ファクター
 Keep __targetname__	__targetname__ を保持
 Keep access	アクセスを保持
+Keep both sides	両側面を保持
+Keep end derivative	派生の終点を保持
+Keep input parts	入力パーツを保持
+Keep material	マテリアルを保持
+Keep opposite side	反対側を保持
+Keep points	点を保持
+Keep profile orientation	輪郭の向きを維持
+Keep start derivative	派生の始点を保持
+Keep tool surfaces and curves	ツールのサーフェスと曲線を保持
+Keep tools	ツールを保持
 Key size must be 32 characters or empty.	キーサイズは 32 文字または空でなければなりません。
 Keyboard shortcut failed to be restored to default.	キーボードショートカットを既定値に復元できませんでした。
 Keyboard shortcuts	キーボード ショートカット
 Keyboard shortcuts failed to be restored to default.	キーボードショートカットを既定値に復元できませんでした。
 Keyboard shortcuts failed to load.	キーボードショートカットを読み込めませんでした。
 Knot points	ノット点
+LRA or Length, Rotation, and Angle table shows coordinates for CNC tube bending machines.	LRA (長さ、回転、角度) テーブルには、CNC パイプ曲げ加工機の座標が示されています。
+LRA table	LRA タブ
 Label already exists. Please choose another name.	ラベルはすでに存在します。別の名前を選択してください。
+Label column index	列インデックスにラベルを付ける
 Label must be between 1 and 255 characters with no forward slashes '/'.	ラベルは1〜255文字にする必要があります。スラッシュ「/」は使用しないでください。
 Label name	ラベル名
 Label name cannot contain HTML.	ラベル名に HTML を含めることはできません。
+Label row index	行インデックスにラベルを付ける
 Labels	ラベル
 Labels…	ラベル…
 Label…	ラベル…
@@ -3666,6 +4199,7 @@ Leave all classroom-owned teams	クラスが所有するすべてのチームを
 Leave classroom	クラスを退出
 Leave classroom?	クラスを退出しますか?
 Leave now	すぐに移動
+Leave open	開いたままにする
 Leave organization	組織をやめる
 Leave team	チームを離れる
 Leave team?	チームを離れますか？
@@ -3675,10 +4209,13 @@ Left view	左ビュー
 Legal	正規
 Legend	凡例
 Length	長さ
+Length Tolerance	長さ許容差
+Length control	長さ制御
 Length must be at least __minLength__ characters.	長さは __minLength__ 文字以上にする必要があります。
 Length must not exceed __maxLength__ characters.	長さは __maxLength__ 文字以内にする必要があります。
 Length unit:  	長さの単位:  
 Length: __lengthUnit__	長さ: __lengthUnit__
+Less or equal	以下
 Let others know who you are and collaborate together in real time	他の人に自分のことを知ってもらい、リアルタイムで共同作業をする
 Letter	文字
 Libraries	ライブラリ
@@ -3692,18 +4229,36 @@ Light users: __lightUsers__ / __totalLightUserSeats__	ライトユーザー: __l
 Light view	ライトビュー
 Like	いいね！
 Likes	いいね！
+Limit	制限
+Limit X maximum distance	限界 X 最大距離
+Limit X minimum distance	限界 X 最小距離
+Limit Y maximum distance	限界 Y 最大距離
+Limit Y minimum distance	限界 Y 最小距離
+Limit Z maximum distance	限界 Z 最大距離
+Limit Z minimum distance	限界 Z 最小距離
 Limit application access per document through the Share dialog	共有ダイアログを使用して、ドキュメントごとのアプリケーションアクセスを制限します
+Limit axial X maximum angle	軸限界 X 最大角
+Limit axial X minimum angle	軸限界 X 最小角
+Limit axial Y maximum angle	軸限界 Y 最大角
+Limit axial Y minimum angle	軸限界 Y 最小角
+Limit axial Z maximum angle	軸限界 Z 最大角
+Limit axial Z minimum angle	軸限界 Z 最小角
+Limit frame ends	フレーム末端を制限
 Limitations of experimental AI features	実験的な AI フィーチャーの制限事項
 Limited permissions reduce the risk of 3rd parties copying or exporting your documents.	制限付きのアクセス許可により、サードパーティがドキュメントをコピーまたはエクスポートするリスクが軽減されます。
 Limited permissions reduce the risk of 3rd parties copying or exporting your publications.	制限付きのアクセス許可により、サードパーティがパブリケーションをコピーまたはエクスポートするリスクが軽減されます。
+Limits	制限
 Line	線
 Line 	線 
 Line (l)	線 (l)
+Line angle	線角度
 Line length can't be tolerant. Use a distance between entities.	線の長さは許容差に設定できません。エンティティ間の距離を使用してください。
+Line or points	線または点
 Line to line angular dimension	線の間の角度寸法
 Line to line linear dimension	線から線までの直線寸法
 Line width	線の幅
 Line/tangent arc switch	線と接線円弧の切り替え
+Linear	直線
 Linear acceleration	直線アクセラレーション
 Linear pattern	直線パターン
 Linear relation	直線リレーション
@@ -3723,8 +4278,10 @@ List of categories this property belongs to	このプロパティが所属する
 List values	リスト値
 List values copied.	リスト値をコピーしました。
 List view	リストビュー
+Load direction	荷重方向
 Load more	さらに読み込む
 Load more changes…	さらに変更を読み込む…
+Load region	荷重領域
 Loading	読み込み中
 Loading Action items…	アクションアイテムを読み込み中…
 Loading CAM Studio…	CAM Studio を読み込み中…
@@ -3793,36 +4350,51 @@ Loads	読み込む
 Loads (__loadItemCount__)	(__loadItemCount__ 件) の読み込み
 Local storage	ローカルストレージ
 Location	場所
+Location(s)	場所
+Locations	場所
 Lock __itemName__ at current position	現在の位置で __itemName__ をロックする
 Lock a sketch entity onto the sketch plane so it does not move.	スケッチ平面上にスケッチエンティティを接地すると移動しなくなります。
 Lock current position	現在の位置をロック
+Lock ends	端点をロック
 Lock environment	ロック環境
 Lock mate inference	合致推測をロックする
+Lock profile direction	輪郭方向をロック
+Lock profile faces	輪郭面をロック
 Lock the position of selected entities relative to one another.	選択したエンティティの場所を関連するもう一方にロックします。
 Lock to named position	名前付き位置でロック
 Lock/follow position to…	位置のロック/フォロー…
+Locked	ロック済み
 Locked at current position	現在の位置でロック済み
 Locked at named position __positionName__	__positionName__ という名前付き位置でロックしました
 Locked at subassembly tab position	サブアセンブリタブの位置でロックしました
 Loft	ロフト
+Lofted corner	ロフトコーナー
 Login Failed. Please solve recaptcha puzzle to continue.	ログインに失敗しました。Recaptcha のパズルを解いて続行してください。
 Login Failed. Please try again.	ログインに失敗しました。もう一度お試しください。
 Logo removed.	ロゴが削除されました。
+Long	長い
 Longest execution steps in this Feature Studio:	このFeature Studioの最長実行ステップは以下です:
 Loop/chain connected	ループ/チェーンを接続
 Loop/chain connected edges	ループ/チェーンをエッジに接続
+Loose	ルース
+Loose (ASME)	ルーズ (ASME)
 Loose end	未処理の末端
 Loose ends	未処理の末端
 Loose ends (__looseEndCount__)	未処理の末端 (__looseEndCount__)
 Lose access to all directly shared classroom-owned documents, publications, and folders	直接共有されているクラス所有のすべてのドキュメント、パブリケーション、フォルダにアクセスできなくなります
 Low luminance color scheme mainly featuring light elements on dark backgrounds.	暗い背景上に明るい要素を主な特徴とする低輝度の配色。
 Low threshold	低しきい値
+Lower	下部
 Lower flag symbol	下部のフラグ記号
 Lower text	下部テキスト
 Lower tolerance	下限公差
 MBD data is not exported for closed composite parts.	閉じた複合部品の場合、MBD データはエクスポートされません。
 MTL file	MTL ファイル
 Machine model and post processor	マシンモデルとポストプロセッサ
+Magnitude	マグニチュード
+Magnitude/bias	大きさ/偏り
+Maintain aspect ratio	縦横比を維持
+Maintain curvature	曲率を維持
 Major diameter	外径
 Make 2 entities of the same type symmetric, relative to a line, plane, or linear edge.	同じ種類の 2 つのエンティティを、線、平面、直線エッジに対して対称にします。
 Make 2 lines perpendicular.	2 本の線を垂直にします。
@@ -3860,6 +4432,10 @@ Manage users	ユーザーを管理
 Manage users…	ユーザーを管理…
 Manage via CSV	CSV 経由で管理
 Manage your Onshape subscription	Onshape サブスクリプションの管理
+Manipulator X axis	マニピュレータ X 軸
+Manipulator Y axis	マニピュレータ Y 軸
+Manipulator Z axis	マニピュレータ Z 軸
+Map	マップ
 Mapping	マッピング
 Mapping failed to refresh.	マッピングを最新の状態に更新できませんでした。
 Mapping is no longer valid and should be deleted.	マッピングは無効になるため、削除する必要があります。
@@ -3882,22 +4458,48 @@ Mass and section properties…	質量特性と断面特性…
 Mass calculation skipped items excluded/suppressed from BOM	BOM から除外/抑制されたアイテムは質量計算に含まれません
 Mass moments of inertia (__units__)	質量慣性モーメント (__units__)
 Mass properties failed to calculate for the current selections.	質量特性を現在の選択値に計算できませんでした。
+Match	一致
 Match case	大文字と小文字を区別する
+Match connections	接続の一致
+Match curvature	曲率の一致
+Match curvature at end	終了点で曲率を一致させる
+Match curvature at start	開始点で曲率を一致させる
+Match edges on face	面のエッジを一致させる
+Match edges on plane	平面上のエッジを一致させる
+Match face options	面を一致させるオプション
+Match faces at parting	パーティングで面を一致させる
+Match faces in features	フィーチャーの面を一致させる
+Match faces in parts	パーツの面を一致させる
+Match flow	フローの一致
+Match flow (G3)	フローの一致 (G3)
+Match individual edges	個々のエッジを一致させる
+Match individual faces	個々の面を一致させる
 Match pixel density on high resolution displays (can affect performance)	高解像度ディスプレイのピクセル密度を一致させる (パフォーマンスに影響を与える可能性があります)
+Match position	位置を合わせる
+Match profile	輪郭の一致
 Match release candidate name with Arena change	リリース候補名を Arena の変更と一致させる
 Match release candidate name with Windchill change	リリース候補名を Windchill の変更と一致させる
+Match tangent	接線の一致
+Match type	一致タイプ
+Matching	一致
 Matching parameters successfully configured.	一致するパラメータが正常に構成されました。
 Mate	合致
 Mate 2 entities tangentially, based on the selected faces, edges, or vertices.	選択した面、エッジ、頂点に基づく 2 つのエンティティの接戦を合致させます。
+Mate DOF to animate	アニメートする合致 DOF
 Mate connector	合致コネクタ
 Mate connector (Ctrl-m)	合致コネクタ (Ctrl-m)
 Mate connector Z axis is not normal to face selections	合致コネクタ Z 軸は選択した面に対して垂直ではありません
 Mate connector for reference coordinate system	基準座標系用の合致コネクタ
+Mate connector for reference frame	参照フレーム用の合致コネクタ
+Mate connectors	合致拘束
 Mate error	合致エラー
 Mate features	合致フィーチャー
 Mate indicator	合致インジケーター
 Mate limits	合致の制限
 Mate solve time : __solveTimeInSeconds__	合致解決時間 : __solveTimeInSeconds__
+Mate to be matched	一致する合致
+Mate type	合致タイプ
+Mate(s)	合致
 Material	マテリアル
 Material Library	マテリアルライブラリ
 Material __materialName__ is specified more than once. 	マテリアル __materialName__ が複数回指定されています。 
@@ -3908,6 +4510,7 @@ Material library __libraryName__ is already added.	マテリアルライブラ�
 Material library __libraryName__ is removed.	マテリアルライブラリ __libraryName__ が削除されました。
 Mates	合致
 Mates and touching faces	合致と接地面
+Mates to drive positions	駆動位置への合致
 Mates with errors cannot be applied.	エラーが発生した合致は適用できません。
 Mates with errors cannot be locked.	エラーが発生した合致はロックできません。
 Math functions	数学関数
@@ -3926,7 +4529,9 @@ Max cone angle has been applied to 	円錐の最大角度の適用先:
 Max count	最大数
 Max date	最大日付
 Max date must not be earlier than __date__.	最大日付は__date__以降にする必要があります。
+Max deviation	最大偏差
 Max distance	最大距離
+Max index (0-based)	最大インデックス (0 から始まる)
 Max length	最大長
 Max principal stress (__unit__)	最大主応力 (__unit__)
 Max radius	最大半径
@@ -3936,7 +4541,10 @@ Max value must be an integer.	最大値は整数でなければなりません�
 Max: __max__	最大値: __max__
 Max: __value__	最大値: __value__
 Maximum	最大
+Maximum angle	最大角度
 Maximum chord length	弦の最大長
+Maximum control points	最大制御点
+Maximum deviation	最大偏差
 Maximum dimension	最大寸法
 Maximum length of 64 is reached.	最大長の 64 に達しました。
 Maximum length of __maxLength__ exceeded.	__maxLength__ の最大長を超過しています。
@@ -3949,9 +4557,13 @@ Maximum of __limit__ characters	最大 __limit__文字
 Maximum/minimum dimension	最大/最小寸法
 Mean (1/__unit__)	平均 (1/__unit__)
 Measure	測定
+Measure to axis of cylinders, circles, arcs, or revolved surfaces	円柱、円、円弧、または回転サーフェスの軸を測定
+Measure to infinitely extended lines, arcs, cylinders, etc.	無限に延長された直線、円弧、円柱などを測定します。
 Measure type:	測定タイプ:
+Measured	測定済み
 Measured lines per second	1 秒あたりの測定ライン
 Measured triangles per second	1 秒あたりに測定された三角形
+Measurement	測定値
 Measure…	測定…
 Measuring performance	性能測定
 Measuring performance. For best results: keep tab in focus until performance check is complete.	性能測定。 最善の結果を得るには、パフォーマンスチェックが完了するまで、タブに焦点を合わせ続けます。
@@ -3976,6 +4588,10 @@ Merge changes from both	両方の変更をマージ
 Merge into __targetname__	__targetname__ にマージ
 Merge into current workspace…	現在のワークスペースにマージ…
 Merge into: __targetBranchName__, from: __sourceBranchName__	マージ先: __targetBranchName__、マージ元: __sourceBranchName__
+Merge ribs	マージリブ
+Merge scope	マージ範囲
+Merge tangent segments	接線セグメントをマージ
+Merge with all	すべてとマージ
 Merged __sourcename__ into __targetname__.	__sourcename__ から __targetname__ にマージしました。
 Merging changes into __targetname__ from __sourcename__	__sourcename__ から __targetname__ に変更をマージ
 Merging feature changes is only supported for Part Studio and Assembly tabs	マージフィーチャーの変更は、Part Studio タブとアセンブリタブのみでサポートされています
@@ -3983,6 +4599,7 @@ Merging…	マージしています…
 Mesh	メッシュ
 Mesh Part	メッシュパーツ
 Mesh bodies	メッシュボディ
+Mesh bodies or faces	メッシュボディまたは面
 Mesh line width	メッシュ線の幅
 Mesh point	メッシュポイント
 Meshes (__numberOfMeshes__)	メッシュ (__numberOfMeshes__)
@@ -3995,9 +4612,13 @@ Metadata failed to update.	メタデータを更新できませんでした。
 Metadata updates failed to apply.	メタデータの更新を適用できませんでした。
 Method	メソッド
 Method:	メソッド:
+Metric	メトリック
 Metro station	地下鉄の駅
 Microsoft Edge (Version 17 and above)	Microsoft Edge (バージョン 17 以降)
+Mid plane	中間平面
+Middle	中央
 Middle mouse button drag	マウスの中ボタンのドラッグ
+Middle mouse button drag or	中央のマウスボタンをドラッグまたは
 Middle mouse button drag or \nCtrl + Middle mouse button drag	右のマウスボタンをドラッグ\nCtrl + 中央のマウスボタンをドラッグ
 Midpoint	中点
 Midpoint line	中点の線
@@ -4015,6 +4636,7 @@ Min date	最小日付
 Min date must be before or equal to max date.	最小の日付は、最大の日付より前か、それ以上の日付でなければなりません。
 Min date must not be earlier than __date__.	最小日付は __date__ 以降にする必要があります。
 Min distance	最小距離
+Min index (0-based)	最小インデックス (0 から始まる)
 Min length	最小の長さ
 Min radius	最小半径
 Min radius (__unit__)	最小半径 (__unit__)
@@ -4022,6 +4644,7 @@ Min value	最小値
 Min value must be an integer.	最小値は整数でなければなりません。
 Min: __min__	最小値: __min__
 Min: __value__	最小値: __value__
+Minimal gap	最小ギャップ
 Minimum	最小
 Minimum count must be less than or equal to max count.	最小カウントは、最大カウント以下にする必要があります。
 Minimum dimension	最小寸法
@@ -4032,8 +4655,14 @@ Minimum length of __minLength__ for __propertyName__ not met. 	__propertyName__�
 Minimum length of __minLength__ not met.	最小の長さ__minLength__が満たされていません。
 Minimum radius	最小半径
 Minimum value must be less than or equal to max value.	最小値は、最大値以下にする必要があります。
+Minimum/Maximum	最小値/最大値
 Minor diameter	内径
 Mirror	ミラー
+Mirror across Y axis	Y 軸全体をミラーリング
+Mirror plane	ミラー平面
+Mirror reference	ミラー参照
+Mirror strategy	ミラー方法
+Mirror type	ミラー タイプ
 Missing	欠落
 Missing Variable Studio	Variable Studio が見つかりません
 Missing __category__	__category__がありません
@@ -4051,6 +4680,9 @@ Missing selection	選択がありません
 Missing sketch dimension data	スケッチの寸法データが見つかりません
 Missing tab	タブがありません
 Missing value handling	欠損値の処理
+Miter	マイター
+Miter angle	マイター角度
+Mix	混合
 Mixer	ミキサー
 Mobile notification setting saved.	モバイル通知設定が保存されました。
 Mobile notifications for shares and comments	共有とコメントのモバイル通知
@@ -4064,12 +4696,14 @@ Model definitions	モデルの定義
 Model space only	モデル空間のみ
 Modeling	モデリング
 Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.	SOLIDWORKS、Creo、Inventor など、Y 軸を上向きにした環境で作成されたモデルは、インポート時に元の向きを維持します。
+Modification type	変更タイプ
 Modified	変更済み
 Modified at	変更日時
 Modified by	変更者
 Modify an individual sheet metal bend relief. Specify bend relief type and scale.	シートメタルの曲げリリーフを個別に変更します。曲げリリーフの種類とスケールを指定します。
 Modify an individual sheet metal corner by selecting an edge, vertex, or face of the existing corner. Specify corner relief type and scale.	既存のコーナーのエッジ、頂点、面を選択して、個々のシートメタルコーナーを修正します。コーナーリリーフの種類と尺度を指定します。
 Modify fillet	フィレットを変更
+Modify joint	ジョイントを変更
 Modify visibility conditions	可視性条件を変更
 Module outline	モジュールの概要
 Module outline (cmd+shift+O / ctrl+shift+O)	モジュールの概要 (cmd+shift+O / ctrl+shift+O)
@@ -4089,6 +4723,7 @@ More than __changeCount__ changes	__changeCount__ 件以上の変更
 More than one part inside is fixed	内部の 1 つ以上のパーツが固定されています
 More than one part is fixed	1 つ以上のパーツが固定されています
 Most Popular	最も人気の高い
+Mounting	マウンティング
 Mouse controls	マウスコントロール
 Mouse controls updated.	マウスコントロールが更新されました。
 Move	移動
@@ -4100,10 +4735,13 @@ Move column to right	列を右に移動する
 Move column to start	列を開始点に移動する
 Move copied instances here	コピーしたインスタンスをここに移動
 Move copied mates here	コピーした相手をここに移動します
+Move curve boundary type	曲線境界の移動のタイプ
 Move documents and folders to	ドキュメントとフォルダの移動先
 Move documents, publications, and folders to	ドキュメント、パブリケーション、およびフォルダの移動先
 Move down	下に移動
+Move end condition	移動終了条件
 Move face	面を移動
+Move face type	移動面タイプ
 Move here	ここに移動
 Move left	左に移動
 Move right	右に移動
@@ -4164,10 +4802,12 @@ My standard content	マイ標準コンテンツ
 N/A	該当なし
 NOT COMPARABLE	比較対象外
 Name	名前
+Name #entityName	名前 #entityName
 Name cannot be empty.	名前は空白にできません。
 Name cannot contain HTML.	名前に HTML を含めることはできません。
 Name cannot exceed 256 characters.	名前は256文字を超えることはできません。
 Name could not be generated.	名前を生成できませんでした。
+Name entity	名前エンティティ
 Name is required	名前が必要です
 Name is required and cannot exceed __maxInputLengthForName__ characters.	名前は必須で、__maxInputLengthForName__ 文字以内にする必要があります。
 Name is required.	名前は必須です。
@@ -4190,7 +4830,9 @@ Need help formatting? Click one of the buttons below to download a template.	書
 Need to sign into an enterprise?	Enterprise にサインインしますか?
 Needs revision	リビジョンが必要
 Network and region	ネットワークと領域
+Neutral plane	中立平面
 Never	なし
+New	新規
 New Part Studios and Assemblies in this workspace will automatically reference this Variable Studio at its default configuration.	このワークスペースの新しい Part Studio やアセンブリは、既定のコンフィギュレーションで自動的にこの Variable Studio を参照します。
 New Part Studios and Assemblies in this workspace will automatically reference this Variable Studio.	このワークスペースの新しい Part Studio やアセンブリは、自動的にこの Variable Studio を参照します。
 New Standard Content Custom Parameter	新しい標準コンテンツのカスタムパラメータ
@@ -4274,6 +4916,7 @@ No configurable properties	構成可能なプロパティがありません
 No connection	接続なし
 No connections found.	接続が見つかりません。
 No contents found in __fileName__	__fileName__ でコンテンツが見つかりません
+No corner	コーナーなし
 No created connections.	作成された接続はありません。
 No credit card	クレジットカードがありません
 No credit card needed	クレジットカードは必要ありません
@@ -4344,10 +4987,12 @@ No matching company found.	一致する Company が見つかりません。
 No matching parameters selected to configure.	構成する一致するパラメータが選択されていません。
 No material assigned	マテリアルが割り当てられていません
 No material library linked with your account.	アカウントにリンクされたマテリアルライブラリがありません。
+No maximum	最大値なし
 No measurements available for current selection.	現在の選択に使用可能な測定はありません。
 No measurements of this type available for current selection.	現在の選択に使用可能なこの種類の測定はありません。
 No members are added to this alias yet.	このエイリアスに追加されたメンバーはまだいません。
 No members found	メンバーが見つかりません
+No minimum	最小値なし
 No models.	モデルがありません。
 No non-manifold edges found	非多様体エッジが見つかりません
 No notes available	使用可能な注記がありません
@@ -4393,9 +5038,11 @@ No teams defined.	チームが定義されていません。
 No teams found.	チームが見つかりません。
 No templates created	テンプレートが作成されていません
 No templates found	テンプレートが見つかりません
+No tolerance	許容差なし
 No tools added	ツールが追加されていません
 No top-level symbols found	最上位の記号が見つかりませんでした
 No translation	平行移動がありません
+No trim	トリミングなし
 No unpublished classes.	未公開のクラスはありません。
 No updates available.	利用可能なアップグレードがありません。
 No users are added to this connection yet.	この接続に追加されたユーザーはまだいません。
@@ -4408,12 +5055,20 @@ No variables are configured	変数が構成されていません
 No views	ビューがありません
 No views created	ビューが作成されていません
 No, I'm no longer a student	いいえ、私はもう学生ではありません
+Nominal	公称
 Non-geometric item authoring:	非幾何学的アイテムの作成:
 Non-manifold tessellation edges	非多様体テッセレーションエッジ
 Non-numeric value for __propertyName__ on row # __rowNumber__. 	列 # __rowNumber__ の __propertyName__ に数値以外の値があります。 
 None	なし
 None of the selected entities could be deleted.	選択したエンティティはどれも削除できませんでした。
 Normal	法線
+Normal (ASME)	通常 (ASME)
+Normal direction	垂直方向
+Normal to face	面に垂直
+Normal to guide	ガイドに垂直
+Normal to profile	輪郭に垂直
+Normal to sketch plane	スケッチ平面に垂直
+Normal to target	ターゲットに垂直
 Not Mapped	マッピングされていません
 Not Started	未開始
 Not a member of this enterprise?	この Enterprise のメンバーではない場合
@@ -4458,6 +5113,7 @@ Number generation	番号の生成
 Number of dashboards	ダッシュボード数
 Number of members for this trial: 	この試用版のメンバー数 
 Number of non-rigid modes	非剛体モード数
+Number of points to add	追加する点の数
 Number of samples	サンプル数
 Number of seats used:	使用済みのシート数:
 Number of subscriptions should not be less than the number of users in a company. There are __numusers__ users in your company.	加入者数は Company の利用者数以上としてください。あなたの Company には __numusers__ 人のユーザーがいます。
@@ -4482,6 +5138,8 @@ OBJ/MTL zip file	OBJ/MTL Zip ファイル
 Object	オブジェクト
 Object property	オブジェクトプロパティ
 Object type:	オブジェクトの種類:
+Obround - Scaled	角丸長方形 - スケール
+Obround - Sized	角丸長方形 - サイズ
 Obsolete	廃止
 Obsolete all previous revisions related to the previous object type and part number	以前のオブジェクトの種類とパーツ番号に関連する以前のすべてのリビジョンを廃止する
 Obsolete revision	廃止リビジョン
@@ -4498,13 +5156,25 @@ Occurrences to affect	影響するオカレンス
 Off	オフ
 Offset	オフセット
 Offset (o)	オフセット (o)
+Offset X distance	オフセット X 距離
+Offset Y distance	オフセット Y 距離
+Offset Z distance	オフセット Z 距離
 Offset a sheet metal model at a reference line with two bends in opposite directions with additional jog controls.	相互に逆方向になる 2 つの曲げを持つ参照線で、追加の折り曲げ制御を使ってシートメタルモデルをオフセットします。
+Offset all	すべてをオフセット
+Offset and extend	オフセットと延長
+Offset angle	角度をオフセット
 Offset curve	曲線をオフセット
+Offset distance	オフセット距離
+Offset from tip	先端からオフセット
+Offset opposite direction	反対方向にオフセット
 Offset plane…	オフセット平面…
 Offset surface	サーフェスをオフセット
+Offset type	オフセットタイプ
+Offset, extend, and split	オフセット、延長、および分割
 Ok	OK
 Oldest first	古い順
 On	オン
+On entity	エンティティ上
 Once a class is selected, you may choose to publish the cloned assignment automatically or create a draft.	クラスを選択したら、複製した課題を自動的に公開するか、下書きを作成するかを選択できます。
 Once a connection is created, an admin from the enterprise will receive an email to approve the request. No data is ever shared until the connection is approved, a user is added, and that data is shared with the user via the share dialog.	接続を作成すると、Enterprise の管理者にリクエストの承認を依頼するメールが送信されます。接続が承認され、ユーザーが追加され、そのデータが共有ダイアログを介してユーザーと共有されるまで、データは共有されません。
 Once set, the KMS key cannot be swapped out or replaced with a different key.	いったん設定した KMS キーは、別のキーとの交換や置換はできません。
@@ -4519,6 +5189,7 @@ One or more recipients do not have view access to the scheduled report. Verify t
 One or more students have started this assignment. The submission option is no longer editable.	1 人かそれ以上の学生がこの課題を開始しました。この提出オプションは編集できなくなりました。
 One or more tabs being moved contain workspace references. All referenced tabs will be moved as part of this operation.	移動する 1 つまたは複数のタブにワークスペース参照が含まれています。この操作を行うと、参照しているすべてのタブが移動します。
 One or more values is invalid.	1 つ以上の値が無効です。
+One sided	片面
 One time	ワンタイム
 One workspace	1 つのワークスペース
 Only active and compatible Onshape properties in the mapped Onshape category can be selected.	マップされた Onshape カテゴリーのアクティブで互換性のある Onshape プロパティのみ選択できます。
@@ -4526,6 +5197,8 @@ Only administrators can delete documents containing released objects	管理者�
 Only administrators can edit the properties of released objects	管理者のみがリリースされたオブジェクトのプロパティを編集できます
 Only administrators can mark objects as not revision-managed	管理者のみがオブジェクトをリビジョン管理されていないものとしてマークできます
 Only data created after configuration is encrypted. Existing documents are not encrypted retroactively, so configure your key as the first step after setting up your company.	暗号化の対象となるのは、構成後に作成されたデータのみです。既存のドキュメントは過去に遡って暗号化されないため、Company のセットアップ後に、最初のステップとしてキーを構成してください。
+Only edges	エッジのみ
+Only faces	面のみ
 Only items with status "Pending" can be deleted.	削除できるのは、ステータスが "保留中" のアイテムのみです。
 Only me	自分のみ
 Only numbers are allowed	数字のみ使用できます
@@ -4534,6 +5207,7 @@ Only show differences	相違のみ表示
 Only show mappings with errors	エラーが発生したマッピングのみを表示
 Only show unread	未読のみ表示
 Only some instances will be highlighted.	一部のインスタンスのみ強調表示されます。
+Only vertices	頂点のみ
 Onshape (default)	Onshape (既定)
 Onshape AI Advisor cannot see your data.	Onshape AI アドバイザーはユーザーのデータを見ることはできません。
 Onshape API Keys Connection	Onshape API キー接続
@@ -4628,27 +5302,47 @@ Opening __name__	__name__ を開く
 Opening configuration inputs references dialog	コンフィギュレーション入力参照ダイアログを開いています
 Operation failed because it would create cyclical references.	循環参照が作成されるため、操作ができませんでした。
 Operation functions	操作関数
+Operation type	操作タイプ
+Opposite alignment	反対の位置合わせ
+Opposite angle	反対の角度
 Opposite direction	反対方向
+Opposite direction angle	反対方向の角度
+Opposite offset direction	反対方向のオフセット
+Opposite origin	反対の原点
+Opposite side	反対側
+Optimize	最適化
 Option "__name__" not found. Select a valid value.	オプション "__name__" が見つかりません。有効な値を選択します。
 Option has been disabled by administrator	オプションは管理者によって無効にされました
 Optional: include a personal message	オプション: 個人的なメッセージを含める
 Options	オプション
+Ordered groups	順序付けたグループ
 Ordinate dimension	累進寸法
 Orient imported models with Y Axis Up	インポートしたモデルで Y 軸を上向きにする
 Orient normal to sketch on edit	スケッチ平面に対して垂直にする
+Orientation	向き
 Origin	原点
+Origin XY	原点 XY
+Origin YZ	原点 YZ
+Origin ZX	原点 ZX
+Origin entity	原点エンティティ
 Origin of new Part Studio	新しい Part Studio の原点
+Origin type	原点タイプ
+Orthogonal path	直交パス
+Orthogonal path coordinate system	直交パスの座標系
 Other	その他
 Other Onshape account email	その他の Onshape アカウントのメールアドレス
 Other documents	他のドキュメント
 Other part(s) fastened to origin	その他のパーツが原点に固定されました
 Other tabs	その他のタブ
 Out-of-date drawings failed to update.	更新が必要な図面を更新できませんでした。
+Outer	外側
 Output units	出力単位
+Outside	外側
 Over	超過
 Over __limit__	__limit__ を超過
 Overage	超過
 Overall merge strategy	全体的なマージ方法
+Overall parameters	全体パラメータ
 Overall performance*	全体的なパフォーマンス*
 Overall restore strategy	全体的な復元方法
 Overridden by administrator __name__	管理者 __name__ によってオーバーライド済み
@@ -4657,19 +5351,27 @@ Overridden by creator __name__	作成者 __name__ によってオーバーライ
 Overridden computed property	オーバーライドされた構成済みプロパティ
 Overridden dimensions	上書きされた寸法
 Override	オーバーライド
+Override bend radius	曲げ半径をオーバーライド
 Override parameter library value	パラメータライブラリの値をオーバーライド
 Override task	オーバーライドタスク
+Overrides	オーバーライド
 Overwrite	上書き
+Overwrite points	点を上書き
 Overwriting the existing dashboard might break any saved copies of the dashboard	既存のダッシュボードを上書きすると、保存されているダッシュボードのコピーが破損する可能性があります
 Own properties	ご自身のプロパティ
 Owned by	所有者
+Owned by me	自分が所有しているアイテム
 Owned by:	所有者:
 Owner	所有者
 Owner ID	所有者 ID
+Owner entity	所有者エンティティ
 Owner not found	所有者が見つかりません
 Owner type not found	所有者のタイプが見つかりません
 Ownership transfer not available. Not a member of any other enterprise.	所有権の引き継ぎはできません。その他の Enterprise のメンバーではありません。
+PCB entity type	PCB のエンティティタイプ
 PCB flex model	PCB フレキシブルのモデル
+PCB holes	PCB の穴
+PCB part to finish	仕上げる PCB パーツ
 PLM Integration	PLM 統合
 PLM Integrations	PLM 統合
 PTC Terms & Privacy Policy	PTC 規約およびプライバシーポリシー
@@ -4686,6 +5388,9 @@ Parallel axis distance	平行軸距離
 Parallel distance	平行距離
 Parallel edges	平行エッジ
 Parallel mate	平行合致
+Parallel to	次と平行
+Parallel to sketch plane	スケッチ平面に平行
+Parameter	パラメータ
 Parameter Name	パラメータ名
 Parameter drives configuration	パラメータドライブのコンフィギュレーション
 Parameter library	パラメータライブラリ
@@ -4710,6 +5415,7 @@ Part Studios	Part Studio
 Part Studios will be updated to the latest FeatureScript version upon import	Part Studio は、インポート時に FeatureScript の最新バージョンに更新されます
 Part Studios…	Part Studio…
 Part is fixed	パーツが固定されました
+Part mirror	パーツミラー
 Part number	パーツ番号
 Part number must be unique.	パーツ番号は一意でなければなりません。
 Part number propagation	パーツ番号の伝播
@@ -4723,19 +5429,39 @@ Part numbers are tied to the type of released object. Resetting the released obj
 Part numbers will be applied in all workspaces associated with the version being released.	パーツ番号はリリースされたバージョンに関連付けられたすべてのワークスペースに適用されます。
 Part numbers will be applied only if the version being released has exactly one associated workspace.	パーツ番号は、リリースされたバージョンが 1 つのワークスペースに完全に関連付けられた場合のみ適用されます。
 Part numbers will only be applied in the version being released.	パーツ番号はリリースされたバージョンでのみ適用されます。
+Part pattern	パーツパターン
 Part properties dialog failed to open.	パーツプロパティダイアログを開くことができませんでした。
+Part to add	追加するパーツ
+Part to remove	削除するパーツ
 Part(s) inside are fixed	内部のパーツが固定されました
 Part/Surface	パーツ/ サーフェス
 Partial Success	部分的な成功
 Partial Variable Studio	部分的な Variable Studio
+Partial fillet	部分フィレット
+Partial flange	部分フランジ
 Partially suppressed from this BOM	この BOM から部分的に抑制
+Parting edges	分割エッジ
+Parting entity	パーティングエンティティ
+Parting line	パーティングライン
+Parting line propagation	パーティングラインの伝播
 Partner	パートナー
 Parts	パーツ
 Parts (__numberOfParts__)	パーツ (__numberOfParts__)
 Parts and Surfaces to affect	影響を受けるパーツとサーフェス
 Parts and surfaces	パーツおよびサーフェス
+Parts and surfaces to convert	変換するパーツとサーフェス
+Parts or bends	パーツまたは曲げ
 Parts to analyze	分析するパーツ
+Parts to draft	抜き勾配のパーツ
+Parts to find match in	一致を検索するパーツ
+Parts to hollow	空洞のパーツ
+Parts to measure	測定するパーツ
+Parts to trim	トリミングするパーツ
+Parts to trim to	パーツをトリミング
+Parts to trim using trim tool	トリミングツールを使用してトリミングするパス
+Parts to use as trim tools	トリミングツールとして使用するパーツ
 Parts within a single Part Studio will become a composite part upon import	単一の Part Studio 内のパーツは、インポートすると複合部品になります
+Parts, surfaces, or curves to split	分割するパーツ、サーフェス、または曲線
 Password	パスワード
 Password and confirm password do not match.	パスワードと確認用パスワードが一致しません。
 Password and password confirmation must match	パスワードとパスワードの確認は一致している必要があります
@@ -4767,9 +5493,12 @@ Paste permission denied by browser. Use Ctrl-V or ⌘-V to paste text.	ブラウ
 Paste sketch	スケッチを貼り付ける
 Paste sketch entities	スケッチエンティティを貼り付ける
 Paste tab	貼り付けタブ
+Path	パス
 Path failed to load.	パスを読み込めませんでした。
+Path to pattern along	パターン化するパス
 Pattern	パターン
 Pattern must match __pattern__.	パターンは __pattern__ と一致している必要があります。
+Pattern type	パターン タイプ
 Pause	一時停止
 Paused regeneration	再生を一時停止中
 Pausing…	一時停止中…
@@ -4787,12 +5516,15 @@ Pending cancellation	保留中のキャンセル
 Pending edits have been discarded.	保留中の編集が破棄されました。
 Pending owner	保留中の所有者
 Pending…	保留中…
+Per chain	チェーン単位
+Per edge	エッジ単位
 Perform a union, subtraction, or intersection on two or more parts or surfaces.	2 つ以上のパーツやサーフェスの和、差、積の演算を実行します。
 Perform actions within Onshape on your behalf during an active session.	アクティブなセッション中に、ユーザーに代わって Onshape 内でアクションを実行します。
 Performance	パフォーマンス
 Performance check	パフォーマンスチェック
 Performance errors detected	パフォーマンスエラーが検出されました
 Performance warning detected	パフォーマンスの警告が検出されました
+Perimeter	周長
 Period (12.34)	ピリオド (12.34)
 Permanently delete all items in Trash	ごみ箱にあるすべてのアイテムが永久に削除されます
 Permission inherited	継承されたアクセス権
@@ -4832,7 +5564,9 @@ Photo failed to be deleted.	写真を削除できませんでした。
 Pick the default template used for the BOM table created in a Drawing owned by the __companyType__.	__companyType__ が所有する図面で作成された BOM テーブルに使用する既定のテンプレートを選択してください。
 Pick the default template used for the BOM table created in an Assembly owned by the __companyType__.	__companyType__ が所有するアセンブリで作成された BOM テーブルに使用する既定のテンプレートを選択してください。
 Pierce	穴をあける
+Pin	ピン
 Pin reference	ピン参照
+Pin slot	ピンスロット
 Pin slot mate	ピンスロット合致
 Pin slot mate (m)	ピンスロット合致 (m)
 Ping time:	ping 時間:
@@ -4850,15 +5584,27 @@ Pinned versioned reference from current document	現在のドキュメントか�
 Pinned versioned reference from current document with newer version	現在のドキュメントから新しいバージョンでピン留めされたバージョン参照
 Pinned versioned reference from other document	他のドキュメントからピン留めされたバージョン参照
 Pinned versioned reference from other document with newer version	他のドキュメントから新しいバージョンでピン留めされたバージョン参照
+Pitch	ピッチ
+Pitch length	ピッチの長さ
+Placement	配置
+Placement origin	配置原点
 Plan	プラン
 Plan details	プランの詳細
 Planar	平面
 Planar mate	平面合致
 Planar mate (m)	平面合致 (m)
+Planarization parameters	平面化パラメータ
+Planarize	平面化
 Plane	平面
+Plane limit	面の制限
+Plane point	平面と点
+Plane type	平面タイプ
+Planes and planar faces to use as trim tools	トリミングツールとして使用する平面と平面上の面
+Planes to find match in	一致を検索する平面
 Plans & Pricing	プランと価格
 Plans and pricing	プランと価格
 Plasma	プラズマ
+Plated	めっき
 Platform	プラットフォーム
 Play	再生
 Plus/minus	正/負
@@ -4866,10 +5612,19 @@ Pocket	ポケット
 Pocket faces	ポケット面
 Point	点
 Point (Shift-s)	点 (Shift-S)
+Point edit type	点の編集タイプ
+Point normal	法線と点
+Point or mate connector	ポイントまたは合致コネクタ
+Point or mate connector used as reference for the curve. Defaults to origin.	曲線の基準点として使用される点または合致コネクタ。既定値は原点です。
 Point to line linear dimension	点から線までの直線寸法
 Point to point linear dimension	点から点までの直線寸法
+Point type	点タイプ
+Points	点
+Points on edges	エッジ上の点
+Points overrides	点のオーバーライド
 Poisson's ratio	ポアソン比
 Polar moment of inertia (__units__)	極慣性モーメント (__units__)
+Polyline	ポリライン
 Poor connection…	接続不良…
 Populating Configurations to Current Configuration	現在のコンフィギュレーションにコンフィギュレーションを反映中
 Popup blocked or failed to open	ポップアップがブロックされたか、開けませんでした
@@ -4885,6 +5640,7 @@ Postal code exceeded maximum length.	郵便番号が最大長を超えていま�
 Postprocessing thickness analysis...	厚さ分析を後処理中...
 Pre-select planar faces that contains holes or standard content and click 'Insert closest to selection'	穴または標準コンテンツを含む平面を事前に選択し、[選択範囲に最も近い位置に挿入] をクリックします
 Pre-select planar faces that contains holes or standard content and click 'Insert furthest from selection'	穴または標準コンテンツを含む平面を事前に選択し、[選択範囲から最も遠い位置に挿入] をクリックします
+Precise	正確
 Precision	精度
 Precision rotate	精度の回転
 Preference changes failed to update.	環境設定の変更を更新できませんでした。
@@ -4902,6 +5658,8 @@ Preparing thickness analysis...	厚さ分析の準備中...
 Preprocessing	前処理中
 Present	現在
 Presentation view	プレゼンテーションビュー
+Preserve active sheet metal models	アクティブなシートメタルモデルを保持
+Preserve material	マテリアルを保持
 Preserve source IDs	ソース ID を保持
 Press desired key combination and confirm	設定したいキーの組み合わせを押して確定してください
 Pressure	圧力
@@ -4926,6 +5684,7 @@ Price:	価格:
 Prices are in $ USD	価格は米国ドルです
 Prices in $ USD	価格は米国ドルです
 Primary	プライマリ
+Primary axis entity	主軸エンティティ
 Primary key	プライマリキー
 Primary key copied.	プライマリキーをコピーしました。
 Primary template is the first sheet.	プライマリテンプレートは最初のシートです。
@@ -4956,12 +5715,15 @@ Product line	製品ライン
 Production version:	製品バージョン:
 Professional CAD for commercial use with built-in data management delivered with 24/7 reliability.	24 時間 365 日の信頼性があるデータ管理機能を組み込んだ商用の Professional CAD。
 Profile	プロファイル
+Profile 1	プロファイル 1
+Profile 2	プロファイル 2
 Profile __partStudioName__	輪郭 __partStudioName__
 Profile __profileName__ could not be selected. Use a browser that supports localStorage.	輪郭 __profileName__ を選択できませんでした。localStorageをサポートするブラウザを使用してください。
 Profile __profileName__ is created.	輪郭 __profileName__ が作成されました。
 Profile __profileName__ is deleted.	輪郭 __profileName__ が削除されました。
 Profile __profileName__ is selected.	輪郭 __profileName__ が選択されました。
 Profile __profileName__ is updated.	輪郭 __profileName__ が更新されました。
+Profile control	輪郭制御
 Profile data currently displayed is from the latest profiled Part Studio you started across all Onshape documents. It can be cleared from the FeatureScript notices panel, or by profiling another Part Studio.	現在表示されているプロファイルデータは、すべての Onshape ドキュメントで開始したプロファイル化された最新の Part Studio から取得したものです。これは、FeatureScript の通知パネルから、または他の Part Studio をプロファイル化することで解除できます。
 Profile failed to be created.	輪郭を作成できませんでした。
 Profile inspector	輪郭インスペクター
@@ -4970,6 +5732,8 @@ Profile link copied to clipboard.	輪郭のリンクをクリップボードに�
 Profile name contains invalid characters. Characters such as &"<> are not allowed.	輪郭の名前に無効な文字が含まれています。「&"<>」などの文字は許可されていません。
 Profile name must be less than 64 characters in length.	輪郭の名前は 64 文字未満の長さにする必要があります。
 Profile of __elementName__	__elementName__ の輪郭
+Profile type	輪郭タイプ
+Profiles	輪郭
 Profiling	輪郭
 Profiling __partStudioName__	__partStudioName__ の輪郭
 Program number	プログラム番号
@@ -5003,6 +5767,7 @@ Projected curve	投影曲線
 Projected tolerance zone	投影公差域
 Projected view	投影ビュー
 Projection	投影
+Projection direction type	投影方向タイプ
 Projects	プロジェクト
 Projects and Folders	プロジェクトとフォルダ
 Propagate	伝播
@@ -5010,6 +5775,8 @@ Propagate changes	変更を伝播
 Propagate error	伝播エラー
 Propagated	伝播
 Propagating changes to features	フィーチャーに変更を伝播中
+Propagation	伝播
+Propagation type	伝播タイプ
 Properties	プロパティ
 Properties date format updated.	プロパティの日付形式が更新されました。
 Properties failed to be reordered.	プロパティを記録できませんでした。
@@ -5057,6 +5824,7 @@ Publication labels	パブリケーションラベル
 Publication link copied to clipboard.	パブリケーションのリンクをクリップボードにコピーしました。
 Publication link:	パブリケーションのリンク:
 Publication location	パブリケーションの場所
+Publication manager	パブリケーションマネージャー
 Publication manager (Alt-t)	パブリケーションマネージャー (Alt-t)
 Publication name	パブリケーション名
 Publication notes	パブリケーションの注記
@@ -5088,6 +5856,7 @@ Published FeatureScript	公開済みの FeatureScript
 Published by	公開者
 Published date	公開日
 Publish…	公開…
+Pull direction	引く方向
 Purchase Onshape	Onshape を購入する
 Purchase record not found.	購入記録が見つかりません。
 Purchase type:	購入タイプ:
@@ -5108,6 +5877,7 @@ Queuing…	キューに追加中...
 Quick tab switching - backward	クイックタブ切り替え - 戻る
 Quick tab switching - forward	クイックタブ切り替え - 進む
 RELEASE	リリース
+Rack and pinion	ラックアンドピニオン
 Rack and pinion relation	ラックアンドピニオンリレーション
 Radial dimension	半径寸法
 Radius	半径
@@ -5116,7 +5886,9 @@ Range	範囲
 Range end cannot appear before range start	範囲終点は範囲始点の前にできません
 Range start and range end cannot be same	範囲始点と範囲終点は同じにできません
 Range start cannot appear after range end	範囲始点は範囲終点の後にできません
+Ratio	比率
 Ray (__unit__)	光線 (__unit__)
+Ray gradient	光線勾配
 Ray gradient (%)	光線勾配 (%)
 Re-invite	再招待
 Re-releasable?	再リリース可能ですか?
@@ -5124,6 +5896,9 @@ Reactivate your subscription	サブスクリプションを再有効化する
 Read or write data within your Onshape documents, only in response to your actions.	ユーザーのアクションがあった場合にのみ、Onshape ドキュメント内のデータの読み取りまたは書き込みを行います。
 Read-only access	読み取り専用アクセス
 Real	実数
+Realign	再配置
+Reapply features	フィーチャーを再適用
+Reapply fillet	フィレットを再適用
 Receipt Id: 	領収書 ID: 
 Receipt failed to load.	レシートを読み込めませんでした。
 Receive email notifications for all new shares, including to your teams, classrooms or companies, and comments in documents or publications you have access to.	チーム、教室、Company などで共有されたすべての新しい通知や、あなたがアクセス権を持つドキュメントやパブリケーションのコメントをメールで受け取ることができます。
@@ -5141,12 +5916,14 @@ Recent activity	最近のアクティビティ
 Recent activity failed to load.	最近のアクティビティを読み込めませんでした。
 Recently opened	最近開いたアイテム
 Recently used	最近使用したアイテム
+Recognize	認識
 Reconfigure	再構成
 Recover Document	ドキュメントを回復
 Recover Part Studio	Part Studio を回復
 Recovery codes	回復コード
 Recreate Release from the current workspace	現在のワークスペースからリリースを再作成
 Rectangle	長方形
+Rectangle - Scaled	長方形 - スケーリング
 Red	赤
 Redo	やり直す
 Redo (Ctrl-y)	やり直す (Ctrl-y)
@@ -5157,7 +5934,10 @@ Refer a friend	友達を紹介する
 Reference	参照
 Reference coordinate system	基準座標系
 Reference designator	参照指定子
+Reference edge	参照エッジ
+Reference faces	参照面
 Reference manager	参照マネージャー
+Reference plane	参照平面
 References	参照
 References from seed assembly are updated	シードアセンブリの参照を更新しました
 References:	参照:
@@ -5188,6 +5968,7 @@ Regenerating the Slack integration token will require you to transfer the new to
 Regeneration times	再生時間
 Regex	正規表現
 Region	領域
+Regular expression	正規表現
 Regular expression search	正規表現検索
 Reject	拒否
 Reject connection?	接続を拒否しますか?
@@ -5196,6 +5977,10 @@ Rejected by __name__	__name__ によって拒否されました
 Rejected by: 	拒否者: 
 Relate a mate with a rotational degree of freedom to a mate with a linear degree of freedom.	回転自由度の合致を、直線自由度の合致に関連付けます。
 Relate the rotational and translational degrees of freedom of a Cylindrical Mate.	円筒合致の回転と平行移動の自由度を関連付けます。
+Relation	リレーション
+Relation ratio	リレーション比
+Relation type	リレーションタイプ
+Relative	相対
 Release	リリース
 Release all configurations…	すべてのコンフィギュレーションをリリース…
 Release candidate	リリース候補
@@ -5228,6 +6013,7 @@ Released reference with newer revision	新しいリビジョンのリリース�
 Releases	リリース
 Releases failed to be displayed in versions and history.	リリースをバージョンと履歴に表示できませんでした。
 Release…	リリース…
+Relief	リリーフ
 Reload and disable graphics	グラフィックをもう一度読み込んで無効にする
 Reload and enable graphics	グラフィックをもう一度読み込んで有効にする
 Remapped headers:	再マップされたヘッダー:
@@ -5248,6 +6034,7 @@ Remove display state	表示状態を削除
 Remove document	ドキュメントを削除
 Remove existing fillets and rounds, or change their radius. Useful for imported parts.	既存のフィレットやラウンドの削除や、半径の変更ができます。インポートしたパーツに便利です。
 Remove expression	式を削除
+Remove fillet	フィレットを削除
 Remove from category	カテゴリーから削除
 Remove from obsoletion	廃止リストから削除
 Remove from recently opened	最近開いたアイテムを削除
@@ -5333,6 +6120,7 @@ Replace __items__	__items__ を置換
 Replace __name__…	__name__を置換…
 Replace __numberBiggerThanOne__ instances…	__numberBiggerThanOne__ インスタンスを置換…
 Replace all	すべてを置換
+Replace all instances	すべてのインスタンスを置換
 Replace face	面を置換
 Replace instance	インスタンスを置換
 Replace instances with a selected part, surface, sketch, or subassembly.	インスタンスを選択したパーツ、サーフェス、スケッチ、サブアセンブリに置き換えます。
@@ -5342,6 +6130,8 @@ Replace reference	参照を置換
 Replace with	置換後
 Replace with __sourcename__	__sourcename__ に置換
 Replace workflow	ワークフローを置換
+Replacement component	交換コンポーネント
+Replacement part	交換パーツ
 Replace…	置換…
 Replacing…	置換中…
 Replicate	複製
@@ -5408,6 +6198,7 @@ Reset to default	既定にリセット
 Reset to defaults	既定にリセット
 Reset to parameter library value	パラメータライブラリの値をリセット
 Reset to the default __parameterName__	デフォルト __parameterName__ にリセットする
+Reset triad	トライアドをリセット
 Resetting the part number type of a releasable object will mark all previous revisions as obsolete and re-releasable. Revision history will still be visible for any previous revisions.	リリース可能なオブジェクトのパーツ番号の種類をリセットすると、以前のすべてのリビジョンが破棄され、再度リリースが可能になります。以前のリビジョンは、引き続きリビジョン履歴として表示されます。
 Resolution	解像度
 Resolve	解決
@@ -5444,7 +6235,9 @@ Restrict geometry changes to merges only	ジオメトリの変更をマージの
 Restrict metadata changes to merges only	メタデータの変更をマージのみに制限する
 Restrict students to only editing their assignment document	学生が自分の課題ドキュメントのみ編集するよう制限する
 Resubmit	再提出
+Result body operation type	結果ボディ操作タイプ
 Result mode	結果モード
+Result type	結果タイプ
 Results	結果
 Results and history	結果と履歴
 Results from	結果
@@ -5461,6 +6254,7 @@ Return to document	ドキュメントに戻る
 Return to documents	ドキュメントに戻る
 Return to this dialog at any time by pressing 	これを押して、いつでもこのダイアログに戻ります 
 Reverse compare	比較を逆にする
+Reverse direction	逆方向
 Reverse scroll wheel zoom direction	逆スクロールホイールのズーム方向
 Revert item to last revision	アイテムを最後のリビジョンに戻す
 Revert to before this merge	このマージ前に戻す
@@ -5495,12 +6289,16 @@ Revoking the Slack integration token will prevent notifications to Slack and dis
 Revolute	回転
 Revolute mate	回転合致
 Revolute mate (m)	回転合致 (m)
+Revolutions	回転
 Revolve	回転
 Revolve (Shift-w)	回転 (Shift-W)
+Revolve angle	回転角
+Revolve axis	回転軸
 Revolved	回転済み
 Revolve…	回転…
 Rhino file	Rhino ファイル
 Rib	リブ
+Rib extrusion direction	リブ押し出し深さ方向
 Right	右側
 Right click a variable value or description to configure them.	変数値または説明を右クリックして設定します。
 Right click on the tab and click Export to download a CSV file, or download a sample.	タブを右クリックし、エクスポートをクリックして CSV ファイルをダウンロードするか、サンプルをダウンロードします。
@@ -5508,6 +6306,7 @@ Right click on this tab and click Update, then choose your saved CSV file.	こ�
 Right click patterns, mates, or instances to configure them.	パターン、合致、またはインスタンスを右クリックして設定します。
 Right click sketch dimensions, features, or feature parameters to configure them.	スケッチ寸法、フィーチャー、フィーチャー パラメータを右クリックして設定します。
 Right mouse button drag	マウスの右ボタンをドラッグ
+Right mouse button drag or	右のマウスボタンをドラッグまたは
 Right view	右ビュー
 Right-click on a row to perform actions	行を右クリックしてアクションを実行
 Rigid body	剛体
@@ -5529,22 +6328,47 @@ Rollback	ロールバック
 Rollback bar	ロールバックバー
 Rollback failed.  Consider opening a previous version instead.	ロールバックできませんでした。代わりに以前のバージョンを開くことを検討してください。
 Rollback to the top of feature list	フィーチャーリストの頂点にロールバック
+Rolled	ロール
+Rolled K Factor	ロール K ファクター
+Rolling ball	回転球
 Rolling ball (__unit__)	回転球 (__unit__)
+Rolling ball gradient	回転球勾配
 Rolling ball gradient (%)	回転球勾配 (%)
 Root opening	ルート開口部
 Rotate	回転させる
 Rotate 180 deg	180 度回転
 Rotate 90 deg	90 度回転
+Rotate about X	X を中心に回転
+Rotate about Y	Y を中心に回転
+Rotate about Z	Z を中心に回転
 Rotate pi rad	PI RAD を回転
 Rotate pi/2 rad	PI/2 RAD を回転
+Rotation	回転させる
+Rotation about Y'	Y' を中心に回転
+Rotation about Z	Z を中心に回転
+Rotation about Z'	Z' を中心に回転
 Rotation angle	回転角度
+Rotation axis	回転軸
+Round	円形
+Round - Scaled	円形 - スケール
+Round - Sized	円形 - サイズ
 Routing curve	ルーティング曲線
+Routing curve (#curveLength)	ルーティング曲線 (#curveLength)
 Routing curve table	ルーティング曲線テーブル
 Routing curve table panel	ルーティング曲線テーブルパネル
+Row	行
 Row IDs	行 ID
+Row access type	行アクセスタイプ
+Row index (0-based)	行インデックス (0 から始まる)
+Row max index (0-based)	行の最大インデックス (0 から始まる)
+Row min index (0-based)	行の最小インデックス (0 から始まる)
 Row name	行名
+Row regular expression	行の正規表現
+Row result type	行の結果タイプ
+Row value	行の値
 Rule: __RuleType__	ルール: __RuleType__
 Ruled surface	ルールドサーフェス
+Ruled surface type	ルールドサーフェスの種類
 Run History	実行履歴
 Run Logs	実行ログ
 Run active simulation	アクティブなシミュレーションを実行
@@ -5559,8 +6383,12 @@ Run restarted successfully.	実行が正常に再開されました。
 Run started successfully.	実行が正常に開始されました。
 Running (__progressPercentage__% complete)	実行中 (__progressPercentage__% 完了)
 Runtime	ランタイム
+S-RT™ free-running locknuts	S-RT™ 自走式かしめナット
 SAML2 Metadata XML	SAML2 メタデータ XML
 SAML2 metadata XML	SAML2 メタデータ XML
+SGPC™ swaging collar studs	SGPC™ スエージングカラースタッド
+SH™ hard panel nuts	SH™ ハードパネルナット
+SL™ TRI-DENT® prevailing torque locknuts	SL™TRI-DENT® 一般的なトルクロックナット
 SMBend	曲げ
 SMBendRelief	曲げリリーフ
 SMCorner	コーナー
@@ -5571,16 +6399,23 @@ SMHem	ヘム
 SMJoint	ジョイント
 SMLoft	シートメタルロフト
 SMMakeJoint	ジョイントを作成する
+SMPS™/SMPP™ nuts	SMPS™ / SMPP™ ナット
 SMRip	リッピング
 SMStartSheetMetal	シートメタルモデル
 SMTab	タブ
 SOLIDWORKS part file	SOLIDWORKS パーツ ファイル
+SOSG™/SOAG™ threaded standoffs	SOSG™/ SOAG™ スレッドスタンドオフ
+SO™/SOS™/SOA™/SO4™ through threaded standoffs	スレッドスタンドオフによる SO™/ SOS™/ SOA™/ SO4™
+SO™/SOS™/SOA™/SO4™ through unthreaded standoffs	スレッド化されていないスタンドオフを介した SO™/ SOS™/ SOA™/ SO4™
 STEP	ステップ
 STEP file	STEP ファイル
 STL Format	STLフォーマット
 STL file	STL ファイル
 Safari (Version 6 and above)	Safari (バージョン 6 以降)
 Safety factor	安全係数
+Same frames as previous	前と同じフレーム
+Sample size	サンプリング
+Sampled	サンプリング済み
 Saturday	土曜日
 Save	保存
 Save Arena settings	Arena 設定を保存
@@ -5624,6 +6459,8 @@ Saving settings…	設定を保存しています…
 Saving…	保存しています…
 Scalable, configurable solutions	スケーラブルで構成可能なソリューション
 Scale	スケール
+Scale factor	縮尺計数
+Scale uniformly	均一にスケーリング
 Schedule a date to remove user(s) from your enterprise.	Enterprise からユーザーを削除する日時を設定してください。
 Schedule assignment	課題をスケジュール
 Schedule deleted.	スケジュールが削除されました。
@@ -5646,6 +6483,7 @@ Scheduling update…	更新をスケジュールしています…
 School level	学校区分
 School level is required.	学校区分は必須です。
 Scope	範囲
+Screw	ねじ
 Screw relation	ねじリレーション
 Scroll left (RMB: to first)	左にスクロール (RMB: 最初)
 Scroll right (RMB: to last)	右にスクロール (RMB: 最後)
@@ -5654,6 +6492,7 @@ Scroll to branch top	ブランチの先頭までスクロール
 Scroll to merge source	マージのソースまでスクロール
 Scroll to merge target	マージのターゲットまでスクロール
 Scroll wheel in/out	スクロールホイールのイン/アウト
+Scroll wheel in/out or	ホイールを上/下スクロールまたは
 Scroll wheel in/out or \nCtrl + Middle mouse button drag	ホイールを上/下スクロールまたは \nCtrl + 中央のマウスボタンをドラッグ
 Scroll wheel in/out or \nShift + Middle mouse button drag	ホイールを上/下スクロールまたは\nShift + 中央のマウスボタンをドラッグ
 Search	検索
@@ -5714,10 +6553,39 @@ Searches in name, description, and part number. Use "*" for wildcard matching	�
 Searching…	検索しています…
 Seats	シート
 Seats:	シート:
+Second bound	2 番目の境界
+Second bound type	2 番目の境界の種類
+Second centered	二次中心
 Second dash	2 番目の破線
+Second depth	二次深さ
+Second direction	二次方向
+Second direction has offset	二次方向にオフセットあり
+Second distance	二次距離
+Second draft	二次抜き勾配
+Second draft angle	二次勾配角度
+Second draft opposite direction	反対方向の二次抜き勾配
+Second end position	二次終点
+Second end type	二次末端の種類
+Second equal spacing	二次等間隔
 Second gap	2 番目のギャップ
+Second instance count	二次インスタンス数
+Second match	2 つ目の一致
+Second offset distance	二次オフセット距離
+Second offset opposite direction	反対方向の二次オフセット
+Second opposite direction	二次反対方向
+Second plane limit	平面の 2 番目の制限
+Second radius	2 つ目の半径
+Second set of surfaces	2 番目のサーフェスセット
+Second side face	2 番目の側面
+Second sketch	2 つ目のスケッチ
+Second trim to face boundaries	面の境界まで 2 つ目のトリム
+Second up to face	二次面へ
+Second up to surface or part	二次サーフェスまたはパーツへ
+Second up to vertex or mate connector	二次頂点または合致コネクタへ
+Secondary axis entity	二次軸エンティティ
 Secondary key	セカンダリキー
 Secondary key copied.	セカンダリキーをコピーしました。
+Section count	セクション数
 Section interference color	断面の干渉色
 Section plane __oneTwoOrThree__ __name__	セクション平面 __oneTwoOrThree__ __name__
 Section planes	断面平面
@@ -5727,8 +6595,13 @@ Sectioned __typeName__ of __entityName__	断面化した __typeName__ の __enti
 Security	セキュリティ
 Security code exceeded maximum length.	セキュリティコードが最大長を超えています。
 See all your enterprises	すべての Enterprise を表示
+Seed geometry type	シードジオメトリのギャップ
 Seen when collaborating with other users	他のユーザーとの連携時に表示可能
+Segment edit type	セグメント編集タイプ
+Segments	セグメント
 Select	選択
+Select (edge)	選択 (エッジ)
+Select (vertex)	選択 (頂点)
 Select Onshape category	Onshape カテゴリーを選択
 Select Onshape property	Onshape プロパティを選択
 Select __companyType__	__companyType__ を選択
@@ -5776,10 +6649,12 @@ Select a workspace to update	更新するワークスペースを選択
 Select action	操作を選択
 Select advanced permissions	高度なアクセス許可を選択
 Select all	すべてを選択
+Select all frames	すべてのフレームを選択
 Select an action	操作を選択してください
 Select an action below to continue	下で操作を選択して続行してください
 Select an assignment to view analytics	課題を選択してアナリティクスを表示
 Select an assignment to view details	課題を選択して詳細を表示
+Select an entity or mate connector	エンティティまたは合致コネクタを選択
 Select an entity to add tag to current comment.	現在のコメントにタグを追加するエンティティを選択します。
 Select an individual assembly tree item to view its properties. Select nothing to view assembly properties	個々のアセンブリ ツリー アイテムを選択して、そのプロパティを表示します。アセンブリのプロパティを表示するには、何も選択しないでください
 Select an individual part to view its properties. Select multiple parts to view their properties. Select nothing to view part studio and all part properties.	個々のパーツを選択すると、そのプロパティが表示されます。複数のパーツを選択すると、それぞれのプロパティが表示されます。何も選択しないと、Part Studio とすべてのパーツのプロパティが表示されます。
@@ -5803,10 +6678,12 @@ Select degree of freedom	自由度を選択
 Select dimension and annotation types to show	表示する寸法と注釈の種類を選択してください
 Select dimensions or sketch plane to configure	寸法またはスケッチ平面を選択して構成
 Select dimensions or sketch plane to configure with __configurationName__	寸法またはスケッチ平面を選択して __configurationName__ を構成
+Select distance to measure the linear distance between two entities./nSelect length to measure the total length of the selected entities.	距離を選択して、2 つのエンティティ間の直線距離を測定します。/n長さを選択して、選択したエンティティの長さの合計を測定します。
 Select document	ドキュメントを選択
 Select entities to be mirrored.	ミラーリングするエンティティを選択します。
 Select entities to measure	測定するエンティティを選択
 Select entities to split. For parts and surfaces, specify whether to keep or remove the split tool. For faces, select a sketch curve, curve, surface, or plane to use as the split tool.	分割するエンティティを選択します。パーツやサーフェスでは、分割ツールを保持するか削除するかを指定します。面の場合、分割ツールとして使用するスケッチ線、曲線、サーフェス、または平面を選択します。
+Select face	面を選択
 Select file	ファイルを選択
 Select folder	フォルダを選択
 Select from your published and draft classes	公開済みのクラスと下書きのクラスから選択します。
@@ -5821,9 +6698,11 @@ Select items to insert	アイテムを選択して挿入
 Select mate connector (__keybind__)	合致コネクタを選択 (__keybind__)
 Select mate connectors (__keybind__)	合致コネクタを選択 (__keybind__)
 Select options	オプションを選択
+Select or create mate connectors in this Part Studio to position derived instances	この Part Studio で合致コネクタを選択または作成して派生インスタンスを配置する
 Select origin/mate connector	原点/合致コネクタを選択
 Select other	その他を選択
 Select other…	その他を選択…
+Select owner entity	所有者エンティティを選択
 Select parameters to configure	パラメータを選択して構成
 Select parameters to configure with __configurationName__	パラメータを選択して __configurationName__ を構成
 Select parent categories	親カテゴリーを選択
@@ -5832,6 +6711,7 @@ Select part or appearance	パーツまたは外観を選択
 Select part or assembly	パーツまたはアセンブリを選択
 Select parts/surfaces/sketches	パーツ/サーフェス/スケッチを選択
 Select patterns	パターンを選択
+Select point	点を選択
 Select provider type	プロバイダータイプを選択
 Select range end	範囲の終点を選択
 Select range start	範囲の始点を選択
@@ -5861,6 +6741,7 @@ Selected edges do not form a continuous chain.	選択されたエッジは連続
 Selected format only supports exporting the active sheet.	選択された形式はアクティブなシートのエクスポートのみをサポートしています。
 Selected items moved.	選択されたアイテムが移動されました。
 Selected material library has a new version available. Accept changes to update part(s) to latest version.	選択したマテリアルライブラリに新しいバージョンがあります。パーツを最新バージョンに更新するための変更に同意します。
+Selected points	選択した点
 Selected resource is not valid for ownership transfer.	選択したリソースは、所有権の引き継ぎには無効です。
 Selected tab contains no supported geometry for export.	選択したタブには、エクスポート用にサポートされているジオメトリが含まれていません。
 Selected users and teams	選択されたユーザーとチーム
@@ -5875,8 +6756,13 @@ Selection no longer available. Close the dialog to leave unchanged.	選択項目
 Selection no longer available. Make a new selection (or close the dialog to leave unchanged)	選択項目が使用できなくなりました。新しい選択項目を作成します (またはダイアログを閉じて未変更のままにします)
 Selection to replace	置き換える選択内容
 Selection to replace with	置き換える選択内容:
+Selection type	選択の種類
+Selections	選択
 Selective update	選択的アップデート
 Select…	選択…
+Self-clinching nuts	セルフクリンチングナット
+Self-clinching standoffs	セルフクリンチングスタンドオフ
+Self-clinching studs & pins	セルフクリンチングスタッド＆ピン
 Semantic	セマンティック
 Send invitation	招待を送信
 Send me a copy	コピーを送信
@@ -5919,6 +6805,7 @@ Setup a new domain for verification	検証用の新しいドメインを設定
 Shaded bodies	シェードボディ
 Shaded with edges	エッジ付きシェード
 Shaded without edges	エッジのないシェード
+Shaft class	シャフトクラス
 Share	シェア
 Share details	詳細を共有
 Share dialog failed to open.	共有ダイアログを開くことができませんでした。
@@ -5934,6 +6821,7 @@ Share with mentioned approver	メンションされた承認者と共有
 Share with mentioned approvers	メンションされた承認者と共有
 Share with mentioned user	メンションされたユーザーと共有
 Share with mentioned users	メンションされたユーザーと共有
+Shared	共有済み
 Shared with Onshape support	Onshape サポートと共有
 Shared with me	共有したアイテム
 Share…	シェア…
@@ -5948,18 +6836,23 @@ Sharing will give this user permission to view and comment on this publication.	
 Sharing…	共有しています…
 Sheet	シート
 Sheet metal context:	シート メタル コンテキスト:
+Sheet metal face to bend	曲げるシートメタル面
 Sheet metal form library	シートメタルフォームライブラリ
 Sheet metal loft	シートメタルロフト
 Sheet metal materials	シートメタルマテリアル
 Sheet metal materials library	シートメタルマテリアルライブラリ
 Sheet metal model	シートメタルモデル
+Sheet metal part	シートメタルパーツ
+Sheet metal parts	シートメタルパーツ
 Sheet metal table and flat view	シートメタルテーブルと展開図
 Sheet range cannot be empty	シート範囲は空白にできません。
 Sheet range is out of bounds	シート範囲が境界線外です
 Sheets	シート
 Shell	シェル
+Shell thickness	シェルの厚さ
 Shift + Middle mouse button drag	Shift + 中央のマウスボタンのドラッグ
 Shininess	光沢
+Short	短い
 Shortcut toolbar settings updated.	ショートカットツールバー設定が更新されました。
 Shortcut toolbars	ショートカット ツールバー
 Show	表示
@@ -5995,6 +6888,7 @@ Show all rigid bodies	すべての剛体を表示
 Show analysis tools__ctxt__toolbar-analysis-btn	分析ツールを表示
 Show analysis tools…	分析ツールを表示…
 Show automatic versions	自動バージョンを表示
+Show calculation variance	計算上の分散を表示
 Show center of mass	重心を表示
 Show changes in history	変更履歴を表示
 Show changes…	変更を表示…
@@ -6003,14 +6897,17 @@ Show code	コードを表示
 Show completed	完了済みアイテムを表示
 Show connections	接続を表示
 Show constraints	拘束を表示
+Show coordinate system of the reference used by the current vertex.	現在の頂点で使用されている基準座標系を表示します。
 Show current branch	現在のブランチを表示
 Show current branch with parent branches	親ブランチを含む現在のブランチを表示
+Show default points	既定点を表示
 Show default tolerances	既定の許容差を表示
 Show deformation	変形を表示
 Show dependencies of __name__…	__name__ の依存関係を表示…
 Show dependencies…	依存関係を表示…
 Show derived tolerances	派生許容差を表示
 Show details	詳細を表示
+Show deviation	偏差を表示
 Show dimensions	寸法を表示
 Show distortion	歪みを表示
 Show drawings	図面を表示
@@ -6035,6 +6932,7 @@ Show inactive values	非アクティブな値を表示
 Show instance list properties	インスタンスリストプロパティを表示
 Show instances	インスタンスを表示
 Show internal geometry	内部ジオメトリを表示
+Show isocurves	ISO 曲線を表示
 Show items already in toolbar	既にツールバーにあるアイテムを表示
 Show less	少なく表示
 Show mates	合致を表示
@@ -6056,16 +6954,20 @@ Show parts list properties	パーツリストプロパティを表示
 Show password	パスワードを表示
 Show pinned references only	ピン留めされた参照のみ表示
 Show preview	プレビューを表示
+Show reference coordinate system	基準座標系を表示
 Show regeneration times	再生時間を表示
 Show replies	返信を表示
 Show results	結果を表示
 Show results in new browser tab	新しいブラウザタブに結果を表示
 Show revisions	リビジョンを表示
+Show ruled lines	罫線を表示
 Show search results as list	一覧で検索結果を表示
 Show selected part	選択されたパーツを表示
+Show selection	選択を表示
 Show setup	セットアップを表示
 Show setup in new browser tab	セットアップを新しいブラウザタブで表示
 Show sketch diagnostics tools	スケッチ診断ツールを表示
+Show start and end profiles	開始輪郭と終了輪郭を表示
 Show top level assembly row	最上位アセンブリの行を表示
 Show top level only	最上位のみ表示
 Show undercut regions	アンダーカット領域を表示
@@ -6085,8 +6987,11 @@ Showing message	メッセージを表示中
 Shown when __displayName__ is __value__	__displayName__ が __value__ の場合に表示
 Shown when __displayName__ is between __value__	__displayName__ が次の間の場合に表示: __value__
 Shows all top level symbols in the dropdown. Use the search field to filter symbols by name. Click on a symbol to navigate to it in the editor.	最上位の記号をすべてドロップダウンに表示します。検索フィールドを使用して、名前で記号を絞り込むことができます。記号をクリックすると、エディタ上でその記号に移動します。
+Side	側面
 Side 1	側面 1
 Side 2	側面 2
+Side length	辺の長さ
+Sides	側面
 Sign in	サインイン
 Sign in to Onshape	Onshape にサインイン
 Sign in to __companyName__	__companyName__ にサインイン
@@ -6108,6 +7013,7 @@ Sign-in attempt throttled. Click "Sign in" again to continue.	サインイン試
 Sign-in attempt throttled. Solve recaptcha puzzle to continue.	サインイン試行が制限されました。reCAPTCHA パズルを解決して続行してください。
 Signed von Mises stress (__unit__)	符号付きミーゼス応力 (__unit__)
 Signing in…	サインイン中…
+Simple	シンプル
 Simulate the effect of a bearing load on one or more faces of an instance.	インスタンスの 1 つまたは複数の面へのベアリング荷重の効果をシミュレートします。
 Simulate the effect of a static, uniform, linear acceleration acting on an instance.	インスタンスに作用する静的で均一な線形加速度の効果をシミュレートします。
 Simulate the effect of an angular velocity and the resultant load acting on an instance.	角速度とそれによってインスタンスに作用する荷重の効果をシミュレートします。
@@ -6123,6 +7029,7 @@ Simulation "__simulationName__" results were deleted	シミュレーション "_
 Simulation "__simulationName__" was canceled	シミュレーション "__simulationName__" はキャンセルされました
 Simulation bonded	結合されたシミュレーション
 Simulation cannot be queued. The maximum number of queued simulations per user (__max__) has been reached.	シミュレーションをキューに入れることができません。ユーザーあたりのキューに入れたシミュレーションの最大数 (__max__) に達しました。
+Simulation connection	シミュレーション接続
 Simulation features	シミュレーションフィーチャー
 Simulation is complete	シミュレーションが完了しました
 Simulation is not included in your current Onshape subscription plan	シミュレーションは現在の Onshape サブスクリプションプランに含まれていません
@@ -6135,10 +7042,13 @@ Simulation status	シミュレーションステータス
 Simulation was canceled	シミュレーションはキャンセルされました
 Simulations	シミュレーション
 Simulations can help estimate how a loaded assembly behaves while being constrained by mates and fixed components.	シミュレーションは、読み込まれたアセンブリが合致コンポーネントや固定コンポーネントで拘束された状態でどのように動作するかを推定するのに役立ちます。
+Single	シングル
 Single flat pattern part only	シングルフラットパターンパーツのみ
+Single sign on	シングルサインオン
 Single sign on (SSO)	シングルサインオン (SSO)
 Single sign on (SSO) user auto-provisioning	シングルサインオン (SSO) ユーザーの自動プロビジョニング
 Single sign on is disabled due to bad configuration.	コンフィギュレーションの不備により、シングルサインオンは無効になっています。
+Single value	単一値
 Size	サイズ
 Size bytes: __sizeBytes__	バイトのサイズ: __sizeBytes__
 Size to Part Studio	サイズを Part Studio に合わせる
@@ -6165,16 +7075,25 @@ Sketch an elliptical arc by defining its center point, major axis, minor axis, s
 Sketch chamfer	面取りをスケッチ
 Sketch copy and pasted	スケッチをコピーして貼り付けました
 Sketch curved text	曲線テキストをスケッチ
+Sketch curves to extrude	押し出しをするスケッチ線
+Sketch fillet	フィレットをスケッチ
 Sketch fillet (Shift-f)	フィレットをスケッチ (Shift-f)
+Sketch for flat view	展開図用のスケッチ
 Sketch functions	スケッチ機能
 Sketch inflection points	スケッチの変曲点
 Sketch new construction geometry or convert existing sketch entities into construction geometry.	新しい作図ジオメトリをスケッチするか、既存のスケッチを作図ジオメトリに変換します。
+Sketch plane	スケッチ平面
 Sketch point	点をスケッチ
+Sketch points	スケッチ点
+Sketch points to place holes	穴を配置するためのスケッチポイント
+Sketch profile	スケッチ輪郭
+Sketch profiles	スケッチ輪郭
 Sketch text border	スケッチテキスト境界
 Sketches	スケッチ
 Sketches and curves	スケッチと曲線
 Skip	スキップ
 Skip aggregation	集約をスキップする
+Skip instances	インスタンスをスキップ
 Slack Workspace ID	Slack ワークスペース ID
 Slack connection	Slack 接続
 Slack integration token	Slack 統合トークン
@@ -6185,6 +7104,10 @@ Slider mate	スライダ合致
 Slider mate (m)	スライダ合致 (m)
 Slot	スロット
 Slowest features (__numberOfFeatures__)	最も遅いフィーチャー (__numberOfFeatures__)
+Smooth	スムーズ
+Smooth fillet corners	スムーズなフィレットコーナー
+Smooth transition	スムーズな変換
+Smoothness	滑らかさ
 Snap mode	スナップモード
 Snap mode (Shift-s)	スナップモード (Shift-s)
 Snippet not found. To use this snippet, import the Onshape Standard Library.	スニペットが見つかりませんでした。このスニペットを使用するには、Onshape 標準ライブラリをインポートしてください。
@@ -6230,7 +7153,9 @@ Sort tasks	タスクを並べ替え
 Source	ソース
 Source category	ソースカテゴリー
 Source drawing view is not selected	ソースの図面ビューが選択されていません
+Source is 'Y Axis Up'	ソースは「YAxisUp」
 Source version name	ソースバージョン名
+Spacing type	間隔タイプ
 Spans	スパン
 Specify a maximum count no greater than __maxLength__.	__maxLength__ 以下の最大数を指定します。
 Specify a maximum count of at least __minLength__.	__minLength__ 以上の最大数を指定します。
@@ -6243,20 +7168,29 @@ Specify a minimum length of at least __minLength__.	__minLength__ 以上の最�
 Specify a valid configuration.	有効なコンフィギュレーションを指定します。
 Specify a value no greater than __maxValue__.	__maxValue__ 以下の値を指定します。
 Specify a value of at least __minValue__.	__minValue__ 以上の値を指定します。
+Specify anchor points	アンカーポイントを指定
+Specify axis	軸を指定
 Specify diameter	直径を指定
+Specify direction	方向を指定
 Specify what user type should be used when automatically provisioning a user who signs in using SSO.	SSO を使用してサインインしたユーザーを自動的にプロビジョニングする際に使用するユーザータイプを指定します。
 Specular color	鏡面反射の色
 Sphere	球体
 Spherical diameter	球の直径
 Spherical radius	球の半径
+Spine	スパイン
 Spline	スプライン
 Spline control point	スプライン制御点
 Spline handle	スプラインハンドル
 Split	分割
+Split face	面を分割
+Split faces	面を分割
 Split into multiple documents	複数のドキュメントに分割
 Split sketch curves into multiple segments. For open curves, select 1 or more points. For closed curves, select 2 or more points.	スケッチ線を複数のセグメントに分割します。開いた曲線には 1 つかそれ以上の点を選択し、閉じた曲線には 2 つ以上の点を選択します。
+Split type	分割タイプ
 Spot face	スポット面
+Spun corner	スパンコーナー
 Square	四角形
+Square - Sized	正方形 - サイズ
 Standard	標準
 Standard Content	標準コンテンツ
 Standard Content Administration	標準コンテンツ管理
@@ -6270,21 +7204,54 @@ Standard content library	標準コンテンツライブラリ
 Standard content parameters failed to load.	標準コンテンツパラメーターを読み込めませんでした。
 Standard library version range start must not be after its stop.	標準ライブラリのバージョン範囲の開始は終了より後にできません。
 Standard:	標準:
+Start	開始
 Start 7 day trial	7 日間の試用を開始
 Start New Run	新しい実行を開始
 Start Onshape Professional Trial	Onshape Professional 試用版を開始
 Start Professional Trial	Professional 試用版を開始
+Start angle	開始角
 Start assignment	課題を開始
 Start assignment and select an existing document.	課題を開始し、既存のドキュメントを選択してください。
 Start assignment to create a copy of the starter document.	課題を開始し、スタータードキュメントのコピーを作成してください。
 Start assignment to create a new document.	課題を開始し、新しいドキュメントを作成してください。
 Start assignment…	課題を開始…
+Start condition	開始条件
+Start curvature offset	開始曲率オフセット
 Start date	開始日
 Start date is after end date	開始日が終了日より後の日付です
 Start date is after today's date	開始日は本日の日付より後の日付です
+Start direction	開始方向
+Start direction has offset	開始方向にオフセットがあります
+Start direction offset angle	開始方向のオフセット角度
+Start edge position	開始エッジの位置
+Start flow offset	開始フローオフセット
+Start from part	パーツから開始
+Start from selected plane	選択した平面から開始
+Start from sketch plane	スケッチ平面から開始
+Start magnitude	開始マグニチュード
+Start offset	開始オフセット
+Start offset opposite direction	反対方向のオフセットの開始
+Start opposite direction	反対方向の開始
+Start plane	開始平面
+Start point	始点
+Start position	開始位置
+Start profile adjacent faces	開始輪郭の隣接面
+Start profile condition	開始輪郭条件
+Start radius	開始半径
+Start trim	始点トリム
+Start type	開始タイプ
 Start typing to search tools	入力を始めてツールを検索
+Start up to face	[面まで] を開始
+Start up to surface or part	[サーフェスまで] または [パーツまで] を開始
+Start up to vertex or mate connector	[頂点まで] または [合致コネクタまで] を開始
+Start value	開始値
 Start zones	開始ゾーン
 Started	開始済み
+Starting offset	オフセットの開始
+Starting offset bound	オフセット境界の開始
+Starting offset depth	オフセット深度の開始
+Starting offset entity	オフセットエンティティの開始
+Starting offset opposite direction	反対方向のオフセットの開始
 Starting simulation (__current__ of __max__ allocated)...	シミュレーションを開始中 (__max__ のうち __current__ が割り当てられています)...
 Starting…	開始中…
 Startup page	スタートページ
@@ -6294,6 +7261,8 @@ State / Region:	州 / 地域
 Statistical tolerance	統計的許容差
 Status	ステータス
 Steep	急勾配
+Step	ステップ
+Steps	ステップ
 Still waiting on an input TRS for __assemblyName__ __simulation__.	__assemblyName__ __simulation__ のための入力 TRS を引き続き待機しています。
 Still waiting on an input TRS for __assemblyName__.	__assemblyName__ のための入力 TRS を引き続き待機しています。
 Stop	停止
@@ -6301,6 +7270,9 @@ Stop Document Extraction	ドキュメント抽出を停止
 Stop extraction if running	実行中の場合は抽出を停止
 Store file in __drive__ (__account__)	__drive__ (__account__) にファイルを保存
 Store file in a new tab	新しいタブにファイルを保存
+Straight	直線
+Straight pipe tap	直線パイプタップ
+Straight tap	直線タップ
 Street address	住所
 Stripe count	ストライプ数
 Structural	構造的
@@ -6319,6 +7291,7 @@ Students cannot view an unpublished class	学生は未公開のクラスを表�
 Students do not have sharing permissions.	学生には共有アクセス許可がありません。
 Students will have view access to the starter document once the assignment is published. It will appear in their document list.	学生は、課題を公開すると、スタータードキュメントへの表示アクセスが許可されます。これはドキュメントリストに表示されます。
 Students: __students__	学生: __students__
+Style	スタイル
 Sub-total	小計
 Subassemblies added to named positions.	サブアセンブリを名前の付いた位置に追加しました。
 Subassemblies position unlocked.	サブアセンブリ位置のロックが解除されました。
@@ -6364,6 +7337,9 @@ Subscription: Active	サブスクリプション: アクティブ
 Subscription: __accountState__	サブスクリプション: __accountState__
 Subscriptions	サブスクリプション
 Subtotal	小計
+Subtract	差
+Subtraction offset	減算オフセット
+Subtraction scope	差の範囲
 Successfully added export rule with convention:  __convention__	次の規則を持つルールのエクスポートが正常に追加されました: __convention__
 Successfully exported Onshape__type__ library.	Onshape__type__ ライブラリが正常にエクスポートされました。
 Successfully exported __name____type__ library.	__name____type__ ライブラリが正常にエクスポートされました。
@@ -6391,10 +7367,15 @@ Suppressed from this BOM	この BOM から抑制済み
 Surface	サーフェス
 Surface area	サーフェス面積
 Surface finish symbol	表面粗さ記号
+Surface or boundary edges	サーフェスまたは境界エッジ
 Surfaces	サーフェス
 Surfaces (__numberOfSurfaces__)	サーフェス (__numberOfSurfaces__)
 Sweep	スイープ
+Sweep path	スイープパス
+Swept profile	輪郭をスイープ
 Switch context workspace?	コンテキストのワークスペースを切り替えますか？
+Switch face	スイッチ面
+Switch side	側面の切り替え
 Switch to	切り替え先
 Switch to "__rowName__"	"__rowName__" に切り替える
 Switch to Assembly	アセンブリに切り替える
@@ -6411,6 +7392,7 @@ Symbol "__symbolName__" no longer exists at specified location	記号「__symbol
 Symbol search cannot be performed due to a collaborator edit.	共同作業者が編集しているため、記号検索を実行できません。
 Symmetric	対称
 Symmetric Dirichlet	対称ディリクレ
+Symmetrical	対称
 Sync Arena revision value upon release candidate approval	リリース候補の承認時に Arena リビジョン値を同期する
 Sync BOM line items	BOM 行アイテムを同期する
 Sync BOM to __plmName__	BOM を __plmName__ に同期
@@ -6439,6 +7421,11 @@ Syncing to Windchill is enabled.	Windchill への同期が有効になりまし�
 Syncing to __plmName__…	__plmName__ に同期中…
 System	システム
 System check	システムチェック
+S™/SS™/CLS™/CLSS™/SP™ nuts	S™/ SS™/ CLS™/ CLSS™/ SP™ ナット
+TFH™/TFHS™ non-flush studs	TFH™/ TFHS™ 非フラッシュスタッド
+TPS™/TP4™ flush-head pilot pins	TPS™/ TP4™ フラッシュヘッドパイロットピン
+TPXS™ self-clinching pilot pins	TPXS™ セルフクリンチングパイロットピン
+TSO™/TSOS™/TSOA™/TSO4™ blind standoffs for thin sheet	薄いシート用の TSO™/ TSOS™/ TSOA™/ TSO4™ ブラインドスタンドオフ
 TXT verification code	TXT 確認コード
 TXT verification file	TXT 確認ファイル
 TYPE INFO	タイプ情報
@@ -6448,7 +7435,9 @@ Tab cannot be moved into a protected workspace. Create or select a branch to mov
 Tab failed to be moved.	タブを移動できませんでした。
 Tab failed to paste.	タブを貼り付けられませんでした。
 Tab graphics	タブグラフィック
+Tab manager	タブマネージャー
 Tab manager (Alt-t)	タブマネージャー (Alt-t)
+Tab mate connector(s)	タブの合致コネクタ
 Tab merge strategy	タブのマージ方法
 Tab must be opened before actions can be performed.	アクションを実行するにはタブを開いておく必要があります。
 Tab name cannot be empty.	タブ名は空白にできません。
@@ -6457,6 +7446,7 @@ Tab name cannot contain HTML.	タブ名に HTML を含めることはできま�
 Tab only exists in '__versionName__'.	タブは '__versionName__' のみに存在します。
 Tab order	タブの並び順
 Tab performance	タブパフォーマンス
+Tab profile	タブプロファイル
 Tab restore strategy	タブの復元方法
 Tab types	タブの種類
 Tab will not exist in __targetname__ after merge	マージ後は __targetname__ にタブが存在しなくなります
@@ -6473,21 +7463,62 @@ Tabs are filtered, some results may not appear in search.	タブはフィルタ�
 Tag	タグ
 Tag entity	タグ エンティティ
 Tag profile	タグプロファイル
+Tag purpose	タグの目的
 Take a self-paced course	自習コースを受講する
+Tangency	接線
 Tangent	接線
 Tangent (t)	接線 (t)
 Tangent arc	接線円弧
 Tangent connected	接線が接続されました
 Tangent connected edges	接線がエッジに接続されました
 Tangent connected faces	接線が面に接続されました
+Tangent direction	接線方向
+Tangent edges	接線エッジ
 Tangent edges phantom	接線エッジをファントムにする
 Tangent edges removed	接線エッジが削除されました
 Tangent edges visible	接線エッジを表示
+Tangent hold lines	接線保持線
 Tangent mate	接線合致
 Tangent mates	接線合致
 Tangent plane	接線平面
+Tangent propagation	接線伝播
+Tangent to curve	曲線に正接
+Tangent to face	面に正接
+Tangent to guide	ガイドに正接
+Tangent to profile	輪郭に正接
+Tap clearance (number of thread pitch lengths)	タップクリアランス (ネジピッチの長さ数)
+Tap drill diameter	タップドリル径
+Tap drill diameter deviation	ねじ下錐直径の偏差
+Tap drill diameter lower deviation	ねじ下錐直径偏差の下限
+Tap drill diameter lower limit	ねじ下錐直径の下限
+Tap drill diameter precision	ねじ下錐直径精度
+Tap drill diameter tolerance controls	ねじ下錐直径許容差の制御
+Tap drill diameter tolerance type	ねじ下錐直径許容差のタイプ
+Tap drill diameter upper deviation	ねじ下錐直径偏差の上限
+Tap drill diameter upper limit	ねじ下錐直径の上限
+Tap through all	すべてをタップ貫通
+Tap type	タップの種類
+Tapered pipe tap	テーパーパイプタップ
+Tapped	タップ
+Tapped depth	タップ深さ
+Tapped depth deviation	タップ深さの偏差
+Tapped depth lower deviation	タップ深さ偏差の下限
+Tapped depth lower limit	タップ深さの下限
+Tapped depth precision	タップ深さの精度
+Tapped depth tolerance controls	タップ深さ許容差の制御
+Tapped depth tolerance type	タップ深さ許容差のタイプ
+Tapped depth upper deviation	タップ深さ偏差の上限
+Tapped depth upper limit	タップ深さの上限
+Target	ターゲット
+Target anchor point	ターゲットアンカーポイント
+Target degree	ターゲット角度
+Target face(s)	ターゲット面
 Target input is empty	ターゲット入力が空です
+Target length	ターゲット長さ
+Target pitch	ターゲットのピッチ
+Target revolutions	ターゲットの回転
 Target version name	ターゲットバージョン名
+Targets	ターゲット
 Task	タスク
 Task failed to be completed.	タスクを完了できませんでした。
 Task failed to be deleted.	タスクを削除できませんでした。
@@ -6525,11 +7556,14 @@ Teams connection	チーム接続
 Teams deleted.	チームが削除されました。
 Teams failed to delete.	チームを削除できませんでした。
 Teams failed to load.	チームを読み込めませんでした。
+Tear	ティア
+Tear drop	ティアドロップ
 Template	テンプレート
 Template document:	テンプレートドキュメント:
 Templates	テンプレート
 Tensile yield strength	引張降伏強度
 Tensile yield strength (__units__)	引張降伏強度 (__units__)
+Termination	終端
 Terms	規約
 Terms & Privacy	規約およびプライバシー
 Terms failed to load.	チームを読み込めませんでした。
@@ -6638,6 +7672,7 @@ There was a problem creating a Websocket connection to Onshape's servers. This u
 There was a problem submitting your ticket. Try again.	チケットの送信中に問題が発生しました。もう一度お試しください。
 There was an error upgrading your subscription. Try again or contact Onshape Support.	サブスクリプションのアップグレードにエラーが発生しました。もう一度お試しいただくか、Onshape サポートにお問い合わせください。
 There was an error upgrading your subscription. __error__. Try again or contact Onshape Support.	サブスクリプションのアップグレードにエラーが発生しました。__error__。もう一度お試しいただくか、Onshape サポートにお問い合わせください。
+Thermal via	熱源
 These categories are owned by __company__.	これらのカテゴリーを __company__ は所有していません。
 These configuration inputs will always be visible	これらのコンフィギュレーション入力は常に表示されます
 These drawings should be updated before creating a version	これらの図面はバージョン作成前に更新する必要があります
@@ -6646,10 +7681,21 @@ These properties only apply to documents owned by __company__.	これらのプ�
 These tabs should be updated	これらのタブは更新する必要があります
 They can obtain their enterprise ID from the Details page of their Enterprise setting.	Enterprise 設定の詳細ページから Enterprise ID を取得できます。
 Thicken	厚みつけ
+Thickness	厚さ
+Thickness 1	厚さ 1
+Thickness 2	厚さ 2
 Thickness analysis	厚さ分析
 Thickness analysis on closed composite parts is not supported.	閉じた複合部品の厚さ分析はサポートされていません。
 Thickness analysis…	厚さ分析…
+Thickness factor	厚さ係数
+Thickness opposite direction	反対方向の厚さ
+Thin	薄い
 Third angle (ANSI)	第三角法 (ANSI)
+Third centered	三次中心
+Third direction	三次方向
+Third distance	3 番目の距離
+Third equal spacing	三次等間隔
+Third instance count	三次インスタンス数
 This Variable Studio is automatically referenced in this workspace	この Variable Studio はこのワークスペースで自動的に参照されます
 This __documentType__ was created by an education subscriber.	この __documentType__ は、Education サブスクリプションの登録者によって作成されました。
 This action cannot be undone.	この操作は元に戻せません。
@@ -6750,13 +7796,29 @@ This workspace is currently being updated. Try again later. You may	このワー
 This workspace is currently not accessible. Try again later.	このワークスペースは現在アクセスできません。後ほどもう一度お試しください。
 This workspace is using an old version of the feature library and must be updated before the __featureTypeName__ feature can be used.	このワークスペースは古いバージョンのフィーチャーライブラリを使用しており、__featureTypeName__ フィーチャーを使用する前に更新する必要があります。
 This workspace only	このワークスペースのみ
+Thread class	ねじのクラス
+Thread length	ねじ部の長さ
+Thread type	ねじの種類
+Threads/inch	1 インチあたりのねじ数
+Three point	3 点
 Three point angular dimension	3 点角度寸法
 Three point circular centerline	3 点円形中心線
+Through all	すべてを貫通
 Thumbnail image for a document.	ドキュメントのサムネイル画像。
 Thursday	木曜日
 Time	時刻
 Time format	時間形式
 Timed out while verifying that no other users are in the document.	ドキュメントに他のユーザーがいないことを確認中にタイムアウトしました。
+Tip angle	先端角度
+Tip angle deviation	先端角度の偏差
+Tip angle lower deviation	先端角度偏差の下限
+Tip angle lower limit	先端角度の下限
+Tip angle precision	先端角度の精度
+Tip angle style	先端角度スタイル
+Tip angle tolerance controls	先端角度許容差の制御
+Tip angle tolerance type	先端角度許容差のタイプ
+Tip angle upper deviation	先端角度偏差の上限
+Tip angle upper limit	先端角度の上限
 Title	タイトル
 Title 1	タイトル 1
 Title 2	タイトル 2
@@ -6771,7 +7833,10 @@ To edit this material library:	このマテリアルライブラリを編集す�
 To get started, enter a name for your company	開始するには、Company の名前を入力します
 To insert closest to selection, preselect planar faces containing holes first.	選択範囲に最も近い位置に挿入するには、最初に穴を含む平面を事前に選択します。
 To insert furthest from selection, preselect planar faces containing holes first.	選択から最も遠い位置に挿入するには、最初に穴を含む平面を事前に選択します。
+To mate connector	合致コネクタへ
 To measure	測定対象
+To owner	所有者へ
+To selection	選択範囲へ
 To size the component, select a circular edge or cylindrical face.	コンポーネントのサイズを設定するには、円形エッジまたは円筒状の面を選択します。
 To: __toEmailList__	宛先: __toEmailList__
 Toggle construction	作図線を切り替える
@@ -6783,12 +7848,16 @@ Toggle replace	置換を切り替える
 Token Value:	トークンの値:
 Tolerance	許容差
 Tolerance options	許容差オプション
+Tolerance type	許容差タイプ
 Too few fields on row #__rowNumber__.	行#__rowNumber__のフィールドが少なすぎます。
 Too many fields on row #__rowNumber__.	行#__rowNumber__のフィールドが多すぎます。
 Toolbar customization could not be saved.	ツールバーのカスタマイズを保存できませんでした。
 Toolbars	ツールバー
 Toolbars failed to reset.	ツールバーをリセットできませんでした。
 Toolbars reset.	ツールバーをリセットしました。
+Tooling	ツーリング
+Tools	ツール
+Tools anchor point	アンカーポイントを指定
 Top	上面
 Top left	左上
 Top level instances	最上位のインスタンス
@@ -6796,6 +7865,7 @@ Top view	トップビュー
 Torus	円環
 Total	合計
 Total instances (__numberOfInstances__)	合計インスタンス (__numberOfInstances__)
+Total length	全長
 Total modules imported: __numImportedModules__	インポートされたモジュールの合計数: __numImportedModules__
 Total parts	合計パーツ
 Total reflects charge of the next bill.	合計は、次回請求分を反映しています。
@@ -6821,12 +7891,21 @@ Transferred publication __documentName__ to __companyType__ __companyName__.	ド
 Transferred publication __documentName__ to user __userEmail__.	パブリケーション __documentName__ をユーザー __userEmail__ に引き継ぎました。
 Transferring ownership…	所有権の引き継ぎ中…
 Transform	トランスフォーム
+Transform by mate connectors	合致コネクタによるトランスフォーム
 Transform sketch entities	スケッチエンティティをトランスフォーム
+Transform type	トランスフォームの種類
+Transition	トランジション
 Translate	平行移動
+Translate by XYZ	XYZ で平行移動
+Translate by distance	距離で平行移動
+Translate by line	線で平行移動
 Translate, rotate, or offset selected faces. Specify end type and distance, or axis and rotation angle. Useful for imported parts.	選択した面の平行移動、回転、オフセットを行います。末端の種類と距離、または軸と回転角度を指定します。インポートしたパーツに便利です。
 Translated	平行移動済み
 Translating…	平行移動中…
 Translation	平行移動
+Translation along X	X に沿って平行移動
+Translation along Y	Y に沿って平行移動
+Translation along Z	Z に沿って平行移動
 Translation failed.	変換できませんでした。
 Translucent	半透明
 Transmit relevant data to third-party AI providers to generate outputs, where applicable.	該当する場合、出力を生成するために、関連データをサードパーティの AI プロバイダーに送信します。
@@ -6837,17 +7916,28 @@ Trashed	ごみ箱に捨てられた
 Treat as false	false として処理
 Treat as true	true として処理
 Treat as zero	ゼロとして処理
+Treatment type	処理タイプ
 Trial	試用版
 Trial expires 	試用期間が終了します 
+Triangle	三角記号
 Triangles	三角記号
 Triggers	トリガー
 Trim	トリミング
 Trim (m)	トリミング (m)
+Trim Type	トリミングの種類
 Trim a face or extend a face to a new surface. Select faces to replace and the surface to use for the replacement. Useful for imported parts.	面をトリミングしたり、新しいサーフェスに面を延長したりします。置換する面と、置換に使用するサーフェスを選択します。インポートしたパーツに便利です。
 Trim a line or curve to the first intersecting point or bounding geometry. If no intersection or bounding geometry is found, the entire entity is deleted.	線または曲線を最初の交差点か境界ジオメトリまでトリミングします。交差点や境界ジオメトリが見つからない場合は、エンティティ全体が削除されます。
+Trim control	トリム制御
 Trim curve	曲線をトリミング
+Trim ends	末端をトリミング
+Trim guides	トリミングガイド
 Trim or extend existing curves by a distance or to a bounding entity.	距離によって、または境界エンティティに対して既存の曲線をトリミングまたは延長します。
+Trim profiles	輪郭をトリミング
+Trim to face boundaries	面の境界までトリム
+Trim to target	ターゲットにトリミング
+Trim type	トリミングタイプ
 Trimetric	トリメトリック
+Trimming	トリミング
 Troubleshooting the performance check	パフォーマンスチェックのトラブルシューティング
 Try	試す
 Try Onshape Professional	Onshape Professional を試す
@@ -6866,14 +7956,24 @@ Turn profile inspector off	輪郭インスペクターをオフにする
 Turn reflection analysis off	反射分析をオフにする
 Turn thickness analysis off	厚さ分析をオフにする
 Turn zebra stripes off	ゼブラストライプをオフにする
+Turns	ターン
+Turns and pitch	ターンとピッチ
 Tutorial	チュートリアル
 Tutorial name is required	チュートリアル名が必須です
 Tutorial type	チュートリアルの種類
+Tutorials	チュートリアル
 Tutorials & Samples	チュートリアルとサンプル
+Tutorials [9]	チュートリアル
+Twist	ツイスト
+Twist opposite direction	反対方向にツイスト
+Twist type	ツイストタイプ
+Two distances	2 つの距離
 Two edge centerline	2 エッジ中心線
 Two point circular centerline	2 点円形中心線
 Two point line	2 点線
 Two point linear centerline	2 点直線中心線
+Two sided	両面
+Two sketches	2 つのスケッチ
 Two-factor authentication	2 段階認証
 Two-factor authentication (2FA)	2 段階認証 (2FA)
 Two-factor authentication activated.	2 段階認証が有効になりました。
@@ -6889,9 +7989,15 @@ Type to filter	入力してフィルター
 Type:	タイプ:
 Types	タイプ
 U curves	U 曲線
+U direction	U 方向
+U profiles	U 輪郭
+U shift	U シフト
+U shift opposite direction	U シフト反対方向
 URL of a document in trash cannot be changed.	ごみ箱にあるドキュメントの URL は変更できません。
 USD user / month	米国ドル (ユーザー/月)
 USD user / year	米国ドル (ユーザー/年)
+UVN (Control polygon)	UVN (制御ポリゴン)
+UVN (Tangent)	UVN (接線)
 Ultimate compressive strength	最大圧縮強度
 Ultimate compressive strength (__units__)	最大圧縮強度 (__units__)
 Ultimate tensile strength	最大引張強度
@@ -6934,6 +8040,8 @@ Unconfigure text	テキストの構成を解除
 Underconstrained color	拘束が不十分な色
 Underconstrained occluded color	拘束が不十分な遮蔽された色
 Undercut	アンダーカット
+Undercut diameter	アンダーカットの直径
+Undercut length	アンダーカットの長さ
 Understand Onshape's document structure with a simple model.	Onshape のドキュメント構造を簡単なモデルで理解します。
 Undo	元に戻す
 Undo (Ctrl-z)	元に戻す (Ctrl-z)
@@ -6944,10 +8052,17 @@ Unexpected character "__char__".	予期しない文字 "__char__"。
 Unfix	固定解除
 Unfix all	すべて固定解除
 Unfold	展開する
+Unfold all	すべて展開
+Unfold none	展開しない
+Unfold selected	選択範囲を展開
+Unfold type	タイプを展開
+Unified	統一された
+Union	和
 Unique parts	一意のパーツ
 Unique sketches	一意のスケッチ
 Unique subassemblies	一意のサブアセンブリ
 Unique surfaces	一意のサーフェス
+Unit	単位
 Unit of measure	測定の単位
 Unit settings failed to load.	単位設定を読み込めませんでした。
 Unit type	ユニットタイプ
@@ -6963,6 +8078,7 @@ Unlock	ロック解除
 Unlock assembly from named positon	名前の付いた位置からアセンブリのロックを解除
 Unmark visited	アクセス済みのマークを解除
 Unnamed	名前なし
+Unowned	所有者なし
 Unpack	アンパック
 Unpack folder	フォルダをアンパック
 Unpaid	未払い
@@ -7006,6 +8122,16 @@ Unverified emails cannot be made primary. Click `Resend verification email` butt
 Up to	最大
 Up to 6 months free	最大 6 か月間無料
 Up to __limit__	最大 __limit__
+Up to entity	エンティティまで
+Up to entity or mate connector	エンティティまたは合致コネクタまで
+Up to entity with offset	オフセットのあるエンティティまで
+Up to face	面へ
+Up to next	次まで
+Up to part	パーツまで
+Up to part/surface	パーツ/サーフェスまで
+Up to surface or part	サーフェスまたはパーツまで
+Up to vertex	頂点まで
+Up to vertex or mate connector	頂点または合致コネクタまで
 Update	更新
 Update FeatureScript version	FeatureScript のバージョンを更新
 Update SSO provider	SSOプロバイダーを更新
@@ -7098,6 +8224,7 @@ Uploaded file	アップロードされたファイル
 Uploading…	アップロード中…
 Upon closing, assignment will be in a "Closed" state. Students will no longer be able to submit and view from the assignments list.	課題が終了すると、課題の状態は "クローズ" になります。学生は課題リストから課題を提出/表示できなくなります。
 Upon publishing, assignment will be in an "In progress" state.	課題は公開すると「進行中」の状態になります。
+Upper	上部
 Upper flag symbol	上部のフラグ記号
 Upper limit should be greater	上限を大きくする必要があります
 Upper text	上部テキスト
@@ -7106,21 +8233,29 @@ Url Arguments	URL 引数
 Url based tutorial	URL ベースのチュートリアル
 Usages	用途
 Use	使用
+Use (Project/Convert)	使用 (投影/変換)
 Use (Project/Convert) (u)	使用 (投影/変換) (u)
 Use AI to contextually suggest and complete code as you type. Toggling this setting will only affect this session.	AI を使用して、入力中にコンテキストに応じてコードの続きを提案します。この設定の切り替えは、現在のセッションにのみ適用されます。
 Use automatic tessellation setting	自動テッセレーション設定を使用
+Use axis	軸を使用
 Use best available tessellation	利用可能な最良のテッセレーションを使用
 Use comma as decimal separator	小数点の区切りにコンマを使用
 Use compatibility mode for surfaces and curves	サーフェスと曲線に互換モードを使用
+Use cubic interpolation	立方体補間の使用
 Use custom annotation text height for MBD export	MBD エクスポートにカスタムの注釈のテキストの高さを使用
 Use custom units for export	エクスポート用のカスタム単位を使用
+Use default minimal gap	既定の最小ギャップを使用
 Use drawing units	図面の単位を使用
 Use entityId with company domain prefix	entityId を Company のドメインプレフィックスに使用
 Use file origin position	ファイルの原点位置を使用
 Use latest version	最新バージョンを使用する
+Use minimal gap	最小ギャップを使用
+Use model K Factor	モデル K 係数を使用
+Use model bend radius	モデルの曲げ半径を使用
 Use one of the recovery codes you previously obtained. Cross it off your list after you've entered it here.	以前に取得した回復コードのいずれかを使用してください。ここに入力したら、リストから消去してください。
 Use pen input as mouse	ペン入力をマウスとして使用
 Use scheduled date/time	設定した日付/時刻を使用
+Use sketch plane direction	スケッチ平面の方向を使用
 Use with small assemblies	小さなアセンブリで使用
 Use workspace units	ワークスペースの単位を使用
 User	ユーザー
@@ -7133,6 +8268,7 @@ User added to __companyType__. User __user__ is already a member of the __compan
 User added to __companyType__. Users __users__ are already members of the __companyType__.	ユーザーが __companyType__ に追加されました。ユーザー __users__ は既に __companyType__ のメンバーです。
 User added to your class.	ユーザーがクラスに追加されました。
 User agent	ユーザーエージェント
+User defined	ユーザー定義
 User details failed to load.	ユーザーを読み込めませんでした。
 User enterprise companies failed to load.	ユーザーの Enterprise Company を読み込めませんでした。
 User export rules	ユーザーエクスポートルール
@@ -7187,6 +8323,10 @@ Using an associative link, insert parts, sketches, surfaces, curves, planes, or 
 Using file:	ファイルを使用しています:
 Using this feature will allow data to leave this Customer-Managed Keys (CMK) enterprise through export/transfer methods. Data will no longer be encrypted and will not be destroyed upon revocation of your Customer-Managed Keys.	このフィーチャーを使用すると、エクスポートや転送により、データがこの顧客管理キー (CMK) Enterprise から外部に持ち出されることになります。持ち出されたデータは暗号化されなくなり、顧客管理キーを無効にしても破棄されません。
 V curves	V 曲線
+V direction	V 方向
+V profiles	V 輪郭
+V shift	V シフト
+V shift opposite direction	V シフト反対方向
 Valid annotations text height in range from 0.0001 to 50 is required.	注釈のテキストの高さは 0.0001 から 50 までの有効な範囲で指定してください。
 Valid email required	有効なメールアドレスが必要です
 Valid file name is required.	有効なファイル名が必須です。
@@ -7216,17 +8356,21 @@ Value is required for __propertyName__. 	__propertyName__には値が必要で�
 Value is too low.	値が低すぎます。
 Value must be an integer.	値は整数でなければなりません。
 Value should not be empty	値は空白にできません
+Value to record	記録する値
 Value with units	単位を持つ値
 Variable	変数
 Variable Studio name	Variable Studio 名
 Variable Studio name cannot be longer than 256 characters	Variable Studio 名は 256 文字以内にする必要があります
+Variable Studio reference	Variable Studio の参照
 Variable Studio reference failed. The source tab may have been deleted.	Variable Studio を参照できませんでした。[ソース] タブが削除された可能性があります。
 Variable Studios	Variable Studio
 Variable feature	変数フィーチャー
+Variable fillet	可変フィレット
 Variable input	変数入力
 Variable name must be a letter followed by a string of letters or numbers.	変数名は、文字の後に文字または数字の文字列を続ける必要があります。
 Variable table	変数テーブル
 Variable tables are not shown without edit or copy permissions.	編集またはコピーのアクセス許可がない場合は、変数テーブルは表示されません。
+Variable type	変数タイプ
 Variables are used to drive mates and part configurations in the assembly.	アセンブリ内の合致とパーツコンフィギュレーションを作動させるには、変数を使用します。
 Variables are used to drive sketch and feature parameters in the Part Studio.	Part Studio 内のスケッチパラメータとフィーチャーパラメータを作動させるには、変数を使用します。
 Vendor	ベンダー
@@ -7268,12 +8412,17 @@ Versions of __instanceName__ and __extraNumber__ referenced elements updated.	__
 Versions of a document in trash cannot be shown.	ごみ箱にあるドキュメントのバージョンは表示できません。
 Versions updated	更新されたバージョン
 Vertex	頂点
+Vertex overrides	頂点のオーバーライド
+Vertex pairs to split with	分割する頂点ペア
 Vertical	垂直
 Vertical (v)	垂直 (v)
 Vertical zones	垂直ゾーン
 Vertices	頂点
+Vertices or curves	頂点または曲線
+Vertices or edges	頂点またはエッジ
 Very fine	非常にきめ細かい
 Very fine tessellation (__numberOfVeryFineTessellation__)	非常にきめ細かいテッセレーション (__numberOfVeryFineTessellation__)
+Via	経由
 Video	動画
 View	ビュー
 View & comment	表示とコメント
@@ -7340,7 +8489,9 @@ Volume	ボリューム
 Wait	待機
 Waiting for workflow transition…	ワークフローの移行を待っています…
 Waiting to run…	実行を待機しています...
+Wall face or bounding edge to hold	保持する壁面または境界エッジ
 Wall stripes	壁のストライプ
+Walls	壁
 Warning: Onshape does not currently support ' + browserName + '.	警告: Onshape は現在、' + browserName + 'をサポートしていません。
 Warning: Onshape does not currently support mobile browsers.	警告: Onshape は現在、モバイルブラウザをサポートしていません。
 Warning: White is a difficult color to see on an Onshape drawing.	警告: 白は Onshape 図面では見にくい色です。
@@ -7373,6 +8524,7 @@ Webhook signatures	Webhook 署名
 Webhooks	Webhook
 Wednesday	水曜日
 Weekly	毎週
+Weight	重量
 Weight property	重みプロパティ
 Weighted average	加重平均
 Weighted sum	加重合計
@@ -7397,7 +8549,9 @@ Where used for workspaces is not supported.	ワークスペースの使用場所
 Where used is not included in your current Onshape subscription plan	使用場所は現在の Onshape サブスクリプションプランに含まれていません
 Where used…	使用場所…
 White	白
+Width	幅
 Width mate	幅合致
+Width mate connectors	幅の合致コネクタ
 Will be seen by all members of the connection.	接続のすべてのメンバーに表示されます。
 Will navigate to versions and history	バージョンと履歴に移動
 Windchill BOM sync scheduled.	Windchill BOM の同期をスケジュールしました。
@@ -7467,8 +8621,20 @@ Workspace units…	ワークスペースの単位…
 Workspaces	ワークスペース
 Workspaces and versions	ワークスペースとバージョン
 Workspaces can be restored within 30 days of deletion.	ワークスペースは削除から 30 日以内であれば復元できます。
+World	ワールド
 Wrap	ラップ
 Wrap faces or sketch entities around a cylindrical or conical part or surface. Create, add to, subtract from, or intersect solids. Create surfaces or split the target face. Adjust the position of the result by specifying anchor points, angle, or shift.	円筒状または円錐状のパーツやサーフェスの周りに面やスケッチエンティティをラップします。ソリッドの作成、追加、削除、交差を行います。サーフェスを作成したり、対象となる面を分割したりします。アンカー点、角度、またはシフトを指定して結果の場所を調整します。
+X offset	X オフセット
+X rotation	X 回転
+X scale	X スケール
+X translation	X 軸移動
+XY plane	XY 平面
+XZ plane	XZ 平面
+Y offset	Y オフセット
+Y rotation	Y 回転
+Y scale	Y スケール
+Y translation	Y 軸移動
+YZ plane	YZ 平面
 Yellow	黄色
 Yes	はい
 Yes, I'm a student	はい、私は学生です
@@ -7614,6 +8780,10 @@ Your subscription will be invoiced to the address on file:	サブスクリプシ
 Your system is running an integrated GPU. If you have a dual-GPU system with a discrete chipset (NVIDIA or AMD) you can get better performance by forcing the browser to use the discrete GPU. See	お使いのシステムは統合 GPU を実行しています。ディスクリート チップセット (NVIDIA または AMD) を搭載したデュアル GPU システムを使用している場合、ブラウザがディスクリートGPUを使用するように強制することで、より良いパフォーマンスを得ることができます。次を参照してください
 Your toolbar changed elsewhere, so we could not apply your edit.	ツールバーが別の場所で変更されたため、編集を適用できませんでした。
 Your__type__ library is already up to date.	__type__ ライブラリは既に最新の状態です。
+Z offset	Z オフセット
+Z rotation	Z 回転
+Z scale	Z スケール
+Z translation	Z 軸移動
 Zebra stripes	ゼブラストライプ
 Zebra stripes are not supported during interference detection.	干渉検出中はゼブラストライプは使用できません。
 Zebra stripes…	ゼブラストライプ…

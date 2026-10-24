@@ -283,14 +283,22 @@ pub const DRAWING_DEFAULT_FONT: &str = "Noto Sans";
 
 /// Families of earlier documents not on live's list, as their nearest one
 /// on it (lead decision S28): Liberation Sans → Arimo, Liberation Serif →
-/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono.
+/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono; any other
+/// unknown name is ARSimp, as live (asb 10-24: unknown fonts render in
+/// ARSimp.shx and re-open as "ARSimp").
 pub fn migrate_font_family(family: &str) -> &str {
     match family {
         "Liberation Sans" => "Arimo",
         "Liberation Serif" => "Tinos",
         "Liberation Mono" => "DejaVu Sans Mono",
-        f => f,
+        f if FONT_FAMILIES.contains(&f) => f,
+        _ => "ARSimp",
     }
+}
+
+/// The SHX shape fonts of the list (live: no Bold / Italic for them).
+pub fn is_shx(family: &str) -> bool {
+    matches!(family, "APMONO" | "ARComp" | "ARIsoP1" | "ARItal" | "ARMono" | "ARSimp" | "ARTxt")
 }
 
 fn migrated_family<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
@@ -2406,6 +2414,10 @@ pub trait AnnotationEnv {
         Some(revision.to_string())
     }
     /// Lines of a hole / thread callout (from the Hole feature).
+    /// A dimension's dual units for the DXF / DWG export (None: single).
+    fn dual_cad(&self, _a: &Annotation, _angular: bool) -> Option<super::cad_objects::CadDual> {
+        None
+    }
     fn hole_callout(&self, _a: &Annotation) -> Vec<String> {
         vec!["⌀?".into()]
     }

@@ -294,15 +294,38 @@ fn dual_text(drawing: &Drawing, f: &DimFormat, value: f64, angular: bool) -> Opt
     if angular || !f.dual.unwrap_or(p.dual.show) {
         return None;
     }
-    let du = p.dual.units_for(!length_units(drawing, f).imperial());
-    // Unset: live's 0.123 / 0.123.
-    let v = unit_number(drawing, value, du, Some(p.dual.precision.unwrap_or(3)), None, false);
+    let du = dual_units(drawing, f);
     let tol = match &f.tolerance {
         Tolerance::Symmetric { value: t } => format!("±{:.*}", p.dual.tolerance_precision.unwrap_or(3) as usize, t.abs() / du.meters()),
         _ => String::new(),
     };
-    let unit = if p.dual.show_unit && !du.symbol().is_empty() { format!(" {}", du.symbol()) } else { String::new() };
-    Some(format!("[{v}{tol}{unit}]"))
+    Some(format!("[{}{tol}{}]", dual_number(drawing, du, value), dual_unit(drawing, du)))
+}
+
+/// The dual units of a length shown with `f` (the other system).
+fn dual_units(drawing: &Drawing, f: &DimFormat) -> super::DimUnits {
+    drawing.props.dual.units_for(!length_units(drawing, f).imperial())
+}
+
+/// A length in the dual units at the dual precision (unset: live's 0.123).
+fn dual_number(drawing: &Drawing, du: super::DimUnits, meters: f64) -> String {
+    unit_number(drawing, meters, du, Some(drawing.props.dual.precision.unwrap_or(3)), None, false)
+}
+
+/// " in" / " mm" with Show dual unit, else nothing.
+fn dual_unit(drawing: &Drawing, du: super::DimUnits) -> String {
+    if drawing.props.dual.show_unit && !du.symbol().is_empty() { format!(" {}", du.symbol()) } else { String::new() }
+}
+
+/// A hole callout length's dual, with its unit ("6.35 mm"), when the
+/// callout shows duals (Drawing properties › Dual, or its palette's Dual
+/// unit / Single unit).
+pub fn dual_len(drawing: &Drawing, f: &DimFormat, meters: f64) -> Option<String> {
+    if !f.dual.unwrap_or(drawing.props.dual.show) {
+        return None;
+    }
+    let du = dual_units(drawing, f);
+    Some(format!("{}{}", dual_number(drawing, du, meters), dual_unit(drawing, du)))
 }
 
 // ------------------------------------------------------------ property fields

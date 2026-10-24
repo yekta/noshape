@@ -32,7 +32,7 @@ pub fn frame() -> FeatureType {
         ParamSpec::num("angle", "Angle", angle_360(0.0)),
         ParamSpec::flip("mirrorProfile", "Mirror across Y axis"),
         ParamSpec::query1("angleReference", "Angle reference", QueryFilter::DIRECTION),
-        ParamSpec::enum_("defaultCornerType", "Default corner type", FRAME_CORNER),
+        ParamSpec::enum_("defaultCornerType", "Default corner type", FRAME_CORNER).hints(Hints::SHOW_LABEL),
         ParamSpec::flip("defaultButtFlip", "Flip corner").visible(|v| butt(v, "defaultCornerType")),
         ParamSpec::array(
             "cornerOverrides",
@@ -40,7 +40,7 @@ pub fn frame() -> FeatureType {
             "Corner",
             vec![
                 ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX),
-                ParamSpec::enum_("cornerType", "Corner type", FRAME_CORNER),
+                ParamSpec::enum_("cornerType", "Corner type", FRAME_CORNER).hints(Hints::SHOW_LABEL),
                 ParamSpec::flip("cornerButtFlip", "Flip corner").visible(|v| butt(v, "cornerType")),
             ],
         ),
@@ -75,7 +75,7 @@ pub fn gusset() -> FeatureType {
     let aligned = |v: &ParamValues| v.is("gussetPosition", "ALIGNED");
     let p = vec![
         ParamSpec::query("edges", "Edges", QueryFilter::LINEAR_EDGE).hints(Hints::INITIAL_FOCUS),
-        ParamSpec::enum_("gussetType", "Gusset type", &[("TRIANGLE", "Triangle"), ("RECTANGLE", "Rectangle")]).hints(rem),
+        ParamSpec::enum_("gussetType", "Gusset type", &[("TRIANGLE", "Triangle"), ("RECTANGLE", "Rectangle")]).hints(rem | Hints::SHOW_LABEL),
         ParamSpec::num("length", "Length", NONNEGATIVE_LENGTH).hints(rem),
         ParamSpec::flip("shouldFlipBaseSides", "Flip base sides").visible(rect),
         ParamSpec::num("thickness", "Thickness", NONNEGATIVE_LENGTH).hints(rem),
@@ -83,7 +83,7 @@ pub fn gusset() -> FeatureType {
         ParamSpec::num("chamferSize", "Chamfer size", NumSpec::positive_length(1.0, 0.04).bounded(1e-5, 500.0))
             .hints(rem | Hints::DISPLAY_SHORT)
             .visible(move |v| rect(v) && v.bool("chamfer")),
-        ParamSpec::enum_("gussetPosition", "Gusset position", &[("CENTERED", "Centered"), ("ALIGNED", "Aligned")]).hints(rem),
+        ParamSpec::enum_("gussetPosition", "Gusset position", &[("CENTERED", "Centered"), ("ALIGNED", "Aligned")]).hints(rem | Hints::SHOW_LABEL),
         ParamSpec::query1("alignedReference", "Alignment entity", QueryFilter::LINEAR_EDGE).visible(aligned),
         ParamSpec::flip("shouldFlipAlignment", "Opposite alignment").visible(aligned),
         ParamSpec::num("offset", "Offset distance", NONNEGATIVE_ZERO_DEFAULT).hints(rem),
@@ -110,7 +110,7 @@ pub fn end_cap() -> FeatureType {
         ParamSpec::flip("offsetDirection", "Opposite direction").visible(move |v| !internal(v)),
         ParamSpec::num("internalOffsetDistance", "Offset", NONNEGATIVE_ZERO_DEFAULT).hints(rem).visible(internal),
         ParamSpec::num("internalShiftDistance", "Inset", NONNEGATIVE_ZERO_DEFAULT).hints(rem).visible(internal),
-        ParamSpec::enum_("cornersType", "Treatment type", &[("NONE", "None"), ("CHAMFER", "Chamfer"), ("FILLET", "Fillet")]).hints(rem).visible(rect),
+        ParamSpec::enum_("cornersType", "Treatment type", &[("NONE", "None"), ("CHAMFER", "Chamfer"), ("FILLET", "Fillet")]).hints(rem | Hints::SHOW_LABEL).visible(rect),
         ParamSpec::num("cornerDistance", "Length", NumSpec::positive_length(5.0, 0.25).bounded(1e-3, 500.0))
             .visible(move |v| rect(v) && v.is("cornersType", "CHAMFER")),
         ParamSpec::num("cornerRadius", "Radius", NumSpec::positive_length(5.0, 0.25).bounded(1e-3, 500.0))
