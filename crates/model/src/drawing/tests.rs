@@ -2488,7 +2488,7 @@ fn dual_dimension_line_breaks_around_the_text() {
                 let half = font::text_width("[2.36 in]", h) / 2.0 + 0.65 * h;
                 assert!(((gap1 - gap0) / 2.0 - half).abs() < 1e-9, "{gap0} {gap1}");
                 // The line reaches the arrows.
-                assert!((pieces[0][0] - if vertical { 50.0 } else { 50.0 }).abs() < 1e-9 && (pieces[1][1] - 110.0).abs() < 1e-9);
+                assert!((pieces[0][0] - 50.0).abs() < 1e-9 && (pieces[1][1] - 110.0).abs() < 1e-9);
                 // Both texts sit inside the gap.
                 for t in g.texts.iter().filter(|t| t.text == "60" || t.text == "[2.36 in]") {
                     let w = font::text_width(&t.text, h);
