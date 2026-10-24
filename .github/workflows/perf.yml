@@ -375,3 +375,27 @@ jobs:
           Select-String -Path pattern_second.log -Pattern '×[0-9]+|panicked|assert' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
+
+      # Regeneration profile (crates/ops/tests/regen_profile.rs): every feature
+      # of the tests/perf fixtures and of the std sheet-metal route, top 15.
+      - name: Regeneration profile (release)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          status=0
+          cargo test --release --locked -p noshape-ops --test regen_profile -- --ignored --nocapture --test-threads=1 2>&1 | tee regen_profile.log || status=$?
+          { echo "### ${{ matrix.name }}: regeneration profile"; echo '```'; grep -E "^profile:" regen_profile.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Regeneration profile (release, Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cargo test --release --locked -p noshape-ops --test regen_profile -- --ignored --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath regen_profile.log
+          $status = $LASTEXITCODE
+          "### ${{ matrix.name }}: regeneration profile" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path regen_profile.log -Pattern '^profile:' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $status

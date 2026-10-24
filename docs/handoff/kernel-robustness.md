@@ -125,6 +125,57 @@ experiments against OCCT directly (outside the repo): `/root/kern-scratch` (`mak
   message depends on the circle's start: in the bend plane "Could not create valid swept body, check input." (G1),
   across it "Result of sweep intersects itself, adjust path or profile selections." (Sw2); turning the circle's
   xDir 90° swaps them (`solid_a.rs::tight_bend_message`).
+- **User bug "second fin pattern" (10-24, v0.4.8, ready 5219bccf):** `crates/model/tests/pattern_second.rs` (perf.yml
+  model job ×400). Fixed: pattern instances / seed tools are scratch evaluations (`EvalCtx::scratch`: no dialog
+  touched-parts distance, 40× → 2×); aborts reach every boolean of a feature (`RegenCancel::scope` round the whole
+  evaluation and each pool-thread instance), the slab fuse / cut (`boolean.cpp::build_with`), skip naming / unify,
+  and an aborted pattern has no fallback. CI release ×400: LP1 0.5-0.9 s, LP2 1.35-1.7 s (Onshape 9.27 / 24.0 s),
+  abort → return 14-159 ms. **Follow-up (parked):** LP2 = LP1. LP2's fuse still works on the whole part carrying
+  LP1's fins (its 400 tools glued in slabs over 1600 faces). Tried: cut the part just inside the touched face, fuse
+  into the near piece, glue the far piece back (`fuse_local`): OCCT's Splitter on the 1600-face part costs more
+  than LP1's whole fuse (1.25 s debug), and fuse_slabs on the near piece rebuilds the cut face so the join fails.
+  Needs a boolean that never visits the far faces (a local face replacement of the touched face: its region minus
+  the tools' footprints + the tools' faces, sewn into the shell).
+- **Robustness sweep round 2 (10-23/24, lead: draft, fillet round 2, patterns, hole & rib; live "kern (10-23 20:00)
+  draft sweep", "(20:30) fillet round 2", "(22:00) patterns", "(23:00) hole & rib", "(10-24 00:30) curvature section").**
+  Tests `kernel_robustness::{draft_sweep, fillet_round_2, patterns, hole_and_rib}_match(es)_onshape`.
+  - Draft: with Reapply OFF, steep fillets tangent to the drafted faces are drafted with them (cones, N4);
+    `features.cpp::draft_sloped_plane`: a sloped plane is turned about its line on the neutral plane, the part
+    without it (neighbours extended) behind the turned plane, failing when the face would turn over against the pull
+    (N3); `end_cone_at_apex`: a drafted cylinder closing inside the part ends at its apex (S3; built again from the
+    input: hole filled, cone cut). Closing angles never fail (S1/S2: ridge, 5 faces); parting line on a cylinder's
+    top edge fails (P1, nothing on the default side).
+  - Fillet: OPEN full rounds: two fillets meeting exactly on a face 2R wide (W1 R2 on a 4 mm rib, H1 R1 on both
+    rim edges of a 2 mm wall) are one face in Parasolid; OCCT fails, the checked fallback's radius × (1 − 1e-5)
+    leaves a 2e-8 m strip between two cylinders (volume right, faces 11 / 19 vs 10 / 14). Needs the Full round
+    construction (`detail.rs::full_round`) for such edge pairs. Curvature section above m 0.8: live's exact poles at 0.8/0.9/0.95/0.99,
+    interpolated (`blend_section::curvature_profile`; the rule behind them is unknown: not a peak-curvature,
+    energy or curvature-derivative minimum). A section blend on a closed circle runs all round (K3). Onshape's
+    mass properties for conic / curvature / variable fillets are approximations (bands ±6..18 mm³); ours are the
+    exact sections' (conic checked against the rational section integrated).
+  - Patterns (Reapply OFF, the face pattern): `pattern.rs::copies_fail` fails like Onshape where copies overlap
+    each other or the seed (R2 radial holes), an added copy misses the part (O3) or a mirrored copy misses it (M2);
+    a removed copy off the part does nothing (O1). Boxes only (an exact distance per copy is seconds at ×1000).
+  - Hole: Start from part counts the depth from the deepest first contact on the entry circle (counterbore /
+    countersink / hole diameter), not the axis: H1-H5 within Onshape's bands of the exact integrals; the tool runs
+    on above the start past the part's highest point over the entry (H4 on a slope). A counterbore tangent to a side
+    face is Onshape's "Hole creates invalid geometry." (non-manifold cut). Not done: tapped H6 (table sizes).
+  - Rib: Parts must be filled (live L22; the dialog fills it); the merged rib is unified with the part (R1: 11
+    faces); a profile ending on a cylinder's seam is extended into it (the seam isn't a part edge). OPEN: R3's
+    message (an extended rib running into the plate: we say "Failed to create a rib from a selected profile." as
+    live L22 does; Onshape says "None of the ribs intersected a part." there).
+  - Hole: a bore tangent to a planar side face (H5: Ø10 counterbore 5 mm from the front face) fails "Hole creates
+    invalid geometry."; the start search sections the part with the entry cylinder once per location and refines
+    the deepest contact with exact rays (a ray is a boolean: 200 per hole was too slow for many holes).
+  - Thicken corner fill (live L17, psb's sweep doc): several faces of one body thickened together: at a straight edge
+    between two planar picked faces, where the slabs part, the prism up to the offset planes' meeting line is
+    added (`solid_a.rs::corner_fills`), then the part is unified: top + front of a 40 × 20 × 10 block, 2 mm =
+    2560 mm³, 8 faces (test `features_c::thicken_as_live`). Curved faces / edges: no fill yet.
+  - Mass properties (`common.cpp::volume_props`): when OCCT's Gauss and adaptive integrators disagree, a shape of
+    analytic surfaces only takes the adaptive one (a Ø6 hole through a Ø40 cylinder: Gauss −0.41 mm³, the mesh
+    arbiter couldn't tell 5e-6); otherwise the mesh decides as before (adaptive is off on B-spline sweeps).
+  - Open: Onshape's row tooltip adds "N missing selection(s)" for unresolved selections (with a ⚠ row icon;
+    behaviours.md 8292): nothing tracks unresolved references yet (C2's R7 fillet). For the lead (UI owner).
 - **IM4 / IM5 (qa5 pass 12-13), fixed 10-22:** g50-g46-shell1.x_t's real fault was ours: an edge on a TRIMMED_CURVE
   (133) whose basis is an intersection (38) took parm_1/parm_2, which are Parasolid's parameters of that curve, not
   of our rebuilt B-spline: the range ran off the curve and healing made it 42 km long. Edges on a rebuilt basis

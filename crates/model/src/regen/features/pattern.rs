@@ -816,6 +816,15 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
                 (!fs.is_empty()).then(|| (b.id.clone(), fs))
             })
             .collect();
+        let targets: Vec<usize> = groups.iter().filter_map(|(id, _)| index_of_body(ev, id)).collect();
+        if let Some((id, fs)) = groups.first()
+            && let Some(bi) = index_of_body(ev, id)
+            && copies_fail(ev, f, &targets, instances)
+        {
+            let body = ev.ctx.bodies[bi].clone();
+            ev.error_shapes = failed_instances(ev, f, &body, fs, instances);
+            return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
+        }
         for (id, fs) in groups {
             found = true;
             // Live "psb flush wall" W1: a wall flush with the part (the
@@ -993,6 +1002,39 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance]) -> b
         }
     }
     false
+}
+
+/// Copies Onshape's face pattern (no Reapply) can't place (live "kern
+/// (10-23 22:00) patterns"): copies overlapping each other or the seed (R2:
+/// radial holes meeting at the cylinder's axis), an added copy off the part
+/// (O3) and, for a mirror, any copy off the part (M2). A removed copy off the
+/// part just does nothing (O1). The seed's tool is the feature evaluated as
+/// New where it stands.
+fn copies_fail(ev: &EvalCtx, f: FeatureId, targets: &[usize], instances: &[Instance]) -> bool {
+    let Some(tool) = seed_tool(ev, f) else { return false };
+    let add = matches!(ev.features.iter().find(|x| x.id == f).and_then(|x| x.params.get("operationType")), Some(crate::params::ParamValue::Enum(o)) if o == "ADD");
+    let mirror = verb(ev) == "mirror";
+    let mut tools = vec![tool.clone()];
+    tools.extend(instances.iter().filter_map(|inst| k::transform(&tool, &inst.t, true).ok().map(|r| r.shape)));
+    let size = tool.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0);
+    let boxes: Vec<Option<k::BoundingBox>> = tools.iter().map(|t| t.bounding_box(false).ok()).collect();
+    for i in 0..tools.len() {
+        for j in i + 1..tools.len() {
+            let (Some(a), Some(b)) = (&boxes[i], &boxes[j]) else { continue };
+            // Copies side by side (boxes sharing a face) don't overlap.
+            if !boxes_meet(a, b, -size * 1e-6) {
+                continue;
+            }
+            let common = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&tools[i]), std::slice::from_ref(&tools[j]), &k::BooleanOptions::default());
+            if common.is_ok_and(|r| r.shape.volume().is_ok_and(|v| v > (size * 1e-4).powi(3))) {
+                return true;
+            }
+        }
+    }
+    // Off the part: boxes apart (an exact distance per copy costs seconds
+    // for ×1000, see apply_tools).
+    let target_boxes: Vec<k::BoundingBox> = targets.iter().filter_map(|&bi| ev.ctx.bodies[bi].shape.bounding_box(false).ok()).collect();
+    (add || mirror) && boxes[1..].iter().flatten().any(|b| !target_boxes.iter().any(|a| boxes_meet(a, b, 1e-7)))
 }
 
 /// Whether `p` lies on the (unbounded) surface of `face`.
