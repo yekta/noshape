@@ -251,25 +251,30 @@ impl DrawingEditor {
         let tangent = [TangentMode::Hidden, TangentMode::Solid, TangentMode::Phantom].into_iter().map(|m| MenuEntry::check(m.label(), m == tm, move |t, _, cx| t.edit_view("Tangent edges", id, cx, |v| m.apply(v)))).collect();
         out.push(MenuEntry::Submenu("Tangent edges".into(), tangent));
         out.push(MenuEntry::item("Adjust linestyle...", move |t, w, cx| t.open_linestyle(id, w, cx)));
-        // View-type entries (Onshape: Edit / Flip direction / Remove crop ...).
+        // View-type entries (Onshape: Edit / Flip direction / Remove crop ...),
+        // after Paste as table (live 5664-5670 crop, 2853 auxiliary).
+        let mut edits: Vec<MenuEntry> = Vec::new();
         if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
-            out.push(MenuEntry::item("Flip direction", move |t, _, cx| t.flip_section(id, cx)));
+            edits.push(MenuEntry::item("Flip direction", move |t, _, cx| t.flip_section(id, cx)));
             if matches!(v.kind, ViewKind::Section { .. }) {
-                out.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
+                edits.push(MenuEntry::item("Edit section...", move |t, _, cx| t.open_section_edit(id, cx)));
             } else if sheet.section_points(id).is_some_and(|p| p.len() == 2) {
-                out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
+                edits.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_cut_angle_panel(id, w, cx)));
             }
         }
+        if matches!(v.kind, ViewKind::Auxiliary { .. }) {
+            edits.push(MenuEntry::item("Edit auxiliary view...", move |t, w, cx| t.edit_aux_view(id, w, cx)));
+        }
         if v.crop.is_some() {
-            // Help Drawing › Crop view: Edit crop reopens the dialog.
-            out.push(MenuEntry::item("Edit crop", move |t, _, cx| t.edit_crop(id, cx)));
-            out.push(MenuEntry::item("Remove crop", move |t, _, cx| t.edit_view("Remove crop", id, cx, |v| v.crop = None)));
+            // Live 5671-5677: "Edit crop..." reopens the Crop view dialog.
+            edits.push(MenuEntry::item("Edit crop...", move |t, _, cx| t.edit_crop(id, cx)));
+            edits.push(MenuEntry::item("Remove crop", move |t, _, cx| t.edit_view("Remove crop", id, cx, |v| v.crop = None)));
         }
         if !v.broken_out.is_empty() {
             // Help broken_out_section_view: "Edit section" and "Remove section".
             let last = v.broken_out.len() - 1;
-            out.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_broken_out_panel(id, last, w, cx)));
-            out.push(MenuEntry::item("Remove section", move |t, _, cx| t.edit_view("Remove broken-out sections", id, cx, |v| v.broken_out.clear())));
+            edits.push(MenuEntry::item("Edit section", move |t, w, cx| t.open_broken_out_panel(id, last, w, cx)));
+            edits.push(MenuEntry::item("Remove section", move |t, _, cx| t.edit_view("Remove broken-out sections", id, cx, |v| v.broken_out.clear())));
         }
         // Live (drawing context menu): "Insert custom table of Part Studio 1…";
         // assemblies: "Insert BOM for Assembly 1 ..." (live drawing/1108).
@@ -344,6 +349,7 @@ impl DrawingEditor {
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
             t.start_paste_table(cx);
         }));
+        out.extend(edits);
         out.extend(self.replication_entries(id));
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Clear selection", |t, _, cx| {
