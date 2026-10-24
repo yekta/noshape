@@ -175,6 +175,44 @@ class Replay:
             time.sleep(1.2 if pause < 0.05 else 0.2)
         return run
 
+    def ctrl_mid_drag(self):
+        """Right-drag left, press Ctrl and drag right (pan), release Ctrl and
+        drag left again: Onshape re-resolves the mode on every drag event."""
+        def run():
+            self.cursor(*self.screen_point())
+            self.mouse.button(ui.BTN_RIGHT, True)
+            time.sleep(0.05)
+            for phase, dx in (("rotate", -10), ("pan", 10), ("rotate", -10)):
+                if phase == "pan":
+                    self.keys.key(ui.KEY_LEFTCTRL, True)
+                    time.sleep(0.05)
+                for _ in range(10):
+                    self.mouse.move(dx, 0)
+                    time.sleep(0.016)
+                if phase == "pan":
+                    self.keys.key(ui.KEY_LEFTCTRL, False)
+                    time.sleep(0.05)
+            time.sleep(0.1)
+            self.mouse.button(ui.BTN_RIGHT, False)
+            time.sleep(0.3)
+        return run
+
+    def wheel_during_box(self):
+        """A left-drag box selection with wheel notches in the middle."""
+        def run():
+            self.cursor(*self.screen_point(-self.size[0] / 2 + 40, -self.size[1] / 2 + 60))
+            self.mouse.button(ui.BTN_LEFT, True)
+            time.sleep(0.05)
+            for _ in range(10):
+                self.mouse.move(10, 10)
+                time.sleep(0.016)
+            for n in (1, -1, 1):
+                self.mouse.wheel(n)
+                time.sleep(0.12)
+            self.mouse.button(ui.BTN_LEFT, False)
+            time.sleep(0.3)
+        return run
+
     def with_key(self, key, fn):
         def run():
             self.keys.key(key, True)
@@ -198,6 +236,8 @@ class Replay:
         self.step("right-drag-fling", self.drag(ui.BTN_RIGHT, -200, 0, pause=0.0))
         self.step("middle-drag", self.drag(ui.BTN_MIDDLE, 200, 100))
         self.step("alt-right-drag", self.with_key(ui.KEY_LEFTALT, self.drag(ui.BTN_RIGHT, -200, 0)))
+        self.step("ctrl-mid-drag", self.ctrl_mid_drag())
+        self.step("wheel-during-box", self.wheel_during_box())
         self.step("touch-rotate", self.touch({0: c}, {0: (c[0] - 200, c[1])}))
         self.step("touch-pan", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] + 100, c[1]), 1: (c[0] + 200, c[1])}, steps=15))
         self.step("touch-pinch", self.touch({0: (c[0] - 50, c[1]), 1: (c[0] + 50, c[1])}, {0: (c[0] - 100, c[1]), 1: (c[0] + 100, c[1])}))

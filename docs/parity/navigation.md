@@ -87,7 +87,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.8 | Pan keeps the point under the cursor under it (perspective: in the plane through the geometry under the cursor) | `pan` | ✅ L: start point ends under the pointer to 1e-4 px; R: (200, 100) drag → 223.607 px |
 | 1.9 | Shift+right-drag rotates (Shift is not bound; it does not pan) | `getClosestMode`, `usesShiftKey` | 🔧 (panned) |
 | 1.10 | Ctrl+middle-drag pans (closest binding) | `getClosestMode` | ✅ |
-| 1.11 | Pressing/releasing Ctrl or Alt mid-drag switches mode (rotate ↔ pan ↔ constrained) without lifting the button | `updateManipulationMode` per drag event | 🔧 |
+| 1.11 | Pressing/releasing Ctrl or Alt mid-drag switches mode (rotate ↔ pan ↔ constrained) without lifting the button | `updateManipulationMode` per drag event | ✅ R: right-drag −100 px, Ctrl held +100 px, released −100 px → the view turns 200 px worth (the Ctrl part pans) |
 | 1.12 | A second button pressed mid-drag re-resolves the mode | `updateInputState` | 🔧 |
 | 1.13 | Releasing outside the graphics area ends the drag | — | 🔧 (`on_mouse_up_out`) |
 | 1.14 | Right-click (no drag): context menu; a right-drag opens none | Home__context_menus | ✅ |
@@ -98,7 +98,7 @@ recomputation from the raw OS/protocol events): `.github/nav/`.
 | 1.19 | Zoom limits: no zoom out once the model is under 100 px across, no zoom in past 2^24 px/m | `canZoom` | 🔧 |
 | 1.20 | Horizontal scroll (tilt wheel, sideways swipe) does nothing | `zoomOnMouseWheelScroll` (`wheelDeltaX > wheelDeltaY` → ignored); live navigation/17 | ✅ R: horizontal wheel → no zoom (X11 and Wayland) |
 | 1.20b | Shift+wheel and Ctrl+wheel zoom exactly like the wheel (Linux; macOS and Chrome on Windows turn Shift+wheel horizontal before Onshape sees it, so it does nothing there) | live navigation/15–16 | ✅ R: Shift / Ctrl+wheel zoom like the wheel; Windows Shift+wheel now zooms too (Chromium keeps it vertical) |
-| 1.21 | Scrolling during a box selection does nothing | `onMouseWheelScroll` | 🔧 |
+| 1.21 | Scrolling during a box selection does nothing | `onMouseWheelScroll` | ✅ R: three wheel notches during a left-drag box → no camera change |
 | 1.22 | Left-drag: box select (left→right window, right→left crossing); never navigates | Home__selection; no flag for the left button | ✅ |
 
 ## 2. Touchpad / trackpad
@@ -224,9 +224,9 @@ drives the app through the kernel: a uinput mouse, keyboard, clickpad and touch 
 libinput in a headless sway, the app on Wayland or on X11 through Xwayland. `check.py`
 recomputes every expected number independently (Chromium's rules on the WAYLAND_DEBUG protocol
 log or on the posted events, Onshape's formulas) and compares each camera change.
-Local run 10-24 22:50: **Wayland 477/477, X11 249/249 checks pass** (wheel notches and 120ths,
+Local run 10-24 23:40: **Wayland 489/489, X11 251/251 checks pass** (wheel notches and 120ths,
 Shift/Ctrl+wheel, horizontal wheel, two-finger scroll up/down/sideways, pinch out/in, right-drag
 with its rotate centre fixed on screen, Alt+right-drag, middle-drag, touch rotate/pan/pinch/roll,
-tap, two-finger tap, two-finger long press). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
+tap, two-finger tap, two-finger long press, Ctrl pressed mid-drag, wheel during a box selection). The checks assert per-event numbers, never timing. macOS (CGEvent scroll with
 phases and momentum, drags) and Windows (SendInput wheel, InjectTouchInput touch, drags) run in
 `.github/workflows/nav.yml`.
