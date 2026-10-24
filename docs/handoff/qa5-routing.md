@@ -337,3 +337,22 @@ functional part (volumes, cancelled = true, error message) can stay:
   error-message assert above it is the deterministic part.
 - `crates/store/src/tests.rs:963` 1 MB commit median `< 250 ms` — owner of store (2b3f0530 area).
 Not timing (no action): custom_features.rs:660 only checks the Timer line's format.
+
+## qa4 QA round 5 v2 (P0/P1; live "qa4 round 5 v2 s1 follow-up" and "qa4 round 5 v2 s1 / s2"; v0.4.8 c7d9d454; r5/v2fu.py)
+- **FUSE-UNIFY (kern, P1 topology)** Extrude (New) of several touching regions of one sketch keeps the region boundaries as
+  separate coplanar faces: live's case (L + Ø10 circle + outer loop offset 3 mm in, 3 regions, Extrude 15 all regions) gives
+  **12 faces** on ours vs live **8 faces** (one 2500 mm² top face, no inner-loop edges), same volume 37500. Cause:
+  `regen/eval.rs` `fuse_named` (~770) fuses the NEW tools with a plain boolean and never runs `unify_same_domain` (extrude.rs's
+  two-sided path does). Downstream faces/edges (fillet picks, face counts, drawings) differ from Onshape.
+- **HOLE-MSG (psb)** a Simple Ø6 through hole tangent to an outer face fails on ours with "Hole cut failed: Boolean operation
+  would result in non-manifold body."; live: "Hole 1 did not regenerate properly: Hole creates invalid geometry."
+- **PAT-REAPPLY-FAIL (psb)** Feature pattern (Reapply ON) of that failing hole, 4 mm × 4 along the x=0 top edge: ours **ERROR
+  "Could not pattern selected features."**; live **OK, no message**, the instances that fail individually are silently skipped and
+  the one that succeeds cuts (37453.53776879832 mm³, 10 faces: a notch at (3,−2)). (On another part ours did report OK and cut;
+  the rule should be live's: skip failing instances, report OK.)
+- **ROLLBACK-AUTOSCROLL (psb)** dragging the rollback bar and holding it near the feature list's edge: live autoscrolls the list;
+  ours doesn't (the bar can't reach rows below the visible ones in one drag).
+- **REGEN-SPEED (perf/kern, P0 info)** per-feature regen vs live (Onshape's server times from its ⏱ panel, similar features):
+  s2 bosses (Extrude Add Ø8–Ø12 on a plate) ours 17–71 ms each vs live ≤ 9 ms; s1 hole 129 vs 19–21 ms, linear pattern of it
+  152 vs 47–96 ms, 30-feature totals ours 462 ms (14 plain bosses) vs live 171 ms (30 mixed features incl. fillets/chamfers).
+  Editing feature 2 and ✓: dialog closes ~0.1–0.2 s in both.

@@ -23,10 +23,10 @@ outer loop 3 mm in (12 regions, under-defined dof 14) → Extrude 15 (all region
   call reloads and regenerates); 23 steps 5.9–8.7 s. App regen panel: **total 763 ms** (Extrude 1 347, Linear pattern 152, Hole
   129, Fillet 62, Chamfer 34, Revolve 25, Sketch 1 11). Edit Extrude 1 15 → 20: preview ~0.7 s after Enter; ✓ → result between
   0.36 and 0.71 s (parts list back to 7). Open → idle 2.7 s. r5/v2s1-regen-times.png.
-- **R5v2-S1-a (asked live, possible P0)** Extrude 1 of all 12 regions keeps the region edges as faces on its top (41 faces); a
+- **R5v2-S1-a → FUSE-UNIFY (kern; live: Onshape merges, 8 faces vs our 12 on live's 3-region case)** Extrude 1 of all 12 regions keeps the region edges as faces on its top (41 faces); a
   later Boolean (the hole pattern) merges them (18 faces). One of the two is wrong; live asked whether Onshape's multi-region
   extrude merges them. r5/v2s1-failed-hole-pattern-before-after.png.
-- **R5v2-S1-b (asked live)** a Hole that fails (tangent to the outer edge: "Hole cut failed: Boolean operation would result in
+- **R5v2-S1-b → HOLE-MSG + PAT-REAPPLY-FAIL (psb; live reports OK and cuts only the succeeding instances, error text "Hole creates invalid geometry.")** a Hole that fails (tangent to the outer edge: "Hole cut failed: Boolean operation would result in
   non-manifold body.") followed by a Linear pattern of it (Reapply on): the pattern reports **Ok** and cuts the shifted copies.
 - CLI notes (not defects): slot = click a centre line, then a width point; a Hole on a Top-plane sketch needs `oppositeDirection`
   and, with several parts, `scope` ("No target parts selected for hole.").
@@ -37,7 +37,8 @@ Plate 200×100×10 + 14 × (sketch circle + boss Add): 30 features, 1 part (2115
 - App: regen panel **total 462 ms** (bosses 17–71 ms each). Edit Extrude 1 (feature 2) 10 → 12: preview settles 0.8–1.3 s after
   Enter, ✓ → result 1.1–1.5 s (burst screenshots, software rendering). Roll to here (Extrude 1): < 0.67 s; rollback bar drag
   down 4 steps: 0.77 s. The bar has no right-click menu ✅ (live); dragging shows the "Rollback bar" pill ✅. Holding the drag at
-  the panel's bottom doesn't auto-scroll the list (live: not recorded). r5/v2s2-regen-times.png, v2s2-rollback-drag.png.
+  the panel's bottom doesn't auto-scroll the list; live autoscrolls → ROLLBACK-AUTOSCROLL (psb). Live (server ⏱): 171 ms total for
+  its 30 features, bosses ≤ 9 ms each (ours 17–71) → REGEN-SPEED (perf/kern). r5/v2s2-regen-times.png, v2s2-rollback-drag.png.
 
 ## v2 Session 4: 3-part assembly with the common mates (v0.4.8; round 4's r4/s2.py rebuilt; compared with live in round 4)
 Plate + block + pin, Fastened / Revolute / Slider, BOM Flattened 3 rows (= round 4 S2, all matching live then). In the app the
