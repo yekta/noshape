@@ -1099,3 +1099,33 @@ behaviours.md "qa5 sketch tools". Code: crates/scene/src/sketch_mode.rs (overlay
     by 1 row (commit "View cube test…"); its re-run was still queued at handoff: re-run
     `cargo test -p noshape-render --test offscreen view_cube`.
   - Re-run done: `offscreen view_cube` passes (1 passed). Block 1 (d08bfff7 + 2ce6ecb1) is fully checked.
+
+## Round 22 (10-24, new icons2 after the quota move; predecessor ddba69f1)
+- WIP split into commits on agent/icons2 (backup of the pre-split tree: local branch icons2-presplit, delete
+  once merged): view cube test box, warning badge, high-quality bar, midpoint marker, Search tools chip,
+  feature dialog rows, docs. Main merged after the split.
+- Search tools (ui.rs `search_tools_toggle`): keys 19 px, fixed widths 35 (alt/⌥) / 17 (c), 2 px under the
+  box middle, text 1 px lower still: edges 1765/1799/1800/1816 and key text rows = live part-studio/00.
+- Feature dialog rows (feature_dialog.rs). gpui rounds every authored length to whole pixels BEFORE layout
+  (vendor/gpui-pre/src/taffy.rs `to_taffy`), so `min_h(27.333)` was 27. Chrome keeps fractional rows (1/64 px
+  layout units) and snaps edges: `FeatureDialog::live_h(h)` returns round(y+h)−round(y) from a running
+  unrounded position (`live_y`, reset per render; only fractional rows call it, in render order):
+  LIVE_EMPTY_FIELD 26.328125 (empty selection field), LIVE_CHECKBOX_ROW 27.328125 (checkbox rows, group
+  titles), and the footer (frame = list end + 24.5 → an extra 1 px spacer when that rounds up).
+  Row boxes now follow the DOM (each fix removed a pair of cancelling 1 px errors): 5 px under every field
+  (`os-param-requires-margin`, also when the dialog ends on a field), select rows 28 px with the select on the
+  top line (inline label pt 7 like live), stacked label+select 48 (select box 25, the 26 px select overflows),
+  quantity rows 26 px (field/tolerance/expander offsets −1; rows with a hole icon 29 px, contents +1), icon
+  selects 31 px with the select 3 px down, Hole size block without top padding, footer 20 px + pt 2 after the
+  body's 4 px padding. Inactive empty field label #666 (active #555).
+  Checked against live dialogs/*-01-open (x=420 underline/edge columns, checkbox ink rows): Extrude, Revolve,
+  Fillet, Chamfer, Shell, Hole, Sweep, Loft, Linear/Circular pattern, Mirror, Boolean, Plane: every row equal.
+  Frame bottom: equal except Revolve and Hole, 1 px short (their side-button field rows; DOM dumps are rounded,
+  can't resolve) — Fillet and Mirror fixed by the footer spacer / 5 px trailing margin (verify in the next build).
+- Behaviour found (not look, reported to the lead): Loft with no profiles shows an enabled ✓ (live: disabled);
+  our Loft error doesn't flag the Profiles field (`field_error`), so `blocked` stays false.
+- Tools: tools/inkrows.py IMG x0 x1 y0 y1 [thr] (ink row runs), tools/dlg3.sh SLUG "Tool" TAG (open a tool by
+  Search tools in the running app3 instance, shot + 3x live|ours in w/cmp-SLUG.png).
+- Next (P1 look, most-used first): sketch toolbar + sketch dimension visuals, feature list / parts list rows,
+  viewport overlays (manipulator arrows, previews, selection highlight); then the remaining dialogs' rarer
+  rows (Draft, Split, Transform, Helix …) with the same model.
