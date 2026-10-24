@@ -349,7 +349,8 @@ jobs:
       # (LP1) and the same pattern under the plate (LP2), with and without
       # Reapply; LP2 must cost about LP1, and an abort must return at once.
       - name: Second pattern (release)
-        if: runner.os != 'Windows'
+        # Timed on its own: a slow step before it doesn't hide its numbers.
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
         shell: bash
         env:
           NOSHAPE_PATTERN_N: '400'
@@ -362,7 +363,8 @@ jobs:
           exit $status
 
       - name: Second pattern (release, Windows)
-        if: runner.os == 'Windows'
+        # Timed on its own: a slow step before it doesn't hide its numbers.
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
         shell: pwsh
         env:
           NOSHAPE_PATTERN_N: '400'
@@ -379,7 +381,8 @@ jobs:
       # Regeneration profile (crates/ops/tests/regen_profile.rs): every feature
       # of the tests/perf fixtures and of the std sheet-metal route, top 15.
       - name: Regeneration profile (release)
-        if: runner.os != 'Windows'
+        # Timed on its own: a slow step before it doesn't hide its numbers.
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
         shell: bash
         run: |
           status=0
@@ -388,7 +391,8 @@ jobs:
           exit $status
 
       - name: Regeneration profile (release, Windows)
-        if: runner.os == 'Windows'
+        # Timed on its own: a slow step before it doesn't hide its numbers.
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
