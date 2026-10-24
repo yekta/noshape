@@ -1133,6 +1133,19 @@ impl AssemblyView {
                 }
             }
         }
+        // A dragged section base on geometry: the snapped entity in orange
+        // and the mate-connector glyph at the point (live: unsnapped, the
+        // plain blue ring).
+        if let Some(d) = &self.ui.section_drag
+            && let Some(s) = &d.snap
+        {
+            match s.entity {
+                Reference::Face(_) => h.hover_outline = Some((s.path.clone(), s.entity.clone())),
+                _ => h.hover_entity = Some((s.path.clone(), s.entity.clone())),
+            }
+            h.light_dots.extend(s.dots.iter().copied());
+            h.inference_glyph = Some((Frame::from_axes(s.point, d.plane0.dir(), d.plane0.x), size * 0.25));
+        }
         if let Some(p) = self.placing_point
             && self.placing.is_some()
         {

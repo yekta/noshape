@@ -189,7 +189,25 @@ pub(crate) struct SectionDrag {
     pub grab0: DVec3,
     pub value: f64,
     pub moved: bool,
+    /// Base drag: what the base snapped to under the pointer.
+    pub snap: Option<SectionSnap>,
 }
+
+/// A section base snap (live behaviours "skb (10-24) section base snap + move
+/// to origin" (1)): the world point, the entity highlighted orange (a face
+/// outlined, an edge or vertex) and a face's corner dots.
+#[derive(Clone, Debug)]
+pub(crate) struct SectionSnap {
+    pub point: DVec3,
+    pub path: noshape_model::assembly::eval::InstancePath,
+    pub entity: Reference,
+    pub dots: Vec<DVec3>,
+}
+
+/// Snap distances in pixels (live: an edge of the face under the pointer
+/// from ≈30–35 px, a vertex from ≈22 px).
+const SECTION_SNAP_EDGE_PX: f64 = 35.0;
+const SECTION_SNAP_VERTEX_PX: f64 = 22.0;
 
 /// The value box after a section drag (live: Onshape's canvas number box,
 /// focused and selected; Enter moves the plane from the drag's start).
@@ -3982,7 +4000,16 @@ impl AssemblyView {
         }
         let saved = self.ui.section.take().map(Box::new);
         let mut planes = Vec::new();
-        if let Some(t) = self.hover.clone().filter(|t| t.kind == PickKind::Face) {
+        // The face under the pointer (shortcut), else the selected face the
+        // menu was opened on (live: right-click a face › Section view… cuts
+        // parallel to it, the manipulator at its centroid).
+        let face = self.hover.clone().filter(|t| t.kind == PickKind::Face).or_else(|| {
+            self.ui.entity_sel.iter().rev().find(|(_, r)| matches!(r, Reference::Face(_))).and_then(|(path, r)| {
+                let occ = self.result.occurrences.iter().position(|o| o.path == *path && o.face_refs.contains(r))?;
+                Some(AsmPickTarget { path: path.clone(), reference: r.clone(), kind: PickKind::Face, occ, anchor: None })
+            })
+        });
+        if let Some(t) = face {
             planes.extend(self.section_plane_of(&t, cx));
         }
         if planes.is_empty()
@@ -4109,6 +4136,86 @@ impl AssemblyView {
         })
     }
 
+    /// What a dragged section base snaps to under `position` (live
+    /// behaviours "skb (10-24) section base snap + move to origin" (1)): a
+    /// vertex within 22 px (also off the parts); on a part, the centre of a
+    /// face bounded by one closed edge (a pin's top circle), an edge of the
+    /// face under the pointer within 35 px (its nearest point), else the
+    /// point on the face. Off the parts and away from vertices: nothing.
+    fn section_base_snap(&self, position: glam::DVec2, cx: &App) -> Option<SectionSnap> {
+        let vp = self.viewport.read(cx);
+        let (ro, rd) = vp.ray(position);
+        let to_d = |p: [f32; 3]| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
+        // The nearest face hit: (ray parameter, occurrence, face).
+        let mut hit: Option<(f64, usize, usize)> = None;
+        for (oi, o) in self.result.occurrences.iter().enumerate().filter(|(_, o)| !o.hidden) {
+            let inv = o.transform.inverse();
+            let (lo, ld) = (inv.transform_point3(ro), inv.transform_vector3(rd));
+            let m = &o.mesh;
+            let pos = |i: u32| m.positions.get(i as usize).copied().map(to_d).unwrap_or_default();
+            for (fi, &(first, count)) in m.face_ranges.iter().enumerate() {
+                let Some(tris) = m.indices.get(first as usize..(first + count) as usize) else { continue };
+                for t in tris.as_chunks::<3>().0 {
+                    if let Some(tt) = panels::ray_triangle(lo, ld, pos(t[0]), pos(t[1]), pos(t[2]))
+                        && hit.is_none_or(|h| tt < h.0)
+                    {
+                        hit = Some((tt, oi, fi));
+                    }
+                }
+            }
+        }
+        // Vertices within 22 px: of the part under the pointer, or of any part.
+        let mut best_v: Option<(f64, usize, usize)> = None;
+        for (oi, o) in self.result.occurrences.iter().enumerate().filter(|(oi, o)| !o.hidden && hit.is_none_or(|h| h.1 == *oi)) {
+            for (vi, v) in o.mesh.vertices.iter().enumerate() {
+                let Some(sp) = vp.project(o.transform.transform_point3(to_d(*v))) else { continue };
+                let dist = sp.distance(position);
+                if dist <= SECTION_SNAP_VERTEX_PX && best_v.is_none_or(|b| dist < b.0) {
+                    best_v = Some((dist, oi, vi));
+                }
+            }
+        }
+        if let Some((_, oi, vi)) = best_v {
+            let o = &self.result.occurrences[oi];
+            return Some(SectionSnap { point: o.transform.transform_point3(to_d(o.mesh.vertices[vi])), path: o.path.clone(), entity: o.vertex_refs.get(vi)?.clone(), dots: Vec::new() });
+        }
+        let (t, oi, fi) = hit?;
+        let o = &self.result.occurrences[oi];
+        let world = |p: [f32; 3]| o.transform.transform_point3(to_d(p));
+        let edges: Vec<usize> = o.context.body(&o.body).and_then(|b| b.shape.edge_faces().ok()).map(|ef| ef.iter().enumerate().filter(|(_, fs)| fs.contains(&(fi as u32))).map(|(ei, _)| ei).collect()).unwrap_or_default();
+        let face = o.face_refs.get(fi)?.clone();
+        let dots: Vec<DVec3> = edges.iter().filter_map(|ei| o.mesh.edges.get(*ei)).flat_map(|pl| [pl.first(), pl.last()]).flatten().map(|p| world(*p)).collect();
+        // A face bounded by one closed edge (a circle): its centre.
+        if let [ei] = edges[..]
+            && let Some(pl) = o.mesh.edges.get(ei)
+            && pl.len() > 2
+            && to_d(pl[0]).distance(to_d(pl[pl.len() - 1])) < 1e-9
+        {
+            let n = (pl.len() - 1) as f64;
+            let c = pl[..pl.len() - 1].iter().map(|p| world(*p)).fold(DVec3::ZERO, |a, p| a + p) / n;
+            return Some(SectionSnap { point: c, path: o.path.clone(), entity: face, dots: Vec::new() });
+        }
+        // The face's edges within 35 px: the nearest point on the nearest one.
+        let mut best_e: Option<(f64, usize, DVec3)> = None;
+        for &ei in &edges {
+            let Some(pl) = o.mesh.edges.get(ei) else { continue };
+            for w in pl.windows(2) {
+                let (a, b) = (world(w[0]), world(w[1]));
+                let (Some(sa), Some(sb)) = (vp.project(a), vp.project(b)) else { continue };
+                let ab = sb - sa;
+                let s = if ab.length_squared() > 1e-12 { ((position - sa).dot(ab) / ab.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+                let dist = (sa + ab * s).distance(position);
+                if dist <= SECTION_SNAP_EDGE_PX && best_e.is_none_or(|e| dist < e.0) {
+                    best_e = Some((dist, ei, a + (b - a) * s));
+                }
+            }
+        }
+        if let Some((_, ei, p)) = best_e {
+            return Some(SectionSnap { point: p, path: o.path.clone(), entity: o.edge_refs.get(ei)?.clone(), dots: Vec::new() });
+        }
+        Some(SectionSnap { point: ro + rd * t, path: o.path.clone(), entity: face, dots })
+    }
+
     /// The arrow's tip and the rings' centre (screen-sized offsets from the base).
     fn section_tip(&self, cx: &App) -> Option<(DVec3, DVec3)> {
         let pl = self.active_section_plane()?;
@@ -4166,7 +4273,7 @@ impl AssemblyView {
             SectionHandle::Base => grab0 = self.ray_plane_at(position, pl.base(), pl.normal, cx).unwrap_or(pl.base()),
         }
         self.ui.section_value = None;
-        self.ui.section_drag = Some(SectionDrag { handle, plane0: pl, s0, v0, grab0, value: 0.0, moved: false });
+        self.ui.section_drag = Some(SectionDrag { handle, plane0: pl, s0, v0, grab0, value: 0.0, moved: false, snap: None });
         cx.notify();
         true
     }
@@ -4200,9 +4307,21 @@ impl AssemblyView {
                 Some((Self::rotated_plane(pl0, k, angle), angle))
             }
             SectionHandle::Base => {
-                let Some(p) = self.ray_plane_at(position, pl0.base(), pl0.normal, cx) else { return true };
+                // On geometry the base snaps (the cut stays until release);
+                // off the parts it follows the pointer in the plane.
+                let snap = self.section_base_snap(position, cx);
+                let p = match &snap {
+                    Some(s) => s.point,
+                    None => match self.ray_plane_at(position, pl0.base(), pl0.normal, cx) {
+                        Some(p) => p - (d.grab0 - pl0.base()),
+                        None => return true,
+                    },
+                };
+                if let Some(dd) = &mut self.ui.section_drag {
+                    dd.snap = snap;
+                }
                 let mut pl = pl0.clone();
-                let delta = p - d.grab0;
+                let delta = p - pl0.base();
                 pl.origin += delta - pl0.normal * delta.dot(pl0.normal);
                 Some((pl, 0.0))
             }
@@ -4225,6 +4344,15 @@ impl AssemblyView {
     /// open, focused and selected (live).
     pub(super) fn end_section_drag(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(d) = self.ui.section_drag.take() else { return false };
+        // Live: on release the plane moves to pass through the snapped point
+        // (an edge below the plane brings the cut down to it).
+        if let Some(s) = d.snap.as_ref().filter(|_| d.handle == SectionHandle::Base)
+            && let Some(slot) = self.active_section_plane_mut()
+        {
+            slot.origin = s.point - slot.normal * slot.offset;
+            // The cut moves with it (the clip planes are scene data).
+            self.rebuild_scene(false, cx);
+        }
         if d.moved && d.handle != SectionHandle::Base {
             self.open_section_value(&d, window, cx);
         }
