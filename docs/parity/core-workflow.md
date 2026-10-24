@@ -504,3 +504,15 @@ line through the dual text), **(d)** (1000-pin orbit 19 fps vs 33 on v0.4.7, mac
 | (e) look | ✅ dark: Part Studio, assembly, BOM = live dk-940/942. ✗ German: toolbar tooltip title "Extrude (shift+e)" (live "Linear austragen (shift+e)"; ui.rs:604 formats before the table lookup, de.tsv:2586 has "Extrude"); Extrude dialog: Thin, Inters…, "Faces und sketch regions to extrude", Direction, Starting offset, Entwurf (live Formschräge), Second end position untranslated/wrong; feature menu German except "Sketch 1… bearbeiten" (live „Sketch 1 [Skizze]“ bearbeiten …). Own names stay English ✅, new features German ✅. Off-gate: Preferences units sentence English, heading "Voreinstellungen" (live "Preferences"), "Dezimalstellen" (live "Dezimalstellen anzeigen") |
 | (f) drawings | ✅ dual text "[2.36 in]" over "60", "[0.39 in]" / "Ø10" (no Ø). ✗ the linear dimension line runs unbroken through the dual text's bracket bottoms (ANSI and ISO); live asbdd-20 breaks it around the text block, in the gap. ✅ PNG 300 px/in (A3 4961×3508, ANSI B 5100×3300), RGB, 2 colours. ✅ note leaders: leader to a vertex with landing, selection amber, leader menu = live minus Paste (empty clipboard) / Add comment. Note tool placement by synthetic clicks fails on v0.4.7 and v0.4.8 alike (Callout works): not a regression |
 | (g) regressions | ✅ section 8: 73/73 ALIVE, no panics (montage g1); smoke: new doc, rectangle (r = Center point rectangle, as live), Extrude, Fillet, quit/reopen intact |
+
+## v0.4.8 re-gate: release/v0.4.8 c7d9d454 (target-lead dev build, footer c7d9d454), FRESH=1, 2026-10-24 19:00–20:30, qa4
+Scope (lead): (a), (d), (f), smoke; German out of scope (P3). **Result: FAIL on (d)**; (a), (f), smoke PASS.
+
+| Item | Result |
+|---|---|
+| (a) fins ×400/×400, delete LP2 while it regenerates | ✅ Delete key: row gone by 0.30 s, spinner gone by 0.92 s; right-click › Delete: row gone by 0.39 s, spinner gone by 1.0 s (was 7–9 s); end state 11 features, LP1 result |
+| (d) orbit, macOS CI perf.yml bench, parts-1000, 300 frames (run 40124041877, ref release/v0.4.8 = c7d9d454) | ✗ GPU-presented orbit **18.9 fps** macOS 14 (mean 52.9 ms, p95 76.0) / **20.0 fps** macOS 15, vs v0.4.7 **32.9 / 33.6** (run 40096336855). The display mesh is back to chord (184 000 triangles = v0.4.7), but the draw has **11 007 instances vs v0.4.7's 6 007**: the remaining cost is not triangles (display levels / edge LOD instances?) |
+| (f) dual dimension line | ✅ broken around the "[2.36 in] / 60" text block on ANSI B and ISO A3, in the PNG and in the app (= live asbdd-20) |
+| smoke | ✅ new doc, corner rectangle (g), Extrude, Fillet, quit/reopen; section 8 73/73 ALIVE, no panics (montage g2) |
+
+Note: perf.yml's `ref` input needs a branch or tag (a bare SHA fails in actions/checkout: run 40121047489 cancelled).
