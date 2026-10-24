@@ -19768,11 +19768,584 @@
    {
     "category": "Retaining rings",
     "class": "Internal retaining rings",
+    "name": "Internal heavy retaining ring DIN 472",
+    "shape": "retainingRing",
+    "form": {
+     "internal": 1,
+     "lugK": 0.5,
+     "blendRule": 1
+    },
+    "sizes": [
+     {
+      "name": "20",
+      "label": "Internal heavy retaining ring 20",
+      "d": 20.0,
+      "dims": {
+       "d": 20.0,
+       "dg": 21.0,
+       "large": 2.4,
+       "small": 1.2,
+       "lug": 4.5,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 0
+      }
+     },
+     {
+      "name": "22",
+      "label": "Internal heavy retaining ring 22",
+      "d": 22.0,
+      "dims": {
+       "d": 22.0,
+       "dg": 23.0,
+       "large": 2.8,
+       "small": 1.4,
+       "lug": 4.7,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 0
+      }
+     },
+     {
+      "name": "24",
+      "label": "Internal heavy retaining ring 24",
+      "d": 24.0,
+      "dims": {
+       "d": 24.0,
+       "dg": 25.2,
+       "large": 3.0,
+       "small": 1.5,
+       "lug": 4.9,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 0
+      }
+     },
+     {
+      "name": "25",
+      "label": "Internal heavy retaining ring 25",
+      "d": 25.0,
+      "dims": {
+       "d": 25.0,
+       "dg": 26.2,
+       "large": 3.1,
+       "small": 1.55,
+       "lug": 5.0,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "26",
+      "label": "Internal heavy retaining ring 26",
+      "d": 26.0,
+      "dims": {
+       "d": 26.0,
+       "dg": 27.2,
+       "large": 3.1,
+       "small": 1.55,
+       "lug": 5.1,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "28",
+      "label": "Internal heavy retaining ring 28",
+      "d": 28.0,
+      "dims": {
+       "d": 28.0,
+       "dg": 29.4,
+       "large": 3.2,
+       "small": 1.6,
+       "lug": 5.3,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "30",
+      "label": "Internal heavy retaining ring 30",
+      "d": 30.0,
+      "dims": {
+       "d": 30.0,
+       "dg": 31.4,
+       "large": 3.3,
+       "small": 1.65,
+       "lug": 5.5,
+       "d5": 2.0,
+       "s": 1.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "32",
+      "label": "Internal heavy retaining ring 32",
+      "d": 32.0,
+      "dims": {
+       "d": 32.0,
+       "dg": 33.7,
+       "large": 3.4,
+       "small": 1.7,
+       "lug": 5.7,
+       "d5": 2.5,
+       "s": 1.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "34",
+      "label": "Internal heavy retaining ring 34",
+      "d": 34.0,
+      "dims": {
+       "d": 34.0,
+       "dg": 35.7,
+       "large": 3.7,
+       "small": 1.85,
+       "lug": 5.9,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "35",
+      "label": "Internal heavy retaining ring 35",
+      "d": 35.0,
+      "dims": {
+       "d": 35.0,
+       "dg": 37.0,
+       "large": 3.8,
+       "small": 1.9,
+       "lug": 6.0,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "37",
+      "label": "Internal heavy retaining ring 37",
+      "d": 37.0,
+      "dims": {
+       "d": 37.0,
+       "dg": 39.0,
+       "large": 3.9,
+       "small": 1.95,
+       "lug": 6.2,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "38",
+      "label": "Internal heavy retaining ring 38",
+      "d": 38.0,
+      "dims": {
+       "d": 38.0,
+       "dg": 40.0,
+       "large": 3.9,
+       "small": 1.95,
+       "lug": 6.3,
+       "d5": 2.5,
+       "s": 1.75,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "40",
+      "label": "Internal heavy retaining ring 40",
+      "d": 40.0,
+      "dims": {
+       "d": 40.0,
+       "dg": 42.5,
+       "large": 3.9,
+       "small": 1.95,
+       "lug": 6.5,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "42",
+      "label": "Internal heavy retaining ring 42",
+      "d": 42.0,
+      "dims": {
+       "d": 42.0,
+       "dg": 44.5,
+       "large": 4.1,
+       "small": 2.05,
+       "lug": 6.7,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "45",
+      "label": "Internal heavy retaining ring 45",
+      "d": 45.0,
+      "dims": {
+       "d": 45.0,
+       "dg": 47.5,
+       "large": 4.3,
+       "small": 2.15,
+       "lug": 7.0,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "47",
+      "label": "Internal heavy retaining ring 47",
+      "d": 47.0,
+      "dims": {
+       "d": 47.0,
+       "dg": 49.5,
+       "large": 4.4,
+       "small": 2.2,
+       "lug": 7.2,
+       "d5": 2.5,
+       "s": 2.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "50",
+      "label": "Internal heavy retaining ring 50",
+      "d": 50.0,
+      "dims": {
+       "d": 50.0,
+       "dg": 53.0,
+       "large": 4.6,
+       "small": 2.3,
+       "lug": 7.5,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "52",
+      "label": "Internal heavy retaining ring 52",
+      "d": 52.0,
+      "dims": {
+       "d": 52.0,
+       "dg": 55.0,
+       "large": 4.7,
+       "small": 2.35,
+       "lug": 7.7,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "55",
+      "label": "Internal heavy retaining ring 55",
+      "d": 55.0,
+      "dims": {
+       "d": 55.0,
+       "dg": 58.0,
+       "large": 5.0,
+       "small": 2.5,
+       "lug": 8.0,
+       "d5": 2.5,
+       "s": 2.5,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "60",
+      "label": "Internal heavy retaining ring 60",
+      "d": 60.0,
+      "dims": {
+       "d": 60.0,
+       "dg": 63.0,
+       "large": 5.4,
+       "small": 2.7,
+       "lug": 8.5,
+       "d5": 2.5,
+       "s": 3.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "62",
+      "label": "Internal heavy retaining ring 62",
+      "d": 62.0,
+      "dims": {
+       "d": 62.0,
+       "dg": 65.0,
+       "large": 5.5,
+       "small": 2.75,
+       "lug": 8.6,
+       "d5": 2.5,
+       "s": 3.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "65",
+      "label": "Internal heavy retaining ring 65",
+      "d": 65.0,
+      "dims": {
+       "d": 65.0,
+       "dg": 68.0,
+       "large": 5.8,
+       "small": 2.9,
+       "lug": 8.7,
+       "d5": 3.0,
+       "s": 3.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "68",
+      "label": "Internal heavy retaining ring 68",
+      "d": 68.0,
+      "dims": {
+       "d": 68.0,
+       "dg": 71.0,
+       "large": 6.1,
+       "small": 3.05,
+       "lug": 8.8,
+       "d5": 3.0,
+       "s": 3.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "70",
+      "label": "Internal heavy retaining ring 70",
+      "d": 70.0,
+      "dims": {
+       "d": 70.0,
+       "dg": 73.0,
+       "large": 6.2,
+       "small": 3.1,
+       "lug": 9.0,
+       "d5": 3.0,
+       "s": 3.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "72",
+      "label": "Internal heavy retaining ring 72",
+      "d": 72.0,
+      "dims": {
+       "d": 72.0,
+       "dg": 75.0,
+       "large": 6.4,
+       "small": 3.2,
+       "lug": 9.2,
+       "d5": 3.0,
+       "s": 3.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "75",
+      "label": "Internal heavy retaining ring 75",
+      "d": 75.0,
+      "dims": {
+       "d": 75.0,
+       "dg": 78.0,
+       "large": 6.6,
+       "small": 3.3,
+       "lug": 9.3,
+       "d5": 3.0,
+       "s": 3.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "80",
+      "label": "Internal heavy retaining ring 80",
+      "d": 80.0,
+      "dims": {
+       "d": 80.0,
+       "dg": 83.5,
+       "large": 7.0,
+       "small": 3.5,
+       "lug": 9.5,
+       "d5": 3.0,
+       "s": 4.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "85",
+      "label": "Internal heavy retaining ring 85",
+      "d": 85.0,
+      "dims": {
+       "d": 85.0,
+       "dg": 88.5,
+       "large": 7.2,
+       "small": 3.6,
+       "lug": 9.7,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "90",
+      "label": "Internal heavy retaining ring 90",
+      "d": 90.0,
+      "dims": {
+       "d": 90.0,
+       "dg": 93.5,
+       "large": 7.6,
+       "small": 3.8,
+       "lug": 10.0,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "95",
+      "label": "Internal heavy retaining ring 95",
+      "d": 95.0,
+      "dims": {
+       "d": 95.0,
+       "dg": 98.5,
+       "large": 8.1,
+       "small": 4.05,
+       "lug": 10.3,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     },
+     {
+      "name": "100",
+      "label": "Internal heavy retaining ring 100",
+      "d": 100.0,
+      "dims": {
+       "d": 100.0,
+       "dg": 103.5,
+       "large": 8.4,
+       "small": 4.2,
+       "lug": 10.5,
+       "d5": 3.5,
+       "s": 4.0,
+       "rc": 0.25
+      },
+      "counts": {
+       "ringConfig": 1
+      }
+     }
+    ],
+    "source": "Onshape standard content table DATA_DIN_472_INTERNAL_RETAINING_RINGS_MAIN (document 494d1ef9fa36511edaa43446, version More unique parameters)"
+   },
+   {
+    "category": "Retaining rings",
+    "class": "Internal retaining rings",
     "name": "Internal retaining ring DIN 472",
     "shape": "retainingRing",
     "form": {
      "internal": 1,
-     "lugK": 0.5
+     "lugK": 0.5,
+     "blendRule": 0
     },
     "sizes": [
      {
@@ -19786,7 +20359,11 @@
        "small": 0.55,
        "lug": 2.4,
        "d5": 1.0,
-       "s": 0.8
+       "s": 0.8,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19800,7 +20377,11 @@
        "small": 0.65,
        "lug": 2.5,
        "d5": 1.0,
-       "s": 0.8
+       "s": 0.8,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19814,7 +20395,11 @@
        "small": 0.7,
        "lug": 3.2,
        "d5": 1.2,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19828,7 +20413,11 @@
        "small": 0.75,
        "lug": 3.3,
        "d5": 1.2,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19842,7 +20431,11 @@
        "small": 0.85,
        "lug": 3.4,
        "d5": 1.5,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19856,7 +20449,11 @@
        "small": 0.9,
        "lug": 3.6,
        "d5": 1.5,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19870,7 +20467,11 @@
        "small": 0.95,
        "lug": 3.7,
        "d5": 1.7,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19884,7 +20485,11 @@
        "small": 1.0,
        "lug": 3.7,
        "d5": 1.7,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19898,7 +20503,11 @@
        "small": 1.0,
        "lug": 3.8,
        "d5": 1.7,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19912,7 +20521,11 @@
        "small": 1.05,
        "lug": 3.9,
        "d5": 1.7,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19926,7 +20539,11 @@
        "small": 1.1,
        "lug": 4.1,
        "d5": 2.0,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19940,7 +20557,11 @@
        "small": 1.1,
        "lug": 4.1,
        "d5": 2.0,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19954,7 +20575,11 @@
        "small": 1.15,
        "lug": 4.2,
        "d5": 2.0,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19968,7 +20593,11 @@
        "small": 1.2,
        "lug": 4.2,
        "d5": 2.0,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19982,7 +20611,11 @@
        "small": 1.25,
        "lug": 4.2,
        "d5": 2.0,
-       "s": 1.0
+       "s": 1.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -19996,7 +20629,11 @@
        "small": 1.3,
        "lug": 4.4,
        "d5": 2.0,
-       "s": 1.2
+       "s": 1.2,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 0
       }
      },
      {
@@ -20010,7 +20647,11 @@
        "small": 1.35,
        "lug": 4.5,
        "d5": 2.0,
-       "s": 1.2
+       "s": 1.2,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20024,7 +20665,11 @@
        "small": 1.4,
        "lug": 4.7,
        "d5": 2.0,
-       "s": 1.2
+       "s": 1.2,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20038,7 +20683,11 @@
        "small": 1.45,
        "lug": 4.8,
        "d5": 2.0,
-       "s": 1.2
+       "s": 1.2,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20052,7 +20701,11 @@
        "small": 1.5,
        "lug": 4.8,
        "d5": 2.0,
-       "s": 1.2
+       "s": 1.2,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20066,7 +20719,11 @@
        "small": 1.6,
        "lug": 5.2,
        "d5": 2.5,
-       "s": 1.2
+       "s": 1.2,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20080,7 +20737,11 @@
        "small": 1.6,
        "lug": 5.4,
        "d5": 2.5,
-       "s": 1.2
+       "s": 1.2,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20094,7 +20755,11 @@
        "small": 1.65,
        "lug": 5.4,
        "d5": 2.5,
-       "s": 1.5
+       "s": 1.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20108,7 +20773,11 @@
        "small": 1.7,
        "lug": 5.4,
        "d5": 2.5,
-       "s": 1.5
+       "s": 1.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20122,7 +20791,11 @@
        "small": 1.75,
        "lug": 5.4,
        "d5": 2.5,
-       "s": 1.5
+       "s": 1.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20136,7 +20809,11 @@
        "small": 1.8,
        "lug": 5.5,
        "d5": 2.5,
-       "s": 1.5
+       "s": 1.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20150,7 +20827,11 @@
        "small": 1.85,
        "lug": 5.5,
        "d5": 2.5,
-       "s": 1.5
+       "s": 1.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20164,7 +20845,11 @@
        "small": 1.95,
        "lug": 5.8,
        "d5": 2.5,
-       "s": 1.75
+       "s": 1.75,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20178,7 +20863,11 @@
        "small": 2.05,
        "lug": 5.9,
        "d5": 2.5,
-       "s": 1.75
+       "s": 1.75,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20192,7 +20881,11 @@
        "small": 2.15,
        "lug": 6.2,
        "d5": 2.5,
-       "s": 1.75
+       "s": 1.75,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20206,7 +20899,11 @@
        "small": 2.2,
        "lug": 6.4,
        "d5": 2.5,
-       "s": 1.75
+       "s": 1.75,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20220,7 +20917,11 @@
        "small": 2.25,
        "lug": 6.4,
        "d5": 2.5,
-       "s": 1.75
+       "s": 1.75,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20234,7 +20935,11 @@
        "small": 2.3,
        "lug": 6.5,
        "d5": 2.5,
-       "s": 2.0
+       "s": 2.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20248,7 +20953,11 @@
        "small": 2.35,
        "lug": 6.7,
        "d5": 2.5,
-       "s": 2.0
+       "s": 2.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20262,7 +20971,11 @@
        "small": 2.5,
        "lug": 6.8,
        "d5": 2.5,
-       "s": 2.0
+       "s": 2.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20276,7 +20989,11 @@
        "small": 2.55,
        "lug": 6.8,
        "d5": 2.5,
-       "s": 2.0
+       "s": 2.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20290,7 +21007,11 @@
        "small": 2.6,
        "lug": 6.9,
        "d5": 2.5,
-       "s": 2.0
+       "s": 2.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20304,7 +21025,11 @@
        "small": 2.7,
        "lug": 7.3,
        "d5": 2.5,
-       "s": 2.0
+       "s": 2.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20318,7 +21043,11 @@
        "small": 2.75,
        "lug": 7.3,
        "d5": 2.5,
-       "s": 2.0
+       "s": 2.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20332,7 +21061,11 @@
        "small": 2.8,
        "lug": 7.3,
        "d5": 2.5,
-       "s": 2.0
+       "s": 2.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20346,7 +21079,11 @@
        "small": 2.9,
        "lug": 7.6,
        "d5": 3.0,
-       "s": 2.5
+       "s": 2.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20360,7 +21097,11 @@
        "small": 3.05,
        "lug": 7.8,
        "d5": 3.0,
-       "s": 2.5
+       "s": 2.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20374,7 +21115,11 @@
        "small": 3.1,
        "lug": 7.8,
        "d5": 3.0,
-       "s": 2.5
+       "s": 2.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20388,7 +21133,11 @@
        "small": 3.2,
        "lug": 7.8,
        "d5": 3.0,
-       "s": 2.5
+       "s": 2.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20402,7 +21151,11 @@
        "small": 3.3,
        "lug": 7.8,
        "d5": 3.0,
-       "s": 2.5
+       "s": 2.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20416,7 +21169,11 @@
        "small": 3.4,
        "lug": 8.5,
        "d5": 3.0,
-       "s": 2.5
+       "s": 2.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20430,7 +21187,11 @@
        "small": 3.5,
        "lug": 8.5,
        "d5": 3.0,
-       "s": 2.5
+       "s": 2.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20444,7 +21205,11 @@
        "small": 3.5,
        "lug": 8.5,
        "d5": 3.0,
-       "s": 2.5
+       "s": 2.5,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20458,7 +21223,11 @@
        "small": 3.6,
        "lug": 8.6,
        "d5": 3.5,
-       "s": 3.0
+       "s": 3.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20472,7 +21241,11 @@
        "small": 3.7,
        "lug": 8.6,
        "d5": 3.5,
-       "s": 3.0
+       "s": 3.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20486,7 +21259,11 @@
        "small": 3.8,
        "lug": 8.6,
        "d5": 3.5,
-       "s": 3.0
+       "s": 3.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20500,7 +21277,11 @@
        "small": 3.9,
        "lug": 8.7,
        "d5": 3.5,
-       "s": 3.0
+       "s": 3.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20514,7 +21295,11 @@
        "small": 4.05,
        "lug": 8.8,
        "d5": 3.5,
-       "s": 3.0
+       "s": 3.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20528,7 +21313,11 @@
        "small": 4.15,
        "lug": 9.0,
        "d5": 3.5,
-       "s": 3.0
+       "s": 3.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20542,7 +21331,11 @@
        "small": 4.2,
        "lug": 9.2,
        "d5": 3.5,
-       "s": 3.0
+       "s": 3.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20556,7 +21349,11 @@
        "small": 4.25,
        "lug": 9.5,
        "d5": 3.5,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20570,7 +21367,11 @@
        "small": 4.35,
        "lug": 9.5,
        "d5": 3.5,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20584,7 +21385,11 @@
        "small": 4.45,
        "lug": 9.5,
        "d5": 3.5,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20598,7 +21403,11 @@
        "small": 4.5,
        "lug": 10.4,
        "d5": 3.5,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20612,7 +21421,11 @@
        "small": 4.55,
        "lug": 10.5,
        "d5": 3.5,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20626,7 +21439,11 @@
        "small": 4.65,
        "lug": 10.5,
        "d5": 3.5,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20640,7 +21457,11 @@
        "small": 4.85,
        "lug": 11.0,
        "d5": 3.5,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20654,7 +21475,11 @@
        "small": 5.0,
        "lug": 11.0,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20668,7 +21493,11 @@
        "small": 5.1,
        "lug": 11.0,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20682,7 +21511,11 @@
        "small": 5.25,
        "lug": 11.2,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20696,7 +21529,11 @@
        "small": 5.35,
        "lug": 11.2,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20710,7 +21547,11 @@
        "small": 5.45,
        "lug": 11.4,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20724,7 +21565,11 @@
        "small": 5.6,
        "lug": 12.0,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20738,7 +21583,11 @@
        "small": 5.7,
        "lug": 12.0,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20752,7 +21601,11 @@
        "small": 5.8,
        "lug": 13.0,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20766,7 +21619,11 @@
        "small": 5.9,
        "lug": 13.0,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 1
       }
      },
      {
@@ -20780,7 +21637,11 @@
        "small": 6.1,
        "lug": 13.5,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20794,7 +21655,11 @@
        "small": 6.35,
        "lug": 13.5,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20808,7 +21673,11 @@
        "small": 6.6,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20822,7 +21691,11 @@
        "small": 6.85,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20836,7 +21709,11 @@
        "small": 6.9,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20850,7 +21727,11 @@
        "small": 6.9,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20864,7 +21745,11 @@
        "small": 7.0,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 4.0
+       "s": 4.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20878,7 +21763,11 @@
        "small": 7.0,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20892,7 +21781,11 @@
        "small": 7.0,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20906,7 +21799,11 @@
        "small": 7.0,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20920,7 +21817,11 @@
        "small": 7.0,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20934,7 +21835,11 @@
        "small": 7.0,
        "lug": 14.2,
        "d5": 4.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20948,7 +21853,11 @@
        "small": 8.0,
        "lug": 16.2,
        "d5": 5.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20962,7 +21871,11 @@
        "small": 8.0,
        "lug": 16.2,
        "d5": 5.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20976,7 +21889,11 @@
        "small": 8.0,
        "lug": 16.2,
        "d5": 5.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -20990,7 +21907,11 @@
        "small": 8.0,
        "lug": 16.2,
        "d5": 5.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      },
      {
@@ -21004,7 +21925,11 @@
        "small": 8.0,
        "lug": 16.2,
        "d5": 5.0,
-       "s": 5.0
+       "s": 5.0,
+       "rc": 0.5
+      },
+      "counts": {
+       "ringConfig": 2
       }
      }
     ],
