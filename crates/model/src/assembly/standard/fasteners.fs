@@ -1884,6 +1884,94 @@ function circleCircleLeft(c1 is Vector, r1 is ValueWithUnits, c2 is Vector, r2 i
     return p[0] < q[0] ? p : q;
 }
 
+/** Both points where circles (c1, r1) and (c2, r2) meet (none: undefined). */
+function circleCircleBoth(c1 is Vector, r1 is ValueWithUnits, c2 is Vector, r2 is ValueWithUnits)
+{
+    const d = norm(c2 - c1);
+    if (d < EPS)
+        return undefined;
+    const u = (c2 - c1) / d;
+    const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+    const h2 = r1 * r1 - a * a;
+    if (h2 < 0 * meter * meter)
+        return undefined;
+    const b = sqrt(h2);
+    const w = vector(-u[1], u[0]);
+    return [c1 + u * a + w * b, c1 + u * a - w * b];
+}
+
+/** Where circles (c1, r1) and (c2, r2) meet: the lower point. */
+function circleCircleLow(c1 is Vector, r1 is ValueWithUnits, c2 is Vector, r2 is ValueWithUnits) returns Vector
+{
+    const pq = circleCircleBoth(c1, r1, c2, r2);
+    return pq[0][1] < pq[1][1] ? pq[0] : pq[1];
+}
+
+/** The middle of the arc (centre c, radius r) from a to b, the short way. */
+function arcMid(c is Vector, a is Vector, b is Vector, r is ValueWithUnits) returns Vector
+{
+    return c + normalize(normalize(a - c) + normalize(b - c)) * r;
+}
+
+/**
+ * An internal ring's configuration B blend (live's Sketch 1): the circle
+ * inside the inner circle (centre ci, radius ri) tangent to it and through
+ * F (the A-arc's centre), meeting the lug circle (rl) square, or 0.96 D off
+ * the hole at zc (`hole`). Returns [centre, radius]: the largest such.
+ */
+function ringBlend(ci is Vector, ri is ValueWithUnits, F is Vector, zc is Vector, rl is ValueWithUnits, D is ValueWithUnits, hole is boolean) returns array
+{
+    const centreOf = function(rho)
+        {
+            const pq = circleCircleBoth(ci, ri - rho, F, rho);
+            if (pq == undefined)
+                return undefined;
+            return pq[0][1] > pq[1][1] ? pq[0] : pq[1];
+        };
+    const f = function(rho)
+        {
+            const c = centreOf(rho);
+            if (c == undefined)
+                return undefined;
+            if (hole)
+                return (norm(c - zc) - rho - D / 2 - 0.96 * D) / meter;
+            return (dot(c, c) - rl * rl - rho * rho) / (meter * meter);
+        };
+    const steps = 2000;
+    var hi = undefined;
+    var fhi = undefined;
+    for (var i = steps - 1; i > 0; i -= 1)
+    {
+        const rho = ri * i / steps;
+        const val = f(rho);
+        if (val != undefined && fhi != undefined && (val < 0) != (fhi < 0))
+        {
+            var a = rho;
+            var b = hi;
+            var fa = val;
+            for (var k = 0; k < 60; k += 1)
+            {
+                const m = (a + b) / 2;
+                const fm = f(m);
+                if (fm == undefined)
+                    break;
+                if ((fm < 0) == (fa < 0))
+                {
+                    a = m;
+                    fa = fm;
+                }
+                else
+                    b = m;
+            }
+            const rho0 = (a + b) / 2;
+            return [centreOf(rho0), rho0];
+        }
+        hi = rho;
+        fhi = val;
+    }
+    throw regenError("No blend for this retaining ring");
+}
+
 /** Hole rules of the external rings' lugs: 0.4 hole diameters from the lug fillet (DIN 471) or the lug side. */
 const RING_HOLE_TO_FILLET = 0;
 const RING_HOLE_TO_SIDE = 1;
@@ -1916,6 +2004,10 @@ export const retainingRing = defineFeature(function(context is Context, id is Id
         isReal(definition.sideAngle, { (unitless) : [0, 7, 45] } as RealBoundSpec);
         annotation { "Name" : "Lug radius factor" }
         isReal(definition.lugK, { (unitless) : [0, 0.8, 10] } as RealBoundSpec);
+        annotation { "Name" : "Configuration" }
+        isInteger(definition.ringConfig, { (unitless) : [0, 0, 2] } as IntegerBoundSpec);
+        annotation { "Name" : "Blend rule" }
+        isInteger(definition.blendRule, { (unitless) : [0, 0, 1] } as IntegerBoundSpec);
     }
     {
         // Live's DIN 471 / 472 and ANSI rings (raw /features: one sketch,
@@ -1974,9 +2066,17 @@ export const retainingRing = defineFeature(function(context is Context, id is Id
         {
             // Internal: the bore circle outside; inside, a circle as wide as
             // L at +Y and S at -Y; the lugs end on radial planes through the
-            // bore's chord of dg / 4, rounded lugK (lug - L / 2) against the
-            // lug circle rg - lug and again into the ring; holes concentric
-            // with the lug ends.
+            // bore's chord of dg / 4. Live's FSRules pick a configuration by
+            // size (behaviours "skb (10-24) rings / washers"):
+            // A: each lug end an arc lugK (lug - L / 2) tangent to the end
+            //    plane and the lug circle rg - lug, a second equal arc into
+            //    the inner circle; holes concentric with the lug ends.
+            // B: the lug's inner edge on the lug circle, one blend arc from it
+            //    into the inner circle (through the A-arc's centre; meeting
+            //    the lug circle square, blendRule 0, or 0.96 D from the hole,
+            //    1), the four corners rounded rc.
+            // C: the inner circle concentric at rg - lug, no lugs; holes on
+            //    rg - lug / 2, 1.5 D from the end planes.
             const R = rg;
             const ri = R - (L + S) / 2;
             const ci = vector(Z, (S - L) / 2);
@@ -1985,8 +2085,40 @@ export const retainingRing = defineFeature(function(context is Context, id is Id
             const v = vector(-0.25, -sqrt(15) / 4);
             const n = vector(-sqrt(15) / 4, 0.25);
             const pl = v * R;
+            if (definition.ringConfig == 2)
+            {
+                const rh = R - lug / 2;
+                const t = 1.5 * D;
+                extrudeProfileZ(context, id + "ring", s / 2, [{ "p" : mirrorX(pl) }, { "p" : pl, "mid" : vector(Z, R) }, { "p" : v * rl }, { "p" : mirrorX(v * rl), "mid" : vector(Z, rl) }]);
+                ringHoles(context, id, s, D, n * t + v * sqrt(rh * rh - t * t));
+                return;
+            }
             const zc = n * Rs + v * sqrt((rl + Rs) * (rl + Rs) - Rs * Rs);
             const F = circleCircleLeft(zc, 2 * Rs, ci, ri - Rs);
+            if (definition.ringConfig == 1)
+            {
+                const blend = ringBlend(ci, ri, F, zc, rl, D, definition.blendRule == 1);
+                const C = blend[0];
+                const rho = blend[1];
+                const rf = definition.rc;
+                const K1 = n * rf + v * sqrt((rl + rf) * (rl + rf) - rf * rf);
+                const L1 = K1 - n * rf;
+                const A1 = K1 * (rl / (rl + rf));
+                const K2 = circleCircleLow(vector(Z, Z), rl + rf, C, rho + rf);
+                const A2 = K2 * (rl / (rl + rf));
+                const B2 = K2 + (C - K2) * (rf / (rho + rf));
+                const T = ci + (C - ci) * (ri / (ri - rho));
+                const m1 = arcMid(K1, L1, A1, rf);
+                const m2 = arcMid(K2, A2, B2, rf);
+                const mb = arcMid(C, B2, T, rho);
+                const ml = normalize(A1 + A2) * rl;
+                extrudeProfileZ(context, id + "ring", s / 2, [{ "p" : mirrorX(pl) }, { "p" : pl, "mid" : vector(Z, R) }, { "p" : L1 }, { "p" : A1, "mid" : m1 },
+                            { "p" : A2, "mid" : ml }, { "p" : B2, "mid" : m2 }, { "p" : T, "mid" : mb }, { "p" : mirrorX(T), "mid" : vector(Z, ci[1] + ri) },
+                            { "p" : mirrorX(B2), "mid" : mirrorX(mb) }, { "p" : mirrorX(A2), "mid" : mirrorX(m2) }, { "p" : mirrorX(A1), "mid" : mirrorX(ml) },
+                            { "p" : mirrorX(L1), "mid" : mirrorX(m1) }]);
+                ringHoles(context, id, s, D, zc);
+                return;
+            }
             const tlz = zc - n * Rs;
             const tzf = (zc + F) / 2;
             const tfe = ci + (F - ci) * (ri / (ri - Rs));

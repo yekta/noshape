@@ -367,6 +367,10 @@ impl StandardSpec {
             && let Some(s) = self.size_row()
         {
             let lengths = c.lengths(s);
+            // A typed length (live's EDIT box) stays.
+            if c.length_edit && self.length.as_deref().and_then(|l| l.trim().parse::<f64>().ok()).is_some_and(|v| v > 0.0) {
+                return;
+            }
             if self.length.as_ref().is_none_or(|l| !lengths.contains(l)) {
                 self.length = c.default_length(s);
             }
