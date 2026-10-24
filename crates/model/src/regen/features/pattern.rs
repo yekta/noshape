@@ -859,17 +859,29 @@ fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], insta
 }
 
 /// The body's faces (not the feature's own `fs`) that carry on a face of the
-/// seed's tool: in the same plane, facing the same way, reaching past it
-/// (Parasolid merges them; the merged face is the feature's too).
+/// seed's tool: in the same plane, facing the same way, reaching past it and
+/// sharing part of its outline (Parasolid merges them; the merged face is
+/// the feature's too). A tool face wholly inside a face of the part (a rib
+/// sketched on the block's bottom plane) leaves that face as it was.
 fn merged_faces(tool: &Shape, body: &Body, fs: &[usize]) -> Vec<usize> {
     let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
-    let tool_planes: Vec<(DVec3, DVec3, DVec3, f64)> = tool
+    let tool_planes: Vec<(DVec3, DVec3, DVec3, f64, Vec<DVec3>)> = tool
         .faces()
         .iter()
         .filter_map(|t| {
             let k::Surface::Plane(pl) = t.face_surface().ok()? else { return None };
             let c = t.centroid().ok()?;
-            Some((pl.origin, t.normal_at_point(c).ok()?.normalize_or_zero(), c, t.area().ok()?))
+            // Points along its outline: line midpoints, other edges' ends.
+            let outline = t
+                .edges()
+                .iter()
+                .filter_map(|e| e.edge_info().ok())
+                .flat_map(|i| match i.curve {
+                    k::Curve::Line { .. } => vec![(i.start + i.end) * 0.5],
+                    _ => vec![i.start, i.end],
+                })
+                .collect();
+            Some((pl.origin, t.normal_at_point(c).ok()?.normalize_or_zero(), c, t.area().ok()?, outline))
         })
         .collect();
     (0..body.faces.len())
@@ -880,8 +892,13 @@ fn merged_faces(tool: &Shape, body: &Body, fs: &[usize]) -> Vec<usize> {
             let (Ok(c), Ok(area)) = (face.centroid(), face.area()) else { return false };
             let Ok(n) = face.normal_at_point(c) else { return false };
             let n = n.normalize_or_zero();
-            tool_planes.iter().any(|(o, tn, tc, ta)| {
-                tn.dot(n) > 1.0 - 1e-9 && (*o - c).dot(n).abs() < tol && area > ta * (1.0 + 1e-6) && k::make_vertex(*tc).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
+            let on_edge = |p: &DVec3| k::make_vertex(*p).is_ok_and(|v| face.edges().iter().any(|e| k::distance(e, &v).is_ok_and(|d| d.distance < tol)));
+            tool_planes.iter().any(|(o, tn, tc, ta, outline)| {
+                tn.dot(n) > 1.0 - 1e-9
+                    && (*o - c).dot(n).abs() < tol
+                    && area > ta * (1.0 + 1e-6)
+                    && k::make_vertex(*tc).and_then(|v| k::distance(&face, &v)).is_ok_and(|d| d.distance < tol)
+                    && outline.iter().any(on_edge)
             })
         })
         .collect()
@@ -964,21 +981,33 @@ fn face_pattern_fails(body: &Body, faces: &[usize], instances: &[Instance], merg
     let Ok(ef) = body.shape.edge_faces() else { return false };
     let probes: Vec<DMat4> = [instances.first(), instances.last()].into_iter().flatten().map(|i| i.t.matrix()).collect();
     let tol = 1e-7_f64.max(body.shape.bounding_box(false).map(|b| b.diagonal() * 1e-9).unwrap_or(0.0));
-    // A face the seed merged into, mapped onto its own plane by an instance:
-    // the copy would merge into it there too (G45's full-width rib patterned
-    // along the block, "lp wall over"'s floor); mirrored to another plane
-    // it attaches like any face (qa5 ADV9: a gusset on the bracket's end).
-    if let Some(merged) = merged {
-        for &m in merged {
-            let Ok(face) = body.shape.sub_shape(ShapeType::Face, m) else { continue };
-            let Ok(k::Surface::Plane(pl)) = face.face_surface() else { continue };
-            let n = pl.normal.normalize_or_zero();
-            if probes.iter().any(|t| {
-                let n2 = t.transform_vector3(n).normalize_or_zero();
-                n2.dot(n).abs() > 1.0 - 1e-9 && (t.transform_point3(pl.origin) - pl.origin).dot(n).abs() < tol
-            }) {
-                return true;
-            }
+    // A face the seed merged into is the feature's too, so the copies carry
+    // it along: each must land in the plane of another face of the part,
+    // facing the same way, to merge into it (qa5 ADV9: a gusset on the
+    // bracket's end mirrored to the other end). Onto its own plane (G45's
+    // full-width rib patterned along the block, "lp wall over"'s floor,
+    // the fins' sides) or into empty space (the fins' front wall moved
+    // back) it can't be placed.
+    let merged = merged.filter(|m| !m.is_empty());
+    let planes: Vec<(usize, DVec3, DVec3)> = match merged {
+        Some(_) => (0..body.faces.len())
+            .filter_map(|i| {
+                let face = body.shape.sub_shape(ShapeType::Face, i).ok()?;
+                let k::Surface::Plane(_) = face.face_surface().ok()? else { return None };
+                let c = face.centroid().ok()?;
+                Some((i, c, face.normal_at_point(c).ok()?.normalize_or_zero()))
+            })
+            .collect(),
+        None => Vec::new(),
+    };
+    for &m in merged.unwrap_or_default() {
+        let Some(&(_, c, n)) = planes.iter().find(|p| p.0 == m) else { continue };
+        let lands = |t: &DMat4| {
+            let (c2, n2) = (t.transform_point3(c), t.transform_vector3(n).normalize_or_zero());
+            planes.iter().any(|&(i, o, nf)| i != m && nf.dot(n2) > 1.0 - 1e-9 && (o - c2).dot(n2).abs() < tol)
+        };
+        if !probes.iter().all(lands) {
+            return true;
         }
     }
     let (mut convex, mut concave) = (false, false);

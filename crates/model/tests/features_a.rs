@@ -294,7 +294,10 @@ fn loft_end_conditions_as_live() {
     check(run(Top::Square(0.004, 0.005), "20 mm", normal, free), 5479.304562064179, 0.2);
     check(run(Top::Square(0.0, 0.005), "40 mm", normal, free), 10945.311932775581, 0.2);
     // Tangent to profile: the corners follow live; its interior columns
-    // differ (asked: "psb (10-24 h)"), within 0.7 %.
+    // differ, within 0.7 %. Live "psb (10-24 h)": the side faces are 3-span
+    // cubics in u whose start derivative leans toward the corner diagonals
+    // and shortens mid-edge (inward part 1.5703 vs the chord's 5/3), which
+    // is no per-column, energy-minimising or corner-blend rule tried.
     check(run(Top::Square(0.0, 0.005), "20 mm", ("TANGENT_TO_PROFILE", "1"), free), 3926.4566141311925, 30.0);
     check(run(Top::Circle, "20 mm", ("NORMAL_TO_PROFILE", "0.5"), free), 6184.16161905679, 1.0);
     check(run(Top::Circle, "20 mm", ("NORMAL_TO_PROFILE", "3"), free), 7468.467388370618, 1.0);
