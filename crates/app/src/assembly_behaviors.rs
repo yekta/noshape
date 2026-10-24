@@ -170,6 +170,18 @@ pub(crate) struct FolderNameDialog {
 /// View state of the behaviours in this module.
 #[derive(Default)]
 pub(crate) struct AsmUi {
+    /// Camera menu render mode, hidden edges and tangent edges.
+    pub display_mode: crate::scene_builder::DisplayMode,
+    pub hidden_edges_visible: bool,
+    pub tangent_edges: crate::scene_builder::TangentEdges,
+    /// Phantom tangent edges' colour and width (Graphics preferences).
+    pub phantom: Option<(u32, f32)>,
+    /// Camera menu "View in high quality" (Shift+R).
+    pub high_quality: bool,
+    /// Cameras before view changes (camera menu "Previous view").
+    pub cam_history: Vec<noshape_render::Camera>,
+    /// Graphics preferences (camera menu), in the left dialogs' place.
+    pub graphics_dialog: Option<(Entity<crate::graphics_prefs_dialog::GraphicsPrefsDialog>, Subscription)>,
     /// A dialog or panel covers the viewport's top left (last render):
     /// zoom to fit centres the model in the rest (as the Part Studio).
     pub left_open: bool,

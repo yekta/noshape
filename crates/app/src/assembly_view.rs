@@ -19,7 +19,7 @@ use crate::os_menu::{OsContextMenuExt as _, OsMenuItem};
 use crate::doc_model::{DocEvent, DocModel};
 use crate::gpu::Gpu;
 use crate::navigation::{self as nav, RotateDir};
-use crate::scene_builder::PickKind;
+use crate::scene_builder::{DisplayMode, PickKind, TangentEdges};
 use crate::theme::{p, with_alpha};
 use crate::viewport::{Viewport, ViewportEvent};
 use glam::{DVec2, DVec3};
@@ -490,8 +490,10 @@ impl AssemblyView {
         subs.push(cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| {
             // The perspective field of view follows the preference, as in
             // the Part Studio.
-            let fov = (crate::graphics_prefs::get(cx).fov_deg as f64).to_radians();
+            let g = crate::graphics_prefs::get(cx);
+            let fov = (g.fov_deg as f64).to_radians();
             this.viewport.update(cx, |vp, _| vp.camera.fov_y = fov);
+            this.ui.phantom = Some((g.phantom_color, g.phantom_width));
             this.rebuild_scene(false, cx);
         }));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
@@ -815,7 +817,14 @@ impl AssemblyView {
     }
 
     fn scene_options(&self) -> AsmSceneOptions {
-        let mut o = AsmSceneOptions { isolate: self.isolate.clone(), ..Default::default() };
+        let mut o = AsmSceneOptions {
+            isolate: self.isolate.clone(),
+            display_mode: self.ui.display_mode,
+            hidden_edges_visible: self.ui.hidden_edges_visible,
+            tangent_edges: self.ui.tangent_edges,
+            phantom: self.ui.phantom,
+            ..Default::default()
+        };
         if let Some(z) = self.active_zebra() {
             o.zebra = Some(noshape_render::Zebra { stripes: z.stripes, flip: z.flip });
             o.hide_edges = !z.show_edges;
@@ -2919,7 +2928,72 @@ impl AssemblyView {
     }
 
     fn view(&mut self, v: StandardView, cx: &mut Context<Self>) {
+        self.push_camera_history(cx);
         self.viewport.update(cx, |vp, cx| vp.animate_to_view(v, cx));
+    }
+
+    /// Remembers the camera before a view change (as the Part Studio does).
+    fn push_camera_history(&mut self, cx: &App) {
+        let cam = self.viewport.read(cx).camera;
+        if self.ui.cam_history.last() != Some(&cam) {
+            self.ui.cam_history.push(cam);
+            if self.ui.cam_history.len() > 50 {
+                self.ui.cam_history.remove(0);
+            }
+        }
+    }
+
+    /// Camera menu render choices (render mode, hidden / tangent edges).
+    fn set_render(&mut self, f: impl FnOnce(&mut AsmUi), cx: &mut Context<Self>) {
+        f(&mut self.ui);
+        self.rebuild_scene(false, cx);
+        cx.notify();
+    }
+
+    /// Shift+R / camera menu "View in high quality": bodies show their finer
+    /// display levels down to Onshape's assembly refinement threshold.
+    fn toggle_high_quality(&mut self, cx: &mut Context<Self>) {
+        self.ui.high_quality = !self.ui.high_quality;
+        let error_px = if self.ui.high_quality { noshape_render::scene::MESH_ERROR_PX_HIGH_QUALITY_ASSEMBLY } else { noshape_render::scene::MESH_ERROR_PX };
+        self.viewport.update(cx, |vp, cx| {
+            vp.style.detail.mesh_error_px = error_px;
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    /// Camera menu "Previous view".
+    fn previous_view(&mut self, cx: &mut Context<Self>) {
+        if let Some(cam) = self.ui.cam_history.pop() {
+            self.viewport.update(cx, |vp, cx| vp.animate_to(cam, cx));
+        }
+    }
+
+    fn zoom_fit(&mut self, cx: &mut Context<Self>) {
+        self.push_camera_history(cx);
+        self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
+    }
+
+    /// Camera menu "Zoom to window": the next box drag zooms to the box.
+    fn toggle_zoom_window(&mut self, cx: &mut Context<Self>) {
+        self.push_camera_history(cx);
+        self.viewport.update(cx, |vp, cx| {
+            vp.zoom_window = !vp.zoom_window;
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    /// Camera menu "Graphics preferences…" (the Part Studio's dialog).
+    fn open_graphics_prefs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let dialog = cx.new(crate::graphics_prefs_dialog::GraphicsPrefsDialog::new);
+        let sub = cx.subscribe(&dialog, |this: &mut Self, _, _: &crate::graphics_prefs_dialog::GraphicsPrefsEvent, cx| {
+            this.ui.graphics_dialog = None;
+            cx.notify();
+        });
+        window.focus(&dialog.focus_handle(cx), cx);
+        self.ui.graphics_dialog = Some((dialog, sub));
+        cx.notify();
     }
 
     // ------------------------------------------------------------ render: toolbar
@@ -4748,6 +4822,10 @@ impl AssemblyView {
             left = left.child(self.render_standard_edit_panel(cx));
             any_left = true;
         }
+        if let Some((d, _)) = &self.ui.graphics_dialog {
+            left = left.child(d.clone());
+            any_left = true;
+        }
         // A connector opened from the mate dialog's chip docks to its right
         // (live 578: the Mate connector dialog at x 467, beside the mate's).
         let mc_beside = self.mate.is_some() && self.mc.as_ref().is_some_and(|m| m.for_mate.is_some());
@@ -5042,6 +5120,7 @@ impl AssemblyView {
             rotation: |this: &Self, cx| this.viewport.read(cx).camera.rotation,
             click: |this, cell, cx| {
                 let rot = cell.rotation();
+                this.push_camera_history(cx);
                 this.viewport.update(cx, |vp, cx| vp.animate_to_rotation_fit(rot, cx));
             },
             rotate: |this, dx, dy, cx| this.rotate_by(dx, dy, cx),
@@ -5073,6 +5152,8 @@ impl AssemblyView {
         let view = cx.entity();
         let perspective = self.viewport.read(cx).camera.projection == noshape_render::Projection::Perspective;
         let section = self.ui.section.is_some();
+        let has_history = !self.ui.cam_history.is_empty();
+        let (mode, hidden_edges, tangent, high_quality) = (self.ui.display_mode, self.ui.hidden_edges_visible, self.ui.tangent_edges, self.ui.high_quality);
         let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
         Button::new("asm-camera-menu")
             .custom(variant)
@@ -5082,27 +5163,63 @@ impl AssemblyView {
             .p_0()
             .rounded(px(3.))
             .tooltip("Camera and render options")
-            .os_dropdown_menu("asm-camera-menu-dd", false, move |mut m, _, _| {
+            .os_dropdown_menu("asm-camera-menu-dd", false, move |mut m, window, cx| {
+                // Live ("qa5 assembly camera menu", VC8): the Part Studio's menu
+                // without "Orient normal to sketch on edit" and "Highlight
+                // boundary edges"; no "Show mates".
                 for (label, sv) in [("Isometric", StandardView::Isometric), ("Dimetric", StandardView::Dimetric), ("Trimetric", StandardView::Trimetric)] {
                     let v = view.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.view(sv, cx))));
                 }
-                let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
-                // Live ("qa5 assembly camera menu", VC8): no "Show mates" here;
-                // Section view… ends the menu as in the Part Studio.
-                m.separator()
-                    .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx)))))
+                let v = view.clone();
+                m = m.separator().item(crate::os_menu::OsMenuItem::new("Graphics preferences…").icon_name("settings").on_click(move |_, w, cx| v.update(cx, |this, cx| this.open_graphics_prefs(w, cx))));
+                let v = view.clone();
+                m = m.separator().item(crate::os_menu::OsMenuItem::new("Previous view").disabled(!has_history).on_click(move |_, _, cx| v.update(cx, |this, cx| this.previous_view(cx))));
+                let (v1, v2) = (view.clone(), view.clone());
+                m = m
                     .separator()
-                    .item(crate::os_menu::OsMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
-                        v2.update(cx, |this, cx| {
-                            this.viewport.update(cx, |vp, cx| {
-                                let p = if perspective { noshape_render::Projection::Orthographic } else { noshape_render::Projection::Perspective };
-                                vp.set_projection(p, cx);
-                            })
+                    .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.zoom_fit(cx))))
+                    .item(crate::os_menu::OsMenuItem::new("Zoom to window").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.toggle_zoom_window(cx))));
+                let v = view.clone();
+                m = m.separator().item(crate::os_menu::OsMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
+                    v.update(cx, |this, cx| {
+                        this.viewport.update(cx, |vp, cx| {
+                            let p = if perspective { noshape_render::Projection::Orthographic } else { noshape_render::Projection::Perspective };
+                            vp.set_projection(p, cx);
                         })
-                    }))
-                    .separator()
-                    .item(crate::os_menu::OsMenuItem::new(if section { "Turn off section view" } else { "Section view…" }).icon_name("menu-section-view").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_section(w, cx))))
+                    })
+                }));
+                // The current render choices, each a ✓ submenu (as the Part Studio).
+                let check = || Some("menu-check");
+                let v = view.clone();
+                m = m.separator().submenu_with_icon(check(), display_label(mode), window, cx, move |mut sm, _, _| {
+                    for dm in [DisplayMode::ShadedWithEdges, DisplayMode::Shaded, DisplayMode::HiddenLine, DisplayMode::Translucent] {
+                        let v = v.clone();
+                        sm = sm.item(crate::os_menu::OsMenuItem::new(display_label(dm)).checked(dm == mode).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_render(|u| u.display_mode = dm, cx))));
+                    }
+                    sm
+                });
+                let v = view.clone();
+                m = m.submenu_with_icon(check(), if hidden_edges { "Hidden edges visible" } else { "Hidden edges removed" }, window, cx, move |mut sm, _, _| {
+                    for on in [true, false] {
+                        let v = v.clone();
+                        sm = sm.item(crate::os_menu::OsMenuItem::new(if on { "Hidden edges visible" } else { "Hidden edges removed" }).checked(on == hidden_edges).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_render(|u| u.hidden_edges_visible = on, cx))));
+                    }
+                    sm
+                });
+                let v = view.clone();
+                m = m.submenu_with_icon(check(), tangent.label(), window, cx, move |mut sm, _, _| {
+                    for te in TangentEdges::ALL {
+                        let v = v.clone();
+                        sm = sm.item(crate::os_menu::OsMenuItem::new(te.label()).checked(te == tangent).on_click(move |_, _, cx| v.update(cx, |this, cx| this.set_render(|u| u.tangent_edges = te, cx))));
+                    }
+                    sm
+                });
+                let v = view.clone();
+                m = m.separator().item(crate::os_menu::OsMenuItem::new("View in high quality").checked(high_quality).on_click(move |_, _, cx| v.update(cx, |this, cx| this.toggle_high_quality(cx))));
+                let v = view.clone();
+                m.separator()
+                    .item(crate::os_menu::OsMenuItem::new(if section { "Turn off section view" } else { "Section view…" }).icon_name("menu-section-view").on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_section(w, cx))))
             })
             .into_any_element()
     }
@@ -5416,7 +5533,8 @@ impl AssemblyView {
             .on_action(cx.listener(|this, _: &ViewTop, _, cx| this.view(StandardView::Top, cx)))
             .on_action(cx.listener(|this, _: &ViewBottom, _, cx| this.view(StandardView::Bottom, cx)))
             .on_action(cx.listener(|this, _: &ViewIsometric, _, cx| this.view(StandardView::Isometric, cx)))
-            .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))))
+            .on_action(cx.listener(|this, _: &ZoomToFit, _, cx| this.zoom_fit(cx)))
+            .on_action(cx.listener(|this, _: &ViewHighQuality, _, cx| this.toggle_high_quality(cx)))
             // View navigation keys, as in the Part Studio (navigation.rs).
             .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_step(true, cx))))
             .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.viewport.update(cx, |vp, cx| vp.zoom_step(false, cx))))
@@ -5540,6 +5658,16 @@ impl Render for AssemblyView {
                 // So is the customize toolbar's Tools panel, over the list
                 // and graphics.
             )
+    }
+}
+
+/// The camera menu's render-mode names (as the Part Studio's).
+fn display_label(m: DisplayMode) -> &'static str {
+    match m {
+        DisplayMode::ShadedWithEdges => "Shaded with edges",
+        DisplayMode::Shaded => "Shaded without edges",
+        DisplayMode::HiddenLine => "Unshaded",
+        DisplayMode::Translucent => "Translucent",
     }
 }
 
