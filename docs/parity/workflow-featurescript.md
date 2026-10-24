@@ -30,6 +30,17 @@ open points requested ("qa5 featurescript"). Status: ✅ matches live/expected, 
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 
+## Re-check (qa4, 2026-10-23 22:40–23:30, app /root/qa4-scratch/bin/noshape-a0e = main a0e360a3; doc built by CLI: QA cube from /root/qa5-scratch/pass3/qacube.fs, then fCuboidX)
+| Finding | Result |
+|---|---|
+| ADV3 row tooltip | ✅ "QA cube 1 did not regenerate properly: Error regenerating." |
+| FS2 gutter | ✅ ⚠ on line 1, wavy underline under the whole call on line 12; tooltip "⚠ Function fCuboidX with 3 argument(s) not found" on both |
+| FS5 notices result | ✅ "Result: Regeneration complete" |
+| RD1 / FS3 volume readout | ✅ no bottom-right volume readout any more |
+| FS4 toolbar | ✅ "Add custom features" + "Custom features in this workspace" ▾, entry with the "Qc" initials box, tooltip "QA cube" + italic "Feature from current workspace" |
+| Row 7 "Qc" icon on the failing row | ✗ outlined #999 (live red) → **fixed by qa4** (ui.rs `initials_icon_status`, red #bd3039 while failing; test `failing_custom_feature_icon_is_outlined_red`) |
+| FS1 new Feature Studio | ✗ 5 lines (live 4: lines 1–2, empty 3–4, caret on 4) → **fixed by qa4** (ops `FS_TEMPLATE` ends `;\n\n`, the app reuses it; test `new_feature_studio_has_four_lines`) |
+
 ## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app; doc built by /root/qa5-scratch/pass21/mkfs.py: QA cube committed, then `fCuboid` → `fCuboidX` + Ctrl+S in the app)
 | Row | Ours now | Status |
 |---|---|---|

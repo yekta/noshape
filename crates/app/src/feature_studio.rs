@@ -279,9 +279,8 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
     ),
 ];
 
-/// A new Feature Studio (live document/70): lines 1–2 the template, empty
-/// lines 3–4, caret on 4 (qa5 FS1).
-pub const FS_TEMPLATE: &str = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\n";
+/// A new Feature Studio (live document/70).
+pub const FS_TEMPLATE: &str = noshape_ops::docedit::FS_TEMPLATE;
 
 /// "New feature" (live document/72, dom/feature-studio-template-and-error.txt).
 const NEW_FEATURE: &str = "annotation { \"Feature Type Name\" : \"My Feature\", \"Feature Type Description\" : \"\" }\nexport const myFeature = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition\n    {\n        // Define the parameters of the feature type\n    }\n    {\n        // Define the function's action\n    });\n";

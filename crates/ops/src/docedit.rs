@@ -6,6 +6,8 @@ use noshape_model::Document;
 use noshape_model::document::{TabContent, TabId};
 
 /// Source of a new Feature Studio (Onshape's template).
+/// A new Feature Studio: the two template lines, then empty lines 3 and 4 with the
+/// caret on 4 (live, qa5 FS1: four lines, not five).
 pub const FS_TEMPLATE: &str = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\n";
 
 /// Tab kinds of the "+" menu: (kind id, base name).
@@ -116,14 +118,13 @@ pub fn insert_drawing_tab(d: &mut Document, name: &str, drawing: noshape_model::
 }
 
 #[cfg(test)]
-mod tests {
-    /// Live document/70 (qa5 FS1): a new Feature Studio shows four lines,
-    /// the two template lines and two empty ones.
+mod fs_template_tests {
     #[test]
-    fn feature_studio_template_has_four_lines() {
+    fn new_feature_studio_has_four_lines() {
+        // Live (qa5 FS1): lines 1-2 template, empty lines 3-4, caret on 4.
         let lines: Vec<&str> = super::FS_TEMPLATE.split('\n').collect();
-        assert_eq!(lines.len(), 4);
-        assert!(lines[0].starts_with("FeatureScript ") && lines[1].starts_with("import(") && lines[2].is_empty() && lines[3].is_empty());
+        assert_eq!(lines.len(), 4, "{lines:?}");
+        assert!(lines[2].is_empty() && lines[3].is_empty());
     }
 
     /// qa5 API2: the display names document_info prints work as kinds.

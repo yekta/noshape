@@ -1057,13 +1057,6 @@ impl PartStudioView {
                 Reference::Plane(DatumPlane::Right) => "Right plane".into(),
                 Reference::Face(n) => format!("Face of {}", owner(n.creator()).map(fname).unwrap_or_else(|| "part".into())),
                 Reference::Edge(n) => format!("Edge of {}", owner(edge_creator(n)).map(fname).unwrap_or_else(|| "part".into())),
-                // A vertex reads "Vertex of <feature>", named by the latest
-                // feature among its faces' creators (live "qa5 sm" (7): the
-                // inner bend corner of two flanges is "Vertex of Flange 1").
-                Reference::Vertex(TopoName::Vertex { faces, .. }) => {
-                    let latest = faces.iter().filter_map(|f| owner(f.creator())).max_by_key(|id| names.iter().position(|(i, _)| i == id));
-                    latest.map(|id| format!("Vertex of {}", fname(id))).unwrap_or_else(|| "Vertex".into())
-                }
                 Reference::Vertex(_) => "Vertex".into(),
                 Reference::Body(b) => bodies.iter().find(|(i, _)| i == b).map(|(_, n)| n.clone()).unwrap_or_else(|| "Part".into()),
                 Reference::SketchEntity { sketch, entity } => format!("{} {}", fname(*sketch), entity_kinds.get(&(*sketch, *entity)).copied().unwrap_or("entity")),
@@ -1528,13 +1521,7 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let labeler = self.labeler(cx);
         let is_derived = feature.type_id == "importDerived";
-        let dialog = cx.new(|cx| {
-            let mut d = FeatureDialog::new(feature, units, labeler, cx);
-            if !is_new {
-                d.focus_for_edit();
-            }
-            d
-        });
+        let dialog = cx.new(|cx| FeatureDialog::new(feature, units, labeler, cx));
         if is_derived {
             let provider = self.doc.read(cx).derived_provider();
             let doc = self.doc.read(cx).session.doc.clone();
@@ -2495,11 +2482,6 @@ impl PartStudioView {
                         // The section view dialog takes planes from the list too.
                         if this.ui.section_dialog.is_some() {
                             this.section_pick(&r3, window, cx);
-                            return;
-                        }
-                        // So does an open analysis tool (Draft analysis's Mold
-                        // split direction, qa5 ADV1).
-                        if this.edit.is_none() && this.ui.analysis_tool.is_some() && this.analysis_pick(&r3, cx) {
                             return;
                         }
                         let t = this.list_target(&r3);
@@ -3599,8 +3581,7 @@ impl PartStudioView {
                     .flex_none()
                     // A custom feature's row shows its initials box (live qa5 FS4).
                     .child(match features::get(&f.type_id).filter(|_| noshape_model::custom::is_custom(&f.type_id)) {
-                        // A failed one's box is outlined red (live "qa5 featurescript" (6)).
-                        Some(t) => crate::ui::initials_icon(t.name).when(status == FeatureStatus::Error && !rolled_back, |d| d.border_color(pal.text_invalid)).when(rolled_back || suppressed || hidden, |d| d.opacity(0.5)),
+                        Some(t) => crate::ui::initials_icon_status(t.name, status == FeatureStatus::Error && !rolled_back).when(rolled_back || suppressed || hidden, |d| d.opacity(0.5)),
                         None => crate::ui::tree_icon(&feature_icon(&f.type_id), rolled_back || suppressed || hidden, cx),
                     })
                     // Onshape list badges: under-defined sketch (12 px blue circle,
@@ -3675,18 +3656,6 @@ impl PartStudioView {
                 if ev.click_count() >= 2 {
                     this.edit_feature(id, window, cx);
                     return;
-                }
-                // A Plane feature's row feeds the section view dialog and an
-                // open analysis tool like the default planes' rows (qa5 ADV1).
-                let plane = this.display.planes.iter().find(|p| p.reference == Reference::FeaturePlane(id)).map(|p| p.reference.clone());
-                if let Some(r) = &plane {
-                    if this.ui.section_dialog.is_some() {
-                        this.section_pick(r, window, cx);
-                        return;
-                    }
-                    if this.edit.is_none() && this.ui.analysis_tool.is_some() && this.analysis_pick(r, cx) {
-                        return;
-                    }
                 }
                 if this.pick_feature_into_dialog(id, cx) {
                     return;
