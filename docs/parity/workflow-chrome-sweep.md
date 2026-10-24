@@ -83,3 +83,10 @@ sizes are measured from pixels at 1×, texts from the dom/ captures.
 | MP1 | Dialog rows (borders, underlines) | 107, 133, 141–182, 188, 214, 276, 305, 333, 392, 423, 454, 513, 541, 569 | the same, except the empty mate connector field ends at 213 and its text sits 2 px high | ✅ empty field caption 25 px with 2 px top padding |
 | MP2 | Parts to measure prefilled from the selection | Part 1 (red: no material) | the same | ✅ matches |
 | MP3 | Text baselines of the labels | — | within 1–2 px (font metrics) | ✗ app-wide font (VC7) |
+
+## qa5 re-run pass 21 (2026-10-23, app = target-lead 17:10, main 88fbf8f)
+| Row | Ours | Status |
+|---|---|---|
+| VC8 Assembly camera menu | Isometric, Dimetric, Trimetric \| Zoom to fit \| Perspective view, Show mates; larger rows, chevron caret; the Part Studio menu (v01) has the full live list | ? live capture requested ("qa5 (10-23 pass 21, ui VC8)") |
+| VC7 menu font, KS1 shortcuts pop-out page | not local (app-wide font / new window) | ✗ → ui (qa5-routing.md) |
+| VC8 (live answered, behaviours "qa5 assembly camera menu") | live = Part Studio menu minus "Orient normal to sketch on edit" / "Highlight boundary edges", no "Show mates". qa5: "Show mates" removed, "Section view…" added; the rest needs assembly features (render modes, named / previous views, graphics prefs, zoom to window, high quality) → qa5-routing ui | 🔧 partly / ✗ ui |
