@@ -144,6 +144,11 @@ pub struct EvalCtx<'a> {
     /// The run's [`super::RegenCancel`]: long loops (pattern instances)
     /// stop early through [`EvalCtx::cancelled`].
     pub cancel: Option<super::RegenCancel>,
+    /// Evaluated for a pattern's instance or seed tool, not as a feature of
+    /// its own: no dialog-only work (the parts a tool touches: an exact
+    /// distance to every part, per instance; user bug 10-24, a second fin
+    /// pattern under a plate already carrying 400 fins).
+    pub scratch: bool,
 }
 
 /// Map a plane frame by an affine (rigid or mirror) transform. Mirrors give a
@@ -223,7 +228,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None, cancel: None }
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None, cancel: None, scratch: false }
     }
 
     /// The run was aborted (a newer edit made it stale): stop and return
@@ -700,7 +705,7 @@ impl<'a> EvalCtx<'a> {
         }
         // The parts the tool touches, for the dialog's boolean heuristics
         // (booleanHeuristics.fs `autoSelectionForBooleanStep`).
-        if kind == BodyKind::Solid && tools.len() <= 8 {
+        if kind == BodyKind::Solid && tools.len() <= 8 && !self.scratch {
             let t = self.auto_scope(&tools);
             self.touched = t.iter().map(|&i| self.ctx.bodies[i].id.clone()).collect();
         }
@@ -855,6 +860,10 @@ impl<'a> EvalCtx<'a> {
                 }
             }
             let t_bool = t0.elapsed();
+            // Aborted: no naming / unify of a result nobody will see.
+            if self.cancelled() {
+                return err("Cancelled");
+            }
             let mut args: Vec<ShapeNames> = vec![target.shape_names()];
             args.extend(near.iter().map(|&i| tools[i].names.clone()));
             let arg_refs: Vec<&ShapeNames> = args.iter().collect();

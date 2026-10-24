@@ -84,6 +84,18 @@ template <class A> void build_cancellable(A& algo)
   algo.Build(pi->Start());
 }
 
+// Build `algo`, stoppable through `flag` (a pool thread has no thread flag).
+template <class A> void build_with(A& algo, const std::atomic<bool>* flag)
+{
+  if (flag == nullptr)
+  {
+    algo.Build();
+    return;
+  }
+  occ::handle<CancelIndicator> pi = new CancelIndicator(flag);
+  algo.Build(pi->Start());
+}
+
 void fail_if_cancelled()
 {
   if (cancelled(t_cancel))
@@ -966,7 +978,7 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
   sp.SetTools(planes);
   sp.SetRunParallel(true);
   sp.SetNonDestructive(true);
-  sp.Build();
+  build_with(sp, flag);
   if (sp.HasErrors() || !sp.IsDone() || cancelled(flag))
     return false;
   HHist h1 = new BRepTools_History(one, sp);
@@ -1011,7 +1023,12 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
     f.SetRunParallel(false);
     f.SetNonDestructive(true);
     f.SetToFillHistory(true);
-    f.Build();
+    build_with(f, flag);
+    if (cancelled(flag))
+    {
+      failed[(size_t)k] = 1;
+      return;
+    }
     if (!f.HasErrors() && f.IsDone() && volumes_add_up(concat(p, q), f.Shape()))
     {
       res[(size_t)k] = f.Shape();
@@ -1031,6 +1048,8 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
   for (char f : failed)
     if (f)
       return false;
+  if (cancelled(flag))
+    return false;
   std::vector<Stage> level2;
   std::vector<TopoDS_Shape> parts;
   for (int k = 0; k < nslab; ++k)
@@ -1055,6 +1074,8 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
     stages.push_back(std::move(level2));
     stages.push_back({stage_of(shared, h3)});
     hist = compose(concat({target}, t), stages);
+    if (cancelled(flag))
+      return false;
     out = unify(joined, hist);
     return true;
   }
@@ -1187,7 +1208,7 @@ bool blend_in_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Edge>& 
   sp.SetTools(planes);
   sp.SetRunParallel(true);
   sp.SetNonDestructive(true);
-  sp.Build();
+  build_with(sp, flag);
   if (sp.HasErrors() || !sp.IsDone() || cancelled(flag))
     return false;
   HHist                     h1 = new BRepTools_History(one, sp);
@@ -1266,6 +1287,8 @@ bool blend_in_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Edge>& 
   stages.push_back(std::move(level2));
   stages.push_back({stage_of(shared, h3)});
   HHist h = compose({target}, stages);
+  if (cancelled(flag))
+    return false;
   const TopoDS_Shape r = unify(joined, h);
   // The whole joined part (806 faces for 400 holes): checked in parallel.
   if (!BRepCheck_Analyzer(r, true, true).IsValid())
@@ -1312,7 +1335,7 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
   sp.SetTools(planes);
   sp.SetRunParallel(true);
   sp.SetNonDestructive(true);
-  sp.Build();
+  build_with(sp, flag);
   if (sp.HasErrors() || !sp.IsDone() || cancelled(flag))
     return false;
   HHist      h1      = new BRepTools_History(one, sp);
@@ -1358,7 +1381,7 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
     c.SetRunParallel(false);
     c.SetNonDestructive(true);
     c.SetToFillHistory(true);
-    c.Build();
+    build_with(c, flag);
     if (c.HasErrors() || !c.IsDone())
     {
       failed[(size_t)k] = 1;
@@ -1391,6 +1414,8 @@ static bool cut_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape
   stages.push_back(std::move(level2));
   stages.push_back({stage_of(shared, h3)});
   HHist h = compose(concat({target}, t), stages);
+  if (cancelled(flag))
+    return false;
   const TopoDS_Shape r = unify(joined, h);
   // The whole joined part (406 faces for 400 holes): checked in parallel.
   if (!BRepCheck_Analyzer(r, true, true).IsValid())
@@ -1510,6 +1535,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     fail_op("boolean failed: " + algo_errors(*b));
   hist = new BRepTools_History(to_list(concat(a, t)), *b);
   res  = b->Shape();
+  fail_if_cancelled();
   if (opts.unify)
     res = unify(res, hist);
   res = remesh_facets(res, facets, hist);
