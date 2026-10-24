@@ -33,6 +33,7 @@ mod doc_dialogs;
 mod doc_model;
 mod drawing_centermark;
 mod drawing_create;
+mod shortcuts_page;
 mod drawing_drawprops;
 mod drawing_insert;
 mod drawing_keys;

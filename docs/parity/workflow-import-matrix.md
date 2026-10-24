@@ -99,3 +99,12 @@ impmatrix16 (117 samples incl. the new psb-L11-boss-fillet.step: Part 1 8179.765
 | IM1 PVZ names / tabs | unchanged | ✗ still → routed kern/fs |
 | IM2 Parasolid volumes (ktane, Bell Crank, McMaster, fluxpad, g26, g48, g49, g50) | unchanged | ✗ still → routed kern |
 | I1 g25-b SAT/STEP/X_T | unchanged | ✗ still → routed kern |
+
+## Re-run pass 22 (qa5, 2026-10-24, CLI built from main c59c5af9 after the api import/export batch; /root/qa5-scratch/pass21/impmatrix21.*)
+| Row | Ours now | Status |
+|---|---|---|
+| IM1 PVZ | pvz-shapes.pvz → File tab + Assembly "RootAssembly" + Part Studio "pvz-shapes parts" with **Cylinder 9407.778113, Torus 1770.239209, Cone 1569.176627** + "Composite part 1" (live names and volumes); pvz-colors keeps "Face colored / Red / Transparent", pvz-longname its long name; multi-instance PVZ files give one part + the assembly | ✅ mostly fixed; live also makes a **"BOM : RootAssembly"** tab (behaviours ~6720), ours none → ✗ IM1b (api) |
+| Re-import names | second import of g25-b → "g25-b (1)", "g25-b (2)" | ✅ (live "(1)") |
+| IM2 B-spline volumes | unchanged (ktane, McMaster, g26, g48, g49, g50 same digits as pass 16) | ✗ kern |
+| I1 g25-b SAT / STEP / X_T | 7585.978524 / 7582.713024 / 7583.000869, unchanged | ✗ kern |
+| No import errors | 0 errors over every sample (incl. qa4-s5-*) | ✅ |
