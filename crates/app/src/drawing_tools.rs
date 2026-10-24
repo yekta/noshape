@@ -1546,8 +1546,10 @@ impl DrawingEditor {
                 }
             }
             Some(t) => {
-                // Onshape: double-clicking a view opens View properties.
+                // Onshape: double-clicking a view opens View properties (with
+                // several selected: just that view's, live drw2 10-21 j).
                 if let Some(v) = t.view() {
+                    self.selection = vec![Sel::View(v)];
                     self.open_view_props(v, window, cx);
                 }
             }
@@ -1609,7 +1611,7 @@ impl DrawingEditor {
         let mut out = Vec::new();
         // Several entities selected (live drawing/291).
         if self.selection.len() > 1 && sel.is_some_and(|s| self.selection.contains(&s)) {
-            return self.multi_selection_entries();
+            return self.multi_selection_entries(cx);
         }
         match sel {
             Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),
@@ -1779,6 +1781,18 @@ impl DrawingEditor {
             }
         }
         out
+    }
+
+    /// `edit_view` on several views, one undo step.
+    pub fn edit_views(&mut self, description: &str, ids: &[ViewId], cx: &mut Context<Self>, f: impl Fn(&mut DrawingView)) {
+        let targets: Vec<(usize, ViewId)> = ids.iter().map(|id| self.drawing.real_view_of(self.sheet, *id)).collect();
+        self.edit(description, cx, |d| {
+            for (si, id) in targets {
+                if let Some(v) = d.sheets.get_mut(si).and_then(|s| s.view_mut(id)) {
+                    f(v);
+                }
+            }
+        });
     }
 
     pub fn edit_view(&mut self, description: &str, id: ViewId, cx: &mut Context<Self>, f: impl FnOnce(&mut DrawingView)) {

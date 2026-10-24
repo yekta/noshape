@@ -2073,6 +2073,10 @@ fn cad_export_dimensions_layers_and_r12_like_onshape() {
     assert_eq!(dimensions.len(), dims);
     for b in &dimensions {
         assert!(b.block_name.starts_with("*D") && b.style_name.starts_with("Onshape-"), "{} {}", b.block_name, b.style_name);
+        // In the drawing's family (Onshape-ISO-25$N in ISO drawings like the
+        // demo, Onshape-Standard$N in ANSI ones), a style of the table.
+        let family = if drawing.is_ansi() { "Onshape-Standard$" } else { "Onshape-ISO-25$" };
+        assert!(d.dim_styles.iter().any(|s| s.name == b.style_name) && (b.style_name.starts_with(family) || b.style_name == "Onshape-OrdinateStyle"), "{}", b.style_name);
         assert_eq!(b.common.layer, "ANNOTATION_TEXT");
         let inner: Vec<&str> = d.entities_in_block(&b.block_name).map(|e| e.as_entity().entity_type()).collect();
         assert!(inner.contains(&"MTEXT") && inner.contains(&"POINT"), "{inner:?}");

@@ -159,15 +159,21 @@ impl DrawingEditor {
         let mut next = sheet.next_annotation_id();
         let existing: Vec<&Annotation> = sheet.annotations.iter().filter(|a| a.kind.view() == Some(target)).collect();
         let mut out: Vec<Annotation> = Vec::new();
+        // Tried: the annotations that could land (live's "n/m").
+        let mut tried = 0usize;
         for (a, pts) in &r.items {
             // Region copies need references to land on.
             if a.refs.is_empty() && delta.is_some() {
                 continue;
             }
+            tried += 1;
             let mut refs = Vec::new();
             for (rf, p) in a.refs.iter().zip(pts) {
                 let q = map(*p);
-                if views::resolve_in_view(&ctx, &geo, &rf.point).is_some_and(|(x, _)| dist(x, q) < MATCH_TOL) {
+                // A circle's center lands only where the circle shows (live: the
+                // Ø of a hole seen edge-on is not replicated).
+                let shown = !matches!(rf.point, PointRef::Center { .. }) || geo.snaps.iter().any(|s| s.kind == SnapKind::Center && dist(s.p, q) < MATCH_TOL);
+                if shown && views::resolve_in_view(&ctx, &geo, &rf.point).is_some_and(|(x, _)| dist(x, q) < MATCH_TOL) {
                     refs.push(rf.clone());
                     continue;
                 }
@@ -199,10 +205,13 @@ impl DrawingEditor {
         if n > 0 {
             self.edit_sheet("Replicate annotations", cx, |s| s.annotations.extend(out));
         }
-        self.status = Some(match n {
-            1 => "1 annotation replicated".into(),
-            n => format!("{n} annotations replicated").into(),
-        });
+        // Live 1891-1899: a green toast at the top centre of the sheet,
+        // "✓ Successfully replicated 7/7 annotations ×".
+        if n > 0 {
+            self.show_toast(crate::i18n::tr("Successfully replicated __n__/__m__ annotations").replace("__n__", &n.to_string()).replace("__m__", &tried.to_string()), cx);
+        } else {
+            self.status = Some("No annotations replicated".into());
+        }
         cx.notify();
     }
 
