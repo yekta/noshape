@@ -1151,11 +1151,17 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         // outline, so faces of parts behind it are rejected before shading
         // (drawn after the faces it cost up to 37 % more GPU time on the
         // macOS runners, docs/handoff/viewport-performance.md).
-        draw(pass, &lists.back_silhouettes, &pipelines.mesh_backsil);
+        let after = std::env::var("NOSHAPE_PERF_SKIP").is_ok_and(|v| v.contains("backsilafter"));
+        if !after {
+            draw(pass, &lists.back_silhouettes, &pipelines.mesh_backsil);
+        }
         let mut start = 0;
         for &(end, solid) in &lists.opaque_runs {
             draw(pass, &lists.opaque[start..end], if solid { &pipelines.mesh_solid } else { &pipelines.mesh_opaque });
             start = end;
+        }
+        if after {
+            draw(pass, &lists.back_silhouettes, &pipelines.mesh_backsil);
         }
         if outline {
             draw(pass, &lists.opaque, &pipelines.mesh_outline);
