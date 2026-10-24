@@ -119,3 +119,10 @@ copy) is still loose per qa5's kern row above, so AN4 stays open (kern).
 STATUS POLY1 (qa4, 2026-10-23): same as qa5's skb row: the solid circle remains; the spinner appears once a vertex is clicked
 (qa4 looked before clicking one).
 STATUS EXP1 (qa4 entry, 2026-10-23): renamed **EXP-HDR** (api, export header fields) to avoid qa5's EXP1 (Rhino export, kern).
+
+## DRW-SIL — api — drawing_get omits silhouette edges; callouts can't target curved parts by script
+- Source: qa4 QA round 4 session 2 (2026-10-24, v0.4.7). Assembly drawing iso view of a plate + Ø10 pin: `drawing_get
+  edges:true` lists the plate and block lines but nothing for the pin (its silhouettes are drawn on the sheet).
+  `drawing_callout` anchored on the pin's centre line attaches to the plate (balloon "1"); in the app a click on the pin's
+  silhouette gives "2". Expected: silhouettes listed like other edges (and the anchor resolved to the part under it).
+  Evidence /root/qa4-scratch/r4/s2-drawing-bom-balloons.png, s2-balloon-pin-app.png; model by r4/s2.py.

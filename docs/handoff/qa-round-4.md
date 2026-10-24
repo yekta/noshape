@@ -965,3 +965,27 @@ Differences so far (live numbers pending):
 - **S1-b** a bend note sits on top of the cutout's arc ("DOWN 90.0° R1.5" covers the left half-circle, r4/s1-drawing-note-over-cut.png).
   Live's note placement on a cut bend: pending.
 - Known, already routed: SM4 (panel design), SM5 (Down vs Up).
+
+### Session 2: 3-part assembly (r4/s2.py builds parts, inserts, mates, exploded view by CLI; limits, drag and drawing in the app)
+Recipe: Part 1 plate 100×60×10, Part 2 pin Ø10×40, Part 3 block 20×20×20; insert one each; Fastened 1 (plate to origin),
+Revolute 1 (pin bottom centre to the plate top centroid), Slider 1 (block bottom to the plate top); Slider limits 0 / 50 mm;
+exploded view (pin +40, block +20 along Z); drawing ANSI_A_MM with Suggested views, BOM table, balloons.
+Note: my script mates the pin and the block to the same plate centroid (the request asks for (25,30) for the pin), so they
+overlap; that doesn't change what was tested.
+
+| Step | noshape v0.4.7 | Live |
+|---|---|---|
+| Insert ×3, mates | OK; Parts 2, 3 show the DOF glyph, tooltip "Has degrees of freedom (1)" ✅ (= live); new mates hidden, rows light grey, tooltip "Revolute 1 (Hidden)" ✅ (= live "a new mate is hidden by default") | pending |
+| Slider limits | ☑ Limits shows Z "No minimum" / "No maximum" ✅; typed 0 / 50 stay **"0" / "50" (no unit)** → S2-a | pending |
+| Drag past the limit | block stops at exactly 50 mm (instance z 60 = plate top 10 + 50), no message | pending |
+| Exploded view | Explode 1 with 2 steps, dashed explode line, "Editing Explode 1 [Done]" banner ✅ | pending |
+| BOM | Flattened, columns Item / Quantity / Part number / Description (= live's default), rows 1–3 | pending |
+| Drawing | Suggested views: top, front, right, iso at 1:2 ✅; BOM table placed; balloons: plate 1, block 3, pin 2 (app click on the pin's silhouette) ✅ | pending |
+
+Differences:
+- **S2-a (fixed by qa4)** mate limit fields kept a bare number; Onshape's quantity field commits "50 mm" / "90 deg" like the
+  offsets. `assembly_mate_dialog.rs` `commit_limit_text` on Enter / blur ("No minimum" untouched); test
+  `limits_commit_with_units_like_onshape`.
+- **S2-b (api)** `drawing_get` lists no silhouette edges of curved faces, so a script can't aim a callout at the pin; a
+  `drawing_callout` anchor on the pin's centre line attached to the plate (balloon "1"). The app picks the silhouette (balloon
+  "2"). → qa5-routing DRW-SIL.
