@@ -847,7 +847,7 @@ impl AssemblyView {
             o.section = s.planes.iter().map(|p| p.clip()).collect();
             // Exclude: the listed instances stay whole; Include: only they are cut.
             o.section_skip = if s.include { self.result.occurrences.iter().map(|oc| oc.top()).filter(|t| !s.items.contains(t)).collect() } else { s.items.iter().copied().collect() };
-            o.section_selected = s.dialog.as_ref().map(|d| d.active);
+            o.section_selected = s.dialog.as_ref().filter(|d| d.chosen).map(|d| d.active);
         }
         o.display_mode = self.ui.display_mode;
         o.hidden_edges_visible = self.ui.hidden_edges_visible;

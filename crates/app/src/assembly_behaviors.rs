@@ -133,9 +133,11 @@ pub(crate) struct AsmSection {
 pub(crate) struct AsmSectionDialog {
     /// The "Items" field takes picks (else "Section planes").
     pub items_active: bool,
-    /// The plane the dialog edits (its chip is bold, its cap tan); none
-    /// (`usize::MAX`) in "Edit section view…".
+    /// The plane the dialog edits (the manipulator's).
     pub active: usize,
+    /// It was picked in this dialog: its chip is bold, its cap tan. Not in
+    /// "Edit section view…" until a plane is picked (live dark-2437, 2403).
+    pub chosen: bool,
     /// The section before the dialog opened (restored by Cancel).
     saved: Option<Box<AsmSection>>,
 }
@@ -3995,7 +3997,7 @@ impl AssemblyView {
             planes.push(AsmSectionPlane { label, origin: f.origin, normal: f.z(), offset: 0.0, flipped: false });
         }
         let active = planes.len().saturating_sub(1);
-        self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, saved }) });
+        self.ui.section = Some(AsmSection { planes, include: false, items: Vec::new(), dialog: Some(AsmSectionDialog { items_active: false, active, chosen: true, saved }) });
         self.rebuild_scene(false, cx);
         cx.notify();
     }
@@ -4005,9 +4007,7 @@ impl AssemblyView {
     /// not restore it, even with nothing changed).
     pub(crate) fn edit_section(&mut self, cx: &mut Context<Self>) {
         let Some(s) = self.ui.section.as_mut().filter(|s| s.dialog.is_none() && !s.planes.is_empty()) else { return };
-        // Live (dark-2437, 2403): no plane is active then: plain chips, caps in
-        // the part colours (no tan) until a plane is picked.
-        s.dialog = Some(AsmSectionDialog { items_active: false, active: usize::MAX, saved: None });
+        s.dialog = Some(AsmSectionDialog { items_active: false, active: s.planes.len() - 1, chosen: false, saved: None });
         self.rebuild_scene(false, cx);
         cx.notify();
     }
@@ -4064,6 +4064,7 @@ impl AssemblyView {
             s.planes.push(pl);
             if let Some(d) = &mut s.dialog {
                 d.active = s.planes.len() - 1;
+                d.chosen = true;
             }
         }
         self.rebuild_scene(false, cx);
@@ -4209,26 +4210,12 @@ impl AssemblyView {
         cx.notify();
     }
 
-    /// Edit section view… (right-click with a section on): the dialog again
-    /// over the current section (Cancel keeps it as it was).
-    pub(super) fn edit_section(&mut self, cx: &mut Context<Self>) {
-        let Some(s) = &mut self.ui.section else { return };
-        if s.dialog.is_some() {
-            return;
-        }
-        let saved = Some(Box::new(s.clone()));
-        let active = s.planes.len().saturating_sub(1);
-        s.dialog = Some(AsmSectionDialog { items_active: false, active, saved });
-        self.rebuild_scene(false, cx);
-        cx.notify();
-    }
-
     pub(super) fn render_section(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let s = self.ui.section.as_ref()?;
         let d = s.dialog.as_ref()?;
         let asm = self.assembly(cx);
         let items = s.items.iter().map(|id| asm.and_then(|a| a.instance(*id).map(|i| i.name.clone())).unwrap_or_default()).collect();
-        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.label.clone()).collect(), active: d.active, items };
+        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.label.clone()).collect(), active: if d.chosen { d.active } else { usize::MAX }, items };
         Some(crate::section_dialog::render(props, "asm-section", &cx.entity(), Self::on_section_action, cx))
     }
 
@@ -4265,6 +4252,7 @@ impl AssemblyView {
                     s.planes.push(AsmSectionPlane { label: "Front".into(), origin: DVec3::ZERO, normal: DVec3::NEG_Y, offset: 0.0, flipped: false });
                     if let Some(d) = &mut s.dialog {
                         d.active = s.planes.len() - 1;
+                        d.chosen = true;
                     }
                 }
             }
