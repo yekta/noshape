@@ -8,14 +8,13 @@
 //! moves at most LEFT_MOUSE_DRAG_DISTANCE_TOLERANCE (2 px) is a click.
 
 use super::PartStudioView;
-use crate::scene_builder::{DisplayMode, TangentEdges};
 use crate::theme::{p, with_alpha};
 use glam::{DQuat, DVec2};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::Selectable as _;
 use gpui_kit::component::h_flex;
 use gpui_kit::*;
-use noshape_render::{Projection, StandardView};
+use noshape_render::Projection;
 
 // The cube's geometry is shared with its drawing in the 3D frame
 // (`noshape_render::overlay::view_cube`, `NOSHAPE_OVERLAY=wgpu`).
@@ -271,6 +270,48 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// The camera menu's picks ([`crate::camera_menu`]).
+    fn on_camera_action(&mut self, a: crate::camera_menu::Action, w: &mut Window, cx: &mut Context<Self>) {
+        use crate::camera_menu::Action;
+        match a {
+            Action::View(sv) => self.view(sv, cx),
+            Action::GraphicsPrefs => self.open_graphics_prefs(w, cx),
+            Action::NamedViews => self.toggle_named_views(w, cx),
+            Action::PreviousView => self.previous_view(cx),
+            Action::ZoomFit => self.zoom_fit(cx),
+            Action::ZoomWindow => self.toggle_zoom_window(cx),
+            Action::ZoomSelection => self.zoom_to_selection(cx),
+            Action::Perspective => self.viewport.update(cx, |vp, cx| {
+                let p = if vp.camera.projection == Projection::Perspective { Projection::Orthographic } else { Projection::Perspective };
+                vp.set_projection(p, cx);
+            }),
+            Action::Orient => {
+                self.ui.orient_on_edit = !self.ui.orient_on_edit;
+                cx.notify();
+            }
+            Action::Display(dm) => self.set_display_mode(dm, w, cx),
+            Action::HiddenEdges(on) => {
+                self.opts.hidden_edges_visible = on;
+                let d = self.display.clone();
+                self.apply_display(d, w, cx);
+            }
+            Action::Tangent(t) => {
+                self.opts.tangent_edges = t;
+                let d = self.display.clone();
+                self.apply_display(d, w, cx);
+            }
+            Action::HighQuality => self.toggle_high_quality(w, cx),
+            Action::Boundary => {
+                self.opts.highlight_boundary = !self.opts.highlight_boundary;
+                let d = self.display.clone();
+                self.apply_display(d, w, cx);
+            }
+            Action::Section if !self.ui.section.is_empty() => self.turn_off_section(w, cx),
+            Action::Section => self.toggle_section(w, cx),
+            Action::EditSection => self.edit_section(w, cx),
+        }
+    }
+
     /// Onshape's "Camera and render options" dropdown (under the cube).
     fn render_camera_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let view = cx.entity();
@@ -286,6 +327,7 @@ impl PartStudioView {
         let tangent = self.opts.tangent_edges;
         let high_quality = self.ui.high_quality;
         let boundary = self.opts.highlight_boundary;
+        let state = crate::camera_menu::State { perspective, has_history, has_selection, mode, hidden_edges, tangent, high_quality, section_on: section, section_dialog: self.ui.section_dialog.is_some(), show_section: !dialog_open, orient: Some(orient), boundary: Some(boundary) };
         // Onshape: the view-mode cube icon with a ▾ under the cube.
         let pal = p();
         // Live (part-studio/21, 53): no fill at rest, #eaeaea on hover,
@@ -296,7 +338,7 @@ impl PartStudioView {
             .custom(variant)
             // The open style paints the variant's active colour.
             .open(open)
-            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("drawing-tool-caret", 12., gpui_kit::rgb(0x333333))))
+            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("camera-caret", 12., gpui_kit::rgb(0x333333))))
             .w(px(44.))
             .h(px(28.))
             .p_0()
@@ -309,109 +351,7 @@ impl PartStudioView {
                 // widget's right edge + 1.
                 let at = this.ui.cube_origin.map(|o| point(o.x + px(WIDGET_PX + 1.), o.y + px(156.))).unwrap_or_default();
                 let view = view.clone();
-                let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
-                m = m.camera();
-                // Onshape (live, dom/menu-camera-render.txt): views | named and
-                // previous views | zoom | projection, sketch orientation |
-                // display, hidden edges, tangent edges (each a ✓ submenu
-                // showing the current choice) | high quality | section view.
-                let item = |label: &str, f: super::ViewAction| {
-                    let v = view.clone();
-                    crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
-                };
-                for (label, sv) in [("Isometric", StandardView::Isometric), ("Dimetric", StandardView::Dimetric), ("Trimetric", StandardView::Trimetric)] {
-                    m = m.item(item(label, Box::new(move |this, _, cx| this.view(sv, cx))));
-                }
-                m = m.separator();
-                m = m.item(item("Graphics preferences…", Box::new(|this, w, cx| this.open_graphics_prefs(w, cx))).icon_name("settings"));
-                m = m.separator();
-                m = m.item(item("Named views…", Box::new(|this, w, cx| this.toggle_named_views(w, cx))));
-                m = m.item(item("Previous view", Box::new(|this, _, cx| this.previous_view(cx))).disabled(!has_history));
-                m = m.separator();
-                m = m.item(item("Zoom to fit", Box::new(|this, _, cx| this.zoom_fit(cx))));
-                m = m.item(item("Zoom to window", Box::new(|this, _, cx| this.toggle_zoom_window(cx))));
-                if has_selection {
-                    m = m.item(item("Zoom to selection", Box::new(|this, _, cx| this.zoom_to_selection(cx))));
-                }
-                m = m.separator();
-                let v = view.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
-                    v.update(cx, |this, cx| {
-                        this.viewport.update(cx, |vp, cx| {
-                            let p = if vp.camera.projection == Projection::Perspective { Projection::Orthographic } else { Projection::Perspective };
-                            vp.set_projection(p, cx);
-                        })
-                    })
-                }));
-                let v = view.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new("Orient normal to sketch on edit").checked(orient).on_click(move |_, _, cx| {
-                    v.update(cx, |this, cx| {
-                        this.ui.orient_on_edit = !this.ui.orient_on_edit;
-                        cx.notify();
-                    })
-                }));
-                m = m.separator();
-                // Live (analysis/01): Onshape's 11x8 #666 check.
-                let check = || Some("menu-check");
-                let v = view.clone();
-                m = m.submenu_with_icon(check(), display_label(mode), window, cx, move |mut sm, _, _| {
-                    for dm in [DisplayMode::ShadedWithEdges, DisplayMode::Shaded, DisplayMode::HiddenLine, DisplayMode::Translucent] {
-                        let v = v.clone();
-                        sm = sm.item(crate::os_menu::OsMenuItem::new(display_label(dm)).checked(dm == mode).on_click(move |_, w, cx| v.update(cx, |this, cx| this.set_display_mode(dm, w, cx))));
-                    }
-                    sm
-                });
-                let v = view.clone();
-                m = m.submenu_with_icon(check(), if hidden_edges { "Hidden edges visible" } else { "Hidden edges removed" }, window, cx, move |mut sm, _, _| {
-                    for on in [true, false] {
-                        let v = v.clone();
-                        sm = sm.item(crate::os_menu::OsMenuItem::new(if on { "Hidden edges visible" } else { "Hidden edges removed" }).checked(on == hidden_edges).on_click(move |_, w, cx| {
-                            v.update(cx, |this, cx| {
-                                this.opts.hidden_edges_visible = on;
-                                let d = this.display.clone();
-                                this.apply_display(d, w, cx);
-                            })
-                        }));
-                    }
-                    sm
-                });
-                let v = view.clone();
-                m = m.submenu_with_icon(check(), tangent.label(), window, cx, move |mut sm, _, _| {
-                    for t in TangentEdges::ALL {
-                        let v = v.clone();
-                        sm = sm.item(crate::os_menu::OsMenuItem::new(t.label()).checked(t == tangent).on_click(move |_, w, cx| {
-                            v.update(cx, |this, cx| {
-                                this.opts.tangent_edges = t;
-                                let d = this.display.clone();
-                                this.apply_display(d, w, cx);
-                            })
-                        }));
-                    }
-                    sm
-                });
-                m = m.separator();
-                m = m.item(crate::os_menu::OsMenuItem::new("View in high quality").checked(high_quality).on_click({
-                    let v = view.clone();
-                    move |_, w, cx| v.update(cx, |this, cx| this.toggle_high_quality(w, cx))
-                }));
-                // Live (dom/menu-camera-render): its own group.
-                m = m.separator();
-                m = m.item(crate::os_menu::OsMenuItem::new("Highlight boundary edges").checked(boundary).on_click({
-                    let v = view.clone();
-                    move |_, w, cx| {
-                        v.update(cx, |this, cx| {
-                            this.opts.highlight_boundary = !this.opts.highlight_boundary;
-                            let d = this.display.clone();
-                            this.apply_display(d, w, cx);
-                        })
-                    }
-                }));
-                if dialog_open {
-                    return m;
-                }
-                m = m.separator();
-                m.item(item(if section { "Turn off section view" } else { "Section view…" }, Box::new(|this, w, cx| this.toggle_section(w, cx))).icon_name("menu-section-view"))
-                });
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| crate::camera_menu::build(m.camera(), state, &view, Self::on_camera_action, window, cx));
                 this.ui.camera_menu = Some(menu.downgrade());
                 crate::os_menu::open_anchored(at, Anchor::TopRight, menu, window, cx);
             }));
@@ -421,18 +361,10 @@ impl PartStudioView {
 }
 
 /// Onshape's names for the display modes (camera menu).
-fn display_label(m: DisplayMode) -> &'static str {
-    match m {
-        DisplayMode::ShadedWithEdges => "Shaded with edges",
-        DisplayMode::Shaded => "Shaded without edges",
-        DisplayMode::HiddenLine => "Unshaded",
-        DisplayMode::Translucent => "Translucent",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use noshape_render::StandardView;
     use noshape_render::Camera;
     use glam::DVec3;
     use noshape_render::overlay::view_cube::{HALF_EDGE, cube_hit, cube_shapes};
