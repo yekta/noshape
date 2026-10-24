@@ -377,3 +377,14 @@ Not timing (no action): custom_features.rs:660 only checks the Timer line's form
 - **DRW-DIM-2EDGES (asb, P2)** drawing smart Dimension: a second click on a parallel edge in the same view places the first
   edge's length there instead of picking the edge (3/3; Top view left+right edge → "54" on the right edge). smart.rs
   dimension_takes_more / smart_takes (v3 s4).
+- **OFF-CORNER (skb)** sketch Offset of a connected chain: live meets the offset lines at **sharp** corners (extended to their
+  intersection, outward and inward); ours puts arcs where copies separate (`sketch/src/tools.rs` offset_chain "Outer corners get
+  arcs") (live "qa4 round 5 s1 follow-up 2" (3)). OFF-SIDE: live forgets the flip between offsets (ours keeps `offset_flip`).
+- **HOLE-FACE confirmed (psb)** live: no hover, nothing added for a face or a body vertex in Hole locations (filter: sketch
+  vertices || explicit mate connectors). Ours takes both via PLANE_LIKE / POINT_LIKE ⊃ MATE_CONNECTOR in kind_matches; check the
+  other MATE_CONNECTOR fields before narrowing (follow-up 2 (1)).
+- **ROLL-LAST widened (psb)** live rolled-back row menu: Rename | Add selection to folder… | Suppress | Dynamic suppression ▸ |
+  Roll to here | Roll to end | Delete (Add comment is cloud); the row above the bar adds "Roll to end" (no Roll to here); ours
+  keeps Edit… / Zoom to selection / Show dependencies… on rolled-back rows and has no "Roll to end" (s2 rollback follow-up).
+- **ROLLBACK-DROP-TOP (psb)** dropping the dragged bar over Default geometry rows/header: live clamps to the top slot; ours
+  leaves the bar where it was.

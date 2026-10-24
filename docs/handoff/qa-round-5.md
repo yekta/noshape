@@ -64,6 +64,14 @@ finding); Hole dialog rows/defaults (Inch tab, 1/4 (0.25), 6.35 / 12 mm, 118 deg
   sketch vertices or mate connectors.
 - Note: once, the first click into the graphics after opening Linear pattern selected nothing; the retry worked (not reproduced).
 
+- **Live follow-ups (behaviours "qa4 round 5 s1 follow-up 2")**: R5v3-S1-f is **not a bug** (live also adds only Coincident
+  when a line closes onto the origin a hair off vertical); R5v3-S1-g **confirmed** (live's Hole locations take neither a face nor
+  a body vertex: no hover highlight, nothing added; ours takes both, since PLANE_LIKE / POINT_LIKE include MATE_CONNECTOR);
+  connected picks join one chain ✅ (live too); **new R5v3-S1-h → OFF-CORNER (skb)**: live joins the chain's offset lines with
+  **sharp corners** (lines extended to meet, e.g. (35,55); inward too), ours inserts **arcs** at the corners where the copies
+  separate (outward convex corners, and the inward copy of the L's reflex corner); OFF-SIDE confirmed: live does **not**
+  remember the flip between offsets.
+
 ## v3 Session 2 in the app: live's own 30-feature part (v0.4.8 c7d9d454; r5/v3s2.py builds it by CLI; live "qa4 round 5 v2 s1 / s2")
 Same features as live's "v2 s2 30 features": plate 100×60×10, Plane 1 (Top + 10), 6 × (boss sketch + Ø8×5 Boss Add), Hole points
 + Hole (2 × Ø6 through), Fillet 1–4 R3 corners, Chamfer 1–3 0.5 on boss tops, Linear pattern 1 (Boss 6 × 2, Reapply), Fillet 5–7
@@ -91,6 +99,14 @@ the rows below a 7 px bar; dragging shows the "Rollback bar" pill; Parts (0) wit
   releasing just above Sketch 1 works (live: "To the top, under Default geometry").
 - Note (cosmetic, synthetic input): after clicking a context-menu item, the row under the pointer kept its hover tint after the
   pointer left the list, until the list was hovered again.
+
+- **Live follow-up (behaviours "qa4 round 5 s2 rollback follow-up")**: rolled-back features' menu is Rename | Add selection to
+  folder… | Suppress | Dynamic suppression ▸ | (Add comment) | **Roll to here | Roll to end** | Delete (the last feature too);
+  live drops Edit…, Zoom to selection, Show dependencies…, Add appearance… for them. The feature just above the bar has **Roll
+  to end** (and "Section view…") but no Roll to here; with the bar at the end the last feature has neither. Ours: rolled-back
+  rows keep Edit… / Zoom to selection / Show dependencies…, no "Roll to end" anywhere, and the last row lacks Roll to here →
+  ROLL-LAST widened. R5v3-S2-d **confirmed**: live's drop indicator clamps to the first legal slot (below "Right"), so a drop
+  over Origin or the Default geometry header lands at the top → ROLLBACK-DROP-TOP (psb).
 
 ## v3 Session 3 in the app: 3-part assembly by hand (v0.4.8 c7d9d454; parts by r5/v3s3.py, assembly built in the UI)
 Plate 100×60×10, pin Ø10×40, block 20³ (round 4 S2's parts). Insert dialog (Current document › Part Studios, click part →
