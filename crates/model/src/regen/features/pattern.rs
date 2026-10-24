@@ -816,6 +816,24 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             .collect();
         for (id, fs) in groups {
             found = true;
+            // Live "psb flush wall" W1: a wall flush with the part (the
+            // feature owns only its caps across the pattern direction) fails
+            // from 3 instances; with 2 the copy moves the cap (Parasolid).
+            if let Some(bi) = index_of_body(ev, &id)
+                && let Some(step) = flush_caps_step(&ev.ctx.bodies[bi], &fs, instances)
+            {
+                let body = ev.ctx.bodies[bi].clone();
+                if instances.len() > 1 {
+                    ev.error_shapes = failed_instances(ev, f, &body, &fs, instances);
+                    return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
+                }
+                let caps: Vec<Shape> = fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok()).collect();
+                let res = k::offset_faces(&body.shape, &caps, step).map_err(|_| fe(SWITCH_TO_PER_INSTANCE))?;
+                let offset_role = |n: &Name| Role::Offset(n.clone());
+                let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &std::collections::BTreeMap::new(), Some(&offset_role));
+                ev.replace_body(bi, res.shape, names);
+                continue;
+            }
             if let Some(bi) = index_of_body(ev, &id)
                 && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances)
             {
@@ -892,6 +910,31 @@ fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
     eval_fn(&mut sub).ok()?;
     let made: Vec<Shape> = sub.ctx.bodies.iter().filter(|b| b.id.feature == tmp).map(|b| b.shape.clone()).collect();
     (!made.is_empty()).then(|| Shape::compound(&made))
+}
+
+/// When a feature's faces on a part are only planar caps across a straight
+/// pattern direction (its sides merged into the part's faces: a wall flush
+/// with the part), the offset that moves those caps by one step (negative:
+/// into the part). None otherwise.
+fn flush_caps_step(body: &Body, faces: &[usize], instances: &[Instance]) -> Option<f64> {
+    let k::Transform::Translate(v) = instances.first()?.t else { return None };
+    let d = v.try_normalize()?;
+    let mut step = None;
+    for &i in faces {
+        let f = body.shape.sub_shape(ShapeType::Face, i).ok()?;
+        let k::Surface::Plane(_) = f.face_surface().ok()? else { return None };
+        let n = f.normal_at_point(f.centroid().ok()?).ok()?.normalize_or_zero();
+        if n.dot(d).abs() < 1.0 - 1e-9 {
+            return None;
+        }
+        // The cap's outward normal: an offset along it by −v·n moves it by v.
+        let s = -v.dot(n);
+        if step.is_some_and(|x: f64| (x - s).abs() > 1e-12) {
+            return None;
+        }
+        step = Some(s);
+    }
+    step
 }
 
 /// Onshape's PATTERN_SWITCH_TO_PER_INSTANCE: a feature pattern whose face

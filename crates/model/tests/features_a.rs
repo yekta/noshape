@@ -1254,3 +1254,55 @@ fn hole_reports_parts_behind() {
     assert_eq!(st.touched.iter().map(|b| b.feature).collect::<Vec<_>>(), vec![x]);
     assert!(st.touched_behind.is_empty());
 }
+
+/// Live "psb (10-23) flush wall pattern": a 0.5 mm wall on the block's end
+/// face (x = 0), Feature pattern of it into the block (+x), 2 mm, Reapply
+/// off. W1 (flush, outward) fails from 3 instances and with 2 moves the end
+/// face to x = 1.5; W2 (inward, adds nothing) has no geometry; W3 (overhang)
+/// fails at 2.
+#[test]
+fn feature_pattern_of_a_flush_wall_as_live() {
+    const SWITCH: &str = "Could not create all instances as entered. Try selecting \"Reapply features\" option.";
+    // (status, message, volume mm³, min x) of the pattern run into the block.
+    let run = |height_y: f64, height_z: f64, outward: bool, count: &str| -> (FeatureStatus, Option<String>, f64, f64) {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.1, 0.02, "10 mm");
+        // Right plane: sketch x = world Y, y = Z; its normal is +X (into the block).
+        let s = t.sketch(Reference::Plane(DatumPlane::Right), rect(0.0, 0.0, height_y, height_z));
+        let r = t.regions(s)[0].clone();
+        let w = t.extrude(r, "0.5 mm", "ADD");
+        t.set(w, "oppositeDirection", b(outward));
+        let res = t.regen();
+        let edge = edge_near(&res.context.bodies[0], DVec3::new(0.05, 0.0, 0.01));
+        let lp = t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(w)])), ("directionOne", q(vec![edge])), ("distance", e("2 mm")), ("instanceCount", e(count))]);
+        // The edge's own orientation decides the sign: take the run whose
+        // copies (or ghosts) lie in the block.
+        for flip in [false, true] {
+            t.set(lp, "oppositeDirection", b(flip));
+            let r = t.regen();
+            let st = r.display.features.last().unwrap().clone();
+            let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
+            let v = total_volume(&r.context) * 1e9;
+            let into = match &st.error_mesh {
+                Some(m) => m.positions.iter().all(|p| p[0] > -1e-6),
+                None => bb.min.x > -1e-9 || st.status != FeatureStatus::Ok,
+            };
+            if into {
+                return (st.status, st.message, v, bb.min.x);
+            }
+        }
+        panic!("no run into the block");
+    };
+    let (st, msg, v, _) = run(0.02, 0.01, true, "5");
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(SWITCH)));
+    assert!((v - 20100.0).abs() < 1e-6, "{v}");
+    assert_eq!(run(0.02, 0.01, true, "3").0, FeatureStatus::Error);
+    let (st, msg, v, minx) = run(0.02, 0.01, true, "2");
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!((v - 19700.0).abs() < 1e-6, "{v}");
+    assert!((minx - 0.0015).abs() < 1e-9, "{minx}");
+    let (st, msg, _, _) = run(0.02, 0.01, false, "5");
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("Selected features do not create any geometry that may be patterned.")));
+    let (st, msg, _, _) = run(0.025, 0.01, true, "2");
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(SWITCH)));
+}
