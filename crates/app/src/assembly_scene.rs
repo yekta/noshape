@@ -278,12 +278,6 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                     };
                     scene.instances.push(Instance::new(Drawable::Lines(h)).per_primitive_color().with_transform(t).unpickable().layer(1));
                 }
-                // Back-face silhouettes: the outline band of opaque solids with
-                // edges and unshaded, as the Part Studio draws them (qa5: a
-                // cylinder's sides had no outline in an assembly).
-                if o.kind == BodyKind::Solid && color[3] >= 0.999 && matches!(mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine) {
-                    scene.instances.push(Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(edge_color).with_transform(t).pick_base(face_base).line_scale(line_w).back_silhouette());
-                }
                 // A mesh part's triangle lines, as in the Part Studio (not in plain Shaded).
                 if let Some(lines) = cached.mesh_lines.clone().filter(|_| mode != DisplayMode::Shaded) {
                     scene.instances.push(Instance::new(Drawable::Lines(lines)).with_color(theme::lin(MESH_LINE_COLOR)).with_transform(t).unpickable().layer(1));
