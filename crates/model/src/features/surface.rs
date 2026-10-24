@@ -130,7 +130,7 @@ pub fn ruled_surface() -> FeatureType {
             "ruledType",
             "Ruled surface type",
             &[("NORMAL", "Normal"), ("TANGENT", "Tangent"), ("ALIGNED_WITH_VECTOR", "Aligned with direction"), ("ANGLE_FROM_VECTOR", "Angle from direction")],
-        ),
+        ).hints(Hints::SHOW_LABEL),
         ParamSpec::query1("axis", "Direction", QueryFilter::DIRECTION).visible(move |v| ty(v, "ALIGNED_WITH_VECTOR") || ty(v, "ANGLE_FROM_VECTOR")),
         ParamSpec::num("angleFromVector", "Angle", angle_360(90.0)).visible(move |v| ty(v, "ANGLE_FROM_VECTOR")),
         ParamSpec::bool("oppositeAngleFromVector", "Opposite direction", false)
@@ -146,13 +146,13 @@ pub fn ruled_surface() -> FeatureType {
             "Vertex overrides",
             "Vertex",
             vec![
-                ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX),
+                ParamSpec::query1("vertex", "Vertex", QueryFilter::VERTEX).hints(Hints::SHOW_LABEL),
                 ParamSpec::enum_(
                     "overrideType",
                     "Ruled surface type",
                     &[("NORMAL", "Normal"), ("TANGENT", "Tangent"), ("ALIGNED_WITH_VECTOR", "Aligned with direction"), ("UP_TO_VERTEX", "Up to vertex")],
                 )
-                .hints(Hints::MATCH_LAST_ARRAY_ITEM),
+                .hints(Hints::MATCH_LAST_ARRAY_ITEM | Hints::SHOW_LABEL),
                 ParamSpec::num("angleOverride", "Angle", angle_360(0.0)).visible(move |v| ovr(v, "NORMAL") || ovr(v, "TANGENT")),
                 ParamSpec::bool("oppositeAngleOverride", "Opposite direction", false)
                     .hints(Hints::OPPOSITE_DIRECTION_CIRCULAR)
@@ -170,7 +170,7 @@ pub fn ruled_surface() -> FeatureType {
             "cornerType",
             "Corner type",
             &[("SPUN", "Spun corner"), ("EXTENDED", "Extended corner"), ("LOFTED", "Lofted corner"), ("NONE", "No corner")],
-        ),
+        ).hints(Hints::SHOW_LABEL),
     ];
     p.extend(surface_merge_scope());
     FeatureType::new("ruledSurface", "Ruled surface", Category::Surface, p).describe("Create a ruled surface from edges")
@@ -204,7 +204,7 @@ pub fn constrained_surface() -> FeatureType {
         .visible(|v| v.is("csType", "POINTS")),
         ParamSpec::query("meshes", "Mesh bodies or faces", QueryFilter::ANY_FACE | QueryFilter::BODY).visible(|v| v.is("csType", "MESH")),
         ParamSpec::num("tolerance", "Tolerance", TOLERANCE_BOUND),
-        ParamSpec::enum_("optimize", "Optimize", &[("PERF", "Performance"), ("SMOOTH", "Smoothness")]),
+        ParamSpec::enum_("optimize", "Optimize", &[("PERF", "Performance"), ("SMOOTH", "Smoothness")]).hints(Hints::SHOW_LABEL),
         ParamSpec::bool("computeDeviation", "Deviation", false).hints(Hints::GROUP_HEADER),
         ParamSpec::num("maxDeviation", "Maximum deviation", NumSpec::positive_length(0.0, 0.0))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)

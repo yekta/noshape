@@ -10,7 +10,7 @@ use noshape_model::drawing::create::DrawingSource;
 use noshape_model::drawing::templates::DrawingTemplate;
 use noshape_model::drawing::views::{self, SourceKey, Sources, ViewCache, ViewGeometry};
 use noshape_model::drawing::tb_lang::TitleLanguage;
-use noshape_model::drawing::{DimUnits, Drawing, Projection, SheetFormat, SheetSize, TitleBlockStyle, ViewId, ZoneStart};
+use noshape_model::drawing::{AsmPosition, DimUnits, Drawing, Projection, SheetFormat, SheetSize, Simplification, TitleBlockStyle, ViewId, ZoneStart};
 use noshape_scene::drawing_tools::{Sel, SheetPick, Tool};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -323,3 +323,125 @@ impl CustomTemplate {
         Some(t)
     }
 }
+
+// ------------------------------------------------------------ Insert view panel
+
+/// The five View simplification choices, with Onshape-like default values.
+pub fn simplification_choices(cur: Simplification) -> [Simplification; 5] {
+    let keep = |d: Simplification| if std::mem::discriminant(&d) == std::mem::discriminant(&cur) { cur } else { d };
+    [Simplification::None, Simplification::Auto, keep(Simplification::Absolute(0.001)), keep(Simplification::RatioToStudio(0.01)), keep(Simplification::RatioToPart(0.01))]
+}
+
+/// The value field text of a simplification ("1 mm", "1 %").
+pub fn simplification_text(s: Simplification, mm: bool) -> String {
+    let trim = |v: f64| {
+        let t = format!("{v:.4}");
+        t.trim_end_matches('0').trim_end_matches('.').to_string()
+    };
+    match s {
+        Simplification::Absolute(m) if mm => format!("{} mm", trim(m * 1000.0)),
+        Simplification::Absolute(m) => format!("{} in", trim(m / 0.0254)),
+        Simplification::RatioToStudio(r) | Simplification::RatioToPart(r) => format!("{} %", trim(r * 100.0)),
+        _ => String::new(),
+    }
+}
+
+/// Parse the value field into `kind` (lengths in the drawing units by default).
+pub fn parse_simplification(kind: Simplification, text: &str, mm: bool) -> Option<Simplification> {
+    match kind {
+        Simplification::Absolute(_) => {
+            let prefs = noshape_units::UnitPrefs { length: if mm { noshape_units::LengthUnit::Millimeter } else { noshape_units::LengthUnit::Inch }, ..Default::default() };
+            let q = noshape_units::evaluate_as(text.trim(), noshape_units::Dim::LENGTH, &prefs, &noshape_units::EmptyScope).ok()?;
+            (q.value > 0.0).then_some(Simplification::Absolute(q.value))
+        }
+        Simplification::RatioToStudio(_) | Simplification::RatioToPart(_) => {
+            let v: f64 = text.trim().trim_end_matches('%').trim().parse().ok()?;
+            let r = (v / 100.0).max(0.0);
+            Some(if matches!(kind, Simplification::RatioToStudio(_)) { Simplification::RatioToStudio(r) } else { Simplification::RatioToPart(r) })
+        }
+        other => Some(other),
+    }
+}
+
+/// An assembly's Explode/Position choices in Onshape's order: Default, the
+/// exploded views, then the named positions.
+pub fn asm_positions(asm: &noshape_model::assembly::Assembly) -> Vec<(String, AsmPosition)> {
+    let mut out = vec![("Default".to_string(), AsmPosition::Default)];
+    out.extend(asm.exploded_views.iter().enumerate().map(|(i, e)| (e.name.clone(), AsmPosition::Explode(i))));
+    out.extend(asm.named_positions.iter().enumerate().map(|(i, n)| (n.name.clone(), AsmPosition::Position(i))));
+    out
+}
+
+/// The name shown for an Explode/Position choice.
+pub fn asm_position_name(asm: &noshape_model::assembly::Assembly, p: AsmPosition) -> String {
+    match p {
+        AsmPosition::Default => "Default".into(),
+        AsmPosition::Explode(i) => asm.exploded_views.get(i).map(|e| e.name.clone()).unwrap_or_default(),
+        AsmPosition::Position(i) => asm.named_positions.get(i).map(|n| n.name.clone()).unwrap_or_default(),
+    }
+}
+
+/// The named views a source offers in View orientation (Part Studios).
+pub fn named_views(doc: &noshape_model::document::Document, source: TabId) -> &[noshape_model::partstudio::NamedView] {
+    match doc.tab(source).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) => &ps.named_views,
+        _ => &[],
+    }
+}
+
+/// The frame of the source's named view `name`, if it still exists.
+pub fn named_view_frame(doc: &noshape_model::document::Document, source: TabId, name: &str) -> Option<[[f64; 3]; 2]> {
+    named_views(doc, source).iter().find(|v| v.name == name).map(noshape_model::drawing::views::named_view_frame)
+}
+
+// ------------------------------------------------------------ dimension palette
+
+/// The palette's precision list (label, decimals; None: the drawing's).
+pub const PRECISIONS: [(&str, Option<u8>); 10] = [("0", Some(0)), ("0.1", Some(1)), ("0.12", Some(2)), ("0.123", Some(3)), ("(Drawing)", None), ("0.1234", Some(4)), ("0.12345", Some(5)), ("0.123456", Some(6)), ("0.1234567", Some(7)), ("0.12345678", Some(8))];
+/// Tolerance lists (D35; hole callouts have no Basic).
+pub const DIM_TOLERANCES: [&str; 10] = ["None", "Symmetrical", "Deviation", "Limits", "Basic", "MIN", "MAX", "Fit", "Fit with tolerance", "Fit (Tolerance only)"];
+pub const HOLE_TOLERANCES: [&str; 9] = ["None", "Symmetrical", "Deviation", "Limits", "MIN", "MAX", "Fit", "Fit with tolerance", "Fit (Tolerance only)"];
+
+/// The tolerance list entry of an annotation's format.
+pub fn tolerance_name(a: &noshape_model::drawing::Annotation) -> &'static str {
+    use noshape_model::drawing::Tolerance;
+    match &a.format.tolerance {
+        Tolerance::None => "None",
+        Tolerance::Symmetric { .. } => "Symmetrical",
+        Tolerance::Deviation { .. } => "Deviation",
+        Tolerance::Limits { .. } => "Limits",
+        Tolerance::Basic => "Basic",
+        Tolerance::Min => "MIN",
+        Tolerance::Max => "MAX",
+        Tolerance::Fit { .. } => a.format.fit.mode.name(),
+    }
+}
+
+/// The palette's tolerance entry `name` with its two value fields (meters:
+/// Symmetrical `a`; Deviation / Limits upper `a`, lower `b`). Fits keep
+/// their classes (H7 for a new one).
+pub fn set_tolerance(f: &mut noshape_model::drawing::DimFormat, name: &str, a: f64, b: f64) {
+    use noshape_model::drawing::{FitMode, Tolerance};
+    let classes = match &f.tolerance {
+        Tolerance::Fit { hole, shaft } => (hole.clone(), shaft.clone()),
+        _ => ("H7".into(), String::new()),
+    };
+    f.tolerance = match name {
+        "Symmetrical" => Tolerance::Symmetric { value: a },
+        "Deviation" => Tolerance::Deviation { upper: a, lower: b },
+        "Limits" => Tolerance::Limits { upper: a, lower: b },
+        "Basic" => Tolerance::Basic,
+        "MIN" => Tolerance::Min,
+        "MAX" => Tolerance::Max,
+        "Fit" | "Fit with tolerance" | "Fit (Tolerance only)" => {
+            f.fit.mode = match name {
+                "Fit with tolerance" => FitMode::WithTolerance,
+                "Fit (Tolerance only)" => FitMode::ToleranceOnly,
+                _ => FitMode::Fit,
+            };
+            Tolerance::Fit { hole: classes.0, shaft: classes.1 }
+        }
+        _ => Tolerance::None,
+    };
+}
+

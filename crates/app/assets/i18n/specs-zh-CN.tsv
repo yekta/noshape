@@ -1,0 +1,1603 @@
+ - X	 - X
+###name	###name
+###name #description	###name #description
+###name = #value	###name = #value
+###name = #value #description	###name = #value #description
+#booleanOperation of #addQlowercaseSelectionType	#booleanOperation of #addQlowercaseSelectionType
+#column = #value	#column = #value
+#connectionEntities	#connectionEntities
+#edge	#edge
+#entity	#entity
+#featureName	#featureName
+#frames	#frames
+#guideEntities	#guideEntities
+#header = #value	#header = #value
+#index	#index
+#index: #x;#y;#z	#index: #x;#y;#z
+#matesQuery	#matesQuery
+#sheetProfileEntities	#sheetProfileEntities
+#vertex	#vertex
+#vertex [#cornerType]	#vertex [#cornerType]
+#wireProfileEntities	#wireProfileEntities
+% diametric engagement	直径接合百分比
+(#index1, #index2)	(#index1, #index2)
++/-	+/-
++X	+X
++Y	+Y
+- Y	- Y
+- Y'	- Y'
+- Z	- Z
+- Z'	- Z'
+-X	-X
+-Y	-Y
+0	0
+0.1	0.1
+0.12	0.12
+0.123	0.123
+0.1234	0.1234
+0.12345	0.12345
+0.123456	0.123456
+118 deg	118 度
+135 deg	135 度
+3D fit spline	3D 拟合样条
+ANSI	ANSI
+Acceleration	加速度
+Access type	访问类型
+Add	加入
+Add additional queries	添加其他查询
+Add chamfer	添加倒角
+Add point on axis drag	在轴拖动上添加点
+Add points	添加点
+Add undercut	添加底切
+Added by the array	Added by the array
+Additional alignment points	其他对齐点
+Additional columns	其他列
+Additional queries	其他查询
+Adjacent	相邻
+Adjacent faces	相邻面
+Align coordinate system	对齐坐标系
+Align to geometry	与几何图元对齐
+Aligned	已对齐
+Aligned with direction	与方向对齐
+Alignment entity	对齐图元
+All deviations	所有偏差
+All frames	所有框架
+All solid bodies	所有实体主体
+All values	所有值
+Allow edge overflow	允许边溢出
+Allow faulty parts	允许错误零件
+Allow owner entity	Allow owner entity
+Along X	沿着 X
+Along Y	沿着 Y
+Along Z	沿着 Z
+Along custom	沿着自定义
+Angle	角度
+Angle Tolerance	角度公差
+Angle control type	角度控制类型
+Angle from direction	与方向所成的角度
+Angle opposite direction	角度相反方向
+Angle reference	角度参考
+Angular velocity	角速度
+Animate Mate	动画化配合
+Any	任意
+Approximate	近似
+Approximation parameters	近似参数
+Approximation target degree	近似目标度数
+Approximation type	近似类型
+Arcs to extrude as bends	要以折弯形式拉伸的圆弧
+Array	排列
+Aspect ratio constraint	长宽比约束
+Assembly to mirror	要镜像的装配体
+Assigned	已分配
+Associated component instance	关联零部件实例
+Asymmetric	不对称
+Attach to	附加到
+Attachment	附件
+Auto position	自动位置
+Automatic miter	自动斜接
+Axes are determined by the first selected instance	Axes are determined by the first selected instance
+Axis	轴
+Axis measurements	轴线测量
+Axis of pattern	阵列轴
+BOTTOM_AXIS_POINT	BOTTOM_AXIS_POINT
+BSO™/BSOS™/BSOA™/BSO4™ blind threaded standoffs	BSO™/BSOS™/BSOA™/BSO4™ 盲孔螺纹支架
+Ball	球
+Base faces	Base faces
+Base mate connector	基础配合连接器
+Base mate connector feature index	Base mate connector feature index
+Base mate connector id	Base mate connector id
+Base origin	基础原点
+Base plane	基准平面
+Basic	基本
+Bearing	轴承
+Bend	折弯
+Bend alignment	折弯对齐
+Bend allowance	折弯裕度
+Bend angle	折弯角度
+Bend angle set programmatically	Bend angle set programmatically
+Bend calculation	折弯计算
+Bend deduction	折弯扣除
+Bend line	折弯线
+Bend or non-planar faces	折弯面或非平坦面
+Bend or non-planar faces to unfold	要展开的折弯面或非平坦面
+Bend radius	折弯半径
+Bend relief	折弯止裂槽
+Bend relief depth	折弯止裂槽深度
+Bend relief depth scale	折弯止裂槽深度比例
+Bend relief type	折弯止裂槽类型
+Bend relief width scale	折弯止裂槽宽度比例
+Best fit	最佳效果
+Between entities	在图元之间
+Between entity	在图元之间
+Bias	偏离
+Blind	给定深度
+Blind in last	盲孔在最后
+Blob Data	Blob Data
+Bodies	主体
+Body	主体
+Body draft	主体拔模
+Body type	主体类型
+Boolean	布尔运算
+Boolean operation	布尔运算
+Bottom edges	底部边
+Bound type	界限类型
+Boundary condition	边界条件
+Boundary condition direction	边界条件方向
+Boundary surface	边界曲面
+Bounded faces	有界限的面
+Bounding box XY	界限框 XY
+Bounding box YZ	界限框 YZ
+Bounding box ZX	界限框 ZX
+Bounding type	边界类型
+Bounds	边界
+Bridging curve	桥接曲线
+Butt	柄形
+Butt joint - Direction 1	对接接头 - 方向 1
+Butt joint - Direction 2	对接接头 - 方向 2
+By index	根据索引
+By index range	根据索引范围
+By label	根据标签
+CENTER	CENTER
+CENTROID	CENTROID
+CLA™ free-running locknuts	CLA™ 自由运转型锁紧螺母
+CSV file	CSV 文件
+Cap	加盖
+Cap entity	封盖图元
+Caps	封盖
+Center	中心
+Center of mass x coordinate	质心 x 坐标
+Center of mass y coordinate	质心 y 坐标
+Center of mass z coordinate	质心 z 坐标
+Centered	居中
+Centimeter	Centimeter
+Chain type	链类型
+Chamfer	倒角
+Chamfer angle	倒角角度
+Chamfer length	倒角长度
+Chamfer size	倒角尺寸
+Chamfer type	倒角类型
+Change radius	更改半径
+Change thickness	更改厚度
+Check to include the clearance for bends	选中该项可包含折弯间隙
+Choose to measure minimum or maximum distance between entities	选择测量图元之间的最小或最大距离
+Chordal tolerance	弦公差
+Circle	圆
+Circular	环形
+Circular edge	环形边
+Circular pattern	环形阵列
+Clearance	间隙孔
+Clearance & tapped	间隙孔和螺纹孔
+Clearance from input	自输入的间隙
+Cliff edges	崖边
+Clockwise	顺时针
+Close	紧密
+Close (ASME)	紧密 (ASME)
+Closed	闭合
+Closed spline	闭合样条
+Column	柱
+Column Override	Column Override
+Column access type	列访问类型
+Column index (0-based)	列索引（基于 0）
+Column max index (0-based)	列最大索引（基于 0）
+Column min index (0-based)	列最小索引（基于 0）
+Column regular expression	列正则表达式
+Column result type	列结果类型
+Column value	列值
+Composite curve	复合曲线
+Composite name	Composite name
+Composite part	复合零件
+Composite part options	复合零件选项
+Compressive yield strength	Compressive yield strength
+Computed pitch	计算螺距
+Computed revolutions	计算的转数
+Concave	凹
+Concave repair	凹面修复
+Confirm	确认
+Conic	圆锥
+Conic edges	圆锥边
+Conic hold lines	圆锥控制线
+Conical or cylindrical face	圆锥或圆柱面
+Connections	连接
+Constrained surface	约束曲面
+Constraints	约束
+Constraints and limits	约束和限制
+Contact analysis	Contact analysis
+Continuity	连续性
+Control	控制
+Control how the load is transferred between the instances	控制如何在实例之间传递载荷
+Control point index	控制点索引
+Control point index #indexValue	Control point index #indexValue
+Control point indices	控制点索引
+Control points	控制点
+Conversion factor	转换系数
+Convert	转换
+Convex	凸
+Coordinate system	坐标系
+Coped butt	搭接
+Copy in place	原位复制
+Copy part	复制零件
+Corner	角点
+Corner break	尖角倒钝
+Corner break style	尖角倒钝样式
+Corner overrides	拐角覆盖
+Corner relief diameter	拐角止裂槽直径
+Corner relief scale	拐角止裂槽比例
+Corner relief type	拐角止裂槽类型
+Corner relief width	拐角止裂槽宽度
+Corner type	拐角类型
+Corners to break	要倒钝的尖角
+Corners to exclude	要排除的圆角
+Count	计数
+Counterbore	沉头孔
+Counterbore depth	沉头孔深度
+Counterbore depth deviation	沉头孔深度偏差
+Counterbore depth lower deviation	沉头孔深度下偏差
+Counterbore depth lower limit	沉头孔深度下限
+Counterbore depth precision	沉头孔深度精度
+Counterbore depth tolerance controls	沉头孔深度公差控制
+Counterbore depth tolerance type	沉头孔深度公差类型
+Counterbore depth upper deviation	沉头孔深度上偏差
+Counterbore depth upper limit	沉头孔深度上限
+Counterbore diameter	沉头孔直径
+Counterbore diameter deviation	沉头孔直径偏差
+Counterbore diameter lower deviation	沉头孔直径下偏差
+Counterbore diameter lower limit	沉头孔直径下限
+Counterbore diameter precision	沉头孔直径精度
+Counterbore diameter tolerance controls	沉头孔直径公差控制
+Counterbore diameter tolerance type	沉头孔直径公差类型
+Counterbore diameter upper deviation	沉头孔直径上偏差
+Counterbore diameter upper limit	沉头孔直径上限
+Counterclockwise	逆时针
+Countersink	倒角孔
+Countersink angle	倒角孔角度
+Countersink angle deviation	倒角孔角度偏差
+Countersink angle lower deviation	倒角孔角度下偏差
+Countersink angle lower limit	倒角孔角度下限
+Countersink angle precision	倒角孔角度精度
+Countersink angle tolerance controls	倒角孔角度公差控制
+Countersink angle tolerance type	倒角孔角度公差类型
+Countersink angle upper deviation	倒角孔角度上偏差
+Countersink angle upper limit	倒角孔角度上限
+Countersink diameter	倒角孔直径
+Countersink diameter deviation	倒角孔直径偏差
+Countersink diameter lower deviation	倒角孔直径下偏差
+Countersink diameter lower limit	倒角孔直径下限
+Countersink diameter precision	倒角孔直径精度
+Countersink diameter tolerance controls	倒角孔直径公差控制
+Countersink diameter tolerance type	倒角孔直径公差类型
+Countersink diameter upper deviation	倒角孔直径上偏差
+Countersink diameter upper limit	倒角孔直径上限
+Create	Create
+Create composite	创建复合零件
+Create points in addition to the curve.	除曲线之外还要创建点。
+Created by	创建者
+Created by features	由特征创建的
+Creation type	创建类型
+Cross section	横截面
+Cross sectional control	横截面控制
+Cube	立方体
+Current value	当前值
+Curvature	曲率
+Curve	曲线
+Curve length	Curve length
+Curve pattern	曲线阵列
+Curve point	曲线点
+Curve projection type	曲线投影类型
+Curve reference	曲线参考
+Curve to face	曲线到面
+Curve type	曲线类型
+Curves	曲线
+Curves to adjust	要调整的曲线
+Custom	自定义
+Custom direction	自定义方向
+CustomMaterial	CustomMaterial
+Cut list	切割清单
+Cut list table	切割清单表格
+Cutouts	切口
+Cylinder edges	圆柱边
+Cylinder/Cone	圆柱/圆锥
+Cylindrical	圆柱
+DSO™/DSOS™ threaded standoffs	DSO™/DSOS™ 螺纹支架
+Data start column (0,1,2,.)	数据起始列 (0,1,2,.)
+Decal	印花
+Default	默认
+Default bend K Factor	默认折弯 K 系数
+Default corner type	默认拐角类型
+Defaults changed	Defaults changed
+Degree	度
+Delete composite parts	删除复合零件
+Delete face	删除面
+Delete faces	删除面
+Delete fillet faces	删除圆角面
+Delete part	删除零件
+Density	密度
+Depends on blob	Depends on blob
+Depth	深度
+Depth deviation	深度偏差
+Depth lower deviation	深度下偏差
+Depth lower limit	深度下限
+Depth precision	深度精度
+Depth tolerance controls	深度公差控制
+Depth tolerance type	深度公差类型
+Depth upper deviation	深度上偏差
+Depth upper limit	深度上限
+Derivative	导数
+Derivative alignment	导数对齐
+Derivative direction	导数方向
+Derived	派生
+Derived mirror	派生镜像
+Description	说明
+Designator	指示符
+Detached	分离
+Deviation	偏差
+Deviation type	偏差类型
+Diameter	直径
+Diameter Tolerance	直径公差
+Diameter deviation	直径偏差
+Diameter fit tolerance table	直径配合公差表格
+Diameter lower deviation	直径下偏差
+Diameter lower limit	直径下限
+Diameter precision	直径精度
+Diameter tolerance controls	直径公差控制
+Diameter tolerance type	直径公差类型
+Diameter upper deviation	直径上偏差
+Diameter upper limit	直径上限
+Direction	方向
+Direction overrides	方向覆盖
+Direction to lock	要锁定的方向
+Disable imprinting	禁用压印
+Dissolve composite parts	解散复合零件
+Distance	距离
+Distance 1	距离 1
+Distance 2	距离 2
+Distance and angle	距离和角度
+Distance per revolution	每转距离
+Draft	拔模
+Draft angle	拔模角度
+Draft on self	自身拔模
+Draft opposite direction	拔模相反方向
+Draft scope	拔模范围
+Draft type	拔模类型
+Drill size	钻孔尺寸
+Drilled	钻孔
+Driving mate selector	驱动配合选择器
+ECAD	ECAD
+Edge	边
+Edge convexity	边凸度
+Edge convexity type	边凸度类型
+Edge joint	边接头
+Edge limit	边界限
+Edge limits	边限制
+Edge match scope	边匹配范围
+Edge or face	边或面
+Edge overflow	边溢出
+Edge parameters	Edge parameters
+Edge point	边点
+Edge positions	边位置
+Edge projection options	边缘投影选项
+Edge queries	Edge queries
+Edges	边
+Edges and curves for ruled surface path	直纹曲面路径的边和曲线
+Edges and faces	边和面
+Edges and sketch curves to revolve	要旋转的边和草图曲线
+Edges and sketch curves to sweep	要旋转的边和草图曲线
+Edges or cylinders to bend	要折弯的边或圆柱体
+Edges or faces	边或面
+Edges or side faces to flange	要添加法兰的边或侧面
+Edges or side faces to hem	要卷边的边或侧面
+Edges or side faces to join	要连接的边或侧面
+Edges that define the bases of the gussets	用于定义角撑板底座的边
+Edges to hold	要按住的边
+Edges to keep	要保留的边
+Edges, curves and sketches	边、曲线和草图
+Edges, faces, and vertices	边、面，和顶点
+Edges, vertices, or faces	边、顶点或面
+Edit angles	编辑角度
+Edit control points	编辑控制点
+Edit curve	编辑曲线
+Edit edge positions	编辑边位置
+Edit mode	编辑模式
+Edit reference	编辑参考
+Edit tangency angles	编辑相切角度
+Edits a curve directly if possible or a composite curve of the selection otherwise.	Edits a curve directly if possible or a composite curve of the selection otherwise.
+Elevate	提高
+Elevation parameters	提高参数
+Elevation target degree	提高目标度数
+Enclose	封闭
+End	结束
+End angle	末端角度
+End cap	端盖
+End condition	终止形态
+End conditions	终止形态
+End curvature offset	结束曲率偏移
+End direction	结束方向
+End edge position	结束边位置
+End flow offset	结束流偏移
+End magnitude	结束幅值
+End offset	结束偏移
+End point	端点
+End position	结束位置
+End profile adjacent faces	结束轮廓相邻面
+End profile condition	终止轮廓形态
+End radius	结束半径
+End trim	结束修剪
+End type	终止类型
+End value	结束值
+Entities	图元
+Entities to chamfer	要创建倒角的图元
+Entities to copy	要复制的图元
+Entities to delete	要删除的图元
+Entities to draft	要拔模的图元
+Entities to fillet	要设置圆角的图元
+Entities to fillet or chamfer	要圆角或倒角的图元
+Entities to measure between	要测量其间距的图元
+Entities to mirror	要镜像的图元
+Entities to pattern	要阵列化的图元
+Entities to split with	用于分割的图元
+Entities to transform or copy	要变换或复制的图元
+Entity	图元
+Entity or mate connector	图元或配合连接器
+Entity to split with	用于分割的图元
+Entity type	图元类型
+Equal	等长
+Equal distance	等距离
+Equal spacing	相等间距
+Equal trim	同等修剪
+Euclidean	欧几里得
+Evaluate on use	使用时评估
+Explode lines	爆炸线
+Explode step	爆炸步骤
+Explode step type	爆炸步骤类型
+Extend	延伸
+Extend bend relief	扩大折弯止裂槽
+Extend entities	延伸图元
+Extend profiles to part	将轮廓延伸到零件
+Extend to full path	延伸至完整路径
+Extended corner	扩展角点
+Extension shape	延伸形状
+External thread	外部螺纹
+Extrude	拉伸
+Extrude direction	拉伸方向
+FH4™/FHP™ flush-head studs for stainless steel sheets	FH4™/FHP™ 不锈钢板用平头钉
+FHL™/FHLS™ flush, low-displacement head studs	FHL™/FHLS™ 低位移平头钉
+FHX™ flush-head studs with X-Press™ thread	带 X-Press™ 螺纹的 FHX™ 平头钉
+FH™/FHS™/FHA™ flush-head pins	FH™/FHS™/FHA™ 平头销
+FH™/FHS™/FHA™ flush-head studs	FH™/FHS™/FHA™ 平头钉
+FLAT	FLAT
+FS sizes	FS sizes
+Face	面
+Face blend	面混合
+Face limits	面限制
+Face match scope	面匹配范围
+Face mirror	面镜像
+Face pattern	面阵列
+Face to trim to	要修剪到的面
+Face, edge or vertex	面、边或顶点
+Face, plane, mate connector, or planar face to use as trim tool	用作修剪工具的面、平面、配合连接器或平坦面
+Faces	面
+Faces and sketch regions	面和草图面域
+Faces and sketch regions to extrude	要拉伸的面和草图面域
+Faces and sketch regions to revolve	要旋转的面和草图面域
+Faces and sketch regions to sweep	要扫掠的面和草图面域
+Faces and surfaces to thicken	要加厚的面和曲面
+Faces or sketch regions to thicken	要加厚的面和草图面域
+Faces to be normal to	要垂直的面
+Faces to connect	要连接的面
+Faces to draft	要拔模的面
+Faces to exclude	要排除的面
+Faces to find match in	要在其中查找匹配的面
+Faces to load	要加载的面
+Faces to lock	要锁定的面
+Faces to measure	要测量的面
+Faces to mirror	要镜像的面
+Faces to move	要移动的面
+Faces to offset	要偏移的面
+Faces to pattern	要阵列化的面
+Faces to remove	要移除的面
+Faces to replace	要替换的面
+Faces to replace with	用来替换的面
+Faces to round	要倒圆角的面
+Faces to split	要分割的面
+Faces to trim to	要修剪到的面
+Faces, edges, and vertices that define sweep paths	用于定义扫掠路径的面、边和顶点
+Faces, surfaces, and sketch regions to offset	要偏移的面、曲面或草图面域
+Fastened	紧固
+Fastener	紧固件
+Fastener fit	紧固件配合
+Fastener type	紧固件类型
+Feature Name Template	Feature Name Template
+Feature mirror	特征镜像
+Feature pattern	特征阵列
+Feature version	Feature version
+Features to find match in	要在其中查找匹配的特征
+Features to mirror	要镜像的特征
+Features to pattern	要阵列化的特征
+Fill	填充
+Fillet	圆角
+Fillet compare type	圆角比较类型
+Fillet faces to modify	要修改的圆角面
+Fillet radius	圆角半径
+Fillet type	圆角类型
+Fillets	圆角
+Filter by body type	按主体类型筛选
+Filter construction entities	筛选构造图元
+Finish flex PCB model	完成柔性 PCB 模型
+Finish sheet metal model	结束钣金模型
+First direction	第一个方向
+First set of surfaces	第一组曲面
+First side face	第一个侧面
+First sketch	第一个草图
+Fit	配合
+Fit (tolerance only)	配合（仅显示公差）
+Fit type	配合类型
+Fit with tolerance	配合与公差
+Flange	法兰
+Flange alignment	法兰对齐
+Flange to merge	要合并的法兰
+Flat	展开
+Flatten assembly	Flatten assembly
+Flattened	压平
+Flex PCB model	柔性 PCB 模型
+Flip	反转
+Flip alignment	反转对齐
+Flip asymmetric	反转不对称
+Flip base sides	反转底边
+Flip cap	反转封盖
+Flip coordinate system	反转坐标系
+Flip corner	反转角点
+Flip direction	反转方向
+Flip direction up	向上反转方向
+Flip first plane	反转第一平面
+Flip normal	反转法线
+Flip offset	反转偏移
+Flip primary axis	反转主轴
+Flip pull direction	反转拉伸方向
+Flip rounding	反转圆角
+Flip second plane	反转第二平面
+Flip side 1	反转侧面 1
+Flip side 2	反转侧面 2
+Flip sides	反转到对侧
+Flip wall	反转壁
+Follow seed position	Follow seed position
+Foot	Foot
+Force	力
+Foreign Id	Foreign Id
+Form	成型
+Form Part Studio	成形 Part Studio
+Form origin mate connector	成型原点配合连接器
+Frame	框架
+Frame groups	框架组
+Frame segments are trimmed against preceding groups and are used as tools for later groups	框架段根据前面的组进行修剪，并用作后面组的工具
+Frame segments in earlier groups are used as tools for later groups	前面组中的框架段用作后面组的工具
+Frame trim	框架修剪
+Frames	框架
+Free	自由
+From import	来自导入
+From mate connector	从配合连接器
+Full revolve	全方位旋转
+Full round	全圆角
+Gap	间隙
+Gap fill	填充间隙
+Gear	齿轮
+General	常规
+Geodesic	测地线
+Greater or equal	大于或等于
+Group	分组
+Group 1	分组 1
+Group 2	分组 2
+Guides	引导线
+Guides and continuity	引导线和连续性
+Gusset	角撑板
+Gusset position	角撑板位置
+Gusset type	角撑板类型
+HF109™ heavy-duty, high tensile strength studs	HF109™ 高张力重型钉
+HFE™/THFE™ heavy-duty studs for thin sheets	HFE™/THFE™ 薄板用重型钉
+HFG8™ heavy-duty, high tensile strength studs	HFG8™ 高张力重型钉
+HFH™/HFHS™/HFHB™ heavy-duty studs	HFH™/HFHS™/HFHB™ 重型钉
+HFLH™ hard panel studs	HFLH™ 硬板钉
+Handedness	左右手习惯
+Has clearance	Has clearance
+Has end direction	Has end direction
+Has offset	有偏移
+Has second direction	有第二个方向
+Has start direction	Has start direction
+Has style	Has style
+Has third direction	具有第三方向
+Header	标头
+Heal	修复
+Height	高度
+Helix	螺旋
+Helix axis	螺旋轴
+Helix axis type	螺旋轴类型
+Help point	辅助点
+Hem	卷边
+Hem alignment	卷边对齐
+Hem type	卷边类型
+Hidden references	Hidden references
+Hold adjacent edges	保持相邻边
+Hold line	控制线
+Hold opposite side	按住对立面
+Hold other line	按住其他线
+Hole	孔
+Hole ID	Hole ID
+Hole class	孔等级
+Hole start plane or mate connector	孔起始平面或配合连接器
+Hole table	孔表格
+Hole type	孔类型
+Hole version	Hole version
+Holes	孔
+Hollow	挖空
+Horizontal reference	水平参考
+H™ nuts/HNL™ prevailing torque locknuts	H™ 螺母/HNL™ 有效力矩型锁紧螺母
+ISO	ISO
+If none selected, this feature will create one at Origin	如果没有选择，则将在原点创建一个特征
+Ignore composite parts	忽略复合零件
+Image	图像
+Image origin index	Image origin index
+Import	导入
+Import appearances	导入外观
+Import material density	导入材料密度
+In place	原位
+Inch	Inch
+Include bends	包含折弯
+Include composite parts filter	Include composite parts filter
+Include mate connectors	包括配合连接器
+Include parts filter	Include parts filter
+Include properties	包括属性
+Include sketches filter	Include sketches filter
+Include surfaces filter	Include surfaces filter
+Index	索引
+Index (0-based)	索引（基于 0）
+Individual edges to match	要匹配的各个边
+Individual faces to match	要匹配的各个面
+Inertial relief	Inertial relief
+Initial Entities	Initial Entities
+Inner	内部
+Inner radius	内半径
+Input type	输入类型
+Inputs	输入
+Inset	插入
+Inside	内部
+Instance	实例
+Instance count	实例数
+Instances	实例
+Instances or faces to constrain	要约束的实例或面
+Instances to measure	要测量的实例
+Instances to mirror	要镜像的实例
+Instances to replace	要替换的实例
+Instances to skip	要跳过的实例
+Interference	干扰
+Interior faces	内部面
+Internal	内部
+Interpolated spline	插值样条
+Intersect	相交
+Intersection curve	交点曲线
+Inverse conic edges	反向圆锥边
+Inverse tangent edges	反向相切边
+Is first	Is first
+IsInContext	IsInContext
+Isocline	等斜线
+Isoparametric curve	等参曲线
+Jog	折弯
+Jog offset	折弯偏移
+Jog offset anchor	折弯偏移锚点
+Joint	接头
+Joint style	接头样式
+Joint type	接头类型
+K Factor	K 系数
+Keep both sides	保留两侧
+Keep end derivative	保留结束导数
+Keep input parts	保留输入零件
+Keep material	保留材料
+Keep opposite side	保留对边
+Keep points	保留点
+Keep profile orientation	保持轮廓方向
+Keep start derivative	保留起始导数
+Keep tool surfaces and curves	保留工具曲面和曲线
+Keep tools	保留工具
+LOOP_CENTER	LOOP_CENTER
+LRA or Length, Rotation, and Angle table shows coordinates for CNC tube bending machines.	LRA（长度、旋转和角度）表格显示 CNC 弯管机的坐标。
+LRA table	LRA 表格
+Label column index	标签列索引
+Label row index	标签行索引
+Leave open	保持为开放
+Legacy	Legacy
+Length	长度
+Length Tolerance	长度公差
+Length control	长度控制
+Less or equal	小于或等于
+Limit	限制
+Limit X maximum distance	限制 X 最大距离
+Limit X minimum distance	限制 X 最小距离
+Limit Y maximum distance	限制 Y 最大距离
+Limit Y minimum distance	限制 Y 最小距离
+Limit Z maximum distance	限制 Z 最大距离
+Limit Z minimum distance	限制 Z 最小距离
+Limit axial X maximum angle	限制 X 轴最大角度
+Limit axial X minimum angle	限制 X 轴最小角度
+Limit axial Y maximum angle	限制 Y 轴最大角度
+Limit axial Y minimum angle	限制 Y 轴最小角度
+Limit axial Z maximum angle	限制 Z 轴最大角度
+Limit axial Z minimum angle	限制 Z 轴最小角度
+Limit cone maximum angle	Limit cone maximum angle
+Limit frame ends	限制框架末端
+Limits	限制
+Line angle	线角度
+Line or points	线或点
+Linear	线性
+Linear pattern	线性阵列
+Linear static	Linear static
+Load	Load
+Load direction	载荷方向
+Load region	载荷区域
+Load type	Load type
+Location	位置
+Location signatures	Location signatures
+Location(s)	位置
+Locations	位置
+Lock ends	锁定末端
+Lock profile direction	锁定轮廓方向
+Lock profile faces	锁定轮廓面
+Locked	已锁定
+Loft	放样
+Lofted corner	放样角点
+Long	长
+Loop	Loop
+Loop/chain connected	环/链相连
+Loose	松动
+Loose (ASME)	松动 (ASME)
+Lower	小写
+Lxx	Lxx
+Lxy	Lxy
+Lxz	Lxz
+Lyx	Lyx
+Lyy	Lyy
+Lyz	Lyz
+Lzx	Lzx
+Lzy	Lzy
+Lzz	Lzz
+MCAD	MCAD
+MID_AXIS_POINT	MID_AXIS_POINT
+MID_POINT	MID_POINT
+MODEL	MODEL
+Magnitude	幅值
+Magnitude/bias	幅值/偏离
+Maintain aspect ratio	保持纵横比
+Maintain curvature	维持曲率
+Make joint	制作接头
+Make periodic	Make periodic
+Manipulator X axis	操纵器 X 轴
+Manipulator Y axis	操纵器 Y 轴
+Manipulator Z axis	操纵器 Z 轴
+Map	映射
+Mass	质量
+Match	匹配
+Match connections	匹配连接
+Match curvature	匹配曲率
+Match curvature at end	在端点处匹配曲率
+Match curvature at start	在起点处匹配曲率
+Match edges on face	在面上匹配边
+Match edges on plane	在平面上匹配边
+Match face options	匹配面选项
+Match faces at parting	分型时匹配面
+Match faces in features	在特征中匹配面
+Match faces in parts	在零件中匹配面
+Match flow (G3)	配对流 (G3)
+Match individual edges	匹配各个边
+Match individual faces	匹配各个面
+Match position	匹配位置
+Match profile	匹配轮廓
+Match tangent	匹配相切
+Match type	匹配类型
+Matching	匹配
+Mate	配合
+Mate DOF to animate	要动画化的配合 DOF
+Mate connector	配合连接器
+Mate connector for reference frame	以配合连接器为参考系
+Mate connector index	Mate connector index
+Mate connectors	配合连接器
+Mate to be matched	要匹配的配合
+Mate type	配合类型
+Mate(s)	配合
+Material	材料
+Mates to drive positions	驱动位置的配合
+Max	最大值
+Max deviation	最大偏差
+Max index (0-based)	最大索引（基于 0）
+Maximum	最大值
+Maximum angle	最大角度
+Maximum control points	最大控制点
+Maximum deviation	最大偏差
+Maximum number of assemblies created	Maximum number of assemblies created
+Measure instances	Measure instances
+Measure to axis of cylinders, circles, arcs, or revolved surfaces	测量到圆柱、圆形、弧线或旋转曲面的轴线
+Measure to infinitely extended lines, arcs, cylinders, etc.	测量到无限延伸的线、弧线、圆柱等
+Measured	已测量
+Measurement	测量
+Merge	合并
+Merge ribs	合并筋
+Merge scope	合并范围
+Merge tangent segments	合并相切线段
+Merge with all	全部合并
+Mesh	网格
+Mesh bodies or faces	网格主体或面
+Mesh point	网格点
+Meter	Meter
+Method	方法
+Metric	公制
+Mid plane	中间平面
+Middle	中间
+Millimeter	Millimeter
+Min	最小值
+Min index (0-based)	最小索引（基于 0）
+Minimal gap	最小间隙
+Minimum	最小值
+Minimum/Maximum	最小值/最大值
+Mirror	镜像
+Mirror across Y axis	沿 Y 轴镜像
+Mirror placement type	Mirror placement type
+Mirror plane	镜像平面
+Mirror reference	镜像参考
+Mirror strategy	镜像策略
+Mirror type	镜像类型
+Miter	斜接
+Miter angle	斜接角度
+Mix	混合
+Modal	Modal
+Mode	模式
+Modification type	修改类型
+Modify fillet	修改圆角
+Modify joint	修改接头
+Moment	力矩
+Mounting	安装
+Move	Move
+Move boundary	移动边界
+Move curve boundary type	移动曲线边界类型
+Move end condition	移动终止形态
+Move face	移动面
+Move face type	移动面类型
+Multi X offset	Multi X offset
+Multi Y offset	Multi Y offset
+Multi Z offset	Multi Z offset
+Multi rotation matrix	Multi rotation matrix
+Multiple	Multiple
+Mutual trim	相互修剪
+Name	名称
+Name #entityName	名称 #entityName
+Name entity	名称图元
+Neutral plane	中性面
+New	新建
+Next	下一个
+No corner	无角点
+No maximum	无最大值
+No minimum	无最小值
+No tolerance	无公差
+No trim	不修剪
+Nominal	名义值
+NonGeometricItem	NonGeometricItem
+None	无
+Normal	正常
+Normal (ASME)	正常 (ASME)
+Normal direction	法线方向
+Normal to face	垂直于面
+Normal to guide	垂直于引导线
+Normal to profile	垂直于轮廓
+Normal to sketch plane	垂直于草图平面
+Normal to target	垂直于目标
+Normal x	Normal x
+Normal y	Normal y
+Normal z	Normal z
+Not supported	Not supported
+Number	数字
+Number of modes	Number of modes
+Number of points to add	要添加的点数
+Number of samples	样本数量
+ORIGIN_X	ORIGIN_X
+ORIGIN_Y	ORIGIN_Y
+ORIGIN_Z	ORIGIN_Z
+Obround - Scaled	圆角矩形 - 使用比例
+Obround - Sized	圆角矩形 - 使用大小
+Offset	偏移
+Offset X distance	偏移 X 距离
+Offset Y distance	偏移 Y 距离
+Offset Z distance	偏移 Z 距离
+Offset all	全部偏移
+Offset and extend	偏移和延伸
+Offset angle	偏移角度
+Offset curve	偏移曲线
+Offset distance	偏移距离
+Offset from tip	相对于顶锥角的偏移量
+Offset opposite direction	偏移相反方向
+Offset surface	偏移曲面
+Offset type	偏移类型
+Offset, extend, and split	偏移、延伸和分割
+On entity	在图元上
+One sided	单面
+Only edges	仅限边
+Only faces	仅限面
+Only vertices	仅限顶点
+Operation type	操作类型
+Opposite alignment	反向对齐
+Opposite angle	对角
+Opposite direction	反向
+Opposite direction angle	相反方向角度
+Opposite offset direction	相对偏移方向
+Opposite origin	相反原点
+Opposite side	对边
+Optimize	优化
+Ordered groups	排序的组
+Orientation	方向
+Origin	原点
+Origin XY	原点 XY
+Origin YZ	原点 YZ
+Origin ZX	原点 ZX
+Origin entity	原点图元
+Origin type	原点类型
+Original unit	Original unit
+Orthogonal path	正交路径
+Orthogonal path coordinate system	正交路径坐标系
+Other	其他
+Outer	外部
+Outside	外部
+Overall parameters	总体参数
+Override	覆盖
+Override bend radius	覆盖折弯半径
+Overrides	覆盖
+Overwrite points	重写点
+Owned by	所有者
+Owner	所有者
+Owner entity	所有者图元
+PART_ORIGIN	PART_ORIGIN
+PCB entity type	PCB 图元类型
+PCB holes	PCB 孔
+PCB part to finish	要完成的 PCB 零件
+POINT	POINT
+Parallel	平行
+Parallel to	平行于
+Parallel to sketch plane	平行于草图平面
+Parameter	参数
+ParametricPartStudio	ParametricPartStudio
+Part	零件
+Part Studio	Part Studio
+Part mirror	零件镜像
+Part or Face mode	Part or Face mode
+Part pattern	零件阵列
+Part to add	要添加的零件
+Part to remove	要移除的零件
+Partial fillet	部分圆角
+Partial flange	部分法兰
+Parting edges	分型边
+Parting entity	分型图元
+Parting line	分型线
+Parting line propagation	分型线延伸
+Parts	零件
+Parts and surfaces to convert	要转换的零件和曲面
+Parts or bends	零件或折弯
+Parts to draft	要拔模的零件
+Parts to find match in	要在其中查找匹配的零件
+Parts to hollow	要挖空的零件
+Parts to import	Parts to import
+Parts to measure	要测量的零件
+Parts to trim	要修剪的零件
+Parts to trim to	要修剪到的零件
+Parts to trim using trim tool	要使用修剪工具修剪的零件
+Parts to use as trim tools	要用作修剪工具的零件
+Parts, surfaces, or curves to split	要分割的零件、曲面或曲线
+Path	路径
+Path to pattern along	沿其进行阵列化的路径
+Pattern	阵列化
+Pattern type	阵列类型
+Per chain	根据链
+Per edge	根据边
+Performance	性能
+Perimeter	周长
+Pin	固定
+Pin slot	销槽
+Pitch	螺距
+Pitch length	螺距长度
+Placement	放置
+Placement origin	放置原点
+Planar	平面
+Planarization parameters	平面化参数
+Planarize	平面化
+Plane	平面
+Plane limit	平面限制
+Plane point	平面点
+Plane type	平面类型
+Planes and planar faces to use as trim tools	要用作修剪工具的平面和平整面
+Planes to find match in	要在其中查找匹配的平面
+Plated	电镀
+Playback type	Playback type
+Pocket	型腔
+Point	点
+Point #index	Point #index
+Point edit type	点编辑类型
+Point index	Point index
+Point normal	点法线
+Point or mate connector	点或配合连接器
+Point or mate connector used as reference for the curve. Defaults to origin.	使用点或配合连接器作为曲线参考。默认为原点。
+Point type	点类型
+Points	点
+Points on edges	边上的点
+Points overrides	点覆盖
+Poisson's ratio	Poisson's ratio
+Polyline	多段线
+Position	位置
+Precise	精确
+Precision	精度
+Preselection	Preselection
+Preserve active sheet metal models	保留活跃的钣金模型
+Preserve material	保留材料
+Pressure	压力
+Previous	上一个
+Primary axis entity	主轴图元
+Process	处理
+Profile 1	Profile 1
+Profile 2	Profile 2
+Profile control	轮廓控制
+Profile type	轮廓类型
+Profiles	轮廓
+Projected curve	投影曲线
+Projection direction type	投影方向类型
+Propagation	延伸
+Propagation type	延伸类型
+Protrusion	突起
+Pull direction	拉伸方向
+Purpose	目标
+Quantity	Quantity
+Query variable	查询变量
+Rack and pinion	齿轮齿条
+Radius	半径
+Range	范围
+Ratio	比率
+Realign	重新对齐
+Reapply features	重新应用特征
+Reapply fillet	重新应用圆角
+Reciprocate	Reciprocate
+Recognize	识别
+Rectangle	矩形
+Rectangle - Scaled	矩形 - 已缩放
+Reference	参考
+Reference edge	参考边
+Reference faces	参考面
+Reference plane	参考平面
+References	参考
+Refold	重新折叠
+Regular expression	正则表达式
+Relation	关系
+Relation ratio	关系比率
+Relation type	关系类型
+Relative	相对
+Relief	止裂
+Remove	移除
+Remove fillet	移除圆角
+Reorient secondary axis	重新定向副轴
+Replace all instances	替换所有实例
+Replace face	替换面
+Replace part	Replace part
+Replacement component	替换零部件
+Replacement part	替换零件
+Replicate	仿制
+Reset triad	重置三重轴
+Result body operation type	结果主体操作类型
+Result type	结果类型
+Reverse direction	反转方向
+Reverse playback	Reverse playback
+Revolute	旋转
+Revolutions	旋转
+Revolve	旋转
+Revolve angle	旋转角度
+Revolve axis	旋转轴
+Rho	Rho
+Rib	筋
+Rib extrusion direction	筋拉伸方向
+Rigid body	Rigid body
+Rip	接缝
+Rolled	滚动
+Rolled K Factor	轧制 K 系数
+Rolling ball	滚球
+Rotate	旋转
+Rotate about X	绕 X 旋转
+Rotate about Y	绕 Y 旋转
+Rotate about Z	绕 Z 旋转
+Rotation	旋转
+Rotation about Y'	绕 Y 旋转
+Rotation about Z	绕 Z 旋转
+Rotation about Z'	绕 Z 旋转
+Rotation angle	旋转角度
+Rotation axis	旋转轴
+Rotation matrix	Rotation matrix
+Round	圆形
+Round - Scaled	圆角 - 已缩放
+Round - Sized	圆角 - 使用大小
+Routing curve	路线曲线
+Routing curve (#curveLength)	路线曲线 (#curveLength)
+Routing curve table	路线曲线表格
+Row	行
+Row access type	行访问类型
+Row index (0-based)	行索引（基于 0）
+Row max index (0-based)	行最大索引（基于 0）
+Row min index (0-based)	行最小索引（基于 0）
+Row regular expression	行正则表达式
+Row result type	行结果类型
+Row value	行值
+Ruled surface	直纹曲面
+Ruled surface type	直纹曲面类型
+S-RT™ free-running locknuts	S-RT™ 自由运转型锁紧螺母
+SGPC™ swaging collar studs	SGPC™ 型锻环钉
+SH™ hard panel nuts	SH™ 硬面螺母
+SL™ TRI-DENT® prevailing torque locknuts	SL™ TRI-DENT® 有效力矩型锁紧螺母
+SMPS™/SMPP™ nuts	SMPS™/SMPP™ 螺母
+SOSG™/SOAG™ threaded standoffs	SOSG™/SOAG™ 螺纹支架
+SO™/SOS™/SOA™/SO4™ through threaded standoffs	SO™/SOS™/SOA™/SO4™ 直通螺纹支架
+SO™/SOS™/SOA™/SO4™ through unthreaded standoffs	SO™/SOS™/SOA™/SO4™ 直通无螺纹支架
+Same frames as previous	与之前相同的框架
+Sample size	样例大小
+Sampled	抽样
+Scale	缩放
+Scale factor	比例因子
+Scale uniformly	均匀缩放
+Scope	范围
+Screw	螺栓
+Second bound	第二界限
+Second bound type	第二界限类型
+Second centered	第二个居中
+Second depth	第二个深度
+Second direction	第二个方向
+Second direction has offset	第二个方向有偏移
+Second distance	第二个距离
+Second draft	第二个拔模
+Second draft angle	第二个拔模角度
+Second draft opposite direction	第二个拔模相反方向
+Second end position	第二个终止位置
+Second end type	第二终止类型
+Second equal spacing	第二相等间距
+Second instance count	第二个实例数
+Second match	第二个匹配
+Second offset distance	第二个偏移距离
+Second offset opposite direction	第二个偏移相反方向
+Second opposite direction	第二个相反方向
+Second plane limit	第二平面限制
+Second radius	第二半径
+Second set of surfaces	第二组曲面
+Second side face	第二个侧面
+Second sketch	第二个草图
+Second trim to face boundaries	第二次修剪到面边界
+Second up to face	第二个成形到面
+Second up to surface or part	第二个成形到曲面或零件
+Second up to vertex or mate connector	第二个成形到顶点或配合连接器
+Secondary axis entity	副轴图元
+Section count	剖面数
+Seed geometry type	源几何图元类型
+Seed instance key	Seed instance key
+Segment edit type	段编辑类型
+Segment index	Segment index
+Segments	线段
+Select	选择
+Select (edge)	选择（边）
+Select (vertex)	选择（顶点）
+Select all frames	选择所有框架
+Select an entity or mate connector	选择一个图元或配合连接器
+Select distance to measure the linear distance between two entities./nSelect length to measure the total length of the selected entities.	选择距离以测量两个图元之间的线性距离。/n选择长度以测量所选图元的总长度。
+Select face	选择面
+Select or create mate connectors in this Part Studio to position derived instances	在此 Part Studio 中选择或创建配合连接器以定位派生实例
+Select owner entity	选择所有者图元
+Select point	选择点
+Selected Point	Selected Point
+Selected point #indexValue	Selected point #indexValue
+Selected points	选定的点
+Selection	选择
+Selection type	选择类型
+Selections	选择
+Self-clinching nuts	压铆螺母
+Self-clinching standoffs	自锁支架
+Self-clinching studs & pins	压铆销钉
+Shaft class	轴等级
+Shared	已共享
+Sheet metal face to bend	要折弯的钣金面
+Sheet metal loft	钣金放样
+Sheet metal model	钣金模型
+Sheet metal part	钣金零件
+Sheet metal parts	钣金零件
+Shell	抽壳
+Shell thickness	抽壳厚度
+Short	短
+Show Flip	Show Flip
+Show calculation variance	显示计算方差
+Show coordinate system of the reference used by the current vertex.	显示当前顶点使用的参考坐标系。
+Show default points	显示默认点
+Show details	显示详细信息
+Show deviation	显示偏差
+Show isocurves	显示等参线
+Show reference coordinate system	显示参考坐标系
+Show ruled lines	显示直纹线
+Show selection	显示选择
+Show start and end profiles	显示起始和结束轮廓
+Side	边
+Side 1	侧面 1
+Side 2	侧面 2
+Side length	边长度
+Sides	侧面
+Simple	简单
+Simulation	仿真
+Simulation connection	仿真连接
+Single	单一
+Single value	单一值
+Size	尺寸
+Sketch	草图
+Sketch curves to extrude	要拉伸的草图曲线
+Sketch for flat view	平面视图草图
+Sketch plane	草图平面
+Sketch points	草图点
+Sketch points to place holes	要放置孔的草图点
+Sketch profile	草图轮廓
+Sketch profiles	草图轮廓
+Skip instances	跳过实例
+Slider	滑块
+Smooth	平滑
+Smooth fillet corners	平滑圆角
+Smooth transition	平滑过渡
+Smoothness	平滑度
+Solid	实体
+Solution index	Solution index
+Source is 'Y Axis Up'	来源为“Y 轴向上”
+Spacing type	间距类型
+Spans	跨距
+Specify anchor points	指定锚点
+Specify axis	指定轴
+Specify direction	指定方向
+Specify normal	Specify normal
+Sphere	球体
+Spine	样条曲线
+Split	分割
+Split face	分割面
+Split faces	分割面
+Split type	分割类型
+Spun corner	旋转角点
+Square - Sized	正方形 - 使用大小
+Standard	标准
+Start	起始
+Start angle	起始角度
+Start condition	起始形态
+Start curvature offset	起始曲率偏移
+Start direction	起始方向
+Start direction has offset	起始方向有偏移
+Start direction offset angle	起始方向偏移角度
+Start edge position	开始边位置
+Start flow offset	起始流偏移
+Start from part	从零件开始
+Start from selected plane	从选定平面开始
+Start from sketch plane	从草图平面开始
+Start magnitude	起始幅值
+Start offset	起始偏移
+Start offset opposite direction	起始偏移相反方向
+Start opposite direction	起始相反方向
+Start plane	起始平面
+Start point	起点
+Start position	起始位置
+Start profile adjacent faces	开始轮廓相邻面
+Start profile condition	起始轮廓形态
+Start radius	起始半径
+Start trim	开始修剪
+Start type	开始类型
+Start up to face	开始直到面
+Start up to surface or part	开始直到曲面或零件
+Start up to vertex or mate connector	开始直到顶点或配合连接器
+Start value	起始值
+Starting height	Starting height
+Starting offset	起始偏移
+Starting offset bound	起始偏移界限
+Starting offset depth	起始偏移深度
+Starting offset entity	起始偏移图元
+Starting offset opposite direction	起始偏移相反方向
+Starting width	Starting width
+Step	步骤
+Steps	步骤
+Straight	直线
+Straight pipe tap	直式管螺纹
+Straight tap	直式螺纹
+Style	样式
+Subtract	差集
+Subtraction offset	差集偏移
+Subtraction scope	差集范围
+Surface	曲面
+Surface area	曲面面积
+Surface or boundary edges	曲面或边界边
+Sweep	扫掠
+Sweep path	扫掠路径
+Swept profile	扫掠轮廓
+Switch face	切换面
+Switch side	切换边
+Symmetric	对称
+Symmetrical	对称
+S™/SS™/CLS™/CLSS™/SP™ nuts	S™/SS™/CLS™/CLSS™/SP™ 螺母
+TFH™/TFHS™ non-flush studs	TFH™/TFHS™ 非平头钉
+TOP_AXIS_POINT	TOP_AXIS_POINT
+TPS™/TP4™ flush-head pilot pins	TPS™/TP4™ 平头定位销
+TPXS™ self-clinching pilot pins	TPXS™ 压铆定位销
+TSO™/TSOS™/TSOA™/TSO4™ blind standoffs for thin sheet	TSO™/TSOS™/TSOA™/TSO4™ 薄板用盲孔支架
+Tab	页签
+Tab mate connector(s)	薄片配合连接器
+Tab profile	薄片轮廓
+Table	表格
+Tag	标记
+Tag purpose	标记目的
+Tangency	相切
+Tangent	相切
+Tangent connected	相切相连
+Tangent direction	相切方向
+Tangent edges	相切边
+Tangent hold lines	相切控制线
+Tangent propagation	切向延伸
+Tangent to curve	与曲线相切
+Tangent to face	与面相切
+Tangent to guide	与引导线相切
+Tangent to profile	相切于轮廓
+Tap clearance (number of thread pitch lengths)	攻牙间隙 (螺纹螺距长度数量)
+Tap drill diameter	攻丝底孔直径
+Tap drill diameter deviation	攻丝底孔直径偏差
+Tap drill diameter lower deviation	攻丝底孔直径下偏差
+Tap drill diameter lower limit	攻丝底孔直径下限
+Tap drill diameter precision	攻丝底孔直径精度
+Tap drill diameter tolerance controls	攻丝底孔直径公差控制
+Tap drill diameter tolerance type	攻丝底孔直径公差类型
+Tap drill diameter upper deviation	攻丝底孔直径上偏差
+Tap drill diameter upper limit	攻丝底孔直径上限
+Tap major diameter	Tap major diameter
+Tap through all	攻牙完全贯穿
+Tap type	螺纹类型
+Tapered pipe tap	锥形管螺纹
+Tapped	螺纹孔
+Tapped angle	Tapped angle
+Tapped depth	螺纹孔深度
+Tapped depth deviation	螺纹孔深度偏差
+Tapped depth lower deviation	螺纹孔深度下偏差
+Tapped depth lower limit	螺纹孔深度下限
+Tapped depth precision	螺纹孔深度精度
+Tapped depth tolerance controls	螺纹孔深度公差控制
+Tapped depth tolerance type	螺纹孔深度公差类型
+Tapped depth upper deviation	螺纹孔深度上偏差
+Tapped depth upper limit	螺纹孔深度上限
+Tapped details	Tapped details
+Target	目标
+Target anchor point	目标锚点
+Target degree	目标度数
+Target face(s)	目标面
+Target length	目标长度
+Target pitch	目标螺距
+Target revolutions	目标转数
+Targets	目标
+Tear	撕裂
+Tear drop	泪珠状
+Tensile yield strength	Tensile yield strength
+Termination	终止
+Thermal via	散热过孔
+Thicken	加厚
+Thickness	厚度
+Thickness 1	厚度 1
+Thickness 2	厚度 2
+Thickness factor	厚度因子
+Thickness opposite direction	厚度相反方向
+Thin	薄壁
+Third centered	第三个居中
+Third direction	第三方向
+Third distance	第三距离
+Third equal spacing	第三相等间距
+Third instance count	第三实例数
+Thread class	螺纹类别
+Thread length	螺纹长度
+Thread standard	Thread standard
+Thread type	螺纹类型
+Threads/inch	螺纹/英寸
+Three point	三点
+Through all	完全贯穿
+Tip angle	顶锥角
+Tip angle deviation	顶锥角偏差
+Tip angle lower deviation	顶锥角下偏差
+Tip angle lower limit	顶锥角下限
+Tip angle precision	顶锥角精度
+Tip angle style	顶锥角样式
+Tip angle tolerance controls	顶锥角公差控制
+Tip angle tolerance type	顶锥角公差类型
+Tip angle upper deviation	顶锥角上偏差
+Tip angle upper limit	顶锥角上限
+To mate connector	到配合连接器
+To owner	转到所有者
+To selection	转到选定对象
+Tolerance	公差
+Tolerance matching	Tolerance matching
+Tolerance type	公差类型
+Tooling	工艺
+Tools	工具
+Tools anchor point	工具锚点
+Total length	总长度
+Transform	变换
+Transform by mate connectors	按配合连接器变换
+Transform type	变换类型
+Transition	转换
+Translate	平动
+Translate by XYZ	按 XYZ 平动
+Translate by distance	按距离平动
+Translate by line	按直线平动
+Translation	平动
+Translation along X	沿 X 平移
+Translation along Y	沿 Y 平移
+Translation along Z	沿 Z 平移
+Treatment type	处理类型
+Triangle	三角形
+Trim	修剪
+Trim Type	修剪类型
+Trim control	修剪控制
+Trim curve	修剪曲线
+Trim ends	修剪末端
+Trim guides	修剪引导线
+Trim profiles	修剪轮廓
+Trim to face boundaries	修剪到面边界
+Trim to target	修剪到目标
+Trim type	修剪类型
+Trimming	正在修剪
+Turns	圈数
+Turns and pitch	圈数和螺距
+Twist	扭曲
+Twist opposite direction	扭曲相反方向
+Twist type	扭曲类型
+Two distances	两个距离
+Two sided	双面
+Two sketches	两个草图
+Type	类型
+U direction	U 方向
+U profiles	U 轮廓
+U shift	U 偏移
+U shift opposite direction	U 偏移相反方向
+UNSET	UNSET
+UVN (Control polygon)	UVN（控制多边形）
+UVN (Tangent)	UVN（相切）
+Ultimate compressive strength	Ultimate compressive strength
+Ultimate tensile strength	Ultimate tensile strength
+Undercut	底切
+Undercut diameter	底切直径
+Undercut length	底切长度
+Unfold	展开
+Unfold all	全部展开
+Unfold none	不展开
+Unfold selected	展开所选内容
+Unfold type	展开类型
+Unified	统一
+Union	并集
+Unit	单位
+Units	单位
+Unowned	无所有者
+Up to entity	成形到图元
+Up to entity or mate connector	成形到图元或配合连接器
+Up to entity with offset	成形到图元再偏移
+Up to face	成形到面
+Up to next	成形到下一个面
+Up to part	成形到零件
+Up to part/surface	成形到零件或曲面
+Up to surface or part	成形到曲面或零件
+Up to vertex	成形到顶点
+Up to vertex or mate connector	成形到顶点或配合连接器
+Upper	大写
+Use axis	使用轴
+Use cubic interpolation	使用三次插值
+Use default minimal gap	使用默认最小间隙
+Use minimal gap	使用最小间隙
+Use model K Factor	使用模型 K 系数
+Use model bend radius	使用模型折弯半径
+Use sketch plane direction	使用草图平面方向
+User defined	用户定义
+V direction	V 方向
+V profiles	V 轮廓
+V shift	V 偏移
+V shift opposite direction	V 偏移相反方向
+V3	V3
+VIRTUAL_SHARP	VIRTUAL_SHARP
+Value	值
+Value to record	要记录的值
+Variable	变量
+Variable Studio reference	Variable Studio 参考
+Variable fillet	可变圆角
+Variable type	变量类型
+VariableStudioVariable	VariableStudioVariable
+Vertex	顶点
+Vertex overrides	顶点覆盖
+Vertex pairs to split with	用于分割的顶点对
+Vertices	顶点
+Vertices or curves	顶点或曲线
+Vertices or edges	顶点或边
+Via	过孔
+Volume	体积
+Wall face or bounding edge to hold	要保持的壁面或边界线
+Walls	壁
+Weight	权重
+Width	宽度
+Width mate connectors	宽度配合连接器
+Workspace precision	工作区精度
+World	世界坐标系
+Wrap	包覆
+X	X
+X Component	X Component
+X axis	X axis
+X offset	X 偏移
+X rotation	X 轴旋转
+X scale	X 比例
+X translation	X 向平动
+XY plane	XY 平面
+XYZ	XYZ
+XZ plane	XZ 平面
+Y	Y
+Y Component	Y Component
+Y axis	Y axis
+Y offset	Y 偏移
+Y rotation	Y 轴旋转
+Y scale	Y 比例
+Y translation	Y 向平动
+YZ plane	YZ 平面
+Yard	Yard
+Young's modulus	Young's modulus
+Z	Z
+Z Component	Z Component
+Z axis	Z axis
+Z offset	Z 偏移
+Z rotation	Z 轴旋转
+Z scale	Z 比例
+Z translation	Z 向平动
+[#continuity] #entities	[#continuity] #entities
+[#designator] #interiorFaces	[#designator] #interiorFaces
+[#pointOnEdgeRadius] #edge	[#pointOnEdgeRadius] #edge
+[#uCondition] #uProfileEntities	[#uCondition] #uProfileEntities
+[#vCondition] #vProfileEntities	[#vCondition] #vProfileEntities
+[#vertexRadius] #vertex	[#vertexRadius] #vertex
+additional query	additional query
+arrayItem	arrayItem
+baseOccurrence	baseOccurrence
+buildFunction	buildFunction
+cap	cap
+computeMass	computeMass
+connection	connection
+domain	domain
+edge	edge
+edge limit	edge limit
+entityInferenceType	entityInferenceType
+fixSingleCompositeEmptyName	fixSingleCompositeEmptyName
+group	group
+guide	guide
+hintFaces	hintFaces
+index	index
+instance	instance
+isForSubFeature	isForSubFeature
+newUI	newUI
+point	point
+point on edge	point on edge
+point override	point override
+profile	profile
+secondaryOriginQuery	secondaryOriginQuery
+side1HasFace	side1HasFace
+side1HasVertex	side1HasVertex
+side2HasFace	side2HasFace
+side2HasVertex	side2HasVertex
+source	source
+specifyMaterialData	specifyMaterialData
+specifyUnits	specifyUnits
+value	value
+vertex	vertex

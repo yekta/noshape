@@ -239,3 +239,9 @@ Still open, routed in docs/handoff/qa5-routing.md (psb): Draft 8 (parting line s
 conditions, connections, trims), Thicken 4 (L17, kern), Fill 5/6 (guides, SF7), Boundary surface 2/5 (driven-query profile
 arrays, boundary conditions), Helix 6/8 (start/end point rules, start/end profiles), Mate connector 5 (owner/attachment at
 regen), pattern L40/L42/L43/L45 and skip-instance infos, Hole L56/L57 and the remaining infos.
+
+## qa5 pass 22 (2026-10-24): labelled selects
+std_show_label_hints_match_builtin (custom_features.rs) found 10 dialogs with selects the std labels (SHOW_LABEL) and we didn't:
+bridgingCurve Method, constrainedSurface Optimize, endcap Treatment type, frame Default corner type / Corner type, gusset Gusset type /
+Gusset position, isoparametricCurve Direction, offsetCurveOnFace Offset type / Gap fill, queryVariable Shared / Select ×2, routingCurve
+Reference / Coordinate system, ruledSurface type / vertex override / corner type. All 🔧 fixed (qa5); the test keeps them aligned.
