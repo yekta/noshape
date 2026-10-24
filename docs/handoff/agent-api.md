@@ -723,3 +723,13 @@ drawing_export, all by driving DrawingTools with sheet-mm clicks.
     DWT, splines checkbox only for DWG / DXF / DWT; the DWG / DWT / CSV notes. Import dialog: no Join for PVZ.
     Requested live raster samples ("api (10-24) drawing raster export") to check the shared rasterizer, and the IM2
     mass-property bands ("api (10-24) IM2 bands").
+  - (10-24) API coverage audit 1: assembly_mate edits mates and takes every dialog option (offset, rotation axis,
+    limits, tangent propagation, flip / reorient); sketch_create disable_imprinting; sketch_paste, sketch_export;
+    feature_add_folder / rename_folder / unpack_folder, feature_dependencies, feature_dynamic_suppression;
+    drawing_create with sketch, configuration, custom_template and the dialog's defaults (ANSI_A_INCH.dwt, No views).
+    Shared code moved to ops (sketch_export, studio folder / suppression helpers, drawing::CustomTemplate).
+  - (10-24) Raster / SVG drawing export as live's files: 300 px per inch, opaque white RGB, no antialiasing, all black,
+    5 px visible edges and 2 px other lines, PNG pHYs 3937 px/m, JPEG q75 4:2:0 at 100 dpi (jpeg-encoder), TIFF
+    uncompressed one strip at 100 dpi, SVG text as outlines. Still different from live: our templates draw a thin
+    line on the sheet edge (live's export has none) and inset the frame 10 mm (live ANSI A ≈ 9.6 mm), reported to
+    the lead. IM2 graded ✅ under the band rule (workflow-import-matrix.md).
