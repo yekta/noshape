@@ -2894,7 +2894,7 @@ impl AssemblyView {
         d.busy = true;
         let prepared = self.result.prepared.clone();
         let start: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
-        let opts = match d.handle {
+        let mut opts = match d.handle {
             Some(h @ ManipHandle::Ring(_)) => SolveOptions { targets: Self::manip_targets_for(h, d.plane_normal, d.plane_point, d.value, &d.start), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
             Some(h @ (ManipHandle::Axis(_) | ManipHandle::Plane(_))) if self.result.solved.instance_dof.get(&d.top).copied() == Some(6) => {
                 // Free instance: exact translation from the drag start.
@@ -2906,14 +2906,33 @@ impl AssemblyView {
                 None => SolveOptions { drags: vec![(d.top, d.local, target)], start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
             },
         };
+        // The instance list keeps its DOF glyphs while dragging; the drag's
+        // "Move" edit re-evaluates them.
+        opts.skip_dof = true;
+        let (dof, instance_dof) = (self.result.solved.dof, self.result.solved.instance_dof.clone());
+        // `NOSHAPE_PERF`: a.drag_solve (background solve), a.drag_apply (UI
+        // thread: apply + scene rebuild), a.drag_step (target to applied).
+        let asked = std::time::Instant::now();
         cx.spawn(async move |this, cx| {
-            let solved = cx.background_spawn(async move { prepared.solve(&opts) }).await;
+            let solved = cx
+                .background_spawn(async move {
+                    let t = std::time::Instant::now();
+                    let mut s = prepared.solve(&opts);
+                    noshape_render::perf::record("a.drag_solve", t.elapsed());
+                    s.dof = dof;
+                    s.instance_dof = instance_dof;
+                    s
+                })
+                .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 let Some(d) = &mut this.drag else { return };
                 d.busy = false;
                 let again = d.pending.is_some();
+                let t = std::time::Instant::now();
                 this.apply_solved(solved, cx);
                 this.rebuild_scene(true, cx);
+                noshape_render::perf::record("a.drag_apply", t.elapsed());
+                noshape_render::perf::record("a.drag_step", asked.elapsed());
                 if again {
                     this.run_drag_solve(cx);
                 }

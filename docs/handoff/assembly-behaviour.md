@@ -1154,3 +1154,32 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   panel [1264, 311, 310×51]) centres the panel on the pick with its bottom edge on it. Assembly/93 shows it pushed in from
   the right edge. Ours now does both (`render_mate_hud`). The note "just below-right" in behaviours.md is not what the
   coordinates show.
+
+## P2 drag/solve speed (skb 10-24, PRIORITIES.md item 2)
+- **How to measure:** run the app with `NOSHAPE_PERF=1 NOSHAPE_PERF_PERIOD=3`. Each drag step logs `a.drag_solve` (the
+  background solve), `a.drag_apply` (apply + scene rebuild on the UI thread) and `a.drag_step` (pointer target to
+  applied). Scripts are in /root/skb-scratch/perf:
+  - `mk_chain.py` + `mate_chain.py`: 20 links chained by 19 revolutes.
+  - `mk_pins.py`: plate + revolute pin + 18 free pins, 20 parts.
+  - `run.sh <doc>`, then `drag.sh X Y DX DY STEPS` (125 Hz pointer moves).
+- **Before:** dragging the chain's last link took **≈600 ms per solve** (p50 580–655 ms).
+- **After:** **≈39 ms** p50 for the chain, and **0.2 ms** for the mated pin among 20 parts.
+- `a.drag_step` latency beyond the solve is the UI thread waiting on Xvfb's software GPU (r.gpu_ms ≈ 300 ms per
+  frame on :103), not ours to fix here.
+- **Solver changes (`solver.rs`):**
+  - **Phase 1 (follow the drag) starts nearly undamped.** The damping λ·(1+diag) used to start at λ = 1e-3. Along the
+    mates' free directions the only curvature is the drag term (DRAG_WEIGHT² = 1e-4), so each step followed ≈10 % of
+    the drag and needed 14–48 iterations. It now starts at 1e-9 (7–13 iterations, exact tracking).
+  - **Bodies are solved in connected groups.** Union of the free bodies each term reads; fixed bodies link nothing.
+    The LM and the DOF eigen-analysis run per group, so a drag only solves its own group, and the dense algebra
+    scales with the group, not the assembly.
+  - **Sparse finite-difference Jacobian.** A body's columns re-evaluate only the terms that read it.
+  - **No DOF analysis in phase 1.** It ran twice per drag step before.
+- **`SolveOptions::skip_dof`:** the app's drag steps skip the DOF analysis and keep the previous instance-list glyphs.
+  The drag's "Move" edit re-evaluates them.
+- **Tests:** `chain_drag_follows_in_few_iterations` (exact tracking, ≤ 80 drag-phase iterations over 5 steps; it was
+  111) and `drag_moves_only_its_group`.
+- **Insert:** live doesn't fix any inserted instance (ins-914: all three show the free glyph), and neither do we.
+  qa4's open "? both inserted instances show the fixed icon" (core-workflow 6) doesn't reproduce:
+  - two free instances fastened together show the free glyph on both (dof 6 each);
+  - a part fastened to the fixed one shows no glyph, as live 2282 does for Part 2 <3>.

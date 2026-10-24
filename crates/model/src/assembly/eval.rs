@@ -223,6 +223,10 @@ pub struct SolveOptions {
     /// the Mate feature is accepted" (help: Mates). Other mates and
     /// relations are not enforced and report ok.
     pub only_mate: Option<MateId>,
+    /// Skip the degrees-of-freedom analysis (each step of a drag): `dof` and
+    /// `instance_dof` stay empty, and the caller keeps the previous ones
+    /// until the drag is committed and re-evaluated.
+    pub skip_dof: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -598,7 +602,7 @@ impl Prepared {
                 drags.push(DragTarget { body: *b, local_point: lp, target: want.transform_point(lp) });
             }
         }
-        let mut r = solver::solve(&mut bodies, &active, &rels, &drags);
+        let mut r = solver::solve_with(&mut bodies, &active, &rels, &drags, !opts.skip_dof);
         // Degrees of freedom of the whole assembly with the mate being
         // defined (the instance list), not of the one-mate preview solve:
         // every mate and relation, nothing held, at the previewed poses.
@@ -614,7 +618,9 @@ impl Prepared {
             let (b, off) = self.body_of[id];
             let f = poses[b].mul(&off);
             out.placements.push((*id, frame_to_placement(&f)));
-            out.instance_dof.insert(*id, if self.fixed[b] { 0 } else { r.body_dof.get(b).copied().unwrap_or(6) });
+            if !opts.skip_dof {
+                out.instance_dof.insert(*id, if self.fixed[b] { 0 } else { r.body_dof.get(b).copied().unwrap_or(6) });
+            }
         }
         for ((sid, child), (b, off)) in &self.nested_body_of {
             let Some(&(sb, soff)) = self.body_of.get(sid) else { continue };
