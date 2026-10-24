@@ -39,6 +39,18 @@ Plate 200×100×10 + 14 × (sketch circle + boss Add): 30 features, 1 part (2115
   down 4 steps: 0.77 s. The bar has no right-click menu ✅ (live); dragging shows the "Rollback bar" pill ✅. Holding the drag at
   the panel's bottom doesn't auto-scroll the list (live: not recorded). r5/v2s2-regen-times.png, v2s2-rollback-drag.png.
 
+## v2 Session 4: 3-part assembly with the common mates (v0.4.8; round 4's r4/s2.py rebuilt; compared with live in round 4)
+Plate + block + pin, Fastened / Revolute / Slider, BOM Flattened 3 rows (= round 4 S2, all matching live then). In the app the
+assembly opens with the mates solved; dragging the block slides it along the Slider axis and the pin follows ✅ (a press that
+arrives with the motion in the same instant box-selects instead: synthetic-input timing, not a product issue).
+r5/v2s4-slider-drag.png. The mate list shows REST/CLI-made mates grey (hidden): the live question on hidden vs shown mates is
+still open (round 4).
+
+## v2 Session 5: drawing with views and dimensions (v0.4.8)
+Covered by the configured-part drawing above (Create Drawing › Suggested views, Dimension / Diameter tools, Update after model
+changes, dangling dimension) and v0.4.8 gate (f) (dual dimensions, PNG export, note leaders): findings DRW-CFG, DRW-DANGLE-DOT,
+DRW-DIMMENU, DRW-CMARK, DRW-DUAL (asb; P2 drawings).
+
 ## Session 4: undo/redo across tabs (done first: no build needed)
 Document "qa4 r5": Part Studio 1 Sketch 1 (rectangle) + Extrude 1 → Assembly 1 › Insert Part 1 → Part Studio 1 Ctrl+Z →
 Assembly 1 Ctrl+Z / Ctrl+Y → Part Studio 1 Ctrl+Y → rename the Part Studio tab, Ctrl+Z → delete Assembly 1, Ctrl+Z.
