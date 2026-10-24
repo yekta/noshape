@@ -193,5 +193,8 @@ impl Render for CompanySettingsView {
                         .child(page),
                 ),
             )
+            // Success toasts ("Onshape Default revision table updated.").
+            .relative()
+            .children(crate::prefs_general::toast_overlay(cx))
     }
 }
