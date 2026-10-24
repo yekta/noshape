@@ -39,6 +39,18 @@ Worktree /root/wt/nav2 (branch agent/nav2, codegen-units 237), scratch
   Local run 10-24 (Xwayland installed with apt): Wayland 468/468 and X11
   240/240 checks pass. Run it as root:
   `.github/nav/linux-replay.sh <bin> .github/nav/block.noshape <out> wayland|x11`.
+* **Later fixes (10-24 evening):** rotate moves wait for the visible-depth
+  centre (`pending_rotate`, `flush_pending_rotate`; capped at 30 moves / 250
+  ms of held inertia), Alt+drag held moves keep their times
+  (`axis_rotate_step(delta, at)`), touch timers reschedule for the earliest
+  deadline (`touch_tick_at`), drawings use −1.2·deltaY when wheelDelta is 0
+  (`drawing_wheel_zoom_amount`). Replay: Wayland 477/477, X11 249/249.
+* **Rules (WORKFLOW 17):** replay checks assert per-event numbers only (no
+  timing); vendored gpui and drawing_tools.rs are shared files: ask the lead
+  before more edits there.
+* **Next:** run nav.yml on macOS/Windows runners once main has the branch
+  (`gh workflow run nav.yml -f ref=main`), fix what it finds; then 1.11–1.13,
+  1.18 (perspective), 1.21, 2.9, 7.9/7.10 (pen) with replay steps.
 * **Live request** REQUESTS.md "nav2 (P1)": DOM WheelEvent wheelDelta sweep,
   CDP synthesizePinchGesture (real touchpad-pinch pipeline), drags with the
   camera read from the view controller, CDP touch gestures.
