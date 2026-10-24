@@ -52,13 +52,20 @@ pub fn model_from_params(ev: &EvalCtx, t: f64) -> FResult<SheetMetalData> {
     Ok(d)
 }
 
-/// Sheet metal model of body `bi` if it is active.
+/// Sheet metal model of body `bi` if it is active (std SHEET_METAL_ACTIVE_ENTITY_NEEDED).
 pub fn active_data(ev: &EvalCtx, bi: usize) -> FResult<Arc<SheetMetalData>> {
-    let b = &ev.ctx.bodies[bi];
-    match ev.ctx.sheet_metal.get(&b.id) {
+    active_data_or(ev, bi, "Selected entities should be from active sheet metal models.")
+}
+
+/// The same for features picking edges (Flange, Hem: std SHEET_METAL_ACTIVE_EDGE_NEEDED).
+pub fn active_edge_data(ev: &EvalCtx, bi: usize) -> FResult<Arc<SheetMetalData>> {
+    active_data_or(ev, bi, "Selected edges should be from active sheet metal models.")
+}
+
+fn active_data_or(ev: &EvalCtx, bi: usize, message: &str) -> FResult<Arc<SheetMetalData>> {
+    match ev.ctx.sheet_metal.get(&ev.ctx.bodies[bi].id) {
         Some(d) if d.active => Ok(d.clone()),
-        Some(_) => err(format!("{} is no longer an active sheet metal model (Finish sheet metal model was applied)", b.name)),
-        None => err(format!("{} is not a sheet metal part; select geometry of an active sheet metal model", b.name)),
+        _ => err(message),
     }
 }
 

@@ -466,13 +466,30 @@ fn sk_constraint(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let (x, y) = (need(i, first)?, need(i, second)?);
                 if b.sketch.kind(x) == Some(EntityKind::Point) { ConstraintKind::Midpoint { point: x, curve: y } } else { ConstraintKind::Midpoint { point: y, curve: x } }
             }
-            "FIX" => ConstraintKind::Fix { entity: need(i, first)? },
+            "FIX" => {
+                let e = need(i, first)?;
+                // An arc's FIX holds its centre and radius, not where it ends (std
+                // sheetMetalHem: "This does not fix the end position of the arc").
+                if let Some(noshape_sketch::Geometry::Arc { center, start, .. }) = b.sketch.entity(e).map(|x| x.geometry.clone()) {
+                    let radius = match (b.sketch.point(center), b.sketch.point(start)) {
+                        (Some(c), Some(p)) => (p - c).length(),
+                        _ => 0.0,
+                    };
+                    b.sketch.add_constraint(ConstraintKind::Fix { entity: center }).map_err(|_| raise_error(i, "SKETCH_ADD_CONSTRAINT_FAILED", None))?;
+                    ConstraintKind::Radius { curve: e, value: radius }
+                } else {
+                    ConstraintKind::Fix { entity: e }
+                }
+            }
             "NORMAL" => ConstraintKind::Normal { line: need(i, first)?, curve: need(i, second)? },
             "MIRROR" => ConstraintKind::Symmetric { a: need(i, first)?, b: need(i, second)?, axis: need(i, ent("localMirror"))? },
             "LENGTH" => ConstraintKind::Length { curve: need(i, first)?, value: len.unwrap_or(0.0) },
-            "DISTANCE" => match second {
-                Some(s) => ConstraintKind::Distance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0), mode: Default::default() },
-                None => ConstraintKind::Length { curve: need(i, first)?, value: len.unwrap_or(0.0) },
+            "DISTANCE" => match (second, def.get("direction").as_str().as_deref()) {
+                (Some(s), Some("HORIZONTAL")) => ConstraintKind::HorizontalDistance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0) },
+                (Some(s), Some("VERTICAL")) => ConstraintKind::VerticalDistance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0) },
+                (Some(s), Some("MINIMUM")) => ConstraintKind::Distance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0), mode: noshape_sketch::DistanceMode::Minimum },
+                (Some(s), _) => ConstraintKind::Distance { a: need(i, first)?, b: s, value: len.unwrap_or(0.0), mode: Default::default() },
+                (None, _) => ConstraintKind::Length { curve: need(i, first)?, value: len.unwrap_or(0.0) },
             },
             "RADIUS" => ConstraintKind::Radius { curve: need(i, first)?, value: len.unwrap_or(0.0) },
             "DIAMETER" => ConstraintKind::Diameter { curve: need(i, first)?, value: len.unwrap_or(0.0) },

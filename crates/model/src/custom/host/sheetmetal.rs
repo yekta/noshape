@@ -78,6 +78,8 @@ struct Definition {
     corner: CornerRelief,
     /// Corner features' settings by definition vertex (else `corner`).
     corners: BTreeMap<usize, CornerRelief>,
+    /// Bend relief features' settings by definition vertex (else `relief`).
+    reliefs: BTreeMap<usize, BendRelief>,
     k_factor: f64,
     /// Active (not finished by Finish sheet metal model), default bend radius.
     active: bool,
@@ -137,6 +139,9 @@ struct BendRelief {
     style: String,
     depth: f64,
     width: f64,
+    /// SIZED_RECTANGLE / SIZED_OBROUND (a Bend relief feature): the straight
+    /// depth itself instead of `depth × bend radius`.
+    sized: Option<f64>,
 }
 
 /// The model's corner relief where two bends meet (live
@@ -183,13 +188,33 @@ impl BendRelief {
             style: enum_field(model, "defaultBendReliefStyle").unwrap_or_else(|| "OBROUND".to_string()),
             depth: num("defaultBendReliefDepthScale", 2.0),
             width: num("defaultBendReliefScale", 1.0625),
+            sized: None,
         }
+    }
+
+    /// A Bend relief feature's override at a bend end (std sheetMetalBendRelief:
+    /// a CORNER attribute with the relief style and its depth / width).
+    fn of_corner(attr: &Value, model: &BendRelief) -> Option<BendRelief> {
+        let style = enum_field(attr, "cornerStyle")?;
+        let num = |k: &str, d: f64| attr.get(k).get("value").as_number().unwrap_or(d);
+        let (style, sized) = match style.as_str() {
+            "OBROUND" | "RECTANGLE" | "TEAR" => (style, None),
+            "SIZED_OBROUND" => ("OBROUND".to_string(), length_of(attr.get("bendReliefDepth").get("value"))),
+            "SIZED_RECTANGLE" => ("RECTANGLE".to_string(), length_of(attr.get("bendReliefDepth").get("value"))),
+            _ => return None,
+        };
+        Some(BendRelief { style, depth: num("bendReliefDepthScale", model.depth), width: num("bendReliefScale", model.width), sized })
     }
 }
 
 /// Corner features' settings on a definition body's vertices.
 fn corner_overrides(st: &CtxState, q: &QueryCx, b: usize, model: &CornerRelief) -> BTreeMap<usize, CornerRelief> {
     (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| sm_attribute(st, &q.to_ref(&Ent::Vertex(b, v)), "CORNER").map(|a| (v, CornerRelief::of_corner(&a, model)))).collect()
+}
+
+/// Bend relief features' settings on a definition body's vertices.
+fn relief_overrides(st: &CtxState, q: &QueryCx, b: usize, model: &BendRelief) -> BTreeMap<usize, BendRelief> {
+    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| sm_attribute(st, &q.to_ref(&Ent::Vertex(b, v)), "CORNER").and_then(|a| BendRelief::of_corner(&a, model)).map(|r| (v, r))).collect()
 }
 
 /// What one part entity comes from: a definition face, edge or vertex.
@@ -268,9 +293,36 @@ struct Topo {
 
 impl Topo {
     fn of(shape: &Shape) -> FResult<Topo> {
-        let faces = shape.faces();
+        let mut faces = shape.faces();
         let edges = shape.edges();
         let edge_faces = shape.edge_faces().map_err(|e| fe(e.to_string()))?;
+        // One consistent side: a shared edge runs opposite ways in its two faces
+        // (Parasolid keeps a sheet so; merged sheets can come in facing each
+        // other's way, which would put a wall's material on the wrong side).
+        let along = |f: &Shape, e: &Shape| f.edges().iter().find(|x| x.is_same(e)).map(|x| x.orientation());
+        let mut seen = vec![false; faces.len()];
+        for start in 0..faces.len() {
+            if seen[start] {
+                continue;
+            }
+            seen[start] = true;
+            let mut queue = vec![start];
+            while let Some(a) = queue.pop() {
+                for (ei, fs) in edge_faces.iter().enumerate() {
+                    let [x, y] = fs[..] else { continue };
+                    let b = if x as usize == a { y as usize } else if y as usize == a { x as usize } else { continue };
+                    if seen[b] {
+                        continue;
+                    }
+                    let (oa, ob) = (along(&faces[a], &edges[ei]), along(&faces[b], &edges[ei]));
+                    if oa.is_some() && oa == ob {
+                        faces[b] = faces[b].reversed().map_err(|e| fe(e.to_string()))?;
+                    }
+                    seen[b] = true;
+                    queue.push(b);
+                }
+            }
+        }
         let edge_ends = edges.iter().map(|e| e.endpoints().unwrap_or_default()).collect();
         let vertices = shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
         Ok(Topo { faces, edges, edge_faces, edge_ends, vertices })
@@ -417,11 +469,7 @@ fn outline_points(sides: &[(DVec3, DVec3)]) -> Vec<DVec3> {
 /// along a free side, a slot into the wall on the free side (see [`BendRelief`]).
 fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f64) -> FResult<Vec<(Shape, usize)>> {
     let mut out = Vec::new();
-    if def.relief.style == "TEAR" {
-        return Ok(out);
-    }
     let m = l.pts.len();
-    let w = def.relief.width * thickness;
     for k in 0..m {
         let Some(&radius) = def.bends.get(&l.side[k]) else { continue };
         let dir = (l.pts[(k + 1) % m] - l.pts[k]).normalize();
@@ -458,16 +506,22 @@ fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f6
             if joint_near(topo, v, l.side[k], radius + thickness) {
                 continue;
             }
-            let straight = def.relief.depth * radius;
-            let depth = if def.relief.style == "RECTANGLE" { straight + w * 0.5 } else { straight };
+            // The model's relief, or a Bend relief feature's at this end.
+            let vi = topo.nearest_vertex(v);
+            let relief = def.reliefs.get(&vi).unwrap_or(&def.relief);
+            if relief.style == "TEAR" {
+                continue;
+            }
+            let w = relief.width * thickness;
+            let straight = relief.sized.unwrap_or(relief.depth * radius);
+            let depth = if relief.style == "RECTANGLE" && relief.sized.is_none() { straight + w * 0.5 } else { straight };
             // Through the whole thickness and a little more.
             let base = v - n * (def.back + thickness);
             let quad = [base, base + away * w, base + away * w + into * depth, base + into * depth];
             let wire = k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?;
             let face = k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?;
-            let vi = topo.nearest_vertex(v);
             out.push((k::extrude(&face, n * thickness * 3.0).map_err(|e| fe(e.to_string()))?.shape, vi));
-            if def.relief.style == "OBROUND" {
+            if relief.style == "OBROUND" {
                 let frame = k::Plane::new(base + away * (w * 0.5) + into * depth, n, away);
                 out.push((k::make_cylinder(&frame, w * 0.5, thickness * 3.0, std::f64::consts::TAU).map_err(|e| fe(e.to_string()))?, vi));
             }
@@ -1079,6 +1133,24 @@ fn inner_point(f: &Shape) -> Option<DVec3> {
     None
 }
 
+/// Faces of a rebuilt part lying on a face of the part it replaces (same
+/// surface, facing the same way) take that face's name, each name once.
+fn keep_names(faces: &[Shape], names: &mut [crate::naming::Name], before: &[(Shape, Vec<crate::naming::Name>)]) {
+    let mut used: std::collections::HashSet<crate::naming::Name> = std::collections::HashSet::new();
+    let old: Vec<(Shape, crate::naming::Name)> = before.iter().flat_map(|(s, n)| s.faces().into_iter().zip(n.iter().cloned())).collect();
+    for (f, name) in faces.iter().zip(names.iter_mut()) {
+        let Some(p) = inner_point(f) else { continue };
+        let Ok(n) = f.normal_at_point(p) else { continue };
+        let same = old.iter().find(|(g, gn)| {
+            !used.contains(gn) && g.project_point(p).is_ok_and(|x| x.distance < 1e-9) && g.normal_at_point(p).is_ok_and(|m| m.dot(n) > 1.0 - 1e-9)
+        });
+        if let Some((_, gn)) = same {
+            used.insert(gn.clone());
+            *name = gn.clone();
+        }
+    }
+}
+
 /// What each face, edge and vertex of the part comes from.
 fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<Def>, Vec<Def>) {
     let faces: Vec<Def> = part
@@ -1161,7 +1233,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     forms.extend(form_tools(&st, &wall, f, &mut tool_ids));
                 }
             }
-            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous });
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -1201,6 +1273,9 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if def_topo != (topo.faces.len(), topo.edges.len()) {
                 return Err(fe("The sheet metal definition changed while rebuilding"));
             }
+            // The parts as they were: faces the rebuild leaves in place keep their names
+            // (Onshape's ids persist: an edge picked before Finish still resolves after it).
+            let before: Vec<(Shape, Vec<crate::naming::Name>)> = ev.ctx.bodies.iter().filter(|b| def.previous.contains(&b.id)).map(|b| (b.shape.clone(), b.faces.clone())).collect();
             ev.ctx.bodies.retain(|b| !def.previous.contains(&b.id));
             // Walls joined only by rips are separate parts (live G34d), first
             // the one holding the lowest definition face.
@@ -1221,6 +1296,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             for p in &mut parts {
                 p.names = super::ops::fresh_names(ev, &p.solid);
                 let part_faces = p.solid.faces();
+                keep_names(&part_faces, &mut p.names, &before);
                 for &fi in &p.members {
                     if let Some(n) = wall_faces(&topo, fi, &part_faces, &p.named(Def::Face(fi))).0.first() {
                         others.insert(fi, n.clone());
@@ -1689,7 +1765,7 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
             let body = &st.ctx.bodies[b];
             let (bends, rips, rolled, rip_styles) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };
