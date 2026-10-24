@@ -27,7 +27,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
 use crate::os_ui::OsDropdownExt as _;
-use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::assembly::analysis;
@@ -492,6 +492,7 @@ impl AssemblyView {
             // the Part Studio.
             let fov = (crate::graphics_prefs::get(cx).fov_deg as f64).to_radians();
             this.viewport.update(cx, |vp, _| vp.camera.fov_y = fov);
+            this.ui.graphics = crate::graphics_prefs::get(cx);
             this.rebuild_scene(false, cx);
         }));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
@@ -565,7 +566,7 @@ impl AssemblyView {
             show_mates: false,
             show_connectors: false,
             // Onshape's Insert dialog starts with the Parts filter on.
-            ui: AsmUi { insert_filter: (true, false), tb_prefs: toolbar::AsmToolbarPrefs::load(), list_properties: crate::preferences_window::ListPrefs::load().instance_list_properties, ..Default::default() },
+            ui: AsmUi { insert_filter: (true, false), tb_prefs: toolbar::AsmToolbarPrefs::load(), list_properties: crate::preferences_window::ListPrefs::load().instance_list_properties, graphics: crate::graphics_prefs::get(cx), ..Default::default() },
             expanded: HashSet::new(),
             message: None,
             mc: None,
@@ -833,8 +834,12 @@ impl AssemblyView {
             o.section = s.planes.iter().map(|p| p.clip()).collect();
             // Exclude: the listed instances stay whole; Include: only they are cut.
             o.section_skip = if s.include { self.result.occurrences.iter().map(|oc| oc.top()).filter(|t| !s.items.contains(t)).collect() } else { s.items.iter().copied().collect() };
-            o.section_selected = s.dialog.as_ref().map(|d| d.active);
+            o.section_selected = s.dialog.as_ref().filter(|d| d.chosen).map(|d| d.active);
         }
+        o.display_mode = self.ui.display_mode;
+        o.hidden_edges_visible = self.ui.hidden_edges_visible;
+        o.tangent_edges = self.ui.tangent_edges;
+        o.graphics = self.ui.graphics;
         // Interference detection: everything see-through around the red
         // overlaps, still pickable for Instances to analyze (live 736).
         if self.interference_shown() && o.isolate.is_none() {
@@ -4852,6 +4857,15 @@ impl AssemblyView {
             left = left.child(el);
             any_left = true;
         }
+        if let Some(el) = self.render_named_views(cx) {
+            left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-named-views")));
+            any_left = true;
+        }
+        // Graphics preferences (Camera and render options), in the dialog place.
+        if let Some((d, _)) = &self.ui.graphics_dialog {
+            left = left.child(d.clone());
+            any_left = true;
+        }
         if let Some(el) = self.render_section(cx) {
             left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-section")));
             any_left = true;
@@ -5057,8 +5071,10 @@ impl AssemblyView {
         // stays 15 px from the pane's left edge.
         // The canvas is narrowed by a docked pane: the cube stays 15 px from
         // its right edge (the overlay spans the pane too).
+        // 14 px down as the Part Studio's (live VC8: the ▾ button at y 218 and its
+        // menu at 246 in both).
         let right = 15. + self.ui.dock_w;
-        div().absolute().top(px(15.)).right(px(right)).child(cube).into_any_element()
+        div().absolute().top(px(14.)).right(px(right)).child(cube).into_any_element()
     }
 
     /// Whether a 712 px pane is docked at the right (BOM, Configurations,
@@ -5072,39 +5088,218 @@ impl AssemblyView {
         let pal = p();
         let view = cx.entity();
         let perspective = self.viewport.read(cx).camera.projection == noshape_render::Projection::Perspective;
-        let section = self.ui.section.is_some();
-        let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
-        Button::new("asm-camera-menu")
+        // Live ("qa5 assembly camera menu", VC8): the Part Studio's menu
+        // without Orient normal to sketch on edit and Highlight boundary edges.
+        let state = crate::camera_menu::State {
+            perspective,
+            has_history: !self.ui.cam_history.is_empty(),
+            has_selection: !self.selected.is_empty(),
+            mode: self.ui.display_mode,
+            hidden_edges: self.ui.hidden_edges_visible,
+            tangent: self.ui.tangent_edges,
+            high_quality: self.ui.high_quality,
+            section_on: self.ui.section.as_ref().is_some_and(|s| !s.planes.is_empty()),
+            section_dialog: self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some()),
+            show_section: true,
+            orient: None,
+            boundary: None,
+        };
+        // As the Part Studio's (live part-studio/21, 53): no fill at rest, #eaeaea
+        // on hover, #e5e5e5 while its menu is open; an 8x4 #333 caret; the menu
+        // in camera style, its right border at the button's right edge + 1.
+        let open = self.ui.camera_menu.as_ref().is_some_and(|m| crate::os_menu::is_open_menu(m, cx));
+        let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(gpui_kit::rgb(0xe5e5e5).into()).shadow(false);
+        let bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let probe = bounds.clone();
+        let button = Button::new("asm-camera-menu")
             .custom(variant)
-            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("ui-chevron-down", 8., pal.text)))
+            .open(open)
+            .child(h_flex().gap(px(4.)).child(crate::assets::icon("view-cube", 20., cx)).child(crate::ui::glyph("camera-caret", 12., gpui_kit::rgb(0x333333))))
             .w(px(44.))
             .h(px(28.))
             .p_0()
             .rounded(px(3.))
-            .tooltip("Camera and render options")
-            .os_dropdown_menu("asm-camera-menu-dd", false, move |mut m, _, _| {
-                for (label, sv) in [("Isometric", StandardView::Isometric), ("Dimetric", StandardView::Dimetric), ("Trimetric", StandardView::Trimetric)] {
-                    let v = view.clone();
-                    m = m.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.view(sv, cx))));
+            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                let b = bounds.get();
+                let view = view.clone();
+                let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| crate::camera_menu::build(m.camera(), state, &view, Self::on_camera_action, window, cx));
+                this.ui.camera_menu = Some(menu.downgrade());
+                crate::os_menu::open_anchored(point(b.right() + px(1.), b.bottom()), Anchor::TopRight, menu, window, cx);
+            }));
+        crate::ui::with_tip(div().id("asm-camera-menu-tip").relative().child(button).child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()), "Camera and render options", crate::ui::TipSide::Left).into_any_element()
+    }
+
+    /// Keep the camera for "Previous view" (before a view change).
+    fn push_camera_history(&mut self, cx: &App) {
+        let cam = self.viewport.read(cx).camera;
+        if self.ui.cam_history.last() != Some(&cam) {
+            self.ui.cam_history.push(cam);
+            if self.ui.cam_history.len() > 50 {
+                self.ui.cam_history.remove(0);
+            }
+        }
+    }
+
+    /// Shift+V / camera menu "Named views…": open or close the dialog.
+    fn toggle_named_views(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ui.named_views.take().is_some() {
+            window.focus(&self.focus, cx);
+        } else {
+            // Live (qa5 KB2): Esc in "New view name" closes the dialog at once.
+            let st = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false));
+            let sub = cx.subscribe_in(&st, window, |this: &mut Self, _, ev: &gpui_kit::component::input::InputEvent, window, cx| {
+                if matches!(ev, gpui_kit::component::input::InputEvent::Change) {
+                    cx.notify();
                 }
-                let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
-                // Live ("qa5 assembly camera menu", VC8): no "Show mates" here;
-                // Section view… ends the menu as in the Part Studio.
-                m.separator()
-                    .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx)))))
-                    .separator()
-                    .item(crate::os_menu::OsMenuItem::new("Perspective view").checked(perspective).on_click(move |_, _, cx| {
-                        v2.update(cx, |this, cx| {
-                            this.viewport.update(cx, |vp, cx| {
-                                let p = if perspective { noshape_render::Projection::Orthographic } else { noshape_render::Projection::Perspective };
-                                vp.set_projection(p, cx);
-                            })
-                        })
-                    }))
-                    .separator()
-                    .item(crate::os_menu::OsMenuItem::new(if section { "Turn off section view" } else { "Section view…" }).icon_name("menu-section-view").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_section(w, cx))))
-            })
-            .into_any_element()
+                if matches!(ev, gpui_kit::component::input::InputEvent::PressEnter { .. }) {
+                    this.on_named_views_action(crate::named_views_dialog::Action::Add, window, cx);
+                    window.focus(&this.focus, cx);
+                }
+            });
+            st.update(cx, |s, cx| s.focus(window, cx));
+            self.ui.named_views = Some((st, sub));
+        }
+        cx.notify();
+    }
+
+    fn render_named_views(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (st, _) = self.ui.named_views.as_ref()?;
+        let st = st.clone();
+        let views: Vec<String> = self.assembly(cx).map(|a| a.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
+        if self.ui.named_view_picked.as_ref().is_some_and(|n| !views.contains(n)) {
+            self.ui.named_view_picked = None;
+        }
+        let props = crate::named_views_dialog::Props { views, picked: self.ui.named_view_picked.clone() };
+        Some(crate::named_views_dialog::render(props, &st, "asm-named-views", &cx.entity(), Self::on_named_views_action, cx))
+    }
+
+    /// The Named views dialog's buttons and list ([`crate::named_views_dialog`]).
+    fn on_named_views_action(&mut self, a: crate::named_views_dialog::Action, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::named_views_dialog::Action;
+        match a {
+            Action::Close => {
+                if self.ui.named_views.take().is_some() {
+                    window.focus(&self.focus, cx);
+                }
+            }
+            Action::Add => {
+                let Some((st, _)) = &self.ui.named_views else { return };
+                let st = st.clone();
+                let typed = st.read(cx).value().trim().to_string();
+                let existing: Vec<String> = self.assembly(cx).map(|a| a.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
+                let name = if typed.is_empty() { (1..).map(|n| format!("View {n}")).find(|n| !existing.contains(n)).unwrap_or_default() } else { typed };
+                let cam = self.viewport.read(cx).camera;
+                let section = self.ui.section.as_ref().map(|s| s.planes.iter().map(|p| { let (n, d) = p.clip(); [n.x, n.y, n.z, d] }).collect()).unwrap_or_default();
+                let view = noshape_model::partstudio::NamedView { name: name.clone(), target: cam.target.to_array(), rotation: cam.rotation.to_array(), distance: cam.distance, perspective: cam.projection == noshape_render::Projection::Perspective, section };
+                self.edit(&format!("Save view : {name}"), cx, |asm| {
+                    asm.named_views.retain(|v| v.name != view.name);
+                    asm.named_views.push(view);
+                });
+                st.update(cx, |s, cx| s.set_value("", window, cx));
+            }
+            Action::Pick(name) => {
+                if let Some(v) = self.assembly(cx).and_then(|a| a.named_views.iter().find(|v| v.name == name).cloned()) {
+                    // Named views restore the section state too (Onshape).
+                    if !v.section.is_empty() || self.ui.section.is_some() {
+                        self.ui.section = (!v.section.is_empty()).then(|| AsmSection {
+                            planes: v.section.iter().map(|q| AsmSectionPlane { label: "Section plane".into(), origin: DVec3::new(q[0], q[1], q[2]) * q[3], normal: DVec3::new(q[0], q[1], q[2]), offset: 0.0, flipped: false }).collect(),
+                            ..Default::default()
+                        });
+                        self.rebuild_scene(false, cx);
+                    }
+                    self.push_camera_history(cx);
+                    self.viewport.update(cx, |vp, cx| {
+                        let mut to = vp.camera;
+                        to.target = DVec3::from_array(v.target);
+                        to.rotation = glam::DQuat::from_array(v.rotation).normalize();
+                        to.distance = v.distance;
+                        to.projection = if v.perspective { noshape_render::Projection::Perspective } else { noshape_render::Projection::Orthographic };
+                        vp.animate_to(to, cx);
+                    });
+                }
+                self.ui.named_view_picked = Some(name);
+            }
+            Action::Remove => {
+                let Some(name) = self.ui.named_view_picked.take() else { return };
+                self.edit(&format!("Delete view : {name}"), cx, |asm| asm.named_views.retain(|v| v.name != name));
+            }
+        }
+        cx.notify();
+    }
+
+    /// The camera menu's picks ([`crate::camera_menu`]).
+    fn on_camera_action(&mut self, a: crate::camera_menu::Action, w: &mut Window, cx: &mut Context<Self>) {
+        use crate::camera_menu::Action;
+        match a {
+            Action::View(sv) => {
+                self.push_camera_history(cx);
+                self.view(sv, cx);
+            }
+            Action::GraphicsPrefs => {
+                let dialog = cx.new(crate::graphics_prefs_dialog::GraphicsPrefsDialog::new);
+                let sub = cx.subscribe(&dialog, |this: &mut Self, _, _: &crate::graphics_prefs_dialog::GraphicsPrefsEvent, cx| {
+                    this.ui.graphics_dialog = None;
+                    cx.notify();
+                });
+                w.focus(&dialog.focus_handle(cx), cx);
+                self.ui.graphics_dialog = Some((dialog, sub));
+                cx.notify();
+            }
+            Action::NamedViews => self.toggle_named_views(w, cx),
+            Action::PreviousView => {
+                if let Some(cam) = self.ui.cam_history.pop() {
+                    self.viewport.update(cx, |vp, cx| vp.animate_to(cam, cx));
+                }
+            }
+            Action::ZoomFit => {
+                self.push_camera_history(cx);
+                self.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
+            }
+            Action::ZoomWindow => {
+                self.push_camera_history(cx);
+                self.viewport.update(cx, |vp, cx| {
+                    vp.zoom_window = !vp.zoom_window;
+                    cx.notify();
+                });
+                cx.notify();
+            }
+            Action::ZoomSelection => {
+                self.push_camera_history(cx);
+                let ids = self.selected.clone();
+                self.zoom_to_instances(ids, cx);
+            }
+            Action::Perspective => self.viewport.update(cx, |vp, cx| {
+                let p = if vp.camera.projection == noshape_render::Projection::Perspective { noshape_render::Projection::Orthographic } else { noshape_render::Projection::Perspective };
+                vp.set_projection(p, cx);
+            }),
+            Action::Display(dm) => {
+                self.ui.display_mode = dm;
+                self.rebuild_scene(false, cx);
+            }
+            Action::HiddenEdges(on) => {
+                self.ui.hidden_edges_visible = on;
+                self.rebuild_scene(false, cx);
+            }
+            Action::Tangent(t) => {
+                self.ui.tangent_edges = t;
+                self.rebuild_scene(false, cx);
+            }
+            Action::HighQuality => {
+                // Onshape's assembly refinement threshold while viewing in high quality.
+                self.ui.high_quality = !self.ui.high_quality;
+                let error_px = if self.ui.high_quality { noshape_render::scene::MESH_ERROR_PX_HIGH_QUALITY_ASSEMBLY } else { noshape_render::scene::MESH_ERROR_PX };
+                self.viewport.update(cx, |vp, cx| {
+                    vp.style.detail.mesh_error_px = error_px;
+                    cx.notify();
+                });
+            }
+            Action::Section if self.ui.section.as_ref().is_some_and(|s| !s.planes.is_empty()) => self.turn_off_section(cx),
+            Action::Section => self.toggle_section(w, cx),
+            Action::EditSection => self.edit_section(cx),
+            // Part Studio only (not in the assembly's menu).
+            Action::Orient | Action::Boundary => {}
+        }
+        cx.notify();
     }
 }
 
@@ -5323,6 +5518,10 @@ impl AssemblyView {
             self.toggle_measure(cx);
         } else if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some()) {
             self.close_section_dialog(false, window, cx);
+        } else if self.ui.named_views.is_some() {
+            // Live (behaviours "Esc on tool panels"): the first Esc closes
+            // Named views, with the focus in the graphics too.
+            self.on_named_views_action(crate::named_views_dialog::Action::Close, window, cx);
         } else if self.exit_isolate(cx) {
         } else {
             // Esc keeps the selection (live 312; Space clears it).
@@ -5384,6 +5583,8 @@ impl AssemblyView {
             .on_action(cx.listener(|this, _: &SelectOther, _, cx| this.select_other(false, cx)))
             .on_action(cx.listener(|this, _: &MeasureTool, _, cx| this.toggle_measure(cx)))
             .on_action(cx.listener(|this, _: &SectionView, window, cx| this.toggle_section(window, cx)))
+            .on_action(cx.listener(|this, _: &NamedViews, window, cx| this.toggle_named_views(window, cx)))
+            .on_action(cx.listener(|this, _: &ZoomWindow, window, cx| this.on_camera_action(crate::camera_menu::Action::ZoomWindow, window, cx)))
             .on_action(cx.listener(|this, _: &SelectOtherPrevious, _, cx| this.select_other(true, cx)))
             .on_action(cx.listener(|this, _: &FlipPrimaryAxis, window, cx| this.flip_or_reorient(true, window, cx)))
             .on_action(cx.listener(|this, _: &ReorientSecondaryAxis, window, cx| this.flip_or_reorient(false, window, cx)))

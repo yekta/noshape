@@ -304,7 +304,6 @@ pub struct PartStudioView {
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// The Named views dialog's "Select a view" list and the view picked in it.
     named_view_picked: Option<String>,
-    pending_named_view: Option<noshape_model::partstudio::NamedView>,
     flat_cache: Option<fab_panel::FlatCache>,
     flat_task: Option<(usize, Task<()>)>,
     /// Onshape interaction state (hide/isolate, select other, S toolbar...).
@@ -428,7 +427,6 @@ impl PartStudioView {
             folder_prompt: None,
             named_views: None,
             named_view_picked: None,
-            pending_named_view: None,
             flat_cache: None,
             flat_task: None,
             ui: behaviors::UiState::new(cx),
@@ -4533,9 +4531,6 @@ impl Render for PartStudioView {
         self.viewport.update(cx, |vp, _| vp.set_ui_follows_camera(follows));
         if self.compare_gfx.changed(&self.doc, cx) {
             self.refresh_scene(false, cx);
-        }
-        if let Some(v) = self.pending_named_view.take() {
-            self.apply_named_view(&v, window, cx);
         }
         self.ensure_filter_input(window, cx);
         self.ensure_config_box_inputs(window, cx);
