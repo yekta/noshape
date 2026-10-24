@@ -2622,7 +2622,8 @@ impl PartStudioView {
             .pt(px(1.))
             .mr(px(-1.))
             // Live order (part-studio/77): Appearance, Configuration, Custom
-            // tables, Inspection table, Variable table. An empty Part Studio
+            // tables, Inspection table, (Sheet metal table and flat view),
+            // Variable table. An empty Part Studio
             // has nothing to color: no Appearance button (live 00).
             .when(!self.display.bodies.is_empty() || !self.display.sketches.is_empty(), |d| d.child(btn("panel-appearance", "appearance", "Appearance panel", RightPanel::Appearance, cx)))
             .child(btn("panel-config", "configuration", "Configuration panel", RightPanel::Configurations, cx))
@@ -2630,8 +2631,10 @@ impl PartStudioView {
             // Live L59 (part-studio/2181): the Hole table panel follows.
             .child(btn("panel-holes", "hole-table", "Hole table", RightPanel::HoleTable, cx))
             .child(btn("panel-inspection", "mbd-status", "Inspection table", RightPanel::Inspection, cx))
+            // Live "qa5 sm" (8): "Sheet metal table and flat view" sits right
+            // above the Variable table.
+            .when(self.has_sheet_metal(), |d| d.child(btn("panel-sm", "sheet-metal-table", "Sheet metal table and flat view", RightPanel::SheetMetal, cx)))
             .child(btn("panel-vars", "variable-table", "Variable table", RightPanel::Variables, cx))
-            .when(self.has_sheet_metal(), |d| d.child(btn("panel-sm", "sheet-metal-table", "Sheet metal: flat pattern and bend table", RightPanel::SheetMetal, cx)))
             .when(self.has_frames(), |d| d.child(btn("panel-cut", "cut-list", "Cut list", RightPanel::CutList, cx)))
             // Live rp-906/914: with the Repair panel open, its wrench "Repair
             // panel" (active, joined to the panel) closes it.

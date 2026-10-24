@@ -308,12 +308,14 @@ fn sheet_metal_extrude_l_bracket_volume() {
     let r = s.ok();
     assert_eq!(r.context.bodies.len(), 1);
     let (t, rad, depth): (f64, f64, f64) = (0.002, 0.003, 0.02);
-    // Material on the inside of the turn: path radius = R + t.
-    let flats = (0.05 - (rad + t)) + (0.03 - (rad + t));
+    // Material outside the turn, the default (live "fs (10-23 05:00)": 3211.3274122872 mm³):
+    // the path is the inner face, walls lose R.
+    let flats = (0.05 - rad) + (0.03 - rad);
     let bend = PI / 4.0 * ((rad + t).powi(2) - rad.powi(2));
     let expected = depth * (flats * t + bend);
     let v = r.context.bodies[0].shape.volume().unwrap();
     assert!(near(v, expected, expected * 1e-6), "volume {v} vs {expected}");
+    assert!(near(v * 1e9, 3_211.327_412_287_2, 1e-6), "live volume: {}", v * 1e9);
 }
 
 #[test]
@@ -874,4 +876,26 @@ fn boundary_one_u_one_v_as_live() {
     let (st, msg, _) = run(&[((0.0, 0.0), (0.04, 0.0)), ((0.0, 0.02), (0.04, 0.02))], &[((0.02, -0.005), (0.02, 0.025))]);
     assert_eq!(st, FeatureStatus::Error);
     assert_eq!(msg.as_deref(), Some("Could not extract boundary profiles matching at end points."));
+}
+
+/// mateConnector.fs "Owner entity": a connector moves with its owner part
+/// (a Transform of the part moves it too).
+#[test]
+fn mate_connector_follows_its_owner() {
+    let mut s = block();
+    let r = s.ok();
+    let top = top_face(&r);
+    let part = r.context.bodies[0].id.clone();
+    s.add("mateConnector", |p| {
+        p.set("originQuery", ParamValue::Query(vec![top.clone()]));
+        p.set("entityInferenceType", ParamValue::Enum("CENTROID".into()));
+    });
+    let before = s.ok().context.connectors[0].origin;
+    s.add("transform", move |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Body(part)]));
+        p.set("transformType", ParamValue::Enum("TRANSLATION_3D".into()));
+        p.set("dx", expr("10 mm"));
+    });
+    let after = s.ok().context.connectors[0].origin;
+    assert!(vnear(after - before, DVec3::new(0.01, 0.0, 0.0)), "{:?}", after - before);
 }

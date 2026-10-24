@@ -27,7 +27,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
 use crate::os_ui::OsDropdownExt as _;
-use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::assembly::analysis;
@@ -843,7 +843,10 @@ impl AssemblyView {
             o.ghost_tops.extend(t.iter().copied());
         }
         if let Some(s) = &self.ui.section {
-            o.section.push(s.clip());
+            o.section = s.planes.iter().map(|p| p.clip()).collect();
+            // Exclude: the listed instances stay whole; Include: only they are cut.
+            o.section_skip = if s.include { self.result.occurrences.iter().map(|oc| oc.top()).filter(|t| !s.items.contains(t)).collect() } else { s.items.iter().copied().collect() };
+            o.section_selected = s.dialog.as_ref().map(|d| d.active);
         }
         // Interference detection: everything see-through around the red
         // overlaps, still pickable for Instances to analyze (live 736).
@@ -1136,6 +1139,7 @@ impl AssemblyView {
             h.cursor_mark = Some((p, size * 0.4));
         }
         h.manipulator = self.manipulator(cx).map(|f| (f, size * 1.6, self.manip_hover.or(self.ui.manip_selected)));
+        h.section_arrow = self.section_arrow_glyph(cx);
         h.explode_triad = self.explode_edit;
         // An explode step being made / edited: one arrow along the move
         // instead of the triad (live 805, 810).
@@ -1159,6 +1163,9 @@ impl AssemblyView {
         let mut sig: Vec<f64> = Vec::new();
         if let Some((f, s, _)) = &h.manipulator {
             sig.extend([f.origin.x, f.origin.y, f.origin.z, *s]);
+        }
+        if let Some((t, d, w, _, _)) = &h.section_arrow {
+            sig.extend([t.x, t.y, t.z, d.x, d.y, d.z, *w]);
         }
         if let Some((s, _)) = h.origin {
             sig.push(s);
@@ -2078,7 +2085,7 @@ impl AssemblyView {
         let free = self.mate.is_none() && self.anim.is_none() && self.placing.is_none() && self.pick_mode(cx).is_none() && !self.show_mates_mode && self.ui.group.is_none() && self.ui.measure.is_none() && self.ui.interference.is_none() && self.replace_panel.is_none() && self.step_edit.is_none();
         // Snap mode: pressing on geometry starts a snap drag (a click still picks).
         let snapping = self.snap.is_some() && self.mate.is_none() && self.hover.is_some();
-        let capture = snapping || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
+        let capture = snapping || self.hover_overlay == Some(OverlayPick::SectionArrow) || (free && (self.manip_hover.is_some() || (self.hover.is_some() && !self.explode_edit)));
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = capture);
     }
 
@@ -2091,7 +2098,7 @@ impl AssemblyView {
                 let c = self.result.connectors.iter().find(|c| c.id == id)?;
                 return Some(MateConnectorRef::assembly_connector(c.id, c.owner));
             }
-            Some(OverlayPick::Manip(_)) | Some(OverlayPick::Mate(_)) => return None,
+            Some(OverlayPick::Manip(_)) | Some(OverlayPick::Mate(_)) | Some(OverlayPick::SectionArrow) => return None,
             None => {}
         }
         if self.pick_mode(cx) == Some(PickMode::Inference) && self.infer_locked {
@@ -2349,6 +2356,13 @@ impl AssemblyView {
                     }
                     return;
                 }
+                if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some()) {
+                    // Section view dialog: picks go to its active field.
+                    if let Some(t) = self.pick(*pick) {
+                        self.section_pick(t, cx);
+                    }
+                    return;
+                }
                 if self.ui.measure.is_some() {
                     // Measure tool: clicked entities are measured.
                     if let Some(t) = self.pick(*pick) {
@@ -2405,6 +2419,9 @@ impl AssemblyView {
                 self.ui.ctx_menu = None;
                 self.ui.mini_toolbar = None;
                 self.triad_menu = None;
+                if self.start_section_drag(*position, cx) {
+                    return;
+                }
                 if let (Some(h), Some(f)) = (self.manip_hover, self.manipulator(cx)) {
                     let ids = self.manip_targets(cx);
                     let top = ids[0];
@@ -2487,6 +2504,9 @@ impl AssemblyView {
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
+                if self.drag_section(*position, cx) {
+                    return;
+                }
                 if self.snap_drag.is_some() {
                     self.update_snap_drag(*position, cx);
                     return;
@@ -2582,6 +2602,9 @@ impl AssemblyView {
                 }
             }
             ViewportEvent::ToolUp { modifiers, .. } => {
+                if self.end_section_drag(cx) {
+                    return;
+                }
                 if self.ui.fixed_drag.take().is_some() {
                     cx.notify();
                 }
@@ -3872,11 +3895,6 @@ impl AssemblyView {
         Self::panel_frame_full(title, body, close, id, plain_close, None)
     }
 
-    /// `panel_frame` whose title moves the panel (`crate::ui::panel_title`).
-    pub(super) fn panel_frame_moving(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, drag: &'static str) -> Div {
-        Self::panel_frame_full(title, body, close, id, false, Some(drag))
-    }
-
     fn panel_frame_full(title: &str, body: impl IntoElement, close: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static, id: &'static str, plain_close: bool, drag: Option<&'static str>) -> Div {
         let pal = p();
         let title = div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).truncate().child(title.to_string());
@@ -4894,6 +4912,9 @@ impl AssemblyView {
             // Docked 712 px pane (live 181-strip-exploded-views).
             out.push(div().absolute().top_0().bottom_0().right_0().border_l_1().border_color(pal.border).child(self.render_explode_panel(cx)).into_any_element());
         }
+        if let Some(el) = self.render_section_value(cx) {
+            out.push(el);
+        }
         if let Some(el) = self.render_manip_value(cx) {
             out.push(el);
         }
@@ -5075,7 +5096,7 @@ impl AssemblyView {
         let pal = p();
         let view = cx.entity();
         let perspective = self.viewport.read(cx).camera.projection == noshape_render::Projection::Perspective;
-        let show_mates = self.show_mates;
+        let section = self.ui.section.is_some();
         let variant = gpui_kit::component::button::ButtonCustomVariant::new(cx).color(with_alpha(pal.panel, 0.35).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
         Button::new("asm-camera-menu")
             .custom(variant)
@@ -5091,6 +5112,8 @@ impl AssemblyView {
                     m = m.item(crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| v.update(cx, |this, cx| this.view(sv, cx))));
                 }
                 let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                // Live ("qa5 assembly camera menu", VC8): no "Show mates" here;
+                // Section view… ends the menu as in the Part Studio.
                 m.separator()
                     .item(crate::os_menu::OsMenuItem::new("Zoom to fit").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx)))))
                     .separator()
@@ -5102,13 +5125,8 @@ impl AssemblyView {
                             })
                         })
                     }))
-                    .item(crate::os_menu::OsMenuItem::new("Show mates").checked(show_mates).on_click(move |_, _, cx| {
-                        v3.update(cx, |this, cx| {
-                            this.show_mates = !this.show_mates;
-                            this.refresh_scene(false, cx);
-                            cx.notify();
-                        })
-                    }))
+                    .separator()
+                    .item(crate::os_menu::OsMenuItem::new(if section { "Turn off section view" } else { "Section view…" }).icon_name("menu-section-view").on_click(move |_, w, cx| v3.update(cx, |this, cx| this.toggle_section(w, cx))))
             })
             .into_any_element()
     }
@@ -5327,8 +5345,8 @@ impl AssemblyView {
             cx.notify();
         } else if self.ui.measure.is_some() {
             self.toggle_measure(cx);
-        } else if self.ui.section.is_some() {
-            self.toggle_section(window, cx);
+        } else if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some()) {
+            self.close_section_dialog(false, window, cx);
         } else if self.exit_isolate(cx) {
         } else {
             // Esc keeps the selection (live 312; Space clears it).

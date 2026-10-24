@@ -237,7 +237,10 @@ pub struct UiState {
     pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
     pub preview_tool_task: Option<Task<()>>,
     /// Measure graphics uploaded for a selection.
-    pub measure_lines: Option<(Vec<Reference>, Option<noshape_render::Instance>)>,
+    pub measure_lines: Option<(Vec<Reference>, Option<String>, Option<noshape_render::Instance>)>,
+    /// The Measure panel's distance row under the pointer (its label): live
+    /// draws that one measurement's dashed line, nothing otherwise.
+    pub measure_hover: Option<String>,
     /// Dynamic suppression editor: feature, expression input.
     pub dyn_suppression: Option<(FeatureId, Entity<InputState>, Subscription)>,
     /// Shortcut map search box.
@@ -245,6 +248,8 @@ pub struct UiState {
     pub shortcut_query: String,
     /// Shortcut sheet tab (General, Part Studio, …).
     pub shortcut_tab: usize,
+    /// The shortcut map's rows (Chrome's scrollbar, live menus/616).
+    pub shortcut_scroll: gpui_kit::ScrollHandle,
     /// Recently started tools, newest first (Search tools with no query).
     pub recent_tools: Vec<&'static str>,
     /// Camera menu "Orient normal to sketch on edit" and its state: an
@@ -436,10 +441,12 @@ impl UiState {
             hole_prev: None,
             preview_tool_task: None,
             measure_lines: None,
+            measure_hover: None,
             dyn_suppression: None,
             shortcut_filter: None,
             shortcut_query: String::new(),
             shortcut_tab: 0,
+            shortcut_scroll: gpui_kit::ScrollHandle::new(),
             recent_tools: Vec::new(),
             orient_on_edit: false,
             orient_pending: false,
@@ -1090,12 +1097,7 @@ impl PartStudioView {
         }
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, "Paste sketch", cx, |ps| {
-                let at = ps.rollback_index();
-                for id in ps.paste_features(&sketches, at) {
-                    if let Some(f) = ps.feature_mut(id) {
-                        f.params.set("sketchPlane", ParamValue::Query(vec![plane.clone()]));
-                    }
-                }
+                noshape_ops::studio::paste_sketches_onto(ps, &sketches, plane);
             });
         });
     }
@@ -1104,7 +1106,7 @@ impl PartStudioView {
     /// coordinates; construction curves as hidden lines).
     pub(super) fn export_sketch(&mut self, id: FeatureId, ext: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(sk) = self.display.sketches.iter().find(|s| s.feature == id) else { return };
-        let g = sketch_sheet(sk);
+        let g = noshape_ops::sketch_export::sketch_sheet(sk);
         let name = sk.name.clone();
         let view = cx.entity();
         crate::files::request_save_path("Export sketch", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
@@ -1119,12 +1121,9 @@ impl PartStudioView {
 
     /// Face menu "Export as DXF/DWG…": the planar face's boundary in its plane.
     pub(super) fn export_face(&mut self, r: Reference, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(frame) = self.frame_of_ref(&r) else { return };
-        let Some(b) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)) else { return };
-        let fi = b.face_refs.iter().position(|x| *x == r).unwrap_or(0);
-        let lines = b.mesh.face_edges(fi).into_iter().filter_map(|e| b.mesh.edges.get(e).map(|pl| (pl.clone(), false))).collect();
-        let g = plane_sheet(&frame, lines);
-        let name = b.name.clone();
+        let Some(ctx) = self.context.as_ref() else { return };
+        let Some(g) = noshape_ops::sketch_export::face_sheet(ctx, &self.display, &r) else { return };
+        let Some(name) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)).map(|b| b.name.clone()) else { return };
         let view = cx.entity();
         crate::files::request_save_path("Export face", format!("{name} face.dxf"), "dxf", window, cx, move |path, cx| {
             let msg = match std::fs::write(&path, noshape_model::drawing::export::to_dxf(&g)) {
@@ -1169,11 +1168,7 @@ impl PartStudioView {
     pub(super) fn set_suppression_expr(&mut self, id: FeatureId, expr: Option<String>, cx: &mut Context<Self>) {
         let expr = expr.filter(|e| !e.trim().is_empty());
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, if expr.is_some() { "Dynamic suppression" } else { "Remove dynamic suppression" }, cx, |ps| {
-                if let Some(f) = ps.feature_mut(id) {
-                    f.suppression_expr = expr;
-                }
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(expr.as_deref()), cx, |ps| noshape_ops::studio::set_suppression_expr(ps, id, expr));
         });
     }
 
@@ -1181,12 +1176,7 @@ impl PartStudioView {
     /// feature active (one undo step).
     pub(super) fn clear_dynamic_suppression(&mut self, id: FeatureId, cx: &mut Context<Self>) {
         self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Unsuppress", cx, |ps| {
-                if let Some(f) = ps.feature_mut(id) {
-                    f.suppression_expr = None;
-                    f.suppressed = false;
-                }
-            });
+            doc.edit_studio(self.tab, noshape_ops::studio::suppress_description(false), cx, |ps| noshape_ops::studio::set_suppressed(ps, &[id], false));
         });
     }
 
@@ -2455,14 +2445,19 @@ impl PartStudioView {
     /// components.
     pub(super) fn measure_overlay(&mut self, cx: &App) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineData, LineSegment};
-        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 {
+        // Live (behaviours "ui (10-23 a)"): no measure lines from the
+        // selection alone; hovering a distance row of the open Measure panel
+        // draws that distance as one black dashed line.
+        let hover = self.ui.measure_hover.clone().filter(|_| self.ui.measure_pinned);
+        if self.edit.is_some() || self.show_mass || self.selection.len() < 2 || hover.is_none() {
             return Vec::new();
         }
         let sel = self.selection.clone();
         let Some(ctx) = self.measure_context(&sel, cx) else { return Vec::new() };
-        // Uploaded once per selection (refresh_scene runs on every hover).
-        if let Some((s, inst)) = &self.ui.measure_lines
+        // Uploaded once per selection and row (refresh_scene runs on every hover).
+        if let Some((s, h, inst)) = &self.ui.measure_lines
             && *s == sel
+            && *h == hover
         {
             return inst.iter().cloned().collect();
         }
@@ -2475,25 +2470,18 @@ impl PartStudioView {
             }
         };
         let mut l = LineData::default();
-        for (_, m) in results {
-            if let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m {
+        for (label, m) in results {
+            if Some(&label) == hover.as_ref()
+                && let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m
+            {
                 let f = |v: glam::DVec3| -> [f32; 3] { v.as_vec3().into() };
-                let style = LineSegment::DASHED | LineSegment::ON_TOP;
-                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style });
-                let x = glam::DVec3::new(b.x, a.y, a.z);
-                let y = glam::DVec3::new(b.x, b.y, a.z);
-                for (p, q, c) in [(a, x, [220, 40, 40, 255]), (x, y, [40, 170, 60, 255]), (y, b, [40, 90, 220, 255])] {
-                    if p.distance(q) > 1e-9 {
-                        l.segments.push(LineSegment { a: f(p), b: f(q), color: c, pick_id: 0, width: 1.0, style });
-                    }
-                }
+                l.segments.push(LineSegment { a: f(a), b: f(b), color: [20, 20, 20, 255], pick_id: 0, width: 2.0, style: LineSegment::DASHED | LineSegment::ON_TOP });
             }
         }
-        // Out of the scene bounds (qa4 R1): a distance to a default plane ends
-        // far out on it, and the depth range fitted to that let edges show
-        // through the parts.
+        // Out of the scene bounds (qa4 R1): a distance to a default plane can
+        // end far out on it.
         let inst = (!l.segments.is_empty()).then(|| Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().no_bounds().layer(21));
-        self.ui.measure_lines = Some((self.selection.clone(), inst.clone()));
+        self.ui.measure_lines = Some((self.selection.clone(), hover, inst.clone()));
         inst.into_iter().collect()
     }
 
@@ -3299,31 +3287,6 @@ impl PartStudioView {
             }
         });
     }
-}
-
-/// A sketch as 2D sheet geometry in millimeters (plane coordinates).
-/// Flat sheet (millimeters, plane coordinates) of world polylines.
-fn plane_sheet(frame: &noshape_model::display::PlaneFrame, polylines: Vec<(Vec<[f32; 3]>, bool)>) -> noshape_model::drawing::sheet::SheetGeometry {
-    use noshape_model::drawing::sheet::{LineStyle, Polyline2};
-    let local = |p: [f32; 3]| {
-        let d = glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64) - frame.origin;
-        [d.dot(frame.x) * 1000.0, d.dot(frame.y) * 1000.0]
-    };
-    let lines: Vec<Polyline2> = polylines.into_iter().map(|(pts, hidden)| Polyline2 { points: pts.into_iter().map(local).collect(), style: if hidden { LineStyle::Hidden } else { LineStyle::Visible }, closed: false, pick: 0 }).collect();
-    let (mut w, mut h) = (0.0f64, 0.0f64);
-    for l in &lines {
-        for p in &l.points {
-            w = w.max(p[0].abs());
-            h = h.max(p[1].abs());
-        }
-    }
-    let mut g = noshape_model::drawing::sheet::SheetGeometry::new(w * 2.0, h * 2.0);
-    g.lines = lines;
-    g
-}
-
-pub fn sketch_sheet(sk: &noshape_model::display::SketchDisplay) -> noshape_model::drawing::sheet::SheetGeometry {
-    plane_sheet(&sk.frame, sk.curves.iter().filter(|c| c.points.len() >= 2 && !c.external).map(|c| (c.points.clone(), c.construction)).collect())
 }
 
 #[cfg(test)]

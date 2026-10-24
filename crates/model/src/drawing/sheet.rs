@@ -243,6 +243,7 @@ pub struct AnnTypeStyle {
 /// A text font (Drawing properties › Font): family, bold, italic.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TextFont {
+    #[serde(deserialize_with = "migrated_family")]
     pub family: String,
     #[serde(default)]
     pub bold: bool,
@@ -250,8 +251,52 @@ pub struct TextFont {
     pub italic: bool,
 }
 
-/// Families the drawing fonts offer (bundled; Noto Sans is Onshape's default).
-pub const FONT_FAMILIES: [&str; 4] = ["Noto Sans", "Liberation Sans", "Liberation Serif", "Liberation Mono"];
+/// The drawing Font lists' families (live drawing/161, dom/drawing-
+/// properties-annotations: these 22 in this order).
+pub const FONT_FAMILIES: [&str; 22] = [
+    "APMONO",
+    "ARComp",
+    "ARIsoP1",
+    "ARItal",
+    "ARMono",
+    "ARSimp",
+    "ARTxt",
+    "Arimo",
+    "DejaVu Sans",
+    "DejaVu Sans Mono",
+    "DejaVu Serif",
+    "Noto Sans",
+    "Noto Sans Chinese Simplified",
+    "Noto Sans Chinese Simplified Light",
+    "Noto Sans Chinese Traditional",
+    "Noto Sans Chinese Traditional Light",
+    "Noto Sans Japanese",
+    "Noto Sans Korean",
+    "Noto Sans UI",
+    "Noto Serif",
+    "Open Sans",
+    "Tinos",
+];
+
+/// Onshape's default drawing font.
+pub const DRAWING_DEFAULT_FONT: &str = "Noto Sans";
+
+/// Families of earlier documents not on live's list, as their nearest one
+/// on it (lead decision S28): Liberation Sans → Arimo, Liberation Serif →
+/// Tinos (the same metrics), Liberation Mono → DejaVu Sans Mono.
+pub fn migrate_font_family(family: &str) -> &str {
+    match family {
+        "Liberation Sans" => "Arimo",
+        "Liberation Serif" => "Tinos",
+        "Liberation Mono" => "DejaVu Sans Mono",
+        f => f,
+    }
+}
+
+fn migrated_family<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let f = <String as serde::Deserialize>::deserialize(d)?;
+    Ok(migrate_font_family(&f).to_string())
+}
 
 /// Texts drawn in a font.
 #[derive(Clone, Debug, PartialEq)]
@@ -1014,22 +1059,15 @@ impl SheetGeometry {
                             self.lines.push(Polyline2 { points: vec![[at[0], at[1] + h * 0.5], [at[0] + w, at[1] + h * 0.5]], style: LineStyle::Thin, closed: false, pick });
                         }
                     }
-                    // Leaders leave the nearer side of the box through a shoulder.
-                    let [x0, y0, x1, y1] = l.bbox;
-                    for ld in &style.leaders {
-                        let t = match ld.view {
-                            Some(v) => env.to_sheet(v, ld.point),
-                            None => ld.point,
-                        };
-                        let right = t[0] > (x0 + x1) / 2.0;
-                        let ym = (y0 + y1) / 2.0;
-                        let start = if right { [x1 + 1.0, ym] } else { [x0 - 1.0, ym] };
-                        let sh = [start[0] + if right { 4.0 } else { -4.0 }, ym];
-                        let mut pts = vec![start, sh];
-                        pts.extend(ld.nodes.iter().copied());
-                        pts.push(t);
-                        let last = pts[pts.len() - 2];
-                        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                    // Leaders leave a side of the box through a landing, or
+                    // branch off another leader (`note_leader_paths`).
+                    let targets: Vec<[f64; 2]> = style.leaders.iter().map(|ld| match ld.view {
+                        Some(v) => env.to_sheet(v, ld.point),
+                        None => ld.point,
+                    }).collect();
+                    for path in note_leader_paths(l.bbox, &style.leaders, &targets) {
+                        let (t, last) = (path.points[path.points.len() - 1], path.points[path.points.len() - 2]);
+                        self.lines.push(Polyline2 { points: path.points, style: LineStyle::Thin, closed: false, pick });
                         self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
                     }
                     // A rotated note (no leaders) turns about its middle.
@@ -2040,6 +2078,13 @@ impl SheetGeometry {
             let (xa, xb, ya, yb) = (x0 - 0.8, x0 + total + 0.8, base - 0.8, base + h + 0.8);
             self.lines.push(Polyline2 { points: vec![loc(xa, ya), loc(xb, ya), loc(xb, yb), loc(xa, yb)], style: LineStyle::Thin, closed: true, pick });
         }
+        // The dual value: a second line, the same height, centred on the
+        // value, above (Top) or below (Bottom) it (live asb 10-24).
+        if let Some(d) = &t.dual {
+            let w = font::text_width(d, h);
+            let y = if t.dual_below { base - h * 1.6 } else { base + h * 1.6 };
+            self.texts.push(Text2 { pos: loc(x0 + (total - w) / 2.0, y), height: h, text: d.clone(), angle, anchor: Anchor::BottomLeft, pick });
+        }
         // Above / below text, centred on the value.
         for (txt, y) in [(&t.above, base + h * 1.5), (&t.below, base - h * 1.5)] {
             if let Some(txt) = txt {
@@ -2129,7 +2174,15 @@ impl SheetGeometry {
             mid = [mid[0] + up[0] * k, mid[1] + up[1] * k];
             angle = 0.0;
         }
-        if text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval {
+        if let Some(dual) = text.dual.clone().filter(|_| text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval) {
+            // Dual (live asb 10-24): the dimension line runs between the two
+            // lines; the dual above it for Top, below it for Bottom.
+            let h = self.style.dim_text;
+            let below = [mid[0] - up[0] * (2.0 * tg + h), mid[1] - up[1] * (2.0 * tg + h)];
+            let (top_text, bottom_text) = if text.dual_below { (text.main.clone(), dual) } else { (dual, text.main.clone()) };
+            self.texts.push(Text2 { pos: mid, height: h, text: top_text, angle, anchor: Anchor::BottomCenter, pick });
+            self.texts.push(Text2 { pos: below, height: h, text: bottom_text, angle, anchor: Anchor::BottomCenter, pick });
+        } else if text.upper.is_none() && !text.boxed && text.above.is_none() && text.below.is_none() && !text.oval {
             self.texts.push(Text2 { pos: mid, height: self.style.dim_text, text: text.main.clone(), angle, anchor: Anchor::BottomCenter, pick });
         } else {
             let mid = if text.boxed { [mid[0] + up[0] * 0.8, mid[1] + up[1] * 0.8] } else { mid };
@@ -2469,4 +2522,50 @@ pub fn wrap_text(text: &str, h: f64, w: f64) -> Vec<String> {
         lines.push(cur);
     }
     lines
+}
+
+/// A note leader's polyline (sheet mm): `head` points before its nodes (the
+/// side point and the bend, or the one branch point), then the nodes, then
+/// the target.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LeaderPath {
+    pub points: Vec<[f64; 2]>,
+    pub head: usize,
+}
+
+impl LeaderPath {
+    /// The bend: where the landing ends (the branch point of a branch).
+    pub fn bend(&self) -> [f64; 2] {
+        self.points[self.head - 1]
+    }
+}
+
+/// The paths of a note's leaders (live drw2 10-21 g): from the box `bbox`'s
+/// side (`Leader.right`, else the one nearer the target) through a
+/// horizontal landing (`Leader.landing`, 4 mm) to the bend, or from the
+/// bend or a node of an earlier leader; then the nodes, then `targets[i]`.
+pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[f64; 2]]) -> Vec<LeaderPath> {
+    use super::LeaderStart;
+    let [x0, y0, x1, y1] = bbox;
+    let ym = (y0 + y1) / 2.0;
+    let mut out: Vec<LeaderPath> = Vec::new();
+    for (i, ld) in leaders.iter().enumerate() {
+        let t = targets.get(i).copied().unwrap_or(ld.point);
+        let head = match ld.start {
+            LeaderStart::Bend(j) if j < i => vec![out[j].bend()],
+            LeaderStart::Node(j, n) if j < i && n < leaders[j].nodes.len() => vec![leaders[j].nodes[n]],
+            _ => {
+                let right = ld.right.unwrap_or(t[0] > (x0 + x1) / 2.0);
+                let start = if right { [x1 + 1.0, ym] } else { [x0 - 1.0, ym] };
+                let l = ld.landing.unwrap_or(4.0);
+                vec![start, [start[0] + if right { l } else { -l }, ym]]
+            }
+        };
+        let n = head.len();
+        let mut points = head;
+        points.extend(ld.nodes.iter().copied());
+        points.push(t);
+        out.push(LeaderPath { points, head: n });
+    }
+    out
 }

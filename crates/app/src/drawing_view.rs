@@ -293,6 +293,11 @@ pub struct DrawingEditor {
     pub paste_table: Option<Vec<Vec<String>>>,
     /// Note tool: the leader anchored by the first click (on a snap point).
     pub note_leader: Option<Leader>,
+    /// Add leader on a note: where the new leader starts (`drawing_leaders`).
+    pub leader_from: Option<noshape_model::drawing::LeaderStart>,
+    /// The selected note leader (note, leader): drawn amber with its nodes
+    /// (live drw2 10-21 g (1)).
+    pub leader_sel: Option<(u64, usize)>,
     /// Weld symbol dialog (drawing_weld.rs).
     pub weld_dlg: Option<crate::drawing_weld::WeldDlg>,
     /// The note editor's formatting ruler (drawing_ruler.rs).
@@ -550,6 +555,8 @@ impl DrawingEditor {
             styles_gap: None,
             table_tool: None,
             note_leader: None,
+            leader_from: None,
+            leader_sel: None,
             cell_sel: None,
             cell_panel: None,
             note_color: None,
@@ -1093,6 +1100,7 @@ impl DrawingEditor {
         let mut overlay = self.overlay.clone();
         overlay.points.extend(self.selection_handles());
         self.note_grip_overlay(&mut overlay);
+        self.leader_overlay(&mut overlay);
         if overlay.is_empty() {
             self.overlay_handles = None;
             return;

@@ -883,7 +883,11 @@ impl Render for VariableStudioView {
                         .children(["Name", "Variable type", "Value", "Description"].map(|h| cell_div().justify_center().child(h))),
                 )
                 .children(rows)
-                .when(only.is_none(), |t| t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div().border_l_1().child(cell_input(&new_name))))))
+                .when(only.is_none(), |t| {
+                    // The add row's other columns are one borderless cell band
+                    // (live dark/dk-961: `#1c1c1c` across them).
+                    t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div().border_l_1().child(cell_input(&new_name)))).child(div().w(px(3. * COL_W)).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
+                })
             });
         if self.host.is_some() {
             return v_flex().track_focus(&self.focus).child(table).into_any_element();

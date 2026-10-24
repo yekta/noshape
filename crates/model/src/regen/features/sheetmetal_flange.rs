@@ -534,7 +534,9 @@ pub fn hem(ev: &mut EvalCtx) -> FResult<()> {
                 if !(PI - 1e-9..2.0 * PI).contains(&a) {
                     return err("Rolled hem angle must be between 180 and 360 degrees");
                 }
-                (a, ev.length("innerRadius")?, 0.0, BendKind::Rolled, data.k_factor_rolled)
+                // A bend, so the bend K factor (the Rolled K factor is for rolled walls, Onshape
+                // Help "Sheet metal model"; std's host develops it with the model's K factor).
+                (a, ev.length("innerRadius")?, 0.0, BendKind::Rolled, data.k_factor)
             }
             "TEAR_DROP" => {
                 let r = ev.length("innerRadius")?;

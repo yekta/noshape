@@ -740,23 +740,10 @@ fn feature_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     if feats.is_empty() {
         return Ok(());
     }
+    // With Reapply, patternUtils.fs re-runs the features and reports their
+    // failure as is (no fallback to the geometry).
     if ev.bool("fullFeaturePattern") {
-        match reapply_features(ev, &feats, instances) {
-            Ok(()) => return Ok(()),
-            // Aborted (a newer edit): no fallback, stop at once.
-            Err(e) if ev.cancelled() => return Err(e),
-            Err(e) => {
-                ev.ctx = before.clone();
-                ev.warnings.truncate(warnings_before);
-                let r = geometric_feature_pattern(ev, &feats, instances);
-                if r.is_err() {
-                    ev.error_shapes.clear();
-                    return Err(e);
-                }
-                ev.warnings.push(format!("Reapply features failed ({}); the features' geometry was patterned instead", e.message));
-                return r;
-            }
-        }
+        return reapply_features(ev, &feats, instances);
     }
     match geometric_feature_pattern(ev, &feats, instances) {
         Ok(()) => Ok(()),
@@ -1593,6 +1580,14 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
             ev.ctx.bodies.push(Arc::new(Body::new(BodyId { feature: f, index: bj as u32 }, name, kind, ns.shape, ns.names.faces, color, f)));
         }
         return Ok(());
+    }
+    // Mate connectors owned by a moved part move with it.
+    let moved: Vec<BodyId> = bodies.iter().map(|&bi| ev.ctx.bodies[bi].id.clone()).collect();
+    let mut conn_refs = conn_refs;
+    for (c, owner) in &ev.ctx.connector_owners {
+        if moved.contains(owner) && !conn_refs.contains(c) {
+            conn_refs.push(c.clone());
+        }
     }
     // Move in place: bodies keep their ids, names and face names.
     for bi in bodies {

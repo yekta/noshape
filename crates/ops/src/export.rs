@@ -111,6 +111,9 @@ pub struct ExportSettings {
     pub hidden: bool,
     /// URDF: index into `URDF_GEOMETRY`.
     pub urdf_geometry: usize,
+    /// Options: 0 Download, 1 Download and store file in a new tab, 2 Store
+    /// file in a new tab (see [`store_file_tab`]).
+    pub options: usize,
 }
 
 impl Default for ExportSettings {
@@ -133,6 +136,7 @@ impl Default for ExportSettings {
             individual: false,
             hidden: false,
             urdf_geometry: 0,
+            options: 0,
         }
     }
 }
@@ -492,6 +496,19 @@ fn crc32(data: &[u8]) -> u32 {
         }
     }
     !crc
+}
+
+/// Export Options › "Store file in a new tab" (and "Download and store"):
+/// the exported file becomes a file tab directly after the exported tab
+/// (live: "Part 1 Drawing 1.dwt" right after the drawing; the exported tab
+/// stays active). One edit, [`store_description`].
+pub fn store_file_tab(d: &mut noshape_model::document::Document, file_name: &str, bytes: &[u8], after: noshape_model::document::TabId) -> noshape_model::document::TabId {
+    crate::import::add_file_tab(d, noshape_model::file_tab::FileTab::new(file_name, bytes, noshape_model::file_tab::now()), None, Some(after))
+}
+
+/// The history entry of [`store_file_tab`]: "Store <file>".
+pub fn store_description(file_name: &str) -> String {
+    format!("Store {file_name}")
 }
 
 #[cfg(test)]

@@ -876,7 +876,7 @@ fn gdt_leaders_and_datum_targets() {
     let s = &mut drawing.sheets[0];
     let id = s.next_annotation_id();
     let target = [0.05, 0.0];
-    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target, nodes: Vec::new() }], extra: Default::default() }, position: [200.0, 250.0], ..Default::default() });
+    s.annotations.push(Annotation { id, kind: AnnotationKind::Gdt { anchor: [200.0, 250.0], frame: vec!["▱".into(), "0.05".into()], leaders: vec![Leader { view: Some(ViewId(2)), point: target, nodes: Vec::new(), ..Default::default() }], extra: Default::default() }, position: [200.0, 250.0], ..Default::default() });
     s.annotations.push(Annotation { id: id + 1, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.03, 0.0], label: "A1".into(), area: DatumTargetArea::Circle { diameter: 0.01 } }, position: [60.0, 250.0], ..Default::default() });
     s.annotations.push(Annotation { id: id + 2, kind: AnnotationKind::DatumTarget { view: ViewId(2), anchor: [-0.04, 0.02], label: "A2".into(), area: DatumTargetArea::Point }, position: [50.0, 262.0], ..Default::default() });
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
@@ -1313,8 +1313,8 @@ fn flat_pattern_view_shows_bend_lines_and_notes() {
     let g = compute_view(&drawing, &drawing.sheets[0], vid, &sources, &ViewCache::new(), false);
     assert!(g.error.is_none(), "{:?}", g.error);
     assert_eq!(g.bends.len(), 1);
-    // The developed length: (50 - 5) + (30 - 5) + 90° × (3 + 0.45 × 2) mm.
-    let expected = 0.045 + 0.025 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
+    // The developed length, material outside the L (live's default): (50 - 3) + (30 - 3) + 90° × (3 + 0.45 × 2) mm.
+    let expected = 0.047 + 0.027 + std::f64::consts::FRAC_PI_2 * (0.003 + 0.45 * 0.002);
     let (w, h) = (g.max[0] - g.min[0], g.max[1] - g.min[1]);
     assert!((w.max(h) - expected).abs() < 1e-6 && (w.min(h) - 0.02).abs() < 1e-9, "{w} x {h}");
     let built = |d: &Drawing| render_sheet(d, 0, &sources, &ViewCache::new(), false).unwrap().geometry;
@@ -2309,4 +2309,51 @@ fn child_view_scale_follows_parent_or_sheet() {
     // Its own scale still wins.
     sheet.view_mut(child).unwrap().scale = Some(0.5);
     assert_eq!(views::view_scale(sheet, child), 0.5);
+}
+
+/// Live drw2 10-21 g: a note leader's landing and side, branches off its
+/// bend and nodes, and node / leader removal keeping the branches.
+#[test]
+fn note_leaders_land_branch_and_lose_nodes() {
+    use super::sheet::note_leader_paths;
+    let bbox = [10.0, 10.0, 30.0, 14.0];
+    let mut leaders = vec![
+        Leader { point: [60.0, 40.0], nodes: vec![[45.0, 30.0]], landing: Some(8.0), ..Default::default() },
+        Leader { point: [70.0, 0.0], start: LeaderStart::Bend(0), ..Default::default() },
+        Leader { point: [50.0, 60.0], start: LeaderStart::Node(0, 0), ..Default::default() },
+    ];
+    let targets: Vec<[f64; 2]> = leaders.iter().map(|l| l.point).collect();
+    let p = note_leader_paths(bbox, &leaders, &targets);
+    // Right side (target to the right), an 8 mm landing, the node, the target.
+    assert_eq!(p[0].points, vec![[31.0, 12.0], [39.0, 12.0], [45.0, 30.0], [60.0, 40.0]]);
+    assert_eq!((p[0].head, p[0].bend()), (2, [39.0, 12.0]));
+    // A branch off the bend, and one off the node.
+    assert_eq!(p[1].points, vec![[39.0, 12.0], [70.0, 0.0]]);
+    assert_eq!(p[2].points, vec![[45.0, 30.0], [50.0, 60.0]]);
+    // A fixed side wins over the nearer one.
+    leaders[0].right = Some(false);
+    assert_eq!(note_leader_paths(bbox, &leaders, &targets)[0].points[0], [9.0, 12.0]);
+    // The node goes: its branch starts at the bend.
+    remove_leader_node(&mut leaders, 0, 0);
+    assert_eq!(leaders[2].start, LeaderStart::Bend(0));
+    // The first leader goes: the branches start at the note's side, renumbered.
+    remove_leader(&mut leaders, 0);
+    assert_eq!(leaders.len(), 2);
+    assert!(leaders.iter().all(|l| l.start == LeaderStart::Side));
+}
+
+/// Lead decision S28: the drawing Font list is live's 22 families; fonts of
+/// earlier documents not on it load as the nearest one (Liberation Sans →
+/// Arimo, Liberation Serif → Tinos, Liberation Mono → DejaVu Sans Mono).
+#[test]
+fn drawing_fonts_are_lives_and_old_families_migrate() {
+    use super::sheet::{DRAWING_DEFAULT_FONT, FONT_FAMILIES, TextFont};
+    assert_eq!(FONT_FAMILIES.len(), 22);
+    assert_eq!((FONT_FAMILIES[0], FONT_FAMILIES[21]), ("APMONO", "Tinos"));
+    assert!(FONT_FAMILIES.contains(&DRAWING_DEFAULT_FONT));
+    assert!(!FONT_FAMILIES.iter().any(|f| f.starts_with("Liberation")));
+    for (old, new) in [("Liberation Sans", "Arimo"), ("Liberation Serif", "Tinos"), ("Liberation Mono", "DejaVu Sans Mono"), ("Noto Sans", "Noto Sans")] {
+        let f: TextFont = serde_json::from_str(&format!("{{\"family\":\"{old}\",\"bold\":true}}")).unwrap();
+        assert_eq!((f.family.as_str(), f.bold), (new, true));
+    }
 }

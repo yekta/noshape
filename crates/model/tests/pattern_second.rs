@@ -131,25 +131,39 @@ fn second_pattern_case(reapply: bool) {
 fn deleting_the_running_second_pattern_stops_it_at_once() {
     let n = count();
     let (s, _, lp2) = model(n, true);
-    // Where LP2 runs in a regeneration: after the features before it.
+    // Where LP2 runs in a regeneration: after the features before it (a
+    // second, warm run).
+    let _ = s.regen(None);
     let r = s.regen(None);
     let lp2_ms = r.display.features.iter().find(|x| x.id == lp2).unwrap().time_ms as f64;
     let start: f64 = r.display.features.iter().take_while(|x| x.id != lp2).map(|x| x.time_ms as f64).sum();
     let s = std::sync::Arc::new(s);
     for frac in [0.2, 0.5, 0.8] {
-        let at = Duration::from_secs_f64((start + lp2_ms * frac) / 1e3);
-        let cancel = RegenCancel::default();
-        let (c2, s2) = (cancel.clone(), s.clone());
-        let worker = std::thread::spawn(move || s2.regen(Some(c2)));
-        std::thread::sleep(at);
-        let t = Instant::now();
-        cancel.abort();
-        let out = worker.join().unwrap();
-        let latency = t.elapsed();
-        eprintln!("×{n}: aborted {:.0} ms in ({:.0} % into LP2, which runs {lp2_ms:.0} ms), returned {:.0} ms after the abort", at.as_secs_f64() * 1e3, frac * 100.0, latency.as_secs_f64() * 1e3);
-        assert!(out.cancelled, "the regeneration finished before the abort");
-        // 200 ms in release (the UI's budget); a debug build runs ~4× slower.
-        let budget = Duration::from_millis(if cfg!(debug_assertions) { 600 } else { 200 });
-        assert!(latency < budget, "returned {:.0} ms after the abort ({:.0} % into LP2)", latency.as_secs_f64() * 1e3, frac * 100.0);
+        // A run can be faster than the measured one: when it finishes before
+        // the abort, abort earlier.
+        let mut at_ms = start + lp2_ms * frac;
+        let mut done = false;
+        for _ in 0..5 {
+            let at = Duration::from_secs_f64(at_ms / 1e3);
+            let cancel = RegenCancel::default();
+            let (c2, s2) = (cancel.clone(), s.clone());
+            let worker = std::thread::spawn(move || s2.regen(Some(c2)));
+            std::thread::sleep(at);
+            let t = Instant::now();
+            cancel.abort();
+            let out = worker.join().unwrap();
+            let latency = t.elapsed();
+            if !out.cancelled {
+                at_ms *= 0.7;
+                continue;
+            }
+            eprintln!("×{n}: aborted {at_ms:.0} ms in (about {:.0} % into LP2, which runs {lp2_ms:.0} ms), returned {:.0} ms after the abort", frac * 100.0, latency.as_secs_f64() * 1e3);
+            // 200 ms in release (the UI's budget); a debug build runs ~4× slower.
+            let budget = Duration::from_millis(if cfg!(debug_assertions) { 600 } else { 200 });
+            assert!(latency < budget, "returned {:.0} ms after the abort ({:.0} % into LP2)", latency.as_secs_f64() * 1e3, frac * 100.0);
+            done = true;
+            break;
+        }
+        assert!(done, "every run finished before the abort ({:.0} % into LP2)", frac * 100.0);
     }
 }

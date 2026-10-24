@@ -647,6 +647,10 @@ pub enum PatternKind {
         /// Seeds whose Placement type isn't Auto position.
         #[serde(default)]
         placement: Vec<(InstanceId, MirrorPlacement)>,
+        /// (source Part Studio, its "-Mirrored" Part Studio) made by the
+        /// Mirror strategy's Update: Derived copies use its parts.
+        #[serde(default)]
+        mirrored_studios: Vec<(TabId, TabId)>,
     },
     /// Follow a Part Studio pattern: the seed's mate is re-created on every
     /// patterned copy of its target geometry.
@@ -1159,12 +1163,18 @@ impl Assembly {
         let wanted: Vec<(InstanceId, u32)> = p.seeds.iter().flat_map(|s| p.grid_indices().into_iter().map(move |i| (*s, i))).collect();
         let created = self.apply_generated(id, wanted.into_iter().map(|(s, i)| (s, i, None, None)).collect());
         // Mirror copies of handed parts use the mirrored part (and back).
-        if let PatternKind::Mirror { handed, derived, .. } = &p.kind
+        if let PatternKind::Mirror { handed, derived, mirrored_studios, .. } = &p.kind
             && let Some(p) = self.pattern(id).cloned()
         {
             for g in &p.generated {
                 let Some(seed) = self.instance(g.seed).map(|i| i.source.clone()) else { continue };
-                let want = if *handed || derived.contains(&g.seed) { seed.mirrored().unwrap_or(seed) } else { seed };
+                // Derived: the part of the seed's "-Mirrored" Part Studio
+                // (same part id), else the in-assembly mirrored part.
+                let derived_part = match &seed {
+                    InstanceSource::Part { studio, body, .. } => mirrored_studios.iter().find(|(s, _)| s == studio).map(|(_, m)| InstanceSource::Part { studio: *m, body: body.clone(), config: Default::default() }),
+                    _ => None,
+                };
+                let want = if *handed || derived.contains(&g.seed) { derived_part.or_else(|| seed.mirrored()).unwrap_or(seed) } else { seed };
                 if let Some(inst) = self.instance_mut(g.instance) {
                     inst.source = want;
                 }

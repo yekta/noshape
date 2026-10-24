@@ -34,6 +34,10 @@ pub mod viewport {
     /// results (#825d6b over the top, #693c45 over the front) within a few
     /// levels.
     pub const ERROR_FILL: u32 = 0x7b1e24;
+    /// FeatureScript debug entities (`DebugColor.MAGENTA`; live 2111: the
+    /// Helix end profiles' circles read #ff2bc1, their centre dots #e224e3).
+    pub const DEBUG_MAGENTA: u32 = 0xff2bc1;
+    pub const DEBUG_MAGENTA_POINT: u32 = 0xe224e3;
     pub const ERROR_FILL_ALPHA: f32 = 0.75;
     /// Construction plane fill (`--os-construction-plane-ambient-color`),
     /// drawn unlit at 20%: one plane reads `#f5f8fa`, three stacked `#e7edf2`.

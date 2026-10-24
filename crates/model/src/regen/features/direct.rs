@@ -522,8 +522,23 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     let extent = ev.model_extent();
     let mut template = match &tr {
         Reference::Face(_) => {
-            let Some(&(tb, tf)) = ev.resolve_faces(std::slice::from_ref(&tr)).first() else { return unresolved() };
-            ev.face_shape(tb, tf)?
+            // Several faces make one template (opReplaceFace): they must
+            // join into one sheet.
+            let picked = ev.query("templateFace").to_vec();
+            let found = ev.resolve_faces(&picked);
+            if found.is_empty() {
+                return unresolved();
+            }
+            let faces: Vec<Shape> = found.iter().map(|&(tb, tf)| ev.face_shape(tb, tf)).collect::<FResult<_>>()?;
+            if faces.len() == 1 {
+                faces.into_iter().next().unwrap_or_else(Shape::null)
+            } else {
+                let sewn = k::sew(&faces, 1e-6, false).map_err(|_| fe(REPLACE_FAILED))?.shape;
+                if sewn.count(ShapeType::Shell) != 1 || sewn.count(ShapeType::Face) != faces.len() {
+                    return err(REPLACE_FAILED);
+                }
+                sewn
+            }
         }
         _ => {
             let Some(p) = ev.resolve_plane(&tr) else { return unresolved() };
@@ -534,7 +549,7 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     // replaced faces must then face the same way as the template, else it
     // fails; the offset goes along the template's (flipped) normal.
     let sense = if ev.params.get("oppositeSense").is_some() && ev.bool("oppositeSense") { -1.0 } else { 1.0 };
-    let template_normal = |p: DVec3| -> Option<DVec3> { template.project_point(p).ok().and_then(|q| template.normal_at_point(q.point).ok()) };
+    let template_normal = |p: DVec3| -> Option<DVec3> { nearest_on(&template, p).map(|(_, n)| n) };
     for (bi, faces) in &groups {
         for &f in faces {
             let face = ev.ctx.bodies[*bi].shape.sub_shape(ShapeType::Face, f)?;
@@ -566,6 +581,14 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
 }
 
 /// Replace one face (by name) of body `bi` with the template's surface.
+/// The template point nearest `p` and the template's normal there (a face,
+/// or a sheet of several).
+fn nearest_on(template: &Shape, p: DVec3) -> Option<(DVec3, DVec3)> {
+    let faces = if template.shape_type() == ShapeType::Face { vec![template.clone()] } else { template.faces() };
+    let (f, q) = faces.iter().filter_map(|f| f.project_point(p).ok().map(|q| (f, q))).min_by(|a, b| a.1.distance.total_cmp(&b.1.distance))?;
+    Some((q.point, f.normal_at_point(q.point).ok()?))
+}
+
 fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape) -> FResult<()> {
     let feature = ev.feature;
     let body = ev.ctx.bodies[bi].clone();
@@ -573,8 +596,8 @@ fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape) -
     let face = body.shape.sub_shape(ShapeType::Face, fi)?;
     let c = face.centroid()?;
     let n = face.normal_at_point(c)?;
-    let q = template.project_point(c)?;
-    let s = (q.point - c).dot(n);
+    let Some((q, _)) = nearest_on(template, c) else { return err(REPLACE_FAILED) };
+    let s = (q - c).dot(n);
     if s.abs() < 1e-9 {
         return Ok(());
     }
