@@ -61,7 +61,7 @@ fn level_segments(r: &RegenResult) -> Vec<usize> {
 
 #[test]
 fn circles_get_onshapes_segments_at_every_size() {
-    // Gated off by default (regen::angle_display_mesh).
+    // The default (regen::angle_display_mesh), whatever NOSHAPE_DISPLAY_MESH says.
     noshape_model::regen::set_angle_display_mesh(true);
     for diameter in [0.02, 0.2, 2.0] {
         let r = regen(&cylinder(diameter));

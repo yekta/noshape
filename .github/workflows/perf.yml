@@ -345,3 +345,33 @@ jobs:
           Select-String -Path big_plate.log -Pattern 'big plate:|tessellate Part 1|boolean_into Cut' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           exit $status
 
+      # User bug 10-24 (crates/model/tests/pattern_second.rs): ×400 fins on top
+      # (LP1) and the same pattern under the plate (LP2), with and without
+      # Reapply; LP2 must cost about LP1, and an abort must return at once.
+      - name: Second pattern (release)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          NOSHAPE_PATTERN_N: '400'
+          NOSHAPE_PERF: '1'
+          RUST_LOG: 'perf=info'
+        run: |
+          status=0
+          cargo test --release --locked -p noshape-model --test pattern_second -- --nocapture --test-threads=1 2>&1 | tee pattern_second.log || status=$?
+          { echo "### ${{ matrix.name }}: second pattern"; echo '```'; grep -E "×[0-9]+|panicked|assert" pattern_second.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Second pattern (release, Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          NOSHAPE_PATTERN_N: '400'
+        run: |
+          $ErrorActionPreference = 'Continue'
+          cargo test --release --locked -p noshape-model --test pattern_second -- --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath pattern_second.log
+          $status = $LASTEXITCODE
+          "### ${{ matrix.name }}: second pattern" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Select-String -Path pattern_second.log -Pattern '×[0-9]+|panicked|assert' | ForEach-Object { $_.Line } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit $status

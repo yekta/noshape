@@ -236,14 +236,22 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
             .filter(|(_, t)| matches!(built.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(id)) if sheet.annotations.iter().any(|a| a.id == *id && matches!(&a.kind, AnnotationKind::Note { style, .. } if all_notes || style.explode))))
             .map(|(k, _)| k)
             .collect();
+        let picture = f == DrawingFormat::Svg || f.raster();
         let opts = ExportOptions {
-            explode_all: (f == DrawingFormat::Pdf && s.text == 0) || (f.cad() && s.text == 2) || f.raster(),
+            // SVG and rasters: text as outlines (live: no <text> in the SVG).
+            explode_all: (f == DrawingFormat::Pdf && s.text == 0) || (f.cad() && s.text == 2) || picture,
             strokes: f.cad(),
             explode,
             underline_overrides: s.overridden == 0,
             exclude_off_sheet: s.exclude_off_sheet,
-            // Only PDF has a Color choice (live).
-            color_mode: if f == DrawingFormat::Pdf { s.color as u8 } else { 0 },
+            // Only PDF has a Color choice; SVG and rasters are all black (live).
+            color_mode: if f == DrawingFormat::Pdf {
+                s.color as u8
+            } else if picture {
+                1
+            } else {
+                0
+            },
         };
         let pictures = i == extras.shaded_sheet && !extras.shaded.is_empty() && (f == DrawingFormat::Pdf || f == DrawingFormat::Svg || f.raster());
         // A shaded view's picture replaces its edges.
@@ -256,6 +264,9 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
             }
         }
         let mut geo = export::prepare(&g, &opts);
+        if picture {
+            picture_pens(&mut geo);
+        }
         // Release management › Watermarks: over everything, whatever the
         // colour mode, on PDF and the raster formats; model spaces have none.
         if let Some(w) = extras.watermark.as_ref().filter(|_| (f == DrawingFormat::Pdf || f.raster()) && !sheet.imported.as_ref().is_some_and(|m| m.model)) {
@@ -298,6 +309,23 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
     Ok(files)
 }
 
+/// SVG and raster line weights (live, at 300 px per inch): visible model
+/// edges 5 px, every other line 2 px. Pens set in the drawing (Adjust
+/// linestyle) still win.
+fn picture_pens(g: &mut noshape_model::drawing::sheet::SheetGeometry) {
+    use noshape_model::drawing::sheet::{LineStyle, PenSpan};
+    let px = |n: f64| n * 25.4 / RASTER_PX_PER_INCH;
+    let width = |st: LineStyle| if st == LineStyle::Visible { px(5.0) } else { px(2.0) };
+    let mut spans: Vec<PenSpan> = Vec::new();
+    for (i, l) in g.lines.iter().enumerate() {
+        match spans.last_mut() {
+            Some(sp) if sp.lines.end == i && g.lines[sp.lines.start].style == l.style => sp.lines.end = i + 1,
+            _ => spans.push(PenSpan { lines: i..i + 1, width_mm: width(l.style), dashes: l.style.dashes().to_vec() }),
+        }
+    }
+    g.pens.splice(0..0, spans);
+}
+
 /// One file of an export: the only file as it is, several in a zip named
 /// "<name> - <sheet>.<ext>".
 pub fn bundle(files: Vec<(String, Vec<u8>)>, name: &str, format: DrawingFormat) -> Vec<u8> {
@@ -309,28 +337,53 @@ pub fn bundle(files: Vec<(String, Vec<u8>)>, name: &str, format: DrawingFormat) 
     }
 }
 
-/// A sheet's exported SVG as PNG, JPEG or TIFF at 300 dpi (the SVG is in
-/// millimetres, read at 96 dpi).
+/// Raster exports: 300 pixels per inch of sheet (live: ANSI A is 3300 x
+/// 2550), whatever their dpi tag says.
+pub const RASTER_PX_PER_INCH: f64 = 300.0;
+
+/// A sheet's exported SVG as PNG, JPEG or TIFF the way live writes them
+/// (behaviours "api (10-24) drawing raster export"): 300 px per inch of
+/// sheet, opaque white RGB without alpha, no antialiasing (two colours);
+/// PNG with a pHYs of 3937 px/m (99.9998 dpi), JPEG quality 75 with 4:2:0
+/// chroma and a 100 dpi JFIF density, TIFF uncompressed in one strip at
+/// 100 dpi. The SVG is in millimetres, read at 96 dpi.
 pub fn rasterize(svg: &[u8], format: DrawingFormat) -> Result<Vec<u8>, String> {
     use resvg::{tiny_skia, usvg};
-    let tree = usvg::Tree::from_data(svg, &usvg::Options::default()).map_err(|e| e.to_string())?;
-    let scale = 300.0 / 96.0;
+    let opt = usvg::Options { shape_rendering: usvg::ShapeRendering::CrispEdges, text_rendering: usvg::TextRendering::OptimizeSpeed, ..usvg::Options::default() };
+    let tree = usvg::Tree::from_data(svg, &opt).map_err(|e| e.to_string())?;
+    let scale = (RASTER_PX_PER_INCH / 96.0) as f32;
     let size = tree.size();
     let (w, h) = ((size.width() * scale).round().max(1.0) as u32, (size.height() * scale).round().max(1.0) as u32);
     let mut pixmap = tiny_skia::Pixmap::new(w, h).ok_or("bad image size")?;
+    pixmap.fill(tiny_skia::Color::WHITE);
     resvg::render(&tree, tiny_skia::Transform::from_scale(scale, scale), &mut pixmap.as_mut());
-    let rgba: Vec<u8> = pixmap.pixels().iter().flat_map(|p| {
-        let c = p.demultiply();
-        [c.red(), c.green(), c.blue(), c.alpha()]
-    }).collect();
-    let buf = image::RgbaImage::from_raw(w, h, rgba).ok_or("bad image size")?;
+    // Opaque over white, so the premultiplied colour is the colour.
+    let rgb: Vec<u8> = pixmap.pixels().iter().flat_map(|p| [p.red(), p.green(), p.blue()]).collect();
     let mut out = std::io::Cursor::new(Vec::new());
-    let r = match format {
-        DrawingFormat::Jpeg => image::DynamicImage::ImageRgba8(buf).to_rgb8().write_to(&mut out, image::ImageFormat::Jpeg),
-        DrawingFormat::Tiff => buf.write_to(&mut out, image::ImageFormat::Tiff),
-        _ => buf.write_to(&mut out, image::ImageFormat::Png),
-    };
-    r.map_err(|e| e.to_string())?;
+    match format {
+        DrawingFormat::Jpeg => {
+            let (w16, h16) = (u16::try_from(w).map_err(|_| "image too large")?, u16::try_from(h).map_err(|_| "image too large")?);
+            let mut e = jpeg_encoder::Encoder::new(&mut out, 75);
+            e.set_sampling_factor(jpeg_encoder::SamplingFactor::R_4_2_0);
+            e.set_density(jpeg_encoder::PixelDensity::dpi(100));
+            e.encode(&rgb, w16, h16, jpeg_encoder::ColorType::Rgb).map_err(|e| e.to_string())?;
+        }
+        DrawingFormat::Tiff => {
+            use tiff::encoder::{Rational, TiffEncoder, colortype::RGB8};
+            let mut enc = TiffEncoder::new(&mut out).map_err(|e| e.to_string())?;
+            let mut im = enc.new_image::<RGB8>(w, h).map_err(|e| e.to_string())?;
+            im.resolution(tiff::tags::ResolutionUnit::Inch, Rational { n: 100, d: 1 });
+            im.rows_per_strip(h).map_err(|e| e.to_string())?;
+            im.write_data(&rgb).map_err(|e| e.to_string())?;
+        }
+        _ => {
+            let mut e = png::Encoder::new(&mut out, w, h);
+            e.set_color(png::ColorType::Rgb);
+            e.set_depth(png::BitDepth::Eight);
+            e.set_pixel_dims(Some(png::PixelDimensions { xppu: 3937, yppu: 3937, unit: png::Unit::Meter }));
+            e.write_header().and_then(|mut wr| wr.write_image_data(&rgb)).map_err(|e| e.to_string())?;
+        }
+    }
     Ok(out.into_inner())
 }
 
