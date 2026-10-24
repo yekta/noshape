@@ -2367,13 +2367,14 @@ fn standard_content_parts_regenerate_with_mate_connectors() {
         }
         // Bolts: one connector under the head; nuts and washers: both faces;
         // retaining rings: live's one mid-plane connector.
-        let want = if c.shape.has_length() || c.shape == standard::Shape::RetainingRing { 1 } else { 2 };
+        let want = if c.shape.has_length() || c.shape == standard::Shape::RetainingRing || c.near_only.is_some() { 1 } else { 2 };
         if r.context.connectors.len() != want {
             failures.push(format!("{name}: {} connectors", r.context.connectors.len()));
             continue;
         }
         // At the origin, the primary axis out of the contact face (mates oppose Z axes).
-        if r.context.connectors[0].origin.length() > 1e-9 || (r.context.connectors[0].z + DVec3::Z).length() > 1e-9 {
+        let z = if c.near_only == Some(false) { DVec3::Z } else { -DVec3::Z };
+        if r.context.connectors[0].origin.length() > 1e-9 || (r.context.connectors[0].z - z).length() > 1e-9 {
             failures.push(format!("{name}: first connector misplaced"));
         }
     }
@@ -3548,6 +3549,37 @@ fn failing_standard_sizes_are_listed_with_live_errors() {
     let k = CATALOGUE.iter().find(|c| c.name == "DIN 6885-1 Parallel keys").unwrap();
     assert_eq!(k.size_names().last(), Some(&"440mm - 550mm"));
     assert_eq!(k.failure("440mm - 550mm"), Some("com.belmonttech.service.exception.BTBadRequestException: Feature script error: @stringToNumber: String is not a number"));
+}
+
+/// NAS clinch nuts (live's raw /features): NASM 45938/2 (hex on a pilot hex,
+/// the bore's pilot end coned to the flats) and NASM 3214 (hex on a stepped
+/// shank, Nut thickness rows); faces and total area (m²) of live's B-rep.
+#[test]
+fn nas_clinch_nuts_match_live() {
+    use super::standard::{self, CATALOGUE, StandardSpec};
+    let cases: [(&str, &str, usize, f64); 5] = [
+        ("Self-locking clinch nut without self-locking threads NASM 45938", "1/4-20", 37, 5.396039629105201e-4),
+        ("Self-locking clinch nut without self-locking threads NASM 45938", "3/8-16", 37, 9.938981948384477e-4),
+        ("Hex head self-locking clinch nut NASM 45938/2", "#6-32", 29, 2.3303731762714102e-4),
+        ("Hex head self-locking clinch nut NASM 45938/2", "1/2-20", 29, 1.99182546955828e-3),
+        ("Plain clinch flush nut NASM 3214", "#2-56", 15, 6.52275552151411e-5),
+    ];
+    for (name, size, faces, live_area) in cases {
+        let c = CATALOGUE.iter().find(|c| c.name == name).unwrap_or_else(|| panic!("{name} in the catalogue"));
+        let mut spec = StandardSpec::new(c);
+        spec.set_size(size);
+        assert_eq!(spec.size, size, "{name}: size {size}");
+        let r = standard::regenerate(&spec).unwrap_or_else(|e| panic!("{name} {size}: {e}"));
+        let b = r.context.body(&standard::part_body(&r).unwrap()).unwrap();
+        let area: f64 = (0..b.faces.len()).map(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().area().unwrap()).sum();
+        assert_eq!(b.faces.len(), faces, "{name} {size}");
+        assert!((area / live_area - 1.0).abs() < 1e-4, "{name} {size}: area {area} live {live_area}");
+    }
+    let c = CATALOGUE.iter().find(|c| c.name == "Plain clinch flush nut NASM 3214").unwrap();
+    let mut spec = StandardSpec::new(c);
+    spec.set_size("#6-32");
+    spec.params.insert("Nut thickness".into(), "0.147".into());
+    assert_eq!(spec.part_name(), "Plain clinch flush nut #6-32 x 0.147");
 }
 
 /// ANSI askew head bolt (live's raw /features): the 9.45° skewed square

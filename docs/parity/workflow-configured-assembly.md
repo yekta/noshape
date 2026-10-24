@@ -49,3 +49,6 @@ happens to have empty space behind the dialog. ✅ **CA3 closed** (no change).
 | Row | Ours | Status |
 |---|---|---|
 | CA4 "30" + Tab | "30 mm", focus moves to List 2 | ✅ **fixed** (c24); a value saved by the old binary still shows "25" without unit (legacy data) |
+
+## Re-run pass 21 (qa5, 2026-10-23, main 40e23871 app /root/target-lead/debug/noshape)
+| A15 | Part 3 <1> picked from the list: amber faces (241,178,49) top / (207,153,42) side, **amber edges**, white triad; only the instance row highlighted | ✅ fixed (shade within lighting) |

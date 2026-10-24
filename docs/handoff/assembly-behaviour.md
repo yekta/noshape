@@ -1063,7 +1063,18 @@ Still to switch (needs a quiet `assembly_view.rs`): Suppress mate (`toggle_mate_
   fillet, end chamfer 0.625·P·√3/2, the shank face split at the Thread length above the end (Thread length per
   length from DATA_AI_ASKEW_HEAD_BOLT_LENGTHS, generator `size_threads`; mod.rs now passes the chosen Thread
   length to the screw script as `lt`). Test `askew_head_bolt_matches_live`.
-* Still to do from PART 2: PEM® (44), NAS (6); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
+* NAS clinch nuts (raw /features; nut forms 8–10, `clinchNut` / `selfLockingClinchNut`): NASM 45938/2 = hex (flats
+  ±Y) on a pilot hex, top corners 30°, the bore's pilot end coned out to the pilot's flats over 0.83·PILOT_HEIGHT
+  (Chamfer 1's two offsets), top chamfer to the major; NASM 3214 = hex (flats ±X) LLen/3 on a CDia shank LLen/3
+  then 0.92·CDia LLen/3, both bore ends chamfered to the major, a row per Nut thickness (DATA_CLINCH_FLUSH_NUT_
+  THICKNESS; part name "… #6-32 x 0.147"); NASM 45938 (without self-locking threads) = the 12-line profile (collar
+  CDia falling 15°, step 0.012 in, shank E_DIA T_LEN with E_DIA/40 rounds as profile arcs, bore opening 25° to the
+  top, 1.5·(major − minor) countersink at the bottom) and 24 scallops (radius 0.06·E_DIA, neighbours meeting on
+  the step's edge (CDia + EDia)/4). Connectors: catalogue `nearOnly` = live's single "Near" (3214 flipped, 45938
+  not flipped, at the origin — which face live puts it on is not in the capture, unconfirmed). Test
+  `nas_clinch_nuts_match_live` (faces + areas, both captured sizes).
+* Still to do from PART 2: PEM® (44), NAS 45938 with self-locking threads, 45938/4 flush nut, NAS 1129 blind /
+  thru standoffs (live's captures lack ALen / Length, so only the recipes check them); DIN 7050/7051/967 recesses, DIN 6908 height, taper and
   slotted spring pins (no live table). The face-type/area diagnostic is /root/skb-scratch/zz_live_face_types.rs
   (paste into assembly/tests.rs to run; reads the live captures directly).
 

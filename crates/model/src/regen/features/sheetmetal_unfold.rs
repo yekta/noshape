@@ -13,7 +13,7 @@
 use super::sheetmetal_util::*;
 use crate::naming::Name;
 use crate::reference::{Reference, Role, TopoName};
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, err};
+use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, err_at};
 use crate::sheetmetal::{Bend, BendKind, SheetMetalData, Wall};
 use glam::{DMat4, DVec3};
 use noshape_kernel as k;
@@ -23,58 +23,51 @@ use std::sync::Arc;
 
 // ------------------------------------------------------------------ rip
 
+/// Rip (std sheetMetalRip, hidden in the UI): splits a wall between vertex
+/// pairs. Each pair splits one planar wall into coplanar pieces, and live
+/// rebuilds the same part (behaviours.md "fs (10-23 13:30)" / "(17:30)": no
+/// gap, no joint in the table), so after std's checks nothing changes.
 pub fn rip(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("vertices").to_vec();
     if refs.len() < 2 || !refs.len().is_multiple_of(2) {
-        return err("Select vertex pairs (two vertices per rip) on a sheet metal wall");
+        return err_at(&["vertices"], "Select pairs of vertices.");
     }
     let mut pts = Vec::new();
     for r in &refs {
-        let Reference::Vertex(n) = r else { return err("Select vertices") };
-        let found = ev.ctx.bodies.iter().enumerate().find_map(|(bi, b)| {
-            let vi = *b.find_vertices(n).first()?;
-            Some((bi, b.shape.sub_shape(ShapeType::Vertex, vi).ok()?.vertex_point().ok()?))
-        });
-        let Some(p) = found else { return err("A selected vertex no longer exists") };
+        let found = match r {
+            Reference::Vertex(n) => ev.ctx.bodies.iter().enumerate().find_map(|(bi, b)| {
+                let vi = *b.find_vertices(n).first()?;
+                Some((bi, b.shape.sub_shape(ShapeType::Vertex, vi).ok()?.vertex_point().ok()?))
+            }),
+            _ => None,
+        };
+        let Some(p) = found else { return err_at(&["vertices"], "Sheet metal corner not found.") };
         pts.push(p);
     }
-    let feature = ev.feature;
-    for (pair, ch) in pts.chunks(2).enumerate() {
+    for ch in pts.chunks(2) {
         let ((bi, p), (bj, q)) = (ch[0], ch[1]);
         if bi != bj {
-            return err("Both vertices of a rip must be on the same part");
+            return err_at(&["vertices"], "Selected parts should be from the same active sheet metal model.");
         }
-        let data = (*active_data(ev, bi)?).clone();
-        let t = data.thickness;
-        let gap = if ev.bool("useDefaultGap") { data.minimal_clearance } else { ev.length("minimalClearance")? }.max(1e-6);
-        let body = ev.ctx.bodies[bi].clone();
-        // A wall face containing both vertices.
-        let mut hit: Option<(DVec3, Name)> = None;
+        let data = active_data(ev, bi)?;
+        let body = &ev.ctx.bodies[bi];
+        // One wall face holding both vertices.
+        let mut walls = 0;
         for w in &data.walls {
-            for fi in faces_named(&body, &w.faces).into_iter().chain(faces_named(&body, &w.back)) {
+            for fi in faces_named(body, &w.faces).into_iter().chain(faces_named(body, &w.back)) {
                 let f = body.shape.sub_shape(ShapeType::Face, fi)?;
                 let Some((c, n)) = plane_of(&f) else { continue };
-                if (p - c).dot(n).abs() < 1e-7 && (q - c).dot(n).abs() < 1e-7 {
-                    hit = Some((n, body.faces[fi].clone()));
-                    break;
+                if (p - c).dot(n).abs() < 1e-7 && (q - c).dot(n).abs() < 1e-7 && f.project_point(p).is_ok_and(|x| x.distance < 1e-7) && f.project_point(q).is_ok_and(|x| x.distance < 1e-7) {
+                    walls += 1;
                 }
             }
-            if hit.is_some() {
-                break;
-            }
         }
-        let Some((n, key)) = hit else { return err("The vertices of a rip must lie on one sheet metal wall face") };
-        let d = q - p;
-        let len = d.length();
-        if len < 1e-9 {
-            return err("The vertices of a rip must be distinct");
+        if walls == 0 {
+            return err("Cannot find a unique, planar wall to split.");
         }
-        let ex = d / len;
-        let tool = oriented_box(p, ex, n, [-gap, len + gap], [-1.5 * t, 0.5 * t], [-gap * 0.5, gap * 0.5])?;
-        let tool = tool_named(tool, |i| side_name(feature, &key, 600 + pair as u16 * 8 + i as u16));
-        let (shape, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &[tool])?;
-        ev.replace_body(bi, shape, names);
-        put_data(ev, bi, data);
+        if (p - q).length() < 1e-9 {
+            return err("Same underlying vertex selected in pair.");
+        }
     }
     Ok(())
 }
