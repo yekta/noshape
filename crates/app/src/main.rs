@@ -33,6 +33,8 @@ mod doc_dialogs;
 mod doc_model;
 mod drawing_centermark;
 mod drawing_create;
+mod camera_menu;
+mod named_views_dialog;
 mod section_dialog;
 mod shortcuts_page;
 mod drawing_drawprops;

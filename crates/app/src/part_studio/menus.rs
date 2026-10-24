@@ -420,7 +420,7 @@ impl PartStudioView {
                 })));
             }
             if section && target_ref.is_none() {
-                exits.push(item("Edit section view…", Box::new(|this, w, cx| this.open_section_dialog(w, cx))));
+                exits.push(item("Edit section view…", Box::new(|this, w, cx| this.edit_section(w, cx))));
             }
             if section {
                 exits.push(item("Turn off section view", Box::new(|this, w, cx| this.toggle_section(w, cx))));
