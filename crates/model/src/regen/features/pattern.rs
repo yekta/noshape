@@ -909,7 +909,14 @@ fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
 /// with the part), the offset that moves those caps by one step (negative:
 /// into the part). None otherwise.
 fn flush_caps_step(body: &Body, faces: &[usize], instances: &[Instance]) -> Option<f64> {
-    let k::Transform::Translate(v) = instances.first()?.t else { return None };
+    // A pure translation (a curve pattern along a straight edge is one too,
+    // live "psb (10-24) flush wall follow-up").
+    let m = instances.first()?.t.matrix();
+    let rigid = glam::DMat3::from_mat4(m);
+    if !rigid.abs_diff_eq(glam::DMat3::IDENTITY, 1e-9) {
+        return None;
+    }
+    let v = m.w_axis.truncate();
     let d = v.try_normalize()?;
     let mut step = None;
     for &i in faces {
@@ -919,8 +926,9 @@ fn flush_caps_step(body: &Body, faces: &[usize], instances: &[Instance]) -> Opti
         if n.dot(d).abs() < 1.0 - 1e-9 {
             return None;
         }
-        // The cap's outward normal: an offset along it by −v·n moves it by v.
-        let s = -v.dot(n);
+        // The cap's outward normal: an offset along it by v·n moves it by v
+        // (live: a curve pattern into the part moves the end cap in).
+        let s = v.dot(n);
         if step.is_some_and(|x: f64| (x - s).abs() > 1e-12) {
             return None;
         }

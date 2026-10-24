@@ -39,7 +39,7 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
     if refs.is_empty() {
         return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall" } else { "Select face or sketch region to extrude." });
     }
-    let profiles = if thin { super::thin::thin_profiles(ev, refs)? } else { ev.profiles(refs)? };
+    let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&|f, _| f.normal))? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
         return err("No valid regions to extrude");
     }

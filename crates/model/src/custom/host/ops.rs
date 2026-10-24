@@ -1296,13 +1296,20 @@ fn op_fill_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         item.set("continuity", ParamValue::Enum(continuity.into()));
         items.push(item);
     }
-    let guides = evaluate_refs(i, &cx, def.get("guideVertices"))?;
+    // fillSurface.fs passes its own definition: guideEntities, useSampling
+    // and sampleSize; the documented field is guideVertices.
+    let mut guides = evaluate_refs(i, &cx, def.get("guideVertices"))?;
+    guides.extend(evaluate_refs(i, &cx, def.get("guideEntities"))?);
+    let sampled = def.get("useSampling").as_bool() == Some(true);
     let mut p = ParamValues::default();
     p.set("surfaceOperationType", ParamValue::Enum("NEW".into()));
     p.set("edges", ParamValue::Array(items));
     p.set("addGuides", ParamValue::Bool(!guides.is_empty()));
     p.set("guideEntities", ParamValue::Query(guides));
-    p.set("constraintMode", ParamValue::Enum("PRECISE".into()));
+    p.set("constraintMode", ParamValue::Enum(if sampled { "SAMPLED" } else { "PRECISE" }.into()));
+    if let Some(n) = def.get("sampleSize").as_number() {
+        p.set("sampleSize", ParamValue::Expr(noshape_units::ExprValue::new(n.to_string())));
+    }
     run_op_with(i, &cx, &id, "REGEN_ERROR", &p, crate::regen::features::surfaces::fill)?;
     Ok(Value::Undefined)
 }

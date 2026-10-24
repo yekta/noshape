@@ -46,7 +46,7 @@ fn xt_parts() -> Vec<(&'static str, Shape)> {
     let ring = |zz: f64, r: f64| make_wire(&[make_circle(DVec3::new(0.0, 0.0, zz) * mm, DVec3::Z, r * mm).unwrap()]).unwrap();
     let c = [(-6.0, -6.0), (6.0, -6.0), (6.0, 6.0), (-6.0, 6.0)];
     let sq = make_wire(&(0..4).map(|i| make_line(DVec3::new(c[i].0, c[i].1, 15.0) * mm, DVec3::new(c[(i + 1) % 4].0, c[(i + 1) % 4].1, 15.0) * mm).unwrap()).collect::<Vec<_>>()).unwrap();
-    let lofted = loft(&[ring(0.0, 10.0), sq, ring(30.0, 10.0)], &LoftOptions { solid: true, ruled: false, closed: false, start_points: None }).unwrap().shape;
+    let lofted = loft(&[ring(0.0, 10.0), sq, ring(30.0, 10.0)], &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
     // A spline profile revolved all round: a closed B-spline surface (split for XT).
     let prof = make_bspline(&[DVec3::new(5.0, 0.0, 0.0) * mm, DVec3::new(9.0, 0.0, 4.0) * mm, DVec3::new(6.0, 0.0, 8.0) * mm, DVec3::new(7.0, 0.0, 12.0) * mm], None, &[0.0, 1.0], &[4, 4], 3, false).unwrap();
     let w = make_wire(&[make_line(DVec3::ZERO, DVec3::new(5.0, 0.0, 0.0) * mm).unwrap(), prof, make_line(DVec3::new(7.0, 0.0, 12.0) * mm, DVec3::new(0.0, 0.0, 12.0) * mm).unwrap(), make_line(DVec3::new(0.0, 0.0, 12.0) * mm, DVec3::ZERO).unwrap()]).unwrap();

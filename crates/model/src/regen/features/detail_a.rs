@@ -80,7 +80,7 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
 
 /// OCCT's draft, or the boolean construction where it fails or builds an
 /// invalid solid (drafted fillets that vanish, e.g. R3 at 30° over 10 mm).
-fn draft_robust(shape: &Shape, faces: &[Shape], pull: DVec3, neutral: &k::Plane, angle: f64) -> k::Result<k::OpResult> {
+pub(super) fn draft_robust(shape: &Shape, faces: &[Shape], pull: DVec3, neutral: &k::Plane, angle: f64) -> k::Result<k::OpResult> {
     match k::draft(shape, faces, pull, neutral, angle) {
         Ok(r) if r.shape.is_valid() => Ok(r),
         first => k::draft_wedges(shape, faces, pull, neutral, angle).map_err(|e| match first {
@@ -253,9 +253,12 @@ pub(super) fn reblend(ev: &mut EvalCtx, bi: usize, modified: &[usize], blends: &
     Ok(())
 }
 
-/// Parting line draft with planar parting lines (perpendicular to the pull
-/// direction): the faces next to the parting edges on the drafted side(s)
-/// are tapered about the parting plane.
+/// Parting line draft: the faces next to the parting edges on the drafted
+/// side(s) are tapered about the parting line (draft.fs, each part on its
+/// own). Edges in one plane perpendicular to the pull hinge about that
+/// plane; a straight edge elsewhere (a stepped or sloped parting line)
+/// hinges its faces about the plane through it closest to perpendicular to
+/// the pull.
 fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
     let no_pull = || crate::regen::eval::err_at(&["pullDirectionEntity"], "Select pull direction.");
     let Some(pr) = ev.query("pullDirectionEntity").first() else { return no_pull() };
@@ -267,87 +270,110 @@ fn parting_line_draft(ev: &mut EvalCtx) -> FResult<()> {
     if edges.is_empty() {
         return crate::regen::eval::err_at(&["partingEdges"], "Select parting edges.");
     }
-    let bi = edges[0].0;
-    if edges.iter().any(|e| e.0 != bi) {
-        return err("The parting edges must belong to one part");
-    }
-    let body = ev.ctx.bodies[bi].clone();
     // draft.fs: an edge running along the pull can't part the faces.
-    for &(_, ei) in &edges {
-        let e = body.shape.sub_shape(ShapeType::Edge, ei)?;
+    for &(bi, ei) in &edges {
+        let e = ev.ctx.bodies[bi].shape.sub_shape(ShapeType::Edge, ei)?;
         let info = e.edge_info()?;
         let t = e.tangent_at((info.first_param + info.last_param) * 0.5)?.normalize_or_zero();
         if t.cross(pull).length() < 1e-9 {
             return crate::regen::eval::err_at(&["partingEdges"], "Parting edge cannot be parallel to pull direction.");
         }
     }
-    let mut pts = Vec::new();
-    for &(_, ei) in &edges {
+    let mut bodies: Vec<usize> = edges.iter().map(|e| e.0).collect();
+    bodies.sort_unstable();
+    bodies.dedup();
+    let mut drafted = false;
+    for bi in bodies {
+        let mine: Vec<usize> = edges.iter().filter(|e| e.0 == bi).map(|e| e.1).collect();
+        drafted |= parting_line_draft_body(ev, bi, &mine, pull)?;
+    }
+    if !drafted {
+        return err(DRAFT_FAILED);
+    }
+    Ok(())
+}
+
+/// [`parting_line_draft`] on one part. False when nothing was drafted.
+fn parting_line_draft_body(ev: &mut EvalCtx, bi: usize, edges: &[usize], pull: DVec3) -> FResult<bool> {
+    let body = ev.ctx.bodies[bi].clone();
+    // Hinge planes (origin, normal), each with its edges.
+    let mut planes: Vec<(DVec3, DVec3, Vec<usize>)> = Vec::new();
+    for &ei in edges {
         let e = body.shape.sub_shape(ShapeType::Edge, ei)?;
         let info = e.edge_info()?;
-        for t in 0..=4 {
-            pts.push(e.point_at(info.first_param + (info.last_param - info.first_param) * t as f64 / 4.0)?);
+        let pts: Vec<DVec3> = (0..=4).map(|t| e.point_at(info.first_param + (info.last_param - info.first_param) * t as f64 / 4.0)).collect::<k::Result<_>>()?;
+        let level = pts.iter().all(|p| (p - pts[0]).dot(pull).abs() < 1e-7);
+        let (origin, normal) = if level {
+            (pts[0], pull)
+        } else if let Ok(k::Curve::Line { direction, .. }) = e.edge_curve() {
+            let d = direction.normalize();
+            (pts[0], (pull - d * pull.dot(d)).normalize())
+        } else {
+            return err("Parting lines must lie in a plane perpendicular to the pull direction");
+        };
+        match planes.iter_mut().find(|(o, n, _)| n.dot(normal) > 1.0 - 1e-9 && (origin - *o).dot(*n).abs() < 1e-7) {
+            Some(pl) => pl.2.push(ei),
+            None => planes.push((origin, normal, vec![ei])),
         }
     }
-    let h0 = pts[0].dot(pull);
-    if pts.iter().any(|p| (p.dot(pull) - h0).abs() > 1e-7) {
-        return err("Parting lines must lie in a plane perpendicular to the pull direction");
-    }
-    let origin = pts[0];
     let ef = body.shape.edge_faces()?;
     let faces = body.shape.faces();
-    let (mut above, mut below): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
-    for &(_, ei) in &edges {
-        for &f in ef.get(ei).map(|v| v.as_slice()).unwrap_or(&[]) {
-            let f = f as usize;
-            let Some(p) = point_on_face(&faces[f]) else { continue };
-            let Some((_, n)) = face_normal_near(&faces[f], p) else { continue };
-            if n.normalize().dot(pull).abs() > 1.0 - 1e-9 {
-                continue; // faces perpendicular to the pull are not drafted
-            }
-            let list = if (p - origin).dot(pull) >= 0.0 { &mut above } else { &mut below };
-            if !list.contains(&f) {
-                list.push(f);
-            }
-        }
-    }
     // A positive angle narrows the part along the pull. One sided: the pull
     // side narrows away from the parting line. Two sided (live L1): the
     // first angle is the side opposite the pull, the second the pull side,
     // and by default both narrow toward the parting line.
     let s1 = if ev.bool("pullDirection") { -1.0 } else { 1.0 };
     let angle = ev.angle("angle")? * s1;
-    let sets: Vec<(Vec<usize>, DVec3, f64)> = match ev.enum_("partingLineSides") {
-        "SYMMETRIC" => vec![(below, pull, angle), (above, pull, -angle)],
-        "TWO_SIDED" => {
-            let a2 = ev.angle("secondAngle")? * if ev.bool("secondPullDirection") { -1.0 } else { 1.0 };
-            vec![(below, pull, angle), (above, pull, a2)]
-        }
-        _ => {
-            if ev.bool("alongPull") { vec![(above, pull, angle)] } else { vec![(below, pull, angle)] }
-        }
-    };
+    let second = if ev.is("partingLineSides", "TWO_SIDED") { ev.angle("secondAngle")? * if ev.bool("secondPullDirection") { -1.0 } else { 1.0 } } else { 0.0 };
+    let sides = ev.enum_("partingLineSides").to_string();
+    let along = ev.bool("alongPull");
     let orig = body.faces.clone();
     let mut drafted = false;
-    for (set, dir, ang) in sets {
-        if set.is_empty() || ang.abs() < 1e-12 {
-            continue;
+    let mut done: Vec<usize> = Vec::new();
+    for (origin, normal, group) in planes {
+        let (mut above, mut below): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
+        for &ei in &group {
+            for &f in ef.get(ei).map(|v| v.as_slice()).unwrap_or(&[]) {
+                let f = f as usize;
+                if done.contains(&f) {
+                    continue;
+                }
+                let Some(p) = point_on_face(&faces[f]) else { continue };
+                let Some((_, n)) = face_normal_near(&faces[f], p) else { continue };
+                if n.normalize().dot(pull).abs() > 1.0 - 1e-9 {
+                    continue; // faces perpendicular to the pull are not drafted
+                }
+                let list = if (p - origin).dot(normal) >= 0.0 { &mut above } else { &mut below };
+                if !list.contains(&f) {
+                    list.push(f);
+                }
+            }
         }
-        let body = ev.ctx.bodies[bi].clone();
-        // Faces by name (indices change after the first draft).
-        let names: Vec<Name> = set.iter().filter_map(|&f| orig.get(f).cloned()).collect();
-        let idx: Vec<usize> = names.iter().flat_map(|n| body.find_faces(n)).collect();
-        let shapes: Vec<Shape> = idx.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-        let neutral = k::Plane::new(origin, dir, if dir.cross(DVec3::X).length() > 0.1 { DVec3::X } else { DVec3::Y });
-        let res = k::draft(&body.shape, &shapes, dir, &neutral, ang).map_err(|_| fe(DRAFT_FAILED))?;
-        let face_names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
-        drafted = true;
-        ev.replace_body(bi, res.shape, face_names);
+        done.extend(above.iter().chain(&below).copied());
+        let sets: Vec<(Vec<usize>, f64)> = match sides.as_str() {
+            "SYMMETRIC" => vec![(below, angle), (above, -angle)],
+            "TWO_SIDED" => vec![(below, angle), (above, second)],
+            _ => {
+                if along { vec![(above, angle)] } else { vec![(below, angle)] }
+            }
+        };
+        for (set, ang) in sets {
+            if set.is_empty() || ang.abs() < 1e-12 {
+                continue;
+            }
+            let body = ev.ctx.bodies[bi].clone();
+            // Faces by name (indices change after the first draft).
+            let names: Vec<Name> = set.iter().filter_map(|&f| orig.get(f).cloned()).collect();
+            let idx: Vec<usize> = names.iter().flat_map(|n| body.find_faces(n)).collect();
+            let shapes: Vec<Shape> = idx.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
+            let neutral = k::Plane::new(origin, normal, if normal.cross(DVec3::X).length() > 0.1 { DVec3::X } else { DVec3::Y });
+            let res = k::draft(&body.shape, &shapes, pull, &neutral, ang).map_err(|_| fe(DRAFT_FAILED))?;
+            let face_names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
+            drafted = true;
+            ev.replace_body(bi, res.shape, face_names);
+        }
     }
-    if !drafted {
-        return err(DRAFT_FAILED);
-    }
-    Ok(())
+    Ok(drafted)
 }
 
 /// Add faces tangent-connected to the selection that are steeper than the
@@ -557,6 +583,161 @@ pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
 
 // ------------------------------------------------------------------ body draft
 
-pub fn body_draft(_ev: &mut EvalCtx) -> FResult<()> {
-    err("Body draft is not supported yet")
+/// bodyDraft.fs (live "psb (10-24 g) body draft"): each drafted face turns
+/// about its edge away from the parting entity, so the part narrows along
+/// the pull and gains material toward the parting entity (a block's top stays
+/// 40 × 20, its bottom grows by 10·tan 5° each side). Symmetric drafts the
+/// two sides of the parting plane each toward it. Corner type Plane bevels
+/// the corners between drafted faces from the held edge's end.
+pub fn body_draft(ev: &mut EvalCtx) -> FResult<()> {
+    let scope = ev.enum_("selectionType").to_string();
+    let (field, empty) = match scope.as_str() {
+        "FACES" => ("faces", "Select faces to draft."),
+        "EDGES" => ("topEdges", "Select edges to draft."),
+        _ => ("bodies", "Select parts to draft."),
+    };
+    if ev.query(field).is_empty() {
+        return crate::regen::eval::err_at(&[field], empty);
+    }
+    let Some(pull) = ev.query("pullDirection").first().and_then(|r| ev.resolve_direction(r)) else {
+        return crate::regen::eval::err_at(&["pullDirection"], "Body draft pull direction is invalid.");
+    };
+    let pull = if ev.bool("flipPullDirection") { -pull } else { pull }.normalize();
+    // Live 2: a block drafted on itself fails on the selection.
+    if ev.bool("draftOnSelf") {
+        return crate::regen::eval::err_at(&[field], "Selected parts could not be drafted.");
+    }
+    let Some(parting) = ev.query("partingObject").first().and_then(|r| ev.resolve_plane(r)) else {
+        return crate::regen::eval::err_at(&["partingObject"], "Parting entity is invalid.");
+    };
+    let angle = ev.angle("angle")?;
+    let height = |p: DVec3| (p - parting.origin).dot(pull);
+    // The faces to draft, per part.
+    let mut per_body: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    let mut held: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    match scope.as_str() {
+        "FACES" => {
+            for (bi, fi) in ev.resolve_faces(ev.query("faces")) {
+                per_body.entry(bi).or_default().push(fi);
+            }
+        }
+        "EDGES" => {
+            for (bi, ei) in ev.resolve_edges(ev.query("topEdges")) {
+                held.entry(bi).or_default().push(ei);
+                let ef = ev.ctx.bodies[bi].shape.edge_faces()?;
+                per_body.entry(bi).or_default().extend(ef.get(ei).map(|v| v.iter().map(|f| *f as usize).collect::<Vec<_>>()).unwrap_or_default());
+            }
+        }
+        _ => {
+            let excluded = ev.resolve_faces(ev.query("excludeFaces"));
+            for bi in ev.resolve_bodies(ev.query("bodies")) {
+                let n = ev.ctx.bodies[bi].shape.faces().len();
+                per_body.entry(bi).or_default().extend((0..n).filter(|fi| !excluded.contains(&(bi, *fi))));
+            }
+        }
+    }
+    let both = ev.bool("bothSides");
+    let plane_corners = ev.is("cornerType", "PLANE");
+    for (bi, mut faces) in per_body {
+        faces.sort_unstable();
+        faces.dedup();
+        let body = ev.ctx.bodies[bi].clone();
+        let all = body.shape.faces();
+        // Faces square to the pull (caps) aren't drafted.
+        faces.retain(|&f| all.get(f).and_then(|face| point_on_face(face).and_then(|p| face_normal_near(face, p))).is_some_and(|(_, n)| n.normalize().dot(pull).abs() < 1.0 - 1e-9));
+        if faces.is_empty() {
+            continue;
+        }
+        // Each side of the parting plane narrows away from it, turning about
+        // its far end (or the held edges).
+        let sides: Vec<(Shape, f64)> = if both {
+            let cut = k::split_by_plane(&body.shape, &k::Plane::new(parting.origin, pull, parting.x)).map_err(|_| fe(BODY_DRAFT_FAILED))?;
+            cut.shape.solids().into_iter().map(|s| { let up = s.centroid().map(|c| height(c) >= 0.0).unwrap_or(true); (s, if up { 1.0 } else { -1.0 }) }).collect()
+        } else {
+            vec![(body.shape.clone(), 1.0)]
+        };
+        let mut drafted: Vec<Shape> = Vec::new();
+        let mut history = None;
+        for (piece, sign) in sides {
+            let dir = pull * sign;
+            let pf = piece.faces();
+            // This piece's faces from the selection: same surface, overlapping.
+            let mine: Vec<Shape> = pf
+                .iter()
+                .filter(|f| {
+                    let Some(p) = point_on_face(f) else { return false };
+                    faces.iter().any(|&o| k::make_vertex(p).and_then(|v| k::distance(&v, &all[o])).is_ok_and(|d| d.distance < 1e-7))
+                        && face_normal_near(f, p).is_some_and(|(_, n)| n.normalize().dot(pull).abs() < 1.0 - 1e-9)
+                })
+                .cloned()
+                .collect();
+            if mine.is_empty() {
+                drafted.push(piece);
+                continue;
+            }
+            // The far end: the held edges, else the piece's extreme along the
+            // draft direction.
+            let far = match held.get(&bi) {
+                Some(edges) => edges.iter().filter_map(|&e| body.shape.sub_shape(ShapeType::Edge, e).ok()).filter_map(|e| e.endpoints().ok()).map(|(a, _)| (a - parting.origin).dot(dir)).fold(f64::MIN, f64::max),
+                None => piece.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(|p| (p - parting.origin).dot(dir)).fold(f64::MIN, f64::max),
+            };
+            let neutral = k::Plane::new(parting.origin + dir * far, dir, parting.x);
+            let res = draft_robust(&piece, &mine, dir, &neutral, angle).map_err(|_| fe(BODY_DRAFT_FAILED))?;
+            if !both && !plane_corners {
+                history = Some(res.history.clone());
+            }
+            let mut shape = res.shape;
+            if plane_corners {
+                shape = bevel_corners(&piece, &mine, shape, dir, parting.origin + dir * far, angle)?;
+            }
+            drafted.push(shape);
+        }
+        let shape = match drafted.as_slice() {
+            [one] => one.clone(),
+            many => k::boolean(k::BooleanOp::Fuse, &many[..1], &many[1..], &k::BooleanOptions::default()).map_err(|_| fe(BODY_DRAFT_FAILED))?.shape,
+        };
+        // The faces keep their names through a plain draft.
+        let names = match &history {
+            Some(h) => ev.name_result(&[&body.shape_names()], h, &shape, &BTreeMap::new(), None),
+            None => name_new(ev, &shape),
+        };
+        ev.replace_body(bi, shape, names);
+    }
+    Ok(())
+}
+
+/// Onshape's text when a body draft can't be built.
+const BODY_DRAFT_FAILED: &str = "Selected parts could not be drafted.";
+
+/// Corner type Plane: each straight corner edge along the pull between two
+/// drafted planes gets a planar bevel from its far end to the two drafted
+/// faces' feet (live 1c: 8530.0348 = the extended corners less four
+/// tetrahedra of tan²α/2 · h³/3).
+fn bevel_corners(original: &Shape, faces: &[Shape], drafted: Shape, dir: DVec3, far: DVec3, angle: f64) -> FResult<Shape> {
+    let normal_of = |f: &Shape| point_on_face(f).and_then(|p| face_normal_near(f, p)).map(|(_, n)| n.normalize());
+    let mut body = drafted;
+    let tn = angle.tan();
+    for e in original.edges() {
+        let Ok(k::Curve::Line { direction, .. }) = e.edge_curve() else { continue };
+        if direction.normalize().cross(dir).length() > 1e-9 {
+            continue;
+        }
+        let touching: Vec<&Shape> = faces.iter().filter(|f| k::distance(&e, f).is_ok_and(|d| d.distance < 1e-9) && f.face_plane().ok().flatten().is_some()).collect();
+        let [f1, f2] = touching.as_slice() else { continue };
+        let (Some(n1), Some(n2)) = (normal_of(f1), normal_of(f2)) else { continue };
+        let Ok((a, b)) = e.endpoints() else { continue };
+        let (top, foot) = if (a - far).dot(dir).abs() < (b - far).dot(dir).abs() { (a, b) } else { (b, a) };
+        let h = (top - foot).length();
+        let (p1, p2) = (foot + n1 * h * tn, foot + n2 * h * tn);
+        let Some(n) = (p1 - top).cross(p2 - top).try_normalize() else { continue };
+        let tip = foot + (n1 + n2) * h * tn;
+        let n = if (tip - top).dot(n) > 0.0 { n } else { -n };
+        let x = if n.cross(DVec3::X).length() > 0.1 { DVec3::X } else { DVec3::Y };
+        let Ok(cut) = k::split_by_plane(&body, &k::Plane::new(top, n, n.cross(x).normalize())) else { continue };
+        let keep: Vec<Shape> = cut.shape.solids().into_iter().filter(|s| s.centroid().is_ok_and(|c| (c - top).dot(n) < 0.0)).collect();
+        if let [one] = keep.as_slice() {
+            body = one.clone();
+        }
+    }
+    Ok(body)
 }

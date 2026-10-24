@@ -62,6 +62,23 @@ pub fn side_source(src: &Source, side: u16) -> Source {
 
 /// Thin regions for the `wallShape` selection of a Thin feature.
 pub fn thin_profiles(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<Profile>> {
+    thin_profiles_sided(ev, refs, WallSide::Left)
+}
+
+/// Where Thickness 1 of an open wall goes.
+pub enum WallSide<'a> {
+    /// Left of the first edge seen from the plane normal (the offset-wire
+    /// operation's convention).
+    Left,
+    /// Live "psb (10-24 c/e)": on d × D, d the first edge's direction and D
+    /// the feature's positive sweep direction at a point of the wall
+    /// (Extrude: the sketch normal; Revolve: the turning direction about the
+    /// axis as directed; Sweep: along the path), whatever Opposite says.
+    Along(&'a dyn Fn(&PlaneFrame, DVec3) -> DVec3),
+}
+
+/// [`thin_profiles`] with the open walls' side given by `side`.
+pub fn thin_profiles_sided(ev: &EvalCtx, refs: &[Reference], side: WallSide) -> FResult<Vec<Profile>> {
     let (t1, t2) = thicknesses(ev)?;
     let mut out = Vec::new();
     // Closed loops of regions and planar faces.
@@ -99,7 +116,18 @@ pub fn thin_profiles(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<Profile>> 
             if w.is_closed().unwrap_or(false) || closed_chain(&w) {
                 out.push(closed_wall(&frame, &w, &chain, t1, t2, key)?);
             } else {
-                out.push(open_wall(&frame, &w, &chain, t1, t2, key)?);
+                let first = chain.first().map(|s| s.shape.clone()).unwrap_or_else(|| w.edges()[0].clone());
+                let (m, left) = left_of(&first, frame.normal)?;
+                let on_left = match &side {
+                    WallSide::Left => true,
+                    WallSide::Along(d) => {
+                        let i = first.edge_info()?;
+                        let t = first.tangent_at((i.first_param + i.last_param) * 0.5)?;
+                        t.cross(d(&frame, m)).dot(left) >= 0.0
+                    }
+                };
+                let (a, b) = if on_left { (t1, t2) } else { (t2, t1) };
+                out.push(open_wall(&frame, &w, &chain, a, b, key)?);
             }
         }
     }
@@ -121,6 +149,32 @@ fn closed_chain(w: &Shape) -> bool {
 }
 
 /// Plane frame of a planar (non-collinear) wire.
+/// The wall curves of a Thin selection as wires with their planes: the loops
+/// of regions and faces, and the chains of curves.
+pub fn wall_wires(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<(Shape, PlaneFrame)>> {
+    let mut out = Vec::new();
+    let face_refs: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::SketchRegion { .. } | Reference::Face(_))).cloned().collect();
+    for p in ev.profiles(&face_refs)? {
+        out.extend(p.shape.wires().into_iter().map(|w| (w, p.frame)));
+    }
+    let curve_refs: Vec<Reference> = refs.iter().filter(|r| !matches!(r, Reference::SketchRegion { .. } | Reference::Face(_))).cloned().collect();
+    let edges = resolve_curves(ev, &curve_refs)?;
+    if !edges.is_empty() {
+        let sketch_frame = curve_refs.iter().find_map(|r| match r {
+            Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => ev.ctx.sketch(*sketch).map(|s| s.frame),
+            _ => None,
+        });
+        for w in wires_from(&edges)? {
+            let frame = match sketch_frame {
+                Some(f) => f,
+                None => wire_frame(&w)?,
+            };
+            out.push((w, frame));
+        }
+    }
+    Ok(out)
+}
+
 fn wire_frame(w: &Shape) -> FResult<PlaneFrame> {
     let pl = w.find_plane(1e-6)?.ok_or_else(|| fe("The wall curves must lie in one plane"))?;
     Ok(PlaneFrame { origin: pl.origin, x: pl.unit_x(), y: pl.unit_normal().cross(pl.unit_x()), normal: pl.unit_normal() })
@@ -135,6 +189,18 @@ fn ends(w: &Shape) -> Option<(DVec3, DVec3)> {
 }
 
 fn offset(w: &Shape, d: f64, open: bool) -> FResult<Shape> {
+    // A lone circle is offset directly: OCCT's 2D offset (its bisecting
+    // locus) can crash on a wire of one circle edge.
+    if !open
+        && let [e] = w.edges().as_slice()
+        && e.is_closed().unwrap_or(false)
+        && let Ok(k::Curve::Circle { center, axis, radius, .. }) = e.edge_curve()
+    {
+        if radius + d <= 1e-12 {
+            return err("The wall offset failed (thickness too large?)");
+        }
+        return Ok(k::make_wire(&[k::make_circle(center, axis, radius + d)?])?);
+    }
     let r = k::offset_wire_2d(w, d, k::JoinType::Intersection, open).or_else(|_| k::offset_wire_2d(w, d, k::JoinType::Arc, open)).map_err(kerr("The wall offset failed (thickness too large?)"))?;
     let r = r.wires().into_iter().next().unwrap_or(r);
     Ok(r)

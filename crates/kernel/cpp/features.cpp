@@ -737,10 +737,26 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
 
 // ---------------------------------------------------------------- loft
 
+// Loft end conditions at the start and at the end (loft.fs
+// createProfileConditions): kind 0 free, 1 along the vector, 2 in the plane
+// normal to it; the magnitude; the vector (null: the profile's plane normal).
+struct LoftEnds
+{
+  int    start     = 0;
+  double start_mag = 0;
+  gp_Vec start_dir;
+  int    end       = 0;
+  double end_mag   = 0;
+  gp_Vec end_dir;
+};
+
 // Natural cubic spline through rows R[k] (each `dim` doubles) at parameters
-// t[k], as piecewise Bezier poles: 3 (n - 1) + 1 of them.
+// t[k], as piecewise Bezier poles: 3 (n - 1) + 1 of them. A non-empty `d0` /
+// `dn` clamps the derivative at the start / end instead.
 static std::vector<std::vector<double>> natural_bezier(const std::vector<std::vector<double>>& R,
-                                                       const std::vector<double>&              t)
+                                                       const std::vector<double>&              t,
+                                                       const std::vector<double>&              d0 = {},
+                                                       const std::vector<double>&              dn = {})
 {
   const size_t n = R.size(), dim = R[0].size();
   std::vector<double> h(n - 1);
@@ -751,11 +767,21 @@ static std::vector<std::vector<double>> natural_bezier(const std::vector<std::ve
   std::vector<std::vector<double>> d(n, std::vector<double>(dim, 0));
   for (size_t k = 0; k < n; ++k)
   {
-    if (k == 0)
+    if (k == 0 && !d0.empty())
+    {
+      b[k] = 1, c[k] = 0;
+      d[k] = d0;
+    }
+    else if (k == 0)
     {
       b[k] = 2, c[k] = 1;
       for (size_t i = 0; i < dim; ++i)
         d[k][i] = 3 * (R[1][i] - R[0][i]) / h[0];
+    }
+    else if (k == n - 1 && !dn.empty())
+    {
+      a[k] = 0, b[k] = 1;
+      d[k] = dn;
     }
     else if (k == n - 1)
     {
@@ -806,13 +832,59 @@ static std::vector<std::vector<double>> natural_bezier(const std::vector<std::ve
 // Rows with differing weights (a circle and a square) are interpolated
 // pointwise, as Parasolid does, through polynomial approximations (1e-8 of
 // the part's size). False (shape untouched) if anything doesn't fit.
-static bool natural_loft(const TopoDS_Shape& loft, const std::vector<TopoDS_Wire>& wires)
+//
+// End conditions clamp the columns' end derivatives. Live "psb (10-24 b)
+// loft end derivative follow-up": with Normal to profile the first inner
+// pole of a face's corner column sits m (0.9 h + 0.1 c) / 3 along the profile
+// normal (h the column's spacing along it, c its chord), exact at every
+// corner; between its two corners a face blends those values with a
+// smoothstep (flat at the corners, as live's interior columns within 1e-3).
+// With Tangent to profile the pole sits m / 3 times the chord's part in the
+// profile plane away. A free end stays natural.
+//
+// `drop` (>= 0): a section that is only there to make ThruSections smooth
+// (it lofts two sections ruled); the columns skip it.
+static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wires, const LoftEnds& ends = {}, int drop = -1)
 {
+  // The surface's sections, and the ones the columns go through.
+  const std::vector<TopoDS_Wire> all = wires;
+  const int                      nts = (int)all.size();
+  if (drop >= 0)
+    wires.erase(wires.begin() + drop);
   const int n = (int)wires.size();
   Bnd_Box   box;
   BRepBndLib::Add(loft, box);
   const double size = box.IsVoid() ? 1.0 : std::sqrt(box.SquareExtent());
   const double tol = 1e-7 * size;
+  // The end profiles' plane normals, pointing along the loft.
+  auto centre = [](const TopoDS_Shape& w) {
+    GProp_GProps g;
+    BRepGProp::LinearProperties(w, g);
+    return g.CentreOfMass();
+  };
+  auto normal_of = [&](int k, int toward, const gp_Vec& given, gp_Vec& out) {
+    if (given.Magnitude() > 1e-12)
+      out = given.Normalized();
+    else
+    {
+      BRepLib_FindSurface fs(wires[k], 1e-6 * size, true);
+      if (!fs.Found())
+        return false;
+      occ::handle<Geom_Plane> pl = occ::down_cast<Geom_Plane>(fs.Surface());
+      if (pl.IsNull())
+        return false;
+      out = gp_Vec(pl->Position().Direction());
+    }
+    const gp_Vec along(centre(wires[k]), centre(wires[toward]));
+    if (out.Dot(along) * (toward > k ? 1 : -1) < 0)
+      out.Reverse();
+    return true;
+  };
+  gp_Vec n0, n1;
+  if (ends.start != 0 && !normal_of(0, 1, ends.start_dir, n0))
+    return false;
+  if (ends.end != 0 && !normal_of(n - 1, n - 2, ends.end_dir, n1))
+    return false;
   struct Update
   {
     TopoDS_Face                      face;
@@ -834,20 +906,22 @@ static bool natural_loft(const TopoDS_Shape& loft, const std::vector<TopoDS_Wire
     bs->Bounds(u0, u1, v0, v1);
     // ThruSections (iso-parametric) puts section k at v0 + k/(n-1) (v1 - v0).
     std::vector<occ::handle<Geom_BSplineCurve>> rows;
-    for (int k = 0; k < n; ++k)
+    for (int k = 0; k < nts; ++k)
     {
-      auto row = occ::down_cast<Geom_BSplineCurve>(bs->VIso(v0 + (v1 - v0) * k / (n - 1)));
+      auto row = occ::down_cast<Geom_BSplineCurve>(bs->VIso(v0 + (v1 - v0) * k / (nts - 1)));
       if (row.IsNull())
         return false;
       // (Loosely: ThruSections carries circles as polynomial approximations.)
       for (double s : {0.25, 0.5, 0.75})
       {
-        BRepExtrema_DistShapeShape dist(BRepBuilderAPI_MakeVertex(row->Value(u0 + (u1 - u0) * s)).Vertex(), wires[k]);
+        BRepExtrema_DistShapeShape dist(BRepBuilderAPI_MakeVertex(row->Value(u0 + (u1 - u0) * s)).Vertex(), all[k]);
         if (!dist.IsDone() || dist.Value() > 1e-4 * size)
           return false;
       }
       rows.push_back(row);
     }
+    if (drop >= 0)
+      rows.erase(rows.begin() + drop);
     bool rational = false, same_weights = true;
     for (const auto& r : rows)
       rational = rational || r->IsRational();
@@ -877,6 +951,35 @@ static bool natural_loft(const TopoDS_Shape& loft, const std::vector<TopoDS_Wire
         if (r->NbPoles() != all->NbPoles() || r->IsRational())
           return false;
     }
+    // A Normal condition's smoothstep needs cubic rows (polygon sides are
+    // lines).
+    if ((ends.start == 1 || ends.end == 1) && rows[0]->Degree() < 3)
+      for (auto& r : rows)
+        r->IncreaseDegree(3);
+    auto corner = [&](int a, int b, const gp_Vec& nrm, double u) {
+      const gp_Vec d(rows[a]->Value(u), rows[b]->Value(u));
+      return 0.9 * std::abs(d.Dot(nrm)) + 0.1 * d.Magnitude();
+    };
+    double ra0 = 0, ra1 = 0, rb0 = 0, rb1 = 0;
+    if (ends.start == 1)
+      ra0 = corner(0, 1, n0, u0), ra1 = corner(0, 1, n0, u1);
+    if (ends.end == 1)
+      rb0 = corner(n - 1, n - 2, n1, u0), rb1 = corner(n - 1, n - 2, n1, u1);
+    // Smoothstep 3s² − 2s³ in the rows' polar form at pole j's knots.
+    const NCollection_Array1<double>& flat = rows[0]->KnotSequence();
+    const int                         deg  = rows[0]->Degree();
+    auto                              step = [&](int j) {
+      double e1 = 0, e2 = 0, e3 = 0;
+      for (int i = 1; i <= deg; ++i)
+      {
+        const double x = (flat(flat.Lower() + j - 1 + i) - u0) / (u1 - u0);
+        e3 += e2 * x;
+        e2 += e1 * x;
+        e1 += x;
+      }
+      const double c2 = deg * (deg - 1) / 2.0, c3 = deg * (deg - 1) * (deg - 2) / 6.0;
+      return 3 * e2 / c2 - 2 * e3 / c3;
+    };
     // Column by column: (x, y, z) or homogeneous (w x, w y, w z, w) with equal weights.
     const int  nu = rows[0]->NbPoles();
     const bool homogeneous = rows[0]->IsRational();
@@ -912,7 +1015,28 @@ static bool natural_loft(const TopoDS_Shape& loft, const std::vector<TopoDS_Wire
         const double w = homogeneous ? r->Weight(j) : 1.0;
         R.push_back({p.X() * w, p.Y() * w, p.Z() * w, w});
       }
-      const auto col = natural_bezier(R, t);
+      // Clamped ends: derivatives along t (the first / last span standing
+      // for a two-profile loft's whole parameter range).
+      auto clamp = [&](int kind, double mag, const gp_Vec& nrm, double r0, double r1, int a, int b) {
+        std::vector<double> d;
+        if (kind == 0)
+          return d;
+        gp_Vec v;
+        if (kind == 1)
+          v = nrm * (mag * (r0 + (r1 - r0) * step(j)));
+        else
+        {
+          const double wa = R[a][3], wb = R[b][3];
+          const gp_Vec chord(gp_Pnt(R[a][0] / wa, R[a][1] / wa, R[a][2] / wa), gp_Pnt(R[b][0] / wb, R[b][1] / wb, R[b][2] / wb));
+          v = (chord - nrm * chord.Dot(nrm)) * (mag * (a < b ? 1 : -1));
+        }
+        v /= std::abs(t[b] - t[a]);
+        const double w = R[a][3];
+        d = {v.X() * w, v.Y() * w, v.Z() * w, 0.0};
+        return d;
+      };
+      const auto col = natural_bezier(R, t, clamp(ends.start, ends.start_mag, n0, ra0, ra1, 0, 1),
+                                      clamp(ends.end, ends.end_mag, n1, rb0, rb1, n - 1, n - 2));
       for (int i = 0; i < nv; ++i)
       {
         const double w = col[i][3];
@@ -1304,15 +1428,238 @@ static bool split_closed_sections(std::vector<TopoDS_Wire>& wires, HHist& hist)
   return true;
 }
 
+// Loft connections (Onshape's Match connections): `conns[c][w]` is
+// connection c's point on section wire w. Each wire is split at its points,
+// turned to run like the first wire (by its normal), started at the first
+// connection, and the edges between consecutive connections are evened out
+// (the longest split at its middle) so that ThruSections pairs connection
+// with connection. `hist` records the split edges (Modified). False when a
+// point is off its wire or the connections come in different orders.
+static bool connect_sections(std::vector<TopoDS_Wire>& wires, const std::vector<std::vector<gp_Pnt>>& conns,
+                             double tol, HHist& hist)
+{
+  const size_t k = conns.size(), nw = wires.size();
+  auto edges_of = [](const TopoDS_Wire& w) {
+    std::vector<TopoDS_Edge> es;
+    for (BRepTools_WireExplorer ex(w); ex.More(); ex.Next())
+      es.push_back(ex.Current());
+    return es;
+  };
+  auto key_of = [](const TopoDS_Edge& e) {
+    TopoDS_Edge key = e;
+    key.Orientation(TopAbs_FORWARD);
+    return key;
+  };
+  // Each piece made here and the original edge it came from.
+  std::vector<std::pair<TopoDS_Edge, TopoDS_Edge>> origin;
+  auto root = [&](const TopoDS_Edge& e) {
+    for (const auto& [piece, orig] : origin)
+      if (piece.IsSame(e))
+        return orig;
+    return key_of(e);
+  };
+  // Pieces of `E` split at curve parameters `cuts`, in wire order.
+  auto split = [&](const TopoDS_Edge& E, std::vector<double> cuts) {
+    std::vector<TopoDS_Edge> out;
+    const bool              fwd = E.Orientation() != TopAbs_REVERSED;
+    double                  f, l;
+    occ::handle<Geom_Curve> c = BRep_Tool::Curve(E, f, l);
+    std::sort(cuts.begin(), cuts.end());
+    if (!fwd)
+      std::reverse(cuts.begin(), cuts.end());
+    std::vector<double> prm{fwd ? f : l};
+    prm.insert(prm.end(), cuts.begin(), cuts.end());
+    prm.push_back(fwd ? l : f);
+    std::vector<TopoDS_Vertex> vs{TopExp::FirstVertex(E, true)};
+    for (double t : cuts)
+      vs.push_back(BRepBuilderAPI_MakeVertex(c->Value(t)));
+    vs.push_back(TopExp::LastVertex(E, true));
+    for (size_t i = 0; i + 1 < prm.size(); ++i)
+    {
+      TopoDS_Edge piece = fwd ? BRepBuilderAPI_MakeEdge(c, vs[i], vs[i + 1], prm[i], prm[i + 1]).Edge()
+                              : TopoDS::Edge(BRepBuilderAPI_MakeEdge(c, vs[i + 1], vs[i], prm[i + 1], prm[i]).Edge().Reversed());
+      origin.emplace_back(piece, root(E));
+      out.push_back(piece);
+    }
+    return out;
+  };
+  auto normal_of = [](const std::vector<TopoDS_Edge>& es) {
+    gp_Vec nrm;
+    std::vector<gp_Pnt> pts;
+    for (const auto& e : es)
+    {
+      BRepAdaptor_Curve c(e);
+      for (int i = 0; i < 8; ++i)
+      {
+        const double t = e.Orientation() != TopAbs_REVERSED ? c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * i / 8
+                                                            : c.LastParameter() - (c.LastParameter() - c.FirstParameter()) * i / 8;
+        pts.push_back(c.Value(t));
+      }
+    }
+    for (size_t i = 0; i < pts.size(); ++i)
+      nrm += gp_Vec(pts[i].XYZ()).Crossed(gp_Vec(pts[(i + 1) % pts.size()].XYZ()));
+    return nrm;
+  };
+  std::vector<std::vector<TopoDS_Edge>> all(nw);
+  std::vector<std::vector<size_t>>      at(nw, std::vector<size_t>(k));
+  gp_Vec                                n0;
+  for (size_t w = 0; w < nw; ++w)
+  {
+    std::vector<TopoDS_Edge> es = edges_of(wires[w]);
+    if (es.empty())
+      return false;
+    // Run like the first wire.
+    const gp_Vec nrm = normal_of(es);
+    if (w == 0)
+      n0 = nrm;
+    else if (nrm.Dot(n0) < 0)
+    {
+      std::reverse(es.begin(), es.end());
+      for (auto& e : es)
+        e = TopoDS::Edge(e.Reversed());
+    }
+    // Each point: its edge and parameter (or the vertex starting an edge).
+    std::vector<std::vector<double>> cuts(es.size());
+    std::vector<std::pair<size_t, double>> where(k);
+    for (size_t c = 0; c < k; ++c)
+    {
+      double best = 1e300;
+      for (size_t i = 0; i < es.size(); ++i)
+      {
+        double                  f, l;
+        occ::handle<Geom_Curve> cv = BRep_Tool::Curve(es[i], f, l);
+        if (cv.IsNull())
+          return false;
+        GeomAPI_ProjectPointOnCurve pr(conns[c][w], cv, f, l);
+        for (int j = 1; j <= pr.NbPoints(); ++j)
+          if (pr.Distance(j) < best)
+            best = pr.Distance(j), where[c] = {i, pr.Parameter(j)};
+        for (double t : {f, l})
+          if (cv->Value(t).Distance(conns[c][w]) < best)
+            best = cv->Value(t).Distance(conns[c][w]), where[c] = {i, t};
+      }
+      if (best > tol)
+        return false;
+      double f, l;
+      BRep_Tool::Range(es[where[c].first], f, l);
+      if (std::abs(where[c].second - f) > 1e-9 && std::abs(where[c].second - l) > 1e-9)
+        cuts[where[c].first].push_back(where[c].second);
+    }
+    // Split, and find the edge each connection starts.
+    std::vector<TopoDS_Edge> out;
+    for (size_t i = 0; i < es.size(); ++i)
+      if (cuts[i].empty())
+        out.push_back(es[i]);
+      else
+        for (const auto& piece : split(es[i], cuts[i]))
+          out.push_back(piece);
+    for (size_t c = 0; c < k; ++c)
+    {
+      size_t best = 0;
+      double bd   = 1e300;
+      for (size_t i = 0; i < out.size(); ++i)
+      {
+        const double d = BRep_Tool::Pnt(TopExp::FirstVertex(out[i], true)).Distance(conns[c][w]);
+        if (d < bd)
+          bd = d, best = i;
+      }
+      if (bd > tol)
+        return false;
+      at[w][c] = best;
+    }
+    // Start at the first connection.
+    const size_t s0 = at[w][0];
+    std::rotate(out.begin(), out.begin() + (long)s0, out.end());
+    for (auto& a : at[w])
+      a = (a + out.size() - s0) % out.size();
+    all[w] = out;
+  }
+  // The connections in the same order round every wire.
+  auto order = [&](size_t w) {
+    std::vector<size_t> o(k);
+    for (size_t c = 0; c < k; ++c)
+      o[c] = c;
+    std::sort(o.begin(), o.end(), [&](size_t a, size_t b) { return at[w][a] < at[w][b]; });
+    return o;
+  };
+  const std::vector<size_t> o0 = order(0);
+  for (size_t w = 0; w < nw; ++w)
+  {
+    if (order(w) != o0)
+      return false;
+    for (size_t c = 1; c < k; ++c)
+      if (at[w][o0[c]] == at[w][o0[c - 1]])
+        return false; // two connections at one point
+  }
+  // Even out the edges between consecutive connections.
+  for (size_t j = 0; j < k; ++j)
+  {
+    auto span = [&](size_t w) {
+      const size_t a = at[w][o0[j]], b = j + 1 < k ? at[w][o0[j + 1]] : all[w].size();
+      return std::make_pair(a, b);
+    };
+    size_t target = 0;
+    for (size_t w = 0; w < nw; ++w)
+      target = std::max(target, span(w).second - span(w).first);
+    for (size_t w = 0; w < nw; ++w)
+      while (span(w).second - span(w).first < target)
+      {
+        const auto [a, b] = span(w);
+        size_t     longest = a;
+        double     len     = -1;
+        for (size_t i = a; i < b; ++i)
+        {
+          BRepAdaptor_Curve c(all[w][i]);
+          const double      li = GCPnts_AbscissaPoint::Length(c);
+          if (li > len)
+            len = li, longest = i;
+        }
+        BRepAdaptor_Curve    c(all[w][longest]);
+        GCPnts_AbscissaPoint mid(c, len / 2, c.FirstParameter());
+        if (!mid.IsDone())
+          return false;
+        const auto pieces = split(all[w][longest], {mid.Parameter()});
+        all[w].erase(all[w].begin() + (long)longest);
+        all[w].insert(all[w].begin() + (long)longest, pieces.begin(), pieces.end());
+        for (size_t c2 = 0; c2 < k; ++c2)
+          if (at[w][c2] > longest)
+            at[w][c2] += 1;
+      }
+  }
+  for (size_t w = 0; w < nw; ++w)
+  {
+    BRepBuilderAPI_MakeWire mk;
+    for (const auto& e : all[w])
+    {
+      mk.Add(e);
+      const TopoDS_Edge orig = root(e);
+      if (!orig.IsSame(e))
+      {
+        if (hist.IsNull())
+          hist = new BRepTools_History();
+        hist->AddModified(orig, e);
+      }
+    }
+    if (!mk.IsDone())
+      return false;
+    wires[w] = mk.Wire();
+  }
+  return true;
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
-                       rust::Slice<const double> start_points, bool allow_natural)
+                       rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural)
 {
   const size_t n = sections.items.size();
   if (n < 2)
     fail_invalid("loft needs at least 2 sections");
-  if (!start_points.empty() && start_points.size() != 3 * n)
+  // One point per section, or several connections (k points per section,
+  // connection by connection).
+  if (!start_points.empty() && start_points.size() % (3 * n) != 0)
     fail_invalid("loft start points must be one (x, y, z) per section");
-  bool natural = allow_natural && !ruled && !closed && n >= 3;
+  const size_t connections = start_points.size() / (3 * n);
+  const bool conditions = ends.start != 0 || ends.end != 0;
+  bool       natural    = allow_natural && !ruled && !closed && (n >= 3 || conditions);
   for (const auto& s : sections.items)
     natural = natural && !s.IsNull() && s.ShapeType() != TopAbs_VERTEX;
   BRepOffsetAPI_ThruSections ts(solid, ruled, 1e-6);
@@ -1334,26 +1681,67 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
       continue;
     }
     TopoDS_Wire w = outer_or_wire(s, "loft section");
-    if (!start_points.empty() && std::isfinite(start_points[3 * i]))
+    if (connections == 1 && std::isfinite(start_points[3 * i]))
       w = rotate_wire_start(
         w, gp_Pnt(start_points[3 * i], start_points[3 * i + 1], start_points[3 * i + 2]));
     wires.push_back(w);
   }
   // Vertex counts matched like Parasolid; then OCCT must keep that matching.
-  HHist      split;
+  HHist split;
+  bool  connected = false;
+  if (connections >= 2)
+  {
+    if (points)
+      fail_invalid("loft connections need wire sections");
+    std::vector<std::vector<gp_Pnt>> conns(connections);
+    for (size_t c = 0; c < connections; ++c)
+      for (size_t i = 0; i < n; ++i)
+      {
+        const double* q = &start_points[3 * (c * n + i)];
+        if (!std::isfinite(q[0]))
+          fail_invalid("every loft connection needs a point on each section");
+        conns[c].push_back(gp_Pnt(q[0], q[1], q[2]));
+      }
+    Bnd_Box box;
+    for (const auto& w : wires)
+      BRepBndLib::Add(w, box);
+    const double tol = 1e-6 * (box.IsVoid() ? 1.0 : std::sqrt(box.SquareExtent()));
+    if (!connect_sections(wires, conns, tol, split))
+      fail_op("the loft connections don't match the sections");
+    connected = true;
+  }
   const bool circles = !points && start_points.empty() && split_closed_sections(wires, split);
   HHist      more;
   const bool counts  = !points && start_points.empty() && match_vertex_counts(wires, more);
   if (counts)
     split = split.IsNull() ? more : compose(compound_of(args), split, more);
-  const bool matched = circles || counts;
+  const bool matched = circles || counts || connected;
   ts.CheckCompatibility(!matched);
   TopoDS_Wire firstWire = wires.empty() ? TopoDS_Wire() : wires.front();
+  // OCCT lofts two sections ruled; an end condition needs the smooth
+  // surface: a section halfway (the first moved there), dropped again by
+  // natural_loft, makes ThruSections smooth it.
+  std::vector<TopoDS_Wire> smooth = wires;
+  int                      drop   = -1;
+  if (natural && n == 2)
+  {
+    GProp_GProps g0, g1;
+    BRepGProp::LinearProperties(wires[0], g0);
+    BRepGProp::LinearProperties(wires[1], g1);
+    gp_Trsf half;
+    half.SetTranslation(gp_Vec(g0.CentreOfMass(), g1.CentreOfMass()) * 0.5);
+    smooth.insert(smooth.begin() + 1, TopoDS::Wire(BRepBuilderAPI_Transform(wires[0], half, true).Shape()));
+    drop = 1;
+  }
   for (size_t i = 0, w = 0; i < n; ++i)
     if (sections.items[i].ShapeType() == TopAbs_VERTEX)
       ts.AddVertex(TopoDS::Vertex(sections.items[i]));
     else
+    {
       ts.AddWire(wires[w++]);
+      if (drop >= 0 && i == 0)
+        ts.AddWire(smooth[1]);
+    }
   if (closed)
   {
     if (firstWire.IsNull())
@@ -1363,8 +1751,8 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   ts.Build();
   if (!ts.IsDone())
     fail_op("loft failed (incompatible sections?)");
-  if (natural && (!natural_loft(ts.Shape(), wires) || !BRepCheck_Analyzer(ts.Shape()).IsValid()))
-    return loft_impl(sections, solid, ruled, closed, start_points, false);
+  if (natural && (!natural_loft(ts.Shape(), smooth, ends, drop) || !BRepCheck_Analyzer(ts.Shape()).IsValid()))
+    return loft_impl(sections, solid, ruled, closed, start_points, ends, false);
   HHist h = history_of(args, ts);
   if (matched)
   {
@@ -1383,9 +1771,15 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
 }
 
 OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
-              rust::Slice<const double> start_points)
+              rust::Slice<const double> start_points, rust::Slice<const double> conditions)
 {
-  return loft_impl(sections, solid, ruled, closed, start_points, true);
+  LoftEnds ends;
+  if (conditions.size() == 10)
+  {
+    const auto& c = conditions;
+    ends = {(int)c[0], c[1], gp_Vec(c[2], c[3], c[4]), (int)c[5], c[6], gp_Vec(c[7], c[8], c[9])};
+  }
+  return loft_impl(sections, solid, ruled, closed, start_points, ends, true);
 }
 
 // ---------------------------------------------------------------- thicken / shell
@@ -3053,13 +3447,22 @@ OpOut op_sew(const OcShapeList& shapes, double tol, bool make_solid)
 }
 
 OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
-              rust::Slice<const int32_t> orders, rust::Slice<const double> points)
+              rust::Slice<const int32_t> orders, rust::Slice<const double> points,
+              const OcShapeList& guides)
 {
   if (edges.items.empty())
     fail_invalid("fill needs boundary edges");
   if (points.size() % 3 != 0)
     fail_invalid("fill points must be (x, y, z) triples");
-  BRepOffsetAPI_MakeFilling mk;
+  // Guide curves are met to modelling tolerance (live "psb (10-24 d)":
+  // within 1e-4 mm): more points on them, more iterations, a finer surface.
+  const bool guided = !guides.items.empty();
+  Bnd_Box    box;
+  for (const auto& e : edges.items)
+    BRepBndLib::Add(e, box);
+  const double              size = box.IsVoid() ? 1.0 : std::sqrt(box.SquareExtent());
+  BRepOffsetAPI_MakeFilling mk(3, guided ? 40 : 15, guided ? 6 : 2, false, 1e-5, guided ? 2e-6 * size : 1e-4, 1e-2, 1e-1,
+                               guided ? 10 : 8, guided ? 30 : 9);
   for (size_t i = 0; i < edges.items.size(); ++i)
   {
     const TopoDS_Edge& e   = as_edge(edges.items[i], "fill boundary edge");
@@ -3076,6 +3479,9 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
   }
   for (size_t i = 0; i + 2 < points.size(); i += 3)
     mk.Add(gp_Pnt(points[i], points[i + 1], points[i + 2]));
+  // Guide curves the surface passes through (free, not boundary).
+  for (const auto& g : guides.items)
+    mk.Add(as_edge(g, "fill guide edge"), GeomAbs_C0, false);
   mk.Build();
   if (!mk.IsDone())
     fail_op("fill surface failed (boundary not closed?)");

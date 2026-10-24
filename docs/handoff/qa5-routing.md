@@ -254,3 +254,12 @@ STATUS FSW-mc (psb, 2026-10-24): connectors follow their owner part on a Transfo
 STATUS FSW-pattern (psb, 2026-10-24): L40/L42 off-part instances, skip infos, curve start info (f373e2e4), no Reapply fallback (f202f693), flush walls W1–W5 (4173dc6b); circular/curve flush variants pending live.
 STATUS FSW-hole (psb, 2026-10-24): L56/L57 merge scope, auto-flip, flip clears scope, tapped-depth and pipe-tap infos done (a5ea263a, 7c3821e8, f373e2e4).
 STATUS FSW-draft (psb, 2026-10-24): parallel parting edge (7c3821e8), edit logic (focus on edit, Switch face) on agent/psb; non-planar / multi-part parting lines still open.
+STATUS FSW-pattern (psb, 2026-10-24 b): circular/curve flush variants and W4/W5 ×2 match live "psb (10-24) flush wall follow-up" (test feature_pattern_of_a_flush_wall_as_live).
+STATUS FSW-unsupported (psb, 2026-10-24): Rib draft done (live G33c 27048.1556 matched, test rib_draft_as_live); Body draft, Decal, face blend variants still open.
+STATUS FSW-fill (psb, 2026-10-24): guide rules as live "psb (10-24 d)" and Precise curve guides done (test fill_guides_as_fs); Add on surface edges (SF7) still open.
+STATUS FSW-bsurf (psb, 2026-10-24): profile arrays are driven-query rows "[None] Edges of …" (live L28: no 2-pick cap); conditions wait for the loft end-derivative rule.
+STATUS FSW-loft (psb, 2026-10-24): end conditions (Normal/Tangent to profile, Normal/Tangent to direction) applied with live's corner rule and loft.fs texts; every connection used (profiles split at the connection points), "Select a point on each profile to define a connection."; guides, path and trims still open.
+STATUS FSW-draft (psb, 2026-10-24 b): parting edges on several parts (each drafted on its own) and stepped / sloped straight parting lines (each edge's own hinge plane) done (test parting_line_draft_on_two_parts_and_steps); curved non-planar parting lines still refused.
+STATUS FSW-sweep (psb, 2026-10-24): Thin sweep as live "psb (10-24 c)": sides, constant normal thickness with Scale, Trim ends to the cap planes, the two failure texts (test thin_sweep_as_live).
+STATUS FSW-sweep (psb, 2026-10-24 b): Extrude / Revolve / Sweep Thin put an open wall's Thickness 1 on live's side (d × D; Extrude was on the left) (test thin_sides_as_live).
+STATUS FSW-unsupported (psb, 2026-10-24 b): Body draft done as live "psb (10-24 g)" (Parts / Faces / Edges to hold, Symmetric, Plane corners, the error texts; test body_draft_as_live); Decal and face blend variants still open.

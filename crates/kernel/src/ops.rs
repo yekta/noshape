@@ -241,6 +241,46 @@ pub struct LoftOptions {
     /// rebuilt to start at its vertex closest to that point. Use NaN for
     /// sections that should not be changed.
     pub start_points: Option<Vec<DVec3>>,
+    /// Several connections (Onshape's Match connections), each one point per
+    /// section (NaN for point sections); used instead of `start_points` when
+    /// there are two or more. The sections are split at the points and
+    /// lofted connection to connection.
+    pub connections: Vec<Vec<DVec3>>,
+    /// Start / end profile conditions (smooth lofts of wire or face sections).
+    pub start: LoftEnd,
+    pub end: LoftEnd,
+}
+
+/// A loft end condition (Onshape's start / end profile condition) with its
+/// magnitude (loft.fs createProfileConditions).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+pub enum LoftEnd {
+    /// No condition (a natural end).
+    #[default]
+    Free,
+    /// Normal to profile: leaves the profile along its plane's normal.
+    Normal(f64),
+    /// Tangent to profile: leaves the profile in its plane.
+    Tangent(f64),
+    /// Tangent to direction: leaves along the direction.
+    AlongDirection(f64, DVec3),
+    /// Normal to direction: leaves in the plane normal to the direction.
+    AcrossDirection(f64, DVec3),
+}
+
+impl LoftEnd {
+    /// (kind: 1 along, 2 in the plane normal to the vector; magnitude;
+    /// vector, zero for the profile's plane normal).
+    fn ffi(self) -> [f64; 5] {
+        let (k, m, v) = match self {
+            LoftEnd::Free => (0.0, 0.0, DVec3::ZERO),
+            LoftEnd::Normal(m) => (1.0, m, DVec3::ZERO),
+            LoftEnd::Tangent(m) => (2.0, m, DVec3::ZERO),
+            LoftEnd::AlongDirection(m, d) => (1.0, m, d),
+            LoftEnd::AcrossDirection(m, d) => (2.0, m, d),
+        };
+        [k, m, v.x, v.y, v.z]
+    }
 }
 
 /// Loft through sections (faces → outer wire, wires, edges; the first/last
@@ -248,7 +288,11 @@ pub struct LoftOptions {
 /// order; section edges `Generate` lateral faces; caps are `First`/`Last`.
 /// Guide curves are not supported (use [`sweep_sections`] with a path).
 pub fn loft(sections: &[Shape], opts: &LoftOptions) -> Result<OpResult> {
+    if opts.connections.len() >= 2 && opts.connections.iter().any(|c| c.len() != sections.len()) {
+        return Err(KernelError::invalid("one point per loft section is required in each connection"));
+    }
     let pts: Vec<f64> = match &opts.start_points {
+        _ if opts.connections.len() >= 2 => opts.connections.iter().flatten().flat_map(|v| [v.x, v.y, v.z]).collect(),
         Some(p) => {
             if p.len() != sections.len() {
                 return Err(KernelError::invalid("one start point per loft section is required"));
@@ -258,7 +302,8 @@ pub fn loft(sections: &[Shape], opts: &LoftOptions) -> Result<OpResult> {
         None => Vec::new(),
     };
     let l = vec_to_list(sections);
-    op(ffi::op_loft(&l, opts.solid, opts.ruled, opts.closed, &pts))
+    let conditions: Vec<f64> = opts.start.ffi().into_iter().chain(opts.end.ffi()).collect();
+    op(ffi::op_loft(&l, opts.solid, opts.ruled, opts.closed, &pts, &conditions))
 }
 
 // ---------------------------------------------------------------- thicken / shell
@@ -493,6 +538,11 @@ pub struct FillEdge {
 /// (BRepOffsetAPI_MakeFilling), optionally passing through `points`.
 /// History args: the boundary edges in order.
 pub fn fill_surface(boundary: &[FillEdge], points: &[DVec3]) -> Result<OpResult> {
+    fill_surface_guided(boundary, points, &[])
+}
+
+/// [`fill_surface`] that also passes through the guide `curves` (edges).
+pub fn fill_surface_guided(boundary: &[FillEdge], points: &[DVec3], curves: &[Shape]) -> Result<OpResult> {
     let edges: Vec<Shape> = boundary.iter().map(|b| b.edge.clone()).collect();
     let supports: Vec<Shape> = boundary.iter().map(|b| b.support.clone().unwrap_or_default()).collect();
     let orders: Vec<i32> = boundary
@@ -506,7 +556,8 @@ pub fn fill_surface(boundary: &[FillEdge], points: &[DVec3]) -> Result<OpResult>
     let pts: Vec<f64> = points.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
     let le = vec_to_list(&edges);
     let ls = vec_to_list(&supports);
-    op(ffi::op_fill(&le, &ls, &orders, &pts))
+    let lg = vec_to_list(curves);
+    op(ffi::op_fill(&le, &ls, &orders, &pts, &lg))
 }
 
 /// Build solids from the regions fully enclosed by intersecting faces,

@@ -186,12 +186,122 @@ fn loft_between_squares() {
         v.set("sheetProfileEntities", q(vec![r]));
         v
     };
-    t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)]))]);
+    let point = |t: &mut T, plane: Reference, p: DVec2| {
+        let mut sk = noshape_sketch::Sketch::new();
+        let id = sk.add_point(p);
+        Reference::SketchEntity { sketch: t.sketch(plane, sk), entity: id.0 }
+    };
+    let bottom = point(&mut t, Reference::Plane(DatumPlane::Top), DVec2::new(-0.01, -0.01));
+    let top = point(&mut t, Reference::FeaturePlane(pl), DVec2::new(-0.005, -0.005));
+    // Opposite corners, and the top square's corners a quarter turn on.
+    let bottom2 = point(&mut t, Reference::Plane(DatumPlane::Top), DVec2::new(0.01, 0.01));
+    let top2 = point(&mut t, Reference::FeaturePlane(pl), DVec2::new(0.005, 0.005));
+    let top_turned = point(&mut t, Reference::FeaturePlane(pl), DVec2::new(0.005, -0.005));
+    let top2_turned = point(&mut t, Reference::FeaturePlane(pl), DVec2::new(-0.005, 0.005));
+    let loft = t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)]))]);
     let res = t.ok();
     let v = total_volume(&res.context);
     let expect = 0.03 / 3.0 * (4e-4 + 1e-4 + 2e-4);
     assert!(near(v, expect, 1e-3), "loft volume {v} vs {expect}");
     assert_eq!(res.context.bodies[0].faces.len(), 6);
+    // loft.fs LOFT_CONNECTION_MATCHING: a connection needs a point on each
+    // profile.
+    let connections = |rows: Vec<Vec<Reference>>| {
+        ParamValue::Array(
+            rows.into_iter()
+                .map(|refs| {
+                    let mut v = ParamValues::default();
+                    v.set("connectionEntities", q(refs));
+                    v
+                })
+                .collect(),
+        )
+    };
+    let connection = |refs: Vec<Reference>| connections(vec![refs]);
+    t.set(loft, "matchConnections", b(true));
+    t.set(loft, "connections", connection(vec![bottom.clone()]));
+    let res = t.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Select a point on each profile to define a connection.")));
+    t.set(loft, "connections", connection(vec![bottom.clone(), top.clone()]));
+    let v = total_volume(&t.ok().context);
+    assert!(near(v, expect, 1e-3), "loft volume {v} vs {expect}");
+    // Two connections: corner to corner as before, or a quarter turn.
+    t.set(loft, "connections", connections(vec![vec![bottom.clone(), top], vec![bottom2.clone(), top2]]));
+    let res = t.ok();
+    assert!(near(total_volume(&res.context), expect, 1e-3));
+    assert_eq!(res.context.bodies[0].faces.len(), 6);
+    t.set(loft, "connections", connections(vec![vec![bottom, top_turned], vec![bottom2, top2_turned]]));
+    let res = t.ok();
+    let body = &res.context.bodies[0];
+    let (a, z) = (DVec3::new(-0.01, -0.01, 0.0), DVec3::new(0.005, -0.005, 0.03));
+    let seam = body.shape.edges().iter().any(|e| e.endpoints().is_ok_and(|(p, q)| (p.distance(a) < 1e-9 && q.distance(z) < 1e-9) || (p.distance(z) < 1e-9 && q.distance(a) < 1e-9)));
+    assert!(seam, "a side edge runs from the bottom corner to the turned top corner");
+    assert!(total_volume(&res.context) < expect, "a twisted loft is thinner in the middle");
+}
+
+/// Live "psb (10-24) loft end derivative" and its follow-up: two-profile
+/// lofts from □20 on Top with end conditions (Normal: 3·ΔCP1 = m·(0.9 h +
+/// 0.1 chord) at each corner column, blended along each face).
+#[test]
+fn loft_end_conditions_as_live() {
+    enum Top {
+        Square(f64, f64),
+        Circle,
+    }
+    let run = |top: Top, h: &str, start: (&str, &str), end: (&str, &str)| -> f64 {
+        let mut t = T::new();
+        let s1 = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.01, -0.01, 0.01, 0.01));
+        let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e(h))]);
+        let top = match top {
+            Top::Circle => {
+                let mut sk = noshape_sketch::Sketch::new();
+                sk.add_circle(DVec2::ZERO, 0.008);
+                sk
+            }
+            Top::Square(x0, half) => rect(x0 - half, -half, x0 + half, half),
+        };
+        let s2 = t.sketch(Reference::FeaturePlane(pl), top);
+        let item = |r: Reference| {
+            let mut v = ParamValues::default();
+            v.set("sheetProfileEntities", q(vec![r]));
+            v
+        };
+        let (r1, r2) = (t.regions(s1)[0].clone(), t.regions(s2)[0].clone());
+        t.add(
+            "loft",
+            &[
+                ("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)])),
+                ("startCondition", en(start.0)),
+                ("startMagnitude", e(start.1)),
+                ("endCondition", en(end.0)),
+                ("endMagnitude", e(end.1)),
+            ],
+        );
+        total_volume(&t.ok().context) * 1e9
+    };
+    let free = ("DEFAULT", "1");
+    let normal = ("NORMAL_TO_PROFILE", "1");
+    let bad = std::cell::RefCell::new(Vec::new());
+    let check = |got: f64, want: f64, tol: f64| {
+        if (got - want).abs() >= tol {
+            bad.borrow_mut().push(format!("{got} vs live {want}"));
+        }
+    };
+    // Live's interior columns carry a small bump past the corner rule
+    // (1.5e-5 of the volume): squares within 0.2 mm³, circles within 1.
+    check(run(Top::Square(0.0, 0.005), "20 mm", normal, free), 5476.391496416564, 0.2);
+    check(run(Top::Square(0.004, 0.005), "20 mm", normal, free), 5479.304562064179, 0.2);
+    check(run(Top::Square(0.0, 0.005), "40 mm", normal, free), 10945.311932775581, 0.2);
+    // Tangent to profile: the corners follow live; its interior columns
+    // differ (asked: "psb (10-24 h)"), within 0.7 %.
+    check(run(Top::Square(0.0, 0.005), "20 mm", ("TANGENT_TO_PROFILE", "1"), free), 3926.4566141311925, 30.0);
+    check(run(Top::Circle, "20 mm", ("NORMAL_TO_PROFILE", "0.5"), free), 6184.16161905679, 1.0);
+    check(run(Top::Circle, "20 mm", ("NORMAL_TO_PROFILE", "3"), free), 7468.467388370618, 1.0);
+    check(run(Top::Circle, "20 mm", normal, normal), 5946.864721235933, 1.0);
+    check(run(Top::Circle, "20 mm", free, normal), 5441.702609683057, 1.0);
+    check(run(Top::Circle, "20 mm", ("TANGENT_TO_PROFILE", "2"), free), 4925.191602878886, 30.0);
+    assert!(bad.borrow().is_empty(), "{:?}", bad.borrow());
 }
 
 #[test]
@@ -429,14 +539,15 @@ fn modify_fillet_radius_and_remove() {
 }
 
 #[test]
-fn unsupported_features_fail_clearly() {
+fn empty_features_fail_clearly() {
     let mut t = T::new();
     t.block(0.0, 0.0, 0.04, 0.04, "20 mm");
     t.add("bodyDraft", &[]);
     t.add("replaceFace", &[]);
     let res = t.regen();
+    // Live "psb (10-24 g)" E1.
     assert_eq!(res.display.features[2].status, FeatureStatus::Error);
-    assert!(res.display.features[2].message.as_deref().unwrap().contains("not supported"));
+    assert_eq!(res.display.features[2].message.as_deref(), Some("Select parts to draft."));
     assert_eq!(res.display.features[3].status, FeatureStatus::Error);
 }
 
@@ -986,6 +1097,64 @@ fn rib_extend_profiles_as_live() {
     assert_eq!(run((0.002, 0.015), (0.038, 0.015), true), Err("Failed to create a rib from a selected profile.".into()));
 }
 
+/// rib.fs applyDraft, live G33c (a U channel: plate 60×40×5, walls 5 thick
+/// and 30 high at both ends): the 4 mm rib from a line at z 25 across the
+/// channel, drafted 3°, widens toward the plate (27048.155585660817 mm³;
+/// 26000 without draft). Normal to a sketch plane at z 15 drafts too.
+#[test]
+fn rib_draft_as_live() {
+    let run = |normal: bool, draft: Option<bool>| -> f64 {
+        let mut t = T::new();
+        let (_, x) = t.block(0.0, -0.02, 0.06, 0.02, "5 mm");
+        for x0 in [0.0, 0.055] {
+            let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(x0, -0.02, x0 + 0.005, 0.02));
+            let r = t.regions(s)[0].clone();
+            t.extrude(r, "30 mm", "ADD");
+        }
+        assert!((total_volume(&t.ok().context) * 1e9 - 22000.0).abs() < 1e-6);
+        let mut sk = noshape_sketch::Sketch::new();
+        let (plane, l) = if normal {
+            let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("15 mm"))]);
+            (Reference::FeaturePlane(pl), sk.add_line(DVec2::new(0.005, 0.0), DVec2::new(0.055, 0.0)))
+        } else {
+            // Front: sketch x = X, y = Z.
+            (Reference::Plane(DatumPlane::Front), sk.add_line(DVec2::new(0.005, 0.025), DVec2::new(0.055, 0.025)))
+        };
+        let s = t.sketch(plane, sk);
+        let rib = t.add(
+            "rib",
+            &[
+                ("profiles", q(vec![Reference::SketchEntity { sketch: s, entity: l.0 }])),
+                ("parts", q(vec![Reference::Body(BodyId { feature: x, index: 0 })])),
+                ("thickness", e("4 mm")),
+                ("ribExtrusionDirection", en(if normal { "NORMAL_TO_SKETCH_PLANE" } else { "PARALLEL_TO_SKETCH_PLANE" })),
+                ("hasDraft", b(draft.is_some())),
+                ("draftAngle", e("3 deg")),
+                ("draftOpposite", b(draft == Some(true))),
+            ],
+        );
+        // The arrow as offered: whichever side reaches the plate.
+        let mut msgs = Vec::new();
+        for flip in [true, false] {
+            t.set(rib, "oppositeDirection", b(flip));
+            let res = t.regen();
+            let st = res.display.features.last().unwrap();
+            if st.status == FeatureStatus::Ok {
+                return total_volume(&res.context) * 1e9;
+            }
+            msgs.push(st.message.clone());
+        }
+        panic!("no rib (normal {normal}, draft {draft:?}): {msgs:?}");
+    };
+    let near_v = |got: f64, want: f64| assert!((got - want).abs() < 1e-6, "{got} vs {want}");
+    near_v(run(false, None), 26000.0);
+    near_v(run(false, Some(false)), 27048.155585660817);
+    // Opposite: narrower toward the plate, 4 − 2·20·tan 3° at z 5.
+    near_v(run(false, Some(true)), 22000.0 + 50.0 * 20.0 * (4.0 - 20.0 * 3f64.to_radians().tan()));
+    near_v(run(true, None), 24000.0);
+    near_v(run(true, Some(false)), 22000.0 + 50.0 * 10.0 * (4.0 + 10.0 * 3f64.to_radians().tan()));
+}
+
 /// Live "lp wall over" (behaviours "URGENT (10-22)") with 5 instances, as
 /// the user's shot of 2026-10-23 and live 2256–2262: the failing Feature
 /// pattern carries a ghost of every instance it couldn't make (the wall's
@@ -1264,7 +1433,7 @@ fn hole_reports_parts_behind() {
 fn feature_pattern_of_a_flush_wall_as_live() {
     const SWITCH: &str = "Could not create all instances as entered. Try selecting \"Reapply features\" option.";
     // (status, message, volume mm³, min x) of the pattern run into the block.
-    let run = |height_y: f64, height_z: f64, outward: bool, count: &str| -> (FeatureStatus, Option<String>, f64, f64) {
+    let run = |height_y: f64, height_z: f64, outward: bool, kind: &str, count: &str| -> (FeatureStatus, Option<String>, f64, f64) {
         let mut t = T::new();
         t.block(0.0, 0.0, 0.1, 0.02, "10 mm");
         // Right plane: sketch x = world Y, y = Z; its normal is +X (into the block).
@@ -1274,37 +1443,69 @@ fn feature_pattern_of_a_flush_wall_as_live() {
         t.set(w, "oppositeDirection", b(outward));
         let res = t.regen();
         let edge = edge_near(&res.context.bodies[0], DVec3::new(0.05, 0.0, 0.01));
-        let lp = t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(w)])), ("directionOne", q(vec![edge])), ("distance", e("2 mm")), ("instanceCount", e(count))]);
+        let feats = ("instanceFunction", q(vec![Reference::Feature(w)]));
+        let pat = match kind {
+            "linear" => t.add("linearPattern", &[("patternType", en("FEATURE")), feats, ("directionOne", q(vec![edge])), ("distance", e("2 mm")), ("instanceCount", e(count))]),
+            "curve" => t.add("curvePattern", &[("patternType", en("FEATURE")), feats, ("edges", q(vec![edge])), ("spacingType", en("DISTANCE")), ("distance", e("2 mm")), ("instanceCount", e(count))]),
+            _ => {
+                // Live: the axis is a sketch line along Z through (50, 10).
+                let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("cplaneType", en("OFFSET")), ("offset", e("50 mm"))]);
+                let mut sk = noshape_sketch::Sketch::new();
+                let l = sk.add_line(DVec2::new(0.01, 0.0), DVec2::new(0.01, 0.01));
+                let s = t.sketch(Reference::FeaturePlane(pl), sk);
+                let axis = Reference::SketchEntity { sketch: s, entity: l.0 };
+                t.add("circularPattern", &[("patternType", en("FEATURE")), feats, ("axis", q(vec![axis])), ("angle", e("2 deg")), ("equalSpace", b(false)), ("instanceCount", e(count))])
+            }
+        };
         // The edge's own orientation decides the sign: take the run whose
         // copies (or ghosts) lie in the block.
+        let mut seen = Vec::new();
         for flip in [false, true] {
-            t.set(lp, "oppositeDirection", b(flip));
+            t.set(pat, "oppositeDirection", b(flip));
             let r = t.regen();
             let st = r.display.features.last().unwrap().clone();
             let bb = r.context.bodies[0].shape.bounding_box(true).unwrap();
             let v = total_volume(&r.context) * 1e9;
-            let into = match &st.error_mesh {
-                Some(m) => m.positions.iter().all(|p| p[0] > -1e-6),
-                None => bb.min.x > -1e-9 || st.status != FeatureStatus::Ok,
-            };
+            let into = kind == "circular"
+                || match &st.error_mesh {
+                    Some(m) => m.positions.iter().all(|p| p[0] > -1e-6),
+                    None => bb.min.x > -1e-9 || st.status != FeatureStatus::Ok,
+                };
             if into {
                 return (st.status, st.message, v, bb.min.x);
             }
+            seen.push((st.status, st.message, v, bb.min.x));
         }
-        panic!("no run into the block");
+        panic!("no run into the block ({kind} ×{count}, {height_y} {height_z} {outward}): {seen:?}");
     };
-    let (st, msg, v, _) = run(0.02, 0.01, true, "5");
+    let (st, msg, v, _) = run(0.02, 0.01, true, "linear", "5");
     assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(SWITCH)));
     assert!((v - 20100.0).abs() < 1e-6, "{v}");
-    assert_eq!(run(0.02, 0.01, true, "3").0, FeatureStatus::Error);
-    let (st, msg, v, minx) = run(0.02, 0.01, true, "2");
+    assert_eq!(run(0.02, 0.01, true, "linear", "3").0, FeatureStatus::Error);
+    let (st, msg, v, minx) = run(0.02, 0.01, true, "linear", "2");
     assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
     assert!((v - 19700.0).abs() < 1e-6, "{v}");
     assert!((minx - 0.0015).abs() < 1e-9, "{minx}");
-    let (st, msg, _, _) = run(0.02, 0.01, false, "5");
+    let (st, msg, _, _) = run(0.02, 0.01, false, "linear", "5");
     assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("Selected features do not create any geometry that may be patterned.")));
-    let (st, msg, _, _) = run(0.025, 0.01, true, "2");
+    let (st, msg, _, _) = run(0.025, 0.01, true, "linear", "2");
     assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(SWITCH)));
+    // Live "psb (10-24) flush wall follow-up": W4 (inward, overhanging) and
+    // W5 (taller than the block) fail at ×2 too; the curve pattern along
+    // the same edge is the linear one; the circular one fails even at ×2.
+    let fail = |v0: f64, (st, msg, v, _): (FeatureStatus, Option<String>, f64, f64)| {
+        assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some(SWITCH)));
+        assert!((v - v0).abs() < 1e-6, "{v}");
+    };
+    fail(20025.0, run(0.025, 0.01, false, "linear", "2"));
+    fail(20150.0, run(0.02, 0.015, true, "linear", "2"));
+    fail(20100.0, run(0.02, 0.01, true, "circular", "2"));
+    fail(20125.0, run(0.025, 0.01, true, "circular", "2"));
+    fail(20100.0, run(0.02, 0.01, true, "curve", "5"));
+    fail(20125.0, run(0.025, 0.01, true, "curve", "2"));
+    let (st, msg, v, minx) = run(0.02, 0.01, true, "curve", "2");
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!((v - 19700.0).abs() < 1e-6 && (minx - 0.0015).abs() < 1e-9, "{v} {minx}");
 }
 
 /// replaceFace.fs: several "Faces to replace with" make one template (the

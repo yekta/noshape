@@ -288,6 +288,55 @@ fn fill_closed_sketch_loop() {
     assert!(near(a, 0.04 * 0.03, 1e-8), "fill area {a}");
 }
 
+/// Live "psb (10-24 d) fill guides": Precise passes through the guide
+/// curves, which have to reach the boundary at an end; Guides on with
+/// nothing picked is the plain (flat) fill.
+#[test]
+fn fill_guides_as_fs() {
+    // (status, message, distance from the arc's top to the fill) for an arc
+    // in the Front plane from x = -a to a bulging to z = 10 mm.
+    let run = |a: Option<f64>, mode: &str| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let lines = rect(&mut sk, -0.02, -0.02, 0.04, 0.04);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let guide = a.map(|a: f64| {
+            // Front: sketch x = X, y = Z; centre below so the arc tops at 10 mm.
+            let c = (0.01 * 0.01 - a * a) / 0.02;
+            let mut g = noshape_sketch::Sketch::new();
+            let arc = g.add_arc(DVec2::new(0.0, c), DVec2::new(a, 0.0), DVec2::new(-a, 0.0));
+            Reference::SketchEntity { sketch: s.sketch(Reference::Plane(DatumPlane::Front), g), entity: arc.0 }
+        });
+        let mode = mode.to_string();
+        s.add("fill", move |p| {
+            let mut row = ParamValues::default();
+            row.set("entities", ParamValue::Query(lines.iter().map(|&e| Reference::SketchEntity { sketch: sid, entity: e }).collect()));
+            row.set("continuity", ParamValue::Enum("G0".into()));
+            p.set("edges", ParamValue::Array(vec![row]));
+            p.set("addGuides", ParamValue::Bool(true));
+            p.set("guideEntities", ParamValue::Query(guide.into_iter().collect()));
+            p.set("constraintMode", ParamValue::Enum(mode));
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap().clone();
+        let top = noshape_kernel::make_vertex(DVec3::new(0.0, 0.0, 0.01)).unwrap();
+        let d = r.context.bodies.iter().find(|b| b.kind == BodyKind::Surface).map(|b| noshape_kernel::distance(&top, &b.shape).unwrap().distance);
+        (st.status, st.message, d, r.context.bodies.iter().position(|b| b.kind == BodyKind::Surface).map(|i| surface_area(&r, i)))
+    };
+    let (st, msg, _, area) = run(None, "PRECISE");
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!(near(area.unwrap(), 0.04 * 0.04, 1e-9), "{area:?}");
+    let (st, msg, d, _) = run(Some(0.02), "PRECISE");
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!(d.unwrap() < 1e-6, "{d:?}");
+    let (st, msg, _, _) = run(Some(0.01), "PRECISE");
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("Guide entities cannot be used as selected.")));
+    // Sampled only passes through the samples.
+    let (st, msg, d, _) = run(Some(0.02), "SAMPLED");
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!(d.unwrap() < 1e-4, "{d:?}");
+}
+
 #[test]
 fn sheet_metal_extrude_l_bracket_volume() {
     let mut s = Studio::new();
@@ -874,6 +923,39 @@ fn boundary_one_u_one_v_as_live() {
     let (st, msg, _) = run(&[((0.0, 0.0), (0.04, 0.0)), ((0.0, 0.02), (0.04, 0.02))], &[((0.02, -0.005), (0.02, 0.025))]);
     assert_eq!(st, FeatureStatus::Error);
     assert_eq!(msg.as_deref(), Some("Could not extract boundary profiles matching at end points."));
+}
+
+/// Live L28: a U row "Normal to profile" on a part edge (no sketch plane)
+/// fails with loft.fs's planar-profile text; the same rows with None work.
+#[test]
+fn boundary_condition_needs_a_planar_profile() {
+    let run = |cond: &str| {
+        let mut s = block();
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let edge_at = |p: DVec3| {
+            let v = noshape_kernel::make_vertex(p).unwrap();
+            let i = b.shape.edges().iter().position(|e| noshape_kernel::distance(&v, e).is_ok_and(|d| d.distance < 1e-9)).unwrap();
+            Reference::Edge((*b.edges[i]).clone())
+        };
+        let (front, back) = (edge_at(DVec3::new(0.05, 0.0, 0.025)), edge_at(DVec3::new(0.05, 0.05, 0.025)));
+        let cond = cond.to_string();
+        s.add("boundarySurface", move |p| {
+            let row = |e: Reference, c: &str| {
+                let mut v = ParamValues::default();
+                v.set("uProfileEntities", ParamValue::Query(vec![e]));
+                v.set("uCondition", ParamValue::Enum(c.into()));
+                v.set("uMagnitude", ParamValue::Expr(ExprValue::new("1")));
+                v
+            };
+            p.set("uProfilesArray", ParamValue::Array(vec![row(front, &cond), row(back, "DEFAULT")]));
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap().clone();
+        (st.status, st.message)
+    };
+    assert_eq!(run("DEFAULT").0, FeatureStatus::Ok);
+    assert_eq!(run("NORMAL_TO_PROFILE"), (FeatureStatus::Error, Some("Only planar profiles are valid for Normal/Tangent to profile start condition.".into())));
 }
 
 /// mateConnector.fs "Owner entity": a connector moves with its owner part

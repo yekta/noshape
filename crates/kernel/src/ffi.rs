@@ -442,6 +442,7 @@ pub(crate) mod ffi {
             ruled: bool,
             closed: bool,
             start_points: &[f64],
+            conditions: &[f64],
         ) -> Result<OpOut>;
         fn set_working_scale(k: f64) -> Result<()>;
         fn op_thicken(s: &OcShape, t1: f64, t2: f64) -> Result<OpOut>;
@@ -482,6 +483,7 @@ pub(crate) mod ffi {
             supports: &OcShapeList,
             orders: &[i32],
             points: &[f64],
+            guides: &OcShapeList,
         ) -> Result<OpOut>;
         fn op_rib(
             base: &OcShape,

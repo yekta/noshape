@@ -346,7 +346,8 @@ fn thin_extrude_closed_and_open_profiles() {
     u.dedup();
     assert_eq!(u.len(), names.len());
 
-    // Open line: thickness 1 on the left of its direction, thickness 2 right.
+    // Open line (live "psb (10-24 e)"): thickness 1 on the right of its
+    // direction seen down the sketch normal, thickness 2 left.
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
     let l = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.04, 0.0));
@@ -355,9 +356,9 @@ fn thin_extrude_closed_and_open_profiles() {
     let res = t.ok();
     assert!(near(total_volume(&res.context), 0.04 * 0.003 * 0.01, 1e-6), "{}", total_volume(&res.context));
     let bb = res.context.bodies[0].shape.bounding_box(true).unwrap();
-    assert!((bb.max.y - 0.002).abs() < 1e-7 && (bb.min.y + 0.001).abs() < 1e-7, "{bb:?}");
+    assert!((bb.min.y + 0.002).abs() < 1e-7 && (bb.max.y - 0.001).abs() < 1e-7, "{bb:?}");
 
-    // Open L polyline turning left: wall on the inside of the corner.
+    // Open L polyline turning left: wall on the outside of the corner.
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
     let p: Vec<_> = [(0.0, 0.0), (0.04, 0.0), (0.04, 0.03)].iter().map(|(x, y)| sk.add_point(DVec2::new(*x, *y))).collect();
@@ -366,7 +367,7 @@ fn thin_extrude_closed_and_open_profiles() {
     let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
     thin_extrude(&mut t, vec![Reference::SketchEntity { sketch: s, entity: l1.0 }, Reference::SketchEntity { sketch: s, entity: l2.0 }], &[("thickness1", e("2 mm"))]);
     let res = t.ok();
-    let area = 0.04 * 0.002 + 0.002 * 0.028;
+    let area = 0.042 * 0.002 + 0.002 * 0.03;
     assert!(near(total_volume(&res.context), area * 0.01, 1e-6), "{}", total_volume(&res.context));
 }
 
