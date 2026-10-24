@@ -1014,22 +1014,15 @@ impl SheetGeometry {
                             self.lines.push(Polyline2 { points: vec![[at[0], at[1] + h * 0.5], [at[0] + w, at[1] + h * 0.5]], style: LineStyle::Thin, closed: false, pick });
                         }
                     }
-                    // Leaders leave the nearer side of the box through a shoulder.
-                    let [x0, y0, x1, y1] = l.bbox;
-                    for ld in &style.leaders {
-                        let t = match ld.view {
-                            Some(v) => env.to_sheet(v, ld.point),
-                            None => ld.point,
-                        };
-                        let right = t[0] > (x0 + x1) / 2.0;
-                        let ym = (y0 + y1) / 2.0;
-                        let start = if right { [x1 + 1.0, ym] } else { [x0 - 1.0, ym] };
-                        let sh = [start[0] + if right { 4.0 } else { -4.0 }, ym];
-                        let mut pts = vec![start, sh];
-                        pts.extend(ld.nodes.iter().copied());
-                        pts.push(t);
-                        let last = pts[pts.len() - 2];
-                        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: false, pick });
+                    // Leaders leave a side of the box through a landing, or
+                    // branch off another leader (`note_leader_paths`).
+                    let targets: Vec<[f64; 2]> = style.leaders.iter().map(|ld| match ld.view {
+                        Some(v) => env.to_sheet(v, ld.point),
+                        None => ld.point,
+                    }).collect();
+                    for path in note_leader_paths(l.bbox, &style.leaders, &targets) {
+                        let (t, last) = (path.points[path.points.len() - 1], path.points[path.points.len() - 2]);
+                        self.lines.push(Polyline2 { points: path.points, style: LineStyle::Thin, closed: false, pick });
                         self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
                     }
                     // A rotated note (no leaders) turns about its middle.
@@ -2469,4 +2462,50 @@ pub fn wrap_text(text: &str, h: f64, w: f64) -> Vec<String> {
         lines.push(cur);
     }
     lines
+}
+
+/// A note leader's polyline (sheet mm): `head` points before its nodes (the
+/// side point and the bend, or the one branch point), then the nodes, then
+/// the target.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LeaderPath {
+    pub points: Vec<[f64; 2]>,
+    pub head: usize,
+}
+
+impl LeaderPath {
+    /// The bend: where the landing ends (the branch point of a branch).
+    pub fn bend(&self) -> [f64; 2] {
+        self.points[self.head - 1]
+    }
+}
+
+/// The paths of a note's leaders (live drw2 10-21 g): from the box `bbox`'s
+/// side (`Leader.right`, else the one nearer the target) through a
+/// horizontal landing (`Leader.landing`, 4 mm) to the bend, or from the
+/// bend or a node of an earlier leader; then the nodes, then `targets[i]`.
+pub fn note_leader_paths(bbox: [f64; 4], leaders: &[super::Leader], targets: &[[f64; 2]]) -> Vec<LeaderPath> {
+    use super::LeaderStart;
+    let [x0, y0, x1, y1] = bbox;
+    let ym = (y0 + y1) / 2.0;
+    let mut out: Vec<LeaderPath> = Vec::new();
+    for (i, ld) in leaders.iter().enumerate() {
+        let t = targets.get(i).copied().unwrap_or(ld.point);
+        let head = match ld.start {
+            LeaderStart::Bend(j) if j < i => vec![out[j].bend()],
+            LeaderStart::Node(j, n) if j < i && n < leaders[j].nodes.len() => vec![leaders[j].nodes[n]],
+            _ => {
+                let right = ld.right.unwrap_or(t[0] > (x0 + x1) / 2.0);
+                let start = if right { [x1 + 1.0, ym] } else { [x0 - 1.0, ym] };
+                let l = ld.landing.unwrap_or(4.0);
+                vec![start, [start[0] + if right { l } else { -l }, ym]]
+            }
+        };
+        let n = head.len();
+        let mut points = head;
+        points.extend(ld.nodes.iter().copied());
+        points.push(t);
+        out.push(LeaderPath { points, head: n });
+    }
+    out
 }
