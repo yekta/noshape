@@ -1884,3 +1884,48 @@ fn create_drawing_dialog_options() {
     assert!(!s["views"].as_array().unwrap().is_empty(), "{s}");
     assert_eq!(try_call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "sketch": "Extrude 1" })).unwrap_err().param.as_deref(), Some("sketch"));
 }
+
+/// Live's raster and SVG files (behaviours "api (10-24) drawing raster
+/// export"): 300 px per inch of sheet, opaque white RGB, two colours, all
+/// black; PNG pHYs 3937 px/m, JPEG 4:2:0 at 100 dpi, TIFF uncompressed;
+/// SVG text as outlines.
+#[test]
+fn drawing_raster_export_matches_live() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "raster-export.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI_A_INCH.dwt", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_note", json!({ "drawing": tab, "text": "RASTER TEST NOTE 123", "position": [40, 40] }));
+    let files: Vec<std::path::PathBuf> = ["png", "jpg", "tif", "svg"].iter().map(|e| scratch(&format!("raster.{e}"))).collect();
+    let path = |ext: &str| files.iter().find(|f| f.extension().is_some_and(|x| x == ext)).unwrap().clone();
+    for (format, ext) in [("PNG", "png"), ("JPEG", "jpg"), ("TIFF", "tif"), ("SVG", "svg")] {
+        call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": format, "file": path(ext).to_str().unwrap() }));
+    }
+    let png = std::fs::read(path("png")).unwrap();
+    let mut r = png::Decoder::new(std::io::Cursor::new(&png)).read_info().unwrap();
+    let info = r.info().clone();
+    assert_eq!((info.width, info.height), (3300, 2550), "ANSI A at 300 px/in");
+    assert_eq!(info.color_type, png::ColorType::Rgb, "no alpha");
+    assert_eq!(info.pixel_dims.map(|p| (p.xppu, p.yppu)), Some((3937, 3937)));
+    let mut buf = vec![0; r.output_buffer_size().unwrap()];
+    r.next_frame(&mut buf).unwrap();
+    let colours: std::collections::HashSet<[u8; 3]> = buf.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
+    assert_eq!(colours, [[255, 255, 255], [0, 0, 0]].into_iter().collect(), "white and black only (no antialiasing, no colour)");
+    let jpg = std::fs::read(path("jpg")).unwrap();
+    // JFIF APP0: units 1 (inch), density 100 x 100.
+    assert_eq!(&jpg[6..11], b"JFIF\0");
+    assert_eq!(&jpg[13..18], &[1, 0, 100, 0, 100]);
+    // Baseline SOF0: Y sampled 2 x 2, Cb and Cr 1 x 1 (4:2:0).
+    let sof = jpg.windows(2).position(|w| w == [0xFF, 0xC0]).unwrap();
+    assert_eq!((jpg[sof + 11], jpg[sof + 14], jpg[sof + 17]), (0x22, 0x11, 0x11));
+    let tif = std::fs::read(path("tif")).unwrap();
+    assert!(tif.len() >= 3300 * 2550 * 3, "uncompressed RGB: {}", tif.len());
+    let svg = std::fs::read_to_string(path("svg")).unwrap();
+    assert!(!svg.contains("<text"), "text as outlines");
+    for attr in ["stroke=\"#", "fill=\"#"] {
+        for (i, _) in svg.match_indices(attr) {
+            let c = &svg[i + attr.len()..i + attr.len() + 6];
+            assert!(c.eq_ignore_ascii_case("000000") || c.eq_ignore_ascii_case("ffffff"), "all black: {attr}{c}");
+        }
+    }
+}

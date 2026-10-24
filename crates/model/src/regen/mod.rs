@@ -197,7 +197,7 @@ impl Regenerator {
             let blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
             key = hash_bytes(key, &blob);
             // Derived features depend on another Part Studio's state.
-            if f.type_id == "importDerived"
+            if crate::features::importing::is_derived(&f.type_id)
                 && let Some(p) = &opts.derived
             {
                 key = hash_bytes(key, &p.version(params.text("partStudio")).to_le_bytes());
