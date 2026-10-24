@@ -4185,7 +4185,10 @@ pub(super) fn sketch_points(sk: &noshape_model::display::SketchDisplay) -> Vec<R
 }
 
 /// Every edge-like filter bit (edges, linear / circular edges, sketch edges).
-const EDGES: QueryFilter = QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
+/// What a part edge / a sketch curve can fill: any edge field, plus the
+/// part-only (`SOLID_EDGE`) or sketch-only (`SKETCH_EDGE`) ones.
+const PART_EDGES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::SOLID_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
+const SKETCH_CURVES: QueryFilter = QueryFilter(QueryFilter::EDGE.0 | QueryFilter::SKETCH_EDGE.0 | QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0);
 
 pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
     // A parts field that also takes mate connectors or point bodies
@@ -4199,11 +4202,11 @@ pub fn kind_matches(kind: PickKind, r: &Reference, f: QueryFilter) -> bool {
         PickKind::Face => want(QueryFilter::ANY_FACE) || want(QueryFilter::PLANE_LIKE),
         // Edge bits only: AXIS also holds cylindrical faces (their axis), so
         // a face field would take edges (qa5 I2: a hole wall in Move face).
-        PickKind::Edge => want(EDGES),
+        PickKind::Edge => want(PART_EDGES),
         PickKind::Vertex => want(QueryFilter::POINT_LIKE),
         PickKind::Plane => want(QueryFilter::PLANE),
         PickKind::Origin => want(QueryFilter::POINT_LIKE),
-        PickKind::SketchCurve => want(EDGES),
+        PickKind::SketchCurve => want(SKETCH_CURVES),
         PickKind::SketchPoint => want(QueryFilter::SKETCH_POINT) || want(QueryFilter::POINT_LIKE),
         PickKind::SketchRegion => want(QueryFilter::SKETCH_REGION),
         PickKind::Connector => want(QueryFilter::MATE_CONNECTOR),

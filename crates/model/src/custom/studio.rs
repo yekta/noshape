@@ -760,6 +760,7 @@ fn filter_of(f: Option<&Ann>) -> QueryFilter {
             ("BodyType", "WIRE") => QueryFilter(QueryFilter::WIRE_BODY.0 | QueryFilter::EDGE.0),
             ("BodyType", "MATE_CONNECTOR") => QueryFilter::MATE_CONNECTOR,
             ("BodyType", "POINT") => QueryFilter::POINT_BODY,
+            ("EdgeTopology", "TWO_SIDED") => QueryFilter::SOLID_EDGE,
             ("SketchObject", "YES") => QueryFilter(QueryFilter::SKETCH_REGION.0 | QueryFilter::SKETCH_EDGE.0 | QueryFilter::SKETCH_POINT.0 | QueryFilter::SKETCH.0),
             ("ConstructionObject", "YES") => QueryFilter(QueryFilter::PLANE.0 | QueryFilter::MATE_CONNECTOR.0),
             _ => QueryFilter(QueryFilter::ANY_FACE.0 | QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0 | QueryFilter::BODY.0 | QueryFilter::SKETCH_REGION.0 | QueryFilter::PLANE.0),

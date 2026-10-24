@@ -45,12 +45,12 @@ pub fn chamfer_options(gate: impl Fn(&ParamValues) -> bool + Clone + Send + Sync
             let ty = ty.clone();
             move |v| ty(v, "OFFSET_ANGLE")
         }),
-        ParamSpec::query("directionOverrides", "Direction overrides", QueryFilter::EDGE).visible(move |v| ty(v, "TWO_OFFSETS") || ty(v, "OFFSET_ANGLE")),
+        ParamSpec::query("directionOverrides", "Direction overrides", QueryFilter::SOLID_EDGE).visible(move |v| ty(v, "TWO_OFFSETS") || ty(v, "OFFSET_ANGLE")),
     ]
 }
 
 pub fn chamfer() -> FeatureType {
-    let mut p = vec![ParamSpec::query("entities", "Entities to chamfer", QueryFilter::EDGE | QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS)];
+    let mut p = vec![ParamSpec::query("entities", "Entities to chamfer", QueryFilter::SOLID_EDGE | QueryFilter::ANY_FACE).hints(Hints::INITIAL_FOCUS)];
     p.extend(chamfer_options(always));
     p.push(ParamSpec::bool("tangentPropagation", "Tangent propagation", true));
     FeatureType::new("chamfer", "Chamfer", Category::Detail, p).describe("Bevel sharp edges")

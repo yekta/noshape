@@ -175,6 +175,10 @@ impl QueryFilter {
     pub const CYLINDRICAL_FACE: Self = Self(1 << 15);
     pub const SKETCH: Self = Self(1 << 16);
     pub const POINT_BODY: Self = Self(1 << 17);
+    /// Edges of parts and surfaces only, never sketch curves (Onshape's
+    /// `EdgeTopology.TWO_SIDED` / `SketchObject.NO`: Fillet, Chamfer). A
+    /// plain [`Self::EDGE`] takes sketch curves too (they are edges).
+    pub const SOLID_EDGE: Self = Self(1 << 18);
     /// Any axis-like entity: linear edges, sketch lines, cylinder/cone axes, mate connector Z.
     pub const AXIS: Self = Self(Self::LINEAR_EDGE.0 | Self::CYLINDRICAL_FACE.0 | Self::MATE_CONNECTOR.0 | Self::SKETCH_EDGE.0);
     /// Any direction-defining entity: axes plus planar faces and planes (normal).

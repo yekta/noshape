@@ -511,8 +511,8 @@ pub fn filter_description(f: QueryFilter) -> String {
         add(QueryFilter::CYLINDRICAL_FACE, "cylindrical faces");
     }
     add(QueryFilter::PLANE, "planes");
-    if f.intersects(QueryFilter::EDGE) {
-        add(QueryFilter::EDGE, "edges");
+    if f.intersects(QueryFilter::EDGE | QueryFilter::SOLID_EDGE) {
+        add(QueryFilter::EDGE | QueryFilter::SOLID_EDGE, "edges");
     } else {
         add(QueryFilter(QueryFilter::LINEAR_EDGE.0 | QueryFilter::CIRCULAR_EDGE.0), "edges");
     }
@@ -3406,6 +3406,12 @@ mod field_point_tests {
         assert!(km(PickKind::Edge, &r, QueryFilter::AXIS) && km(PickKind::Edge, &r, QueryFilter::DIRECTION));
         assert!(km(PickKind::Face, &r, QueryFilter::AXIS), "a cylinder gives its axis");
         assert!(km(PickKind::SketchCurve, &r, QueryFilter::ANY_EDGE));
+        // Fillet / Chamfer take part edges only (a sketch line lying on a
+        // part's edge isn't picked); sketch-only fields take no part edges.
+        let fillet = QueryFilter::SOLID_EDGE | QueryFilter::ANY_FACE;
+        assert!(km(PickKind::Edge, &r, fillet) && !km(PickKind::SketchCurve, &r, fillet));
+        assert!(km(PickKind::SketchCurve, &r, QueryFilter::SKETCH_EDGE) && !km(PickKind::Edge, &r, QueryFilter::SKETCH_EDGE));
+        assert_eq!(super::filter_description(fillet), "Select faces or edges.");
     }
 
     #[test]
