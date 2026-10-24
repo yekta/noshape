@@ -96,6 +96,7 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                 let refs = values.query(&d.id);
                 query_of_refs(cx, refs)
             }
+            ParamKindFs::FeatureList { .. } => host::feature_list_value(values.query(&d.id)),
             ParamKindFs::Array { items, .. } => {
                 let mut arr = Vec::new();
                 for it in values.array(&d.id) {
@@ -306,6 +307,7 @@ pub(crate) fn run_editing_logic(
                     }
                     let pv = match &d.kind {
                         ParamKindFs::Query { .. } => ParamValue::Query(host::query::evaluate_refs(&mut i, &cx, v).ok()?),
+                        ParamKindFs::FeatureList { .. } => ParamValue::Query(host::feature_list_refs(v)),
                         ParamKindFs::Bool { .. } => ParamValue::Bool(v.as_bool()?),
                         ParamKindFs::Num { kind, .. } => {
                             let q = match kind {

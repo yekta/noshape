@@ -80,7 +80,7 @@ fn face_through(ev: &EvalCtx, bi: usize, data: &SheetMetalData, wall: usize, on_
 }
 
 pub fn jog(ev: &mut EvalCtx) -> FResult<()> {
-    let BendInputs { bi, fi, mut data, lp, wdir, up, n, theta, r, kf } = bend_inputs(ev)?;
+    let BendInputs { bi, fi, mut data, lp, wdir, up, n, mut theta, r, kf } = bend_inputs(ev)?;
     if theta >= std::f64::consts::PI - 1e-6 {
         return err("The jog angle must be smaller than 180°");
     }
@@ -91,14 +91,15 @@ pub fn jog(ev: &mut EvalCtx) -> FResult<()> {
     let offset = jog_offset(ev, t, fc, up)?;
     // Offset of two adjacent bends (no wall between them): R(1-cos) + (R+T)(1-cos).
     let adjacent = (2.0 * r + t) * (1.0 - theta.cos());
-    let wall = (offset - adjacent) / theta.sin();
-    if wall < -1e-9 {
-        return err(format!(
-            "The jog offset is too small for the bend radius and angle (at least {:.3} mm nominal)",
-            adjacent * 1000.0
-        ));
+    // Std applyEditLogicForBendAngle: an offset the bends can't reach at this
+    // angle sets the angle that makes them adjacent (Info).
+    let cos_adjacent = 1.0 - offset / (2.0 * r + t);
+    if ev.is("angleControlType", "BEND_ANGLE") && cos_adjacent.abs() < 1.0 && offset - adjacent <= 1e-8 {
+        theta = cos_adjacent.acos();
+        ev.infos.push("Updating bend angle in order to accommodate the specified jog offset.".into());
     }
-    let wall = wall.max(0.0);
+    let adjacent = (2.0 * r + t) * (1.0 - theta.cos());
+    let wall = ((offset - adjacent) / theta.sin()).max(0.0);
     let ba = theta * (r + kf * t);
     let w0 = alignment_start(ev.enum_("bendAlignment"), theta, r, t, ba);
     let spec1 = BendSpec { lp, n, wdir, up, theta, r, kf, w0, kbase: 0 };
