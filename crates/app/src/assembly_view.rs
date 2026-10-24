@@ -5202,7 +5202,7 @@ impl AssemblyView {
                     // Named views restore the section state too (Onshape).
                     if !v.section.is_empty() || self.ui.section.is_some() {
                         self.ui.section = (!v.section.is_empty()).then(|| AsmSection {
-                            planes: v.section.iter().map(|q| AsmSectionPlane { label: "Section plane".into(), origin: DVec3::new(q[0], q[1], q[2]) * q[3], normal: DVec3::new(q[0], q[1], q[2]), offset: 0.0, flipped: false }).collect(),
+                            planes: v.section.iter().map(|q| AsmSectionPlane::new(DVec3::new(q[0], q[1], q[2]) * q[3], DVec3::new(q[0], q[1], q[2]), DVec3::new(q[0], q[1], q[2]).any_orthonormal_vector())).collect(),
                             ..Default::default()
                         });
                         self.rebuild_scene(false, cx);
