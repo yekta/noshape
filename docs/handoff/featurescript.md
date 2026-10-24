@@ -716,45 +716,24 @@ Still to do:
    80), so it was backed out. Find out why (std's flange relief tracking by name?) before retrying.
 5. SM16: done (std editing logic runs in dialogs; `std_feature::editing_logic_in`).
 
-### What still fails with the std route forced on (NOSHAPE_STD_SHEET_METAL=1, 24 Oct)
-features_c, sheetmetal_std and sheetmetal_frames pass fully with the std route on (24 Oct). Fixed on the way (each
-per live): Extrude material outside by default (native too); rolled hem = bend K (live 0.45); FS sketch FIX on an
-arc = centre + radius, DISTANCE direction honoured (tear-drop hem); definition sheet faces oriented consistently
-(Topo::of; partial flange = live fs sm5, 22 faces); part names kept across rebuilds (keep_names: Finish -> Flange);
-Bend relief overrides (CORNER attributes per bend end); Butt Direction 1 = wall made first in Onshape's face order
-(creation_ranks: extrusion = first side, start cap, end cap, other sides; live "fs (10-24 09:30)" / "(12:00)").
-Native now follows std/live there too, except: native partial-flange reliefs (sm5 test ignored for native),
-loft rect -> triangle (ignored, both routes; std 51 faces vs live 49).
-Next gate: run every model test with the std route on, then switch STD_SHEET_METAL on by default.
+### What still fails with the std route forced on (NOSHAPE_STD_SHEET_METAL=1, 23 Oct ~21:00)
+Gate for switching it on: every one of these passes (or is shown to test native-only internals and is rewritten
+against live numbers). features_c passes fully both ways (2 ignored: loft rect->triangle, below; one older); sheetmetal_std 9/9 + Closed corner ignored.
+Done today: Jog preserve-off (kernel find_plane), native Jog follows std's applyEditLogicForBendAngle (Info, smaller
+angle); Form on std end to end: Tag runs by std (std param ids; FeatureList values `{Id: function}` tagged FeatureList),
+qConsumed, opMergeContexts / opPattern keep attributes, evCollision face pairs (crossing = INTERFERE), and
+updateSheetMetalGeometry applies walls' formedToolBodyIds (cut removes, fuse adds; tools hidden with persistent
+transient ids `JP<n>` in Context::fs_transients; flat footprint + outline). Native Form/Tag follow std's rules
+(untagged studio fails, locations only on targetFaces, std messages). recognize / jog tests check geometry.
+- Rip: done (24 Oct). Live = no-op (1 part, 8000 mm³, 6 faces, no joint); its probe: std's split works, and a rip
+  between coplanar pieces of a wall leaves no gap. Host: coplanar definition faces get no rip gap, the part's faces
+  are unified, the unfold carries them over, no table joint; native Rip = std's checks only. (Our qCreatedBy(split,
+  EDGE) seems to give no edge where live gives 1; harmless here, look at it if a rip ever needs its attribute.)
+- Sheet metal loft rect -> triangle (ignored test, live "fs (10-23 10:30)": 17452.843417228427 mm³, 49 faces: PLANE 37,
+  CYL 10, OTHER 2; 5 bends + rip). Std (host loft.rs walks unequal profiles: shortest diagonal, parallel edges
+  together = live's trapezoid + 5 triangles, bend angles match) gives 51 faces / 17449.70: where three bends meet live has
+  2 swept corner faces, we have planar patches. Native: unequal corner counts unsupported.
+- EXTRUDE process: live answered (REQUESTS "fs (10-23 05:00)"): default = 3211.3274122872 mm³, material OUTSIDE the L,
+  flat 80.126106 x 20; flipped = 3051.33, inside, 76.126106. Std matches the default; the native route (inside) deviates.
+- sheetmetal_frames (7; SM5 fixed the outer-flange one): hem bbox, bend count, flange outer bend direction, convert BUTT, corner relief volume.
 Not mine but seen: drawing::tests::flat_pattern_view_shows_bend_lines_and_notes fails on "DOWN 90.0° R3" (format.rs angle).
-
-
-## fs handoff (24 Oct, account move) — exact state
-
-**Branch agent/fs.** ready/fs = the last checked merge before "Butt joint Direction 1…" (that Butt commit and
-everything after it is NOT ready yet). Top of the branch is a WIP commit (do not mark it ready as is).
-
-**Sheet metal (now P3, parked per lead).** Std route still OFF by default. With it forced on, features_c,
-sheetmetal_std and sheetmetal_frames pass fully (see "What still fails" above). Unchecked work on the branch:
-1. Commit "Butt joint Direction 1 …" (creation_ranks in host/sheetmetal.rs): sheet metal suites green both routes.
-2. WIP commit:
-   - host query.rs created_by: edges an opSplitFace cut count as its (CtxState.made_edges, filled in
-     ops.rs op_split_face by midpoint). Gives std Rip its RIP joint, like live.
-   - Coplanar unify / unfold only across RIP edges (live sm8 keeps other coplanar faces apart).
-   - Topo::of orientation: each connected piece keeps the side most of its area has (face 0 was the root).
-   - sheetmetal_frames sm5 test: TAU literal (clippy).
-   - Status: sheet metal suites green on both routes, but custom_features::std_sheet_metal_matches_onshape
-     still FAILS on sm8 (Tab): we get faces [850,850,80,60,40,40,30,20,10,10], live [850,850,80,40,40,30,30,20,10,10].
-     It passed before this batch (check at 26801b49/old SHA had it failing too: it came with the
-     orientation pass or keep_names or bend-relief overrides — bisect by reverting each in turn).
-   Next: fix sm8, run clippy + `cargo test -p noshape-model`, then mark ready. Keep the std route parked.
-
-**P1 std-oracle pass (new focus, not started in code).** Infrastructure exists:
-custom_features.rs `std_feature_dialogs_match_builtin_schemas` diffs each built-in dialog against the dialog
-generated from std's precondition; EXPECTED_IDENTICAL_DIALOGS already lists chamfer, revolve, shell, sweep,
-linear/circularPattern, mirror, booleanBodies, cPlane, draft, splitPart. Missing from the P1 list: extrude,
-fillet, hole, loft, transform. Plan per feature: run that test with --nocapture, read its report for the
-feature (labels, ids, defaults, visibility, order), fix the built-in schema (crates/model/src/features/*.rs)
-and add the name to EXPECTED_IDENTICAL_DIALOGS; then compare editing logic (std `…EditLogic` functions) and
-every error/warning text in std's module against our regen (crates/model/src/regen/features/*.rs).
-Order: Extrude, Fillet, Hole, then Loft, Transform. Report per feature to the lead.

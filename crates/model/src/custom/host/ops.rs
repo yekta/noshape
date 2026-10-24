@@ -1196,29 +1196,10 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             on.extend(existing.iter().filter(|(a, m, z)| in_plane(*a) && in_plane(*m) && in_plane(*z)).map(|e| e.1));
             tools.push((pl.origin, n, on));
         }
-        Ok((made, tools, pieces, owners, mids))
+        Ok((made, tools, pieces, owners))
     })?;
-    let (new_edges, tools, pieces, owners, mids) = new_edges;
+    let (new_edges, tools, pieces, owners) = new_edges;
     let mut st = cx.state.lock();
-    // The edges it made are its (names lose the operation once wrapped):
-    // std Rip finds its new edge by qCreatedBy(split, EDGE), as live.
-    let made: Vec<crate::naming::Name> = st
-        .ctx
-        .bodies
-        .iter()
-        .filter(|b| owners.contains(&b.id))
-        .flat_map(|b| {
-            let names = b.edges.clone();
-            b.shape.edges().into_iter().zip(names).filter_map(|(e, n)| {
-                let info = e.edge_info().ok()?;
-                let m = e.point_at((info.first_param + info.last_param) * 0.5).ok()?;
-                mids.iter().any(|x| x.distance(m) < 1e-7).then_some(n)
-            }).collect::<Vec<_>>()
-        })
-        .collect();
-    for n in made {
-        st.made_edges.insert(n, id.clone());
-    }
     if own_existing {
         // Its edges derive from this split even where it changed nothing
         // (tracking keeps what operations since its start made or changed).

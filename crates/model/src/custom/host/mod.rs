@@ -148,8 +148,6 @@ pub struct CtxState {
     transient_versions: HashMap<Arc<str>, u64>,
     /// The edges each `opSplitEdges` split (`qSplitBy` finds their pieces).
     pub split_edges: HashMap<FsId, Vec<(BodyId, noshape_kernel::Shape)>>,
-    /// Edges an operation cut into faces (opSplitFace), by name (`qCreatedBy`).
-    pub made_edges: HashMap<crate::naming::Name, FsId>,
     /// The bodies each `opPattern` instance made, by (operation id, instance name) (`qPatternInstances`).
     pub pattern_instances: HashMap<(FsId, String), Vec<BodyId>>,
     /// `opSplitFace` planar tools: a point and normal of each tool's plane
@@ -223,7 +221,6 @@ impl FsContext {
                 dependencies: HashMap::new(),
                 splits: HashMap::new(),
                 split_edges: HashMap::new(),
-                made_edges: HashMap::new(),
                 pattern_instances: HashMap::new(),
                 split_tools: Vec::new(),
                 split_face_pieces: HashMap::new(),

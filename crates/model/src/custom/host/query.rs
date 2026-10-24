@@ -698,8 +698,6 @@ impl<'a> QueryCx<'a> {
             // Edges and vertices named without faces (wire and point
             // bodies) were created with their body.
             Ent::Edge(b, i) => match &*ctx.bodies[*b].edges[*i] {
-                // An edge a split cut (live: std Rip's qCreatedBy(split, EDGE) finds its edge).
-                n if self.st.made_edges.contains_key(n) => self.st.made_edges.get(n).cloned(),
                 TopoName::Edge { faces, .. } => newest(faces),
                 TopoName::Boundary { face, .. } => face_id(face).map(|x| x.1),
                 TopoName::Vertex { faces, .. } => newest(faces),
