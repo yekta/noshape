@@ -3612,8 +3612,9 @@ impl PartStudioView {
                     // Onshape list badges: under-defined sketch (12 px blue circle,
                     // undimmed, 8 px in from the icon's top-left). An error only turns
                     // the name red (part-studio/94).
-                    // Missing selections / warnings: Onshape's yellow triangle.
-                    .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().right(px(-3.)).bottom(px(-5.)).text_size(px(10.)).text_color(pal.warning).child("▲")))
+                    // Missing selections / warnings: Onshape's 12 px yellow triangle
+                    // badge on the icon's bottom right (live 2071, 2458 Refold).
+                    .when(status == FeatureStatus::Warning && !rolled_back, |d| d.child(div().absolute().left(px(9.)).top(px(8.)).child(crate::assets::icon("list-warning-overlay", 12., cx))))
                     .when(underdefined, |d| d.child(div().absolute().left(px(9.5)).top(px(8.)).child(crate::assets::icon("list-underdefined-overlay", 12., cx)))),
             )
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
